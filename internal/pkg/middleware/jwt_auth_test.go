@@ -6,6 +6,7 @@ import (
 
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
 func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
@@ -76,6 +77,47 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 	}
 	if claims.TenantID != "5001" {
 		t.Fatalf("unexpected fallback tenant id: %s", claims.TenantID)
+	}
+}
+
+func TestUserClaimsMapToSecurityPlanePrincipalAndTenantScope(t *testing.T) {
+	result := &auth.VerifyResult{
+		Claims: &auth.TokenClaims{
+			UserID:    "1001",
+			AccountID: "2001",
+			TenantID:  "3001",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			Roles:     []string{"qs:operator"},
+			AMR:       []string{"pwd"},
+		},
+	}
+
+	claims := buildUserClaims(result)
+	principal := securityplane.Principal{
+		Kind:      securityplane.PrincipalKindUser,
+		Source:    securityplane.PrincipalSourceHTTPJWT,
+		UserID:    claims.UserID,
+		AccountID: claims.AccountID,
+		TenantID:  claims.TenantID,
+		SessionID: claims.SessionID,
+		TokenID:   claims.TokenID,
+		Roles:     claims.Roles,
+		AMR:       claims.AMR,
+	}
+	scope := securityplane.NewTenantScope(claims.TenantID, "")
+
+	if principal.UserID != "1001" || principal.AccountID != "2001" || principal.TokenID != "token-1" {
+		t.Fatalf("unexpected principal projection: %#v", principal)
+	}
+	if principal.Kind != securityplane.PrincipalKindUser || principal.Source != securityplane.PrincipalSourceHTTPJWT {
+		t.Fatalf("unexpected principal kind/source: %#v", principal)
+	}
+	if len(principal.RoleNames()) != 1 || principal.RoleNames()[0] != "qs:operator" {
+		t.Fatalf("principal roles = %#v, want [qs:operator]", principal.RoleNames())
+	}
+	if !scope.HasNumericOrg || scope.OrgID != 3001 {
+		t.Fatalf("tenant scope = %#v, want numeric org 3001", scope)
 	}
 }
 

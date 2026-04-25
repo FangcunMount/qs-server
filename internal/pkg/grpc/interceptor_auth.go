@@ -22,6 +22,10 @@ type IAMAuthInterceptor struct {
 	forceRemote bool
 }
 
+type mtlsIdentityContextKey struct{}
+
+var mtlsIdentityKey mtlsIdentityContextKey
+
 func buildVerifyOptions(forceRemote bool) *auth.VerifyOptions {
 	return &auth.VerifyOptions{
 		ForceRemote:     forceRemote,
@@ -152,7 +156,10 @@ func (i *IAMAuthInterceptor) extractToken(ctx context.Context) (string, error) {
 // verifyIdentityMatch 验证 JWT 声明的身份与 mTLS 证书身份是否一致
 func (i *IAMAuthInterceptor) verifyIdentityMatch(ctx context.Context, claims *auth.TokenClaims) error {
 	// 从 context 中获取 mTLS 身份信息（由 MTLSInterceptor 注入）
-	mtlsIdentity, ok := ctx.Value("mtls.identity").(map[string]interface{})
+	mtlsIdentity, ok := ctx.Value(mtlsIdentityKey).(map[string]interface{})
+	if !ok {
+		mtlsIdentity, ok = ctx.Value("mtls.identity").(map[string]interface{})
+	}
 	if !ok {
 		return fmt.Errorf("mTLS identity not found in context")
 	}

@@ -74,7 +74,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("open mysql: %v", err)
 	}
-	defer db.Close()
+	defer func() {
+		if err := db.Close(); err != nil {
+			log.Printf("close mysql: %v", err)
+		}
+	}()
 
 	mongoClient, err := mongo.Connect(ctx, options.Client().ApplyURI(cfg.mongoURI))
 	if err != nil {
@@ -109,7 +113,11 @@ func main() {
 	if err != nil {
 		log.Fatalf("mysql conn: %v", err)
 	}
-	defer conn.Close()
+	defer func() {
+		if err := conn.Close(); err != nil {
+			log.Printf("close mysql conn: %v", err)
+		}
+	}()
 
 	if err := prepareMySQLScope(ctx, conn, rows); err != nil {
 		log.Fatalf("prepare mysql repair scope: %v", err)
@@ -176,7 +184,7 @@ func openMySQL(dsn string) (*sql.DB, error) {
 	return sql.Open("mysql", c.FormatDSN())
 }
 
-func loadScope(ctx context.Context, db *sql.DB, cfg config) ([]scopeRow, error) {
+func loadScope(ctx context.Context, db *sql.DB, cfg config) (rows []scopeRow, err error) {
 	query := `
 SELECT
   t.id, t.org_id, t.plan_id, t.testee_id, t.assessment_id, a.answer_sheet_id,
@@ -216,9 +224,12 @@ WHERE t.org_id = ?
 	if err != nil {
 		return nil, err
 	}
-	defer rs.Close()
+	defer func() {
+		if closeErr := rs.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 
-	var rows []scopeRow
 	for rs.Next() {
 		var row scopeRow
 		if err := rs.Scan(
@@ -301,11 +312,11 @@ func printScope(rows []scopeRow, limit int) {
 	}
 }
 
-func prepareMySQLScope(ctx context.Context, conn *sql.Conn, rows []scopeRow) error {
+func prepareMySQLScope(ctx context.Context, conn *sql.Conn, rows []scopeRow) (err error) {
 	if _, err := conn.ExecContext(ctx, `DROP TEMPORARY TABLE IF EXISTS repair_plan_task_time_scope`); err != nil {
 		return err
 	}
-	_, err := conn.ExecContext(ctx, `
+	_, err = conn.ExecContext(ctx, `
 CREATE TEMPORARY TABLE repair_plan_task_time_scope (
   task_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
   org_id BIGINT NOT NULL,
@@ -343,7 +354,11 @@ INSERT INTO repair_plan_task_time_scope (
 	if err != nil {
 		return err
 	}
-	defer stmt.Close()
+	defer func() {
+		if closeErr := stmt.Close(); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 	for _, r := range rows {
 		if _, err := stmt.ExecContext(ctx,
 			r.TaskID, r.OrgID, r.PlanID, r.TesteeID, r.AssessmentID, r.AnswerSheetID,
@@ -392,12 +407,16 @@ func backupMongo(ctx context.Context, db *mongo.Database, rows []scopeRow, suffi
 	return backupMongoCollection(ctx, db.Collection("interpret_reports"), db.Collection("repair_bak_interpret_reports_"+suffix), bson.M{"domain_id": bson.M{"$in": assessmentIDs}})
 }
 
-func backupMongoCollection(ctx context.Context, src, dst *mongo.Collection, filter bson.M) error {
+func backupMongoCollection(ctx context.Context, src, dst *mongo.Collection, filter bson.M) (err error) {
 	cur, err := src.Find(ctx, filter)
 	if err != nil {
 		return err
 	}
-	defer cur.Close(ctx)
+	defer func() {
+		if closeErr := cur.Close(ctx); err == nil && closeErr != nil {
+			err = closeErr
+		}
+	}()
 	var docs []interface{}
 	for cur.Next(ctx) {
 		var doc bson.M
@@ -416,12 +435,18 @@ func backupMongoCollection(ctx context.Context, src, dst *mongo.Collection, filt
 	return err
 }
 
-func repairMySQL(ctx context.Context, conn *sql.Conn, cfg config) error {
+func repairMySQL(ctx context.Context, conn *sql.Conn, cfg config) (err error) {
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err != nil {
+			if rollbackErr := tx.Rollback(); rollbackErr != nil {
+				log.Printf("rollback mysql repair: %v", rollbackErr)
+			}
+		}
+	}()
 
 	statements := []string{
 		`UPDATE assessment_task t INNER JOIN repair_plan_task_time_scope s ON s.task_id = t.id
@@ -462,7 +487,8 @@ WHERE bf.org_id = s.org_id
 	if err := repairAnalyticsProjection(ctx, tx); err != nil {
 		return err
 	}
-	return tx.Commit()
+	err = tx.Commit()
+	return err
 }
 
 func repairPlanStatistics(ctx context.Context, tx *sql.Tx, cfg config) error {

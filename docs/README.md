@@ -15,6 +15,7 @@
 | 事件入口 | 事件系统统一从 [03-基础设施/01-事件系统.md](./03-基础设施/01-事件系统.md) 和 [03-基础设施/event/README.md](./03-基础设施/event/README.md) 进入 |
 | Redis 入口 | Redis 相关文档统一从 [03-基础设施/12-Redis文档中心.md](./03-基础设施/12-Redis文档中心.md) 进入 |
 | Resilience 入口 | 限流、队列、背压、锁、幂等和降级统一从 [03-基础设施/resilience/README.md](./03-基础设施/resilience/README.md) 进入 |
+| Security 入口 | JWT、IAM、authz snapshot、capability、service auth、mTLS/ACL 统一从 [03-基础设施/security/README.md](./03-基础设施/security/README.md) 进入 |
 
 ---
 
@@ -88,6 +89,14 @@
 3. [03-基础设施/resilience/05-观测降级与排障.md](./03-基础设施/resilience/05-观测降级与排障.md)
 4. [03-基础设施/resilience/06-新增高并发治理能力SOP.md](./03-基础设施/resilience/06-新增高并发治理能力SOP.md)
 5. [03-基础设施/resilience/07-能力矩阵.md](./03-基础设施/resilience/07-能力矩阵.md)
+
+### 需要看身份与安全控制面
+
+1. [03-基础设施/security/README.md](./03-基础设施/security/README.md)
+2. [03-基础设施/security/00-整体架构.md](./03-基础设施/security/00-整体架构.md)
+3. [03-基础设施/security/01-Principal与TenantScope.md](./03-基础设施/security/01-Principal与TenantScope.md)
+4. [03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md](./03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md)
+5. [03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md](./03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md)
 
 ### 需要准备宣讲或对外介绍
 

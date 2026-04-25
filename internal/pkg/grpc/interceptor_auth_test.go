@@ -2,11 +2,13 @@ package grpc
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
 	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
 func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
@@ -55,6 +57,83 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	}
 	if got := TokenMetadataFromContext(ctx); got == nil {
 		t.Fatal("expected token_metadata")
+	}
+}
+
+func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testing.T) {
+	interceptor := &IAMAuthInterceptor{}
+	result := &auth.VerifyResult{
+		Claims: &auth.TokenClaims{
+			UserID:    "1001",
+			AccountID: "2001",
+			TenantID:  "3001",
+			SessionID: "session-1",
+			TokenID:   "token-1",
+			Roles:     []string{"qs:operator"},
+			AMR:       []string{"pwd"},
+			Extra: map[string]interface{}{
+				"username": "alice",
+			},
+		},
+	}
+
+	ctx := interceptor.injectUserContext(context.Background(), result)
+	principal := securityplane.Principal{
+		Kind:      securityplane.PrincipalKindUser,
+		Source:    securityplane.PrincipalSourceGRPCJWT,
+		UserID:    UserIDFromContext(ctx),
+		AccountID: AccountIDFromContext(ctx),
+		TenantID:  TenantIDFromContext(ctx),
+		SessionID: SessionIDFromContext(ctx),
+		TokenID:   TokenIDFromContext(ctx),
+		Username:  UsernameFromContext(ctx),
+		Roles:     RolesFromContext(ctx),
+	}
+	scope := securityplane.NewTenantScope(principal.TenantID, "")
+
+	if principal.UserID != "1001" || principal.Username != "alice" {
+		t.Fatalf("unexpected principal projection: %#v", principal)
+	}
+	if principal.Source != securityplane.PrincipalSourceGRPCJWT {
+		t.Fatalf("principal source = %q, want grpc_jwt", principal.Source)
+	}
+	if !scope.HasNumericOrg || scope.OrgID != 3001 {
+		t.Fatalf("tenant scope = %#v, want numeric org 3001", scope)
+	}
+}
+
+func TestVerifyIdentityMatchUsesLegacyMTLSIdentityMapContract(t *testing.T) {
+	interceptor := &IAMAuthInterceptor{}
+	claims := &auth.TokenClaims{Extra: map[string]interface{}{"service_id": "qs-worker"}}
+	ctx := context.WithValue(context.Background(), mtlsIdentityKey, map[string]interface{}{
+		"common_name": "qs-worker.svc",
+	})
+
+	if err := interceptor.verifyIdentityMatch(ctx, claims); err != nil {
+		t.Fatalf("verifyIdentityMatch() unexpected error: %v", err)
+	}
+
+	mismatch := context.WithValue(context.Background(), mtlsIdentityKey, map[string]interface{}{
+		"common_name": "collection-server.svc",
+	})
+	err := interceptor.verifyIdentityMatch(mismatch, claims)
+	if err == nil || !strings.Contains(err.Error(), "service_id mismatch") {
+		t.Fatalf("verifyIdentityMatch() error = %v, want service_id mismatch", err)
+	}
+}
+
+func TestLoadACLConfigUsesDefaultPolicyOnlyUntilFileLoaderExists(t *testing.T) {
+	denyACL := loadACLConfig("acl.yaml", "deny")
+	if services := denyACL.ListServices(); len(services) != 0 {
+		t.Fatalf("loaded ACL services = %v, want none while file loader is not implemented", services)
+	}
+	if err := denyACL.CheckAccess("collection-server", "/qs.Internal/Submit"); err == nil {
+		t.Fatal("deny default policy allowed unconfigured service")
+	}
+
+	allowACL := loadACLConfig("acl.yaml", "allow")
+	if err := allowACL.CheckAccess("collection-server", "/qs.Internal/Submit"); err != nil {
+		t.Fatalf("allow default policy rejected unconfigured service: %v", err)
 	}
 }
 

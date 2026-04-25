@@ -2,6 +2,8 @@
 
 **本文回答**：这篇文档解释 IAM 能力在 `qs-server` 仓库里是怎样接进来的：哪些模块和中间件真正依赖 IAM、用户态与服务态 token 各自解决什么问题、gRPC 与 mTLS 在基础设施层如何配合，以及排查认证问题时应从哪些装配点和配置键入手。
 
+> 当前 Security Control Plane 深讲 truth layer 已迁入 [security/README.md](./security/README.md)。本文保留为 IAM 与认证兼容入口；涉及 `Principal`、`TenantScope`、`AuthzSnapshot`、`CapabilityDecision`、`ServiceIdentity` 的模型解释，以 security 子目录为准。
+
 ---
 
 ## 30 秒了解系统
