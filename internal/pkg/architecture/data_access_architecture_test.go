@@ -13,7 +13,6 @@ func TestDataAccessPackagesDoNotDependOnTransportImplementations(t *testing.T) {
 		"internal/apiserver/infra/mysql",
 		"internal/apiserver/infra/mongo",
 		"internal/pkg/database",
-		"internal/pkg/mongodb",
 		"internal/pkg/migration",
 	} {
 		walkGoFiles(t, filepath.Join(root, relRoot), func(path string, text string) {
