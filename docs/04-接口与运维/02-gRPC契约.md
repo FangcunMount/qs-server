@@ -4,6 +4,8 @@
 
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 的讲解维度组织。**传输安全与 IAM 拦截器链**见 [03-基础设施/04-IAM与认证](../03-基础设施/04-IAM与认证.md)；**进程间调用关系**见 [01-运行时/04-进程间通信](../01-运行时/04-进程间通信.md)。本文补齐 **proto 位置、注册器、调用方矩阵、InternalService 定位、Verify**。
 
+Transport & Contract 的深讲 truth layer 见 [03-基础设施/transport/README.md](../03-基础设施/transport/README.md)。本文保留 gRPC 运维索引；service adapter ownership、proto 生成边界和 contract tests 以深讲目录为准。
+
 ---
 
 ## 30 秒了解系统
@@ -76,6 +78,7 @@ flowchart LR
 | 关注点 | 路径 |
 | ------ | ---- |
 | 服务实现桩 | [internal/apiserver/interface/grpc/service](../../internal/apiserver/interface/grpc/service/) |
+| transport-owned service facade | [internal/apiserver/transport/grpc/service](../../internal/apiserver/transport/grpc/service/) |
 | worker Internal 调用 | [internal/worker/infra/grpcclient/internal_client.go](../../internal/worker/infra/grpcclient/internal_client.go) |
 
 ---

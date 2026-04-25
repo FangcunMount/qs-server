@@ -4,6 +4,8 @@
 
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 的讲解维度组织。**业务语义与模块边界**见 [02-业务模块](../02-业务模块/) 各篇；**入口限流键与路由覆盖**见 [03-基础设施/03-缓存与限流](../03-基础设施/03-缓存与限流.md)。本文补齐 **What / Where / Verify**：双 REST 面分工、契约生成链、公开路径与自检方式。
 
+Transport & Contract 的深讲 truth layer 见 [03-基础设施/transport/README.md](../03-基础设施/transport/README.md)。本文保留运维入口和契约索引，不重复维护 route matrix 的全部设计解释。
+
 ---
 
 ## 30 秒了解系统
@@ -76,6 +78,7 @@ flowchart LR
 | 静态挂载 OpenAPI / Swagger UI | 各进程 `server` / `app` 装配（与 [Makefile](../../Makefile) 产物路径一致） |
 | 缓存治理 internal 路由 | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) |
 | 事件状态 internal 路由 | [internal/apiserver/transport/rest/routes_events.go](../../internal/apiserver/transport/rest/routes_events.go)；只读聚合见 [internal/apiserver/application/eventing/status_service.go](../../internal/apiserver/application/eventing/status_service.go) |
+| Transport 深讲 | [transport/README.md](../03-基础设施/transport/README.md) |
 
 ---
 

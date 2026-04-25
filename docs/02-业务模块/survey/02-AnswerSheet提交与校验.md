@@ -64,7 +64,7 @@ flowchart TB
 
 ## 代码锚点
 
-- collection 入口：[answersheet_handler.go](../../../internal/collection-server/interface/restful/handler/answersheet_handler.go)
+- collection 入口：[answersheet_handler.go](../../../internal/collection-server/transport/rest/handler/answersheet_handler.go)
 - collection 队列：[submit_queue.go](../../../internal/collection-server/application/answersheet/submit_queue.go)
 - apiserver 提交服务：[submission_service.go](../../../internal/apiserver/application/survey/answersheet/submission_service.go)
 - durable submit：[durable_submit.go](../../../internal/apiserver/infra/mongo/answersheet/durable_submit.go)

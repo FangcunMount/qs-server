@@ -88,7 +88,7 @@ sequenceDiagram
     H-->>U: JSON 响应
 ```
 
-**提交答卷**入口统一走 **`SubmitQueued`**（见 [answersheet_handler.go](../../internal/collection-server/interface/restful/handler/answersheet_handler.go)），内部再根据 **是否启用队列** 分支，见下节。
+**提交答卷**入口统一走 **`SubmitQueued`**（见 [answersheet_handler.go](../../internal/collection-server/transport/rest/handler/answersheet_handler.go)），内部再根据 **是否启用队列** 分支，见下节。
 
 ---
 

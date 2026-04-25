@@ -7,7 +7,7 @@
 | 维度 | 当前事实 |
 | ---- | -------- |
 | 类型 | collection-server 进程内 memory channel + `submitQueueWorkerPool` |
-| 入口 | [`AnswerSheetHandler.Submit`](../../../internal/collection-server/interface/restful/handler/answersheet_handler.go) |
+| 入口 | [`AnswerSheetHandler.Submit`](../../../internal/collection-server/transport/rest/handler/answersheet_handler.go) |
 | 核心实现 | [`SubmitQueue`](../../../internal/collection-server/application/answersheet/submit_queue.go) + [`submitQueueWorkerPool`](../../../internal/collection-server/application/answersheet/submit_queue_worker_pool.go) |
 | 状态 | `queued / processing / done / failed` |
 | 满队行为 | 返回 `ErrQueueFull`，handler 转 HTTP `429` |
@@ -66,11 +66,11 @@ sequenceDiagram
 ## 代码锚点与测试锚点
 
 - Queue 实现与契约测试：[`internal/collection-server/application/answersheet`](../../../internal/collection-server/application/answersheet/)
-- Handler `202/429`：[`answersheet_handler.go`](../../../internal/collection-server/interface/restful/handler/answersheet_handler.go)
+- Handler `202/429`：[`answersheet_handler.go`](../../../internal/collection-server/transport/rest/handler/answersheet_handler.go)
 - 提交 guard：[`submit_guard.go`](../../../internal/collection-server/infra/redisops/submit_guard.go)
 
 ## Verify
 
 ```bash
-go test ./internal/collection-server/application/answersheet ./internal/collection-server/interface/restful/handler
+go test ./internal/collection-server/application/answersheet ./internal/collection-server/transport/rest/handler
 ```

@@ -10,9 +10,9 @@ import (
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
+	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/gin-gonic/gin"
 )
 
@@ -58,6 +58,7 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/daily")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/events/status")
+	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/resilience/status")
 }
 
 func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {

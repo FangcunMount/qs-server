@@ -1,8 +1,8 @@
 package rest
 
 import (
-	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/gin-gonic/gin"
 )
 

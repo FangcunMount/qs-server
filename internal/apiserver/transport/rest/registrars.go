@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
-	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/gin-gonic/gin"
 )

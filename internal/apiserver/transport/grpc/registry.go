@@ -25,7 +25,7 @@ import (
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	scaleDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/service"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 )
 

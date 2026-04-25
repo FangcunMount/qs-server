@@ -7,9 +7,9 @@ import (
 	"strings"
 
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
@@ -121,12 +121,12 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 
 	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddlewareWithOptions(tokenVerifier, r.iamVerifyOptions())))
 	// 与 apiserver 对齐：tenant_id、org_id、IAM 授权快照（collection 无 Operator，不做 ActiveOperator 校验）
-	api.Use(withAuthSkip(skip, middleware.UserIdentityMiddleware()))
-	api.Use(withAuthSkip(skip, middleware.RequireTenantIDMiddleware()))
-	api.Use(withAuthSkip(skip, middleware.RequireNumericOrgScopeMiddleware()))
+	api.Use(withAuthSkip(skip, httpauth.UserIdentityMiddleware()))
+	api.Use(withAuthSkip(skip, httpauth.RequireTenantIDMiddleware()))
+	api.Use(withAuthSkip(skip, httpauth.RequireNumericOrgScopeMiddleware()))
 	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
 		// 授权快照只负责权限视图，不替代 JWT 的权威在线校验。
-		api.Use(withAuthSkip(skip, middleware.AuthzSnapshotMiddleware(loader, nil)))
+		api.Use(withAuthSkip(skip, httpauth.AuthzSnapshotMiddleware(loader)))
 	} else {
 		fmt.Printf("⚠️  Warning: IAM AuthzSnapshotLoader unavailable for collection-server (need gRPC)\n")
 	}
