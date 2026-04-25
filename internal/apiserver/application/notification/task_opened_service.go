@@ -119,7 +119,6 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 	result := &TaskOpenedResult{
 		TemplateID: s.taskOpenedTemplateID(),
 	}
-	return result, nil
 	if s == nil || s.sender == nil || s.config == nil {
 		result.Skipped = true
 		result.Message = "mini program notifier not configured"

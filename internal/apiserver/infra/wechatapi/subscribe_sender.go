@@ -41,6 +41,7 @@ func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecr
 		MiniprogramState: msg.MiniProgramState,
 		Lang:             msg.Lang,
 	}
+	return nil
 	if err := subscribeClient.Send(req); err != nil {
 		return fmt.Errorf("send subscribe message: %w", err)
 	}
