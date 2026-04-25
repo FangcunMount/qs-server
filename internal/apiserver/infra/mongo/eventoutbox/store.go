@@ -5,22 +5,13 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
-)
-
-const (
-	statusPending    = "pending"
-	statusPublishing = "publishing"
-	statusPublished  = "published"
-	statusFailed     = "failed"
-
-	defaultPublishingStaleFor = 1 * time.Minute
 )
 
 // OutboxPO stores domain events until they are durably published.
@@ -60,7 +51,7 @@ func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicRe
 	}
 	store := &Store{
 		coll:               db.Collection((&OutboxPO{}).CollectionName()),
-		publishingStaleFor: defaultPublishingStaleFor,
+		publishingStaleFor: outboxcore.DefaultPublishingStaleFor,
 		topicResolver:      resolver,
 	}
 	if err := store.ensureIndexes(context.Background()); err != nil {
@@ -89,7 +80,7 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			},
 			Options: options.Index().
 				SetName("idx_pending_created_at_next_attempt_at").
-				SetPartialFilterExpression(bson.M{"status": statusPending}),
+				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPending}),
 		},
 		{
 			Keys: bson.D{
@@ -98,7 +89,7 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			},
 			Options: options.Index().
 				SetName("idx_failed_next_attempt_at_created_at").
-				SetPartialFilterExpression(bson.M{"status": statusFailed}),
+				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusFailed}),
 		},
 		{
 			Keys: bson.D{
@@ -107,7 +98,7 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			},
 			Options: options.Index().
 				SetName("idx_publishing_updated_at_created_at").
-				SetPartialFilterExpression(bson.M{"status": statusPublishing}),
+				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPublishing}),
 		},
 	}); err != nil {
 		return fmt.Errorf("create mongo outbox indexes: %w", err)
@@ -134,37 +125,34 @@ func (s *Store) StageEventsTx(ctx mongo.SessionContext, events []event.DomainEve
 }
 
 func (s *Store) buildDocuments(events []event.DomainEvent) ([]*OutboxPO, error) {
-	if len(events) == 0 {
-		return nil, nil
+	return s.buildDocumentsAt(events, time.Now())
+}
+
+func (s *Store) buildDocumentsAt(events []event.DomainEvent, now time.Time) ([]*OutboxPO, error) {
+	records, err := outboxcore.BuildRecords(outboxcore.BuildRecordsOptions{
+		Events:   events,
+		Resolver: s.topicResolver,
+		Now:      now,
+	})
+	if err != nil {
+		return nil, err
 	}
-
-	now := time.Now()
-	docs := make([]*OutboxPO, 0, len(events))
-	for _, evt := range events {
-		topicName, ok := s.topicResolver.GetTopicForEvent(evt.EventType())
-		if !ok {
-			return nil, fmt.Errorf("event %q not found in event config", evt.EventType())
-		}
-		payload, err := eventcodec.EncodeDomainEvent(evt)
-		if err != nil {
-			return nil, err
-		}
-
+	docs := make([]*OutboxPO, 0, len(records))
+	for _, record := range records {
 		docs = append(docs, &OutboxPO{
-			EventID:       evt.EventID(),
-			EventType:     evt.EventType(),
-			AggregateType: evt.AggregateType(),
-			AggregateID:   evt.AggregateID(),
-			TopicName:     topicName,
-			PayloadJSON:   string(payload),
-			Status:        statusPending,
-			AttemptCount:  0,
-			NextAttemptAt: now,
-			CreatedAt:     now,
-			UpdatedAt:     now,
+			EventID:       record.EventID,
+			EventType:     record.EventType,
+			AggregateType: record.AggregateType,
+			AggregateID:   record.AggregateID,
+			TopicName:     record.TopicName,
+			PayloadJSON:   record.PayloadJSON,
+			Status:        record.Status,
+			AttemptCount:  record.AttemptCount,
+			NextAttemptAt: record.NextAttemptAt,
+			CreatedAt:     record.CreatedAt,
+			UpdatedAt:     record.UpdatedAt,
 		})
 	}
-
 	return docs, nil
 }
 
@@ -180,7 +168,7 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 	// starve forever behind a large pending backlog.
 	failedQuota := minInt(limit-len(claimed), 2)
 	if failedQuota > 0 {
-		items, err := s.claimDueByNextAttempt(ctx, statusFailed, failedQuota, now)
+		items, err := s.claimDueByNextAttempt(ctx, outboxcore.StatusFailed, failedQuota, now)
 		if err != nil {
 			return nil, err
 		}
@@ -209,7 +197,7 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 	// capacity before touching stale publishing again.
 	remaining := limit - len(claimed)
 	if remaining > 0 {
-		items, err := s.claimDueByNextAttempt(ctx, statusFailed, remaining, now)
+		items, err := s.claimDueByNextAttempt(ctx, outboxcore.StatusFailed, remaining, now)
 		if err != nil {
 			return nil, err
 		}
@@ -236,7 +224,7 @@ func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]o
 	claimed := make([]outboxport.PendingEvent, 0, limit)
 	for len(claimed) < limit {
 		item, found, err := s.claimOne(ctx, bson.M{
-			"status":          statusPending,
+			"status":          outboxcore.StatusPending,
 			"next_attempt_at": bson.M{"$lte": now},
 		}, bson.D{{Key: "created_at", Value: 1}}, now)
 		if err != nil {
@@ -282,7 +270,7 @@ func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleB
 	claimed := make([]outboxport.PendingEvent, 0, limit)
 	for len(claimed) < limit {
 		item, found, err := s.claimOne(ctx, bson.M{
-			"status":     statusPublishing,
+			"status":     outboxcore.StatusPublishing,
 			"updated_at": bson.M{"$lte": staleBefore},
 		}, bson.D{{Key: "updated_at", Value: 1}, {Key: "created_at", Value: 1}}, now)
 		if err != nil {
@@ -300,7 +288,7 @@ func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleB
 func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, now time.Time) (outboxport.PendingEvent, bool, error) {
 	update := bson.M{
 		"$set": bson.M{
-			"status":     statusPublishing,
+			"status":     outboxcore.StatusPublishing,
 			"updated_at": now,
 		},
 	}
@@ -316,16 +304,14 @@ func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, n
 		return outboxport.PendingEvent{}, false, err
 	}
 
-	evt, err := eventcodec.DecodeDomainEvent([]byte(po.PayloadJSON))
+	pending, err := outboxcore.DecodePendingEvent(po.EventID, po.PayloadJSON)
 	if err != nil {
-		_ = s.MarkEventFailed(ctx, po.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
+		transition := outboxcore.NewDecodeFailureTransition(err, time.Now())
+		_ = s.MarkEventFailed(ctx, po.EventID, transition.LastError, transition.NextAttemptAt)
 		return outboxport.PendingEvent{}, false, nil
 	}
 
-	return outboxport.PendingEvent{
-		EventID: po.EventID,
-		Event:   evt,
-	}, true, nil
+	return pending, true, nil
 }
 
 func minInt(a, b int) int {
@@ -336,26 +322,28 @@ func minInt(a, b int) int {
 }
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
+	transition := outboxcore.NewPublishedTransition(publishedAt)
 	_, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
 		"$set": bson.M{
-			"status":       statusPublished,
-			"published_at": publishedAt,
-			"updated_at":   publishedAt,
+			"status":       transition.Status,
+			"published_at": transition.PublishedAt,
+			"updated_at":   transition.UpdatedAt,
 		},
 	})
 	return err
 }
 
 func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
+	transition := outboxcore.NewFailedTransition(lastError, nextAttemptAt, time.Now())
 	_, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
 		"$set": bson.M{
-			"status":          statusFailed,
-			"last_error":      lastError,
-			"next_attempt_at": nextAttemptAt,
-			"updated_at":      time.Now(),
+			"status":          transition.Status,
+			"last_error":      transition.LastError,
+			"next_attempt_at": transition.NextAttemptAt,
+			"updated_at":      transition.UpdatedAt,
 		},
 		"$inc": bson.M{
-			"attempt_count": 1,
+			"attempt_count": transition.AttemptIncrement,
 		},
 	})
 	return err

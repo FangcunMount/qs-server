@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -12,7 +13,7 @@ import (
 
 const (
 	defaultOutboxRelayBatchSize  = 50
-	defaultOutboxRelayRetryDelay = 10 * time.Second
+	defaultOutboxRelayRetryDelay = outboxcore.DefaultRelayRetryDelay
 )
 
 // PendingOutboxEvent keeps the application-facing alias for the shared outbox contract.

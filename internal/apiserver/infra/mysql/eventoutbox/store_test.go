@@ -3,24 +3,40 @@ package eventoutbox
 import (
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-type fakeTopicResolver map[string]string
+type fakeTopicResolver struct {
+	topics     map[string]string
+	deliveries map[string]eventcatalog.DeliveryClass
+}
 
 func (r fakeTopicResolver) GetTopicForEvent(eventType string) (string, bool) {
-	topic, ok := r[eventType]
+	topic, ok := r.topics[eventType]
 	return topic, ok
 }
 
+func (r fakeTopicResolver) GetDeliveryClass(eventType string) (eventcatalog.DeliveryClass, bool) {
+	delivery, ok := r.deliveries[eventType]
+	return delivery, ok
+}
+
 func TestBuildRowsUsesInjectedTopicResolver(t *testing.T) {
+	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
 	store := &Store{
-		topicResolver: fakeTopicResolver{"sample.created": "sample.topic"},
+		topicResolver: fakeTopicResolver{
+			topics:     map[string]string{"sample.created": "sample.topic"},
+			deliveries: map[string]eventcatalog.DeliveryClass{"sample.created": eventcatalog.DeliveryClassDurableOutbox},
+		},
 	}
 	evt := event.New("sample.created", "Sample", "sample-1", map[string]string{"id": "sample-1"})
 
-	rows, err := store.buildRows([]event.DomainEvent{evt})
+	rows, err := store.buildRowsAt([]event.DomainEvent{evt}, now)
 	if err != nil {
 		t.Fatalf("buildRows: %v", err)
 	}
@@ -29,6 +45,19 @@ func TestBuildRowsUsesInjectedTopicResolver(t *testing.T) {
 	}
 	if rows[0].TopicName != "sample.topic" {
 		t.Fatalf("topic = %q, want sample.topic", rows[0].TopicName)
+	}
+	if rows[0].Status != outboxcore.StatusPending || rows[0].AttemptCount != 0 {
+		t.Fatalf("initial state = %q/%d, want pending/0", rows[0].Status, rows[0].AttemptCount)
+	}
+	if !rows[0].NextAttemptAt.Equal(now) || !rows[0].CreatedAt.Equal(now) || !rows[0].UpdatedAt.Equal(now) {
+		t.Fatalf("times = %#v, want %s", rows[0], now)
+	}
+	decoded, err := eventcodec.DecodeDomainEvent([]byte(rows[0].PayloadJSON))
+	if err != nil {
+		t.Fatalf("DecodeDomainEvent: %v", err)
+	}
+	if decoded.EventType() != evt.EventType() || decoded.AggregateID() != evt.AggregateID() {
+		t.Fatalf("decoded event = %#v, want %q/%q", decoded, evt.EventType(), evt.AggregateID())
 	}
 }
 
@@ -42,5 +71,23 @@ func TestBuildRowsRejectsUnknownEvent(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "sample.created") {
 		t.Fatalf("error = %v, want event type", err)
+	}
+}
+
+func TestBuildRowsRejectsBestEffortEvent(t *testing.T) {
+	store := &Store{
+		topicResolver: fakeTopicResolver{
+			topics:     map[string]string{"sample.changed": "sample.topic"},
+			deliveries: map[string]eventcatalog.DeliveryClass{"sample.changed": eventcatalog.DeliveryClassBestEffort},
+		},
+	}
+	evt := event.New("sample.changed", "Sample", "sample-1", map[string]string{})
+
+	_, err := store.buildRows([]event.DomainEvent{evt})
+	if err == nil {
+		t.Fatalf("buildRows should reject best-effort event")
+	}
+	if !strings.Contains(err.Error(), "best_effort") {
+		t.Fatalf("error = %v, want delivery class", err)
 	}
 }

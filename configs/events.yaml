@@ -27,6 +27,7 @@ topics:
 events:
   questionnaire.changed:
     topic: questionnaire-lifecycle
+    delivery: best_effort
     aggregate: Questionnaire
     domain: survey/questionnaire
     description: "问卷生命周期变化"
@@ -34,6 +35,7 @@ events:
 
   scale.changed:
     topic: questionnaire-lifecycle
+    delivery: best_effort
     aggregate: MedicalScale
     domain: scale
     description: "量表生命周期变化"
@@ -41,6 +43,7 @@ events:
 
   answersheet.submitted:
     topic: assessment-lifecycle
+    delivery: durable_outbox
     aggregate: AnswerSheet
     domain: survey/answersheet
     description: "答卷已提交"
@@ -48,6 +51,7 @@ events:
 
   assessment.submitted:
     topic: assessment-lifecycle
+    delivery: durable_outbox
     aggregate: Assessment
     domain: evaluation/assessment
     description: "测评已提交"
@@ -55,6 +59,7 @@ events:
 
   assessment.interpreted:
     topic: assessment-lifecycle
+    delivery: durable_outbox
     aggregate: Assessment
     domain: evaluation/assessment
     description: "测评已解读"
@@ -62,6 +67,7 @@ events:
 
   assessment.failed:
     topic: assessment-lifecycle
+    delivery: durable_outbox
     aggregate: Assessment
     domain: evaluation/assessment
     description: "测评失败"
@@ -69,6 +75,7 @@ events:
 
   report.generated:
     topic: assessment-lifecycle
+    delivery: durable_outbox
     aggregate: Report
     domain: evaluation/report
     description: "报告已生成（在 assessment.interpreted 之后发布）"
@@ -76,6 +83,7 @@ events:
 
   footprint.entry_opened:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "用户成功打开入口"
@@ -83,6 +91,7 @@ events:
 
   footprint.intake_confirmed:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "用户完成一次接入"
@@ -90,6 +99,7 @@ events:
 
   footprint.testee_profile_created:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "新建受试者档案"
@@ -97,6 +107,7 @@ events:
 
   footprint.care_relationship_established:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "建立看护/服务关系"
@@ -104,6 +115,7 @@ events:
 
   footprint.care_relationship_transferred:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "转移看护/服务关系"
@@ -111,6 +123,7 @@ events:
 
   footprint.answersheet_submitted:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "提交答卷"
@@ -118,6 +131,7 @@ events:
 
   footprint.assessment_created:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "形成测评"
@@ -125,6 +139,7 @@ events:
 
   footprint.report_generated:
     topic: analytics-behavior
+    delivery: durable_outbox
     aggregate: BehaviorFootprint
     domain: statistics/behavior
     description: "产出报告"
@@ -132,6 +147,7 @@ events:
 
   task.opened:
     topic: task-lifecycle
+    delivery: best_effort
     aggregate: AssessmentTask
     domain: plan
     description: "任务已开放"
@@ -139,6 +155,7 @@ events:
 
   task.completed:
     topic: task-lifecycle
+    delivery: best_effort
     aggregate: AssessmentTask
     domain: plan
     description: "任务已完成"
@@ -146,6 +163,7 @@ events:
 
   task.expired:
     topic: task-lifecycle
+    delivery: best_effort
     aggregate: AssessmentTask
     domain: plan
     description: "任务已过期"
@@ -153,6 +171,7 @@ events:
 
   task.canceled:
     topic: task-lifecycle
+    delivery: best_effort
     aggregate: AssessmentTask
     domain: plan
     description: "任务已取消"

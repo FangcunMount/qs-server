@@ -12,6 +12,11 @@ type TopicResolver interface {
 	GetTopicForEvent(eventType string) (string, bool)
 }
 
+// DeliveryClassResolver resolves an event type to its delivery contract.
+type DeliveryClassResolver interface {
+	GetDeliveryClass(eventType string) (DeliveryClass, bool)
+}
+
 // NewCatalog builds a query catalog from a validated config.
 func NewCatalog(cfg *Config) *Catalog {
 	c := &Catalog{
@@ -80,6 +85,20 @@ func (c *Catalog) GetEventConfig(eventType string) (EventConfig, bool) {
 	}
 	cfg, ok := c.config.Events[eventType]
 	return cfg, ok
+}
+
+// GetDeliveryClass returns the delivery class configured for an event type.
+func (c *Catalog) GetDeliveryClass(eventType string) (DeliveryClass, bool) {
+	if c == nil || c.config == nil {
+		return "", false
+	}
+	return c.config.GetDeliveryClass(eventType)
+}
+
+// IsDurableOutbox reports whether the event must be staged through an outbox.
+func (c *Catalog) IsDurableOutbox(eventType string) bool {
+	delivery, ok := c.GetDeliveryClass(eventType)
+	return ok && delivery == DeliveryClassDurableOutbox
 }
 
 // AllTopicNames returns all physical topic names that have events.

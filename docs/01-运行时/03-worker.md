@@ -14,7 +14,7 @@
 | 事件真值 | `event_type`、topic 和 handler 绑定最终以 `configs/events.yaml` 为准，代码注册必须与之对齐 |
 | 当前实际订阅 | 运行时当前有 4 个业务 topic，其中包括 `qs.analytics.behavior` |
 | 本地依赖 | Redis 只用于锁、统计辅助等 handler 侧能力，不改变业务状态归属 |
-| 排障入口 | 先看 `events.yaml`，再看 `server.go` 分发链、handler 注册和对应 gRPC client |
+| 排障入口 | 先看 `events.yaml`，再看 `process/runtime_bootstrap.go`、显式 handler registry 和对应 gRPC client |
 
 ## 重点速查（继续往下读前先记这几条）
 
@@ -63,7 +63,7 @@ flowchart LR
     H --> API
 ```
 
-**关键点**：**handler 自注册**（`init()`），绑定关系需与 **events.yaml** 一致。
+**关键点**：handler factory 由显式 [`handlers.NewRegistry()`](../../internal/worker/handlers/catalog.go) 构造，绑定关系需与 **events.yaml** 一致。
 
 ---
 
@@ -177,7 +177,7 @@ sequenceDiagram
 
 - **无 HTTP 业务端口**；排障靠日志、MQ 积压、gRPC 错误。  
 - **信封/metadata 变更**会导致分发失败，需与 apiserver 发布端同步升级。  
-- **退出**：信号关闭 subscriber 与连接（见 server 实现）。
+- **退出**：信号关闭 subscriber 与连接（见 process lifecycle 实现）。
 
 ---
 

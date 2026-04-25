@@ -21,13 +21,36 @@ type TopicConfig struct {
 	Description string `yaml:"description"`
 }
 
+// DeliveryClass describes the durability contract for one event type.
+type DeliveryClass string
+
+const (
+	DeliveryClassBestEffort    DeliveryClass = "best_effort"
+	DeliveryClassDurableOutbox DeliveryClass = "durable_outbox"
+)
+
+// Valid reports whether the delivery class is part of the supported contract.
+func (c DeliveryClass) Valid() bool {
+	switch c {
+	case DeliveryClassBestEffort, DeliveryClassDurableOutbox:
+		return true
+	default:
+		return false
+	}
+}
+
+func (c DeliveryClass) String() string {
+	return string(c)
+}
+
 // EventConfig describes one event type and its runtime routing contract.
 type EventConfig struct {
-	Topic       string `yaml:"topic"`
-	Aggregate   string `yaml:"aggregate"`
-	Domain      string `yaml:"domain"`
-	Description string `yaml:"description"`
-	Handler     string `yaml:"handler"`
+	Topic       string        `yaml:"topic"`
+	Delivery    DeliveryClass `yaml:"delivery"`
+	Aggregate   string        `yaml:"aggregate"`
+	Domain      string        `yaml:"domain"`
+	Description string        `yaml:"description"`
+	Handler     string        `yaml:"handler"`
 }
 
 // Load reads and validates an event catalog from disk.
@@ -62,6 +85,12 @@ func (c *Config) Validate() error {
 		}
 		if eventCfg.Handler == "" {
 			return fmt.Errorf("event %q has empty handler", eventType)
+		}
+		if eventCfg.Delivery == "" {
+			return fmt.Errorf("event %q has empty delivery", eventType)
+		}
+		if !eventCfg.Delivery.Valid() {
+			return fmt.Errorf("event %q has invalid delivery %q", eventType, eventCfg.Delivery)
 		}
 		referencedTopics[eventCfg.Topic] = struct{}{}
 	}
@@ -114,6 +143,15 @@ func (c *Config) GetHandlerName(eventType string) (string, bool) {
 		return "", false
 	}
 	return eventCfg.Handler, eventCfg.Handler != ""
+}
+
+// GetDeliveryClass returns the configured delivery class for an event type.
+func (c *Config) GetDeliveryClass(eventType string) (DeliveryClass, bool) {
+	eventCfg, ok := c.Events[eventType]
+	if !ok || eventCfg.Delivery == "" {
+		return "", false
+	}
+	return eventCfg.Delivery, true
 }
 
 // ListEventTypes returns all event types present in the catalog.

@@ -30,6 +30,7 @@ topics:
 events:
   sample.created:
     topic: sample
+    delivery: best_effort
     handler: sample_handler
 `), 0o600); err != nil {
 		t.Fatalf("write events config: %v", err)
