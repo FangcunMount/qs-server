@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
@@ -53,6 +55,154 @@ func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatalf("walk internal: %v", err)
+	}
+}
+
+func TestDurableOutboxEventsAreNotDirectPublished(t *testing.T) {
+	root := repoRoot(t)
+	catalog := loadEventCatalog(t)
+	durableTokens := durableOutboxEventTokens(t, catalog)
+	allowedDirectPublishFiles := bestEffortDirectPublishFiles()
+
+	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() {
+			return nil
+		}
+		if filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if rel == "internal/apiserver/application/eventing/publish.go" {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(content)
+		if !strings.Contains(text, "PublishCollectedEvents(") {
+			return nil
+		}
+		if _, ok := allowedDirectPublishFiles[rel]; !ok {
+			t.Fatalf("%s uses PublishCollectedEvents; direct publish is only allowed for reviewed best-effort application paths", rel)
+		}
+		for eventType, tokens := range durableTokens {
+			for _, token := range tokens {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s direct-publishes durable_outbox event %q via token %q; stage durable events through outbox", rel, eventType, token)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("walk internal: %v", err)
+	}
+}
+
+func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[string][]string {
+	t.Helper()
+	tokens := map[string][]string{
+		eventcatalog.AnswerSheetSubmitted: {
+			eventcatalog.AnswerSheetSubmitted,
+			"AnswerSheetSubmitted",
+			"NewAnswerSheetSubmittedEvent",
+		},
+		eventcatalog.AssessmentSubmitted: {
+			eventcatalog.AssessmentSubmitted,
+			"AssessmentSubmitted",
+			"NewAssessmentSubmittedEvent",
+		},
+		eventcatalog.AssessmentInterpreted: {
+			eventcatalog.AssessmentInterpreted,
+			"AssessmentInterpreted",
+			"NewAssessmentInterpretedEvent",
+		},
+		eventcatalog.AssessmentFailed: {
+			eventcatalog.AssessmentFailed,
+			"AssessmentFailed",
+			"NewAssessmentFailedEvent",
+		},
+		eventcatalog.ReportGenerated: {
+			eventcatalog.ReportGenerated,
+			"ReportGenerated",
+			"NewReportGeneratedEvent",
+		},
+		eventcatalog.FootprintEntryOpened: {
+			eventcatalog.FootprintEntryOpened,
+			"FootprintEntryOpened",
+			"NewFootprintEntryOpenedEvent",
+		},
+		eventcatalog.FootprintIntakeConfirmed: {
+			eventcatalog.FootprintIntakeConfirmed,
+			"FootprintIntakeConfirmed",
+			"NewFootprintIntakeConfirmedEvent",
+		},
+		eventcatalog.FootprintTesteeProfileCreated: {
+			eventcatalog.FootprintTesteeProfileCreated,
+			"FootprintTesteeProfileCreated",
+			"NewFootprintTesteeProfileCreatedEvent",
+		},
+		eventcatalog.FootprintCareRelationshipEstablished: {
+			eventcatalog.FootprintCareRelationshipEstablished,
+			"FootprintCareRelationshipEstablished",
+			"NewFootprintCareRelationshipEstablishedEvent",
+		},
+		eventcatalog.FootprintCareRelationshipTransferred: {
+			eventcatalog.FootprintCareRelationshipTransferred,
+			"FootprintCareRelationshipTransferred",
+			"NewFootprintCareRelationshipTransferredEvent",
+		},
+		eventcatalog.FootprintAnswerSheetSubmitted: {
+			eventcatalog.FootprintAnswerSheetSubmitted,
+			"FootprintAnswerSheetSubmitted",
+			"NewFootprintAnswerSheetSubmittedEvent",
+		},
+		eventcatalog.FootprintAssessmentCreated: {
+			eventcatalog.FootprintAssessmentCreated,
+			"FootprintAssessmentCreated",
+			"NewFootprintAssessmentCreatedEvent",
+		},
+		eventcatalog.FootprintReportGenerated: {
+			eventcatalog.FootprintReportGenerated,
+			"FootprintReportGenerated",
+			"NewFootprintReportGeneratedEvent",
+		},
+	}
+
+	cfg := catalog.Config()
+	if cfg == nil {
+		t.Fatalf("catalog config is nil")
+	}
+	for eventType := range cfg.Events {
+		if !catalog.IsDurableOutbox(eventType) {
+			continue
+		}
+		if len(tokens[eventType]) == 0 {
+			t.Fatalf("durable_outbox event %q is missing architecture scan tokens", eventType)
+		}
+	}
+	for eventType := range tokens {
+		if !catalog.IsDurableOutbox(eventType) {
+			t.Fatalf("architecture scan token %q is not configured as durable_outbox", eventType)
+		}
+	}
+	return tokens
+}
+
+func bestEffortDirectPublishFiles() map[string]struct{} {
+	return map[string]struct{}{
+		"internal/apiserver/application/plan/enrollment_service.go":                {},
+		"internal/apiserver/application/plan/lifecycle_service.go":                 {},
+		"internal/apiserver/application/plan/task_management_service.go":           {},
+		"internal/apiserver/application/plan/task_scheduler_service.go":            {},
+		"internal/apiserver/application/scale/factor_service.go":                   {},
+		"internal/apiserver/application/scale/lifecycle_service.go":                {},
+		"internal/apiserver/application/survey/questionnaire/lifecycle_service.go": {},
 	}
 }
 

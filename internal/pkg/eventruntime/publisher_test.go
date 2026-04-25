@@ -73,6 +73,31 @@ func TestRoutingPublisherUsesExplicitCatalogAndMetadata(t *testing.T) {
 	}
 }
 
+func TestRoutingPublisherAllowsDurableOutboxEventForRelayPublish(t *testing.T) {
+	catalog := loadEventCatalog(t)
+	if !catalog.IsDurableOutbox(eventcatalog.AnswerSheetSubmitted) {
+		t.Fatalf("%q must be configured as durable_outbox for this contract test", eventcatalog.AnswerSheetSubmitted)
+	}
+	mq := &capturedPublisher{}
+	publisher := NewRoutingPublisher(RoutingPublisherOptions{
+		Catalog:     catalog,
+		MQPublisher: mq,
+		Source:      "outbox-relay",
+		Mode:        PublishModeMQ,
+	})
+	evt := event.New(eventcatalog.AnswerSheetSubmitted, "AnswerSheet", "sheet-1", map[string]string{"id": "sheet-1"})
+
+	if err := publisher.Publish(context.Background(), evt); err != nil {
+		t.Fatalf("Publish durable outbox event from relay path: %v", err)
+	}
+	if mq.topic == "" {
+		t.Fatalf("durable outbox event was not routed to MQ")
+	}
+	if mq.msg == nil || mq.msg.Metadata["event_type"] != eventcatalog.AnswerSheetSubmitted {
+		t.Fatalf("published message metadata = %#v", mq.msg)
+	}
+}
+
 func TestRoutingPublisherObservesMQPublished(t *testing.T) {
 	observer := &publishObserver{}
 	publisher := NewRoutingPublisher(RoutingPublisherOptions{
