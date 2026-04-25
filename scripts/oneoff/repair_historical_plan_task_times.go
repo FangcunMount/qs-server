@@ -532,21 +532,44 @@ GROUP BY t.org_id, t.plan_id`, cfg.orgID, cfg.planID)
 
 func repairAnalyticsProjection(ctx context.Context, tx *sql.Tx) error {
 	statements := []string{
+		`DROP TEMPORARY TABLE IF EXISTS repair_plan_task_projection_delta_raw`,
 		`DROP TEMPORARY TABLE IF EXISTS repair_plan_task_projection_delta`,
+		`CREATE TEMPORARY TABLE repair_plan_task_projection_delta_raw (
+  org_id BIGINT NOT NULL,
+  clinician_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  entry_id BIGINT UNSIGNED NOT NULL DEFAULT 0,
+  stat_date DATE NOT NULL,
+  answersheet_submitted_delta BIGINT NOT NULL DEFAULT 0,
+  assessment_created_delta BIGINT NOT NULL DEFAULT 0,
+  report_generated_delta BIGINT NOT NULL DEFAULT 0,
+  episode_completed_delta BIGINT NOT NULL DEFAULT 0
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+		`INSERT INTO repair_plan_task_projection_delta_raw
+SELECT org_id, clinician_id, entry_id, DATE(old_episode_submitted_at), -1, 0, 0, 0
+FROM repair_plan_task_time_scope WHERE old_episode_submitted_at IS NOT NULL`,
+		`INSERT INTO repair_plan_task_projection_delta_raw
+SELECT org_id, clinician_id, entry_id, DATE(new_submitted_at), 1, 0, 0, 0
+FROM repair_plan_task_time_scope`,
+		`INSERT INTO repair_plan_task_projection_delta_raw
+SELECT org_id, clinician_id, entry_id, DATE(old_episode_assessment_created_at), 0, -1, 0, 0
+FROM repair_plan_task_time_scope WHERE old_episode_assessment_created_at IS NOT NULL`,
+		`INSERT INTO repair_plan_task_projection_delta_raw
+SELECT org_id, clinician_id, entry_id, DATE(new_assessment_created_at), 0, 1, 0, 0
+FROM repair_plan_task_time_scope WHERE old_episode_assessment_created_at IS NOT NULL`,
+		`INSERT INTO repair_plan_task_projection_delta_raw
+SELECT org_id, clinician_id, entry_id, DATE(old_episode_report_generated_at), 0, 0, -1, -1
+FROM repair_plan_task_time_scope WHERE old_episode_report_generated_at IS NOT NULL`,
+		`INSERT INTO repair_plan_task_projection_delta_raw
+SELECT org_id, clinician_id, entry_id, DATE(new_report_generated_at), 0, 0, 1, 1
+FROM repair_plan_task_time_scope WHERE new_report_generated_at IS NOT NULL`,
 		`CREATE TEMPORARY TABLE repair_plan_task_projection_delta DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AS
-SELECT d.org_id, d.clinician_id, d.entry_id, d.stat_date,
-       SUM(d.answersheet_submitted_delta) AS answersheet_submitted_delta,
-       SUM(d.assessment_created_delta) AS assessment_created_delta,
-       SUM(d.report_generated_delta) AS report_generated_delta,
-       SUM(d.episode_completed_delta) AS episode_completed_delta
-FROM (
-  SELECT org_id, clinician_id, entry_id, DATE(old_episode_submitted_at) AS stat_date, -1 AS answersheet_submitted_delta, 0 AS assessment_created_delta, 0 AS report_generated_delta, 0 AS episode_completed_delta FROM repair_plan_task_time_scope WHERE old_episode_submitted_at IS NOT NULL
-  UNION ALL SELECT org_id, clinician_id, entry_id, DATE(new_submitted_at), 1, 0, 0, 0 FROM repair_plan_task_time_scope
-  UNION ALL SELECT org_id, clinician_id, entry_id, DATE(old_episode_assessment_created_at), 0, -1, 0, 0 FROM repair_plan_task_time_scope WHERE old_episode_assessment_created_at IS NOT NULL
-  UNION ALL SELECT org_id, clinician_id, entry_id, DATE(new_assessment_created_at), 0, 1, 0, 0 FROM repair_plan_task_time_scope WHERE old_episode_assessment_created_at IS NOT NULL
-  UNION ALL SELECT org_id, clinician_id, entry_id, DATE(old_episode_report_generated_at), 0, 0, -1, -1 FROM repair_plan_task_time_scope WHERE old_episode_report_generated_at IS NOT NULL
-  UNION ALL SELECT org_id, clinician_id, entry_id, DATE(new_report_generated_at), 0, 0, 1, 1 FROM repair_plan_task_time_scope WHERE new_report_generated_at IS NOT NULL
-) d WHERE d.stat_date IS NOT NULL GROUP BY d.org_id, d.clinician_id, d.entry_id, d.stat_date`,
+SELECT org_id, clinician_id, entry_id, stat_date,
+       SUM(answersheet_submitted_delta) AS answersheet_submitted_delta,
+       SUM(assessment_created_delta) AS assessment_created_delta,
+       SUM(report_generated_delta) AS report_generated_delta,
+       SUM(episode_completed_delta) AS episode_completed_delta
+FROM repair_plan_task_projection_delta_raw
+GROUP BY org_id, clinician_id, entry_id, stat_date`,
 		`INSERT INTO analytics_projection_org_daily (
   org_id, stat_date, entry_opened_count, intake_confirmed_count, testee_profile_created_count,
   care_relationship_established_count, care_relationship_transferred_count,
