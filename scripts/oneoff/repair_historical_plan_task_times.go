@@ -86,6 +86,9 @@ func main() {
 		log.Fatalf("open mongo: %v", err)
 	}
 	defer func() { _ = mongoClient.Disconnect(context.Background()) }()
+	if err := mongoClient.Ping(ctx, nil); err != nil {
+		log.Fatalf("ping mongo: %v", err)
+	}
 	mongoDB := mongoClient.Database(cfg.mongoDatabase)
 
 	if _, err := db.ExecContext(ctx, "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
