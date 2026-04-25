@@ -76,6 +76,25 @@ func TestLimitByKeyIsIndependentPerKey(t *testing.T) {
 	}
 }
 
+func TestLimitByKeyUsesAnonymousFallbackForEmptyKey(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	handler := LimitByKeyWithOptions(1, 1, func(*gin.Context) string {
+		return ""
+	}, LimitOptions{Observer: &limitRecordingObserver{}})
+
+	router := gin.New()
+	router.GET("/", handler, func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+
+	router.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, "/", nil))
+	recorder := httptest.NewRecorder()
+	router.ServeHTTP(recorder, httptest.NewRequest(http.MethodGet, "/", nil))
+	if recorder.Code != http.StatusTooManyRequests {
+		t.Fatalf("second anonymous request status = %d, want 429", recorder.Code)
+	}
+}
+
 type limitRecordingObserver struct {
 	decisions []resilienceplane.Decision
 }

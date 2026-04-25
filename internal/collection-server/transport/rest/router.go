@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"slices"
-	"strconv"
 	"strings"
 
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
@@ -12,8 +11,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
-	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
 )
 
@@ -238,19 +237,28 @@ func distributedLimit(
 	limitScope string,
 	resource string,
 ) gin.HandlerFunc {
-	subject := resilienceplane.Subject{
-		Component: "collection-server",
-		Scope:     limitScope,
-		Resource:  resource,
-		Strategy:  "redis",
+	return distributedLimitWithOptions(limiter, scope, qps, burst, keyFn, limitScope, resource, pkgmiddleware.LimitOptions{})
+}
+
+func distributedLimitWithOptions(
+	limiter *redisplane.DistributedLimiter,
+	scope string,
+	qps float64,
+	burst int,
+	keyFn func(*gin.Context) string,
+	limitScope string,
+	resource string,
+	opts pkgmiddleware.LimitOptions,
+) gin.HandlerFunc {
+	policy := ratelimit.RateLimitPolicy{
+		Component:     "collection-server",
+		Scope:         limitScope,
+		Resource:      resource,
+		Strategy:      "redis",
+		RatePerSecond: qps,
+		Burst:         burst,
 	}
-	observer := resilienceplane.DefaultObserver()
-	return func(c *gin.Context) {
-		if limiter == nil {
-			resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeDegradedOpen)
-			c.Next()
-			return
-		}
+	return pkgmiddleware.LimitWithLimiter(ratelimit.NewRedisLimiter(limiter, policy), func(c *gin.Context) string {
 		key := scope
 		if keyFn != nil {
 			suffix := keyFn(c)
@@ -258,25 +266,8 @@ func distributedLimit(
 				key += ":" + suffix
 			}
 		}
-		allowed, retryAfter, err := limiter.Allow(c.Request.Context(), key, qps, burst)
-		if err != nil {
-			resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeDegradedOpen)
-			c.Next()
-			return
-		}
-		if allowed {
-			resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeAllowed)
-			c.Next()
-			return
-		}
-		resilienceplane.Observe(c.Request.Context(), observer, resilienceplane.ProtectionRateLimit, subject, resilienceplane.OutcomeRateLimited)
-		seconds := int(retryAfter.Seconds()) + 1
-		if seconds < 1 {
-			seconds = 1
-		}
-		c.Header("Retry-After", strconv.Itoa(seconds))
-		c.AbortWithStatus(http.StatusTooManyRequests)
-	}
+		return key
+	}, opts)
 }
 
 func ensureRateLimitOptions(rateCfg *options.RateLimitOptions) *options.RateLimitOptions {

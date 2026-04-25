@@ -47,7 +47,7 @@ flowchart TD
 
 | 能力 | 必补测试 |
 | ---- | -------- |
-| Rate limit | allow、limited、Retry-After、Redis unavailable fallback |
+| Rate limit | `RateLimitDecision` allow/limited、Retry-After、Redis unavailable fallback |
 | Queue | accepted、full、duplicate request_id、failed reuse、TTL cleanup |
 | Backpressure | nil limiter、acquire、timeout、release |
 | Redis lock | invalid spec、contention、wrong-token release、TTL expiry |

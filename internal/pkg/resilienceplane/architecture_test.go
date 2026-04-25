@@ -77,6 +77,24 @@ func TestBackpressureIsNotConfiguredThroughPackageGlobals(t *testing.T) {
 	}
 }
 
+func TestRateLimitEntrypointsUseDecisionAdapter(t *testing.T) {
+	root := repoRoot(t)
+	paths := []string{
+		"internal/apiserver/transport/rest",
+		"internal/collection-server/transport/rest",
+	}
+	for _, rel := range paths {
+		scanGoSourceFiles(t, filepath.Join(root, rel), func(path string, content string) {
+			if strings.Contains(content, "resilienceplane.Observe(") {
+				t.Fatalf("%s observes rate limit directly; use internal/pkg/ratelimit decision adapter", path)
+			}
+			if strings.Contains(content, `Header("Retry-After"`) {
+				t.Fatalf("%s writes Retry-After directly; use internal/pkg/ratelimit decision adapter", path)
+			}
+		})
+	}
+}
+
 func TestRedisLockSpecsHaveResilienceSemantics(t *testing.T) {
 	specs := []redislock.Spec{
 		redislock.Specs.AnswersheetProcessing,
