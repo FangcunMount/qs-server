@@ -53,5 +53,6 @@
 8. [08-架构边界审计与Tier1测试策略：2026-04-22.md](./08-架构边界审计与Tier1测试策略：2026-04-22.md) — 分层边界现状、允许例外、Tier 1 测试策略与第一阶段深度治理落点
 9. [09-govulncheck剩余advisory分组处置：2026-04-22.md](./09-govulncheck剩余advisory分组处置：2026-04-22.md) — Go 1.25.9 升级后的 govulncheck 分组结果、历史已吸收 advisory 与 watchlist 处置方式
 10. [10-operating 事件只读状态接入.md](./10-operating%20事件只读状态接入.md) — operating 如何读取事件 catalog 摘要与 outbox backlog/lag，只读不治理
+11. [11-QPS容量档位与资源配置建议.md](./11-QPS容量档位与资源配置建议.md) — QPS 100-1000 的配置档位、容器资源、主机硬件和压测验收建议
 
 **机器可读契约**：[api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[api/rest/collection.yaml](../../api/rest/collection.yaml)、[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/)；各进程配置见 [configs/](../../configs/)。
