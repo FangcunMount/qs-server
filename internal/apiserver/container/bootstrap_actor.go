@@ -66,30 +66,3 @@ func (c *Container) initActorModule() error {
 	c.printf("📦 Actor module initialized\n")
 	return nil
 }
-
-func (c *Container) wireActorEvaluationDependencies() {
-	if c == nil || c.ActorModule == nil || c.EvaluationModule == nil {
-		return
-	}
-
-	c.ActorModule.SetEvaluationServices(
-		c.EvaluationModule.ManagementService,
-		c.EvaluationModule.ScoreQueryService,
-	)
-}
-
-func (c *Container) wireProtectedScopeDependencies() {
-	if c == nil || c.ActorModule == nil || c.ActorModule.TesteeAccessService == nil {
-		return
-	}
-
-	if c.EvaluationModule != nil {
-		c.EvaluationModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
-	}
-	if c.PlanModule != nil {
-		c.PlanModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
-	}
-	if c.StatisticsModule != nil {
-		c.StatisticsModule.SetTesteeAccessService(c.ActorModule.TesteeAccessService)
-	}
-}

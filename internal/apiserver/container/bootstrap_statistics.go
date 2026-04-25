@@ -43,17 +43,20 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 	}
 
 	return assembler.StatisticsModuleDeps{
-		MySQLDB:          c.mysqlDB,
-		RedisClient:      redisClient,
-		CacheBuilder:     c.CacheBuilder(redisplane.FamilyQuery),
-		AnswerSheetRepo:  answerSheetRepo,
-		RepairWindowDays: c.statisticsRepairWindowDays,
-		QueryPolicy:      c.CachePolicy(cachepolicy.PolicyStatsQuery),
-		HotsetRecorder:   c.hotsetRecorder(),
-		LockManager:      c.CacheLockManager(),
-		VersionStore:     versionStore,
-		Observer:         c.cacheObserver(),
-		MySQLLimiter:     c.backpressure.MySQL,
+		MySQLDB:           c.mysqlDB,
+		RedisClient:       redisClient,
+		CacheBuilder:      c.CacheBuilder(redisplane.FamilyQuery),
+		AnswerSheetRepo:   answerSheetRepo,
+		RepairWindowDays:  c.statisticsRepairWindowDays,
+		QueryPolicy:       c.CachePolicy(cachepolicy.PolicyStatsQuery),
+		HotsetRecorder:    c.hotsetRecorder(),
+		LockManager:       c.CacheLockManager(),
+		VersionStore:      versionStore,
+		Observer:          c.cacheObserver(),
+		MySQLLimiter:      c.backpressure.MySQL,
+		TesteeAccess:      c.actorTesteeAccessService(),
+		WarmupCoordinator: c.WarmupCoordinator(),
+		StatusService:     c.CacheGovernanceStatusService(),
 	}
 }
 
@@ -81,12 +84,6 @@ func (c *Container) initWarmupCoordinator() error {
 	}
 	if c.cache != nil {
 		c.cache.BindGovernance(newCacheGovernanceAdapter(c).bindings())
-	}
-	if c.StatisticsModule != nil {
-		c.StatisticsModule.SetWarmupCoordinator(c.WarmupCoordinator())
-		if c.StatisticsModule.Handler != nil {
-			c.StatisticsModule.Handler.SetCacheGovernanceStatusService(c.CacheGovernanceStatusService())
-		}
 	}
 	return nil
 }

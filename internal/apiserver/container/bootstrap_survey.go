@@ -48,10 +48,3 @@ func (c *Container) initSurveyModule() error {
 	c.printf("📦 Survey module initialized (questionnaire + answersheet)\n")
 	return nil
 }
-
-func (c *Container) wireSurveyScaleDependencies() {
-	if c == nil || c.SurveyModule == nil || c.ScaleModule == nil {
-		return
-	}
-	c.SurveyModule.SetScaleRepository(c.ScaleModule.Repo)
-}

@@ -54,6 +54,16 @@ type Container struct {
 	healthHandler        *handler.HealthHandler
 }
 
+// ClientBundle is the collection-server runtime client graph produced by the
+// gRPC integration stage and consumed by the container composition root.
+type ClientBundle struct {
+	AnswerSheet   *grpcclient.AnswerSheetClient
+	Questionnaire *grpcclient.QuestionnaireClient
+	Evaluation    *grpcclient.EvaluationClient
+	Actor         *grpcclient.ActorClient
+	Scale         *grpcclient.ScaleClient
+}
+
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, opsHandle *redisplane.Handle, lockManager *redislock.Manager, familyStatus *cacheobservability.FamilyStatusRegistry) *Container {
 	return &Container{
@@ -227,31 +237,18 @@ func resilienceReason(ok bool, reason string) string {
 	return reason
 }
 
-// ==================== Setters (用于 GRPCClientRegistry 注入) ====================
-
-// SetAnswerSheetClient 设置答卷客户端
-func (c *Container) SetAnswerSheetClient(client *grpcclient.AnswerSheetClient) {
-	c.answerSheetClient = client
-}
-
-// SetQuestionnaireClient 设置问卷客户端
-func (c *Container) SetQuestionnaireClient(client *grpcclient.QuestionnaireClient) {
-	c.questionnaireClient = client
-}
-
-// SetEvaluationClient 设置测评客户端
-func (c *Container) SetEvaluationClient(client *grpcclient.EvaluationClient) {
-	c.evaluationClient = client
-}
-
-// SetActorClient 设置 Actor 客户端
-func (c *Container) SetActorClient(client *grpcclient.ActorClient) {
-	c.actorClient = client
-}
-
-// SetScaleClient 设置量表客户端
-func (c *Container) SetScaleClient(client *grpcclient.ScaleClient) {
-	c.scaleClient = client
+// InitializeRuntimeClients installs the runtime client bundle built by the
+// integration stage. It replaces per-client setter wiring with one explicit
+// composition edge.
+func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
+	if c == nil {
+		return
+	}
+	c.answerSheetClient = bundle.AnswerSheet
+	c.questionnaireClient = bundle.Questionnaire
+	c.evaluationClient = bundle.Evaluation
+	c.actorClient = bundle.Actor
+	c.scaleClient = bundle.Scale
 }
 
 // ActorClient 获取 Actor 客户端

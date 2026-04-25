@@ -78,21 +78,7 @@ func (c *Container) buildQRCodeServiceConfig(wechatOptions *options.WeChatOption
 }
 
 func (c *Container) wireQRCodeServiceDependencies() {
-	if c == nil || c.QRCodeService == nil {
-		return
-	}
-	if c.EvaluationModule != nil {
-		c.EvaluationModule.SetQRCodeService(c.QRCodeService)
-	}
-	if c.SurveyModule != nil {
-		c.SurveyModule.SetQRCodeService(c.QRCodeService)
-	}
-	if c.ScaleModule != nil {
-		c.ScaleModule.SetQRCodeService(c.QRCodeService)
-	}
-	if c.ActorModule != nil {
-		c.ActorModule.SetQRCodeService(c.QRCodeService)
-	}
+	newModuleGraph(c).postWireQRCodeService()
 }
 
 // InitQRCodeService 初始化小程序码生成服务（应用层）。

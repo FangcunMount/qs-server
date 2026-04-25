@@ -25,6 +25,7 @@ func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
 		EntryBaseURL:   c.planEntryURL,
 		Observer:       c.cacheObserver(),
 		MySQLLimiter:   c.backpressure.MySQL,
+		TesteeAccess:   c.actorTesteeAccessService(),
 	}
 }
 

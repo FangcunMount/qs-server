@@ -178,6 +178,20 @@ git diff --check
 
 ---
 
+## Runtime Composition / Config Options 维护门禁
+
+新增或修改三进程 container、process stage、runtime client 或配置项时，不能只在局部代码里补一个 setter 或字段。Runtime Composition 的当前 truth layer 见 [03-基础设施/runtime/README.md](./03-基础设施/runtime/README.md)，维护时必须同步核对：
+
+1. **Composition Graph**：apiserver 跨模块依赖优先进入 constructor deps；确需后置注入时只能进入 `ModuleGraph/PostWire`，并更新 architecture allowlist。
+2. **ClientBundle**：collection-server / worker 新增 gRPC runtime client 时，必须更新 `ClientBundle`、registry bundle 构造和 container 注入测试；不要新增 per-client setter。
+3. **Config contract**：新增配置项必须能从 `configs/*.yaml -> options.Options -> config.Config -> process/container deps` 追踪，并补 dev/prod contract tests。
+4. **默认值稳定**：配置默认值、Redis family、Event catalog path、Resilience/IAM/metrics 关键路径变更时，必须写明行为边界和测试锚点。
+5. **文档同步**：更新 [runtime/00-CompositionGraph与ConfigOptions.md](./03-基础设施/runtime/00-CompositionGraph与ConfigOptions.md) 或 [05-配置体系.md](./03-基础设施/05-配置体系.md)，不要把规划中的重排写成当前启动事实。
+
+默认流程是：`contract tests -> composition/config code -> docs -> docs hygiene`。如果变更会改变启动顺序、外部配置字段名、环境变量名、HTTP/gRPC/MQ 行为或 Redis key，必须拆成单独行为变更处理。
+
+---
+
 ## 业务模块深讲维护门禁
 
 新增或修改业务聚合、状态、事件、读模型、校验规则或 SOP 时，不能只更新旧的单篇模块文。`02-业务模块` 的长期 truth layer 已收口到子目录深讲，默认按下面的流程维护：

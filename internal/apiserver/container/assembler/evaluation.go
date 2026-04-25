@@ -109,6 +109,7 @@ type EvaluationModuleDeps struct {
 	TopicResolver        eventcatalog.TopicResolver
 	MySQLLimiter         backpressure.Acquirer
 	MongoLimiter         backpressure.Acquirer
+	TesteeAccessService  actorAccessApp.TesteeAccessService
 }
 
 // NewEvaluationModule 创建评估模块。
@@ -120,6 +121,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	module := &EvaluationModule{}
 	module.mysqlDB = normalized.MySQLDB
 	module.eventPublisher = normalized.EventPublisher
+	module.testeeAccessService = normalized.TesteeAccessService
 
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
@@ -325,14 +327,6 @@ func (m *EvaluationModule) SetScaleRepository(
 		if m.testeeAccessService != nil {
 			m.Handler.SetTesteeAccessService(m.testeeAccessService)
 		}
-	}
-}
-
-// SetTesteeAccessService 设置 testee 访问控制服务。
-func (m *EvaluationModule) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
-	m.testeeAccessService = testeeAccessService
-	if m.Handler != nil {
-		m.Handler.SetTesteeAccessService(testeeAccessService)
 	}
 }
 

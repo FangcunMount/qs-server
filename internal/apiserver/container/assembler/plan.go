@@ -56,6 +56,7 @@ type PlanModuleDeps struct {
 	EntryBaseURL   string
 	Observer       *cacheobservability.ComponentObserver
 	MySQLLimiter   backpressure.Acquirer
+	TesteeAccess   actorAccessApp.TesteeAccessService
 }
 
 // NewPlanModule 创建 Plan 模块。
@@ -67,6 +68,7 @@ func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
 
 	module := &PlanModule{}
 	module.eventPublisher = normalized.EventPublisher
+	module.testeeAccessService = normalized.TesteeAccess
 
 	// 初始化 repository 层
 	// 初始化基础 Repository
@@ -126,14 +128,6 @@ func normalizePlanModuleDeps(deps PlanModuleDeps) (PlanModuleDeps, error) {
 		deps.EntryBaseURL = strings.TrimSpace(deps.EntryBaseURL)
 	}
 	return deps, nil
-}
-
-// SetTesteeAccessService 设置 testee 访问控制服务。
-func (m *PlanModule) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
-	m.testeeAccessService = testeeAccessService
-	if m.Handler != nil {
-		m.Handler.SetTesteeAccessService(testeeAccessService)
-	}
 }
 
 // Cleanup 清理模块资源

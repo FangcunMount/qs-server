@@ -11,118 +11,82 @@ import (
 
 // GRPCClientRegistry gRPC 客户端注册器
 type GRPCClientRegistry struct {
-	manager   *grpcclient.Manager
-	container *container.Container
+	manager *grpcclient.Manager
 }
 
 // NewGRPCClientRegistry 创建 gRPC 客户端注册器
-func NewGRPCClientRegistry(manager *grpcclient.Manager, container *container.Container) *GRPCClientRegistry {
+func NewGRPCClientRegistry(manager *grpcclient.Manager) *GRPCClientRegistry {
 	return &GRPCClientRegistry{
-		manager:   manager,
-		container: container,
+		manager: manager,
 	}
 }
 
-func NewRegistry(manager *grpcclient.Manager, container *container.Container) *GRPCClientRegistry {
-	return NewGRPCClientRegistry(manager, container)
+func NewRegistry(manager *grpcclient.Manager) *GRPCClientRegistry {
+	return NewGRPCClientRegistry(manager)
 }
 
-// RegisterClients 注册所有 gRPC 客户端到容器
-func (r *GRPCClientRegistry) RegisterClients() error {
-	log.Info("🔧 Registering gRPC clients to container...")
-
-	// 注册答卷客户端
-	if err := r.registerAnswerSheetClient(); err != nil {
-		return err
+// ClientBundle returns all gRPC clients as one explicit runtime dependency graph.
+func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
+	log.Info("🔧 Building collection gRPC client bundle...")
+	bundle := container.ClientBundle{
+		AnswerSheet:   r.answerSheetClient(),
+		Questionnaire: r.questionnaireClient(),
+		Evaluation:    r.evaluationClient(),
+		Actor:         r.actorClient(),
+		Scale:         r.scaleClient(),
 	}
-
-	// 注册问卷客户端
-	if err := r.registerQuestionnaireClient(); err != nil {
-		return err
-	}
-
-	// 注册测评客户端
-	if err := r.registerEvaluationClient(); err != nil {
-		return err
-	}
-
-	// 注册 Actor 客户端
-	if err := r.registerActorClient(); err != nil {
-		return err
-	}
-
-	// 注册 Scale 客户端
-	if err := r.registerScaleClient(); err != nil {
-		return err
-	}
-
-	log.Info("✅ All gRPC clients registered to container")
-	return nil
+	log.Info("✅ Collection gRPC client bundle built")
+	return bundle
 }
 
-// registerAnswerSheetClient 注册答卷客户端
-func (r *GRPCClientRegistry) registerAnswerSheetClient() error {
+func (r *GRPCClientRegistry) answerSheetClient() *grpcclient.AnswerSheetClient {
 	client := r.manager.AnswerSheetClient()
 	if client == nil {
 		log.Warn("AnswerSheet client is not initialized, skipping registration")
 		return nil
 	}
-
-	r.container.SetAnswerSheetClient(client)
-	log.Info("   📋 AnswerSheet client injected to container")
-	return nil
+	log.Info("   📋 AnswerSheet client added to bundle")
+	return client
 }
 
-// registerQuestionnaireClient 注册问卷客户端
-func (r *GRPCClientRegistry) registerQuestionnaireClient() error {
+func (r *GRPCClientRegistry) questionnaireClient() *grpcclient.QuestionnaireClient {
 	client := r.manager.QuestionnaireClient()
 	if client == nil {
 		log.Warn("Questionnaire client is not initialized, skipping registration")
 		return nil
 	}
-
-	r.container.SetQuestionnaireClient(client)
-	log.Info("   📝 Questionnaire client injected to container")
-	return nil
+	log.Info("   📝 Questionnaire client added to bundle")
+	return client
 }
 
-// registerEvaluationClient 注册测评客户端
-func (r *GRPCClientRegistry) registerEvaluationClient() error {
+func (r *GRPCClientRegistry) evaluationClient() *grpcclient.EvaluationClient {
 	client := r.manager.EvaluationClient()
 	if client == nil {
 		log.Warn("Evaluation client is not initialized, skipping registration")
 		return nil
 	}
-
-	r.container.SetEvaluationClient(client)
-	log.Info("   📊 Evaluation client injected to container")
-	return nil
+	log.Info("   📊 Evaluation client added to bundle")
+	return client
 }
 
-// registerActorClient 注册 Actor 客户端
-func (r *GRPCClientRegistry) registerActorClient() error {
+func (r *GRPCClientRegistry) actorClient() *grpcclient.ActorClient {
 	client := r.manager.ActorClient()
 	if client == nil {
 		log.Warn("Actor client is not initialized, skipping registration")
 		return nil
 	}
-
-	r.container.SetActorClient(client)
-	log.Info("   👤 Actor client injected to container")
-	return nil
+	log.Info("   👤 Actor client added to bundle")
+	return client
 }
 
-// registerScaleClient 注册量表客户端
-func (r *GRPCClientRegistry) registerScaleClient() error {
+func (r *GRPCClientRegistry) scaleClient() *grpcclient.ScaleClient {
 	client := r.manager.ScaleClient()
 	if client == nil {
 		log.Warn("Scale client is not initialized, skipping registration")
 		return nil
 	}
-
-	r.container.SetScaleClient(client)
-	log.Info("   📊 Scale client injected to container")
-	return nil
+	log.Info("   📊 Scale client added to bundle")
+	return client
 }
 
 // CreateGRPCClientManager 创建 gRPC 客户端管理器。

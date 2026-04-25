@@ -4,14 +4,13 @@ import (
 	"testing"
 
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
+	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 )
 
 func TestCreateWorkerServerKeepsRootState(t *testing.T) {
 	t.Parallel()
 
-	cfg := &workerconfig.Config{
-		Log: &workerconfig.LogConfig{},
-	}
+	cfg := &workerconfig.Config{Options: workeroptions.NewOptions()}
 	server, err := createServer(cfg)
 	if err != nil {
 		t.Fatalf("createServer() error = %v", err)

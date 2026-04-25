@@ -49,17 +49,20 @@ type StatisticsModule struct {
 
 // StatisticsModuleDeps 定义 Statistics 模块的显式构造依赖。
 type StatisticsModuleDeps struct {
-	MySQLDB          *gorm.DB
-	RedisClient      redis.UniversalClient
-	CacheBuilder     *rediskey.Builder
-	AnswerSheetRepo  surveyAnswerSheet.Repository
-	RepairWindowDays int
-	QueryPolicy      cachepolicy.CachePolicy
-	HotsetRecorder   cachetarget.HotsetRecorder
-	LockManager      *redislock.Manager
-	VersionStore     cachequery.VersionTokenStore
-	Observer         *cacheobservability.ComponentObserver
-	MySQLLimiter     backpressure.Acquirer
+	MySQLDB           *gorm.DB
+	RedisClient       redis.UniversalClient
+	CacheBuilder      *rediskey.Builder
+	AnswerSheetRepo   surveyAnswerSheet.Repository
+	RepairWindowDays  int
+	QueryPolicy       cachepolicy.CachePolicy
+	HotsetRecorder    cachetarget.HotsetRecorder
+	LockManager       *redislock.Manager
+	VersionStore      cachequery.VersionTokenStore
+	Observer          *cacheobservability.ComponentObserver
+	MySQLLimiter      backpressure.Acquirer
+	TesteeAccess      actorAccessApp.TesteeAccessService
+	WarmupCoordinator cachegov.Coordinator
+	StatusService     cachegov.StatusService
 }
 
 // NewStatisticsModule 创建统计模块。
@@ -69,6 +72,8 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 		return nil, err
 	}
 	module := &StatisticsModule{}
+	module.testeeAccessService = normalized.TesteeAccess
+	module.warmupCoordinator = normalized.WarmupCoordinator
 
 	// 初始化 repository 层
 	module.Repo = statisticsInfra.NewStatisticsRepository(normalized.MySQLDB, mysql.BaseRepositoryOptions{
@@ -115,6 +120,9 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 	if module.warmupCoordinator != nil {
 		module.Handler.SetWarmupCoordinator(module.warmupCoordinator)
 	}
+	if normalized.StatusService != nil {
+		module.Handler.SetCacheGovernanceStatusService(normalized.StatusService)
+	}
 
 	return module, nil
 }
@@ -124,21 +132,6 @@ func normalizeStatisticsModuleDeps(deps StatisticsModuleDeps) (StatisticsModuleD
 		return StatisticsModuleDeps{}, errors.WithCode(code.ErrModuleInitializationFailed, "database connection is nil")
 	}
 	return deps, nil
-}
-
-// SetTesteeAccessService 设置 testee 访问控制服务。
-func (m *StatisticsModule) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
-	m.testeeAccessService = testeeAccessService
-	if m.Handler != nil {
-		m.Handler.SetTesteeAccessService(testeeAccessService)
-	}
-}
-
-func (m *StatisticsModule) SetWarmupCoordinator(coordinator cachegov.Coordinator) {
-	m.warmupCoordinator = coordinator
-	if m.Handler != nil {
-		m.Handler.SetWarmupCoordinator(coordinator)
-	}
 }
 
 // Cleanup 清理模块资源

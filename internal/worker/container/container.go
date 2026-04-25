@@ -37,6 +37,14 @@ type Container struct {
 	eventDispatcher *workereventing.Dispatcher
 }
 
+// ClientBundle is the worker runtime client graph produced by the gRPC
+// integration stage and consumed by the container composition root.
+type ClientBundle struct {
+	AnswerSheet *grpcclient.AnswerSheetClient
+	Evaluation  *grpcclient.EvaluationClient
+	Internal    *grpcclient.InternalClient
+}
+
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *redisplane.Handle, lockManager *redislock.Manager, eventCatalog *eventcatalog.Catalog) *Container {
 	lockBuilder := rediskey.NewBuilder()
@@ -139,21 +147,16 @@ func (c *Container) IsInitialized() bool {
 	return c.initialized
 }
 
-// ==================== Setters (用于 GRPCClientRegistry 注入) ====================
-
-// SetAnswerSheetClient 设置答卷客户端
-func (c *Container) SetAnswerSheetClient(client *grpcclient.AnswerSheetClient) {
-	c.answerSheetClient = client
-}
-
-// SetEvaluationClient 设置测评客户端
-func (c *Container) SetEvaluationClient(client *grpcclient.EvaluationClient) {
-	c.evaluationClient = client
-}
-
-// SetInternalClient 设置内部服务客户端
-func (c *Container) SetInternalClient(client *grpcclient.InternalClient) {
-	c.internalClient = client
+// InitializeRuntimeClients installs the runtime client bundle built by the
+// integration stage. It replaces per-client setter wiring with one explicit
+// composition edge.
+func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
+	if c == nil {
+		return
+	}
+	c.answerSheetClient = bundle.AnswerSheet
+	c.evaluationClient = bundle.Evaluation
+	c.internalClient = bundle.Internal
 }
 
 // ==================== Getters ====================

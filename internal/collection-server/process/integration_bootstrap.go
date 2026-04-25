@@ -38,10 +38,8 @@ func (s *server) initializeIntegrations(_ resourceOutput, containerOutput contai
 	}
 	output.grpcClients.grpcManager = grpcManager
 
-	grpcRegistry := grpcclientintegration.NewRegistry(grpcManager, containerOutput.container)
-	if err := grpcRegistry.RegisterClients(); err != nil {
-		return integrationOutput{}, err
-	}
+	grpcRegistry := grpcclientintegration.NewRegistry(grpcManager)
+	containerOutput.container.InitializeRuntimeClients(grpcRegistry.ClientBundle())
 	if err := containerOutput.container.Initialize(); err != nil {
 		return integrationOutput{}, err
 	}
