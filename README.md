@@ -2,7 +2,7 @@
 
 问卷与量表测评后端：**前台收集答卷**、**领域事件驱动异步评估**、**报告与统计**；实现上采用 **DDD + 六边形架构**，主业务集中在 **qs-apiserver**，**collection-server** 为前台 BFF，**qs-worker** 消费消息并回调内部 gRPC。
 
-[![Go Version](https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go)](https://go.dev/)
+[![Go Version](https://img.shields.io/badge/Go-1.25.9-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
 ---
@@ -18,7 +18,7 @@
 | ---- | -------- | ------------------------------ |
 | **qs-apiserver** | 核心 API、领域模块、gRPC、事件发布 | `18082` |
 | **collection-server** | 小程序/收集端 REST、访问控制前置 | `18083` |
-| **qs-worker** | 异步评估、报告与统计等（无固定对外 HTTP） | - |
+| **qs-worker** | 异步评估、报告与统计等；无业务 HTTP，可选 metrics/governance HTTP | 按 worker metrics 配置 |
 
 **技术栈（概要）**：Go · MySQL · MongoDB · Redis · 消息队列（配置见各环境 yaml）· REST + gRPC。横切能力部分依赖 [github.com/FangcunMount/component-base](https://github.com/FangcunMount/component-base)（详见 [docs/00-总览/02-代码组织与边界.md](docs/00-总览/02-代码组织与边界.md)）。
 
@@ -89,7 +89,7 @@ qs-server/
 
 ### 依赖检查
 
-- **Go**：与 [go.mod](go.mod) 中 `go` 版本一致（当前为 1.24.x）。
+- **Go**：与 [go.mod](go.mod) 中 `go` 版本一致（当前为 1.25.9）。
 - **运行时依赖**（本地联调常见）：MySQL、MongoDB、Redis、消息队列等；以各环境 [configs/](configs/) 为准。
 - 一键检查（需本机已装客户端工具，脚本见 [scripts/](scripts/)）：
 
@@ -150,6 +150,7 @@ make dev-collection
 
 - **文档入口**：[docs/README.md](docs/README.md)；写作约定：[docs/CONTRIBUTING-DOCS.md](docs/CONTRIBUTING-DOCS.md)。
 - **契约**：REST — [api/rest/apiserver.yaml](api/rest/apiserver.yaml)、[api/rest/collection.yaml](api/rest/collection.yaml)；gRPC proto — [internal/apiserver/interface/grpc/proto/](internal/apiserver/interface/grpc/proto/)、事件 — [configs/events.yaml](configs/events.yaml)。
+- **横切真值层**：事件系统见 [docs/03-基础设施/event](docs/03-基础设施/event/)，Redis 见 [docs/03-基础设施/redis](docs/03-基础设施/redis/)，高并发治理见 [docs/03-基础设施/resilience](docs/03-基础设施/resilience/)。
 - **常用命令**：
 
 ```bash

@@ -11,7 +11,7 @@
 | 本组作用 | 先按 **限界上下文** 看清模块静态设计，不在这里重复运行时拓扑和跨进程时序 |
 | 模块分工 | `survey / scale / evaluation` 是主业务三界；`actor / plan / statistics` 是参与者、任务编排和读侧聚合补充 |
 | 最顺读法 | 先读 `survey -> scale -> evaluation` 建立“采集 -> 规则 -> 产出”主轴，再按需要读 `actor / plan / statistics` |
-| 真值边界 | 模块文优先回答“对象、服务、边界、模块内关键设计”；跨进程链路去 [01-运行时](../01-运行时/)、跨模块判断去 [05-专题分析](../05-专题分析/) |
+| 真值边界 | 模块深讲目录优先回答“对象、服务、边界、状态机、模块内关键设计”；跨进程链路去 [01-运行时](../01-运行时/)、跨模块判断去 [05-专题分析](../05-专题分析/) |
 | 证据来源 | 以 `internal/apiserver/domain`、`application`、`assembler`、`api/rest`、`proto`、`configs/events.yaml` 为准 |
 
 ## 重点速查
@@ -56,12 +56,25 @@ flowchart LR
 
 | 顺序 | 文档 | 模块 | 先回答什么问题 |
 | ---- | ---- | ---- | -------------- |
-| 1 | [01-survey](./01-survey.md) | Survey | 问卷和答卷事实怎么建模、提交后发布什么事件 |
-| 2 | [02-scale](./02-scale.md) | Scale | 量表、因子、计分与解读规则为什么独立成界 |
-| 3 | [03-evaluation](./03-evaluation.md) | Evaluation | 测评、引擎、报告、`assessment.*` / `report.*` 在哪里推进 |
-| 4 | [05-actor](./05-actor.md) | Actor | 参与者相关能力如何作为业务主链的外部条件存在 |
-| 5 | [04-plan](./04-plan.md) | Plan | 计划、任务和定时编排怎样衔接主链 |
-| 6 | [06-statistics](./06-statistics.md) | Statistics | 统计为何单独成读侧模块、如何和异步链配合 |
+| 1 | [survey/README.md](./survey/README.md) | Survey | 问卷和答卷事实怎么建模、提交后发布什么事件 |
+| 2 | [scale/README.md](./scale/README.md) | Scale | 量表、因子、计分与解读规则为什么独立成界 |
+| 3 | [evaluation/README.md](./evaluation/README.md) | Evaluation | 测评、引擎、报告、`assessment.*` / `report.*` 在哪里推进 |
+| 4 | [actor/README.md](./actor/README.md) | Actor | 参与者相关能力如何作为业务主链的外部条件存在 |
+| 5 | [plan/README.md](./plan/README.md) | Plan | 计划、任务和定时编排怎样衔接主链 |
+| 6 | [statistics/README.md](./statistics/README.md) | Statistics | 统计为何单独成读侧模块、如何和异步链配合 |
+
+## 深讲目录与兼容入口
+
+现行 truth layer 以子目录深讲为主，原来的单篇模块文保留为兼容入口和历史连续阅读材料。
+
+| 模块 | 深讲入口 | 兼容入口 | 维护重点 |
+| ---- | -------- | -------- | -------- |
+| Survey | [survey/README.md](./survey/README.md) | [01-survey.md](./01-survey.md) | Questionnaire 版本、AnswerSheet 提交、题型校验、durable submit |
+| Scale | [scale/README.md](./scale/README.md) | [02-scale.md](./02-scale.md) | MedicalScale、Factor、计分策略、解读规则 |
+| Evaluation | [evaluation/README.md](./evaluation/README.md) | [03-evaluation.md](./03-evaluation.md) | Assessment 状态机、engine pipeline、report、outbox |
+| Plan | [plan/README.md](./plan/README.md) | [04-plan.md](./04-plan.md) | Plan/Task 状态机、scheduler、通知事件 |
+| Actor | [actor/README.md](./actor/README.md) | [05-actor.md](./05-actor.md) | Testee、Clinician、Operator、IAM 边界 |
+| Statistics | [statistics/README.md](./statistics/README.md) | [06-statistics.md](./06-statistics.md) | 查询读模型、同步调度、query cache、behavior projection |
 
 ## 与其他层如何分工
 

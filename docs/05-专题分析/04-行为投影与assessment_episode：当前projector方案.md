@@ -2,6 +2,8 @@
 
 **本文回答**：`qs-server` 里当前这套 behavior projector 到底在做什么、`behavior_footprint` / `assessment_episode` / `analytics_pending_event` 分别承担什么职责、为什么会有后台 reconcile 轮询、`assessment_episode record not found` 这类日志到底意味着什么。
 
+> 深讲 truth layer 已迁到 [behavior-projection/README.md](./behavior-projection/README.md)。本文保留为兼容入口和历史连续阅读材料；新增 projector、pending、reconcile 或 episode 能力时，优先维护子目录深讲。
+
 相关文档：
 
 - [../02-业务模块/06-statistics.md](../02-业务模块/06-statistics.md)

@@ -12,7 +12,7 @@
 | 最重要的上下游 | 上游是客户端 REST；核心下游是 `qs-apiserver` gRPC，辅以 Redis 和 IAM |
 | 提交答卷的关键认识 | `SubmitQueued` 是统一入口；`request_id` 只负责队列状态查询，业务幂等以可选 `idempotency_key` 透传给 apiserver 的 durable 提交链为准 |
 | 与主服务的边界 | 它不直连 MySQL / Mongo 主库，不在本进程内完成问卷、测评等主业务持久化 |
-| 本地状态 | Redis 主要服务于排队、会话类辅助和部分缓存，不改变“主状态在 apiserver”的边界 |
+| 本地状态 | Redis 主要服务于 `ops_runtime` 分布式限流、SubmitGuard done marker / lease 和治理状态，不改变“主状态在 apiserver”的边界 |
 | MQ 边界 | 本进程**不**消费 QS 业务事件总线；只会通过 `iam.authz-sync.*` 订阅 IAM 的授权版本通知；业务事件拓扑见 [03-基础设施/01-事件系统](../03-基础设施/01-事件系统.md) |
 | 排障入口 | 先看中间件链与 Handler，再看 `SubmissionService` / `SubmitQueue` 与 gRPC client |
 
@@ -21,10 +21,10 @@
 1. **这是 BFF，不是第二个业务主服务**：它做的是入口层治理和转发收敛，不是领域状态权威。  
 2. **答卷提交要区分两条路径**：启用队列时先入进程内有界队列；未启用时直接同步走 gRPC。  
 3. **`request_id` 不再承担 durable 幂等语义**：它只用于 `202` 后的队列状态查询；若调用方提供 `idempotency_key`，`collection-server` 会原样透传给 apiserver。  
-4. **Redis 在这里的职责偏辅助**：主要用于排队与前台侧支撑，不代表业务真值落在本进程。  
+4. **Redis 在这里的职责偏入口治理**：主要用于分布式限流、提交幂等 guard 与治理状态，不代表业务真值落在本进程。
 5. **排障顺序**：先看路由和中间件，再看 Handler / Service，最后看 gRPC client 和 queue 配置。  
 
-**组件定位**：**前台 BFF** 进程；**不**直连 MySQL/Mongo 主库；对外 **REST**，对内通过 **gRPC** 调用 **apiserver**；本地 **Redis** + **IAM** 支撑排队、会话类辅助与身份。  
+**组件定位**：**前台 BFF** 进程；**不**直连 MySQL/Mongo 主库；对外 **REST**，对内通过 **gRPC** 调用 **apiserver**；本地 **Redis** + **IAM** 支撑入口限流、SubmitGuard 与身份。
 限流与排队机制见 [03-缓存与限流](../03-基础设施/03-缓存与限流.md)；REST 契约见 [04-REST](../04-接口与运维/01-REST契约.md)。
 
 ---
@@ -38,7 +38,7 @@
 | **角色** | 小程序/收集端入口：**鉴权、限流、排队、监护** 等前置能力 |
 | **上游** | 客户端 **REST** |
 | **下游（兄弟组件）** | **apiserver gRPC**（强依赖） |
-| **下游（数据/控制面）** | **Redis**（排队等）；**IAM SDK**；可选 IAM 授权版本订阅 |
+| **下游（数据/控制面）** | **Redis**（分布式限流、SubmitGuard、治理状态）；**IAM SDK**；可选 IAM 授权版本订阅 |
 
 ---
 
@@ -159,7 +159,7 @@ sequenceDiagram
 | **apiserver** | gRPC | 主读写与领域逻辑 |
 | **Client** | REST | 唯一对外业务面 |
 | **IAM** | SDK | 验签、监护查询等 |
-| **Redis** | TCP | 排队与辅助状态 |
+| **Redis** | TCP | `ops_runtime` 分布式限流、SubmitGuard done marker / lease、governance readiness |
 
 ## 排障时先看什么
 

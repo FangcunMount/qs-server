@@ -2,6 +2,8 @@
 
 **本文回答**：`survey` 模块负责“问卷模板 + 答卷事实”的整个采集侧闭环；这篇文档会先让读者一屏内看清模块职责、主入口、关键事件和边界，再展开模型、链路、题型扩展、校验引擎与存储细节。
 
+> 深讲 truth layer 已迁到 [survey/README.md](./survey/README.md)。本文保留为兼容入口和连续阅读材料；新增 Questionnaire / AnswerSheet / 题型能力时，优先维护子目录深讲。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---

@@ -2,6 +2,8 @@
 
 **本文回答**：`evaluation` 模块负责把“已落库的答卷 + 量表规则”稳定推进为“测评状态、结构化得分、解读报告与后续事件”；这篇文档会先给出模块边界与重点速查，再展开模型、链路、契约和存储细节。
 
+> 深讲 truth layer 已迁到 [evaluation/README.md](./evaluation/README.md)。本文保留为兼容入口和连续阅读材料；新增 Assessment 状态、pipeline step、report 或 outbox 行为时，优先维护子目录深讲。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---

@@ -13,7 +13,7 @@
 | 最重要的运行时认识 | 同步请求和异步回调最终都收口到本进程执行业务写；worker 不是第二套主业务容器 |
 | 异步边界 | 事件最终由本进程发布；其中评估主链关键事件已通过 outbox relay 出站，长耗时后续由 worker 消费后再通过 gRPC 回调本进程完成 |
 | 同进程后台 | 缓存预热、统计同步 ticker 等后台任务在本进程内运行，但不改变“主状态收口”的事实 |
-| 排障入口 | 先看 `server.go` 的装配与 `PrepareRun`，再看 `container/assembler` 和 Router / GRPCRegistry |
+| 排障入口 | 先看 `process/run.go` 与 `process/*_bootstrap.go`，再看 `container/assembler`、`transport/rest` 和 `transport/grpc` |
 
 ## 重点速查（继续往下读前先记这几条）
 
@@ -81,20 +81,20 @@ flowchart TD
 
 ## 它是怎么启动和关闭的
 
-### 启动与时序（`PrepareRun` 示意）
+### 启动与时序（`process.Run` 示意）
 
 ```mermaid
 sequenceDiagram
     participant M as main / App
-    participant S as server.PrepareRun
+    participant S as process.Run / bootstrap
     participant DB as DB / Redis
     participant C as Container
     participant R as Router + GRPCRegistry
 
-    M->>S: Run → createAPIServer
-    S->>DB: 迁移、连接、背压、MQ Publisher
+    M->>S: App.Run → process.Run
+    S->>DB: resource bootstrap：迁移、连接、背压、MQ Publisher
     S->>C: IAM + assembler 装配模块
-    S->>R: 注册 REST + gRPC
+    S->>R: transport bootstrap：注册 REST + gRPC
     S->>S: Listen HTTP(S) + gRPC
     S->>S: WarmupCache（异步）
     S->>S: startStatisticsSyncScheduler（可选）
@@ -177,7 +177,8 @@ sequenceDiagram
 
 | 关注点 | 路径 |
 | ------ | ---- |
-| 进程入口 | [cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)、[app.go](../../internal/apiserver/app.go)、[run.go](../../internal/apiserver/run.go) |
+| 进程入口 | [cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)、[app.go](../../internal/apiserver/app.go)、[run.go](../../internal/apiserver/run.go)、[process](../../internal/apiserver/process/) |
+| REST / gRPC 注册 | [transport/rest](../../internal/apiserver/transport/rest/)、[transport/grpc](../../internal/apiserver/transport/grpc/) |
 | 通用 HTTP 栈 | [genericapiserver.go](../../internal/pkg/server/genericapiserver.go) |
 
 ## 边界与注意事项

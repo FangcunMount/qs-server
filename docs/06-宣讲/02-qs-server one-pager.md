@@ -15,6 +15,17 @@
 | 最该记住的边界 | `survey` 管采集，`scale` 管规则，`evaluation` 管测评状态和结果 |
 | 最该主动补的一句 | 当前最需要如实说明的风险是“durable 幂等仍是显式 `idempotency_key` opt-in”，以及“并不是所有事件都已 outbox 化” |
 
+## 一页主图
+
+```mermaid
+flowchart LR
+    client["Client"] --> collection["collection-server<br/>BFF / RateLimit / SubmitQueue"]
+    collection --> api["qs-apiserver<br/>Domain / Storage / Event"]
+    api --> outbox["durable outbox"]
+    outbox --> worker["qs-worker<br/>Event handlers"]
+    worker --> api
+```
+
 ## 一页结论
 
 | 维度 | 结论 | 证据 |

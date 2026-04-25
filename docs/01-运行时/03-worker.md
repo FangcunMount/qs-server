@@ -13,7 +13,7 @@
 | 最重要的运行时认识 | worker 不装配完整领域容器，也不持有业务写真值；它只是把事件驱动回主服务 |
 | 事件真值 | `event_type`、topic 和 handler 绑定最终以 `configs/events.yaml` 为准，代码注册必须与之对齐 |
 | 当前实际订阅 | 运行时当前有 4 个业务 topic，其中包括 `qs.analytics.behavior` |
-| 本地依赖 | Redis 只用于锁、统计辅助等 handler 侧能力，不改变业务状态归属 |
+| 本地依赖 | Redis 只用于 duplicate suppression / lock lease 与治理 readiness，不改变业务状态归属 |
 | 排障入口 | 先看 `events.yaml`，再看 `process/runtime_bootstrap.go`、显式 handler registry 和对应 gRPC client |
 
 ## 重点速查（继续往下读前先记这几条）
@@ -22,9 +22,9 @@
 2. **`event_type` 是主索引**：排障时先确认消息上的 `event_type`，再对照 yaml 的 handler 键和代码注册。  
 3. **Ack/Nack 取决于 Dispatch 结果**：理解投递语义时，要从 `createDispatchHandler` 这一层看成功、失败和重试。  
 4. **并发和 backlog 共享只看 worker 配置**：当前真正影响 NSQ in-flight 的是 `worker.concurrency`；多实例共享同一 backlog 取决于相同的 `worker.service-name`。  
-5. **Redis 是侧载能力**：锁、统计和幂等辅助可能用到 Redis，但这不等于 worker 成了独立业务服务。
+5. **Redis 是侧载能力**：duplicate suppression、lock lease 和治理 readiness 可能用到 Redis，但这不等于 worker 成了独立业务服务。
 
-**组件定位**：**MQ 消费进程**；根据 [`configs/events.yaml`](../../configs/events.yaml) 订阅 Topic；将消息按 **event_type** 分发给 handler；通过 **gRPC** 回调 **apiserver** 完成业务写。**不**暴露业务 HTTP；**不**装配完整领域容器。  
+**组件定位**：**MQ 消费进程**；根据 [`configs/events.yaml`](../../configs/events.yaml) 订阅 Topic；将消息按 **event_type** 分发给 handler；通过 **gRPC** 回调 **apiserver** 完成业务写。**不**暴露业务 HTTP；可选 metrics/governance HTTP 只服务观测与只读状态；**不**装配完整领域容器。
 事件拓扑见 [03-事件系统](../03-基础设施/01-事件系统.md)；gRPC 客户端表见 [04-gRPC](../04-接口与运维/02-gRPC契约.md)。
 
 ---
@@ -38,7 +38,7 @@
 | **角色** | 异步执行器：把「已发布事件」转成「对 apiserver 的 RPC」 |
 | **上游** | **MQ**（apiserver 发布的 4 个业务 Topic） |
 | **下游（兄弟组件）** | **apiserver gRPC**（AnswerSheet / Evaluation / Internal） |
-| **本地依赖** | **Redis**（锁、统计辅助等，视 handler） |
+| **本地依赖** | **Redis**（duplicate suppression / lock lease / governance readiness） |
 
 ---
 
@@ -175,7 +175,7 @@ sequenceDiagram
 
 ## 边界与注意事项
 
-- **无 HTTP 业务端口**；排障靠日志、MQ 积压、gRPC 错误。  
+- **无 HTTP 业务端口**；排障优先看日志、MQ 积压、gRPC 错误，metrics server 启用时再看 `/metrics`、`/readyz`、`/governance/redis`、`/governance/resilience`。
 - **信封/metadata 变更**会导致分发失败，需与 apiserver 发布端同步升级。  
 - **退出**：信号关闭 subscriber 与连接（见 process lifecycle 实现）。
 

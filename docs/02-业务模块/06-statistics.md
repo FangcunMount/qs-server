@@ -2,6 +2,8 @@
 
 **本文回答**：`qs-server` 当前的 `statistics` 模块到底负责什么、查询链路怎么分层、Redis 在统计模块里还承担什么角色、夜间同步如何运行，以及哪些旧的 Redis 预聚合设计已经退出运行时。
 
+> 深讲 truth layer 已迁到 [statistics/README.md](./statistics/README.md)。本文保留为兼容入口和连续阅读材料；新增统计口径、读模型、query cache 或 behavior projection 关系时，优先维护子目录深讲。
+
 ---
 
 ## 30 秒了解系统

@@ -21,16 +21,16 @@
 | 双 REST 面 | `collection-server` 面向前台 / 小程序，`qs-apiserver` 面向后台、运维和内部管理 |
 | 契约真值 | 最终以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 和 [api/rest/collection.yaml](../../api/rest/collection.yaml) 为准 |
 | 生成链 | `swag` 先生成 swagger，再由脚本转成 REST yaml，最后用 `compare_api_docs.py` 做校验 |
-| 路由真值 | 运行时实际暴露仍以各进程 `routers.go` 为准，导出文件必须与之持续对齐 |
+| 路由真值 | 运行时实际暴露以各进程 `transport/rest` 注册为准，导出文件必须与之持续对齐 |
 | 最易混点 | `/api/rest/*` 是静态挂载的导出文档，不是业务 API 前缀 |
-| 排障入口 | 先查 OpenAPI 文件和 `Makefile` 生成链，再回到 `routers.go` 和具体 handler |
-| internal 只读面板 | `qs-apiserver` 额外提供缓存治理 `/internal/v1/cache/governance/*` 与事件状态 `GET /internal/v1/events/status`，用于 operating 只读展示 |
+| 排障入口 | 先查 OpenAPI 文件和 `Makefile` 生成链，再回到 `transport/rest` 和具体 handler |
+| internal 只读面板 | `qs-apiserver` 额外提供缓存治理 `/internal/v1/cache/governance/*`、事件状态 `GET /internal/v1/events/status`、Resilience 状态 `GET /internal/v1/resilience/status`，用于 operating 只读展示 |
 
 ### 基础设施边界
 
 | | 内容 |
 | -- | ---- |
-| **负责（摘要）** | 契约文件位置、生成命令、与 `routers.go` 的 Verify 关系；公开与受保护路径约定 |
+| **负责（摘要）** | 契约文件位置、生成命令、与 `transport/rest` 的 Verify 关系；公开与受保护路径约定 |
 | **不负责（摘要）** | 各 Handler 字段级说明（见 02）；限流配额数值（见 03-缓存与限流） |
 | **关联** | [02-业务模块](../02-业务模块/)、[00-总览/04](../00-总览/04-本地开发与配置约定.md)（`make` 与端口） |
 
@@ -87,7 +87,7 @@ flowchart LR
 | **典型资源** | `questionnaires`、`scales`、`testees`、`answersheets`、`assessments`（前台子集） | 同上领域在后台的完整生命周期 + `plans`、`statistics`、`staff`、`codes` 等 |
 | **典型动作** | `POST /answersheets`、报告/状态查询、`GET .../wait-report` | `POST .../publish`、统计 `sync/*` 手工补跑、`plans/tasks/schedule` 手工触发 |
 
-**结论**：REST **按调用方拆分**，不在 collection 复制一套后台生命周期实现；详细列表以 **OpenAPI + `routers.go`** 为准。
+**结论**：REST **按调用方拆分**，不在 collection 复制一套后台生命周期实现；详细列表以 **OpenAPI + `transport/rest` 注册点** 为准。
 
 ## OpenAPI 文件从哪里来，怎样和路由保持一致
 
@@ -99,7 +99,7 @@ flowchart LR
 | `make docs-rest` | 生成 `api/rest/*.yaml` |
 | `make docs-verify` | 对比 swagger 与 OAS 摘要 |
 
-**Verify**：改路由后 **同时** 跑 `make docs-rest`（或 CI 等价）与 `make docs-verify`；**最终是否挂载**以 **`routers.go`** 为准——YAML 为导出物，可能滞后。
+**Verify**：改路由后 **同时** 跑 `make docs-rest`（或 CI 等价）与 `make docs-verify`；**最终是否挂载**以 **`transport/rest/router.go`、`registrars.go` 与 `routes_*.go`** 为准——YAML 为导出物，可能滞后。
 
 ## 公开路径、受保护路径和静态导出应该怎么区分
 
@@ -124,7 +124,6 @@ flowchart LR
 
 这组路由的职责不同：
 
-- `status`：查看当前进程对 `static/object/query/meta/sdk/lock` family 的解析结果、namespace、profile、degraded mode，以及最近一次 warmup run 快照
 - `status`：查看当前进程对 `static/object/query/meta/sdk/lock` family 的解析结果、namespace、profile、degraded mode，以及最近一次 warmup run 快照；当前响应还包含 `generated_at` 与 `summary`，适合 operating BFF 直接透传给只读治理页
 - `hotset`：按 `kind` 查看 top-N 热点 scope 与 score，只做治理预览，不暴露时序或聚合能力
 - `repair-complete`：给 `seeddata / repair` 任务结束后触发缓存联动，不是只读面板
@@ -148,6 +147,20 @@ flowchart LR
 - 路由注册以 [internal/apiserver/transport/rest/routes_events.go](../../internal/apiserver/transport/rest/routes_events.go) 为准
 - 只读聚合以 [internal/apiserver/application/eventing/status_service.go](../../internal/apiserver/application/eventing/status_service.go) 为准
 - route contract 以 [internal/apiserver/transport/rest/routes_events_test.go](../../internal/apiserver/transport/rest/routes_events_test.go) 为准
+
+### Resilience 状态 internal 面板（What / Where / Verify）
+
+高并发治理当前也提供 **只读状态摘要**，挂在：
+
+- `GET /internal/v1/resilience/status`
+
+这组接口返回 apiserver 当前 rate limit、backpressure、scheduler leader lock 的 capability snapshot，不提供限流动态配置、queue drain、lock release 或 repair 动作。collection-server 与 worker 各自还在 governance HTTP 面暴露 `/governance/resilience`，供 operating 聚合当前状态。
+
+**Verify**：
+
+- 路由注册以 [internal/apiserver/transport/rest/routes_resilience.go](../../internal/apiserver/transport/rest/routes_resilience.go) 为准
+- 状态模型以 [internal/pkg/resilienceplane/status.go](../../internal/pkg/resilienceplane/status.go) 为准
+- route contract 以 [internal/apiserver/transport/rest/routes_resilience_test.go](../../internal/apiserver/transport/rest/routes_resilience_test.go) 为准
 
 ### Prometheus 观测面（What / Where / Verify）
 
@@ -174,7 +187,7 @@ flowchart LR
 
 - [internal/pkg/cacheobservability](../../internal/pkg/cacheobservability/)
 
-`worker` **没有**对应的 internal 面板；其 `lock_cache` 降级状态只通过 `/metrics` 与结构化日志暴露。
+`worker` 不提供 apiserver 风格的 `/internal/v1/...` 路由；metrics server 启用时，Redis 与 Resilience 只读摘要分别通过 `/governance/redis`、`/governance/resilience` 暴露，趋势仍看 `/metrics` 与 Grafana。
 
 ---
 

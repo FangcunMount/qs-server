@@ -11,7 +11,7 @@
 | 本组作用 | 解释“为什么这样拆、为什么这样跑、为什么要这样保护”，不是重复模块内对象清单 |
 | 三个核心问题 | 为什么 `survey / scale / evaluation` 分离；为什么提交同步但评估异步；为什么保护层与读侧要单独存在 |
 | 阅读方式 | 先抓设计判断，再回到 `00/02/03` 找代码、契约和运行时证据 |
-| 真值边界 | 专题文写“跨层问题”；模块静态设计看 [02-业务模块](../02-业务模块/)，事件/缓存/配置机制看 [03-基础设施](../03-基础设施/) |
+| 真值边界 | 专题文写“跨层问题”；模块静态设计看 [02-业务模块](../02-业务模块/)，事件/缓存/配置机制看 [03-基础设施](../03-基础设施/)；行为投影细节看 [behavior-projection/README.md](./behavior-projection/README.md) |
 
 ## 重点速查
 
@@ -51,7 +51,7 @@ flowchart LR
 | 1 | [01-测评业务模型：survey、scale、evaluation 为什么分离.md](./01-测评业务模型：survey、scale、evaluation%20为什么分离.md) | 为什么主业务一定要拆成采集、规则、产出三界 |
 | 2 | [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md) | 为什么提交答卷同步返回，而计分和报告走异步链 |
 | 3 | [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) | 为什么系统稳定性依赖保护层和读侧，而不是单一缓存 |
-| 4 | [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md) | 当前行为 projector 到底在做什么，为什么会有 pending reconcile |
+| 4 | [behavior-projection/README.md](./behavior-projection/README.md) | 当前行为 projector 到底在做什么，为什么会有 pending reconcile |
 
 ## 与其他层如何分工
 
@@ -70,13 +70,15 @@ flowchart LR
 1. [01-测评业务模型：survey、scale、evaluation 为什么分离.md](./01-测评业务模型：survey、scale、evaluation%20为什么分离.md)
 2. [02-异步评估链路：从答卷提交到报告生成.md](./02-异步评估链路：从答卷提交到报告生成.md)
 3. [03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md](./03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md)
-4. [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md)
+4. [behavior-projection/README.md](./behavior-projection/README.md)
 配合阅读：
 
 - [../00-总览/01-系统地图.md](../00-总览/01-系统地图.md)
 - [../00-总览/03-核心业务链路.md](../00-总览/03-核心业务链路.md)
 - [../02-业务模块](../02-业务模块/)
 - [../03-基础设施](../03-基础设施/)
+
+原 [04-行为投影与assessment_episode：当前projector方案.md](./04-行为投影与assessment_episode：当前projector方案.md) 保留为兼容入口；深讲与长期维护以 [behavior-projection/README.md](./behavior-projection/README.md) 为准。
 
 这组文档解释的是**当前代码里的核心设计判断**，不展开设计演进史，也不重复模块级接口清单。
 

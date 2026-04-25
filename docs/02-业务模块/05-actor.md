@@ -2,6 +2,8 @@
 
 **本文回答**：`actor` 模块负责回答“业务里的人是谁”，把 `Testee`、`Operator`、`Clinician` 以及它们与 IAM、测评入口关系稳定收敛成可引用的业务主体；这篇文档会先让读者一屏内看清模块职责、主入口、关键边界和运行时位置，再展开模型、契约、集成与存储细节。
 
+> 深讲 truth layer 已迁到 [actor/README.md](./actor/README.md)。本文保留为兼容入口和连续阅读材料；新增 Testee / Clinician / Operator / IAM 边界能力时，优先维护子目录深讲。
+
 本文档按 [CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md) 中的**业务模块推荐结构**撰写；写作时需覆盖的动机、命名、实现位置与可核对性，见该文「讲解维度」一节，本文正文不重复贴标签。
 
 ---
@@ -315,7 +317,6 @@ flowchart TB
 | `GET` | `/testees/{id}` | 受试者详情 | Actor |
 | `PUT` | `/testees/{id}` | 更新受试者 | Actor |
 | `GET` | `/testees/{id}/scale-analysis` | 量表分析（聚合 evaluation 读模型） | 见「核心模式」§8 |
-| `GET` | `/testees/{id}/periodic-stats` | 周期统计 | yaml / Handler 有；**当前 `routers.go` 未见挂载**——以实际路由为准，未注册则接口不可用 |
 | `GET` | `/testees/{id}/plans` | 受试者参与计划列表 | OpenAPI 标签 Plan-Query，与 [plan](./04-plan.md) 查询衔接 |
 | `GET` | `/testees/{id}/plans/{plan_id}/tasks` | 计划下任务列表 | 同上 |
 | `GET` | `/testees/{id}/tasks` | 受试者任务列表 | 同上 |
@@ -323,6 +324,8 @@ flowchart TB
 | `GET` | `/staff` | 操作者列表（兼容路径） | Actor |
 | `GET` | `/staff/{id}` | 操作者详情（兼容路径） | Actor |
 | `DELETE` | `/staff/{id}` | 删除操作者（兼容路径） | Actor |
+
+受试者周期统计当前归属 Statistics 路由：`GET /api/v1/statistics/testees/{testee_id}/periodic`，挂载以 [routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) 为准；不要把它当成 Actor REST 主表的一部分维护。
 
 **gRPC（Verify）**：
 

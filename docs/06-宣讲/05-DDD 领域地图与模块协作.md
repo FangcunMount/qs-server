@@ -19,6 +19,32 @@
 | 版本口径 | 问卷版本是最硬的跨域锚点；量表不能在叙述里擅自夸大成“完整多版本治理已闭环” |
 | 最适合强调的点 | 这不是为了“DDD 而 DDD”，而是为了把采集、规则、结果三类变化源拆开演进 |
 
+## 领域地图主图
+
+```mermaid
+flowchart LR
+    actor["Actor<br/>主体"] --> survey["Survey<br/>采集事实"]
+    plan["Plan<br/>任务编排"] --> survey
+    scale["Scale<br/>规则权威"] --> evaluation["Evaluation<br/>测评产出"]
+    survey --> evaluation
+    evaluation --> statistics["Statistics<br/>读侧聚合"]
+```
+
+## 讲解时先回答的问题
+
+DDD 领域地图这一页最容易讲成“我们用了 DDD”。更有效的讲法是先回答“为什么需要这些边界”：
+
+| 业务问题 | 对应边界 |
+| -------- | -------- |
+| 问卷题型和答卷事实会频繁变化 | Survey |
+| 计分、因子、风险规则需要单独审计 | Scale |
+| 测评状态、报告和失败补偿需要状态机 | Evaluation |
+| 计划任务是长期编排，不是一次测评 | Plan |
+| 业务参与者不是 IAM 用户表 | Actor |
+| 查询和统计口径不同于写模型 | Statistics |
+
+这张地图的重点不是“模块数量”，而是每个模块对应一个变化原因。
+
 ## 领域地图
 
 | 上下文 | 自己负责什么 | 不负责什么 | 与其他上下文的关系 |
@@ -30,6 +56,19 @@
 | `calculation` | 计分、公式和计算值对象 | 聚合状态机 | 作为支撑子域，被 `survey` / `evaluation` 使用 |
 
 核心证据见 [../02-业务模块/01-survey.md](../02-业务模块/01-survey.md)、[../02-业务模块/02-scale.md](../02-业务模块/02-scale.md)、[../02-业务模块/03-evaluation.md](../02-业务模块/03-evaluation.md)。
+
+## 模式地图
+
+| 模式 | 典型模块 | 宣讲重点 |
+| ---- | -------- | -------- |
+| 状态机 | Questionnaire、Assessment、Task、Pending | 防止状态字段被任意改写 |
+| 策略模式 | Survey validation、Scale scoring、Evaluation interpretation | 新能力扩展点稳定，不污染主流程 |
+| 职责链 | Evaluation Engine Pipeline | 把复杂评估拆成可测试阶段 |
+| Builder | Report | 报告组装与评估状态分离 |
+| 防腐层 | Actor/IAM、Worker/Internal gRPC | 外部模型不直接污染领域模型 |
+| Read Model | Statistics、Behavior Projection | 查询口径与写模型分离 |
+
+讲这些模式时要始终回到具体代码和业务问题，不要把模式当成标签。
 
 ## 聚合、不变量与边界
 
@@ -61,6 +100,15 @@
 - 如果把问卷、量表和测评揉成一个模块，答卷提交、规则演进和报告查询会共用一套对象，模型会极快膨胀。
 - 把三者拆开后，`survey` 能专注采集，`scale` 能专注规则权威，`evaluation` 能专注状态机和结果。
 - 这种拆分也解释了为什么 `AssessmentScore` 与 `InterpretReport` 可以用不同存储，而不需要让“测评表”承载一切。
+
+## 代价要主动说清楚
+
+| 代价 | 为什么可接受 |
+| ---- | ------------ |
+| 跨模块引用增加 | 用引用值对象、事件和 application service 控制边界 |
+| 读者理解门槛提高 | 通过 business deep docs 和专题文档降低认知成本 |
+| 异步最终一致 | 用 outbox、pending、reconcile 和观测指标控制风险 |
+| 测试范围变大 | 每个 truth layer 都有 contract tests 和 Verify 命令 |
 
 ## 宣讲时建议强调
 
