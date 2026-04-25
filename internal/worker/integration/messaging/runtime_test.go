@@ -9,6 +9,7 @@ import (
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 )
 
 type fakeDispatcher struct {
@@ -57,6 +58,17 @@ func (s *fakeSubscriber) SubscribeWithMiddleware(topic, channel string, handler 
 func (*fakeSubscriber) Stop() {}
 
 func (*fakeSubscriber) Close() error { return nil }
+
+type consumeObserver struct {
+	events []eventobservability.ConsumeEvent
+}
+
+func (o *consumeObserver) ObservePublish(context.Context, eventobservability.PublishEvent) {}
+func (o *consumeObserver) ObserveOutbox(context.Context, eventobservability.OutboxEvent)   {}
+
+func (o *consumeObserver) ObserveConsume(_ context.Context, evt eventobservability.ConsumeEvent) {
+	o.events = append(o.events, evt)
+}
 
 func TestDispatchHandlerUsesMetadataEventTypeFirst(t *testing.T) {
 	dispatcher := &fakeDispatcher{}
@@ -173,6 +185,34 @@ func TestDispatchHandlerAcksInvalidPayloadWithoutDispatch(t *testing.T) {
 	}
 }
 
+func TestDispatchHandlerObservesPoisonAcked(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{}
+	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
+	msg.SetAckFunc(func() error { return nil })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomePoisonAcked)
+}
+
+func TestDispatchHandlerObservesPoisonAckFailed(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{}
+	msg := basemessaging.NewMessage("msg-1", []byte("not-json"))
+	msg.SetAckFunc(func() error { return errors.New("ack failed") })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomePoisonAckFailed)
+}
+
 func TestDispatchHandlerNacksOnDispatchError(t *testing.T) {
 	wantErr := errors.New("dispatch failed")
 	dispatcher := &fakeDispatcher{err: wantErr}
@@ -191,6 +231,83 @@ func TestDispatchHandlerNacksOnDispatchError(t *testing.T) {
 
 	if nackCount != 1 {
 		t.Fatalf("nackCount = %d, want 1", nackCount)
+	}
+}
+
+func TestDispatchHandlerObservesNacked(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{err: errors.New("dispatch failed")}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetNackFunc(func() error { return nil })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err == nil {
+		t.Fatalf("handler should return dispatch error")
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNacked)
+}
+
+func TestDispatchHandlerObservesNackFailed(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{err: errors.New("dispatch failed")}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetNackFunc(func() error { return errors.New("nack failed") })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err == nil {
+		t.Fatalf("handler should return dispatch error")
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNackFailed)
+}
+
+func TestDispatchHandlerObservesAcked(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetAckFunc(func() error { return nil })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeAcked)
+}
+
+func TestDispatchHandlerObservesAckFailed(t *testing.T) {
+	observer := &consumeObserver{}
+	dispatcher := &fakeDispatcher{}
+	msg := basemessaging.NewMessage("msg-1", []byte(`{}`))
+	msg.Metadata["event_type"] = "metadata.event"
+	msg.SetAckFunc(func() error { return errors.New("ack failed") })
+
+	handler := createDispatchHandlerWithObserver(testLogger(), dispatcher, "topic", "worker", observer)
+	if err := handler(context.Background(), msg); err == nil {
+		t.Fatalf("handler should return ack error")
+	}
+
+	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeAckFailed)
+}
+
+func assertConsumeOutcome(t *testing.T, observer *consumeObserver, outcome eventobservability.ConsumeOutcome) {
+	t.Helper()
+	if len(observer.events) != 1 {
+		t.Fatalf("observed consume events = %#v, want one", observer.events)
+	}
+	evt := observer.events[0]
+	if evt.Outcome != outcome {
+		t.Fatalf("outcome = %q, want %q", evt.Outcome, outcome)
+	}
+	if evt.Service != "worker" {
+		t.Fatalf("service = %q, want worker", evt.Service)
+	}
+	if evt.Topic != "topic" {
+		t.Fatalf("topic = %q, want topic", evt.Topic)
 	}
 }
 

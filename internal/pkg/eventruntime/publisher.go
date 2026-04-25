@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -15,6 +16,7 @@ import (
 type RoutingPublisher struct {
 	topicResolver eventcatalog.TopicResolver
 	mqPublisher   messaging.Publisher
+	observer      eventobservability.Observer
 	source        string
 	mode          PublishMode
 }
@@ -47,6 +49,7 @@ type RoutingPublisherOptions struct {
 	Catalog       *eventcatalog.Catalog
 	TopicResolver eventcatalog.TopicResolver
 	MQPublisher   messaging.Publisher
+	Observer      eventobservability.Observer
 	Source        string
 	Mode          PublishMode
 }
@@ -66,9 +69,14 @@ func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
 	if opts.Mode == "" {
 		opts.Mode = PublishModeLogging
 	}
+	observer := opts.Observer
+	if observer == nil {
+		observer = eventobservability.DefaultObserver()
+	}
 	return &RoutingPublisher{
 		topicResolver: resolver,
 		mqPublisher:   opts.MQPublisher,
+		observer:      observer,
 		source:        opts.Source,
 		mode:          opts.Mode,
 	}
@@ -79,6 +87,7 @@ func (p *RoutingPublisher) Publish(ctx context.Context, evt event.DomainEvent) e
 	eventType := evt.EventType()
 	topicName, ok := p.topicResolver.GetTopicForEvent(eventType)
 	if !ok {
+		p.observe(ctx, "", eventType, eventobservability.PublishOutcomeUnknownEvent)
 		logger.L(ctx).Errorw("event type not found in config, cannot route to topic",
 			"event_type", eventType,
 			"event_id", evt.EventID(),
@@ -98,11 +107,16 @@ func (p *RoutingPublisher) Publish(ctx context.Context, evt event.DomainEvent) e
 	case PublishModeMQ:
 		return p.publishToMQ(ctx, topicName, evt)
 	case PublishModeLogging:
-		return p.publishToLog(ctx, topicName, evt)
+		p.publishToLog(ctx, topicName, evt)
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeLogged)
+		return nil
 	case PublishModeNop:
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeNop)
 		return nil
 	default:
-		return p.publishToLog(ctx, topicName, evt)
+		p.publishToLog(ctx, topicName, evt)
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeLogged)
+		return nil
 	}
 }
 
@@ -122,15 +136,19 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 			"event_type", evt.EventType(),
 			"topic", topicName,
 		)
-		return p.publishToLog(ctx, topicName, evt)
+		p.publishToLog(ctx, topicName, evt)
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeFallbackLogged)
+		return nil
 	}
 
 	msg, err := eventcodec.BuildMessage(evt, p.source)
 	if err != nil {
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeEncodeFailed)
 		return err
 	}
 
 	if err := p.mqPublisher.PublishMessage(ctx, topicName, msg); err != nil {
+		p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeMQFailed)
 		logger.L(ctx).Errorw("failed to publish event to topic",
 			"event_type", evt.EventType(),
 			"topic", topicName,
@@ -147,6 +165,7 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 		"source", p.source,
 		"result", "success",
 	)
+	p.observe(ctx, topicName, evt.EventType(), eventobservability.PublishOutcomeMQPublished)
 	return nil
 }
 
@@ -161,4 +180,17 @@ func (p *RoutingPublisher) publishToLog(ctx context.Context, topicName string, e
 		"source", p.source,
 	)
 	return nil
+}
+
+func (p *RoutingPublisher) observe(ctx context.Context, topicName, eventType string, outcome eventobservability.PublishOutcome) {
+	if p == nil || p.observer == nil {
+		return
+	}
+	p.observer.ObservePublish(ctx, eventobservability.PublishEvent{
+		Source:    p.source,
+		Mode:      string(p.mode),
+		Topic:     topicName,
+		EventType: eventType,
+		Outcome:   outcome,
+	})
 }

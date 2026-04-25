@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/nsqio/go-nsq"
 )
@@ -44,8 +45,10 @@ func (MessageEventExtractor) Extract(msg *basemessaging.Message) (string, error)
 }
 
 type MessageSettlementPolicy struct {
-	logger *slog.Logger
-	topic  string
+	logger   *slog.Logger
+	service  string
+	topic    string
+	observer eventobservability.Observer
 }
 
 func (p MessageSettlementPolicy) AckInvalid(msg *basemessaging.Message, parseErr error) {
@@ -55,12 +58,15 @@ func (p MessageSettlementPolicy) AckInvalid(msg *basemessaging.Message, parseErr
 		slog.String("error", parseErr.Error()),
 	)
 	if ackErr := msg.Ack(); ackErr != nil {
+		p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAckFailed)
 		p.logger.Warn("failed to ack invalid message",
 			slog.String("topic", p.topic),
 			slog.String("msg_id", msg.UUID),
 			slog.String("error", ackErr.Error()),
 		)
+		return
 	}
+	p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAcked)
 }
 
 func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventType string, dispatchErr error) {
@@ -71,16 +77,24 @@ func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventTyp
 		slog.String("error", dispatchErr.Error()),
 	)
 	if nackErr := msg.Nack(); nackErr != nil {
+		p.observe(msg, eventType, eventobservability.ConsumeOutcomeNackFailed)
 		p.logger.Warn("failed to nack message",
 			slog.String("topic", p.topic),
 			slog.String("msg_id", msg.UUID),
 			slog.String("error", nackErr.Error()),
 		)
+		return
 	}
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeNacked)
 }
 
 func (p MessageSettlementPolicy) AckSuccess(msg *basemessaging.Message) error {
 	if ackErr := msg.Ack(); ackErr != nil {
+		eventType := ""
+		if msg != nil && msg.Metadata != nil {
+			eventType = msg.Metadata["event_type"]
+		}
+		p.observe(msg, eventType, eventobservability.ConsumeOutcomeAckFailed)
 		p.logger.Warn("failed to ack message",
 			slog.String("topic", p.topic),
 			slog.String("msg_id", msg.UUID),
@@ -88,7 +102,24 @@ func (p MessageSettlementPolicy) AckSuccess(msg *basemessaging.Message) error {
 		)
 		return ackErr
 	}
+	eventType := ""
+	if msg != nil && msg.Metadata != nil {
+		eventType = msg.Metadata["event_type"]
+	}
+	p.observe(msg, eventType, eventobservability.ConsumeOutcomeAcked)
 	return nil
+}
+
+func (p MessageSettlementPolicy) observe(msg *basemessaging.Message, eventType string, outcome eventobservability.ConsumeOutcome) {
+	if p.observer == nil {
+		return
+	}
+	p.observer.ObserveConsume(context.Background(), eventobservability.ConsumeEvent{
+		Service:   p.service,
+		Topic:     p.topic,
+		EventType: eventType,
+		Outcome:   outcome,
+	})
 }
 
 func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
@@ -129,6 +160,30 @@ func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, source Topic
 }
 
 func SubscribeHandlers(serviceName string, logger *slog.Logger, runtime SubscriptionRuntime, subscriber basemessaging.Subscriber) error {
+	return SubscribeHandlersWithOptions(SubscribeHandlersOptions{
+		ServiceName: serviceName,
+		Logger:      logger,
+		Runtime:     runtime,
+		Subscriber:  subscriber,
+	})
+}
+
+type SubscribeHandlersOptions struct {
+	ServiceName string
+	Logger      *slog.Logger
+	Runtime     SubscriptionRuntime
+	Subscriber  basemessaging.Subscriber
+	Observer    eventobservability.Observer
+}
+
+func SubscribeHandlersWithOptions(opts SubscribeHandlersOptions) error {
+	if opts.Observer == nil {
+		opts.Observer = eventobservability.DefaultObserver()
+	}
+	serviceName := opts.ServiceName
+	logger := opts.Logger
+	runtime := opts.Runtime
+	subscriber := opts.Subscriber
 	if runtime == nil || subscriber == nil {
 		return nil
 	}
@@ -136,7 +191,7 @@ func SubscribeHandlers(serviceName string, logger *slog.Logger, runtime Subscrip
 	subscriptions := runtime.GetTopicSubscriptions()
 	for _, sub := range subscriptions {
 		topicName := sub.TopicName
-		msgHandler := createDispatchHandler(logger, runtime, topicName)
+		msgHandler := createDispatchHandlerWithObserver(logger, runtime, topicName, serviceName, opts.Observer)
 		if err := subscriber.Subscribe(topicName, serviceName, msgHandler); err != nil {
 			logger.Error("failed to subscribe",
 				slog.String("topic", topicName),
@@ -154,8 +209,15 @@ func SubscribeHandlers(serviceName string, logger *slog.Logger, runtime Subscrip
 }
 
 func createDispatchHandler(logger *slog.Logger, dispatcher EventDispatcher, topicName string) basemessaging.Handler {
+	return createDispatchHandlerWithObserver(logger, dispatcher, topicName, "", eventobservability.DefaultObserver())
+}
+
+func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDispatcher, topicName, serviceName string, observer eventobservability.Observer) basemessaging.Handler {
 	extractor := MessageEventExtractor{}
-	settlement := MessageSettlementPolicy{logger: logger, topic: topicName}
+	if observer == nil {
+		observer = eventobservability.DefaultObserver()
+	}
+	settlement := MessageSettlementPolicy{logger: logger, service: serviceName, topic: topicName, observer: observer}
 	return func(ctx context.Context, msg *basemessaging.Message) error {
 		eventType, err := extractor.Extract(msg)
 		if err != nil {
