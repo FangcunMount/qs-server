@@ -12,6 +12,7 @@
 | 依赖保护 | apiserver MySQL / Mongo / IAM in-flight backpressure，显式注入到 repo/client |
 | 重复抑制 | Redis lease primitive + caller-owned `leader/idempotency/duplicate` semantics |
 | 降级边界 | collection Redis limiter fail-open；worker duplicate gate degraded-continue |
+| 维护模式 | 新增保护点必须按 `模型 -> contract test -> docs -> hygiene` 闭环维护 |
 
 ## 阅读顺序
 
@@ -23,6 +24,12 @@
 6. [05-观测降级与排障](./05-观测降级与排障.md)：按 outcome 排障。
 7. [06-新增高并发治理能力SOP](./06-新增高并发治理能力SOP.md)：新增能力的测试与文档清单。
 8. [07-能力矩阵](./07-能力矩阵.md)：横向核对每个能力的模型、primitive、outcome 和测试。
+
+## 维护模式
+
+Resilience Plane 当前进入稳定维护态。新增或调整保护点时，先判断它属于入口保护、提交削峰、依赖保护、重复抑制还是降级策略，再按 [06-新增高并发治理能力SOP](./06-新增高并发治理能力SOP.md) 补齐模型 / adapter、contract tests、bounded outcome 和文档锚点。
+
+如果能力会改变 HTTP status、`Retry-After`、SubmitQueue 状态、Redis key、LockSpec、component-base primitive 归属或降级语义，必须先单独设计，不要只在局部代码里顺手修改。新增能力最终必须回填 [07-能力矩阵](./07-能力矩阵.md)。
 
 ## 主图
 

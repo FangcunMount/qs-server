@@ -150,6 +150,20 @@ git diff --check
 
 ---
 
+## Resilience Plane 维护门禁
+
+新增或修改高并发治理能力时，不能只改代码或局部测试。凡是涉及限流、队列、背压、Redis lock、幂等、重复抑制或降级策略，必须同步核对：
+
+1. **模型锚点**：是否已有或需要新增 `ratelimit`、`resilienceplane`、`backpressure`、`redislock`、`SubmitQueue` 等模型 / adapter。
+2. **契约测试**：是否覆盖外部语义，例如 HTTP status、`Retry-After`、队列状态、Redis fail-open、锁竞争、降级继续。
+3. **观测 outcome**：是否通过 `resilienceplane.Observer` 上报 bounded outcome，且 label 不包含 user ID、request ID、lock key 或 error message。
+4. **文档真值层**：是否更新 [resilience/06-新增高并发治理能力SOP.md](./03-基础设施/resilience/06-新增高并发治理能力SOP.md) 或 [resilience/07-能力矩阵.md](./03-基础设施/resilience/07-能力矩阵.md)。
+5. **边界声明**：是否明确该能力不改变已有 HTTP 响应、Redis key、SubmitQueue 生命周期、LockSpec 语义或 component-base primitive 归属，除非本次变更明确要求。
+
+默认流程是：`模型 / adapter -> contract tests -> 文档更新 -> docs hygiene`。如果新增保护点不能放入现有能力矩阵，先补设计说明，不要把它混写成已有能力。
+
+---
+
 ## 维护清单
 
 提交文档前，至少自检下面几项：

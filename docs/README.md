@@ -86,6 +86,7 @@
 2. [03-基础设施/resilience/00-整体架构.md](./03-基础设施/resilience/00-整体架构.md)
 3. [03-基础设施/resilience/05-观测降级与排障.md](./03-基础设施/resilience/05-观测降级与排障.md)
 4. [03-基础设施/resilience/06-新增高并发治理能力SOP.md](./03-基础设施/resilience/06-新增高并发治理能力SOP.md)
+5. [03-基础设施/resilience/07-能力矩阵.md](./03-基础设施/resilience/07-能力矩阵.md)
 
 ### 需要准备宣讲或对外介绍
 
