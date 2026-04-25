@@ -9,10 +9,11 @@ import (
 
 // Limiter provides a simple in-flight limiter with optional timeout.
 type Limiter struct {
-	sem      chan struct{}
-	timeout  time.Duration
-	subject  resilienceplane.Subject
-	observer resilienceplane.Observer
+	sem         chan struct{}
+	maxInflight int
+	timeout     time.Duration
+	subject     resilienceplane.Subject
+	observer    resilienceplane.Observer
 }
 
 type Acquirer interface {
@@ -35,8 +36,9 @@ func NewLimiterWithOptions(maxInflight int, timeout time.Duration, opts Options)
 		return nil
 	}
 	return &Limiter{
-		sem:     make(chan struct{}, maxInflight),
-		timeout: timeout,
+		sem:         make(chan struct{}, maxInflight),
+		maxInflight: maxInflight,
+		timeout:     timeout,
 		subject: resilienceplane.Subject{
 			Component: opts.Component,
 			Scope:     opts.Dependency,
@@ -57,6 +59,7 @@ func (l *Limiter) Acquire(ctx context.Context) (context.Context, func(), error) 
 		ctx = context.Background()
 	}
 
+	waitStartedAt := time.Now()
 	waitCtx := ctx
 	var cancel context.CancelFunc
 	if l.timeout > 0 {
@@ -67,10 +70,13 @@ func (l *Limiter) Acquire(ctx context.Context) (context.Context, func(), error) 
 
 	select {
 	case l.sem <- struct{}{}:
+		l.observeWait(resilienceplane.OutcomeBackpressureAcquired, time.Since(waitStartedAt))
 		l.observe(ctx, resilienceplane.OutcomeBackpressureAcquired)
+		l.observeInFlight()
 		release := func() {
 			<-l.sem
 			l.observe(ctx, resilienceplane.OutcomeBackpressureReleased)
+			l.observeInFlight()
 			if cancel != nil {
 				cancel()
 			}
@@ -82,8 +88,34 @@ func (l *Limiter) Acquire(ctx context.Context) (context.Context, func(), error) 
 		if cancel != nil {
 			cancel()
 		}
+		l.observeWait(resilienceplane.OutcomeBackpressureTimeout, time.Since(waitStartedAt))
 		l.observe(ctx, resilienceplane.OutcomeBackpressureTimeout)
 		return ctx, func() {}, waitCtx.Err()
+	}
+}
+
+func (l *Limiter) Snapshot(name string) resilienceplane.BackpressureSnapshot {
+	if l == nil {
+		return resilienceplane.BackpressureSnapshot{
+			Name:     name,
+			Enabled:  false,
+			Degraded: true,
+			Reason:   "backpressure limiter disabled",
+		}
+	}
+	subject := l.subject
+	if name == "" {
+		name = subject.Scope
+	}
+	return resilienceplane.BackpressureSnapshot{
+		Component:     subject.Component,
+		Name:          name,
+		Dependency:    subject.Scope,
+		Strategy:      subject.Strategy,
+		Enabled:       true,
+		MaxInflight:   l.maxInflight,
+		InFlight:      len(l.sem),
+		TimeoutMillis: l.timeout.Milliseconds(),
 	}
 }
 
@@ -92,6 +124,20 @@ func (l *Limiter) observe(ctx context.Context, outcome resilienceplane.Outcome) 
 		return
 	}
 	resilienceplane.Observe(ctx, l.observer, resilienceplane.ProtectionBackpressure, l.subject, outcome)
+}
+
+func (l *Limiter) observeInFlight() {
+	if l == nil {
+		return
+	}
+	resilienceplane.ObserveBackpressureInFlight(l.subject, len(l.sem))
+}
+
+func (l *Limiter) observeWait(outcome resilienceplane.Outcome, duration time.Duration) {
+	if l == nil {
+		return
+	}
+	resilienceplane.ObserveBackpressureWaitDuration(l.subject, outcome, duration)
 }
 
 func defaultObserver(observer resilienceplane.Observer) resilienceplane.Observer {

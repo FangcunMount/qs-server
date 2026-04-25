@@ -17,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
 )
 
@@ -47,6 +48,7 @@ type Deps struct {
 	QRCodeObjectKeyPrefix   string
 	GovernanceStatusService cachegov.StatusService
 	EventStatusService      appEventing.StatusService
+	Backpressure            []resilienceplane.BackpressureSnapshot
 	IAM                     IAMDeps
 }
 

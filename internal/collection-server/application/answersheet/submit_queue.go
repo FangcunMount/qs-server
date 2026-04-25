@@ -110,8 +110,10 @@ func (q *SubmitQueue) Enqueue(ctx context.Context, requestID string, writerID ui
 	case q.jobs <- job:
 		q.setStatus(requestID, SubmitStatusQueued, "")
 		q.observe(ctx, resilienceplane.OutcomeQueueAccepted)
+		q.observeQueueDepth()
 	default:
 		q.observe(ctx, resilienceplane.OutcomeQueueFull)
+		q.observeQueueDepth()
 		return ErrQueueFull
 	}
 
@@ -124,7 +126,40 @@ func (q *SubmitQueue) GetStatus(requestID string) (SubmitStatusResponse, bool) {
 		return SubmitStatusResponse{}, false
 	}
 
-	return q.statuses.Get(requestID)
+	status, ok, cleaned := q.statuses.Get(requestID)
+	q.observeCleaned(context.Background(), cleaned)
+	q.observeQueueStatusCounts()
+	return status, ok
+}
+
+func (q *SubmitQueue) StatusSnapshot(now time.Time) resilienceplane.QueueSnapshot {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	if q == nil {
+		return resilienceplane.QueueSnapshot{
+			GeneratedAt:       now,
+			Component:         "collection-server",
+			Name:              "answersheet_submit",
+			Strategy:          "memory_channel",
+			LifecycleBoundary: "process_memory_no_drain",
+		}
+	}
+	counts, cleaned := q.statuses.Snapshot(now)
+	q.observeCleaned(context.Background(), cleaned)
+	snapshot := resilienceplane.QueueSnapshot{
+		GeneratedAt:       now,
+		Component:         q.subject.Component,
+		Name:              q.subject.Scope,
+		Strategy:          q.subject.Strategy,
+		Depth:             len(q.jobs),
+		Capacity:          cap(q.jobs),
+		StatusTTLSeconds:  int64(q.statuses.statusTTL.Seconds()),
+		StatusCounts:      counts,
+		LifecycleBoundary: "process_memory_no_drain",
+	}
+	q.observeQueueSnapshot(snapshot)
+	return snapshot
 }
 
 const (
@@ -139,11 +174,14 @@ func (q *SubmitQueue) setStatus(requestID, status, answerSheetID string) {
 		return
 	}
 
-	q.statuses.Set(requestID, SubmitStatusResponse{
+	cleaned := q.statuses.Set(requestID, SubmitStatusResponse{
 		Status:        status,
 		AnswerSheetID: answerSheetID,
 		UpdatedAt:     time.Now().Unix(),
 	})
+	q.observeCleaned(context.Background(), cleaned)
+	q.observeQueueDepth()
+	q.observeQueueStatusCounts()
 
 	switch status {
 	case SubmitStatusProcessing:
@@ -169,6 +207,39 @@ func (q *SubmitQueue) observe(ctx context.Context, outcome resilienceplane.Outco
 	resilienceplane.Observe(ctx, q.observer, resilienceplane.ProtectionQueue, q.subject, outcome)
 }
 
+func (q *SubmitQueue) observeCleaned(ctx context.Context, count int) {
+	if q == nil || count <= 0 {
+		return
+	}
+	resilienceplane.Observe(ctx, q.observer, resilienceplane.ProtectionQueue, q.subject, resilienceplane.OutcomeQueueStatusCleaned)
+}
+
+func (q *SubmitQueue) observeQueueDepth() {
+	if q == nil {
+		return
+	}
+	resilienceplane.ObserveQueueDepth(q.subject, len(q.jobs))
+}
+
+func (q *SubmitQueue) observeQueueStatusCounts() {
+	if q == nil || q.statuses == nil {
+		return
+	}
+	for status, count := range q.statuses.Counts() {
+		resilienceplane.ObserveQueueStatus(q.subject, status, count)
+	}
+}
+
+func (q *SubmitQueue) observeQueueSnapshot(snapshot resilienceplane.QueueSnapshot) {
+	if q == nil {
+		return
+	}
+	resilienceplane.ObserveQueueDepth(q.subject, snapshot.Depth)
+	for status, count := range snapshot.StatusCounts {
+		resilienceplane.ObserveQueueStatus(q.subject, status, count)
+	}
+}
+
 func defaultSubmitQueueObserver(observer resilienceplane.Observer) resilienceplane.Observer {
 	if observer != nil {
 		return observer
@@ -190,25 +261,26 @@ func newSubmitQueueStatusStore(statusTTL time.Duration) *submitQueueStatusStore 
 	}
 }
 
-func (s *submitQueueStatusStore) Set(requestID string, status SubmitStatusResponse) {
+func (s *submitQueueStatusStore) Set(requestID string, status SubmitStatusResponse) int {
 	if s == nil || requestID == "" {
-		return
+		return 0
 	}
-	s.cleanup()
+	cleaned := s.cleanup()
 	s.mu.Lock()
 	s.statuses[requestID] = status
 	s.mu.Unlock()
+	return cleaned
 }
 
-func (s *submitQueueStatusStore) Get(requestID string) (SubmitStatusResponse, bool) {
+func (s *submitQueueStatusStore) Get(requestID string) (SubmitStatusResponse, bool, int) {
 	if s == nil || requestID == "" {
-		return SubmitStatusResponse{}, false
+		return SubmitStatusResponse{}, false, 0
 	}
-	s.cleanup()
+	cleaned := s.cleanup()
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	status, ok := s.statuses[requestID]
-	return status, ok
+	return status, ok, cleaned
 }
 
 func (s *submitQueueStatusStore) GetFresh(requestID string) (SubmitStatusResponse, bool) {
@@ -221,20 +293,52 @@ func (s *submitQueueStatusStore) GetFresh(requestID string) (SubmitStatusRespons
 	return status, ok
 }
 
-func (s *submitQueueStatusStore) cleanup() {
+func (s *submitQueueStatusStore) Snapshot(now time.Time) (map[string]int, int) {
 	if s == nil {
-		return
+		return map[string]int{}, 0
 	}
-	now := time.Now()
+	cleaned := s.cleanupAt(now)
+	return s.Counts(), cleaned
+}
+
+func (s *submitQueueStatusStore) Counts() map[string]int {
+	counts := map[string]int{
+		SubmitStatusQueued:     0,
+		SubmitStatusProcessing: 0,
+		SubmitStatusDone:       0,
+		SubmitStatusFailed:     0,
+	}
+	if s == nil {
+		return counts
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	for _, status := range s.statuses {
+		counts[status.Status]++
+	}
+	return counts
+}
+
+func (s *submitQueueStatusStore) cleanup() int {
+	return s.cleanupAt(time.Now())
+}
+
+func (s *submitQueueStatusStore) cleanupAt(now time.Time) int {
+	if s == nil {
+		return 0
+	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if now.Sub(s.lastCleanup) < time.Minute {
-		return
+		return 0
 	}
+	cleaned := 0
 	for key, status := range s.statuses {
 		if now.Sub(time.Unix(status.UpdatedAt, 0)) > s.statusTTL {
 			delete(s.statuses, key)
+			cleaned++
 		}
 	}
 	s.lastCleanup = now
+	return cleaned
 }

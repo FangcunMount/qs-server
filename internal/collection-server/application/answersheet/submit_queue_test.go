@@ -139,6 +139,56 @@ func TestSubmitQueueStatusExpiresAfterTTL(t *testing.T) {
 	}
 }
 
+func TestSubmitQueueStatusSnapshotReportsDepthCountsAndTTL(t *testing.T) {
+	release := make(chan struct{})
+	q := NewSubmitQueue(1, 2, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		<-release
+		return &SubmitAnswerSheetResponse{ID: "42"}, nil
+	})
+	t.Cleanup(func() { close(release) })
+
+	if err := q.Enqueue(context.Background(), "req-1", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("first enqueue: %v", err)
+	}
+	if err := q.Enqueue(context.Background(), "req-2", 1, &SubmitAnswerSheetRequest{}); err != nil {
+		t.Fatalf("second enqueue: %v", err)
+	}
+
+	snapshot := q.StatusSnapshot(time.Now())
+	if snapshot.Name != "answersheet_submit" || snapshot.Capacity != 2 {
+		t.Fatalf("snapshot = %+v", snapshot)
+	}
+	if snapshot.StatusTTLSeconds != int64((10 * time.Minute).Seconds()) {
+		t.Fatalf("ttl seconds = %d", snapshot.StatusTTLSeconds)
+	}
+	if snapshot.StatusCounts[SubmitStatusQueued]+snapshot.StatusCounts[SubmitStatusProcessing] != 2 {
+		t.Fatalf("status counts = %+v, want two in-flight statuses", snapshot.StatusCounts)
+	}
+}
+
+func TestSubmitQueueStatusSnapshotReportsCleanupOutcome(t *testing.T) {
+	observer := &submitQueueRecordingObserver{}
+	q := NewSubmitQueueWithOptions(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		return &SubmitAnswerSheetResponse{ID: "42"}, nil
+	}, SubmitQueueRuntimeOptions{Observer: observer})
+	q.statuses.statusTTL = time.Millisecond
+	q.statuses.mu.Lock()
+	q.statuses.statuses["expired"] = SubmitStatusResponse{
+		Status:    SubmitStatusDone,
+		UpdatedAt: time.Now().Add(-time.Second).Unix(),
+	}
+	q.statuses.lastCleanup = time.Now().Add(-time.Hour)
+	q.statuses.mu.Unlock()
+
+	snapshot := q.StatusSnapshot(time.Now())
+	if snapshot.StatusCounts[SubmitStatusDone] != 0 {
+		t.Fatalf("status counts = %+v, want expired done status removed", snapshot.StatusCounts)
+	}
+	if !observer.has(resilienceplane.OutcomeQueueStatusCleaned) {
+		t.Fatal("expected queue_status_cleaned outcome")
+	}
+}
+
 func TestSubmitQueueReportsOutcomes(t *testing.T) {
 	observer := &submitQueueRecordingObserver{}
 	q := NewSubmitQueueWithOptions(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {

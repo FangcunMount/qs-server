@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
@@ -171,6 +172,33 @@ func (c *Container) DispatchEvent(ctx context.Context, eventType string, payload
 		return nil
 	}
 	return c.eventDispatcher.DispatchEvent(ctx, eventType, payload)
+}
+
+// ResilienceSnapshot returns the worker's current resilience capability summary.
+func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
+	snapshot := resilienceplane.NewRuntimeSnapshot("worker", time.Now())
+	lockConfigured := c != nil && c.lockManager != nil
+	lockReason := ""
+	if !lockConfigured {
+		lockReason = "worker duplicate suppression lock manager unavailable"
+	}
+	snapshot.DuplicateSuppression = []resilienceplane.CapabilitySnapshot{{
+		Name:       "answersheet_submitted",
+		Kind:       resilienceplane.ProtectionDuplicateSuppression.String(),
+		Strategy:   "redis_lock",
+		Configured: lockConfigured,
+		Degraded:   !lockConfigured,
+		Reason:     lockReason,
+	}}
+	snapshot.Locks = []resilienceplane.CapabilitySnapshot{{
+		Name:       "answersheet_processing",
+		Kind:       resilienceplane.ProtectionLock.String(),
+		Strategy:   "redis_lock",
+		Configured: lockConfigured,
+		Degraded:   !lockConfigured,
+		Reason:     lockReason,
+	}}
+	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
 }
 
 // Logger 获取日志器

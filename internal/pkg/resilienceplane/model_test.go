@@ -3,6 +3,7 @@ package resilienceplane
 import (
 	"context"
 	"testing"
+	"time"
 )
 
 var _ Observer = NopObserver{}
@@ -34,6 +35,7 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		OutcomeQueueProcessing:      "queue_processing",
 		OutcomeQueueDone:            "queue_done",
 		OutcomeQueueFailed:          "queue_failed",
+		OutcomeQueueStatusCleaned:   "queue_status_cleaned",
 		OutcomeBackpressureAcquired: "backpressure_acquired",
 		OutcomeBackpressureTimeout:  "backpressure_timeout",
 		OutcomeBackpressureReleased: "backpressure_released",
@@ -49,6 +51,44 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		if got := outcome.String(); got != want {
 			t.Fatalf("outcome %v string = %q, want %q", outcome, got, want)
 		}
+	}
+}
+
+func TestMetricHelpersNormalizeBoundedLabels(t *testing.T) {
+	subject := Subject{
+		Component: "collection-server",
+		Scope:     "answersheet_submit",
+		Resource:  "submit_queue",
+		Strategy:  "memory_channel",
+	}
+
+	ObserveQueueDepth(subject, 3)
+	ObserveQueueStatus(subject, "queued", 2)
+	ObserveBackpressureInFlight(Subject{
+		Component: "apiserver",
+		Scope:     "mysql",
+		Resource:  "downstream",
+		Strategy:  "semaphore",
+	}, 1)
+	ObserveBackpressureWaitDuration(Subject{
+		Component: "apiserver",
+		Scope:     "mysql",
+		Resource:  "downstream",
+		Strategy:  "semaphore",
+	}, OutcomeBackpressureAcquired, 0)
+}
+
+func TestFinalizeRuntimeSnapshotSummarizesCapabilities(t *testing.T) {
+	snapshot := NewRuntimeSnapshot("apiserver", time.Time{})
+	snapshot.RateLimits = []CapabilitySnapshot{{Name: "rest", Configured: true}}
+	snapshot.Backpressure = []BackpressureSnapshot{{Name: "mysql", Enabled: true}, {Name: "mongo", Degraded: true}}
+
+	got := FinalizeRuntimeSnapshot(snapshot)
+	if got.Summary.CapabilityCount != 3 {
+		t.Fatalf("capability count = %d, want 3", got.Summary.CapabilityCount)
+	}
+	if got.Summary.DegradedCount != 1 || got.Summary.Ready {
+		t.Fatalf("summary = %+v, want one degraded and not ready", got.Summary)
 	}
 }
 

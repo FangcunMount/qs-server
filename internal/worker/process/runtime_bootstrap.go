@@ -15,11 +15,12 @@ func (s *server) initializeRuntime(resources resourceOutput, containerOutput con
 	}
 
 	if s.config != nil && s.config.Metrics != nil && s.config.Metrics.Enable {
-		metrics := observability.NewMetricsServerWithGovernance(
+		metrics := observability.NewMetricsServerWithGovernanceAndResilience(
 			s.config.Metrics.BindAddress,
 			s.config.Metrics.BindPort,
 			"worker",
 			resources.redisRuntime.familyStatus,
+			containerOutput.container.ResilienceSnapshot,
 		)
 		if err := metrics.Start(); err != nil {
 			return runtimeOutput{}, err

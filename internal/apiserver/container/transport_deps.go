@@ -6,6 +6,7 @@ import (
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttransport.Deps {
@@ -18,6 +19,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.QRCodeObjectKeyPrefix = c.QRCodeObjectKeyPrefix
 	deps.GovernanceStatusService = c.CacheGovernanceStatusService()
 	deps.EventStatusService = c.buildEventStatusService()
+	deps.Backpressure = c.buildBackpressureSnapshots()
 
 	if c.SurveyModule != nil {
 		if c.SurveyModule.Questionnaire != nil {
@@ -56,6 +58,35 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	}
 
 	return deps
+}
+
+type backpressureSnapshotter interface {
+	Snapshot(name string) resilienceplane.BackpressureSnapshot
+}
+
+func (c *Container) buildBackpressureSnapshots() []resilienceplane.BackpressureSnapshot {
+	if c == nil {
+		return nil
+	}
+	return []resilienceplane.BackpressureSnapshot{
+		backpressureSnapshot("mysql", c.backpressure.MySQL),
+		backpressureSnapshot("mongo", c.backpressure.Mongo),
+		backpressureSnapshot("iam", c.backpressure.IAM),
+	}
+}
+
+func backpressureSnapshot(name string, limiter interface{}) resilienceplane.BackpressureSnapshot {
+	if snapshotter, ok := limiter.(backpressureSnapshotter); ok {
+		return snapshotter.Snapshot(name)
+	}
+	return resilienceplane.BackpressureSnapshot{
+		Component:  "apiserver",
+		Name:       name,
+		Dependency: name,
+		Strategy:   "semaphore",
+		Enabled:    false,
+		Reason:     "backpressure disabled",
+	}
 }
 
 func (c *Container) buildEventStatusService() appEventing.StatusService {

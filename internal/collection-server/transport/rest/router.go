@@ -74,6 +74,7 @@ func (r *Router) registerPublicRoutes(engine *gin.Engine) {
 	engine.GET("/health", healthHandler.Health)
 	engine.GET("/readyz", healthHandler.Ready)
 	engine.GET("/governance/redis", healthHandler.RedisFamilies)
+	engine.GET("/governance/resilience", healthHandler.Resilience)
 	engine.GET("/ping", healthHandler.Ping)
 
 	// 公开的API路由

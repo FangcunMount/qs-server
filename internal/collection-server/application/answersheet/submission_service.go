@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -144,6 +145,19 @@ func (s *SubmissionService) GetSubmitStatus(requestID string) (*SubmitStatusResp
 		return nil, false
 	}
 	return &status, true
+}
+
+func (s *SubmissionService) SubmitQueueStatusSnapshot(now time.Time) resilienceplane.QueueSnapshot {
+	if s == nil || s.queue == nil {
+		return resilienceplane.QueueSnapshot{
+			GeneratedAt:       now,
+			Component:         "collection-server",
+			Name:              "answersheet_submit",
+			Strategy:          "memory_channel",
+			LifecycleBoundary: "process_memory_no_drain",
+		}
+	}
+	return s.queue.StatusSnapshot(now)
 }
 
 func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {

@@ -1,6 +1,8 @@
 package container
 
 import (
+	"time"
+
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -15,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 // Container 主容器，负责管理所有组件
@@ -123,7 +126,7 @@ func (c *Container) initHandlers() {
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, guardianshipService)
-	c.healthHandler = handler.NewHealthHandler("collection-server", "2.0.0", c.familyStatus)
+	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
 
 	log.Info("✅ REST handlers initialized")
 }
@@ -181,6 +184,47 @@ func (c *Container) RateLimitOptions() *options.RateLimitOptions {
 // OpsHandle returns the collection-server operational Redis handle.
 func (c *Container) OpsHandle() *redisplane.Handle {
 	return c.opsHandle
+}
+
+func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {
+	now := time.Now()
+	snapshot := resilienceplane.NewRuntimeSnapshot("collection-server", now)
+	var rateCfg *options.RateLimitOptions
+	if c != nil && c.opts != nil {
+		rateCfg = c.opts.RateLimit
+	}
+	strategy := "local"
+	if c != nil && c.opsHandle != nil && c.opsHandle.Client != nil {
+		strategy = "redis"
+	}
+	if rateCfg != nil {
+		snapshot.RateLimits = []resilienceplane.CapabilitySnapshot{
+			{Name: "submit_global", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
+			{Name: "submit_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
+			{Name: "query_global", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
+			{Name: "query_user", Kind: resilienceplane.ProtectionRateLimit.String(), Strategy: strategy, Configured: rateCfg.Enabled},
+		}
+	}
+	if c != nil && c.submissionService != nil {
+		snapshot.Queues = []resilienceplane.QueueSnapshot{c.submissionService.SubmitQueueStatusSnapshot(now)}
+	}
+	idempotencyConfigured := c != nil && c.lockManager != nil && c.opsHandle != nil && c.opsHandle.Client != nil
+	snapshot.Idempotency = []resilienceplane.CapabilitySnapshot{{
+		Name:       "answersheet_submit",
+		Kind:       resilienceplane.ProtectionIdempotency.String(),
+		Strategy:   "redis_lock",
+		Configured: idempotencyConfigured,
+		Degraded:   !idempotencyConfigured,
+		Reason:     resilienceReason(idempotencyConfigured, "submit guard redis runtime unavailable"),
+	}}
+	return resilienceplane.FinalizeRuntimeSnapshot(snapshot)
+}
+
+func resilienceReason(ok bool, reason string) string {
+	if ok {
+		return ""
+	}
+	return reason
 }
 
 // ==================== Setters (用于 GRPCClientRegistry 注入) ====================

@@ -2,8 +2,10 @@ package handler
 
 import (
 	"net/http"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )
@@ -13,14 +15,20 @@ type HealthHandler struct {
 	serviceName string
 	version     string
 	status      *cacheobservability.FamilyStatusRegistry
+	resilience  func() resilienceplane.RuntimeSnapshot
 }
 
 // NewHealthHandler 创建健康检查处理器
 func NewHealthHandler(serviceName, version string, status *cacheobservability.FamilyStatusRegistry) *HealthHandler {
+	return NewHealthHandlerWithResilience(serviceName, version, status, nil)
+}
+
+func NewHealthHandlerWithResilience(serviceName, version string, status *cacheobservability.FamilyStatusRegistry, resilience func() resilienceplane.RuntimeSnapshot) *HealthHandler {
 	return &HealthHandler{
 		serviceName: serviceName,
 		version:     version,
 		status:      status,
+		resilience:  resilience,
 	}
 }
 
@@ -64,6 +72,19 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 // RedisFamilies 返回 Redis family 治理快照
 func (h *HealthHandler) RedisFamilies(c *gin.Context) {
 	core.WriteResponse(c, nil, cacheobservability.SnapshotForComponent(h.serviceName, h.status))
+}
+
+// Resilience 返回 collection-server 高并发治理只读快照。
+func (h *HealthHandler) Resilience(c *gin.Context) {
+	if h != nil && h.resilience != nil {
+		core.WriteResponse(c, nil, h.resilience())
+		return
+	}
+	component := "collection-server"
+	if h != nil && h.serviceName != "" {
+		component = h.serviceName
+	}
+	core.WriteResponse(c, nil, resilienceplane.FinalizeRuntimeSnapshot(resilienceplane.NewRuntimeSnapshot(component, time.Now())))
 }
 
 // Ping 简单连通性测试

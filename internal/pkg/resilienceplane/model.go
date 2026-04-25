@@ -29,6 +29,7 @@ const (
 	OutcomeQueueProcessing      Outcome = "queue_processing"
 	OutcomeQueueDone            Outcome = "queue_done"
 	OutcomeQueueFailed          Outcome = "queue_failed"
+	OutcomeQueueStatusCleaned   Outcome = "queue_status_cleaned"
 	OutcomeBackpressureAcquired Outcome = "backpressure_acquired"
 	OutcomeBackpressureTimeout  Outcome = "backpressure_timeout"
 	OutcomeBackpressureReleased Outcome = "backpressure_released"

@@ -82,6 +82,40 @@ func TestAcquireTimeoutReportsOutcome(t *testing.T) {
 	}
 }
 
+func TestSnapshotReportsInFlightAndConfig(t *testing.T) {
+	limiter := NewLimiterWithOptions(2, 150*time.Millisecond, Options{
+		Component:  "apiserver",
+		Dependency: "mysql",
+	})
+
+	snapshot := limiter.Snapshot("mysql")
+	if !snapshot.Enabled || snapshot.MaxInflight != 2 || snapshot.TimeoutMillis != 150 {
+		t.Fatalf("initial snapshot = %+v", snapshot)
+	}
+	if snapshot.InFlight != 0 {
+		t.Fatalf("initial in-flight = %d, want 0", snapshot.InFlight)
+	}
+
+	_, release, err := limiter.Acquire(context.Background())
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	defer release()
+
+	snapshot = limiter.Snapshot("mysql")
+	if snapshot.InFlight != 1 {
+		t.Fatalf("in-flight = %d, want 1", snapshot.InFlight)
+	}
+}
+
+func TestNilLimiterSnapshotIsDegraded(t *testing.T) {
+	var limiter *Limiter
+	snapshot := limiter.Snapshot("mysql")
+	if snapshot.Enabled || !snapshot.Degraded {
+		t.Fatalf("nil snapshot = %+v, want disabled degraded", snapshot)
+	}
+}
+
 type backpressureRecordingObserver struct {
 	decisions []resilienceplane.Decision
 }
