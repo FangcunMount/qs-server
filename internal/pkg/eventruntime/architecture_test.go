@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestEventRuntimeProductionCodeDoesNotUseGlobalEventConfig(t *testing.T) {
+func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
 	root := repoRoot(t)
 	err := filepath.WalkDir(filepath.Join(root, "internal"), func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -16,31 +16,36 @@ func TestEventRuntimeProductionCodeDoesNotUseGlobalEventConfig(t *testing.T) {
 		if entry.IsDir() {
 			return nil
 		}
-		if filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+		if filepath.Ext(path) != ".go" {
 			return nil
 		}
 		rel := filepath.ToSlash(mustRel(t, root, path))
-		if strings.HasPrefix(rel, "internal/pkg/eventconfig/") {
-			return nil
-		}
 
 		content, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
 		text := string(content)
-		if strings.Contains(text, "eventconfig.Global(") || strings.Contains(text, "eventconfig.Initialize(") {
-			t.Fatalf("%s must not use eventconfig global registry in production code", rel)
+		if strings.Contains(text, removedEventConfigImportPath()) {
+			t.Fatalf("%s must use eventcatalog/eventruntime instead of removed eventconfig", rel)
 		}
-		if (strings.Contains(rel, "/domain/") || strings.Contains(rel, "/application/")) &&
-			strings.Contains(text, `"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"`) {
-			t.Fatalf("%s must use eventcatalog/eventruntime instead of eventconfig", rel)
+		if strings.HasPrefix(rel, "internal/worker/integration/messaging/") &&
+			strings.Contains(text, workerContainerImportPath()) {
+			t.Fatalf("%s must depend on narrow messaging interfaces instead of worker/container", rel)
 		}
 		return nil
 	})
 	if err != nil {
 		t.Fatalf("walk internal: %v", err)
 	}
+}
+
+func removedEventConfigImportPath() string {
+	return "github.com/FangcunMount/qs-server/internal/pkg/" + "eventconfig"
+}
+
+func workerContainerImportPath() string {
+	return "github.com/FangcunMount/qs-server/internal/worker/" + "container"
 }
 
 func repoRoot(t *testing.T) string {

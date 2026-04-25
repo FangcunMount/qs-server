@@ -14,7 +14,11 @@ func TestEventDispatcherInitializesCurrentRuntimeTopics(t *testing.T) {
 		Logger: logger,
 	})
 
-	if err := dispatcher.Initialize("../../../configs/events.yaml"); err != nil {
+	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+	if err := dispatcher.Initialize(eventcatalog.NewCatalog(cfg)); err != nil {
 		t.Fatalf("initialize dispatcher: %v", err)
 	}
 
@@ -23,10 +27,6 @@ func TestEventDispatcherInitializesCurrentRuntimeTopics(t *testing.T) {
 		t.Fatalf("expected 4 topic subscriptions, got %d", len(subs))
 	}
 
-	cfg, err := eventcatalog.Load("../../../configs/events.yaml")
-	if err != nil {
-		t.Fatalf("load config: %v", err)
-	}
 	for _, eventType := range cfg.ListEventTypes() {
 		if !dispatcher.HasHandler(eventType) {
 			t.Fatalf("expected handler for event type %q", eventType)

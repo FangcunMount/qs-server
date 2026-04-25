@@ -18,10 +18,9 @@ import (
 
 // EventDispatcher 事件分发器
 // 负责：
-// 1. 加载事件配置
-// 2. 注册处理器
-// 3. 订阅 Topic
-// 4. 分发事件到对应处理器
+// 1. 注册处理器
+// 2. 订阅 Topic
+// 3. 分发事件到对应处理器
 type EventDispatcher struct {
 	logger     *slog.Logger
 	subscriber *eventruntime.Subscriber
@@ -49,30 +48,19 @@ func NewEventDispatcher(logger *slog.Logger, deps *HandlerDependencies) *EventDi
 	}
 }
 
-// Initialize 初始化事件分发器
-// 1. 加载事件配置
-// 2. 创建处理器工厂（使用 init() 自注册机制）
-// 3. 注册所有处理器
-func (d *EventDispatcher) Initialize(configPath string) error {
-	d.logger.Info("initializing event dispatcher",
-		slog.String("config_path", configPath),
-	)
-
-	// 1. 加载事件配置
-	cfg, err := eventcatalog.Load(configPath)
-	if err != nil {
-		return fmt.Errorf("failed to load event config: %w", err)
+// Initialize 初始化事件分发器。
+func (d *EventDispatcher) Initialize(catalog *eventcatalog.Catalog) error {
+	if catalog == nil || catalog.Config() == nil {
+		return fmt.Errorf("event catalog is not loaded")
 	}
-	catalog := eventcatalog.NewCatalog(cfg)
+	d.logger.Info("initializing event dispatcher")
 
-	// 2. 列出已通过 init() 注册的处理器
 	registeredHandlers := handlers.ListRegistered()
 	d.logger.Info("handlers registered via init()",
 		slog.Int("count", len(registeredHandlers)),
 		slog.Any("handlers", registeredHandlers),
 	)
 
-	// 3. 将依赖转换为 handlers.Dependencies
 	handlerDeps := &handlers.Dependencies{
 		Logger:            d.deps.Logger,
 		AnswerSheetClient: d.deps.AnswerSheetClient,
@@ -83,17 +71,14 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 		Notifier:          d.deps.Notifier,
 	}
 
-	// 4. 创建处理器工厂（基于 init() 注册的处理器）
 	factory := d.createHandlerFactory(handlerDeps)
 
-	// 5. 创建订阅器
 	d.subscriber = eventruntime.NewSubscriber(eventruntime.SubscriberOptions{
 		Catalog:        catalog,
 		HandlerFactory: factory,
 		Logger:         d.logger,
 	})
 
-	// 6. 注册处理器
 	if err := d.subscriber.RegisterHandlers(); err != nil {
 		return fmt.Errorf("failed to register handlers: %w", err)
 	}

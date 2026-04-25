@@ -21,6 +21,37 @@ func TestLoadEventsYAMLAndCodeConstantsStayInSync(t *testing.T) {
 	}
 }
 
+func TestRemovedEventTypesAbsent(t *testing.T) {
+	cfg, err := Load("../../../configs/events.yaml")
+	if err != nil {
+		t.Fatalf("load config: %v", err)
+	}
+
+	removed := []string{
+		"questionnaire.published",
+		"questionnaire.unpublished",
+		"questionnaire.archived",
+		"scale.published",
+		"scale.unpublished",
+		"scale.updated",
+		"scale.archived",
+		"plan.created",
+		"plan.testee_enrolled",
+		"plan.testee_terminated",
+		"plan.paused",
+		"plan.resumed",
+		"plan.canceled",
+		"plan.finished",
+		"report.exported",
+	}
+
+	for _, eventType := range removed {
+		if _, ok := cfg.Events[eventType]; ok {
+			t.Fatalf("removed event type %q still exists in config", eventType)
+		}
+	}
+}
+
 func TestCatalogQueriesTopicHandlerAndSubscription(t *testing.T) {
 	cfg, err := Load("../../../configs/events.yaml")
 	if err != nil {

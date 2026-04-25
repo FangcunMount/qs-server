@@ -19,11 +19,12 @@ import (
 
 // Container 主容器，负责管理所有组件
 type Container struct {
-	initialized bool
-	opts        *options.Options
-	logger      *slog.Logger
-	lockManager *redislock.Manager
-	lockBuilder *rediskey.Builder
+	initialized  bool
+	opts         *options.Options
+	logger       *slog.Logger
+	lockManager  *redislock.Manager
+	lockBuilder  *rediskey.Builder
+	eventCatalog *eventcatalog.Catalog
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient *grpcclient.AnswerSheetClient
@@ -35,17 +36,18 @@ type Container struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *redisplane.Handle, lockManager *redislock.Manager) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *redisplane.Handle, lockManager *redislock.Manager, eventCatalog *eventcatalog.Catalog) *Container {
 	lockBuilder := rediskey.NewBuilder()
 	if lockHandle != nil {
 		lockBuilder = lockHandle.Builder
 	}
 	return &Container{
-		opts:        opts,
-		logger:      logger,
-		lockManager: lockManager,
-		lockBuilder: lockBuilder,
-		initialized: false,
+		opts:         opts,
+		logger:       logger,
+		lockManager:  lockManager,
+		lockBuilder:  lockBuilder,
+		eventCatalog: eventCatalog,
+		initialized:  false,
 	}
 }
 
@@ -86,14 +88,7 @@ func (c *Container) initEventDispatcher() error {
 	// 创建事件分发器
 	c.eventDispatcher = application.NewEventDispatcher(c.logger, deps)
 
-	// 确定配置路径
-	configPath := "configs/events.yaml"
-	if c.opts.Worker != nil && c.opts.Worker.EventConfigPath != "" {
-		configPath = c.opts.Worker.EventConfigPath
-	}
-
-	// 初始化
-	if err := c.eventDispatcher.Initialize(configPath); err != nil {
+	if err := c.eventDispatcher.Initialize(c.eventCatalog); err != nil {
 		return err
 	}
 

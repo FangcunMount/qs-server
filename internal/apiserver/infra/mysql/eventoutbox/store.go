@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -88,7 +88,7 @@ func (s *Store) buildRows(events []event.DomainEvent) ([]*OutboxPO, error) {
 		if !ok {
 			return nil, fmt.Errorf("event %q not found in event config", evt.EventType())
 		}
-		payload, err := outboxcodec.Encode(evt)
+		payload, err := eventcodec.EncodeDomainEvent(evt)
 		if err != nil {
 			return nil, err
 		}
@@ -98,7 +98,7 @@ func (s *Store) buildRows(events []event.DomainEvent) ([]*OutboxPO, error) {
 			AggregateType: evt.AggregateType(),
 			AggregateID:   evt.AggregateID(),
 			TopicName:     topicName,
-			PayloadJSON:   payload,
+			PayloadJSON:   string(payload),
 			Status:        statusPending,
 			AttemptCount:  0,
 			NextAttemptAt: now,
@@ -150,7 +150,7 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 
 	claimed := make([]outboxport.PendingEvent, 0, len(rows))
 	for _, row := range rows {
-		evt, err := outboxcodec.Decode(row.PayloadJSON)
+		evt, err := eventcodec.DecodeDomainEvent([]byte(row.PayloadJSON))
 		if err != nil {
 			_ = s.MarkEventFailed(ctx, row.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
 			continue

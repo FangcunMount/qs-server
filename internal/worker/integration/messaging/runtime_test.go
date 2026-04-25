@@ -8,6 +8,7 @@ import (
 	"testing"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 type fakeDispatcher struct {
@@ -23,6 +24,39 @@ func (d *fakeDispatcher) DispatchEvent(_ context.Context, eventType string, payl
 	d.payload = payload
 	return d.err
 }
+
+type fakeSubscriptionRuntime struct {
+	fakeDispatcher
+	subs []eventcatalog.TopicSubscription
+}
+
+func (r *fakeSubscriptionRuntime) GetTopicSubscriptions() []eventcatalog.TopicSubscription {
+	return r.subs
+}
+
+type fakeSubscriber struct {
+	topic   string
+	channel string
+	handler basemessaging.Handler
+}
+
+func (s *fakeSubscriber) Subscribe(topic, channel string, handler basemessaging.Handler) error {
+	s.topic = topic
+	s.channel = channel
+	s.handler = handler
+	return nil
+}
+
+func (s *fakeSubscriber) SubscribeWithMiddleware(topic, channel string, handler basemessaging.Handler, middlewares ...basemessaging.Middleware) error {
+	for i := len(middlewares) - 1; i >= 0; i-- {
+		handler = middlewares[i](handler)
+	}
+	return s.Subscribe(topic, channel, handler)
+}
+
+func (*fakeSubscriber) Stop() {}
+
+func (*fakeSubscriber) Close() error { return nil }
 
 func TestDispatchHandlerUsesMetadataEventTypeFirst(t *testing.T) {
 	dispatcher := &fakeDispatcher{}
@@ -92,6 +126,28 @@ func TestMessageSettlementPolicyAckSuccess(t *testing.T) {
 	}
 	if ackCount != 1 {
 		t.Fatalf("ackCount = %d, want 1", ackCount)
+	}
+}
+
+func TestSubscribeHandlersUsesNarrowSubscriptionRuntime(t *testing.T) {
+	runtime := &fakeSubscriptionRuntime{
+		subs: []eventcatalog.TopicSubscription{
+			{TopicName: "sample.topic", EventTypes: []string{"sample.created"}},
+		},
+	}
+	subscriber := &fakeSubscriber{}
+
+	if err := SubscribeHandlers("worker-channel", testLogger(), runtime, subscriber); err != nil {
+		t.Fatalf("SubscribeHandlers: %v", err)
+	}
+	if subscriber.topic != "sample.topic" {
+		t.Fatalf("topic = %q, want sample.topic", subscriber.topic)
+	}
+	if subscriber.channel != "worker-channel" {
+		t.Fatalf("channel = %q, want worker-channel", subscriber.channel)
+	}
+	if subscriber.handler == nil {
+		t.Fatalf("handler = nil")
 	}
 }
 

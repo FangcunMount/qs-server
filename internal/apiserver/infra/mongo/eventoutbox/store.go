@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/outboxcodec"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -145,7 +145,7 @@ func (s *Store) buildDocuments(events []event.DomainEvent) ([]*OutboxPO, error) 
 		if !ok {
 			return nil, fmt.Errorf("event %q not found in event config", evt.EventType())
 		}
-		payload, err := outboxcodec.Encode(evt)
+		payload, err := eventcodec.EncodeDomainEvent(evt)
 		if err != nil {
 			return nil, err
 		}
@@ -156,7 +156,7 @@ func (s *Store) buildDocuments(events []event.DomainEvent) ([]*OutboxPO, error) 
 			AggregateType: evt.AggregateType(),
 			AggregateID:   evt.AggregateID(),
 			TopicName:     topicName,
-			PayloadJSON:   payload,
+			PayloadJSON:   string(payload),
 			Status:        statusPending,
 			AttemptCount:  0,
 			NextAttemptAt: now,
@@ -316,7 +316,7 @@ func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, n
 		return outboxport.PendingEvent{}, false, err
 	}
 
-	evt, err := outboxcodec.Decode(po.PayloadJSON)
+	evt, err := eventcodec.DecodeDomainEvent([]byte(po.PayloadJSON))
 	if err != nil {
 		_ = s.MarkEventFailed(ctx, po.EventID, fmt.Sprintf("decode outbox payload: %v", err), time.Now().Add(10*time.Second))
 		return outboxport.PendingEvent{}, false, nil

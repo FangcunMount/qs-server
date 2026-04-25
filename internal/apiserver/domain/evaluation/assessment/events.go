@@ -10,7 +10,7 @@ import (
 )
 
 // ==================== 事件类型常量 ====================
-// 从 eventconfig 包导入，保持事件类型的单一来源
+// 从 eventcatalog 包导入，保持事件类型的单一来源
 
 const (
 	// EventTypeSubmitted 测评已提交

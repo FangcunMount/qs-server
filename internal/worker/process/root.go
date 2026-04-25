@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"
@@ -40,6 +41,7 @@ type redisRuntimeOutput struct {
 type resourceOutput struct {
 	handles      resourceHandles
 	redisRuntime redisRuntimeOutput
+	eventCatalog *eventcatalog.Catalog
 }
 
 type containerOutput struct {

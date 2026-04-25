@@ -9,6 +9,7 @@ func (s *server) initializeContainer(resources resourceOutput) (containerOutput,
 			s.logger,
 			resources.redisRuntime.lockHandle,
 			resources.redisRuntime.lockManager,
+			resources.eventCatalog,
 		),
 	}, nil
 }

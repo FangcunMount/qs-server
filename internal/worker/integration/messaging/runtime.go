@@ -7,14 +7,23 @@ import (
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
 	"github.com/FangcunMount/component-base/pkg/messaging/rabbitmq"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
-	"github.com/FangcunMount/qs-server/internal/worker/container"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/nsqio/go-nsq"
 )
 
-type eventDispatcher interface {
+type TopicSubscriptionSource interface {
+	GetTopicSubscriptions() []eventcatalog.TopicSubscription
+}
+
+type EventDispatcher interface {
 	DispatchEvent(ctx context.Context, eventType string, payload []byte) error
+}
+
+type SubscriptionRuntime interface {
+	TopicSubscriptionSource
+	EventDispatcher
 }
 
 type MessageEventExtractor struct{}
@@ -100,11 +109,11 @@ func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFli
 	}
 }
 
-func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, c *container.Container) error {
-	if c == nil {
+func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, source TopicSubscriptionSource) error {
+	if source == nil {
 		return nil
 	}
-	subscriptions := c.GetTopicSubscriptions()
+	subscriptions := source.GetTopicSubscriptions()
 	topics := make([]string, 0, len(subscriptions))
 	for _, sub := range subscriptions {
 		topics = append(topics, sub.TopicName)
@@ -119,15 +128,15 @@ func EnsureTopics(cfg *config.MessagingConfig, logger *slog.Logger, c *container
 	return creator.EnsureTopics(topics)
 }
 
-func SubscribeHandlers(serviceName string, logger *slog.Logger, c *container.Container, subscriber basemessaging.Subscriber) error {
-	if c == nil || subscriber == nil {
+func SubscribeHandlers(serviceName string, logger *slog.Logger, runtime SubscriptionRuntime, subscriber basemessaging.Subscriber) error {
+	if runtime == nil || subscriber == nil {
 		return nil
 	}
 
-	subscriptions := c.GetTopicSubscriptions()
+	subscriptions := runtime.GetTopicSubscriptions()
 	for _, sub := range subscriptions {
 		topicName := sub.TopicName
-		msgHandler := createDispatchHandler(logger, c, topicName)
+		msgHandler := createDispatchHandler(logger, runtime, topicName)
 		if err := subscriber.Subscribe(topicName, serviceName, msgHandler); err != nil {
 			logger.Error("failed to subscribe",
 				slog.String("topic", topicName),
@@ -144,7 +153,7 @@ func SubscribeHandlers(serviceName string, logger *slog.Logger, c *container.Con
 	return nil
 }
 
-func createDispatchHandler(logger *slog.Logger, dispatcher eventDispatcher, topicName string) basemessaging.Handler {
+func createDispatchHandler(logger *slog.Logger, dispatcher EventDispatcher, topicName string) basemessaging.Handler {
 	extractor := MessageEventExtractor{}
 	settlement := MessageSettlementPolicy{logger: logger, topic: topicName}
 	return func(ctx context.Context, msg *basemessaging.Message) error {
