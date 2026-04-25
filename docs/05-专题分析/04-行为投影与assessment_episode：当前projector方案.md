@@ -241,7 +241,7 @@ worker 把行为事件转成 gRPC 请求：
 
 apiserver internal gRPC 入口：
 
-- [../../internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)
+- [../../internal/apiserver/transport/grpc/service/internal.go](../../internal/apiserver/transport/grpc/service/internal.go)
 
 真正的 projector 实现：
 

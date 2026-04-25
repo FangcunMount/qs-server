@@ -1,7 +1,7 @@
 package rest
 
 import (
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 

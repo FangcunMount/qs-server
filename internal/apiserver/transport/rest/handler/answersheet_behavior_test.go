@@ -10,7 +10,7 @@ import (
 	"time"
 
 	answersheetapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 

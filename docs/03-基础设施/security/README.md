@@ -54,12 +54,12 @@ flowchart LR
 | JWT claims | [`internal/pkg/middleware/jwt_auth.go`](../../../internal/pkg/middleware/jwt_auth.go) | [`internal/pkg/middleware/jwt_auth_test.go`](../../../internal/pkg/middleware/jwt_auth_test.go) |
 | HTTP identity | [`internal/pkg/httpauth/identity.go`](../../../internal/pkg/httpauth/identity.go) | [`internal/pkg/httpauth/identity_test.go`](../../../internal/pkg/httpauth/identity_test.go) |
 | gRPC auth | [`internal/pkg/grpc/interceptor_auth.go`](../../../internal/pkg/grpc/interceptor_auth.go) | [`internal/pkg/grpc/interceptor_auth_test.go`](../../../internal/pkg/grpc/interceptor_auth_test.go) |
-| capability | [`internal/apiserver/application/authz`](../../../internal/apiserver/application/authz) | [`internal/apiserver/interface/restful/middleware/capability_middleware_test.go`](../../../internal/apiserver/interface/restful/middleware/capability_middleware_test.go) |
-| operator projection | [`internal/apiserver/application/actor/operator/role_projection_updater.go`](../../../internal/apiserver/application/actor/operator/role_projection_updater.go) | [`internal/apiserver/interface/restful/middleware/authz_snapshot_middleware_test.go`](../../../internal/apiserver/interface/restful/middleware/authz_snapshot_middleware_test.go) |
+| capability | [`internal/apiserver/application/authz`](../../../internal/apiserver/application/authz) | [`internal/apiserver/transport/rest/middleware/capability_middleware_test.go`](../../../internal/apiserver/transport/rest/middleware/capability_middleware_test.go) |
+| operator projection | [`internal/apiserver/application/actor/operator/role_projection_updater.go`](../../../internal/apiserver/application/actor/operator/role_projection_updater.go) | [`internal/apiserver/transport/rest/middleware/authz_snapshot_middleware_test.go`](../../../internal/apiserver/transport/rest/middleware/authz_snapshot_middleware_test.go) |
 
 ## Verify
 
 ```bash
-GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/apiserver/interface/restful/middleware ./internal/apiserver/transport/grpc
+GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/apiserver/transport/rest/middleware ./internal/apiserver/transport/grpc
 python scripts/check_docs_hygiene.py
 ```

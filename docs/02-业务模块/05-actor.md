@@ -59,9 +59,9 @@
 
 ### 契约入口
 
-- **REST**：`/api/v1/testees`、`/api/v1/staff`、`/api/v1/clinicians`、`/api/v1/public/assessment-entries/:token` 等以代码为准；当前保留 `/api/v1/practitioners` 作为兼容别名。Handler [actor.go](../../internal/apiserver/interface/restful/handler/actor.go)、[clinician.go](../../internal/apiserver/interface/restful/handler/clinician.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
-- **C 端 / BFF gRPC**：`CreateTestee`、`GetTestee`、`ListTesteesByOrg` 等见 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)、[actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)。
-- **internal gRPC**：`TagTestee` 见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
+- **REST**：`/api/v1/testees`、`/api/v1/staff`、`/api/v1/clinicians`、`/api/v1/public/assessment-entries/:token` 等以代码为准；当前保留 `/api/v1/practitioners` 作为兼容别名。Handler [actor.go](../../internal/apiserver/transport/rest/handler/actor.go)、[clinician.go](../../internal/apiserver/transport/rest/handler/clinician.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
+- **C 端 / BFF gRPC**：`CreateTestee`、`GetTestee`、`ListTesteesByOrg` 等见 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)、[actor_service.go](../../internal/apiserver/transport/grpc/service/actor_service.go)。
+- **internal gRPC**：`TagTestee` 见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/transport/grpc/service/internal.go)。
 - **领域事件**：**N/A（当前无纳入 `configs/events.yaml` 的 actor 领域事件）**；与代码注释占位对照见「核心契约」。
 
 ### 运行时示意图
@@ -371,7 +371,7 @@ BFF 侧编排示例：[collection-server/application/testee/service.go](../../in
 
 #### 测评后打标（internal）
 
-`InternalService.TagTestee` → `TesteeTaggingService`：按风险等级等更新标签、可选重点关注（实现见 [tagging_service.go](../../internal/apiserver/application/actor/testee/tagging_service.go)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)）。
+`InternalService.TagTestee` → `TesteeTaggingService`：按风险等级等更新标签、可选重点关注（实现见 [tagging_service.go](../../internal/apiserver/application/actor/testee/tagging_service.go)、[internal.go](../../internal/apiserver/transport/grpc/service/internal.go)）。
 
 ### 核心横切：actor、IAM、collection-server 与业务模块
 
@@ -418,7 +418,7 @@ BFF 侧编排示例：[collection-server/application/testee/service.go](../../in
 
 #### 4. 请求用户身份在接口层，不进 actor 聚合
 
-JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/middleware/iam_middleware.go)、[handler/base](../../internal/apiserver/interface/restful/handler/base.go) 等解析；领域对象不持久化「当前会话」。
+JWT / claims 由 [iam_middleware](../../internal/apiserver/transport/rest/middleware/iam_middleware.go)、[handler/base](../../internal/apiserver/transport/rest/handler/base.go) 等解析；领域对象不持久化「当前会话」。
 
 #### 5. 后台 testee 可见性统一走访问守卫
 
@@ -433,7 +433,7 @@ JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/mid
 
 #### 6. 后台动作权限统一走角色守卫
 
-第四阶段后，后台动作权限通过路由分组与 [capability_middleware.go](../../internal/apiserver/interface/restful/middleware/capability_middleware.go) 统一收口；它不替代全局 IAM 授权，而是把当前 BC 内最关键的动作权限稳定地表达在 REST 入口层：
+第四阶段后，后台动作权限通过路由分组与 [capability_middleware.go](../../internal/apiserver/transport/rest/middleware/capability_middleware.go) 统一收口；它不替代全局 IAM 授权，而是把当前 BC 内最关键的动作权限稳定地表达在 REST 入口层：
 
 - `qs:evaluation_plan_manager` / `qs:admin`：创建/暂停/恢复/取消计划，受试者入组/退组，调度待推送任务，手动开放/取消任务。
 - `qs:evaluator` / `qs:admin`：批量评估、重试失败测评。
@@ -457,7 +457,7 @@ JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/mid
 
 #### 10. REST 上的「量表分析」类接口
 
-如 `GetScaleAnalysis` 在 Handler 层聚合 **evaluation** 读数据，语义是「以 testee 为维度的查询」，**不是** actor 域原生生成的核心业务对象（见 [actor.go](../../internal/apiserver/interface/restful/handler/actor.go) 与装配注入）。
+如 `GetScaleAnalysis` 在 Handler 层聚合 **evaluation** 读数据，语义是「以 testee 为维度的查询」，**不是** actor 域原生生成的核心业务对象（见 [actor.go](../../internal/apiserver/transport/rest/handler/actor.go) 与装配注入）。
 
 ### 核心存储：MySQL 与可选 Redis
 
@@ -473,9 +473,9 @@ JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/mid
 | 装配 | [internal/apiserver/container/assembler/actor.go](../../internal/apiserver/container/assembler/actor.go) |
 | 应用服务 | [internal/apiserver/application/actor/](../../internal/apiserver/application/actor/) |
 | 领域 | [internal/apiserver/domain/actor/](../../internal/apiserver/domain/actor/) |
-| REST | [internal/apiserver/interface/restful/handler/actor.go](../../internal/apiserver/interface/restful/handler/actor.go) |
-| gRPC | [internal/apiserver/interface/grpc/service/actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go) |
-| internal gRPC | [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)（`TagTestee`） |
+| REST | [internal/apiserver/transport/rest/handler/actor.go](../../internal/apiserver/transport/rest/handler/actor.go) |
+| gRPC | [internal/apiserver/transport/grpc/service/actor_service.go](../../internal/apiserver/transport/grpc/service/actor_service.go) |
+| internal gRPC | [internal/apiserver/transport/grpc/service/internal.go](../../internal/apiserver/transport/grpc/service/internal.go)（`TagTestee`） |
 | MySQL | [internal/apiserver/infra/mysql/actor/](../../internal/apiserver/infra/mysql/actor/) |
 
 ---
@@ -495,7 +495,7 @@ JWT / claims 由 [iam_middleware](../../internal/apiserver/interface/restful/mid
 
 - 变更 REST：同步 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 与 Handler。
 - 变更 C 端 gRPC：同步 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto) 与 `collection-server`。
-- 变更 `TagTestee`：同步 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go) 与 worker 调用方。
+- 变更 `TagTestee`：同步 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/transport/grpc/service/internal.go) 与 worker 调用方。
 - 若引入 actor 领域事件：新增 [configs/events.yaml](../../configs/events.yaml)、领域事件定义、发布点，并废除本文「N/A」表述。
 
 ---

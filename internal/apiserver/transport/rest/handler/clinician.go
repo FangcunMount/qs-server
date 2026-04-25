@@ -12,8 +12,8 @@ import (
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )

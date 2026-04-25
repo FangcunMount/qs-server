@@ -40,8 +40,7 @@ func TestBusinessHandlersDoNotAuthorizeWithJWTRoles(t *testing.T) {
 
 	root := repoRoot(t)
 	paths := []string{
-		"internal/apiserver/interface/restful/handler",
-		"internal/apiserver/transport/rest",
+		"internal/apiserver/transport/rest/handler",
 		"internal/collection-server/transport/rest/handler",
 		"internal/worker/handlers",
 	}

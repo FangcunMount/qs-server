@@ -5,8 +5,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/gin-gonic/gin"
 )
 

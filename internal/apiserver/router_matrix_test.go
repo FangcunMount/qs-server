@@ -4,16 +4,20 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
+	"strings"
 	"testing"
 
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
+	"gopkg.in/yaml.v3"
 )
 
 type routerClinicianQueryStub struct{}
@@ -61,6 +65,37 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/resilience/status")
 }
 
+func TestRouterPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := gin.New()
+	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
+	router.RegisterRoutes(engine)
+
+	spec := loadRouterMatrixOpenAPI(t, "../../api/rest/apiserver.yaml")
+	missing := 0
+	for _, route := range engine.Routes() {
+		if !routeMustBeDocumented(route) {
+			continue
+		}
+		path := normalizeOpenAPIPath(route.Path)
+		method := strings.ToLower(route.Method)
+		ops, ok := spec.Paths[path]
+		if !ok {
+			t.Errorf("OpenAPI missing route %s %s normalized as %s", route.Method, route.Path, path)
+			missing++
+			continue
+		}
+		if _, ok := ops[method]; !ok {
+			t.Errorf("OpenAPI path %s missing method %s for route %s %s", path, method, route.Method, route.Path)
+			missing++
+		}
+	}
+	if missing > 0 {
+		t.Fatalf("OpenAPI is missing %d registered public/business routes", missing)
+	}
+}
+
 func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
@@ -74,6 +109,56 @@ func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
 
 	if rec.Code != http.StatusForbidden {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestTransportPlaneDoesNotUseLegacyInterfaceImplementation(t *testing.T) {
+	root, err := os.Getwd()
+	if err != nil {
+		t.Fatal(err)
+	}
+	for {
+		if _, err := os.Stat(filepath.Join(root, "go.mod")); err == nil {
+			break
+		}
+		next := filepath.Dir(root)
+		if next == root {
+			t.Fatal("go.mod not found")
+		}
+		root = next
+	}
+
+	forbidden := []string{
+		"internal/apiserver/interface/restful",
+		"internal/apiserver/interface/grpc/service",
+	}
+	err = filepath.WalkDir(filepath.Join(root, "internal"), func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() {
+			if strings.HasSuffix(filepath.ToSlash(path), "/internal/apiserver/interface/grpc/proto") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		source := string(data)
+		for _, token := range forbidden {
+			if strings.Contains(source, token) {
+				t.Fatalf("%s imports legacy transport implementation path %s", path, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 
@@ -149,4 +234,61 @@ func assertRoutePresent(t *testing.T, routes gin.RoutesInfo, method, path string
 		}
 	}
 	t.Fatalf("route %s %s not registered", method, path)
+}
+
+type routerMatrixOpenAPISpec struct {
+	Paths map[string]map[string]any `yaml:"paths"`
+}
+
+func loadRouterMatrixOpenAPI(t *testing.T, path string) routerMatrixOpenAPISpec {
+	t.Helper()
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var spec routerMatrixOpenAPISpec
+	if err := yaml.Unmarshal(data, &spec); err != nil {
+		t.Fatalf("parse %s: %v", path, err)
+	}
+	if len(spec.Paths) == 0 {
+		t.Fatalf("%s has no OpenAPI paths", path)
+	}
+	return spec
+}
+
+func routeMustBeDocumented(route gin.RouteInfo) bool {
+	if route.Method != http.MethodGet &&
+		route.Method != http.MethodPost &&
+		route.Method != http.MethodPut &&
+		route.Method != http.MethodDelete {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(route.Path, "/internal/v1/"):
+		return false
+	case strings.HasPrefix(route.Path, "/governance/"):
+		return false
+	case strings.HasPrefix(route.Path, "/api/rest/"):
+		return false
+	case strings.HasPrefix(route.Path, "/swagger-ui/"):
+		return false
+	case route.Path == "/swagger" || route.Path == "/readyz":
+		return false
+	default:
+		return true
+	}
+}
+
+func normalizeOpenAPIPath(path string) string {
+	path = strings.TrimPrefix(path, "/api/v1")
+	if path == "" {
+		path = "/"
+	}
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			parts[i] = "{" + strings.TrimPrefix(part, ":") + "}"
+		}
+	}
+	return strings.Join(parts, "/")
 }

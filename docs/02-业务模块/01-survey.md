@@ -61,8 +61,8 @@
 
 ### 契约入口
 
-- **REST**：问卷与答卷路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler 见 [internal/apiserver/interface/restful/handler/](../../internal/apiserver/interface/restful/handler/) 下问卷/答卷相关文件。
-- **前台 gRPC**：`SaveAnswerSheet` 等以 [answersheet.proto](../../internal/apiserver/interface/grpc/proto/answersheet/answersheet.proto) 及 [answersheet.go](../../internal/apiserver/interface/grpc/service/answersheet.go) 为准。
+- **REST**：问卷与答卷路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler 见 [internal/apiserver/transport/rest/handler/](../../internal/apiserver/transport/rest/handler/) 下问卷/答卷相关文件。
+- **前台 gRPC**：`SaveAnswerSheet` 等以 [answersheet.proto](../../internal/apiserver/interface/grpc/proto/answersheet/answersheet.proto) 及 [answersheet.go](../../internal/apiserver/transport/grpc/service/answersheet.go) 为准。
 - **领域事件**：事件类型字符串、Topic、handler 须与 [configs/events.yaml](../../configs/events.yaml) 一致；下文「核心契约」中有对照表便于 **Verify**。
 
 ### 运行时示意图
@@ -282,12 +282,12 @@ flowchart TB
   - `collection-server` 调 `AnswerSheetService`
   - 入口：
     [internal/collection-server/application/answersheet/submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go)
-    [internal/apiserver/interface/grpc/service/answersheet.go](../../internal/apiserver/interface/grpc/service/answersheet.go)
+    [internal/apiserver/transport/grpc/service/answersheet.go](../../internal/apiserver/transport/grpc/service/answersheet.go)
 - internal gRPC
   - `worker` 调 `InternalService.CalculateAnswerSheetScore`
   - 入口：
     [internal/worker/handlers/answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go)
-    [internal/apiserver/interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go)
+    [internal/apiserver/transport/grpc/service/internal.go](../../internal/apiserver/transport/grpc/service/internal.go)
 
 #### 输出
 
@@ -312,7 +312,7 @@ flowchart TB
 
 #### 前台提交流程的真正入口
 
-`apiserver` 的 [internal/apiserver/interface/restful/handler/answersheet.go](../../internal/apiserver/interface/restful/handler/answersheet.go) 不是小程序收集端的主提交入口。前台答卷提交主链路实际是：
+`apiserver` 的 [internal/apiserver/transport/rest/handler/answersheet.go](../../internal/apiserver/transport/rest/handler/answersheet.go) 不是小程序收集端的主提交入口。前台答卷提交主链路实际是：
 
 `collection-server -> gRPC -> survey.SubmissionService`
 
@@ -591,7 +591,7 @@ flowchart TB
 | 应用服务 | [internal/apiserver/application/survey/](../../internal/apiserver/application/survey/) |
 | 领域 | [internal/apiserver/domain/survey/](../../internal/apiserver/domain/survey/)、[internal/apiserver/domain/validation/](../../internal/apiserver/domain/validation/) |
 | 计算子域 | [internal/apiserver/domain/calculation/](../../internal/apiserver/domain/calculation/) |
-| REST / gRPC | [internal/apiserver/interface/restful/handler/](../../internal/apiserver/interface/restful/handler/)、[internal/apiserver/interface/grpc/service/answersheet.go](../../internal/apiserver/interface/grpc/service/answersheet.go) |
+| REST / gRPC | [internal/apiserver/transport/rest/handler/](../../internal/apiserver/transport/rest/handler/)、[internal/apiserver/transport/grpc/service/answersheet.go](../../internal/apiserver/transport/grpc/service/answersheet.go) |
 
 ---
 

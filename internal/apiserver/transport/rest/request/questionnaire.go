@@ -1,7 +1,7 @@
 package request
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/viewmodel"
 )
 
 // CreateQuestionnaireRequest 创建问卷请求

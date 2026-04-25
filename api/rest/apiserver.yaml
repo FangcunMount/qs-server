@@ -523,6 +523,15 @@ paths:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
   /clinicians/{id}:
+    put:
+      tags:
+      - Transport-Contract
+      summary: PUT /clinicians/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
     get:
       tags:
       - Actor-Clinician
@@ -3729,6 +3738,600 @@ paths:
               schema:
                 type: object
                 additionalProperties: true
+  /statistics/clinicians:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/clinicians
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/clinicians/me/overview:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/clinicians/me/overview
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/clinicians/me/entries:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/clinicians/me/entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/clinicians/me/testees-summary:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/clinicians/me/testees-summary
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/clinicians/{id}:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/clinicians/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/entries:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/entries/{id}:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/entries/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/testees/{testee_id}/periodic:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/testees/{testee_id}/periodic
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/overview:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /statistics/overview
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/me
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me/assessment-entries:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/me/assessment-entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/me/assessment-entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me/assessment-entries/{id}:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/me/assessment-entries/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me/assessment-entries/{id}/deactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/me/assessment-entries/{id}/deactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me/assessment-entries/{id}/reactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/me/assessment-entries/{id}/reactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me/testees:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/me/testees
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/me/relations:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/me/relations
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+    put:
+      tags:
+      - Transport-Contract
+      summary: PUT /practitioners/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/activate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/{id}/activate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/assessment-entries:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/{id}/assessment-entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/{id}/assessment-entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/deactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/{id}/deactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/bind-operator:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/{id}/bind-operator
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/unbind-operator:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /practitioners/{id}/unbind-operator
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/testees:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/{id}/testees
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /practitioners/{id}/relations:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /practitioners/{id}/relations
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /public/info:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /public/info
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/me/relations:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /clinicians/me/relations
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/me/assessment-entries/{id}/deactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/me/assessment-entries/{id}/deactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/me/assessment-entries/{id}/reactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/me/assessment-entries/{id}/reactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/activate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/{id}/activate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/assessment-entries:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /clinicians/{id}/assessment-entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/{id}/assessment-entries
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/deactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/{id}/deactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/bind-operator:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/{id}/bind-operator
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/unbind-operator:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinicians/{id}/unbind-operator
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/testees:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /clinicians/{id}/testees
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinicians/{id}/relations:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /clinicians/{id}/relations
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /testees/{id}/clinicians:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /testees/{id}/clinicians
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /testees/{id}/clinician-relations:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /testees/{id}/clinician-relations
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /questionnaires/published:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /questionnaires/published
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /questionnaires/published/{code}:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /questionnaires/published/{code}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /admin/users:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /admin/users
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /admin/statistics:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /admin/statistics
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /admin/logs:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /admin/logs
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /assessment-entries/{id}:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /assessment-entries/{id}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /assessment-entries/{id}/deactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /assessment-entries/{id}/deactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /assessment-entries/{id}/reactivate:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /assessment-entries/{id}/reactivate
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinician-testee-relations/assign:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinician-testee-relations/assign
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinician-testee-relations/assign-primary:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinician-testee-relations/assign-primary
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinician-testee-relations/assign-attending:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinician-testee-relations/assign-attending
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinician-testee-relations/assign-collaborator:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinician-testee-relations/assign-collaborator
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinician-testee-relations/transfer-primary:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinician-testee-relations/transfer-primary
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /clinician-testee-relations/{id}/unbind:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /clinician-testee-relations/{id}/unbind
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /statistics/questionnaires/batch:
+    post:
+      tags:
+      - Transport-Contract
+      summary: POST /statistics/questionnaires/batch
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+  /questionnaires/{code}/questions/{qcode}:
+    put:
+      tags:
+      - Transport-Contract
+      summary: PUT /questionnaires/{code}/questions/{qcode}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
+    delete:
+      tags:
+      - Transport-Contract
+      summary: DELETE /questionnaires/{code}/questions/{qcode}
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
 components:
   schemas:
     cachetarget.WarmupKind:

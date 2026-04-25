@@ -77,8 +77,7 @@ flowchart LR
 
 | 关注点 | 路径 |
 | ------ | ---- |
-| 服务实现桩 | [internal/apiserver/interface/grpc/service](../../internal/apiserver/interface/grpc/service/) |
-| transport-owned service facade | [internal/apiserver/transport/grpc/service](../../internal/apiserver/transport/grpc/service/) |
+| 服务实现桩 | [internal/apiserver/transport/grpc/service](../../internal/apiserver/transport/grpc/service/) |
 | worker Internal 调用 | [internal/worker/infra/grpcclient/internal_client.go](../../internal/worker/infra/grpcclient/internal_client.go) |
 
 ---

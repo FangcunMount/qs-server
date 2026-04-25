@@ -2,8 +2,8 @@ package handler
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/request"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/response"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )

@@ -91,7 +91,7 @@ flowchart TB
 - Testee domain：[domain/actor/testee](../../../internal/apiserver/domain/actor/testee/)
 - Testee app：[application/actor/testee](../../../internal/apiserver/application/actor/testee/)
 - Tagging service：[tagging_service.go](../../../internal/apiserver/application/actor/testee/tagging_service.go)
-- Internal gRPC：[internal.go](../../../internal/apiserver/interface/grpc/service/internal.go)
+- Internal gRPC：[internal.go](../../../internal/apiserver/transport/grpc/service/internal.go)
 
 ## Verify
 

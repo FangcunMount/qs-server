@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestRESTTransportUsesTransportOwnedHandlerFacade(t *testing.T) {
+func TestRESTTransportDoesNotDependOnLegacyRESTImplementation(t *testing.T) {
 	t.Parallel()
 
 	err := filepath.WalkDir(".", func(path string, d os.DirEntry, err error) error {
@@ -17,15 +17,12 @@ func TestRESTTransportUsesTransportOwnedHandlerFacade(t *testing.T) {
 		if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
-		if strings.HasPrefix(filepath.ToSlash(path), "handler/") {
-			return nil
-		}
 		data, err := os.ReadFile(path)
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(data), "internal/apiserver/interface/restful/handler") {
-			t.Fatalf("transport/rest should import transport/rest/handler facade, not legacy interface handler: %s", path)
+		if strings.Contains(string(data), "internal/apiserver/interface/restful") {
+			t.Fatalf("transport/rest must own REST implementation and not import legacy interface/restful: %s", path)
 		}
 		return nil
 	})

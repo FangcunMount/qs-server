@@ -9,7 +9,7 @@
 | 本层解决什么 | 把 REST、gRPC、OpenAPI、proto、路由注册、handler/service adapter 的契约边界收口 |
 | 当前真值 | 运行时 router/registry + `api/rest/*.yaml` + `.proto` + contract tests |
 | 当前边界 | 不改业务语义；只保证 wire contract、auth surface、adapter ownership 可核对 |
-| 迁移状态 | REST/gRPC 正在从 legacy `interface/*` 向 `transport/*` 渐进收口 |
+| 迁移状态 | REST handler/DTO 与 gRPC service adapter 已归属 `transport/*`；generated proto 继续保留历史 `interface/grpc/proto` 路径 |
 | 入口文档 | 本目录讲架构和 SOP；[04-接口与运维](../../04-接口与运维/) 保留契约运维索引 |
 
 ## 阅读顺序

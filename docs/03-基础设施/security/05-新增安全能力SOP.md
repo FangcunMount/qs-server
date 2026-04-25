@@ -64,7 +64,7 @@ flowchart LR
 
 ```bash
 GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/pkg/iamauth
-GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/apiserver/interface/restful/middleware ./internal/apiserver/transport/grpc ./internal/apiserver/infra/iam ./internal/collection-server/infra/iam
+GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/apiserver/transport/rest/middleware ./internal/apiserver/transport/grpc ./internal/apiserver/infra/iam ./internal/collection-server/infra/iam
 python scripts/check_docs_hygiene.py
 git diff --check
 ```

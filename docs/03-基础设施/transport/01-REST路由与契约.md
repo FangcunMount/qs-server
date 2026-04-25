@@ -64,7 +64,7 @@ classDiagram
 
 - **Adapter**：handler 是 HTTP adapter，不承载领域规则。
 - **Policy / Chain**：auth、capability、rate limit 通过 middleware 链组合，而不是散落到 handler。
-- **Contract Test**：OpenAPI test 只锁关键公共 route；internal route 通过专门 route test 锁住。
+- **Contract Test**：OpenAPI test 锁所有公开业务 route；internal/governance/static route 通过显式 allowlist 和专门 route test 锁住。
 - **取舍**：OpenAPI 当前不是运行时自动生成真值，所以新增接口时必须同步 YAML 与 test；这是显式维护成本，但避免引入更重的代码生成链。
 
 ## Verify

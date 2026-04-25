@@ -2,8 +2,13 @@ package rest
 
 import (
 	"os"
+	"strings"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/collection-server/container"
+	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
 )
 
@@ -19,6 +24,46 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/scales/categories", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}/care-context", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
+}
+
+func TestCollectionPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	c := container.NewContainer(
+		options.NewOptions(),
+		nil,
+		nil,
+		cacheobservability.NewFamilyStatusRegistry("collection-server"),
+	)
+	if err := c.Initialize(); err != nil {
+		t.Fatal(err)
+	}
+
+	engine := gin.New()
+	NewRouter(c).RegisterRoutes(engine)
+
+	spec := loadOpenAPISpec(t, "../../../../api/rest/collection.yaml")
+	missing := 0
+	for _, route := range engine.Routes() {
+		if !collectionRouteMustBeDocumented(route) {
+			continue
+		}
+		path := normalizeCollectionOpenAPIPath(route.Path)
+		method := strings.ToLower(route.Method)
+		ops, ok := spec.Paths[path]
+		if !ok {
+			t.Errorf("OpenAPI missing route %s %s normalized as %s", route.Method, route.Path, path)
+			missing++
+			continue
+		}
+		if _, ok := ops[method]; !ok {
+			t.Errorf("OpenAPI path %s missing method %s for route %s %s", path, method, route.Method, route.Path)
+			missing++
+		}
+	}
+	if missing > 0 {
+		t.Fatalf("OpenAPI is missing %d registered public/business routes", missing)
+	}
 }
 
 type openAPISpec struct {
@@ -50,4 +95,39 @@ func assertOpenAPIOperation(t *testing.T, spec openAPISpec, path, method string)
 	if _, ok := ops[method]; !ok {
 		t.Fatalf("OpenAPI path %s missing method %s", path, method)
 	}
+}
+
+func collectionRouteMustBeDocumented(route gin.RouteInfo) bool {
+	if route.Method != "GET" &&
+		route.Method != "POST" &&
+		route.Method != "PUT" &&
+		route.Method != "DELETE" {
+		return false
+	}
+	switch {
+	case strings.HasPrefix(route.Path, "/governance/"):
+		return false
+	case strings.HasPrefix(route.Path, "/api/rest/"):
+		return false
+	case strings.HasPrefix(route.Path, "/swagger-ui/"):
+		return false
+	case route.Path == "/swagger" || route.Path == "/readyz":
+		return false
+	default:
+		return true
+	}
+}
+
+func normalizeCollectionOpenAPIPath(path string) string {
+	path = strings.TrimPrefix(path, "/api/v1")
+	if path == "" {
+		path = "/"
+	}
+	parts := strings.Split(path, "/")
+	for i, part := range parts {
+		if strings.HasPrefix(part, ":") {
+			parts[i] = "{" + strings.TrimPrefix(part, ":") + "}"
+		}
+	}
+	return strings.Join(parts, "/")
 }

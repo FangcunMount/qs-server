@@ -39,7 +39,7 @@ func TestCollectionContainerDoesNotImportApiserverRuntime(t *testing.T) {
 				importPath := strings.Trim(imported.Path.Value, `"`)
 				if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/container") ||
 					strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/transport") ||
-					strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware") {
+					strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware") {
 					t.Fatalf("%s imports %s; collection composition must not depend on apiserver runtime wiring", path, importPath)
 				}
 			}

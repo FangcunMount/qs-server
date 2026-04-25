@@ -2,7 +2,7 @@ package response
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/viewmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/viewmodel"
 )
 
 // QuestionnaireResponse 问卷响应

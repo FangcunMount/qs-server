@@ -76,7 +76,7 @@ flowchart LR
 | apiserver 路由 | [internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/) |
 | collection 路由 | [internal/collection-server/transport/rest/router.go](../../internal/collection-server/transport/rest/router.go) |
 | 静态挂载 OpenAPI / Swagger UI | 各进程 `server` / `app` 装配（与 [Makefile](../../Makefile) 产物路径一致） |
-| 缓存治理 internal 路由 | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) |
+| 缓存治理 internal 路由 | [internal/apiserver/transport/rest/handler/statistics.go](../../internal/apiserver/transport/rest/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) |
 | 事件状态 internal 路由 | [internal/apiserver/transport/rest/routes_events.go](../../internal/apiserver/transport/rest/routes_events.go)；只读聚合见 [internal/apiserver/application/eventing/status_service.go](../../internal/apiserver/application/eventing/status_service.go) |
 | Transport 深讲 | [transport/README.md](../03-基础设施/transport/README.md) |
 
@@ -134,7 +134,7 @@ flowchart LR
 **Verify**：
 
 - 路由注册以 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) 为准
-- 返回结构与查询参数校验以 [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 为准
+- 返回结构与查询参数校验以 [internal/apiserver/transport/rest/handler/statistics.go](../../internal/apiserver/transport/rest/handler/statistics.go) 为准
 - `status` / `hotset` 口径来自缓存治理服务与 runtime family registry，不是 OpenAPI 静态文件推导出来的文档状态
 
 ### 事件状态 internal 面板（What / Where / Verify）

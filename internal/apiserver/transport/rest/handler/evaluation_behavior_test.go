@@ -9,7 +9,7 @@ import (
 
 	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 

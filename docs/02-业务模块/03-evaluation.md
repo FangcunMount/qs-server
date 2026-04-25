@@ -286,8 +286,8 @@ sequenceDiagram
 
 | 步骤 | 动作 | RPC / 事件 | 实现锚点 |
 | ---- | ---- | ----------- | -------- |
-| 1 | 计分回写答卷 | `CalculateAnswerSheetScore` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go) |
-| 2 | 建测评并提交 | `CreateAssessmentFromAnswerSheet` → `assessment.submitted` | [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)；[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go) |
+| 1 | 计分回写答卷 | `CalculateAnswerSheetScore` | [internal.go](../../internal/apiserver/transport/grpc/service/internal.go)；[answersheet_handler.go](../../internal/worker/handlers/answersheet_handler.go) |
+| 2 | 建测评并提交 | `CreateAssessmentFromAnswerSheet` → `assessment.submitted` | [internal.go](../../internal/apiserver/transport/grpc/service/internal.go)；[events.go](../../internal/apiserver/domain/evaluation/assessment/events.go) |
 | 3 | 执行评估 | `EvaluateAssessment` | [assessment_handler.go](../../internal/worker/handlers/assessment_handler.go)；[engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go) |
 | 4 | 流水线结束 | `assessment.interpreted`、`report.generated` | 这两类成功事件在 **报告保存成功** 时一起进入 Mongo outbox，而不是在 MySQL assessment save 后 direct publish |
 
@@ -301,15 +301,15 @@ sequenceDiagram
 
 #### REST
 
-`/evaluations/*`、`/assessments/*` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)，路由 [transport/rest](../../internal/apiserver/transport/rest/)。
+`/evaluations/*`、`/assessments/*` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [evaluation.go](../../internal/apiserver/transport/rest/handler/evaluation.go)，路由 [transport/rest](../../internal/apiserver/transport/rest/)。
 
 #### 对外 gRPC（Evaluation）
 
-如 `GetMyAssessment`、`ListMyAssessments`、`GetAssessmentScores`、`GetAssessmentReport` — [evaluation.proto](../../internal/apiserver/interface/grpc/proto/evaluation/evaluation.proto)，实现 [evaluation.go](../../internal/apiserver/interface/grpc/service/evaluation.go)。
+如 `GetMyAssessment`、`ListMyAssessments`、`GetAssessmentScores`、`GetAssessmentReport` — [evaluation.proto](../../internal/apiserver/interface/grpc/proto/evaluation/evaluation.proto)，实现 [evaluation.go](../../internal/apiserver/transport/grpc/service/evaluation.go)。
 
 #### 对内 gRPC（InternalService）
 
-[internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto) 中与测评强相关：`CalculateAnswerSheetScore`、`CreateAssessmentFromAnswerSheet`、`EvaluateAssessment`；实现 [internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
+[internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto) 中与测评强相关：`CalculateAnswerSheetScore`、`CreateAssessmentFromAnswerSheet`、`EvaluateAssessment`；实现 [internal.go](../../internal/apiserver/transport/grpc/service/internal.go)。
 
 #### 领域事件（须与配置一致）
 
@@ -396,7 +396,7 @@ sequenceDiagram
 | 模块装配 | [internal/apiserver/container/assembler/evaluation.go](../../internal/apiserver/container/assembler/evaluation.go) |
 | 应用服务 | [internal/apiserver/application/evaluation/](../../internal/apiserver/application/evaluation/) |
 | 领域 | [internal/apiserver/domain/evaluation/](../../internal/apiserver/domain/evaluation/) |
-| 接口 | [handler/evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)、[grpc/service/evaluation.go](../../internal/apiserver/interface/grpc/service/evaluation.go)、[grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go) |
+| 接口 | [handler/evaluation.go](../../internal/apiserver/transport/rest/handler/evaluation.go)、[grpc/service/evaluation.go](../../internal/apiserver/transport/grpc/service/evaluation.go)、[grpc/service/internal.go](../../internal/apiserver/transport/grpc/service/internal.go) |
 
 ---
 

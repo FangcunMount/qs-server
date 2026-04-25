@@ -3,8 +3,8 @@ package rest
 import (
 	"net/http"
 
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 

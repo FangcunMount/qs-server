@@ -194,7 +194,7 @@ flowchart TB
 
 ### 2. 问卷 → 量表：仓储解析，而非问卷上长量表子树
 
-内部 gRPC [`CreateAssessmentFromAnswerSheet`](../../internal/apiserver/interface/grpc/service/internal.go) 在创建测评前会调用 `scaleRepo.FindByQuestionnaireCode(ctx, req.QuestionnaireCode)`：
+内部 gRPC [`CreateAssessmentFromAnswerSheet`](../../internal/apiserver/transport/grpc/service/internal.go) 在创建测评前会调用 `scaleRepo.FindByQuestionnaireCode(ctx, req.QuestionnaireCode)`：
 
 - 若找到量表，则把 **量表 ID/code/name** 填入 `CreateAssessmentDTO`，后续写入 `Assessment` 的 `MedicalScaleRef`；
 - 若**未找到**（`err != nil` 或 `medicalScale == nil`），日志会说明 **「问卷未关联量表，将创建纯问卷模式的测评」**，此时 `MedicalScaleID` 等保持为空，即 **测评可以存在「无量表」模式**——这是三界模型在实现上的重要边界：**没有规则层 ≠ 不能建测评**，但 **引擎侧**能否走完整因子/解读链路由 pipeline 与数据是否齐全决定。
@@ -382,7 +382,7 @@ flowchart TB
 | 跨聚合创建 | [domain/evaluation/assessment/creator.go](../../internal/apiserver/domain/evaluation/assessment/creator.go) | `AssessmentCreator`：受试者、问卷、答卷、量表一致性 |
 | 报告 | [domain/evaluation/report](../../internal/apiserver/domain/evaluation/report) | 解读结果载体 |
 | 评估引擎与 pipeline | [application/evaluation/engine/service.go](../../internal/apiserver/application/evaluation/engine/service.go)、[pipeline/](../../internal/apiserver/application/evaluation/engine/pipeline/) | `buildPipeline` 顺序即运行时步骤 |
-| 从答卷创建测评（worker 回调） | [interface/grpc/service/internal.go](../../internal/apiserver/interface/grpc/service/internal.go) | `CreateAssessmentFromAnswerSheet`：解析量表、写 `CreateAssessmentDTO` |
+| 从答卷创建测评（worker 回调） | [transport/grpc/service/internal.go](../../internal/apiserver/transport/grpc/service/internal.go) | `CreateAssessmentFromAnswerSheet`：解析量表、写 `CreateAssessmentDTO` |
  
 ## 延伸阅读与互链
 

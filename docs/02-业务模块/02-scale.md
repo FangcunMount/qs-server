@@ -55,8 +55,8 @@
 
 ### 契约入口
 
-- **REST**：量表路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler 见 [scale.go](../../internal/apiserver/interface/restful/handler/scale.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
-- **C 端 gRPC**：`GetScale` / `ListScales` / `GetScaleCategories` 等以 [scale.proto](../../internal/apiserver/interface/grpc/proto/scale/scale.proto) 与 [scale.go](../../internal/apiserver/interface/grpc/service/scale.go) 为准。
+- **REST**：量表路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler 见 [scale.go](../../internal/apiserver/transport/rest/handler/scale.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
+- **C 端 gRPC**：`GetScale` / `ListScales` / `GetScaleCategories` 等以 [scale.proto](../../internal/apiserver/interface/grpc/proto/scale/scale.proto) 与 [scale.go](../../internal/apiserver/transport/grpc/service/scale.go) 为准。
 - **领域事件**：事件类型、Topic、handler 须与 [configs/events.yaml](../../configs/events.yaml) 一致；完整运行时事件清单与消费链路见 [03-基础设施/01-事件系统.md](../03-基础设施/01-事件系统.md)。
 
 ### 运行时示意图
@@ -251,9 +251,9 @@ flowchart TB
 
 - 后台 REST（示例路径）
   - `/api/v1/scales`、`/api/v1/scales/:code/factors`、`/api/v1/scales/:code/interpret-rules` 等
-  - 路由入口：[transport/rest](../../internal/apiserver/transport/rest/)、[scale.go](../../internal/apiserver/interface/restful/handler/scale.go)
+  - 路由入口：[transport/rest](../../internal/apiserver/transport/rest/)、[scale.go](../../internal/apiserver/transport/rest/handler/scale.go)
 - C 端 gRPC
-  - 见 [scale.proto](../../internal/apiserver/interface/grpc/proto/scale/scale.proto)、[scale.go](../../internal/apiserver/interface/grpc/service/scale.go)
+  - 见 [scale.proto](../../internal/apiserver/interface/grpc/proto/scale/scale.proto)、[scale.go](../../internal/apiserver/transport/grpc/service/scale.go)
 - 跨模块依赖
   - 发布前若问卷版本为空，从 [questionnaire.Repository](../../internal/apiserver/domain/survey/questionnaire/repository.go) 取最新版本并写回量表（[lifecycle_service.go](../../internal/apiserver/application/scale/lifecycle_service.go) `ensureQuestionnaireVersion`）
 
@@ -400,7 +400,7 @@ sequenceDiagram
 | 应用服务 | [internal/apiserver/application/scale/](../../internal/apiserver/application/scale/) |
 | 领域 | [internal/apiserver/domain/scale/](../../internal/apiserver/domain/scale/) |
 | 计算子域 | [internal/apiserver/domain/calculation/](../../internal/apiserver/domain/calculation/) |
-| REST / gRPC | [internal/apiserver/interface/restful/handler/scale.go](../../internal/apiserver/interface/restful/handler/scale.go)、[internal/apiserver/interface/grpc/service/scale.go](../../internal/apiserver/interface/grpc/service/scale.go) |
+| REST / gRPC | [internal/apiserver/transport/rest/handler/scale.go](../../internal/apiserver/transport/rest/handler/scale.go)、[internal/apiserver/transport/grpc/service/scale.go](../../internal/apiserver/transport/grpc/service/scale.go) |
 
 ---
 

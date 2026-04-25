@@ -10,8 +10,8 @@ import (
 
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/middleware"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 

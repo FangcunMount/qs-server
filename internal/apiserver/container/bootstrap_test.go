@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
+	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/event"

@@ -34,7 +34,7 @@ flowchart LR
 2. 修改 `.proto`，保持 package 和 go_package 策略一致。
 3. 本轮若必须重生成 proto，必须单独声明 codegen 变更，不混在 transport cleanup 中。
 4. 在 `transport/grpc/registry.go` 增加注册路径。
-5. service adapter 放在 `transport/grpc/service` 主路径；legacy interface 包只允许兼容迁移。
+5. service adapter 放在 `transport/grpc/service` 主路径；不要新增 `interface/*` implementation 包。
 6. 补 proto/registry contract test。
 
 ## 不可变边界

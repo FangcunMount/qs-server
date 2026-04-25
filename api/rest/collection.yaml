@@ -1247,6 +1247,16 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+  /assessments/high-risk:
+    get:
+      tags:
+      - Transport-Contract
+      summary: GET /assessments/high-risk
+      responses:
+        '200':
+          description: OK
+        '429':
+          description: Too Many Requests
 components:
   schemas:
     answersheet.AnswerSheetResponse:

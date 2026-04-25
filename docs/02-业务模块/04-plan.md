@@ -55,7 +55,7 @@
 
 ### 契约入口
 
-- **REST**：用户侧计划与任务路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准（如 `/api/v1/plans`、`/api/v1/plans/enroll`）；系统动作走 `/internal/v1/plans/tasks/schedule|:id/complete|:id/expire`。Handler 见 [plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
+- **REST**：用户侧计划与任务路径以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准（如 `/api/v1/plans`、`/api/v1/plans/enroll`）；系统动作走 `/internal/v1/plans/tasks/schedule|:id/complete|:id/expire`。Handler 见 [plan.go](../../internal/apiserver/transport/rest/handler/plan.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
 - **领域事件**：事件类型、Topic、handler 须与 [configs/events.yaml](../../configs/events.yaml) 一致；下文「核心契约」中有对照表便于 **Verify**。
 
 ### 运行时示意图
@@ -226,7 +226,7 @@ flowchart TB
 
 #### 输入
 
-- 后台 REST：以 [apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [plan.go](../../internal/apiserver/interface/restful/handler/plan.go)。
+- 后台 REST：以 [apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [plan.go](../../internal/apiserver/transport/rest/handler/plan.go)。
 - **系统动作 REST**：`POST /internal/v1/plans/tasks/schedule|:id/complete|:id/expire`，路由见 [transport/rest](../../internal/apiserver/transport/rest/) `registerPlanInternalRoutes`。
 - **跨模块**：创建计划时可选 `scale.Repository.ExistsByCode`（[lifecycle_service.go](../../internal/apiserver/application/plan/lifecycle_service.go) 与装配注入）。
 
@@ -347,7 +347,7 @@ sequenceDiagram
 | 装配 | [internal/apiserver/container/assembler/plan.go](../../internal/apiserver/container/assembler/plan.go) |
 | 应用服务 | [internal/apiserver/application/plan/](../../internal/apiserver/application/plan/) |
 | 领域 | [internal/apiserver/domain/plan/](../../internal/apiserver/domain/plan/) |
-| REST | [internal/apiserver/interface/restful/handler/plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、[internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/)（受保护与 internal 路由） |
+| REST | [internal/apiserver/transport/rest/handler/plan.go](../../internal/apiserver/transport/rest/handler/plan.go)、[internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/)（受保护与 internal 路由） |
 | MySQL | [internal/apiserver/infra/mysql/plan/](../../internal/apiserver/infra/mysql/plan/) |
 
 ---
@@ -365,7 +365,7 @@ sequenceDiagram
 ### 维护时核对
 
 - 变更 REST：同步 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 与 Handler。
-- 变更 `SchedulePendingTasks` / `CompleteTask` / `ExpireTask`：同步 [transport/rest](../../internal/apiserver/transport/rest/)、[plan.go](../../internal/apiserver/interface/restful/handler/plan.go)、运维脚本与本文说明。
+- 变更 `SchedulePendingTasks` / `CompleteTask` / `ExpireTask`：同步 [transport/rest](../../internal/apiserver/transport/rest/)、[plan.go](../../internal/apiserver/transport/rest/handler/plan.go)、运维脚本与本文说明。
 - 变更事件或 Topic：同步 [configs/events.yaml](../../configs/events.yaml)、领域 `events.go`、发布点与 worker。
 - 变更入口 URL 规则或 `baseURL`：同步 [entry_generator.go](../../internal/apiserver/infra/plan/entry_generator.go) 与装配/配置。
 
