@@ -54,7 +54,7 @@ func (s *server) eventConfigPath() string {
 	if s == nil || s.config == nil || s.config.Options == nil {
 		return defaultEventConfigPath
 	}
-	return workerEventConfigPath(s.config.Options.Worker)
+	return workerEventConfigPath(s.config.Worker)
 }
 
 func workerEventConfigPath(worker *options.WorkerOptions) string {
