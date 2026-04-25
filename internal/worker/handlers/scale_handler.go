@@ -7,12 +7,6 @@ import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
-func init() {
-	Register("scale_changed_handler", func(deps *Dependencies) HandlerFunc {
-		return handleScaleChanged(deps)
-	})
-}
-
 func handleScaleChanged(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[domainScale.ScaleChangedData]{

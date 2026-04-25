@@ -7,12 +7,6 @@ import (
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
 
-func init() {
-	Register("questionnaire_changed_handler", func(deps *Dependencies) HandlerFunc {
-		return handleQuestionnaireChanged(deps)
-	})
-}
-
 func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[domainQuestionnaire.QuestionnaireChangedData]{

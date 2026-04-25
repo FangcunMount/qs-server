@@ -33,21 +33,6 @@ type taskNotificationCallbacks[T any] struct {
 	notifyFailureFields func(data *T) []any
 }
 
-func init() {
-	Register("task_opened_handler", func(deps *Dependencies) HandlerFunc {
-		return handleTaskOpened(deps)
-	})
-	Register("task_completed_handler", func(deps *Dependencies) HandlerFunc {
-		return handleTaskCompleted(deps)
-	})
-	Register("task_expired_handler", func(deps *Dependencies) HandlerFunc {
-		return handleTaskExpired(deps)
-	})
-	Register("task_canceled_handler", func(deps *Dependencies) HandlerFunc {
-		return handleTaskCanceled(deps)
-	})
-}
-
 func handleTaskOpened(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		var data domainPlan.TaskOpenedData

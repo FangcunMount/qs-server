@@ -1,15 +1,5 @@
-// Package handlers 提供事件处理器注册机制
-//
-// 使用 init() 模式自动注册处理器：
-//
-//	func init() {
-//	    handlers.Register("my_handler", func(deps *handlers.Dependencies) handlers.HandlerFunc {
-//	        return func(ctx context.Context, eventType string, payload []byte) error {
-//	            // 处理逻辑
-//	            return nil
-//	        }
-//	    })
-//	}
+// Package handlers provides worker event handler factories through an explicit
+// Registry constructed at the process composition boundary.
 package handlers
 
 import (
@@ -17,7 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log/slog"
-	"sync"
+	"sort"
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
@@ -82,6 +72,56 @@ type Dependencies struct {
 // 接收依赖，返回处理器函数
 type HandlerFactory func(deps *Dependencies) HandlerFunc
 
+// Registry is an explicit, immutable handler factory catalog.
+type Registry struct {
+	factories map[string]HandlerFactory
+}
+
+func newRegistryFromFactories(factories map[string]HandlerFactory) *Registry {
+	copied := make(map[string]HandlerFactory, len(factories))
+	for name, factory := range factories {
+		if factory == nil {
+			continue
+		}
+		copied[name] = factory
+	}
+	return &Registry{factories: copied}
+}
+
+// Names returns registered handler names in deterministic order.
+func (r *Registry) Names() []string {
+	if r == nil {
+		return nil
+	}
+	names := make([]string, 0, len(r.factories))
+	for name := range r.factories {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// Has reports whether the registry contains a handler factory.
+func (r *Registry) Has(name string) bool {
+	if r == nil {
+		return false
+	}
+	_, ok := r.factories[name]
+	return ok
+}
+
+// Create instantiates one handler by name.
+func (r *Registry) Create(name string, deps *Dependencies) (HandlerFunc, bool) {
+	if r == nil {
+		return nil, false
+	}
+	factory, ok := r.factories[name]
+	if !ok {
+		return nil, false
+	}
+	return factory(deps), true
+}
+
 // ==================== 事件消息解析 ====================
 
 // EventEnvelope 事件信封结构。
@@ -105,56 +145,4 @@ func ParseEventData[T any](payload []byte, target *T) (*EventEnvelope, error) {
 	}
 
 	return env, nil
-}
-
-// ==================== 全局注册表 ====================
-
-var (
-	registryMu sync.RWMutex
-	registry   = make(map[string]HandlerFactory)
-)
-
-// Register 注册处理器工厂
-// 在 init() 中调用，注册处理器名称与工厂函数的映射
-func Register(name string, factory HandlerFactory) {
-	registryMu.Lock()
-	defer registryMu.Unlock()
-
-	if _, exists := registry[name]; exists {
-		panic(fmt.Sprintf("handler %q already registered", name))
-	}
-	registry[name] = factory
-}
-
-// GetFactory 获取处理器工厂
-func GetFactory(name string) (HandlerFactory, bool) {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-
-	factory, ok := registry[name]
-	return factory, ok
-}
-
-// ListRegistered 列出所有已注册的处理器名称
-func ListRegistered() []string {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-
-	names := make([]string, 0, len(registry))
-	for name := range registry {
-		names = append(names, name)
-	}
-	return names
-}
-
-// CreateAll 根据依赖创建所有已注册的处理器
-func CreateAll(deps *Dependencies) map[string]HandlerFunc {
-	registryMu.RLock()
-	defer registryMu.RUnlock()
-
-	handlers := make(map[string]HandlerFunc, len(registry))
-	for name, factory := range registry {
-		handlers[name] = factory(deps)
-	}
-	return handlers
 }

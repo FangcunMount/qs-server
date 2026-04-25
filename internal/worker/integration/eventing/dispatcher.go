@@ -26,21 +26,12 @@ type HandlerDependencies struct {
 	Notifier          port.TaskNotifier
 }
 
-// HandlerRegistry hides the worker handlers package's init-based registry behind
-// a narrow seam so dispatcher tests do not need to mutate global handler state.
+// HandlerRegistry is the explicit worker handler factory catalog consumed by
+// the event dispatcher.
 type HandlerRegistry interface {
-	ListRegistered() []string
-	CreateAll(*handlers.Dependencies) map[string]handlers.HandlerFunc
-}
-
-type defaultHandlerRegistry struct{}
-
-func (defaultHandlerRegistry) ListRegistered() []string {
-	return handlers.ListRegistered()
-}
-
-func (defaultHandlerRegistry) CreateAll(deps *handlers.Dependencies) map[string]handlers.HandlerFunc {
-	return handlers.CreateAll(deps)
+	Names() []string
+	Has(name string) bool
+	Create(name string, deps *handlers.Dependencies) (handlers.HandlerFunc, bool)
 }
 
 // Dispatcher subscribes configured event types and dispatches messages to worker handlers.
@@ -51,16 +42,8 @@ type Dispatcher struct {
 	registry   HandlerRegistry
 }
 
-// NewDispatcher creates a dispatcher backed by the worker handlers package registry.
-func NewDispatcher(logger *slog.Logger, deps *HandlerDependencies) *Dispatcher {
-	return NewDispatcherWithRegistry(logger, deps, defaultHandlerRegistry{})
-}
-
-// NewDispatcherWithRegistry creates a dispatcher with an explicit handler registry.
-func NewDispatcherWithRegistry(logger *slog.Logger, deps *HandlerDependencies, registry HandlerRegistry) *Dispatcher {
-	if registry == nil {
-		registry = defaultHandlerRegistry{}
-	}
+// NewDispatcher creates a dispatcher with an explicit handler registry.
+func NewDispatcher(logger *slog.Logger, deps *HandlerDependencies, registry HandlerRegistry) *Dispatcher {
 	return &Dispatcher{
 		logger:   logger,
 		deps:     deps,
@@ -73,13 +56,19 @@ func (d *Dispatcher) Initialize(catalog *eventcatalog.Catalog) error {
 	if catalog == nil || catalog.Config() == nil {
 		return fmt.Errorf("event catalog is not loaded")
 	}
+	if d.registry == nil {
+		return fmt.Errorf("handler registry is not configured")
+	}
 	d.logger.Info("initializing event dispatcher")
 
-	registeredHandlers := d.registry.ListRegistered()
-	d.logger.Info("handlers registered via init()",
+	registeredHandlers := d.registry.Names()
+	d.logger.Info("handlers available in explicit registry",
 		slog.Int("count", len(registeredHandlers)),
 		slog.Any("handlers", registeredHandlers),
 	)
+	if err := d.validateHandlerBindings(catalog); err != nil {
+		return err
+	}
 
 	factory := d.createHandlerFactory(d.buildHandlerDependencies())
 
@@ -100,6 +89,15 @@ func (d *Dispatcher) Initialize(catalog *eventcatalog.Catalog) error {
 	return nil
 }
 
+func (d *Dispatcher) validateHandlerBindings(catalog *eventcatalog.Catalog) error {
+	for eventType, eventCfg := range catalog.Config().Events {
+		if !d.registry.Has(eventCfg.Handler) {
+			return fmt.Errorf("handler %q not registered for event %q", eventCfg.Handler, eventType)
+		}
+	}
+	return nil
+}
+
 func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 	return &handlers.Dependencies{
 		Logger:            d.deps.Logger,
@@ -113,13 +111,18 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 }
 
 func (d *Dispatcher) createHandlerFactory(deps *handlers.Dependencies) eventruntime.HandlerFactory {
-	allHandlers := d.registry.CreateAll(deps)
+	createdHandlers := make(map[string]eventruntime.HandlerFunc)
 	return func(handlerName string) (eventruntime.HandlerFunc, error) {
-		handler, ok := allHandlers[handlerName]
-		if !ok {
-			return nil, fmt.Errorf("handler %q not registered via init()", handlerName)
+		if handler, ok := createdHandlers[handlerName]; ok {
+			return handler, nil
 		}
-		return eventruntime.HandlerFunc(handler), nil
+		handler, ok := d.registry.Create(handlerName, deps)
+		if !ok {
+			return nil, fmt.Errorf("handler %q not registered", handlerName)
+		}
+		runtimeHandler := eventruntime.HandlerFunc(handler)
+		createdHandlers[handlerName] = runtimeHandler
+		return runtimeHandler, nil
 	}
 }
 

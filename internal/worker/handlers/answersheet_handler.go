@@ -12,13 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 )
 
-func init() {
-	// 注册答卷提交处理器
-	Register("answersheet_submitted_handler", func(deps *Dependencies) HandlerFunc {
-		return handleAnswerSheetSubmitted(deps)
-	})
-}
-
 type answerSheetProcessingGateMode string
 
 const (

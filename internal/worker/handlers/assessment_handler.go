@@ -11,18 +11,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func init() {
-	Register("assessment_submitted_handler", func(deps *Dependencies) HandlerFunc {
-		return handleAssessmentSubmitted(deps)
-	})
-	Register("assessment_interpreted_handler", func(deps *Dependencies) HandlerFunc {
-		return handleAssessmentInterpreted(deps)
-	})
-	Register("assessment_failed_handler", func(deps *Dependencies) HandlerFunc {
-		return handleAssessmentFailed(deps)
-	})
-}
-
 // handleAssessmentSubmitted 处理测评提交事件
 // 业务逻辑：
 // 1. 解析测评提交事件

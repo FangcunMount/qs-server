@@ -40,6 +40,15 @@ func TestEventSystemDoesNotImportRemovedEventConfig(t *testing.T) {
 			strings.Contains(text, workerHandlersImportPath()) {
 			t.Fatalf("%s must use eventcodec instead of worker/handlers", rel)
 		}
+		if !strings.HasPrefix(rel, "internal/worker/handlers/") &&
+			usesLegacyWorkerHandlerRegistry(text) {
+			t.Fatalf("%s must use an explicit handlers.Registry instead of global handler registry helpers", rel)
+		}
+		if strings.HasPrefix(rel, "internal/worker/handlers/") &&
+			!strings.HasSuffix(rel, "_test.go") &&
+			usesInitRegisteredWorkerHandler(text) {
+			t.Fatalf("%s must use the explicit handler catalog instead of init-time registration", rel)
+		}
 		return nil
 	})
 	if err != nil {
@@ -61,6 +70,24 @@ func workerApplicationImportPath() string {
 
 func workerHandlersImportPath() string {
 	return "github.com/FangcunMount/qs-server/internal/worker/" + "handlers"
+}
+
+func usesLegacyWorkerHandlerRegistry(text string) bool {
+	legacyCalls := []string{
+		"handlers." + "GetFactory(",
+		"handlers." + "ListRegistered(",
+		"handlers." + "CreateAll(",
+	}
+	for _, call := range legacyCalls {
+		if strings.Contains(text, call) {
+			return true
+		}
+	}
+	return false
+}
+
+func usesInitRegisteredWorkerHandler(text string) bool {
+	return strings.Contains(text, "func init(") || strings.Contains(text, "Register(")
 }
 
 func repoRoot(t *testing.T) string {

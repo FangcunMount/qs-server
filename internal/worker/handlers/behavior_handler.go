@@ -9,12 +9,6 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func init() {
-	Register("behavior_projector_handler", func(deps *Dependencies) HandlerFunc {
-		return handleBehaviorProjector(deps)
-	})
-}
-
 func handleBehaviorProjector(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
 		if deps.InternalClient == nil {

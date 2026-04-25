@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	workernotifier "github.com/FangcunMount/qs-server/internal/worker/infra/notifier"
 	workereventing "github.com/FangcunMount/qs-server/internal/worker/integration/eventing"
@@ -86,7 +87,7 @@ func (c *Container) initEventDispatcher() error {
 	}
 
 	// 创建事件分发器
-	c.eventDispatcher = workereventing.NewDispatcher(c.logger, deps)
+	c.eventDispatcher = workereventing.NewDispatcher(c.logger, deps, handlers.NewRegistry())
 
 	if err := c.eventDispatcher.Initialize(c.eventCatalog); err != nil {
 		return err

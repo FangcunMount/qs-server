@@ -162,7 +162,7 @@ sequenceDiagram
 | ---- | ------ | -------- |
 | **订阅** | NSQ / RabbitMQ 等由配置选择；Topic 列表来自 **events.yaml** | [process/runtime_bootstrap.go](../../internal/worker/process/runtime_bootstrap.go) |
 | **分发** | metadata `event_type` 优先 | [integration/eventing/dispatcher.go](../../internal/worker/integration/eventing/dispatcher.go) |
-| **注册表** | `init()` 注册，运行时查找 | [handlers/registry.go](../../internal/worker/handlers/registry.go) |
+| **Handler Catalog** | 显式 `Registry`；factory 清单由 container 注入 dispatcher | [handlers/catalog.go](../../internal/worker/handlers/catalog.go)、[handlers/registry.go](../../internal/worker/handlers/registry.go) |
 | **gRPC** | 三类客户端注入容器 | [integration/grpcclient/registry.go](../../internal/worker/integration/grpcclient/registry.go) |
 | **典型链路** | 见上文“常见事件怎样映射到 handler 和 gRPC”；答卷/测评/报告主路径 | `handlers/*_handler.go` |
 

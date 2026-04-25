@@ -10,12 +10,6 @@ import (
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
-func init() {
-	Register("report_generated_handler", func(deps *Dependencies) HandlerFunc {
-		return handleReportGenerated(deps)
-	})
-}
-
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
 		var data domainReport.ReportGeneratedData
