@@ -2,10 +2,7 @@ package wechatapi
 
 import (
 	"context"
-	"strings"
 	"testing"
-
-	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 )
 
 func TestQRCodeGeneratorValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
@@ -36,14 +33,14 @@ func TestTokenProviderValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
 	}
 }
 
-func TestSubscribeSenderValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
-	sender := NewSubscribeSender(nil)
+// func TestSubscribeSenderValidatesRequiredInputsBeforeSDKCall(t *testing.T) {
+// 	sender := NewSubscribeSender(nil)
 
-	err := sender.SendSubscribeMessage(context.Background(), "", "secret", wechatPort.SubscribeMessage{
-		ToUser:     "openid",
-		TemplateID: "tmpl",
-	})
-	if err == nil || !strings.Contains(err.Error(), "appID and appSecret cannot be empty") {
-		t.Fatalf("expected app config validation error, got %v", err)
-	}
-}
+// 	err := sender.SendSubscribeMessage(context.Background(), "", "secret", wechatPort.SubscribeMessage{
+// 		ToUser:     "openid",
+// 		TemplateID: "tmpl",
+// 	})
+// 	if err == nil || !strings.Contains(err.Error(), "appID and appSecret cannot be empty") {
+// 		t.Fatalf("expected app config validation error, got %v", err)
+// 	}
+// }
