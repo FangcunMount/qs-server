@@ -147,6 +147,13 @@ func (r *Repository) MarkEventFailed(ctx context.Context, eventID, lastError str
 	return r.outboxStore.MarkEventFailed(ctx, eventID, lastError, nextAttemptAt)
 }
 
+func (r *Repository) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outboxport.StatusSnapshot, error) {
+	if r == nil || r.outboxStore == nil {
+		return outboxport.StatusSnapshot{}, nil
+	}
+	return r.outboxStore.OutboxStatusSnapshot(ctx, now)
+}
+
 func (r *Repository) withTransaction(ctx context.Context, fn func(txCtx mongo.SessionContext) error) error {
 	session, err := r.DB().Client().StartSession()
 	if err != nil {

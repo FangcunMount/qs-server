@@ -305,6 +305,9 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.GovernanceStatusService != c.CacheGovernanceStatusService() {
 		t.Fatalf("GovernanceStatusService = %#v, want %#v", deps.GovernanceStatusService, c.CacheGovernanceStatusService())
 	}
+	if deps.EventStatusService == nil {
+		t.Fatalf("EventStatusService = nil, want read-only event status service")
+	}
 	if deps.QRCodeObjectKeyPrefix != "rest-prefix" {
 		t.Fatalf("QRCodeObjectKeyPrefix = %q, want rest-prefix", deps.QRCodeObjectKeyPrefix)
 	}

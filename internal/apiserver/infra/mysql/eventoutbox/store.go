@@ -174,3 +174,36 @@ func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, 
 			"attempt_count":   gorm.Expr("attempt_count + ?", transition.AttemptIncrement),
 		}).Error
 }
+
+func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outboxport.StatusSnapshot, error) {
+	if s == nil || s.db == nil {
+		return outboxcore.BuildStatusSnapshot("assessment-mysql-outbox", now, nil), nil
+	}
+
+	statuses := outboxcore.UnfinishedStatuses()
+	observations := make([]outboxcore.StatusObservation, 0, len(statuses))
+	for _, status := range statuses {
+		var count int64
+		if err := s.db.WithContext(ctx).Model(&OutboxPO{}).Where("status = ?", status).Count(&count).Error; err != nil {
+			return outboxport.StatusSnapshot{}, err
+		}
+		var oldest OutboxPO
+		var oldestCreatedAt *time.Time
+		if count > 0 {
+			if err := s.db.WithContext(ctx).
+				Where("status = ?", status).
+				Order("created_at ASC").
+				Limit(1).
+				Find(&oldest).Error; err != nil {
+				return outboxport.StatusSnapshot{}, err
+			}
+			oldestCreatedAt = &oldest.CreatedAt
+		}
+		observations = append(observations, outboxcore.StatusObservation{
+			Status:          status,
+			Count:           count,
+			OldestCreatedAt: oldestCreatedAt,
+		})
+	}
+	return outboxcore.BuildStatusSnapshot("assessment-mysql-outbox", now, observations), nil
+}

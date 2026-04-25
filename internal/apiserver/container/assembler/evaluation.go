@@ -48,10 +48,11 @@ type EvaluationModule struct {
 	mysqlDB *gorm.DB
 
 	// ==================== Repository 层 ====================
-	AssessmentRepo        assessment.Repository
-	ScoreRepo             assessment.ScoreRepository
-	ReportRepo            report.ReportRepository
-	AssessmentOutboxRelay appEventing.OutboxRelay
+	AssessmentRepo               assessment.Repository
+	ScoreRepo                    assessment.ScoreRepository
+	ReportRepo                   report.ReportRepository
+	AssessmentOutboxRelay        appEventing.OutboxRelay
+	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
 	// ==================== Assessment 应用服务 ====================
 	// 按行为者组织的测评服务
@@ -138,7 +139,12 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
 	module.ReportRepo = reportRepo
-	module.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver), module.eventPublisher)
+	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
+	module.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, module.eventPublisher)
+	module.AssessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
+		Name:   "assessment-mysql-outbox",
+		Reader: assessmentOutboxStore,
+	}
 
 	// ==================== 初始化领域服务 ====================
 

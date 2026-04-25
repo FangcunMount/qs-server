@@ -57,6 +57,7 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/plans/tasks/window")
 	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/statistics/sync/daily")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
+	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/events/status")
 }
 
 func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {

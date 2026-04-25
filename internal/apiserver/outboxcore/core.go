@@ -22,6 +22,13 @@ const (
 	DefaultFailedTransitionAttempts = 1
 )
 
+var unfinishedStatuses = []string{StatusPending, StatusFailed, StatusPublishing}
+
+// UnfinishedStatuses returns the statuses used for outbox backlog and lag views.
+func UnfinishedStatuses() []string {
+	return append([]string(nil), unfinishedStatuses...)
+}
+
 // Record is the DB-neutral outbox representation shared by concrete stores.
 type Record struct {
 	EventID       string
@@ -35,6 +42,14 @@ type Record struct {
 	NextAttemptAt time.Time
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
+}
+
+// StatusObservation is the DB-specific aggregate input used to build a
+// DB-neutral read-only outbox status snapshot.
+type StatusObservation struct {
+	Status          string
+	Count           int64
+	OldestCreatedAt *time.Time
 }
 
 type BuildRecordsOptions struct {
@@ -94,6 +109,54 @@ func BuildRecords(opts BuildRecordsOptions) ([]Record, error) {
 		})
 	}
 	return records, nil
+}
+
+// BuildStatusSnapshot creates a canonical unfinished outbox status snapshot.
+// Unknown statuses are ignored and missing unfinished statuses are returned with
+// zero count so Prometheus gauges can be reset deterministically.
+func BuildStatusSnapshot(store string, now time.Time, observations []StatusObservation) outboxport.StatusSnapshot {
+	if now.IsZero() {
+		now = time.Now()
+	}
+	byStatus := make(map[string]StatusObservation, len(observations))
+	for _, observation := range observations {
+		if !isUnfinishedStatus(observation.Status) {
+			continue
+		}
+		byStatus[observation.Status] = observation
+	}
+
+	buckets := make([]outboxport.StatusBucket, 0, len(unfinishedStatuses))
+	for _, status := range unfinishedStatuses {
+		observation := byStatus[status]
+		ageSeconds := 0.0
+		if observation.Count > 0 && observation.OldestCreatedAt != nil {
+			ageSeconds = now.Sub(*observation.OldestCreatedAt).Seconds()
+			if ageSeconds < 0 {
+				ageSeconds = 0
+			}
+		}
+		buckets = append(buckets, outboxport.StatusBucket{
+			Status:           status,
+			Count:            observation.Count,
+			OldestCreatedAt:  observation.OldestCreatedAt,
+			OldestAgeSeconds: ageSeconds,
+		})
+	}
+	return outboxport.StatusSnapshot{
+		Store:       store,
+		GeneratedAt: now,
+		Buckets:     buckets,
+	}
+}
+
+func isUnfinishedStatus(status string) bool {
+	for _, known := range unfinishedStatuses {
+		if status == known {
+			return true
+		}
+	}
+	return false
 }
 
 // DecodePendingEvent converts persisted payload JSON back into the shared pending event contract.

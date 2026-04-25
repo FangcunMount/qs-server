@@ -95,6 +95,7 @@ func (registrar internalRouteRegistrar) register(engine *gin.Engine) {
 	r.registerPlanInternalRoutes(internalV1)
 	r.registerStatisticsInternalRoutes(internalV1)
 	r.registerCacheGovernanceInternalRoutes(internalV1)
+	r.registerEventStatusInternalRoutes(internalV1)
 }
 
 func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, routePrefix string) {

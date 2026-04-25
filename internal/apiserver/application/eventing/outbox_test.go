@@ -6,13 +6,16 @@ import (
 	"testing"
 	"time"
 
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type outboxObserver struct {
-	events []eventobservability.OutboxEvent
+	events       []eventobservability.OutboxEvent
+	status       []eventobservability.OutboxStatusEvent
+	statusScrape []eventobservability.OutboxStatusScrapeEvent
 }
 
 func (o *outboxObserver) ObservePublish(context.Context, eventobservability.PublishEvent) {}
@@ -22,11 +25,21 @@ func (o *outboxObserver) ObserveOutbox(_ context.Context, evt eventobservability
 	o.events = append(o.events, evt)
 }
 
+func (o *outboxObserver) ObserveOutboxStatus(_ context.Context, evt eventobservability.OutboxStatusEvent) {
+	o.status = append(o.status, evt)
+}
+
+func (o *outboxObserver) ObserveOutboxStatusScrape(_ context.Context, evt eventobservability.OutboxStatusScrapeEvent) {
+	o.statusScrape = append(o.statusScrape, evt)
+}
+
 type fakeOutboxStore struct {
 	pending          []PendingOutboxEvent
 	claimErr         error
 	markPublishedErr error
 	markFailedErr    error
+	statusSnapshot   outboxport.StatusSnapshot
+	statusErr        error
 	published        []string
 	failed           []string
 }
@@ -48,6 +61,13 @@ func (s *fakeOutboxStore) MarkEventFailed(_ context.Context, eventID, _ string, 
 	return s.markFailedErr
 }
 
+func (s *fakeOutboxStore) OutboxStatusSnapshot(context.Context, time.Time) (outboxport.StatusSnapshot, error) {
+	if s.statusErr != nil {
+		return outboxport.StatusSnapshot{}, s.statusErr
+	}
+	return s.statusSnapshot, nil
+}
+
 func TestOutboxRelayObservesClaimFailed(t *testing.T) {
 	wantErr := errors.New("claim failed")
 	observer := &outboxObserver{}
@@ -67,7 +87,15 @@ func TestOutboxRelayObservesClaimFailed(t *testing.T) {
 
 func TestOutboxRelayObservesPublished(t *testing.T) {
 	observer := &outboxObserver{}
-	store := &fakeOutboxStore{pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)}}
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		statusSnapshot: outboxport.StatusSnapshot{
+			Store: "test-relay",
+			Buckets: []outboxport.StatusBucket{
+				{Status: "pending", Count: 0},
+			},
+		},
+	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
 		Name:      "test-relay",
 		Store:     store,
@@ -82,6 +110,7 @@ func TestOutboxRelayObservesPublished(t *testing.T) {
 	if len(store.published) != 1 || store.published[0] != "evt-1" {
 		t.Fatalf("published markers = %#v, want evt-1", store.published)
 	}
+	assertOutboxStatusScrape(t, observer, eventobservability.OutboxStatusScrapeOutcomeSuccess)
 }
 
 func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {
@@ -154,6 +183,28 @@ func TestOutboxRelayObservesMarkPublishedFailed(t *testing.T) {
 	assertOutboxOutcome(t, observer, eventobservability.OutboxOutcomeMarkPublishedFailed)
 }
 
+func TestOutboxRelayStatusReporterFailureDoesNotChangeDispatchResult(t *testing.T) {
+	observer := &outboxObserver{}
+	store := &fakeOutboxStore{
+		pending:   []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+		statusErr: errors.New("status failed"),
+	}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:      "test-relay",
+		Store:     store,
+		Publisher: &fakePublisher{},
+		Observer:  observer,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	assertOutboxStatusScrape(t, observer, eventobservability.OutboxStatusScrapeOutcomeFailure)
+	if len(store.published) != 1 || store.published[0] != "evt-1" {
+		t.Fatalf("published markers = %#v, want evt-1", store.published)
+	}
+}
+
 func pendingEvent(eventID, eventType string) PendingOutboxEvent {
 	return PendingOutboxEvent{
 		EventID: eventID,
@@ -179,4 +230,14 @@ func assertOutboxContainsOutcome(t *testing.T, observer *outboxObserver, outcome
 		}
 	}
 	t.Fatalf("observed outbox events = %#v, want outcome %q", observer.events, outcome)
+}
+
+func assertOutboxStatusScrape(t *testing.T, observer *outboxObserver, outcome eventobservability.OutboxStatusScrapeOutcome) {
+	t.Helper()
+	if len(observer.statusScrape) != 1 {
+		t.Fatalf("observed status scrape events = %#v, want one", observer.statusScrape)
+	}
+	if observer.statusScrape[0].Outcome != outcome {
+		t.Fatalf("scrape outcome = %q, want %q", observer.statusScrape[0].Outcome, outcome)
+	}
 }

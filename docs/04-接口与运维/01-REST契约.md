@@ -24,7 +24,7 @@
 | 路由真值 | 运行时实际暴露仍以各进程 `routers.go` 为准，导出文件必须与之持续对齐 |
 | 最易混点 | `/api/rest/*` 是静态挂载的导出文档，不是业务 API 前缀 |
 | 排障入口 | 先查 OpenAPI 文件和 `Makefile` 生成链，再回到 `routers.go` 和具体 handler |
-| 缓存治理面板 | `qs-apiserver` 额外提供 `/internal/v1/cache/governance/status` 与 `/internal/v1/cache/governance/hotset`，用于查看 family 路由状态、最近一次 warmup 与热点预览 |
+| internal 只读面板 | `qs-apiserver` 额外提供缓存治理 `/internal/v1/cache/governance/*` 与事件状态 `GET /internal/v1/events/status`，用于 operating 只读展示 |
 
 ### 基础设施边界
 
@@ -75,6 +75,7 @@ flowchart LR
 | collection 路由 | [internal/collection-server/transport/rest/router.go](../../internal/collection-server/transport/rest/router.go) |
 | 静态挂载 OpenAPI / Swagger UI | 各进程 `server` / `app` 装配（与 [Makefile](../../Makefile) 产物路径一致） |
 | 缓存治理 internal 路由 | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) |
+| 事件状态 internal 路由 | [internal/apiserver/transport/rest/routes_events.go](../../internal/apiserver/transport/rest/routes_events.go)；只读聚合见 [internal/apiserver/application/eventing/status_service.go](../../internal/apiserver/application/eventing/status_service.go) |
 
 ---
 
@@ -133,6 +134,20 @@ flowchart LR
 - 路由注册以 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) 为准
 - 返回结构与查询参数校验以 [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 为准
 - `status` / `hotset` 口径来自缓存治理服务与 runtime family registry，不是 OpenAPI 静态文件推导出来的文档状态
+
+### 事件状态 internal 面板（What / Where / Verify）
+
+事件系统当前只提供 **只读状态摘要**，挂在：
+
+- `GET /internal/v1/events/status`
+
+这组接口只返回 catalog summary 与 MySQL/Mongo outbox 的 `pending/failed/publishing` backlog / lag 快照，不提供 replay、repair、dead-letter 或手工 mark 操作。详细接入方式见 [10-operating 事件只读状态接入](./10-operating%20事件只读状态接入.md)。
+
+**Verify**：
+
+- 路由注册以 [internal/apiserver/transport/rest/routes_events.go](../../internal/apiserver/transport/rest/routes_events.go) 为准
+- 只读聚合以 [internal/apiserver/application/eventing/status_service.go](../../internal/apiserver/application/eventing/status_service.go) 为准
+- route contract 以 [internal/apiserver/transport/rest/routes_events_test.go](../../internal/apiserver/transport/rest/routes_events_test.go) 为准
 
 ### Prometheus 观测面（What / Where / Verify）
 

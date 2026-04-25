@@ -3,6 +3,7 @@ package messaging
 import (
 	"context"
 	"log/slog"
+	"time"
 
 	basemessaging "github.com/FangcunMount/component-base/pkg/messaging"
 	cbnsq "github.com/FangcunMount/component-base/pkg/messaging/nsq"
@@ -69,7 +70,7 @@ func (p MessageSettlementPolicy) AckInvalid(msg *basemessaging.Message, parseErr
 	p.observe(msg, "", eventobservability.ConsumeOutcomePoisonAcked)
 }
 
-func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventType string, dispatchErr error) {
+func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventType string, dispatchErr error) eventobservability.ConsumeOutcome {
 	p.logger.Error("failed to dispatch event",
 		slog.String("topic", p.topic),
 		slog.String("event_type", eventType),
@@ -77,37 +78,42 @@ func (p MessageSettlementPolicy) NackFailed(msg *basemessaging.Message, eventTyp
 		slog.String("error", dispatchErr.Error()),
 	)
 	if nackErr := msg.Nack(); nackErr != nil {
-		p.observe(msg, eventType, eventobservability.ConsumeOutcomeNackFailed)
+		outcome := eventobservability.ConsumeOutcomeNackFailed
+		p.observe(msg, eventType, outcome)
 		p.logger.Warn("failed to nack message",
 			slog.String("topic", p.topic),
 			slog.String("msg_id", msg.UUID),
 			slog.String("error", nackErr.Error()),
 		)
-		return
+		return outcome
 	}
-	p.observe(msg, eventType, eventobservability.ConsumeOutcomeNacked)
+	outcome := eventobservability.ConsumeOutcomeNacked
+	p.observe(msg, eventType, outcome)
+	return outcome
 }
 
-func (p MessageSettlementPolicy) AckSuccess(msg *basemessaging.Message) error {
+func (p MessageSettlementPolicy) AckSuccess(msg *basemessaging.Message) (eventobservability.ConsumeOutcome, error) {
 	if ackErr := msg.Ack(); ackErr != nil {
 		eventType := ""
 		if msg != nil && msg.Metadata != nil {
 			eventType = msg.Metadata["event_type"]
 		}
-		p.observe(msg, eventType, eventobservability.ConsumeOutcomeAckFailed)
+		outcome := eventobservability.ConsumeOutcomeAckFailed
+		p.observe(msg, eventType, outcome)
 		p.logger.Warn("failed to ack message",
 			slog.String("topic", p.topic),
 			slog.String("msg_id", msg.UUID),
 			slog.String("error", ackErr.Error()),
 		)
-		return ackErr
+		return outcome, ackErr
 	}
 	eventType := ""
 	if msg != nil && msg.Metadata != nil {
 		eventType = msg.Metadata["event_type"]
 	}
-	p.observe(msg, eventType, eventobservability.ConsumeOutcomeAcked)
-	return nil
+	outcome := eventobservability.ConsumeOutcomeAcked
+	p.observe(msg, eventType, outcome)
+	return outcome, nil
 }
 
 func (p MessageSettlementPolicy) observe(msg *basemessaging.Message, eventType string, outcome eventobservability.ConsumeOutcome) {
@@ -231,11 +237,27 @@ func createDispatchHandlerWithObserver(logger *slog.Logger, dispatcher EventDisp
 			slog.String("msg_id", msg.UUID),
 		)
 
+		startedAt := time.Now()
 		if err := dispatcher.DispatchEvent(ctx, eventType, msg.Payload); err != nil {
-			settlement.NackFailed(msg, eventType, err)
+			outcome := settlement.NackFailed(msg, eventType, err)
+			eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{
+				Service:   serviceName,
+				Topic:     topicName,
+				EventType: eventType,
+				Outcome:   outcome,
+				Duration:  time.Since(startedAt),
+			})
 			return err
 		}
 
-		return settlement.AckSuccess(msg)
+		outcome, err := settlement.AckSuccess(msg)
+		eventobservability.ObserveConsumeDuration(ctx, observer, eventobservability.ConsumeDurationEvent{
+			Service:   serviceName,
+			Topic:     topicName,
+			EventType: eventType,
+			Outcome:   outcome,
+			Duration:  time.Since(startedAt),
+		})
+		return err
 	}
 }

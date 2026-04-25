@@ -348,3 +348,39 @@ func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, 
 	})
 	return err
 }
+
+func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outboxport.StatusSnapshot, error) {
+	if s == nil || s.coll == nil {
+		return outboxcore.BuildStatusSnapshot("mongo-domain-events", now, nil), nil
+	}
+
+	statuses := outboxcore.UnfinishedStatuses()
+	observations := make([]outboxcore.StatusObservation, 0, len(statuses))
+	for _, status := range statuses {
+		count, err := s.coll.CountDocuments(ctx, bson.M{"status": status})
+		if err != nil {
+			return outboxport.StatusSnapshot{}, err
+		}
+		var oldestCreatedAt *time.Time
+		if count > 0 {
+			var oldest struct {
+				CreatedAt time.Time `bson:"created_at"`
+			}
+			err := s.coll.FindOne(
+				ctx,
+				bson.M{"status": status},
+				options.FindOne().SetSort(bson.D{{Key: "created_at", Value: 1}}).SetProjection(bson.M{"created_at": 1}),
+			).Decode(&oldest)
+			if err != nil {
+				return outboxport.StatusSnapshot{}, err
+			}
+			oldestCreatedAt = &oldest.CreatedAt
+		}
+		observations = append(observations, outboxcore.StatusObservation{
+			Status:          status,
+			Count:           count,
+			OldestCreatedAt: oldestCreatedAt,
+		})
+	}
+	return outboxcore.BuildStatusSnapshot("mongo-domain-events", now, observations), nil
+}

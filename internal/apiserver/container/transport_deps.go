@@ -1,6 +1,7 @@
 package container
 
 import (
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
@@ -16,6 +17,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	deps.QRCodeObjectStore = c.QRCodeObjectStore
 	deps.QRCodeObjectKeyPrefix = c.QRCodeObjectKeyPrefix
 	deps.GovernanceStatusService = c.CacheGovernanceStatusService()
+	deps.EventStatusService = c.buildEventStatusService()
 
 	if c.SurveyModule != nil {
 		if c.SurveyModule.Questionnaire != nil {
@@ -54,6 +56,23 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 	}
 
 	return deps
+}
+
+func (c *Container) buildEventStatusService() appEventing.StatusService {
+	if c == nil {
+		return appEventing.NewStatusService(appEventing.StatusServiceOptions{})
+	}
+	outboxes := make([]appEventing.NamedOutboxStatusReader, 0, 2)
+	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil && c.SurveyModule.AnswerSheet.SubmittedEventStatusReader.Reader != nil {
+		outboxes = append(outboxes, c.SurveyModule.AnswerSheet.SubmittedEventStatusReader)
+	}
+	if c.EvaluationModule != nil && c.EvaluationModule.AssessmentOutboxStatusReader.Reader != nil {
+		outboxes = append(outboxes, c.EvaluationModule.AssessmentOutboxStatusReader)
+	}
+	return appEventing.NewStatusService(appEventing.StatusServiceOptions{
+		Catalog:  c.eventCatalog,
+		Outboxes: outboxes,
+	})
 }
 
 func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {

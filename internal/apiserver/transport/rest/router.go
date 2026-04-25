@@ -9,6 +9,7 @@ import (
 	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
@@ -45,6 +46,7 @@ type Deps struct {
 	QRCodeObjectStore       objectstorageport.PublicObjectStore
 	QRCodeObjectKeyPrefix   string
 	GovernanceStatusService cachegov.StatusService
+	EventStatusService      appEventing.StatusService
 	IAM                     IAMDeps
 }
 

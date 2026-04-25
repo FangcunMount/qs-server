@@ -60,7 +60,8 @@ func (*fakeSubscriber) Stop() {}
 func (*fakeSubscriber) Close() error { return nil }
 
 type consumeObserver struct {
-	events []eventobservability.ConsumeEvent
+	events    []eventobservability.ConsumeEvent
+	durations []eventobservability.ConsumeDurationEvent
 }
 
 func (o *consumeObserver) ObservePublish(context.Context, eventobservability.PublishEvent) {}
@@ -68,6 +69,10 @@ func (o *consumeObserver) ObserveOutbox(context.Context, eventobservability.Outb
 
 func (o *consumeObserver) ObserveConsume(_ context.Context, evt eventobservability.ConsumeEvent) {
 	o.events = append(o.events, evt)
+}
+
+func (o *consumeObserver) ObserveConsumeDuration(_ context.Context, evt eventobservability.ConsumeDurationEvent) {
+	o.durations = append(o.durations, evt)
 }
 
 func TestDispatchHandlerUsesMetadataEventTypeFirst(t *testing.T) {
@@ -133,8 +138,12 @@ func TestMessageSettlementPolicyAckSuccess(t *testing.T) {
 	})
 
 	policy := MessageSettlementPolicy{logger: testLogger(), topic: "topic"}
-	if err := policy.AckSuccess(msg); err != nil {
+	outcome, err := policy.AckSuccess(msg)
+	if err != nil {
 		t.Fatalf("AckSuccess: %v", err)
+	}
+	if outcome != eventobservability.ConsumeOutcomeAcked {
+		t.Fatalf("outcome = %q, want acked", outcome)
 	}
 	if ackCount != 1 {
 		t.Fatalf("ackCount = %d, want 1", ackCount)
@@ -197,6 +206,7 @@ func TestDispatchHandlerObservesPoisonAcked(t *testing.T) {
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomePoisonAcked)
+	assertNoConsumeDuration(t, observer)
 }
 
 func TestDispatchHandlerObservesPoisonAckFailed(t *testing.T) {
@@ -211,6 +221,7 @@ func TestDispatchHandlerObservesPoisonAckFailed(t *testing.T) {
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomePoisonAckFailed)
+	assertNoConsumeDuration(t, observer)
 }
 
 func TestDispatchHandlerNacksOnDispatchError(t *testing.T) {
@@ -247,6 +258,7 @@ func TestDispatchHandlerObservesNacked(t *testing.T) {
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNacked)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeNacked)
 }
 
 func TestDispatchHandlerObservesNackFailed(t *testing.T) {
@@ -262,6 +274,7 @@ func TestDispatchHandlerObservesNackFailed(t *testing.T) {
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeNackFailed)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeNackFailed)
 }
 
 func TestDispatchHandlerObservesAcked(t *testing.T) {
@@ -277,6 +290,7 @@ func TestDispatchHandlerObservesAcked(t *testing.T) {
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeAcked)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeAcked)
 }
 
 func TestDispatchHandlerObservesAckFailed(t *testing.T) {
@@ -292,6 +306,7 @@ func TestDispatchHandlerObservesAckFailed(t *testing.T) {
 	}
 
 	assertConsumeOutcome(t, observer, eventobservability.ConsumeOutcomeAckFailed)
+	assertConsumeDuration(t, observer, eventobservability.ConsumeOutcomeAckFailed)
 }
 
 func assertConsumeOutcome(t *testing.T, observer *consumeObserver, outcome eventobservability.ConsumeOutcome) {
@@ -308,6 +323,36 @@ func assertConsumeOutcome(t *testing.T, observer *consumeObserver, outcome event
 	}
 	if evt.Topic != "topic" {
 		t.Fatalf("topic = %q, want topic", evt.Topic)
+	}
+}
+
+func assertConsumeDuration(t *testing.T, observer *consumeObserver, outcome eventobservability.ConsumeOutcome) {
+	t.Helper()
+	if len(observer.durations) != 1 {
+		t.Fatalf("observed consume durations = %#v, want one", observer.durations)
+	}
+	evt := observer.durations[0]
+	if evt.Outcome != outcome {
+		t.Fatalf("duration outcome = %q, want %q", evt.Outcome, outcome)
+	}
+	if evt.Service != "worker" {
+		t.Fatalf("duration service = %q, want worker", evt.Service)
+	}
+	if evt.Topic != "topic" {
+		t.Fatalf("duration topic = %q, want topic", evt.Topic)
+	}
+	if evt.EventType != "metadata.event" {
+		t.Fatalf("duration event_type = %q, want metadata.event", evt.EventType)
+	}
+	if evt.Duration < 0 {
+		t.Fatalf("duration = %v, want non-negative", evt.Duration)
+	}
+}
+
+func assertNoConsumeDuration(t *testing.T, observer *consumeObserver) {
+	t.Helper()
+	if len(observer.durations) != 0 {
+		t.Fatalf("observed consume durations = %#v, want none", observer.durations)
 	}
 }
 

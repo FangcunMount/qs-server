@@ -2,17 +2,29 @@ package eventobservability
 
 import (
 	"context"
+	"strings"
 	"testing"
+
+	"github.com/prometheus/client_golang/prometheus"
 )
 
 var _ Observer = NopObserver{}
 var _ Observer = (*PrometheusObserver)(nil)
+var _ ConsumeDurationObserver = NopObserver{}
+var _ ConsumeDurationObserver = (*PrometheusObserver)(nil)
+var _ OutboxStatusObserver = NopObserver{}
+var _ OutboxStatusObserver = (*PrometheusObserver)(nil)
+var _ OutboxStatusScrapeObserver = NopObserver{}
+var _ OutboxStatusScrapeObserver = (*PrometheusObserver)(nil)
 
 func TestNopObserverIsNilSafe(t *testing.T) {
 	observer := NormalizeObserver(nil)
 	observer.ObservePublish(context.Background(), PublishEvent{Outcome: PublishOutcomeMQPublished})
 	observer.ObserveOutbox(context.Background(), OutboxEvent{Outcome: OutboxOutcomePublished})
 	observer.ObserveConsume(context.Background(), ConsumeEvent{Outcome: ConsumeOutcomeAcked})
+	ObserveConsumeDuration(context.Background(), observer, ConsumeDurationEvent{Outcome: ConsumeOutcomeAcked})
+	ObserveOutboxStatus(context.Background(), observer, OutboxStatusEvent{Store: "store", Status: "pending"})
+	ObserveOutboxStatusScrape(context.Background(), observer, OutboxStatusScrapeEvent{Store: "store", Outcome: OutboxStatusScrapeOutcomeSuccess})
 }
 
 func TestDefaultObserverIsPrometheusObserver(t *testing.T) {
@@ -35,6 +47,8 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		OutboxOutcomePublishFailed.String():       "publish_failed",
 		OutboxOutcomeMarkFailedFailed.String():    "mark_failed_failed",
 		OutboxOutcomeMarkPublishedFailed.String(): "mark_published_failed",
+		OutboxStatusScrapeOutcomeSuccess.String(): "success",
+		OutboxStatusScrapeOutcomeFailure.String(): "failure",
 		ConsumeOutcomePoisonAcked.String():        "poison_acked",
 		ConsumeOutcomePoisonAckFailed.String():    "poison_ack_failed",
 		ConsumeOutcomeAcked.String():              "acked",
@@ -50,4 +64,33 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 			t.Fatalf("outcome string = %q, want %q", got, want)
 		}
 	}
+}
+
+func TestEventMetricsUseBoundedLabels(t *testing.T) {
+	descriptions := []string{
+		describeCollector(eventConsumeDuration),
+		describeCollector(eventOutboxBacklog),
+		describeCollector(eventOutboxOldestAge),
+		describeCollector(eventOutboxStatusScrapeTotal),
+	}
+	for _, desc := range descriptions {
+		for _, forbidden := range []string{"event_id", "aggregate_id", "error", "last_error"} {
+			if strings.Contains(desc, forbidden) {
+				t.Fatalf("metric description %q contains forbidden high-cardinality label %q", desc, forbidden)
+			}
+		}
+	}
+}
+
+func describeCollector(collector interface {
+	Describe(chan<- *prometheus.Desc)
+}) string {
+	ch := make(chan *prometheus.Desc, 4)
+	collector.Describe(ch)
+	close(ch)
+	var builder strings.Builder
+	for desc := range ch {
+		builder.WriteString(desc.String())
+	}
+	return builder.String()
 }

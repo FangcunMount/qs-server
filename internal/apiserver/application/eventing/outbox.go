@@ -22,6 +22,13 @@ type PendingOutboxEvent = outboxport.PendingEvent
 // OutboxStore keeps the application-facing alias for the shared outbox contract.
 type OutboxStore = outboxport.Store
 
+// OutboxStatusReader keeps the application-facing alias for read-only outbox status.
+type OutboxStatusReader = outboxport.StatusReader
+
+type OutboxStatusReporter interface {
+	ReportOutboxStatus(ctx context.Context)
+}
+
 // OutboxRelay dispatches due outbox events.
 type OutboxRelay interface {
 	DispatchDue(ctx context.Context) error
@@ -32,6 +39,7 @@ type outboxRelay struct {
 	store      OutboxStore
 	publisher  event.EventPublisher
 	observer   eventobservability.Observer
+	status     OutboxStatusReporter
 	batchSize  int
 	retryDelay time.Duration
 }
@@ -50,6 +58,7 @@ type OutboxRelayOptions struct {
 	Store      OutboxStore
 	Publisher  event.EventPublisher
 	Observer   eventobservability.Observer
+	Status     OutboxStatusReporter
 	BatchSize  int
 	RetryDelay time.Duration
 }
@@ -64,11 +73,17 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 	if opts.Observer == nil {
 		opts.Observer = eventobservability.DefaultObserver()
 	}
+	if opts.Status == nil {
+		if reader, ok := opts.Store.(OutboxStatusReader); ok {
+			opts.Status = NewOutboxStatusReporter(opts.Name, reader, opts.Observer)
+		}
+	}
 	return &outboxRelay{
 		name:       opts.Name,
 		store:      opts.Store,
 		publisher:  opts.Publisher,
 		observer:   opts.Observer,
+		status:     opts.Status,
 		batchSize:  opts.BatchSize,
 		retryDelay: opts.RetryDelay,
 	}
@@ -78,6 +93,7 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 	if r == nil || r.store == nil || r.publisher == nil {
 		return nil
 	}
+	defer r.reportStatus(ctx)
 
 	pendingEvents, err := r.store.ClaimDueEvents(ctx, r.batchSize, time.Now())
 	if err != nil {
@@ -119,6 +135,13 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (r *outboxRelay) reportStatus(ctx context.Context) {
+	if r == nil || r.status == nil {
+		return
+	}
+	r.status.ReportOutboxStatus(ctx)
 }
 
 func (r *outboxRelay) observe(ctx context.Context, topicName, eventType string, outcome eventobservability.OutboxOutcome) {

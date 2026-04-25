@@ -81,10 +81,11 @@ type AnswerSheetSubModule struct {
 	Handler *handler.AnswerSheetHandler
 
 	// service 层 - 按行为者组织
-	SubmissionService   asApp.AnswerSheetSubmissionService
-	ManagementService   asApp.AnswerSheetManagementService
-	ScoringService      asApp.AnswerSheetScoringService // 新增：计分服务
-	SubmittedEventRelay asApp.SubmittedEventRelay
+	SubmissionService          asApp.AnswerSheetSubmissionService
+	ManagementService          asApp.AnswerSheetManagementService
+	ScoringService             asApp.AnswerSheetScoringService // 新增：计分服务
+	SubmittedEventRelay        asApp.SubmittedEventRelay
+	SubmittedEventStatusReader appEventing.NamedOutboxStatusReader
 }
 
 // NewSurveyModule 创建 Survey 模块。
@@ -233,6 +234,10 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, limiter
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
 	sub.SubmittedEventRelay = appEventing.NewOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)
+	sub.SubmittedEventStatusReader = appEventing.NamedOutboxStatusReader{
+		Name:   "mongo-domain-events",
+		Reader: baseRepo,
+	}
 
 	// 初始化 handler 层
 	sub.Handler = handler.NewAnswerSheetHandler(

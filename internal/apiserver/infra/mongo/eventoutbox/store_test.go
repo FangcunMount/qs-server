@@ -91,3 +91,22 @@ func TestBuildDocumentsRejectsBestEffortEvent(t *testing.T) {
 		t.Fatalf("error = %v, want delivery class", err)
 	}
 }
+
+func TestOutboxStatusSnapshotNilStoreReturnsZeroBuckets(t *testing.T) {
+	now := time.Date(2026, 4, 25, 12, 0, 0, 0, time.UTC)
+	snapshot, err := (*Store)(nil).OutboxStatusSnapshot(t.Context(), now)
+	if err != nil {
+		t.Fatalf("OutboxStatusSnapshot: %v", err)
+	}
+	if snapshot.Store != "mongo-domain-events" {
+		t.Fatalf("store = %q, want mongo-domain-events", snapshot.Store)
+	}
+	if len(snapshot.Buckets) != 3 {
+		t.Fatalf("buckets = %#v, want three unfinished buckets", snapshot.Buckets)
+	}
+	for _, bucket := range snapshot.Buckets {
+		if bucket.Count != 0 || bucket.OldestAgeSeconds != 0 {
+			t.Fatalf("bucket = %#v, want zero bucket", bucket)
+		}
+	}
+}
