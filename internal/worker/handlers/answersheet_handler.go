@@ -120,19 +120,6 @@ func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, u
 	return env, answerSheetID, &data, nil
 }
 
-// withAnswerSheetProcessingGate 使用 best-effort Redis 闸门抑制重复工作。
-// 真正正确性仍由下游幂等查询和数据库唯一索引保证。
-func withAnswerSheetProcessingGate(
-	ctx context.Context,
-	deps *Dependencies,
-	eventID string,
-	answerSheetID uint64,
-	hooks answerSheetProcessingGateHooks,
-	fn func(context.Context) error,
-) error {
-	return newAnswerSheetDuplicateSuppressionGate(hooks).Run(ctx, deps, eventID, answerSheetID, fn)
-}
-
 func (g answerSheetDuplicateSuppressionGate) Run(
 	ctx context.Context,
 	deps *Dependencies,
