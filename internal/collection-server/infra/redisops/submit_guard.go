@@ -18,12 +18,18 @@ const (
 type SubmitGuard struct {
 	opsHandle *redisplane.Handle
 	lockMgr   *redislock.Manager
+	observer  resilienceplane.Observer
 }
 
 func NewSubmitGuard(opsHandle *redisplane.Handle, lockMgr *redislock.Manager) *SubmitGuard {
+	return NewSubmitGuardWithObserver(opsHandle, lockMgr, nil)
+}
+
+func NewSubmitGuardWithObserver(opsHandle *redisplane.Handle, lockMgr *redislock.Manager, observer resilienceplane.Observer) *SubmitGuard {
 	return &SubmitGuard{
 		opsHandle: opsHandle,
 		lockMgr:   lockMgr,
+		observer:  defaultObserver(observer),
 	}
 }
 
@@ -101,10 +107,21 @@ func submitDoneKey(key string) string {
 }
 
 func (g *SubmitGuard) observe(ctx context.Context, kind resilienceplane.ProtectionKind, outcome resilienceplane.Outcome) {
-	resilienceplane.Observe(ctx, resilienceplane.DefaultObserver(), kind, resilienceplane.Subject{
+	observer := resilienceplane.DefaultObserver()
+	if g != nil && g.observer != nil {
+		observer = g.observer
+	}
+	resilienceplane.Observe(ctx, observer, kind, resilienceplane.Subject{
 		Component: "collection-server",
 		Scope:     "answersheet_submit",
 		Resource:  "submit_guard",
 		Strategy:  "redis_lock",
 	}, outcome)
+}
+
+func defaultObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+	if observer != nil {
+		return observer
+	}
+	return resilienceplane.DefaultObserver()
 }

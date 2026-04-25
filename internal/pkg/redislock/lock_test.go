@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -196,4 +197,67 @@ func TestManagerReleaseSpecWithWrongTokenDoesNotUnlock(t *testing.T) {
 	} else if acquired {
 		t.Fatal("expected lock to remain held after wrong-token release")
 	}
+}
+
+func TestManagerUsesInjectedObserver(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	observer := &redislockRecordingObserver{}
+	manager := NewManagerWithObserver("worker", "lock_lease", &redisplane.Handle{
+		Family:  redisplane.FamilyLock,
+		Client:  client,
+		Builder: rediskey.NewBuilderWithNamespace("cache:lock"),
+	}, observer)
+	identity := Identity{Name: "answersheet_processing", Key: "answersheet:processing:1"}
+
+	lease, acquired, err := manager.Acquire(context.Background(), identity, time.Minute)
+	if err != nil {
+		t.Fatalf("Acquire() error = %v", err)
+	}
+	if !acquired || lease == nil {
+		t.Fatalf("Acquire() acquired=%v lease=%+v, want lock", acquired, lease)
+	}
+	if _, acquired, err := manager.Acquire(context.Background(), identity, time.Minute); err != nil {
+		t.Fatalf("contention Acquire() error = %v", err)
+	} else if acquired {
+		t.Fatal("contention Acquire() acquired lock, want false")
+	}
+	if err := manager.Release(context.Background(), identity, lease); err != nil {
+		t.Fatalf("Release() error = %v", err)
+	}
+	if _, _, err := manager.Acquire(context.Background(), Identity{}, time.Minute); err == nil {
+		t.Fatal("expected invalid identity acquire error")
+	}
+
+	for _, outcome := range []resilienceplane.Outcome{
+		resilienceplane.OutcomeLockAcquired,
+		resilienceplane.OutcomeLockContention,
+		resilienceplane.OutcomeLockReleased,
+		resilienceplane.OutcomeLockError,
+	} {
+		if !observer.has(outcome) {
+			t.Fatalf("observer missing outcome %s in %#v", outcome, observer.decisions)
+		}
+	}
+}
+
+type redislockRecordingObserver struct {
+	decisions []resilienceplane.Decision
+}
+
+func (r *redislockRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+	r.decisions = append(r.decisions, decision)
+}
+
+func (r *redislockRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+	for _, decision := range r.decisions {
+		if decision.Outcome == outcome {
+			return true
+		}
+	}
+	return false
 }

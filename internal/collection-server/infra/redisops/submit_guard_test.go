@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -201,4 +202,98 @@ func TestSubmitGuardAllowsWhenDisabledOrKeyEmpty(t *testing.T) {
 	} else if doneID != "" || lease != nil || !acquired {
 		t.Fatalf("disabled guard Begin() = doneID=%q lease=%+v acquired=%v, want allow", doneID, lease, acquired)
 	}
+}
+
+func TestSubmitGuardUsesInjectedObserver(t *testing.T) {
+	mr := miniredis.RunT(t)
+	opsClient := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	lockClient := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = opsClient.Close()
+		_ = lockClient.Close()
+	})
+
+	opsHandle := &redisplane.Handle{
+		Family:  redisplane.FamilyOps,
+		Client:  opsClient,
+		Builder: rediskey.NewBuilderWithNamespace("ops:runtime"),
+	}
+	lockHandle := &redisplane.Handle{
+		Family:  redisplane.FamilyLock,
+		Client:  lockClient,
+		Builder: rediskey.NewBuilderWithNamespace("cache:lock"),
+	}
+	observer := &submitGuardRecordingObserver{}
+	instanceA := NewSubmitGuardWithObserver(opsHandle, redislock.NewManager("collection-server-a", "lock_lease", lockHandle), observer)
+	instanceB := NewSubmitGuardWithObserver(opsHandle, redislock.NewManager("collection-server-b", "lock_lease", lockHandle), observer)
+
+	_, lease, acquired, err := instanceA.Begin(context.Background(), "req-observed")
+	if err != nil {
+		t.Fatalf("Begin() error = %v", err)
+	}
+	if !acquired || lease == nil {
+		t.Fatalf("Begin() acquired=%v lease=%+v, want lock", acquired, lease)
+	}
+	if _, leaseB, acquired, err := instanceB.Begin(context.Background(), "req-observed"); err != nil {
+		t.Fatalf("contention Begin() error = %v", err)
+	} else if acquired || leaseB != nil {
+		t.Fatalf("contention Begin() acquired=%v lease=%+v, want contention", acquired, leaseB)
+	}
+	if err := instanceA.Complete(context.Background(), "req-observed", lease, "answersheet-observed"); err != nil {
+		t.Fatalf("Complete() error = %v", err)
+	}
+	if doneID, _, acquired, err := instanceB.Begin(context.Background(), "req-observed"); err != nil {
+		t.Fatalf("done marker Begin() error = %v", err)
+	} else if doneID != "answersheet-observed" || acquired {
+		t.Fatalf("done marker Begin() doneID=%q acquired=%v, want idempotency hit", doneID, acquired)
+	}
+
+	degraded := NewSubmitGuardWithObserver(nil, nil, observer)
+	if _, _, acquired, err := degraded.Begin(context.Background(), "req-degraded"); err != nil {
+		t.Fatalf("degraded Begin() error = %v", err)
+	} else if !acquired {
+		t.Fatal("degraded Begin() should fail open")
+	}
+
+	closedOpsClient := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	if err := closedOpsClient.Close(); err != nil {
+		t.Fatalf("close client: %v", err)
+	}
+	errorGuard := NewSubmitGuardWithObserver(&redisplane.Handle{
+		Family:  redisplane.FamilyOps,
+		Client:  closedOpsClient,
+		Builder: rediskey.NewBuilderWithNamespace("ops:runtime"),
+	}, nil, observer)
+	if _, _, _, err := errorGuard.Begin(context.Background(), "req-error"); err == nil {
+		t.Fatal("expected closed Redis client error")
+	}
+
+	for _, outcome := range []resilienceplane.Outcome{
+		resilienceplane.OutcomeLockAcquired,
+		resilienceplane.OutcomeLockContention,
+		resilienceplane.OutcomeIdempotencyHit,
+		resilienceplane.OutcomeDegradedOpen,
+		resilienceplane.OutcomeLockError,
+	} {
+		if !observer.has(outcome) {
+			t.Fatalf("observer missing outcome %s in %#v", outcome, observer.decisions)
+		}
+	}
+}
+
+type submitGuardRecordingObserver struct {
+	decisions []resilienceplane.Decision
+}
+
+func (r *submitGuardRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+	r.decisions = append(r.decisions, decision)
+}
+
+func (r *submitGuardRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+	for _, decision := range r.decisions {
+		if decision.Outcome == outcome {
+			return true
+		}
+	}
+	return false
 }

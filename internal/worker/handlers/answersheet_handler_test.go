@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -188,8 +189,10 @@ func TestAnswerSheetProcessingLockKeyUsesNamespace(t *testing.T) {
 func TestHandleAnswerSheetSubmitted_DegradedWithoutRedisContinues(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	observer := &workerGateRecordingObserver{}
 
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		observer: observer,
 		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
 			t.Fatal("acquire should not be called when redis client is nil")
 			return nil, false, nil
@@ -210,14 +213,19 @@ func TestHandleAnswerSheetSubmitted_DegradedWithoutRedisContinues(t *testing.T) 
 	if client.createCalls != 1 {
 		t.Fatalf("expected 1 create call, got %d", client.createCalls)
 	}
+	if !observer.has(resilienceplane.OutcomeDegradedOpen) {
+		t.Fatal("expected degraded_open outcome")
+	}
 }
 
 func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	observer := &workerGateRecordingObserver{}
 
 	releaseCalled := false
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		observer: observer,
 		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
 			return nil, false, errors.New("boom")
 		},
@@ -239,6 +247,39 @@ func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T
 	}
 	if releaseCalled {
 		t.Fatalf("release should not be called when acquire fails")
+	}
+	if !observer.has(resilienceplane.OutcomeDegradedOpen) {
+		t.Fatal("expected degraded_open outcome")
+	}
+}
+
+func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing.T) {
+	client := &fakeWorkerInternalClient{}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	observer := &workerGateRecordingObserver{}
+
+	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		observer: observer,
+		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+			return nil, false, nil
+		},
+		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
+			t.Fatal("release should not be called when lock is not acquired")
+			return nil
+		},
+	})
+
+	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 902)); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+	if client.calculateCalls != 0 {
+		t.Fatalf("expected no score calls, got %d", client.calculateCalls)
+	}
+	if client.createCalls != 0 {
+		t.Fatalf("expected no create calls, got %d", client.createCalls)
+	}
+	if !observer.has(resilienceplane.OutcomeDuplicateSkipped) {
+		t.Fatal("expected duplicate_skipped outcome")
 	}
 }
 
@@ -328,4 +369,21 @@ func mustBuildAnswerSheetSubmittedPayload(t *testing.T, answerSheetID uint64) []
 		t.Fatalf("marshal payload: %v", err)
 	}
 	return payload
+}
+
+type workerGateRecordingObserver struct {
+	decisions []resilienceplane.Decision
+}
+
+func (r *workerGateRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+	r.decisions = append(r.decisions, decision)
+}
+
+func (r *workerGateRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+	for _, decision := range r.decisions {
+		if decision.Outcome == outcome {
+			return true
+		}
+	}
+	return false
 }

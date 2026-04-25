@@ -3,6 +3,7 @@ package answersheet
 import (
 	"context"
 	"errors"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -167,6 +168,15 @@ func TestSubmitQueueReportsOutcomes(t *testing.T) {
 	} {
 		if !observer.has(outcome) {
 			t.Fatalf("expected outcome %s", outcome)
+		}
+	}
+}
+
+func TestSubmitQueueHasNoLifecycleControlSurface(t *testing.T) {
+	queueType := reflect.TypeOf(&SubmitQueue{})
+	for _, method := range []string{"Stop", "Drain", "Close"} {
+		if _, ok := queueType.MethodByName(method); ok {
+			t.Fatalf("SubmitQueue exposes %s; lifecycle drain/shutdown is intentionally not supported", method)
 		}
 	}
 }

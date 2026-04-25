@@ -22,8 +22,9 @@ const (
 )
 
 type answerSheetProcessingGateHooks struct {
-	acquire func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*redislock.Lease, bool, error)
-	release func(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error
+	acquire  func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*redislock.Lease, bool, error)
+	release  func(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error
+	observer resilienceplane.Observer
 }
 
 type DuplicateSuppressionGate interface {
@@ -31,7 +32,8 @@ type DuplicateSuppressionGate interface {
 }
 
 type answerSheetDuplicateSuppressionGate struct {
-	hooks answerSheetProcessingGateHooks
+	hooks    answerSheetProcessingGateHooks
+	observer resilienceplane.Observer
 }
 
 var _ DuplicateSuppressionGate = answerSheetDuplicateSuppressionGate{}
@@ -48,7 +50,10 @@ func newAnswerSheetDuplicateSuppressionGate(hooks answerSheetProcessingGateHooks
 	if hooks.release == nil {
 		hooks.release = releaseProcessingLock
 	}
-	return answerSheetDuplicateSuppressionGate{hooks: hooks}
+	return answerSheetDuplicateSuppressionGate{
+		hooks:    hooks,
+		observer: defaultAnswerSheetGateObserver(hooks.observer),
+	}
 }
 
 // handleAnswerSheetSubmitted 返回答卷提交处理函数
@@ -132,7 +137,7 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 
 	if deps.LockManager == nil {
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "redis_unavailable")
-		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDegradedOpen)
+		g.observe(ctx, resilienceplane.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -146,7 +151,7 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 	lease, acquired, err := g.hooks.acquire(ctx, deps, answerSheetID)
 	if err != nil {
 		cacheobservability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
-		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDegradedOpen)
+		g.observe(ctx, resilienceplane.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -158,7 +163,7 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 		return fn(ctx)
 	}
 	if !acquired {
-		observeAnswerSheetGate(ctx, resilienceplane.OutcomeDuplicateSkipped)
+		g.observe(ctx, resilienceplane.OutcomeDuplicateSkipped)
 		deps.Logger.Info("answersheet processing skipped as duplicate",
 			slog.String("event_id", eventID),
 			slog.String("answersheet_id", answerSheetIDStr),
@@ -190,13 +195,20 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 	return fn(ctx)
 }
 
-func observeAnswerSheetGate(ctx context.Context, outcome resilienceplane.Outcome) {
-	resilienceplane.Observe(ctx, resilienceplane.DefaultObserver(), resilienceplane.ProtectionDuplicateSuppression, resilienceplane.Subject{
+func (g answerSheetDuplicateSuppressionGate) observe(ctx context.Context, outcome resilienceplane.Outcome) {
+	resilienceplane.Observe(ctx, g.observer, resilienceplane.ProtectionDuplicateSuppression, resilienceplane.Subject{
 		Component: "worker",
 		Scope:     "answersheet_submitted",
 		Resource:  "answersheet_processing",
 		Strategy:  "redis_lock",
 	}, outcome)
+}
+
+func defaultAnswerSheetGateObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+	if observer != nil {
+		return observer
+	}
+	return resilienceplane.DefaultObserver()
 }
 
 // acquireProcessingLock 获取答卷处理的 best-effort Redis lease lock。

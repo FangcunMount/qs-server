@@ -29,14 +29,21 @@ type Manager struct {
 	component string
 	name      string
 	handle    *redisplane.Handle
+	observer  resilienceplane.Observer
 }
 
 // NewManager 为一个进程级锁工作负载创建分布式锁管理器。
 func NewManager(component, name string, handle *redisplane.Handle) *Manager {
+	return NewManagerWithObserver(component, name, handle, nil)
+}
+
+// NewManagerWithObserver 创建带显式 resilience observer 的锁管理器。
+func NewManagerWithObserver(component, name string, handle *redisplane.Handle, observer resilienceplane.Observer) *Manager {
 	return &Manager{
 		component: component,
 		name:      name,
 		handle:    handle,
+		observer:  defaultObserver(observer),
 	}
 }
 
@@ -143,13 +150,24 @@ func (m *Manager) metricName(identity Identity) string {
 
 func (m *Manager) observe(ctx context.Context, identity Identity, outcome resilienceplane.Outcome) {
 	component := ""
+	observer := resilienceplane.DefaultObserver()
 	if m != nil {
 		component = m.component
+		if m.observer != nil {
+			observer = m.observer
+		}
 	}
-	resilienceplane.Observe(ctx, resilienceplane.DefaultObserver(), resilienceplane.ProtectionLock, resilienceplane.Subject{
+	resilienceplane.Observe(ctx, observer, resilienceplane.ProtectionLock, resilienceplane.Subject{
 		Component: component,
 		Scope:     m.metricName(identity),
 		Resource:  "redis_lock",
 		Strategy:  "lease",
 	}, outcome)
+}
+
+func defaultObserver(observer resilienceplane.Observer) resilienceplane.Observer {
+	if observer != nil {
+		return observer
+	}
+	return resilienceplane.DefaultObserver()
 }

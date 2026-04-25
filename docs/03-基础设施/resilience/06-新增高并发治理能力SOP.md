@@ -42,6 +42,7 @@ flowchart TD
 3. 如果新增 Redis lock spec，必须在 [`redislock.Specs`](../../../internal/pkg/redislock/spec.go) 写清 `Name / Description / DefaultTTL`。
 4. 如果新增队列状态或降级分支，必须写明对 HTTP status、重试、状态查询的影响。
 5. 如果要改 component-base primitive，先在 component-base 补 contract tests，再同步 qs-server 依赖版本。
+6. 如果新增保护能力，必须更新 [07-能力矩阵](./07-能力矩阵.md)。
 
 ## 测试清单
 

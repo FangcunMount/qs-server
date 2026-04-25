@@ -57,6 +57,12 @@ sequenceDiagram
 - `SubmitQueue` 负责入队、状态查询和 outcome；`submitQueueWorkerPool` 只负责消费 job 与推进 `processing/done/failed`。
 - 队列削峰之后仍会进入 `SubmitGuard`，由 Redis lock/done marker 做跨实例提交抑制。
 
+## Lifecycle Boundary
+
+- `SubmitQueue` 当前没有 `Stop / Drain / Close` 方法。
+- collection-server 进程退出时，队列中的未处理 job 不做 drain，也不持久化恢复。
+- 如果未来要支持 graceful drain，需要单独设计 shutdown hook、等待上限、状态回写和失败语义，不能作为普通重构顺手加入。
+
 ## 代码锚点与测试锚点
 
 - Queue 实现与契约测试：[`internal/collection-server/application/answersheet`](../../../internal/collection-server/application/answersheet/)

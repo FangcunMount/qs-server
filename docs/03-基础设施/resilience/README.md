@@ -22,6 +22,7 @@
 5. [04-RedisLock幂等与重复抑制](./04-RedisLock幂等与重复抑制.md)：区分 leader、idempotency、best-effort gate。
 6. [05-观测降级与排障](./05-观测降级与排障.md)：按 outcome 排障。
 7. [06-新增高并发治理能力SOP](./06-新增高并发治理能力SOP.md)：新增能力的测试与文档清单。
+8. [07-能力矩阵](./07-能力矩阵.md)：横向核对每个能力的模型、primitive、outcome 和测试。
 
 ## 主图
 
