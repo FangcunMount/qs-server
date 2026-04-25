@@ -423,7 +423,7 @@ backoff 规则：
 
 apiserver 启动后，会起一个后台协程：
 
-- [../../internal/apiserver/server.go](../../internal/apiserver/server.go)
+- [../../internal/apiserver/process/runtime_bootstrap.go](../../internal/apiserver/process/runtime_bootstrap.go)
 
 它的配置是固定的：
 

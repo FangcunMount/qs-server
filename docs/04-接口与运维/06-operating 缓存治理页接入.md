@@ -119,6 +119,17 @@ Operating BFF 建议暴露 4 个页面专用接口：
 - `query.stats_questionnaire`
 - `query.stats_plan`
 
+kind、scope、family 的现行模型以 [internal/apiserver/cachetarget/target.go](../../internal/apiserver/cachetarget/target.go) 为准，不要在 BFF 中维护第二套含义不同的解析规则。
+
+| Kind | Scope 格式 | Family | 说明 |
+| ---- | ---------- | ------ | ---- |
+| `static.scale` | `scale:{code}` | `static_meta` | 单量表静态缓存 |
+| `static.questionnaire` | `questionnaire:{code}` | `static_meta` | 问卷静态缓存 |
+| `static.scale_list` | `published` | `static_meta` | 已发布量表列表 |
+| `query.stats_system` | `org:{orgID}` | `query_result` | 机构级统计查询 |
+| `query.stats_questionnaire` | `org:{orgID}:questionnaire:{code}` | `query_result` | 问卷统计查询 |
+| `query.stats_plan` | `org:{orgID}:plan:{planID}` | `query_result` | 计划统计查询 |
+
 ## 页面最小信息架构
 
 页面建议拆成 4 个区：
@@ -260,7 +271,7 @@ Operating 后台如需直接接入手工预热，推荐固定为：
 
 - `targets` 不能为空
 - `kind` 必须在白名单内
-- `query.*` 的 `scope` 必须属于当前 operating 操作者所在机构
+- `query.*` 的 `scope` 必须属于当前 operating 操作者所在机构；orgID 解析规则与 [cachetarget.WarmupTarget.OrgID](../../internal/apiserver/cachetarget/target.go) 保持一致
 - `static.*` 允许跨机构视图触发，因为它们对应静态资源缓存
 
 ### 返回结果如何直接驱动页面
@@ -285,10 +296,11 @@ Operating 后台如需直接接入手工预热，推荐固定为：
 
 页面建议把 `items[]` 直接渲染成命令执行结果表，而不是只展示一个总状态。
 
-worker 继续没有 internal 面板；其缓存治理状态只能通过：
+worker 继续没有 internal 缓存治理面板；其 Redis 状态只能通过：
 
 - Grafana
 - `/metrics`
+- `GET /governance/redis`
 - 结构化日志
 
 查看。

@@ -57,7 +57,7 @@
 
 ### 契约入口
 
-- **REST**：`/api/v1/testees`、`/api/v1/staff`、`/api/v1/clinicians`、`/api/v1/public/assessment-entries/:token` 等以代码为准；当前保留 `/api/v1/practitioners` 作为兼容别名。Handler [actor.go](../../internal/apiserver/interface/restful/handler/actor.go)、[clinician.go](../../internal/apiserver/interface/restful/handler/clinician.go)、路由 [routers.go](../../internal/apiserver/routers.go)。
+- **REST**：`/api/v1/testees`、`/api/v1/staff`、`/api/v1/clinicians`、`/api/v1/public/assessment-entries/:token` 等以代码为准；当前保留 `/api/v1/practitioners` 作为兼容别名。Handler [actor.go](../../internal/apiserver/interface/restful/handler/actor.go)、[clinician.go](../../internal/apiserver/interface/restful/handler/clinician.go)、路由 [transport/rest](../../internal/apiserver/transport/rest/)。
 - **C 端 / BFF gRPC**：`CreateTestee`、`GetTestee`、`ListTesteesByOrg` 等见 [actor.proto](../../internal/apiserver/interface/grpc/proto/actor/actor.proto)、[actor_service.go](../../internal/apiserver/interface/grpc/service/actor_service.go)。
 - **internal gRPC**：`TagTestee` 见 [internal.proto](../../internal/apiserver/interface/grpc/proto/internalapi/internal.proto)、[internal.go](../../internal/apiserver/interface/grpc/service/internal.go)。
 - **领域事件**：**N/A（当前无纳入 `configs/events.yaml` 的 actor 领域事件）**；与代码注释占位对照见「核心契约」。
@@ -306,7 +306,7 @@ flowchart TB
 
 **与 OpenAPI / 路由对读（Verify）**：
 
-以下为 **机器可读契约**（以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准）；路由挂载以 [routers.go](../../internal/apiserver/routers.go)（`registerActorProtectedRoutes` 等）为准，二者不一致时应以代码为准并同步 yaml。
+以下为 **机器可读契约**（以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准）；路由挂载以 [transport/rest](../../internal/apiserver/transport/rest/)（`registerActorProtectedRoutes` 等）为准，二者不一致时应以代码为准并同步 yaml。
 
 | HTTP | 路径（前缀 `/api/v1`） | 摘要 | 备注 |
 | ---- | ---------------------- | ---- | ---- |

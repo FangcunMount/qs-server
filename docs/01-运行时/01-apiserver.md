@@ -100,24 +100,24 @@ sequenceDiagram
     S->>S: startStatisticsSyncScheduler（可选）
 ```
 
-**Verify**：真实顺序与条件分支以 [internal/apiserver/server.go](../../internal/apiserver/server.go) 为准。
+**Verify**：真实顺序与条件分支以 [internal/apiserver/process/run.go](../../internal/apiserver/process/run.go) 为准。
 
 ---
 
 ### 优雅关闭（gRPC、HTTP、DB、统计 ticker、容器）
 
-进程使用 `component-base` 的 **`GracefulShutdown`**（POSIX 信号）。**主关闭回调**在 [server.go `PrepareRun`](../../internal/apiserver/server.go) 末尾注册，**大致顺序**为：
+进程使用 `component-base` 的 **`GracefulShutdown`**（POSIX 信号）。**主关闭回调**在 [process/lifecycle.go](../../internal/apiserver/process/lifecycle.go) 注册，**大致顺序**为：
 
-1. **`container.Cleanup()`**：IAM、各业务 **module.Cleanup()** 等（见 [container.go `Cleanup`](../../internal/apiserver/container/container.go)）。  
+1. **`container.Cleanup()`**：IAM、各业务 **module.Cleanup()** 等（见 [container/lifecycle.go `Cleanup`](../../internal/apiserver/container/lifecycle.go)）。
 2. **`dbManager.Close()`**：MySQL / Mongo / Redis 等连接。  
 3. **`genericAPIServer.Close()`**：HTTP(S)。  
 4. **`grpcServer.Close()`**：gRPC **GracefulStop**（见 [internal/pkg/grpc/server.go](../../internal/pkg/grpc/server.go)）。
 
 **统计同步 ticker**：`startStatisticsSyncScheduler` 内为三轮 `SyncDaily/Accumulated/Plan` **单独注册**一条 `ShutdownCallback`，仅对 ticker 使用的 **context 调用 `cancel()`**，使 goroutine 在 `select` 上退出。**与主回调同属** `GracefulShutdown`；若关心「cancel 与关库的先后」，以 **回调注册顺序** 与 **`github.com/FangcunMount/component-base/pkg/shutdown` 的实际 invocation 顺序**为准（排障时可打日志核对）。
 
-**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 `PrepareRun` 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container `initEventPublisher`](../../internal/apiserver/container/container.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。与此同时，`PrepareRun` 还会按配置启动 **Mongo outbox relay** 与 **assessment MySQL outbox relay**；它们并不只补发 `answersheet.submitted` 和 `assessment.* / report.generated`，也会按持久化边界补发已经 staged 的 `footprint.*` 行为事件。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
+**QS 业务事件 Publisher**：底层 **`messaging.Publisher`** 由 resource stage 中 `MessagingOptions.NewPublisher()` 创建并注入 **Container** → **`eventconfig.NewRoutingPublisher`**（[container/bootstrap_notification.go](../../internal/apiserver/container/bootstrap_notification.go)）。这里的 `messaging.*` 只服务 **QS 业务事件总线**。与此同时，runtime stage 还会按配置启动 **Mongo outbox relay** 与 **assessment MySQL outbox relay**；它们并不只补发 `answersheet.submitted` 和 `assessment.* / report.generated`，也会按持久化边界补发已经 staged 的 `footprint.*` 行为事件。**显式 Close** 是否在 `Cleanup` 链中完成，以实现为准；线上通常以 **进程退出** 回收连接。
 
-**IAM 授权版本同步**：与业务事件总线分离，`apiserver` 通过 **`iam.authz-sync.*`** 创建独立订阅者，消费 **`iam.authz.version`** 控制面主题以推进本地授权快照失效，见 [server.go `startAuthzVersionSync`](../../internal/apiserver/server.go) 与 [version_sync.go](../../internal/pkg/iamauth/version_sync.go)。
+**IAM 授权版本同步**：与业务事件总线分离，`apiserver` 通过 **`iam.authz-sync.*`** 创建独立订阅者，消费 **`iam.authz.version`** 控制面主题以推进本地授权快照失效，见 [process/container_bootstrap.go](../../internal/apiserver/process/container_bootstrap.go) 与 [version_sync.go](../../internal/pkg/iamauth/version_sync.go)。
 
 ---
 
@@ -165,13 +165,13 @@ sequenceDiagram
 | 功能 | 关键点 | 代码锚点 |
 | ---- | ------ | -------- |
 | **配置加载** | `Options` → `config.Config`，与 `configs/*.yaml` 绑定 | [options/options.go](../../internal/apiserver/options/options.go) |
-| **存储接入** | 迁移、连接池、**背压** 包在适配层 | [database.go](../../internal/apiserver/database.go)、[backpressure](../../internal/pkg/backpressure/limiter.go) |
+| **存储接入** | 迁移、连接池、**背压** 包在适配层 | [bootstrap/database.go](../../internal/apiserver/bootstrap/database.go)、[backpressure](../../internal/pkg/backpressure/limiter.go) |
 | **模块装配** | 按 assembler 注入各 BC | [container/assembler/](../../internal/apiserver/container/assembler/) |
-| **REST** | 后台路由、运维接口 | [routers.go](../../internal/apiserver/routers.go) |
-| **gRPC** | 六类服务注册；模块 nil 则跳过 | [grpc_registry.go](../../internal/apiserver/grpc_registry.go) |
+| **REST** | 后台路由、运维接口 | [transport/rest](../../internal/apiserver/transport/rest/) |
+| **gRPC** | 六类服务注册；模块 nil 则跳过 | [transport/grpc/registry.go](../../internal/apiserver/transport/grpc/registry.go) |
 | **发事件** | 应用层见上文“领域事件从哪里发布”；Topic/handler 与 [events.yaml](../../configs/events.yaml) 对齐 | [03-事件系统](../03-基础设施/01-事件系统.md) |
-| **缓存预热** | 启动后异步 | [container.go WarmupCache](../../internal/apiserver/container/container.go) |
-| **统计落库 ticker** | 与 Crontab 可能叠加；关闭见上文“优雅关闭” | [server.go](../../internal/apiserver/server.go)、[04-调度](../04-接口与运维/04-调度与后台任务.md) |
+| **缓存预热** | 启动后异步 | [container/runtime_cache_governance.go](../../internal/apiserver/container/runtime_cache_governance.go) |
+| **统计落库 ticker** | 与 Crontab 可能叠加；关闭见上文“优雅关闭” | [process/runtime_bootstrap.go](../../internal/apiserver/process/runtime_bootstrap.go)、[04-调度](../04-接口与运维/04-调度与后台任务.md) |
 
 ### 关键代码入口（索引）
 

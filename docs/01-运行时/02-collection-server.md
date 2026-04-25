@@ -167,9 +167,9 @@ sequenceDiagram
 
 | 功能 | 关键点 | 代码锚点 |
 | ---- | ------ | -------- |
-| **启动** | 可选 **GOMEMLIMIT/GOGC**、**:6060 pprof** | [app.go](../../internal/collection-server/app.go)、[server.go](../../internal/collection-server/server.go) |
-| **gRPC 客户端** | 五类 client 注入容器 | [grpc_client_registry.go](../../internal/collection-server/grpc_client_registry.go)、[manager.go](../../internal/collection-server/infra/grpcclient/manager.go) |
-| **路由** | 公开路径 vs `/api/v1` 受保护 | [routers.go](../../internal/collection-server/routers.go) |
+| **启动** | 可选 **GOMEMLIMIT/GOGC**、**:6060 pprof** | [app.go](../../internal/collection-server/app.go)、[process/run.go](../../internal/collection-server/process/run.go) |
+| **gRPC 客户端** | 五类 client 注入容器 | [integration/grpcclient/registry.go](../../internal/collection-server/integration/grpcclient/registry.go)、[manager.go](../../internal/collection-server/infra/grpcclient/manager.go) |
+| **路由** | 公开路径 vs `/api/v1` 受保护 | [transport/rest/router.go](../../internal/collection-server/transport/rest/router.go) |
 | **提交排队** | 200/202/429、有界 | [submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) |
 | **监护与提交** | JWT 之外的业务校验 | [submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go) |
 | **身份中间件** | 与 apiserver **不是**同一套 UserIdentity 实现 | [iam_middleware.go](../../internal/collection-server/interface/restful/middleware/iam_middleware.go) |

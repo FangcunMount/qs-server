@@ -37,7 +37,7 @@
 ### 契约入口
 
 - **OpenAPI 导出**：[api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[api/rest/collection.yaml](../../api/rest/collection.yaml)
-- **路由注册**：[internal/apiserver/routers.go](../../internal/apiserver/routers.go)、[internal/collection-server/routers.go](../../internal/collection-server/routers.go)
+- **路由注册**：[internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/)、[internal/collection-server/transport/rest/router.go](../../internal/collection-server/transport/rest/router.go)
 - **文档生成**：[Makefile](../../Makefile)（`docs-swagger`、`docs-rest`、`docs-verify`）、[scripts/generate_rest_from_swagger.py](../../scripts/generate_rest_from_swagger.py)、[scripts/compare_api_docs.py](../../scripts/compare_api_docs.py)
 
 ### 运行时示意图
@@ -71,10 +71,10 @@ flowchart LR
 
 | 关注点 | 路径 |
 | ------ | ---- |
-| apiserver 路由 | [internal/apiserver/routers.go](../../internal/apiserver/routers.go) |
-| collection 路由 | [internal/collection-server/routers.go](../../internal/collection-server/routers.go) |
+| apiserver 路由 | [internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/) |
+| collection 路由 | [internal/collection-server/transport/rest/router.go](../../internal/collection-server/transport/rest/router.go) |
 | 静态挂载 OpenAPI / Swagger UI | 各进程 `server` / `app` 装配（与 [Makefile](../../Makefile) 产物路径一致） |
-| 缓存治理 internal 路由 | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/routers.go](../../internal/apiserver/routers.go) |
+| 缓存治理 internal 路由 | [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 中 `CacheGovernance*` handler；注册见 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) |
 
 ---
 
@@ -104,13 +104,13 @@ flowchart LR
 
 两进程通常保留 **`/health`、`/ping`、Swagger、`/api/rest/*`** 等；业务在 **`/api/v1`** 下，由 IAM 配置决定是否走 JWT 中间件（见 [03-基础设施/04-IAM与认证](../03-基础设施/04-IAM与认证.md)）。
 
-**collection** 侧存在 **显式匿名只读**（如部分 `GET /scales`），便于拉元数据——以 [collection `routers.go`](../../internal/collection-server/routers.go) 为准。
+**collection** 侧存在 **显式匿名只读**（如部分 `GET /scales`），便于拉元数据——以 [collection `transport/rest/router.go`](../../internal/collection-server/transport/rest/router.go) 为准。
 
 ## 排障和改动时先看什么
 
 | 关注点 | 路径 |
 | ------ | ---- |
-| 统计/计划等运维 REST | apiserver `statistics`、`plans` 路由组（[routers.go](../../internal/apiserver/routers.go)） |
+| 统计/计划等运维 REST | apiserver `statistics`、`plans` 路由组（[transport/rest](../../internal/apiserver/transport/rest/)） |
 | 与异步链路关系 | 运维触发的同步 ≠ MQ 消费；事件见 [03-基础设施/01-事件系统](../03-基础设施/01-事件系统.md) |
 
 ### 缓存治理 internal 面板（What / Where / Verify）
@@ -130,7 +130,7 @@ flowchart LR
 
 **Verify**：
 
-- 路由注册以 [internal/apiserver/routers.go](../../internal/apiserver/routers.go) 为准
+- 路由注册以 [internal/apiserver/transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go) 为准
 - 返回结构与查询参数校验以 [internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go) 为准
 - `status` / `hotset` 口径来自缓存治理服务与 runtime family registry，不是 OpenAPI 静态文件推导出来的文档状态
 

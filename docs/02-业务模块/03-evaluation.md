@@ -299,7 +299,7 @@ sequenceDiagram
 
 #### REST
 
-`/evaluations/*`、`/assessments/*` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)，路由 [routers.go](../../internal/apiserver/routers.go)。
+`/evaluations/*`、`/assessments/*` 等以 [api/rest/apiserver.yaml](../../api/rest/apiserver.yaml) 为准；Handler [evaluation.go](../../internal/apiserver/interface/restful/handler/evaluation.go)，路由 [transport/rest](../../internal/apiserver/transport/rest/)。
 
 #### 对外 gRPC（Evaluation）
 

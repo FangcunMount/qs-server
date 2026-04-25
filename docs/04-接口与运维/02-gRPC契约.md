@@ -21,7 +21,7 @@
 | 服务端角色 | 只有 `qs-apiserver` 暴露 gRPC Server |
 | 客户端角色 | `collection-server` 和 `qs-worker` 都是 gRPC 客户端，但调用的 Service 集合不同 |
 | 契约真值 | `.proto` 以 [internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/) 为准 |
-| 注册真值 | 服务端注册以 [grpc_registry.go](../../internal/apiserver/grpc_registry.go) 为准，客户端以各自 `grpc_client_registry.go` 为准 |
+| 注册真值 | 服务端注册以 [transport/grpc/registry.go](../../internal/apiserver/transport/grpc/registry.go) 为准，客户端以各自 integration registry 为准 |
 | `InternalService` 定位 | 它主要服务 worker 回调，不等价于对外查询型服务 |
 | 排障入口 | 先看 proto 和注册器，再看对应 service 实现与 client 调用点 |
 
@@ -36,9 +36,9 @@
 ### 契约入口
 
 - **Proto**：[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/)（`actor`、`answersheet`、`evaluation`、`questionnaire`、`scale`、`internalapi`）
-- **服务端注册**：[internal/apiserver/grpc_registry.go](../../internal/apiserver/grpc_registry.go)
+- **服务端注册**：[internal/apiserver/transport/grpc/registry.go](../../internal/apiserver/transport/grpc/registry.go)
 - **通用 Server 与拦截器**：[internal/pkg/grpc/server.go](../../internal/pkg/grpc/server.go)
-- **客户端**：collection [grpc_client_registry.go](../../internal/collection-server/grpc_client_registry.go)；worker [grpc_client_registry.go](../../internal/worker/grpc_client_registry.go)
+- **客户端**：collection [integration/grpcclient/registry.go](../../internal/collection-server/integration/grpcclient/registry.go)；worker [integration/grpcclient/registry.go](../../internal/worker/integration/grpcclient/registry.go)
 
 ### 运行时示意图
 
@@ -91,7 +91,7 @@ flowchart LR
 | `ScaleService` | ✓ | — | 量表只读与分类 |
 | `InternalService` | — | ✓ | 计分、创建 Assessment、执行评估、打标签、二维码 |
 
-**Verify**：若某模块未装配，`GRPCRegistry` 会 **跳过** 对应服务（见 [`grpc_registry.go`](../../internal/apiserver/grpc_registry.go) 内 `nil` 判断与日志）。排障需 **proto + 注册器 + 容器装配** 一起看。
+**Verify**：若某模块未装配，`GRPCRegistry` 会 **跳过** 对应服务（见 [`transport/grpc/registry.go`](../../internal/apiserver/transport/grpc/registry.go) 内 `nil` 判断与日志）。排障需 **proto + 注册器 + 容器装配** 一起看。
 
 ## 哪些进程是服务端，哪些进程是客户端
 

@@ -20,7 +20,7 @@
 
 ### 契约入口
 
-- **apiserver**：[`internal/apiserver/container/iam_module.go`](../../internal/apiserver/container/iam_module.go)、[`internal/apiserver/infra/iam/`](../../internal/apiserver/infra/iam/)。
+- **apiserver**：[`internal/apiserver/container/iam.go`](../../internal/apiserver/container/iam.go)、[`internal/apiserver/infra/iam/`](../../internal/apiserver/infra/iam/)。
 - **collection-server**：[`internal/collection-server/container/iam_module.go`](../../internal/collection-server/container/iam_module.go)、[`internal/collection-server/infra/iam/`](../../internal/collection-server/infra/iam/)。
 - **HTTP/gRPC**：[`internal/pkg/middleware/jwt_auth.go`](../../internal/pkg/middleware/jwt_auth.go)、[`internal/pkg/grpc/interceptor_auth.go`](../../internal/pkg/grpc/interceptor_auth.go)。
 
@@ -64,10 +64,10 @@ flowchart LR
 
 | 关注点 | 路径 |
 | ------ | ---- |
-| apiserver IAM 模块 | [internal/apiserver/container/iam_module.go](../../internal/apiserver/container/iam_module.go) |
+| apiserver IAM 模块 | [internal/apiserver/container/iam.go](../../internal/apiserver/container/iam.go) |
 | collection IAM 模块 | [internal/collection-server/container/iam_module.go](../../internal/collection-server/container/iam_module.go) |
 | 共享拦截器 | [internal/pkg/grpc/interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go)、[internal/pkg/grpc/server.go](../../internal/pkg/grpc/server.go)（`buildUnaryInterceptors`） |
-| apiserver gRPC 授权快照 | [internal/apiserver/grpc_authz_snapshot_interceptor.go](../../internal/apiserver/grpc_authz_snapshot_interceptor.go)、[`buildGRPCServer`](../../internal/apiserver/server.go) 注入 |
+| apiserver gRPC 授权快照 | [internal/apiserver/transport/grpc/authz_snapshot_interceptor.go](../../internal/apiserver/transport/grpc/authz_snapshot_interceptor.go)、[internal/apiserver/process/transport_bootstrap.go](../../internal/apiserver/process/transport_bootstrap.go) 注入 |
 
 ---
 
@@ -109,7 +109,7 @@ flowchart LR
 ### 核心模式：internal gRPC（apiserver 侧）
 
 - **拦截器链顺序**（Unary，与代码一致）：Recovery → RequestID → Logging →（可选）mTLS Identity →（可选）**IAMAuth** →（可选）**授权快照（ExtraUnaryAfterAuth）** →（可选）ACL →（可选）Audit，见 [pkg/grpc `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)。
-- **IAMAuth 之后：授权快照**：仅 **qs-apiserver** 在装配 gRPC 时，若 `IAMModule.AuthzSnapshotLoader()` 可用，则通过 `Config.ExtraUnaryAfterAuth` 追加 **`NewAuthzSnapshotUnaryInterceptor`**（[grpc_authz_snapshot_interceptor.go](../../internal/apiserver/grpc_authz_snapshot_interceptor.go)），调用 IAM **GetAuthorizationSnapshot**，并向 context 写入与 HTTP [`AuthzSnapshotMiddleware`](../../internal/apiserver/interface/restful/middleware/authz_snapshot_middleware.go) 一致的 **`authz` 快照**与 **`GrantingUserID`**。无 JWT 或未注入 `tenant_id`/`user_id` 的 RPC（如 Health、Reflection、未走 IAM 的内部调用）**不**拉快照。
+- **IAMAuth 之后：授权快照**：仅 **qs-apiserver** 在装配 gRPC 时，若 `IAMModule.AuthzSnapshotLoader()` 可用，则通过 `Config.ExtraUnaryAfterAuth` 追加 **`NewAuthzSnapshotUnaryInterceptor`**（[authz_snapshot_interceptor.go](../../internal/apiserver/transport/grpc/authz_snapshot_interceptor.go)），调用 IAM **GetAuthorizationSnapshot**，并向 context 写入与 HTTP [`AuthzSnapshotMiddleware`](../../internal/apiserver/interface/restful/middleware/authz_snapshot_middleware.go) 一致的 **`authz` 快照**与 **`GrantingUserID`**。无 JWT 或未注入 `tenant_id`/`user_id` 的 RPC（如 Health、Reflection、未走 IAM 的内部调用）**不**拉快照。
 - **`grpc.auth.enabled`**：为 `true` 且注入了 `TokenVerifier` 时挂载 `IAMAuthInterceptor`；否则跳过认证（或仅打 warn）。
 - **默认跳过认证**：gRPC **Health**、**Reflection**（前缀匹配），见 `NewIAMAuthInterceptor` 内 `skipMethods`；授权快照拦截器对同类路径 **跳过**加载（与 IAM 白名单对齐）。**业务 RPC 不在默认白名单**，需带 JWT 或运行时扩展 `AddSkipMethod`。
 - **worker → apiserver**：[`InternalClient`](../../internal/worker/infra/grpcclient/internal_client.go) 调用 **未**附加 `authorization` metadata；[`Manager`](../../internal/worker/infra/grpcclient/manager.go) 仅 TLS/mTLS 传输凭证。故 **生产若开启 `grpc.auth.enabled`**，需 **PerRPC 注入服务 JWT** 或调整拦截器/白名单；示例 [`configs/apiserver.dev.yaml`](../../configs/apiserver.dev.yaml) 中 **`auth.enabled: false`** 与当前客户端行为一致。

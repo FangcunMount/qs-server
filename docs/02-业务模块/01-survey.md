@@ -275,7 +275,7 @@ flowchart TB
   - `/api/v1/questionnaires`
   - `/api/v1/answersheets`
   - 路由入口：
-    [internal/apiserver/routers.go](../../internal/apiserver/routers.go)
+    [internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/)
 - 前台 gRPC
   - `collection-server` 调 `AnswerSheetService`
   - 入口：

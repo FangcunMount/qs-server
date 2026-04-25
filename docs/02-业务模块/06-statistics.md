@@ -183,7 +183,7 @@ flowchart LR
 代码锚点：
 
 - [../../internal/apiserver/options/options.go](../../internal/apiserver/options/options.go)
-- [../../internal/apiserver/server.go](../../internal/apiserver/server.go)
+- [../../internal/apiserver/process/runtime_bootstrap.go](../../internal/apiserver/process/runtime_bootstrap.go)
 
 ---
 
@@ -237,7 +237,7 @@ flowchart LR
 代码锚点：
 
 - [../../internal/apiserver/interface/restful/handler/statistics.go](../../internal/apiserver/interface/restful/handler/statistics.go)
-- [../../internal/apiserver/routers.go](../../internal/apiserver/routers.go)
+- [../../internal/apiserver/transport/rest](../../internal/apiserver/transport/rest/)
 
 说明：历史上曾有 `statistics/validate` 入口，但它已经不在当前 router 注册路径中，不应再按现行能力描述。
 

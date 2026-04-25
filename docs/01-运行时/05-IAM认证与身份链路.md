@@ -113,7 +113,7 @@ sequenceDiagram
 
 ### apiserver：gRPC 入站，传输层与 Unary 链顺序（mTLS 先于 IAM JWT）
 
-**易混点**：**mTLS** 先在 **TLS 握手** 完成客户端认证；**IAMAuthInterceptor** 再在 **应用层** 读 metadata 里的 **JWT**（可与 **用户态** 或 **服务态** token 对应）。服务端 **Unary 链**（与代码一致）为：**Recovery → RequestID → Logging →（可选）MTLSInterceptor →（可选）IAMAuth →（可选）授权快照（`Config.ExtraUnaryAfterAuth`，仅 **qs-apiserver** 装配 `AuthzSnapshotLoader` 时）→（可选）ACL →（可选）Audit → Handler**。其中 **TLS/mTLS 在连接建立时完成**；**MTLSInterceptor 在 IAMAuth 之前**；**授权快照在 IAMAuth 之后、ACL 之前**（见 [internal/pkg/grpc/server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)、[apiserver `grpc_authz_snapshot_interceptor.go`](../../internal/apiserver/grpc_authz_snapshot_interceptor.go)）。
+**易混点**：**mTLS** 先在 **TLS 握手** 完成客户端认证；**IAMAuthInterceptor** 再在 **应用层** 读 metadata 里的 **JWT**（可与 **用户态** 或 **服务态** token 对应）。服务端 **Unary 链**（与代码一致）为：**Recovery → RequestID → Logging →（可选）MTLSInterceptor →（可选）IAMAuth →（可选）授权快照（`Config.ExtraUnaryAfterAuth`，仅 **qs-apiserver** 装配 `AuthzSnapshotLoader` 时）→（可选）ACL →（可选）Audit → Handler**。其中 **TLS/mTLS 在连接建立时完成**；**MTLSInterceptor 在 IAMAuth 之前**；**授权快照在 IAMAuth 之后、ACL 之前**（见 [internal/pkg/grpc/server.go `buildUnaryInterceptors`](../../internal/pkg/grpc/server.go)、[apiserver `authz_snapshot_interceptor.go`](../../internal/apiserver/transport/grpc/authz_snapshot_interceptor.go)）。
 
 ```mermaid
 flowchart LR
@@ -147,7 +147,7 @@ flowchart LR
 | **用途** | 标识 **collection-server** 服务身份，向 **apiserver gRPC** 附加 **`authorization`（服务 JWT）**，与 **终端用户 JWT**（REST Bearer）区分 |
 | **装配** | [collection `iam_module.go`](../../internal/collection-server/container/iam_module.go) 在 **`iam.service_auth.*`**（含 `ServiceID`、`TargetAudience` 等）合法时创建 **`ServiceAuthHelper`** |
 | **实现** | [infra/iam/service_auth.go](../../internal/collection-server/infra/iam/service_auth.go) 实现 **`credentials.PerRPCCredentials`**（`GetRequestMetadata`），并提供 **`DialWithServiceAuth`**（`grpc.WithPerRPCCredentials`） |
-| **与默认 gRPC Manager** | [PrepareRun 先 IAM 后 gRPC](../../internal/collection-server/server.go)；若 **`ServiceAuthHelper` 非空**，[`Manager.connect`](../../internal/collection-server/infra/grpcclient/manager.go) 会 **`grpc.WithPerRPCCredentials`**；与 **`DialWithServiceAuth`** 同属 PerRPC 模式（独立拨号场景仍可用后者） |
+| **与默认 gRPC Manager** | [process/run.go](../../internal/collection-server/process/run.go) 中保持先 IAM 后 gRPC 的 stage 顺序；若 **`ServiceAuthHelper` 非空**，[`Manager.connect`](../../internal/collection-server/infra/grpcclient/manager.go) 会 **`grpc.WithPerRPCCredentials`**；与 **`DialWithServiceAuth`** 同属 PerRPC 模式（独立拨号场景仍可用后者） |
 
 **与 apiserver 入站配套**（mTLS + 服务 JWT + 可选身份对齐）：见 [03-基础设施/04-IAM与认证.md](../03-基础设施/04-IAM与认证.md) 中 **「用户态与服务态」「gRPC 与可选 mTLS」「internal gRPC」** 等节；**配置键** 见同文 **`iam.service_auth.*`**。
 
@@ -161,8 +161,8 @@ flowchart LR
 | ---- | ------ | ---- |
 | **共享 JWT 中间件** | 多来源取 token | [jwt_auth.go](../../internal/pkg/middleware/jwt_auth.go) |
 | **collection IAM 模块** | Verifier + Guardianship 等 | [iam_module.go](../../internal/collection-server/container/iam_module.go) |
-| **apiserver IAM 模块** | 另含后台所需服务 | [iam_module.go](../../internal/apiserver/container/iam_module.go) |
-| **gRPC 拦截器** | 链顺序见 **§3.3**（含 IAMAuth 后可选授权快照）；Health/Reflection 默认跳过 IAM | [server.go](../../internal/pkg/grpc/server.go)、[interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go)、[grpc_authz_snapshot_interceptor.go](../../internal/apiserver/grpc_authz_snapshot_interceptor.go) |
+| **apiserver IAM 模块** | 另含后台所需服务 | [iam.go](../../internal/apiserver/container/iam.go) |
+| **gRPC 拦截器** | 链顺序见 **§3.3**（含 IAMAuth 后可选授权快照）；Health/Reflection 默认跳过 IAM | [server.go](../../internal/pkg/grpc/server.go)、[interceptor_auth.go](../../internal/pkg/grpc/interceptor_auth.go)、[authz_snapshot_interceptor.go](../../internal/apiserver/transport/grpc/authz_snapshot_interceptor.go) |
 | **服务间 gRPC 认证（collection）** | `ServiceAuthHelper` / `PerRPC` | [iam_module.go](../../internal/collection-server/container/iam_module.go)、[service_auth.go](../../internal/collection-server/infra/iam/service_auth.go) |
 
 ---

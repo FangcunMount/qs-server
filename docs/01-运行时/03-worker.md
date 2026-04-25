@@ -118,7 +118,7 @@ sequenceDiagram
 
 ## Ack/Nack 与投递语义该怎么理解
 
-**本进程内**（[server.go `createDispatchHandler`](../../internal/worker/server.go)）：
+**本进程内**（[process/runtime_bootstrap.go](../../internal/worker/process/runtime_bootstrap.go)）：
 
 | 情况 | 行为 |
 | ---- | ---- |
@@ -136,7 +136,7 @@ sequenceDiagram
 
 ### 并发与同 channel 扩 worker
 
-当前 worker 的 NSQ in-flight 上限来自 `worker.concurrency`，代码锚点在 [server.go](../../internal/worker/server.go) 创建 subscriber 的路径。
+当前 worker 的 NSQ in-flight 上限来自 `worker.concurrency`，代码锚点在 [process/runtime_bootstrap.go](../../internal/worker/process/runtime_bootstrap.go) 创建 subscriber 的路径。
 
 多实例要共同消费同一个 NSQ backlog，关键是：
 
@@ -160,10 +160,10 @@ sequenceDiagram
 
 | 功能 | 关键点 | 代码锚点 |
 | ---- | ------ | -------- |
-| **订阅** | NSQ / RabbitMQ 等由配置选择；Topic 列表来自 **events.yaml** | [server.go](../../internal/worker/server.go) |
+| **订阅** | NSQ / RabbitMQ 等由配置选择；Topic 列表来自 **events.yaml** | [process/runtime_bootstrap.go](../../internal/worker/process/runtime_bootstrap.go) |
 | **分发** | metadata `event_type` 优先 | [event_dispatcher.go](../../internal/worker/application/event_dispatcher.go) |
 | **注册表** | `init()` 注册，运行时查找 | [handlers/registry.go](../../internal/worker/handlers/registry.go) |
-| **gRPC** | 三类客户端注入容器 | [grpc_client_registry.go](../../internal/worker/grpc_client_registry.go) |
+| **gRPC** | 三类客户端注入容器 | [integration/grpcclient/registry.go](../../internal/worker/integration/grpcclient/registry.go) |
 | **典型链路** | 见上文“常见事件怎样映射到 handler 和 gRPC”；答卷/测评/报告主路径 | `handlers/*_handler.go` |
 
 ### 关键代码入口（索引）

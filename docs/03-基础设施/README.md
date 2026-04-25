@@ -19,7 +19,7 @@
 
 1. **不要混层**：本组不重复业务模块里的接口表和聚合规则，只补横切机制的代码锚点与配置事实。  
 2. **事件以主文档和真值文件为准**：事件 topic、事件到 topic 的映射、handler 绑定最终以 [`configs/events.yaml`](../../configs/events.yaml) 与 [01-事件系统](./01-事件系统.md) 为准。
-3. **Redis 文档已经收口成一个中心页 + 三篇真值文**：先看 [12-Redis文档中心.md](./12-Redis文档中心.md)，再按需进入 [06-Redis使用情况.md](./06-Redis使用情况.md)、[11-Redis三层设计与落地手册.md](./11-Redis三层设计与落地手册.md)、[13-Redis缓存业务清单.md](./13-Redis缓存业务清单.md)；`07-10` 现在只保留为历史设计稿与阶段记录。
+3. **Redis 文档已经收口成一个中心页 + 深讲目录**：先看 [12-Redis文档中心.md](./12-Redis文档中心.md)，再进入 [redis/README.md](./redis/README.md)；`06/11/13` 保留为摘要与兼容入口，`07-10` 只保留为历史设计稿与阶段记录。
 4. **从这里下钻**：遇到“这项能力在什么进程里启用、由哪些配置驱动、代码从哪挂进去”这类问题，优先从本组开始。  
 
 ## 为什么这一组要单独存在
@@ -46,9 +46,9 @@
 1. [01-事件系统.md](./01-事件系统.md) — `configs/events.yaml`、发布/消费、与 worker 衔接  
 2. [02-存储模型.md](./02-存储模型.md) — MySQL / MongoDB / Redis 分工与进程接入  
 3. [03-缓存与限流.md](./03-缓存与限流.md) — 与 [05-专题/03](../05-专题分析/03-保护层与读侧架构：限流、背压、缓存、统计预聚合.md) 互补：此处偏**实现位置与配置**  
-4. [12-Redis文档中心.md](./12-Redis文档中心.md) — Redis **Foundation / Cache / Lock / Governance** 四层阅读地图
-5. [06-Redis使用情况.md](./06-Redis使用情况.md) — Redis 在当前代码中的**三进程角色、family 边界、治理接口与运维入口**
-6. [11-Redis三层设计与落地手册.md](./11-Redis三层设计与落地手册.md) — Redis **Cache / Lock / Governance** 三层设计，以及新增缓存 / 锁的落地手册
+4. [12-Redis文档中心.md](./12-Redis文档中心.md) — Redis 当前真值入口与阅读地图
+5. [redis/README.md](./redis/README.md) — Redis 深讲目录，覆盖整体架构、runtime、Cache、Lock、Governance、排障和 SOP
+6. [06-Redis使用情况.md](./06-Redis使用情况.md) — Redis 在当前代码中的三进程角色、family 边界、治理接口与运维入口摘要
 7. [13-Redis缓存业务清单.md](./13-Redis缓存业务清单.md) — 当前 `apiserver` 里各类业务缓存、查询缓存与治理型缓存的清单
 8. [04-IAM与认证.md](./04-IAM与认证.md) — 与 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md) 互补
 9. [05-配置体系.md](./05-配置体系.md) — `configs/*.yaml`、`Options`、**`events.yaml` 的特殊性**
