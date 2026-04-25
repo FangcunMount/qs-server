@@ -8,7 +8,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 本组主题 | Runtime Composition、Transport & Contract、事件系统、存储分布、Resilience Plane、Redis、Security Control Plane、配置体系等横切机制 |
+| 本组主题 | Runtime Composition、Transport & Contract、事件系统、Data Access、External Integration、存储分布、Resilience Plane、Redis、Security Control Plane、配置体系等横切机制 |
 | 真值边界 | 这里讲机制、配置锚点和实现位置；业务接口与聚合边界以 [02-业务模块](../02-业务模块/) 为准 |
 | 与专题分工 | [05-专题分析](../05-专题分析/) 侧重“为什么这样设计”；本组侧重“代码里具体怎么挂、怎么配、怎么核对” |
 | 与运行时分工 | [01-运行时](../01-运行时/) 讲进程与时序；本组讲事件、存储、IAM、缓存限流等横切能力本身 |
@@ -18,12 +18,15 @@
 ## 重点速查（继续往下读前先记这几条）
 
 1. **不要混层**：本组不重复业务模块里的接口表和聚合规则，只补横切机制的代码锚点与配置事实。
-2. **Runtime Composition 已有深讲入口**：process stage、container、ModuleGraph、ClientBundle 与 Config/Options 统一从 [runtime/README.md](./runtime/README.md) 进入。
-3. **Transport & Contract 已有深讲入口**：REST、gRPC、OpenAPI、proto、route matrix 与新增接口 SOP 统一从 [transport/README.md](./transport/README.md) 进入。
-4. **事件以主文档、深讲目录和真值文件为准**：事件 topic、delivery、handler 绑定最终以 [`configs/events.yaml`](../../configs/events.yaml)、[01-事件系统](./01-事件系统.md) 与 [event/README.md](./event/README.md) 为准。
-5. **Resilience Plane 已有单独入口**：限流、SubmitQueue、背压、Redis lock、幂等、重复抑制和降级统一从 [resilience/README.md](./resilience/README.md) 进入。
-6. **Security Control Plane 已有深讲入口**：JWT、IAM、authz snapshot、capability、service auth、mTLS/ACL 统一从 [security/README.md](./security/README.md) 进入。
-7. **Redis 文档已经收口成一个中心页 + 深讲目录**：先看 [12-Redis文档中心.md](./12-Redis文档中心.md)，再进入 [redis/README.md](./redis/README.md)；`06/11/13` 保留为摘要与兼容入口，`07-10` 只保留为历史设计稿与阶段记录。
+2. **先看横切能力矩阵**：[00-横切能力矩阵.md](./00-横切能力矩阵.md) 说明每个 plane 的观测入口、治理边界和 truth layer。
+3. **Runtime Composition 已有深讲入口**：process stage、container、ModuleGraph、ClientBundle 与 Config/Options 统一从 [runtime/README.md](./runtime/README.md) 进入。
+4. **Transport & Contract 已有深讲入口**：REST、gRPC、OpenAPI、proto、route matrix 与新增接口 SOP 统一从 [transport/README.md](./transport/README.md) 进入。
+5. **Data Access 已有深讲入口**：MySQL、Mongo、migration、read model 和 outbox/idempotency 存储边界统一从 [data-access/README.md](./data-access/README.md) 进入。
+6. **External Integration 已有深讲入口**：WeChat、OSS、Notification adapter 统一从 [integrations/README.md](./integrations/README.md) 进入。
+7. **事件以主文档、深讲目录和真值文件为准**：事件 topic、delivery、handler 绑定最终以 [`configs/events.yaml`](../../configs/events.yaml)、[01-事件系统](./01-事件系统.md) 与 [event/README.md](./event/README.md) 为准。
+8. **Resilience Plane 已有单独入口**：限流、SubmitQueue、背压、Redis lock、幂等、重复抑制和降级统一从 [resilience/README.md](./resilience/README.md) 进入。
+9. **Security Control Plane 已有深讲入口**：JWT、IAM、authz snapshot、capability、service auth、mTLS/ACL 统一从 [security/README.md](./security/README.md) 进入。
+10. **Redis 文档已经收口成一个中心页 + 深讲目录**：先看 [12-Redis文档中心.md](./12-Redis文档中心.md)，再进入 [redis/README.md](./redis/README.md)；`06/11/13` 保留为摘要与兼容入口，`07-10` 只保留为历史设计稿与阶段记录。
 
 ## 为什么这一组要单独存在
 
@@ -42,24 +45,27 @@
 | ------ | ---- |
 | [02-业务模块](../02-业务模块/) | 各 BC 的职责、契约 Verify、模块内锚点 |
 | [05-专题分析](../05-专题分析/) | 三界分离、异步链路、保护层与读侧等**设计叙事** |
-| **03-基础设施（本文）** | Runtime Composition、Transport & Contract、事件拓扑、存储分布、Resilience Plane、Redis、Security Control Plane、YAML→Options 等**机制与锚点**；组合图统一从 [runtime/README.md](./runtime/README.md) 进入；接口统一从 [transport/README.md](./transport/README.md) 进入；事件统一从 [01-事件系统](./01-事件系统.md) 和 [event/README.md](./event/README.md) 进入；Redis 统一从 [12-Redis文档中心](./12-Redis文档中心.md) 进入 |
+| **03-基础设施（本文）** | Runtime Composition、Transport & Contract、事件拓扑、Data Access、External Integration、存储分布、Resilience Plane、Redis、Security Control Plane、YAML→Options 等**机制与锚点**；组合图统一从 [runtime/README.md](./runtime/README.md) 进入；接口统一从 [transport/README.md](./transport/README.md) 进入；Data Access 从 [data-access/README.md](./data-access/README.md) 进入；外部集成从 [integrations/README.md](./integrations/README.md) 进入；事件统一从 [01-事件系统](./01-事件系统.md) 和 [event/README.md](./event/README.md) 进入；Redis 统一从 [12-Redis文档中心](./12-Redis文档中心.md) 进入 |
 
 ## 建议阅读顺序
 
-1. [runtime/README.md](./runtime/README.md) — Runtime Composition 深讲目录，覆盖 process stage、ModuleGraph、ClientBundle 和 Config/Options contract
-2. [transport/README.md](./transport/README.md) — Transport & Contract 深讲目录，覆盖 REST、gRPC、OpenAPI、proto、contract tests 和新增接口 SOP
-3. [01-事件系统.md](./01-事件系统.md) — 事件系统兼容入口、真值优先级、事件清单与阅读地图
-4. [event/README.md](./event/README.md) — 事件深讲目录，覆盖契约、Publish/Outbox、Worker、SOP、观测和 MQ 选型
-5. [02-存储模型.md](./02-存储模型.md) — MySQL / MongoDB / Redis 分工与进程接入
-6. [03-缓存与限流.md](./03-缓存与限流.md) — Resilience Plane 兼容入口，保留保护层摘要与排障入口
-7. [resilience/README.md](./resilience/README.md) — Resilience 深讲目录，覆盖限流、队列、背压、锁、幂等、降级和 SOP
-8. [12-Redis文档中心.md](./12-Redis文档中心.md) — Redis 当前真值入口与阅读地图
-9. [redis/README.md](./redis/README.md) — Redis 深讲目录，覆盖整体架构、runtime、Cache、Lock、Governance、排障和 SOP
-10. [06-Redis使用情况.md](./06-Redis使用情况.md) — Redis 在当前代码中的三进程角色、family 边界、治理接口与运维入口摘要
-11. [13-Redis缓存业务清单.md](./13-Redis缓存业务清单.md) — 当前 `apiserver` 里各类业务缓存、查询缓存与治理型缓存的清单
-12. [security/README.md](./security/README.md) — Security Control Plane 深讲目录，覆盖 Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity、mTLS/ACL 和新增安全能力 SOP
-13. [04-IAM与认证.md](./04-IAM与认证.md) — IAM 与认证兼容入口，与 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md) 互补
-14. [05-配置体系.md](./05-配置体系.md) — `configs/*.yaml`、`Options`、**`events.yaml` 的特殊性**
+1. [00-横切能力矩阵.md](./00-横切能力矩阵.md) — 所有横切 plane 的观测入口、治理边界和 truth layer 索引
+2. [runtime/README.md](./runtime/README.md) — Runtime Composition 深讲目录，覆盖 process stage、ModuleGraph、ClientBundle 和 Config/Options contract
+3. [transport/README.md](./transport/README.md) — Transport & Contract 深讲目录，覆盖 REST、gRPC、OpenAPI、proto、contract tests 和新增接口 SOP
+4. [01-事件系统.md](./01-事件系统.md) — 事件系统兼容入口、真值优先级、事件清单与阅读地图
+5. [event/README.md](./event/README.md) — 事件深讲目录，覆盖契约、Publish/Outbox、Worker、SOP、观测和 MQ 选型
+6. [02-存储模型.md](./02-存储模型.md) — MySQL / MongoDB / Redis 分工与进程接入
+7. [data-access/README.md](./data-access/README.md) — Data Access 深讲目录，覆盖 MySQL、Mongo、migration、read model 和 SOP
+8. [integrations/README.md](./integrations/README.md) — External Integration 深讲目录，覆盖 WeChat、OSS、Notification 和 SOP
+9. [03-缓存与限流.md](./03-缓存与限流.md) — Resilience Plane 兼容入口，保留保护层摘要与排障入口
+10. [resilience/README.md](./resilience/README.md) — Resilience 深讲目录，覆盖限流、队列、背压、锁、幂等、降级和 SOP
+11. [12-Redis文档中心.md](./12-Redis文档中心.md) — Redis 当前真值入口与阅读地图
+12. [redis/README.md](./redis/README.md) — Redis 深讲目录，覆盖整体架构、runtime、Cache、Lock、Governance、排障和 SOP
+13. [06-Redis使用情况.md](./06-Redis使用情况.md) — Redis 在当前代码中的三进程角色、family 边界、治理接口与运维入口摘要
+14. [13-Redis缓存业务清单.md](./13-Redis缓存业务清单.md) — 当前 `apiserver` 里各类业务缓存、查询缓存与治理型缓存的清单
+15. [security/README.md](./security/README.md) — Security Control Plane 深讲目录，覆盖 Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity、mTLS/ACL 和新增安全能力 SOP
+16. [04-IAM与认证.md](./04-IAM与认证.md) — IAM 与认证兼容入口，与 [01-运行时/05-IAM认证与身份链路.md](../01-运行时/05-IAM认证与身份链路.md) 互补
+17. [05-配置体系.md](./05-配置体系.md) — `configs/*.yaml`、`Options`、**`events.yaml` 的特殊性**
 
 如果要回看 Redis 的设计演进或阶段性重构记录，再按需阅读：
 

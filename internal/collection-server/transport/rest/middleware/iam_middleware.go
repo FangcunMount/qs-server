@@ -8,61 +8,39 @@ import (
 	"github.com/gin-gonic/gin"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
-// IAMContext 上下文键常量
 const (
-	// UserIDKey 用户ID（uint64）
-	UserIDKey = "user_id"
-	// ChildIDKey 儿童ID（uint64）
+	// UserIDKey is the legacy collection context key for numeric user ID.
+	UserIDKey = httpauth.UserIDKey
+	// ChildIDKey is the collection context key for verified child ID.
 	ChildIDKey = "child_id"
-	// TesteeIDKey 受试者ID（需要通过业务查询获取）
+	// TesteeIDKey is reserved for business lookup results.
 	TesteeIDKey = "testee_id"
+	// PrincipalKey stores the Security Control Plane principal projection.
+	PrincipalKey = httpauth.PrincipalKey
+	// TenantScopeKey stores the Security Control Plane tenant scope projection.
+	TenantScopeKey = httpauth.TenantScopeKey
 )
 
-// UserIdentityMiddleware 用户身份解析中间件
-// 将 JWT claims 中的 UserID（string）转换为 uint64 并存入 context
-// 依赖于 JWTAuthMiddleware 已执行
+// UserIdentityMiddleware keeps collection legacy context keys while delegating
+// identity projection to the shared HTTP auth runtime.
 func UserIdentityMiddleware() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		claims := pkgmiddleware.GetUserClaims(c)
-		if claims == nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": "user not authenticated",
-			})
-			c.Abort()
-			return
-		}
-
-		// 解析 UserID（IAM 返回的是 string 类型）
-		userID, err := strconv.ParseUint(claims.UserID, 10, 64)
-		if err != nil {
-			c.JSON(http.StatusUnauthorized, gin.H{
-				"error": fmt.Sprintf("invalid user id format: %s", claims.UserID),
-			})
-			c.Abort()
-			return
-		}
-
-		// 将 uint64 类型的 user_id 存入 context
-		c.Set(UserIDKey, userID)
-
-		c.Next()
-	}
+	return httpauth.UserIdentityMiddleware()
 }
 
-// GuardianshipVerifier 监护关系验证器接口
+// GuardianshipVerifier verifies guardian-child relationships.
 type GuardianshipVerifier interface {
 	IsGuardian(ctx gin.Context, userID, childID string) (bool, error)
 }
 
-// GuardianshipMiddleware 监护关系验证中间件
-// 验证当前用户是否是指定儿童的监护人
-// childIDParam: 从 URL query 或 body 中获取 child_id 的参数名
+// GuardianshipMiddleware verifies that the authenticated user is the guardian
+// of the child referenced by the given query or path parameter.
 func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDParam string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 检查服务是否可用
 		if guardianshipSvc == nil || !guardianshipSvc.IsEnabled() {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error": "guardianship service not available",
@@ -71,7 +49,6 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 			return
 		}
 
-		// 获取用户 claims
 		claims := pkgmiddleware.GetUserClaims(c)
 		if claims == nil {
 			c.JSON(http.StatusUnauthorized, gin.H{
@@ -81,7 +58,6 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 			return
 		}
 
-		// 获取 child_id（从 query 参数或 path 参数）
 		childIDStr := c.Query(childIDParam)
 		if childIDStr == "" {
 			childIDStr = c.Param(childIDParam)
@@ -94,7 +70,6 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 			return
 		}
 
-		// 验证监护关系
 		isGuardian, err := guardianshipSvc.IsGuardian(c.Request.Context(), claims.UserID, childIDStr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
@@ -103,7 +78,6 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 			c.Abort()
 			return
 		}
-
 		if !isGuardian {
 			c.JSON(http.StatusForbidden, gin.H{
 				"error": "you are not the guardian of this child",
@@ -112,7 +86,6 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 			return
 		}
 
-		// 解析并存储 child_id
 		childID, err := strconv.ParseUint(childIDStr, 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
@@ -127,46 +100,36 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 	}
 }
 
-// OptionalGuardianshipMiddleware 可选的监护关系验证中间件
-// 如果提供了 child_id 则验证监护关系，否则跳过
+// OptionalGuardianshipMiddleware verifies guardianship only when the child ID
+// parameter is present; unavailable IAM dependencies degrade open as before.
 func OptionalGuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDParam string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		// 获取 child_id
 		childIDStr := c.Query(childIDParam)
 		if childIDStr == "" {
 			childIDStr = c.Param(childIDParam)
 		}
 		if childIDStr == "" {
-			// 没有提供 child_id，跳过验证
 			c.Next()
 			return
 		}
 
-		// 检查服务是否可用
 		if guardianshipSvc == nil || !guardianshipSvc.IsEnabled() {
-			// 服务不可用时跳过验证（降级策略）
 			c.Next()
 			return
 		}
 
-		// 获取用户 claims
 		claims := pkgmiddleware.GetUserClaims(c)
 		if claims == nil {
-			// 用户未认证，跳过验证
 			c.Next()
 			return
 		}
 
-		// 验证监护关系
 		isGuardian, err := guardianshipSvc.IsGuardian(c.Request.Context(), claims.UserID, childIDStr)
 		if err != nil {
-			// 验证失败时记录日志但不阻断请求（降级策略）
 			c.Next()
 			return
 		}
-
 		if isGuardian {
-			// 解析并存储 child_id
 			childID, _ := strconv.ParseUint(childIDStr, 10, 64)
 			c.Set(ChildIDKey, childID)
 		}
@@ -175,26 +138,27 @@ func OptionalGuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, ch
 	}
 }
 
-// GetUserID 从 gin.Context 获取用户ID（uint64）
+// GetUserID returns the numeric collection user ID from gin.Context.
 func GetUserID(c *gin.Context) uint64 {
-	val, exists := c.Get(UserIDKey)
-	if !exists {
-		return 0
-	}
-	if id, ok := val.(uint64); ok {
-		return id
-	}
-	return 0
+	return httpauth.GetUserID(c)
 }
 
-// GetChildID 从 gin.Context 获取儿童ID（uint64）
+// GetChildID returns the verified child ID from gin.Context.
 func GetChildID(c *gin.Context) uint64 {
 	val, exists := c.Get(ChildIDKey)
 	if !exists {
 		return 0
 	}
-	if id, ok := val.(uint64); ok {
-		return id
-	}
-	return 0
+	id, _ := val.(uint64)
+	return id
+}
+
+// GetPrincipal returns the Security Control Plane principal projection.
+func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
+	return httpauth.GetPrincipal(c)
+}
+
+// GetTenantScope returns the Security Control Plane tenant scope projection.
+func GetTenantScope(c *gin.Context) (securityplane.TenantScope, bool) {
+	return httpauth.GetTenantScope(c)
 }

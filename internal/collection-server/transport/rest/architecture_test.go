@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func TestCollectionTransportDoesNotImportApiserverInterface(t *testing.T) {
+func TestCollectionTransportDoesNotImportForeignOrLegacyInterface(t *testing.T) {
 	t.Parallel()
 
 	root := filepath.Clean("..")
@@ -22,9 +22,13 @@ func TestCollectionTransportDoesNotImportApiserverInterface(t *testing.T) {
 		if err != nil {
 			return err
 		}
-		if strings.Contains(string(data), "internal/apiserver/interface") ||
-			strings.Contains(string(data), "internal/apiserver/transport") {
+		text := string(data)
+		if strings.Contains(text, "internal/apiserver/interface") ||
+			strings.Contains(text, "internal/apiserver/transport") {
 			t.Fatalf("collection transport must not import apiserver interface/transport: %s", path)
+		}
+		if strings.Contains(text, "internal/collection-server/interface/restful") {
+			t.Fatalf("collection transport must own REST middleware/handlers, not import legacy interface/restful: %s", path)
 		}
 		return nil
 	})

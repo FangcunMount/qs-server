@@ -1,7 +1,7 @@
 package handler
 
 import (
-	"github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
+	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 )

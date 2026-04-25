@@ -172,7 +172,7 @@ sequenceDiagram
 | **路由** | 公开路径 vs `/api/v1` 受保护 | [transport/rest/router.go](../../internal/collection-server/transport/rest/router.go) |
 | **提交排队** | 200/202/429、有界 | [submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) |
 | **监护与提交** | JWT 之外的业务校验 | [submission_service.go](../../internal/collection-server/application/answersheet/submission_service.go) |
-| **身份中间件** | 与 apiserver **不是**同一套 UserIdentity 实现 | [iam_middleware.go](../../internal/collection-server/interface/restful/middleware/iam_middleware.go) |
+| **身份中间件** | collection 通过 transport-owned facade 复用 `httpauth` 身份投影，并保留 collection 数字 user_id helper | [iam_middleware.go](../../internal/collection-server/transport/rest/middleware/iam_middleware.go) |
 
 ### 关键代码入口（索引）
 

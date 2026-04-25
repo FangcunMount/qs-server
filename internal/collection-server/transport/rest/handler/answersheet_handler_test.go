@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
-	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/interface/restful/middleware"
+	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"

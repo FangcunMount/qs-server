@@ -16,6 +16,9 @@
 | Redis 入口 | Redis 相关文档统一从 [03-基础设施/12-Redis文档中心.md](./03-基础设施/12-Redis文档中心.md) 进入 |
 | Resilience 入口 | 限流、队列、背压、锁、幂等和降级统一从 [03-基础设施/resilience/README.md](./03-基础设施/resilience/README.md) 进入 |
 | Security 入口 | JWT、IAM、authz snapshot、capability、service auth、mTLS/ACL 统一从 [03-基础设施/security/README.md](./03-基础设施/security/README.md) 进入 |
+| Data Access 入口 | MySQL、Mongo、migration、read model 统一从 [03-基础设施/data-access/README.md](./03-基础设施/data-access/README.md) 进入 |
+| 外部集成入口 | WeChat、OSS、通知适配统一从 [03-基础设施/integrations/README.md](./03-基础设施/integrations/README.md) 进入 |
+| 横切能力矩阵 | 所有 plane 的观测入口和治理边界见 [03-基础设施/00-横切能力矩阵.md](./03-基础设施/00-横切能力矩阵.md) |
 
 ---
 
@@ -97,6 +100,22 @@
 3. [03-基础设施/security/01-Principal与TenantScope.md](./03-基础设施/security/01-Principal与TenantScope.md)
 4. [03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md](./03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md)
 5. [03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md](./03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md)
+
+### 需要看结构化存储 / Data Access Plane
+
+1. [03-基础设施/data-access/README.md](./03-基础设施/data-access/README.md)
+2. [03-基础设施/data-access/00-整体架构.md](./03-基础设施/data-access/00-整体架构.md)
+3. [03-基础设施/data-access/01-MySQL仓储与UnitOfWork.md](./03-基础设施/data-access/01-MySQL仓储与UnitOfWork.md)
+4. [03-基础设施/data-access/02-Mongo文档仓储.md](./03-基础设施/data-access/02-Mongo文档仓储.md)
+5. [03-基础设施/data-access/05-新增持久化能力SOP.md](./03-基础设施/data-access/05-新增持久化能力SOP.md)
+
+### 需要看外部集成适配
+
+1. [03-基础设施/integrations/README.md](./03-基础设施/integrations/README.md)
+2. [03-基础设施/integrations/00-整体架构.md](./03-基础设施/integrations/00-整体架构.md)
+3. [03-基础设施/integrations/01-WeChat适配器.md](./03-基础设施/integrations/01-WeChat适配器.md)
+4. [03-基础设施/integrations/02-ObjectStorage适配器.md](./03-基础设施/integrations/02-ObjectStorage适配器.md)
+5. [03-基础设施/integrations/04-新增外部集成SOP.md](./03-基础设施/integrations/04-新增外部集成SOP.md)
 
 ### 需要准备宣讲或对外介绍
 

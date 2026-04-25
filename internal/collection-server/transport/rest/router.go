@@ -9,6 +9,7 @@ import (
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
@@ -121,7 +122,7 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 
 	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddlewareWithOptions(tokenVerifier, r.iamVerifyOptions())))
 	// 与 apiserver 对齐：tenant_id、org_id、IAM 授权快照（collection 无 Operator，不做 ActiveOperator 校验）
-	api.Use(withAuthSkip(skip, httpauth.UserIdentityMiddleware()))
+	api.Use(withAuthSkip(skip, collectionmiddleware.UserIdentityMiddleware()))
 	api.Use(withAuthSkip(skip, httpauth.RequireTenantIDMiddleware()))
 	api.Use(withAuthSkip(skip, httpauth.RequireNumericOrgScopeMiddleware()))
 	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {

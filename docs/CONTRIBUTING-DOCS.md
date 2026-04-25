@@ -192,6 +192,34 @@ git diff --check
 
 ---
 
+## Data Access Plane 维护门禁
+
+新增或修改 MySQL、Mongo、migration、outbox 存储、read model 或 statistics projection 时，不能只改 repository。Data Access 的当前 truth layer 见 [03-基础设施/data-access/README.md](./03-基础设施/data-access/README.md)，维护时必须同步核对：
+
+1. **边界归属**：确认变更是主写模型、文档模型、read model、outbox/idempotency 还是 migration；不要把一次性修复脚本混入常规 repository。
+2. **依赖方向**：domain 不得 import infra、GORM、Mongo driver；repository 不得 import transport/handler。
+3. **迁移契约**：新增表、集合、索引、状态字段时必须补 MySQL/Mongo migration，并保留 down 文件或明确不可逆理由。
+4. **测试保护**：补 mapper、repository、backpressure、transaction、outbox/read model contract tests；必要时更新 [data_access_architecture_test.go](../internal/pkg/architecture/data_access_architecture_test.go)。
+5. **文档同步**：更新 [data-access](./03-基础设施/data-access/README.md) 对应深讲和相关业务模块文档。
+
+默认流程是：`模型/port -> migration -> mapper/repository -> contract tests -> data-access docs -> docs hygiene`。
+
+---
+
+## External Integration Adapter 维护门禁
+
+新增或修改 WeChat、OSS、通知、Webhook、第三方 SDK 或外部 API 适配时，不能让业务层直接理解 SDK 类型或外部错误。External Integration 的当前 truth layer 见 [03-基础设施/integrations/README.md](./03-基础设施/integrations/README.md)，维护时必须同步核对：
+
+1. **窄 port**：application 只依赖业务需要的接口，不直接依赖 SDK client。
+2. **adapter 边界**：credential、timeout、endpoint、SDK cache、错误包装和外部字段转换都留在 infra adapter。
+3. **测试保护**：常规单测覆盖 validation、cache key、请求组装、模板字段、错误映射；真实网络调用不进入单元测试。
+4. **观测边界**：metrics/status label 不得包含 token、secret、openid、手机号、error message 等高基数字段或敏感字段。
+5. **文档同步**：更新 [integrations](./03-基础设施/integrations/README.md) 对应深讲；宣讲层只回链，不维护第二份事实。
+
+默认流程是：`业务用例 -> port -> adapter -> local contract tests -> integrations docs -> docs hygiene`。
+
+---
+
 ## 业务模块深讲维护门禁
 
 新增或修改业务聚合、状态、事件、读模型、校验规则或 SOP 时，不能只更新旧的单篇模块文。`02-业务模块` 的长期 truth layer 已收口到子目录深讲，默认按下面的流程维护：
