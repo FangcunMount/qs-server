@@ -169,12 +169,12 @@ git diff --check
 新增或修改 JWT、IAM、authz snapshot、operator role projection、service auth、mTLS、ACL 或 capability 时，不能只改中间件或 handler。安全控制面的维护默认按 [03-基础设施/security/README.md](./03-基础设施/security/README.md) 的 truth layer 处理，并同步核对：
 
 1. **模型归属**：变更必须能归到 `Principal`、`TenantScope`、`AuthzSnapshot`、`CapabilityDecision`、`ServiceIdentity`、`OperatorRoleProjection` 或 `mTLS/ACL` 中的一类。
-2. **契约测试**：涉及身份、租户范围、metadata、context key、status code、capability 或 ACL 默认策略时，必须补 contract / seam tests。
+2. **契约测试**：涉及身份、租户范围、metadata、context key、status code、capability、service identity 或 ACL 默认策略时，必须补 contract / seam tests。
 3. **权限真值**：业务 capability 必须以 IAM authorization snapshot 为准，不允许新增基于 JWT roles 的 handler 级授权。
 4. **文档真值层**：同步更新 [security/00-整体架构.md](./03-基础设施/security/00-整体架构.md) 或对应深讲页；旧 [04-IAM与认证.md](./03-基础设施/04-IAM与认证.md) 只保留摘要和回链。
 5. **否定边界**：如果能力只是 seam 或规划，例如 ACL 文件加载、强制 service auth transport security、mTLS 身份一致性收口，必须明确写成当前不支持或后续阶段，不得写成已实现。
 
-默认流程是：`模型 -> contract tests -> runtime adapter -> security docs -> docs hygiene`。如果变更会改变 HTTP/gRPC status、JWT claims schema、IAM SDK 配置或 mTLS/ACL 行为，必须作为单独安全策略变更处理。
+默认流程是：`模型 -> contract tests -> runtime projection / adapter -> security docs -> docs hygiene`。`securityprojection` 只能做 primitive input 到 `securityplane` 值对象的映射，不能依赖 Gin、gRPC、IAM SDK 或 apiserver 应用包。如果变更会改变 HTTP/gRPC status、JWT claims schema、IAM SDK 配置或 mTLS/ACL 行为，必须作为单独安全策略变更处理。
 
 ---
 

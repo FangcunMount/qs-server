@@ -7,15 +7,19 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityprojection"
 	"github.com/gin-gonic/gin"
 )
 
 const (
-	UserIDKey    = "user_id"
-	UserIDStrKey = "user_id_str"
-	OrgIDKey     = "org_id"
-	TenantIDKey  = "tenant_id"
-	RolesKey     = "roles"
+	UserIDKey      = "user_id"
+	UserIDStrKey   = "user_id_str"
+	OrgIDKey       = "org_id"
+	TenantIDKey    = "tenant_id"
+	RolesKey       = "roles"
+	PrincipalKey   = "security_principal"
+	TenantScopeKey = "security_tenant_scope"
 )
 
 // UserIdentityMiddleware projects IAM JWT claims into gin.Context.
@@ -49,6 +53,7 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 		if len(claims.Roles) > 0 {
 			c.Set(RolesKey, claims.Roles)
 		}
+		setSecurityProjection(c, claims)
 
 		c.Next()
 	}
@@ -78,6 +83,7 @@ func OptionalUserIdentityMiddleware() gin.HandlerFunc {
 		if len(claims.Roles) > 0 {
 			c.Set(RolesKey, claims.Roles)
 		}
+		setSecurityProjection(c, claims)
 
 		c.Next()
 	}
@@ -153,4 +159,43 @@ func GetRoles(c *gin.Context) []string {
 	}
 	roles, _ := val.([]string)
 	return roles
+}
+
+// GetPrincipal returns the Security Control Plane principal projection.
+func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
+	val, exists := c.Get(PrincipalKey)
+	if !exists {
+		return securityplane.Principal{}, false
+	}
+	principal, ok := val.(securityplane.Principal)
+	return principal, ok
+}
+
+// GetTenantScope returns the Security Control Plane tenant scope projection.
+func GetTenantScope(c *gin.Context) (securityplane.TenantScope, bool) {
+	val, exists := c.Get(TenantScopeKey)
+	if !exists {
+		return securityplane.TenantScope{}, false
+	}
+	scope, ok := val.(securityplane.TenantScope)
+	return scope, ok
+}
+
+func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims) {
+	if claims == nil {
+		return
+	}
+	principal := securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
+		Kind:      securityplane.PrincipalKindUser,
+		Source:    securityplane.PrincipalSourceHTTPJWT,
+		UserID:    claims.UserID,
+		AccountID: claims.AccountID,
+		TenantID:  claims.TenantID,
+		SessionID: claims.SessionID,
+		TokenID:   claims.TokenID,
+		Roles:     claims.Roles,
+		AMR:       claims.AMR,
+	})
+	c.Set(PrincipalKey, principal)
+	c.Set(TenantScopeKey, securityprojection.TenantScopeFromTenantID(claims.TenantID, ""))
 }

@@ -9,6 +9,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
 	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/serviceauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
+	pkgserviceauth "github.com/FangcunMount/qs-server/internal/pkg/serviceauth"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
@@ -103,18 +105,20 @@ func (h *ServiceAuthHelper) CallWithAuth(ctx context.Context, fn func(ctx contex
 // GetRequestMetadata 实现 credentials.PerRPCCredentials 接口
 // 用于 gRPC WithPerRPCCredentials
 func (h *ServiceAuthHelper) GetRequestMetadata(_ context.Context, _ ...string) (map[string]string, error) {
-	token, err := h.GetToken(context.Background())
-	if err != nil {
-		return nil, err
-	}
-	return map[string]string{
-		"authorization": "Bearer " + token,
-	}, nil
+	return pkgserviceauth.BearerRequestMetadata(context.Background(), h)
 }
 
 // RequireTransportSecurity 实现 credentials.PerRPCCredentials 接口
 func (h *ServiceAuthHelper) RequireTransportSecurity() bool {
-	return false // 根据实际需求设置，在 mTLS 环境下可以返回 true
+	return pkgserviceauth.RequireTransportSecurity()
+}
+
+// ServiceIdentity returns the Security Control Plane service identity projection.
+func (h *ServiceAuthHelper) ServiceIdentity() securityplane.ServiceIdentity {
+	if h == nil || h.config == nil {
+		return securityplane.ServiceIdentity{}
+	}
+	return pkgserviceauth.ServiceIdentity(h.config.ServiceID, h.config.TargetAudience)
 }
 
 // Stats 获取刷新统计

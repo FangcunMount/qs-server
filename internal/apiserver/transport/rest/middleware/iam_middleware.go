@@ -13,6 +13,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/securityprojection"
 )
 
 // Context 键常量
@@ -29,6 +31,10 @@ const (
 	RolesKey = "roles"
 	// CurrentOperatorKey 当前租户下已激活的 operator
 	CurrentOperatorKey = "current_operator"
+	// PrincipalKey Security Control Plane 当前调用方投影
+	PrincipalKey = "security_principal"
+	// TenantScopeKey Security Control Plane 当前租户范围投影
+	TenantScopeKey = "security_tenant_scope"
 )
 
 // UserIdentityMiddleware 用户身份解析中间件
@@ -72,6 +78,7 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 			}
 			// 如果解析失败，不阻断请求，OrgID 可能不是数字格式
 		}
+		setSecurityProjection(c, claims)
 
 		c.Next()
 	}
@@ -188,6 +195,7 @@ func OptionalUserIdentityMiddleware() gin.HandlerFunc {
 		if len(claims.Roles) > 0 {
 			c.Set(RolesKey, claims.Roles)
 		}
+		setSecurityProjection(c, claims)
 
 		c.Next()
 	}
@@ -333,4 +341,43 @@ func HasRole(c *gin.Context, role string) bool {
 		}
 	}
 	return false
+}
+
+// GetPrincipal returns the Security Control Plane principal projection.
+func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
+	val, exists := c.Get(PrincipalKey)
+	if !exists {
+		return securityplane.Principal{}, false
+	}
+	principal, ok := val.(securityplane.Principal)
+	return principal, ok
+}
+
+// GetTenantScope returns the Security Control Plane tenant scope projection.
+func GetTenantScope(c *gin.Context) (securityplane.TenantScope, bool) {
+	val, exists := c.Get(TenantScopeKey)
+	if !exists {
+		return securityplane.TenantScope{}, false
+	}
+	scope, ok := val.(securityplane.TenantScope)
+	return scope, ok
+}
+
+func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims) {
+	if claims == nil {
+		return
+	}
+	principal := securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
+		Kind:      securityplane.PrincipalKindUser,
+		Source:    securityplane.PrincipalSourceHTTPJWT,
+		UserID:    claims.UserID,
+		AccountID: claims.AccountID,
+		TenantID:  claims.TenantID,
+		SessionID: claims.SessionID,
+		TokenID:   claims.TokenID,
+		Roles:     claims.Roles,
+		AMR:       claims.AMR,
+	})
+	c.Set(PrincipalKey, principal)
+	c.Set(TenantScopeKey, securityprojection.TenantScopeFromTenantID(claims.TenantID, ""))
 }

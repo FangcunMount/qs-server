@@ -39,6 +39,20 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if got := GetRoles(c); len(got) != 1 || got[0] != "operator" {
 			t.Fatalf("roles = %#v, want [operator]", got)
 		}
+		principal, ok := GetPrincipal(c)
+		if !ok {
+			t.Fatal("expected security principal projection")
+		}
+		if principal.UserID != "42" || principal.TenantID != "88" {
+			t.Fatalf("principal = %#v, want user 42 tenant 88", principal)
+		}
+		scope, ok := GetTenantScope(c)
+		if !ok {
+			t.Fatal("expected tenant scope projection")
+		}
+		if !scope.HasNumericOrg || scope.OrgID != 88 {
+			t.Fatalf("scope = %#v, want numeric org 88", scope)
+		}
 		c.Status(http.StatusNoContent)
 	})
 

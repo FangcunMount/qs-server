@@ -7,12 +7,12 @@
 | 维度 | 当前结论 |
 | ---- | -------- |
 | 核心目标 | 把身份、租户范围、授权快照、能力决策和服务身份用同一套语言解释 |
-| 代码模型 | 只读模型在 [`internal/pkg/securityplane`](../../../internal/pkg/securityplane) |
+| 代码模型 | 只读模型在 [`internal/pkg/securityplane`](../../../internal/pkg/securityplane)，运行时投影在 [`internal/pkg/securityprojection`](../../../internal/pkg/securityprojection) |
 | 权限真值 | 业务 capability 以 IAM `AuthzSnapshot` 为准，不信任 JWT roles |
 | HTTP 路径 | JWT -> identity projection -> tenant/org scope -> authz snapshot -> capability middleware |
 | gRPC 路径 | metadata bearer token -> IAMAuth interceptor -> authz snapshot interceptor -> service handler |
 | 服务身份 | service auth 写入 bearer token；mTLS / ACL 是 gRPC interceptor 链上的可选能力 |
-| 当前边界 | P0 只建模型、contract tests 和文档；不改鉴权行为 |
+| 当前边界 | HTTP / gRPC / service-auth 已写入或暴露 security projection；不改鉴权行为 |
 
 ## 阅读顺序
 
@@ -51,6 +51,7 @@ flowchart LR
 | 能力 | 源码锚点 | 测试锚点 |
 | ---- | -------- | -------- |
 | 只读模型 | [`internal/pkg/securityplane`](../../../internal/pkg/securityplane) | [`internal/pkg/securityplane/model_test.go`](../../../internal/pkg/securityplane/model_test.go) |
+| 运行时投影 | [`internal/pkg/securityprojection`](../../../internal/pkg/securityprojection) | [`internal/pkg/securityprojection/projection_test.go`](../../../internal/pkg/securityprojection/projection_test.go) |
 | JWT claims | [`internal/pkg/middleware/jwt_auth.go`](../../../internal/pkg/middleware/jwt_auth.go) | [`internal/pkg/middleware/jwt_auth_test.go`](../../../internal/pkg/middleware/jwt_auth_test.go) |
 | HTTP identity | [`internal/pkg/httpauth/identity.go`](../../../internal/pkg/httpauth/identity.go) | [`internal/pkg/httpauth/identity_test.go`](../../../internal/pkg/httpauth/identity_test.go) |
 | gRPC auth | [`internal/pkg/grpc/interceptor_auth.go`](../../../internal/pkg/grpc/interceptor_auth.go) | [`internal/pkg/grpc/interceptor_auth_test.go`](../../../internal/pkg/grpc/interceptor_auth_test.go) |
@@ -60,6 +61,6 @@ flowchart LR
 ## Verify
 
 ```bash
-GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/apiserver/transport/rest/middleware ./internal/apiserver/transport/grpc
+GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/securityprojection ./internal/pkg/serviceauth ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/apiserver/transport/rest/middleware ./internal/apiserver/transport/grpc
 python scripts/check_docs_hygiene.py
 ```

@@ -24,8 +24,8 @@ flowchart LR
 | 步骤 | 必做内容 |
 | ---- | -------- |
 | 1. 定模型 | 明确新增能力属于身份、租户范围、授权快照、能力判断、服务身份、传输安全还是 projection |
-| 2. 锁行为 | 补 contract tests，覆盖 status、context key、metadata、error code、fallback |
-| 3. 选位置 | transport 只做 adapter，application/authz 做 capability，IAM SDK 留在 infra/container |
+| 2. 锁行为 | 补 contract tests，覆盖 status、context key、metadata、error code、fallback、projection getter |
+| 3. 选位置 | `securityprojection` 只做 primitive -> model，transport 只做 adapter，application/authz 做 capability，IAM SDK 留在 infra/container |
 | 4. 补文档 | 更新本目录对应深讲页和锚点 |
 | 5. 验证 | 跑目标测试、docs hygiene、`git diff --check` |
 
@@ -33,7 +33,7 @@ flowchart LR
 
 | 变更 | 应放在哪里 | 不应做什么 |
 | ---- | ---------- | ---------- |
-| 新 JWT claim | `middleware` 验证投影 + `securityplane.Principal` 文档 | 不在 handler 直接读 raw claim |
+| 新 JWT claim | `middleware` 验证投影 + `securityprojection` / `securityplane.Principal` 文档 | 不在 handler 直接读 raw claim |
 | 新 tenant/org 规则 | identity/scope middleware + `TenantScope` tests | 不在业务服务里解析 `tenant_id` 字符串 |
 | 新 REST 权限 | `application/authz` capability + route middleware | 不用 JWT roles 判断 capability |
 | 新 service-to-service 调用 | service auth wrapper / gRPC client wiring | 不手写 authorization metadata 字符串 |
@@ -63,7 +63,7 @@ flowchart LR
 ## Verify
 
 ```bash
-GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/pkg/iamauth
+GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/securityplane ./internal/pkg/securityprojection ./internal/pkg/serviceauth ./internal/pkg/middleware ./internal/pkg/httpauth ./internal/pkg/grpc ./internal/pkg/iamauth
 GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/apiserver/transport/rest/middleware ./internal/apiserver/transport/grpc ./internal/apiserver/infra/iam ./internal/collection-server/infra/iam
 python scripts/check_docs_hygiene.py
 git diff --check

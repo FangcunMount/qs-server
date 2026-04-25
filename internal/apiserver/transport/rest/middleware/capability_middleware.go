@@ -30,7 +30,7 @@ func RequireCapabilityMiddleware(capability Capability) gin.HandlerFunc {
 			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required"))
 			return
 		}
-		if !authzapp.SnapshotSatisfiesCapability(snap, capability) {
+		if decision := authzapp.DecideCapability(snap, capability); !decision.Allowed {
 			abortPermissionDenied(c, errors.WithCode(
 				code.ErrPermissionDenied,
 				"capability %s denied by IAM authorization",
@@ -50,11 +50,9 @@ func RequireAnyCapabilityMiddleware(capabilities ...Capability) gin.HandlerFunc 
 			abortPermissionDenied(c, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required"))
 			return
 		}
-		for _, capability := range capabilities {
-			if authzapp.SnapshotSatisfiesCapability(snap, capability) {
-				c.Next()
-				return
-			}
+		if decision := authzapp.DecideAnyCapability(snap, capabilities...); decision.Allowed {
+			c.Next()
+			return
 		}
 		abortPermissionDenied(c, errors.WithCode(
 			code.ErrPermissionDenied,

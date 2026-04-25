@@ -78,18 +78,14 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testin
 	}
 
 	ctx := interceptor.injectUserContext(context.Background(), result)
-	principal := securityplane.Principal{
-		Kind:      securityplane.PrincipalKindUser,
-		Source:    securityplane.PrincipalSourceGRPCJWT,
-		UserID:    UserIDFromContext(ctx),
-		AccountID: AccountIDFromContext(ctx),
-		TenantID:  TenantIDFromContext(ctx),
-		SessionID: SessionIDFromContext(ctx),
-		TokenID:   TokenIDFromContext(ctx),
-		Username:  UsernameFromContext(ctx),
-		Roles:     RolesFromContext(ctx),
+	principal, ok := PrincipalFromContext(ctx)
+	if !ok {
+		t.Fatal("expected principal projection")
 	}
-	scope := securityplane.NewTenantScope(principal.TenantID, "")
+	scope, ok := TenantScopeFromContext(ctx)
+	if !ok {
+		t.Fatal("expected tenant scope projection")
+	}
 
 	if principal.UserID != "1001" || principal.Username != "alice" {
 		t.Fatalf("unexpected principal projection: %#v", principal)
@@ -99,6 +95,9 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testin
 	}
 	if !scope.HasNumericOrg || scope.OrgID != 3001 {
 		t.Fatalf("tenant scope = %#v, want numeric org 3001", scope)
+	}
+	if got := principal.AuthenticationMethods(); len(got) != 1 || got[0] != "pwd" {
+		t.Fatalf("principal amr = %#v, want [pwd]", got)
 	}
 }
 
@@ -111,6 +110,13 @@ func TestVerifyIdentityMatchUsesLegacyMTLSIdentityMapContract(t *testing.T) {
 
 	if err := interceptor.verifyIdentityMatch(ctx, claims); err != nil {
 		t.Fatalf("verifyIdentityMatch() unexpected error: %v", err)
+	}
+	identity, ok := ServiceIdentityFromMTLSContext(ctx)
+	if !ok {
+		t.Fatal("expected mTLS service identity projection")
+	}
+	if identity.Source != securityplane.ServiceIdentitySourceMTLS || identity.ServiceID != "qs-worker" || identity.CommonName != "qs-worker.svc" {
+		t.Fatalf("identity = %#v, want qs-worker mTLS identity", identity)
 	}
 
 	mismatch := context.WithValue(context.Background(), mtlsIdentityKey, map[string]interface{}{

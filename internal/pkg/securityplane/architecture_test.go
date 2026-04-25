@@ -35,6 +35,31 @@ func TestSecurityPlaneModelsStayTransportAndSDKFree(t *testing.T) {
 	})
 }
 
+func TestSecurityProjectionStaysTransportAndSDKFree(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanGoFiles(t, filepath.Join(root, "internal/pkg/securityprojection"), func(path string, file *ast.File) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, imported := range file.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			forbiddenPrefixes := []string{
+				"github.com/gin-gonic/gin",
+				"google.golang.org/grpc",
+				"github.com/FangcunMount/iam-contracts/",
+				"github.com/FangcunMount/qs-server/internal/apiserver/",
+			}
+			for _, prefix := range forbiddenPrefixes {
+				if strings.HasPrefix(importPath, prefix) {
+					t.Fatalf("%s imports %s; securityprojection must stay transport and SDK agnostic", path, importPath)
+				}
+			}
+		}
+	})
+}
+
 func TestBusinessHandlersDoNotAuthorizeWithJWTRoles(t *testing.T) {
 	t.Parallel()
 
@@ -60,6 +85,23 @@ func TestBusinessHandlersDoNotAuthorizeWithJWTRoles(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProductionCodeDoesNotBypassCapabilityDecision(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowed := map[string]bool{
+		filepath.Join(root, "internal/apiserver/application/authz/capability.go"): true,
+	}
+	scanGoSourceFiles(t, filepath.Join(root, "internal"), func(path string, content string) {
+		if allowed[path] {
+			return
+		}
+		if strings.Contains(content, "SnapshotSatisfiesCapability(") {
+			t.Fatalf("%s calls SnapshotSatisfiesCapability; runtime paths must use DecideCapability/DecideAnyCapability", path)
+		}
+	})
 }
 
 func repoRoot(t *testing.T) string {

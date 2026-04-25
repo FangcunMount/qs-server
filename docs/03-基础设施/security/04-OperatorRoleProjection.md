@@ -47,7 +47,7 @@ sequenceDiagram
 | [`internal/apiserver/application/actor/operator/role_projection_updater.go`](../../../internal/apiserver/application/actor/operator/role_projection_updater.go) | middleware 注入的应用层 updater |
 | [`internal/apiserver/infra/iam/operator_roles_sync.go`](../../../internal/apiserver/infra/iam/operator_roles_sync.go) | IAM infra / bootstrap / service flow 使用的同步 helper |
 
-P0 不收口这两处逻辑，只用文档和 tests 固定语义。后续阶段可以提取单一 projection service。
+本轮不收口这两处逻辑，只用文档和 tests 固定语义。后续阶段可以提取单一 projection service。
 
 ## 边界
 
