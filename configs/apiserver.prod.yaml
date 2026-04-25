@@ -270,7 +270,7 @@ plan_scheduler:
   org_ids: [1]                  # 组织ID列表（从配置读取，默认调度所有组织）
   initial_delay: "1m"           # 启动后首次调度延迟，避免与其他服务启动冲突
   interval: "10m"               # 2C4G 临时降配阶段回到保守扫描频率
-  pending_lookback: "1440h"       # 只自动开放最近 24 小时内到期的 pending 任务，避免历史补录任务被立即开放
+  pending_lookback: "1200d"       # 只自动开放最近 24 小时内到期的 pending 任务，避免历史补录任务被立即开放
   lock_key: "qs:plan-scheduler:leader" # 分布式锁键，确保单实例执行
   lock_ttl: "2m"                # 锁过期时间，略长于调度间隔，避免死锁
 
