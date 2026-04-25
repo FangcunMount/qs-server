@@ -29,6 +29,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
@@ -76,6 +77,7 @@ type ActorModuleDeps struct {
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	OperationAccountSvc *iam.OperationAccountService
 	Observer            *cacheobservability.ComponentObserver
+	TopicResolver       eventconfig.TopicResolver
 }
 
 // NewActorModule 创建 Actor 模块。
@@ -115,7 +117,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
-	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStore(mysqlDB))
+	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStoreWithTopicResolver(mysqlDB, deps.TopicResolver))
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(module.TesteeRepo)

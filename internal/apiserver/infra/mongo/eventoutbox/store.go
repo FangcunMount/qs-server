@@ -47,12 +47,21 @@ func (OutboxPO) CollectionName() string {
 type Store struct {
 	coll               *mongo.Collection
 	publishingStaleFor time.Duration
+	topicResolver      eventconfig.TopicResolver
 }
 
 func NewStore(db *mongo.Database) (*Store, error) {
+	return NewStoreWithTopicResolver(db, eventconfig.Global())
+}
+
+func NewStoreWithTopicResolver(db *mongo.Database, resolver eventconfig.TopicResolver) (*Store, error) {
+	if resolver == nil {
+		resolver = eventconfig.Global()
+	}
 	store := &Store{
 		coll:               db.Collection((&OutboxPO{}).CollectionName()),
 		publishingStaleFor: defaultPublishingStaleFor,
+		topicResolver:      resolver,
 	}
 	if err := store.ensureIndexes(context.Background()); err != nil {
 		return nil, err
@@ -132,7 +141,7 @@ func (s *Store) buildDocuments(events []event.DomainEvent) ([]*OutboxPO, error) 
 	now := time.Now()
 	docs := make([]*OutboxPO, 0, len(events))
 	for _, evt := range events {
-		topicName, ok := eventconfig.Global().GetTopicForEvent(evt.EventType())
+		topicName, ok := s.topicResolver.GetTopicForEvent(evt.EventType())
 		if !ok {
 			return nil, fmt.Errorf("event %q not found in event config", evt.EventType())
 		}

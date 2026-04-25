@@ -4,6 +4,8 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 // HandlerFunc 处理器函数类型
@@ -16,7 +18,7 @@ type HandlerFactory func(handlerName string) (HandlerFunc, error)
 // Subscriber 配置驱动的事件订阅器
 // 根据配置自动订阅 Topic 并分发事件
 type Subscriber struct {
-	registry       *Registry
+	catalog        catalogReader
 	handlerFactory HandlerFactory
 	logger         *slog.Logger
 
@@ -27,21 +29,32 @@ type Subscriber struct {
 // SubscriberOptions 订阅器选项
 type SubscriberOptions struct {
 	Registry       *Registry
+	Catalog        *eventcatalog.Catalog
 	HandlerFactory HandlerFactory
 	Logger         *slog.Logger
 }
 
+type catalogReader interface {
+	Config() *eventcatalog.Config
+	TopicSubscriptions() []eventcatalog.TopicSubscription
+}
+
 // NewSubscriber 创建订阅器
 func NewSubscriber(opts SubscriberOptions) *Subscriber {
-	if opts.Registry == nil {
-		opts.Registry = Global()
+	catalog := catalogReader(nil)
+	if opts.Catalog != nil {
+		catalog = opts.Catalog
+	} else if opts.Registry != nil {
+		catalog = opts.Registry
+	} else {
+		catalog = Global()
 	}
 	if opts.Logger == nil {
 		opts.Logger = slog.Default()
 	}
 
 	return &Subscriber{
-		registry:       opts.Registry,
+		catalog:        catalog,
 		handlerFactory: opts.HandlerFactory,
 		logger:         opts.Logger,
 		handlers:       make(map[string]HandlerFunc),
@@ -50,7 +63,7 @@ func NewSubscriber(opts SubscriberOptions) *Subscriber {
 
 // RegisterHandlers 根据配置注册所有处理器
 func (s *Subscriber) RegisterHandlers() error {
-	cfg := s.registry.Config()
+	cfg := s.catalog.Config()
 	if cfg == nil {
 		return fmt.Errorf("config not loaded")
 	}
@@ -73,34 +86,11 @@ func (s *Subscriber) RegisterHandlers() error {
 
 // GetTopicsToSubscribe 获取需要订阅的 Topic 列表
 func (s *Subscriber) GetTopicsToSubscribe() []TopicSubscription {
-	cfg := s.registry.Config()
-	if cfg == nil {
-		return nil
-	}
-
-	var subs []TopicSubscription
-	for topicKey, topicCfg := range cfg.Topics {
-		events := cfg.GetEventsByTopic(topicKey)
-		if len(events) == 0 {
-			continue
-		}
-
-		subs = append(subs, TopicSubscription{
-			TopicName:  topicCfg.Name,
-			TopicKey:   topicKey,
-			EventTypes: events,
-		})
-	}
-
-	return subs
+	return s.catalog.TopicSubscriptions()
 }
 
 // TopicSubscription Topic 订阅信息
-type TopicSubscription struct {
-	TopicName  string
-	TopicKey   string
-	EventTypes []string
-}
+type TopicSubscription = eventcatalog.TopicSubscription
 
 // Dispatch 分发事件到对应的处理器
 func (s *Subscriber) Dispatch(ctx context.Context, eventType string, payload []byte) error {

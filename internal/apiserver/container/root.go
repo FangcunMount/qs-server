@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
@@ -37,6 +38,7 @@ type Container struct {
 
 	// 事件发布器（统一管理）
 	eventPublisher event.EventPublisher
+	eventCatalog   *eventcatalog.Catalog
 	publisherMode  eventconfig.PublishMode
 
 	// 业务模块
@@ -136,6 +138,7 @@ func (c *Container) Initialize() error {
 	if err := eventconfig.Initialize("configs/events.yaml"); err != nil {
 		return fmt.Errorf("failed to load event config: %w", err)
 	}
+	c.eventCatalog = eventconfig.Global().Catalog()
 	c.printf("📋 Event config loaded (events.yaml)\n")
 
 	// 初始化事件发布器（所有模块共享）
@@ -210,6 +213,7 @@ func (c *Container) initEventPublisher() {
 		Mode:        c.publisherMode,
 		Source:      event.SourceAPIServer,
 		MQPublisher: c.mqPublisher,
+		Catalog:     c.eventCatalog,
 	})
 }
 

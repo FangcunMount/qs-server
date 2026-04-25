@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
@@ -24,7 +25,6 @@ import (
 type EventDispatcher struct {
 	logger     *slog.Logger
 	subscriber *eventconfig.Subscriber
-	registry   *eventconfig.Registry
 
 	// 处理器依赖
 	deps *HandlerDependencies
@@ -59,10 +59,11 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 	)
 
 	// 1. 加载事件配置
-	if err := eventconfig.Initialize(configPath); err != nil {
+	cfg, err := eventcatalog.Load(configPath)
+	if err != nil {
 		return fmt.Errorf("failed to load event config: %w", err)
 	}
-	d.registry = eventconfig.Global()
+	catalog := eventcatalog.NewCatalog(cfg)
 
 	// 2. 列出已通过 init() 注册的处理器
 	registeredHandlers := handlers.ListRegistered()
@@ -87,6 +88,7 @@ func (d *EventDispatcher) Initialize(configPath string) error {
 
 	// 5. 创建订阅器
 	d.subscriber = eventconfig.NewSubscriber(eventconfig.SubscriberOptions{
+		Catalog:        catalog,
 		HandlerFactory: factory,
 		Logger:         d.logger,
 	})

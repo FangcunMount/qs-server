@@ -60,6 +60,7 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		AssessmentListPolicy: c.CachePolicy(cachepolicy.PolicyAssessmentList),
 		VersionStore:         versionStore,
 		Observer:             c.cacheObserver(),
+		TopicResolver:        c.eventCatalog,
 	}
 }
 

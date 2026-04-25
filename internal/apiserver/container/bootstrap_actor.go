@@ -44,6 +44,7 @@ func (c *Container) buildActorModuleDeps() assembler.ActorModuleDeps {
 		OperatorAuthz:       deps.opAuthz,
 		OperationAccountSvc: deps.operationAccountSvc,
 		Observer:            c.cacheObserver(),
+		TopicResolver:       c.eventCatalog,
 	}
 }
 

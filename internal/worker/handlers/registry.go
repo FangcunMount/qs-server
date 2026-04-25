@@ -21,6 +21,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
@@ -83,24 +84,12 @@ type HandlerFactory func(deps *Dependencies) HandlerFunc
 
 // ==================== 事件消息解析 ====================
 
-// EventEnvelope 事件信封结构
-// 对应发布端 event.Event[T] 的 JSON 序列化格式
-type EventEnvelope struct {
-	ID            string          `json:"id"`
-	EventType     string          `json:"eventType"`
-	OccurredAt    time.Time       `json:"occurredAt"`
-	AggregateType string          `json:"aggregateType"`
-	AggregateID   string          `json:"aggregateID"`
-	Data          json.RawMessage `json:"data"` // 业务数据，延迟解析
-}
+// EventEnvelope 事件信封结构。
+type EventEnvelope = eventcodec.Envelope
 
 // ParseEventEnvelope 解析事件信封
 func ParseEventEnvelope(payload []byte) (*EventEnvelope, error) {
-	var env EventEnvelope
-	if err := json.Unmarshal(payload, &env); err != nil {
-		return nil, fmt.Errorf("failed to parse event envelope: %w", err)
-	}
-	return &env, nil
+	return eventcodec.DecodeEnvelope(payload)
 }
 
 // ParseEventData 解析事件业务数据到指定类型

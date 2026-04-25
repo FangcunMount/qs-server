@@ -32,6 +32,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/interface/restful/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventconfig"
 	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -101,6 +102,7 @@ type EvaluationModuleDeps struct {
 	AssessmentListPolicy cachepolicy.CachePolicy
 	VersionStore         cachequery.VersionTokenStore
 	Observer             *cacheobservability.ComponentObserver
+	TopicResolver        eventconfig.TopicResolver
 }
 
 // NewEvaluationModule 创建评估模块。
@@ -129,7 +131,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
 	module.ReportRepo = reportRepo
-	module.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStore(normalized.MySQLDB), module.eventPublisher)
+	module.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver), module.eventPublisher)
 
 	// ==================== 初始化领域服务 ====================
 

@@ -2,18 +2,20 @@ package eventconfig
 
 import (
 	"sync"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
-// Registry 事件配置注册表（单例）
-// 提供全局访问点，避免到处传递配置对象
-type Registry struct {
-	config *Config
-	mu     sync.RWMutex
+// TopicResolver resolves an event type to its physical topic name.
+type TopicResolver interface {
+	GetTopicForEvent(eventType string) (string, bool)
+}
 
-	// 缓存：事件类型 -> Topic 名称
-	eventToTopic map[string]string
-	// 缓存：Topic 名称 -> 事件类型列表
-	topicToEvents map[string][]string
+// Registry is the legacy mutable global access point for event configuration.
+// New process code should prefer explicit eventcatalog.Catalog dependencies.
+type Registry struct {
+	mu      sync.RWMutex
+	catalog *eventcatalog.Catalog
 }
 
 var (
@@ -21,18 +23,15 @@ var (
 	once           sync.Once
 )
 
-// Global 获取全局注册表
+// Global returns the legacy global registry.
 func Global() *Registry {
 	once.Do(func() {
-		globalRegistry = &Registry{
-			eventToTopic:  make(map[string]string),
-			topicToEvents: make(map[string][]string),
-		}
+		globalRegistry = &Registry{catalog: eventcatalog.NewCatalog(nil)}
 	})
 	return globalRegistry
 }
 
-// Initialize 初始化全局注册表
+// Initialize loads the global registry.
 func Initialize(configPath string) error {
 	cfg, err := Load(configPath)
 	if err != nil {
@@ -42,88 +41,59 @@ func Initialize(configPath string) error {
 	return nil
 }
 
-// SetConfig 设置配置并构建缓存
+// SetConfig replaces the registry catalog.
 func (r *Registry) SetConfig(cfg *Config) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
-
-	r.config = cfg
-	r.buildCache()
+	r.catalog = eventcatalog.NewCatalog(cfg)
 }
 
-// buildCache 构建查找缓存
-func (r *Registry) buildCache() {
-	r.eventToTopic = make(map[string]string)
-	r.topicToEvents = make(map[string][]string)
-
-	for eventType, eventCfg := range r.config.Events {
-		if topicCfg, ok := r.config.Topics[eventCfg.Topic]; ok {
-			topicName := topicCfg.Name
-			r.eventToTopic[eventType] = topicName
-			r.topicToEvents[topicName] = append(r.topicToEvents[topicName], eventType)
-		}
+// Catalog returns the current immutable catalog snapshot.
+func (r *Registry) Catalog() *eventcatalog.Catalog {
+	r.mu.RLock()
+	defer r.mu.RUnlock()
+	if r.catalog == nil {
+		return eventcatalog.NewCatalog(nil)
 	}
+	return r.catalog
 }
 
-// Config 获取配置（只读）
+// Config returns the loaded config.
 func (r *Registry) Config() *Config {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.config
+	return r.Catalog().Config()
 }
 
-// GetTopicForEvent 获取事件对应的 Topic
+// GetTopicForEvent returns the physical topic for an event type.
 func (r *Registry) GetTopicForEvent(eventType string) (string, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	topic, ok := r.eventToTopic[eventType]
-	return topic, ok
+	return r.Catalog().GetTopicForEvent(eventType)
 }
 
-// GetEventsForTopic 获取 Topic 下的所有事件
+// GetEventsForTopic returns event types bound to a physical topic.
 func (r *Registry) GetEventsForTopic(topicName string) []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	return r.topicToEvents[topicName]
+	return r.Catalog().GetEventsForTopic(topicName)
 }
 
-// GetTopicConfig 获取 Topic 配置
+// GetTopicConfig returns a logical topic config.
 func (r *Registry) GetTopicConfig(topicKey string) (TopicConfig, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if r.config == nil {
-		return TopicConfig{}, false
-	}
-	cfg, ok := r.config.Topics[topicKey]
-	return cfg, ok
+	return r.Catalog().GetTopicConfig(topicKey)
 }
 
-// GetEventConfig 获取事件配置
+// GetEventConfig returns an event config.
 func (r *Registry) GetEventConfig(eventType string) (EventConfig, bool) {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	if r.config == nil {
-		return EventConfig{}, false
-	}
-	cfg, ok := r.config.Events[eventType]
-	return cfg, ok
+	return r.Catalog().GetEventConfig(eventType)
 }
 
-// AllTopicNames 获取所有 Topic 名称
+// AllTopicNames returns all physical topic names.
 func (r *Registry) AllTopicNames() []string {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	names := make([]string, 0, len(r.topicToEvents))
-	for name := range r.topicToEvents {
-		names = append(names, name)
-	}
-	return names
+	return r.Catalog().AllTopicNames()
 }
 
-// IsEventRegistered 检查事件是否已注册
+// IsEventRegistered reports whether the event type exists in the catalog.
 func (r *Registry) IsEventRegistered(eventType string) bool {
-	r.mu.RLock()
-	defer r.mu.RUnlock()
-	_, ok := r.eventToTopic[eventType]
-	return ok
+	return r.Catalog().IsEventRegistered(eventType)
+}
+
+// TopicSubscriptions returns all topic subscriptions with events.
+func (r *Registry) TopicSubscriptions() []eventcatalog.TopicSubscription {
+	return r.Catalog().TopicSubscriptions()
 }

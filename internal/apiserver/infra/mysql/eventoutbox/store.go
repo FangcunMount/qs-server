@@ -47,12 +47,21 @@ func (OutboxPO) TableName() string {
 type Store struct {
 	db                 *gorm.DB
 	publishingStaleFor time.Duration
+	topicResolver      eventconfig.TopicResolver
 }
 
 func NewStore(db *gorm.DB) *Store {
+	return NewStoreWithTopicResolver(db, eventconfig.Global())
+}
+
+func NewStoreWithTopicResolver(db *gorm.DB, resolver eventconfig.TopicResolver) *Store {
+	if resolver == nil {
+		resolver = eventconfig.Global()
+	}
 	return &Store{
 		db:                 db,
 		publishingStaleFor: defaultPublishingStaleFor,
+		topicResolver:      resolver,
 	}
 }
 
@@ -75,7 +84,7 @@ func (s *Store) buildRows(events []event.DomainEvent) ([]*OutboxPO, error) {
 	now := time.Now()
 	rows := make([]*OutboxPO, 0, len(events))
 	for _, evt := range events {
-		topicName, ok := eventconfig.Global().GetTopicForEvent(evt.EventType())
+		topicName, ok := s.topicResolver.GetTopicForEvent(evt.EventType())
 		if !ok {
 			return nil, fmt.Errorf("event %q not found in event config", evt.EventType())
 		}

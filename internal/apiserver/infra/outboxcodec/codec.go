@@ -1,19 +1,13 @@
 package outboxcodec
 
 import (
-	"encoding/json"
-
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-type storedDomainEvent struct {
-	event.BaseEvent
-	Data json.RawMessage `json:"data"`
-}
-
 // Encode serializes a domain event into a generic payload envelope.
 func Encode(evt event.DomainEvent) (string, error) {
-	payload, err := json.Marshal(evt)
+	payload, err := eventcodec.EncodeDomainEvent(evt)
 	if err != nil {
 		return "", err
 	}
@@ -22,9 +16,5 @@ func Encode(evt event.DomainEvent) (string, error) {
 
 // Decode deserializes a generic payload envelope back into a domain event.
 func Decode(payload string) (event.DomainEvent, error) {
-	var evt storedDomainEvent
-	if err := json.Unmarshal([]byte(payload), &evt); err != nil {
-		return nil, err
-	}
-	return evt, nil
+	return eventcodec.DecodeDomainEvent([]byte(payload))
 }

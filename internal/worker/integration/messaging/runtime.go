@@ -13,6 +13,10 @@ import (
 	"github.com/nsqio/go-nsq"
 )
 
+type eventDispatcher interface {
+	DispatchEvent(ctx context.Context, eventType string, payload []byte) error
+}
+
 func CreateSubscriber(cfg *config.MessagingConfig, logger *slog.Logger, maxInFlight int) (basemessaging.Subscriber, error) {
 	switch cfg.Provider {
 	case "nsq":
@@ -75,8 +79,11 @@ func SubscribeHandlers(serviceName string, logger *slog.Logger, c *container.Con
 	return nil
 }
 
-func createDispatchHandler(logger *slog.Logger, c *container.Container, topicName string) basemessaging.Handler {
+func createDispatchHandler(logger *slog.Logger, dispatcher eventDispatcher, topicName string) basemessaging.Handler {
 	return func(ctx context.Context, msg *basemessaging.Message) error {
+		if msg.Metadata == nil {
+			msg.Metadata = map[string]string{}
+		}
 		eventType, ok := msg.Metadata["event_type"]
 		if !ok {
 			env, err := handlers.ParseEventEnvelope(msg.Payload)
@@ -108,7 +115,7 @@ func createDispatchHandler(logger *slog.Logger, c *container.Container, topicNam
 			slog.String("msg_id", msg.UUID),
 		)
 
-		if err := c.DispatchEvent(ctx, eventType, msg.Payload); err != nil {
+		if err := dispatcher.DispatchEvent(ctx, eventType, msg.Payload); err != nil {
 			logger.Error("failed to dispatch event",
 				slog.String("topic", topicName),
 				slog.String("event_type", eventType),

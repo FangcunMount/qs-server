@@ -2,21 +2,22 @@ package eventconfig
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // RoutingPublisher 配置驱动的路由发布器
 // 根据事件配置自动将事件路由到正确的 Topic
 type RoutingPublisher struct {
-	registry    *Registry
-	mqPublisher messaging.Publisher
-	source      string
-	mode        PublishMode
+	topicResolver TopicResolver
+	mqPublisher   messaging.Publisher
+	source        string
+	mode          PublishMode
 }
 
 // PublishMode 发布模式
@@ -47,16 +48,25 @@ func PublishModeFromEnv(env string) PublishMode {
 
 // RoutingPublisherOptions 发布器选项
 type RoutingPublisherOptions struct {
-	Registry    *Registry
-	MQPublisher messaging.Publisher
-	Source      string
-	Mode        PublishMode
+	Registry      *Registry
+	Catalog       *eventcatalog.Catalog
+	TopicResolver TopicResolver
+	MQPublisher   messaging.Publisher
+	Source        string
+	Mode          PublishMode
 }
 
 // NewRoutingPublisher 创建路由发布器
 func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
-	if opts.Registry == nil {
-		opts.Registry = Global()
+	resolver := opts.TopicResolver
+	if resolver == nil && opts.Catalog != nil {
+		resolver = opts.Catalog
+	}
+	if resolver == nil && opts.Registry != nil {
+		resolver = opts.Registry
+	}
+	if resolver == nil {
+		resolver = Global()
 	}
 	if opts.Source == "" {
 		opts.Source = event.SourceAPIServer
@@ -66,10 +76,10 @@ func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
 	}
 
 	return &RoutingPublisher{
-		registry:    opts.Registry,
-		mqPublisher: opts.MQPublisher,
-		source:      opts.Source,
-		mode:        opts.Mode,
+		topicResolver: resolver,
+		mqPublisher:   opts.MQPublisher,
+		source:        opts.Source,
+		mode:          opts.Mode,
 	}
 }
 
@@ -78,7 +88,7 @@ func (p *RoutingPublisher) Publish(ctx context.Context, evt event.DomainEvent) e
 	eventType := evt.EventType()
 
 	// 从配置中查找 Topic
-	topicName, ok := p.registry.GetTopicForEvent(eventType)
+	topicName, ok := p.topicResolver.GetTopicForEvent(eventType)
 	if !ok {
 		logger.L(ctx).Errorw("event type not found in config, cannot route to topic",
 			"event_type", eventType,
@@ -127,19 +137,10 @@ func (p *RoutingPublisher) publishToMQ(ctx context.Context, topicName string, ev
 		return p.publishToLog(ctx, topicName, evt)
 	}
 
-	// 序列化事件
-	payload, err := json.Marshal(evt)
+	msg, err := eventcodec.BuildMessage(evt, p.source)
 	if err != nil {
-		return fmt.Errorf("failed to marshal event: %w", err)
+		return err
 	}
-
-	// 构建消息
-	msg := messaging.NewMessage(evt.EventID(), payload)
-	msg.Metadata["event_type"] = evt.EventType()
-	msg.Metadata["aggregate_type"] = evt.AggregateType()
-	msg.Metadata["aggregate_id"] = evt.AggregateID()
-	msg.Metadata["occurred_at"] = evt.OccurredAt().Format("2006-01-02T15:04:05.000Z07:00")
-	msg.Metadata["source"] = p.source
 
 	// 发布到配置的 Topic
 	if err := p.mqPublisher.PublishMessage(ctx, topicName, msg); err != nil {
