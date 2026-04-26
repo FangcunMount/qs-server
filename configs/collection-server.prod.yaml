@@ -29,9 +29,11 @@ insecure:
 # -------------------------------------------------------
 secure:
   bind-address: "0.0.0.0"
-  bind-port: 8443
+  # serverA Nginx 统一终止公网 HTTPS，并通过 infra-network 访问本服务 HTTP 8080。
+  # collection-server 部署在 serverB，不再挂载 /data/ssl 公网证书。
+  bind-port: 0
   tls:
-    # Web 证书（容器内路径，由 docker-compose 从宿主机挂载）
+    # bind-port=0 时不会读取 Web 证书；保留字段便于回滚启用 HTTPS listener。
     cert-file: "/etc/qs-server/ssl/certs/fangcunmount.cn.crt"
     private-key-file: "/etc/qs-server/ssl/private/fangcunmount.cn.key"
 
@@ -42,7 +44,7 @@ grpc_client:
   endpoint: "qs-apiserver:9090"  # Docker 容器服务名
   timeout: 30
   insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
-  max_inflight: 80
+  max_inflight: 120
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
@@ -69,7 +71,7 @@ redis:
   password: ""
   database: 1
   max-idle: 40
-  max-active: 120
+  max-active: 160
   timeout: 300
   min-idle-conns: 10
   pool-timeout: 10
@@ -102,26 +104,26 @@ redis_runtime:
 # -------------------------------------------------------
 rate_limit:
   enabled: true
-  submit_global_qps: 250
-  submit_global_burst: 400
-  submit_user_qps: 100
-  submit_user_burst: 150
-  query_global_qps: 250
-  query_global_burst: 400
-  query_user_qps: 100
-  query_user_burst: 150
-  wait_report_global_qps: 120
-  wait_report_global_burst: 180
-  wait_report_user_qps: 30
-  wait_report_user_burst: 60
+  submit_global_qps: 300
+  submit_global_burst: 450
+  submit_user_qps: 120
+  submit_user_burst: 180
+  query_global_qps: 300
+  query_global_burst: 450
+  query_user_qps: 120
+  query_user_burst: 180
+  wait_report_global_qps: 140
+  wait_report_global_burst: 210
+  wait_report_user_qps: 40
+  wait_report_user_burst: 80
 
 # -------------------------------------------------------
 # 3.4 提交排队配置
 # -------------------------------------------------------
 submit_queue:
   enabled: true
-  queue_size: 500
-  worker_count: 8
+  queue_size: 800
+  worker_count: 12
   wait_timeout_ms: 200
 
 # ============================================================
@@ -225,11 +227,11 @@ log:
 # ============================================================
 # 控制 Go 运行时的 GC/内存行为与并发
 runtime:
-  # 将 GOMEMLIMIT 设置为容器配额的 80-85% 以避免 OOM（容器 mem_limit=384MiB）
-  go-mem-limit: "320MiB"
+  # 将 GOMEMLIMIT 设置为容器配额的 80-85% 以避免 OOM（容器 mem_limit=896MiB）
+  go-mem-limit: "704MiB"
   # 更积极的 GC，降低峰值内存
   gogc: 50
 
 # 并发/连接池调优
 concurrency:
-  max-concurrency: 40
+  max-concurrency: 80

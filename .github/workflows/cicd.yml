@@ -4,8 +4,13 @@ name: CI/CD Pipeline
 # 必需的 Secrets 配置
 # ============================================================================
 # Organization Secrets (组织级别，共享配置):
-#   SVRA_HOST, SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
-#   SVRA_SUDO_PASSWORD (可选，如果 sudo 需要密码)
+#   SVRA_HOST (serverA: qs-apiserver)
+#   SVRB_HOST (serverB: qs-collection-server)
+#   SVRD_HOST (serverD: qs-worker)
+#   SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
+#   SVRB_USERNAME/SVRB_SSH_KEY/SVRB_SSH_PORT 可选，缺省复用 SVRA_*
+#   SVRD_USERNAME/SVRD_SSH_KEY/SVRD_SSH_PORT 可选，缺省复用 SVRA_*
+#   SVRA/SVRB/SVRD_SUDO_PASSWORD (可选，如果 sudo 需要密码)
 #   MONGODB_HOST, MONGODB_PORT
 #   MYSQL_HOST, MYSQL_PORT (Worker 使用)
 #   REDIS_HOST, REDIS_PORT
@@ -41,7 +46,7 @@ on:
           - collection
           - worker
       worker_replicas:
-        description: 'Worker 副本数（留空则读取 QS_WORKER_REPLICAS，缺失时默认为 1）'
+        description: 'Worker 副本数（留空则读取 QS_WORKER_REPLICAS，缺失时默认为 3）'
         required: false
         type: string
         default: ''
@@ -70,11 +75,18 @@ jobs:
       - name: Check Required Secrets
         env:
           SVRA_HOST: ${{ secrets.SVRA_HOST }}
+          SVRB_HOST: ${{ secrets.SVRB_HOST }}
+          SVRD_HOST: ${{ secrets.SVRD_HOST }}
           SVRA_USERNAME: ${{ secrets.SVRA_USERNAME }}
           SVRA_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          SVRB_USERNAME: ${{ secrets.SVRB_USERNAME }}
+          SVRB_SSH_KEY: ${{ secrets.SVRB_SSH_KEY }}
+          SVRD_USERNAME: ${{ secrets.SVRD_USERNAME }}
+          SVRD_SSH_KEY: ${{ secrets.SVRD_SSH_KEY }}
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
           MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
           MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
           MONGODB_PORT: ${{ secrets.MONGODB_PORT }}
           MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
           MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
@@ -89,8 +101,14 @@ jobs:
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT }}
+          NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
+          NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT }}
           SVRA_SSH_PORT: ${{ secrets.SVRA_SSH_PORT }}
+          SVRB_SSH_PORT: ${{ secrets.SVRB_SSH_PORT }}
+          SVRD_SSH_PORT: ${{ secrets.SVRD_SSH_PORT }}
           SVRA_SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          SVRB_SUDO_PASSWORD: ${{ secrets.SVRB_SUDO_PASSWORD }}
+          SVRD_SUDO_PASSWORD: ${{ secrets.SVRD_SUDO_PASSWORD }}
           WWW_UID: ${{ secrets.WWW_UID }}
           WWW_GID: ${{ secrets.WWW_GID }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -111,8 +129,8 @@ jobs:
             echo "ℹ️ Not on main branch – required secrets reported for awareness only."
           fi
 
-          REQUIRED_SECRETS=(SVRA_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_HOST JWT_SECRET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET DOCKERHUB_USERNAME DOCKERHUB_TOKEN)
-          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRA_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD NSQ_NSQD_HOST NSQ_NSQD_PORT WWW_UID WWW_GID OSS_SESSION_TOKEN)
+          REQUIRED_SECRETS=(SVRA_HOST SVRB_HOST SVRD_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_HOST JWT_SECRET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET NSQ_NSQD_HOST NSQ_LOOKUPD_HOST DOCKERHUB_USERNAME DOCKERHUB_TOKEN WWW_UID WWW_GID)
+          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRB_USERNAME SVRB_SSH_KEY SVRB_SSH_PORT SVRD_USERNAME SVRD_SSH_KEY SVRD_SSH_PORT SVRA_SUDO_PASSWORD SVRB_SUDO_PASSWORD SVRD_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD NSQ_NSQD_PORT NSQ_LOOKUPD_PORT OSS_SESSION_TOKEN)
 
           for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
             VALUE=${!SECRET_NAME}
@@ -139,9 +157,6 @@ jobs:
                 SVRA_SUDO_PASSWORD)
                   echo "⚠️ $SECRET_NAME is not set (needed only if sudo prompts for a password)"
                   ;;
-                WWW_UID|WWW_GID)
-                  echo "⚠️ $SECRET_NAME is not set (defaults to 1000/1000)"
-                  ;;
                 MONGODB_PORT)
                   echo "⚠️ $SECRET_NAME is not set (defaults to 27017)"
                   ;;
@@ -157,7 +172,7 @@ jobs:
                 REDIS_PASSWORD)
                   echo "⚠️ $SECRET_NAME is not set (redis auth disabled)"
                   ;;
-                NSQ_NSQD_HOST|NSQ_NSQD_PORT)
+                NSQ_NSQD_PORT|NSQ_LOOKUPD_PORT)
                   echo "⚠️ $SECRET_NAME is not set (NSQ may be optional)"
                   ;;
                 *)
@@ -415,8 +430,8 @@ jobs:
       (github.event_name == 'push' && github.ref == 'refs/heads/main') ||
       (github.event_name == 'workflow_dispatch')
     env:
-      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
-      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
     permissions:
       contents: read
       packages: write
@@ -426,6 +441,17 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Validate runtime UID/GID
+        run: |
+          : "${WWW_UID:?WWW_UID secret is required}"
+          : "${WWW_GID:?WWW_GID secret is required}"
+          case "${WWW_UID}:${WWW_GID}" in
+            *[!0-9:]*|:*|*:|"")
+              echo "WWW_UID/WWW_GID must be numeric" >&2
+              exit 1
+              ;;
+          esac
       
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -507,8 +533,8 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver'))
     env:
-      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
-      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
       SERVICE_NAME: qs-apiserver
       IMAGE_NAME: qs-apiserver
       CONTAINER_NAME: qs-apiserver
@@ -683,8 +709,10 @@ jobs:
           script: |
             set -Eeuo pipefail
 
-            APP_UID="${WWW_UID:-1000}"
-            APP_GID="${WWW_GID:-1000}"
+            : "${WWW_UID:?WWW_UID secret is required}"
+            : "${WWW_GID:?WWW_GID secret is required}"
+            APP_UID="${WWW_UID}"
+            APP_GID="${WWW_GID}"
 
             # SUDO 助手
             if sudo -n true 2>/dev/null; then
@@ -790,6 +818,10 @@ jobs:
             $SUDO rsync -a "$DEPLOY_TMP/configs/" /opt/qs-server/${CONTAINER_NAME}/configs/
             $SUDO chown -R "$APP_UID:$APP_GID" /opt/qs-server/${CONTAINER_NAME}/configs
             $SUDO chown -R "$APP_UID:$APP_GID" /data/logs/qs-server/${CONTAINER_NAME}
+            $SUDO mkdir -p /data/image/qrcode
+            $SUDO chmod 0777 /data/image
+            $SUDO chown -R "$APP_UID:$APP_GID" /data/image/qrcode
+            $SUDO chmod 0755 /data/image/qrcode
 
             # 网络（创建 qs-network，检查 infra-network）
             if ! $SUDO docker network ls --format '{{.Name}}' | grep -w qs-network > /dev/null 2>&1; then
@@ -820,6 +852,18 @@ jobs:
               echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
+            GRPC_CA="$GRPC_CERT_DIR/ca/ca-chain.crt"
+            GRPC_CRT="$GRPC_CERT_DIR/server/qs-apiserver.crt"
+            GRPC_KEY="$GRPC_CERT_DIR/server/qs-apiserver.key"
+            for f in "$GRPC_CA" "$GRPC_CRT" "$GRPC_KEY"; do
+              if ! $SUDO test -r "$f"; then
+                echo "❌ Missing or unreadable gRPC mTLS file: $f"
+                exit 1
+              fi
+            done
+            $SUDO chown "$APP_UID:$APP_GID" "$GRPC_CA" "$GRPC_CRT" "$GRPC_KEY"
+            $SUDO chmod 0644 "$GRPC_CA" "$GRPC_CRT"
+            $SUDO chmod 0640 "$GRPC_KEY"
 
             # 必须同时修正所在目录：仅 chown 文件时，若 private 仍为 700 且属主为其他用户，容器内无法遍历目录 → stat key 报 permission denied
             TLS_CERT_DIR="$(dirname "$CERT_HOST_PATH")"
@@ -913,8 +957,8 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.service == 'all' || github.event.inputs.service == 'collection'))
     env:
-      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
-      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
       SERVICE_NAME: collection-server
       IMAGE_NAME: qs-collection-server
       CONTAINER_NAME: qs-collection-server
@@ -997,10 +1041,10 @@ jobs:
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
           source: "deploy-package-collection.tar.gz"
           target: "/tmp"
 
@@ -1019,20 +1063,22 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SVRB_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
           envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,HTTP_PORT,HTTPS_PORT,INTERNAL_HTTP_PORT,INTERNAL_HTTPS_PORT,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
           script: |
             set -Eeuo pipefail
 
-            APP_UID="${WWW_UID:-1000}"
-            APP_GID="${WWW_GID:-1000}"
+            : "${WWW_UID:?WWW_UID secret is required}"
+            : "${WWW_GID:?WWW_GID secret is required}"
+            APP_UID="${WWW_UID}"
+            APP_GID="${WWW_GID}"
 
             # SUDO 助手
             if sudo -n true 2>/dev/null; then
@@ -1146,27 +1192,25 @@ jobs:
               exit 1
             fi
 
-            # Web TLS（与 iam-contracts 一致）
-            CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
-            KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
+            # collection-server 的公网 HTTPS 由 serverA Nginx 终止，serverB 只需要 gRPC mTLS。
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
 
-            if ! $SUDO test -r "$CERT_HOST_PATH" || ! $SUDO test -r "$KEY_HOST_PATH"; then
-              echo "❌ Web certificates not found or unreadable by root"
-              exit 1
-            fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
               echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
-
-            TLS_CERT_DIR="$(dirname "$CERT_HOST_PATH")"
-            TLS_KEY_DIR="$(dirname "$KEY_HOST_PATH")"
-            $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH" "$TLS_CERT_DIR" "$TLS_KEY_DIR"
-            $SUDO chmod 0755 "$TLS_CERT_DIR"
-            $SUDO chmod 0750 "$TLS_KEY_DIR"
-            $SUDO chmod 0644 "$CERT_HOST_PATH"
-            $SUDO chmod 0640 "$KEY_HOST_PATH"
+            GRPC_CA="$GRPC_CERT_DIR/ca/ca-chain.crt"
+            GRPC_CRT="$GRPC_CERT_DIR/server/qs-collection-server.crt"
+            GRPC_KEY="$GRPC_CERT_DIR/server/qs-collection-server.key"
+            for f in "$GRPC_CA" "$GRPC_CRT" "$GRPC_KEY"; do
+              if ! $SUDO test -r "$f"; then
+                echo "❌ Missing or unreadable gRPC mTLS file: $f"
+                exit 1
+              fi
+            done
+            $SUDO chown "$APP_UID:$APP_GID" "$GRPC_CA" "$GRPC_CRT" "$GRPC_KEY"
+            $SUDO chmod 0644 "$GRPC_CA" "$GRPC_CRT"
+            $SUDO chmod 0640 "$GRPC_KEY"
 
             export DOCKER_IMAGE_QS_COLLECTION_SERVER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
 
@@ -1243,9 +1287,9 @@ jobs:
       (github.event_name == 'workflow_dispatch' &&
        (github.event.inputs.service == 'all' || github.event.inputs.service == 'worker'))
     env:
-      WWW_UID: ${{ secrets.WWW_UID || '1000' }}
-      WWW_GID: ${{ secrets.WWW_GID || '1000' }}
-      WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '1' }}
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
+      WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
       SERVICE_NAME: qs-worker
       IMAGE_NAME: qs-worker
       CONTAINER_NAME: qs-worker
@@ -1367,10 +1411,10 @@ jobs:
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
           source: "deploy-package-worker.tar.gz"
           target: "/tmp"
 
@@ -1385,21 +1429,23 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SVRD_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
           envs: DOCKER_REGISTRY,DOCKER_REPOSITORY,IMAGE_NAME,CONTAINER_NAME,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS
           script: |
             set -Eeuo pipefail
 
-            APP_UID="${WWW_UID:-1000}"
-            APP_GID="${WWW_GID:-1000}"
+            : "${WWW_UID:?WWW_UID secret is required}"
+            : "${WWW_GID:?WWW_GID secret is required}"
+            APP_UID="${WWW_UID}"
+            APP_GID="${WWW_GID}"
 
             # SUDO 助手
             if sudo -n true 2>/dev/null; then
@@ -1518,23 +1564,24 @@ jobs:
               exit 1
             fi
 
-            # Worker compose 挂载 TLS，与 apiserver 对齐属主
-            CERT_HOST_PATH="/data/ssl/certs/fangcunmount.cn.crt"
-            KEY_HOST_PATH="/data/ssl/private/fangcunmount.cn.key"
+            # Worker 只需要 gRPC mTLS，不需要 serverA 公网 TLS 证书。
             GRPC_CERT_DIR="/data/infra/ssl/grpc"
-            if $SUDO test -r "$CERT_HOST_PATH" && $SUDO test -r "$KEY_HOST_PATH"; then
-              TLS_CERT_DIR="$(dirname "$CERT_HOST_PATH")"
-              TLS_KEY_DIR="$(dirname "$KEY_HOST_PATH")"
-              $SUDO chown "$APP_UID:$APP_GID" "$CERT_HOST_PATH" "$KEY_HOST_PATH" "$TLS_CERT_DIR" "$TLS_KEY_DIR"
-              $SUDO chmod 0755 "$TLS_CERT_DIR"
-              $SUDO chmod 0750 "$TLS_KEY_DIR"
-              $SUDO chmod 0644 "$CERT_HOST_PATH"
-              $SUDO chmod 0640 "$KEY_HOST_PATH"
-            fi
             if ! $SUDO test -d "$GRPC_CERT_DIR"; then
               echo "❌ gRPC certificate directory not found: $GRPC_CERT_DIR"
               exit 1
             fi
+            GRPC_CA="$GRPC_CERT_DIR/ca/ca-chain.crt"
+            GRPC_CRT="$GRPC_CERT_DIR/server/qs-worker.crt"
+            GRPC_KEY="$GRPC_CERT_DIR/server/qs-worker.key"
+            for f in "$GRPC_CA" "$GRPC_CRT" "$GRPC_KEY"; do
+              if ! $SUDO test -r "$f"; then
+                echo "❌ Missing or unreadable gRPC mTLS file: $f"
+                exit 1
+              fi
+            done
+            $SUDO chown "$APP_UID:$APP_GID" "$GRPC_CA" "$GRPC_CRT" "$GRPC_KEY"
+            $SUDO chmod 0644 "$GRPC_CA" "$GRPC_CRT"
+            $SUDO chmod 0640 "$GRPC_KEY"
 
             export DOCKER_IMAGE_QS_WORKER="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
 

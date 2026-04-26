@@ -4,8 +4,8 @@ services:
     container_name: qs-apiserver
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
-    mem_limit: "1024m"
-    cpus: "1.0"
+    mem_limit: "1536m"
+    cpus: "1.5"
     networks:
       - qs-network
       - infra-network
@@ -33,7 +33,7 @@ services:
       # 二维码存储目录
       - /data/image/qrcode:/data/image/qrcode:rw
     environment:
-      - GOMEMLIMIT=640MiB
+      - GOMEMLIMIT=1152MiB
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
   qs-collection-server:
@@ -41,8 +41,8 @@ services:
     container_name: qs-collection-server
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
-    mem_limit: "512m"
-    cpus: "0.5"
+    mem_limit: "896m"
+    cpus: "1.0"
     networks:
       - qs-network
       - infra-network
@@ -54,28 +54,24 @@ services:
       - "prometheus.metrics_path=/metrics"
     ports:
       - "8082:8080"
-      - "9446:8443"
       - "6060:6060" # pprof（仅内网调试，生产注意访问控制）
     env_file:
       - /opt/qs-server/qs-collection-server/configs/env/config.prod.env
     volumes:
       - /opt/qs-server/qs-collection-server/configs:/app/configs
       - /data/logs/qs-server/qs-collection-server:/data/logs/qs
-      # 证书与密钥目录统一挂载（私钥须对镜像内 www 同 UID 可读，同 qs-apiserver）
-      - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
-      - /data/ssl/private:/etc/qs-server/ssl/private:ro
-      # gRPC mTLS 证书目录
+      # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     # 设置 Go 内存限制，帮助 GC 更积极地回收内存
     environment:
-      - GOMEMLIMIT=320MiB
+      - GOMEMLIMIT=704MiB
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
   qs-worker:
     image: ${DOCKER_IMAGE_QS_WORKER:-ghcr.io/fangcunmount/qs-worker:latest}
     restart: unless-stopped
     # docker compose (非 swarm) 资源限制
-    mem_limit: "256m"
+    mem_limit: "512m"
     cpus: "0.5"
     networks:
       - qs-network
@@ -86,20 +82,17 @@ services:
       - "prometheus.component=qs-worker"
       - "prometheus.metrics_port=9092"
       - "prometheus.metrics_path=/metrics"
-    ports:
-      - "19092:9092"
+    expose:
+      - "9092"
     env_file:
       - /opt/qs-server/qs-worker/configs/env/config.prod.env
     volumes:
       - /opt/qs-server/qs-worker/configs:/app/configs
       - /data/logs/qs-server/qs-worker:/data/logs/qs
-      # 证书与密钥目录统一挂载（REST TLS 证书）
-      - /data/ssl/certs:/etc/qs-server/ssl/certs:ro
-      - /data/ssl/private:/etc/qs-server/ssl/private:ro
-      # gRPC mTLS 证书目录（CA + 客户端证书）
+      # gRPC mTLS 证书目录（CA + 客户端证书），worker 不需要公网 REST TLS 证书
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     environment:
-      - GOMEMLIMIT=192MiB
+      - GOMEMLIMIT=384MiB
     command: ["--config=/app/configs/worker.prod.yaml"]
 
 networks:

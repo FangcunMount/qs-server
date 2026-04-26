@@ -120,8 +120,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 10        # 2C4G 临时降配阶段降低热连接占用
-  max-open-connections: 100        # 收紧连接池，和下游背压预算一起控制数据库并发
+  max-idle-connections: 20        # 300QPS 目标下保留更充足的热连接
+  max-open-connections: 140       # 与下游背压预算一起控制数据库并发
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
@@ -148,7 +148,7 @@ redis:
   password: ""
   database: 1
   max-idle: 40
-  max-active: 200
+  max-active: 260
   timeout: 300
   min-idle-conns: 10
   pool-timeout: 10
@@ -294,20 +294,20 @@ statistics_sync:
 # ----------------------------------------------------------------------------
 rate_limit:
   enabled: true
-  submit_global_qps: 200
-  submit_global_burst: 300
+  submit_global_qps: 300
+  submit_global_burst: 450
   submit_user_qps: 200
   submit_user_burst: 300
-  admin_submit_global_qps: 320
-  admin_submit_global_burst: 480
+  admin_submit_global_qps: 360
+  admin_submit_global_burst: 540
   admin_submit_user_qps: 320
   admin_submit_user_burst: 480
-  query_global_qps: 200
-  query_global_burst: 300
+  query_global_qps: 300
+  query_global_burst: 450
   query_user_qps: 200
   query_user_burst: 300
-  wait_report_global_qps: 200
-  wait_report_global_burst: 300
+  wait_report_global_qps: 300
+  wait_report_global_burst: 450
   wait_report_user_qps: 200
   wait_report_user_burst: 300
 
@@ -317,15 +317,15 @@ rate_limit:
 backpressure:
   mysql:
     enabled: true
-    max_inflight: 100
+    max_inflight: 140
     timeout_ms: 2500
   mongo:
     enabled: true
-    max_inflight: 100
+    max_inflight: 130
     timeout_ms: 2000
   iam:
     enabled: true
-    max_inflight: 100
+    max_inflight: 130
     timeout_ms: 2000
 
 # ----------------------------------------------------------------------------

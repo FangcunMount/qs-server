@@ -44,8 +44,8 @@ RUN apk add --no-cache ca-certificates tzdata
 # 设置时区
 ENV TZ=Asia/Shanghai
 
-ARG RUN_UID=1000
-ARG RUN_GID=1000
+ARG RUN_UID=2000
+ARG RUN_GID=2000
 RUN addgroup -g ${RUN_GID} www && \
     adduser -D -u ${RUN_UID} -G www www
 

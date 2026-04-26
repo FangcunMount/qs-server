@@ -45,8 +45,8 @@ RUN apk add --no-cache ca-certificates tzdata
 ENV TZ=Asia/Shanghai
 
 # 运行用户：与宿主机 www（或 Nginx 运行用户）UID/GID 对齐，由 CI build-arg 传入
-ARG RUN_UID=1000
-ARG RUN_GID=1000
+ARG RUN_UID=2000
+ARG RUN_GID=2000
 RUN addgroup -g ${RUN_GID} www && \
     adduser -D -u ${RUN_UID} -G www www
 

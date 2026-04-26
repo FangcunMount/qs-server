@@ -105,11 +105,14 @@ func (s *GenericAPIServer) Run() error {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	// 创建 HTTPS 服务器
-	s.secureServer = &http.Server{
-		Addr:              s.SecureServingInfo.Address(),
-		Handler:           s,
-		ReadHeaderTimeout: 5 * time.Second,
+	secureEnabled := s.SecureServingInfo != nil && s.SecureServingInfo.BindPort > 0
+	if secureEnabled {
+		// 创建 HTTPS 服务器
+		s.secureServer = &http.Server{
+			Addr:              s.SecureServingInfo.Address(),
+			Handler:           s,
+			ReadHeaderTimeout: 5 * time.Second,
+		}
 	}
 
 	var eg errgroup.Group
@@ -127,24 +130,28 @@ func (s *GenericAPIServer) Run() error {
 		return nil
 	})
 
-	// 启动 HTTPS 服务器
-	eg.Go(func() error {
-		key, cert := s.SecureServingInfo.CertKey.KeyFile, s.SecureServingInfo.CertKey.CertFile
-		log.Infof("cert: %s, key: %s, bindPort: %d", cert, key, s.SecureServingInfo.BindPort)
-		if cert == "" || key == "" || s.SecureServingInfo.BindPort == 0 {
-			return fmt.Errorf("invalid HTTPS configuration: cert=%s, key=%s, bindPort=%d", cert, key, s.SecureServingInfo.BindPort)
-		}
+	if secureEnabled {
+		// 启动 HTTPS 服务器
+		eg.Go(func() error {
+			key, cert := s.SecureServingInfo.CertKey.KeyFile, s.SecureServingInfo.CertKey.CertFile
+			log.Infof("cert: %s, key: %s, bindPort: %d", cert, key, s.SecureServingInfo.BindPort)
+			if cert == "" || key == "" {
+				return fmt.Errorf("invalid HTTPS configuration: cert=%s, key=%s, bindPort=%d", cert, key, s.SecureServingInfo.BindPort)
+			}
 
-		log.Infof("Start to listening the incoming requests on https address: %s", s.SecureServingInfo.Address())
+			log.Infof("Start to listening the incoming requests on https address: %s", s.SecureServingInfo.Address())
 
-		if err := s.secureServer.ListenAndServeTLS(cert, key); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			return fmt.Errorf("https server listen on %s failed: %w", s.SecureServingInfo.Address(), err)
-		}
+			if err := s.secureServer.ListenAndServeTLS(cert, key); err != nil && !errors.Is(err, http.ErrServerClosed) {
+				return fmt.Errorf("https server listen on %s failed: %w", s.SecureServingInfo.Address(), err)
+			}
 
-		log.Infof("Server on %s stopped", s.SecureServingInfo.Address())
+			log.Infof("Server on %s stopped", s.SecureServingInfo.Address())
 
-		return nil
-	})
+			return nil
+		})
+	} else {
+		log.Infof("HTTPS server disabled because secure.bind-port is 0")
+	}
 
 	// 检查服务器是否正常运行
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
