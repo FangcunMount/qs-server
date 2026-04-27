@@ -819,6 +819,8 @@ jobs:
 
             # 备份
             BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
+            $SUDO chown "$(id -u):$(id -g)" "$BACKUP_DIR"
+            $SUDO chmod 0750 "$BACKUP_DIR"
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             if [ -d "/opt/qs-server/${CONTAINER_NAME}/configs" ] && [ "$(ls -A /opt/qs-server/${CONTAINER_NAME}/configs 2>/dev/null)" != "" ]; then
               $SUDO tar -czf "$BACKUP_DIR/backup_${TIMESTAMP}.tar.gz" \
@@ -959,7 +961,14 @@ jobs:
             fi
 
             # 清理旧备份
-            $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f 2>/dev/null || true'
+            old_backups="$($SUDO ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"
+            old_backups="$(printf '%s\n' "$old_backups" | tail -n +6 || true)"
+            if [ -n "$old_backups" ]; then
+              printf '%s\n' "$old_backups" | while IFS= read -r backup_file; do
+                [ -z "$backup_file" ] && continue
+                $SUDO rm -f "$backup_file" || true
+              done
+            fi
 
             rm -rf "$DEPLOY_TMP"
             rm -f /tmp/deploy-package-apiserver.tar.gz
@@ -1198,6 +1207,8 @@ jobs:
 
             # 备份
             BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
+            $SUDO chown "$(id -u):$(id -g)" "$BACKUP_DIR"
+            $SUDO chmod 0750 "$BACKUP_DIR"
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             if [ -d "/opt/qs-server/${CONTAINER_NAME}/configs" ] && [ "$(ls -A /opt/qs-server/${CONTAINER_NAME}/configs 2>/dev/null)" != "" ]; then
               $SUDO tar -czf "$BACKUP_DIR/backup_${TIMESTAMP}.tar.gz" \
@@ -1306,7 +1317,14 @@ jobs:
             fi
 
             # 清理旧备份
-            $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
+            old_backups="$($SUDO ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"
+            old_backups="$(printf '%s\n' "$old_backups" | tail -n +6 || true)"
+            if [ -n "$old_backups" ]; then
+              printf '%s\n' "$old_backups" | while IFS= read -r backup_file; do
+                [ -z "$backup_file" ] && continue
+                $SUDO rm -f "$backup_file" || true
+              done
+            fi
 
             rm -rf "$DEPLOY_TMP"
             rm -f /tmp/deploy-package-collection.tar.gz
@@ -1576,6 +1594,8 @@ jobs:
 
             # 备份
             BACKUP_DIR="/opt/backups/qs-server/${CONTAINER_NAME}"
+            $SUDO chown "$(id -u):$(id -g)" "$BACKUP_DIR"
+            $SUDO chmod 0750 "$BACKUP_DIR"
             TIMESTAMP=$(date +%Y%m%d_%H%M%S)
             if [ -d "/opt/qs-server/${CONTAINER_NAME}/configs" ] && [ "$(ls -A /opt/qs-server/${CONTAINER_NAME}/configs 2>/dev/null)" != "" ]; then
               $SUDO tar -czf "$BACKUP_DIR/backup_${TIMESTAMP}.tar.gz" \
@@ -1682,7 +1702,8 @@ jobs:
             if [ "${RUNNING_COUNT}" -ge "${WORKER_REPLICAS}" ]; then
               echo "✅ Worker replicas are running (${RUNNING_COUNT}/${WORKER_REPLICAS})"
               $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps qs-worker
-              FIRST_WORKER=$($SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q qs-worker | head -n1)
+              WORKER_CONTAINERS="$($SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q qs-worker)"
+              FIRST_WORKER="$(printf '%s\n' "$WORKER_CONTAINERS" | sed -n '1p')"
               if [ -z "${FIRST_WORKER}" ]; then
                 echo "❌ No running worker container found for connectivity check"
                 exit 1
@@ -1713,7 +1734,14 @@ jobs:
             fi
 
             # 清理旧备份
-            $SUDO bash -c 'ls -t '"$BACKUP_DIR"'/backup_*.tar.gz 2>/dev/null | tail -n +6 | xargs -r rm -f || true'
+            old_backups="$($SUDO ls -t "$BACKUP_DIR"/backup_*.tar.gz 2>/dev/null || true)"
+            old_backups="$(printf '%s\n' "$old_backups" | tail -n +6 || true)"
+            if [ -n "$old_backups" ]; then
+              printf '%s\n' "$old_backups" | while IFS= read -r backup_file; do
+                [ -z "$backup_file" ] && continue
+                $SUDO rm -f "$backup_file" || true
+              done
+            fi
 
             echo "✅ ${CONTAINER_NAME} deployed"
 
