@@ -13,14 +13,14 @@ name: CI/CD Pipeline
 #   SVRA/SVRB/SVRD_SUDO_PASSWORD (可选，如果 sudo 需要密码)
 #   MONGODB_HOST, MONGODB_PORT
 #   MYSQL_HOST, MYSQL_PORT (Worker 使用)
-#   REDIS_HOST, REDIS_PORT
+#   REDIS_HOST, REDIS_PORT, REDIS_USE_SSL, REDIS_SSL_INSECURE_SKIP_VERIFY
 #   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
 #
 # Repository Secrets (仓库级别，敏感信息):
 #   MONGODB_USERNAME, MONGODB_PASSWORD, MONGODB_DBNAME
 #   MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DATABASE (Worker 使用)
-#   REDIS_PORT/DB/USERNAME/PASSWORD
+#   REDIS_PORT/DB/USERNAME/PASSWORD/USE_SSL/SSL_INSECURE_SKIP_VERIFY
 #   JWT_SECRET
 #   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_SESSION_TOKEN（可选，apiserver 二维码 OSS）
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
@@ -99,6 +99,8 @@ jobs:
           REDIS_DB: ${{ secrets.REDIS_DB }}
           REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT }}
           NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
@@ -130,7 +132,7 @@ jobs:
           fi
 
           REQUIRED_SECRETS=(SVRA_HOST SVRB_HOST SVRD_HOST SVRA_USERNAME SVRA_SSH_KEY MONGODB_HOST MONGODB_USERNAME MONGODB_PASSWORD MONGODB_DBNAME MYSQL_HOST MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE REDIS_HOST JWT_SECRET OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET NSQ_NSQD_HOST NSQ_LOOKUPD_HOST DOCKERHUB_USERNAME DOCKERHUB_TOKEN WWW_UID WWW_GID)
-          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRB_USERNAME SVRB_SSH_KEY SVRB_SSH_PORT SVRD_USERNAME SVRD_SSH_KEY SVRD_SSH_PORT SVRA_SUDO_PASSWORD SVRB_SUDO_PASSWORD SVRD_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD NSQ_NSQD_PORT NSQ_LOOKUPD_PORT OSS_SESSION_TOKEN)
+          OPTIONAL_SECRETS=(SVRA_SSH_PORT SVRB_USERNAME SVRB_SSH_KEY SVRB_SSH_PORT SVRD_USERNAME SVRD_SSH_KEY SVRD_SSH_PORT SVRA_SUDO_PASSWORD SVRB_SUDO_PASSWORD SVRD_SUDO_PASSWORD MONGODB_PORT MYSQL_PORT REDIS_PORT REDIS_DB REDIS_USERNAME REDIS_PASSWORD REDIS_USE_SSL REDIS_SSL_INSECURE_SKIP_VERIFY NSQ_NSQD_PORT NSQ_LOOKUPD_PORT OSS_SESSION_TOKEN)
 
           for SECRET_NAME in "${REQUIRED_SECRETS[@]}"; do
             VALUE=${!SECRET_NAME}
@@ -171,6 +173,12 @@ jobs:
                   ;;
                 REDIS_PASSWORD)
                   echo "⚠️ $SECRET_NAME is not set (redis auth disabled)"
+                  ;;
+                REDIS_USE_SSL)
+                  echo "⚠️ $SECRET_NAME is not set (defaults to true when REDIS_PORT=6380, otherwise false)"
+                  ;;
+                REDIS_SSL_INSECURE_SKIP_VERIFY)
+                  echo "⚠️ $SECRET_NAME is not set (defaults to false)"
                   ;;
                 NSQ_NSQD_PORT|NSQ_LOOKUPD_PORT)
                   echo "⚠️ $SECRET_NAME is not set (NSQ may be optional)"
@@ -573,6 +581,8 @@ jobs:
           REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
           REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
@@ -601,6 +611,15 @@ jobs:
             JWT_SECRET NSQ_NSQD_HOST NSQ_NSQD_PORT \
             OSS_ACCESS_KEY_ID OSS_ACCESS_KEY_SECRET
 
+          if [ -z "${REDIS_USE_SSL:-}" ]; then
+            if [ "${REDIS_PORT}" = "6380" ]; then
+              REDIS_USE_SSL=true
+            else
+              REDIS_USE_SSL=false
+            fi
+          fi
+          REDIS_SSL_INSECURE_SKIP_VERIFY="${REDIS_SSL_INSECURE_SKIP_VERIFY:-false}"
+
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
@@ -624,6 +643,8 @@ jobs:
           QS_APISERVER_REDIS_USERNAME=__REDIS_USERNAME__
           QS_APISERVER_REDIS_PASSWORD=__REDIS_PASSWORD__
           QS_APISERVER_REDIS_DB=__REDIS_DB__
+          QS_APISERVER_REDIS_USE_SSL=__REDIS_USE_SSL__
+          QS_APISERVER_REDIS_SSL_INSECURE_SKIP_VERIFY=__REDIS_SSL_INSECURE_SKIP_VERIFY__
 
           QS_APISERVER_JWT_SECRET=__JWT_SECRET__
 
@@ -651,6 +672,8 @@ jobs:
           sed -i "s|__REDIS_USERNAME__|${REDIS_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__REDIS_DB__|${REDIS_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_USE_SSL__|${REDIS_USE_SSL}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_SSL_INSECURE_SKIP_VERIFY__|${REDIS_SSL_INSECURE_SKIP_VERIFY}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_NSQD_HOST__|${NSQ_NSQD_HOST}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__NSQ_NSQD_PORT__|${NSQ_NSQD_PORT}|g" deploy-package/configs/env/config.prod.env
@@ -986,6 +1009,8 @@ jobs:
           REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
           REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
         run: |
           require_env() {
@@ -1005,6 +1030,15 @@ jobs:
           require_env \
             REDIS_HOST REDIS_PORT JWT_SECRET
 
+          if [ -z "${REDIS_USE_SSL:-}" ]; then
+            if [ "${REDIS_PORT}" = "6380" ]; then
+              REDIS_USE_SSL=true
+            else
+              REDIS_USE_SSL=false
+            fi
+          fi
+          REDIS_SSL_INSECURE_SKIP_VERIFY="${REDIS_SSL_INSECURE_SKIP_VERIFY:-false}"
+
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
           cp build/docker/docker-compose.prod.yml deploy-package/docker-compose.prod.yml
@@ -1017,6 +1051,8 @@ jobs:
           COLLECTION_SERVER_REDIS_USERNAME=__REDIS_USERNAME__
           COLLECTION_SERVER_REDIS_PASSWORD=__REDIS_PASSWORD__
           COLLECTION_SERVER_REDIS_DB=__REDIS_DB__
+          COLLECTION_SERVER_REDIS_USE_SSL=__REDIS_USE_SSL__
+          COLLECTION_SERVER_REDIS_SSL_INSECURE_SKIP_VERIFY=__REDIS_SSL_INSECURE_SKIP_VERIFY__
 
           COLLECTION_SERVER_JWT_SECRET=__JWT_SECRET__
           ENVEOF
@@ -1028,6 +1064,8 @@ jobs:
           sed -i "s|__REDIS_USERNAME__|${REDIS_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__REDIS_DB__|${REDIS_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_USE_SSL__|${REDIS_USE_SSL}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_SSL_INSECURE_SKIP_VERIFY__|${REDIS_SSL_INSECURE_SKIP_VERIFY}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__JWT_SECRET__|${JWT_SECRET}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
@@ -1328,6 +1366,8 @@ jobs:
           REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
           REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
           REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
         run: |
           require_env() {
             local missing=0
@@ -1348,6 +1388,15 @@ jobs:
             MYSQL_HOST MYSQL_PORT MYSQL_USERNAME MYSQL_PASSWORD MYSQL_DATABASE \
             NSQ_NSQD_HOST NSQ_NSQD_PORT NSQ_LOOKUPD_HOST NSQ_LOOKUPD_PORT \
             REDIS_HOST REDIS_PORT
+
+          if [ -z "${REDIS_USE_SSL:-}" ]; then
+            if [ "${REDIS_PORT}" = "6380" ]; then
+              REDIS_USE_SSL=true
+            else
+              REDIS_USE_SSL=false
+            fi
+          fi
+          REDIS_SSL_INSECURE_SKIP_VERIFY="${REDIS_SSL_INSECURE_SKIP_VERIFY:-false}"
 
           mkdir -p deploy-package/configs/env
           cp -r configs deploy-package/
@@ -1378,6 +1427,8 @@ jobs:
           QS_WORKER_REDIS_USERNAME=__REDIS_USERNAME__
           QS_WORKER_REDIS_PASSWORD=__REDIS_PASSWORD__
           QS_WORKER_REDIS_DB=__REDIS_DB__
+          QS_WORKER_REDIS_USE_SSL=__REDIS_USE_SSL__
+          QS_WORKER_REDIS_SSL_INSECURE_SKIP_VERIFY=__REDIS_SSL_INSECURE_SKIP_VERIFY__
           ENVEOF
 
           # 去除前导空格并替换占位符为实际值
@@ -1399,6 +1450,8 @@ jobs:
           sed -i "s|__REDIS_USERNAME__|${REDIS_USERNAME}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__REDIS_PASSWORD__|${REDIS_PASSWORD}|g" deploy-package/configs/env/config.prod.env
           sed -i "s|__REDIS_DB__|${REDIS_DB}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_USE_SSL__|${REDIS_USE_SSL}|g" deploy-package/configs/env/config.prod.env
+          sed -i "s|__REDIS_SSL_INSECURE_SKIP_VERIFY__|${REDIS_SSL_INSECURE_SKIP_VERIFY}|g" deploy-package/configs/env/config.prod.env
 
           echo "=========================================="
           echo "📋 Generated config.prod.env for Worker"
