@@ -97,19 +97,17 @@ func main() {
 		log.Fatalf("set mysql names: %v", err)
 	}
 
-	rows, err := loadScope(ctx, db, cfg)
-	if err != nil {
-		log.Fatalf("load scope: %v", err)
-	}
-	printScope(rows, cfg.limit)
-	if len(rows) == 0 {
-		log.Print("scope is empty; nothing to repair")
-		return
-	}
-	if cfg.maxTasks > 0 && len(rows) >= cfg.maxTasks {
-		log.Printf("WARNING: Reached max-tasks limit (%d). Loaded %d tasks. Set --max-tasks higher or to 0 to load all tasks.", cfg.maxTasks, len(rows))
-	}
 	if !cfg.apply {
+		// Dry-run mode: load and preview once
+		rows, err := loadScope(ctx, db, cfg, 0)
+		if err != nil {
+			log.Fatalf("load scope: %v", err)
+		}
+		printScope(rows, cfg.limit)
+		if len(rows) == 0 {
+			log.Print("scope is empty; nothing to repair")
+			return
+		}
 		log.Print("dry-run only; re-run with --apply to update MySQL and MongoDB")
 		return
 	}
@@ -117,6 +115,17 @@ func main() {
 	if err := validateBackupSuffix(cfg.backupSuffix); err != nil {
 		log.Fatalf("invalid --backup-suffix: %v", err)
 	}
+
+	// Get total task count for progress tracking
+	totalCount, err := getTotalTaskCount(ctx, db, cfg)
+	if err != nil {
+		log.Fatalf("get total task count: %v", err)
+	}
+	if totalCount == 0 {
+		log.Print("No tasks to repair")
+		return
+	}
+	log.Printf("Found %d tasks to repair\n", totalCount)
 
 	conn, err := db.Conn(ctx)
 	if err != nil {
@@ -128,23 +137,114 @@ func main() {
 		}
 	}()
 
-	if err := prepareMySQLScope(ctx, conn, rows); err != nil {
-		log.Fatalf("prepare mysql repair scope: %v", err)
-	}
-	if err := backupMySQL(ctx, conn, cfg.backupSuffix); err != nil {
-		log.Fatalf("backup mysql: %v", err)
-	}
-	if err := backupMongo(ctx, mongoDB, rows, cfg.backupSuffix); err != nil {
-		log.Fatalf("backup mongo: %v", err)
-	}
-	if err := repairMySQL(ctx, conn, cfg); err != nil {
-		log.Fatalf("repair mysql: %v", err)
-	}
-	if err := repairMongo(ctx, mongoDB, rows); err != nil {
-		log.Fatalf("repair mongo: %v", err)
+	// Batch processing loop
+	batchSize := cfg.maxTasks
+	if batchSize <= 0 {
+		batchSize = 5000 // Default batch size if maxTasks is 0
 	}
 
-	log.Printf("DONE repaired tasks=%d assessments=%d answersheets=%d", len(rows), len(rows), len(rows))
+	totalProcessed := 0
+	for {
+		rows, err := loadScope(ctx, db, cfg, totalProcessed)
+		if err != nil {
+			log.Fatalf("load scope: %v", err)
+		}
+
+		if len(rows) == 0 {
+			printProgressBar(totalCount, totalCount, batchSize)
+			log.Printf("\nAll done! Total tasks repaired: %d", totalProcessed)
+			return
+		}
+
+		printScope(rows, cfg.limit)
+		log.Printf("Processing batch: offset=%d, count=%d", totalProcessed, len(rows))
+
+		if err := processBatch(ctx, conn, mongoDB, rows, cfg); err != nil {
+			log.Fatalf("process batch at offset %d: %v", totalProcessed, err)
+		}
+
+		totalProcessed += len(rows)
+		printProgressBar(totalProcessed, totalCount, batchSize)
+
+		// If we got fewer rows than maxTasks, we're done
+		if len(rows) < batchSize {
+			log.Printf("\nFinal batch completed. Total tasks repaired: %d", totalProcessed)
+			return
+		}
+	}
+}
+
+func processBatch(ctx context.Context, conn *sql.Conn, mongoDB *mongo.Database, rows []scopeRow, cfg config) error {
+	if err := prepareMySQLScope(ctx, conn, rows); err != nil {
+		return fmt.Errorf("prepare mysql repair scope: %w", err)
+	}
+	if err := backupMySQL(ctx, conn, cfg.backupSuffix); err != nil {
+		return fmt.Errorf("backup mysql: %w", err)
+	}
+	if err := backupMongo(ctx, mongoDB, rows, cfg.backupSuffix); err != nil {
+		return fmt.Errorf("backup mongo: %w", err)
+	}
+	if err := repairMySQL(ctx, conn, cfg); err != nil {
+		return fmt.Errorf("repair mysql: %w", err)
+	}
+	if err := repairMongo(ctx, mongoDB, rows); err != nil {
+		return fmt.Errorf("repair mongo: %w", err)
+	}
+	log.Printf("Batch repair completed: tasks=%d assessments=%d answersheets=%d", len(rows), len(rows), len(rows))
+	return nil
+}
+
+func getTotalTaskCount(ctx context.Context, db *sql.DB, cfg config) (int, error) {
+	query := `
+SELECT COUNT(*)
+FROM assessment_task t
+INNER JOIN assessment a
+  ON a.id = t.assessment_id
+ AND a.deleted_at IS NULL
+WHERE t.org_id = ?
+  AND t.plan_id = ?
+  AND t.deleted_at IS NULL
+  AND t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci
+  AND t.assessment_id IS NOT NULL
+  AND t.created_at >= ?
+  AND t.created_at < ?
+  AND a.origin_type COLLATE utf8mb4_unicode_ci = 'plan' COLLATE utf8mb4_unicode_ci
+  AND a.origin_id COLLATE utf8mb4_unicode_ci = ? COLLATE utf8mb4_unicode_ci`
+
+	args := []any{cfg.orgID, cfg.planID, cfg.taskCreatedStart, cfg.taskCreatedEnd, strconv.FormatUint(cfg.planID, 10)}
+	if cfg.plannedStart != "" {
+		query += " AND t.planned_at >= ?"
+		args = append(args, cfg.plannedStart)
+	}
+	if cfg.plannedEnd != "" {
+		query += " AND t.planned_at < ?"
+		args = append(args, cfg.plannedEnd)
+	}
+
+	var count int
+	err := db.QueryRowContext(ctx, query, args...).Scan(&count)
+	return count, err
+}
+
+func printProgressBar(current, total, batchSize int) {
+	if total <= 0 {
+		return
+	}
+
+	percentage := float64(current) / float64(total) * 100
+	filled := int(percentage / 2) // 50-char bar
+	empty := 50 - filled
+
+	bar := "["
+	for i := 0; i < filled; i++ {
+		bar += "="
+	}
+	for i := 0; i < empty; i++ {
+		bar += " "
+	}
+	bar += "]"
+
+	log.Printf("%s %.1f%% (%d/%d)", bar, percentage, current, total)
 }
 
 func parseFlags() config {
@@ -162,7 +262,7 @@ func parseFlags() config {
 	flag.DurationVar(&cfg.timeout, "timeout", 30*time.Minute, "overall script timeout, e.g. 30m, 1h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply changes; default is dry-run")
 	flag.IntVar(&cfg.limit, "preview-limit", 20, "number of rows to preview")
-	flag.IntVar(&cfg.maxTasks, "max-tasks", 10000, "maximum number of tasks to repair; set to 0 for unlimited (use with caution!)")
+	flag.IntVar(&cfg.maxTasks, "max-tasks", 5000, "batch size for processing tasks; default 5000; set to 0 for unlimited (use with caution!)")
 	flag.Parse()
 
 	required := map[string]string{
@@ -195,7 +295,7 @@ func openMySQL(dsn string) (*sql.DB, error) {
 	return sql.Open("mysql", c.FormatDSN())
 }
 
-func loadScope(ctx context.Context, db *sql.DB, cfg config) (rows []scopeRow, err error) {
+func loadScope(ctx context.Context, db *sql.DB, cfg config, offset int) (rows []scopeRow, err error) {
 	query := `
 SELECT
   t.id, t.org_id, t.plan_id, t.testee_id, t.assessment_id, a.answer_sheet_id,
@@ -230,9 +330,12 @@ WHERE t.org_id = ?
 		args = append(args, cfg.plannedEnd)
 	}
 	query += " ORDER BY t.planned_at, t.id"
-	if cfg.maxTasks > 0 {
-		query += fmt.Sprintf(" LIMIT %d", cfg.maxTasks)
+
+	batchSize := cfg.maxTasks
+	if batchSize <= 0 {
+		batchSize = 5000
 	}
+	query += fmt.Sprintf(" LIMIT %d OFFSET %d", batchSize, offset)
 
 	rs, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
