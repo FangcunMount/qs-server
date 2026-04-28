@@ -252,13 +252,28 @@ docker_compose_pull_supports_quiet() {
   $SUDO docker compose pull --help 2>/dev/null | grep -q -- '--quiet'
 }
 
+docker_compose() {
+  local image_value="${!IMAGE_ENV_VAR:-}"
+  if [ -z "$image_value" ]; then
+    echo "${IMAGE_ENV_VAR} is not set before docker compose execution" >&2
+    exit 1
+  fi
+
+  $SUDO env "$IMAGE_ENV_VAR=$image_value" docker compose "$@"
+}
+
 docker_compose_pull() {
   local -a compose_args=("$@")
+  local image_value="${!IMAGE_ENV_VAR:-}"
+  if [ -z "$image_value" ]; then
+    echo "${IMAGE_ENV_VAR} is not set before docker compose pull" >&2
+    exit 1
+  fi
 
   if docker_compose_pull_supports_quiet; then
-    $SUDO docker compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"
+    $SUDO env "$IMAGE_ENV_VAR=$image_value" docker compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"
   else
-    $SUDO env COMPOSE_PROGRESS=plain docker compose "${compose_args[@]}" pull "$COMPOSE_SERVICE"
+    $SUDO env "$IMAGE_ENV_VAR=$image_value" COMPOSE_PROGRESS=plain docker compose "${compose_args[@]}" pull "$COMPOSE_SERVICE"
   fi
 }
 
@@ -267,7 +282,7 @@ deploy_http_service() {
 
   cd "/opt/qs-server/${CONTAINER_NAME}"
   docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
-  $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d "$COMPOSE_SERVICE"
+  docker_compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d "$COMPOSE_SERVICE"
 
   echo "Waiting for service to be ready (in-container health check)..."
   local attempts=0
@@ -310,24 +325,24 @@ deploy_worker() {
 
   cd "/opt/qs-server/${CONTAINER_NAME}"
   docker_compose_pull -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml"
-  $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
+  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
 
   echo "Waiting for container to start..."
   sleep 10
 
   local running_count worker_containers first_worker ready
-  running_count=$($SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q "$COMPOSE_SERVICE" | wc -l | tr -d ' ')
+  running_count=$(docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps --status running -q "$COMPOSE_SERVICE" | wc -l | tr -d ' ')
 
   if [ "$running_count" -lt "$WORKER_REPLICAS" ]; then
     echo "Worker replicas failed to reach expected count (${running_count}/${WORKER_REPLICAS})" >&2
-    $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE" || true
-    $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
+    docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE" || true
+    docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
     exit 1
   fi
 
   echo "Worker replicas are running (${running_count}/${WORKER_REPLICAS})"
-  $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE"
-  worker_containers="$($SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q "$COMPOSE_SERVICE")"
+  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps "$COMPOSE_SERVICE"
+  worker_containers="$(docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" ps -q "$COMPOSE_SERVICE")"
   first_worker="$(printf '%s\n' "$worker_containers" | sed -n '1p')"
   if [ -z "$first_worker" ]; then
     echo "No running worker container found for connectivity check" >&2
@@ -346,13 +361,13 @@ deploy_worker() {
   if [ "$ready" -ne 1 ]; then
     echo "Worker cannot resolve or reach qs-apiserver:9090 from inside container" >&2
     $SUDO docker exec "$first_worker" sh -lc 'echo "--- /etc/resolv.conf ---"; cat /etc/resolv.conf; echo "--- getent ---"; getent hosts qs-apiserver || true; echo "--- nc ---"; nc -vz qs-apiserver 9090 || true'
-    $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
+    docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 100 "$COMPOSE_SERVICE" || true
     exit 1
   fi
 
   echo "Worker can resolve and reach qs-apiserver:9090"
   echo "Recent logs (all worker replicas):"
-  $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 "$COMPOSE_SERVICE"
+  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" logs --tail 20 "$COMPOSE_SERVICE"
 }
 
 echo "=========================================="

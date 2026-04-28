@@ -195,6 +195,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          command_timeout: 30m
           envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG
           script: |
             set -Eeuo pipefail
@@ -270,6 +271,7 @@ jobs:
           username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          command_timeout: 30m
           envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG
           script: |
             set -Eeuo pipefail
@@ -361,6 +363,7 @@ jobs:
           username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          command_timeout: 30m
           envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS,IMAGE_TAG
           script: |
             set -Eeuo pipefail
