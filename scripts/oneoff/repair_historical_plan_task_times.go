@@ -58,6 +58,7 @@ type scopeRow struct {
 	OldEpisodeAssessmentCreatedAt sql.NullTime
 	OldEpisodeReportGeneratedAt   sql.NullTime
 
+	NewTaskCreatedAt       time.Time
 	NewOpenAt              time.Time
 	NewExpireAt            time.Time
 	NewCompletedAt         time.Time
@@ -289,6 +290,7 @@ func computeNewTimes(row *scopeRow) {
 		}
 	}
 
+	row.NewTaskCreatedAt = row.PlannedAt.Add(-7 * 24 * time.Hour)
 	row.NewOpenAt = row.PlannedAt
 	row.NewExpireAt = row.PlannedAt.Add(7 * 24 * time.Hour)
 	row.NewCompletedAt = row.PlannedAt.Add(completeDelay)
@@ -345,6 +347,7 @@ CREATE TEMPORARY TABLE repair_plan_task_time_scope (
   old_episode_submitted_at DATETIME(3) NULL,
   old_episode_assessment_created_at DATETIME(3) NULL,
   old_episode_report_generated_at DATETIME(3) NULL,
+  new_task_created_at DATETIME(3) NOT NULL,
   new_open_at DATETIME(3) NOT NULL,
   new_expire_at DATETIME(3) NOT NULL,
   new_completed_at DATETIME(3) NOT NULL,
@@ -364,9 +367,9 @@ INSERT INTO repair_plan_task_time_scope (
   task_id, org_id, plan_id, testee_id, assessment_id, answer_sheet_id,
   episode_id, report_id, entry_id, clinician_id, planned_at,
   old_episode_submitted_at, old_episode_assessment_created_at, old_episode_report_generated_at,
-  new_open_at, new_expire_at, new_completed_at, new_submitted_at,
+  new_task_created_at, new_open_at, new_expire_at, new_completed_at, new_submitted_at,
   new_assessment_created_at, new_interpreted_at, new_report_generated_at
-) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -380,7 +383,7 @@ INSERT INTO repair_plan_task_time_scope (
 			r.TaskID, r.OrgID, r.PlanID, r.TesteeID, r.AssessmentID, r.AnswerSheetID,
 			nullInt64ToAny(r.EpisodeID), nullInt64ToAny(r.ReportID), r.EntryID, r.ClinicianID, r.PlannedAt,
 			nullTimeToAny(r.OldEpisodeSubmittedAt), nullTimeToAny(r.OldEpisodeAssessmentCreatedAt), nullTimeToAny(r.OldEpisodeReportGeneratedAt),
-			r.NewOpenAt, r.NewExpireAt, r.NewCompletedAt, r.NewSubmittedAt,
+			r.NewTaskCreatedAt, r.NewOpenAt, r.NewExpireAt, r.NewCompletedAt, r.NewSubmittedAt,
 			r.NewAssessmentCreatedAt, nullTimeToAny(r.NewInterpretedAt), nullTimeToAny(r.NewReportGeneratedAt),
 		); err != nil {
 			return err
@@ -474,7 +477,7 @@ func repairMySQL(ctx context.Context, conn *sql.Conn, cfg config) (err error) {
 
 	statements := []string{
 		`UPDATE assessment_task t INNER JOIN repair_plan_task_time_scope s ON s.task_id = t.id
-SET t.open_at = s.new_open_at, t.expire_at = s.new_expire_at, t.completed_at = s.new_completed_at, t.updated_at = NOW(3), t.version = t.version + 1`,
+SET t.created_at = s.new_task_created_at, t.open_at = s.new_open_at, t.expire_at = s.new_expire_at, t.completed_at = s.new_completed_at, t.updated_at = NOW(3), t.version = t.version + 1`,
 		`UPDATE assessment a INNER JOIN repair_plan_task_time_scope s ON s.assessment_id = a.id
 SET a.created_at = s.new_assessment_created_at, a.submitted_at = s.new_submitted_at,
     a.interpreted_at = CASE WHEN a.interpreted_at IS NULL THEN NULL ELSE s.new_interpreted_at END,
