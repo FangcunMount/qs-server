@@ -1,0 +1,402 @@
+name: Production Deploy
+
+# ============================================================================
+# 必需的 Secrets 配置
+# ============================================================================
+# Organization Secrets (组织级别，共享配置):
+#   SVRA_HOST (serverA: qs-apiserver)
+#   SVRB_HOST (serverB: qs-collection-server)
+#   SVRD_HOST (serverD: qs-worker)
+#   SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
+#   SVRB_USERNAME/SVRB_SSH_KEY/SVRB_SSH_PORT 可选，缺省复用 SVRA_*
+#   SVRD_USERNAME/SVRD_SSH_KEY/SVRD_SSH_PORT 可选，缺省复用 SVRA_*
+#   SVRA/SVRB/SVRD_SUDO_PASSWORD (可选，如果 sudo 需要密码)
+#   MONGODB_HOST, MONGODB_PORT
+#   MYSQL_HOST, MYSQL_PORT (Worker 使用)
+#   REDIS_HOST, REDIS_PORT, REDIS_USE_SSL, REDIS_SSL_INSECURE_SKIP_VERIFY
+#   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
+#   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+#
+# Repository Secrets (仓库级别，敏感信息):
+#   MONGODB_USERNAME, MONGODB_PASSWORD, MONGODB_DBNAME
+#   MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DATABASE (Worker 使用)
+#   REDIS_PORT/DB/USERNAME/PASSWORD/USE_SSL/SSL_INSECURE_SKIP_VERIFY
+#   JWT_SECRET
+#   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_SESSION_TOKEN（可选，apiserver 二维码 OSS）
+#   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
+#   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
+# ============================================================================
+
+on:
+  workflow_run:
+    workflows: ["CI"]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      service:
+        description: '要部署的服务'
+        required: true
+        type: choice
+        options:
+          - all
+          - apiserver
+          - collection
+          - worker
+      worker_replicas:
+        description: 'Worker 副本数（留空则读取 QS_WORKER_REPLICAS，缺失时默认为 3）'
+        required: false
+        type: string
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
+env:
+  DOCKER_REGISTRY: ghcr.io
+  DOCKER_REPOSITORY: fangcunmount
+  DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
+  DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+  BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
+
+jobs:
+  docker:
+    name: Build and Push Docker Images
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main')
+    env:
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
+      DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      matrix:
+        service: [apiserver, collection, worker]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and publish ${{ matrix.service }}
+        run: |
+          make cd-image \
+            SERVICE="${{ matrix.service }}" \
+            DEPLOY_REF="${DEPLOY_REF}" \
+            DEPLOY_SHA="${DEPLOY_SHA}" \
+            BUILD_TIME="${BUILD_TIME}"
+
+  deploy-apiserver:
+    name: Deploy API Server
+    needs: [docker]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    permissions:
+      contents: read
+      packages: read
+    if: |
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver'))
+    env:
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Prepare deployment package
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE != '' && secrets.MYSQL_DATABASE || secrets.MYSQL_DBNAME }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
+          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
+          OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
+          OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
+          OSS_SESSION_TOKEN: ${{ secrets.OSS_SESSION_TOKEN }}
+        run: |
+          make cd-package SERVICE=apiserver
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-package-apiserver.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          SERVICE: apiserver
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ env.WWW_UID }}
+          WWW_GID: ${{ env.WWW_GID }}
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          script: |
+            set -Eeuo pipefail
+            BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
+            mkdir -p "$BOOTSTRAP_TMP"
+            trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
+            tar -xzf "/tmp/deploy-package-${SERVICE}.tar.gz" -C "$BOOTSTRAP_TMP"
+            bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+
+  deploy-collection:
+    name: Deploy Collection Server
+    needs: [docker]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    permissions:
+      contents: read
+      packages: read
+    if: |
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.service == 'all' || github.event.inputs.service == 'collection'))
+    env:
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Prepare deployment package
+        env:
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
+          JWT_SECRET: ${{ secrets.JWT_SECRET }}
+        run: |
+          make cd-package SERVICE=collection
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-package-collection.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          SERVICE: collection
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          SUDO_PASSWORD: ${{ secrets.SVRB_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ env.WWW_UID }}
+          WWW_GID: ${{ env.WWW_GID }}
+        with:
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          script: |
+            set -Eeuo pipefail
+            BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
+            mkdir -p "$BOOTSTRAP_TMP"
+            trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
+            tar -xzf "/tmp/deploy-package-${SERVICE}.tar.gz" -C "$BOOTSTRAP_TMP"
+            bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+
+  deploy-worker:
+    name: Deploy Worker
+    needs: [docker]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    permissions:
+      contents: read
+      packages: read
+    if: |
+      (github.event_name == 'workflow_run' &&
+       github.event.workflow_run.conclusion == 'success' &&
+       github.event.workflow_run.head_branch == 'main') ||
+      (github.event_name == 'workflow_dispatch' &&
+       (github.event.inputs.service == 'all' || github.event.inputs.service == 'worker'))
+    env:
+      WWW_UID: ${{ secrets.WWW_UID }}
+      WWW_GID: ${{ secrets.WWW_GID }}
+      WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+
+      - name: Prepare deployment package
+        env:
+          MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
+          MONGODB_PORT: ${{ secrets.MONGODB_PORT || 27017 }}
+          MONGODB_USERNAME: ${{ secrets.MONGODB_USERNAME }}
+          MONGODB_PASSWORD: ${{ secrets.MONGODB_PASSWORD }}
+          MONGODB_DBNAME: ${{ secrets.MONGODB_DBNAME }}
+          MYSQL_HOST: ${{ secrets.MYSQL_HOST }}
+          MYSQL_PORT: ${{ secrets.MYSQL_PORT || 3306 }}
+          MYSQL_USERNAME: ${{ secrets.MYSQL_USERNAME }}
+          MYSQL_PASSWORD: ${{ secrets.MYSQL_PASSWORD }}
+          MYSQL_DATABASE: ${{ secrets.MYSQL_DATABASE }}
+          NSQ_NSQD_HOST: ${{ secrets.NSQ_NSQD_HOST }}
+          NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
+          NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
+          NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT || 4161 }}
+          GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR || 'qs-apiserver:9090' }}
+          REDIS_HOST: ${{ secrets.REDIS_HOST }}
+          REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
+          REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
+          REDIS_USERNAME: ${{ secrets.REDIS_USERNAME }}
+          REDIS_PASSWORD: ${{ secrets.REDIS_PASSWORD }}
+          REDIS_USE_SSL: ${{ secrets.REDIS_USE_SSL }}
+          REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
+        run: |
+          make cd-package SERVICE=worker
+
+      - name: Upload deployment package
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          source: "deploy-package-worker.tar.gz"
+          target: "/tmp"
+
+      - name: Deploy to Production Server
+        uses: appleboy/ssh-action@v1.0.0
+        env:
+          SERVICE: worker
+          DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
+          DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
+          GHCR_USERNAME: ${{ github.actor }}
+          GITHUB_TOKEN: ${{ github.token }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+          SUDO_PASSWORD: ${{ secrets.SVRD_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
+          WWW_UID: ${{ env.WWW_UID }}
+          WWW_GID: ${{ env.WWW_GID }}
+          WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
+        with:
+          host: ${{ secrets.SVRD_HOST }}
+          username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS
+          script: |
+            set -Eeuo pipefail
+            BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
+            mkdir -p "$BOOTSTRAP_TMP"
+            trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
+            tar -xzf "/tmp/deploy-package-${SERVICE}.tar.gz" -C "$BOOTSTRAP_TMP"
+            bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+
+  notify:
+    name: Send Notification
+    needs: [deploy-apiserver, deploy-collection, deploy-worker]
+    runs-on: ubuntu-latest
+    if: |
+      always() && (
+        (github.event_name == 'workflow_run' &&
+         github.event.workflow_run.conclusion == 'success' &&
+         github.event.workflow_run.head_branch == 'main') ||
+        github.event_name == 'workflow_dispatch'
+      )
+    steps:
+      - name: Log deployment status
+        run: |
+          echo "=========================================="
+          echo "Deployment Summary"
+          echo "=========================================="
+          echo "API Server: ${{ needs.deploy-apiserver.result }}"
+          echo "Collection Server: ${{ needs.deploy-collection.result }}"
+          echo "Worker: ${{ needs.deploy-worker.result }}"
+
+          ok() {
+            [ "$1" = "success" ] || [ "$1" = "skipped" ]
+          }
+
+          if ok "${{ needs.deploy-apiserver.result }}" &&
+             ok "${{ needs.deploy-collection.result }}" &&
+             ok "${{ needs.deploy-worker.result }}"; then
+            echo "All deployments succeeded or were skipped by design"
+          else
+            echo "Some deployments failed"
+            exit 1
+          fi

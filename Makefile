@@ -39,6 +39,7 @@ COVERAGE_DIR := coverage
 SECURITY_DIR := $(TMP_DIR)/security
 MAINTAINABILITY_DIR := $(TMP_DIR)/maintainability
 QUALITY_DIR := scripts/quality
+CD_SCRIPT_DIR := scripts/cd
 
 GOSEC_BASE_ARGS := -exclude-generated \
 	-exclude-dir=internal/apiserver/docs \
@@ -103,6 +104,7 @@ COLOR_RED := \033[31m
 .PHONY: up down re st log
 .PHONY: quick-start
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
+.PHONY: cd-image cd-package cd-remote-deploy cd-validate
 
 # ============================================================================
 # 帮助信息
@@ -134,6 +136,9 @@ help: ## 显示帮助信息
 	@echo "$(COLOR_BOLD)📚 其他命令:$(COLOR_RESET)"
 	@grep -E '^(deps|install|clean|version|debug|up|down|quick|docs).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
+	@echo "$(COLOR_BOLD)🚢 CD 命令:$(COLOR_RESET)"
+	@grep -E '^cd-.*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
+	@echo ""
 
 docs-swagger: ## 生成 swagger 文档 (apiserver & collection)
 	@command -v swag >/dev/null 2>&1 || { echo "swag 未安装，请先执行: go install github.com/swaggo/swag/cmd/swag@v1.16.4"; exit 1; }
@@ -150,6 +155,28 @@ docs-hygiene: ## 检查现行 docs/ 的链接、锚点与章节编号
 
 docs-verify: docs-rest docs-hygiene ## 对比 api/rest 与 swagger，并检查现行文档卫生
 	python scripts/compare_api_docs.py
+
+# ============================================================================
+# CD 发布入口
+# ============================================================================
+
+cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|collection|worker)
+	@SERVICE="$(SERVICE)" IMAGE_METADATA_PRINT=1 "$(CD_SCRIPT_DIR)/image-metadata.sh" >/dev/null
+	@test -x "$(CD_SCRIPT_DIR)/build-image.sh"
+	@test -x "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
+	@test -x "$(CD_SCRIPT_DIR)/prepare-package.sh"
+	@test -x "$(CD_SCRIPT_DIR)/remote-deploy.sh"
+	@echo "$(COLOR_GREEN)✅ CD metadata validated for SERVICE=$(SERVICE)$(COLOR_RESET)"
+
+cd-image: cd-validate ## 构建并发布服务镜像到 GHCR 和 Docker Hub
+	@SERVICE="$(SERVICE)" DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_SHA="$(DEPLOY_SHA)" BUILD_TIME="$(BUILD_TIME)" "$(CD_SCRIPT_DIR)/build-image.sh"
+	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
+
+cd-package: cd-validate ## 生成服务生产部署包
+	@SERVICE="$(SERVICE)" "$(CD_SCRIPT_DIR)/prepare-package.sh"
+
+cd-remote-deploy: cd-validate ## 在目标机执行远端部署脚本
+	@SERVICE="$(SERVICE)" "$(CD_SCRIPT_DIR)/remote-deploy.sh"
 
 version: ## 显示版本信息
 	@echo "$(COLOR_BOLD)版本信息:$(COLOR_RESET)"
