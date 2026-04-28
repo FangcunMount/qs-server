@@ -382,19 +382,42 @@ SELECT
 FROM cleanup_assessment_orphan_queue`).Scan(&s.TotalRefs, &s.BehaviorFootprintRefs, &s.AssessmentEpisodeRefs, &s.MongoAnswerSheetIDs); err != nil {
 		return s, err
 	}
-	if err := conn.QueryRowContext(ctx, `
-SELECT COUNT(*) FROM (
-  SELECT assessment_id AS report_domain_id
-  FROM cleanup_assessment_orphan_queue
-  WHERE assessment_id <> 0
-  UNION
-  SELECT report_id AS report_domain_id
-  FROM cleanup_assessment_orphan_queue
-  WHERE report_id <> 0
-) report_ids`).Scan(&s.MongoReportIDs); err != nil {
+	reportIDs, err := countDistinctReportDomainIDs(ctx, conn)
+	if err != nil {
 		return s, err
 	}
+	s.MongoReportIDs = reportIDs
 	return s, nil
+}
+
+func countDistinctReportDomainIDs(ctx context.Context, conn *sql.Conn) (int, error) {
+	if _, err := conn.ExecContext(ctx, `DROP TEMPORARY TABLE IF EXISTS cleanup_assessment_orphan_report_ids`); err != nil {
+		return 0, err
+	}
+	if _, err := conn.ExecContext(ctx, `
+CREATE TEMPORARY TABLE cleanup_assessment_orphan_report_ids (
+  report_domain_id BIGINT UNSIGNED NOT NULL PRIMARY KEY
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`); err != nil {
+		return 0, err
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT IGNORE INTO cleanup_assessment_orphan_report_ids (report_domain_id)
+SELECT assessment_id
+FROM cleanup_assessment_orphan_queue
+WHERE assessment_id <> 0`); err != nil {
+		return 0, err
+	}
+	if _, err := conn.ExecContext(ctx, `
+INSERT IGNORE INTO cleanup_assessment_orphan_report_ids (report_domain_id)
+SELECT report_id
+FROM cleanup_assessment_orphan_queue
+WHERE report_id <> 0`); err != nil {
+		return 0, err
+	}
+
+	var count int
+	err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM cleanup_assessment_orphan_report_ids`).Scan(&count)
+	return count, err
 }
 
 func loadQueuedOrphanRefs(ctx context.Context, conn *sql.Conn, cfg config) (rows []orphanRefRow, err error) {
