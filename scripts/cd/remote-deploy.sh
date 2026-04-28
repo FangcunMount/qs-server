@@ -226,6 +226,10 @@ select_image() {
 
   printf -v "$IMAGE_ENV_VAR" '%s' "$image"
   export "$IMAGE_ENV_VAR"
+  COMPOSE_ENV_FILE="$DEPLOY_TMP/compose-image.env"
+  printf '%s=%s\n' "$IMAGE_ENV_VAR" "$image" >"$COMPOSE_ENV_FILE"
+  chmod 0600 "$COMPOSE_ENV_FILE"
+  export COMPOSE_ENV_FILE
 }
 
 cleanup_old_backups() {
@@ -253,27 +257,25 @@ docker_compose_pull_supports_quiet() {
 }
 
 docker_compose() {
-  local image_value="${!IMAGE_ENV_VAR:-}"
-  if [ -z "$image_value" ]; then
-    echo "${IMAGE_ENV_VAR} is not set before docker compose execution" >&2
+  if [ -z "${COMPOSE_ENV_FILE:-}" ] || [ ! -f "$COMPOSE_ENV_FILE" ]; then
+    echo "COMPOSE_ENV_FILE is not ready before docker compose execution" >&2
     exit 1
   fi
 
-  $SUDO env "$IMAGE_ENV_VAR=$image_value" docker compose "$@"
+  $SUDO docker compose --env-file "$COMPOSE_ENV_FILE" "$@"
 }
 
 docker_compose_pull() {
   local -a compose_args=("$@")
-  local image_value="${!IMAGE_ENV_VAR:-}"
-  if [ -z "$image_value" ]; then
-    echo "${IMAGE_ENV_VAR} is not set before docker compose pull" >&2
+  if [ -z "${COMPOSE_ENV_FILE:-}" ] || [ ! -f "$COMPOSE_ENV_FILE" ]; then
+    echo "COMPOSE_ENV_FILE is not ready before docker compose pull" >&2
     exit 1
   fi
 
   if docker_compose_pull_supports_quiet; then
-    $SUDO env "$IMAGE_ENV_VAR=$image_value" docker compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"
+    docker_compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"
   else
-    $SUDO env "$IMAGE_ENV_VAR=$image_value" COMPOSE_PROGRESS=plain docker compose "${compose_args[@]}" pull "$COMPOSE_SERVICE"
+    docker_compose "${compose_args[@]}" pull "$COMPOSE_SERVICE"
   fi
 }
 
