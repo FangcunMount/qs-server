@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
 	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"

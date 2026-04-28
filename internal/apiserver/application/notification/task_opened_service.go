@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
-	idpv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/idp/v1"
+	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
+	idpv1 "github.com/FangcunMount/iam/api/grpc/iam/idp/v1"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"

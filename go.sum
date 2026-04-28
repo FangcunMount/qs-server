@@ -4,8 +4,8 @@ github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c h1:udKWzYgxTojEK
 github.com/Azure/go-ansiterm v0.0.0-20250102033503-faa5f7b0171c/go.mod h1:xomTg63KZ2rFqZQzSB4Vz2SUXa1BpHTVz9L5PTmPC4E=
 github.com/FangcunMount/component-base v0.5.4 h1:lyQMSwjcQoV1+7pu4ZqRnjByCVxximcHx2TSDOQ0IxI=
 github.com/FangcunMount/component-base v0.5.4/go.mod h1:joIP/7WESMC1e5wFr6plb/11L14JZzemufXPOlPwMJw=
-github.com/FangcunMount/iam-contracts v1.0.1 h1:YXr61nFyOomSdKKa2LhXvuLluNP3FSYS2EW2SHjlD3k=
-github.com/FangcunMount/iam-contracts v1.0.1/go.mod h1:NLEwQcRg5Lx/St8isZ2Xt2avNKO29isZOATtu3mqSRg=
+github.com/FangcunMount/iam v1.0.3 h1:Ov9Vwg/lEn9RiXTSd29VoilLvt2LvDU09A+PjPFAOqo=
+github.com/FangcunMount/iam v1.0.3/go.mod h1:1nosT2MFVy5glKXCvLW8asgXSZcGuQmmw/yHpWzNU4g=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

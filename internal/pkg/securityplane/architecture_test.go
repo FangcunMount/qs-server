@@ -23,7 +23,7 @@ func TestSecurityPlaneModelsStayTransportAndSDKFree(t *testing.T) {
 			forbiddenPrefixes := []string{
 				"github.com/gin-gonic/gin",
 				"google.golang.org/grpc",
-				"github.com/FangcunMount/iam-contracts/",
+				"github.com/FangcunMount/iam/",
 				"github.com/FangcunMount/qs-server/internal/apiserver/",
 			}
 			for _, prefix := range forbiddenPrefixes {
@@ -48,7 +48,7 @@ func TestSecurityProjectionStaysTransportAndSDKFree(t *testing.T) {
 			forbiddenPrefixes := []string{
 				"github.com/gin-gonic/gin",
 				"google.golang.org/grpc",
-				"github.com/FangcunMount/iam-contracts/",
+				"github.com/FangcunMount/iam/",
 				"github.com/FangcunMount/qs-server/internal/apiserver/",
 			}
 			for _, prefix := range forbiddenPrefixes {

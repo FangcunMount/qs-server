@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	sdk "github.com/FangcunMount/iam-contracts/pkg/sdk"
-	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/serviceauth"
+	sdk "github.com/FangcunMount/iam/pkg/sdk"
+	auth "github.com/FangcunMount/iam/pkg/sdk/auth/serviceauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	pkgserviceauth "github.com/FangcunMount/qs-server/internal/pkg/serviceauth"
 	"google.golang.org/grpc"

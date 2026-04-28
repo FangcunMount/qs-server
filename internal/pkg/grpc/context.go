@@ -4,7 +4,7 @@ import (
 	"context"
 	"strings"
 
-	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityprojection"
 )

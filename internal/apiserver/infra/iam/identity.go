@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
-	"github.com/FangcunMount/iam-contracts/pkg/sdk/identity"
+	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
+	"github.com/FangcunMount/iam/pkg/sdk/identity"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 

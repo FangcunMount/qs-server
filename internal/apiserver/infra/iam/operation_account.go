@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/authn/v1"
-	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/client"
+	authnv1 "github.com/FangcunMount/iam/api/grpc/iam/authn/v1"
+	auth "github.com/FangcunMount/iam/pkg/sdk/auth/client"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 

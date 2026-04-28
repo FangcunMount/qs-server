@@ -6,7 +6,7 @@ import (
 	"slices"
 	"strings"
 
-	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"

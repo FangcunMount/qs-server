@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	identityv1 "github.com/FangcunMount/iam-contracts/api/grpc/iam/identity/v1"
+	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"

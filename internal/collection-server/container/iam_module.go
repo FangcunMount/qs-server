@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	auth "github.com/FangcunMount/iam-contracts/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	iamauth "github.com/FangcunMount/qs-server/internal/pkg/iamauth"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"

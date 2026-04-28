@@ -240,7 +240,7 @@ err = migrator.Rollback()
 mysql:
   host: ${MYSQL_HOST:127.0.0.1}
   port: ${MYSQL_PORT:3306}
-  database: ${MYSQL_DATABASE:iam_contracts}
+  database: ${MYSQL_DATABASE:iam}
   username: ${MYSQL_USER:root}
   password: ${MYSQL_PASSWORD:}
 
@@ -330,7 +330,7 @@ db.schema_migrations.find()
 
    ```bash
    # 迁移前自动备份
-   mysqldump iam_contracts > backup_$(date +%Y%m%d_%H%M%S).sql
+   mysqldump iam > backup_$(date +%Y%m%d_%H%M%S).sql
    ```
 
 2. **权限分离**

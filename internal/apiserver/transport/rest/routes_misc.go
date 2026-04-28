@@ -9,7 +9,7 @@ import (
 // registerUserProtectedRoutes 注册用户相关的受保护路由。
 // 用户管理已迁移到 IAM 服务，此方法保留以便未来扩展。
 func (r *Router) registerUserProtectedRoutes(_ *gin.RouterGroup) {
-	// 用户相关功能已迁移到 iam-contracts 项目
+	// 用户相关功能已迁移到 iam 项目
 }
 
 // registerCodesRoutes 注册 codes 申请路由。
