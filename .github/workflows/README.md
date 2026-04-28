@@ -9,7 +9,7 @@
 
 本仓库生产部署直接以仓库内配置文件为准，不再额外注入“升配/降配档位”。流程要点：
 
-1. 镜像：CD 构建并推送 `qs-apiserver` / `qs-collection-server` / `qs-worker` 到 GHCR/Docker Hub，目标机再拉取。
+1. 镜像：CD 构建并推送 `qs-apiserver` / `qs-collection-server` / `qs-worker` 到 GHCR/Docker Hub，目标机按本次 `DEPLOY_SHA` 对应的不可变 tag 拉取。
 2. 包含文件：`deploy-package` 会携带 `configs`、`configs/env/config.prod.env` 以及 `docker-compose.prod.yml`。
 3. 目标机操作：
    - 备份现有 configs，展开 deploy-package。
@@ -22,8 +22,14 @@ CD 本地入口：
 
 - `make cd-image SERVICE=apiserver DEPLOY_REF=main DEPLOY_SHA=<sha>`
 - `make cd-package SERVICE=apiserver`
-- `make cd-remote-deploy SERVICE=apiserver`
+- `make cd-remote-deploy SERVICE=apiserver IMAGE_TAG=<sha>`
 - `make cd-validate SERVICE=apiserver`
+
+镜像构建与拉取：
+
+- `cd-image` 默认使用 GHCR registry cache：`ghcr.io/fangcunmount/<image>:buildcache`。
+- 生产部署默认传递 `IMAGE_TAG=${DEPLOY_SHA}`，远端优先拉取 GHCR 的 SHA tag；GHCR 登录失败时用同一 SHA tag fallback 到 Docker Hub。
+- 远端 `docker compose pull` 优先使用 `--quiet`，避免 Docker 进度条在 GitHub Actions 日志中重复刷屏。
 
 Secrets 传递规则：
 

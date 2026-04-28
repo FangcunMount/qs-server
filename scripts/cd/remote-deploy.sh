@@ -13,6 +13,14 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 
 APP_UID="${WWW_UID}"
 APP_GID="${WWW_GID}"
+IMAGE_TAG="${IMAGE_TAG:-latest}"
+
+case "$IMAGE_TAG" in
+  ""|*[!A-Za-z0-9_.-]*)
+    echo "IMAGE_TAG must contain only letters, digits, underscores, periods, and dashes; got: ${IMAGE_TAG}" >&2
+    exit 1
+    ;;
+esac
 
 if sudo -n true 2>/dev/null; then
   SUDO="sudo"
@@ -193,7 +201,7 @@ setup_apiserver_web_tls() {
 }
 
 select_image() {
-  local image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:latest"
+  local image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
   local ghcr_login_ok=0
 
   echo "Checking registry login for ${DOCKER_REPOSITORY}/${IMAGE_NAME}"
@@ -210,7 +218,7 @@ select_image() {
         echo "Docker Hub login failed; verify DOCKERHUB_USERNAME/DOCKERHUB_TOKEN." >&2
         exit 1
       fi
-      image="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:latest"
+      image="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
     else
       echo "GHCR login failed and Docker Hub credentials missing."
     fi
@@ -240,11 +248,25 @@ stop_single_container() {
   fi
 }
 
+docker_compose_pull_supports_quiet() {
+  $SUDO docker compose pull --help 2>/dev/null | grep -q -- '--quiet'
+}
+
+docker_compose_pull() {
+  local -a compose_args=("$@")
+
+  if docker_compose_pull_supports_quiet; then
+    $SUDO docker compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"
+  else
+    $SUDO env COMPOSE_PROGRESS=plain docker compose "${compose_args[@]}" pull "$COMPOSE_SERVICE"
+  fi
+}
+
 deploy_http_service() {
   stop_single_container
 
   cd "/opt/qs-server/${CONTAINER_NAME}"
-  $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" pull "$COMPOSE_SERVICE"
+  docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
   $SUDO docker compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d "$COMPOSE_SERVICE"
 
   echo "Waiting for service to be ready (in-container health check)..."
@@ -287,7 +309,7 @@ deploy_worker() {
   fi
 
   cd "/opt/qs-server/${CONTAINER_NAME}"
-  $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" pull "$COMPOSE_SERVICE"
+  docker_compose_pull -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml"
   $SUDO docker compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
 
   echo "Waiting for container to start..."
@@ -335,6 +357,7 @@ deploy_worker() {
 
 echo "=========================================="
 echo "Deploying ${CONTAINER_NAME}"
+echo "Image tag: ${IMAGE_TAG}"
 echo "=========================================="
 
 prepare_dirs_and_backup

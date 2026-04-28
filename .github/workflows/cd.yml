@@ -189,12 +189,13 @@ jobs:
           SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
+          IMAGE_TAG: ${{ env.DEPLOY_SHA }}
         with:
           host: ${{ secrets.SVRA_HOST }}
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG
           script: |
             set -Eeuo pipefail
             BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
@@ -263,12 +264,13 @@ jobs:
           SUDO_PASSWORD: ${{ secrets.SVRB_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
+          IMAGE_TAG: ${{ env.DEPLOY_SHA }}
         with:
           host: ${{ secrets.SVRB_HOST }}
           username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG
           script: |
             set -Eeuo pipefail
             BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
@@ -353,12 +355,13 @@ jobs:
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
+          IMAGE_TAG: ${{ env.DEPLOY_SHA }}
         with:
           host: ${{ secrets.SVRD_HOST }}
           username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS,IMAGE_TAG
           script: |
             set -Eeuo pipefail
             BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"

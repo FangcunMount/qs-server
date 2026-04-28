@@ -169,14 +169,14 @@ cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|coll
 	@echo "$(COLOR_GREEN)✅ CD metadata validated for SERVICE=$(SERVICE)$(COLOR_RESET)"
 
 cd-image: cd-validate ## 构建并发布服务镜像到 GHCR 和 Docker Hub
-	@SERVICE="$(SERVICE)" DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_SHA="$(DEPLOY_SHA)" BUILD_TIME="$(BUILD_TIME)" "$(CD_SCRIPT_DIR)/build-image.sh"
+	@SERVICE="$(SERVICE)" DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_SHA="$(DEPLOY_SHA)" BUILD_TIME="$(BUILD_TIME)" BUILD_CACHE_REF="$(BUILD_CACHE_REF)" "$(CD_SCRIPT_DIR)/build-image.sh"
 	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
 
 cd-package: cd-validate ## 生成服务生产部署包
 	@SERVICE="$(SERVICE)" "$(CD_SCRIPT_DIR)/prepare-package.sh"
 
 cd-remote-deploy: cd-validate ## 在目标机执行远端部署脚本
-	@SERVICE="$(SERVICE)" "$(CD_SCRIPT_DIR)/remote-deploy.sh"
+	@SERVICE="$(SERVICE)" IMAGE_TAG="$(IMAGE_TAG)" "$(CD_SCRIPT_DIR)/remote-deploy.sh"
 
 version: ## 显示版本信息
 	@echo "$(COLOR_BOLD)版本信息:$(COLOR_RESET)"

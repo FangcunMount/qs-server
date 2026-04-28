@@ -19,10 +19,8 @@ case "${WWW_UID}:${WWW_GID}" in
 esac
 
 BUILD_TIME="${BUILD_TIME:-$(date -u '+%Y-%m-%dT%H:%M:%SZ')}"
-CACHE_ARGS=""
-if [ -n "${ACTIONS_RUNTIME_TOKEN:-}" ]; then
-  CACHE_ARGS="--cache-from type=gha --cache-to type=gha,mode=max"
-fi
+BUILD_CACHE_REF="${BUILD_CACHE_REF:-${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:buildcache}"
+CACHE_ARGS="--cache-from type=registry,ref=${BUILD_CACHE_REF} --cache-to type=registry,ref=${BUILD_CACHE_REF},mode=max,ignore-error=true"
 
 # shellcheck disable=SC2086
 docker buildx build \
