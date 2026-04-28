@@ -166,6 +166,8 @@ func main() {
 		totalProcessed += len(rows)
 		printProgressBar(totalProcessed, totalCount, batchSize)
 
+		cfg.backupSuffix = time.Now().Format("20060102150405")
+
 		// If we got fewer rows than maxTasks, we're done
 		if len(rows) < batchSize {
 			log.Printf("\nFinal batch completed. Total tasks repaired: %d", totalProcessed)
