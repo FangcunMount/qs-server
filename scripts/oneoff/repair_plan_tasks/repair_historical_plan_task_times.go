@@ -68,6 +68,10 @@ type scopeRow struct {
 	NewReportGeneratedAt   sql.NullTime
 }
 
+type scopeQuerier interface {
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+}
+
 func main() {
 	cfg := parseFlags()
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
@@ -116,17 +120,6 @@ func main() {
 		log.Fatalf("invalid --backup-suffix: %v", err)
 	}
 
-	// Get total task count for progress tracking
-	totalCount, err := getTotalTaskCount(ctx, db, cfg)
-	if err != nil {
-		log.Fatalf("get total task count: %v", err)
-	}
-	if totalCount == 0 {
-		log.Print("No tasks to repair")
-		return
-	}
-	log.Printf("Found %d tasks to repair\n", totalCount)
-
 	conn, err := db.Conn(ctx)
 	if err != nil {
 		log.Fatalf("mysql conn: %v", err)
@@ -137,42 +130,51 @@ func main() {
 		}
 	}()
 
-	// Batch processing loop
-	batchSize := cfg.maxTasks
-	if batchSize <= 0 {
-		batchSize = 5000 // Default batch size if maxTasks is 0
+	// Snapshot task IDs before mutating fields that are part of the original scope.
+	totalCount, err := prepareRepairQueue(ctx, conn, cfg)
+	if err != nil {
+		log.Fatalf("prepare repair queue: %v", err)
 	}
+	if totalCount == 0 {
+		log.Print("No tasks to repair")
+		return
+	}
+	log.Printf("Found %d tasks to repair\n", totalCount)
+
+	// Batch processing loop
+	batchSize := effectiveBatchSize(cfg)
 
 	totalProcessed := 0
+	batchNumber := 0
+	baseBackupSuffix := cfg.backupSuffix
 	for {
-		rows, err := loadScope(ctx, db, cfg, totalProcessed)
+		rows, err := loadQueuedScope(ctx, conn, cfg)
 		if err != nil {
-			log.Fatalf("load scope: %v", err)
+			log.Fatalf("load queued scope: %v", err)
 		}
 
 		if len(rows) == 0 {
-			printProgressBar(totalCount, totalCount, batchSize)
+			printProgressBar(totalProcessed, totalCount, batchSize)
 			log.Printf("\nAll done! Total tasks repaired: %d", totalProcessed)
 			return
 		}
 
-		printScope(rows, cfg.limit)
-		log.Printf("Processing batch: offset=%d, count=%d", totalProcessed, len(rows))
+		batchNumber++
+		batchCfg := cfg
+		batchCfg.backupSuffix = backupSuffixForBatch(baseBackupSuffix, batchNumber)
 
-		if err := processBatch(ctx, conn, mongoDB, rows, cfg); err != nil {
-			log.Fatalf("process batch at offset %d: %v", totalProcessed, err)
+		printScope(rows, cfg.limit)
+		log.Printf("Processing batch: number=%d, count=%d, backup_suffix=%s", batchNumber, len(rows), batchCfg.backupSuffix)
+
+		if err := processBatch(ctx, conn, mongoDB, rows, batchCfg); err != nil {
+			log.Fatalf("process batch %d: %v", batchNumber, err)
+		}
+		if err := markQueueProcessed(ctx, conn); err != nil {
+			log.Fatalf("mark queue processed for batch %d: %v", batchNumber, err)
 		}
 
 		totalProcessed += len(rows)
 		printProgressBar(totalProcessed, totalCount, batchSize)
-
-		cfg.backupSuffix = time.Now().Format("20060102150405")
-
-		// If we got fewer rows than maxTasks, we're done
-		if len(rows) < batchSize {
-			log.Printf("\nFinal batch completed. Total tasks repaired: %d", totalProcessed)
-			return
-		}
 	}
 }
 
@@ -196,9 +198,23 @@ func processBatch(ctx context.Context, conn *sql.Conn, mongoDB *mongo.Database, 
 	return nil
 }
 
-func getTotalTaskCount(ctx context.Context, db *sql.DB, cfg config) (int, error) {
+func prepareRepairQueue(ctx context.Context, conn *sql.Conn, cfg config) (int, error) {
+	if _, err := conn.ExecContext(ctx, `DROP TEMPORARY TABLE IF EXISTS repair_plan_task_time_queue`); err != nil {
+		return 0, err
+	}
+	if _, err := conn.ExecContext(ctx, `
+CREATE TEMPORARY TABLE repair_plan_task_time_queue (
+  task_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  planned_at DATETIME(3) NOT NULL,
+  processed TINYINT(1) NOT NULL DEFAULT 0,
+  KEY idx_repair_queue_unprocessed (processed, planned_at, task_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`); err != nil {
+		return 0, err
+	}
+
 	query := `
-SELECT COUNT(*)
+INSERT INTO repair_plan_task_time_queue (task_id, planned_at)
+SELECT t.id, t.planned_at
 FROM assessment_task t
 INNER JOIN assessment a
   ON a.id = t.assessment_id
@@ -222,9 +238,13 @@ WHERE t.org_id = ?
 		query += " AND t.planned_at < ?"
 		args = append(args, cfg.plannedEnd)
 	}
+	query += " ORDER BY t.planned_at, t.id"
 
 	var count int
-	err := db.QueryRowContext(ctx, query, args...).Scan(&count)
+	if _, err := conn.ExecContext(ctx, query, args...); err != nil {
+		return 0, err
+	}
+	err := conn.QueryRowContext(ctx, `SELECT COUNT(*) FROM repair_plan_task_time_queue`).Scan(&count)
 	return count, err
 }
 
@@ -249,6 +269,20 @@ func printProgressBar(current, total, batchSize int) {
 	log.Printf("%s %.1f%% (%d/%d)", bar, percentage, current, total)
 }
 
+func effectiveBatchSize(cfg config) int {
+	if cfg.maxTasks <= 0 {
+		return 5000
+	}
+	return cfg.maxTasks
+}
+
+func backupSuffixForBatch(base string, batchNumber int) string {
+	if batchNumber <= 1 {
+		return base
+	}
+	return fmt.Sprintf("%s_%04d", base, batchNumber)
+}
+
 func parseFlags() config {
 	var cfg config
 	flag.StringVar(&cfg.mysqlDSN, "mysql-dsn", "", "MySQL DSN, e.g. user:pass@tcp(host:3306)/qs?parseTime=true")
@@ -264,7 +298,7 @@ func parseFlags() config {
 	flag.DurationVar(&cfg.timeout, "timeout", 30*time.Minute, "overall script timeout, e.g. 30m, 1h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply changes; default is dry-run")
 	flag.IntVar(&cfg.limit, "preview-limit", 20, "number of rows to preview")
-	flag.IntVar(&cfg.maxTasks, "max-tasks", 5000, "batch size for processing tasks; default 5000; set to 0 for unlimited (use with caution!)")
+	flag.IntVar(&cfg.maxTasks, "max-tasks", 5000, "batch size for processing tasks; values <= 0 use default 5000")
 	flag.Parse()
 
 	required := map[string]string{
@@ -333,13 +367,38 @@ WHERE t.org_id = ?
 	}
 	query += " ORDER BY t.planned_at, t.id"
 
-	batchSize := cfg.maxTasks
-	if batchSize <= 0 {
-		batchSize = 5000
-	}
+	batchSize := effectiveBatchSize(cfg)
 	query += fmt.Sprintf(" LIMIT %d OFFSET %d", batchSize, offset)
 
-	rs, err := db.QueryContext(ctx, query, args...)
+	return queryScopeRows(ctx, db, query, args...)
+}
+
+func loadQueuedScope(ctx context.Context, conn *sql.Conn, cfg config) (rows []scopeRow, err error) {
+	query := fmt.Sprintf(`
+SELECT
+  t.id, t.org_id, t.plan_id, t.testee_id, t.assessment_id, a.answer_sheet_id,
+  e.episode_id, e.report_id, COALESCE(e.entry_id, 0), COALESCE(e.clinician_id, 0),
+  t.planned_at, t.created_at, t.open_at, t.expire_at, t.completed_at,
+  a.created_at, a.submitted_at, a.interpreted_at,
+  e.submitted_at, e.assessment_created_at, e.report_generated_at
+FROM repair_plan_task_time_queue q
+INNER JOIN assessment_task t
+  ON t.id = q.task_id
+INNER JOIN assessment a
+  ON a.id = t.assessment_id
+ AND a.deleted_at IS NULL
+LEFT JOIN assessment_episode e
+  ON e.answersheet_id = a.answer_sheet_id
+ AND e.deleted_at IS NULL
+WHERE q.processed = 0
+ORDER BY q.planned_at, q.task_id
+LIMIT %d`, effectiveBatchSize(cfg))
+
+	return queryScopeRows(ctx, conn, query)
+}
+
+func queryScopeRows(ctx context.Context, q scopeQuerier, query string, args ...any) (rows []scopeRow, err error) {
+	rs, err := q.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -364,6 +423,16 @@ WHERE t.org_id = ?
 		rows = append(rows, row)
 	}
 	return rows, rs.Err()
+}
+
+func markQueueProcessed(ctx context.Context, conn *sql.Conn) error {
+	_, err := conn.ExecContext(ctx, `
+UPDATE repair_plan_task_time_queue q
+INNER JOIN repair_plan_task_time_scope s
+  ON s.task_id = q.task_id
+SET q.processed = 1
+WHERE q.processed = 0`)
+	return err
 }
 
 func computeNewTimes(row *scopeRow) {
