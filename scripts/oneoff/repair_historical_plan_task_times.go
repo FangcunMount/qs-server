@@ -31,6 +31,7 @@ type config struct {
 	timeout          time.Duration
 	apply            bool
 	limit            int
+	maxTasks         int
 }
 
 type scopeRow struct {
@@ -104,6 +105,9 @@ func main() {
 		log.Print("scope is empty; nothing to repair")
 		return
 	}
+	if cfg.maxTasks > 0 && len(rows) >= cfg.maxTasks {
+		log.Printf("WARNING: Reached max-tasks limit (%d). Loaded %d tasks. Set --max-tasks higher or to 0 to load all tasks.", cfg.maxTasks, len(rows))
+	}
 	if !cfg.apply {
 		log.Print("dry-run only; re-run with --apply to update MySQL and MongoDB")
 		return
@@ -157,6 +161,7 @@ func parseFlags() config {
 	flag.DurationVar(&cfg.timeout, "timeout", 30*time.Minute, "overall script timeout, e.g. 30m, 1h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply changes; default is dry-run")
 	flag.IntVar(&cfg.limit, "preview-limit", 20, "number of rows to preview")
+	flag.IntVar(&cfg.maxTasks, "max-tasks", 10000, "maximum number of tasks to repair; set to 0 for unlimited (use with caution!)")
 	flag.Parse()
 
 	required := map[string]string{
@@ -224,6 +229,9 @@ WHERE t.org_id = ?
 		args = append(args, cfg.plannedEnd)
 	}
 	query += " ORDER BY t.planned_at, t.id"
+	if cfg.maxTasks > 0 {
+		query += fmt.Sprintf(" LIMIT %d", cfg.maxTasks)
+	}
 
 	rs, err := db.QueryContext(ctx, query, args...)
 	if err != nil {
