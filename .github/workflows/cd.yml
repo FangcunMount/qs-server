@@ -64,16 +64,47 @@ env:
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
 
 jobs:
-  docker:
-    name: Build and Push Docker Images
+  plan:
+    name: Plan Deploy Services
     runs-on: ubuntu-latest
-    environment:
-      name: production
     if: |
       github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'workflow_run' &&
        github.event.workflow_run.conclusion == 'success' &&
        github.event.workflow_run.head_branch == 'main')
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      services: ${{ steps.plan.outputs.services }}
+      has_services: ${{ steps.plan.outputs.has_services }}
+      apiserver: ${{ steps.plan.outputs.apiserver }}
+      collection: ${{ steps.plan.outputs.collection }}
+      worker: ${{ steps.plan.outputs.worker }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 0
+
+      - name: Plan deploy services
+        id: plan
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          MANUAL_SERVICE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.service || 'all' }}
+          GITHUB_TOKEN: ${{ github.token }}
+        run: |
+          make cd-plan
+
+  docker:
+    name: Build and Push Docker Images
+    needs: [plan]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+    if: |
+      needs.plan.outputs.has_services == 'true'
     env:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
@@ -82,8 +113,9 @@ jobs:
       contents: read
       packages: write
     strategy:
+      fail-fast: false
       matrix:
-        service: [apiserver, collection, worker]
+        service: ${{ fromJSON(needs.plan.outputs.services) }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -116,7 +148,7 @@ jobs:
 
   deploy-apiserver:
     name: Deploy API Server
-    needs: [docker]
+    needs: [plan, docker]
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -124,11 +156,9 @@ jobs:
       contents: read
       packages: read
     if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' &&
-       (github.event.inputs.service == 'all' || github.event.inputs.service == 'apiserver'))
+      always() &&
+      needs.docker.result == 'success' &&
+      needs.plan.outputs.apiserver == 'true'
     env:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
@@ -207,7 +237,7 @@ jobs:
 
   deploy-collection:
     name: Deploy Collection Server
-    needs: [docker]
+    needs: [plan, docker]
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -215,11 +245,9 @@ jobs:
       contents: read
       packages: read
     if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' &&
-       (github.event.inputs.service == 'all' || github.event.inputs.service == 'collection'))
+      always() &&
+      needs.docker.result == 'success' &&
+      needs.plan.outputs.collection == 'true'
     env:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
@@ -283,7 +311,7 @@ jobs:
 
   deploy-worker:
     name: Deploy Worker
-    needs: [docker]
+    needs: [plan, docker]
     runs-on: ubuntu-latest
     environment:
       name: production
@@ -291,11 +319,9 @@ jobs:
       contents: read
       packages: read
     if: |
-      (github.event_name == 'workflow_run' &&
-       github.event.workflow_run.conclusion == 'success' &&
-       github.event.workflow_run.head_branch == 'main') ||
-      (github.event_name == 'workflow_dispatch' &&
-       (github.event.inputs.service == 'all' || github.event.inputs.service == 'worker'))
+      always() &&
+      needs.docker.result == 'success' &&
+      needs.plan.outputs.worker == 'true'
     env:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
@@ -375,7 +401,7 @@ jobs:
 
   notify:
     name: Send Notification
-    needs: [deploy-apiserver, deploy-collection, deploy-worker]
+    needs: [plan, docker, deploy-apiserver, deploy-collection, deploy-worker]
     runs-on: ubuntu-latest
     if: |
       always() && (
@@ -390,9 +416,27 @@ jobs:
           echo "=========================================="
           echo "Deployment Summary"
           echo "=========================================="
+          echo "Plan: ${{ needs.plan.result }}"
+          echo "Planned services: ${{ needs.plan.outputs.services }}"
+          echo "Docker images: ${{ needs.docker.result }}"
           echo "API Server: ${{ needs.deploy-apiserver.result }}"
           echo "Collection Server: ${{ needs.deploy-collection.result }}"
           echo "Worker: ${{ needs.deploy-worker.result }}"
+
+          if [ "${{ needs.plan.result }}" != "success" ]; then
+            echo "Deploy planning failed"
+            exit 1
+          fi
+
+          if [ "${{ needs.plan.outputs.has_services }}" != "true" ]; then
+            echo "No deployable service changes detected; production deploy skipped"
+            exit 0
+          fi
+
+          if [ "${{ needs.docker.result }}" != "success" ]; then
+            echo "Docker image build/push failed"
+            exit 1
+          fi
 
           ok() {
             [ "$1" = "success" ] || [ "$1" = "skipped" ]

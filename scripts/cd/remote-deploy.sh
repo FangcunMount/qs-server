@@ -267,23 +267,28 @@ docker_compose() {
 
 docker_compose_pull() {
   local -a compose_args=("$@")
+  local pull_started pull_elapsed
   if [ -z "${COMPOSE_ENV_FILE:-}" ] || [ ! -f "$COMPOSE_ENV_FILE" ]; then
     echo "COMPOSE_ENV_FILE is not ready before docker compose pull" >&2
     exit 1
   fi
 
+  echo "Pulling ${COMPOSE_SERVICE} image tag ${IMAGE_TAG}..."
+  pull_started=$(date +%s)
   if docker_compose_pull_supports_quiet; then
     docker_compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"
   else
     docker_compose "${compose_args[@]}" pull "$COMPOSE_SERVICE"
   fi
+  pull_elapsed=$(($(date +%s) - pull_started))
+  echo "Pulled ${COMPOSE_SERVICE} image in ${pull_elapsed}s"
 }
 
 deploy_http_service() {
-  stop_single_container
-
   cd "/opt/qs-server/${CONTAINER_NAME}"
   docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
+
+  stop_single_container
   docker_compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d "$COMPOSE_SERVICE"
 
   echo "Waiting for service to be ready (in-container health check)..."
@@ -314,6 +319,9 @@ deploy_worker() {
     exit 1
   fi
 
+  cd "/opt/qs-server/${CONTAINER_NAME}"
+  docker_compose_pull -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml"
+
   echo "Cleaning up legacy worker containers..."
   local legacy_workers
   legacy_workers=$($SUDO docker ps -a --format '{{.ID}} {{.Names}}' | awk '$2 == "qs-worker" || $2 ~ /^qs-deploy-worker-[0-9]+-qs-worker-[0-9]+$/ {print $1}')
@@ -325,8 +333,6 @@ deploy_worker() {
     done
   fi
 
-  cd "/opt/qs-server/${CONTAINER_NAME}"
-  docker_compose_pull -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml"
   docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
 
   echo "Waiting for container to start..."

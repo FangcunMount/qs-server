@@ -104,7 +104,7 @@ COLOR_RED := \033[31m
 .PHONY: up down re st log
 .PHONY: quick-start
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
-.PHONY: cd-image cd-package cd-remote-deploy cd-validate
+.PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan
 
 # ============================================================================
 # 帮助信息
@@ -166,7 +166,11 @@ cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|coll
 	@test -x "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
 	@test -x "$(CD_SCRIPT_DIR)/prepare-package.sh"
 	@test -x "$(CD_SCRIPT_DIR)/remote-deploy.sh"
+	@test -x "$(CD_SCRIPT_DIR)/plan-services.sh"
 	@echo "$(COLOR_GREEN)✅ CD metadata validated for SERVICE=$(SERVICE)$(COLOR_RESET)"
+
+cd-plan: ## 规划本次 CD 需要发布的服务
+	@"$(CD_SCRIPT_DIR)/plan-services.sh"
 
 cd-image: cd-validate ## 构建并发布服务镜像到 GHCR 和 Docker Hub
 	@SERVICE="$(SERVICE)" DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_SHA="$(DEPLOY_SHA)" BUILD_TIME="$(BUILD_TIME)" BUILD_CACHE_REF="$(BUILD_CACHE_REF)" "$(CD_SCRIPT_DIR)/build-image.sh"
