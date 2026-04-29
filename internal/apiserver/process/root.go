@@ -2,6 +2,7 @@ package process
 
 import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
@@ -11,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
-	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"

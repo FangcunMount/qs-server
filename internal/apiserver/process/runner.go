@@ -1,8 +1,8 @@
 package process
 
 import (
+	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
 )
 
 type prepareState struct {

@@ -2,8 +2,8 @@ package process
 
 import (
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
-	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
 )
 
 type lifecycleDeps struct {

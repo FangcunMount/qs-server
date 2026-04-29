@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	rediskit "github.com/FangcunMount/component-base/pkg/redis"
+	baseredisadapter "github.com/FangcunMount/component-base/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	lockkeyspace "github.com/FangcunMount/qs-server/internal/pkg/locklease/keyspace"
@@ -52,7 +52,10 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 		observability.ObserveFamilyFailure(m.component, string(cacheplane.FamilyLock), err)
 		return nil, false, err
 	}
-	token, acquired, err := rediskit.AcquireLease(ctx, m.handle.Client, key, ttl)
+	lease, acquired, err := baseredisadapter.NewManager(m.handle.Client, nil).Acquire(ctx, Identity{
+		Name: identity.Name,
+		Key:  key,
+	}, ttl)
 	if err != nil {
 		observability.ObserveLockAcquire(lockName, "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
@@ -68,7 +71,7 @@ func (m *Manager) Acquire(ctx context.Context, identity Identity, ttl time.Durat
 	observability.ObserveLockAcquire(lockName, "ok")
 	m.observe(ctx, identity, resilienceplane.OutcomeLockAcquired)
 	observability.ObserveFamilySuccess(m.component, string(cacheplane.FamilyLock))
-	return &Lease{Key: key, Token: token}, true, nil
+	return lease, true, nil
 }
 
 // AcquireSpec 按锁规格获取锁租约。
@@ -92,7 +95,7 @@ func (m *Manager) Release(ctx context.Context, identity Identity, lease *Lease) 
 	if m == nil || m.handle == nil || m.handle.Client == nil || lease == nil || lease.Token == "" {
 		return nil
 	}
-	if err := rediskit.ReleaseLease(ctx, m.handle.Client, lease.Key, lease.Token); err != nil {
+	if err := baseredisadapter.NewManager(m.handle.Client, nil).Release(ctx, identity, lease); err != nil {
 		observability.ObserveLockRelease(lockName, "error")
 		m.observe(ctx, identity, resilienceplane.OutcomeLockError)
 		observability.ObserveFamilyFailure(m.component, string(cacheplane.FamilyLock), err)

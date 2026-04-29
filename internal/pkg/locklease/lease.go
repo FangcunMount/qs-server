@@ -1,42 +1,15 @@
 package locklease
 
 import (
-	"context"
 	"time"
+
+	base "github.com/FangcunMount/component-base/pkg/locklease"
 )
 
-// Spec describes one semantic distributed lease-lock workload.
-type Spec struct {
-	Name        string
-	Description string
-	DefaultTTL  time.Duration
-}
-
-// Identity builds the concrete lease identity for a business key.
-func (s Spec) Identity(key string) Identity {
-	return Identity{
-		Name: s.Name,
-		Key:  key,
-	}
-}
-
-// Identity describes one concrete lock instance.
-type Identity struct {
-	Name string
-	Key  string
-}
-
-// Lease represents a successfully acquired lock lease.
-type Lease struct {
-	Key   string
-	Token string
-}
-
-// Manager is the Redis-free lease-lock port used by business code.
-type Manager interface {
-	AcquireSpec(ctx context.Context, spec Spec, key string, ttlOverride ...time.Duration) (*Lease, bool, error)
-	ReleaseSpec(ctx context.Context, spec Spec, key string, lease *Lease) error
-}
+type Spec = base.Spec
+type Identity = base.Identity
+type Lease = base.Lease
+type Manager = base.Manager
 
 // Specs defines qs-server built-in lease-lock workloads.
 var Specs = struct {

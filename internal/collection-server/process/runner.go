@@ -2,7 +2,7 @@ package process
 
 import (
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
+	"github.com/FangcunMount/component-base/pkg/processruntime"
 )
 
 type prepareRunner struct {

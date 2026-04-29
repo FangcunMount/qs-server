@@ -3,7 +3,8 @@ module github.com/FangcunMount/qs-server
 go 1.25.9
 
 require (
-	github.com/FangcunMount/component-base v0.5.4
+	github.com/FangcunMount/component-base v0.6.0
+	github.com/FangcunMount/iam v1.0.3
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
 	github.com/google/uuid v1.6.0
@@ -29,7 +30,6 @@ require (
 )
 
 require (
-	github.com/FangcunMount/iam v1.0.3 // indirect
 	github.com/alicebob/gopher-json v0.0.0-20200520072559-a9ecdc9d1d3a // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20220106215444-fb4bf637b56d // indirect
 	github.com/bytedance/gopkg v0.1.3 // indirect
@@ -144,7 +144,7 @@ require (
 	github.com/tpkeeper/gin-dump v1.0.1
 	github.com/zsais/go-gin-prometheus v0.1.0
 	golang.org/x/sync v0.19.0
-	golang.org/x/time v0.12.0
+	golang.org/x/time v0.12.0 // indirect
 	google.golang.org/grpc v1.80.0
 	gorm.io/driver/mysql v1.6.0 // indirect
 )

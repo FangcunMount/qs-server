@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	"github.com/FangcunMount/component-base/pkg/processruntime"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	bootstrap "github.com/FangcunMount/qs-server/internal/apiserver/bootstrap"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
-	"github.com/FangcunMount/qs-server/internal/pkg/processruntime"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
 
