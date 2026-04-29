@@ -288,7 +288,7 @@ func backupStatisticsTables(ctx context.Context, conn *sql.Conn, cfg config) err
 	for _, table := range tables {
 		backup := fmt.Sprintf("%s_backup_%s", table, cfg.backupSuffix)
 		log.Printf("backup %s -> %s", table, backup)
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE `%s` LIKE `%s`", backup, table)); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backup, table)); err != nil {
 			return err
 		}
 		where := "@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id"
@@ -298,7 +298,7 @@ func backupStatisticsTables(ctx context.Context, conn *sql.Conn, cfg config) err
 		if table == "statistics_accumulated" {
 			where = "statistic_type IN ('questionnaire', 'system') AND (" + where + ")"
 		}
-		if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT INTO `%s` SELECT * FROM `%s` WHERE %s", backup, table, where)); err != nil {
+		if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT IGNORE INTO `%s` SELECT * FROM `%s` WHERE %s", backup, table, where)); err != nil {
 			return err
 		}
 	}
@@ -314,19 +314,19 @@ func backupStatisticsTables(ctx context.Context, conn *sql.Conn, cfg config) err
 func backupPendingTables(ctx context.Context, conn *sql.Conn, cfg config) error {
 	pendingBackup := fmt.Sprintf("analytics_pending_event_backup_%s", cfg.backupSuffix)
 	checkpointBackup := fmt.Sprintf("analytics_projector_checkpoint_backup_%s", cfg.backupSuffix)
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE `%s` LIKE analytics_pending_event", pendingBackup)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE analytics_pending_event", pendingBackup)); err != nil {
 		return err
 	}
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE `%s` LIKE analytics_projector_checkpoint", checkpointBackup)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE analytics_projector_checkpoint", checkpointBackup)); err != nil {
 		return err
 	}
 
 	predicate := pendingPredicate(cfg, "p")
-	if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT INTO `%s` SELECT p.* FROM analytics_pending_event p WHERE %s", pendingBackup, predicate)); err != nil {
+	if _, err := conn.ExecContext(ctx, fmt.Sprintf("INSERT IGNORE INTO `%s` SELECT p.* FROM analytics_pending_event p WHERE %s", pendingBackup, predicate)); err != nil {
 		return err
 	}
 	if _, err := conn.ExecContext(ctx, fmt.Sprintf(`
-INSERT INTO %[1]s
+INSERT IGNORE INTO %[1]s
 SELECT c.*
 FROM analytics_projector_checkpoint c
 JOIN analytics_pending_event p ON p.event_id = c.event_id
@@ -518,7 +518,20 @@ FROM (
   SELECT org_id, DATE(failed_at), 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
   FROM assessment_episode WHERE deleted_at IS NULL AND status = 'failed' AND failed_at IS NOT NULL AND failed_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
 ) agg
-GROUP BY agg.org_id, agg.stat_date`
+GROUP BY agg.org_id, agg.stat_date
+ON DUPLICATE KEY UPDATE
+  entry_opened_count = VALUES(entry_opened_count),
+  intake_confirmed_count = VALUES(intake_confirmed_count),
+  testee_profile_created_count = VALUES(testee_profile_created_count),
+  care_relationship_established_count = VALUES(care_relationship_established_count),
+  care_relationship_transferred_count = VALUES(care_relationship_transferred_count),
+  answersheet_submitted_count = VALUES(answersheet_submitted_count),
+  assessment_created_count = VALUES(assessment_created_count),
+  report_generated_count = VALUES(report_generated_count),
+  episode_completed_count = VALUES(episode_completed_count),
+  episode_failed_count = VALUES(episode_failed_count),
+  deleted_at = NULL,
+  updated_at = NOW(3)`
 
 const rebuildProjectionClinicianDailySQL = `
 INSERT INTO analytics_projection_clinician_daily (
@@ -570,7 +583,20 @@ FROM (
   SELECT org_id, clinician_id, DATE(failed_at), 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
   FROM assessment_episode WHERE deleted_at IS NULL AND clinician_id IS NOT NULL AND clinician_id <> 0 AND status = 'failed' AND failed_at IS NOT NULL AND failed_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
 ) agg
-GROUP BY agg.org_id, agg.clinician_id, agg.stat_date`
+GROUP BY agg.org_id, agg.clinician_id, agg.stat_date
+ON DUPLICATE KEY UPDATE
+  entry_opened_count = VALUES(entry_opened_count),
+  intake_confirmed_count = VALUES(intake_confirmed_count),
+  testee_profile_created_count = VALUES(testee_profile_created_count),
+  care_relationship_established_count = VALUES(care_relationship_established_count),
+  care_relationship_transferred_count = VALUES(care_relationship_transferred_count),
+  answersheet_submitted_count = VALUES(answersheet_submitted_count),
+  assessment_created_count = VALUES(assessment_created_count),
+  report_generated_count = VALUES(report_generated_count),
+  episode_completed_count = VALUES(episode_completed_count),
+  episode_failed_count = VALUES(episode_failed_count),
+  deleted_at = NULL,
+  updated_at = NOW(3)`
 
 const rebuildProjectionEntryDailySQL = `
 INSERT INTO analytics_projection_entry_daily (
@@ -619,7 +645,21 @@ FROM (
   SELECT org_id, entry_id, COALESCE(clinician_id, 0), DATE(failed_at), 0, 0, 0, 0, 0, 0, 0, 0, 0, 1
   FROM assessment_episode WHERE deleted_at IS NULL AND entry_id IS NOT NULL AND status = 'failed' AND failed_at IS NOT NULL AND failed_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
 ) agg
-GROUP BY agg.org_id, agg.entry_id, agg.stat_date`
+GROUP BY agg.org_id, agg.entry_id, agg.stat_date
+ON DUPLICATE KEY UPDATE
+  clinician_id = VALUES(clinician_id),
+  entry_opened_count = VALUES(entry_opened_count),
+  intake_confirmed_count = VALUES(intake_confirmed_count),
+  testee_profile_created_count = VALUES(testee_profile_created_count),
+  care_relationship_established_count = VALUES(care_relationship_established_count),
+  care_relationship_transferred_count = VALUES(care_relationship_transferred_count),
+  answersheet_submitted_count = VALUES(answersheet_submitted_count),
+  assessment_created_count = VALUES(assessment_created_count),
+  report_generated_count = VALUES(report_generated_count),
+  episode_completed_count = VALUES(episode_completed_count),
+  episode_failed_count = VALUES(episode_failed_count),
+  deleted_at = NULL,
+  updated_at = NOW(3)`
 
 const rebuildDailyQuestionnaireSQL = `
 INSERT INTO statistics_daily (
@@ -636,7 +676,12 @@ FROM (
   FROM assessment
   WHERE deleted_at IS NULL AND questionnaire_code <> '' AND interpreted_at IS NOT NULL AND interpreted_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
 ) agg
-GROUP BY agg.org_id, agg.statistic_key, agg.stat_date`
+GROUP BY agg.org_id, agg.statistic_key, agg.stat_date
+ON DUPLICATE KEY UPDATE
+  submission_count = VALUES(submission_count),
+  completion_count = VALUES(completion_count),
+  deleted_at = NULL,
+  updated_at = NOW()`
 
 const rebuildDailySystemSQL = `
 INSERT INTO statistics_daily (
@@ -653,7 +698,12 @@ FROM (
   FROM assessment
   WHERE deleted_at IS NULL AND interpreted_at IS NOT NULL AND interpreted_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
 ) agg
-GROUP BY agg.org_id, agg.stat_date`
+GROUP BY agg.org_id, agg.stat_date
+ON DUPLICATE KEY UPDATE
+  submission_count = VALUES(submission_count),
+  completion_count = VALUES(completion_count),
+  deleted_at = NULL,
+  updated_at = NOW()`
 
 const rebuildAccumulatedQuestionnaireSQL = `
 INSERT INTO statistics_accumulated (
@@ -703,7 +753,17 @@ LEFT JOIN (
   WHERE deleted_at IS NULL AND questionnaire_code <> '' AND created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   GROUP BY org_id, questionnaire_code
 ) b ON b.org_id = d.org_id AND b.questionnaire_code = d.statistic_key
-`
+ON DUPLICATE KEY UPDATE
+  total_submissions = VALUES(total_submissions),
+  total_completions = VALUES(total_completions),
+  last7d_submissions = VALUES(last7d_submissions),
+  last15d_submissions = VALUES(last15d_submissions),
+  last30d_submissions = VALUES(last30d_submissions),
+  distribution = VALUES(distribution),
+  first_occurred_at = VALUES(first_occurred_at),
+  last_occurred_at = VALUES(last_occurred_at),
+  last_updated_at = NOW(),
+  deleted_at = NULL`
 
 const rebuildAccumulatedSystemSQL = `
 INSERT INTO statistics_accumulated (
@@ -761,7 +821,15 @@ LEFT JOIN (
   FROM assessment
   WHERE deleted_at IS NULL AND created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   GROUP BY org_id
-) b ON b.org_id = orgs.org_id`
+) b ON b.org_id = orgs.org_id
+ON DUPLICATE KEY UPDATE
+  total_submissions = VALUES(total_submissions),
+  total_completions = VALUES(total_completions),
+  distribution = VALUES(distribution),
+  first_occurred_at = VALUES(first_occurred_at),
+  last_occurred_at = VALUES(last_occurred_at),
+  last_updated_at = NOW(),
+  deleted_at = NULL`
 
 const rebuildPlanSQL = `
 INSERT INTO statistics_plan (
@@ -784,4 +852,13 @@ LEFT JOIN assessment_task t
  AND t.plan_id = p.id
  AND t.deleted_at IS NULL
 WHERE p.deleted_at IS NULL AND (@qs_rebuild_org_id = 0 OR p.org_id = @qs_rebuild_org_id)
-GROUP BY p.org_id, p.id`
+GROUP BY p.org_id, p.id
+ON DUPLICATE KEY UPDATE
+  total_tasks = VALUES(total_tasks),
+  completed_tasks = VALUES(completed_tasks),
+  pending_tasks = VALUES(pending_tasks),
+  expired_tasks = VALUES(expired_tasks),
+  enrolled_testees = VALUES(enrolled_testees),
+  active_testees = VALUES(active_testees),
+  last_updated_at = NOW(),
+  deleted_at = NULL`
