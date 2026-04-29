@@ -532,8 +532,8 @@ FROM (
   SELECT org_id, DATE(submitted_at), 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
   FROM assessment_episode WHERE deleted_at IS NULL AND submitted_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   UNION ALL
-  SELECT org_id, DATE(assessment_created_at), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
-  FROM assessment_episode WHERE deleted_at IS NULL AND assessment_created_at IS NOT NULL AND assessment_created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
+  SELECT org_id, DATE(report_generated_at), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
+  FROM assessment_episode WHERE deleted_at IS NULL AND report_generated_at IS NOT NULL AND report_generated_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   UNION ALL
   SELECT org_id, DATE(report_generated_at), 0, 0, 0, 0, 0, 0, 0, 1, 1, 0
   FROM assessment_episode WHERE deleted_at IS NULL AND report_generated_at IS NOT NULL AND report_generated_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
@@ -597,8 +597,8 @@ FROM (
   SELECT org_id, clinician_id, DATE(submitted_at), 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
   FROM assessment_episode WHERE deleted_at IS NULL AND clinician_id IS NOT NULL AND clinician_id <> 0 AND submitted_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   UNION ALL
-  SELECT org_id, clinician_id, DATE(assessment_created_at), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
-  FROM assessment_episode WHERE deleted_at IS NULL AND clinician_id IS NOT NULL AND clinician_id <> 0 AND assessment_created_at IS NOT NULL AND assessment_created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
+  SELECT org_id, clinician_id, DATE(report_generated_at), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
+  FROM assessment_episode WHERE deleted_at IS NULL AND clinician_id IS NOT NULL AND clinician_id <> 0 AND report_generated_at IS NOT NULL AND report_generated_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   UNION ALL
   SELECT org_id, clinician_id, DATE(report_generated_at), 0, 0, 0, 0, 0, 0, 0, 1, 1, 0
   FROM assessment_episode WHERE deleted_at IS NULL AND clinician_id IS NOT NULL AND clinician_id <> 0 AND report_generated_at IS NOT NULL AND report_generated_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
@@ -659,8 +659,8 @@ FROM (
   SELECT org_id, entry_id, COALESCE(clinician_id, 0), DATE(submitted_at), 0, 0, 0, 0, 0, 1, 0, 0, 0, 0
   FROM assessment_episode WHERE deleted_at IS NULL AND entry_id IS NOT NULL AND submitted_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   UNION ALL
-  SELECT org_id, entry_id, COALESCE(clinician_id, 0), DATE(assessment_created_at), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
-  FROM assessment_episode WHERE deleted_at IS NULL AND entry_id IS NOT NULL AND assessment_created_at IS NOT NULL AND assessment_created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
+  SELECT org_id, entry_id, COALESCE(clinician_id, 0), DATE(report_generated_at), 0, 0, 0, 0, 0, 0, 1, 0, 0, 0
+  FROM assessment_episode WHERE deleted_at IS NULL AND entry_id IS NOT NULL AND report_generated_at IS NOT NULL AND report_generated_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
   UNION ALL
   SELECT org_id, entry_id, COALESCE(clinician_id, 0), DATE(report_generated_at), 0, 0, 0, 0, 0, 0, 0, 1, 1, 0
   FROM assessment_episode WHERE deleted_at IS NULL AND entry_id IS NOT NULL AND report_generated_at IS NOT NULL AND report_generated_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)

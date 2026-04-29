@@ -73,21 +73,9 @@ func (r *ReportRepository) SaveWithTesteeAndEvents(
 	}
 
 	return r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
-		exists, err := r.existsByIDTx(txCtx, rpt.ID())
-		if err != nil {
-			return fmt.Errorf("检查报告是否存在失败: %w", err)
+		if err := r.SaveReportRecord(txCtx, rpt, testeeID); err != nil {
+			return err
 		}
-
-		if exists {
-			if err := r.updateTx(txCtx, ctx, rpt); err != nil {
-				return err
-			}
-		} else {
-			if err := r.insertTx(txCtx, ctx, rpt, testeeID); err != nil {
-				return err
-			}
-		}
-
 		if len(events) > 0 {
 			if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
 				return fmt.Errorf("暂存报告事件失败: %w", err)
@@ -96,6 +84,26 @@ func (r *ReportRepository) SaveWithTesteeAndEvents(
 
 		return nil
 	})
+}
+
+func (r *ReportRepository) SaveReportRecord(ctx context.Context, rpt *report.InterpretReport, testeeID testee.ID) error {
+	if rpt == nil {
+		return nil
+	}
+	txCtx, ok := ctx.(mongo.SessionContext)
+	if !ok {
+		return mongoEventOutbox.ErrActiveSessionTransactionRequired
+	}
+
+	exists, err := r.existsByIDTx(txCtx, rpt.ID())
+	if err != nil {
+		return fmt.Errorf("检查报告是否存在失败: %w", err)
+	}
+
+	if exists {
+		return r.updateTx(txCtx, ctx, rpt)
+	}
+	return r.insertTx(txCtx, ctx, rpt, testeeID)
 }
 
 // FindByID 根据ID查找报告

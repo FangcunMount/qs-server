@@ -41,7 +41,7 @@ type OrgOverviewWindow struct {
 	EntryResolvedCount       int64 `json:"entry_resolved_count"`       // 旅程侧：被用户成功打开的入口次数
 	EntryIntakeCount         int64 `json:"entry_intake_count"`         // 旅程侧：完成 intake 的次数
 	RelationAssignedCount    int64 `json:"relation_assigned_count"`    // 旅程侧：建立照护关系的唯一受试者数
-	AssessmentCreatedCount   int64 `json:"assessment_created_count"`   // 旅程侧：形成测评的次数
+	AssessmentCreatedCount   int64 `json:"assessment_created_count"`   // 旅程侧：结果就绪后形成测评的次数
 	AssessmentCompletedCount int64 `json:"assessment_completed_count"` // 旅程侧：结果就绪的次数
 }
 

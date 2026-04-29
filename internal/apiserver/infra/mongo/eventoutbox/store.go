@@ -2,6 +2,7 @@ package eventoutbox
 
 import (
 	"context"
+	stderrors "errors"
 	"fmt"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+var ErrActiveSessionTransactionRequired = stderrors.New("active mongo session transaction required")
 
 // OutboxPO stores domain events until they are durably published.
 type OutboxPO struct {
@@ -107,9 +110,21 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
+func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
+	txCtx, ok := ctx.(mongo.SessionContext)
+	if !ok {
+		return ErrActiveSessionTransactionRequired
+	}
+	return s.stageWithSession(txCtx, events)
+}
+
 // StageEventsTx stages events through an explicit Mongo session transaction.
 // Deprecated: keep this only for existing repository-owned Mongo transactions.
 func (s *Store) StageEventsTx(ctx mongo.SessionContext, events []event.DomainEvent) error {
+	return s.stageWithSession(ctx, events)
+}
+
+func (s *Store) stageWithSession(ctx mongo.SessionContext, events []event.DomainEvent) error {
 	docs, err := s.buildDocuments(events)
 	if err != nil {
 		return err

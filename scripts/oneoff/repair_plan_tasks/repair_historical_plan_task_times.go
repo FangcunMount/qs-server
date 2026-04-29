@@ -736,16 +736,10 @@ FROM repair_plan_task_time_scope WHERE old_episode_submitted_at IS NOT NULL`,
 SELECT org_id, clinician_id, entry_id, DATE(new_submitted_at), 1, 0, 0, 0
 FROM repair_plan_task_time_scope`,
 		`INSERT INTO repair_plan_task_projection_delta_raw
-SELECT org_id, clinician_id, entry_id, DATE(old_episode_assessment_created_at), 0, -1, 0, 0
-FROM repair_plan_task_time_scope WHERE old_episode_assessment_created_at IS NOT NULL`,
-		`INSERT INTO repair_plan_task_projection_delta_raw
-SELECT org_id, clinician_id, entry_id, DATE(new_assessment_created_at), 0, 1, 0, 0
-FROM repair_plan_task_time_scope WHERE old_episode_assessment_created_at IS NOT NULL`,
-		`INSERT INTO repair_plan_task_projection_delta_raw
-SELECT org_id, clinician_id, entry_id, DATE(old_episode_report_generated_at), 0, 0, -1, -1
+SELECT org_id, clinician_id, entry_id, DATE(old_episode_report_generated_at), 0, -1, -1, -1
 FROM repair_plan_task_time_scope WHERE old_episode_report_generated_at IS NOT NULL`,
 		`INSERT INTO repair_plan_task_projection_delta_raw
-SELECT org_id, clinician_id, entry_id, DATE(new_report_generated_at), 0, 0, 1, 1
+SELECT org_id, clinician_id, entry_id, DATE(new_report_generated_at), 0, 1, 1, 1
 FROM repair_plan_task_time_scope WHERE new_report_generated_at IS NOT NULL`,
 		`CREATE TEMPORARY TABLE repair_plan_task_projection_delta DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AS
 SELECT org_id, clinician_id, entry_id, stat_date,

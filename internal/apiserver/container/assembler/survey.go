@@ -230,7 +230,9 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, limiter
 	scoringDomainService := answersheet.NewScoringService()
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, baseRepo, quesRepo, batchValidator)
+	mongoTxRunner := newMongoTransactionRunner(mongoDB)
+	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, baseRepo, baseRepo)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
 	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)

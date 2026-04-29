@@ -41,6 +41,7 @@ type service struct {
 	waiterRegistry waiterNotifier
 	txRunner       apptransaction.Runner
 	eventStager    EventStager
+	reportSaver    pipeline.ReportDurableSaver
 
 	// 处理器链
 	pipeline *pipeline.Chain
@@ -64,6 +65,12 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 	return func(s *service) {
 		s.txRunner = txRunner
 		s.eventStager = eventStager
+	}
+}
+
+func WithReportDurableSaver(saver pipeline.ReportDurableSaver) ServiceOption {
+	return func(s *service) {
+		s.reportSaver = saver
 	}
 }
 
@@ -114,7 +121,9 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	chain.AddHandler(pipeline.NewRiskLevelHandler(s.scoreRepo))
 
 	// 4. 测评分析解读处理器
-	chain.AddHandler(pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder))
+	interpretationHandler := pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder)
+	interpretationHandler.SetReportDurableSaver(s.reportSaver)
+	chain.AddHandler(interpretationHandler)
 
 	// 5. 本地 waiter 通知处理器
 	if s.waiterRegistry != nil {

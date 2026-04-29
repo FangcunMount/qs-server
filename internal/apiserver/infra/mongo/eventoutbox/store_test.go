@@ -1,6 +1,7 @@
 package eventoutbox
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -89,6 +90,15 @@ func TestBuildDocumentsRejectsBestEffortEvent(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "best_effort") {
 		t.Fatalf("error = %v, want delivery class", err)
+	}
+}
+
+func TestStageRequiresActiveSessionTransactionContext(t *testing.T) {
+	store := &Store{}
+
+	err := store.Stage(t.Context())
+	if !errors.Is(err, ErrActiveSessionTransactionRequired) {
+		t.Fatalf("Stage error = %v, want ErrActiveSessionTransactionRequired", err)
 	}
 }
 

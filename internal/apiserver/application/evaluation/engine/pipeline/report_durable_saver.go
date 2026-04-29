@@ -2,7 +2,9 @@ package pipeline
 
 import (
 	"context"
+	"fmt"
 
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -12,8 +14,22 @@ type ReportDurableSaver interface {
 	SaveReportDurably(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error
 }
 
+type ReportDurableWriter interface {
+	SaveReportRecord(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID) error
+}
+
+type ReportEventStager interface {
+	Stage(ctx context.Context, events ...event.DomainEvent) error
+}
+
 type eventfulReportRepositoryAdapter struct {
 	repo domainReport.ReportRepository
+}
+
+type transactionalReportDurableSaver struct {
+	runner apptransaction.Runner
+	writer ReportDurableWriter
+	stager ReportEventStager
 }
 
 func NewReportDurableSaver(repo domainReport.ReportRepository) ReportDurableSaver {
@@ -26,6 +42,37 @@ func NewReportDurableSaver(repo domainReport.ReportRepository) ReportDurableSave
 	return eventfulReportRepositoryAdapter{repo: repo}
 }
 
+func NewTransactionalReportDurableSaver(
+	runner apptransaction.Runner,
+	writer ReportDurableWriter,
+	stager ReportEventStager,
+) ReportDurableSaver {
+	return transactionalReportDurableSaver{
+		runner: runner,
+		writer: writer,
+		stager: stager,
+	}
+}
+
 func (a eventfulReportRepositoryAdapter) SaveReportDurably(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
 	return a.repo.SaveWithTesteeAndEvents(ctx, rpt, testeeID, events)
+}
+
+func (s transactionalReportDurableSaver) SaveReportDurably(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
+	if rpt == nil {
+		return nil
+	}
+	if s.runner == nil || s.writer == nil || s.stager == nil {
+		return fmt.Errorf("report transactional durable saver requires transaction runner, writer and event stager")
+	}
+
+	return s.runner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.writer.SaveReportRecord(txCtx, rpt, testeeID); err != nil {
+			return err
+		}
+		if len(events) == 0 {
+			return nil
+		}
+		return s.stager.Stage(txCtx, events...)
+	})
 }

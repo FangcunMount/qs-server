@@ -13,6 +13,7 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
@@ -27,6 +28,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
+	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
@@ -89,6 +91,7 @@ type EvaluationModule struct {
 	eventPublisher        event.EventPublisher
 	testeeAccessService   actorAccessApp.TesteeAccessService
 	assessmentOutboxStore *mysqlEventOutbox.Store
+	reportDurableSaver    pipeline.ReportDurableSaver
 }
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
@@ -143,7 +146,13 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	}
 	module.ReportRepo = reportRepo
 	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
+	mongoTxRunner := newMongoTransactionRunner(normalized.MongoDB)
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
+	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(normalized.MongoDB, normalized.TopicResolver)
+	if err != nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
+	}
+	module.reportDurableSaver = pipeline.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
 	module.assessmentOutboxStore = assessmentOutboxStore
 	module.AssessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, module.eventPublisher)
 	module.AssessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
@@ -182,6 +191,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 			serviceOpts = append(serviceOpts, engine.WithWaiterRegistry(waiterRegistry))
 		}
 		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore))
+		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(module.reportDurableSaver))
 
 		module.EvaluationService = engine.NewService(
 			module.AssessmentRepo,
@@ -308,6 +318,9 @@ func (m *EvaluationModule) SetScaleRepository(
 	serviceOpts := []engine.ServiceOption{}
 	if m.assessmentOutboxStore != nil {
 		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(newMySQLTransactionRunner(m.mysqlDB), m.assessmentOutboxStore))
+	}
+	if m.reportDurableSaver != nil {
+		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(m.reportDurableSaver))
 	}
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,

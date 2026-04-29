@@ -51,7 +51,7 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 	}
 
 	if metaInfo.IdempotencyKey != "" {
-		existing, err := r.findByIdempotencyKey(ctx, metaInfo.IdempotencyKey)
+		existing, err := r.FindCompletedSubmission(ctx, metaInfo.IdempotencyKey)
 		if err != nil {
 			return nil, false, err
 		}
@@ -60,9 +60,47 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 		}
 	}
 
+	if err := r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
+		events, err := r.SaveSubmittedAnswerSheet(txCtx, sheet, metaInfo)
+		if err != nil {
+			return err
+		}
+		if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
+			return err
+		}
+
+		return nil
+	}); err != nil {
+		if metaInfo.IdempotencyKey != "" {
+			existing, lookupErr := r.WaitForCompletedSubmission(ctx, metaInfo.IdempotencyKey)
+			if lookupErr == nil && existing != nil {
+				sheet.ClearEvents()
+				return existing, true, nil
+			}
+		}
+		return nil, false, err
+	}
+
+	sheet.ClearEvents()
+	return sheet, false, nil
+}
+
+func (r *Repository) FindCompletedSubmission(ctx context.Context, idempotencyKey string) (*domainAnswerSheet.AnswerSheet, error) {
+	return r.findByIdempotencyKey(ctx, idempotencyKey)
+}
+
+func (r *Repository) WaitForCompletedSubmission(ctx context.Context, idempotencyKey string) (*domainAnswerSheet.AnswerSheet, error) {
+	return r.waitForCompletedIdempotentResult(ctx, idempotencyKey)
+}
+
+func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta) ([]event.DomainEvent, error) {
+	if sheet == nil {
+		return nil, nil
+	}
+
 	po := r.mapper.ToPO(sheet)
 	if po == nil {
-		return nil, false, nil
+		return nil, nil
 	}
 
 	mongoBase.ApplyAuditCreate(ctx, po)
@@ -72,7 +110,7 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 
 	answerSheetDoc, err := po.ToBsonM()
 	if err != nil {
-		return nil, false, err
+		return nil, err
 	}
 
 	var idempotencyDoc *AnswerSheetSubmitIdempotencyPO
@@ -92,47 +130,33 @@ func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet
 		}
 	}
 
-	if err := r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
-		if idempotencyDoc != nil {
-			if _, err := r.idempotencyColl.InsertOne(txCtx, idempotencyDoc); err != nil {
-				return err
-			}
+	if idempotencyDoc != nil {
+		if _, err := r.idempotencyColl.InsertOne(ctx, idempotencyDoc); err != nil {
+			return nil, err
 		}
-
-		if _, err := r.Collection().InsertOne(txCtx, answerSheetDoc); err != nil {
-			return err
-		}
-
-		events := append([]event.DomainEvent{}, sheet.Events()...)
-		orgID, err := safeconv.Uint64ToInt64(metaInfo.OrgID)
-		if err != nil {
-			return err
-		}
-		events = append(events, domainStatistics.NewFootprintAnswerSheetSubmittedEvent(
-			orgID,
-			metaInfo.TesteeID,
-			sheet.ID().Uint64(),
-			sheet.FilledAt(),
-		))
-
-		if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
-			return err
-		}
-
-		return nil
-	}); err != nil {
-		if metaInfo.IdempotencyKey != "" {
-			existing, lookupErr := r.waitForCompletedIdempotentResult(ctx, metaInfo.IdempotencyKey)
-			if lookupErr == nil && existing != nil {
-				sheet.ClearEvents()
-				return existing, true, nil
-			}
-		}
-		return nil, false, err
 	}
 
-	sheet.ClearEvents()
-	return sheet, false, nil
+	if _, err := r.Collection().InsertOne(ctx, answerSheetDoc); err != nil {
+		return nil, err
+	}
+
+	events := append([]event.DomainEvent{}, sheet.Events()...)
+	orgID, err := safeconv.Uint64ToInt64(metaInfo.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	events = append(events, domainStatistics.NewFootprintAnswerSheetSubmittedEvent(
+		orgID,
+		metaInfo.TesteeID,
+		sheet.ID().Uint64(),
+		sheet.FilledAt(),
+	))
+
+	return events, nil
+}
+
+func (r *Repository) Stage(ctx context.Context, events ...event.DomainEvent) error {
+	return r.outboxStore.Stage(ctx, events...)
 }
 
 func (r *Repository) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {

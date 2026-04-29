@@ -95,6 +95,28 @@ func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 	}
 }
 
+func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal/apiserver/container/assembler/survey.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read survey assembler: %v", err)
+	}
+	text := string(data)
+	required := []string{
+		"asApp.NewTransactionalSubmissionDurableStore(",
+		"asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)",
+	}
+	for _, token := range required {
+		if !strings.Contains(text, token) {
+			t.Fatalf("survey production assembler must wire transactional submission durable store with %q", token)
+		}
+	}
+	if strings.Contains(text, "asApp.NewSubmissionService(sub.Repo, baseRepo, quesRepo, batchValidator)") {
+		t.Fatalf("survey production assembler must not pass repository-owned durable store to submission service")
+	}
+}
+
 func TestMongoReportEventfulSaveCompatibilityEntrypointsStayContained(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
@@ -111,6 +133,25 @@ func TestMongoReportEventfulSaveCompatibilityEntrypointsStayContained(t *testing
 			t.Fatalf("%s must use ReportDurableSaver instead of calling SaveWithTesteeAndEvents directly", rel)
 		}
 	})
+}
+
+func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal/apiserver/container/assembler/evaluation.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read evaluation assembler: %v", err)
+	}
+	text := string(data)
+	required := []string{
+		"pipeline.NewTransactionalReportDurableSaver(",
+		"engine.WithReportDurableSaver(module.reportDurableSaver)",
+	}
+	for _, token := range required {
+		if !strings.Contains(text, token) {
+			t.Fatalf("evaluation production assembler must wire transactional report durable saver with %q", token)
+		}
+	}
 }
 
 func TestContainerUsesDurableOutboxRelayConstructor(t *testing.T) {

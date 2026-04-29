@@ -366,24 +366,8 @@ FROM (
   UNION ALL
 
   SELECT
-    s.`org_id`, s.`clinician_id`, s.`entry_id`, DATE(s.`old_episode_assessment_created_at`),
-    0, -1, 0, 0
-  FROM `repair_plan_task_time_scope` s
-  WHERE s.`old_episode_assessment_created_at` IS NOT NULL
-
-  UNION ALL
-
-  SELECT
-    s.`org_id`, s.`clinician_id`, s.`entry_id`, DATE(s.`new_assessment_created_at`),
-    0, 1, 0, 0
-  FROM `repair_plan_task_time_scope` s
-  WHERE s.`old_episode_assessment_created_at` IS NOT NULL
-
-  UNION ALL
-
-  SELECT
     s.`org_id`, s.`clinician_id`, s.`entry_id`, DATE(s.`old_episode_report_generated_at`),
-    0, 0, -1, -1
+    0, -1, -1, -1
   FROM `repair_plan_task_time_scope` s
   WHERE s.`old_episode_report_generated_at` IS NOT NULL
 
@@ -391,7 +375,7 @@ FROM (
 
   SELECT
     s.`org_id`, s.`clinician_id`, s.`entry_id`, DATE(s.`new_report_generated_at`),
-    0, 0, 1, 1
+    0, 1, 1, 1
   FROM `repair_plan_task_time_scope` s
   WHERE s.`new_report_generated_at` IS NOT NULL
 ) d

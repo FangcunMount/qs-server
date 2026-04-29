@@ -2,14 +2,11 @@ package statistics
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"time"
 
 	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -97,15 +94,24 @@ func (s *behaviorEventStager) StageCareRelationshipTransferred(ctx context.Conte
 }
 
 type assessmentEpisodeProjector struct {
-	uow  apptransaction.Runner
-	repo BehaviorProjectionRepository
+	uow     apptransaction.Runner
+	repo    BehaviorProjectionRepository
+	router  behaviorEventRouter
+	pending pendingRetryQueue
 }
 
 func NewAssessmentEpisodeProjectorWithTransactionRunner(runner apptransaction.Runner, repo BehaviorProjectionRepository) BehaviorProjectorService {
 	if runner == nil || repo == nil {
 		return nil
 	}
-	return &assessmentEpisodeProjector{uow: runner, repo: repo}
+	projection := projectionWriter{repo: repo}
+	lifecycler := episodeLifecycler{repo: repo, projection: projection}
+	return &assessmentEpisodeProjector{
+		uow:     runner,
+		repo:    repo,
+		router:  behaviorEventRouter{lifecycler: lifecycler},
+		pending: pendingRetryQueue{repo: repo},
+	}
 }
 
 func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventResult, error) {
@@ -122,17 +128,13 @@ func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, i
 			return nil
 		}
 
-		status, err := p.projectEvent(txCtx, input)
+		status, err := p.router.projectEvent(txCtx, input)
 		if err != nil {
 			return err
 		}
 		if status == BehaviorProjectEventStatusPending {
 			result.Status = status
-			payload, err := marshalBehaviorProjectEventInput(input)
-			if err != nil {
-				return err
-			}
-			if err := p.repo.UpsertAnalyticsPendingEvent(txCtx, input.EventID, input.EventType, payload, time.Now().Add(nextBehaviorPendingBackoff(1)), "pending_attribution"); err != nil {
+			if err := p.pending.enqueue(txCtx, input, 1, "pending_attribution"); err != nil {
 				return err
 			}
 			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusPending)
@@ -146,7 +148,7 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 	if limit <= 0 {
 		limit = 100
 	}
-	rows, err := p.repo.ListDueAnalyticsPendingEvents(ctx, limit, time.Now())
+	rows, err := p.pending.listDue(ctx, limit, time.Now())
 	if err != nil {
 		return 0, err
 	}
@@ -155,25 +157,25 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 		if item == nil {
 			continue
 		}
-		var input BehaviorProjectEventInput
-		if err := json.Unmarshal([]byte(item.PayloadJSON), &input); err != nil {
+		input, err := p.pending.decode(item)
+		if err != nil {
 			if txErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-				return p.repo.RescheduleAnalyticsPendingEvent(txCtx, item.EventID, err.Error(), time.Now().Add(nextBehaviorPendingBackoff(item.AttemptCount+1)))
+				return p.pending.reschedule(txCtx, item.EventID, err.Error(), item.AttemptCount+1)
 			}); txErr != nil {
 				return processed, txErr
 			}
 			continue
 		}
 
-		err := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			status, err := p.projectEvent(txCtx, input)
+		err = p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+			status, err := p.router.projectEvent(txCtx, input)
 			if err != nil {
-				return p.repo.RescheduleAnalyticsPendingEvent(txCtx, input.EventID, err.Error(), time.Now().Add(nextBehaviorPendingBackoff(item.AttemptCount+1)))
+				return p.pending.reschedule(txCtx, input.EventID, err.Error(), item.AttemptCount+1)
 			}
 			if status == BehaviorProjectEventStatusPending {
-				return p.repo.RescheduleAnalyticsPendingEvent(txCtx, input.EventID, "pending_attribution", time.Now().Add(nextBehaviorPendingBackoff(item.AttemptCount+1)))
+				return p.pending.reschedule(txCtx, input.EventID, "pending_attribution", item.AttemptCount+1)
 			}
-			if err := p.repo.DeleteAnalyticsPendingEvent(txCtx, input.EventID); err != nil {
+			if err := p.pending.delete(txCtx, input.EventID); err != nil {
 				return err
 			}
 			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusCompleted)
@@ -184,416 +186,4 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 		processed++
 	}
 	return processed, nil
-}
-
-func (p *assessmentEpisodeProjector) projectEvent(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
-	switch input.EventType {
-	case domainStatistics.EventTypeFootprintEntryOpened:
-		return BehaviorProjectEventStatusCompleted, p.applyEntryOpened(ctx, input)
-	case domainStatistics.EventTypeFootprintIntakeConfirmed:
-		return BehaviorProjectEventStatusCompleted, p.applyIntakeConfirmed(ctx, input)
-	case domainStatistics.EventTypeFootprintTesteeProfileCreated:
-		return BehaviorProjectEventStatusCompleted, p.applyTesteeProfileCreated(ctx, input)
-	case domainStatistics.EventTypeFootprintCareRelationshipEstablished:
-		return BehaviorProjectEventStatusCompleted, p.applyCareRelationshipEstablished(ctx, input)
-	case domainStatistics.EventTypeFootprintCareRelationshipTransferred:
-		return BehaviorProjectEventStatusCompleted, p.applyCareRelationshipTransferred(ctx, input)
-	case domainStatistics.EventTypeFootprintAnswerSheetSubmitted:
-		return BehaviorProjectEventStatusCompleted, p.applyAnswerSheetSubmitted(ctx, input)
-	case domainStatistics.EventTypeFootprintAssessmentCreated:
-		return p.applyAssessmentCreated(ctx, input)
-	case domainStatistics.EventTypeFootprintReportGenerated:
-		return p.applyReportGenerated(ctx, input)
-	case domainAssessment.EventTypeFailed:
-		return p.applyAssessmentFailed(ctx, input)
-	default:
-		return BehaviorProjectEventStatusCompleted, fmt.Errorf("unsupported behavior event type %q", input.EventType)
-	}
-}
-
-func (p *assessmentEpisodeProjector) appendBehaviorFootprint(ctx context.Context, input BehaviorProjectEventInput, eventName domainStatistics.BehaviorEventName, subjectType string, subjectID uint64, actorType string, actorID uint64) error {
-	return p.repo.AppendBehaviorFootprint(ctx, &domainStatistics.BehaviorFootprint{
-		ID:                input.EventID,
-		OrgID:             input.OrgID,
-		SubjectType:       subjectType,
-		SubjectID:         subjectID,
-		ActorType:         actorType,
-		ActorID:           actorID,
-		EntryID:           input.EntryID,
-		ClinicianID:       input.ClinicianID,
-		SourceClinicianID: input.SourceClinicianID,
-		TesteeID:          input.TesteeID,
-		AnswerSheetID:     input.AnswerSheetID,
-		AssessmentID:      input.AssessmentID,
-		ReportID:          input.ReportID,
-		EventName:         eventName,
-		OccurredAt:        input.OccurredAt,
-		Properties: map[string]interface{}{
-			"source_event_id": input.EventID,
-			"source_event":    input.EventType,
-		},
-	})
-}
-
-func (p *assessmentEpisodeProjector) applyEntryOpened(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventEntryOpened, "assessment_entry", input.EntryID, "assessment_entry", input.EntryID); err != nil {
-		return err
-	}
-	return p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:            input.OrgID,
-		ClinicianID:      input.ClinicianID,
-		EntryID:          input.EntryID,
-		StatDate:         input.OccurredAt,
-		EntryOpenedCount: 1,
-	})
-}
-
-func (p *assessmentEpisodeProjector) applyIntakeConfirmed(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventIntakeConfirmed, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
-		return err
-	}
-	if err := p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                input.OrgID,
-		ClinicianID:          input.ClinicianID,
-		EntryID:              input.EntryID,
-		StatDate:             input.OccurredAt,
-		IntakeConfirmedCount: 1,
-	}); err != nil {
-		return err
-	}
-	return p.rebindEpisodesToIntake(ctx, input)
-}
-
-func (p *assessmentEpisodeProjector) applyTesteeProfileCreated(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventTesteeProfileCreated, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
-		return err
-	}
-	return p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                     input.OrgID,
-		ClinicianID:               input.ClinicianID,
-		EntryID:                   input.EntryID,
-		StatDate:                  input.OccurredAt,
-		TesteeProfileCreatedCount: 1,
-	})
-}
-
-func (p *assessmentEpisodeProjector) applyCareRelationshipEstablished(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipEstablished, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
-		return err
-	}
-	return p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                            input.OrgID,
-		ClinicianID:                      input.ClinicianID,
-		EntryID:                          input.EntryID,
-		StatDate:                         input.OccurredAt,
-		CareRelationshipEstablishedCount: 1,
-	})
-}
-
-func (p *assessmentEpisodeProjector) applyCareRelationshipTransferred(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipTransferred, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
-		return err
-	}
-	return p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                            input.OrgID,
-		ClinicianID:                      input.ClinicianID,
-		StatDate:                         input.OccurredAt,
-		CareRelationshipTransferredCount: 1,
-	})
-}
-
-func (p *assessmentEpisodeProjector) applyAnswerSheetSubmitted(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAnswerSheetSubmitted, "answersheet", input.AnswerSheetID, "testee", input.TesteeID); err != nil {
-		return err
-	}
-	episode, err := p.repo.FindEpisodeByAnswerSheetID(ctx, input.OrgID, input.AnswerSheetID)
-	if err != nil {
-		return err
-	}
-	if episode == nil {
-		episode = &domainStatistics.AssessmentEpisode{
-			EpisodeID:           input.AnswerSheetID,
-			OrgID:               input.OrgID,
-			TesteeID:            input.TesteeID,
-			AnswerSheetID:       input.AnswerSheetID,
-			SubmittedAt:         input.OccurredAt,
-			Status:              domainStatistics.EpisodeStatusActive,
-			AttributedIntakeAt:  nil,
-			AssessmentCreatedAt: nil,
-			ReportGeneratedAt:   nil,
-			FailedAt:            nil,
-		}
-		if latestIntake, err := p.repo.FindLatestFootprintByEvent(ctx, input.OrgID, input.TesteeID, domainStatistics.BehaviorEventIntakeConfirmed, input.OccurredAt, behaviorAttributionWindow); err != nil {
-			return err
-		} else if latestIntake != nil {
-			if latestIntake.EntryID != 0 {
-				episode.EntryID = uint64Ptr(latestIntake.EntryID)
-			}
-			if latestIntake.ClinicianID != 0 {
-				episode.ClinicianID = uint64Ptr(latestIntake.ClinicianID)
-			}
-			episode.AttributedIntakeAt = timePtr(latestIntake.OccurredAt)
-		}
-		if err := p.repo.SaveEpisode(ctx, episode); err != nil {
-			return err
-		}
-	}
-	return p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                     input.OrgID,
-		ClinicianID:               valueOrZero(episode.ClinicianID),
-		EntryID:                   valueOrZero(episode.EntryID),
-		StatDate:                  input.OccurredAt,
-		AnswerSheetSubmittedCount: 1,
-	})
-}
-
-func (p *assessmentEpisodeProjector) applyAssessmentCreated(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAssessmentCreated, "assessment", input.AssessmentID, "testee", input.TesteeID); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	episode, err := p.repo.FindEpisodeByAnswerSheetID(ctx, input.OrgID, input.AnswerSheetID)
-	if err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	if episode == nil {
-		return BehaviorProjectEventStatusPending, nil
-	}
-	if episode.AssessmentID != nil && *episode.AssessmentID == input.AssessmentID && episode.AssessmentCreatedAt != nil {
-		return BehaviorProjectEventStatusCompleted, nil
-	}
-	episode.AssessmentID = uint64Ptr(input.AssessmentID)
-	episode.AssessmentCreatedAt = timePtr(input.OccurredAt)
-	if err := p.repo.SaveEpisode(ctx, episode); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	if err := p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                  input.OrgID,
-		ClinicianID:            valueOrZero(episode.ClinicianID),
-		EntryID:                valueOrZero(episode.EntryID),
-		StatDate:               input.OccurredAt,
-		AssessmentCreatedCount: 1,
-	}); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	return BehaviorProjectEventStatusCompleted, nil
-}
-
-func (p *assessmentEpisodeProjector) applyReportGenerated(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
-	if err := p.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventReportGenerated, "report", input.ReportID, "assessment", input.AssessmentID); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	episode, err := p.repo.FindEpisodeByAssessmentID(ctx, input.OrgID, input.AssessmentID)
-	if err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	if episode == nil {
-		return BehaviorProjectEventStatusPending, nil
-	}
-	if episode.ReportID != nil && *episode.ReportID == input.ReportID && episode.ReportGeneratedAt != nil {
-		return BehaviorProjectEventStatusCompleted, nil
-	}
-	episode.ReportID = uint64Ptr(input.ReportID)
-	episode.ReportGeneratedAt = timePtr(input.OccurredAt)
-	episode.Status = domainStatistics.EpisodeStatusCompleted
-	if err := p.repo.SaveEpisode(ctx, episode); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	if err := p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:                 input.OrgID,
-		ClinicianID:           valueOrZero(episode.ClinicianID),
-		EntryID:               valueOrZero(episode.EntryID),
-		StatDate:              input.OccurredAt,
-		ReportGeneratedCount:  1,
-		EpisodeCompletedCount: 1,
-	}); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	return BehaviorProjectEventStatusCompleted, nil
-}
-
-func (p *assessmentEpisodeProjector) applyAssessmentFailed(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
-	episode, err := p.repo.FindEpisodeByAssessmentID(ctx, input.OrgID, input.AssessmentID)
-	if err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	if episode == nil {
-		return BehaviorProjectEventStatusPending, nil
-	}
-	if episode.Status == domainStatistics.EpisodeStatusFailed {
-		return BehaviorProjectEventStatusCompleted, nil
-	}
-	episode.Status = domainStatistics.EpisodeStatusFailed
-	episode.FailureReason = input.FailureReason
-	episode.FailedAt = timePtr(input.OccurredAt)
-	if err := p.repo.SaveEpisode(ctx, episode); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	if err := p.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:              input.OrgID,
-		ClinicianID:        valueOrZero(episode.ClinicianID),
-		EntryID:            valueOrZero(episode.EntryID),
-		StatDate:           input.OccurredAt,
-		EpisodeFailedCount: 1,
-	}); err != nil {
-		return BehaviorProjectEventStatusCompleted, err
-	}
-	return BehaviorProjectEventStatusCompleted, nil
-}
-
-func marshalBehaviorProjectEventInput(input BehaviorProjectEventInput) (string, error) {
-	bytes, err := json.Marshal(input)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
-}
-
-func timePtr(v time.Time) *time.Time {
-	return &v
-}
-
-func uint64Ptr(v uint64) *uint64 {
-	return &v
-}
-
-func valueOrZero(v *uint64) uint64 {
-	if v == nil {
-		return 0
-	}
-	return *v
-}
-
-func nextBehaviorPendingBackoff(attemptCount int64) time.Duration {
-	if attemptCount <= 1 {
-		return defaultBehaviorPendingBackoff
-	}
-	backoff := defaultBehaviorPendingBackoff
-	for i := int64(1); i < attemptCount && backoff < maxBehaviorPendingBackoff; i++ {
-		backoff *= 2
-		if backoff >= maxBehaviorPendingBackoff {
-			return maxBehaviorPendingBackoff
-		}
-	}
-	return backoff
-}
-
-func (p *assessmentEpisodeProjector) rebindEpisodesToIntake(ctx context.Context, input BehaviorProjectEventInput) error {
-	episodes, err := p.repo.ListEpisodesForAttribution(ctx, input.OrgID, input.TesteeID, input.OccurredAt, behaviorAttributionWindow)
-	if err != nil {
-		return err
-	}
-	for _, episode := range episodes {
-		if episode == nil || input.OccurredAt.After(episode.SubmittedAt) {
-			continue
-		}
-		oldEntryID := valueOrZero(episode.EntryID)
-		oldClinicianID := valueOrZero(episode.ClinicianID)
-		if episode.AttributedIntakeAt != nil && !input.OccurredAt.After(*episode.AttributedIntakeAt) {
-			continue
-		}
-		episode.EntryID = uint64Ptr(input.EntryID)
-		episode.ClinicianID = uint64Ptr(input.ClinicianID)
-		episode.AttributedIntakeAt = timePtr(input.OccurredAt)
-		if err := p.repo.SaveEpisode(ctx, episode); err != nil {
-			return err
-		}
-		if err := p.reallocateEpisodeProjection(ctx, episode, oldClinicianID, oldEntryID, input.ClinicianID, input.EntryID); err != nil {
-			return err
-		}
-	}
-	return nil
-}
-
-func (p *assessmentEpisodeProjector) reallocateEpisodeProjection(ctx context.Context, episode *domainStatistics.AssessmentEpisode, oldClinicianID, oldEntryID, newClinicianID, newEntryID uint64) error {
-	mutations := episodeProjectionMutations(episode)
-	if oldClinicianID == newClinicianID && oldEntryID == newEntryID {
-		return nil
-	}
-	for _, mutation := range mutations {
-		if oldClinicianID != 0 && oldClinicianID != newClinicianID {
-			negative := mutation
-			negative.ClinicianID = oldClinicianID
-			negative.EntryID = 0
-			invertAnalyticsProjectionMutation(&negative)
-			if err := p.repo.ApplyAnalyticsClinicianProjectionMutation(ctx, negative); err != nil {
-				return err
-			}
-		}
-		if oldEntryID != 0 && oldEntryID != newEntryID {
-			negative := mutation
-			negative.ClinicianID = oldClinicianID
-			negative.EntryID = oldEntryID
-			invertAnalyticsProjectionMutation(&negative)
-			if err := p.repo.ApplyAnalyticsEntryProjectionMutation(ctx, negative); err != nil {
-				return err
-			}
-		}
-		if newClinicianID != 0 && oldClinicianID != newClinicianID {
-			positive := mutation
-			positive.ClinicianID = newClinicianID
-			positive.EntryID = 0
-			if err := p.repo.ApplyAnalyticsClinicianProjectionMutation(ctx, positive); err != nil {
-				return err
-			}
-		}
-		if newEntryID != 0 && oldEntryID != newEntryID {
-			positive := mutation
-			positive.ClinicianID = newClinicianID
-			positive.EntryID = newEntryID
-			if err := p.repo.ApplyAnalyticsEntryProjectionMutation(ctx, positive); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
-}
-
-func episodeProjectionMutations(episode *domainStatistics.AssessmentEpisode) []domainStatistics.AnalyticsProjectionMutation {
-	if episode == nil {
-		return nil
-	}
-	mutations := []domainStatistics.AnalyticsProjectionMutation{{
-		OrgID:                     episode.OrgID,
-		StatDate:                  episode.SubmittedAt,
-		AnswerSheetSubmittedCount: 1,
-	}}
-	if episode.AssessmentCreatedAt != nil {
-		mutations = append(mutations, domainStatistics.AnalyticsProjectionMutation{
-			OrgID:                  episode.OrgID,
-			StatDate:               *episode.AssessmentCreatedAt,
-			AssessmentCreatedCount: 1,
-		})
-	}
-	if episode.ReportGeneratedAt != nil {
-		mutations = append(mutations, domainStatistics.AnalyticsProjectionMutation{
-			OrgID:                 episode.OrgID,
-			StatDate:              *episode.ReportGeneratedAt,
-			ReportGeneratedCount:  1,
-			EpisodeCompletedCount: 1,
-		})
-	}
-	if episode.Status == domainStatistics.EpisodeStatusFailed && episode.FailedAt != nil {
-		mutations = append(mutations, domainStatistics.AnalyticsProjectionMutation{
-			OrgID:              episode.OrgID,
-			StatDate:           *episode.FailedAt,
-			EpisodeFailedCount: 1,
-		})
-	}
-	return mutations
-}
-
-func invertAnalyticsProjectionMutation(mutation *domainStatistics.AnalyticsProjectionMutation) {
-	if mutation == nil {
-		return
-	}
-	mutation.EntryOpenedCount *= -1
-	mutation.IntakeConfirmedCount *= -1
-	mutation.TesteeProfileCreatedCount *= -1
-	mutation.CareRelationshipEstablishedCount *= -1
-	mutation.CareRelationshipTransferredCount *= -1
-	mutation.AnswerSheetSubmittedCount *= -1
-	mutation.AssessmentCreatedCount *= -1
-	mutation.ReportGeneratedCount *= -1
-	mutation.EpisodeCompletedCount *= -1
-	mutation.EpisodeFailedCount *= -1
 }

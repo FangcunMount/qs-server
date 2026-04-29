@@ -48,6 +48,12 @@ func NewInterpretationHandler(
 	}
 }
 
+func (h *InterpretationHandler) SetReportDurableSaver(saver ReportDurableSaver) {
+	if saver != nil {
+		h.reportSaver = saver
+	}
+}
+
 // Handle 处理测评分析解读
 func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) error {
 	l := logger.L(ctx)
