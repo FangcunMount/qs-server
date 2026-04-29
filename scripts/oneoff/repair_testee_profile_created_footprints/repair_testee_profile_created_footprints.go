@@ -312,12 +312,23 @@ func prepareRepairScope(ctx context.Context, conn *sql.Conn) error {
 		insertTargetByOccurredAtSQL,
 		insertTargetBySourceTesteeSQL,
 	}
-	for _, stmt := range statements {
+	for i, stmt := range statements {
 		if _, err := conn.ExecContext(ctx, stmt); err != nil {
-			return err
+			return fmt.Errorf("statement %d %q: %w", i+1, statementName(stmt), err)
 		}
 	}
 	return nil
+}
+
+func statementName(stmt string) string {
+	stmt = strings.TrimSpace(stmt)
+	if idx := strings.IndexByte(stmt, '\n'); idx >= 0 {
+		stmt = stmt[:idx]
+	}
+	if len(stmt) > 96 {
+		return stmt[:96] + "..."
+	}
+	return stmt
 }
 
 func loadRepairSummary(ctx context.Context, conn *sql.Conn) (repairSummary, error) {
@@ -568,7 +579,7 @@ CREATE TEMPORARY TABLE repair_testee_profile_created_source (
   PRIMARY KEY (id),
   UNIQUE KEY uniq_source_org_testee (org_id, testee_id),
   KEY idx_source_org_time (org_id, occurred_at)
-) ENGINE=InnoDB`
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 
 const insertSourceSQL = `
 INSERT INTO repair_testee_profile_created_source (
@@ -591,7 +602,7 @@ CREATE TEMPORARY TABLE repair_testee_profile_created_existing (
   testee_id BIGINT UNSIGNED NOT NULL,
   footprint_id VARCHAR(128) NOT NULL,
   PRIMARY KEY (org_id, testee_id)
-) ENGINE=InnoDB`
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 
 const insertExistingTableSQL = `
 INSERT INTO repair_testee_profile_created_existing (
@@ -631,7 +642,7 @@ CREATE TEMPORARY TABLE repair_testee_profile_created_relation (
   testee_id BIGINT UNSIGNED NOT NULL,
   relation_id BIGINT UNSIGNED NOT NULL,
   PRIMARY KEY (org_id, testee_id)
-) ENGINE=InnoDB`
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 
 const insertRelationTableSQL = `
 INSERT INTO repair_testee_profile_created_relation (
@@ -670,7 +681,7 @@ const createTargetTableSQL = `
 CREATE TEMPORARY TABLE repair_testee_profile_created_target (
   id VARCHAR(128) NOT NULL,
   PRIMARY KEY (id)
-) ENGINE=InnoDB`
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`
 
 const insertTargetByOccurredAtSQL = `
 INSERT IGNORE INTO repair_testee_profile_created_target (id)
