@@ -110,6 +110,9 @@ func main() {
 	if err != nil {
 		log.Fatalf("load affected statistics window: %v", err)
 	}
+	if err := prepareFootprintScope(ctx, conn); err != nil {
+		log.Fatalf("prepare footprint scope: %v", err)
+	}
 	if err := backupMySQL(ctx, conn, cfg.backupSuffix); err != nil {
 		log.Fatalf("backup mysql: %v", err)
 	}
@@ -598,6 +601,80 @@ FROM repair_mock_task_completion_scope`).Scan(&from, &to)
 	return normalizeLocalDay(from.Time), normalizeLocalDay(to.Time), nil
 }
 
+func prepareFootprintScope(ctx context.Context, conn *sql.Conn) error {
+	statements := []struct {
+		name string
+		sql  string
+	}{
+		{
+			name: "drop old footprint scope",
+			sql:  "DROP TEMPORARY TABLE IF EXISTS repair_mock_task_footprint_scope",
+		},
+		{
+			name: "create footprint scope",
+			sql: `
+CREATE TEMPORARY TABLE repair_mock_task_footprint_scope (
+  footprint_id VARCHAR(128) NOT NULL PRIMARY KEY,
+  task_id BIGINT UNSIGNED NOT NULL,
+  org_id BIGINT NOT NULL,
+  plan_id BIGINT UNSIGNED NOT NULL,
+  answer_sheet_id BIGINT UNSIGNED NOT NULL,
+  assessment_id BIGINT UNSIGNED NOT NULL,
+  KEY idx_repair_mock_footprint_scope_task (task_id),
+  KEY idx_repair_mock_footprint_scope_org (org_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`,
+		},
+		{
+			name: "collect footprints by answersheet",
+			sql: `
+INSERT IGNORE INTO repair_mock_task_footprint_scope (
+  footprint_id, task_id, org_id, plan_id, answer_sheet_id, assessment_id
+)
+SELECT bf.id, s.task_id, s.org_id, s.plan_id, s.answer_sheet_id, s.assessment_id
+FROM repair_mock_task_completion_scope s
+STRAIGHT_JOIN behavior_footprint bf
+  ON bf.org_id = s.org_id
+ AND bf.answersheet_id = s.answer_sheet_id
+WHERE bf.deleted_at IS NULL
+  AND bf.event_name COLLATE utf8mb4_unicode_ci IN (
+    'answersheet_submitted' COLLATE utf8mb4_unicode_ci,
+    'assessment_created' COLLATE utf8mb4_unicode_ci,
+    'report_generated' COLLATE utf8mb4_unicode_ci
+  )`,
+		},
+		{
+			name: "collect footprints by assessment",
+			sql: `
+INSERT IGNORE INTO repair_mock_task_footprint_scope (
+  footprint_id, task_id, org_id, plan_id, answer_sheet_id, assessment_id
+)
+SELECT bf.id, s.task_id, s.org_id, s.plan_id, s.answer_sheet_id, s.assessment_id
+FROM repair_mock_task_completion_scope s
+STRAIGHT_JOIN behavior_footprint bf
+  ON bf.org_id = s.org_id
+ AND bf.assessment_id = s.assessment_id
+WHERE bf.deleted_at IS NULL
+  AND bf.event_name COLLATE utf8mb4_unicode_ci IN (
+    'answersheet_submitted' COLLATE utf8mb4_unicode_ci,
+    'assessment_created' COLLATE utf8mb4_unicode_ci,
+    'report_generated' COLLATE utf8mb4_unicode_ci
+  )`,
+		},
+	}
+	for _, statement := range statements {
+		log.Printf("prepare footprint scope: %s", statement.name)
+		if _, err := conn.ExecContext(ctx, statement.sql); err != nil {
+			return err
+		}
+	}
+	var count int64
+	if err := conn.QueryRowContext(ctx, "SELECT COUNT(*) FROM repair_mock_task_footprint_scope").Scan(&count); err != nil {
+		return err
+	}
+	log.Printf("prepare footprint scope: matched footprints=%d", count)
+	return nil
+}
+
 func backupMySQL(ctx context.Context, conn *sql.Conn, suffix string) error {
 	statements := []string{
 		fmt.Sprintf("CREATE TABLE repair_bak_mock_task_completion_scope_%s AS SELECT * FROM repair_mock_task_completion_scope", suffix),
@@ -627,15 +704,7 @@ WHERE e.deleted_at IS NULL`, suffix)
 	footprintInsert := fmt.Sprintf(`
 INSERT IGNORE INTO repair_bak_mock_task_completion_footprint_%s
 SELECT bf.* FROM behavior_footprint bf
-INNER JOIN repair_mock_task_completion_scope s
-   ON s.org_id = bf.org_id
-  AND (s.answer_sheet_id = bf.answersheet_id OR s.assessment_id = bf.assessment_id)
-WHERE bf.deleted_at IS NULL
-  AND bf.event_name COLLATE utf8mb4_unicode_ci IN (
-    'answersheet_submitted' COLLATE utf8mb4_unicode_ci,
-    'assessment_created' COLLATE utf8mb4_unicode_ci,
-    'report_generated' COLLATE utf8mb4_unicode_ci
-  )`, suffix)
+INNER JOIN repair_mock_task_footprint_scope fs ON fs.footprint_id = bf.id`, suffix)
 	log.Printf("backup mysql step 6/6")
 	_, err := conn.ExecContext(ctx, footprintInsert)
 	return err
@@ -705,9 +774,7 @@ WHERE e.deleted_at IS NULL`,
 			name: "clear footprint entry attribution",
 			sql: `
 UPDATE behavior_footprint bf
-INNER JOIN repair_mock_task_completion_scope s
-   ON s.org_id = bf.org_id
-  AND (s.answer_sheet_id = bf.answersheet_id OR s.assessment_id = bf.assessment_id)
+INNER JOIN repair_mock_task_footprint_scope fs ON fs.footprint_id = bf.id
 SET
   bf.entry_id = 0,
   bf.clinician_id = 0,
@@ -716,19 +783,15 @@ SET
     COALESCE(bf.properties_json, JSON_OBJECT()),
     '$.repair_source', 'repair_mock_plan_task_completion_rate',
     '$.origin_type', 'adhoc',
-    '$.detached_plan_id', s.plan_id,
-    '$.detached_task_id', s.task_id
+    '$.detached_plan_id', fs.plan_id,
+    '$.detached_task_id', fs.task_id
   ),
   bf.updated_at = NOW(3)
-WHERE bf.deleted_at IS NULL
-  AND bf.event_name COLLATE utf8mb4_unicode_ci IN (
-    'answersheet_submitted' COLLATE utf8mb4_unicode_ci,
-    'assessment_created' COLLATE utf8mb4_unicode_ci,
-    'report_generated' COLLATE utf8mb4_unicode_ci
-  )`,
+WHERE bf.deleted_at IS NULL`,
 		},
 	}
 	for _, statement := range statements {
+		log.Printf("repair mysql step: %s", statement.name)
 		result, err := tx.ExecContext(ctx, statement.sql, statement.args...)
 		if err != nil {
 			return fmt.Errorf("%s: %w", statement.name, err)
