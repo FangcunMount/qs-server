@@ -136,7 +136,7 @@ func (r *managementRepoStub) FindByOrgIDAndTesteeIDs(_ context.Context, orgID in
 	return r.findByScopeAssessments, r.findByScopeTotal, nil
 }
 
-func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
+func TestManagementServiceRetryRequiresTransactionalOutbox(t *testing.T) {
 	id := domain.NewID(9001)
 	testeeID := testee.NewID(3001)
 	submittedAt := time.Now().Add(-time.Hour)
@@ -163,26 +163,62 @@ func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
 	repo := &managementRepoStub{assessment: a}
 	svc := NewManagementService(repo, nil)
 
-	result, err := svc.Retry(context.Background(), 9, id.Uint64())
-	if err != nil {
-		t.Fatalf("Retry returned error: %v", err)
+	if _, err := svc.Retry(context.Background(), 9, id.Uint64()); err == nil {
+		t.Fatal("expected Retry to fail when transactional outbox is not configured")
+	}
+	if repo.saved != nil {
+		t.Fatal("expected repository Save not to be called without transactional outbox")
+	}
+	if repo.savedWithEvents != nil {
+		t.Fatal("expected deprecated SaveWithEvents fallback not to be called")
+	}
+}
+
+func TestSaveAssessmentAndStageEventsRequiresCompleteTransactionalOutboxConfig(t *testing.T) {
+	submittedAt := time.Now().Add(-time.Hour)
+	a := domain.Reconstruct(
+		domain.NewID(9002),
+		9,
+		testee.NewID(3002),
+		domain.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		domain.NewAnswerSheetRef(meta.FromUint64(4002)),
+		nil,
+		domain.NewAdhocOrigin(),
+		domain.StatusSubmitted,
+		nil,
+		nil,
+		&submittedAt,
+		nil,
+		nil,
+		nil,
+	)
+	if err := a.MarkAsFailed("pipeline failed"); err != nil {
+		t.Fatalf("MarkAsFailed returned error: %v", err)
 	}
 
-	if result.Status != domain.StatusSubmitted.String() {
-		t.Fatalf("expected submitted result status, got %s", result.Status)
+	assertMissingDependency := func(t *testing.T, repo *managementRepoStub, err error) {
+		t.Helper()
+		if err == nil {
+			t.Fatal("expected missing transactional outbox dependency to fail")
+		}
+		if repo.saved != nil {
+			t.Fatal("expected repository Save not to be called")
+		}
+		if repo.savedWithEvents != nil {
+			t.Fatal("expected deprecated eventful save fallback not to be called")
+		}
 	}
-	if repo.savedWithEvents == nil {
-		t.Fatalf("expected retried assessment to be saved with outbox events")
-	}
-	if !repo.savedWithEvents.Status().IsSubmitted() {
-		t.Fatalf("expected saved assessment to be submitted, got %s", repo.savedWithEvents.Status())
-	}
-	if len(repo.savedEventTypes) != 1 {
-		t.Fatalf("expected one staged event, got %d", len(repo.savedEventTypes))
-	}
-	if repo.savedEventTypes[0] != domain.EventTypeSubmitted {
-		t.Fatalf("expected assessment.submitted event, got %s", repo.savedEventTypes[0])
-	}
+
+	t.Run("missing tx runner", func(t *testing.T) {
+		repo := &managementRepoStub{}
+		err := saveAssessmentAndStageEvents(context.Background(), repo, nil, &recordingEventStager{}, a, nil)
+		assertMissingDependency(t, repo, err)
+	})
+	t.Run("missing stager", func(t *testing.T) {
+		repo := &managementRepoStub{}
+		err := saveAssessmentAndStageEvents(context.Background(), repo, &recordingTxRunner{}, nil, a, nil)
+		assertMissingDependency(t, repo, err)
+	})
 }
 
 func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *testing.T) {

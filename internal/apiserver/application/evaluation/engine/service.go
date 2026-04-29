@@ -411,7 +411,7 @@ func (s *service) markAsFailed(ctx context.Context, a *assessment.Assessment, re
 
 func (s *service) saveAssessmentWithEvents(ctx context.Context, a *assessment.Assessment) error {
 	if s.txRunner == nil || s.eventStager == nil {
-		return s.assessmentRepo.SaveWithEvents(ctx, a)
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment engine transactional outbox requires transaction runner and event stager")
 	}
 	if a == nil {
 		return nil

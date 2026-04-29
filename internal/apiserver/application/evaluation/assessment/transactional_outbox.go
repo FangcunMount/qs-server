@@ -3,8 +3,10 @@ package assessment
 import (
 	"context"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -21,10 +23,7 @@ func saveAssessmentAndStageEvents(
 	additional []event.DomainEvent,
 ) error {
 	if txRunner == nil || stager == nil {
-		if len(additional) > 0 {
-			return repo.SaveWithAdditionalEvents(ctx, a, additional)
-		}
-		return repo.SaveWithEvents(ctx, a)
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment transactional outbox requires transaction runner and event stager")
 	}
 	if a == nil {
 		return nil

@@ -1,6 +1,7 @@
 package architecture
 
 import (
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -59,11 +60,9 @@ func TestOutboxStagingCompatibilityEntrypointsStayContained(t *testing.T) {
 func TestAssessmentEventfulSaveCompatibilityEntrypointsStayContained(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
-		"internal/apiserver/application/evaluation/assessment/transactional_outbox.go": {},
-		"internal/apiserver/application/evaluation/engine/service.go":                  {},
-		"internal/apiserver/domain/evaluation/assessment/repository.go":                {},
-		"internal/apiserver/infra/cache/assessment_detail_cache.go":                    {},
-		"internal/apiserver/infra/mysql/evaluation/assessment_repository.go":           {},
+		"internal/apiserver/domain/evaluation/assessment/repository.go":      {},
+		"internal/apiserver/infra/cache/assessment_detail_cache.go":          {},
+		"internal/apiserver/infra/mysql/evaluation/assessment_repository.go": {},
 	}
 	walkGoFiles(t, filepath.Join(root, "internal/apiserver"), func(path string, text string) {
 		if strings.HasSuffix(path, "_test.go") || (!strings.Contains(text, "SaveWithEvents(") && !strings.Contains(text, "SaveWithAdditionalEvents(")) {
@@ -74,6 +73,26 @@ func TestAssessmentEventfulSaveCompatibilityEntrypointsStayContained(t *testing.
 			t.Fatalf("%s must use application UoW + outbox stager instead of eventful repository save compatibility methods", rel)
 		}
 	})
+}
+
+func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal/apiserver/container/assembler/evaluation.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read evaluation assembler: %v", err)
+	}
+	text := string(data)
+	required := []string{
+		"engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore)",
+		"assessmentApp.NewSubmissionServiceWithTransactionalOutbox(",
+		"assessmentApp.NewManagementServiceWithTransactionalOutbox(",
+	}
+	for _, token := range required {
+		if !strings.Contains(text, token) {
+			t.Fatalf("evaluation production assembler must wire assessment transactional outbox with %q", token)
+		}
+	}
 }
 
 func TestMongoReportEventfulSaveCompatibilityEntrypointsStayContained(t *testing.T) {

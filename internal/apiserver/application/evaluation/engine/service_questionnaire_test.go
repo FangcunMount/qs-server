@@ -17,11 +17,38 @@ import (
 )
 
 type fakeAssessmentRepo struct {
-	assessment *domainAssessment.Assessment
-	saveCalls  int
+	assessment         *domainAssessment.Assessment
+	saveCalls          int
+	eventfulSaveCalls  int
+	saveCtxHadTxMarker bool
 }
 
-func (r *fakeAssessmentRepo) Save(_ context.Context, assessment *domainAssessment.Assessment) error {
+type engineTxCtxMarker struct{}
+
+type engineRecordingTxRunner struct {
+	called bool
+}
+
+func (r *engineRecordingTxRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	r.called = true
+	return fn(context.WithValue(ctx, engineTxCtxMarker{}, true))
+}
+
+type engineRecordingEventStager struct {
+	ctxHadTxMarker bool
+	eventTypes     []string
+}
+
+func (s *engineRecordingEventStager) Stage(ctx context.Context, events ...event.DomainEvent) error {
+	s.ctxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
+	for _, evt := range events {
+		s.eventTypes = append(s.eventTypes, evt.EventType())
+	}
+	return nil
+}
+
+func (r *fakeAssessmentRepo) Save(ctx context.Context, assessment *domainAssessment.Assessment) error {
+	r.saveCtxHadTxMarker, _ = ctx.Value(engineTxCtxMarker{}).(bool)
 	r.assessment = assessment
 	r.saveCalls++
 	return nil
@@ -29,6 +56,7 @@ func (r *fakeAssessmentRepo) Save(_ context.Context, assessment *domainAssessmen
 
 func (r *fakeAssessmentRepo) SaveWithEvents(_ context.Context, assessment *domainAssessment.Assessment) error {
 	r.assessment = assessment
+	r.eventfulSaveCalls++
 	r.saveCalls++
 	assessment.ClearEvents()
 	return nil
@@ -36,6 +64,7 @@ func (r *fakeAssessmentRepo) SaveWithEvents(_ context.Context, assessment *domai
 
 func (r *fakeAssessmentRepo) SaveWithAdditionalEvents(_ context.Context, assessment *domainAssessment.Assessment, _ []event.DomainEvent) error {
 	r.assessment = assessment
+	r.eventfulSaveCalls++
 	r.saveCalls++
 	assessment.ClearEvents()
 	return nil
@@ -293,6 +322,8 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 		scaleRepo:         &fakeScaleRepo{scale: scaleDomain},
 		answerSheetRepo:   &fakeAnswerSheetRepo{answerSheet: answerSheet},
 		questionnaireRepo: &fakeQuestionnaireRepo{},
+		txRunner:          &engineRecordingTxRunner{},
+		eventStager:       &engineRecordingEventStager{},
 	}
 
 	err = svc.Evaluate(context.Background(), 101)
@@ -305,6 +336,88 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 	if aRepo.saveCalls == 0 {
 		t.Fatal("assessment should be persisted after markAsFailed")
 	}
+	if aRepo.eventfulSaveCalls != 0 {
+		t.Fatal("deprecated SaveWithEvents fallback should not be used")
+	}
+	if !aRepo.saveCtxHadTxMarker {
+		t.Fatal("assessment Save should receive transaction context")
+	}
+}
+
+func TestSaveAssessmentWithEventsRequiresTransactionalOutbox(t *testing.T) {
+	a := engineAssessmentForOutboxTest(t)
+	if err := a.MarkAsFailed("pipeline failed"); err != nil {
+		t.Fatalf("MarkAsFailed returned error: %v", err)
+	}
+	repo := &fakeAssessmentRepo{}
+	svc := &service{assessmentRepo: repo}
+
+	err := svc.saveAssessmentWithEvents(context.Background(), a)
+	if err == nil {
+		t.Fatal("expected missing transactional outbox dependencies to fail")
+	}
+	if repo.saveCalls != 0 {
+		t.Fatalf("repository save calls = %d, want 0", repo.saveCalls)
+	}
+	if repo.eventfulSaveCalls != 0 {
+		t.Fatal("deprecated SaveWithEvents fallback should not be used")
+	}
+}
+
+func TestSaveAssessmentWithEventsStagesThroughApplicationTransaction(t *testing.T) {
+	a := engineAssessmentForOutboxTest(t)
+	if err := a.MarkAsFailed("pipeline failed"); err != nil {
+		t.Fatalf("MarkAsFailed returned error: %v", err)
+	}
+	repo := &fakeAssessmentRepo{}
+	txRunner := &engineRecordingTxRunner{}
+	stager := &engineRecordingEventStager{}
+	svc := &service{assessmentRepo: repo, txRunner: txRunner, eventStager: stager}
+
+	if err := svc.saveAssessmentWithEvents(context.Background(), a); err != nil {
+		t.Fatalf("saveAssessmentWithEvents returned error: %v", err)
+	}
+	if !txRunner.called {
+		t.Fatal("expected transaction runner to be used")
+	}
+	if repo.saveCalls != 1 {
+		t.Fatalf("repository save calls = %d, want 1", repo.saveCalls)
+	}
+	if repo.eventfulSaveCalls != 0 {
+		t.Fatal("deprecated SaveWithEvents fallback should not be used")
+	}
+	if !repo.saveCtxHadTxMarker {
+		t.Fatal("assessment Save should receive transaction context")
+	}
+	if !stager.ctxHadTxMarker {
+		t.Fatal("event stager should receive transaction context")
+	}
+	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domainAssessment.EventTypeFailed {
+		t.Fatalf("staged event types = %#v, want assessment failed", stager.eventTypes)
+	}
+	if len(a.Events()) != 0 {
+		t.Fatalf("expected events to be cleared after successful transaction, got %d", len(a.Events()))
+	}
+}
+
+func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
+	t.Helper()
+	return domainAssessment.Reconstruct(
+		meta.FromUint64(9901),
+		1,
+		testee.NewID(202),
+		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "0.9.0"),
+		domainAssessment.NewAnswerSheetRef(meta.FromUint64(303)),
+		ptr(domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")),
+		domainAssessment.NewAdhocOrigin(),
+		domainAssessment.StatusSubmitted,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+		nil,
+	)
 }
 
 func ptr[T any](v T) *T {
