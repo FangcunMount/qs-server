@@ -32,6 +32,7 @@ type config struct {
 	targetRate       float64
 	seed             string
 	downgradeStatus  string
+	includeUnlinked  bool
 	backupSuffix     string
 	previewLimit     int
 	timeout          time.Duration
@@ -155,6 +156,7 @@ func parseFlags() config {
 	flag.Float64Var(&cfg.targetRate, "target-rate", 0.50, "target completion-rate after downgrading eligible completed tasks")
 	flag.StringVar(&cfg.seed, "seed", "mock-plan-task-completion-rate-v1", "stable seed used to choose tasks to downgrade")
 	flag.StringVar(&cfg.downgradeStatus, "downgrade-status", "expired", "task status for downgraded tasks: expired or opened")
+	flag.BoolVar(&cfg.includeUnlinked, "include-unlinked-completed", false, "also downgrade completed tasks whose assessment is missing or no longer plan-origin")
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "suffix for backup tables")
 	flag.IntVar(&cfg.previewLimit, "preview-limit", 20, "number of selected task rows to preview")
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall script timeout")
@@ -229,6 +231,16 @@ func prepareGroupStats(ctx context.Context, conn *sql.Conn, cfg config) error {
 	if cfg.groupByPlan {
 		groupPlanExpr = "t.plan_id"
 	}
+	eligibleCompletedExpr := `
+        (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)
+         AND t.assessment_id IS NOT NULL
+         AND a.id IS NOT NULL
+         AND a.origin_type COLLATE utf8mb4_unicode_ci = 'plan' COLLATE utf8mb4_unicode_ci
+         AND a.origin_id COLLATE utf8mb4_unicode_ci = CAST(t.plan_id AS CHAR) COLLATE utf8mb4_unicode_ci`
+	if cfg.includeUnlinked {
+		eligibleCompletedExpr = `
+        (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)`
+	}
 	where, args := buildTaskFilters(cfg, "t")
 	query := fmt.Sprintf(`
 CREATE TEMPORARY TABLE repair_mock_task_group_stats DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AS
@@ -256,14 +268,7 @@ FROM (
       %s AS group_plan_id,
       t.testee_id,
       CASE WHEN t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL THEN 1 ELSE 0 END AS is_completed,
-      CASE
-        WHEN (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)
-         AND t.assessment_id IS NOT NULL
-         AND a.id IS NOT NULL
-         AND a.origin_type COLLATE utf8mb4_unicode_ci = 'plan' COLLATE utf8mb4_unicode_ci
-         AND a.origin_id COLLATE utf8mb4_unicode_ci = CAST(t.plan_id AS CHAR) COLLATE utf8mb4_unicode_ci
-        THEN 1 ELSE 0
-      END AS is_eligible_completed
+      CASE WHEN %s THEN 1 ELSE 0 END AS is_eligible_completed
     FROM assessment_task t
     LEFT JOIN assessment a
       ON a.id = t.assessment_id
@@ -275,7 +280,7 @@ FROM (
 ) g
 WHERE g.total_tasks > 0
   AND g.completed_tasks / g.total_tasks > ?
-  AND LEAST(g.eligible_completed_tasks, GREATEST(g.completed_tasks - g.keep_completed_tasks, 0)) > 0`, groupPlanExpr, where)
+  AND LEAST(g.eligible_completed_tasks, GREATEST(g.completed_tasks - g.keep_completed_tasks, 0)) > 0`, groupPlanExpr, eligibleCompletedExpr, where)
 	allArgs := []any{cfg.minRate, cfg.maxRate, cfg.targetRate}
 	allArgs = append(allArgs, args...)
 	allArgs = append(allArgs, cfg.maxRate)
@@ -287,6 +292,22 @@ func prepareTaskScope(ctx context.Context, conn *sql.Conn, cfg config) error {
 	groupPlanExpr := "CAST(0 AS UNSIGNED)"
 	if cfg.groupByPlan {
 		groupPlanExpr = "t.plan_id"
+	}
+	assessmentJoin := `
+  INNER JOIN assessment a
+    ON a.id = t.assessment_id
+   AND a.org_id = t.org_id
+   AND a.deleted_at IS NULL
+   AND a.origin_type COLLATE utf8mb4_unicode_ci = 'plan' COLLATE utf8mb4_unicode_ci
+   AND a.origin_id COLLATE utf8mb4_unicode_ci = CAST(t.plan_id AS CHAR) COLLATE utf8mb4_unicode_ci`
+	eligibleTaskCondition := "AND t.assessment_id IS NOT NULL"
+	if cfg.includeUnlinked {
+		assessmentJoin = `
+  LEFT JOIN assessment a
+    ON a.id = t.assessment_id
+   AND a.org_id = t.org_id
+   AND a.deleted_at IS NULL`
+		eligibleTaskCondition = ""
 	}
 	where, args := buildTaskFilters(cfg, "t")
 	if _, err := conn.ExecContext(ctx, `
@@ -302,9 +323,9 @@ CREATE TEMPORARY TABLE repair_mock_task_completion_scope (
   old_open_at DATETIME(3) NULL,
   old_expire_at DATETIME(3) NULL,
   old_completed_at DATETIME(3) NULL,
-  assessment_id BIGINT UNSIGNED NOT NULL,
-  answer_sheet_id BIGINT UNSIGNED NOT NULL,
-  old_origin_type VARCHAR(50) NOT NULL,
+  assessment_id BIGINT UNSIGNED NULL,
+  answer_sheet_id BIGINT UNSIGNED NULL,
+  old_origin_type VARCHAR(50) NULL,
   old_origin_id VARCHAR(100) NULL,
   old_assessment_created_at DATETIME(3) NULL,
   old_assessment_submitted_at DATETIME(3) NULL,
@@ -386,21 +407,16 @@ FROM (
     ON g.org_id = t.org_id
    AND g.group_plan_id = %s
    AND g.testee_id = t.testee_id
-  INNER JOIN assessment a
-    ON a.id = t.assessment_id
-   AND a.org_id = t.org_id
-   AND a.deleted_at IS NULL
-   AND a.origin_type COLLATE utf8mb4_unicode_ci = 'plan' COLLATE utf8mb4_unicode_ci
-   AND a.origin_id COLLATE utf8mb4_unicode_ci = CAST(t.plan_id AS CHAR) COLLATE utf8mb4_unicode_ci
+  %s
   LEFT JOIN assessment_episode e
     ON e.org_id = t.org_id
    AND e.answersheet_id = a.answer_sheet_id
    AND e.deleted_at IS NULL
   WHERE %s
     AND (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)
-    AND t.assessment_id IS NOT NULL
+    %s
 ) ranked
-WHERE ranked.repair_rank <= ranked.downgrade_tasks`, groupPlanExpr, groupPlanExpr, groupPlanExpr, where)
+WHERE ranked.repair_rank <= ranked.downgrade_tasks`, groupPlanExpr, groupPlanExpr, groupPlanExpr, assessmentJoin, where, eligibleTaskCondition)
 	allArgs := []any{cfg.seed}
 	allArgs = append(allArgs, args...)
 	_, err := conn.ExecContext(ctx, query, allArgs...)
@@ -559,14 +575,15 @@ LIMIT %d`, limit))
 		}
 	}()
 	for rows.Next() {
-		var taskID, planID, testeeID, assessmentID, answerSheetID uint64
+		var taskID, planID, testeeID uint64
+		var assessmentID, answerSheetID sql.NullInt64
 		var completedAt sql.NullTime
 		var rank, downgradeTasks int64
 		if err := rows.Scan(&taskID, &planID, &testeeID, &assessmentID, &answerSheetID, &completedAt, &rank, &downgradeTasks); err != nil {
 			return err
 		}
-		log.Printf("preview downgrade task=%d plan=%d testee=%d assessment=%d answersheet=%d completed_at=%s rank=%d/%d",
-			taskID, planID, testeeID, assessmentID, answerSheetID, formatNullTime(completedAt), rank, downgradeTasks)
+		log.Printf("preview downgrade task=%d plan=%d testee=%d assessment=%s answersheet=%s completed_at=%s rank=%d/%d",
+			taskID, planID, testeeID, formatNullInt64(assessmentID), formatNullInt64(answerSheetID), formatNullTime(completedAt), rank, downgradeTasks)
 	}
 	return rows.Err()
 }
@@ -640,7 +657,9 @@ FROM repair_mock_task_completion_scope s
 STRAIGHT_JOIN behavior_footprint bf
   ON bf.org_id = s.org_id
  AND bf.answersheet_id = s.answer_sheet_id
-WHERE bf.deleted_at IS NULL
+WHERE s.answer_sheet_id IS NOT NULL
+  AND s.answer_sheet_id <> 0
+  AND bf.deleted_at IS NULL
   AND bf.event_name COLLATE utf8mb4_unicode_ci IN (
     'answersheet_submitted' COLLATE utf8mb4_unicode_ci,
     'assessment_created' COLLATE utf8mb4_unicode_ci,
@@ -658,7 +677,9 @@ FROM repair_mock_task_completion_scope s
 STRAIGHT_JOIN behavior_footprint bf
   ON bf.org_id = s.org_id
  AND bf.assessment_id = s.assessment_id
-WHERE bf.deleted_at IS NULL
+WHERE s.assessment_id IS NOT NULL
+  AND s.assessment_id <> 0
+  AND bf.deleted_at IS NULL
   AND bf.event_name COLLATE utf8mb4_unicode_ci IN (
     'answersheet_submitted' COLLATE utf8mb4_unicode_ci,
     'assessment_created' COLLATE utf8mb4_unicode_ci,
@@ -684,7 +705,7 @@ func backupMySQL(ctx context.Context, conn *sql.Conn, suffix string) error {
 	statements := []string{
 		fmt.Sprintf("CREATE TABLE repair_bak_mock_task_completion_scope_%s AS SELECT * FROM repair_mock_task_completion_scope", suffix),
 		fmt.Sprintf("CREATE TABLE repair_bak_mock_task_completion_task_%s AS SELECT t.* FROM assessment_task t INNER JOIN repair_mock_task_completion_scope s ON s.task_id = t.id", suffix),
-		fmt.Sprintf("CREATE TABLE repair_bak_mock_task_completion_assessment_%s AS SELECT a.* FROM assessment a INNER JOIN repair_mock_task_completion_scope s ON s.assessment_id = a.id", suffix),
+		fmt.Sprintf("CREATE TABLE repair_bak_mock_task_completion_assessment_%s AS SELECT a.* FROM assessment a INNER JOIN repair_mock_task_completion_scope s ON s.assessment_id IS NOT NULL AND s.assessment_id = a.id", suffix),
 	}
 	for i, statement := range statements {
 		log.Printf("backup mysql step %d/%d", i+1, 6)
@@ -695,7 +716,7 @@ func backupMySQL(ctx context.Context, conn *sql.Conn, suffix string) error {
 	episodeBackup := fmt.Sprintf(`
 CREATE TABLE repair_bak_mock_task_completion_episode_%s AS
 SELECT e.* FROM assessment_episode e
-INNER JOIN repair_mock_task_completion_scope s ON s.answer_sheet_id = e.answersheet_id
+INNER JOIN repair_mock_task_completion_scope s ON s.answer_sheet_id IS NOT NULL AND s.answer_sheet_id = e.answersheet_id
 WHERE e.deleted_at IS NULL`, suffix)
 	log.Printf("backup mysql step 4/6")
 	if _, err := conn.ExecContext(ctx, episodeBackup); err != nil {
@@ -755,7 +776,7 @@ SET
 			name: "convert assessment origin to adhoc",
 			sql: `
 UPDATE assessment a
-INNER JOIN repair_mock_task_completion_scope s ON s.assessment_id = a.id
+INNER JOIN repair_mock_task_completion_scope s ON s.assessment_id IS NOT NULL AND s.assessment_id = a.id
 SET
   a.origin_type = 'adhoc',
   a.origin_id = NULL,
@@ -767,7 +788,7 @@ WHERE a.deleted_at IS NULL`,
 			name: "clear episode entry attribution",
 			sql: `
 UPDATE assessment_episode e
-INNER JOIN repair_mock_task_completion_scope s ON s.answer_sheet_id = e.answersheet_id
+INNER JOIN repair_mock_task_completion_scope s ON s.answer_sheet_id IS NOT NULL AND s.answer_sheet_id = e.answersheet_id
 SET
   e.entry_id = NULL,
   e.clinician_id = NULL,
@@ -888,6 +909,13 @@ func formatNullTime(v sql.NullTime) string {
 		return "<null>"
 	}
 	return v.Time.Format(time.DateTime)
+}
+
+func formatNullInt64(v sql.NullInt64) string {
+	if !v.Valid {
+		return "<null>"
+	}
+	return fmt.Sprintf("%d", v.Int64)
 }
 
 func formatRate(v sql.NullFloat64) string {
