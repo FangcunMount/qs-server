@@ -804,6 +804,10 @@ WHERE bf.deleted_at IS NULL`,
 }
 
 func rebuildStatistics(ctx context.Context, sqlDB *sql.DB, orgID int64, from, to time.Time) error {
+	rebuildFrom := normalizeLocalDay(from).AddDate(0, 0, -1)
+	rebuildTo := normalizeLocalDay(to).AddDate(0, 0, 1)
+	log.Printf("rebuild statistics projections with padded window: org=%d from=%s to=%s", orgID, formatDay(rebuildFrom), formatDay(rebuildTo))
+
 	gormDB, err := gorm.Open(gormmysql.New(gormmysql.Config{Conn: sqlDB}), &gorm.Config{})
 	if err != nil {
 		return err
@@ -814,7 +818,7 @@ func rebuildStatistics(ctx context.Context, sqlDB *sql.DB, orgID int64, from, to
 	}
 	repo := statisticsInfra.NewStatisticsRepository(gormDB)
 	txCtx := dbmysql.WithTx(ctx, tx)
-	if err := repo.RebuildDailyStatistics(txCtx, orgID, from, to); err != nil {
+	if err := repo.RebuildDailyStatistics(txCtx, orgID, rebuildFrom, rebuildTo); err != nil {
 		_ = tx.Rollback()
 		return err
 	}
