@@ -100,7 +100,12 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
 	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(module.Repo, module.Cache)
 	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
-	module.ReadService = statisticsApp.NewReadService(statisticsReadModelInfra.NewReadModel(normalized.MySQLDB), normalized.AnswerSheetRepo)
+	module.ReadService = statisticsApp.NewReadService(
+		statisticsReadModelInfra.NewReadModel(normalized.MySQLDB),
+		normalized.AnswerSheetRepo,
+		statisticsApp.WithReadServiceCache(module.Cache),
+		statisticsApp.WithReadServiceHotset(normalized.HotsetRecorder),
+	)
 	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(module.Repo)
 	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, module.Repo)
 	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, module.Repo, normalized.RepairWindowDays, normalized.LockManager)

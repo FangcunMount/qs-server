@@ -20,6 +20,7 @@ const (
 	WarmupKindStaticScale             WarmupKind = "static.scale"
 	WarmupKindStaticQuestionnaire     WarmupKind = "static.questionnaire"
 	WarmupKindStaticScaleList         WarmupKind = "static.scale_list"
+	WarmupKindQueryStatsOverview      WarmupKind = "query.stats_overview"
 	WarmupKindQueryStatsSystem        WarmupKind = "query.stats_system"
 	WarmupKindQueryStatsQuestionnaire WarmupKind = "query.stats_questionnaire"
 	WarmupKindQueryStatsPlan          WarmupKind = "query.stats_plan"
@@ -57,6 +58,9 @@ func (t WarmupTarget) Key() string {
 // OrgID returns the owning organization for query warmup targets.
 func (t WarmupTarget) OrgID() (int64, bool) {
 	switch t.Kind {
+	case WarmupKindQueryStatsOverview:
+		orgID, _, ok := ParseQueryStatsOverviewScope(t.Scope)
+		return orgID, ok
 	case WarmupKindQueryStatsSystem:
 		return ParseQueryStatsSystemScope(t.Scope)
 	case WarmupKindQueryStatsQuestionnaire:
@@ -75,7 +79,7 @@ func FamilyForKind(kind WarmupKind) cachemodel.Family {
 	switch kind {
 	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticScaleList:
 		return cachemodel.FamilyStatic
-	case WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
+	case WarmupKindQueryStatsOverview, WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
 		return cachemodel.FamilyQuery
 	default:
 		return cachemodel.FamilyDefault
@@ -113,6 +117,15 @@ func NewStaticScaleListWarmupTarget() WarmupTarget {
 	}
 }
 
+// NewQueryStatsOverviewWarmupTarget 创建 operating 统计概览查询预热目标。
+func NewQueryStatsOverviewWarmupTarget(orgID int64, preset string) WarmupTarget {
+	return WarmupTarget{
+		Family: cachemodel.FamilyQuery,
+		Kind:   WarmupKindQueryStatsOverview,
+		Scope:  fmt.Sprintf("org:%d:preset:%s", orgID, normalizeOverviewPreset(preset)),
+	}
+}
+
 // NewQueryStatsSystemWarmupTarget 创建系统统计查询预热目标。
 func NewQueryStatsSystemWarmupTarget(orgID int64) WarmupTarget {
 	return WarmupTarget{
@@ -145,6 +158,7 @@ func ParseWarmupKind(raw string) (WarmupKind, bool) {
 	case WarmupKindStaticScale,
 		WarmupKindStaticQuestionnaire,
 		WarmupKindStaticScaleList,
+		WarmupKindQueryStatsOverview,
 		WarmupKindQueryStatsSystem,
 		WarmupKindQueryStatsQuestionnaire,
 		WarmupKindQueryStatsPlan:
@@ -176,6 +190,12 @@ func ParseWarmupTarget(kind WarmupKind, scope string) (WarmupTarget, error) {
 			return WarmupTarget{}, fmt.Errorf("invalid static scale list warmup scope: %s", scope)
 		}
 		return expected, nil
+	case WarmupKindQueryStatsOverview:
+		orgID, preset, ok := ParseQueryStatsOverviewScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid stats overview warmup scope: %s", scope)
+		}
+		return NewQueryStatsOverviewWarmupTarget(orgID, preset), nil
 	case WarmupKindQueryStatsSystem:
 		orgID, ok := ParseQueryStatsSystemScope(scope)
 		if !ok {
@@ -221,6 +241,35 @@ func ParseQueryStatsSystemScope(scope string) (int64, bool) {
 		return 0, false
 	}
 	return orgID, true
+}
+
+func ParseQueryStatsOverviewScope(scope string) (int64, string, bool) {
+	parts := strings.Split(scope, ":")
+	if len(parts) != 4 || parts[0] != "org" || parts[2] != "preset" {
+		return 0, "", false
+	}
+	orgID, err := strconv.ParseInt(parts[1], 10, 64)
+	if err != nil || orgID <= 0 {
+		return 0, "", false
+	}
+	preset := normalizeOverviewPreset(parts[3])
+	if !isSupportedOverviewPreset(preset) {
+		return 0, "", false
+	}
+	return orgID, preset, true
+}
+
+func normalizeOverviewPreset(preset string) string {
+	return strings.ToLower(strings.TrimSpace(preset))
+}
+
+func isSupportedOverviewPreset(preset string) bool {
+	switch preset {
+	case "today", "7d", "30d":
+		return true
+	default:
+		return false
+	}
 }
 
 func ParseQueryStatsQuestionnaireScope(scope string) (int64, string, bool) {

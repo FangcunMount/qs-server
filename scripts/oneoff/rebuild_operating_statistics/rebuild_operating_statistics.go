@@ -171,6 +171,8 @@ func printSummary(ctx context.Context, db *gorm.DB, orgID int64, cfg config, sta
 		{"projection access_org_daily", "SELECT COUNT(*) AS count FROM analytics_access_org_daily WHERE org_id = ? AND stat_date >= ? AND stat_date < ?", []interface{}{orgID, cfg.from, cfg.to}},
 		{"projection assessment_service_org_daily", "SELECT COUNT(*) AS count FROM analytics_assessment_service_org_daily WHERE org_id = ? AND stat_date >= ? AND stat_date < ?", []interface{}{orgID, cfg.from, cfg.to}},
 		{"projection plan_task_daily", "SELECT COUNT(*) AS count FROM analytics_plan_task_daily WHERE org_id = ?", []interface{}{orgID}},
+		{"snapshot organization", "SELECT COUNT(*) AS count FROM analytics_organization_snapshot WHERE org_id = ? AND deleted_at IS NULL", []interface{}{orgID}},
+		{"snapshot plan_task_window", "SELECT COUNT(*) AS count FROM analytics_plan_task_window_snapshot WHERE org_id = ? AND deleted_at IS NULL", []interface{}{orgID}},
 	}
 	for _, item := range items {
 		count, err := countQuery(ctx, db, item.sql, item.args...)

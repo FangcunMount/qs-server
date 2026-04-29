@@ -60,12 +60,15 @@ type ReadModel interface {
 	ListOrgOverviewTrend(ctx context.Context, orgID int64, metric OrgOverviewMetric, from, to time.Time) []domainStatistics.DailyCount
 	GetOrganizationOverview(ctx context.Context, orgID int64) (domainStatistics.OrganizationOverview, error)
 	GetAccessFunnel(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelWindow, error)
+	GetAccessFunnelTrend(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelTrend, error)
 	ListAccessFunnelTrend(ctx context.Context, orgID int64, metric AccessFunnelMetric, from, to time.Time) []domainStatistics.DailyCount
 	GetAssessmentService(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceWindow, error)
+	GetAssessmentServiceTrend(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceTrend, error)
 	ListAssessmentServiceTrend(ctx context.Context, orgID int64, metric AssessmentServiceMetric, from, to time.Time) []domainStatistics.DailyCount
 	GetDimensionAnalysisSummary(ctx context.Context, orgID int64) (domainStatistics.DimensionAnalysisSummary, error)
 	GetPlanTaskOverview(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.PlanTaskWindow, error)
 	GetPlanTaskOverviewByPlan(ctx context.Context, orgID int64, planID uint64, from, to time.Time) (domainStatistics.PlanTaskWindow, error)
+	GetPlanTaskTrend(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskTrend, error)
 	ListPlanTaskTrend(ctx context.Context, orgID int64, planID *uint64, metric PlanTaskMetric, from, to time.Time) []domainStatistics.DailyCount
 
 	CountClinicianSubjects(ctx context.Context, orgID int64) (int64, error)

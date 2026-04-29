@@ -2,12 +2,17 @@ package statistics
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -15,11 +20,33 @@ import (
 type readService struct {
 	readModel       StatisticsReadModel
 	answerSheetRepo surveyAnswerSheet.Repository
+	cache           *statisticsCache.StatisticsCache
+	hotset          cachetarget.HotsetRecorder
+}
+
+type ReadServiceOption func(*readService)
+
+func WithReadServiceCache(cache *statisticsCache.StatisticsCache) ReadServiceOption {
+	return func(s *readService) {
+		s.cache = cache
+	}
+}
+
+func WithReadServiceHotset(hotset cachetarget.HotsetRecorder) ReadServiceOption {
+	return func(s *readService) {
+		s.hotset = hotset
+	}
 }
 
 // NewReadService 创建统一统计读服务。
-func NewReadService(readModel StatisticsReadModel, answerSheetRepo surveyAnswerSheet.Repository) ReadService {
-	return &readService{readModel: readModel, answerSheetRepo: answerSheetRepo}
+func NewReadService(readModel StatisticsReadModel, answerSheetRepo surveyAnswerSheet.Repository, opts ...ReadServiceOption) ReadService {
+	service := &readService{readModel: readModel, answerSheetRepo: answerSheetRepo}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(service)
+		}
+	}
+	return service
 }
 
 func (s *readService) GetOverview(ctx context.Context, orgID int64, filter QueryFilter) (*domainStatistics.StatisticsOverview, error) {
@@ -28,6 +55,22 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		return nil, err
 	}
 
+	cacheKey := overviewStatsCacheKey(orgID, timeRange)
+	if stats, ok := s.loadCachedOverview(ctx, cacheKey); ok {
+		s.recordOverviewHotset(ctx, orgID, timeRange)
+		return stats, nil
+	}
+
+	stats, err := s.buildOverview(ctx, orgID, timeRange)
+	if err != nil {
+		return nil, err
+	}
+	s.cacheOverview(ctx, cacheKey, stats)
+	s.recordOverviewHotset(ctx, orgID, timeRange)
+	return stats, nil
+}
+
+func (s *readService) buildOverview(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.StatisticsOverview, error) {
 	organizationOverview, err := s.readModel.GetOrganizationOverview(ctx, orgID)
 	if err != nil {
 		return nil, err
@@ -48,6 +91,18 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 	if err != nil {
 		return nil, err
 	}
+	accessTrend, err := s.readModel.GetAccessFunnelTrend(ctx, orgID, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	assessmentTrend, err := s.readModel.GetAssessmentServiceTrend(ctx, orgID, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	planTrend, err := s.readModel.GetPlanTaskTrend(ctx, orgID, nil, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
 
 	return &domainStatistics.StatisticsOverview{
 		OrgID:                orgID,
@@ -56,29 +111,29 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		AccessFunnel: domainStatistics.AccessFunnelStatistics{
 			Window: accessWindow,
 			Trend: domainStatistics.AccessFunnelTrend{
-				EntryOpened:                 fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricEntryOpened, timeRange.From, timeRange.To)),
-				IntakeConfirmed:             fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricIntakeConfirmed, timeRange.From, timeRange.To)),
-				TesteeCreated:               fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricTesteeCreated, timeRange.From, timeRange.To)),
-				CareRelationshipEstablished: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricCareRelationshipEstablished, timeRange.From, timeRange.To)),
+				EntryOpened:                 fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.EntryOpened),
+				IntakeConfirmed:             fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.IntakeConfirmed),
+				TesteeCreated:               fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.TesteeCreated),
+				CareRelationshipEstablished: fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.CareRelationshipEstablished),
 			},
 		},
 		AssessmentService: domainStatistics.AssessmentServiceStatistics{
 			Window: assessmentWindow,
 			Trend: domainStatistics.AssessmentServiceTrend{
-				AnswerSheetSubmitted: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricAnswerSheetSubmitted, timeRange.From, timeRange.To)),
-				AssessmentCreated:    fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricAssessmentCreated, timeRange.From, timeRange.To)),
-				ReportGenerated:      fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricReportGenerated, timeRange.From, timeRange.To)),
-				AssessmentFailed:     fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricAssessmentFailed, timeRange.From, timeRange.To)),
+				AnswerSheetSubmitted: fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.AnswerSheetSubmitted),
+				AssessmentCreated:    fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.AssessmentCreated),
+				ReportGenerated:      fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.ReportGenerated),
+				AssessmentFailed:     fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.AssessmentFailed),
 			},
 		},
 		DimensionAnalysis: dimensionAnalysis,
 		Plan: domainStatistics.PlanDomainStatistics{
 			Window: planWindow,
 			Trend: domainStatistics.PlanTaskTrend{
-				TaskCreated:   fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricCreated, timeRange.From, timeRange.To)),
-				TaskOpened:    fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricOpened, timeRange.From, timeRange.To)),
-				TaskCompleted: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricCompleted, timeRange.From, timeRange.To)),
-				TaskExpired:   fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricExpired, timeRange.From, timeRange.To)),
+				TaskCreated:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCreated),
+				TaskOpened:    fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskOpened),
+				TaskCompleted: fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCompleted),
+				TaskExpired:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskExpired),
 			},
 		},
 	}, nil
@@ -455,6 +510,73 @@ func fillMissingDailyCounts(from, to time.Time, counts []domainStatistics.DailyC
 	}
 
 	return filled
+}
+
+func (s *readService) loadCachedOverview(ctx context.Context, cacheKey string) (*domainStatistics.StatisticsOverview, bool) {
+	if s == nil || s.cache == nil || strings.TrimSpace(cacheKey) == "" {
+		return nil, false
+	}
+	cached, err := s.cache.GetQueryCache(ctx, cacheKey)
+	if err != nil || cached == "" {
+		return nil, false
+	}
+	var stats domainStatistics.StatisticsOverview
+	if err := json.Unmarshal([]byte(cached), &stats); err != nil {
+		logger.L(ctx).Warnw("解析统计概览缓存失败", "cache_key", cacheKey, "error", err)
+		return nil, false
+	}
+	logger.L(ctx).Debugw("从Redis缓存获取统计概览", "cache_key", cacheKey)
+	return &stats, true
+}
+
+func (s *readService) cacheOverview(ctx context.Context, cacheKey string, stats *domainStatistics.StatisticsOverview) {
+	if s == nil || s.cache == nil || stats == nil || strings.TrimSpace(cacheKey) == "" {
+		return
+	}
+	data, err := json.Marshal(stats)
+	if err != nil {
+		logger.L(ctx).Warnw("序列化统计概览缓存失败", "cache_key", cacheKey, "error", err)
+		return
+	}
+	if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
+		logger.L(ctx).Warnw("写入统计概览缓存失败", "cache_key", cacheKey, "error", err)
+	}
+}
+
+func (s *readService) recordOverviewHotset(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) {
+	if s == nil || s.hotset == nil {
+		return
+	}
+	preset, ok := overviewWarmupPreset(timeRange)
+	if !ok {
+		return
+	}
+	_ = s.hotset.Record(ctx, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
+}
+
+func overviewStatsCacheKey(orgID int64, timeRange domainStatistics.StatisticsTimeRange) string {
+	from := normalizeLocalDay(timeRange.From).Format("2006-01-02")
+	to := normalizeLocalDay(timeRange.To).Format("2006-01-02")
+	if preset, ok := overviewWarmupPreset(timeRange); ok {
+		return fmt.Sprintf("overview:%d:preset:%s:%s:%s", orgID, preset, from, to)
+	}
+	return fmt.Sprintf("overview:%d:range:%s:%s", orgID, from, to)
+}
+
+func overviewWarmupPreset(timeRange domainStatistics.StatisticsTimeRange) (string, bool) {
+	preset := strings.TrimSpace(string(timeRange.Preset))
+	toDay := normalizeLocalDay(timeRange.To)
+	fromDay := normalizeLocalDay(timeRange.From)
+	switch domainStatistics.TimeRangePreset(preset) {
+	case domainStatistics.TimeRangePresetToday:
+		return preset, fromDay.Equal(toDay)
+	case domainStatistics.TimeRangePreset7D:
+		return preset, fromDay.Equal(toDay.AddDate(0, 0, -6))
+	case domainStatistics.TimeRangePreset30D:
+		return preset, fromDay.Equal(toDay.AddDate(0, 0, -29))
+	default:
+		return "", false
+	}
 }
 
 func normalizePage(page, pageSize int) (int, int) {

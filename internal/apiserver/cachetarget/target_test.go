@@ -24,6 +24,9 @@ func TestWarmupTargetFactoriesNormalizeScopes(t *testing.T) {
 	if got := NewQueryStatsSystemWarmupTarget(9); got.Scope != "org:9" {
 		t.Fatalf("system scope = %q, want org:9", got.Scope)
 	}
+	if got := NewQueryStatsOverviewWarmupTarget(9, " 30D "); got.Scope != "org:9:preset:30d" {
+		t.Fatalf("overview scope = %q, want org:9:preset:30d", got.Scope)
+	}
 	if got := NewQueryStatsQuestionnaireWarmupTarget(9, " Q-001 "); got.Scope != "org:9:questionnaire:q-001" {
 		t.Fatalf("questionnaire stats scope = %q", got.Scope)
 	}
@@ -50,6 +53,9 @@ func TestWarmupTargetParsers(t *testing.T) {
 	if orgID, ok := ParseQueryStatsSystemScope("org:7"); !ok || orgID != 7 {
 		t.Fatalf("ParseQueryStatsSystemScope() = %d, %v", orgID, ok)
 	}
+	if orgID, preset, ok := ParseQueryStatsOverviewScope("org:7:preset:30d"); !ok || orgID != 7 || preset != "30d" {
+		t.Fatalf("ParseQueryStatsOverviewScope() = %d, %q, %v", orgID, preset, ok)
+	}
 	if orgID, code, ok := ParseQueryStatsQuestionnaireScope("org:7:questionnaire:q-001"); !ok || orgID != 7 || code != "q-001" {
 		t.Fatalf("ParseQueryStatsQuestionnaireScope() = %d, %q, %v", orgID, code, ok)
 	}
@@ -70,6 +76,7 @@ func TestFamilyForKind(t *testing.T) {
 		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, want: cachemodel.FamilyStatic},
 		{name: "static scale list", kind: WarmupKindStaticScaleList, want: cachemodel.FamilyStatic},
 		{name: "query stats system", kind: WarmupKindQueryStatsSystem, want: cachemodel.FamilyQuery},
+		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, want: cachemodel.FamilyQuery},
 		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, want: cachemodel.FamilyQuery},
 		{name: "query stats plan", kind: WarmupKindQueryStatsPlan, want: cachemodel.FamilyQuery},
 		{name: "unknown", kind: WarmupKind("unknown"), want: cachemodel.FamilyDefault},
@@ -99,6 +106,7 @@ func TestParseWarmupTarget(t *testing.T) {
 		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, scope: " questionnaire:Q-001 ", want: NewStaticQuestionnaireWarmupTarget("q-001")},
 		{name: "static scale list", kind: WarmupKindStaticScaleList, scope: " published ", want: NewStaticScaleListWarmupTarget()},
 		{name: "query stats system", kind: WarmupKindQueryStatsSystem, scope: " org:7 ", want: NewQueryStatsSystemWarmupTarget(7)},
+		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, scope: " org:7:preset:30D ", want: NewQueryStatsOverviewWarmupTarget(7, "30d")},
 		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, scope: " org:7:questionnaire:Q-001 ", want: NewQueryStatsQuestionnaireWarmupTarget(7, "q-001")},
 		{name: "query stats plan", kind: WarmupKindQueryStatsPlan, scope: " org:7:plan:99 ", want: NewQueryStatsPlanWarmupTarget(7, 99)},
 	}
@@ -131,6 +139,7 @@ func TestParseWarmupTargetRejectsInvalidScopes(t *testing.T) {
 		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, scope: "scale:s-001", wantErr: "invalid static questionnaire warmup scope: scale:s-001"},
 		{name: "static scale list", kind: WarmupKindStaticScaleList, scope: "draft", wantErr: "invalid static scale list warmup scope: draft"},
 		{name: "query stats system", kind: WarmupKindQueryStatsSystem, scope: "org:0", wantErr: "invalid stats system warmup scope: org:0"},
+		{name: "query stats overview", kind: WarmupKindQueryStatsOverview, scope: "org:7:preset:90d", wantErr: "invalid stats overview warmup scope: org:7:preset:90d"},
 		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, scope: "org:7", wantErr: "invalid stats questionnaire warmup scope: org:7"},
 		{name: "query stats plan", kind: WarmupKindQueryStatsPlan, scope: "org:7:plan:0", wantErr: "invalid stats plan warmup scope: org:7:plan:0"},
 		{name: "unsupported kind", kind: WarmupKind("unknown"), scope: "scope", wantErr: "unsupported warmup kind: unknown"},
@@ -158,6 +167,7 @@ func TestWarmupTargetOrgID(t *testing.T) {
 		wantOK bool
 	}{
 		{name: "stats system", target: NewQueryStatsSystemWarmupTarget(7), want: 7, wantOK: true},
+		{name: "stats overview", target: NewQueryStatsOverviewWarmupTarget(7, "30d"), want: 7, wantOK: true},
 		{name: "stats questionnaire", target: NewQueryStatsQuestionnaireWarmupTarget(8, "q-001"), want: 8, wantOK: true},
 		{name: "stats plan", target: NewQueryStatsPlanWarmupTarget(9, 99), want: 9, wantOK: true},
 		{name: "static", target: NewStaticScaleWarmupTarget("s-001"), wantOK: false},

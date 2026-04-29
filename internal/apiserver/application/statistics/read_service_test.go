@@ -7,13 +7,19 @@ import (
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/alicebob/miniredis/v2"
+	redis "github.com/redis/go-redis/v9"
 )
 
 type statisticsReadModelStub struct {
 	lastOverviewOrgID int64
 	lastOverviewFrom  time.Time
 	lastOverviewTo    time.Time
+	overviewReadCalls int
 
 	lastTrendMetrics []OrgOverviewMetric
 	lastTrendFrom    []time.Time
@@ -61,6 +67,7 @@ func (s *statisticsReadModelStub) ListOrgOverviewTrend(_ context.Context, _ int6
 }
 
 func (s *statisticsReadModelStub) GetOrganizationOverview(context.Context, int64) (domainStatistics.OrganizationOverview, error) {
+	s.overviewReadCalls++
 	return s.organizationOverview, nil
 }
 
@@ -77,6 +84,17 @@ func (s *statisticsReadModelStub) ListAccessFunnelTrend(_ context.Context, _ int
 	return append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[metric]...)
 }
 
+func (s *statisticsReadModelStub) GetAccessFunnelTrend(_ context.Context, _ int64, from, to time.Time) (domainStatistics.AccessFunnelTrend, error) {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return domainStatistics.AccessFunnelTrend{
+		EntryOpened:                 append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricEntryOpened]...),
+		IntakeConfirmed:             append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricIntakeConfirmed]...),
+		TesteeCreated:               append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricTesteeCreated]...),
+		CareRelationshipEstablished: append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[AccessFunnelMetricCareRelationshipEstablished]...),
+	}, nil
+}
+
 func (s *statisticsReadModelStub) GetAssessmentService(context.Context, int64, time.Time, time.Time) (domainStatistics.AssessmentServiceWindow, error) {
 	return s.assessmentServiceWindow, nil
 }
@@ -85,6 +103,17 @@ func (s *statisticsReadModelStub) ListAssessmentServiceTrend(_ context.Context, 
 	s.lastTrendFrom = append(s.lastTrendFrom, from)
 	s.lastTrendTo = append(s.lastTrendTo, to)
 	return append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[metric]...)
+}
+
+func (s *statisticsReadModelStub) GetAssessmentServiceTrend(_ context.Context, _ int64, from, to time.Time) (domainStatistics.AssessmentServiceTrend, error) {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return domainStatistics.AssessmentServiceTrend{
+		AnswerSheetSubmitted: append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricAnswerSheetSubmitted]...),
+		AssessmentCreated:    append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricAssessmentCreated]...),
+		ReportGenerated:      append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricReportGenerated]...),
+		AssessmentFailed:     append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[AssessmentServiceMetricAssessmentFailed]...),
+	}, nil
 }
 
 func (s *statisticsReadModelStub) GetDimensionAnalysisSummary(context.Context, int64) (domainStatistics.DimensionAnalysisSummary, error) {
@@ -103,6 +132,17 @@ func (s *statisticsReadModelStub) ListPlanTaskTrend(_ context.Context, _ int64, 
 	s.lastTrendFrom = append(s.lastTrendFrom, from)
 	s.lastTrendTo = append(s.lastTrendTo, to)
 	return append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[metric]...)
+}
+
+func (s *statisticsReadModelStub) GetPlanTaskTrend(_ context.Context, _ int64, _ *uint64, from, to time.Time) (domainStatistics.PlanTaskTrend, error) {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return domainStatistics.PlanTaskTrend{
+		TaskCreated:   append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricCreated]...),
+		TaskOpened:    append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricOpened]...),
+		TaskCompleted: append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricCompleted]...),
+		TaskExpired:   append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[PlanTaskMetricExpired]...),
+	}, nil
 }
 
 func (*statisticsReadModelStub) CountClinicianSubjects(context.Context, int64) (int64, error) {
@@ -221,8 +261,8 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 	if !stub.lastOverviewFrom.Equal(wantFrom) || !stub.lastOverviewTo.Equal(wantTo) {
 		t.Fatalf("overview range = [%v,%v), want [%v,%v)", stub.lastOverviewFrom, stub.lastOverviewTo, wantFrom, wantTo)
 	}
-	if len(stub.lastTrendFrom) != 12 {
-		t.Fatalf("trend calls = %d, want 12", len(stub.lastTrendFrom))
+	if len(stub.lastTrendFrom) != 3 {
+		t.Fatalf("trend calls = %d, want 3", len(stub.lastTrendFrom))
 	}
 	if got.OrganizationOverview.TesteeCount != 7 || got.AccessFunnel.Window.EntryOpenedCount != 3 {
 		t.Fatalf("unexpected overview payload: %+v", got)
@@ -232,6 +272,55 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 	}
 	if got.AccessFunnel.Trend.EntryOpened[1].Date.Format("2006-01-02") != "2026-04-02" || got.AccessFunnel.Trend.EntryOpened[1].Count != 0 {
 		t.Fatalf("unexpected filled trend point: %+v", got.AccessFunnel.Trend.EntryOpened[1])
+	}
+}
+
+func TestReadServiceGetOverviewUsesCacheAside(t *testing.T) {
+	t.Parallel()
+
+	cache := newStatisticsQueryCache(t)
+	stub := &statisticsReadModelStub{
+		organizationOverview: domainStatistics.OrganizationOverview{TesteeCount: 17},
+		accessFunnelWindow: domainStatistics.AccessFunnelWindow{
+			EntryOpenedCount:     5,
+			IntakeConfirmedCount: 4,
+			TesteeCreatedCount:   3,
+		},
+		assessmentServiceWindow: domainStatistics.AssessmentServiceWindow{AssessmentCreatedCount: 8},
+		dimensionAnalysisSummary: domainStatistics.DimensionAnalysisSummary{
+			ClinicianCount: 2,
+			EntryCount:     1,
+			ContentCount:   4,
+		},
+		planTaskWindow: domainStatistics.PlanTaskWindow{TaskCompletedCount: 6},
+	}
+	service := NewReadService(stub, nil, WithReadServiceCache(cache))
+	filter := QueryFilter{
+		From: "2026-04-01",
+		To:   "2026-04-02",
+	}
+
+	first, err := service.GetOverview(context.Background(), 11, filter)
+	if err != nil {
+		t.Fatalf("first GetOverview returned error: %v", err)
+	}
+	if stub.overviewReadCalls != 1 {
+		t.Fatalf("overview read calls after first request = %d, want 1", stub.overviewReadCalls)
+	}
+
+	stub.organizationOverview = domainStatistics.OrganizationOverview{TesteeCount: 999}
+	second, err := service.GetOverview(context.Background(), 11, filter)
+	if err != nil {
+		t.Fatalf("second GetOverview returned error: %v", err)
+	}
+	if stub.overviewReadCalls != 1 {
+		t.Fatalf("overview read calls after cache hit = %d, want 1", stub.overviewReadCalls)
+	}
+	if second.OrganizationOverview.TesteeCount != first.OrganizationOverview.TesteeCount || second.OrganizationOverview.TesteeCount != 17 {
+		t.Fatalf("cached overview testee count = %d, want 17", second.OrganizationOverview.TesteeCount)
+	}
+	if second.AccessFunnel.Window.EntryOpenedCount != first.AccessFunnel.Window.EntryOpenedCount {
+		t.Fatalf("cached access funnel changed: got %d want %d", second.AccessFunnel.Window.EntryOpenedCount, first.AccessFunnel.Window.EntryOpenedCount)
 	}
 }
 
@@ -298,6 +387,21 @@ func TestReadServiceGetQuestionnaireBatchStatisticsDeduplicatesKeepsOrderAndFall
 	if got.Items[2].Code != "SCL90" || got.Items[2].TotalSubmissions != 0 || got.Items[2].TotalCompletions != 0 {
 		t.Fatalf("unexpected SCL90 stats: %+v", got.Items[2])
 	}
+}
+
+func newStatisticsQueryCache(t *testing.T) *statisticsCache.StatisticsCache {
+	t.Helper()
+
+	mr := miniredis.RunT(t)
+	client := redis.NewUniversalClient(&redis.UniversalOptions{Addrs: []string{mr.Addr()}})
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+	return statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(
+		client,
+		keyspace.NewBuilderWithNamespace("stats-test"),
+		cachepolicy.CachePolicy{},
+	)
 }
 
 var _ StatisticsReadModel = (*statisticsReadModelStub)(nil)

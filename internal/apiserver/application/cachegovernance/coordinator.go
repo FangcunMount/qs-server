@@ -80,6 +80,7 @@ type Dependencies struct {
 	WarmScale                       func(context.Context, string) error
 	WarmQuestionnaire               func(context.Context, string) error
 	WarmScaleList                   func(context.Context) error
+	WarmStatsOverview               func(context.Context, int64, string) error
 	WarmStatsSystem                 func(context.Context, int64) error
 	WarmStatsQuestionnaire          func(context.Context, int64, string) error
 	WarmStatsPlan                   func(context.Context, int64, uint64) error
@@ -236,7 +237,12 @@ func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) err
 	if c == nil || !c.cfg.Enable || orgID <= 0 {
 		return nil
 	}
-	targets := []cachetarget.WarmupTarget{cachetarget.NewQueryStatsSystemWarmupTarget(orgID)}
+	targets := []cachetarget.WarmupTarget{
+		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "today"),
+		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "7d"),
+		cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, "30d"),
+		cachetarget.NewQueryStatsSystemWarmupTarget(orgID),
+	}
 	_, err := c.executeTargets(ctx, "statistics_sync", append(targets, c.mergeQueryTargets(ctx, []int64{orgID}, nil)...))
 	return err
 }
@@ -313,6 +319,16 @@ func (c *coordinator) registerExecutors() {
 			return nil
 		}
 		return c.deps.WarmScaleList(ctx)
+	})
+	c.registry.Register(cachetarget.WarmupKindQueryStatsOverview, func(ctx context.Context, target cachetarget.WarmupTarget) error {
+		if c.deps.WarmStatsOverview == nil {
+			return nil
+		}
+		orgID, preset, ok := cachetarget.ParseQueryStatsOverviewScope(target.Scope)
+		if !ok {
+			return fmt.Errorf("invalid stats overview warmup scope: %s", target.Scope)
+		}
+		return c.deps.WarmStatsOverview(ctx, orgID, preset)
 	})
 	c.registry.Register(cachetarget.WarmupKindQueryStatsSystem, func(ctx context.Context, target cachetarget.WarmupTarget) error {
 		if c.deps.WarmStatsSystem == nil {
@@ -396,6 +412,9 @@ func (c *coordinator) querySeedTargets(orgFilter []int64) []cachetarget.WarmupTa
 				continue
 			}
 		}
+		for _, preset := range overviewSeedPresets(c.deps.StatisticsSeeds.OverviewPresets) {
+			targets = append(targets, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
+		}
 		targets = append(targets, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 		for _, code := range c.deps.StatisticsSeeds.QuestionnaireCodes {
 			targets = append(targets, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, code))
@@ -405,6 +424,29 @@ func (c *coordinator) querySeedTargets(orgFilter []int64) []cachetarget.WarmupTa
 		}
 	}
 	return targets
+}
+
+func overviewSeedPresets(configured []string) []string {
+	if len(configured) == 0 {
+		return []string{"today", "7d", "30d"}
+	}
+	result := make([]string, 0, len(configured))
+	seen := map[string]struct{}{}
+	for _, preset := range configured {
+		preset = strings.ToLower(strings.TrimSpace(preset))
+		switch preset {
+		case "today", "7d", "30d":
+			if _, ok := seen[preset]; ok {
+				continue
+			}
+			seen[preset] = struct{}{}
+			result = append(result, preset)
+		}
+	}
+	if len(result) == 0 {
+		return []string{"today", "7d", "30d"}
+	}
+	return result
 }
 
 func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
@@ -419,6 +461,7 @@ func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, re
 	}
 	targets := make([]cachetarget.WarmupTarget, 0)
 	for _, kind := range []cachetarget.WarmupKind{
+		cachetarget.WarmupKindQueryStatsOverview,
 		cachetarget.WarmupKindQueryStatsSystem,
 		cachetarget.WarmupKindQueryStatsQuestionnaire,
 		cachetarget.WarmupKindQueryStatsPlan,
@@ -448,6 +491,9 @@ func (c *coordinator) repairQueryTargets(req RepairCompleteRequest) []cachetarge
 			continue
 		}
 		if strings.TrimSpace(req.RepairKind) == "statistics_backfill" {
+			for _, preset := range overviewSeedPresets(nil) {
+				targets = append(targets, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
+			}
 			targets = append(targets, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 		}
 		for _, code := range req.QuestionnaireCodes {
@@ -595,6 +641,9 @@ func allowQueryTarget(target cachetarget.WarmupTarget, orgFilter map[int64]struc
 		return true
 	}
 	switch target.Kind {
+	case cachetarget.WarmupKindQueryStatsOverview:
+		orgID, _, ok := cachetarget.ParseQueryStatsOverviewScope(target.Scope)
+		return ok && allowOrg(orgFilter, orgID)
 	case cachetarget.WarmupKindQueryStatsSystem:
 		orgID, ok := cachetarget.ParseQueryStatsSystemScope(target.Scope)
 		return ok && allowOrg(orgFilter, orgID)

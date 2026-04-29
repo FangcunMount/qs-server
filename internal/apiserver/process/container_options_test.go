@@ -31,6 +31,7 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	opts.Cache.StatisticsWarmup = &apiserveroptions.StatisticsWarmupOptions{
 		Enable:             true,
 		OrgIDs:             []int64{101, 202},
+		OverviewPresets:    []string{"today", "30d"},
 		QuestionnaireCodes: []string{"phq9", "gad7"},
 		PlanIDs:            []uint64{11, 22},
 	}
@@ -111,6 +112,9 @@ func TestAPIServerBuildContainerCacheOptions(t *testing.T) {
 	}
 	if len(got.StatisticsWarmup.OrgIDs) != 2 || got.StatisticsWarmup.OrgIDs[1] != 202 {
 		t.Fatalf("StatisticsWarmup.OrgIDs = %+v", got.StatisticsWarmup.OrgIDs)
+	}
+	if len(got.StatisticsWarmup.OverviewPresets) != 2 || got.StatisticsWarmup.OverviewPresets[1] != "30d" {
+		t.Fatalf("StatisticsWarmup.OverviewPresets = %+v", got.StatisticsWarmup.OverviewPresets)
 	}
 	if !got.Warmup.Enable || !got.Warmup.StartupStatic || !got.Warmup.StartupQuery {
 		t.Fatalf("Warmup mapping mismatch: %+v", got.Warmup)

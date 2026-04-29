@@ -264,6 +264,7 @@ cache:
   statistics_warmup:
     enable: false
     org_ids: [1]
+    overview_presets: ["today", "7d", "30d"]
     questionnaire_codes: []
     plan_ids: []
   warmup:

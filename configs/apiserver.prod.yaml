@@ -250,6 +250,7 @@ cache:
   statistics_warmup:          # 统计查询结果缓存预热配置
     enable: false             # 2C4G 临时降配阶段关闭统计预热，改为按需加载
     org_ids: [1]              # 组织ID列表（从配置读取，默认预热所有组织）
+    overview_presets: ["today", "7d", "30d"] # 首页概览常用窗口
     questionnaire_codes: []    # 问卷编码列表（从配置读取，默认预热所有问卷）
     plan_ids: []              # 计划ID列表（从配置读取，默认预热所有计划）
   warmup:

@@ -127,7 +127,10 @@ func (r *StatisticsRepository) RebuildAccumulatedStatistics(ctx context.Context,
 	if err != nil {
 		return err
 	}
-	return tx.Create(systemRow).Error
+	if err := tx.Create(systemRow).Error; err != nil {
+		return err
+	}
+	return r.rebuildOrganizationSnapshot(ctx, tx, orgID, time.Now().In(time.Local))
 }
 
 func (r *StatisticsRepository) RebuildPlanStatistics(ctx context.Context, orgID int64) error {
@@ -166,7 +169,10 @@ func (r *StatisticsRepository) RebuildPlanStatistics(ctx context.Context, orgID 
 			return err
 		}
 	}
-	return r.rebuildPlanTaskDailyProjection(ctx, tx, orgID)
+	if err := r.rebuildPlanTaskDailyProjection(ctx, tx, orgID); err != nil {
+		return err
+	}
+	return r.rebuildPlanTaskWindowSnapshots(ctx, tx, orgID, time.Now().In(time.Local))
 }
 
 func (r *StatisticsRepository) buildQuestionnaireAccumulatedRows(ctx context.Context, tx *gorm.DB, orgID int64, todayStart time.Time) ([]*StatisticsAccumulatedPO, error) {

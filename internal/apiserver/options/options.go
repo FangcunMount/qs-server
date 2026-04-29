@@ -393,6 +393,7 @@ func NewCacheOptions() *CacheOptions {
 		StatisticsWarmup: &StatisticsWarmupOptions{
 			Enable:             false,
 			OrgIDs:             []int64{1},
+			OverviewPresets:    []string{"today", "7d", "30d"},
 			QuestionnaireCodes: []string{},
 			PlanIDs:            []uint64{},
 		},
@@ -468,6 +469,7 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 		c.StatisticsWarmup = &StatisticsWarmupOptions{
 			Enable:             false,
 			OrgIDs:             []int64{1},
+			OverviewPresets:    []string{"today", "7d", "30d"},
 			QuestionnaireCodes: []string{},
 			PlanIDs:            []uint64{},
 		}
@@ -527,6 +529,7 @@ type CacheTTLOptions struct {
 type StatisticsWarmupOptions struct {
 	Enable             bool     `json:"enable" mapstructure:"enable"`
 	OrgIDs             []int64  `json:"org_ids" mapstructure:"org_ids"`
+	OverviewPresets    []string `json:"overview_presets" mapstructure:"overview_presets"`
 	QuestionnaireCodes []string `json:"questionnaire_codes" mapstructure:"questionnaire_codes"`
 	PlanIDs            []uint64 `json:"plan_ids" mapstructure:"plan_ids"`
 }

@@ -75,6 +75,7 @@ func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cache
 	}
 	return &cachegov.StatisticsWarmupConfig{
 		OrgIDs:             cacheCfg.StatisticsWarmup.OrgIDs,
+		OverviewPresets:    cacheCfg.StatisticsWarmup.OverviewPresets,
 		QuestionnaireCodes: cacheCfg.StatisticsWarmup.QuestionnaireCodes,
 		PlanIDs:            cacheCfg.StatisticsWarmup.PlanIDs,
 	}

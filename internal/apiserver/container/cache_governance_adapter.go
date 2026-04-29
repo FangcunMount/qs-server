@@ -4,6 +4,7 @@ import (
 	"context"
 	"strings"
 
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -30,9 +31,11 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	}
 
 	var warmStatsSystem func(context.Context, int64) error
+	var warmStatsOverview func(context.Context, int64, string) error
 	var warmStatsQuestionnaire func(context.Context, int64, string) error
 	var warmStatsPlan func(context.Context, int64, uint64) error
 	if c != nil && c.CacheClient(cacheplane.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
+		warmStatsOverview = a.warmOverviewStatsTarget
 		warmStatsSystem = a.warmSystemStatsTarget
 		warmStatsQuestionnaire = a.warmQuestionnaireStatsTarget
 		warmStatsPlan = a.warmPlanStatsTarget
@@ -45,6 +48,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		WarmScale:                       warmScale,
 		WarmQuestionnaire:               warmQuestionnaire,
 		WarmScaleList:                   warmScaleList,
+		WarmStatsOverview:               warmStatsOverview,
 		WarmStatsSystem:                 warmStatsSystem,
 		WarmStatsQuestionnaire:          warmStatsQuestionnaire,
 		WarmStatsPlan:                   warmStatsPlan,
@@ -165,6 +169,15 @@ func (a cacheGovernanceAdapter) warmSystemStatsTarget(ctx context.Context, orgID
 		return nil
 	}
 	_, err := c.StatisticsModule.SystemStatisticsService.GetSystemStatistics(ctx, orgID)
+	return err
+}
+
+func (a cacheGovernanceAdapter) warmOverviewStatsTarget(ctx context.Context, orgID int64, preset string) error {
+	c := a.container
+	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.ReadService == nil {
+		return nil
+	}
+	_, err := c.StatisticsModule.ReadService.GetOverview(ctx, orgID, statisticsApp.QueryFilter{Preset: preset})
 	return err
 }
 
