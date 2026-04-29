@@ -4,24 +4,24 @@ import (
 	"context"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 type StatusService interface {
-	GetRuntime(context.Context) (*cacheobservability.RuntimeSnapshot, error)
+	GetRuntime(context.Context) (*observability.RuntimeSnapshot, error)
 	GetStatus(context.Context) (*StatusSnapshot, error)
 	GetHotset(context.Context, cachetarget.WarmupKind, int64) (*HotsetSnapshot, error)
 }
 
 type StatusSnapshot struct {
-	cacheobservability.RuntimeSnapshot
+	observability.RuntimeSnapshot
 	Warmup WarmupStatusSnapshot `json:"warmup"`
 }
 
 type HotsetSnapshot struct {
-	Family    redisplane.Family        `json:"family"`
+	Family    cachemodel.Family        `json:"family"`
 	Kind      cachetarget.WarmupKind   `json:"kind"`
 	Limit     int64                    `json:"limit"`
 	Available bool                     `json:"available"`
@@ -32,12 +32,12 @@ type HotsetSnapshot struct {
 
 type governanceStatusService struct {
 	component string
-	status    *cacheobservability.FamilyStatusRegistry
+	status    *observability.FamilyStatusRegistry
 	hotset    cachetarget.HotsetInspector
 	coord     Coordinator
 }
 
-func NewStatusService(component string, status *cacheobservability.FamilyStatusRegistry, hotset cachetarget.HotsetInspector, coord Coordinator) StatusService {
+func NewStatusService(component string, status *observability.FamilyStatusRegistry, hotset cachetarget.HotsetInspector, coord Coordinator) StatusService {
 	return &governanceStatusService{
 		component: component,
 		status:    status,
@@ -46,24 +46,24 @@ func NewStatusService(component string, status *cacheobservability.FamilyStatusR
 	}
 }
 
-func (s *governanceStatusService) GetRuntime(ctx context.Context) (*cacheobservability.RuntimeSnapshot, error) {
+func (s *governanceStatusService) GetRuntime(ctx context.Context) (*observability.RuntimeSnapshot, error) {
 	_ = ctx
 	component := ""
 	if s != nil {
 		component = s.component
 	}
-	result := cacheobservability.RuntimeSnapshot{
+	result := observability.RuntimeSnapshot{
 		GeneratedAt: time.Now(),
 		Component:   component,
-		Families:    []cacheobservability.FamilyStatus{},
-		Summary: cacheobservability.RuntimeSummary{
+		Families:    []observability.FamilyStatus{},
+		Summary: observability.RuntimeSummary{
 			Ready: true,
 		},
 	}
 	if s == nil {
 		return &result, nil
 	}
-	snapshot := cacheobservability.SnapshotForComponent(s.component, s.status)
+	snapshot := observability.SnapshotForComponent(s.component, s.status)
 	return &snapshot, nil
 }
 
@@ -116,7 +116,7 @@ func (s *governanceStatusService) GetHotset(ctx context.Context, kind cachetarge
 	return result, nil
 }
 
-func (s *governanceStatusService) familyStatus(family redisplane.Family) *cacheobservability.FamilyStatus {
+func (s *governanceStatusService) familyStatus(family cachemodel.Family) *observability.FamilyStatus {
 	if s == nil || s.status == nil {
 		return nil
 	}

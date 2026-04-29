@@ -19,10 +19,10 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -51,10 +51,10 @@ type PlanModuleDeps struct {
 	EventPublisher event.EventPublisher
 	ScaleRepo      scale.Repository
 	RedisClient    redis.UniversalClient
-	CacheBuilder   *rediskey.Builder
+	CacheBuilder   *keyspace.Builder
 	PlanPolicy     cachepolicy.CachePolicy
 	EntryBaseURL   string
-	Observer       *cacheobservability.ComponentObserver
+	Observer       *observability.ComponentObserver
 	MySQLLimiter   backpressure.Acquirer
 	TesteeAccess   actorAccessApp.TesteeAccessService
 }

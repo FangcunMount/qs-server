@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
 )
@@ -33,7 +33,7 @@ func TestCollectionPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
 		options.NewOptions(),
 		nil,
 		nil,
-		cacheobservability.NewFamilyStatusRegistry("collection-server"),
+		observability.NewFamilyStatusRegistry("collection-server"),
 	)
 	if err := c.Initialize(); err != nil {
 		t.Fatal(err)

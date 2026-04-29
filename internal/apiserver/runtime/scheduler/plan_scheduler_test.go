@@ -9,8 +9,8 @@ import (
 
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 )
 
 type fakePlanCommandService struct {
@@ -80,7 +80,7 @@ type fakeSchedulerLockManager struct {
 	releaseCount int
 }
 
-func (m *fakeSchedulerLockManager) acquire(_ context.Context, _ redislock.Spec, _ string, _ time.Duration) (*redislock.Lease, bool, error) {
+func (m *fakeSchedulerLockManager) acquire(_ context.Context, _ redisadapter.Spec, _ string, _ time.Duration) (*redisadapter.Lease, bool, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -88,10 +88,10 @@ func (m *fakeSchedulerLockManager) acquire(_ context.Context, _ redislock.Spec, 
 		return nil, false, nil
 	}
 	m.locked = true
-	return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+	return &redisadapter.Lease{Key: "lock-key", Token: "token"}, true, nil
 }
 
-func (m *fakeSchedulerLockManager) release(_ context.Context, _ redislock.Spec, _ string, _ *redislock.Lease) error {
+func (m *fakeSchedulerLockManager) release(_ context.Context, _ redisadapter.Spec, _ string, _ *redisadapter.Lease) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
@@ -114,13 +114,13 @@ func TestNewPlanRunner(t *testing.T) {
 
 	if runner := newPlanRunnerWithHooks(
 		&apiserveroptions.PlanSchedulerOptions{Enable: false},
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected disabled scheduler to return nil runner")
 	}
@@ -130,23 +130,23 @@ func TestNewPlanRunner(t *testing.T) {
 		nil,
 		command,
 		newTestPlanLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil lock manager to return nil runner")
 	}
 
 	if runner := newPlanRunnerWithHooks(
 		opts,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		nil,
 		newTestPlanLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil command service to return nil runner")
 	}
@@ -165,7 +165,7 @@ func TestPlanRunnerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 
 	runner := newPlanRunnerWithHooks(
 		newTestPlanSchedulerOptions(11, 22, 33),
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
 		lock.acquire,
@@ -202,7 +202,7 @@ func TestPlanRunnerRunOncePassesPendingLookbackWindow(t *testing.T) {
 
 	runner := newPlanRunnerWithHooks(
 		opts,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
 		lock.acquire,
@@ -243,7 +243,7 @@ func TestPlanRunnerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 
 	runner := newPlanRunnerWithHooks(
 		newTestPlanSchedulerOptions(1, 2, 3),
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
 		lock.acquire,
@@ -265,13 +265,13 @@ func TestPlanRunnerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 	command := &fakePlanCommandService{}
 	runner := newPlanRunnerWithHooks(
 		newTestPlanSchedulerOptions(1, 2),
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
 			return nil, false, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
@@ -285,13 +285,13 @@ func TestPlanRunnerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 func TestPlanRunnerLockKeyUsesLockNamespace(t *testing.T) {
 	runner := newPlanRunnerWithHooks(
 		newTestPlanSchedulerOptions(1),
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		&fakePlanCommandService{},
 		newTestPlanLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 	if got := runner.lockKey(); got != "apiserver-test:cache:lock:qs:plan-scheduler:test" {
 		t.Fatalf("unexpected lock key: %s", got)
@@ -304,28 +304,28 @@ func TestPlanRunnerRunOnceUsesConfiguredLockOverride(t *testing.T) {
 	opts.LockKey = "qs:plan-scheduler:custom"
 	opts.LockTTL = 90 * time.Second
 
-	var gotSpec redislock.Spec
+	var gotSpec redisadapter.Spec
 	var gotKey string
 	var gotTTL time.Duration
 	runner := newPlanRunnerWithHooks(
 		opts,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
-		func(_ context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+		func(_ context.Context, spec redisadapter.Spec, key string, ttl time.Duration) (*redisadapter.Lease, bool, error) {
 			gotSpec = spec
 			gotKey = key
 			gotTTL = ttl
-			return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+			return &redisadapter.Lease{Key: "lock-key", Token: "token"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
 		t.Fatalf("runOnce returned error: %v", err)
 	}
-	if gotSpec.Name != redislock.Specs.PlanSchedulerLeader.Name {
-		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redislock.Specs.PlanSchedulerLeader.Name)
+	if gotSpec.Name != redisadapter.Specs.PlanSchedulerLeader.Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redisadapter.Specs.PlanSchedulerLeader.Name)
 	}
 	if gotKey != opts.LockKey {
 		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)
@@ -351,7 +351,7 @@ func TestPlanRunnerStartStopsOnContextCancel(t *testing.T) {
 
 	runner := newPlanRunnerWithHooks(
 		opts,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command,
 		newTestPlanLockBuilder(),
 		lock.acquire,
@@ -394,7 +394,7 @@ func TestPlanRunnerMultiInstanceOnlyOneExecutes(t *testing.T) {
 	opts := newTestPlanSchedulerOptions(1)
 	runner1 := newPlanRunnerWithHooks(
 		opts,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command1,
 		newTestPlanLockBuilder(),
 		lock.acquire,
@@ -402,7 +402,7 @@ func TestPlanRunnerMultiInstanceOnlyOneExecutes(t *testing.T) {
 	)
 	runner2 := newPlanRunnerWithHooks(
 		opts,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		command2,
 		newTestPlanLockBuilder(),
 		lock.acquire,
@@ -458,8 +458,8 @@ func newTestPlanSchedulerOptions(orgIDs ...int64) *apiserveroptions.PlanSchedule
 	}
 }
 
-func newTestPlanLockBuilder() *rediskey.Builder {
-	return rediskey.NewBuilderWithNamespace(
-		rediskey.ComposeNamespace("apiserver-test", "cache:lock"),
+func newTestPlanLockBuilder() *keyspace.Builder {
+	return keyspace.NewBuilderWithNamespace(
+		keyspace.ComposeNamespace("apiserver-test", "cache:lock"),
 	)
 }

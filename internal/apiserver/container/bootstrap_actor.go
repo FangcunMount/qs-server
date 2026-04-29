@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 type actorModuleInitDeps struct {
@@ -38,8 +38,8 @@ func (c *Container) buildActorModuleDeps() assembler.ActorModuleDeps {
 		MySQLDB:             c.mysqlDB,
 		GuardianshipService: deps.guardianshipSvc,
 		IdentityService:     deps.identitySvc,
-		RedisClient:         c.CacheClient(redisplane.FamilyObject),
-		CacheBuilder:        c.CacheBuilder(redisplane.FamilyObject),
+		RedisClient:         c.CacheClient(cacheplane.FamilyObject),
+		CacheBuilder:        c.CacheBuilder(cacheplane.FamilyObject),
 		TesteePolicy:        c.CachePolicy(cachepolicy.PolicyTestee),
 		OperatorAuthz:       deps.opAuthz,
 		OperationAccountSvc: deps.operationAccountSvc,

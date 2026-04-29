@@ -11,9 +11,9 @@ import (
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	collectionconfig "github.com/FangcunMount/qs-server/internal/collection-server/config"
 	collectionoptions "github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	workerconfig "github.com/FangcunMount/qs-server/internal/worker/config"
 	workeroptions "github.com/FangcunMount/qs-server/internal/worker/options"
 	"github.com/spf13/viper"
@@ -35,13 +35,13 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			if cfg.Options != opts {
 				t.Fatal("config must wrap the decoded apiserver options")
 			}
-			assertRedisFamilies(t, opts.RedisRuntime, []redisplane.Family{
-				redisplane.FamilyStatic,
-				redisplane.FamilyObject,
-				redisplane.FamilyQuery,
-				redisplane.FamilyMeta,
-				redisplane.FamilySDK,
-				redisplane.FamilyLock,
+			assertRedisFamilies(t, opts.RedisRuntime, []cacheplane.Family{
+				cacheplane.FamilyStatic,
+				cacheplane.FamilyObject,
+				cacheplane.FamilyQuery,
+				cacheplane.FamilyMeta,
+				cacheplane.FamilySDK,
+				cacheplane.FamilyLock,
 			})
 			if opts.MessagingOptions == nil {
 				t.Fatal("messaging options must be traceable")
@@ -73,9 +73,9 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if cfg.Options != opts {
 				t.Fatal("config must wrap the decoded collection options")
 			}
-			assertRedisFamilies(t, opts.RedisRuntime, []redisplane.Family{
-				redisplane.FamilyOps,
-				redisplane.FamilyLock,
+			assertRedisFamilies(t, opts.RedisRuntime, []cacheplane.Family{
+				cacheplane.FamilyOps,
+				cacheplane.FamilyLock,
 			})
 			if opts.RateLimit == nil || !opts.RateLimit.Enabled {
 				t.Fatal("collection rate limit config must be traceable and enabled by default")
@@ -105,8 +105,8 @@ func TestWorkerDevProdConfigContracts(t *testing.T) {
 			if cfg.Options != opts {
 				t.Fatal("config must wrap the decoded worker options")
 			}
-			assertRedisFamilies(t, opts.RedisRuntime, []redisplane.Family{
-				redisplane.FamilyLock,
+			assertRedisFamilies(t, opts.RedisRuntime, []cacheplane.Family{
+				cacheplane.FamilyLock,
 			})
 			if cfg.Messaging == nil || cfg.Messaging.Provider == "" {
 				t.Fatal("worker messaging config must be traceable")
@@ -166,7 +166,7 @@ func completeAndValidate(t *testing.T, opts interface {
 	}
 }
 
-func assertRedisFamilies(t *testing.T, runtimeOpts *genericoptions.RedisRuntimeOptions, families []redisplane.Family) {
+func assertRedisFamilies(t *testing.T, runtimeOpts *genericoptions.RedisRuntimeOptions, families []cacheplane.Family) {
 	t.Helper()
 	if runtimeOpts == nil {
 		t.Fatal("redis runtime options are nil")

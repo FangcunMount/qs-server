@@ -4,8 +4,8 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -16,16 +16,16 @@ const (
 )
 
 type SubmitGuard struct {
-	opsHandle *redisplane.Handle
-	lockMgr   *redislock.Manager
+	opsHandle *cacheplane.Handle
+	lockMgr   locklease.Manager
 	observer  resilienceplane.Observer
 }
 
-func NewSubmitGuard(opsHandle *redisplane.Handle, lockMgr *redislock.Manager) *SubmitGuard {
+func NewSubmitGuard(opsHandle *cacheplane.Handle, lockMgr locklease.Manager) *SubmitGuard {
 	return NewSubmitGuardWithObserver(opsHandle, lockMgr, nil)
 }
 
-func NewSubmitGuardWithObserver(opsHandle *redisplane.Handle, lockMgr *redislock.Manager, observer resilienceplane.Observer) *SubmitGuard {
+func NewSubmitGuardWithObserver(opsHandle *cacheplane.Handle, lockMgr locklease.Manager, observer resilienceplane.Observer) *SubmitGuard {
 	return &SubmitGuard{
 		opsHandle: opsHandle,
 		lockMgr:   lockMgr,
@@ -33,7 +33,7 @@ func NewSubmitGuardWithObserver(opsHandle *redisplane.Handle, lockMgr *redislock
 	}
 }
 
-func (g *SubmitGuard) Begin(ctx context.Context, key string) (string, *redislock.Lease, bool, error) {
+func (g *SubmitGuard) Begin(ctx context.Context, key string) (string, *locklease.Lease, bool, error) {
 	if g == nil || key == "" {
 		return "", nil, true, nil
 	}
@@ -48,7 +48,7 @@ func (g *SubmitGuard) Begin(ctx context.Context, key string) (string, *redislock
 		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeDegradedOpen)
 		return "", nil, true, nil
 	}
-	lease, acquired, err := g.lockMgr.AcquireSpec(ctx, redislock.Specs.CollectionSubmit, submitInflightKey(key), defaultSubmitInflightTTL)
+	lease, acquired, err := g.lockMgr.AcquireSpec(ctx, locklease.Specs.CollectionSubmit, submitInflightKey(key), defaultSubmitInflightTTL)
 	if err != nil {
 		g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
 		return "", nil, false, err
@@ -61,34 +61,34 @@ func (g *SubmitGuard) Begin(ctx context.Context, key string) (string, *redislock
 	return "", lease, acquired, nil
 }
 
-func (g *SubmitGuard) Complete(ctx context.Context, key string, lease *redislock.Lease, answerSheetID string) error {
+func (g *SubmitGuard) Complete(ctx context.Context, key string, lease *locklease.Lease, answerSheetID string) error {
 	if g == nil {
 		return nil
 	}
-	if answerSheetID != "" && g.opsHandle != nil && g.opsHandle.Client != nil && g.opsHandle.Builder != nil {
-		if err := g.opsHandle.Client.Set(ctx, g.opsHandle.Builder.BuildLockKey(submitDoneKey(key)), answerSheetID, defaultSubmitResultTTL).Err(); err != nil {
+	if answerSheetID != "" && g.opsHandle != nil && g.opsHandle.Client != nil {
+		if err := g.opsHandle.Client.Set(ctx, g.opsKeyspace().IdempotencyDone(key), answerSheetID, defaultSubmitResultTTL).Err(); err != nil {
 			g.observe(ctx, resilienceplane.ProtectionIdempotency, resilienceplane.OutcomeLockError)
 			return err
 		}
 	}
 	if g.lockMgr != nil {
-		return g.lockMgr.ReleaseSpec(context.Background(), redislock.Specs.CollectionSubmit, submitInflightKey(key), lease)
+		return g.lockMgr.ReleaseSpec(context.Background(), locklease.Specs.CollectionSubmit, submitInflightKey(key), lease)
 	}
 	return nil
 }
 
-func (g *SubmitGuard) Abort(ctx context.Context, key string, lease *redislock.Lease) error {
+func (g *SubmitGuard) Abort(ctx context.Context, key string, lease *locklease.Lease) error {
 	if g == nil || g.lockMgr == nil {
 		return nil
 	}
-	return g.lockMgr.ReleaseSpec(ctx, redislock.Specs.CollectionSubmit, submitInflightKey(key), lease)
+	return g.lockMgr.ReleaseSpec(ctx, locklease.Specs.CollectionSubmit, submitInflightKey(key), lease)
 }
 
 func (g *SubmitGuard) lookupDone(ctx context.Context, key string) (string, bool, error) {
-	if g == nil || g.opsHandle == nil || g.opsHandle.Client == nil || g.opsHandle.Builder == nil {
+	if g == nil || g.opsHandle == nil || g.opsHandle.Client == nil {
 		return "", false, nil
 	}
-	value, err := g.opsHandle.Client.Get(ctx, g.opsHandle.Builder.BuildLockKey(submitDoneKey(key))).Result()
+	value, err := g.opsHandle.Client.Get(ctx, g.opsKeyspace().IdempotencyDone(key)).Result()
 	if err != nil {
 		if err == redis.Nil {
 			return "", false, nil
@@ -96,6 +96,13 @@ func (g *SubmitGuard) lookupDone(ctx context.Context, key string) (string, bool,
 		return "", false, err
 	}
 	return value, true, nil
+}
+
+func (g *SubmitGuard) opsKeyspace() opsKeyspace {
+	if g == nil || g.opsHandle == nil {
+		return newOpsKeyspace("")
+	}
+	return newOpsKeyspace(g.opsHandle.Namespace)
 }
 
 func submitInflightKey(key string) string {

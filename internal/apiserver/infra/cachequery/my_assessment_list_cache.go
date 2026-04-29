@@ -9,7 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 )
 
 const defaultAssessmentListCacheTTL = 10 * time.Minute
@@ -20,14 +20,14 @@ const defaultAssessmentListLocalMaxEntries = 512
 // It uses version tokens and versioned keys so the hot path does not need pattern deletion.
 type MyAssessmentListCache struct {
 	query      *VersionedQueryCache
-	keyBuilder *rediskey.Builder
+	keyBuilder *keyspace.Builder
 }
 
-func NewMyAssessmentListCacheWithBuilderAndPolicy(c cacheentry.Cache, versionStore VersionTokenStore, keyBuilder *rediskey.Builder, policy cachepolicy.CachePolicy) *MyAssessmentListCache {
+func NewMyAssessmentListCacheWithBuilderAndPolicy(c cacheentry.Cache, versionStore VersionTokenStore, keyBuilder *keyspace.Builder, policy cachepolicy.CachePolicy) *MyAssessmentListCache {
 	return NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c, versionStore, keyBuilder, policy, nil)
 }
 
-func NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c cacheentry.Cache, versionStore VersionTokenStore, keyBuilder *rediskey.Builder, policy cachepolicy.CachePolicy, observer FamilyObserver) *MyAssessmentListCache {
+func NewMyAssessmentListCacheWithBuilderPolicyAndObserver(c cacheentry.Cache, versionStore VersionTokenStore, keyBuilder *keyspace.Builder, policy cachepolicy.CachePolicy, observer FamilyObserver) *MyAssessmentListCache {
 	if c == nil {
 		return nil
 	}

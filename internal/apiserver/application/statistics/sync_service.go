@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"gorm.io/gorm"
 )
 
@@ -19,14 +19,14 @@ const statisticsSyncLockTTL = 30 * time.Minute
 type syncService struct {
 	db               *gorm.DB
 	repairWindowDays int
-	lockManager      *redislock.Manager
+	lockManager      locklease.Manager
 }
 
 // NewSyncService 创建统计同步服务。
 func NewSyncService(
 	db *gorm.DB,
 	repairWindowDays int,
-	lockManager *redislock.Manager,
+	lockManager locklease.Manager,
 ) StatisticsSyncService {
 	if repairWindowDays <= 0 {
 		repairWindowDays = defaultStatisticsRepairWindowDays
@@ -463,7 +463,7 @@ func (s *syncService) withRedisLock(ctx context.Context, lockName string, fn fun
 		return fmt.Errorf("statistics sync redis lock manager is unavailable")
 	}
 
-	lease, acquired, err := s.lockManager.AcquireSpec(ctx, redislock.Specs.StatisticsSync, lockName, statisticsSyncLockTTL)
+	lease, acquired, err := s.lockManager.AcquireSpec(ctx, locklease.Specs.StatisticsSync, lockName, statisticsSyncLockTTL)
 	if err != nil {
 		return err
 	}
@@ -471,7 +471,7 @@ func (s *syncService) withRedisLock(ctx context.Context, lockName string, fn fun
 		return fmt.Errorf("statistics sync lock busy: %s", lockName)
 	}
 	defer func() {
-		_ = s.lockManager.ReleaseSpec(context.Background(), redislock.Specs.StatisticsSync, lockName, lease)
+		_ = s.lockManager.ReleaseSpec(context.Background(), locklease.Specs.StatisticsSync, lockName, lease)
 	}()
 
 	return fn(ctx)

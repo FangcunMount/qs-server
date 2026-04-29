@@ -12,15 +12,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -50,12 +51,12 @@ type ScaleModuleDeps struct {
 	EventPublisher    event.EventPublisher
 	QuestionnaireRepo domainQuestionnaire.Repository
 	RedisClient       redis.UniversalClient
-	CacheBuilder      *rediskey.Builder
+	CacheBuilder      *keyspace.Builder
 	IdentityService   *iam.IdentityService
 	ScalePolicy       cachepolicy.CachePolicy
 	ScaleListPolicy   cachepolicy.CachePolicy
 	HotsetRecorder    cachetarget.HotsetRecorder
-	Observer          *cacheobservability.ComponentObserver
+	Observer          *observability.ComponentObserver
 	MongoLimiter      backpressure.Acquirer
 }
 
@@ -82,7 +83,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	var listCache *scaleApp.ScaleListCache
 	if normalized.RedisClient != nil {
 		listCache = scaleApp.NewScaleListCacheWithPolicyAndKeyBuilder(
-			normalized.RedisClient,
+			cacheentry.NewRedisCache(normalized.RedisClient),
 			module.Repo,
 			normalized.IdentityService,
 			normalized.CacheBuilder,

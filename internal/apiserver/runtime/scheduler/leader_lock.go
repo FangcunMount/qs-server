@@ -5,13 +5,13 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 )
 
-type leaderLockAcquireFunc func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error)
+type leaderLockAcquireFunc func(context.Context, locklease.Spec, string, time.Duration) (*locklease.Lease, bool, error)
 
-type leaderLockReleaseFunc func(context.Context, redislock.Spec, string, *redislock.Lease) error
+type leaderLockReleaseFunc func(context.Context, locklease.Spec, string, *locklease.Lease) error
 
 type leaderLeaseRunner interface {
 	DisplayKey() string
@@ -19,7 +19,7 @@ type leaderLeaseRunner interface {
 }
 
 type leaderLock struct {
-	spec       redislock.Spec
+	spec       locklease.Spec
 	rawKey     string
 	ttl        time.Duration
 	displayKey string
@@ -34,15 +34,15 @@ type leaderLockRunOptions struct {
 }
 
 func newLeaderLock(
-	spec redislock.Spec,
+	spec locklease.Spec,
 	rawKey string,
 	ttl time.Duration,
-	builder *rediskey.Builder,
+	builder *keyspace.Builder,
 	acquire leaderLockAcquireFunc,
 	release leaderLockReleaseFunc,
 ) *leaderLock {
 	if builder == nil {
-		builder = rediskey.NewBuilder()
+		builder = keyspace.NewBuilder()
 	}
 	return &leaderLock{
 		spec:       spec,

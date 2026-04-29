@@ -10,8 +10,8 @@ import (
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	questionnaireInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -24,17 +24,17 @@ type CachedQuestionnaireRepository struct {
 	repo     domainQuestionnaire.Repository
 	client   redis.UniversalClient
 	ttl      time.Duration
-	keys     *rediskey.Builder
+	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
-	observer *cacheobservability.ComponentObserver
+	observer *observability.ComponentObserver
 	store    *ObjectCacheStore[domainQuestionnaire.Questionnaire]
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
+func NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) domainQuestionnaire.Repository {
 	return NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) domainQuestionnaire.Repository {
+func NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(repo domainQuestionnaire.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) domainQuestionnaire.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

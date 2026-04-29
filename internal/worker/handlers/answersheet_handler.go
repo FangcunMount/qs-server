@@ -4,12 +4,13 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"reflect"
 	"strconv"
 
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -22,8 +23,8 @@ const (
 )
 
 type answerSheetProcessingGateHooks struct {
-	acquire  func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*redislock.Lease, bool, error)
-	release  func(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error
+	acquire  func(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*locklease.Lease, bool, error)
+	release  func(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *locklease.Lease) error
 	observer resilienceplane.Observer
 }
 
@@ -135,8 +136,8 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 	answerSheetIDStr := strconv.FormatUint(answerSheetID, 10)
 	lockKey := answerSheetProcessingLockKey(deps, answerSheetID)
 
-	if deps.LockManager == nil {
-		cacheobservability.ObserveLockDegraded("answersheet_processing", "redis_unavailable")
+	if !lockManagerAvailable(deps.LockManager) {
+		observability.ObserveLockDegraded("answersheet_processing", "redis_unavailable")
 		g.observe(ctx, resilienceplane.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
@@ -150,7 +151,7 @@ func (g answerSheetDuplicateSuppressionGate) Run(
 
 	lease, acquired, err := g.hooks.acquire(ctx, deps, answerSheetID)
 	if err != nil {
-		cacheobservability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
+		observability.ObserveLockDegraded("answersheet_processing", "acquire_failed")
 		g.observe(ctx, resilienceplane.OutcomeDegradedOpen)
 		deps.Logger.Warn("answersheet processing gate degraded",
 			slog.String("event_id", eventID),
@@ -212,11 +213,11 @@ func defaultAnswerSheetGateObserver(observer resilienceplane.Observer) resilienc
 }
 
 // acquireProcessingLock 获取答卷处理的 best-effort Redis lease lock。
-func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*redislock.Lease, bool, error) {
-	if deps.LockManager == nil {
+func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64) (*locklease.Lease, bool, error) {
+	if !lockManagerAvailable(deps.LockManager) {
 		return nil, false, fmt.Errorf("lock manager is unavailable")
 	}
-	lease, acquired, err := deps.LockManager.AcquireSpec(ctx, redislock.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID))
+	lease, acquired, err := deps.LockManager.AcquireSpec(ctx, locklease.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID))
 	if err != nil {
 		return nil, false, fmt.Errorf("failed to acquire processing lock: %w", err)
 	}
@@ -224,14 +225,27 @@ func acquireProcessingLock(ctx context.Context, deps *Dependencies, answerSheetI
 }
 
 // releaseProcessingLock 释放答卷处理的 Redis lease lock。
-func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *redislock.Lease) error {
-	if deps.LockManager == nil {
+func releaseProcessingLock(ctx context.Context, deps *Dependencies, answerSheetID uint64, lease *locklease.Lease) error {
+	if !lockManagerAvailable(deps.LockManager) {
 		return nil
 	}
-	if err := deps.LockManager.ReleaseSpec(ctx, redislock.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID), lease); err != nil {
+	if err := deps.LockManager.ReleaseSpec(ctx, locklease.Specs.AnswersheetProcessing, answerSheetProcessingLockKeyBase(answerSheetID), lease); err != nil {
 		return fmt.Errorf("failed to release processing lock: %w", err)
 	}
 	return nil
+}
+
+func lockManagerAvailable(manager locklease.Manager) bool {
+	if manager == nil {
+		return false
+	}
+	value := reflect.ValueOf(manager)
+	switch value.Kind() {
+	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
+		return !value.IsNil()
+	default:
+		return true
+	}
 }
 
 func answerSheetProcessingLockKeyBase(answerSheetID uint64) string {

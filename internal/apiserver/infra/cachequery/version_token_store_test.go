@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -14,11 +14,11 @@ type testFamilyObserver struct {
 }
 
 func (o testFamilyObserver) ObserveFamilySuccess(family string) {
-	cacheobservability.ObserveFamilySuccess(o.component, family)
+	observability.ObserveFamilySuccess(o.component, family)
 }
 
 func (o testFamilyObserver) ObserveFamilyFailure(family string, err error) {
-	cacheobservability.ObserveFamilyFailure(o.component, family, err)
+	observability.ObserveFamilyFailure(o.component, family, err)
 }
 
 func TestRedisVersionTokenStoreCurrentAndBump(t *testing.T) {
@@ -83,13 +83,13 @@ func TestRedisVersionTokenStoreObserverUsesInjectedComponent(t *testing.T) {
 		_ = client.Close()
 	})
 
-	registry := cacheobservability.NewFamilyStatusRegistry("token-observer")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("token-observer")
+	registry.Update(observability.FamilyStatus{
 		Component: "token-observer",
 		Family:    "meta_hotset",
 		Available: false,
 		Degraded:  true,
-		Mode:      cacheobservability.FamilyModeDegraded,
+		Mode:      observability.FamilyModeDegraded,
 	})
 
 	store := NewRedisVersionTokenStoreWithKindAndObserver(client, "assessment:list", testFamilyObserver{component: "token-observer"})
@@ -97,7 +97,7 @@ func TestRedisVersionTokenStoreObserverUsesInjectedComponent(t *testing.T) {
 		t.Fatalf("Current() error = %v", err)
 	}
 
-	snapshot := cacheobservability.SnapshotForComponent("token-observer", registry)
+	snapshot := observability.SnapshotForComponent("token-observer", registry)
 	if !snapshot.Summary.Ready {
 		t.Fatalf("runtime summary ready = false, want true after observed success: %#v", snapshot.Summary)
 	}

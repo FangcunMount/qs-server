@@ -14,9 +14,11 @@ import (
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -24,9 +26,9 @@ import (
 type Container struct {
 	initialized  bool
 	opts         *options.Options
-	opsHandle    *redisplane.Handle
-	lockManager  *redislock.Manager
-	familyStatus *cacheobservability.FamilyStatusRegistry
+	opsHandle    *cacheplane.Handle
+	lockManager  locklease.Manager
+	familyStatus *observability.FamilyStatusRegistry
 
 	// IAM 模块
 	IAMModule *IAMModule
@@ -65,7 +67,7 @@ type ClientBundle struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, opsHandle *redisplane.Handle, lockManager *redislock.Manager, familyStatus *cacheobservability.FamilyStatusRegistry) *Container {
+func NewContainer(opts *options.Options, opsHandle *cacheplane.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
 	return &Container{
 		opts:         opts,
 		opsHandle:    opsHandle,
@@ -192,8 +194,15 @@ func (c *Container) RateLimitOptions() *options.RateLimitOptions {
 }
 
 // OpsHandle returns the collection-server operational Redis handle.
-func (c *Container) OpsHandle() *redisplane.Handle {
+func (c *Container) OpsHandle() *cacheplane.Handle {
 	return c.opsHandle
+}
+
+func (c *Container) RateLimitBackend() ratelimit.Backend {
+	if c == nil || c.opsHandle == nil || c.opsHandle.Client == nil {
+		return nil
+	}
+	return ratelimitredis.NewBackend(c.opsHandle.Client, c.opsHandle.Builder)
 }
 
 func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
@@ -14,16 +14,16 @@ import (
 type HealthHandler struct {
 	serviceName string
 	version     string
-	status      *cacheobservability.FamilyStatusRegistry
+	status      *observability.FamilyStatusRegistry
 	resilience  func() resilienceplane.RuntimeSnapshot
 }
 
 // NewHealthHandler 创建健康检查处理器
-func NewHealthHandler(serviceName, version string, status *cacheobservability.FamilyStatusRegistry) *HealthHandler {
+func NewHealthHandler(serviceName, version string, status *observability.FamilyStatusRegistry) *HealthHandler {
 	return NewHealthHandlerWithResilience(serviceName, version, status, nil)
 }
 
-func NewHealthHandlerWithResilience(serviceName, version string, status *cacheobservability.FamilyStatusRegistry, resilience func() resilienceplane.RuntimeSnapshot) *HealthHandler {
+func NewHealthHandlerWithResilience(serviceName, version string, status *observability.FamilyStatusRegistry, resilience func() resilienceplane.RuntimeSnapshot) *HealthHandler {
 	return &HealthHandler{
 		serviceName: serviceName,
 		version:     version,
@@ -44,13 +44,13 @@ func (h *HealthHandler) Health(c *gin.Context) {
 		"status":  "healthy",
 		"service": h.serviceName,
 		"version": h.version,
-		"redis":   cacheobservability.SnapshotForComponent(h.serviceName, h.status),
+		"redis":   observability.SnapshotForComponent(h.serviceName, h.status),
 	})
 }
 
 // Ready 就绪检查
 func (h *HealthHandler) Ready(c *gin.Context) {
-	snapshot := cacheobservability.SnapshotForComponent(h.serviceName, h.status)
+	snapshot := observability.SnapshotForComponent(h.serviceName, h.status)
 	statusCode := http.StatusOK
 	statusText := "ready"
 	if !snapshot.Summary.Ready {
@@ -71,7 +71,7 @@ func (h *HealthHandler) Ready(c *gin.Context) {
 
 // RedisFamilies 返回 Redis family 治理快照
 func (h *HealthHandler) RedisFamilies(c *gin.Context) {
-	core.WriteResponse(c, nil, cacheobservability.SnapshotForComponent(h.serviceName, h.status))
+	core.WriteResponse(c, nil, observability.SnapshotForComponent(h.serviceName, h.status))
 }
 
 // Resilience 返回 collection-server 高并发治理只读快照。
@@ -114,6 +114,6 @@ func (h *HealthHandler) Info(c *gin.Context) {
 		"version":     h.version,
 		"description": "问卷收集服务 - BFF 层",
 		"status":      "ready",
-		"redis":       cacheobservability.SnapshotForComponent(h.serviceName, h.status),
+		"redis":       observability.SnapshotForComponent(h.serviceName, h.status),
 	})
 }

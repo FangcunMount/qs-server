@@ -10,7 +10,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 type readThroughValue struct {
@@ -252,20 +252,20 @@ func TestReadThroughDegradesCacheReadErrorToMiss(t *testing.T) {
 func TestReadThroughObserverUsesInjectedComponent(t *testing.T) {
 	t.Parallel()
 
-	registry := cacheobservability.NewFamilyStatusRegistry("readthrough-observer")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("readthrough-observer")
+	registry.Update(observability.FamilyStatus{
 		Component: "readthrough-observer",
 		Family:    string(cachepolicy.FamilyFor(cachepolicy.PolicyAssessmentDetail)),
 		Available: false,
 		Degraded:  true,
-		Mode:      cacheobservability.FamilyModeDegraded,
+		Mode:      observability.FamilyModeDegraded,
 	})
 
 	value, err := ReadThrough(context.Background(), ReadThroughOptions[readThroughValue]{
 		PolicyKey: cachepolicy.PolicyAssessmentDetail,
 		CacheKey:  "assessment:detail:42",
 		Policy:    cachepolicy.CachePolicy{},
-		Observer:  cacheobservability.NewComponentObserver("readthrough-observer"),
+		Observer:  observability.NewComponentObserver("readthrough-observer"),
 		GetCached: func(context.Context) (*readThroughValue, error) {
 			return &readThroughValue{Value: "cached"}, nil
 		},
@@ -277,7 +277,7 @@ func TestReadThroughObserverUsesInjectedComponent(t *testing.T) {
 		t.Fatalf("ReadThrough() value = %#v, want cached hit", value)
 	}
 
-	snapshot := cacheobservability.SnapshotForComponent("readthrough-observer", registry)
+	snapshot := observability.SnapshotForComponent("readthrough-observer", registry)
 	if !snapshot.Summary.Ready {
 		t.Fatalf("runtime summary ready = false, want true after observed success: %#v", snapshot.Summary)
 	}

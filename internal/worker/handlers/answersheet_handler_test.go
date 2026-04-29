@@ -11,9 +11,9 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -123,10 +123,10 @@ func TestHandleAnswerSheetSubmitted_LockedExecutesAndReleases(t *testing.T) {
 
 	released := false
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
-		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "token-1"}, true, nil
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-1"}, true, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
 			released = true
 			return nil
 		},
@@ -177,8 +177,8 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkip(t *testing.T) {
 
 func TestAnswerSheetProcessingLockKeyUsesNamespace(t *testing.T) {
 	deps := &Dependencies{
-		LockKeyBuilder: rediskey.NewBuilderWithNamespace(
-			rediskey.ComposeNamespace("worker-test", "cache:lock"),
+		LockKeyBuilder: keyspace.NewBuilderWithNamespace(
+			keyspace.ComposeNamespace("worker-test", "cache:lock"),
 		),
 	}
 	if got := answerSheetProcessingLockKey(deps, 42); got != "worker-test:cache:lock:answersheet:processing:42" {
@@ -193,11 +193,11 @@ func TestHandleAnswerSheetSubmitted_DegradedWithoutRedisContinues(t *testing.T) 
 
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
 		observer: observer,
-		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
 			t.Fatal("acquire should not be called when redis client is nil")
 			return nil, false, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
 			t.Fatal("release should not be called when redis client is nil")
 			return nil
 		},
@@ -226,10 +226,10 @@ func TestHandleAnswerSheetSubmitted_DegradedOnAcquireErrorContinues(t *testing.T
 	releaseCalled := false
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
 		observer: observer,
-		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
 			return nil, false, errors.New("boom")
 		},
-		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
 			releaseCalled = true
 			return nil
 		},
@@ -260,10 +260,10 @@ func TestHandleAnswerSheetSubmitted_DuplicateSkipUsesInjectedObserver(t *testing
 
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
 		observer: observer,
-		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
 			return nil, false, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
 			t.Fatal("release should not be called when lock is not acquired")
 			return nil
 		},
@@ -288,10 +288,10 @@ func TestHandleAnswerSheetSubmitted_ReleaseErrorDoesNotFail(t *testing.T) {
 	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
 
 	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
-		acquire: func(context.Context, *Dependencies, uint64) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "token-2"}, true, nil
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-2"}, true, nil
 		},
-		release: func(context.Context, *Dependencies, uint64, *redislock.Lease) error {
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
 			return errors.New("release failed")
 		},
 	})
@@ -309,12 +309,12 @@ func TestHandleAnswerSheetSubmitted_ReleaseErrorDoesNotFail(t *testing.T) {
 }
 
 func newAnswerSheetHandlerTestDeps(client InternalClient, redisClient redis.UniversalClient) *Dependencies {
-	lockBuilder := rediskey.NewBuilderWithNamespace(
-		rediskey.ComposeNamespace("worker-test", "cache:lock"),
+	lockBuilder := keyspace.NewBuilderWithNamespace(
+		keyspace.ComposeNamespace("worker-test", "cache:lock"),
 	)
-	var lockManager *redislock.Manager
+	var lockManager *redisadapter.Manager
 	if redisClient != nil {
-		lockManager = redislock.NewManager("worker", "lock_lease", &redisplane.Handle{
+		lockManager = redisadapter.NewManager("worker", "lock_lease", &cacheplane.Handle{
 			Client:  redisClient,
 			Builder: lockBuilder,
 		})

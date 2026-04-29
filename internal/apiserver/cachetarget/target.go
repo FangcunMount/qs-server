@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 )
 
 type contextKey string
@@ -29,7 +29,7 @@ const scaleListWarmupScope = "published"
 
 // WarmupTarget 描述一个稳定的预热目标。
 type WarmupTarget struct {
-	Family redisplane.Family
+	Family cachemodel.Family
 	Kind   WarmupKind
 	Scope  string
 }
@@ -42,12 +42,12 @@ type HotsetItem struct {
 // HotsetRecorder 记录和读取可治理缓存目标的热点排行。
 type HotsetRecorder interface {
 	Record(context.Context, WarmupTarget) error
-	Top(context.Context, redisplane.Family, WarmupKind, int64) ([]WarmupTarget, error)
+	Top(context.Context, cachemodel.Family, WarmupKind, int64) ([]WarmupTarget, error)
 }
 
 // HotsetInspector 读取带分数的热点排行，供治理状态接口使用。
 type HotsetInspector interface {
-	TopWithScores(context.Context, redisplane.Family, WarmupKind, int64) ([]HotsetItem, error)
+	TopWithScores(context.Context, cachemodel.Family, WarmupKind, int64) ([]HotsetItem, error)
 }
 
 func (t WarmupTarget) Key() string {
@@ -71,14 +71,14 @@ func (t WarmupTarget) OrgID() (int64, bool) {
 }
 
 // FamilyForKind returns the Redis family used by a governance warmup kind.
-func FamilyForKind(kind WarmupKind) redisplane.Family {
+func FamilyForKind(kind WarmupKind) cachemodel.Family {
 	switch kind {
 	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticScaleList:
-		return redisplane.FamilyStatic
+		return cachemodel.FamilyStatic
 	case WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
-		return redisplane.FamilyQuery
+		return cachemodel.FamilyQuery
 	default:
-		return redisplane.FamilyDefault
+		return cachemodel.FamilyDefault
 	}
 }
 
@@ -89,7 +89,7 @@ func normalizeCodeScope(prefix, code string) string {
 // NewStaticScaleWarmupTarget 创建量表静态缓存预热目标。
 func NewStaticScaleWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
-		Family: redisplane.FamilyStatic,
+		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticScale,
 		Scope:  normalizeCodeScope("scale", code),
 	}
@@ -98,7 +98,7 @@ func NewStaticScaleWarmupTarget(code string) WarmupTarget {
 // NewStaticQuestionnaireWarmupTarget 创建问卷静态缓存预热目标。
 func NewStaticQuestionnaireWarmupTarget(code string) WarmupTarget {
 	return WarmupTarget{
-		Family: redisplane.FamilyStatic,
+		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticQuestionnaire,
 		Scope:  normalizeCodeScope("questionnaire", code),
 	}
@@ -107,7 +107,7 @@ func NewStaticQuestionnaireWarmupTarget(code string) WarmupTarget {
 // NewStaticScaleListWarmupTarget 创建量表列表预热目标。
 func NewStaticScaleListWarmupTarget() WarmupTarget {
 	return WarmupTarget{
-		Family: redisplane.FamilyStatic,
+		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticScaleList,
 		Scope:  scaleListWarmupScope,
 	}
@@ -116,7 +116,7 @@ func NewStaticScaleListWarmupTarget() WarmupTarget {
 // NewQueryStatsSystemWarmupTarget 创建系统统计查询预热目标。
 func NewQueryStatsSystemWarmupTarget(orgID int64) WarmupTarget {
 	return WarmupTarget{
-		Family: redisplane.FamilyQuery,
+		Family: cachemodel.FamilyQuery,
 		Kind:   WarmupKindQueryStatsSystem,
 		Scope:  fmt.Sprintf("org:%d", orgID),
 	}
@@ -125,7 +125,7 @@ func NewQueryStatsSystemWarmupTarget(orgID int64) WarmupTarget {
 // NewQueryStatsQuestionnaireWarmupTarget 创建问卷统计查询预热目标。
 func NewQueryStatsQuestionnaireWarmupTarget(orgID int64, code string) WarmupTarget {
 	return WarmupTarget{
-		Family: redisplane.FamilyQuery,
+		Family: cachemodel.FamilyQuery,
 		Kind:   WarmupKindQueryStatsQuestionnaire,
 		Scope:  fmt.Sprintf("org:%d:questionnaire:%s", orgID, strings.ToLower(strings.TrimSpace(code))),
 	}
@@ -134,7 +134,7 @@ func NewQueryStatsQuestionnaireWarmupTarget(orgID int64, code string) WarmupTarg
 // NewQueryStatsPlanWarmupTarget 创建计划统计查询预热目标。
 func NewQueryStatsPlanWarmupTarget(orgID int64, planID uint64) WarmupTarget {
 	return WarmupTarget{
-		Family: redisplane.FamilyQuery,
+		Family: cachemodel.FamilyQuery,
 		Kind:   WarmupKindQueryStatsPlan,
 		Scope:  fmt.Sprintf("org:%d:plan:%d", orgID, planID),
 	}

@@ -10,9 +10,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -36,8 +36,8 @@ type databaseResourceDeps struct {
 
 type redisRuntimeStageDeps struct {
 	getClient      func() (redis.UniversalClient, error)
-	buildRuntime   func() *redisbootstrap.RuntimeBundle
-	buildSubsystem func(*redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem
+	buildRuntime   func() *cacheplanebootstrap.RuntimeBundle
+	buildSubsystem func(*cacheplanebootstrap.RuntimeBundle) *cachebootstrap.Subsystem
 }
 
 type mqPublisherStageDeps struct {
@@ -91,15 +91,15 @@ func (s *server) buildRedisRuntimeDeps(dbManager *bootstrap.DatabaseManager) red
 
 	return redisRuntimeStageDeps{
 		getClient: dbManager.GetRedisClient,
-		buildRuntime: func() *redisbootstrap.RuntimeBundle {
-			return redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+		buildRuntime: func() *cacheplanebootstrap.RuntimeBundle {
+			return cacheplanebootstrap.BuildRuntime(context.Background(), cacheplanebootstrap.Options{
 				Component:      "apiserver",
 				RuntimeOptions: s.config.RedisRuntime,
 				Resolver:       dbManager,
 				LockName:       "lock_lease",
 			})
 		},
-		buildSubsystem: func(runtimeBundle *redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
+		buildSubsystem: func(runtimeBundle *cacheplanebootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
 			return cachebootstrap.NewSubsystemFromRuntime(runtimeBundle, s.buildContainerCacheOptions())
 		},
 	}
@@ -221,7 +221,7 @@ func newDependencyBackpressureLimiter(dependency string, maxInflight int, timeou
 	})
 }
 
-func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, *redisbootstrap.RuntimeBundle, *cachebootstrap.Subsystem) {
+func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, *cacheplanebootstrap.RuntimeBundle, *cachebootstrap.Subsystem) {
 	var redisCache redis.UniversalClient
 	if deps.getClient != nil {
 		client, err := deps.getClient()
@@ -233,7 +233,7 @@ func initializeRedisRuntime(deps redisRuntimeStageDeps) (redis.UniversalClient, 
 		}
 		redisCache = client
 	}
-	var redisRuntime *redisbootstrap.RuntimeBundle
+	var redisRuntime *cacheplanebootstrap.RuntimeBundle
 	if deps.buildRuntime != nil {
 		redisRuntime = deps.buildRuntime()
 	}

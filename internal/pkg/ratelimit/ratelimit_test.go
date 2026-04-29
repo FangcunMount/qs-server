@@ -60,12 +60,12 @@ func TestLocalLimiterInvalidPolicyRejectsWithRetryAfter(t *testing.T) {
 	}
 }
 
-func TestRedisLimiterAllowsLimitsAndDegradesOpen(t *testing.T) {
-	backend := &fakeRedisBackend{
+func TestDistributedLimiterAllowsLimitsAndDegradesOpen(t *testing.T) {
+	backend := &fakeBackend{
 		allowed:    false,
 		retryAfter: 1500 * time.Millisecond,
 	}
-	limiter := NewRedisLimiter(backend, testPolicy("redis"))
+	limiter := NewDistributedLimiter(backend, testPolicy("redis"))
 
 	decision := limiter.Decide(context.Background(), "limit:submit:global")
 	if decision.Allowed {
@@ -87,7 +87,7 @@ func TestRedisLimiterAllowsLimitsAndDegradesOpen(t *testing.T) {
 		t.Fatalf("decision = %#v, want degraded open", decision)
 	}
 
-	decision = NewRedisLimiter(nil, testPolicy("redis")).Decide(context.Background(), "limit:submit:global")
+	decision = NewDistributedLimiter(nil, testPolicy("redis")).Decide(context.Background(), "limit:submit:global")
 	if !decision.Allowed || decision.Outcome != resilienceplane.OutcomeDegradedOpen {
 		t.Fatalf("nil backend decision = %#v, want degraded open", decision)
 	}
@@ -104,12 +104,12 @@ func testPolicy(strategy string) RateLimitPolicy {
 	}
 }
 
-type fakeRedisBackend struct {
+type fakeBackend struct {
 	allowed    bool
 	retryAfter time.Duration
 	err        error
 }
 
-func (f *fakeRedisBackend) Allow(context.Context, string, float64, int) (bool, time.Duration, error) {
+func (f *fakeBackend) Allow(context.Context, string, float64, int) (bool, time.Duration, error) {
 	return f.allowed, f.retryAfter, f.err
 }

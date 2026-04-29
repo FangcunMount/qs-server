@@ -6,7 +6,7 @@ import (
 
 	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -28,7 +28,7 @@ func TestNewActorModuleUsesCachedTesteeRepoWhenRedisConfigured(t *testing.T) {
 	module, err := NewActorModule(ActorModuleDeps{
 		MySQLDB:      &gorm.DB{},
 		RedisClient:  redisClient,
-		CacheBuilder: rediskey.NewBuilderWithNamespace("test"),
+		CacheBuilder: keyspace.NewBuilderWithNamespace("test"),
 		TesteePolicy: cachepolicy.CachePolicy{TTL: time.Minute},
 	})
 	if err != nil {

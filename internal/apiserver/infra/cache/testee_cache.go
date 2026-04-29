@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	testeeInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -22,18 +22,18 @@ const (
 // 实现 testee.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedTesteeRepository struct {
 	repo     testee.Repository
-	keys     *rediskey.Builder
+	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
-	observer *cacheobservability.ComponentObserver
+	observer *observability.ComponentObserver
 	store    *ObjectCacheStore[testee.Testee]
 }
 
 // NewCachedTesteeRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的受试者缓存 Repository。
-func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) testee.Repository {
+func NewCachedTesteeRepositoryWithBuilderAndPolicy(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) testee.Repository {
 	return NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) testee.Repository {
+func NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(repo testee.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) testee.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

@@ -8,9 +8,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	grpcclientinfra "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
 
@@ -29,11 +29,11 @@ type resourceHandles struct {
 }
 
 type redisRuntimeOutput struct {
-	familyStatus *cacheobservability.FamilyStatusRegistry
-	redisRuntime *redisplane.Runtime
-	opsHandle    *redisplane.Handle
-	lockHandle   *redisplane.Handle
-	lockManager  *redislock.Manager
+	familyStatus *observability.FamilyStatusRegistry
+	redisRuntime *cacheplane.Runtime
+	opsHandle    *cacheplane.Handle
+	lockHandle   *cacheplane.Handle
+	lockManager  locklease.Manager
 }
 
 type resourceOutput struct {

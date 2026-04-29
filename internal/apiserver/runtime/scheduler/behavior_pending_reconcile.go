@@ -7,9 +7,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 )
 
 // BehaviorPendingReconcileRunner periodically retries pending behavior attribution work.
@@ -23,18 +23,18 @@ type BehaviorPendingReconcileRunner struct {
 func NewBehaviorPendingReconcileRunner(
 	opts *apiserveroptions.BehaviorPendingReconcileOptions,
 	projector statisticsApp.BehaviorProjectorService,
-	lockManager *redislock.Manager,
-	lockBuilder *rediskey.Builder,
+	lockManager locklease.Manager,
+	lockBuilder *keyspace.Builder,
 ) *BehaviorPendingReconcileRunner {
 	return newBehaviorPendingReconcileRunnerWithHooks(
 		opts,
 		projector,
 		lockManager,
 		lockBuilder,
-		func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+		func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error) {
 			return lockManager.AcquireSpec(ctx, spec, key, ttl)
 		},
-		func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error {
+		func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error {
 			return lockManager.ReleaseSpec(ctx, spec, key, lease)
 		},
 	)
@@ -43,10 +43,10 @@ func NewBehaviorPendingReconcileRunner(
 func newBehaviorPendingReconcileRunnerWithHooks(
 	opts *apiserveroptions.BehaviorPendingReconcileOptions,
 	projector statisticsApp.BehaviorProjectorService,
-	lockManager *redislock.Manager,
-	lockBuilder *rediskey.Builder,
-	acquireLock func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error),
-	releaseLock func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error,
+	lockManager locklease.Manager,
+	lockBuilder *keyspace.Builder,
+	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),
+	releaseLock func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error,
 ) *BehaviorPendingReconcileRunner {
 	if opts == nil || !opts.Enable {
 		return nil
@@ -72,7 +72,7 @@ func newBehaviorPendingReconcileRunnerWithHooks(
 		return nil
 	}
 	if lockManager == nil {
-		cacheobservability.ObserveLockDegraded("behavior_pending_reconcile", "redis_unavailable")
+		observability.ObserveLockDegraded("behavior_pending_reconcile", "redis_unavailable")
 		log.Warnf("behavior pending reconcile not started (HA lock unavailable: redis client unavailable)")
 		return nil
 	}
@@ -85,7 +85,7 @@ func newBehaviorPendingReconcileRunnerWithHooks(
 		opts:      opts,
 		projector: projector,
 		leader: newLeaderLock(
-			redislock.Specs.BehaviorPendingReconcile,
+			locklease.Specs.BehaviorPendingReconcile,
 			opts.LockKey,
 			opts.LockTTL,
 			lockBuilder,

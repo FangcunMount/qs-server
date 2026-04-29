@@ -15,7 +15,7 @@ import (
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
@@ -227,18 +227,18 @@ func (r *Router) redisGovernance(c *gin.Context) {
 	c.JSON(http.StatusOK, r.runtimeSnapshot(c))
 }
 
-func (r *Router) runtimeSnapshot(c *gin.Context) cacheobservability.RuntimeSnapshot {
+func (r *Router) runtimeSnapshot(c *gin.Context) observability.RuntimeSnapshot {
 	if r != nil && r.deps.GovernanceStatusService != nil {
 		snapshot, err := r.deps.GovernanceStatusService.GetRuntime(c.Request.Context())
 		if err == nil && snapshot != nil {
 			return *snapshot
 		}
 	}
-	return cacheobservability.RuntimeSnapshot{
+	return observability.RuntimeSnapshot{
 		GeneratedAt: time.Now(),
 		Component:   "apiserver",
-		Families:    []cacheobservability.FamilyStatus{},
-		Summary: cacheobservability.RuntimeSummary{
+		Families:    []observability.FamilyStatus{},
+		Summary: observability.RuntimeSummary{
 			Ready: true,
 		},
 	}

@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 // VersionedQueryCache owns the version-token + versioned-key query/list cache path.
@@ -70,17 +70,17 @@ func (c *VersionedQueryCache) Get(ctx context.Context, versionKey string, buildD
 
 	version, err := c.CurrentVersion(ctx, versionKey)
 	if err != nil {
-		cacheobservability.ObserveCacheGet(family, string(c.key), "miss")
+		observability.ObserveCacheGet(family, string(c.key), "miss")
 		return cacheentry.ErrCacheNotFound
 	}
 	key := buildDataKey(version)
 
 	if c.memory != nil {
 		if data, ok := c.memory.Get(key); ok {
-			cacheobservability.ObserveCacheGet(family, string(c.key), "hit")
+			observability.ObserveCacheGet(family, string(c.key), "hit")
 			cacheentry.ObservePayload(c.key, len(data), len(data))
 			if err := json.Unmarshal(data, dest); err != nil {
-				cacheobservability.ObserveCacheGet(family, string(c.key), "error")
+				observability.ObserveCacheGet(family, string(c.key), "error")
 				return cacheentry.ErrCacheNotFound
 			}
 			return nil
@@ -89,25 +89,25 @@ func (c *VersionedQueryCache) Get(ctx context.Context, versionKey string, buildD
 
 	start := time.Now()
 	data, err := c.payload.Get(ctx, key)
-	cacheobservability.ObserveCacheOperationDuration(family, string(c.key), "get", time.Since(start))
+	observability.ObserveCacheOperationDuration(family, string(c.key), "get", time.Since(start))
 	if err != nil {
 		if err == cacheentry.ErrCacheNotFound {
-			cacheobservability.ObserveCacheGet(family, string(c.key), "miss")
+			observability.ObserveCacheGet(family, string(c.key), "miss")
 			c.observeSuccess(family)
 		} else {
-			cacheobservability.ObserveCacheGet(family, string(c.key), "error")
+			observability.ObserveCacheGet(family, string(c.key), "error")
 			c.observeFailure(family, err)
-			cacheobservability.ObserveCacheGet(family, string(c.key), "miss")
+			observability.ObserveCacheGet(family, string(c.key), "miss")
 		}
 		return cacheentry.ErrCacheNotFound
 	}
 	if err := json.Unmarshal(data, dest); err != nil {
-		cacheobservability.ObserveCacheGet(family, string(c.key), "error")
+		observability.ObserveCacheGet(family, string(c.key), "error")
 		c.observeFailure(family, err)
-		cacheobservability.ObserveCacheGet(family, string(c.key), "miss")
+		observability.ObserveCacheGet(family, string(c.key), "miss")
 		return cacheentry.ErrCacheNotFound
 	}
-	cacheobservability.ObserveCacheGet(family, string(c.key), "hit")
+	observability.ObserveCacheGet(family, string(c.key), "hit")
 	c.observeSuccess(family)
 	if c.memory != nil {
 		c.memory.Set(key, data)
@@ -137,13 +137,13 @@ func (c *VersionedQueryCache) Set(ctx context.Context, versionKey string, buildD
 
 	start := time.Now()
 	if err := c.payload.Set(ctx, key, raw, c.policy.TTLOr(c.ttl)); err != nil {
-		cacheobservability.ObserveCacheOperationDuration(family, string(c.key), "set", time.Since(start))
-		cacheobservability.ObserveCacheWrite(family, string(c.key), "set", "error")
+		observability.ObserveCacheOperationDuration(family, string(c.key), "set", time.Since(start))
+		observability.ObserveCacheWrite(family, string(c.key), "set", "error")
 		c.observeFailure(family, err)
 		return
 	}
-	cacheobservability.ObserveCacheOperationDuration(family, string(c.key), "set", time.Since(start))
-	cacheobservability.ObserveCacheWrite(family, string(c.key), "set", "ok")
+	observability.ObserveCacheOperationDuration(family, string(c.key), "set", time.Since(start))
+	observability.ObserveCacheWrite(family, string(c.key), "set", "ok")
 	c.observeSuccess(family)
 }
 

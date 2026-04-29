@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
@@ -29,8 +29,8 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		}
 	}
 
-	redisClient := c.CacheClient(redisplane.FamilyObject)
-	queryRedisClient := c.CacheClient(redisplane.FamilyQuery)
+	redisClient := c.CacheClient(cacheplane.FamilyObject)
+	queryRedisClient := c.CacheClient(cacheplane.FamilyQuery)
 	if c.cacheOptions.DisableEvaluationCache {
 		redisClient = nil
 		queryRedisClient = nil
@@ -39,7 +39,7 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 	var versionStore cachequery.VersionTokenStore
 	if queryRedisClient != nil {
 		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(
-			c.CacheClient(redisplane.FamilyMeta),
+			c.CacheClient(cacheplane.FamilyMeta),
 			string(cachepolicy.PolicyAssessmentList),
 			c.cacheObserver(),
 		)
@@ -53,10 +53,10 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		QuestionnaireRepo:    questionnaireRepo,
 		EventPublisher:       c.eventPublisher,
 		RedisClient:          redisClient,
-		CacheBuilder:         c.CacheBuilder(redisplane.FamilyObject),
+		CacheBuilder:         c.CacheBuilder(cacheplane.FamilyObject),
 		AssessmentPolicy:     c.CachePolicy(cachepolicy.PolicyAssessmentDetail),
 		QueryRedisClient:     queryRedisClient,
-		QueryCacheBuilder:    c.CacheBuilder(redisplane.FamilyQuery),
+		QueryCacheBuilder:    c.CacheBuilder(cacheplane.FamilyQuery),
 		AssessmentListPolicy: c.CachePolicy(cachepolicy.PolicyAssessmentList),
 		VersionStore:         versionStore,
 		Observer:             c.cacheObserver(),

@@ -5,9 +5,9 @@ import (
 	"time"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 )
 
 // ==================== 应用服务接口 ====================
@@ -76,7 +76,7 @@ type ManualWarmupRequest = cachegov.ManualWarmupRequest
 
 // GovernanceHotsetResponse 描述治理热集响应。
 type GovernanceHotsetResponse struct {
-	Family    redisplane.Family        `json:"family,omitempty"`
+	Family    cachemodel.Family        `json:"family,omitempty"`
 	Kind      cachetarget.WarmupKind   `json:"kind,omitempty"`
 	Limit     int64                    `json:"limit,omitempty"`
 	Available bool                     `json:"available"`

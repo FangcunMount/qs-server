@@ -7,9 +7,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 )
 
 type planCommandService interface {
@@ -26,19 +26,19 @@ type PlanRunner struct {
 // NewPlanRunner creates the apiserver plan scheduler runner.
 func NewPlanRunner(
 	opts *apiserveroptions.PlanSchedulerOptions,
-	lockManager *redislock.Manager,
+	lockManager locklease.Manager,
 	command planCommandService,
-	lockBuilder *rediskey.Builder,
+	lockBuilder *keyspace.Builder,
 ) *PlanRunner {
 	return newPlanRunnerWithHooks(
 		opts,
 		lockManager,
 		command,
 		lockBuilder,
-		func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+		func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error) {
 			return lockManager.AcquireSpec(ctx, spec, key, ttl)
 		},
-		func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error {
+		func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error {
 			return lockManager.ReleaseSpec(ctx, spec, key, lease)
 		},
 	)
@@ -46,22 +46,22 @@ func NewPlanRunner(
 
 func newPlanRunnerWithHooks(
 	opts *apiserveroptions.PlanSchedulerOptions,
-	lockManager *redislock.Manager,
+	lockManager locklease.Manager,
 	command planCommandService,
-	lockBuilder *rediskey.Builder,
-	acquireLock func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error),
-	releaseLock func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error,
+	lockBuilder *keyspace.Builder,
+	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),
+	releaseLock func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error,
 ) *PlanRunner {
 	if opts == nil || !opts.Enable {
 		return nil
 	}
 	if command == nil {
-		cacheobservability.ObserveLockDegraded("plan_scheduler_leader", "service_unavailable")
+		observability.ObserveLockDegraded("plan_scheduler_leader", "service_unavailable")
 		log.Warnf("apiserver plan scheduler not started (plan command service unavailable)")
 		return nil
 	}
 	if lockManager == nil {
-		cacheobservability.ObserveLockDegraded("plan_scheduler_leader", "redis_unavailable")
+		observability.ObserveLockDegraded("plan_scheduler_leader", "redis_unavailable")
 		log.Warnf("apiserver plan scheduler not started (HA lock unavailable: redis client unavailable)")
 		return nil
 	}
@@ -74,7 +74,7 @@ func newPlanRunnerWithHooks(
 		opts:    opts,
 		command: command,
 		leader: newLeaderLock(
-			redislock.Specs.PlanSchedulerLeader,
+			locklease.Specs.PlanSchedulerLeader,
 			opts.LockKey,
 			opts.LockTTL,
 			lockBuilder,

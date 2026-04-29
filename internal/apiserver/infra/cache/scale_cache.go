@@ -10,8 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -21,18 +21,18 @@ const defaultScaleCacheTTL = 24 * time.Hour
 // 实现 scale.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedScaleRepository struct {
 	repo     scale.Repository
-	keys     *rediskey.Builder
+	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
-	observer *cacheobservability.ComponentObserver
+	observer *observability.ComponentObserver
 	store    *ObjectCacheStore[scale.MedicalScale]
 }
 
 // NewCachedScaleRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的量表缓存 Repository。
-func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) scale.Repository {
+func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) scale.Repository {
 	return NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) scale.Repository {
+func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) scale.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

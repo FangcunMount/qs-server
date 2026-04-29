@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 // ObjectReadThroughOptions describes the repository object-cache read-through path.
@@ -13,7 +13,7 @@ type ObjectReadThroughOptions[T any] struct {
 	PolicyKey        cachepolicy.CachePolicyKey
 	CacheKey         string
 	Policy           cachepolicy.CachePolicy
-	Observer         *cacheobservability.ComponentObserver
+	Observer         *observability.ComponentObserver
 	Runner           *ReadThroughRunner[T]
 	Store            *ObjectCacheStore[T]
 	Load             func(context.Context) (*T, error)

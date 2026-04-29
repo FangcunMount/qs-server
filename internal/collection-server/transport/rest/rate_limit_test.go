@@ -6,20 +6,21 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	redis "github.com/redis/go-redis/v9"
 )
 
-func TestDistributedLimitFailOpenWhenRedisLimiterUnavailable(t *testing.T) {
+func TestDistributedLimitFailOpenWhenDistributedLimiterUnavailable(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	observer := &rateLimitRecordingObserver{}
 	router := gin.New()
-	router.GET("/", distributedLimitWithOptions(nil, "limit:submit:global", 1, 1, nil, "submit", "global", pkgmiddleware.LimitOptions{Observer: observer}), func(c *gin.Context) {
+	router.GET("/", distributedLimitWithOptions(nil, "limit:submit:global", nil, pkgmiddleware.LimitOptions{Observer: observer}), func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
 
@@ -40,14 +41,17 @@ func TestDistributedLimitRejectsWithRetryAfterAndOutcome(t *testing.T) {
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
 	t.Cleanup(func() { _ = client.Close() })
 
-	limiter := redisplane.NewDistributedLimiter(&redisplane.Handle{
-		Family:  redisplane.FamilyOps,
-		Client:  client,
-		Builder: rediskey.NewBuilderWithNamespace("ops:runtime"),
+	limiter := ratelimit.NewDistributedLimiter(redisadapter.NewBackend(client, keyspace.NewBuilderWithNamespace("ops:runtime")), ratelimit.RateLimitPolicy{
+		Component:     "collection-server",
+		Scope:         "submit",
+		Resource:      "global",
+		Strategy:      "redis",
+		RatePerSecond: 1,
+		Burst:         1,
 	})
 	observer := &rateLimitRecordingObserver{}
 	router := gin.New()
-	router.GET("/", distributedLimitWithOptions(limiter, "limit:submit:global", 1, 1, nil, "submit", "global", pkgmiddleware.LimitOptions{Observer: observer}), func(c *gin.Context) {
+	router.GET("/", distributedLimitWithOptions(limiter, "limit:submit:global", nil, pkgmiddleware.LimitOptions{Observer: observer}), func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})
 

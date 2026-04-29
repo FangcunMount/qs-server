@@ -4,8 +4,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/configmask"
 	cliflag "github.com/FangcunMount/qs-server/pkg/flag"
 	"github.com/spf13/pflag"
@@ -268,9 +268,9 @@ func (o *Options) Validate() []error {
 	if len(o.Redis.Addrs) == 0 && o.Redis.Port <= 0 {
 		errs = append(errs, fmt.Errorf("redis.port must be greater than 0 when addrs not provided"))
 	}
-	errs = append(errs, redisplane.ValidateRuntimeOptions(
+	errs = append(errs, cacheplane.ValidateRuntimeOptions(
 		o.RedisRuntime,
-		[]redisplane.Family{redisplane.FamilyLock},
+		[]cacheplane.Family{cacheplane.FamilyLock},
 		o.RedisProfiles,
 		"redis_runtime",
 	)...)

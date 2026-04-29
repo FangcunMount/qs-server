@@ -740,19 +740,23 @@ FROM (
 LEFT JOIN (
   SELECT questionnaire_code, org_id, JSON_OBJECTAGG(origin_type, cnt) AS origin_json
   FROM (
-    SELECT org_id, questionnaire_code, COALESCE(NULLIF(origin_type, ''), 'unknown') AS origin_type, COUNT(*) AS cnt
+    SELECT
+      org_id,
+      questionnaire_code COLLATE utf8mb4_unicode_ci AS questionnaire_code,
+      COALESCE(NULLIF(origin_type COLLATE utf8mb4_unicode_ci, ''), 'unknown') AS origin_type,
+      COUNT(*) AS cnt
     FROM assessment
     WHERE deleted_at IS NULL AND questionnaire_code <> '' AND created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
-    GROUP BY org_id, questionnaire_code, COALESCE(NULLIF(origin_type, ''), 'unknown')
+    GROUP BY org_id, questionnaire_code COLLATE utf8mb4_unicode_ci, COALESCE(NULLIF(origin_type COLLATE utf8mb4_unicode_ci, ''), 'unknown')
   ) x
   GROUP BY org_id, questionnaire_code
-) o ON o.org_id = d.org_id AND o.questionnaire_code = d.statistic_key
+) o ON o.org_id = d.org_id AND o.questionnaire_code COLLATE utf8mb4_unicode_ci = d.statistic_key COLLATE utf8mb4_unicode_ci
 LEFT JOIN (
-  SELECT org_id, questionnaire_code, MIN(created_at) AS first_occurred_at, MAX(created_at) AS last_occurred_at
+  SELECT org_id, questionnaire_code COLLATE utf8mb4_unicode_ci AS questionnaire_code, MIN(created_at) AS first_occurred_at, MAX(created_at) AS last_occurred_at
   FROM assessment
   WHERE deleted_at IS NULL AND questionnaire_code <> '' AND created_at < @qs_rebuild_cutoff AND (@qs_rebuild_org_id = 0 OR org_id = @qs_rebuild_org_id)
-  GROUP BY org_id, questionnaire_code
-) b ON b.org_id = d.org_id AND b.questionnaire_code = d.statistic_key
+  GROUP BY org_id, questionnaire_code COLLATE utf8mb4_unicode_ci
+) b ON b.org_id = d.org_id AND b.questionnaire_code COLLATE utf8mb4_unicode_ci = d.statistic_key COLLATE utf8mb4_unicode_ci
 ON DUPLICATE KEY UPDATE
   total_submissions = VALUES(total_submissions),
   total_completions = VALUES(total_completions),

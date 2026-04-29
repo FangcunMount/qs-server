@@ -9,9 +9,9 @@ import (
 	answersheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 )
 
 // ServerGRPCBootstrapDeps describes the narrow container-owned dependencies
@@ -25,8 +25,8 @@ type ServerGRPCBootstrapDeps struct {
 // ServerRuntimeDeps describes the narrow container-owned dependencies needed by
 // background runtimes started from the apiserver process.
 type ServerRuntimeDeps struct {
-	LockBuilder               *rediskey.Builder
-	LockManager               *redislock.Manager
+	LockBuilder               *keyspace.Builder
+	LockManager               locklease.Manager
 	WarmupCoordinator         cachegov.Coordinator
 	PlanCommandService        planApp.PlanCommandService
 	StatisticsSyncService     statisticsApp.StatisticsSyncService
@@ -56,7 +56,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 		return deps
 	}
 
-	deps.LockBuilder = c.CacheBuilder(redisplane.FamilyLock)
+	deps.LockBuilder = c.CacheBuilder(cacheplane.FamilyLock)
 	deps.LockManager = c.CacheLockManager()
 	deps.WarmupCoordinator = c.WarmupCoordinator()
 

@@ -6,15 +6,17 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachehotset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -36,26 +38,26 @@ type Subsystem struct {
 	component   string
 	cacheConfig CacheOptions
 
-	statusRegistry *cacheobservability.FamilyStatusRegistry
-	runtime        *redisplane.Runtime
-	handles        map[redisplane.Family]*redisplane.Handle
+	statusRegistry *observability.FamilyStatusRegistry
+	runtime        *cacheplane.Runtime
+	handles        map[cacheplane.Family]*cacheplane.Handle
 	policyCatalog  *cachepolicy.PolicyCatalog
-	observer       *cacheobservability.ComponentObserver
+	observer       *observability.ComponentObserver
 
 	hotsetRecorder  cachetarget.HotsetRecorder
 	hotsetInspector cachetarget.HotsetInspector
-	lockManager     *redislock.Manager
+	lockManager     locklease.Manager
 
 	warmupCoordinator cachegov.Coordinator
 	statusService     cachegov.StatusService
 }
 
 // NewSubsystem 创建 cache 子系统组合根，并完成 runtime/policy/hotset/lock 的基础装配。
-func NewSubsystem(component string, resolver redisplane.Resolver, runtimeOptions *genericoptions.RedisRuntimeOptions, cacheConfig CacheOptions) *Subsystem {
+func NewSubsystem(component string, resolver cacheplane.Resolver, runtimeOptions *genericoptions.RedisRuntimeOptions, cacheConfig CacheOptions) *Subsystem {
 	if component == "" {
 		component = "apiserver"
 	}
-	return NewSubsystemFromRuntime(redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+	return NewSubsystemFromRuntime(cacheplanebootstrap.BuildRuntime(context.Background(), cacheplanebootstrap.Options{
 		Component:      component,
 		RuntimeOptions: runtimeOptions,
 		Resolver:       resolver,
@@ -64,12 +66,12 @@ func NewSubsystem(component string, resolver redisplane.Resolver, runtimeOptions
 }
 
 // NewSubsystemFromRuntime creates cache governance and policy wiring from a shared Redis runtime bundle.
-func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheConfig CacheOptions) *Subsystem {
+func NewSubsystemFromRuntime(runtimeBundle *cacheplanebootstrap.RuntimeBundle, cacheConfig CacheOptions) *Subsystem {
 	component := "apiserver"
-	var statusRegistry *cacheobservability.FamilyStatusRegistry
-	var runtime *redisplane.Runtime
-	var handles map[redisplane.Family]*redisplane.Handle
-	var lockManager *redislock.Manager
+	var statusRegistry *observability.FamilyStatusRegistry
+	var runtime *cacheplane.Runtime
+	var handles map[cacheplane.Family]*cacheplane.Handle
+	var lockManager locklease.Manager
 	if runtimeBundle != nil {
 		if runtimeBundle.Component != "" {
 			component = runtimeBundle.Component
@@ -80,7 +82,7 @@ func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheC
 		lockManager = runtimeBundle.LockManager
 	}
 	if statusRegistry == nil {
-		statusRegistry = cacheobservability.NewFamilyStatusRegistry(component)
+		statusRegistry = observability.NewFamilyStatusRegistry(component)
 	}
 
 	s := &Subsystem{
@@ -89,12 +91,12 @@ func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheC
 		statusRegistry: statusRegistry,
 		runtime:        runtime,
 		handles:        handles,
-		observer:       cacheobservability.NewComponentObserver(component),
+		observer:       observability.NewComponentObserver(component),
 	}
 	s.policyCatalog = newPolicyCatalog(cacheConfig)
 	s.hotsetRecorder = cachehotset.NewRedisStoreWithObserver(
-		s.Client(redisplane.FamilyMeta),
-		s.Builder(redisplane.FamilyMeta),
+		s.Client(cacheplane.FamilyMeta),
+		s.Builder(cacheplane.FamilyMeta),
 		cachehotset.Options{
 			Enable:          cacheConfig.Warmup.HotsetEnable,
 			TopN:            cacheConfig.Warmup.HotsetTopN,
@@ -107,7 +109,7 @@ func NewSubsystemFromRuntime(runtimeBundle *redisbootstrap.RuntimeBundle, cacheC
 	}
 	s.lockManager = lockManager
 	if s.lockManager == nil {
-		s.lockManager = redislock.NewManager(component, "lock_lease", s.Handle(redisplane.FamilyLock))
+		s.lockManager = redisadapter.NewManager(component, "lock_lease", s.Handle(cacheplane.FamilyLock))
 	}
 	s.warnMetaCacheAvailability()
 	return s
@@ -126,7 +128,7 @@ func (s *Subsystem) BindGovernance(bindings GovernanceBindings) {
 		HotsetTopN:      s.cacheConfig.Warmup.HotsetTopN,
 		MaxItemsPerKind: s.cacheConfig.Warmup.MaxItemsPerKind,
 	}, cachegov.Dependencies{
-		Runtime:                         cachegov.NewFamilyRuntime(s.Handle(redisplane.FamilyStatic), s.Handle(redisplane.FamilyQuery)),
+		Runtime:                         cachegov.NewFamilyRuntime(s.warmupFamilies()),
 		StatisticsSeeds:                 s.cacheConfig.StatisticsWarmup,
 		Hotset:                          s.hotsetRecorder,
 		ListPublishedScaleCodes:         bindings.ListPublishedScaleCodes,
@@ -149,21 +151,21 @@ func (s *Subsystem) Component() string {
 	return s.component
 }
 
-func (s *Subsystem) StatusRegistry() *cacheobservability.FamilyStatusRegistry {
+func (s *Subsystem) StatusRegistry() *observability.FamilyStatusRegistry {
 	if s == nil {
 		return nil
 	}
 	return s.statusRegistry
 }
 
-func (s *Subsystem) Runtime() *redisplane.Runtime {
+func (s *Subsystem) Runtime() *cacheplane.Runtime {
 	if s == nil {
 		return nil
 	}
 	return s.runtime
 }
 
-func (s *Subsystem) Handle(family redisplane.Family) *redisplane.Handle {
+func (s *Subsystem) Handle(family cacheplane.Family) *cacheplane.Handle {
 	if s == nil {
 		return nil
 	}
@@ -178,7 +180,7 @@ func (s *Subsystem) Handle(family redisplane.Family) *redisplane.Handle {
 	return s.runtime.Handle(context.Background(), family)
 }
 
-func (s *Subsystem) Client(family redisplane.Family) redis.UniversalClient {
+func (s *Subsystem) Client(family cacheplane.Family) redis.UniversalClient {
 	handle := s.Handle(family)
 	if handle == nil {
 		return nil
@@ -186,7 +188,7 @@ func (s *Subsystem) Client(family redisplane.Family) redis.UniversalClient {
 	return handle.Client
 }
 
-func (s *Subsystem) Builder(family redisplane.Family) *rediskey.Builder {
+func (s *Subsystem) Builder(family cacheplane.Family) *keyspace.Builder {
 	handle := s.Handle(family)
 	if handle == nil {
 		return nil
@@ -201,7 +203,7 @@ func (s *Subsystem) Policy(key cachepolicy.CachePolicyKey) cachepolicy.CachePoli
 	return s.policyCatalog.Policy(key)
 }
 
-func (s *Subsystem) Observer() *cacheobservability.ComponentObserver {
+func (s *Subsystem) Observer() *observability.ComponentObserver {
 	if s == nil {
 		return nil
 	}
@@ -222,7 +224,7 @@ func (s *Subsystem) HotsetInspector() cachetarget.HotsetInspector {
 	return s.hotsetInspector
 }
 
-func (s *Subsystem) LockManager() *redislock.Manager {
+func (s *Subsystem) LockManager() locklease.Manager {
 	if s == nil {
 		return nil
 	}
@@ -244,48 +246,59 @@ func (s *Subsystem) StatusService() cachegov.StatusService {
 }
 
 func (s *Subsystem) warnMetaCacheAvailability() {
-	metaHandle := s.Handle(redisplane.FamilyMeta)
-	metaRedisCache := s.Client(redisplane.FamilyMeta)
+	metaHandle := s.Handle(cacheplane.FamilyMeta)
+	metaRedisCache := s.Client(cacheplane.FamilyMeta)
 	if s.cacheConfig.Warmup.HotsetEnable && metaRedisCache == nil {
 		logger.L(context.Background()).Warnw("meta_cache unavailable while hotset governance is enabled; hotset recording and hot-target warmup will degrade",
 			"component", s.component,
-			"family", string(redisplane.FamilyMeta),
+			"family", string(cacheplane.FamilyMeta),
 			"profile", handleProfile(metaHandle),
 		)
 	}
 	if metaRedisCache == nil {
 		logger.L(context.Background()).Warnw("meta_cache unavailable; version-token query caches will run uncached where required",
 			"component", s.component,
-			"family", string(redisplane.FamilyMeta),
+			"family", string(cacheplane.FamilyMeta),
 			"profile", handleProfile(metaHandle),
 		)
 	}
 }
 
-func handleProfile(handle *redisplane.Handle) string {
+func handleProfile(handle *cacheplane.Handle) string {
 	if handle == nil {
 		return ""
 	}
 	return handle.Profile
 }
 
+func (s *Subsystem) warmupFamilies() map[cachemodel.Family]bool {
+	families := map[cachemodel.Family]bool{}
+	if staticHandle := s.Handle(cacheplane.FamilyStatic); staticHandle != nil {
+		families[cachemodel.FamilyStatic] = staticHandle.AllowWarmup
+	}
+	if queryHandle := s.Handle(cacheplane.FamilyQuery); queryHandle != nil {
+		families[cachemodel.FamilyQuery] = queryHandle.AllowWarmup
+	}
+	return families
+}
+
 func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
-	return cachepolicy.NewPolicyCatalog(map[redisplane.Family]cachepolicy.CachePolicy{
-		redisplane.FamilyStatic: {
+	return cachepolicy.NewPolicyCatalog(map[cachemodel.Family]cachepolicy.CachePolicy{
+		cachemodel.FamilyStatic: {
 			Compress:     resolvePolicySwitch(cacheConfig.Static.Compress, cacheConfig.CompressPayload),
 			Singleflight: resolvePolicySwitch(cacheConfig.Static.Singleflight, true),
 			Negative:     resolvePolicySwitch(cacheConfig.Static.Negative, false),
 			NegativeTTL:  firstPositiveDuration(cacheConfig.Static.NegativeTTL, cacheConfig.TTL.Negative),
 			JitterRatio:  firstPositiveFloat(cacheConfig.Static.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
-		redisplane.FamilyObject: {
+		cachemodel.FamilyObject: {
 			Compress:     resolvePolicySwitch(cacheConfig.Object.Compress, cacheConfig.CompressPayload),
 			Singleflight: resolvePolicySwitch(cacheConfig.Object.Singleflight, true),
 			Negative:     resolvePolicySwitch(cacheConfig.Object.Negative, false),
 			NegativeTTL:  firstPositiveDuration(cacheConfig.Object.NegativeTTL, cacheConfig.TTL.Negative),
 			JitterRatio:  firstPositiveFloat(cacheConfig.Object.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
-		redisplane.FamilyQuery: {
+		cachemodel.FamilyQuery: {
 			TTL:          cacheConfig.Query.TTL,
 			NegativeTTL:  firstPositiveDuration(cacheConfig.Query.NegativeTTL, cacheConfig.TTL.Negative),
 			Compress:     resolvePolicySwitch(cacheConfig.Query.Compress, cacheConfig.CompressPayload),
@@ -293,14 +306,14 @@ func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
 			Negative:     resolvePolicySwitch(cacheConfig.Query.Negative, false),
 			JitterRatio:  firstPositiveFloat(cacheConfig.Query.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
-		redisplane.FamilySDK: {
+		cachemodel.FamilySDK: {
 			Compress:     resolvePolicySwitch(cacheConfig.SDK.Compress, false),
 			Singleflight: resolvePolicySwitch(cacheConfig.SDK.Singleflight, false),
 			Negative:     resolvePolicySwitch(cacheConfig.SDK.Negative, false),
 			NegativeTTL:  cacheConfig.SDK.NegativeTTL,
 			JitterRatio:  firstPositiveFloat(cacheConfig.SDK.TTLJitterRatio, cacheConfig.TTLJitterRatio),
 		},
-		redisplane.FamilyLock: {
+		cachemodel.FamilyLock: {
 			Compress:     resolvePolicySwitch(cacheConfig.Lock.Compress, false),
 			Singleflight: resolvePolicySwitch(cacheConfig.Lock.Singleflight, false),
 			Negative:     resolvePolicySwitch(cacheConfig.Lock.Negative, false),

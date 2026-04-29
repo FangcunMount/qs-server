@@ -7,21 +7,21 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
 )
 
 func TestHealthHandlerReadyReturnsServiceUnavailableWhenRedisDegraded(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	registry := cacheobservability.NewFamilyStatusRegistry("collection-server")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("collection-server")
+	registry.Update(observability.FamilyStatus{
 		Component: "collection-server",
 		Family:    "ops_runtime",
 		Profile:   "ops_runtime",
 		Available: false,
 		Degraded:  true,
-		Mode:      cacheobservability.FamilyModeDegraded,
+		Mode:      observability.FamilyModeDegraded,
 		LastError: "redis unavailable",
 	})
 	handler := NewHealthHandler("collection-server", "2.0.0", registry)
@@ -60,13 +60,13 @@ func TestHealthHandlerReadyReturnsServiceUnavailableWhenRedisDegraded(t *testing
 
 func TestHealthHandlerRedisFamiliesReturnsSnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
-	registry := cacheobservability.NewFamilyStatusRegistry("collection-server")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("collection-server")
+	registry.Update(observability.FamilyStatus{
 		Component: "collection-server",
 		Family:    "lock_lease",
 		Profile:   "lock_cache",
 		Available: true,
-		Mode:      cacheobservability.FamilyModeNamedProfile,
+		Mode:      observability.FamilyModeNamedProfile,
 	})
 	handler := NewHealthHandler("collection-server", "2.0.0", registry)
 

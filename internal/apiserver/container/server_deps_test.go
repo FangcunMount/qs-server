@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {
@@ -66,8 +66,8 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	c.EvaluationModule = &assembler.EvaluationModule{AssessmentOutboxRelay: assessmentRelay}
 
 	deps := c.BuildServerRuntimeDeps()
-	if deps.LockBuilder != c.CacheBuilder(redisplane.FamilyLock) {
-		t.Fatalf("LockBuilder = %#v, want %#v", deps.LockBuilder, c.CacheBuilder(redisplane.FamilyLock))
+	if deps.LockBuilder != c.CacheBuilder(cacheplane.FamilyLock) {
+		t.Fatalf("LockBuilder = %#v, want %#v", deps.LockBuilder, c.CacheBuilder(cacheplane.FamilyLock))
 	}
 	if deps.LockManager != c.CacheLockManager() {
 		t.Fatalf("LockManager = %#v, want %#v", deps.LockManager, c.CacheLockManager())

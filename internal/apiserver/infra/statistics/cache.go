@@ -7,8 +7,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -20,12 +20,12 @@ type StatisticsCache struct {
 	cache        cacheentry.Cache
 	versionStore cachequery.VersionTokenStore
 	policy       cachepolicy.CachePolicy
-	observer     *cacheobservability.ComponentObserver
-	keys         *rediskey.Builder
+	observer     *observability.ComponentObserver
+	keys         *keyspace.Builder
 }
 
 // NewStatisticsCacheWithBuilderAndPolicy 创建绑定显式 key builder/policy 的统计缓存。
-func NewStatisticsCacheWithBuilderAndPolicy(client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) *StatisticsCache {
+func NewStatisticsCacheWithBuilderAndPolicy(client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) *StatisticsCache {
 	return NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 		client,
 		builder,
@@ -37,10 +37,10 @@ func NewStatisticsCacheWithBuilderAndPolicy(client redis.UniversalClient, builde
 
 func NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 	client redis.UniversalClient,
-	builder *rediskey.Builder,
+	builder *keyspace.Builder,
 	policy cachepolicy.CachePolicy,
 	versionStore cachequery.VersionTokenStore,
-	observer *cacheobservability.ComponentObserver,
+	observer *observability.ComponentObserver,
 ) *StatisticsCache {
 	if builder == nil {
 		panic("redis builder is required")

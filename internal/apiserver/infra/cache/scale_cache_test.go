@@ -6,8 +6,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -24,7 +24,7 @@ func TestCachedScaleRepositoryCreateUpdateRemoveWritesAndInvalidatesCache(t *tes
 	cached := NewCachedScaleRepositoryWithBuilderAndPolicy(
 		baseRepo,
 		client,
-		rediskey.NewBuilderWithNamespace("test-ns"),
+		keyspace.NewBuilderWithNamespace("test-ns"),
 		cachepolicy.CachePolicy{},
 	).(*CachedScaleRepository)
 	domain := newScaleCacheTestScale(t, "S-001")
@@ -59,7 +59,7 @@ func TestCachedScaleRepositoryCreateUpdateRemoveWritesAndInvalidatesCache(t *tes
 }
 
 func TestCachedScaleRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedScaleRepositoryWithBuilderAndPolicy(nil, nil, rediskey.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{})
+	repo := NewCachedScaleRepositoryWithBuilderAndPolicy(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{})
 	cached, ok := repo.(*CachedScaleRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)

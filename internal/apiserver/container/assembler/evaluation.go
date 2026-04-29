@@ -32,11 +32,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -99,13 +99,13 @@ type EvaluationModuleDeps struct {
 	QuestionnaireRepo    questionnaire.Repository
 	EventPublisher       event.EventPublisher
 	RedisClient          redis.UniversalClient
-	CacheBuilder         *rediskey.Builder
+	CacheBuilder         *keyspace.Builder
 	AssessmentPolicy     cachepolicy.CachePolicy
 	QueryRedisClient     redis.UniversalClient
-	QueryCacheBuilder    *rediskey.Builder
+	QueryCacheBuilder    *keyspace.Builder
 	AssessmentListPolicy cachepolicy.CachePolicy
 	VersionStore         cachequery.VersionTokenStore
-	Observer             *cacheobservability.ComponentObserver
+	Observer             *observability.ComponentObserver
 	TopicResolver        eventcatalog.TopicResolver
 	MySQLLimiter         backpressure.Acquirer
 	MongoLimiter         backpressure.Acquirer

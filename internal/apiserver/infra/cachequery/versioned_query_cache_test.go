@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -19,13 +19,13 @@ func TestVersionedQueryCacheObserverUsesInjectedComponent(t *testing.T) {
 		_ = client.Close()
 	})
 
-	registry := cacheobservability.NewFamilyStatusRegistry("query-observer")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("query-observer")
+	registry.Update(observability.FamilyStatus{
 		Component: "query-observer",
 		Family:    string(cachepolicy.FamilyFor(cachepolicy.PolicyAssessmentList)),
 		Available: false,
 		Degraded:  true,
-		Mode:      cacheobservability.FamilyModeDegraded,
+		Mode:      observability.FamilyModeDegraded,
 	})
 
 	cache := NewVersionedQueryCacheWithObserver(
@@ -41,7 +41,7 @@ func TestVersionedQueryCacheObserverUsesInjectedComponent(t *testing.T) {
 		return "query:assessment:list:42:v0"
 	}, map[string]string{"ok": "true"})
 
-	snapshot := cacheobservability.SnapshotForComponent("query-observer", registry)
+	snapshot := observability.SnapshotForComponent("query-observer", registry)
 	if !snapshot.Summary.Ready {
 		t.Fatalf("runtime summary ready = false, want true after observed success: %#v", snapshot.Summary)
 	}

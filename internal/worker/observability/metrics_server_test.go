@@ -7,19 +7,19 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 func TestMetricsServerReadyzReturnsServiceUnavailableWhenFamilyDegraded(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("worker")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("worker")
+	registry.Update(observability.FamilyStatus{
 		Component: "worker",
 		Family:    "lock_lease",
 		Profile:   "lock_cache",
 		Available: false,
 		Degraded:  true,
-		Mode:      cacheobservability.FamilyModeDegraded,
+		Mode:      observability.FamilyModeDegraded,
 		LastError: "redis unavailable",
 	})
 
@@ -42,13 +42,13 @@ func TestMetricsServerReadyzReturnsServiceUnavailableWhenFamilyDegraded(t *testi
 }
 
 func TestMetricsServerGovernanceEndpointReturnsSnapshot(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("worker")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("worker")
+	registry.Update(observability.FamilyStatus{
 		Component: "worker",
 		Family:    "lock_lease",
 		Profile:   "lock_cache",
 		Available: true,
-		Mode:      cacheobservability.FamilyModeNamedProfile,
+		Mode:      observability.FamilyModeNamedProfile,
 	})
 
 	server := NewMetricsServerWithGovernance("127.0.0.1", 19091, "worker", registry)
@@ -84,7 +84,7 @@ func TestMetricsServerGovernanceEndpointReturnsSnapshot(t *testing.T) {
 }
 
 func TestMetricsServerResilienceEndpointReturnsSnapshot(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("worker")
+	registry := observability.NewFamilyStatusRegistry("worker")
 	server := NewMetricsServerWithGovernanceAndResilience(
 		"127.0.0.1",
 		19091,

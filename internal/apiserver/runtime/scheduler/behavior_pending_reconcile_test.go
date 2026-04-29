@@ -9,8 +9,8 @@ import (
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 )
 
 type fakeBehaviorProjector struct {
@@ -68,12 +68,12 @@ func TestNewBehaviorPendingReconcileRunner(t *testing.T) {
 	if runner := newBehaviorPendingReconcileRunnerWithHooks(
 		&apiserveroptions.BehaviorPendingReconcileOptions{Enable: false},
 		projector,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected disabled reconcile runner to return nil")
 	}
@@ -81,12 +81,12 @@ func TestNewBehaviorPendingReconcileRunner(t *testing.T) {
 	if runner := newBehaviorPendingReconcileRunnerWithHooks(
 		opts,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil projector to return nil")
 	}
@@ -96,10 +96,10 @@ func TestNewBehaviorPendingReconcileRunner(t *testing.T) {
 		projector,
 		nil,
 		newTestBehaviorLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil lock manager to return nil")
 	}
@@ -109,12 +109,12 @@ func TestNewBehaviorPendingReconcileRunner(t *testing.T) {
 	if runner := newBehaviorPendingReconcileRunnerWithHooks(
 		invalid,
 		projector,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected invalid interval to return nil")
 	}
@@ -124,12 +124,12 @@ func TestBehaviorPendingReconcileLockKeyUsesLockNamespace(t *testing.T) {
 	runner := newBehaviorPendingReconcileRunnerWithHooks(
 		newTestBehaviorPendingReconcileOptions(),
 		&fakeBehaviorProjector{},
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 	if got := runner.lockKey(); got != "apiserver-test:cache:lock:qs:behavior-pending-reconcile:test" {
 		t.Fatalf("unexpected lock key: %s", got)
@@ -142,28 +142,28 @@ func TestBehaviorPendingReconcileRunOnceUsesConfiguredLockOverride(t *testing.T)
 	opts.LockKey = "qs:behavior-pending-reconcile:custom"
 	opts.LockTTL = 45 * time.Second
 
-	var gotSpec redislock.Spec
+	var gotSpec redisadapter.Spec
 	var gotKey string
 	var gotTTL time.Duration
 	runner := newBehaviorPendingReconcileRunnerWithHooks(
 		opts,
 		projector,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
-		func(_ context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+		func(_ context.Context, spec redisadapter.Spec, key string, ttl time.Duration) (*redisadapter.Lease, bool, error) {
 			gotSpec = spec
 			gotKey = key
 			gotTTL = ttl
-			return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+			return &redisadapter.Lease{Key: "lock-key", Token: "token"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
 		t.Fatalf("runOnce returned error: %v", err)
 	}
-	if gotSpec.Name != redislock.Specs.BehaviorPendingReconcile.Name {
-		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redislock.Specs.BehaviorPendingReconcile.Name)
+	if gotSpec.Name != redisadapter.Specs.BehaviorPendingReconcile.Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redisadapter.Specs.BehaviorPendingReconcile.Name)
 	}
 	if gotKey != opts.LockKey {
 		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)
@@ -178,12 +178,12 @@ func TestBehaviorPendingReconcileRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 	runner := newBehaviorPendingReconcileRunnerWithHooks(
 		newTestBehaviorPendingReconcileOptions(),
 		projector,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
 			return nil, false, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
@@ -203,7 +203,7 @@ func TestBehaviorPendingReconcileRunOnceUsesBatchLimit(t *testing.T) {
 	runner := newBehaviorPendingReconcileRunnerWithHooks(
 		opts,
 		projector,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -226,7 +226,7 @@ func TestBehaviorPendingReconcileRunOnceReturnsProjectorError(t *testing.T) {
 	runner := newBehaviorPendingReconcileRunnerWithHooks(
 		newTestBehaviorPendingReconcileOptions(),
 		projector,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -249,7 +249,7 @@ func TestBehaviorPendingReconcileMultiInstanceOnlyOneExecutes(t *testing.T) {
 	runner1 := newBehaviorPendingReconcileRunnerWithHooks(
 		opts,
 		projector1,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -257,7 +257,7 @@ func TestBehaviorPendingReconcileMultiInstanceOnlyOneExecutes(t *testing.T) {
 	runner2 := newBehaviorPendingReconcileRunnerWithHooks(
 		opts,
 		projector2,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestBehaviorLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -307,8 +307,8 @@ func newTestBehaviorPendingReconcileOptions() *apiserveroptions.BehaviorPendingR
 	}
 }
 
-func newTestBehaviorLockBuilder() *rediskey.Builder {
-	return rediskey.NewBuilderWithNamespace(
-		rediskey.ComposeNamespace("apiserver-test", "cache:lock"),
+func newTestBehaviorLockBuilder() *keyspace.Builder {
+	return keyspace.NewBuilderWithNamespace(
+		keyspace.ComposeNamespace("apiserver-test", "cache:lock"),
 	)
 }

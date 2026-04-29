@@ -11,9 +11,9 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
@@ -63,8 +63,8 @@ type Dependencies struct {
 	AnswerSheetClient *grpcclient.AnswerSheetClient
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    InternalClient
-	LockManager       *redislock.Manager
-	LockKeyBuilder    *rediskey.Builder
+	LockManager       locklease.Manager
+	LockKeyBuilder    *keyspace.Builder
 	Notifier          port.TaskNotifier
 }
 

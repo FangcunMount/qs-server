@@ -7,22 +7,22 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 )
 
 func TestLeaderLockRunExecutesBodyAndReleasesWhenAcquired(t *testing.T) {
 	bodyCalls := 0
 	releaseCalls := 0
 	lock := newLeaderLock(
-		redislock.Specs.PlanSchedulerLeader,
+		redisadapter.Specs.PlanSchedulerLeader,
 		"qs:plan-scheduler:test",
 		30*time.Second,
-		rediskey.NewBuilderWithNamespace("apiserver-test:cache:lock"),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+		keyspace.NewBuilderWithNamespace("apiserver-test:cache:lock"),
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "lock-key", Token: "token"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error {
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error {
 			releaseCalls++
 			return nil
 		},
@@ -47,14 +47,14 @@ func TestLeaderLockRunSkipsBodyWhenNotAcquired(t *testing.T) {
 	releaseCalls := 0
 	var skippedKey string
 	lock := newLeaderLock(
-		redislock.Specs.StatisticsSyncLeader,
+		redisadapter.Specs.StatisticsSyncLeader,
 		"qs:statistics-sync:test",
 		time.Minute,
-		rediskey.NewBuilderWithNamespace("apiserver-test:cache:lock"),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+		keyspace.NewBuilderWithNamespace("apiserver-test:cache:lock"),
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
 			return nil, false, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error {
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error {
 			releaseCalls++
 			return nil
 		},
@@ -84,14 +84,14 @@ func TestLeaderLockRunSkipsBodyWhenNotAcquired(t *testing.T) {
 func TestLeaderLockRunWrapsAcquireError(t *testing.T) {
 	acquireErr := errors.New("redis unavailable")
 	lock := newLeaderLock(
-		redislock.Specs.BehaviorPendingReconcile,
+		redisadapter.Specs.BehaviorPendingReconcile,
 		"qs:behavior-pending-reconcile:test",
 		time.Minute,
 		nil,
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
 			return nil, false, acquireErr
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error {
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error {
 			t.Fatal("release must not be called on acquire error")
 			return nil
 		},
@@ -120,14 +120,14 @@ func TestLeaderLockRunPreservesBodyErrorAndReportsReleaseError(t *testing.T) {
 	var gotReleaseKey string
 	var gotReleaseErr error
 	lock := newLeaderLock(
-		redislock.Specs.PlanSchedulerLeader,
+		redisadapter.Specs.PlanSchedulerLeader,
 		"qs:plan-scheduler:test",
 		time.Minute,
-		rediskey.NewBuilderWithNamespace("apiserver-test:cache:lock"),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+		keyspace.NewBuilderWithNamespace("apiserver-test:cache:lock"),
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "lock-key", Token: "token"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error {
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error {
 			return releaseErr
 		},
 	)
@@ -153,14 +153,14 @@ func TestLeaderLockRunPreservesBodyErrorAndReportsReleaseError(t *testing.T) {
 
 func TestLeaderLockDisplayKeyUsesDefaultBuilderWhenBuilderIsNil(t *testing.T) {
 	lock := newLeaderLock(
-		redislock.Specs.PlanSchedulerLeader,
+		redisadapter.Specs.PlanSchedulerLeader,
 		"qs:plan-scheduler:test",
 		time.Minute,
 		nil,
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
 			return nil, false, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error {
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error {
 			return nil
 		},
 	)

@@ -6,10 +6,10 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
@@ -24,8 +24,8 @@ type Container struct {
 	initialized  bool
 	opts         *options.Options
 	logger       *slog.Logger
-	lockManager  *redislock.Manager
-	lockBuilder  *rediskey.Builder
+	lockManager  locklease.Manager
+	lockBuilder  *keyspace.Builder
 	eventCatalog *eventcatalog.Catalog
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
@@ -46,8 +46,8 @@ type ClientBundle struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *redisplane.Handle, lockManager *redislock.Manager, eventCatalog *eventcatalog.Catalog) *Container {
-	lockBuilder := rediskey.NewBuilder()
+func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *cacheplane.Handle, lockManager locklease.Manager, eventCatalog *eventcatalog.Catalog) *Container {
+	lockBuilder := keyspace.NewBuilder()
 	if lockHandle != nil {
 		lockBuilder = lockHandle.Builder
 	}

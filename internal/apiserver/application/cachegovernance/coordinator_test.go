@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 )
 
 func TestCoordinatorHandleManualWarmupReturnsStructuredResultAndRecordsRun(t *testing.T) {
@@ -12,10 +12,10 @@ func TestCoordinatorHandleManualWarmupReturnsStructuredResultAndRecordsRun(t *te
 	var systemCalls []int64
 
 	coord := NewCoordinator(Config{Enable: true}, Dependencies{
-		Runtime: NewFamilyRuntime(
-			&redisplane.Handle{Family: redisplane.FamilyStatic, AllowWarmup: true},
-			&redisplane.Handle{Family: redisplane.FamilyQuery, AllowWarmup: true},
-		),
+		Runtime: NewFamilyRuntime(map[cachemodel.Family]bool{
+			cachemodel.FamilyStatic: true,
+			cachemodel.FamilyQuery:  true,
+		}),
 		WarmScale: func(_ context.Context, code string) error {
 			scaleCalls = append(scaleCalls, code)
 			return nil
@@ -73,9 +73,9 @@ func TestCoordinatorHandleRepairCompleteStillUsesStructuredExecutor(t *testing.T
 	var questionnaireCalls []string
 
 	coord := NewCoordinator(Config{Enable: true}, Dependencies{
-		Runtime: NewFamilyRuntime(
-			&redisplane.Handle{Family: redisplane.FamilyQuery, AllowWarmup: true},
-		),
+		Runtime: NewFamilyRuntime(map[cachemodel.Family]bool{
+			cachemodel.FamilyQuery: true,
+		}),
 		WarmStatsQuestionnaire: func(_ context.Context, _ int64, code string) error {
 			questionnaireCalls = append(questionnaireCalls, code)
 			return nil

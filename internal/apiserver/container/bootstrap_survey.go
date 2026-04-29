@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) resolveIdentityService() *iam.IdentityService {
@@ -20,8 +20,8 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 	return assembler.SurveyModuleDeps{
 		MongoDB:             c.mongoDB,
 		EventPublisher:      c.eventPublisher,
-		RedisClient:         c.CacheClient(redisplane.FamilyStatic),
-		CacheBuilder:        c.CacheBuilder(redisplane.FamilyStatic),
+		RedisClient:         c.CacheClient(cacheplane.FamilyStatic),
+		CacheBuilder:        c.CacheBuilder(cacheplane.FamilyStatic),
 		IdentityService:     c.resolveIdentityService(),
 		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
 		HotsetRecorder:      c.hotsetRecorder(),

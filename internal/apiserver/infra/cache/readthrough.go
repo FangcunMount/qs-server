@@ -6,7 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 // ReadThroughOptions 描述一次统一的缓存读穿透流程。
@@ -14,7 +14,7 @@ type ReadThroughOptions[T any] struct {
 	PolicyKey         cachepolicy.CachePolicyKey
 	CacheKey          string
 	Policy            cachepolicy.CachePolicy
-	Observer          *cacheobservability.ComponentObserver
+	Observer          *observability.ComponentObserver
 	Runner            *ReadThroughRunner[T]
 	GetCached         func(context.Context) (*T, error)
 	Load              func(context.Context) (*T, error)
@@ -64,19 +64,19 @@ func (r *ReadThroughRunner[T]) Read(ctx context.Context, opts ReadThroughOptions
 	if opts.GetCached != nil {
 		start := time.Now()
 		cached, err := opts.GetCached(ctx)
-		cacheobservability.ObserveCacheOperationDuration(family, policy, "get", time.Since(start))
+		observability.ObserveCacheOperationDuration(family, policy, "get", time.Since(start))
 		if err == nil {
-			cacheobservability.ObserveCacheGet(family, policy, "hit")
+			observability.ObserveCacheGet(family, policy, "hit")
 			opts.Observer.ObserveFamilySuccess(family)
 			return cached, nil
 		}
 		if err != cacheentry.ErrCacheNotFound {
-			cacheobservability.ObserveCacheGet(family, policy, "error")
+			observability.ObserveCacheGet(family, policy, "error")
 			opts.Observer.ObserveFamilyFailure(family, err)
 		} else {
 			opts.Observer.ObserveFamilySuccess(family)
 		}
-		cacheobservability.ObserveCacheGet(family, policy, "miss")
+		observability.ObserveCacheGet(family, policy, "miss")
 	}
 
 	load := func() (*T, error) {
@@ -85,7 +85,7 @@ func (r *ReadThroughRunner[T]) Read(ctx context.Context, opts ReadThroughOptions
 		}
 		start := time.Now()
 		value, err := opts.Load(ctx)
-		cacheobservability.ObserveCacheOperationDuration(family, policy, "source_load", time.Since(start))
+		observability.ObserveCacheOperationDuration(family, policy, "source_load", time.Since(start))
 		return value, err
 	}
 
@@ -115,14 +115,14 @@ func (r *ReadThroughRunner[T]) Read(ctx context.Context, opts ReadThroughOptions
 			writeNegative := func(writeCtx context.Context) {
 				start := time.Now()
 				err := opts.SetNegativeCached(writeCtx)
-				cacheobservability.ObserveCacheOperationDuration(family, policy, "set", time.Since(start))
+				observability.ObserveCacheOperationDuration(family, policy, "set", time.Since(start))
 				if err != nil {
-					cacheobservability.ObserveCacheWrite(family, policy, "set", "error")
+					observability.ObserveCacheWrite(family, policy, "set", "error")
 					opts.Observer.ObserveFamilyFailure(family, err)
 					return
 				}
 				opts.Observer.ObserveFamilySuccess(family)
-				cacheobservability.ObserveCacheWrite(family, policy, "set", "ok")
+				observability.ObserveCacheWrite(family, policy, "set", "ok")
 			}
 			if opts.AsyncSetNegative {
 				go writeNegative(context.Background())
@@ -137,14 +137,14 @@ func (r *ReadThroughRunner[T]) Read(ctx context.Context, opts ReadThroughOptions
 		writeValue := func(writeCtx context.Context) {
 			start := time.Now()
 			err := opts.SetCached(writeCtx, value)
-			cacheobservability.ObserveCacheOperationDuration(family, policy, "set", time.Since(start))
+			observability.ObserveCacheOperationDuration(family, policy, "set", time.Since(start))
 			if err != nil {
-				cacheobservability.ObserveCacheWrite(family, policy, "set", "error")
+				observability.ObserveCacheWrite(family, policy, "set", "error")
 				opts.Observer.ObserveFamilyFailure(family, err)
 				return
 			}
 			opts.Observer.ObserveFamilySuccess(family)
-			cacheobservability.ObserveCacheWrite(family, policy, "set", "ok")
+			observability.ObserveCacheWrite(family, policy, "set", "ok")
 		}
 		if opts.AsyncSetCached {
 			go writeValue(context.Background())

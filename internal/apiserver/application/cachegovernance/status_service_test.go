@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
 
 type stubCoordinator struct {
@@ -40,7 +40,7 @@ type stubHotsetInspector struct {
 	err   error
 }
 
-func (s stubHotsetInspector) TopWithScores(_ context.Context, _ redisplane.Family, _ cachetarget.WarmupKind, _ int64) ([]cachetarget.HotsetItem, error) {
+func (s stubHotsetInspector) TopWithScores(_ context.Context, _ cachemodel.Family, _ cachetarget.WarmupKind, _ int64) ([]cachetarget.HotsetItem, error) {
 	if s.err != nil {
 		return nil, s.err
 	}
@@ -48,17 +48,17 @@ func (s stubHotsetInspector) TopWithScores(_ context.Context, _ redisplane.Famil
 }
 
 func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("apiserver")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("apiserver")
+	registry.Update(observability.FamilyStatus{
 		Family:      "query_result",
 		Profile:     "query_cache",
 		Namespace:   "prod:cache:query",
 		AllowWarmup: true,
 		Configured:  true,
 		Available:   true,
-		Mode:        cacheobservability.FamilyModeNamedProfile,
+		Mode:        observability.FamilyModeNamedProfile,
 	})
-	registry.Update(cacheobservability.FamilyStatus{
+	registry.Update(observability.FamilyStatus{
 		Family:      "static_meta",
 		Profile:     "static_cache",
 		Namespace:   "prod:cache:static",
@@ -66,17 +66,17 @@ func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *test
 		Configured:  true,
 		Available:   false,
 		Degraded:    true,
-		Mode:        cacheobservability.FamilyModeDegraded,
+		Mode:        observability.FamilyModeDegraded,
 		LastError:   "redis unavailable",
 	})
-	registry.Update(cacheobservability.FamilyStatus{
+	registry.Update(observability.FamilyStatus{
 		Component:   "worker",
 		Family:      "lock_lease",
 		Profile:     "lock_cache",
 		Configured:  true,
 		Available:   false,
 		Degraded:    true,
-		Mode:        cacheobservability.FamilyModeDegraded,
+		Mode:        observability.FamilyModeDegraded,
 		LastError:   "redis unavailable",
 		AllowWarmup: false,
 	})
@@ -148,17 +148,17 @@ func TestStatusServiceGetStatusFiltersComponentAndIncludesWarmupSnapshot(t *test
 }
 
 func TestStatusServiceGetRuntimeUsesSharedSnapshotContract(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("apiserver")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("apiserver")
+	registry.Update(observability.FamilyStatus{
 		Family:      "query_result",
 		Profile:     "query_cache",
 		Namespace:   "prod:cache:query",
 		AllowWarmup: true,
 		Configured:  true,
 		Available:   true,
-		Mode:        cacheobservability.FamilyModeNamedProfile,
+		Mode:        observability.FamilyModeNamedProfile,
 	})
-	registry.Update(cacheobservability.FamilyStatus{
+	registry.Update(observability.FamilyStatus{
 		Family:      "static_meta",
 		Profile:     "static_cache",
 		Namespace:   "prod:cache:static",
@@ -166,15 +166,15 @@ func TestStatusServiceGetRuntimeUsesSharedSnapshotContract(t *testing.T) {
 		Configured:  true,
 		Available:   false,
 		Degraded:    true,
-		Mode:        cacheobservability.FamilyModeDegraded,
+		Mode:        observability.FamilyModeDegraded,
 		LastError:   "redis unavailable",
 	})
-	registry.Update(cacheobservability.FamilyStatus{
+	registry.Update(observability.FamilyStatus{
 		Component: "worker",
 		Family:    "lock_lease",
 		Profile:   "lock_cache",
 		Available: true,
-		Mode:      cacheobservability.FamilyModeNamedProfile,
+		Mode:      observability.FamilyModeNamedProfile,
 	})
 
 	service := NewStatusService("apiserver", registry, nil, nil)
@@ -212,15 +212,15 @@ func TestStatusServiceGetRuntimeUsesSharedSnapshotContract(t *testing.T) {
 }
 
 func TestStatusServiceGetHotsetReturnsItemsAndFamilyStatus(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("apiserver")
-	registry.Update(cacheobservability.FamilyStatus{
-		Family:      string(redisplane.FamilyQuery),
+	registry := observability.NewFamilyStatusRegistry("apiserver")
+	registry.Update(observability.FamilyStatus{
+		Family:      string(cachemodel.FamilyQuery),
 		Profile:     "query_cache",
 		Namespace:   "prod:cache:query",
 		AllowWarmup: true,
 		Configured:  true,
 		Available:   true,
-		Mode:        cacheobservability.FamilyModeNamedProfile,
+		Mode:        observability.FamilyModeNamedProfile,
 	})
 	service := NewStatusService("apiserver", registry, stubHotsetInspector{
 		items: []cachetarget.HotsetItem{
@@ -244,8 +244,8 @@ func TestStatusServiceGetHotsetReturnsItemsAndFamilyStatus(t *testing.T) {
 	if got.Degraded {
 		t.Fatal("GetHotset().Degraded = true, want false")
 	}
-	if got.Family != redisplane.FamilyQuery {
-		t.Fatalf("GetHotset().Family = %q, want %q", got.Family, redisplane.FamilyQuery)
+	if got.Family != cachemodel.FamilyQuery {
+		t.Fatalf("GetHotset().Family = %q, want %q", got.Family, cachemodel.FamilyQuery)
 	}
 	if len(got.Items) != 1 {
 		t.Fatalf("GetHotset().Items len = %d, want 1", len(got.Items))
@@ -256,15 +256,15 @@ func TestStatusServiceGetHotsetReturnsItemsAndFamilyStatus(t *testing.T) {
 }
 
 func TestStatusServiceGetHotsetReturnsDegradedWhenInspectorFails(t *testing.T) {
-	registry := cacheobservability.NewFamilyStatusRegistry("apiserver")
-	registry.Update(cacheobservability.FamilyStatus{
-		Family:      string(redisplane.FamilyStatic),
+	registry := observability.NewFamilyStatusRegistry("apiserver")
+	registry.Update(observability.FamilyStatus{
+		Family:      string(cachemodel.FamilyStatic),
 		Profile:     "static_cache",
 		Namespace:   "prod:cache:static",
 		AllowWarmup: true,
 		Configured:  true,
 		Available:   true,
-		Mode:        cacheobservability.FamilyModeNamedProfile,
+		Mode:        observability.FamilyModeNamedProfile,
 	})
 	service := NewStatusService("apiserver", registry, stubHotsetInspector{
 		err: errors.New("meta cache unavailable"),

@@ -6,8 +6,8 @@ import (
 	"strconv"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -50,29 +50,29 @@ func (s *RedisVersionTokenStore) Current(ctx context.Context, versionKey string)
 	start := time.Now()
 	value, err := s.client.Get(ctx, versionKey).Result()
 	if err == redis.Nil {
-		cacheobservability.ObserveQueryCacheVersion(s.kind, "current", "ok", time.Since(start))
-		s.observeSuccess(string(redisplane.FamilyMeta))
+		observability.ObserveQueryCacheVersion(s.kind, "current", "ok", time.Since(start))
+		s.observeSuccess(string(cacheplane.FamilyMeta))
 		return 0, nil
 	}
 	if err != nil {
-		cacheobservability.ObserveQueryCacheVersion(s.kind, "current", "error", time.Since(start))
-		s.observeFailure(string(redisplane.FamilyMeta), err)
+		observability.ObserveQueryCacheVersion(s.kind, "current", "error", time.Since(start))
+		s.observeFailure(string(cacheplane.FamilyMeta), err)
 		return 0, err
 	}
 	if value == "" {
-		cacheobservability.ObserveQueryCacheVersion(s.kind, "current", "ok", time.Since(start))
-		s.observeSuccess(string(redisplane.FamilyMeta))
+		observability.ObserveQueryCacheVersion(s.kind, "current", "ok", time.Since(start))
+		s.observeSuccess(string(cacheplane.FamilyMeta))
 		return 0, nil
 	}
 
 	token, parseErr := strconv.ParseUint(value, 10, 64)
 	if parseErr != nil {
-		cacheobservability.ObserveQueryCacheVersion(s.kind, "current", "error", time.Since(start))
-		s.observeFailure(string(redisplane.FamilyMeta), parseErr)
+		observability.ObserveQueryCacheVersion(s.kind, "current", "error", time.Since(start))
+		s.observeFailure(string(cacheplane.FamilyMeta), parseErr)
 		return 0, fmt.Errorf("parse version token %q: %w", versionKey, parseErr)
 	}
-	cacheobservability.ObserveQueryCacheVersion(s.kind, "current", "ok", time.Since(start))
-	s.observeSuccess(string(redisplane.FamilyMeta))
+	observability.ObserveQueryCacheVersion(s.kind, "current", "ok", time.Since(start))
+	s.observeSuccess(string(cacheplane.FamilyMeta))
 	return token, nil
 }
 
@@ -83,12 +83,12 @@ func (s *RedisVersionTokenStore) Bump(ctx context.Context, versionKey string) (u
 	start := time.Now()
 	token, err := s.client.Incr(ctx, versionKey).Uint64()
 	if err != nil {
-		cacheobservability.ObserveQueryCacheVersion(s.kind, "bump", "error", time.Since(start))
-		s.observeFailure(string(redisplane.FamilyMeta), err)
+		observability.ObserveQueryCacheVersion(s.kind, "bump", "error", time.Since(start))
+		s.observeFailure(string(cacheplane.FamilyMeta), err)
 		return 0, err
 	}
-	cacheobservability.ObserveQueryCacheVersion(s.kind, "bump", "ok", time.Since(start))
-	s.observeSuccess(string(redisplane.FamilyMeta))
+	observability.ObserveQueryCacheVersion(s.kind, "bump", "ok", time.Since(start))
+	s.observeSuccess(string(cacheplane.FamilyMeta))
 	return token, nil
 }
 

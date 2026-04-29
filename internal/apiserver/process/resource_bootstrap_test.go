@@ -10,9 +10,9 @@ import (
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -32,7 +32,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	var mysqlDB gorm.DB
 	var mongoDB mongo.Database
 	var redisClient redis.UniversalClient
-	runtimeBundle := &redisbootstrap.RuntimeBundle{Component: "apiserver"}
+	runtimeBundle := &cacheplanebootstrap.RuntimeBundle{Component: "apiserver"}
 	subsystem := &cachebootstrap.Subsystem{}
 	publisher := &fakePublisher{}
 	catalog := eventcatalog.NewCatalog(nil)
@@ -50,8 +50,8 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 		},
 		redisRuntime: redisRuntimeStageDeps{
 			getClient:    func() (redis.UniversalClient, error) { return redisClient, nil },
-			buildRuntime: func() *redisbootstrap.RuntimeBundle { return runtimeBundle },
-			buildSubsystem: func(got *redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
+			buildRuntime: func() *cacheplanebootstrap.RuntimeBundle { return runtimeBundle },
+			buildSubsystem: func(got *cacheplanebootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
 				if got != runtimeBundle {
 					t.Fatalf("runtime bundle = %#v, want %#v", got, runtimeBundle)
 				}
@@ -110,13 +110,13 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 func TestInitializeRedisRuntimeReturnsSubsystemWhenRedisUnavailable(t *testing.T) {
 	subsystem := &cachebootstrap.Subsystem{}
 
-	runtimeBundle := &redisbootstrap.RuntimeBundle{Component: "apiserver"}
+	runtimeBundle := &cacheplanebootstrap.RuntimeBundle{Component: "apiserver"}
 	client, gotRuntime, gotSubsystem := initializeRedisRuntime(redisRuntimeStageDeps{
 		getClient: func() (redis.UniversalClient, error) { return nil, errors.New("redis unavailable") },
-		buildRuntime: func() *redisbootstrap.RuntimeBundle {
+		buildRuntime: func() *cacheplanebootstrap.RuntimeBundle {
 			return runtimeBundle
 		},
-		buildSubsystem: func(got *redisbootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
+		buildSubsystem: func(got *cacheplanebootstrap.RuntimeBundle) *cachebootstrap.Subsystem {
 			if got != runtimeBundle {
 				t.Fatalf("runtime bundle = %#v, want %#v", got, runtimeBundle)
 			}

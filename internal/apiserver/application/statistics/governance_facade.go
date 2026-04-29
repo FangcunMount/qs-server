@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -78,11 +78,11 @@ func (f *governanceFacade) HandleManualWarmup(ctx context.Context, protectedOrgI
 func (f *governanceFacade) GetStatus(ctx context.Context) (*cachegov.StatusSnapshot, error) {
 	if f == nil || f.statusService == nil {
 		return &cachegov.StatusSnapshot{
-			RuntimeSnapshot: cacheobservability.RuntimeSnapshot{
+			RuntimeSnapshot: observability.RuntimeSnapshot{
 				GeneratedAt: time.Now(),
 				Component:   f.componentName(),
-				Families:    []cacheobservability.FamilyStatus{},
-				Summary: cacheobservability.RuntimeSummary{
+				Families:    []observability.FamilyStatus{},
+				Summary: observability.RuntimeSummary{
 					Ready: true,
 				},
 			},

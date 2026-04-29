@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/prometheus/client_golang/prometheus/promhttp"
 )
@@ -19,7 +19,7 @@ type MetricsServer struct {
 	listener net.Listener
 }
 
-func NewMetricsServerWithGovernance(bindAddress string, bindPort int, component string, registry *cacheobservability.FamilyStatusRegistry) *MetricsServer {
+func NewMetricsServerWithGovernance(bindAddress string, bindPort int, component string, registry *observability.FamilyStatusRegistry) *MetricsServer {
 	return NewMetricsServerWithGovernanceAndResilience(bindAddress, bindPort, component, registry, nil)
 }
 
@@ -27,7 +27,7 @@ func NewMetricsServerWithGovernanceAndResilience(
 	bindAddress string,
 	bindPort int,
 	component string,
-	registry *cacheobservability.FamilyStatusRegistry,
+	registry *observability.FamilyStatusRegistry,
 	resilience func() resilienceplane.RuntimeSnapshot,
 ) *MetricsServer {
 	mux := http.NewServeMux()
@@ -36,11 +36,11 @@ func NewMetricsServerWithGovernanceAndResilience(
 		writeGovernanceJSON(w, http.StatusOK, map[string]interface{}{
 			"status":    "healthy",
 			"component": component,
-			"redis":     cacheobservability.SnapshotForComponent(component, registry),
+			"redis":     observability.SnapshotForComponent(component, registry),
 		})
 	})
 	mux.HandleFunc("/readyz", func(w http.ResponseWriter, _ *http.Request) {
-		snapshot := cacheobservability.SnapshotForComponent(component, registry)
+		snapshot := observability.SnapshotForComponent(component, registry)
 		statusCode := http.StatusOK
 		statusText := "ready"
 		if !snapshot.Summary.Ready {
@@ -54,7 +54,7 @@ func NewMetricsServerWithGovernanceAndResilience(
 		})
 	})
 	mux.HandleFunc("/governance/redis", func(w http.ResponseWriter, _ *http.Request) {
-		writeGovernanceJSON(w, http.StatusOK, cacheobservability.SnapshotForComponent(component, registry))
+		writeGovernanceJSON(w, http.StatusOK, observability.SnapshotForComponent(component, registry))
 	})
 	mux.HandleFunc("/governance/resilience", func(w http.ResponseWriter, _ *http.Request) {
 		if resilience == nil {

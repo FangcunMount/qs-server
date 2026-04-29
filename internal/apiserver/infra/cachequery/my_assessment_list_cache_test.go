@@ -8,7 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -28,7 +28,7 @@ func TestMyAssessmentListCacheUsesVersionTokenInvalidation(t *testing.T) {
 
 	queryCache := cacheentry.NewRedisCache(queryClient)
 	versionStore := NewRedisVersionTokenStore(metaClient)
-	keyBuilder := rediskey.NewBuilderWithNamespace("cache:query")
+	keyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
 	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, versionStore, keyBuilder, cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,
@@ -104,7 +104,7 @@ func TestMyAssessmentListCacheDegradesVersionReadFailureToMiss(t *testing.T) {
 	})
 
 	queryCache := cacheentry.NewRedisCache(queryClient)
-	keyBuilder := rediskey.NewBuilderWithNamespace("cache:query")
+	keyBuilder := keyspace.NewBuilderWithNamespace("cache:query")
 	listCache := NewMyAssessmentListCacheWithBuilderAndPolicy(queryCache, failingVersionStore{}, keyBuilder, cachepolicy.CachePolicy{
 		TTL:         time.Minute,
 		JitterRatio: 0,

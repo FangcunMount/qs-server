@@ -14,11 +14,11 @@ import (
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	redis "github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
 )
@@ -51,14 +51,14 @@ type StatisticsModule struct {
 type StatisticsModuleDeps struct {
 	MySQLDB           *gorm.DB
 	RedisClient       redis.UniversalClient
-	CacheBuilder      *rediskey.Builder
+	CacheBuilder      *keyspace.Builder
 	AnswerSheetRepo   surveyAnswerSheet.Repository
 	RepairWindowDays  int
 	QueryPolicy       cachepolicy.CachePolicy
 	HotsetRecorder    cachetarget.HotsetRecorder
-	LockManager       *redislock.Manager
+	LockManager       locklease.Manager
 	VersionStore      cachequery.VersionTokenStore
-	Observer          *cacheobservability.ComponentObserver
+	Observer          *observability.ComponentObserver
 	MySQLLimiter      backpressure.Acquirer
 	TesteeAccess      actorAccessApp.TesteeAccessService
 	WarmupCoordinator cachegov.Coordinator

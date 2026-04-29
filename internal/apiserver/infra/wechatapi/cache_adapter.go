@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 	"github.com/silenceper/wechat/v2/cache"
 )
@@ -15,17 +15,17 @@ import (
 // 用于微信 SDK 的 access_token 缓存
 type RedisCacheAdapter struct {
 	client   redis.UniversalClient
-	keys     *rediskey.Builder
-	observer *cacheobservability.ComponentObserver
+	keys     *keyspace.Builder
+	observer *observability.ComponentObserver
 }
 
 // NewRedisCacheAdapterWithBuilder 创建带显式 key builder 的 Redis 缓存适配器。
-func NewRedisCacheAdapterWithBuilder(client redis.UniversalClient, builder *rediskey.Builder) cache.Cache {
-	return NewRedisCacheAdapterWithBuilderAndObserver(client, builder, cacheobservability.NewComponentObserver("apiserver"))
+func NewRedisCacheAdapterWithBuilder(client redis.UniversalClient, builder *keyspace.Builder) cache.Cache {
+	return NewRedisCacheAdapterWithBuilderAndObserver(client, builder, observability.NewComponentObserver("apiserver"))
 }
 
 // NewRedisCacheAdapterWithBuilderAndObserver 创建带显式 observer 的 Redis 缓存适配器。
-func NewRedisCacheAdapterWithBuilderAndObserver(client redis.UniversalClient, builder *rediskey.Builder, observer *cacheobservability.ComponentObserver) cache.Cache {
+func NewRedisCacheAdapterWithBuilderAndObserver(client redis.UniversalClient, builder *keyspace.Builder, observer *observability.ComponentObserver) cache.Cache {
 	if client == nil {
 		// 如果 Redis 客户端为 nil，返回内存缓存
 		return cache.NewMemory()
@@ -135,7 +135,7 @@ func (a *RedisCacheAdapter) observeSuccess() {
 		a.observer.ObserveFamilySuccess("sdk_token")
 		return
 	}
-	cacheobservability.ObserveFamilySuccess("apiserver", "sdk_token")
+	observability.ObserveFamilySuccess("apiserver", "sdk_token")
 }
 
 func (a *RedisCacheAdapter) observeFailure(err error) {
@@ -146,5 +146,5 @@ func (a *RedisCacheAdapter) observeFailure(err error) {
 		a.observer.ObserveFamilyFailure("sdk_token", err)
 		return
 	}
-	cacheobservability.ObserveFamilyFailure("apiserver", "sdk_token", err)
+	observability.ObserveFamilyFailure("apiserver", "sdk_token", err)
 }

@@ -12,9 +12,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	redis "github.com/redis/go-redis/v9"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 )
 
 const (
@@ -29,7 +28,7 @@ type ScaleListCache struct {
 	entry       cacheentry.Cache
 	payload     *cacheentry.PayloadStore
 	identitySvc iambridge.IdentityResolver
-	keyBuilder  *rediskey.Builder
+	keyBuilder  *keyspace.Builder
 	policy      cachepolicy.CachePolicy
 	pageSize    int
 	// 节点内短 TTL 内存缓存，减少 Redis GET/JSON 解码成本
@@ -40,19 +39,18 @@ const defaultScaleListLocalMaxEntries = 64
 
 // NewScaleListCacheWithPolicyAndKeyBuilder 创建带显式 key builder/policy 的全局量表列表缓存实例。
 func NewScaleListCacheWithPolicyAndKeyBuilder(
-	redisClient redis.UniversalClient,
+	entry cacheentry.Cache,
 	repo domainScale.Repository,
 	identitySvc iambridge.IdentityResolver,
-	keyBuilder *rediskey.Builder,
+	keyBuilder *keyspace.Builder,
 	policy cachepolicy.CachePolicy,
 ) *ScaleListCache {
-	if redisClient == nil || repo == nil {
+	if entry == nil || repo == nil {
 		return nil
 	}
 	if keyBuilder == nil {
 		panic("cache key builder is required")
 	}
-	entry := cacheentry.NewRedisCache(redisClient)
 
 	return &ScaleListCache{
 		repo:        repo,
@@ -85,10 +83,10 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 	key := c.keyBuilder.BuildScaleListKey()
 	if total == 0 {
 		if err := c.entry.Delete(ctx, key); err != nil {
-			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+			observability.ObserveFamilyFailure("apiserver", "static_meta", err)
 			return err
 		}
-		cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+		observability.ObserveFamilySuccess("apiserver", "static_meta")
 		return nil
 	}
 
@@ -113,10 +111,10 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 	c.resetMemory()
 
 	if err := c.payload.Set(ctx, key, data, c.policy.TTLOr(defaultScaleListCacheTTL)); err != nil {
-		cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+		observability.ObserveFamilyFailure("apiserver", "static_meta", err)
 		return err
 	}
-	cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+	observability.ObserveFamilySuccess("apiserver", "static_meta")
 	return nil
 }
 
@@ -136,17 +134,17 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 	data, err := c.payload.Get(ctx, key)
 	if err != nil {
 		if err == cacheentry.ErrCacheNotFound {
-			cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+			observability.ObserveFamilySuccess("apiserver", "static_meta")
 		} else {
-			cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+			observability.ObserveFamilyFailure("apiserver", "static_meta", err)
 		}
 		return nil, false
 	}
-	cacheobservability.ObserveFamilySuccess("apiserver", "static_meta")
+	observability.ObserveFamilySuccess("apiserver", "static_meta")
 
 	var payload scaleSummaryListCache
 	if err := json.Unmarshal(data, &payload); err != nil {
-		cacheobservability.ObserveFamilyFailure("apiserver", "static_meta", err)
+		observability.ObserveFamilyFailure("apiserver", "static_meta", err)
 		return nil, false
 	}
 

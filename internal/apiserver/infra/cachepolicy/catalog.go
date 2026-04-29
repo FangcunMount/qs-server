@@ -1,18 +1,18 @@
 package cachepolicy
 
-import "github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+import "github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 
 // PolicyCatalog 统一管理对象级缓存策略。
 // 它只负责对象策略与逻辑 family 的映射，不再承担 Redis profile/namespace 路由职责。
 type PolicyCatalog struct {
-	familyDefaults map[redisplane.Family]CachePolicy
+	familyDefaults map[cachemodel.Family]CachePolicy
 	policies       map[CachePolicyKey]CachePolicy
 }
 
 // NewPolicyCatalog 创建对象级缓存策略目录。
-func NewPolicyCatalog(familyDefaults map[redisplane.Family]CachePolicy, policies map[CachePolicyKey]CachePolicy) *PolicyCatalog {
+func NewPolicyCatalog(familyDefaults map[cachemodel.Family]CachePolicy, policies map[CachePolicyKey]CachePolicy) *PolicyCatalog {
 	catalog := &PolicyCatalog{
-		familyDefaults: make(map[redisplane.Family]CachePolicy),
+		familyDefaults: make(map[cachemodel.Family]CachePolicy),
 		policies:       make(map[CachePolicyKey]CachePolicy),
 	}
 	for family, policy := range familyDefaults {
@@ -34,15 +34,15 @@ func (c *PolicyCatalog) Policy(key CachePolicyKey) CachePolicy {
 }
 
 // FamilyFor 返回对象策略所属的逻辑 Redis family。
-func FamilyFor(key CachePolicyKey) redisplane.Family {
+func FamilyFor(key CachePolicyKey) cachemodel.Family {
 	switch key {
 	case PolicyScale, PolicyScaleList, PolicyQuestionnaire:
-		return redisplane.FamilyStatic
+		return cachemodel.FamilyStatic
 	case PolicyAssessmentDetail, PolicyTestee, PolicyPlan:
-		return redisplane.FamilyObject
+		return cachemodel.FamilyObject
 	case PolicyAssessmentList, PolicyStatsQuery:
-		return redisplane.FamilyQuery
+		return cachemodel.FamilyQuery
 	default:
-		return redisplane.FamilyDefault
+		return cachemodel.FamilyDefault
 	}
 }

@@ -3,15 +3,15 @@ package cachepolicy
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 )
 
 func TestPolicyCatalogMergesFamilyDefaultIntoObjectPolicy(t *testing.T) {
 	t.Parallel()
 
 	catalog := NewPolicyCatalog(
-		map[redisplane.Family]CachePolicy{
-			redisplane.FamilyQuery: {
+		map[cachemodel.Family]CachePolicy{
+			cachemodel.FamilyQuery: {
 				Compress:     PolicySwitchEnabled,
 				Singleflight: PolicySwitchDisabled,
 			},
@@ -36,12 +36,12 @@ func TestFamilyForReturnsExpectedRedisFamily(t *testing.T) {
 	tests := []struct {
 		name string
 		key  CachePolicyKey
-		want redisplane.Family
+		want cachemodel.Family
 	}{
-		{name: "static scale", key: PolicyScale, want: redisplane.FamilyStatic},
-		{name: "object plan", key: PolicyPlan, want: redisplane.FamilyObject},
-		{name: "query stats", key: PolicyStatsQuery, want: redisplane.FamilyQuery},
-		{name: "unknown", key: CachePolicyKey("unknown"), want: redisplane.FamilyDefault},
+		{name: "static scale", key: PolicyScale, want: cachemodel.FamilyStatic},
+		{name: "object plan", key: PolicyPlan, want: cachemodel.FamilyObject},
+		{name: "query stats", key: PolicyStatsQuery, want: cachemodel.FamilyQuery},
+		{name: "unknown", key: CachePolicyKey("unknown"), want: cachemodel.FamilyDefault},
 	}
 
 	for _, tt := range tests {

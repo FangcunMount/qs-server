@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -17,7 +17,7 @@ func TestRedisCacheAdapterUsesExplicitBuilderNamespace(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewRedisCacheAdapterWithBuilder(client, rediskey.NewBuilderWithNamespace("prod:cache:sdk"))
+	cache := NewRedisCacheAdapterWithBuilder(client, keyspace.NewBuilderWithNamespace("prod:cache:sdk"))
 	if err := cache.Set("access_token", "token-1", time.Minute); err != nil {
 		t.Fatalf("cache set failed: %v", err)
 	}
@@ -36,25 +36,25 @@ func TestRedisCacheAdapterUsesInjectedObserver(t *testing.T) {
 		_ = client.Close()
 	})
 
-	registry := cacheobservability.NewFamilyStatusRegistry("wechat-sdk-test")
-	registry.Update(cacheobservability.FamilyStatus{
+	registry := observability.NewFamilyStatusRegistry("wechat-sdk-test")
+	registry.Update(observability.FamilyStatus{
 		Component: "wechat-sdk-test",
 		Family:    "sdk_token",
 		Available: false,
 		Degraded:  true,
-		Mode:      cacheobservability.FamilyModeDegraded,
+		Mode:      observability.FamilyModeDegraded,
 	})
 
 	cache := NewRedisCacheAdapterWithBuilderAndObserver(
 		client,
-		rediskey.NewBuilderWithNamespace("prod:cache:sdk"),
-		cacheobservability.NewComponentObserver("wechat-sdk-test"),
+		keyspace.NewBuilderWithNamespace("prod:cache:sdk"),
+		observability.NewComponentObserver("wechat-sdk-test"),
 	)
 	if err := cache.Set("access_token", "token-1", time.Minute); err != nil {
 		t.Fatalf("cache set failed: %v", err)
 	}
 
-	snapshot := cacheobservability.SnapshotForComponent("wechat-sdk-test", registry)
+	snapshot := observability.SnapshotForComponent("wechat-sdk-test", registry)
 	if !snapshot.Summary.Ready {
 		t.Fatalf("runtime summary ready = false, want true after observed success: %#v", snapshot.Summary)
 	}

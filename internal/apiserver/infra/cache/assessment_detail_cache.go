@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	assessmentInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -21,18 +21,18 @@ const defaultAssessmentDetailCacheTTL = 2 * time.Hour
 // 实现 assessment.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedAssessmentRepository struct {
 	repo     assessment.Repository
-	keys     *rediskey.Builder
+	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
-	observer *cacheobservability.ComponentObserver
+	observer *observability.ComponentObserver
 	store    *ObjectCacheStore[assessment.Assessment]
 }
 
 // NewCachedAssessmentRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的测评缓存 Repository。
-func NewCachedAssessmentRepositoryWithBuilderAndPolicy(repo assessment.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) assessment.Repository {
+func NewCachedAssessmentRepositoryWithBuilderAndPolicy(repo assessment.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) assessment.Repository {
 	return NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo assessment.Repository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) assessment.Repository {
+func NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(repo assessment.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) assessment.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

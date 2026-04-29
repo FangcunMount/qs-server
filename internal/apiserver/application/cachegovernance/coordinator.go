@@ -9,9 +9,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/prometheus/client_golang/prometheus"
 	"github.com/prometheus/client_golang/prometheus/promauto"
 )
@@ -423,9 +423,9 @@ func (c *coordinator) queryHotTargets(ctx context.Context, orgFilter []int64, re
 		cachetarget.WarmupKindQueryStatsQuestionnaire,
 		cachetarget.WarmupKindQueryStatsPlan,
 	} {
-		items, err := c.deps.Hotset.Top(ctx, redisplane.FamilyQuery, kind, c.cfg.HotsetTopN)
+		items, err := c.deps.Hotset.Top(ctx, cachemodel.FamilyQuery, kind, c.cfg.HotsetTopN)
 		if err != nil {
-			logger.L(ctx).Warnw("failed to load warmup hotset", "family", redisplane.FamilyQuery, "kind", kind, "error", err)
+			logger.L(ctx).Warnw("failed to load warmup hotset", "family", cachemodel.FamilyQuery, "kind", kind, "error", err)
 			continue
 		}
 		for _, item := range items {
@@ -477,7 +477,7 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 	if len(targets) == 0 {
 		warmupRunTotal.WithLabelValues(trigger, "skipped").Inc()
 		finishedAt := time.Now()
-		cacheobservability.ObserveWarmupDuration(trigger, "skipped", finishedAt.Sub(startedAt))
+		observability.ObserveWarmupDuration(trigger, "skipped", finishedAt.Sub(startedAt))
 		run := WarmupRunSnapshot{
 			Trigger:      trigger,
 			StartedAt:    startedAt,
@@ -555,7 +555,7 @@ func (c *coordinator) executeTargets(ctx context.Context, trigger string, target
 	}
 	finishedAt := time.Now()
 	warmupRunTotal.WithLabelValues(trigger, result).Inc()
-	cacheobservability.ObserveWarmupDuration(trigger, result, finishedAt.Sub(startedAt))
+	observability.ObserveWarmupDuration(trigger, result, finishedAt.Sub(startedAt))
 	c.recordRun(WarmupRunSnapshot{
 		Trigger:      trigger,
 		StartedAt:    startedAt,

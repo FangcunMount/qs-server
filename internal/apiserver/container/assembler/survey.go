@@ -23,10 +23,10 @@ import (
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -49,11 +49,11 @@ type SurveyModuleDeps struct {
 	MongoDB             *mongo.Database
 	EventPublisher      event.EventPublisher
 	RedisClient         redis.UniversalClient
-	CacheBuilder        *rediskey.Builder
+	CacheBuilder        *keyspace.Builder
 	IdentityService     *iam.IdentityService
 	QuestionnairePolicy cachepolicy.CachePolicy
 	HotsetRecorder      cachetarget.HotsetRecorder
-	Observer            *cacheobservability.ComponentObserver
+	Observer            *observability.ComponentObserver
 	TopicResolver       eventcatalog.TopicResolver
 	MongoLimiter        backpressure.Acquirer
 }
@@ -136,7 +136,7 @@ func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) 
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *rediskey.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *cacheobservability.ComponentObserver, limiter backpressure.Acquirer) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *keyspace.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *observability.ComponentObserver, limiter backpressure.Acquirer) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）

@@ -6,7 +6,7 @@ import (
 	"time"
 
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -18,7 +18,7 @@ func TestStatisticsCacheUsesNamespacedQueryKeys(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, rediskey.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
 	ctx := context.Background()
 
 	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
@@ -46,7 +46,7 @@ func TestStatisticsCacheUsesExplicitBuilderNamespace(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, rediskey.NewBuilderWithNamespace("prod:cache:query"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("prod:cache:query"), cachepolicy.CachePolicy{})
 	ctx := context.Background()
 
 	if err := cache.SetQueryCache(ctx, "system:1", "{\"ok\":true}", time.Minute); err != nil {
@@ -66,7 +66,7 @@ func TestStatisticsCacheAppliesPolicyTTLAndCompression(t *testing.T) {
 
 	cache := NewStatisticsCacheWithBuilderAndPolicy(
 		client,
-		rediskey.NewBuilderWithNamespace("prod:cache:query"),
+		keyspace.NewBuilderWithNamespace("prod:cache:query"),
 		cachepolicy.CachePolicy{
 			TTL:      3 * time.Minute,
 			Compress: cachepolicy.PolicySwitchEnabled,
@@ -98,7 +98,7 @@ func TestStatisticsCacheDegradesRedisReadErrorToMiss(t *testing.T) {
 		_ = client.Close()
 	})
 
-	cache := NewStatisticsCacheWithBuilderAndPolicy(client, rediskey.NewBuilderWithNamespace("prod:cache:query"), cachepolicy.CachePolicy{})
+	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("prod:cache:query"), cachepolicy.CachePolicy{})
 	value, err := cache.GetQueryCache(context.Background(), "system:1")
 	if err != nil {
 		t.Fatalf("GetQueryCache() error = %v", err)
@@ -117,7 +117,7 @@ func TestStatisticsCacheSupportsMissingVersionTokenStoreKey(t *testing.T) {
 
 	cache := NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 		client,
-		rediskey.NewBuilderWithNamespace("prod:cache:query"),
+		keyspace.NewBuilderWithNamespace("prod:cache:query"),
 		cachepolicy.CachePolicy{TTL: time.Minute},
 		nil,
 		nil,

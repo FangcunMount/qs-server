@@ -6,10 +6,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	"github.com/FangcunMount/component-base/pkg/shutdown"
 	"github.com/FangcunMount/component-base/pkg/shutdown/shutdownmanagers/posixsignal"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	cachegovobs "github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/worker/config"
 	"github.com/FangcunMount/qs-server/internal/worker/container"
@@ -32,10 +32,10 @@ type resourceHandles struct {
 }
 
 type redisRuntimeOutput struct {
-	familyStatus *cacheobservability.FamilyStatusRegistry
-	redisRuntime *redisplane.Runtime
-	lockHandle   *redisplane.Handle
-	lockManager  *redislock.Manager
+	familyStatus *cachegovobs.FamilyStatusRegistry
+	redisRuntime *cacheplane.Runtime
+	lockHandle   *cacheplane.Handle
+	lockManager  locklease.Manager
 }
 
 type resourceOutput struct {

@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
@@ -19,8 +19,8 @@ func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
 		MySQLDB:        c.mysqlDB,
 		EventPublisher: c.eventPublisher,
 		ScaleRepo:      scaleRepo,
-		RedisClient:    c.CacheClient(redisplane.FamilyObject),
-		CacheBuilder:   c.CacheBuilder(redisplane.FamilyObject),
+		RedisClient:    c.CacheClient(cacheplane.FamilyObject),
+		CacheBuilder:   c.CacheBuilder(cacheplane.FamilyObject),
 		PlanPolicy:     c.CachePolicy(cachepolicy.PolicyPlan),
 		EntryBaseURL:   c.planEntryURL,
 		Observer:       c.cacheObserver(),

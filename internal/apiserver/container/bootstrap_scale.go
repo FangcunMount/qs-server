@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
@@ -19,8 +19,8 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 		MongoDB:           c.mongoDB,
 		EventPublisher:    c.eventPublisher,
 		QuestionnaireRepo: questionnaireRepo,
-		RedisClient:       c.CacheClient(redisplane.FamilyStatic),
-		CacheBuilder:      c.CacheBuilder(redisplane.FamilyStatic),
+		RedisClient:       c.CacheClient(cacheplane.FamilyStatic),
+		CacheBuilder:      c.CacheBuilder(cacheplane.FamilyStatic),
 		IdentityService:   c.resolveIdentityService(),
 		ScalePolicy:       c.CachePolicy(cachepolicy.PolicyScale),
 		ScaleListPolicy:   c.CachePolicy(cachepolicy.PolicyScaleList),

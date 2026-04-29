@@ -7,7 +7,7 @@ import (
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
@@ -21,7 +21,7 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 	disableStatisticsCache := c.cacheOptions.DisableStatisticsCache
 	redisClient := c.redisCache
 	if !disableStatisticsCache {
-		redisClient = c.CacheClient(redisplane.FamilyQuery)
+		redisClient = c.CacheClient(cacheplane.FamilyQuery)
 	}
 	if disableStatisticsCache {
 		redisClient = nil
@@ -33,7 +33,7 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 	}
 	if !disableStatisticsCache {
 		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(
-			c.CacheClient(redisplane.FamilyMeta),
+			c.CacheClient(cacheplane.FamilyMeta),
 			string(cachepolicy.PolicyStatsQuery),
 			c.cacheObserver(),
 		)
@@ -45,7 +45,7 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 	return assembler.StatisticsModuleDeps{
 		MySQLDB:           c.mysqlDB,
 		RedisClient:       redisClient,
-		CacheBuilder:      c.CacheBuilder(redisplane.FamilyQuery),
+		CacheBuilder:      c.CacheBuilder(cacheplane.FamilyQuery),
 		AnswerSheetRepo:   answerSheetRepo,
 		RepairWindowDays:  c.statisticsRepairWindowDays,
 		QueryPolicy:       c.CachePolicy(cachepolicy.PolicyStatsQuery),

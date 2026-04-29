@@ -10,8 +10,8 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
 type questionnaireRepoStub struct {
@@ -283,7 +283,7 @@ func TestCachedQuestionnaireRepositorySupportsExplicitBuilderNamespace(t *testin
 		},
 	}
 
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, keyspace.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{
 		Negative: cachepolicy.PolicySwitchEnabled,
 	}).(*CachedQuestionnaireRepository)
 	if _, err := cachedRepo.FindPublishedByCode(context.Background(), "Q-001"); err != nil {
@@ -320,7 +320,7 @@ func newQuestionnaireCacheTestRepoWithNamespace(t *testing.T, namespace string) 
 			"Q-001:1.0.2": head,
 		},
 	}
-	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, rediskey.NewBuilderWithNamespace(namespace), cachepolicy.CachePolicy{
+	cachedRepo := NewCachedQuestionnaireRepositoryWithBuilderAndPolicy(repo, client, keyspace.NewBuilderWithNamespace(namespace), cachepolicy.CachePolicy{
 		Negative: cachepolicy.PolicySwitchEnabled,
 	}).(*CachedQuestionnaireRepository)
 

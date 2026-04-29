@@ -4,14 +4,14 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 )
 
 func TestWarmupTargetFactoriesNormalizeScopes(t *testing.T) {
 	t.Parallel()
 
 	scale := NewStaticScaleWarmupTarget(" S-001 ")
-	if scale.Family != redisplane.FamilyStatic || scale.Kind != WarmupKindStaticScale || scale.Scope != "scale:s-001" {
+	if scale.Family != cachemodel.FamilyStatic || scale.Kind != WarmupKindStaticScale || scale.Scope != "scale:s-001" {
 		t.Fatalf("scale target = %#v", scale)
 	}
 	questionnaire := NewStaticQuestionnaireWarmupTarget(" Q-001 ")
@@ -64,15 +64,15 @@ func TestFamilyForKind(t *testing.T) {
 	tests := []struct {
 		name string
 		kind WarmupKind
-		want redisplane.Family
+		want cachemodel.Family
 	}{
-		{name: "static scale", kind: WarmupKindStaticScale, want: redisplane.FamilyStatic},
-		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, want: redisplane.FamilyStatic},
-		{name: "static scale list", kind: WarmupKindStaticScaleList, want: redisplane.FamilyStatic},
-		{name: "query stats system", kind: WarmupKindQueryStatsSystem, want: redisplane.FamilyQuery},
-		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, want: redisplane.FamilyQuery},
-		{name: "query stats plan", kind: WarmupKindQueryStatsPlan, want: redisplane.FamilyQuery},
-		{name: "unknown", kind: WarmupKind("unknown"), want: redisplane.FamilyDefault},
+		{name: "static scale", kind: WarmupKindStaticScale, want: cachemodel.FamilyStatic},
+		{name: "static questionnaire", kind: WarmupKindStaticQuestionnaire, want: cachemodel.FamilyStatic},
+		{name: "static scale list", kind: WarmupKindStaticScaleList, want: cachemodel.FamilyStatic},
+		{name: "query stats system", kind: WarmupKindQueryStatsSystem, want: cachemodel.FamilyQuery},
+		{name: "query stats questionnaire", kind: WarmupKindQueryStatsQuestionnaire, want: cachemodel.FamilyQuery},
+		{name: "query stats plan", kind: WarmupKindQueryStatsPlan, want: cachemodel.FamilyQuery},
+		{name: "unknown", kind: WarmupKind("unknown"), want: cachemodel.FamilyDefault},
 	}
 	for _, tt := range tests {
 		tt := tt
@@ -161,7 +161,7 @@ func TestWarmupTargetOrgID(t *testing.T) {
 		{name: "stats questionnaire", target: NewQueryStatsQuestionnaireWarmupTarget(8, "q-001"), want: 8, wantOK: true},
 		{name: "stats plan", target: NewQueryStatsPlanWarmupTarget(9, 99), want: 9, wantOK: true},
 		{name: "static", target: NewStaticScaleWarmupTarget("s-001"), wantOK: false},
-		{name: "invalid query", target: WarmupTarget{Family: redisplane.FamilyQuery, Kind: WarmupKindQueryStatsPlan, Scope: "org:7:plan:0"}, wantOK: false},
+		{name: "invalid query", target: WarmupTarget{Family: cachemodel.FamilyQuery, Kind: WarmupKindQueryStatsPlan, Scope: "org:7:plan:0"}, wantOK: false},
 	}
 	for _, tt := range tests {
 		tt := tt

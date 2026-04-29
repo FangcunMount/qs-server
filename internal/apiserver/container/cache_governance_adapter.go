@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 type cacheGovernanceAdapter struct {
@@ -23,7 +23,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	var warmScale func(context.Context, string) error
 	var warmQuestionnaire func(context.Context, string) error
 	var warmScaleList func(context.Context) error
-	if c != nil && c.CacheClient(redisplane.FamilyStatic) != nil {
+	if c != nil && c.CacheClient(cacheplane.FamilyStatic) != nil {
 		warmScale = a.warmScaleCacheTarget
 		warmQuestionnaire = a.warmQuestionnaireCacheTarget
 		warmScaleList = a.warmScaleListTarget
@@ -32,7 +32,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 	var warmStatsSystem func(context.Context, int64) error
 	var warmStatsQuestionnaire func(context.Context, int64, string) error
 	var warmStatsPlan func(context.Context, int64, uint64) error
-	if c != nil && c.CacheClient(redisplane.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
+	if c != nil && c.CacheClient(cacheplane.FamilyQuery) != nil && !c.cacheOptions.DisableStatisticsCache {
 		warmStatsSystem = a.warmSystemStatsTarget
 		warmStatsQuestionnaire = a.warmQuestionnaireStatsTarget
 		warmStatsPlan = a.warmPlanStatsTarget

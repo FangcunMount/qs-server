@@ -4,28 +4,28 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	redis "github.com/redis/go-redis/v9"
 )
 
-func (c *Container) CacheHandle(family redisplane.Family) *redisplane.Handle {
+func (c *Container) CacheHandle(family cacheplane.Family) *cacheplane.Handle {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.Handle(family)
 }
 
-func (c *Container) CacheClient(family redisplane.Family) redis.UniversalClient {
+func (c *Container) CacheClient(family cacheplane.Family) redis.UniversalClient {
 	if c == nil || c.cache == nil {
 		return nil
 	}
 	return c.cache.Client(family)
 }
 
-func (c *Container) CacheBuilder(family redisplane.Family) *rediskey.Builder {
+func (c *Container) CacheBuilder(family cacheplane.Family) *keyspace.Builder {
 	if c == nil || c.cache == nil {
 		return nil
 	}
@@ -39,7 +39,7 @@ func (c *Container) CachePolicy(key cachepolicy.CachePolicyKey) cachepolicy.Cach
 	return c.cache.Policy(key)
 }
 
-func (c *Container) cacheObserver() *cacheobservability.ComponentObserver {
+func (c *Container) cacheObserver() *observability.ComponentObserver {
 	if c == nil || c.cache == nil {
 		return nil
 	}
@@ -60,7 +60,7 @@ func (c *Container) HotsetInspector() cachetarget.HotsetInspector {
 	return c.cache.HotsetInspector()
 }
 
-func (c *Container) CacheLockManager() *redislock.Manager {
+func (c *Container) CacheLockManager() locklease.Manager {
 	if c == nil || c.cache == nil {
 		return nil
 	}

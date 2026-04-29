@@ -11,8 +11,8 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter"
 )
 
 type fakeStatisticsSyncService struct {
@@ -122,12 +122,12 @@ func TestNewStatisticsSyncRunner(t *testing.T) {
 		&apiserveroptions.StatisticsSyncOptions{Enable: false},
 		syncService,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected disabled statistics sync to return nil")
 	}
@@ -136,12 +136,12 @@ func TestNewStatisticsSyncRunner(t *testing.T) {
 		opts,
 		nil,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil sync service to return nil")
 	}
@@ -152,10 +152,10 @@ func TestNewStatisticsSyncRunner(t *testing.T) {
 		nil,
 		nil,
 		newTestStatisticsLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected nil lock manager to return nil")
 	}
@@ -166,12 +166,12 @@ func TestNewStatisticsSyncRunner(t *testing.T) {
 		invalid,
 		syncService,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	); runner != nil {
 		t.Fatalf("expected invalid run_at to return nil")
 	}
@@ -182,12 +182,12 @@ func TestStatisticsSyncRunnerLockKeyUsesLockNamespace(t *testing.T) {
 		newTestStatisticsSyncOptions(),
 		&fakeStatisticsSyncService{},
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
-			return &redislock.Lease{Key: "k", Token: "t"}, true, nil
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "t"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 	if got := runner.lockKey(); got != "apiserver-test:cache:lock:qs:statistics-sync:test" {
 		t.Fatalf("unexpected lock key: %s", got)
@@ -200,29 +200,29 @@ func TestStatisticsSyncRunnerRunOnceUsesConfiguredLockOverride(t *testing.T) {
 	opts.LockKey = "qs:statistics-sync:custom"
 	opts.LockTTL = 2 * time.Hour
 
-	var gotSpec redislock.Spec
+	var gotSpec redisadapter.Spec
 	var gotKey string
 	var gotTTL time.Duration
 	runner := newStatisticsSyncRunnerWithHooks(
 		opts,
 		syncService,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
-		func(_ context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+		func(_ context.Context, spec redisadapter.Spec, key string, ttl time.Duration) (*redisadapter.Lease, bool, error) {
 			gotSpec = spec
 			gotKey = key
 			gotTTL = ttl
-			return &redislock.Lease{Key: "lock-key", Token: "token"}, true, nil
+			return &redisadapter.Lease{Key: "lock-key", Token: "token"}, true, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
 		t.Fatalf("runOnce returned error: %v", err)
 	}
-	if gotSpec.Name != redislock.Specs.StatisticsSyncLeader.Name {
-		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redislock.Specs.StatisticsSyncLeader.Name)
+	if gotSpec.Name != redisadapter.Specs.StatisticsSyncLeader.Name {
+		t.Fatalf("spec.name = %q, want %q", gotSpec.Name, redisadapter.Specs.StatisticsSyncLeader.Name)
 	}
 	if gotKey != opts.LockKey {
 		t.Fatalf("key = %q, want %q", gotKey, opts.LockKey)
@@ -241,7 +241,7 @@ func TestStatisticsSyncRunnerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 		newTestStatisticsSyncOptions(11, 22),
 		syncService,
 		warmup,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -289,7 +289,7 @@ func TestStatisticsSyncRunnerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 		newTestStatisticsSyncOptions(1, 2, 3),
 		syncService,
 		warmup,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -328,12 +328,12 @@ func TestStatisticsSyncRunnerRunOnceSkipsWhenLockNotAcquired(t *testing.T) {
 		newTestStatisticsSyncOptions(),
 		syncService,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
-		func(context.Context, redislock.Spec, string, time.Duration) (*redislock.Lease, bool, error) {
+		func(context.Context, redisadapter.Spec, string, time.Duration) (*redisadapter.Lease, bool, error) {
 			return nil, false, nil
 		},
-		func(context.Context, redislock.Spec, string, *redislock.Lease) error { return nil },
+		func(context.Context, redisadapter.Spec, string, *redisadapter.Lease) error { return nil },
 	)
 
 	if err := runner.runOnce(context.Background()); err != nil {
@@ -357,7 +357,7 @@ func TestStatisticsSyncRunnerMultiInstanceOnlyOneExecutes(t *testing.T) {
 		opts,
 		syncService1,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -366,7 +366,7 @@ func TestStatisticsSyncRunnerMultiInstanceOnlyOneExecutes(t *testing.T) {
 		opts,
 		syncService2,
 		nil,
-		&redislock.Manager{},
+		&redisadapter.Manager{},
 		newTestStatisticsLockBuilder(),
 		lock.acquire,
 		lock.release,
@@ -420,9 +420,9 @@ func newTestStatisticsSyncOptions(orgIDs ...int64) *apiserveroptions.StatisticsS
 	}
 }
 
-func newTestStatisticsLockBuilder() *rediskey.Builder {
-	return rediskey.NewBuilderWithNamespace(
-		rediskey.ComposeNamespace("apiserver-test", "cache:lock"),
+func newTestStatisticsLockBuilder() *keyspace.Builder {
+	return keyspace.NewBuilderWithNamespace(
+		keyspace.ComposeNamespace("apiserver-test", "cache:lock"),
 	)
 }
 

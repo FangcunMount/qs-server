@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	bootstrap "github.com/FangcunMount/qs-server/internal/worker/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/worker/options"
 )
@@ -19,12 +19,12 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		return resourceOutput{}, err
 	}
 
-	redisRuntime := redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+	redisRuntime := cacheplanebootstrap.BuildRuntime(context.Background(), cacheplanebootstrap.Options{
 		Component:      "worker",
 		RuntimeOptions: s.config.RedisRuntime,
 		Resolver:       dbManager,
-		Defaults: map[redisplane.Family]redisplane.Route{
-			redisplane.FamilyLock: {
+		Defaults: map[cacheplane.Family]cacheplane.Route{
+			cacheplane.FamilyLock: {
 				RedisProfile:         "lock_cache",
 				NamespaceSuffix:      "cache:lock",
 				AllowFallbackDefault: true,
@@ -43,7 +43,7 @@ func (s *server) prepareResources() (resourceOutput, error) {
 		redisRuntime: redisRuntimeOutput{
 			familyStatus: redisRuntime.StatusRegistry,
 			redisRuntime: redisRuntime.Runtime,
-			lockHandle:   redisRuntime.Handle(redisplane.FamilyLock),
+			lockHandle:   redisRuntime.Handle(cacheplane.FamilyLock),
 			lockManager:  redisRuntime.LockManager,
 		},
 		eventCatalog: eventCatalog,

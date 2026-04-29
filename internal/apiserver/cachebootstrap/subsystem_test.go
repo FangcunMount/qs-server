@@ -5,9 +5,9 @@ import (
 	"testing"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisbootstrap"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -80,15 +80,15 @@ func TestSubsystemReturnsFamilyScopedBuilders(t *testing.T) {
 		&genericoptions.RedisRuntimeOptions{
 			Namespace: "prod:cache",
 			Families: map[string]*genericoptions.RedisRuntimeFamilyRoute{
-				string(redisplane.FamilyObject): {NamespaceSuffix: "object"},
-				string(redisplane.FamilyQuery):  {NamespaceSuffix: "query"},
+				string(cacheplane.FamilyObject): {NamespaceSuffix: "object"},
+				string(cacheplane.FamilyQuery):  {NamespaceSuffix: "query"},
 			},
 		},
 		CacheOptions{},
 	)
 
-	objectBuilder := subsystem.Builder(redisplane.FamilyObject)
-	queryBuilder := subsystem.Builder(redisplane.FamilyQuery)
+	objectBuilder := subsystem.Builder(cacheplane.FamilyObject)
+	queryBuilder := subsystem.Builder(cacheplane.FamilyQuery)
 	if objectBuilder == nil || queryBuilder == nil {
 		t.Fatal("builders = nil, want family-scoped builders")
 	}
@@ -101,13 +101,13 @@ func TestSubsystemReturnsFamilyScopedBuilders(t *testing.T) {
 }
 
 func TestSubsystemUsesSharedRedisRuntimeBundle(t *testing.T) {
-	runtimeBundle := redisbootstrap.BuildRuntime(context.Background(), redisbootstrap.Options{
+	runtimeBundle := cacheplanebootstrap.BuildRuntime(context.Background(), cacheplanebootstrap.Options{
 		Component: "apiserver",
 		RuntimeOptions: &genericoptions.RedisRuntimeOptions{
 			Namespace: "prod:cache",
 			Families: map[string]*genericoptions.RedisRuntimeFamilyRoute{
-				string(redisplane.FamilyMeta): {NamespaceSuffix: "meta"},
-				string(redisplane.FamilyLock): {NamespaceSuffix: "lock"},
+				string(cacheplane.FamilyMeta): {NamespaceSuffix: "meta"},
+				string(cacheplane.FamilyLock): {NamespaceSuffix: "lock"},
 			},
 		},
 		Resolver: fakeResolver{},
@@ -127,7 +127,7 @@ func TestSubsystemUsesSharedRedisRuntimeBundle(t *testing.T) {
 	if subsystem.LockManager() != runtimeBundle.LockManager {
 		t.Fatal("subsystem lock manager did not use shared runtime bundle")
 	}
-	if got := subsystem.Builder(redisplane.FamilyMeta).BuildQueryVersionKey("stats", "system"); got != "prod:cache:meta:query:version:stats:system" {
+	if got := subsystem.Builder(cacheplane.FamilyMeta).BuildQueryVersionKey("stats", "system"); got != "prod:cache:meta:query:version:stats:system" {
 		t.Fatalf("meta builder key = %q, want prod:cache:meta:query:version:stats:system", got)
 	}
 }

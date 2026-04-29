@@ -9,12 +9,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/gin-gonic/gin"
 )
 
-func newGovernanceTestContainer(statuses ...cacheobservability.FamilyStatus) *container.Container {
+func newGovernanceTestContainer(statuses ...observability.FamilyStatus) *container.Container {
 	subsystem := cachebootstrap.NewSubsystem(
 		"apiserver",
 		nil,
@@ -35,8 +35,8 @@ func TestRouterReadyzReturnsServiceUnavailableWhenRuntimeNotReady(t *testing.T) 
 
 	engine := gin.New()
 	router := resttransport.NewRouter(newGovernanceTestContainer(
-		cacheobservability.FamilyStatus{Component: "apiserver", Family: "query_result", Available: true},
-		cacheobservability.FamilyStatus{Component: "apiserver", Family: "static_meta", Available: false, Degraded: true},
+		observability.FamilyStatus{Component: "apiserver", Family: "query_result", Available: true},
+		observability.FamilyStatus{Component: "apiserver", Family: "static_meta", Available: false, Degraded: true},
 	).BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 
@@ -76,7 +76,7 @@ func TestRouterGovernanceEndpointReturnsRuntimeSnapshotOnly(t *testing.T) {
 
 	engine := gin.New()
 	router := resttransport.NewRouter(newGovernanceTestContainer(
-		cacheobservability.FamilyStatus{Component: "apiserver", Family: "query_result", Profile: "query_cache", Available: true},
+		observability.FamilyStatus{Component: "apiserver", Family: "query_result", Profile: "query_cache", Available: true},
 	).BuildRESTDeps(nil))
 	router.RegisterRoutes(engine)
 

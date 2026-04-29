@@ -11,8 +11,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -26,8 +26,8 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 	}, nil)
 
 	deps := c.buildActorModuleDeps()
-	if deps.CacheBuilder != c.CacheBuilder(redisplane.FamilyObject) {
-		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(redisplane.FamilyObject))
+	if deps.CacheBuilder != c.CacheBuilder(cacheplane.FamilyObject) {
+		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(cacheplane.FamilyObject))
 	}
 	if deps.TesteePolicy != c.CachePolicy(cachepolicy.PolicyTestee) {
 		t.Fatalf("policy = %#v, want %#v", deps.TesteePolicy, c.CachePolicy(cachepolicy.PolicyTestee))
@@ -53,8 +53,8 @@ func TestContainerBuildSurveyModuleDepsUsesStaticCacheBuilderAndPolicy(t *testin
 	if deps.EventPublisher != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", deps.EventPublisher, c.eventPublisher)
 	}
-	if deps.CacheBuilder != c.CacheBuilder(redisplane.FamilyStatic) {
-		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(redisplane.FamilyStatic))
+	if deps.CacheBuilder != c.CacheBuilder(cacheplane.FamilyStatic) {
+		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(cacheplane.FamilyStatic))
 	}
 	if deps.QuestionnairePolicy != c.CachePolicy(cachepolicy.PolicyQuestionnaire) {
 		t.Fatalf("policy = %#v, want %#v", deps.QuestionnairePolicy, c.CachePolicy(cachepolicy.PolicyQuestionnaire))
@@ -82,14 +82,14 @@ func TestContainerBuildStatisticsModuleDepsSelectsQueryCacheAndLockManager(t *te
 	if deps.RedisClient != queryClient {
 		t.Fatalf("redis client = %#v, want query cache %#v", deps.RedisClient, queryClient)
 	}
-	if deps.CacheBuilder != c.CacheBuilder(redisplane.FamilyQuery) {
-		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(redisplane.FamilyQuery))
+	if deps.CacheBuilder != c.CacheBuilder(cacheplane.FamilyQuery) {
+		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(cacheplane.FamilyQuery))
 	}
 	if deps.QueryPolicy != c.CachePolicy(cachepolicy.PolicyStatsQuery) {
 		t.Fatalf("policy = %#v, want %#v", deps.QueryPolicy, c.CachePolicy(cachepolicy.PolicyStatsQuery))
 	}
 	if deps.LockManager == nil {
-		t.Fatalf("lock manager = %#v, want *redislock.Manager", deps.LockManager)
+		t.Fatalf("lock manager = %#v, want *redisadapter.Manager", deps.LockManager)
 	}
 	if _, ok := interface{}(deps.VersionStore).(interface {
 		Current(context.Context, string) (uint64, error)

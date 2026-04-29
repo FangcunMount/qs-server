@@ -27,11 +27,11 @@ import (
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 )
 
 // ActorModule Actor 模块（测评对象和工作人员）
@@ -73,11 +73,11 @@ type ActorModuleDeps struct {
 	GuardianshipService *iam.GuardianshipService
 	IdentityService     *iam.IdentityService
 	RedisClient         redis.UniversalClient
-	CacheBuilder        *rediskey.Builder
+	CacheBuilder        *keyspace.Builder
 	TesteePolicy        cachepolicy.CachePolicy
 	OperatorAuthz       *iam.OperatorAuthzBundle
 	OperationAccountSvc *iam.OperationAccountService
-	Observer            *cacheobservability.ComponentObserver
+	Observer            *observability.ComponentObserver
 	TopicResolver       eventcatalog.TopicResolver
 	MySQLLimiter        backpressure.Acquirer
 }

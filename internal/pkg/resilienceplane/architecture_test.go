@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 )
 
 func TestResiliencePathsDoNotImportPrometheusDirectly(t *testing.T) {
@@ -18,8 +18,8 @@ func TestResiliencePathsDoNotImportPrometheusDirectly(t *testing.T) {
 	paths := []string{
 		"internal/pkg/middleware",
 		"internal/pkg/backpressure",
-		"internal/pkg/redislock",
-		"internal/pkg/redisplane",
+		"internal/pkg/locklease/redisadapter",
+		"internal/pkg/cacheplane",
 		"internal/collection-server/application/answersheet",
 		"internal/collection-server/infra/redisops",
 		"internal/worker/handlers",
@@ -43,15 +43,93 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if strings.HasPrefix(rel, "internal/pkg/redislock/") {
+		if strings.HasPrefix(rel, "internal/pkg/locklease/redisadapter/") {
 			return
 		}
 		for _, imported := range file.Imports {
 			if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/component-base/pkg/redis/lease" {
-				t.Fatalf("%s imports component-base redis lease directly; use internal/pkg/redislock", rel)
+				t.Fatalf("%s imports component-base redis lease directly; use internal/pkg/locklease port", rel)
 			}
 		}
 	})
+}
+
+func TestBusinessCodeDoesNotImportRedisLockAdapterDirectly(t *testing.T) {
+	root := repoRoot(t)
+	allowed := map[string]struct{}{
+		"internal/pkg/cacheplane/bootstrap":   {},
+		"internal/pkg/locklease/redisadapter": {},
+		"internal/apiserver/cachebootstrap":   {},
+		"internal/pkg/resilienceplane":        {},
+		"internal/pkg/configcontract":         {},
+		"internal/collection-server/process":  {},
+		"internal/worker/process":             {},
+	}
+	scanGoFiles(t, filepath.Join(root, "internal"), func(path string, file *ast.File) {
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.HasSuffix(rel, "_test.go") {
+			return
+		}
+		for prefix := range allowed {
+			if strings.HasPrefix(rel, prefix+"/") {
+				return
+			}
+		}
+		for _, imported := range file.Imports {
+			if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter" {
+				t.Fatalf("%s imports redislock adapter directly; use internal/pkg/locklease port", rel)
+			}
+		}
+	})
+}
+
+func TestProductionCodeDoesNotImportTopLevelRedisPackages(t *testing.T) {
+	root := repoRoot(t)
+	scanGoFiles(t, filepath.Join(root, "internal"), func(path string, file *ast.File) {
+		rel, err := filepath.Rel(root, path)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.HasSuffix(rel, "_test.go") {
+			return
+		}
+		for _, imported := range file.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/pkg/redis") {
+				t.Fatalf("%s imports top-level redis package %s; use cacheplane, cachegovernance, locklease, or layer-local redisadapter", rel, importPath)
+			}
+		}
+	})
+}
+
+func TestBusinessCodeDoesNotImportGoRedisDirectly(t *testing.T) {
+	root := repoRoot(t)
+	paths := []string{
+		"internal/apiserver/application",
+		"internal/apiserver/cachetarget",
+		"internal/apiserver/domain",
+		"internal/collection-server/application",
+		"internal/worker/handlers",
+	}
+	for _, relRoot := range paths {
+		scanGoFiles(t, filepath.Join(root, relRoot), func(path string, file *ast.File) {
+			rel, err := filepath.Rel(root, path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if strings.HasSuffix(rel, "_test.go") {
+				return
+			}
+			for _, imported := range file.Imports {
+				if strings.Trim(imported.Path.Value, `"`) == "github.com/redis/go-redis/v9" {
+					t.Fatalf("%s imports go-redis directly; business code should depend on cache, governance, lock, or ratelimit ports", rel)
+				}
+			}
+		})
+	}
 }
 
 func TestBackpressureIsNotConfiguredThroughPackageGlobals(t *testing.T) {
@@ -95,14 +173,14 @@ func TestRateLimitEntrypointsUseDecisionAdapter(t *testing.T) {
 	}
 }
 
-func TestRedisLockSpecsHaveResilienceSemantics(t *testing.T) {
-	specs := []redislock.Spec{
-		redislock.Specs.AnswersheetProcessing,
-		redislock.Specs.PlanSchedulerLeader,
-		redislock.Specs.StatisticsSyncLeader,
-		redislock.Specs.StatisticsSync,
-		redislock.Specs.BehaviorPendingReconcile,
-		redislock.Specs.CollectionSubmit,
+func TestLockLeaseSpecsHaveResilienceSemantics(t *testing.T) {
+	specs := []locklease.Spec{
+		locklease.Specs.AnswersheetProcessing,
+		locklease.Specs.PlanSchedulerLeader,
+		locklease.Specs.StatisticsSyncLeader,
+		locklease.Specs.StatisticsSync,
+		locklease.Specs.BehaviorPendingReconcile,
+		locklease.Specs.CollectionSubmit,
 	}
 	for _, spec := range specs {
 		if spec.Name == "" {

@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -20,18 +20,18 @@ const defaultPlanCacheTTL = 2 * time.Hour
 // 实现 plan.AssessmentPlanRepository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedPlanRepository struct {
 	repo     plan.AssessmentPlanRepository
-	keys     *rediskey.Builder
+	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
-	observer *cacheobservability.ComponentObserver
+	observer *observability.ComponentObserver
 	store    *ObjectCacheStore[plan.AssessmentPlan]
 }
 
 // NewCachedPlanRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的计划缓存 Repository。
-func NewCachedPlanRepositoryWithBuilderAndPolicy(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy) plan.AssessmentPlanRepository {
+func NewCachedPlanRepositoryWithBuilderAndPolicy(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) plan.AssessmentPlanRepository {
 	return NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *rediskey.Builder, policy cachepolicy.CachePolicy, observer *cacheobservability.ComponentObserver) plan.AssessmentPlanRepository {
+func NewCachedPlanRepositoryWithBuilderPolicyAndObserver(repo plan.AssessmentPlanRepository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) plan.AssessmentPlanRepository {
 	if builder == nil {
 		panic("redis builder is required")
 	}

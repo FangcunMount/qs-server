@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -23,9 +23,9 @@ type actorLookupClient interface {
 
 // IdempotencyGuard protects cross-instance submit idempotency for the same request key.
 type IdempotencyGuard interface {
-	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *redislock.Lease, acquired bool, err error)
-	Complete(ctx context.Context, key string, lease *redislock.Lease, answerSheetID string) error
-	Abort(ctx context.Context, key string, lease *redislock.Lease) error
+	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *locklease.Lease, acquired bool, err error)
+	Complete(ctx context.Context, key string, lease *locklease.Lease, answerSheetID string) error
+	Abort(ctx context.Context, key string, lease *locklease.Lease) error
 }
 
 type answerSheetGateway interface {

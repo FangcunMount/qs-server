@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 // Validate 验证命令行参数
@@ -22,15 +22,15 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 
-	errs = append(errs, redisplane.ValidateRuntimeOptions(
+	errs = append(errs, cacheplane.ValidateRuntimeOptions(
 		o.RedisRuntime,
-		[]redisplane.Family{
-			redisplane.FamilyStatic,
-			redisplane.FamilyObject,
-			redisplane.FamilyQuery,
-			redisplane.FamilyMeta,
-			redisplane.FamilySDK,
-			redisplane.FamilyLock,
+		[]cacheplane.Family{
+			cacheplane.FamilyStatic,
+			cacheplane.FamilyObject,
+			cacheplane.FamilyQuery,
+			cacheplane.FamilyMeta,
+			cacheplane.FamilySDK,
+			cacheplane.FamilyLock,
 		},
 		o.RedisProfiles,
 		"redis_runtime",

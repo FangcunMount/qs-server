@@ -8,9 +8,9 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheobservability"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
-	"github.com/FangcunMount/qs-server/internal/pkg/redislock"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 )
 
 type statisticsSyncService interface {
@@ -34,8 +34,8 @@ func NewStatisticsSyncRunner(
 	opts *apiserveroptions.StatisticsSyncOptions,
 	syncService statisticsSyncService,
 	warmupCoordinator cachegov.Coordinator,
-	lockManager *redislock.Manager,
-	lockBuilder *rediskey.Builder,
+	lockManager locklease.Manager,
+	lockBuilder *keyspace.Builder,
 ) *StatisticsSyncRunner {
 	return newStatisticsSyncRunnerWithHooks(
 		opts,
@@ -43,10 +43,10 @@ func NewStatisticsSyncRunner(
 		warmupCoordinator,
 		lockManager,
 		lockBuilder,
-		func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error) {
+		func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error) {
 			return lockManager.AcquireSpec(ctx, spec, key, ttl)
 		},
-		func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error {
+		func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error {
 			return lockManager.ReleaseSpec(ctx, spec, key, lease)
 		},
 	)
@@ -56,10 +56,10 @@ func newStatisticsSyncRunnerWithHooks(
 	opts *apiserveroptions.StatisticsSyncOptions,
 	syncService statisticsSyncService,
 	warmupCoordinator cachegov.Coordinator,
-	lockManager *redislock.Manager,
-	lockBuilder *rediskey.Builder,
-	acquireLock func(ctx context.Context, spec redislock.Spec, key string, ttl time.Duration) (*redislock.Lease, bool, error),
-	releaseLock func(ctx context.Context, spec redislock.Spec, key string, lease *redislock.Lease) error,
+	lockManager locklease.Manager,
+	lockBuilder *keyspace.Builder,
+	acquireLock func(ctx context.Context, spec locklease.Spec, key string, ttl time.Duration) (*locklease.Lease, bool, error),
+	releaseLock func(ctx context.Context, spec locklease.Spec, key string, lease *locklease.Lease) error,
 ) *StatisticsSyncRunner {
 	if opts == nil || !opts.Enable {
 		return nil
@@ -90,7 +90,7 @@ func newStatisticsSyncRunnerWithHooks(
 		return nil
 	}
 	if lockManager == nil {
-		cacheobservability.ObserveLockDegraded("statistics_sync_leader", "redis_unavailable")
+		observability.ObserveLockDegraded("statistics_sync_leader", "redis_unavailable")
 		log.Warnf("statistics sync scheduler not started (HA lock unavailable: redis client unavailable)")
 		return nil
 	}
@@ -104,7 +104,7 @@ func newStatisticsSyncRunnerWithHooks(
 		syncService:       syncService,
 		warmupCoordinator: warmupCoordinator,
 		leader: newLeaderLock(
-			redislock.Specs.StatisticsSyncLeader,
+			locklease.Specs.StatisticsSyncLeader,
 			opts.LockKey,
 			opts.LockTTL,
 			lockBuilder,

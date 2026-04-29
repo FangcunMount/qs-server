@@ -7,9 +7,10 @@ import (
 	"time"
 
 	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -23,7 +24,7 @@ func TestScaleListCacheCompressedRoundTrip(t *testing.T) {
 		mr.Close()
 	})
 
-	builder := rediskey.NewBuilderWithNamespace("scale-list-test")
+	builder := keyspace.NewBuilderWithNamespace("scale-list-test")
 	repo := &scaleListCacheRepo{
 		count: 2,
 		pages: map[int][]*domainscale.MedicalScale{
@@ -33,7 +34,7 @@ func TestScaleListCacheCompressedRoundTrip(t *testing.T) {
 			},
 		},
 	}
-	cache := NewScaleListCacheWithPolicyAndKeyBuilder(client, repo, nil, builder, cachepolicy.CachePolicy{
+	cache := NewScaleListCacheWithPolicyAndKeyBuilder(cacheentry.NewRedisCache(client), repo, nil, builder, cachepolicy.CachePolicy{
 		TTL:      time.Minute,
 		Compress: cachepolicy.PolicySwitchEnabled,
 	})
@@ -72,10 +73,10 @@ func TestScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
 	})
 
 	cache := NewScaleListCacheWithPolicyAndKeyBuilder(
-		client,
+		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{},
 		nil,
-		rediskey.NewBuilderWithNamespace("scale-list-miss"),
+		keyspace.NewBuilderWithNamespace("scale-list-miss"),
 		cachepolicy.CachePolicy{},
 	)
 	if result, ok := cache.GetPage(ctx, 1, 10); ok || result != nil {
@@ -87,10 +88,10 @@ func TestScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
 		t.Fatalf("Close() error = %v", err)
 	}
 	errorCache := NewScaleListCacheWithPolicyAndKeyBuilder(
-		closedClient,
+		cacheentry.NewRedisCache(closedClient),
 		&scaleListCacheRepo{},
 		nil,
-		rediskey.NewBuilderWithNamespace("scale-list-error"),
+		keyspace.NewBuilderWithNamespace("scale-list-error"),
 		cachepolicy.CachePolicy{},
 	)
 	if result, ok := errorCache.GetPage(ctx, 1, 10); ok || result != nil {
@@ -107,14 +108,14 @@ func TestScaleListCacheRebuildDeletesCacheWhenListEmpty(t *testing.T) {
 		mr.Close()
 	})
 
-	builder := rediskey.NewBuilderWithNamespace("scale-list-empty")
+	builder := keyspace.NewBuilderWithNamespace("scale-list-empty")
 	key := builder.BuildScaleListKey()
 	if err := client.Set(ctx, key, []byte("stale"), time.Minute).Err(); err != nil {
 		t.Fatalf("redis Set() error = %v", err)
 	}
 
 	cache := NewScaleListCacheWithPolicyAndKeyBuilder(
-		client,
+		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{count: 0},
 		nil,
 		builder,
@@ -137,9 +138,9 @@ func TestScaleListCacheGetPageUsesLocalMemoryAfterRedisHit(t *testing.T) {
 		mr.Close()
 	})
 
-	builder := rediskey.NewBuilderWithNamespace("scale-list-memory")
+	builder := keyspace.NewBuilderWithNamespace("scale-list-memory")
 	cache := NewScaleListCacheWithPolicyAndKeyBuilder(
-		client,
+		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{
 			count: 1,
 			pages: map[int][]*domainscale.MedicalScale{

@@ -1,32 +1,28 @@
 package cachegovernance
 
-import "github.com/FangcunMount/qs-server/internal/pkg/redisplane"
+import "github.com/FangcunMount/qs-server/internal/apiserver/cachemodel"
 
 // FamilyRuntime 只暴露预热治理需要的 family 运行时能力。
 type FamilyRuntime interface {
-	AllowWarmup(family redisplane.Family) bool
+	AllowWarmup(family cachemodel.Family) bool
 }
 
 type familyRuntime struct {
-	handles map[redisplane.Family]*redisplane.Handle
+	families map[cachemodel.Family]bool
 }
 
-// NewFamilyRuntime 基于已解析的 redis family handle 创建最小运行时视图。
-func NewFamilyRuntime(handles ...*redisplane.Handle) FamilyRuntime {
-	runtime := &familyRuntime{handles: make(map[redisplane.Family]*redisplane.Handle, len(handles))}
-	for _, handle := range handles {
-		if handle == nil {
-			continue
-		}
-		runtime.handles[handle.Family] = handle
+// NewFamilyRuntime creates the minimal runtime view required by cache governance.
+func NewFamilyRuntime(families map[cachemodel.Family]bool) FamilyRuntime {
+	runtime := &familyRuntime{families: make(map[cachemodel.Family]bool, len(families))}
+	for family, allow := range families {
+		runtime.families[family] = allow
 	}
 	return runtime
 }
 
-func (r *familyRuntime) AllowWarmup(family redisplane.Family) bool {
+func (r *familyRuntime) AllowWarmup(family cachemodel.Family) bool {
 	if r == nil {
 		return false
 	}
-	handle := r.handles[family]
-	return handle != nil && handle.AllowWarmup
+	return r.families[family]
 }

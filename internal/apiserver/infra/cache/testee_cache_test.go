@@ -7,14 +7,14 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/rediskey"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
 )
 
 func TestCachedTesteeRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
-	repo := NewCachedTesteeRepositoryWithBuilderAndPolicy(nil, nil, rediskey.NewBuilderWithNamespace("prod:cache:object"), cachepolicy.CachePolicy{})
+	repo := NewCachedTesteeRepositoryWithBuilderAndPolicy(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:object"), cachepolicy.CachePolicy{})
 	cached, ok := repo.(*CachedTesteeRepository)
 	if !ok {
 		t.Fatalf("unexpected repository type %T", repo)
@@ -38,7 +38,7 @@ func TestCachedTesteeRepositoryCachesNegativeResult(t *testing.T) {
 	cached := NewCachedTesteeRepositoryWithBuilderAndPolicy(
 		repo,
 		client,
-		rediskey.NewBuilderWithNamespace("test-ns"),
+		keyspace.NewBuilderWithNamespace("test-ns"),
 		cachepolicy.CachePolicy{
 			Negative:    cachepolicy.PolicySwitchEnabled,
 			NegativeTTL: time.Minute,
