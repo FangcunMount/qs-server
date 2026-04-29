@@ -552,7 +552,12 @@ LIMIT %d`, limit))
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Panicln("rows close err: ", err)
+		}
+	}()
 	for rows.Next() {
 		var taskID, planID, testeeID, assessmentID, answerSheetID uint64
 		var completedAt sql.NullTime
