@@ -12,6 +12,7 @@ import (
 
 	"github.com/go-sql-driver/mysql"
 	redis "github.com/redis/go-redis/v9"
+	"github.com/redis/go-redis/v9/maintnotifications"
 )
 
 // rebuild_statistics rebuilds statistics-side derived data from repaired source facts.
@@ -37,7 +38,9 @@ type config struct {
 	apply            bool
 	skipBackup       bool
 	clearPending     bool
+	cacheCleanupOnly bool
 	redisAddr        string
+	redisUsername    string
 	redisPassword    string
 	redisDB          int
 	redisKeyPattern  string
@@ -54,6 +57,13 @@ func main() {
 
 	ctx, cancel := context.WithTimeout(context.Background(), cfg.timeout)
 	defer cancel()
+
+	if cfg.cacheCleanupOnly {
+		if err := cleanupRedisStatsCache(ctx, cfg); err != nil {
+			log.Fatalf("cleanup redis stats cache: %v", err)
+		}
+		return
+	}
 
 	db, err := openMySQL(cfg.mysqlDSN)
 	if err != nil {
@@ -109,7 +119,10 @@ func main() {
 	}
 	if !cfg.skipCacheCleanup && strings.TrimSpace(cfg.redisAddr) != "" {
 		if err := cleanupRedisStatsCache(ctx, cfg); err != nil {
-			log.Fatalf("cleanup redis stats cache: %v", err)
+			log.Printf("cleanup redis stats cache failed; database rebuild already completed: %v", err)
+		} else {
+			log.Print("statistics rebuild completed")
+			return
 		}
 	}
 
@@ -128,13 +141,21 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.apply, "apply", false, "apply changes; default is dry-run")
 	flag.BoolVar(&cfg.skipBackup, "skip-backup", false, "skip backup table creation before applying changes")
 	flag.BoolVar(&cfg.clearPending, "clear-pending", false, "mark matching analytics pending checkpoints completed and delete matching analytics_pending_event rows")
+	flag.BoolVar(&cfg.cacheCleanupOnly, "cache-cleanup-only", false, "only clean Redis stats query cache; does not connect to MySQL")
 	flag.StringVar(&cfg.redisAddr, "redis-addr", "", "optional Redis address for stats query cache cleanup, e.g. 127.0.0.1:6379")
+	flag.StringVar(&cfg.redisUsername, "redis-username", "", "optional Redis ACL username")
 	flag.StringVar(&cfg.redisPassword, "redis-password", "", "optional Redis password")
 	flag.IntVar(&cfg.redisDB, "redis-db", 0, "optional Redis DB")
 	flag.StringVar(&cfg.redisKeyPattern, "redis-key-pattern", "*stats:query*", "Redis SCAN pattern used when --redis-addr is set")
 	flag.BoolVar(&cfg.skipCacheCleanup, "skip-cache-cleanup", false, "skip Redis stats query cache cleanup")
 	flag.Parse()
 
+	if cfg.cacheCleanupOnly {
+		if strings.TrimSpace(cfg.redisAddr) == "" {
+			log.Fatal("--redis-addr is required with --cache-cleanup-only")
+		}
+		return cfg
+	}
 	if strings.TrimSpace(cfg.mysqlDSN) == "" {
 		log.Fatal("--mysql-dsn is required")
 	}
@@ -436,9 +457,11 @@ func rebuildTraditionalStatistics(ctx context.Context, conn *sql.Conn) error {
 func cleanupRedisStatsCache(ctx context.Context, cfg config) error {
 	log.Printf("cleanup redis stats query cache addr=%s pattern=%s", cfg.redisAddr, cfg.redisKeyPattern)
 	client := redis.NewClient(&redis.Options{
-		Addr:     cfg.redisAddr,
-		Password: cfg.redisPassword,
-		DB:       cfg.redisDB,
+		Addr:                     cfg.redisAddr,
+		Username:                 cfg.redisUsername,
+		Password:                 cfg.redisPassword,
+		DB:                       cfg.redisDB,
+		MaintNotificationsConfig: &maintnotifications.Config{Mode: maintnotifications.ModeDisabled},
 	})
 	defer func() { _ = client.Close() }()
 	if err := client.Ping(ctx).Err(); err != nil {
