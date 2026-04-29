@@ -112,12 +112,12 @@ func (b *Builder) BuildWeChatCacheKey(key string) string {
 	return NewCacheKeyspace(b.namespace()).WeChatSDK(key)
 }
 
-func (b *Builder) prefix(key string) string {
-	if b == nil {
-		return AddNamespace(key)
-	}
-	return b.keyspace.Prefix(key)
-}
+// func (b *Builder) prefix(key string) string {
+// 	if b == nil {
+// 		return AddNamespace(key)
+// 	}
+// 	return b.keyspace.Prefix(key)
+// }
 
 func (b *Builder) namespace() string {
 	if b == nil {

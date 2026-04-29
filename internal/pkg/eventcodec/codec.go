@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-const occurredAtLayout = basecodec.OccurredAtLayout
+// const occurredAtLayout = basecodec.OccurredAtLayout
 
 type Envelope = basecodec.Envelope
 
