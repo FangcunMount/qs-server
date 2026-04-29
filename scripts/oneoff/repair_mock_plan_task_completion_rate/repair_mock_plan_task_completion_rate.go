@@ -18,26 +18,28 @@ import (
 )
 
 type config struct {
-	mysqlDSN         string
-	orgID            int64
-	planID           uint64
-	allPlans         bool
-	groupByPlan      bool
-	taskCreatedStart *time.Time
-	taskCreatedEnd   *time.Time
-	plannedStart     *time.Time
-	plannedEnd       *time.Time
-	minRate          float64
-	maxRate          float64
-	targetRate       float64
-	seed             string
-	downgradeStatus  string
-	includeUnlinked  bool
-	backupSuffix     string
-	previewLimit     int
-	timeout          time.Duration
-	apply            bool
-	rebuildStats     bool
+	mysqlDSN           string
+	orgID              int64
+	planID             uint64
+	allPlans           bool
+	groupByPlan        bool
+	taskCreatedStart   *time.Time
+	taskCreatedEnd     *time.Time
+	taskCompletedStart *time.Time
+	taskCompletedEnd   *time.Time
+	plannedStart       *time.Time
+	plannedEnd         *time.Time
+	minRate            float64
+	maxRate            float64
+	targetRate         float64
+	seed               string
+	downgradeStatus    string
+	includeUnlinked    bool
+	backupSuffix       string
+	previewLimit       int
+	timeout            time.Duration
+	apply              bool
+	rebuildStats       bool
 }
 
 type scopeSummary struct {
@@ -140,6 +142,7 @@ func main() {
 func parseFlags() config {
 	var cfg config
 	var taskCreatedStartRaw, taskCreatedEndRaw string
+	var taskCompletedStartRaw, taskCompletedEndRaw string
 	var plannedStartRaw, plannedEndRaw string
 
 	flag.StringVar(&cfg.mysqlDSN, "mysql-dsn", "", "MySQL DSN, e.g. user:pass@tcp(host:3306)/qs?parseTime=true&loc=Local")
@@ -149,6 +152,8 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.groupByPlan, "group-by-plan", false, "calculate completion rate per testee+plan instead of per testee")
 	flag.StringVar(&taskCreatedStartRaw, "task-created-start", "", "optional inclusive task created_at start, format 2006-01-02 or 2006-01-02 15:04:05")
 	flag.StringVar(&taskCreatedEndRaw, "task-created-end", "", "optional exclusive task created_at end")
+	flag.StringVar(&taskCompletedStartRaw, "task-completed-start", "", "optional inclusive completed_at start for downgrade candidates only")
+	flag.StringVar(&taskCompletedEndRaw, "task-completed-end", "", "optional exclusive completed_at end for downgrade candidates only")
 	flag.StringVar(&plannedStartRaw, "planned-start", "", "optional inclusive planned_at start")
 	flag.StringVar(&plannedEndRaw, "planned-end", "", "optional exclusive planned_at end")
 	flag.Float64Var(&cfg.minRate, "min-rate", 0.30, "lower completion-rate bound used for validation")
@@ -189,11 +194,15 @@ func parseFlags() config {
 
 	cfg.taskCreatedStart = parseOptionalTimeFlag("--task-created-start", taskCreatedStartRaw)
 	cfg.taskCreatedEnd = parseOptionalTimeFlag("--task-created-end", taskCreatedEndRaw)
+	cfg.taskCompletedStart = parseOptionalTimeFlag("--task-completed-start", taskCompletedStartRaw)
+	cfg.taskCompletedEnd = parseOptionalTimeFlag("--task-completed-end", taskCompletedEndRaw)
 	cfg.plannedStart = parseOptionalTimeFlag("--planned-start", plannedStartRaw)
 	cfg.plannedEnd = parseOptionalTimeFlag("--planned-end", plannedEndRaw)
 	requirePairedRange("--task-created-start", cfg.taskCreatedStart, "--task-created-end", cfg.taskCreatedEnd)
+	requirePairedRange("--task-completed-start", cfg.taskCompletedStart, "--task-completed-end", cfg.taskCompletedEnd)
 	requirePairedRange("--planned-start", cfg.plannedStart, "--planned-end", cfg.plannedEnd)
 	requireBefore("--task-created", cfg.taskCreatedStart, cfg.taskCreatedEnd)
+	requireBefore("--task-completed", cfg.taskCompletedStart, cfg.taskCompletedEnd)
 	requireBefore("--planned", cfg.plannedStart, cfg.plannedEnd)
 	return cfg
 }
@@ -231,15 +240,18 @@ func prepareGroupStats(ctx context.Context, conn *sql.Conn, cfg config) error {
 	if cfg.groupByPlan {
 		groupPlanExpr = "t.plan_id"
 	}
+	candidateFilter, candidateArgs := buildCompletedCandidateFilter(cfg, "t")
 	eligibleCompletedExpr := `
         (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)
+` + candidateFilter + `
          AND t.assessment_id IS NOT NULL
          AND a.id IS NOT NULL
          AND a.origin_type COLLATE utf8mb4_unicode_ci = 'plan' COLLATE utf8mb4_unicode_ci
          AND a.origin_id COLLATE utf8mb4_unicode_ci = CAST(t.plan_id AS CHAR) COLLATE utf8mb4_unicode_ci`
 	if cfg.includeUnlinked {
 		eligibleCompletedExpr = `
-        (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)`
+        (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)
+` + candidateFilter
 	}
 	where, args := buildTaskFilters(cfg, "t")
 	query := fmt.Sprintf(`
@@ -282,6 +294,7 @@ WHERE g.total_tasks > 0
   AND g.completed_tasks / g.total_tasks > ?
   AND LEAST(g.eligible_completed_tasks, GREATEST(g.completed_tasks - g.keep_completed_tasks, 0)) > 0`, groupPlanExpr, eligibleCompletedExpr, where)
 	allArgs := []any{cfg.minRate, cfg.maxRate, cfg.targetRate}
+	allArgs = append(allArgs, candidateArgs...)
 	allArgs = append(allArgs, args...)
 	allArgs = append(allArgs, cfg.maxRate)
 	_, err := conn.ExecContext(ctx, query, allArgs...)
@@ -309,6 +322,7 @@ func prepareTaskScope(ctx context.Context, conn *sql.Conn, cfg config) error {
    AND a.deleted_at IS NULL`
 		eligibleTaskCondition = ""
 	}
+	candidateFilter, candidateArgs := buildCompletedCandidateFilter(cfg, "t")
 	where, args := buildTaskFilters(cfg, "t")
 	if _, err := conn.ExecContext(ctx, `
 CREATE TEMPORARY TABLE repair_mock_task_completion_scope (
@@ -415,10 +429,12 @@ FROM (
   WHERE %s
     AND (t.status COLLATE utf8mb4_unicode_ci = 'completed' COLLATE utf8mb4_unicode_ci OR t.completed_at IS NOT NULL)
     %s
+    %s
 ) ranked
-WHERE ranked.repair_rank <= ranked.downgrade_tasks`, groupPlanExpr, groupPlanExpr, groupPlanExpr, assessmentJoin, where, eligibleTaskCondition)
+WHERE ranked.repair_rank <= ranked.downgrade_tasks`, groupPlanExpr, groupPlanExpr, groupPlanExpr, assessmentJoin, where, candidateFilter, eligibleTaskCondition)
 	allArgs := []any{cfg.seed}
 	allArgs = append(allArgs, args...)
+	allArgs = append(allArgs, candidateArgs...)
 	_, err := conn.ExecContext(ctx, query, allArgs...)
 	return err
 }
@@ -447,6 +463,23 @@ func buildTaskFilters(cfg config, alias string) (string, []any) {
 		args = append(args, *cfg.plannedEnd)
 	}
 	return strings.Join(conditions, " AND "), args
+}
+
+func buildCompletedCandidateFilter(cfg config, alias string) (string, []any) {
+	conditions := make([]string, 0, 2)
+	args := make([]any, 0, 2)
+	if cfg.taskCompletedStart != nil {
+		conditions = append(conditions, fmt.Sprintf("%s.completed_at >= ?", alias))
+		args = append(args, *cfg.taskCompletedStart)
+	}
+	if cfg.taskCompletedEnd != nil {
+		conditions = append(conditions, fmt.Sprintf("%s.completed_at < ?", alias))
+		args = append(args, *cfg.taskCompletedEnd)
+	}
+	if len(conditions) == 0 {
+		return "", nil
+	}
+	return "AND " + strings.Join(conditions, " AND "), args
 }
 
 func loadSummary(ctx context.Context, conn *sql.Conn, cfg config) (scopeSummary, error) {
