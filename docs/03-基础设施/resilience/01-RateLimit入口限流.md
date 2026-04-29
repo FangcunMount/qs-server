@@ -8,7 +8,7 @@
 | ---- | -------- |
 | 决策模型 | [`ratelimit.RateLimitPolicy / RateLimitDecision`](../../../internal/pkg/ratelimit/model.go) |
 | 本地限流 | [`ratelimit.LocalLimiter`](../../../internal/pkg/ratelimit/local.go)，进程内 token bucket |
-| 分布式限流 | collection-server 优先使用 [`ratelimit.RedisLimiter`](../../../internal/pkg/ratelimit/redis.go) 包装 [`redisplane.DistributedLimiter`](../../../internal/pkg/redisplane/ratelimiter.go) |
+| 分布式限流 | collection-server 优先使用 [`ratelimit.NewDistributedLimiter`](../../../internal/pkg/ratelimit/distributed.go) 包装 [`ratelimit/redisadapter.NewBackend`](../../../internal/pkg/ratelimit/redisadapter/redis_backend.go) |
 | 超限行为 | HTTP `429` + `Retry-After` |
 | Redis 错误 | collection 分布式 limiter fail-open，继续请求 |
 | 观测 | `resilienceplane` 记录 `allowed / rate_limited / degraded_open` |
@@ -58,12 +58,12 @@ sequenceDiagram
 
 - Rate Limit 模型与测试：[`internal/pkg/ratelimit`](../../../internal/pkg/ratelimit/)
 - Gin adapter 与测试：[`internal/pkg/middleware`](../../../internal/pkg/middleware/)
-- Redis token bucket 与测试：[`internal/pkg/redisplane/ratelimiter.go`](../../../internal/pkg/redisplane/ratelimiter.go)
+- Redis token bucket 与测试：[`internal/pkg/ratelimit/redisadapter`](../../../internal/pkg/ratelimit/redisadapter/)
 - collection 挂载点：[`internal/collection-server/transport/rest/router.go`](../../../internal/collection-server/transport/rest/router.go)
 - apiserver 挂载点：[`internal/apiserver/transport/rest/router.go`](../../../internal/apiserver/transport/rest/router.go)
 
 ## Verify
 
 ```bash
-go test ./internal/pkg/ratelimit ./internal/pkg/middleware ./internal/pkg/redisplane
+go test ./internal/pkg/ratelimit/... ./internal/pkg/middleware
 ```

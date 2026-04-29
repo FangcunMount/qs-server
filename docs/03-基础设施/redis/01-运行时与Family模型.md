@@ -6,10 +6,10 @@
 
 | 概念 | 说明 | 代码 |
 | ---- | ---- | ---- |
-| Family | 逻辑 Redis workload，如 `static_meta`、`lock_lease` | [redisplane/catalog.go](../../../internal/pkg/redisplane/catalog.go) |
+| Family | 逻辑 Redis workload，如 `static_meta`、`lock_lease` | [cacheplane/catalog.go](../../../internal/pkg/cacheplane/catalog.go) |
 | Profile | 物理 Redis 配置名，如 `static_cache`、`lock_cache` | `configs/*.yaml` |
-| Namespace | family-scoped key 前缀 | [rediskey/builder.go](../../../internal/pkg/rediskey/builder.go) |
-| RuntimeBundle | 进程内 family handles + lock manager + status registry | [redisbootstrap/runtime.go](../../../internal/pkg/redisbootstrap/runtime.go) |
+| Namespace | family-scoped key 前缀 | [cacheplane/keyspace/builder.go](../../../internal/pkg/cacheplane/keyspace/builder.go) |
+| RuntimeBundle | 进程内 family handles + lock manager + status registry | [cacheplane/bootstrap/runtime.go](../../../internal/pkg/cacheplane/bootstrap/runtime.go) |
 | Fallback | family profile 不可用时是否允许回退 default Redis | [options/redis_runtime_options.go](../../../internal/pkg/options/redis_runtime_options.go) |
 
 ## Family / Profile / Namespace 模型
@@ -57,10 +57,10 @@ classDiagram
 sequenceDiagram
     participant P as process/resource_bootstrap
     participant DB as DatabaseManager
-    participant RB as redisbootstrap.BuildRuntime
-    participant RP as redisplane.Runtime
+    participant RB as cacheplane/bootstrap.BuildRuntime
+    participant RP as cacheplane.Runtime
     participant OBS as FamilyStatusRegistry
-    participant LM as redislock.Manager
+    participant LM as locklease.Manager
 
     P->>DB: GetRedisClient(profile)
     P->>RB: Options{Component, RuntimeOptions, Defaults, Resolver}

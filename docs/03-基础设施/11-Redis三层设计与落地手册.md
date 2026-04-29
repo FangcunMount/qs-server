@@ -15,7 +15,7 @@
 
 ```mermaid
 flowchart LR
-    Foundation["Foundation\nredisplane / redisbootstrap"] --> Cache["Cache"]
+    Foundation["Foundation\ncacheplane / cacheplane/bootstrap"] --> Cache["Cache"]
     Foundation --> Lock["Lock"]
     Cache --> Governance["Governance"]
     Lock --> Governance
@@ -27,14 +27,14 @@ flowchart LR
 - 新增 object cache：先定义 `cachepolicy`，再写 repository decorator，详见 [ObjectCache 主路径](./redis/03-ObjectCache主路径.md)。
 - 新增 query/list cache：优先 version token，不优先扫描删 key，详见 [QueryCache 与 StaticList](./redis/04-QueryCache与StaticList.md)。
 - 新增 warmup target：先定义 `cachetarget.WarmupKind` 和 canonical scope，详见 [Hotset 与 WarmupTarget 模型](./redis/05-Hotset与WarmupTarget模型.md)。
-- 新增分布式锁：先确认不是数据库一致性问题，再新增 `redislock.Spec`，详见 [Redis 分布式锁层](./redis/06-Redis分布式锁层.md)。
+- 新增分布式锁：先确认不是数据库一致性问题，再新增 `locklease.Spec`，详见 [Redis 分布式锁层](./redis/06-Redis分布式锁层.md)。
 - 排障先看 family 状态、endpoint 和 metrics，详见 [观测、降级与排障](./redis/08-观测降级与排障.md)。
 
 ## 当前不支持
 
 | 能力 | 当前状态 |
 | ---- | -------- |
-| Redis lock 自动续租 | 不支持 |
+| Lock lease 自动续租 | 不支持 |
 | Fencing token | 不支持 |
 | collection-server 领域读缓存 | 不支持 |
 | worker object/query cache | 不支持 |

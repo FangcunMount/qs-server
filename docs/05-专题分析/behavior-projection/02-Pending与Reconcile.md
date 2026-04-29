@@ -99,7 +99,7 @@ stateDiagram-v2
 - pending 状态与 backoff：[internal/apiserver/application/statistics/journey.go](../../../internal/apiserver/application/statistics/journey.go)
 - scheduler leader lock：[internal/apiserver/runtime/scheduler/](../../../internal/apiserver/runtime/scheduler/)
 - MySQL repository：[internal/apiserver/infra/mysql/statistics/journey_repository.go](../../../internal/apiserver/infra/mysql/statistics/journey_repository.go)
-- Resilience lock 文档：[../../03-基础设施/resilience/04-RedisLock幂等与重复抑制.md](../../03-基础设施/resilience/04-RedisLock幂等与重复抑制.md)
+- Resilience lock 文档：[../../03-基础设施/resilience/04-LockLease幂等与重复抑制.md](../../03-基础设施/resilience/04-LockLease幂等与重复抑制.md)
 
 ## Verify
 

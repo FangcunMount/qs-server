@@ -188,7 +188,7 @@ flowchart LR
 
 这些指标的定义与低基数标签约束在：
 
-- [internal/pkg/cacheobservability](../../internal/pkg/cacheobservability/)
+- [internal/pkg/cachegovernance/observability](../../internal/pkg/cachegovernance/observability/)
 
 `worker` 不提供 apiserver 风格的 `/internal/v1/...` 路由；metrics server 启用时，Redis 与 Resilience 只读摘要分别通过 `/governance/redis`、`/governance/resilience` 暴露，趋势仍看 `/metrics` 与 Grafana。
 

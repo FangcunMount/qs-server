@@ -10,7 +10,7 @@
 | query cache | `infra/cachequery` versioned query | version token、local hot、Redis fallback |
 | static-list cache | application rebuilder + `cacheentry` + `cachequery.LocalHotCache` | rebuild、empty delete、memory hit |
 | warmup target | `cachetarget` + `cachegovernance` bindings | kind/scope/family/org guard |
-| LockSpec | `redislock` + 调用方 helper | acquire/contention/release/TTL |
+| LockSpec | `locklease` + 调用方 helper | acquire/contention/release/TTL |
 | operating BFF | internal REST proxy | kind/scope whitelist、org guard、error passthrough |
 
 ## 决策流程
@@ -40,7 +40,7 @@ flowchart TD
 1. 在 `cachepolicy` 中定义 `PolicyKey`、family 和默认策略。
 2. 在 repository 外层新增 `Cached*Repository`，保持原 repository 接口。
 3. 使用 `ObjectCacheStore` 和 `ReadThroughObject`。
-4. key 使用 `rediskey.Builder`。
+4. key 使用 `cacheplane/keyspace.Builder`。
 5. 写路径定义失效点。
 6. 补测试：
    - positive hit
@@ -85,10 +85,10 @@ sequenceDiagram
 ## 新增 LockSpec
 
 1. 先确认不是数据库唯一性或事务问题。
-2. 在 `redislock/spec.go` 增加 spec。
+2. 在 `locklease/lease.go` 增加 spec。
 3. 明确 TTL 覆盖的 critical section。
 4. 明确 contention 语义：skip、duplicate、retry 或 degraded continue。
-5. 在调用方保留业务语义，不把它放进 `redislock`。
+5. 在调用方保留业务语义，不把它放进 `locklease`。
 6. 补 acquire/release/contention/wrong-token/TTL 测试。
 
 ## operating BFF 接入
@@ -113,5 +113,5 @@ sequenceDiagram
 ```bash
 python scripts/check_docs_hygiene.py
 git diff --check
-GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/redisplane ./internal/pkg/redisbootstrap ./internal/pkg/redislock ./internal/pkg/rediskey ./internal/pkg/cacheobservability ./internal/apiserver/cachebootstrap ./internal/apiserver/cachetarget ./internal/apiserver/infra/cache ./internal/apiserver/infra/cacheentry ./internal/apiserver/infra/cachequery ./internal/apiserver/infra/cachehotset ./internal/apiserver/application/cachegovernance ./internal/apiserver/runtime/scheduler ./internal/collection-server/infra/redisops ./internal/worker/handlers
+GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/cacheplane ./internal/pkg/cacheplane/bootstrap ./internal/pkg/locklease ./internal/pkg/cacheplane/keyspace ./internal/pkg/cachegovernance/observability ./internal/apiserver/cachebootstrap ./internal/apiserver/cachetarget ./internal/apiserver/infra/cache ./internal/apiserver/infra/cacheentry ./internal/apiserver/infra/cachequery ./internal/apiserver/infra/cachehotset ./internal/apiserver/application/cachegovernance ./internal/apiserver/runtime/scheduler ./internal/collection-server/infra/redisops ./internal/worker/handlers
 ```

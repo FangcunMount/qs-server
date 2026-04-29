@@ -58,7 +58,7 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64, opts
 	}
 
 	lockName := fmt.Sprintf("statistics:daily:%d:%s:%s", orgID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
-	if err := s.withRedisLock(ctx, lockName, func(lockCtx context.Context) error {
+	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
 		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec(
 				`DELETE FROM statistics_daily
@@ -167,7 +167,7 @@ func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64
 
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
 	lockName := fmt.Sprintf("statistics:accumulated:%d:%s", orgID, todayStart.Format("2006-01-02"))
-	if err := s.withRedisLock(ctx, lockName, func(lockCtx context.Context) error {
+	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
 		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec(
 				`DELETE FROM statistics_accumulated
@@ -216,7 +216,7 @@ func (s *syncService) SyncPlanStatistics(ctx context.Context, orgID int64) error
 
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
 	lockName := fmt.Sprintf("statistics:plan:%d:%s", orgID, todayStart.Format("2006-01-02"))
-	if err := s.withRedisLock(ctx, lockName, func(lockCtx context.Context) error {
+	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
 		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
 			if err := tx.Exec("DELETE FROM statistics_plan WHERE org_id = ?", orgID).Error; err != nil {
 				return err
@@ -458,7 +458,7 @@ func (s *syncService) buildSystemAccumulatedRow(
 	}, nil
 }
 
-func (s *syncService) withRedisLock(ctx context.Context, lockName string, fn func(context.Context) error) error {
+func (s *syncService) withLockLease(ctx context.Context, lockName string, fn func(context.Context) error) error {
 	if s.lockManager == nil {
 		return fmt.Errorf("statistics sync redis lock manager is unavailable")
 	}

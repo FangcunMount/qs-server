@@ -1,6 +1,6 @@
 # Resilience Plane 文档中心
 
-**本文回答**：`qs-server` 的限流、队列、背压、Redis lock、幂等、重复抑制和降级应该从哪里开始读；哪些文档是当前真值层；新增高并发治理能力时应该补哪些源码和测试。
+**本文回答**：`qs-server` 的限流、队列、背压、Lock lease、幂等、重复抑制和降级应该从哪里开始读；哪些文档是当前真值层；新增高并发治理能力时应该补哪些源码和测试。
 
 ## 30 秒结论
 
@@ -21,7 +21,7 @@
 2. [01-RateLimit入口限流](./01-RateLimit入口限流.md)：理解本地与 Redis token bucket。
 3. [02-SubmitQueue提交削峰](./02-SubmitQueue提交削峰.md)：理解 collection 进程内队列。
 4. [03-Backpressure下游背压](./03-Backpressure下游背压.md)：理解 MySQL/Mongo/IAM 并发保护。
-5. [04-RedisLock幂等与重复抑制](./04-RedisLock幂等与重复抑制.md)：区分 leader、idempotency、best-effort gate。
+5. [04-LockLease幂等与重复抑制](./04-LockLease幂等与重复抑制.md)：区分 leader、idempotency、best-effort gate。
 6. [05-观测降级与排障](./05-观测降级与排障.md)：按 outcome 排障。
 7. [06-新增高并发治理能力SOP](./06-新增高并发治理能力SOP.md)：新增能力的测试与文档清单。
 8. [07-能力矩阵](./07-能力矩阵.md)：横向核对每个能力的模型、primitive、outcome 和测试。
@@ -32,7 +32,7 @@
 | ---- | ---- | -------- |
 | `GET /internal/v1/resilience/status` | apiserver 当前限流、背压、scheduler lock capability snapshot | internal admin 只读；不提供调参或 lock release |
 | `GET /governance/resilience` on collection-server | collection rate limit、SubmitQueue、SubmitGuard snapshot | 只读；不提供 queue drain |
-| `GET /governance/resilience` on worker metrics server | worker duplicate suppression 与 Redis lock capability snapshot | 只读；不提供 retry 或 skip 修复 |
+| `GET /governance/resilience` on worker metrics server | worker duplicate suppression 与 Lock lease capability snapshot | 只读；不提供 retry 或 skip 修复 |
 | Grafana `resilience-*` dashboards | `qs_resilience_*` 时序趋势和告警 | 不直接承载治理动作 |
 
 ## 维护模式
@@ -64,6 +64,6 @@ flowchart LR
 ## Verify
 
 - `go test ./internal/pkg/resilienceplane ./internal/pkg/middleware ./internal/pkg/backpressure`
-- `go test ./internal/pkg/redislock ./internal/pkg/redisplane`
+- `go test ./internal/pkg/locklease ./internal/pkg/cacheplane`
 - `go test ./internal/collection-server/application/answersheet ./internal/collection-server/infra/redisops`
 - `go test ./internal/worker/handlers ./internal/apiserver/runtime/scheduler`

@@ -17,13 +17,13 @@
 
 ```mermaid
 flowchart TB
-    Runtime["redisbootstrap.RuntimeBundle"] --> Subsystem["cachebootstrap.Subsystem"]
+    Runtime["cacheplane/bootstrap.RuntimeBundle"] --> Subsystem["cachebootstrap.Subsystem"]
     Options["cache options"] --> Subsystem
     Subsystem --> Policy["PolicyCatalog"]
     Subsystem --> Observer["ComponentObserver"]
     Subsystem --> Builder["Family builders"]
     Subsystem --> Hotset["cachehotset.RedisStore"]
-    Subsystem --> Lock["redislock.Manager"]
+    Subsystem --> Lock["locklease.Manager"]
     Subsystem --> Gov["cachegovernance.Coordinator"]
     Subsystem --> Status["cachegovernance.StatusService"]
 

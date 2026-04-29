@@ -21,13 +21,13 @@ flowchart TD
     docs["补 resilience docs + contract tests"]
 
     start --> entry
-    entry -->|yes| limit["用 middleware / redisplane limiter"]
+    entry -->|yes| limit["用 middleware / cacheplane limiter"]
     entry -->|no| queue
     queue -->|yes| submit["评估 SubmitQueue 或显式业务队列"]
     queue -->|no| dep
     dep -->|yes| bp["用 backpressure limiter"]
     dep -->|no| duplicate
-    duplicate -->|yes| lock["用 redislock primitive + caller-owned semantics"]
+    duplicate -->|yes| lock["用 locklease primitive + caller-owned semantics"]
     duplicate -->|no| design["单独设计，不混入 Resilience Plane"]
     limit --> docs
     submit --> docs
@@ -38,10 +38,10 @@ flowchart TD
 ## 代码步骤
 
 1. 先补 contract test，锁住当前外部语义。
-2. 补或复用模型 / adapter，例如 `RateLimitDecision`、`SubmitQueue`、`backpressure.Acquirer`、`redislock.Spec`、`IdempotencyGuard` 或 `DuplicateSuppressionGate`。
+2. 补或复用模型 / adapter，例如 `RateLimitDecision`、`SubmitQueue`、`backpressure.Acquirer`、`locklease.Spec`、`IdempotencyGuard` 或 `DuplicateSuppressionGate`。
 3. 如果新增观测，只通过 [`resilienceplane.Observer`](../../../internal/pkg/resilienceplane/) 上报 bounded outcome；label 必须保持 bounded。
 4. 如果能力有当前状态，必须补 `RuntimeSnapshot` 或对应 status endpoint 字段；如果能力有趋势价值，必须补 Prometheus rule / Grafana dashboard 或明确为什么不补。
-5. 如果新增 Redis lock spec，必须在 [`redislock.Specs`](../../../internal/pkg/redislock/spec.go) 写清 `Name / Description / DefaultTTL`。
+5. 如果新增 Lock lease spec，必须在 [`locklease.Specs`](../../../internal/pkg/locklease/lease.go) 写清 `Name / Description / DefaultTTL`。
 6. 如果新增队列状态或降级分支，必须写明对 HTTP status、重试、状态查询、Redis key 或进程退出语义的影响。
 7. 如果要改 component-base primitive，先在 component-base 补 contract tests，再同步 qs-server 依赖版本；不要把 qs-server 业务 Resilience 语义上移到 component-base。
 8. 如果新增保护能力，必须更新 [07-能力矩阵](./07-能力矩阵.md)，并更新对应深讲文档的代码锚点与测试锚点。
@@ -68,14 +68,14 @@ flowchart TD
 | Rate limit | `RateLimitDecision` allow/limited、Retry-After、Redis unavailable fallback |
 | Queue | accepted、full、duplicate request_id、failed reuse、TTL cleanup |
 | Backpressure | nil limiter、acquire、timeout、release |
-| Redis lock | invalid spec、contention、wrong-token release、TTL expiry |
+| Lock lease | invalid spec、contention、wrong-token release、TTL expiry |
 | Duplicate suppression | locked executes、contention skip、degraded continue |
 | Docs | `scripts/check_docs_hygiene.py` |
 
 ## Verify
 
 ```bash
-go test ./internal/pkg/resilienceplane ./internal/pkg/middleware ./internal/pkg/backpressure ./internal/pkg/redislock ./internal/pkg/redisplane
+go test ./internal/pkg/resilienceplane ./internal/pkg/middleware ./internal/pkg/backpressure ./internal/pkg/locklease ./internal/pkg/cacheplane
 go test ./internal/collection-server/... ./internal/apiserver/... ./internal/worker/...
 python scripts/check_docs_hygiene.py
 ```

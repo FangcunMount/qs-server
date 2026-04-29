@@ -34,12 +34,12 @@ flowchart LR
 | 文档 | 负责什么 | 先读场景 |
 | ---- | -------- | -------- |
 | [00-整体架构.md](./00-整体架构.md) | Redis 四层架构、三进程职责、包依赖图 | 想建立全局心智模型 |
-| [01-运行时与Family模型.md](./01-运行时与Family模型.md) | `redisplane`、`redisbootstrap`、family/profile/namespace/fallback | 排查 runtime 路由、profile 或 namespace |
+| [01-运行时与Family模型.md](./01-运行时与Family模型.md) | `cacheplane`、`cacheplane/bootstrap`、family/profile/namespace/fallback | 排查 runtime 路由、profile 或 namespace |
 | [02-Cache层总览.md](./02-Cache层总览.md) | `cachebootstrap.Subsystem`、policy、observer、cache 形态分流 | 判断一个缓存应该走哪条主路径 |
 | [03-ObjectCache主路径.md](./03-ObjectCache主路径.md) | object repository decorator、read-through、negative、compression、async writeback | 新增或排查单对象缓存 |
 | [04-QueryCache与StaticList.md](./04-QueryCache与StaticList.md) | version token、versioned query、local hot cache、ScaleListCache | 新增或排查列表/查询缓存 |
 | [05-Hotset与WarmupTarget模型.md](./05-Hotset与WarmupTarget模型.md) | `cachetarget`、hotset ZSet、target scope、采样与 trim | 新增 warmup target 或排查 hotset |
-| [06-Redis分布式锁层.md](./06-Redis分布式锁层.md) | `redislock`、scheduler leader、submit guard、worker duplicate suppression | 新增 LockSpec 或排查多实例互斥 |
+| [06-Redis分布式锁层.md](./06-Redis分布式锁层.md) | `locklease`、scheduler leader、submit guard、worker duplicate suppression | 新增 LockSpec 或排查多实例互斥 |
 | [07-缓存治理层.md](./07-缓存治理层.md) | coordinator、status service、manual warmup、repair complete | 接 operating 或排查治理接口 |
 | [08-观测降级与排障.md](./08-观测降级与排障.md) | family status、metrics、readyz、Redis degraded 排障 | 生产排障 |
 | [09-新增Redis能力SOP.md](./09-新增Redis能力SOP.md) | 新增缓存/锁/target 的决策流程与测试要求 | 开始改代码前 |
@@ -63,7 +63,7 @@ git diff --check
 如果新增或移动 Redis 代码锚点，额外执行 Redis 相关包测试：
 
 ```bash
-GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/redisplane ./internal/pkg/redisbootstrap ./internal/pkg/redislock ./internal/pkg/rediskey ./internal/pkg/cacheobservability ./internal/apiserver/cachebootstrap ./internal/apiserver/cachetarget ./internal/apiserver/infra/cache ./internal/apiserver/infra/cacheentry ./internal/apiserver/infra/cachequery ./internal/apiserver/infra/cachehotset ./internal/apiserver/application/cachegovernance ./internal/apiserver/runtime/scheduler ./internal/collection-server/infra/redisops ./internal/worker/handlers
+GOTOOLCHAIN=local /Users/yangshujie/.gvm/gos/go1.25.9/bin/go test ./internal/pkg/cacheplane ./internal/pkg/cacheplane/bootstrap ./internal/pkg/locklease ./internal/pkg/cacheplane/keyspace ./internal/pkg/cachegovernance/observability ./internal/apiserver/cachebootstrap ./internal/apiserver/cachetarget ./internal/apiserver/infra/cache ./internal/apiserver/infra/cacheentry ./internal/apiserver/infra/cachequery ./internal/apiserver/infra/cachehotset ./internal/apiserver/application/cachegovernance ./internal/apiserver/runtime/scheduler ./internal/collection-server/infra/redisops ./internal/worker/handlers
 ```
 
 ---

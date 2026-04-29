@@ -54,7 +54,7 @@ func TestBusinessCodeDoesNotImportComponentBaseLeaseDirectly(t *testing.T) {
 	})
 }
 
-func TestBusinessCodeDoesNotImportRedisLockAdapterDirectly(t *testing.T) {
+func TestBusinessCodeDoesNotImportLockLeaseRedisAdapterDirectly(t *testing.T) {
 	root := repoRoot(t)
 	allowed := map[string]struct{}{
 		"internal/pkg/cacheplane/bootstrap":   {},
@@ -80,7 +80,7 @@ func TestBusinessCodeDoesNotImportRedisLockAdapterDirectly(t *testing.T) {
 		}
 		for _, imported := range file.Imports {
 			if strings.Trim(imported.Path.Value, `"`) == "github.com/FangcunMount/qs-server/internal/pkg/locklease/redisadapter" {
-				t.Fatalf("%s imports redislock adapter directly; use internal/pkg/locklease port", rel)
+				t.Fatalf("%s imports locklease redis adapter directly; use internal/pkg/locklease port", rel)
 			}
 		}
 	})

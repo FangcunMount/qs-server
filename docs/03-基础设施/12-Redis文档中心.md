@@ -25,10 +25,10 @@ flowchart TD
 
 优先锚点：
 
-- Runtime： [internal/pkg/redisplane](../../internal/pkg/redisplane)、[internal/pkg/redisbootstrap](../../internal/pkg/redisbootstrap)、[internal/pkg/rediskey](../../internal/pkg/rediskey)
+- Runtime： [internal/pkg/cacheplane](../../internal/pkg/cacheplane)、[internal/pkg/cacheplane/bootstrap](../../internal/pkg/cacheplane/bootstrap)、[internal/pkg/cacheplane/keyspace](../../internal/pkg/cacheplane/keyspace)
 - Cache： [internal/apiserver/cachebootstrap](../../internal/apiserver/cachebootstrap)、[infra/cache](../../internal/apiserver/infra/cache)、[cacheentry](../../internal/apiserver/infra/cacheentry)、[cachequery](../../internal/apiserver/infra/cachequery)、[cachehotset](../../internal/apiserver/infra/cachehotset)、[cachetarget](../../internal/apiserver/cachetarget)
-- Lock： [internal/pkg/redislock](../../internal/pkg/redislock)、[runtime/scheduler](../../internal/apiserver/runtime/scheduler)、[collection redisops](../../internal/collection-server/infra/redisops)、[worker handlers](../../internal/worker/handlers)
-- Governance： [application/cachegovernance](../../internal/apiserver/application/cachegovernance)、[transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go)、[cacheobservability](../../internal/pkg/cacheobservability)
+- Lock： [internal/pkg/locklease](../../internal/pkg/locklease)、[runtime/scheduler](../../internal/apiserver/runtime/scheduler)、[collection redisops](../../internal/collection-server/infra/redisops)、[worker handlers](../../internal/worker/handlers)
+- Governance： [application/cachegovernance](../../internal/apiserver/application/cachegovernance)、[transport/rest/routes_statistics.go](../../internal/apiserver/transport/rest/routes_statistics.go)、[cachegovernance/observability](../../internal/pkg/cachegovernance/observability)
 - Config： [configs/apiserver.prod.yaml](../../configs/apiserver.prod.yaml)、[configs/collection-server.prod.yaml](../../configs/collection-server.prod.yaml)、[configs/worker.prod.yaml](../../configs/worker.prod.yaml)
 
 ## Redis 文档结构
@@ -64,9 +64,9 @@ flowchart LR
 
 ```mermaid
 flowchart TB
-    F["Foundation\nredisplane / redisbootstrap / rediskey"]
+    F["Foundation\ncacheplane / cacheplane/bootstrap / cacheplane/keyspace"]
     C["Cache\ncachebootstrap / cacheentry / cachequery / cachehotset"]
-    L["Lock\nredislock / scheduler leader / submit guard"]
+    L["Lock\nlocklease / scheduler leader / submit guard"]
     G["Governance\ncachetarget / cachegovernance / observability"]
 
     F --> C
@@ -80,7 +80,7 @@ flowchart TB
 - `apiserver` 是完整 Redis Cache 和 Cache Governance 消费方。
 - `collection-server` 只使用 `ops_runtime + lock_lease`，不做领域读缓存。
 - `worker` 当前使用 `lock_lease`，不做 object/query cache，也不做 Redis 统计增量写入。
-- `redislock` 不提供自动续租、fencing token 或业务通用幂等框架。
+- `locklease` 不提供自动续租、fencing token 或业务通用幂等框架。
 - `hotset` 是治理候选和观测数据，不是业务正确性的来源。
 
 ## 文档维护规则

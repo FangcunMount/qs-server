@@ -24,7 +24,7 @@
 5. **Data Access 已有深讲入口**：MySQL、Mongo、migration、read model 和 outbox/idempotency 存储边界统一从 [data-access/README.md](./data-access/README.md) 进入。
 6. **External Integration 已有深讲入口**：WeChat、OSS、Notification adapter 统一从 [integrations/README.md](./integrations/README.md) 进入。
 7. **事件以主文档、深讲目录和真值文件为准**：事件 topic、delivery、handler 绑定最终以 [`configs/events.yaml`](../../configs/events.yaml)、[01-事件系统](./01-事件系统.md) 与 [event/README.md](./event/README.md) 为准。
-8. **Resilience Plane 已有单独入口**：限流、SubmitQueue、背压、Redis lock、幂等、重复抑制和降级统一从 [resilience/README.md](./resilience/README.md) 进入。
+8. **Resilience Plane 已有单独入口**：限流、SubmitQueue、背压、Lock lease、幂等、重复抑制和降级统一从 [resilience/README.md](./resilience/README.md) 进入。
 9. **Security Control Plane 已有深讲入口**：JWT、IAM、authz snapshot、capability、service auth、mTLS/ACL 统一从 [security/README.md](./security/README.md) 进入。
 10. **Redis 文档已经收口成一个中心页 + 深讲目录**：先看 [12-Redis文档中心.md](./12-Redis文档中心.md)，再进入 [redis/README.md](./redis/README.md)；`06/11/13` 保留为摘要与兼容入口，`07-10` 只保留为历史设计稿与阶段记录。
 
@@ -34,7 +34,7 @@
 
 - 事件系统如何把 `events.yaml`、发布端、worker 消费端串起来
 - MySQL / MongoDB / Redis 为什么这样分工，以及代码各自从哪里接入
-- 限流、SubmitQueue、背压、Redis lock、缓存、Security Control Plane、配置等横切能力究竟挂在什么位置、由哪些配置驱动
+- 限流、SubmitQueue、背压、Lock lease、缓存、Security Control Plane、配置等横切能力究竟挂在什么位置、由哪些配置驱动
 - Redis 在缓存、统计、锁、第三方 SDK 和工具链中分别扮演什么角色
 
 本组优先讲**机制、配置锚点和 Verify 方法**，不重复业务模块内的接口表和聚合规则。

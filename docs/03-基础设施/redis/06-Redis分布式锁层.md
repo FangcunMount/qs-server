@@ -1,6 +1,6 @@
 # Redis 分布式锁层
 
-**本文回答**：`redislock` 如何建模 Redis lease，scheduler leader lock、collection submit guard、worker duplicate suppression 三类消费语义如何不同，以及当前明确不支持什么。
+**本文回答**：`locklease` 如何建模 Redis lease，scheduler leader lock、collection submit guard、worker duplicate suppression 三类消费语义如何不同，以及当前明确不支持什么。
 
 ## 30 秒结论
 
@@ -17,8 +17,8 @@
 ```mermaid
 sequenceDiagram
     participant Caller
-    participant M as redislock.Manager
-    participant H as redisplane.Handle
+    participant M as locklease.Manager
+    participant H as cacheplane.Handle
     participant R as Redis
 
     Caller->>M: AcquireSpec(spec, key, ttl)
@@ -42,7 +42,7 @@ sequenceDiagram
 sequenceDiagram
     participant S as Scheduler runner
     participant L as leaderLock
-    participant M as redislock.Manager
+    participant M as locklease.Manager
     participant Body as Business tick
 
     S->>L: Run(ctx, opts, body)
@@ -107,13 +107,13 @@ sequenceDiagram
 
 - 不自动续租。
 - 不提供 fencing token。
-- 不把 Redis lock 当数据库唯一约束。
+- 不把 Lock lease 当数据库唯一约束。
 - 不统一三类业务幂等语义。
 - 不把 lock contention 统一视为错误。
 
 ## Verify
 
-- [redislock tests](../../../internal/pkg/redislock/lock_test.go)
+- [locklease tests](../../../internal/pkg/locklease/lock_test.go)
 - [leader lock tests](../../../internal/apiserver/runtime/scheduler/leader_lock_test.go)
 - [submit guard tests](../../../internal/collection-server/infra/redisops/submit_guard_test.go)
 - [worker handler tests](../../../internal/worker/handlers/answersheet_handler_test.go)

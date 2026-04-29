@@ -206,7 +206,7 @@ func TestManagerUsesInjectedObserver(t *testing.T) {
 		_ = client.Close()
 	})
 
-	observer := &redislockRecordingObserver{}
+	observer := &lockleaseRecordingObserver{}
 	manager := NewManagerWithObserver("worker", "lock_lease", &cacheplane.Handle{
 		Family:  cacheplane.FamilyLock,
 		Client:  client,
@@ -245,15 +245,15 @@ func TestManagerUsesInjectedObserver(t *testing.T) {
 	}
 }
 
-type redislockRecordingObserver struct {
+type lockleaseRecordingObserver struct {
 	decisions []resilienceplane.Decision
 }
 
-func (r *redislockRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
+func (r *lockleaseRecordingObserver) ObserveDecision(_ context.Context, decision resilienceplane.Decision) {
 	r.decisions = append(r.decisions, decision)
 }
 
-func (r *redislockRecordingObserver) has(outcome resilienceplane.Outcome) bool {
+func (r *lockleaseRecordingObserver) has(outcome resilienceplane.Outcome) bool {
 	for _, decision := range r.decisions {
 		if decision.Outcome == outcome {
 			return true

@@ -55,7 +55,7 @@ sequenceDiagram
 - `context.WithoutCancel` 让 worker 在请求断开后仍可继续提交。
 - `submit_queue.enabled` 是历史字段；当前服务构造时总是初始化 queue。
 - `SubmitQueue` 负责入队、状态查询和 outcome；`submitQueueWorkerPool` 只负责消费 job 与推进 `processing/done/failed`。
-- 队列削峰之后仍会进入 `SubmitGuard`，由 Redis lock/done marker 做跨实例提交抑制。
+- 队列削峰之后仍会进入 `SubmitGuard`，由 Lock lease/done marker 做跨实例提交抑制。
 
 ## Lifecycle Boundary
 

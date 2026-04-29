@@ -16,7 +16,7 @@
 ```mermaid
 classDiagram
     class WarmupTarget {
-      Family redisplane.Family
+      Family cacheplane.Family
       Kind WarmupKind
       Scope string
       Key()
@@ -57,7 +57,7 @@ sequenceDiagram
     participant T as cachetarget
     participant H as cachehotset.RedisStore
     participant R as Redis meta_hotset
-    participant O as cacheobservability
+    participant O as cachegovernance/observability
 
     App->>T: NewQueryStatsPlanWarmupTarget(org, plan)
     App->>H: Record(target)
