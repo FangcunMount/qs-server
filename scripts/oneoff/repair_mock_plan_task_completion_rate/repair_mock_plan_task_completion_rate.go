@@ -40,6 +40,7 @@ type config struct {
 	timeout            time.Duration
 	apply              bool
 	rebuildStats       bool
+	rebuildStatsOnly   bool
 }
 
 type scopeSummary struct {
@@ -84,6 +85,26 @@ func main() {
 
 	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
+	}
+
+	if cfg.rebuildStatsOnly {
+		if !cfg.apply {
+			from, to, err := requestedStatisticsWindow(cfg)
+			if err != nil {
+				log.Fatalf("resolve rebuild statistics window: %v", err)
+			}
+			log.Printf("dry-run only; statistics projections would be rebuilt: org=%d from=%s to=%s", cfg.orgID, formatDay(from), formatDay(to))
+			return
+		}
+		from, to, err := requestedStatisticsWindow(cfg)
+		if err != nil {
+			log.Fatalf("resolve rebuild statistics window: %v", err)
+		}
+		if err := rebuildStatistics(ctx, db, cfg.orgID, from, to); err != nil {
+			log.Fatalf("rebuild statistics projections: %v", err)
+		}
+		log.Printf("statistics projections rebuilt: org=%d from=%s to=%s", cfg.orgID, formatDay(from), formatDay(to))
+		return
 	}
 
 	if err := prepareScope(ctx, conn, cfg); err != nil {
@@ -167,6 +188,7 @@ func parseFlags() config {
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall script timeout")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply changes; default is dry-run")
 	flag.BoolVar(&cfg.rebuildStats, "rebuild-statistics", true, "after apply, rebuild operating statistics projections for affected window and plan snapshots")
+	flag.BoolVar(&cfg.rebuildStatsOnly, "rebuild-statistics-only", false, "only rebuild statistics projections for the provided date ranges; does not repair task data")
 	flag.Parse()
 
 	if strings.TrimSpace(cfg.mysqlDSN) == "" {
@@ -175,7 +197,7 @@ func parseFlags() config {
 	if cfg.orgID <= 0 {
 		log.Fatal("--org-id is required")
 	}
-	if cfg.planID == 0 && !cfg.allPlans {
+	if !cfg.rebuildStatsOnly && cfg.planID == 0 && !cfg.allPlans {
 		log.Fatal("either --plan-id or --all-plans is required")
 	}
 	if cfg.minRate < 0 || cfg.maxRate > 1 || cfg.targetRate < 0 || cfg.targetRate > 1 || cfg.minRate > cfg.targetRate || cfg.targetRate > cfg.maxRate {
@@ -213,8 +235,15 @@ func openMySQL(dsn string) (*sql.DB, error) {
 		return nil, err
 	}
 	c.ParseTime = true
+	c.Loc = time.Local
 	if c.Collation == "" {
 		c.Collation = "utf8mb4_unicode_ci"
+	}
+	if c.Params == nil {
+		c.Params = make(map[string]string)
+	}
+	if _, ok := c.Params["time_zone"]; !ok {
+		c.Params["time_zone"] = mysqlTimeZoneOffset(time.Now().In(time.Local))
 	}
 	return sql.Open("mysql", c.FormatDSN())
 }
@@ -892,6 +921,45 @@ func rebuildStatistics(ctx context.Context, sqlDB *sql.DB, orgID int64, from, to
 	return tx.Commit().Error
 }
 
+func requestedStatisticsWindow(cfg config) (time.Time, time.Time, error) {
+	var from time.Time
+	var to time.Time
+	considerStart := func(v *time.Time) {
+		if v == nil {
+			return
+		}
+		day := normalizeLocalDay(*v)
+		if from.IsZero() || day.Before(from) {
+			from = day
+		}
+	}
+	considerEnd := func(v *time.Time) {
+		if v == nil {
+			return
+		}
+		day := normalizeLocalDay(*v)
+		if !v.Equal(day) {
+			day = day.AddDate(0, 0, 1)
+		}
+		if to.IsZero() || day.After(to) {
+			to = day
+		}
+	}
+	considerStart(cfg.taskCreatedStart)
+	considerEnd(cfg.taskCreatedEnd)
+	considerStart(cfg.taskCompletedStart)
+	considerEnd(cfg.taskCompletedEnd)
+	considerStart(cfg.plannedStart)
+	considerEnd(cfg.plannedEnd)
+	if from.IsZero() || to.IsZero() {
+		return time.Time{}, time.Time{}, fmt.Errorf("at least one complete date range is required")
+	}
+	if !from.Before(to) {
+		return time.Time{}, time.Time{}, fmt.Errorf("statistics rebuild window must satisfy from < to")
+	}
+	return from, to, nil
+}
+
 func validateBackupSuffix(s string) error {
 	if !regexp.MustCompile(`^[A-Za-z0-9_]+$`).MatchString(s) {
 		return fmt.Errorf("must match ^[A-Za-z0-9_]+$")
@@ -935,6 +1003,18 @@ func requireBefore(label string, start *time.Time, end *time.Time) {
 func normalizeLocalDay(value time.Time) time.Time {
 	local := value.In(time.Local)
 	return time.Date(local.Year(), local.Month(), local.Day(), 0, 0, 0, 0, local.Location())
+}
+
+func mysqlTimeZoneOffset(value time.Time) string {
+	_, offset := value.Zone()
+	sign := "+"
+	if offset < 0 {
+		sign = "-"
+		offset = -offset
+	}
+	hours := offset / 3600
+	minutes := (offset % 3600) / 60
+	return fmt.Sprintf("'%s%02d:%02d'", sign, hours, minutes)
 }
 
 func formatNullTime(v sql.NullTime) string {
