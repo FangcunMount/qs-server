@@ -8,6 +8,7 @@ import (
 
 	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
@@ -99,19 +100,25 @@ func (s *behaviorEventStager) StageCareRelationshipTransferred(ctx context.Conte
 }
 
 type assessmentEpisodeProjector struct {
-	uow  transactionRunner
+	uow  apptransaction.Runner
 	repo *statisticsInfra.StatisticsRepository
-}
-
-type transactionRunner interface {
-	WithinTransaction(ctx context.Context, fn func(txCtx context.Context) error, opts ...mysql.TxOptions) error
 }
 
 func NewAssessmentEpisodeProjector(db *gorm.DB, repo *statisticsInfra.StatisticsRepository) BehaviorProjectorService {
 	if db == nil || repo == nil {
 		return nil
 	}
-	return &assessmentEpisodeProjector{uow: mysql.NewUnitOfWork(db), repo: repo}
+	uow := mysql.NewUnitOfWork(db)
+	return NewAssessmentEpisodeProjectorWithTransactionRunner(apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+		return uow.WithinTransaction(ctx, fn)
+	}), repo)
+}
+
+func NewAssessmentEpisodeProjectorWithTransactionRunner(runner apptransaction.Runner, repo *statisticsInfra.StatisticsRepository) BehaviorProjectorService {
+	if runner == nil || repo == nil {
+		return nil
+	}
+	return &assessmentEpisodeProjector{uow: runner, repo: repo}
 }
 
 func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventResult, error) {

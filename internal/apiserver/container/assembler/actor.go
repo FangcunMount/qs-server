@@ -100,8 +100,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		authzSnap = deps.OperatorAuthz.Snapshot
 	}
 
-	// 初始化 UnitOfWork
-	uow := mysql.NewUnitOfWork(mysqlDB)
+	txRunner := newMySQLTransactionRunner(mysqlDB)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
 
 	// 初始化 repository 层
@@ -144,7 +143,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		testeeFactory,
 		testeeValidator,
 		testeeBinder,
-		uow,
+		txRunner,
 		guardianshipSvc,
 	)
 	module.TesteeManagementService = testeeApp.NewManagementService(
@@ -152,14 +151,14 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		testeeEditor,
 		testeeBinder,
 		testeeTagger,
-		uow,
+		txRunner,
 	)
 	module.TesteeQueryService = testeeApp.NewQueryService(module.TesteeRepo)
 	module.TesteeTaggingService = testeeApp.NewTaggingService(
 		module.TesteeRepo,
 		module.TesteeManagementService,
 		module.TesteeQueryService,
-		uow,
+		txRunner,
 	)
 
 	module.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
@@ -175,7 +174,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		operatorLifecycler,
 		operatorRoleAllocator,
 		operatorBinder,
-		uow,
+		txRunner,
 		identitySvc,
 		operationAccountSvc,
 		authzAssign,
@@ -186,7 +185,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		operatorValidator,
 		operatorRoleAllocator,
 		operatorLifecycler,
-		uow,
+		txRunner,
 		authzAssign,
 		authzSnap,
 	)
@@ -196,7 +195,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		module.ClinicianRepo,
 		module.OperatorRepo,
 		clinicianValidator,
-		uow,
+		txRunner,
 	)
 	module.ClinicianQueryService = clinicianApp.NewQueryService(module.ClinicianRepo, module.RelationRepo, module.AssessmentEntryRepo)
 	module.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
@@ -204,7 +203,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		module.ClinicianRepo,
 		module.TesteeRepo,
 		behaviorEvents,
-		uow,
+		txRunner,
 	)
 	module.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
 		module.OperatorRepo,
@@ -224,7 +223,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		resolveLogWriter,
 		intakeLogWriter,
 		behaviorEvents,
-		uow,
+		txRunner,
 	)
 
 	module.TesteeHandler = handler.NewTesteeHandler(

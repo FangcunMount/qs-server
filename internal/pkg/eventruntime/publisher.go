@@ -82,6 +82,11 @@ func NewRoutingPublisher(opts RoutingPublisherOptions) *RoutingPublisher {
 	}
 }
 
+// IsMQBacked reports whether this publisher can durably dispatch events to MQ.
+func (p *RoutingPublisher) IsMQBacked() bool {
+	return p != nil && p.mode == PublishModeMQ && p.mqPublisher != nil
+}
+
 // Publish publishes one event to its configured topic.
 func (p *RoutingPublisher) Publish(ctx context.Context, evt event.DomainEvent) error {
 	eventType := evt.EventType()

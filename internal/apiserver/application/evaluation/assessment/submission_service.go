@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
@@ -24,9 +25,11 @@ type assessmentListCache interface {
 // submissionService 测评提交服务实现
 // 行为者：答题者 (Testee)
 type submissionService struct {
-	repo      assessment.Repository
-	creator   assessment.AssessmentCreator
-	listCache assessmentListCache
+	repo        assessment.Repository
+	creator     assessment.AssessmentCreator
+	txRunner    apptransaction.Runner
+	eventStager EventStager
+	listCache   assessmentListCache
 }
 
 // NewSubmissionService 创建测评提交服务
@@ -36,9 +39,8 @@ func NewSubmissionService(
 	_ event.EventPublisher,
 ) AssessmentSubmissionService {
 	return &submissionService{
-		repo:      repo,
-		creator:   creator,
-		listCache: nil,
+		repo:    repo,
+		creator: creator,
 	}
 }
 
@@ -53,6 +55,22 @@ func NewSubmissionServiceWithListCache(
 		repo:      repo,
 		creator:   creator,
 		listCache: listCache,
+	}
+}
+
+func NewSubmissionServiceWithTransactionalOutbox(
+	repo assessment.Repository,
+	creator assessment.AssessmentCreator,
+	txRunner apptransaction.Runner,
+	eventStager EventStager,
+	listCache assessmentListCache,
+) AssessmentSubmissionService {
+	return &submissionService{
+		repo:        repo,
+		creator:     creator,
+		txRunner:    txRunner,
+		eventStager: eventStager,
+		listCache:   listCache,
 	}
 }
 
@@ -131,7 +149,7 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 	additionalEvents := []event.DomainEvent{
 		domainStatistics.NewFootprintAssessmentCreatedEvent(req.OrgID, dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
 	}
-	if err := s.repo.SaveWithAdditionalEvents(ctx, a, additionalEvents); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, additionalEvents); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", a.ID().Uint64(),
 			"action", "create_assessment",
@@ -208,7 +226,7 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		"assessment_id", assessmentID,
 		"new_status", a.Status().String(),
 	)
-	if err := s.repo.SaveWithEvents(ctx, a); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, nil); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", assessmentID,
 			"action", "submit_assessment",

@@ -4,17 +4,17 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 type lifecycleService struct {
 	repo         domainClinician.Repository
 	operatorRepo domainOperator.Repository
 	validator    domainClinician.Validator
-	uow          *mysql.UnitOfWork
+	uow          apptransaction.Runner
 }
 
 // NewLifecycleService 创建从业者生命周期服务。
@@ -22,7 +22,7 @@ func NewLifecycleService(
 	repo domainClinician.Repository,
 	operatorRepo domainOperator.Repository,
 	validator domainClinician.Validator,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 ) ClinicianLifecycleService {
 	return &lifecycleService{
 		repo:         repo,

@@ -8,10 +8,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 // lifecycleService 操作者生命周期服务实现
@@ -24,7 +24,7 @@ type lifecycleService struct {
 	lifecycler    domain.Lifecycler
 	roleAllocator domain.RoleAllocator
 	binder        domain.Binder
-	uow           *mysql.UnitOfWork
+	uow           apptransaction.Runner
 	identitySvc   *iam.IdentityService
 	accountSvc    *iam.OperationAccountService
 	assignment    *iam.AuthzAssignmentClient
@@ -40,7 +40,7 @@ func NewLifecycleService(
 	lifecycler domain.Lifecycler,
 	roleAllocator domain.RoleAllocator,
 	binder domain.Binder,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 	identitySvc *iam.IdentityService,
 	accountSvc *iam.OperationAccountService,
 	assignment *iam.AuthzAssignmentClient,

@@ -5,11 +5,11 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 type relationshipService struct {
@@ -17,11 +17,7 @@ type relationshipService struct {
 	clinicianRepo  domainClinician.Repository
 	testeeRepo     domainTestee.Repository
 	behaviorEvents BehaviorEventStager
-	uow            transactionRunner
-}
-
-type transactionRunner interface {
-	WithinTransaction(ctx context.Context, fn func(txCtx context.Context) error, opts ...mysql.TxOptions) error
+	uow            apptransaction.Runner
 }
 
 type relationAssignmentInput struct {
@@ -40,7 +36,7 @@ func NewRelationshipService(
 	clinicianRepo domainClinician.Repository,
 	testeeRepo domainTestee.Repository,
 	behaviorEvents BehaviorEventStager,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 ) ClinicianRelationshipService {
 	return &relationshipService{
 		relationRepo:   relationRepo,

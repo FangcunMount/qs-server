@@ -86,8 +86,9 @@ type EvaluationModule struct {
 	SuggestionService reportApp.SuggestionService
 
 	// 事件发布器（由容器统一注入）
-	eventPublisher      event.EventPublisher
-	testeeAccessService actorAccessApp.TesteeAccessService
+	eventPublisher        event.EventPublisher
+	testeeAccessService   actorAccessApp.TesteeAccessService
+	assessmentOutboxStore *mysqlEventOutbox.Store
 }
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
@@ -141,8 +142,10 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
 	module.ReportRepo = reportRepo
+	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
-	module.AssessmentOutboxRelay = appEventing.NewOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, module.eventPublisher)
+	module.assessmentOutboxStore = assessmentOutboxStore
+	module.AssessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, module.eventPublisher)
 	module.AssessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
 		Reader: assessmentOutboxStore,
@@ -178,6 +181,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		if waiterRegistry != nil {
 			serviceOpts = append(serviceOpts, engine.WithWaiterRegistry(waiterRegistry))
 		}
+		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore))
 
 		module.EvaluationService = engine.NewService(
 			module.AssessmentRepo,
@@ -219,22 +223,25 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 			normalized.AssessmentListPolicy,
 			normalized.Observer,
 		)
-		module.SubmissionService = assessmentApp.NewSubmissionServiceWithListCache(
+		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutbox(
 			module.AssessmentRepo,
 			assessmentCreator,
-			module.eventPublisher,
+			txRunner,
+			assessmentOutboxStore,
 			listCache,
 		)
 	} else {
-		module.SubmissionService = assessmentApp.NewSubmissionService(
+		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutbox(
 			module.AssessmentRepo,
 			assessmentCreator,
-			module.eventPublisher,
+			txRunner,
+			assessmentOutboxStore,
+			nil,
 		)
 	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
-	module.ManagementService = assessmentApp.NewManagementService(module.AssessmentRepo, module.eventPublisher)
+	module.ManagementService = assessmentApp.NewManagementServiceWithTransactionalOutbox(module.AssessmentRepo, module.eventPublisher, txRunner, assessmentOutboxStore)
 
 	// 报告查询服务 - 服务于报告查询者
 	module.ReportQueryService = assessmentApp.NewReportQueryService(module.ReportRepo)
@@ -298,6 +305,10 @@ func (m *EvaluationModule) SetScaleRepository(
 	if m.mysqlDB == nil {
 		return
 	}
+	serviceOpts := []engine.ServiceOption{}
+	if m.assessmentOutboxStore != nil {
+		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(newMySQLTransactionRunner(m.mysqlDB), m.assessmentOutboxStore))
+	}
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,
 		m.ScoreRepo,
@@ -306,6 +317,7 @@ func (m *EvaluationModule) SetScaleRepository(
 		answerSheetRepo,
 		questionnaireRepo,
 		reportBuilder,
+		serviceOpts...,
 	)
 
 	// 重新创建 ScoreQueryService，传入 scaleRepo

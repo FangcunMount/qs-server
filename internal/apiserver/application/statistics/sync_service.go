@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -18,7 +19,7 @@ const statisticsSyncLockTTL = 30 * time.Minute
 // syncService 统计同步服务实现。
 // 写侧只依赖 MySQL，把统计表视为可重建的物化视图。
 type syncService struct {
-	uow              transactionRunner
+	uow              apptransaction.Runner
 	repairWindowDays int
 	lockManager      locklease.Manager
 }
@@ -32,8 +33,22 @@ func NewSyncService(
 	if repairWindowDays <= 0 {
 		repairWindowDays = defaultStatisticsRepairWindowDays
 	}
+	uow := mysql.NewUnitOfWork(db)
+	return NewSyncServiceWithTransactionRunner(apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+		return uow.WithinTransaction(ctx, fn)
+	}), repairWindowDays, lockManager)
+}
+
+func NewSyncServiceWithTransactionRunner(
+	runner apptransaction.Runner,
+	repairWindowDays int,
+	lockManager locklease.Manager,
+) StatisticsSyncService {
+	if repairWindowDays <= 0 {
+		repairWindowDays = defaultStatisticsRepairWindowDays
+	}
 	return &syncService{
-		uow:              mysql.NewUnitOfWork(db),
+		uow:              runner,
 		repairWindowDays: repairWindowDays,
 		lockManager:      lockManager,
 	}

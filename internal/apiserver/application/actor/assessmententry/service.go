@@ -6,13 +6,13 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessmentEntry "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -27,7 +27,7 @@ type service struct {
 	resolveLog      ResolveLogWriter
 	intakeLog       IntakeLogWriter
 	behaviorEvents  BehaviorEventStager
-	uow             *mysql.UnitOfWork
+	uow             apptransaction.Runner
 }
 
 type intakeState struct {
@@ -53,7 +53,7 @@ func NewService(
 	resolveLog ResolveLogWriter,
 	intakeLog IntakeLogWriter,
 	behaviorEvents BehaviorEventStager,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 ) AssessmentEntryService {
 	return &service{
 		repo:            repo,

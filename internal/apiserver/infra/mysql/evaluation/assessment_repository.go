@@ -62,11 +62,13 @@ func (r *assessmentRepository) Save(ctx context.Context, a *assessment.Assessmen
 }
 
 // SaveWithEvents 保存测评并将聚合上的事件落到 MySQL outbox。
+// Deprecated: application use cases should use UoW + outbox stager explicitly.
 func (r *assessmentRepository) SaveWithEvents(ctx context.Context, a *assessment.Assessment) error {
 	return r.SaveWithAdditionalEvents(ctx, a, nil)
 }
 
 // SaveWithAdditionalEvents 保存测评并在同一事务里暂存聚合事件与补充事件。
+// Deprecated: application use cases should use UoW + outbox stager explicitly.
 func (r *assessmentRepository) SaveWithAdditionalEvents(ctx context.Context, a *assessment.Assessment, additional []event.DomainEvent) error {
 	if a == nil {
 		return nil

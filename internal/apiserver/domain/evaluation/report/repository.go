@@ -17,6 +17,7 @@ type ReportRepository interface {
 	Save(ctx context.Context, report *InterpretReport) error
 
 	// SaveWithTesteeAndEvents 保存报告，并在同一 Mongo 持久化边界内暂存需要可靠出站的事件。
+	// Deprecated: Mongo 事务边界当前保留在 repository 内；后续迁移到应用层 UoW 后应改用显式 stager。
 	SaveWithTesteeAndEvents(ctx context.Context, report *InterpretReport, testeeID testee.ID, events []event.DomainEvent) error
 
 	// FindByID 根据ID查找报告

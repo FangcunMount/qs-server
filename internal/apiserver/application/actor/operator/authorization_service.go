@@ -6,9 +6,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 // authorizationService 操作者权限管理服务实现
@@ -18,7 +18,7 @@ type authorizationService struct {
 	validator     domain.Validator
 	roleAllocator domain.RoleAllocator
 	lifecycler    domain.Lifecycler
-	uow           *mysql.UnitOfWork
+	uow           apptransaction.Runner
 	assignment    *iaminfra.AuthzAssignmentClient
 	snapshot      *iaminfra.AuthzSnapshotLoader
 }
@@ -29,7 +29,7 @@ func NewAuthorizationService(
 	validator domain.Validator,
 	roleAllocator domain.RoleAllocator,
 	lifecycler domain.Lifecycler,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 	assignment *iaminfra.AuthzAssignmentClient,
 	snapshot *iaminfra.AuthzSnapshotLoader,
 ) OperatorAuthorizationService {

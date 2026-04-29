@@ -7,10 +7,10 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 // registrationService 受试者注册服务实现
@@ -20,7 +20,7 @@ type registrationService struct {
 	factory         domain.Factory
 	validator       domain.Validator
 	binder          domain.Binder
-	uow             *mysql.UnitOfWork
+	uow             apptransaction.Runner
 	guardianshipSvc *iam.GuardianshipService
 }
 
@@ -30,7 +30,7 @@ func NewRegistrationService(
 	factory domain.Factory,
 	validator domain.Validator,
 	binder domain.Binder,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 	guardianshipSvc *iam.GuardianshipService,
 ) TesteeRegistrationService {
 	return &registrationService{

@@ -107,6 +107,8 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 	return nil
 }
 
+// StageEventsTx stages events through an explicit Mongo session transaction.
+// Deprecated: keep this only for existing repository-owned Mongo transactions.
 func (s *Store) StageEventsTx(ctx mongo.SessionContext, events []event.DomainEvent) error {
 	docs, err := s.buildDocuments(events)
 	if err != nil {

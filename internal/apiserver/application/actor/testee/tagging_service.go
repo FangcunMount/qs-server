@@ -6,8 +6,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 // taggingService 受试者标签服务实现
@@ -15,7 +15,7 @@ type taggingService struct {
 	repo              domain.Repository
 	managementService TesteeManagementService
 	queryService      TesteeQueryService
-	uow               *mysql.UnitOfWork
+	uow               apptransaction.Runner
 }
 
 // NewTaggingService 创建受试者标签服务
@@ -23,7 +23,7 @@ func NewTaggingService(
 	repo domain.Repository,
 	managementService TesteeManagementService,
 	queryService TesteeQueryService,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 ) TesteeTaggingService {
 	return &taggingService{
 		repo:              repo,

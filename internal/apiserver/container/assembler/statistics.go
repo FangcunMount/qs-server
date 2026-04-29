@@ -93,6 +93,7 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 		// Redis不可用时，创建空实现（查询时会降级到MySQL）
 		module.Cache = nil
 	}
+	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
 
 	// 初始化 service 层
 	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
@@ -101,8 +102,8 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
 	module.ReadService = statisticsApp.NewReadService(statisticsReadModelInfra.NewReadModel(normalized.MySQLDB), normalized.AnswerSheetRepo)
 	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(normalized.MySQLDB)
-	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjector(normalized.MySQLDB, module.Repo)
-	module.SyncService = statisticsApp.NewSyncService(normalized.MySQLDB, normalized.RepairWindowDays, normalized.LockManager)
+	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, module.Repo)
+	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, normalized.RepairWindowDays, normalized.LockManager)
 
 	// 初始化 handler 层
 	module.Handler = handler.NewStatisticsHandler(

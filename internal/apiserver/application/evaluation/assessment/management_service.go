@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -26,13 +27,28 @@ type assessmentListConditions struct {
 // managementService 测评管理服务实现
 // 行为者：管理员 (Staff/Admin)
 type managementService struct {
-	repo assessment.Repository
+	repo        assessment.Repository
+	txRunner    apptransaction.Runner
+	eventStager EventStager
 }
 
 // NewManagementService 创建测评管理服务
 func NewManagementService(repo assessment.Repository, _ event.EventPublisher) AssessmentManagementService {
 	return &managementService{
 		repo: repo,
+	}
+}
+
+func NewManagementServiceWithTransactionalOutbox(
+	repo assessment.Repository,
+	_ event.EventPublisher,
+	txRunner apptransaction.Runner,
+	eventStager EventStager,
+) AssessmentManagementService {
+	return &managementService{
+		repo:        repo,
+		txRunner:    txRunner,
+		eventStager: eventStager,
 	}
 }
 
@@ -360,7 +376,7 @@ func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID
 		"new_status", a.Status().String(),
 	)
 
-	if err := s.repo.SaveWithEvents(ctx, a); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, nil); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", assessmentID,
 			"action", "retry_assessment",

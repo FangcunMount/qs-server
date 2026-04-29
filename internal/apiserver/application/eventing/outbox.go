@@ -54,16 +54,20 @@ func NewOutboxRelay(name string, store OutboxStore, publisher event.EventPublish
 }
 
 type OutboxRelayOptions struct {
-	Name       string
-	Store      OutboxStore
-	Publisher  event.EventPublisher
-	Observer   eventobservability.Observer
-	Status     OutboxStatusReporter
-	BatchSize  int
-	RetryDelay time.Duration
+	Name                    string
+	Store                   OutboxStore
+	Publisher               event.EventPublisher
+	Observer                eventobservability.Observer
+	Status                  OutboxStatusReporter
+	BatchSize               int
+	RetryDelay              time.Duration
+	RequireDurablePublisher bool
 }
 
 func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
+	if opts.RequireDurablePublisher && !isDurablePublisher(opts.Publisher) {
+		return nil
+	}
 	if opts.BatchSize <= 0 {
 		opts.BatchSize = defaultOutboxRelayBatchSize
 	}
@@ -87,6 +91,27 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 		batchSize:  opts.BatchSize,
 		retryDelay: opts.RetryDelay,
 	}
+}
+
+func NewDurableOutboxRelay(name string, store OutboxStore, publisher event.EventPublisher) OutboxRelay {
+	return NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:                    name,
+		Store:                   store,
+		Publisher:               publisher,
+		RequireDurablePublisher: true,
+	})
+}
+
+type durablePublisher interface {
+	IsMQBacked() bool
+}
+
+func isDurablePublisher(publisher event.EventPublisher) bool {
+	if publisher == nil {
+		return false
+	}
+	typed, ok := publisher.(durablePublisher)
+	return ok && typed.IsMQBacked()
 }
 
 func (r *outboxRelay) DispatchDue(ctx context.Context) error {

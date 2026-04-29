@@ -57,6 +57,7 @@ func (r *ReportRepository) SaveWithTestee(ctx context.Context, rpt *report.Inter
 }
 
 // SaveWithTesteeAndEvents 保存报告并在同一 Mongo 持久化边界内暂存事件。
+// Deprecated: Mongo 事务边界当前保留在 repository 内；后续迁移到应用层 UoW 后应改用显式 stager。
 func (r *ReportRepository) SaveWithTesteeAndEvents(
 	ctx context.Context,
 	rpt *report.InterpretReport,

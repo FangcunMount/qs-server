@@ -44,6 +44,15 @@ type fakeOutboxStore struct {
 	failed           []string
 }
 
+type durableFakePublisher struct {
+	fakePublisher
+	mqBacked bool
+}
+
+func (p *durableFakePublisher) IsMQBacked() bool {
+	return p.mqBacked
+}
+
 func (s *fakeOutboxStore) ClaimDueEvents(context.Context, int, time.Time) ([]PendingOutboxEvent, error) {
 	if s.claimErr != nil {
 		return nil, s.claimErr
@@ -200,6 +209,45 @@ func TestOutboxRelayStatusReporterFailureDoesNotChangeDispatchResult(t *testing.
 		t.Fatalf("DispatchDue: %v", err)
 	}
 	assertOutboxStatusScrape(t, observer, eventobservability.OutboxStatusScrapeOutcomeFailure)
+	if len(store.published) != 1 || store.published[0] != "evt-1" {
+		t.Fatalf("published markers = %#v, want evt-1", store.published)
+	}
+}
+
+func TestDurableOutboxRelayRejectsNonMQBackedPublisher(t *testing.T) {
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+	}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:                    "durable-relay",
+		Store:                   store,
+		Publisher:               &fakePublisher{},
+		RequireDurablePublisher: true,
+	})
+	if relay != nil {
+		t.Fatal("expected durable relay construction to reject generic publisher")
+	}
+	if len(store.published) != 0 || len(store.failed) != 0 {
+		t.Fatalf("store should not be touched, published=%#v failed=%#v", store.published, store.failed)
+	}
+}
+
+func TestDurableOutboxRelayAcceptsMQBackedPublisher(t *testing.T) {
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+	}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:                    "durable-relay",
+		Store:                   store,
+		Publisher:               &durableFakePublisher{mqBacked: true},
+		RequireDurablePublisher: true,
+	})
+	if relay == nil {
+		t.Fatal("expected durable relay construction to accept MQ-backed publisher")
+	}
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
 	if len(store.published) != 1 || store.published[0] != "evt-1" {
 		t.Fatalf("published markers = %#v, want evt-1", store.published)
 	}

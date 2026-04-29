@@ -4,8 +4,8 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 // managementService 受试者档案管理服务实现
@@ -15,7 +15,7 @@ type managementService struct {
 	editor domain.Editor
 	binder domain.Binder
 	tagger domain.Tagger
-	uow    *mysql.UnitOfWork
+	uow    apptransaction.Runner
 }
 
 // NewManagementService 创建受试者档案管理服务
@@ -24,7 +24,7 @@ func NewManagementService(
 	editor domain.Editor,
 	binder domain.Binder,
 	tagger domain.Tagger,
-	uow *mysql.UnitOfWork,
+	uow apptransaction.Runner,
 ) TesteeManagementService {
 	return &managementService{
 		repo:   repo,

@@ -233,7 +233,7 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, limiter
 	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, baseRepo, quesRepo, batchValidator)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
-	sub.SubmittedEventRelay = appEventing.NewOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)
+	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)
 	sub.SubmittedEventStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "mongo-domain-events",
 		Reader: baseRepo,

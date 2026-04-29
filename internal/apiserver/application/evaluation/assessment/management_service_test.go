@@ -29,9 +29,35 @@ type managementRepoStub struct {
 	findByScopeOrgID       int64
 	findByScopeTesteeIDs   []testee.ID
 	findByScopeStatus      *domain.Status
+	saveCtxHadTxMarker     bool
 }
 
-func (r *managementRepoStub) Save(_ context.Context, a *domain.Assessment) error {
+type txCtxMarker struct{}
+
+type recordingTxRunner struct {
+	called bool
+}
+
+func (r *recordingTxRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
+	r.called = true
+	return fn(context.WithValue(ctx, txCtxMarker{}, true))
+}
+
+type recordingEventStager struct {
+	ctxHadTxMarker bool
+	eventTypes     []string
+}
+
+func (s *recordingEventStager) Stage(ctx context.Context, events ...event.DomainEvent) error {
+	s.ctxHadTxMarker, _ = ctx.Value(txCtxMarker{}).(bool)
+	for _, evt := range events {
+		s.eventTypes = append(s.eventTypes, evt.EventType())
+	}
+	return nil
+}
+
+func (r *managementRepoStub) Save(ctx context.Context, a *domain.Assessment) error {
+	r.saveCtxHadTxMarker, _ = ctx.Value(txCtxMarker{}).(bool)
 	r.saved = a
 	r.assessment = a
 	return nil
@@ -156,6 +182,56 @@ func TestManagementServiceRetryPublishesAssessmentSubmitted(t *testing.T) {
 	}
 	if repo.savedEventTypes[0] != domain.EventTypeSubmitted {
 		t.Fatalf("expected assessment.submitted event, got %s", repo.savedEventTypes[0])
+	}
+}
+
+func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *testing.T) {
+	id := domain.NewID(9101)
+	submittedAt := time.Now().Add(-time.Hour)
+	failedAt := time.Now().Add(-time.Minute)
+	reason := "pipeline failed"
+	a := domain.Reconstruct(
+		id,
+		9,
+		testee.NewID(3001),
+		domain.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		domain.NewAnswerSheetRef(meta.FromUint64(4001)),
+		nil,
+		domain.NewAdhocOrigin(),
+		domain.StatusFailed,
+		nil,
+		nil,
+		&submittedAt,
+		nil,
+		&failedAt,
+		&reason,
+	)
+
+	repo := &managementRepoStub{assessment: a}
+	txRunner := &recordingTxRunner{}
+	stager := &recordingEventStager{}
+	svc := NewManagementServiceWithTransactionalOutbox(repo, nil, txRunner, stager)
+
+	if _, err := svc.Retry(context.Background(), 9, id.Uint64()); err != nil {
+		t.Fatalf("Retry returned error: %v", err)
+	}
+	if !txRunner.called {
+		t.Fatal("expected application transaction runner to be used")
+	}
+	if !repo.saveCtxHadTxMarker {
+		t.Fatal("expected repository Save to receive transaction context")
+	}
+	if !stager.ctxHadTxMarker {
+		t.Fatal("expected outbox stager to receive transaction context")
+	}
+	if repo.savedWithEvents != nil {
+		t.Fatal("expected compatibility SaveWithEvents path not to be used")
+	}
+	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domain.EventTypeSubmitted {
+		t.Fatalf("staged event types = %#v, want assessment submitted", stager.eventTypes)
+	}
+	if len(a.Events()) != 0 {
+		t.Fatalf("expected events to be cleared after successful transaction, got %d", len(a.Events()))
 	}
 }
 

@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -15,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type waiterNotifier interface {
@@ -37,9 +39,15 @@ type service struct {
 
 	// 等待队列注册表（可选，用于长轮询）
 	waiterRegistry waiterNotifier
+	txRunner       apptransaction.Runner
+	eventStager    EventStager
 
 	// 处理器链
 	pipeline *pipeline.Chain
+}
+
+type EventStager interface {
+	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
 // ServiceOption 服务选项
@@ -49,6 +57,13 @@ type ServiceOption func(*service)
 func WithWaiterRegistry(waiterRegistry waiterNotifier) ServiceOption {
 	return func(s *service) {
 		s.waiterRegistry = waiterRegistry
+	}
+}
+
+func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventStager) ServiceOption {
+	return func(s *service) {
+		s.txRunner = txRunner
+		s.eventStager = eventStager
 	}
 }
 
@@ -386,10 +401,34 @@ func (s *service) markAsFailed(ctx context.Context, a *assessment.Assessment, re
 		)
 		return
 	}
-	if err := s.assessmentRepo.SaveWithEvents(ctx, a); err != nil {
+	if err := s.saveAssessmentWithEvents(ctx, a); err != nil {
 		l.Warnw("failed to persist failed assessment with outbox",
 			"assessment_id", a.ID().Uint64(),
 			"error", err.Error(),
 		)
 	}
+}
+
+func (s *service) saveAssessmentWithEvents(ctx context.Context, a *assessment.Assessment) error {
+	if s.txRunner == nil || s.eventStager == nil {
+		return s.assessmentRepo.SaveWithEvents(ctx, a)
+	}
+	if a == nil {
+		return nil
+	}
+	err := s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
+		if err := s.assessmentRepo.Save(txCtx, a); err != nil {
+			return err
+		}
+		eventsToStage := a.Events()
+		if len(eventsToStage) == 0 {
+			return nil
+		}
+		return s.eventStager.Stage(txCtx, eventsToStage...)
+	})
+	if err != nil {
+		return err
+	}
+	a.ClearEvents()
+	return nil
 }
