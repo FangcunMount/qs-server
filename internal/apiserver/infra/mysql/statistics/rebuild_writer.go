@@ -60,7 +60,7 @@ func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID
 		return err
 	}
 
-	return tx.Exec(
+	if err := tx.Exec(
 		`INSERT INTO statistics_daily (
 			org_id, statistic_type, statistic_key, stat_date, submission_count, completion_count
 		)
@@ -90,7 +90,14 @@ func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID
 		orgID,
 		orgID, startDate, endDate,
 		orgID, startDate, endDate,
-	).Error
+	).Error; err != nil {
+		return err
+	}
+
+	if err := r.rebuildAccessDailyProjections(ctx, tx, orgID, startDate, endDate); err != nil {
+		return err
+	}
+	return r.rebuildAssessmentServiceDailyProjections(ctx, tx, orgID, startDate, endDate)
 }
 
 func (r *StatisticsRepository) RebuildAccumulatedStatistics(ctx context.Context, orgID int64, todayStart time.Time) error {
@@ -154,10 +161,12 @@ func (r *StatisticsRepository) RebuildPlanStatistics(ctx context.Context, orgID 
 	).Scan(&planRows).Error; err != nil {
 		return err
 	}
-	if len(planRows) == 0 {
-		return nil
+	if len(planRows) > 0 {
+		if err := tx.CreateInBatches(planRows, 200).Error; err != nil {
+			return err
+		}
 	}
-	return tx.CreateInBatches(planRows, 200).Error
+	return r.rebuildPlanTaskDailyProjection(ctx, tx, orgID)
 }
 
 func (r *StatisticsRepository) buildQuestionnaireAccumulatedRows(ctx context.Context, tx *gorm.DB, orgID int64, todayStart time.Time) ([]*StatisticsAccumulatedPO, error) {

@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	"context"
 	"testing"
 	"time"
 
@@ -43,7 +44,7 @@ func TestPlanPOToPlanStatistics(t *testing.T) {
 	t.Parallel()
 
 	repo := &StatisticsRepository{}
-	stats := repo.planPOToPlanStatistics(&StatisticsPlanPO{
+	stats := repo.planPOToPlanStatistics(context.Background(), &StatisticsPlanPO{
 		OrgID:           3,
 		PlanID:          1001,
 		TotalTasks:      10,

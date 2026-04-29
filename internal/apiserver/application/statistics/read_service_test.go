@@ -24,9 +24,17 @@ type statisticsReadModelStub struct {
 
 	lastBatchCodes []string
 
-	orgOverviewSnapshot domainStatistics.OrgOverviewSnapshot
-	orgOverviewWindow   domainStatistics.OrgOverviewWindow
-	trendByMetric       map[OrgOverviewMetric][]domainStatistics.DailyCount
+	orgOverviewSnapshot      domainStatistics.OrgOverviewSnapshot
+	orgOverviewWindow        domainStatistics.OrgOverviewWindow
+	trendByMetric            map[OrgOverviewMetric][]domainStatistics.DailyCount
+	organizationOverview     domainStatistics.OrganizationOverview
+	accessFunnelWindow       domainStatistics.AccessFunnelWindow
+	accessTrendByMetric      map[AccessFunnelMetric][]domainStatistics.DailyCount
+	assessmentServiceWindow  domainStatistics.AssessmentServiceWindow
+	assessmentTrendByMetric  map[AssessmentServiceMetric][]domainStatistics.DailyCount
+	dimensionAnalysisSummary domainStatistics.DimensionAnalysisSummary
+	planTaskWindow           domainStatistics.PlanTaskWindow
+	planTrendByMetric        map[PlanTaskMetric][]domainStatistics.DailyCount
 
 	countAssessmentEntriesResult int64
 	listAssessmentEntryMetas     []domainStatistics.AssessmentEntryStatisticsMeta
@@ -50,6 +58,51 @@ func (s *statisticsReadModelStub) ListOrgOverviewTrend(_ context.Context, _ int6
 	s.lastTrendFrom = append(s.lastTrendFrom, from)
 	s.lastTrendTo = append(s.lastTrendTo, to)
 	return append([]domainStatistics.DailyCount(nil), s.trendByMetric[metric]...)
+}
+
+func (s *statisticsReadModelStub) GetOrganizationOverview(context.Context, int64) (domainStatistics.OrganizationOverview, error) {
+	return s.organizationOverview, nil
+}
+
+func (s *statisticsReadModelStub) GetAccessFunnel(_ context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelWindow, error) {
+	s.lastOverviewOrgID = orgID
+	s.lastOverviewFrom = from
+	s.lastOverviewTo = to
+	return s.accessFunnelWindow, nil
+}
+
+func (s *statisticsReadModelStub) ListAccessFunnelTrend(_ context.Context, _ int64, metric AccessFunnelMetric, from, to time.Time) []domainStatistics.DailyCount {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return append([]domainStatistics.DailyCount(nil), s.accessTrendByMetric[metric]...)
+}
+
+func (s *statisticsReadModelStub) GetAssessmentService(context.Context, int64, time.Time, time.Time) (domainStatistics.AssessmentServiceWindow, error) {
+	return s.assessmentServiceWindow, nil
+}
+
+func (s *statisticsReadModelStub) ListAssessmentServiceTrend(_ context.Context, _ int64, metric AssessmentServiceMetric, from, to time.Time) []domainStatistics.DailyCount {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return append([]domainStatistics.DailyCount(nil), s.assessmentTrendByMetric[metric]...)
+}
+
+func (s *statisticsReadModelStub) GetDimensionAnalysisSummary(context.Context, int64) (domainStatistics.DimensionAnalysisSummary, error) {
+	return s.dimensionAnalysisSummary, nil
+}
+
+func (s *statisticsReadModelStub) GetPlanTaskOverview(context.Context, int64, time.Time, time.Time) (domainStatistics.PlanTaskWindow, error) {
+	return s.planTaskWindow, nil
+}
+
+func (s *statisticsReadModelStub) GetPlanTaskOverviewByPlan(context.Context, int64, uint64, time.Time, time.Time) (domainStatistics.PlanTaskWindow, error) {
+	return s.planTaskWindow, nil
+}
+
+func (s *statisticsReadModelStub) ListPlanTaskTrend(_ context.Context, _ int64, _ *uint64, metric PlanTaskMetric, from, to time.Time) []domainStatistics.DailyCount {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return append([]domainStatistics.DailyCount(nil), s.planTrendByMetric[metric]...)
 }
 
 func (*statisticsReadModelStub) CountClinicianSubjects(context.Context, int64) (int64, error) {
@@ -143,13 +196,15 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 	t.Parallel()
 
 	stub := &statisticsReadModelStub{
-		orgOverviewSnapshot: domainStatistics.OrgOverviewSnapshot{TesteeCount: 7},
-		orgOverviewWindow:   domainStatistics.OrgOverviewWindow{EntryCreatedCount: 3},
-		trendByMetric: map[OrgOverviewMetric][]domainStatistics.DailyCount{
-			OrgOverviewMetricAssessmentCreated: {
+		organizationOverview: domainStatistics.OrganizationOverview{TesteeCount: 7},
+		accessFunnelWindow:   domainStatistics.AccessFunnelWindow{EntryOpenedCount: 3},
+		accessTrendByMetric: map[AccessFunnelMetric][]domainStatistics.DailyCount{
+			AccessFunnelMetricEntryOpened: {
 				{Date: time.Date(2026, 4, 1, 0, 0, 0, 0, time.Local), Count: 2},
 			},
 		},
+		assessmentTrendByMetric: map[AssessmentServiceMetric][]domainStatistics.DailyCount{},
+		planTrendByMetric:       map[PlanTaskMetric][]domainStatistics.DailyCount{},
 	}
 	service := NewReadService(stub, nil)
 
@@ -166,17 +221,17 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 	if !stub.lastOverviewFrom.Equal(wantFrom) || !stub.lastOverviewTo.Equal(wantTo) {
 		t.Fatalf("overview range = [%v,%v), want [%v,%v)", stub.lastOverviewFrom, stub.lastOverviewTo, wantFrom, wantTo)
 	}
-	if len(stub.lastTrendMetrics) != 3 {
-		t.Fatalf("trend calls = %d, want 3", len(stub.lastTrendMetrics))
+	if len(stub.lastTrendFrom) != 12 {
+		t.Fatalf("trend calls = %d, want 12", len(stub.lastTrendFrom))
 	}
-	if got.Snapshot.TesteeCount != 7 || got.Window.EntryCreatedCount != 3 {
+	if got.OrganizationOverview.TesteeCount != 7 || got.AccessFunnel.Window.EntryOpenedCount != 3 {
 		t.Fatalf("unexpected overview payload: %+v", got)
 	}
-	if len(got.Trend.Assessments) != 2 {
-		t.Fatalf("filled assessment trend len = %d, want 2", len(got.Trend.Assessments))
+	if len(got.AccessFunnel.Trend.EntryOpened) != 2 {
+		t.Fatalf("filled access trend len = %d, want 2", len(got.AccessFunnel.Trend.EntryOpened))
 	}
-	if got.Trend.Assessments[1].Date.Format("2006-01-02") != "2026-04-02" || got.Trend.Assessments[1].Count != 0 {
-		t.Fatalf("unexpected filled trend point: %+v", got.Trend.Assessments[1])
+	if got.AccessFunnel.Trend.EntryOpened[1].Date.Format("2006-01-02") != "2026-04-02" || got.AccessFunnel.Trend.EntryOpened[1].Count != 0 {
+		t.Fatalf("unexpected filled trend point: %+v", got.AccessFunnel.Trend.EntryOpened[1])
 	}
 }
 

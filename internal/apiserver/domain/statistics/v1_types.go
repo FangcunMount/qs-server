@@ -52,13 +52,99 @@ type OrgOverviewTrend struct {
 	Assignments []DailyCount `json:"assignments"`
 }
 
+// OrganizationOverview 机构资源总览。
+type OrganizationOverview struct {
+	TesteeCount      int64 `json:"testee_count"`
+	ClinicianCount   int64 `json:"clinician_count"`
+	ActiveEntryCount int64 `json:"active_entry_count"`
+	AssessmentCount  int64 `json:"assessment_count"`
+	ReportCount      int64 `json:"report_count"`
+}
+
+// AccessFunnelWindow 接入漏斗窗口指标。
+type AccessFunnelWindow struct {
+	EntryOpenedCount                 int64 `json:"entry_opened_count"`
+	IntakeConfirmedCount             int64 `json:"intake_confirmed_count"`
+	TesteeCreatedCount               int64 `json:"testee_created_count"`
+	CareRelationshipEstablishedCount int64 `json:"care_relationship_established_count"`
+}
+
+// AccessFunnelTrend 接入漏斗趋势。
+type AccessFunnelTrend struct {
+	EntryOpened                 []DailyCount `json:"entry_opened"`
+	IntakeConfirmed             []DailyCount `json:"intake_confirmed"`
+	TesteeCreated               []DailyCount `json:"testee_created"`
+	CareRelationshipEstablished []DailyCount `json:"care_relationship_established"`
+}
+
+// AccessFunnelStatistics 接入漏斗统计域。
+type AccessFunnelStatistics struct {
+	Window AccessFunnelWindow `json:"window"`
+	Trend  AccessFunnelTrend  `json:"trend"`
+}
+
+// AssessmentServiceWindow 测评服务交付窗口指标。
+type AssessmentServiceWindow struct {
+	AnswerSheetSubmittedCount int64 `json:"answersheet_submitted_count"`
+	AssessmentCreatedCount    int64 `json:"assessment_created_count"`
+	ReportGeneratedCount      int64 `json:"report_generated_count"`
+	AssessmentFailedCount     int64 `json:"assessment_failed_count"`
+}
+
+// AssessmentServiceTrend 测评服务交付趋势。
+type AssessmentServiceTrend struct {
+	AnswerSheetSubmitted []DailyCount `json:"answersheet_submitted"`
+	AssessmentCreated    []DailyCount `json:"assessment_created"`
+	ReportGenerated      []DailyCount `json:"report_generated"`
+	AssessmentFailed     []DailyCount `json:"assessment_failed"`
+}
+
+// AssessmentServiceStatistics 测评服务交付统计域。
+type AssessmentServiceStatistics struct {
+	Window AssessmentServiceWindow `json:"window"`
+	Trend  AssessmentServiceTrend  `json:"trend"`
+}
+
+// DimensionAnalysisSummary 维度分析入口摘要。
+type DimensionAnalysisSummary struct {
+	ClinicianCount int64 `json:"clinician_count"`
+	EntryCount     int64 `json:"entry_count"`
+	ContentCount   int64 `json:"content_count"`
+}
+
+// PlanTaskWindow 计划任务窗口指标。
+type PlanTaskWindow struct {
+	TaskCreatedCount   int64 `json:"task_created_count"`
+	TaskOpenedCount    int64 `json:"task_opened_count"`
+	TaskCompletedCount int64 `json:"task_completed_count"`
+	TaskExpiredCount   int64 `json:"task_expired_count"`
+	EnrolledTestees    int64 `json:"enrolled_testees"`
+	ActiveTestees      int64 `json:"active_testees"`
+}
+
+// PlanTaskTrend 计划任务趋势。
+type PlanTaskTrend struct {
+	TaskCreated   []DailyCount `json:"task_created"`
+	TaskOpened    []DailyCount `json:"task_opened"`
+	TaskCompleted []DailyCount `json:"task_completed"`
+	TaskExpired   []DailyCount `json:"task_expired"`
+}
+
+// PlanDomainStatistics 计划统计域。
+type PlanDomainStatistics struct {
+	Window PlanTaskWindow `json:"window"`
+	Trend  PlanTaskTrend  `json:"trend"`
+}
+
 // StatisticsOverview 机构统计概览。
 type StatisticsOverview struct {
-	OrgID     int64               `json:"org_id"`
-	TimeRange StatisticsTimeRange `json:"time_range"`
-	Snapshot  OrgOverviewSnapshot `json:"snapshot"`
-	Window    OrgOverviewWindow   `json:"window"`
-	Trend     OrgOverviewTrend    `json:"trend"`
+	OrgID                int64                       `json:"org_id"`
+	TimeRange            StatisticsTimeRange         `json:"time_range"`
+	OrganizationOverview OrganizationOverview        `json:"organization_overview"`
+	AccessFunnel         AccessFunnelStatistics      `json:"access_funnel"`
+	AssessmentService    AssessmentServiceStatistics `json:"assessment_service"`
+	DimensionAnalysis    DimensionAnalysisSummary    `json:"dimension_analysis"`
+	Plan                 PlanDomainStatistics        `json:"plan"`
 }
 
 // ClinicianStatisticsSubject 从业者摘要。

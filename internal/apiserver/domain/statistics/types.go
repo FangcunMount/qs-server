@@ -97,4 +97,8 @@ type PlanStatistics struct {
 	// 受试者统计
 	EnrolledTestees int64 `json:"enrolled_testees"` // 已加入计划的受试者数
 	ActiveTestees   int64 `json:"active_testees"`   // 活跃受试者数（有完成任务的）
+
+	// 近窗口任务趋势，默认由计划日投影提供
+	Window PlanTaskWindow `json:"window"`
+	Trend  PlanTaskTrend  `json:"trend"`
 }

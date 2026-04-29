@@ -152,6 +152,178 @@ func (m *readModel) ListOrgOverviewTrend(ctx context.Context, orgID int64, metri
 	return result
 }
 
+func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (domainStatistics.OrganizationOverview, error) {
+	overview := domainStatistics.OrganizationOverview{}
+
+	if err := m.db.WithContext(ctx).Model(&actorInfra.TesteePO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&overview.TesteeCount).Error; err != nil {
+		return overview, err
+	}
+	if err := m.db.WithContext(ctx).Model(&actorInfra.ClinicianPO{}).
+		Where("org_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, true).
+		Count(&overview.ClinicianCount).Error; err != nil {
+		return overview, err
+	}
+	if err := m.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
+		Where("org_id = ? AND is_active = ? AND deleted_at IS NULL", orgID, true).
+		Where("expires_at IS NULL OR expires_at > ?", time.Now()).
+		Count(&overview.ActiveEntryCount).Error; err != nil {
+		return overview, err
+	}
+	if err := m.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&overview.AssessmentCount).Error; err != nil {
+		return overview, err
+	}
+	if err := m.db.WithContext(ctx).Model(&evaluationInfra.AssessmentPO{}).
+		Where("org_id = ? AND interpreted_at IS NOT NULL AND deleted_at IS NULL", orgID).
+		Count(&overview.ReportCount).Error; err != nil {
+		return overview, err
+	}
+
+	return overview, nil
+}
+
+func (m *readModel) GetAccessFunnel(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelWindow, error) {
+	var row struct {
+		EntryOpenedCount                 sql.NullInt64
+		IntakeConfirmedCount             sql.NullInt64
+		TesteeCreatedCount               sql.NullInt64
+		CareRelationshipEstablishedCount sql.NullInt64
+	}
+	if err := m.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsAccessOrgDailyPO{}).
+		Select(`
+			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
+			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
+			COALESCE(SUM(testee_created_count), 0) AS testee_created_count,
+			COALESCE(SUM(care_relationship_established_count), 0) AS care_relationship_established_count
+		`).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Scan(&row).Error; err != nil {
+		return domainStatistics.AccessFunnelWindow{}, err
+	}
+	return domainStatistics.AccessFunnelWindow{
+		EntryOpenedCount:                 row.EntryOpenedCount.Int64,
+		IntakeConfirmedCount:             row.IntakeConfirmedCount.Int64,
+		TesteeCreatedCount:               row.TesteeCreatedCount.Int64,
+		CareRelationshipEstablishedCount: row.CareRelationshipEstablishedCount.Int64,
+	}, nil
+}
+
+func (m *readModel) ListAccessFunnelTrend(ctx context.Context, orgID int64, metric statisticsreadmodel.AccessFunnelMetric, from, to time.Time) []domainStatistics.DailyCount {
+	field, ok := accessFunnelTrendField(metric)
+	if !ok {
+		return []domainStatistics.DailyCount{}
+	}
+	return m.listOrgDailyTrend(ctx, &statisticsInfra.AnalyticsAccessOrgDailyPO{}, field, orgID, from, to)
+}
+
+func (m *readModel) GetAssessmentService(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceWindow, error) {
+	var row struct {
+		AnswerSheetSubmittedCount sql.NullInt64
+		AssessmentCreatedCount    sql.NullInt64
+		ReportGeneratedCount      sql.NullInt64
+		AssessmentFailedCount     sql.NullInt64
+	}
+	if err := m.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsAssessmentServiceOrgDailyPO{}).
+		Select(`
+			COALESCE(SUM(answersheet_submitted_count), 0) AS answersheet_submitted_count,
+			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count,
+			COALESCE(SUM(report_generated_count), 0) AS report_generated_count,
+			COALESCE(SUM(assessment_failed_count), 0) AS assessment_failed_count
+		`).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Scan(&row).Error; err != nil {
+		return domainStatistics.AssessmentServiceWindow{}, err
+	}
+	return domainStatistics.AssessmentServiceWindow{
+		AnswerSheetSubmittedCount: row.AnswerSheetSubmittedCount.Int64,
+		AssessmentCreatedCount:    row.AssessmentCreatedCount.Int64,
+		ReportGeneratedCount:      row.ReportGeneratedCount.Int64,
+		AssessmentFailedCount:     row.AssessmentFailedCount.Int64,
+	}, nil
+}
+
+func (m *readModel) ListAssessmentServiceTrend(ctx context.Context, orgID int64, metric statisticsreadmodel.AssessmentServiceMetric, from, to time.Time) []domainStatistics.DailyCount {
+	field, ok := assessmentServiceTrendField(metric)
+	if !ok {
+		return []domainStatistics.DailyCount{}
+	}
+	return m.listOrgDailyTrend(ctx, &statisticsInfra.AnalyticsAssessmentServiceOrgDailyPO{}, field, orgID, from, to)
+}
+
+func (m *readModel) GetDimensionAnalysisSummary(ctx context.Context, orgID int64) (domainStatistics.DimensionAnalysisSummary, error) {
+	summary := domainStatistics.DimensionAnalysisSummary{}
+	if err := m.db.WithContext(ctx).Model(&actorInfra.ClinicianPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&summary.ClinicianCount).Error; err != nil {
+		return summary, err
+	}
+	if err := m.db.WithContext(ctx).Model(&actorInfra.AssessmentEntryPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		Count(&summary.EntryCount).Error; err != nil {
+		return summary, err
+	}
+	var contentRow struct {
+		Count int64 `gorm:"column:count"`
+	}
+	if err := m.db.WithContext(ctx).Raw(`
+		SELECT COUNT(*) AS count
+		FROM (
+			SELECT DISTINCT
+				CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END AS content_type,
+				COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) AS content_code
+			FROM assessment
+			WHERE org_id = ? AND deleted_at IS NULL
+			  AND COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) <> ''
+		) content`, orgID).Scan(&contentRow).Error; err != nil {
+		return summary, err
+	}
+	summary.ContentCount = contentRow.Count
+	return summary, nil
+}
+
+func (m *readModel) GetPlanTaskOverview(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.PlanTaskWindow, error) {
+	return m.getPlanTaskOverview(ctx, orgID, nil, from, to)
+}
+
+func (m *readModel) GetPlanTaskOverviewByPlan(ctx context.Context, orgID int64, planID uint64, from, to time.Time) (domainStatistics.PlanTaskWindow, error) {
+	return m.getPlanTaskOverview(ctx, orgID, &planID, from, to)
+}
+
+func (m *readModel) ListPlanTaskTrend(ctx context.Context, orgID int64, planID *uint64, metric statisticsreadmodel.PlanTaskMetric, from, to time.Time) []domainStatistics.DailyCount {
+	field, ok := planTaskTrendField(metric)
+	if !ok {
+		return []domainStatistics.DailyCount{}
+	}
+
+	type row struct {
+		StatDate time.Time
+		Count    int64
+	}
+	query := m.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsPlanTaskDailyPO{}).
+		Select(fmt.Sprintf("stat_date, COALESCE(SUM(%s), 0) AS count", field)).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Group("stat_date").
+		Order("stat_date ASC")
+	if planID != nil {
+		query = query.Where("plan_id = ?", *planID)
+	}
+	var rows []row
+	if err := query.Scan(&rows).Error; err != nil {
+		return []domainStatistics.DailyCount{}
+	}
+	result := make([]domainStatistics.DailyCount, 0, len(rows))
+	for _, item := range rows {
+		result = append(result, domainStatistics.DailyCount{Date: item.StatDate, Count: item.Count})
+	}
+	return result
+}
+
 func (m *readModel) CountClinicianSubjects(ctx context.Context, orgID int64) (int64, error) {
 	var total int64
 	if err := m.db.WithContext(ctx).Model(&actorInfra.ClinicianPO{}).
@@ -497,6 +669,90 @@ func (m *readModel) enrichAssessmentEntryMeta(ctx context.Context, orgID int64, 
 	return metaItem, nil
 }
 
+func (m *readModel) listOrgDailyTrend(ctx context.Context, model interface{}, field string, orgID int64, from, to time.Time) []domainStatistics.DailyCount {
+	type row struct {
+		StatDate time.Time
+		Count    int64
+	}
+	var rows []row
+	if err := m.db.WithContext(ctx).
+		Model(model).
+		Select(fmt.Sprintf("stat_date, COALESCE(%s, 0) AS count", field)).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Order("stat_date ASC").
+		Scan(&rows).Error; err != nil {
+		return []domainStatistics.DailyCount{}
+	}
+
+	result := make([]domainStatistics.DailyCount, 0, len(rows))
+	for _, item := range rows {
+		result = append(result, domainStatistics.DailyCount{Date: item.StatDate, Count: item.Count})
+	}
+	return result
+}
+
+func (m *readModel) getPlanTaskOverview(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskWindow, error) {
+	var row struct {
+		TaskCreatedCount   sql.NullInt64
+		TaskOpenedCount    sql.NullInt64
+		TaskCompletedCount sql.NullInt64
+		TaskExpiredCount   sql.NullInt64
+	}
+	query := m.db.WithContext(ctx).
+		Model(&statisticsInfra.AnalyticsPlanTaskDailyPO{}).
+		Select(`
+			COALESCE(SUM(task_created_count), 0) AS task_created_count,
+			COALESCE(SUM(task_opened_count), 0) AS task_opened_count,
+			COALESCE(SUM(task_completed_count), 0) AS task_completed_count,
+			COALESCE(SUM(task_expired_count), 0) AS task_expired_count
+		`).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to))
+	if planID != nil {
+		query = query.Where("plan_id = ?", *planID)
+	}
+	if err := query.Scan(&row).Error; err != nil {
+		return domainStatistics.PlanTaskWindow{}, err
+	}
+
+	enrolledTestees, err := m.countPlanTaskDistinctTestees(ctx, orgID, planID, "created_at", "", from, to)
+	if err != nil {
+		return domainStatistics.PlanTaskWindow{}, err
+	}
+	activeTestees, err := m.countPlanTaskDistinctTestees(ctx, orgID, planID, "completed_at", "completed", from, to)
+	if err != nil {
+		return domainStatistics.PlanTaskWindow{}, err
+	}
+
+	return domainStatistics.PlanTaskWindow{
+		TaskCreatedCount:   row.TaskCreatedCount.Int64,
+		TaskOpenedCount:    row.TaskOpenedCount.Int64,
+		TaskCompletedCount: row.TaskCompletedCount.Int64,
+		TaskExpiredCount:   row.TaskExpiredCount.Int64,
+		EnrolledTestees:    enrolledTestees,
+		ActiveTestees:      activeTestees,
+	}, nil
+}
+
+func (m *readModel) countPlanTaskDistinctTestees(ctx context.Context, orgID int64, planID *uint64, timeField, status string, from, to time.Time) (int64, error) {
+	var count int64
+	query := m.db.WithContext(ctx).
+		Table("assessment_task t").
+		Joins("JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL").
+		Select("COUNT(DISTINCT t.testee_id) AS count").
+		Where("t.org_id = ? AND t.deleted_at IS NULL", orgID).
+		Where(fmt.Sprintf("t.%s >= ? AND t.%s < ?", timeField, timeField), from, to)
+	if planID != nil {
+		query = query.Where("t.plan_id = ?", *planID)
+	}
+	if status != "" {
+		query = query.Where("t.status = ?", status)
+	}
+	if err := scanCountQuery(query, &count); err != nil {
+		return 0, err
+	}
+	return count, nil
+}
+
 func overviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) (string, bool) {
 	switch metric {
 	case statisticsreadmodel.OrgOverviewMetricAssessmentCreated:
@@ -505,6 +761,51 @@ func overviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) (string, b
 		return "intake_confirmed_count", true
 	case statisticsreadmodel.OrgOverviewMetricRelationAssigned:
 		return "care_relationship_established_count", true
+	default:
+		return "", false
+	}
+}
+
+func accessFunnelTrendField(metric statisticsreadmodel.AccessFunnelMetric) (string, bool) {
+	switch metric {
+	case statisticsreadmodel.AccessFunnelMetricEntryOpened:
+		return "entry_opened_count", true
+	case statisticsreadmodel.AccessFunnelMetricIntakeConfirmed:
+		return "intake_confirmed_count", true
+	case statisticsreadmodel.AccessFunnelMetricTesteeCreated:
+		return "testee_created_count", true
+	case statisticsreadmodel.AccessFunnelMetricCareRelationshipEstablished:
+		return "care_relationship_established_count", true
+	default:
+		return "", false
+	}
+}
+
+func assessmentServiceTrendField(metric statisticsreadmodel.AssessmentServiceMetric) (string, bool) {
+	switch metric {
+	case statisticsreadmodel.AssessmentServiceMetricAnswerSheetSubmitted:
+		return "answersheet_submitted_count", true
+	case statisticsreadmodel.AssessmentServiceMetricAssessmentCreated:
+		return "assessment_created_count", true
+	case statisticsreadmodel.AssessmentServiceMetricReportGenerated:
+		return "report_generated_count", true
+	case statisticsreadmodel.AssessmentServiceMetricAssessmentFailed:
+		return "assessment_failed_count", true
+	default:
+		return "", false
+	}
+}
+
+func planTaskTrendField(metric statisticsreadmodel.PlanTaskMetric) (string, bool) {
+	switch metric {
+	case statisticsreadmodel.PlanTaskMetricCreated:
+		return "task_created_count", true
+	case statisticsreadmodel.PlanTaskMetricOpened:
+		return "task_opened_count", true
+	case statisticsreadmodel.PlanTaskMetricCompleted:
+		return "task_completed_count", true
+	case statisticsreadmodel.PlanTaskMetricExpired:
+		return "task_expired_count", true
 	default:
 		return "", false
 	}

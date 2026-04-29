@@ -28,27 +28,59 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		return nil, err
 	}
 
-	snapshot, err := s.readModel.GetOrgOverviewSnapshot(ctx, orgID)
+	organizationOverview, err := s.readModel.GetOrganizationOverview(ctx, orgID)
 	if err != nil {
 		return nil, err
 	}
-	window, err := s.readModel.GetOrgOverviewWindow(ctx, orgID, timeRange.From, timeRange.To)
+	accessWindow, err := s.readModel.GetAccessFunnel(ctx, orgID, timeRange.From, timeRange.To)
 	if err != nil {
 		return nil, err
 	}
-
-	trend := domainStatistics.OrgOverviewTrend{
-		Assessments: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListOrgOverviewTrend(ctx, orgID, OrgOverviewMetricAssessmentCreated, timeRange.From, timeRange.To)),
-		Intakes:     fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListOrgOverviewTrend(ctx, orgID, OrgOverviewMetricIntakeConfirmed, timeRange.From, timeRange.To)),
-		Assignments: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListOrgOverviewTrend(ctx, orgID, OrgOverviewMetricRelationAssigned, timeRange.From, timeRange.To)),
+	assessmentWindow, err := s.readModel.GetAssessmentService(ctx, orgID, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	dimensionAnalysis, err := s.readModel.GetDimensionAnalysisSummary(ctx, orgID)
+	if err != nil {
+		return nil, err
+	}
+	planWindow, err := s.readModel.GetPlanTaskOverview(ctx, orgID, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
 	}
 
 	return &domainStatistics.StatisticsOverview{
-		OrgID:     orgID,
-		TimeRange: timeRange,
-		Snapshot:  snapshot,
-		Window:    window,
-		Trend:     trend,
+		OrgID:                orgID,
+		TimeRange:            timeRange,
+		OrganizationOverview: organizationOverview,
+		AccessFunnel: domainStatistics.AccessFunnelStatistics{
+			Window: accessWindow,
+			Trend: domainStatistics.AccessFunnelTrend{
+				EntryOpened:                 fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricEntryOpened, timeRange.From, timeRange.To)),
+				IntakeConfirmed:             fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricIntakeConfirmed, timeRange.From, timeRange.To)),
+				TesteeCreated:               fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricTesteeCreated, timeRange.From, timeRange.To)),
+				CareRelationshipEstablished: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAccessFunnelTrend(ctx, orgID, AccessFunnelMetricCareRelationshipEstablished, timeRange.From, timeRange.To)),
+			},
+		},
+		AssessmentService: domainStatistics.AssessmentServiceStatistics{
+			Window: assessmentWindow,
+			Trend: domainStatistics.AssessmentServiceTrend{
+				AnswerSheetSubmitted: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricAnswerSheetSubmitted, timeRange.From, timeRange.To)),
+				AssessmentCreated:    fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricAssessmentCreated, timeRange.From, timeRange.To)),
+				ReportGenerated:      fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricReportGenerated, timeRange.From, timeRange.To)),
+				AssessmentFailed:     fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListAssessmentServiceTrend(ctx, orgID, AssessmentServiceMetricAssessmentFailed, timeRange.From, timeRange.To)),
+			},
+		},
+		DimensionAnalysis: dimensionAnalysis,
+		Plan: domainStatistics.PlanDomainStatistics{
+			Window: planWindow,
+			Trend: domainStatistics.PlanTaskTrend{
+				TaskCreated:   fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricCreated, timeRange.From, timeRange.To)),
+				TaskOpened:    fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricOpened, timeRange.From, timeRange.To)),
+				TaskCompleted: fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricCompleted, timeRange.From, timeRange.To)),
+				TaskExpired:   fillMissingDailyCounts(timeRange.From, timeRange.To, s.readModel.ListPlanTaskTrend(ctx, orgID, nil, PlanTaskMetricExpired, timeRange.From, timeRange.To)),
+			},
+		},
 	}, nil
 }
 
