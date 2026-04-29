@@ -11,10 +11,7 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	"gorm.io/gorm"
 )
 
 const (
@@ -101,20 +98,10 @@ func (s *behaviorEventStager) StageCareRelationshipTransferred(ctx context.Conte
 
 type assessmentEpisodeProjector struct {
 	uow  apptransaction.Runner
-	repo *statisticsInfra.StatisticsRepository
+	repo BehaviorProjectionRepository
 }
 
-func NewAssessmentEpisodeProjector(db *gorm.DB, repo *statisticsInfra.StatisticsRepository) BehaviorProjectorService {
-	if db == nil || repo == nil {
-		return nil
-	}
-	uow := mysql.NewUnitOfWork(db)
-	return NewAssessmentEpisodeProjectorWithTransactionRunner(apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
-		return uow.WithinTransaction(ctx, fn)
-	}), repo)
-}
-
-func NewAssessmentEpisodeProjectorWithTransactionRunner(runner apptransaction.Runner, repo *statisticsInfra.StatisticsRepository) BehaviorProjectorService {
+func NewAssessmentEpisodeProjectorWithTransactionRunner(runner apptransaction.Runner, repo BehaviorProjectionRepository) BehaviorProjectorService {
 	if runner == nil || repo == nil {
 		return nil
 	}
@@ -129,7 +116,7 @@ func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, i
 			return err
 		}
 		if existing != "" {
-			if existing == statisticsInfra.AnalyticsProjectorCheckpointStatusPending {
+			if existing == domainStatistics.AnalyticsProjectorCheckpointStatusPending {
 				result.Status = BehaviorProjectEventStatusPending
 			}
 			return nil
@@ -148,9 +135,9 @@ func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, i
 			if err := p.repo.UpsertAnalyticsPendingEvent(txCtx, input.EventID, input.EventType, payload, time.Now().Add(nextBehaviorPendingBackoff(1)), "pending_attribution"); err != nil {
 				return err
 			}
-			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, statisticsInfra.AnalyticsProjectorCheckpointStatusPending)
+			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusPending)
 		}
-		return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, statisticsInfra.AnalyticsProjectorCheckpointStatusCompleted)
+		return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusCompleted)
 	})
 	return result, err
 }
@@ -189,7 +176,7 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 			if err := p.repo.DeleteAnalyticsPendingEvent(txCtx, input.EventID); err != nil {
 				return err
 			}
-			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, statisticsInfra.AnalyticsProjectorCheckpointStatusCompleted)
+			return p.repo.MarkAnalyticsProjectorCheckpointStatus(txCtx, input.EventID, domainStatistics.AnalyticsProjectorCheckpointStatusCompleted)
 		})
 		if err != nil {
 			return processed, err

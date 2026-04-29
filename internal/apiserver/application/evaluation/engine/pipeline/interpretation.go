@@ -26,7 +26,7 @@ import (
 type InterpretationHandler struct {
 	*BaseHandler
 	assessmentRepo  assessment.Repository
-	reportRepo      domainReport.ReportRepository
+	reportSaver     ReportDurableSaver
 	reportBuilder   domainReport.ReportBuilder
 	interpreter     interpretation.Interpreter                    // 解读服务
 	defaultProvider *interpretation.DefaultInterpretationProvider // 默认解读提供者
@@ -41,7 +41,7 @@ func NewInterpretationHandler(
 	return &InterpretationHandler{
 		BaseHandler:     NewBaseHandler("InterpretationHandler"),
 		assessmentRepo:  assessmentRepo,
-		reportRepo:      reportRepo,
+		reportSaver:     NewReportDurableSaver(reportRepo),
 		reportBuilder:   reportBuilder,
 		interpreter:     interpretation.GetDefaultInterpreter(), // 使用默认解读器
 		defaultProvider: interpretation.GetDefaultProvider(),    // 使用默认解读提供者
@@ -366,7 +366,7 @@ func (h *InterpretationHandler) generateAndSaveReport(ctx context.Context, evalC
 	l.Debugw("Report built successfully", "report_id", reportID)
 
 	// 保存报告，并在报告成功落库时可靠暂存评估成功事件。
-	if err := h.reportRepo.SaveWithTesteeAndEvents(ctx, rpt, evalCtx.Assessment.TesteeID(), h.buildSuccessEvents(evalCtx, rpt)); err != nil {
+	if err := h.reportSaver.SaveReportDurably(ctx, rpt, evalCtx.Assessment.TesteeID(), h.buildSuccessEvents(evalCtx, rpt)); err != nil {
 		reportID, _ := rpt.ID().Value()
 		assessmentID, _ := evalCtx.Assessment.ID().Value()
 		l.Errorw("Failed to save report",

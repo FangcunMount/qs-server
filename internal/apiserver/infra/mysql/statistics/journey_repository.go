@@ -307,7 +307,7 @@ func (r *StatisticsRepository) UpsertAnalyticsPendingEvent(ctx context.Context, 
 	}).Error
 }
 
-func (r *StatisticsRepository) ListDueAnalyticsPendingEvents(ctx context.Context, limit int, now time.Time) ([]*AnalyticsPendingEventPO, error) {
+func (r *StatisticsRepository) ListDueAnalyticsPendingEvents(ctx context.Context, limit int, now time.Time) ([]*domainStatistics.AnalyticsPendingEvent, error) {
 	var rows []*AnalyticsPendingEventPO
 	query := r.WithContext(ctx).
 		Where("next_attempt_at <= ? AND deleted_at IS NULL", now).
@@ -318,7 +318,19 @@ func (r *StatisticsRepository) ListDueAnalyticsPendingEvents(ctx context.Context
 	if err := query.Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	return rows, nil
+	items := make([]*domainStatistics.AnalyticsPendingEvent, 0, len(rows))
+	for _, row := range rows {
+		if row == nil {
+			continue
+		}
+		items = append(items, &domainStatistics.AnalyticsPendingEvent{
+			EventID:      row.EventID,
+			EventType:    row.EventType,
+			PayloadJSON:  row.PayloadJSON,
+			AttemptCount: row.AttemptCount,
+		})
+	}
+	return items, nil
 }
 
 func (r *StatisticsRepository) RescheduleAnalyticsPendingEvent(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {

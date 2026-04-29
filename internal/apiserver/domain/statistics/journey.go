@@ -99,7 +99,29 @@ type AnalyticsProjectionMutation struct {
 	EpisodeFailedCount               int64
 }
 
+const (
+	AnalyticsProjectorCheckpointStatusProcessing = "processing"
+	AnalyticsProjectorCheckpointStatusCompleted  = "completed"
+	AnalyticsProjectorCheckpointStatusPending    = "pending"
+)
+
+type AnalyticsPendingEvent struct {
+	EventID      string
+	EventType    string
+	PayloadJSON  string
+	AttemptCount int64
+}
+
 // AnalyticsProjectionRepository 维护分析投影。
 type AnalyticsProjectionRepository interface {
 	ApplyAnalyticsProjectionMutation(ctx context.Context, mutation AnalyticsProjectionMutation) error
+	ApplyAnalyticsClinicianProjectionMutation(ctx context.Context, mutation AnalyticsProjectionMutation) error
+	ApplyAnalyticsEntryProjectionMutation(ctx context.Context, mutation AnalyticsProjectionMutation) error
+	ListEpisodesForAttribution(ctx context.Context, orgID int64, testeeID uint64, intakeAt time.Time, window time.Duration) ([]*AssessmentEpisode, error)
+	TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, eventID, eventType string) (string, error)
+	MarkAnalyticsProjectorCheckpointStatus(ctx context.Context, eventID, status string) error
+	UpsertAnalyticsPendingEvent(ctx context.Context, eventID, eventType, payload string, nextAttemptAt time.Time, lastError string) error
+	ListDueAnalyticsPendingEvents(ctx context.Context, limit int, now time.Time) ([]*AnalyticsPendingEvent, error)
+	RescheduleAnalyticsPendingEvent(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error
+	DeleteAnalyticsPendingEvent(ctx context.Context, eventID string) error
 }

@@ -94,6 +94,9 @@ func (r *interpretationReportRepoStub) SaveWithTesteeAndEvents(_ context.Context
 	}
 	return nil
 }
+func (r *interpretationReportRepoStub) SaveReportDurably(ctx context.Context, report *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
+	return r.SaveWithTesteeAndEvents(ctx, report, testeeID, events)
+}
 func (r *interpretationReportRepoStub) FindByID(context.Context, domainReport.ID) (*domainReport.InterpretReport, error) {
 	return nil, nil
 }
@@ -152,7 +155,7 @@ func TestInterpretationHandlerStagesInterpretedAndReportGeneratedInOrder(t *test
 	handler := &InterpretationHandler{
 		BaseHandler:    NewBaseHandler("InterpretationHandler"),
 		assessmentRepo: assessmentRepo,
-		reportRepo:     reportRepo,
+		reportSaver:    reportRepo,
 		reportBuilder:  &reportBuilderAdapter{report: rpt},
 	}
 

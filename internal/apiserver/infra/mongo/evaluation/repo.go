@@ -56,6 +56,10 @@ func (r *ReportRepository) SaveWithTestee(ctx context.Context, rpt *report.Inter
 	return r.SaveWithTesteeAndEvents(ctx, rpt, testeeID, nil)
 }
 
+func (r *ReportRepository) SaveReportDurably(ctx context.Context, rpt *report.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
+	return r.SaveWithTesteeAndEvents(ctx, rpt, testeeID, events)
+}
+
 // SaveWithTesteeAndEvents 保存报告并在同一 Mongo 持久化边界内暂存事件。
 // Deprecated: Mongo 事务边界当前保留在 repository 内；后续迁移到应用层 UoW 后应改用显式 stager。
 func (r *ReportRepository) SaveWithTesteeAndEvents(

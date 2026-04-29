@@ -96,14 +96,14 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
 
 	// 初始化 service 层
-	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
-	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
-	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(normalized.MySQLDB, module.Repo, module.Cache)
-	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(normalized.MySQLDB, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(module.Repo, module.Cache)
+	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
 	module.ReadService = statisticsApp.NewReadService(statisticsReadModelInfra.NewReadModel(normalized.MySQLDB), normalized.AnswerSheetRepo)
-	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(normalized.MySQLDB)
+	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(module.Repo)
 	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, module.Repo)
-	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, normalized.RepairWindowDays, normalized.LockManager)
+	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, module.Repo, normalized.RepairWindowDays, normalized.LockManager)
 
 	// 初始化 handler 层
 	module.Handler = handler.NewStatisticsHandler(

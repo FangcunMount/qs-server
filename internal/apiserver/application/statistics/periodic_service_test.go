@@ -1,62 +1,38 @@
 package statistics
 
 import (
+	"context"
 	"testing"
-	"time"
 
-	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
+	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
-func TestBuildPeriodicProjectStatisticsBuildsOrderedSummary(t *testing.T) {
-	completedAt := time.Date(2026, 4, 10, 9, 0, 0, 0, time.UTC)
-	expireAt := time.Date(2026, 4, 17, 9, 0, 0, 0, time.UTC)
-	assessmentID := uint64(2001)
+type periodicReaderStub struct {
+	orgID    int64
+	testeeID uint64
+	result   *domainStatistics.TesteePeriodicStatisticsResponse
+}
 
-	project, hasActiveTask := buildPeriodicProjectStatistics("1001", []planInfra.AssessmentTaskPO{
-		{
-			PlanID:       1001,
-			Seq:          2,
-			Status:       "pending",
-			ScaleCode:    "scale-b",
-			PlannedAt:    time.Date(2026, 4, 17, 8, 0, 0, 0, time.UTC),
-			ExpireAt:     &expireAt,
-			AssessmentID: nil,
-		},
-		{
-			PlanID:       1001,
-			Seq:          1,
-			Status:       "completed",
-			ScaleCode:    "scale-a",
-			PlannedAt:    time.Date(2026, 4, 10, 8, 0, 0, 0, time.UTC),
-			CompletedAt:  &completedAt,
-			AssessmentID: &assessmentID,
-		},
-	}, map[uint64]string{
-		assessmentID: "PHQ-9",
-	})
+func (s *periodicReaderStub) GetPeriodicStats(_ context.Context, orgID int64, testeeID uint64) (*domainStatistics.TesteePeriodicStatisticsResponse, error) {
+	s.orgID = orgID
+	s.testeeID = testeeID
+	return s.result, nil
+}
 
-	if !hasActiveTask {
-		t.Fatalf("expected pending task to mark project active")
+func TestPeriodicStatsServiceDelegatesToReader(t *testing.T) {
+	t.Parallel()
+
+	reader := &periodicReaderStub{result: &domainStatistics.TesteePeriodicStatisticsResponse{TotalProjects: 2}}
+	service := NewPeriodicStatsService(reader)
+
+	got, err := service.GetPeriodicStats(context.Background(), 11, 22)
+	if err != nil {
+		t.Fatalf("GetPeriodicStats returned error: %v", err)
 	}
-	if project.ScaleName != "PHQ-9" || project.ProjectName != "PHQ-9" {
-		t.Fatalf("expected assessment name to win, got %+v", project)
+	if got.TotalProjects != 2 {
+		t.Fatalf("TotalProjects = %d, want 2", got.TotalProjects)
 	}
-	if project.TotalWeeks != 2 || project.CompletedWeeks != 1 {
-		t.Fatalf("unexpected week counts: %+v", project)
-	}
-	if project.CurrentWeek != 2 {
-		t.Fatalf("expected current week 2, got %d", project.CurrentWeek)
-	}
-	if project.CompletionRate != 50 {
-		t.Fatalf("expected completion rate 50, got %v", project.CompletionRate)
-	}
-	if len(project.Tasks) != 2 || project.Tasks[0].Week != 1 || project.Tasks[1].Week != 2 {
-		t.Fatalf("expected tasks to be ordered by sequence, got %+v", project.Tasks)
-	}
-	if project.StartDate == nil || project.StartDate.Format(time.RFC3339) != "2026-04-10T08:00:00Z" {
-		t.Fatalf("unexpected start date: %+v", project.StartDate)
-	}
-	if project.EndDate == nil || project.EndDate.Format(time.RFC3339) != "2026-04-17T09:00:00Z" {
-		t.Fatalf("unexpected end date: %+v", project.EndDate)
+	if reader.orgID != 11 || reader.testeeID != 22 {
+		t.Fatalf("reader args = (%d, %d), want (11, 22)", reader.orgID, reader.testeeID)
 	}
 }
