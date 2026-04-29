@@ -83,7 +83,7 @@ func (r *assessmentRepository) SaveWithAdditionalEvents(ctx context.Context, a *
 		if len(eventsToStage) == 0 {
 			return nil
 		}
-		return r.outboxStore.StageEventsTx(tx, eventsToStage)
+		return r.outboxStore.Stage(txCtx, eventsToStage...)
 	})
 	if err != nil {
 		return err

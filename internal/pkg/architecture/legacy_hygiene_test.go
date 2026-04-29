@@ -11,6 +11,7 @@ func TestRemovedLegacyPathsDoNotReturnToProductionCode(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"internal/apiserver/infra/mysql/plan/Untitled",
+		"internal/pkg/database/tx/runner.go",
 	} {
 		if _, err := os.Stat(filepath.Join(root, rel)); err == nil {
 			t.Fatalf("legacy stray file must not exist: %s", rel)
@@ -21,6 +22,7 @@ func TestRemovedLegacyPathsDoNotReturnToProductionCode(t *testing.T) {
 
 	forbiddenImports := []string{
 		"github.com/FangcunMount/qs-server/internal/pkg/" + "eventconfig",
+		"github.com/FangcunMount/qs-server/internal/pkg/database/" + "tx",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/" + "outboxcodec",
 		"github.com/FangcunMount/qs-server/internal/worker/" + "application",
 		"github.com/FangcunMount/qs-server/internal/collection-server/interface/" + "restful",

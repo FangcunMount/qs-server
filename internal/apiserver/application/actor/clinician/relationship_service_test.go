@@ -10,6 +10,7 @@ import (
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 )
 
 func TestAssignTesteeNormalizesAssignedToAttending(t *testing.T) {
@@ -18,6 +19,7 @@ func TestAssignTesteeNormalizesAssignedToAttending(t *testing.T) {
 		relationRepo:  relationRepo,
 		clinicianRepo: &relationshipServiceClinicianRepo{item: makeActiveClinician(10)},
 		testeeRepo:    &relationshipServiceTesteeRepo{item: makeTestee(20)},
+		uow:           passthroughTxRunner{},
 	}
 
 	result, err := svc.AssignTestee(context.Background(), AssignTesteeDTO{
@@ -58,6 +60,7 @@ func TestTransferPrimaryUnbindsExistingPrimary(t *testing.T) {
 		relationRepo:  relationRepo,
 		clinicianRepo: &relationshipServiceClinicianRepo{item: makeActiveClinician(11)},
 		testeeRepo:    &relationshipServiceTesteeRepo{item: makeTestee(20)},
+		uow:           passthroughTxRunner{},
 	}
 
 	result, err := svc.TransferPrimary(context.Background(), TransferPrimaryDTO{
@@ -80,6 +83,12 @@ func TestTransferPrimaryUnbindsExistingPrimary(t *testing.T) {
 	if result.ClinicianID != 11 {
 		t.Fatalf("expected transferred primary to target clinician 11, got %d", result.ClinicianID)
 	}
+}
+
+type passthroughTxRunner struct{}
+
+func (passthroughTxRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error, _ ...mysql.TxOptions) error {
+	return fn(ctx)
 }
 
 func TestListAssignedTesteesBatchLoadsTestees(t *testing.T) {

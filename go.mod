@@ -3,7 +3,7 @@ module github.com/FangcunMount/qs-server
 go 1.25.9
 
 require (
-	github.com/FangcunMount/component-base v0.6.0
+	github.com/FangcunMount/component-base v0.6.1
 	github.com/FangcunMount/iam v1.0.3
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1

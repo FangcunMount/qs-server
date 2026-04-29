@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"gorm.io/gorm"
 )
@@ -17,7 +18,7 @@ const statisticsSyncLockTTL = 30 * time.Minute
 // syncService 统计同步服务实现。
 // 写侧只依赖 MySQL，把统计表视为可重建的物化视图。
 type syncService struct {
-	db               *gorm.DB
+	uow              transactionRunner
 	repairWindowDays int
 	lockManager      locklease.Manager
 }
@@ -32,7 +33,7 @@ func NewSyncService(
 		repairWindowDays = defaultStatisticsRepairWindowDays
 	}
 	return &syncService{
-		db:               db,
+		uow:              mysql.NewUnitOfWork(db),
 		repairWindowDays: repairWindowDays,
 		lockManager:      lockManager,
 	}
@@ -59,7 +60,11 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64, opts
 
 	lockName := fmt.Sprintf("statistics:daily:%d:%s:%s", orgID, startDate.Format("2006-01-02"), endDate.Format("2006-01-02"))
 	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
-		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
+		return s.uow.WithinTransaction(lockCtx, func(txCtx context.Context) error {
+			tx, err := mysql.RequireTx(txCtx)
+			if err != nil {
+				return err
+			}
 			if err := tx.Exec(
 				`DELETE FROM statistics_daily
 				  WHERE org_id = ? AND statistic_type IN ('questionnaire', 'system')
@@ -168,7 +173,11 @@ func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
 	lockName := fmt.Sprintf("statistics:accumulated:%d:%s", orgID, todayStart.Format("2006-01-02"))
 	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
-		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
+		return s.uow.WithinTransaction(lockCtx, func(txCtx context.Context) error {
+			tx, err := mysql.RequireTx(txCtx)
+			if err != nil {
+				return err
+			}
 			if err := tx.Exec(
 				`DELETE FROM statistics_accumulated
 				  WHERE org_id = ? AND statistic_type IN ('questionnaire', 'system')`,
@@ -217,7 +226,11 @@ func (s *syncService) SyncPlanStatistics(ctx context.Context, orgID int64) error
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
 	lockName := fmt.Sprintf("statistics:plan:%d:%s", orgID, todayStart.Format("2006-01-02"))
 	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
-		return s.db.WithContext(lockCtx).Transaction(func(tx *gorm.DB) error {
+		return s.uow.WithinTransaction(lockCtx, func(txCtx context.Context) error {
+			tx, err := mysql.RequireTx(txCtx)
+			if err != nil {
+				return err
+			}
 			if err := tx.Exec("DELETE FROM statistics_plan WHERE org_id = ?", orgID).Error; err != nil {
 				return err
 			}

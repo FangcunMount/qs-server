@@ -58,7 +58,7 @@ type behaviorEventStager struct {
 }
 
 type behaviorEventOutboxStore interface {
-	StageEventsTx(tx *gorm.DB, events []event.DomainEvent) error
+	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
 func NewBehaviorEventStager(outboxStore behaviorEventOutboxStore) interface {
@@ -75,11 +75,7 @@ func (s *behaviorEventStager) stage(ctx context.Context, evt event.DomainEvent) 
 	if s == nil || s.outboxStore == nil || evt == nil {
 		return nil
 	}
-	tx, ok := mysql.TxFromContext(ctx)
-	if !ok {
-		return fmt.Errorf("behavior event staging requires mysql transaction")
-	}
-	return s.outboxStore.StageEventsTx(tx, []event.DomainEvent{evt})
+	return s.outboxStore.Stage(ctx, evt)
 }
 
 func (s *behaviorEventStager) StageEntryOpened(ctx context.Context, orgID int64, clinicianID, entryID uint64, occurredAt time.Time) error {
@@ -103,21 +99,24 @@ func (s *behaviorEventStager) StageCareRelationshipTransferred(ctx context.Conte
 }
 
 type assessmentEpisodeProjector struct {
-	db   *gorm.DB
+	uow  transactionRunner
 	repo *statisticsInfra.StatisticsRepository
+}
+
+type transactionRunner interface {
+	WithinTransaction(ctx context.Context, fn func(txCtx context.Context) error, opts ...mysql.TxOptions) error
 }
 
 func NewAssessmentEpisodeProjector(db *gorm.DB, repo *statisticsInfra.StatisticsRepository) BehaviorProjectorService {
 	if db == nil || repo == nil {
 		return nil
 	}
-	return &assessmentEpisodeProjector{db: db, repo: repo}
+	return &assessmentEpisodeProjector{uow: mysql.NewUnitOfWork(db), repo: repo}
 }
 
 func (p *assessmentEpisodeProjector) ProjectBehaviorEvent(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventResult, error) {
 	result := BehaviorProjectEventResult{Status: BehaviorProjectEventStatusCompleted}
-	err := p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		txCtx := mysql.WithTx(ctx, tx)
+	err := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 		existing, err := p.repo.TryBeginAnalyticsProjectorCheckpoint(txCtx, input.EventID, input.EventType)
 		if err != nil {
 			return err
@@ -164,8 +163,7 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 		}
 		var input BehaviorProjectEventInput
 		if err := json.Unmarshal([]byte(item.PayloadJSON), &input); err != nil {
-			if txErr := p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-				txCtx := mysql.WithTx(ctx, tx)
+			if txErr := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 				return p.repo.RescheduleAnalyticsPendingEvent(txCtx, item.EventID, err.Error(), time.Now().Add(nextBehaviorPendingBackoff(item.AttemptCount+1)))
 			}); txErr != nil {
 				return processed, txErr
@@ -173,8 +171,7 @@ func (p *assessmentEpisodeProjector) ReconcilePendingBehaviorEvents(ctx context.
 			continue
 		}
 
-		err := p.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-			txCtx := mysql.WithTx(ctx, tx)
+		err := p.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
 			status, err := p.projectEvent(txCtx, input)
 			if err != nil {
 				return p.repo.RescheduleAnalyticsPendingEvent(txCtx, input.EventID, err.Error(), time.Now().Add(nextBehaviorPendingBackoff(item.AttemptCount+1)))

@@ -2,10 +2,12 @@ package eventoutbox
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -55,7 +57,24 @@ func NewStoreWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver)
 	}
 }
 
+func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
+	tx, err := mysql.RequireTx(ctx)
+	if err != nil {
+		return err
+	}
+	return s.stageWithDB(tx, events)
+}
+
+// StageEventsTx stages events through an explicit transaction handle.
+// Deprecated: use Stage(ctx, events...) with a transaction context.
 func (s *Store) StageEventsTx(tx *gorm.DB, events []event.DomainEvent) error {
+	return s.stageWithDB(tx, events)
+}
+
+func (s *Store) stageWithDB(tx *gorm.DB, events []event.DomainEvent) error {
+	if tx == nil {
+		return mysql.ErrActiveTransactionRequired
+	}
 	rows, err := s.buildRows(events)
 	if err != nil {
 		return err
@@ -153,18 +172,25 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
 	transition := outboxcore.NewPublishedTransition(publishedAt)
-	return s.db.WithContext(ctx).Model(&OutboxPO{}).
+	result := s.db.WithContext(ctx).Model(&OutboxPO{}).
 		Where("event_id = ?", eventID).
 		Updates(map[string]interface{}{
 			"status":       transition.Status,
 			"published_at": transition.PublishedAt,
 			"updated_at":   transition.UpdatedAt,
-		}).Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("outbox event %q not found", eventID)
+	}
+	return nil
 }
 
 func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
 	transition := outboxcore.NewFailedTransition(lastError, nextAttemptAt, time.Now())
-	return s.db.WithContext(ctx).Model(&OutboxPO{}).
+	result := s.db.WithContext(ctx).Model(&OutboxPO{}).
 		Where("event_id = ?", eventID).
 		Updates(map[string]interface{}{
 			"status":          transition.Status,
@@ -172,7 +198,14 @@ func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, 
 			"next_attempt_at": transition.NextAttemptAt,
 			"updated_at":      transition.UpdatedAt,
 			"attempt_count":   gorm.Expr("attempt_count + ?", transition.AttemptIncrement),
-		}).Error
+		})
+	if result.Error != nil {
+		return result.Error
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("outbox event %q not found", eventID)
+	}
+	return nil
 }
 
 func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outboxport.StatusSnapshot, error) {

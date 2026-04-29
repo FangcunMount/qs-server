@@ -1,11 +1,13 @@
 package eventoutbox
 
 import (
+	"errors"
 	"strings"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
+	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -89,6 +91,17 @@ func TestBuildRowsRejectsBestEffortEvent(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "best_effort") {
 		t.Fatalf("error = %v, want delivery class", err)
+	}
+}
+
+func TestStageRequiresActiveTransactionContext(t *testing.T) {
+	t.Parallel()
+
+	store := &Store{}
+	evt := event.New("sample.created", "Sample", "sample-1", map[string]string{})
+	err := store.Stage(t.Context(), evt)
+	if !errors.Is(err, mysql.ErrActiveTransactionRequired) {
+		t.Fatalf("Stage() error = %v, want ErrActiveTransactionRequired", err)
 	}
 }
 

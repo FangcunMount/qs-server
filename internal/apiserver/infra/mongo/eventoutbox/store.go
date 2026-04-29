@@ -323,19 +323,25 @@ func minInt(a, b int) int {
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
 	transition := outboxcore.NewPublishedTransition(publishedAt)
-	_, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
+	result, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
 		"$set": bson.M{
 			"status":       transition.Status,
 			"published_at": transition.PublishedAt,
 			"updated_at":   transition.UpdatedAt,
 		},
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("outbox event %q not found", eventID)
+	}
+	return nil
 }
 
 func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
 	transition := outboxcore.NewFailedTransition(lastError, nextAttemptAt, time.Now())
-	_, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
+	result, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
 		"$set": bson.M{
 			"status":          transition.Status,
 			"last_error":      transition.LastError,
@@ -346,7 +352,13 @@ func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, 
 			"attempt_count": transition.AttemptIncrement,
 		},
 	})
-	return err
+	if err != nil {
+		return err
+	}
+	if result.MatchedCount == 0 {
+		return fmt.Errorf("outbox event %q not found", eventID)
+	}
+	return nil
 }
 
 func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outboxport.StatusSnapshot, error) {

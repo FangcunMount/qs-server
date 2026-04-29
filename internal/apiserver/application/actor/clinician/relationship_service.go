@@ -17,7 +17,11 @@ type relationshipService struct {
 	clinicianRepo  domainClinician.Repository
 	testeeRepo     domainTestee.Repository
 	behaviorEvents BehaviorEventStager
-	uow            *mysql.UnitOfWork
+	uow            transactionRunner
+}
+
+type transactionRunner interface {
+	WithinTransaction(ctx context.Context, fn func(txCtx context.Context) error, opts ...mysql.TxOptions) error
 }
 
 type relationAssignmentInput struct {

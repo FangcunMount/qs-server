@@ -3,14 +3,12 @@ package mysql
 import (
 	"context"
 
+	gormuow "github.com/FangcunMount/component-base/pkg/uow/gorm"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"gorm.io/gorm"
 )
-
-// txKey 是用于在 context 中存储事务的自定义键类型
-type txKey struct{}
 
 // BaseRepository provides common CRUD helpers for GORM repositories.
 type BaseRepository[T Syncable] struct {
@@ -48,23 +46,6 @@ func (r *BaseRepository[T]) acquire(ctx context.Context) (context.Context, func(
 	return r.limiter.Acquire(ctx)
 }
 
-// WithTx attaches a transaction handle to the context for repository helpers.
-func WithTx(ctx context.Context, tx *gorm.DB) context.Context {
-	if tx == nil {
-		return ctx
-	}
-	return context.WithValue(ctx, txKey{}, tx)
-}
-
-// TxFromContext extracts a transaction handle from context when present.
-func TxFromContext(ctx context.Context) (*gorm.DB, bool) {
-	if ctx == nil {
-		return nil, false
-	}
-	tx, ok := ctx.Value(txKey{}).(*gorm.DB)
-	return tx, ok && tx != nil
-}
-
 // SetErrorTranslator registers a function to translate DB errors into
 // domain/business errors. This allows repositories to map driver-specific
 // messages (unique constraint, duplicate entry) to structured errors.
@@ -81,11 +62,7 @@ func (r *BaseRepository[T]) DB() *gorm.DB {
 // If the context contains a transaction (set by UnitOfWork), it will use that transaction.
 // Otherwise, it uses the default DB connection.
 func (r *BaseRepository[T]) WithContext(ctx context.Context) *gorm.DB {
-	// 尝试从 context 中提取事务
-	if tx, ok := TxFromContext(ctx); ok {
-		return tx.WithContext(ctx)
-	}
-	return r.db.WithContext(ctx)
+	return gormuow.WithContext(ctx, r.db)
 }
 
 // CreateAndSync persists an entity and lets the caller sync generated fields back.
@@ -145,7 +122,7 @@ func (r *BaseRepository[T]) FindByID(ctx context.Context, id uint64) (T, error) 
 	defer release()
 
 	var entity T
-	result := r.db.WithContext(ctx).First(&entity, id)
+	result := r.WithContext(ctx).First(&entity, id)
 	if result.Error != nil {
 		var zero T
 		return zero, result.Error
@@ -161,7 +138,7 @@ func (r *BaseRepository[T]) FindByField(ctx context.Context, model interface{}, 
 	}
 	defer release()
 
-	return r.db.WithContext(ctx).Where(field+" = ?", value).First(model).Error
+	return r.WithContext(ctx).Where(field+" = ?", value).First(model).Error
 }
 
 // DeleteByID removes records by primary key.
@@ -173,7 +150,7 @@ func (r *BaseRepository[T]) DeleteByID(ctx context.Context, id uint64) error {
 	defer release()
 
 	var entity T
-	return r.db.WithContext(ctx).Delete(&entity, id).Error
+	return r.WithContext(ctx).Delete(&entity, id).Error
 }
 
 // ExistsByID checks if a record exists for the given ID.
@@ -186,7 +163,7 @@ func (r *BaseRepository[T]) ExistsByID(ctx context.Context, id uint64) (bool, er
 
 	var count int64
 	var entity T
-	err = r.db.WithContext(ctx).Model(&entity).Where("id = ?", id).Count(&count).Error
+	err = r.WithContext(ctx).Model(&entity).Where("id = ?", id).Count(&count).Error
 	if err != nil {
 		return false, err
 	}
@@ -202,7 +179,7 @@ func (r *BaseRepository[T]) ExistsByField(ctx context.Context, model interface{}
 	defer release()
 
 	var count int64
-	if err := r.db.WithContext(ctx).Model(model).Where(field+" = ?", value).Count(&count).Error; err != nil {
+	if err := r.WithContext(ctx).Model(model).Where(field+" = ?", value).Count(&count).Error; err != nil {
 		return false, err
 	}
 	return count > 0, nil
@@ -216,7 +193,7 @@ func (r *BaseRepository[T]) FindWithConditions(ctx context.Context, conditions m
 	}
 	defer release()
 
-	db := r.db.WithContext(ctx)
+	db := r.WithContext(ctx)
 	for field, value := range conditions {
 		db = db.Where(field+" = ?", value)
 	}
@@ -235,7 +212,7 @@ func (r *BaseRepository[T]) FindList(ctx context.Context, models interface{}, co
 	}
 	defer release()
 
-	db := r.db.WithContext(ctx)
+	db := r.WithContext(ctx)
 	for field, value := range conditions {
 		db = db.Where(field+" = ?", value)
 	}
@@ -264,7 +241,7 @@ func (r *BaseRepository[T]) CountWithConditions(ctx context.Context, model inter
 	defer release()
 
 	var count int64
-	db := r.db.WithContext(ctx).Model(model)
+	db := r.WithContext(ctx).Model(model)
 	for field, value := range conditions {
 		db = db.Where(field+" = ?", value)
 	}

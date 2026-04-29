@@ -3,52 +3,34 @@ package mysql
 import (
 	"context"
 
+	gormuow "github.com/FangcunMount/component-base/pkg/uow/gorm"
 	"gorm.io/gorm"
 )
 
-// UnitOfWork wraps a GORM DB to offer transactional execution helpers.
-type UnitOfWork struct {
-	db *gorm.DB
-}
+type TxOptions = gormuow.TxOptions
+type UnitOfWork = gormuow.UnitOfWork
 
-// NewUnitOfWork constructs a UnitOfWork for the given *gorm.DB.
+var (
+	ErrUnitOfWorkUnavailable     = gormuow.ErrUnitOfWorkUnavailable
+	ErrActiveTransactionRequired = gormuow.ErrActiveTransactionRequired
+)
+
 func NewUnitOfWork(db *gorm.DB) *UnitOfWork {
-	if db == nil {
-		return nil
-	}
-	return &UnitOfWork{db: db}
+	return gormuow.NewUnitOfWork(db)
 }
 
-// WithinTransaction executes fn inside a database transaction.
-// The transaction is automatically injected into the context so that
-// Repository operations can use it transparently.
-//
-// 使用方式：
-//
-//	err := uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-//	    // 在这里调用 Repository 方法，它们会自动使用事务
-//	    return repo.Save(txCtx, entity)
-//	})
-func (u *UnitOfWork) WithinTransaction(ctx context.Context, fn func(txCtx context.Context) error) error {
-	if fn == nil {
-		return nil
-	}
-	if u == nil || u.db == nil {
-		return fn(ctx)
-	}
+func WithTx(ctx context.Context, tx *gorm.DB) context.Context {
+	return gormuow.WithTx(ctx, tx)
+}
 
-	// 检查数据库连接状态
-	sqlDB, err := u.db.DB()
-	if err != nil {
-		return err
-	}
-	if err := sqlDB.Ping(); err != nil {
-		return err
-	}
+func TxFromContext(ctx context.Context) (*gorm.DB, bool) {
+	return gormuow.TxFromContext(ctx)
+}
 
-	return u.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		// 将事务注入到 context 中，使用类型安全的 key
-		txCtx := context.WithValue(ctx, txKey{}, tx)
-		return fn(txCtx)
-	})
+func RequireTx(ctx context.Context) (*gorm.DB, error) {
+	return gormuow.RequireTx(ctx)
+}
+
+func AfterCommit(ctx context.Context, hook func(context.Context) error) error {
+	return gormuow.AfterCommit(ctx, hook)
 }

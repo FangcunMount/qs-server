@@ -61,3 +61,31 @@ func TestExtractedProcessRuntimePackageHasNoLocalGoFiles(t *testing.T) {
 		}
 	}
 }
+
+func TestSharedTransactionEventAndOutboxPackagesUseComponentBase(t *testing.T) {
+	root := repoRoot(t)
+	requiredByFile := map[string]string{
+		"internal/pkg/database/mysql/uow.go":       "github.com/FangcunMount/component-base/pkg/uow/gorm",
+		"pkg/event/event.go":                       "github.com/FangcunMount/component-base/pkg/event",
+		"internal/pkg/eventcodec/codec.go":         "github.com/FangcunMount/component-base/pkg/eventcodec",
+		"internal/apiserver/port/outbox/outbox.go": "github.com/FangcunMount/component-base/pkg/outbox",
+		"internal/apiserver/outboxcore/core.go":    "github.com/FangcunMount/component-base/pkg/outboxcore",
+	}
+
+	for rel, required := range requiredByFile {
+		file, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, rel), nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatalf("parse %s: %v", rel, err)
+		}
+		found := false
+		for _, imported := range file.Imports {
+			if strings.Trim(imported.Path.Value, `"`) == required {
+				found = true
+				break
+			}
+		}
+		if !found {
+			t.Fatalf("%s must import extracted component-base package %s", rel, required)
+		}
+	}
+}

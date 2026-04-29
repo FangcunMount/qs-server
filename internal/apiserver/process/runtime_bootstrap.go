@@ -55,7 +55,8 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 			startSchedulerManager(manager, runtimeOutput)
 		}
 	}
-	if serverDeps.AnswerSheetSubmittedRelay != nil {
+	durableRelayEnabled := resources.messaging.mqPublisher != nil
+	if serverDeps.AnswerSheetSubmittedRelay != nil && durableRelayEnabled {
 		deps.relays = append(deps.relays, relayRuntimeDeps{
 			stopHookName: "stop mongo outbox relay",
 			startLogName: "mongo outbox relay",
@@ -64,7 +65,7 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 			dispatch:     serverDeps.AnswerSheetSubmittedRelay.DispatchDue,
 		})
 	}
-	if serverDeps.AssessmentOutboxRelay != nil {
+	if serverDeps.AssessmentOutboxRelay != nil && durableRelayEnabled {
 		deps.relays = append(deps.relays, relayRuntimeDeps{
 			stopHookName: "stop assessment outbox relay",
 			startLogName: "assessment outbox relay",
