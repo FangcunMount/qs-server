@@ -549,12 +549,7 @@ LIMIT %d`, limit))
 	if err != nil {
 		return err
 	}
-	defer func() {
-		err := rows.Close()
-		if err != nil {
-			log.Panicln("close err: ", err)
-		}
-	}()
+	defer rows.Close()
 	for rows.Next() {
 		var taskID, planID, testeeID, assessmentID, answerSheetID uint64
 		var completedAt sql.NullTime
@@ -571,17 +566,28 @@ LIMIT %d`, limit))
 func affectedStatisticsWindow(ctx context.Context, conn *sql.Conn) (time.Time, time.Time, error) {
 	var from, to sql.NullTime
 	err := conn.QueryRowContext(ctx, `
-SELECT MIN(stat_day), DATE_ADD(MAX(stat_day), INTERVAL 1 DAY)
-FROM (
-  SELECT DATE(old_task_created_at) AS stat_day FROM repair_mock_task_completion_scope WHERE old_task_created_at IS NOT NULL
-  UNION ALL SELECT DATE(old_open_at) FROM repair_mock_task_completion_scope WHERE old_open_at IS NOT NULL
-  UNION ALL SELECT DATE(old_expire_at) FROM repair_mock_task_completion_scope WHERE old_expire_at IS NOT NULL
-  UNION ALL SELECT DATE(old_completed_at) FROM repair_mock_task_completion_scope WHERE old_completed_at IS NOT NULL
-  UNION ALL SELECT DATE(old_assessment_created_at) FROM repair_mock_task_completion_scope WHERE old_assessment_created_at IS NOT NULL
-  UNION ALL SELECT DATE(old_assessment_submitted_at) FROM repair_mock_task_completion_scope WHERE old_assessment_submitted_at IS NOT NULL
-  UNION ALL SELECT DATE(old_assessment_interpreted_at) FROM repair_mock_task_completion_scope WHERE old_assessment_interpreted_at IS NOT NULL
-  UNION ALL SELECT DATE(old_assessment_failed_at) FROM repair_mock_task_completion_scope WHERE old_assessment_failed_at IS NOT NULL
-) days`).Scan(&from, &to)
+SELECT
+  DATE(MIN(LEAST(
+    COALESCE(old_task_created_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_open_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_expire_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_completed_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_assessment_created_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_assessment_submitted_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_assessment_interpreted_at, '9999-12-31 23:59:59.999'),
+    COALESCE(old_assessment_failed_at, '9999-12-31 23:59:59.999')
+  ))),
+  DATE_ADD(DATE(MAX(GREATEST(
+    COALESCE(old_task_created_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_open_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_expire_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_completed_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_assessment_created_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_assessment_submitted_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_assessment_interpreted_at, '1000-01-01 00:00:00.000'),
+    COALESCE(old_assessment_failed_at, '1000-01-01 00:00:00.000')
+  ))), INTERVAL 1 DAY)
+FROM repair_mock_task_completion_scope`).Scan(&from, &to)
 	if err != nil {
 		return time.Time{}, time.Time{}, err
 	}
