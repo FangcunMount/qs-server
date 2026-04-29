@@ -286,9 +286,64 @@ func prepareTaskScope(ctx context.Context, conn *sql.Conn, cfg config) error {
 		groupPlanExpr = "t.plan_id"
 	}
 	where, args := buildTaskFilters(cfg, "t")
+	if _, err := conn.ExecContext(ctx, `
+CREATE TEMPORARY TABLE repair_mock_task_completion_scope (
+  task_id BIGINT UNSIGNED NOT NULL PRIMARY KEY,
+  org_id BIGINT NOT NULL,
+  plan_id BIGINT UNSIGNED NOT NULL,
+  group_plan_id BIGINT UNSIGNED NOT NULL,
+  testee_id BIGINT UNSIGNED NOT NULL,
+  old_task_status VARCHAR(50) NOT NULL,
+  old_task_assessment_id BIGINT UNSIGNED NULL,
+  old_task_created_at DATETIME(3) NULL,
+  old_open_at DATETIME(3) NULL,
+  old_expire_at DATETIME(3) NULL,
+  old_completed_at DATETIME(3) NULL,
+  assessment_id BIGINT UNSIGNED NOT NULL,
+  answer_sheet_id BIGINT UNSIGNED NOT NULL,
+  old_origin_type VARCHAR(50) NOT NULL,
+  old_origin_id VARCHAR(100) NULL,
+  old_assessment_created_at DATETIME(3) NULL,
+  old_assessment_submitted_at DATETIME(3) NULL,
+  old_assessment_interpreted_at DATETIME(3) NULL,
+  old_assessment_failed_at DATETIME(3) NULL,
+  episode_id BIGINT UNSIGNED NULL,
+  old_episode_entry_id BIGINT UNSIGNED NULL,
+  old_episode_clinician_id BIGINT UNSIGNED NULL,
+  old_attributed_intake_at DATETIME(3) NULL,
+  report_id BIGINT UNSIGNED NULL,
+  old_episode_submitted_at DATETIME(3) NULL,
+  old_episode_assessment_created_at DATETIME(3) NULL,
+  old_episode_report_generated_at DATETIME(3) NULL,
+  repair_rank BIGINT NOT NULL,
+  downgrade_tasks BIGINT NOT NULL,
+  KEY idx_repair_mock_task_scope_testee (testee_id, group_plan_id),
+  KEY idx_repair_mock_task_scope_assessment (assessment_id),
+  KEY idx_repair_mock_task_scope_answersheet (answer_sheet_id),
+  KEY idx_repair_mock_task_scope_org (org_id)
+) DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci`); err != nil {
+		return err
+	}
 	query := fmt.Sprintf(`
-CREATE TEMPORARY TABLE repair_mock_task_completion_scope DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci AS
-SELECT *
+INSERT INTO repair_mock_task_completion_scope (
+  task_id, org_id, plan_id, group_plan_id, testee_id, old_task_status,
+  old_task_assessment_id, old_task_created_at, old_open_at, old_expire_at,
+  old_completed_at, assessment_id, answer_sheet_id, old_origin_type,
+  old_origin_id, old_assessment_created_at, old_assessment_submitted_at,
+  old_assessment_interpreted_at, old_assessment_failed_at, episode_id,
+  old_episode_entry_id, old_episode_clinician_id, old_attributed_intake_at,
+  report_id, old_episode_submitted_at, old_episode_assessment_created_at,
+  old_episode_report_generated_at, repair_rank, downgrade_tasks
+)
+SELECT
+  task_id, org_id, plan_id, group_plan_id, testee_id, old_task_status,
+  old_task_assessment_id, old_task_created_at, old_open_at, old_expire_at,
+  old_completed_at, assessment_id, answer_sheet_id, old_origin_type,
+  old_origin_id, old_assessment_created_at, old_assessment_submitted_at,
+  old_assessment_interpreted_at, old_assessment_failed_at, episode_id,
+  old_episode_entry_id, old_episode_clinician_id, old_attributed_intake_at,
+  report_id, old_episode_submitted_at, old_episode_assessment_created_at,
+  old_episode_report_generated_at, repair_rank, downgrade_tasks
 FROM (
   SELECT
     t.id AS task_id,
