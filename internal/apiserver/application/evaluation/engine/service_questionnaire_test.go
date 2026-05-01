@@ -11,7 +11,7 @@ import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
+	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -426,7 +426,7 @@ func ptr[T any](v T) *T {
 
 type waiterNotifierStub struct{}
 
-func (w *waiterNotifierStub) Notify(context.Context, uint64, waiter.StatusSummary) {}
+func (w *waiterNotifierStub) Notify(context.Context, uint64, evaluationwaiter.StatusSummary) {}
 
 func (w *waiterNotifierStub) GetWaiterCount(uint64) int { return 0 }
 

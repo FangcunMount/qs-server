@@ -2,17 +2,14 @@ package statistics
 
 import (
 	"context"
+	"fmt"
 	"testing"
 	"time"
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/alicebob/miniredis/v2"
-	redis "github.com/redis/go-redis/v9"
 )
 
 type statisticsReadModelStub struct {
@@ -389,20 +386,67 @@ func TestReadServiceGetQuestionnaireBatchStatisticsDeduplicatesKeepsOrderAndFall
 	}
 }
 
-func newStatisticsQueryCache(t *testing.T) *statisticsCache.StatisticsCache {
-	t.Helper()
+type memoryStatisticsCache struct {
+	overview map[string]*domainStatistics.StatisticsOverview
+}
 
-	mr := miniredis.RunT(t)
-	client := redis.NewUniversalClient(&redis.UniversalOptions{Addrs: []string{mr.Addr()}})
-	t.Cleanup(func() {
-		_ = client.Close()
-	})
-	return statisticsCache.NewStatisticsCacheWithBuilderAndPolicy(
-		client,
-		keyspace.NewBuilderWithNamespace("stats-test"),
-		cachepolicy.CachePolicy{},
+func newStatisticsQueryCache(t *testing.T) *memoryStatisticsCache {
+	t.Helper()
+	return &memoryStatisticsCache{overview: make(map[string]*domainStatistics.StatisticsOverview)}
+}
+
+func (*memoryStatisticsCache) LoadSystemStatistics(context.Context, int64) (*domainStatistics.SystemStatistics, bool) {
+	return nil, false
+}
+
+func (*memoryStatisticsCache) StoreSystemStatistics(context.Context, int64, *domainStatistics.SystemStatistics) {
+}
+
+func (*memoryStatisticsCache) LoadQuestionnaireStatistics(context.Context, int64, string) (*domainStatistics.QuestionnaireStatistics, bool) {
+	return nil, false
+}
+
+func (*memoryStatisticsCache) StoreQuestionnaireStatistics(context.Context, int64, string, *domainStatistics.QuestionnaireStatistics) {
+}
+
+func (*memoryStatisticsCache) LoadTesteeStatistics(context.Context, int64, uint64) (*domainStatistics.TesteeStatistics, bool) {
+	return nil, false
+}
+
+func (*memoryStatisticsCache) StoreTesteeStatistics(context.Context, int64, uint64, *domainStatistics.TesteeStatistics) {
+}
+
+func (*memoryStatisticsCache) LoadPlanStatistics(context.Context, int64, uint64) (*domainStatistics.PlanStatistics, bool) {
+	return nil, false
+}
+
+func (*memoryStatisticsCache) StorePlanStatistics(context.Context, int64, uint64, *domainStatistics.PlanStatistics) {
+}
+
+func (c *memoryStatisticsCache) LoadOverview(_ context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.StatisticsOverview, bool) {
+	if c == nil {
+		return nil, false
+	}
+	stats, ok := c.overview[statisticsCacheOverviewKey(orgID, timeRange)]
+	return stats, ok
+}
+
+func (c *memoryStatisticsCache) StoreOverview(_ context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange, stats *domainStatistics.StatisticsOverview) {
+	if c == nil || stats == nil {
+		return
+	}
+	c.overview[statisticsCacheOverviewKey(orgID, timeRange)] = stats
+}
+
+func statisticsCacheOverviewKey(orgID int64, timeRange domainStatistics.StatisticsTimeRange) string {
+	return fmt.Sprintf("%d|%s|%s|%s",
+		orgID,
+		timeRange.Preset,
+		timeRange.From.Format(time.RFC3339Nano),
+		timeRange.To.Format(time.RFC3339Nano),
 	)
 }
 
 var _ StatisticsReadModel = (*statisticsReadModelStub)(nil)
 var _ domainAnswerSheet.Repository = (*answerSheetRepoStub)(nil)
+var _ statisticscache.Cache = (*memoryStatisticsCache)(nil)

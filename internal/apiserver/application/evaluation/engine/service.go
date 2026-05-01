@@ -13,16 +13,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
+	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-type waiterNotifier interface {
-	Notify(ctx context.Context, assessmentID uint64, summary waiter.StatusSummary)
-	GetWaiterCount(assessmentID uint64) int
-}
+type waiterNotifier = evaluationwaiter.Notifier
 
 // service 评估引擎服务实现
 type service struct {

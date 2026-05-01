@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
-	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -53,8 +53,8 @@ type Container struct {
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 
 	// 基础设施服务
-	QRCodeGenerator       wechatPort.QRCodeGenerator            // 小程序码生成器（可选）
-	SubscribeSender       wechatPort.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
+	QRCodeGenerator       wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
+	SubscribeSender       wechatmini.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）
 	QRCodeObjectStore     objectstorageport.PublicObjectStore   // 二维码对象存储（可选）
 	QRCodeObjectKeyPrefix string                                // 二维码对象 key 前缀
 

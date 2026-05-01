@@ -100,6 +100,10 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		authzSnap = deps.OperatorAuthz.Snapshot
 	}
 	authzSnapshotReader := iam.NewAuthzSnapshotReader(authzSnap)
+	operatorAuthzGateway := iam.NewOperatorAuthzGateway(authzAssign, authzSnap)
+	userDirectory := iam.NewUserDirectory(identitySvc)
+	accountRegistrar := iam.NewOperationAccountRegistrar(operationAccountSvc)
+	guardianDirectory := iam.NewGuardianDirectory(guardianshipSvc, identitySvc)
 
 	txRunner := newMySQLTransactionRunner(mysqlDB)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
@@ -164,8 +168,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 
 	module.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
 		module.TesteeQueryService,
-		guardianshipSvc,
-		identitySvc,
+		guardianDirectory,
 	)
 	module.OperatorLifecycleService = operatorApp.NewLifecycleService(
 		module.OperatorRepo,
@@ -176,10 +179,9 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		operatorRoleAllocator,
 		operatorBinder,
 		txRunner,
-		identitySvc,
-		operationAccountSvc,
-		authzAssign,
-		authzSnap,
+		userDirectory,
+		accountRegistrar,
+		operatorAuthzGateway,
 	)
 	module.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
 		module.OperatorRepo,
@@ -187,8 +189,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		operatorRoleAllocator,
 		operatorLifecycler,
 		txRunner,
-		authzAssign,
-		authzSnap,
+		operatorAuthzGateway,
 	)
 	module.OperatorQueryService = operatorApp.NewQueryService(module.OperatorRepo)
 	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(module.OperatorRepo)

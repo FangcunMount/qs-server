@@ -6,6 +6,7 @@ import (
 
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	qrcodeObjectStorage "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/aliyunoss"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -114,6 +115,12 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions, ossO
 	}
 
 	config := c.buildQRCodeServiceConfig(wechatOptions, ossOptions)
+	imageStore := qrcodeObjectStorage.NewQRCodeAssetStore(qrcodeObjectStorage.QRCodeAssetStoreOptions{
+		ObjectStore:     c.QRCodeObjectStore,
+		ObjectKeyPrefix: config.ObjectKeyPrefix,
+		PublicURLPrefix: config.PublicURLPrefix,
+		LocalStorageDir: qrcodeApp.QRCodeStorageDir,
+	})
 	if wechatOptions.WeChatAppID != "" {
 		c.printf("📱 QRCode service will use IAM to query wechat app (wechat_app_id: %s)\n", wechatOptions.WeChatAppID)
 	} else {
@@ -124,7 +131,7 @@ func (c *Container) InitQRCodeService(wechatOptions *options.WeChatOptions, ossO
 		c.QRCodeGenerator,
 		config,
 		c.resolveWeChatAppService(),
-		c.QRCodeObjectStore,
+		imageStore,
 	)
 	c.wireQRCodeServiceDependencies()
 	c.printf("📱 QRCode service initialized (application layer, page_path: %s)\n", wechatOptions.PagePath)

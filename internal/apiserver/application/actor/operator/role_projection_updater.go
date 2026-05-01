@@ -22,7 +22,13 @@ func (u roleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *doma
 		return nil
 	}
 
-	roles := snap.RoleNames()
+	return persistOperatorRolesFromNames(ctx, u.repo, op, snap.RoleNames())
+}
+
+func persistOperatorRolesFromNames(ctx context.Context, repo domain.Repository, op *domain.Operator, roles []string) error {
+	if repo == nil || op == nil {
+		return nil
+	}
 	projected := make([]domain.Role, 0, len(roles))
 	for _, role := range roles {
 		projected = append(projected, domain.Role(role))
@@ -35,7 +41,7 @@ func (u roleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *doma
 	}
 
 	op.ReplaceRolesProjection(projected)
-	return u.repo.Update(ctx, op)
+	return repo.Update(ctx, op)
 }
 
 func operatorRolesEqual(current, projected []domain.Role) bool {

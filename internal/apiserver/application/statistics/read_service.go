@@ -2,17 +2,14 @@ package statistics
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
+	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -20,13 +17,13 @@ import (
 type readService struct {
 	readModel       StatisticsReadModel
 	answerSheetRepo surveyAnswerSheet.Repository
-	cache           *statisticsCache.StatisticsCache
+	cache           statisticscache.Cache
 	hotset          cachetarget.HotsetRecorder
 }
 
 type ReadServiceOption func(*readService)
 
-func WithReadServiceCache(cache *statisticsCache.StatisticsCache) ReadServiceOption {
+func WithReadServiceCache(cache statisticscache.Cache) ReadServiceOption {
 	return func(s *readService) {
 		s.cache = cache
 	}
@@ -55,8 +52,7 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 		return nil, err
 	}
 
-	cacheKey := overviewStatsCacheKey(orgID, timeRange)
-	if stats, ok := s.loadCachedOverview(ctx, cacheKey); ok {
+	if stats, ok := s.loadCachedOverview(ctx, orgID, timeRange); ok {
 		s.recordOverviewHotset(ctx, orgID, timeRange)
 		return stats, nil
 	}
@@ -65,7 +61,7 @@ func (s *readService) GetOverview(ctx context.Context, orgID int64, filter Query
 	if err != nil {
 		return nil, err
 	}
-	s.cacheOverview(ctx, cacheKey, stats)
+	s.cacheOverview(ctx, orgID, timeRange, stats)
 	s.recordOverviewHotset(ctx, orgID, timeRange)
 	return stats, nil
 }
@@ -512,35 +508,18 @@ func fillMissingDailyCounts(from, to time.Time, counts []domainStatistics.DailyC
 	return filled
 }
 
-func (s *readService) loadCachedOverview(ctx context.Context, cacheKey string) (*domainStatistics.StatisticsOverview, bool) {
-	if s == nil || s.cache == nil || strings.TrimSpace(cacheKey) == "" {
+func (s *readService) loadCachedOverview(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.StatisticsOverview, bool) {
+	if s == nil || s.cache == nil {
 		return nil, false
 	}
-	cached, err := s.cache.GetQueryCache(ctx, cacheKey)
-	if err != nil || cached == "" {
-		return nil, false
-	}
-	var stats domainStatistics.StatisticsOverview
-	if err := json.Unmarshal([]byte(cached), &stats); err != nil {
-		logger.L(ctx).Warnw("解析统计概览缓存失败", "cache_key", cacheKey, "error", err)
-		return nil, false
-	}
-	logger.L(ctx).Debugw("从Redis缓存获取统计概览", "cache_key", cacheKey)
-	return &stats, true
+	return s.cache.LoadOverview(ctx, orgID, timeRange)
 }
 
-func (s *readService) cacheOverview(ctx context.Context, cacheKey string, stats *domainStatistics.StatisticsOverview) {
-	if s == nil || s.cache == nil || stats == nil || strings.TrimSpace(cacheKey) == "" {
+func (s *readService) cacheOverview(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange, stats *domainStatistics.StatisticsOverview) {
+	if s == nil || s.cache == nil || stats == nil {
 		return
 	}
-	data, err := json.Marshal(stats)
-	if err != nil {
-		logger.L(ctx).Warnw("序列化统计概览缓存失败", "cache_key", cacheKey, "error", err)
-		return
-	}
-	if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
-		logger.L(ctx).Warnw("写入统计概览缓存失败", "cache_key", cacheKey, "error", err)
-	}
+	s.cache.StoreOverview(ctx, orgID, timeRange, stats)
 }
 
 func (s *readService) recordOverviewHotset(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) {
@@ -552,15 +531,6 @@ func (s *readService) recordOverviewHotset(ctx context.Context, orgID int64, tim
 		return
 	}
 	_ = s.hotset.Record(ctx, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
-}
-
-func overviewStatsCacheKey(orgID int64, timeRange domainStatistics.StatisticsTimeRange) string {
-	from := normalizeLocalDay(timeRange.From).Format("2006-01-02")
-	to := normalizeLocalDay(timeRange.To).Format("2006-01-02")
-	if preset, ok := overviewWarmupPreset(timeRange); ok {
-		return fmt.Sprintf("overview:%d:preset:%s:%s:%s", orgID, preset, from, to)
-	}
-	return fmt.Sprintf("overview:%d:range:%s:%s", orgID, from, to)
 }
 
 func overviewWarmupPreset(timeRange domainStatistics.StatisticsTimeRange) (string, bool) {

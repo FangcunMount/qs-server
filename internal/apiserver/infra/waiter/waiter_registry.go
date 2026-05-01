@@ -4,6 +4,8 @@ import (
 	"context"
 	"sync"
 	"time"
+
+	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
 // Logger 日志接口（避免循环依赖）
@@ -13,13 +15,7 @@ type Logger interface {
 	Warnw(msg string, keysAndValues ...interface{})
 }
 
-// StatusSummary 状态摘要（用于长轮询响应）
-type StatusSummary struct {
-	Status     string   `json:"status"` // pending/submitted/interpreted/failed
-	TotalScore *float64 `json:"total_score,omitempty"`
-	RiskLevel  *string  `json:"risk_level,omitempty"`
-	UpdatedAt  int64    `json:"updated_at"` // Unix timestamp
-}
+type StatusSummary = evaluationwaiter.StatusSummary
 
 // WaiterRegistry 等待队列注册表
 // 用于长轮询机制：当评估完成时，通知所有等待该测评的客户端

@@ -2,13 +2,12 @@ package operator
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 )
 
 // authorizationService 操作者权限管理服务实现
@@ -19,8 +18,7 @@ type authorizationService struct {
 	roleAllocator domain.RoleAllocator
 	lifecycler    domain.Lifecycler
 	uow           apptransaction.Runner
-	assignment    *iaminfra.AuthzAssignmentClient
-	snapshot      *iaminfra.AuthzSnapshotLoader
+	authz         iambridge.OperatorAuthzGateway
 }
 
 // NewAuthorizationService 创建操作者权限管理服务
@@ -30,8 +28,7 @@ func NewAuthorizationService(
 	roleAllocator domain.RoleAllocator,
 	lifecycler domain.Lifecycler,
 	uow apptransaction.Runner,
-	assignment *iaminfra.AuthzAssignmentClient,
-	snapshot *iaminfra.AuthzSnapshotLoader,
+	authz iambridge.OperatorAuthzGateway,
 ) OperatorAuthorizationService {
 	return &authorizationService{
 		repo:          repo,
@@ -39,8 +36,7 @@ func NewAuthorizationService(
 		roleAllocator: roleAllocator,
 		lifecycler:    lifecycler,
 		uow:           uow,
-		assignment:    assignment,
-		snapshot:      snapshot,
+		authz:         authz,
 	}
 }
 
@@ -60,12 +56,11 @@ func (s *authorizationService) AssignRole(ctx context.Context, operatorID uint64
 		return errors.Wrap(err, "failed to find operator")
 	}
 
-	if s.assignment != nil && s.snapshot != nil {
-		dom := s.snapshot.DomainForOrg(st.OrgID())
-		if err := s.assignment.Grant(ctx, dom, strconv.FormatInt(st.UserID(), 10), roleName, actorctx.IAMGrantedBySubject(ctx)); err != nil {
+	if s.operatorAuthzEnabled() {
+		if err := s.authz.GrantOperatorRole(ctx, st.OrgID(), st.UserID(), roleName, actorctx.IAMGrantedBySubject(ctx)); err != nil {
 			return errors.Wrap(err, "iam grant assignment")
 		}
-		if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, st.OrgID(), st); err != nil {
+		if err := s.persistOperatorRolesFromAuthz(ctx, st); err != nil {
 			return errors.Wrap(err, "sync roles from iam snapshot")
 		}
 		return nil
@@ -99,12 +94,11 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 		return errors.Wrap(err, "failed to find operator")
 	}
 
-	if s.assignment != nil && s.snapshot != nil {
-		dom := s.snapshot.DomainForOrg(st.OrgID())
-		if err := s.assignment.Revoke(ctx, dom, strconv.FormatInt(st.UserID(), 10), roleName); err != nil {
+	if s.operatorAuthzEnabled() {
+		if err := s.authz.RevokeOperatorRole(ctx, st.OrgID(), st.UserID(), roleName); err != nil {
 			return errors.Wrap(err, "iam revoke assignment")
 		}
-		if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, st.OrgID(), st); err != nil {
+		if err := s.persistOperatorRolesFromAuthz(ctx, st); err != nil {
 			return errors.Wrap(err, "sync roles from iam snapshot")
 		}
 		return nil
@@ -120,6 +114,21 @@ func (s *authorizationService) RemoveRole(ctx context.Context, operatorID uint64
 		}
 		return s.repo.Update(txCtx, st2)
 	})
+}
+
+func (s *authorizationService) operatorAuthzEnabled() bool {
+	return s != nil && s.authz != nil && s.authz.IsEnabled()
+}
+
+func (s *authorizationService) persistOperatorRolesFromAuthz(ctx context.Context, op *domain.Operator) error {
+	if s == nil || s.authz == nil || op == nil {
+		return nil
+	}
+	roleNames, err := s.authz.LoadOperatorRoleNames(ctx, op.OrgID(), op.UserID())
+	if err != nil {
+		return err
+	}
+	return persistOperatorRolesFromNames(ctx, s.repo, op, roleNames)
 }
 
 // Activate 激活操作者

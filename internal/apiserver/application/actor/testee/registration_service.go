@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -21,7 +21,7 @@ type registrationService struct {
 	validator       domain.Validator
 	binder          domain.Binder
 	uow             apptransaction.Runner
-	guardianshipSvc *iam.GuardianshipService
+	guardianshipSvc iambridge.GuardianshipReader
 }
 
 // NewRegistrationService 创建受试者注册服务
@@ -31,7 +31,7 @@ func NewRegistrationService(
 	validator domain.Validator,
 	binder domain.Binder,
 	uow apptransaction.Runner,
-	guardianshipSvc *iam.GuardianshipService,
+	guardianshipSvc iambridge.GuardianshipReader,
 ) TesteeRegistrationService {
 	return &registrationService{
 		repo:            repo,

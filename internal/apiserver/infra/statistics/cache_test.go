@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	cachepolicy "github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
@@ -133,5 +134,44 @@ func TestStatisticsCacheSupportsMissingVersionTokenStoreKey(t *testing.T) {
 	}
 	if got != "{\"ok\":true}" {
 		t.Fatalf("GetQueryCache() = %q, want original payload", got)
+	}
+}
+
+func TestStatisticsTypedCacheOwnsStatisticsQueryKeys(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
+	ctx := context.Background()
+
+	cache.StoreQuestionnaireStatistics(ctx, 12, "PHQ9", &domainStatistics.QuestionnaireStatistics{})
+	cache.StorePlanStatistics(ctx, 12, 1001, &domainStatistics.PlanStatistics{})
+
+	if !mr.Exists("stats-test:query:stats:query:questionnaire:12:PHQ9:v0") {
+		t.Fatalf("expected questionnaire statistics query key")
+	}
+	if !mr.Exists("stats-test:query:stats:query:plan:12:1001:v0") {
+		t.Fatalf("expected plan statistics query key")
+	}
+}
+
+func TestStatisticsTypedCacheDegradesInvalidJSONToMiss(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	cache := NewStatisticsCacheWithBuilderAndPolicy(client, keyspace.NewBuilderWithNamespace("stats-test"), cachepolicy.CachePolicy{})
+	ctx := context.Background()
+
+	if err := cache.SetQueryCache(ctx, "system:12", "{", time.Minute); err != nil {
+		t.Fatalf("SetQueryCache() error = %v", err)
+	}
+	if stats, ok := cache.LoadSystemStatistics(ctx, 12); ok || stats != nil {
+		t.Fatalf("LoadSystemStatistics() = (%+v, %v), want miss", stats, ok)
 	}
 }

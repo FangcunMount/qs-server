@@ -16,22 +16,17 @@ func TestApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 	root := repoRoot(t)
 	forbiddenImports := map[string]string{
 		"go.mongodb.org/mongo-driver":                                 "repository ports, not Mongo driver errors",
+		"github.com/FangcunMount/iam/":                                "IAM bridge ports, not generated IAM packages",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/": "application ports, not infrastructure packages",
 	}
-	for _, dir := range []string{
-		filepath.Join(root, "internal", "apiserver", "application", "actor", "access"),
-		filepath.Join(root, "internal", "apiserver", "application", "scale"),
-		filepath.Join(root, "internal", "apiserver", "application", "survey", "questionnaire"),
-	} {
-		scanGoImports(t, dir, func(path, importPath string) {
-			for forbidden, replacement := range forbiddenImports {
-				if strings.HasPrefix(importPath, forbidden) {
-					rel := filepath.ToSlash(mustRel(t, root, path))
-					t.Fatalf("%s imports %s; application services must depend on %s", rel, importPath, replacement)
-				}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application"), func(path, importPath string) {
+		for forbidden, replacement := range forbiddenImports {
+			if strings.HasPrefix(importPath, forbidden) {
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				t.Fatalf("%s imports %s; application services must depend on %s", rel, importPath, replacement)
 			}
-		})
-	}
+		}
+	})
 }
 
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {

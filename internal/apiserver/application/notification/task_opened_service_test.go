@@ -7,13 +7,12 @@ import (
 	"testing"
 	"time"
 
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
-	idpv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/idp/v2"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
 
 type testeeLookupStub struct {
@@ -57,49 +56,34 @@ func (s *scaleLookupStub) GetByCode(context.Context, string) (*scaleApp.ScaleRes
 	return s.result, s.err
 }
 
-type guardianshipLookupStub struct {
-	enabled   bool
-	resp      *identityv2.ListProfileLinksResponse
-	err       error
-	callCount int
+type recipientResolverStub struct {
+	enabled    bool
+	recipients *iambridge.MiniProgramRecipients
+	err        error
+	callCount  int
+	childID    string
 }
 
-func (s *guardianshipLookupStub) IsEnabled() bool { return s.enabled }
-func (s *guardianshipLookupStub) ListGuardians(context.Context, string) (*identityv2.ListProfileLinksResponse, error) {
+func (s *recipientResolverStub) IsEnabled() bool { return s.enabled }
+func (s *recipientResolverStub) ResolveMiniProgramRecipients(_ context.Context, childID string) (*iambridge.MiniProgramRecipients, error) {
 	s.callCount++
-	return s.resp, s.err
-}
-
-type userLookupStub struct {
-	enabled bool
-	users   map[string]*identityv2.GetUserResponse
-	errs    map[string]error
-}
-
-func (s *userLookupStub) IsEnabled() bool { return s.enabled }
-func (s *userLookupStub) GetUser(_ context.Context, userID string) (*identityv2.GetUserResponse, error) {
-	if err := s.errs[userID]; err != nil {
-		return nil, err
-	}
-	if resp, ok := s.users[userID]; ok {
-		return resp, nil
-	}
-	return nil, fmt.Errorf("not found")
+	s.childID = childID
+	return s.recipients, s.err
 }
 
 type wechatAppLookupStub struct{}
 
 func (s *wechatAppLookupStub) IsEnabled() bool { return false }
-func (s *wechatAppLookupStub) GetWechatApp(context.Context, string) (*idpv2.GetWechatAppResponse, error) {
+func (s *wechatAppLookupStub) ResolveWeChatAppConfig(context.Context, string) (*iambridge.WeChatAppConfig, error) {
 	return nil, fmt.Errorf("disabled")
 }
 
 type senderStub struct {
-	templates []port.SubscribeTemplate
-	sent      []port.SubscribeMessage
+	templates []wechatmini.SubscribeTemplate
+	sent      []wechatmini.SubscribeMessage
 }
 
-func (s *senderStub) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg port.SubscribeMessage) error {
+func (s *senderStub) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) error {
 	if appID == "" || appSecret == "" {
 		return fmt.Errorf("missing app config")
 	}
@@ -107,7 +91,7 @@ func (s *senderStub) SendSubscribeMessage(_ context.Context, appID, appSecret st
 	return nil
 }
 
-func (s *senderStub) ListTemplates(context.Context, string, string) ([]port.SubscribeTemplate, error) {
+func (s *senderStub) ListTemplates(context.Context, string, string) ([]wechatmini.SubscribeTemplate, error) {
 	return s.templates, nil
 }
 
@@ -136,28 +120,15 @@ func buildTaskOpenedFixture(t *testing.T, testeeID uint64, seq int, totalTimes i
 func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	profileID := uint64(1001)
 	planAggregate, task, tasks := buildTaskOpenedFixture(t, 12, 2, 4)
-	guardians := &guardianshipLookupStub{
+	resolver := &recipientResolverStub{
 		enabled: true,
-		resp: &identityv2.ListProfileLinksResponse{
-			Items: []*identityv2.ProfileLinkEdge{
-				{
-					User: &identityv2.User{
-						Id: "guardian-1",
-						ExternalIdentities: []*identityv2.ExternalIdentity{
-							{Provider: "wx:minip", ExternalId: "openid-guardian"},
-						},
-					},
-				},
-			},
+		recipients: &iambridge.MiniProgramRecipients{
+			OpenIDs: []string{"openid-guardian"},
+			Source:  "guardian",
 		},
 	}
-	identitySvc := &userLookupStub{
-		enabled: true,
-		errs:    map[string]error{"1001": fmt.Errorf("not found")},
-		users:   map[string]*identityv2.GetUserResponse{},
-	}
 	sender := &senderStub{
-		templates: []port.SubscribeTemplate{
+		templates: []wechatmini.SubscribeTemplate{
 			{
 				ID:      "tmpl-1",
 				Content: "计划名称\n{{thing5.DATA}}\n计划时间\n{{date1.DATA}}\n计划进展\n{{character_string2.DATA}}\n温馨提示\n{{thing3.DATA}}",
@@ -174,8 +145,7 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 		&taskLookupStub{task: task, tasks: tasks},
 		&planLookupStub{plan: planAggregate},
 		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "儿童抑郁量表"}},
-		guardians,
-		identitySvc,
+		resolver,
 		&wechatAppLookupStub{},
 		sender,
 		&Config{
@@ -198,8 +168,8 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	if result.SentCount != 1 || result.RecipientSource != "guardian" {
 		t.Fatalf("unexpected result: %#v", result)
 	}
-	if guardians.callCount != 1 {
-		t.Fatalf("expected guardianship fallback, got callCount=%d", guardians.callCount)
+	if resolver.callCount != 1 || resolver.childID != "1001" {
+		t.Fatalf("expected recipient resolver call, got callCount=%d childID=%q", resolver.callCount, resolver.childID)
 	}
 	if len(sender.sent) != 1 {
 		t.Fatalf("expected one sent message, got %d", len(sender.sent))
@@ -221,23 +191,15 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 	profileID := uint64(2002)
 	planAggregate, task, tasks := buildTaskOpenedFixture(t, 22, 1, 3)
-	guardians := &guardianshipLookupStub{enabled: true}
-	identitySvc := &userLookupStub{
+	resolver := &recipientResolverStub{
 		enabled: true,
-		users: map[string]*identityv2.GetUserResponse{
-			"2002": {
-				User: &identityv2.User{
-					Id: "2002",
-					ExternalIdentities: []*identityv2.ExternalIdentity{
-						{Provider: "wx:minip", ExternalId: "openid-testee"},
-					},
-				},
-			},
+		recipients: &iambridge.MiniProgramRecipients{
+			OpenIDs: []string{"openid-testee"},
+			Source:  "testee",
 		},
-		errs: map[string]error{},
 	}
 	sender := &senderStub{
-		templates: []port.SubscribeTemplate{
+		templates: []wechatmini.SubscribeTemplate{
 			{
 				ID:      "tmpl-1",
 				Content: "计划名称\n{{thing5.DATA}}\n计划时间\n{{date1.DATA}}\n计划进展\n{{character_string2.DATA}}\n温馨提示\n{{thing3.DATA}}",
@@ -254,8 +216,7 @@ func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 		&taskLookupStub{task: task, tasks: tasks[:1]},
 		&planLookupStub{plan: planAggregate},
 		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "执行功能测评"}},
-		guardians,
-		identitySvc,
+		resolver,
 		&wechatAppLookupStub{},
 		sender,
 		&Config{
@@ -276,8 +237,8 @@ func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 	if result.RecipientSource != "testee" || result.SentCount != 1 {
 		t.Fatalf("unexpected result: %#v", result)
 	}
-	if guardians.callCount != 0 {
-		t.Fatalf("expected direct user path without guardian fallback, got callCount=%d", guardians.callCount)
+	if resolver.callCount != 1 || resolver.childID != "2002" {
+		t.Fatalf("expected recipient resolver call, got callCount=%d childID=%q", resolver.callCount, resolver.childID)
 	}
 	if len(sender.sent) != 1 || sender.sent[0].ToUser != "openid-testee" {
 		t.Fatalf("unexpected sent payload: %#v", sender.sent)
@@ -294,7 +255,7 @@ func TestSendTaskOpenedFailsWhenTemplateKeysMismatch(t *testing.T) {
 	profileID := uint64(3003)
 	planAggregate, task, tasks := buildTaskOpenedFixture(t, 33, 1, 2)
 	sender := &senderStub{
-		templates: []port.SubscribeTemplate{
+		templates: []wechatmini.SubscribeTemplate{
 			{
 				ID:      "tmpl-1",
 				Content: "{{thing5.DATA}}\n{{date1.DATA}}\n{{thing3.DATA}}",
@@ -311,20 +272,12 @@ func TestSendTaskOpenedFailsWhenTemplateKeysMismatch(t *testing.T) {
 		&taskLookupStub{task: task, tasks: tasks},
 		&planLookupStub{plan: planAggregate},
 		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "儿童抑郁量表"}},
-		&guardianshipLookupStub{enabled: true},
-		&userLookupStub{
+		&recipientResolverStub{
 			enabled: true,
-			users: map[string]*identityv2.GetUserResponse{
-				"3003": {
-					User: &identityv2.User{
-						Id: "3003",
-						ExternalIdentities: []*identityv2.ExternalIdentity{
-							{Provider: "wx:minip", ExternalId: "openid-testee"},
-						},
-					},
-				},
+			recipients: &iambridge.MiniProgramRecipients{
+				OpenIDs: []string{"openid-testee"},
+				Source:  "testee",
 			},
-			errs: map[string]error{},
 		},
 		&wechatAppLookupStub{},
 		sender,

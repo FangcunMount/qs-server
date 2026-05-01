@@ -2,15 +2,13 @@ package operator
 
 import (
 	"context"
-	"strconv"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -25,10 +23,9 @@ type lifecycleService struct {
 	roleAllocator domain.RoleAllocator
 	binder        domain.Binder
 	uow           apptransaction.Runner
-	identitySvc   *iam.IdentityService
-	accountSvc    *iam.OperationAccountService
-	assignment    *iam.AuthzAssignmentClient
-	snapshot      *iam.AuthzSnapshotLoader
+	identitySvc   iambridge.UserDirectory
+	accountSvc    iambridge.OperationAccountRegistrar
+	authz         iambridge.OperatorAuthzGateway
 }
 
 // NewLifecycleService 创建操作者生命周期服务
@@ -41,10 +38,9 @@ func NewLifecycleService(
 	roleAllocator domain.RoleAllocator,
 	binder domain.Binder,
 	uow apptransaction.Runner,
-	identitySvc *iam.IdentityService,
-	accountSvc *iam.OperationAccountService,
-	assignment *iam.AuthzAssignmentClient,
-	snapshot *iam.AuthzSnapshotLoader,
+	identitySvc iambridge.UserDirectory,
+	accountSvc iambridge.OperationAccountRegistrar,
+	authz iambridge.OperatorAuthzGateway,
 ) OperatorLifecycleService {
 	return &lifecycleService{
 		repo:          repo,
@@ -57,8 +53,7 @@ func NewLifecycleService(
 		uow:           uow,
 		identitySvc:   identitySvc,
 		accountSvc:    accountSvc,
-		assignment:    assignment,
-		snapshot:      snapshot,
+		authz:         authz,
 	}
 }
 
@@ -93,7 +88,7 @@ func (s *lifecycleService) Register(ctx context.Context, dto RegisterOperatorDTO
 		return nil, err
 	}
 
-	if dto.IsActive && s.assignment != nil && s.snapshot != nil {
+	if dto.IsActive && s.operatorAuthzEnabled() {
 		if err := s.syncIAMRolesAfterRegister(ctx, result, dto.Roles); err != nil {
 			if created {
 				if rollbackErr := s.rollbackRegisteredOperator(ctx, result.ID()); rollbackErr != nil {
@@ -247,7 +242,7 @@ func (s *lifecycleService) validateRegisterDTO(dto RegisterOperatorDTO) error {
 			return err
 		}
 	}
-	if s.assignment == nil || s.snapshot == nil {
+	if !s.operatorAuthzEnabled() {
 		if len(dto.Roles) == 0 {
 			return errors.WithCode(code.ErrValidation, "roles are required when IAM authorization is not enabled")
 		}
@@ -269,12 +264,12 @@ func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto Register
 		if s.accountSvc == nil || !s.accountSvc.IsEnabled() {
 			return 0, errors.WithCode(code.ErrValidation, "IAM operation account service is not enabled")
 		}
-		result, err := s.accountSvc.RegisterOperationAccount(ctx, iam.RegisterOperationAccountInput{
-			ExistingUserID: formatOptionalUserID(dto.UserID),
+		result, err := s.accountSvc.RegisterOperationAccount(ctx, iambridge.OperationAccountRegistration{
+			ExistingUserID: dto.UserID,
 			Name:           dto.Name,
 			Phone:          dto.Phone,
 			Email:          dto.Email,
-			ScopedTenantID: strconv.FormatInt(dto.OrgID, 10),
+			ScopedTenantID: dto.OrgID,
 			Password:       dto.Password,
 		})
 		if err != nil {
@@ -319,24 +314,7 @@ func (s *lifecycleService) findExistingUserByPhone(ctx context.Context, phone st
 		return 0, false, nil
 	}
 
-	searchReq := &identityv2.SearchUsersRequest{Phones: []string{phone}}
-	searchResp, err := s.identitySvc.SearchUsers(ctx, searchReq)
-	if err != nil {
-		return 0, false, err
-	}
-	if searchResp == nil || len(searchResp.Users) == 0 {
-		return 0, false, nil
-	}
-
-	uidStr := strings.TrimSpace(searchResp.Users[0].Id)
-	if uidStr == "" {
-		return 0, false, nil
-	}
-	uid, err := strconv.ParseInt(uidStr, 10, 64)
-	if err != nil {
-		return 0, false, errors.Wrap(err, "failed to parse user id from IAM search result")
-	}
-	return uid, true, nil
+	return s.identitySvc.FindUserIDByPhone(ctx, phone)
 }
 
 func isUserAlreadyExistsErr(err error) bool {
@@ -349,16 +327,9 @@ func isUserAlreadyExistsErr(err error) bool {
 	return strings.Contains(strings.ToLower(err.Error()), "user already exists")
 }
 
-func formatOptionalUserID(userID int64) string {
-	if userID == 0 {
-		return ""
-	}
-	return strconv.FormatInt(userID, 10)
-}
-
 // createAndSaveOperator 在事务内检查是否已存在、创建 Operator、分配角色并保存
 func (s *lifecycleService) createAndSaveOperator(txCtx context.Context, dto RegisterOperatorDTO, userID int64) (*domain.Operator, bool, error) {
-	useIAM := s.assignment != nil && s.snapshot != nil
+	useIAM := s.operatorAuthzEnabled()
 
 	st, err := s.repo.FindByUser(txCtx, dto.OrgID, userID)
 	if err == nil {
@@ -428,19 +399,31 @@ func (s *lifecycleService) syncOperatorProjection(st *domain.Operator, dto Regis
 }
 
 func (s *lifecycleService) syncIAMRolesAfterRegister(ctx context.Context, op *domain.Operator, roleNames []string) error {
-	dom := s.snapshot.DomainForOrg(op.OrgID())
-	uidStr := strconv.FormatInt(op.UserID(), 10)
 	for _, rn := range roleNames {
 		role := domain.Role(rn)
 		if err := s.validator.ValidateRole(role); err != nil {
 			return err
 		}
-		if err := s.assignment.Grant(ctx, dom, uidStr, rn, actorctx.IAMGrantedBySubject(ctx)); err != nil {
+		if err := s.authz.GrantOperatorRole(ctx, op.OrgID(), op.UserID(), rn, actorctx.IAMGrantedBySubject(ctx)); err != nil {
 			return err
 		}
 	}
-	_, err := iam.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.snapshot, s.repo, op.OrgID(), op)
-	return err
+	return s.persistOperatorRolesFromAuthz(ctx, op)
+}
+
+func (s *lifecycleService) operatorAuthzEnabled() bool {
+	return s != nil && s.authz != nil && s.authz.IsEnabled()
+}
+
+func (s *lifecycleService) persistOperatorRolesFromAuthz(ctx context.Context, op *domain.Operator) error {
+	if s == nil || s.authz == nil || op == nil {
+		return nil
+	}
+	roleNames, err := s.authz.LoadOperatorRoleNames(ctx, op.OrgID(), op.UserID())
+	if err != nil {
+		return err
+	}
+	return persistOperatorRolesFromNames(ctx, s.repo, op, roleNames)
 }
 
 func (s *lifecycleService) rollbackRegisteredOperator(ctx context.Context, id domain.ID) error {

@@ -6,14 +6,14 @@ import (
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 type miniProgramTaskNotificationDeps struct {
-	wechatAppService *iam.WeChatAppService
-	guardianshipSvc  *iam.GuardianshipService
-	identitySvc      *iam.IdentityService
-	scaleQuery       scaleApp.ScaleQueryService
+	wechatAppService  *iam.WeChatAppService
+	recipientResolver iambridge.MiniProgramRecipientResolver
+	scaleQuery        scaleApp.ScaleQueryService
 }
 
 func (c *Container) resolveMiniProgramTaskNotificationDeps() miniProgramTaskNotificationDeps {
@@ -23,8 +23,10 @@ func (c *Container) resolveMiniProgramTaskNotificationDeps() miniProgramTaskNoti
 	}
 	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
 		deps.wechatAppService = c.IAMModule.WeChatAppService()
-		deps.guardianshipSvc = c.IAMModule.GuardianshipService()
-		deps.identitySvc = c.IAMModule.IdentityService()
+		deps.recipientResolver = iam.NewMiniProgramRecipientResolver(
+			c.IAMModule.GuardianshipService(),
+			c.IAMModule.IdentityService(),
+		)
 	}
 	if c.ScaleModule != nil {
 		deps.scaleQuery = c.ScaleModule.QueryService
@@ -81,8 +83,7 @@ func (c *Container) InitMiniProgramTaskNotificationService(wechatOptions *option
 		c.PlanModule.TaskRepo,
 		c.PlanModule.PlanRepo,
 		deps.scaleQuery,
-		deps.guardianshipSvc,
-		deps.identitySvc,
+		deps.recipientResolver,
 		deps.wechatAppService,
 		c.SubscribeSender,
 		buildMiniProgramTaskNotificationConfig(wechatOptions),

@@ -12,13 +12,12 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
-	idpv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/idp/v2"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
 
 var templateKeyPattern = regexp.MustCompile(`\{\{([a-zA-Z_]+\d+)\.DATA\}\}`)
@@ -49,21 +48,6 @@ type scaleLookup interface {
 	GetByCode(ctx context.Context, code string) (*scaleApp.ScaleResult, error)
 }
 
-type guardianshipLookup interface {
-	IsEnabled() bool
-	ListGuardians(ctx context.Context, childID string) (*identityv2.ListProfileLinksResponse, error)
-}
-
-type userLookup interface {
-	IsEnabled() bool
-	GetUser(ctx context.Context, userID string) (*identityv2.GetUserResponse, error)
-}
-
-type wechatAppLookup interface {
-	IsEnabled() bool
-	GetWechatApp(ctx context.Context, appID string) (*idpv2.GetWechatAppResponse, error)
-}
-
 type templateSpec struct {
 	keys []string
 }
@@ -80,10 +64,9 @@ type taskOpenedService struct {
 	taskRepo           taskLookup
 	planRepo           planLookup
 	scaleQueryService  scaleLookup
-	guardianshipSvc    guardianshipLookup
-	identitySvc        userLookup
-	wechatAppService   wechatAppLookup
-	sender             port.MiniProgramSubscribeSender
+	recipientResolver  iambridge.MiniProgramRecipientResolver
+	wechatAppService   iambridge.WeChatAppConfigProvider
+	sender             wechatmini.MiniProgramSubscribeSender
 	config             *Config
 
 	templateCache sync.Map
@@ -95,10 +78,9 @@ func NewMiniProgramTaskNotificationService(
 	taskRepo taskLookup,
 	planRepo planLookup,
 	scaleQueryService scaleLookup,
-	guardianshipSvc guardianshipLookup,
-	identitySvc userLookup,
-	wechatAppService wechatAppLookup,
-	sender port.MiniProgramSubscribeSender,
+	recipientResolver iambridge.MiniProgramRecipientResolver,
+	wechatAppService iambridge.WeChatAppConfigProvider,
+	sender wechatmini.MiniProgramSubscribeSender,
 	config *Config,
 ) MiniProgramTaskNotificationService {
 	return &taskOpenedService{
@@ -106,8 +88,7 @@ func NewMiniProgramTaskNotificationService(
 		taskRepo:           taskRepo,
 		planRepo:           planRepo,
 		scaleQueryService:  scaleQueryService,
-		guardianshipSvc:    guardianshipSvc,
-		identitySvc:        identitySvc,
+		recipientResolver:  recipientResolver,
 		wechatAppService:   wechatAppService,
 		sender:             sender,
 		config:             config,
@@ -181,7 +162,7 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 	var sent int
 	var sendErrs []string
 	for _, openID := range recipients {
-		if err := s.sender.SendSubscribeMessage(ctx, appID, appSecret, port.SubscribeMessage{
+		if err := s.sender.SendSubscribeMessage(ctx, appID, appSecret, wechatmini.SubscribeMessage{
 			ToUser:           openID,
 			TemplateID:       result.TemplateID,
 			Page:             page,
@@ -266,14 +247,14 @@ func (s *taskOpenedService) getWechatAppConfig(ctx context.Context) (appID, appS
 		return "", "", fmt.Errorf("mini program notification config is nil")
 	}
 	if s.config.WeChatAppID != "" && s.wechatAppService != nil && s.wechatAppService.IsEnabled() {
-		resp, err := s.wechatAppService.GetWechatApp(ctx, s.config.WeChatAppID)
+		resp, err := s.wechatAppService.ResolveWeChatAppConfig(ctx, s.config.WeChatAppID)
 		if err != nil {
 			return "", "", fmt.Errorf("get wechat app from IAM: %w", err)
 		}
-		if resp == nil || resp.App == nil || resp.App.GetAppId() == "" || resp.App.GetAppSecret() == "" {
+		if resp == nil || resp.AppID == "" || resp.AppSecret == "" {
 			return "", "", fmt.Errorf("wechat app config from IAM is incomplete")
 		}
-		return resp.App.GetAppId(), resp.App.GetAppSecret(), nil
+		return resp.AppID, resp.AppSecret, nil
 	}
 	if s.config.AppID != "" && s.config.AppSecret != "" {
 		return s.config.AppID, s.config.AppSecret, nil
@@ -285,81 +266,17 @@ func (s *taskOpenedService) resolveRecipients(ctx context.Context, testeeResult 
 	if testeeResult == nil || testeeResult.ProfileID == nil {
 		return nil, "", nil
 	}
-
-	// Best-effort: 某些数据可能直接把 profile_id 绑定到 IAM.User。
-	directUserOpenIDs := s.resolveUserOpenIDs(ctx, strconv.FormatUint(*testeeResult.ProfileID, 10))
-	if len(directUserOpenIDs) > 0 {
-		return directUserOpenIDs, "testee", nil
+	if s.recipientResolver == nil || !s.recipientResolver.IsEnabled() {
+		return nil, "", nil
 	}
-
-	guardianOpenIDs, err := s.resolveGuardianOpenIDs(ctx, strconv.FormatUint(*testeeResult.ProfileID, 10))
+	recipients, err := s.recipientResolver.ResolveMiniProgramRecipients(ctx, strconv.FormatUint(*testeeResult.ProfileID, 10))
 	if err != nil {
 		return nil, "", err
 	}
-	return guardianOpenIDs, "guardian", nil
-}
-
-func (s *taskOpenedService) resolveGuardianOpenIDs(ctx context.Context, childID string) ([]string, error) {
-	if childID == "" || s.guardianshipSvc == nil || !s.guardianshipSvc.IsEnabled() {
-		return nil, nil
+	if recipients == nil {
+		return nil, "", nil
 	}
-
-	resp, err := s.guardianshipSvc.ListGuardians(ctx, childID)
-	if err != nil {
-		return nil, fmt.Errorf("list guardians: %w", err)
-	}
-
-	var recipients []string
-	for _, edge := range resp.Items {
-		if edge == nil {
-			continue
-		}
-		if edge.User != nil {
-			recipients = append(recipients, extractMiniProgramOpenIDs(edge.User)...)
-			continue
-		}
-		if edge.ProfileLink != nil && edge.ProfileLink.UserId != "" {
-			recipients = append(recipients, s.resolveUserOpenIDs(ctx, edge.ProfileLink.UserId)...)
-		}
-	}
-	return uniqueStrings(recipients), nil
-}
-
-func (s *taskOpenedService) resolveUserOpenIDs(ctx context.Context, userID string) []string {
-	if userID == "" || s.identitySvc == nil || !s.identitySvc.IsEnabled() {
-		return nil
-	}
-	resp, err := s.identitySvc.GetUser(ctx, userID)
-	if err != nil {
-		logger.L(ctx).Debugw("failed to resolve mini program recipient by user id",
-			"action", "resolve_miniprogram_recipient",
-			"user_id", userID,
-			"error", err.Error(),
-		)
-		return nil
-	}
-	if resp == nil || resp.User == nil {
-		return nil
-	}
-	return extractMiniProgramOpenIDs(resp.User)
-}
-
-func extractMiniProgramOpenIDs(user *identityv2.User) []string {
-	if user == nil {
-		return nil
-	}
-
-	var recipients []string
-	for _, identity := range user.ExternalIdentities {
-		if identity == nil || identity.ExternalId == "" {
-			continue
-		}
-		provider := strings.ToLower(identity.Provider)
-		if provider == "wx:minip" || provider == "wechat" || provider == "wechat_miniprogram" || strings.HasPrefix(provider, "wx:minip:") {
-			recipients = append(recipients, identity.ExternalId)
-		}
-	}
-	return uniqueStrings(recipients)
+	return recipients.OpenIDs, recipients.Source, nil
 }
 
 func (s *taskOpenedService) loadTemplateSpec(ctx context.Context, appID, appSecret, templateID string) (*templateSpec, error) {
@@ -586,24 +503,4 @@ func (s *taskOpenedService) buildPagePath(entryURL string) string {
 		return pagePath
 	}
 	return pagePath + "?" + pageQuery.Encode()
-}
-
-func uniqueStrings(items []string) []string {
-	if len(items) == 0 {
-		return nil
-	}
-	seen := make(map[string]struct{}, len(items))
-	result := make([]string, 0, len(items))
-	for _, item := range items {
-		if item == "" {
-			continue
-		}
-		if _, ok := seen[item]; ok {
-			continue
-		}
-		seen[item] = struct{}{}
-		result = append(result, item)
-	}
-	slices.Sort(result)
-	return result
 }

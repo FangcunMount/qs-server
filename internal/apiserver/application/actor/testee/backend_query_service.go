@@ -6,28 +6,25 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 )
 
 // backendQueryService 受试者后台查询服务实现
 // 行为者：B端员工(Staff) - 后台管理系统
 // 职责：提供受试者详细信息查询能力（包含家长信息等后台管理所需数据）
 type backendQueryService struct {
-	queryService    TesteeQueryService       // 复用基础查询服务
-	guardianshipSvc *iam.GuardianshipService // IAM 监护关系服务
-	identitySvc     *iam.IdentityService     // IAM 身份服务（用于查询用户详细信息）
+	queryService      TesteeQueryService
+	guardianDirectory iambridge.GuardianDirectory
 }
 
 // NewBackendQueryService 创建受试者后台查询服务
 func NewBackendQueryService(
 	queryService TesteeQueryService,
-	guardianshipSvc *iam.GuardianshipService,
-	identitySvc *iam.IdentityService,
+	guardianDirectory iambridge.GuardianDirectory,
 ) TesteeBackendQueryService {
 	return &backendQueryService{
-		queryService:    queryService,
-		guardianshipSvc: guardianshipSvc,
-		identitySvc:     identitySvc,
+		queryService:      queryService,
+		guardianDirectory: guardianDirectory,
 	}
 }
 
@@ -51,13 +48,13 @@ func (s *backendQueryService) GetByIDWithGuardians(ctx context.Context, testeeID
 			"action", "get_testee_with_guardians",
 			"testee_id", testeeID,
 		)
-	} else if s.guardianshipSvc == nil {
+	} else if s.guardianDirectory == nil {
 		logger.L(ctx).Debugw("Guardianship service is nil, skipping guardian fetch",
 			"action", "get_testee_with_guardians",
 			"testee_id", testeeID,
 			"profile_id", *testeeResult.ProfileID,
 		)
-	} else if !s.guardianshipSvc.IsEnabled() {
+	} else if !s.guardianDirectory.IsEnabled() {
 		logger.L(ctx).Debugw("Guardianship service is not enabled, skipping guardian fetch",
 			"action", "get_testee_with_guardians",
 			"testee_id", testeeID,
@@ -110,7 +107,7 @@ func (s *backendQueryService) ListTesteesWithGuardians(ctx context.Context, dto 
 		}
 
 		// 3. 为每个受试者获取家长信息（如果可用）
-		if testeeResult.ProfileID != nil && s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
+		if testeeResult.ProfileID != nil && s.guardianDirectory != nil && s.guardianDirectory.IsEnabled() {
 			guardians, err := s.fetchGuardians(ctx, *testeeResult.ProfileID)
 			if err != nil {
 				// 家长信息获取失败不影响主流程，记录日志即可
@@ -140,26 +137,15 @@ func (s *backendQueryService) ListTesteesWithGuardians(ctx context.Context, dto 
 func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint64) ([]GuardianInfo, error) {
 	childID := fmt.Sprintf("%d", profileID)
 
-	resp, err := s.guardianshipSvc.ListGuardians(ctx, childID)
+	items, err := s.guardianDirectory.ListGuardians(ctx, childID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list guardians from IAM")
 	}
-
-	if resp == nil {
-		logger.L(ctx).Debugw("IAM ListGuardians returned nil response",
-			"action", "fetch_guardians",
-			"profile_id", profileID,
-			"child_id", childID,
-		)
-		return []GuardianInfo{}, nil
-	}
-
-	if len(resp.Items) == 0 {
+	if len(items) == 0 {
 		logger.L(ctx).Debugw("IAM ListGuardians returned empty items",
 			"action", "fetch_guardians",
 			"profile_id", profileID,
 			"child_id", childID,
-			"total", resp.Total,
 		)
 		return []GuardianInfo{}, nil
 	}
@@ -168,114 +154,32 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 		"action", "fetch_guardians",
 		"profile_id", profileID,
 		"child_id", childID,
-		"total", resp.Total,
-		"items_count", len(resp.Items),
+		"items_count", len(items),
 	)
 
-	// 转换 IAM 响应为 GuardianInfo
-	guardians := make([]GuardianInfo, 0, len(resp.Items))
-	skippedCount := 0
-	for i, edge := range resp.Items {
-		if edge.ProfileLink == nil {
-			logger.L(ctx).Warnw("Skipping guardian item: ProfileLink is nil",
-				"action", "fetch_guardians",
-				"profile_id", profileID,
-				"item_index", i,
-			)
-			skippedCount++
-			continue
+	guardians := make([]GuardianInfo, 0, len(items))
+	for i, item := range items {
+		guardianInfo := GuardianInfo{
+			Name:     item.Name,
+			Phone:    item.Phone,
+			Relation: item.Relation,
 		}
-
-		// 获取监护关系
-		relation := edge.ProfileLink.GetRelation().String()
-
-		var guardianInfo GuardianInfo
-		guardianInfo.Relation = relation
-
-		// 如果 edge.User 不为 nil，直接使用
-		if edge.User != nil {
-			// 从 Guardian 的 Contacts 中获取电话号码
-			phone := ""
-			if len(edge.User.Contacts) > 0 {
-				// 优先获取手机号
-				for _, contact := range edge.User.Contacts {
-					if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
-						phone = contact.GetValue()
-						break
-					}
-				}
-			}
-
-			guardianInfo.Name = edge.User.GetNickname()
-			guardianInfo.Phone = phone
-		} else {
-			// 如果 edge.User 为 nil，根据 profile_link.user_id 查询用户信息
-			if s.identitySvc != nil && s.identitySvc.IsEnabled() && edge.ProfileLink.UserId != "" {
-				logger.L(ctx).Debugw("Guardian is nil, fetching user info by user_id",
-					"action", "fetch_guardians",
-					"profile_id", profileID,
-					"item_index", i,
-					"user_id", edge.ProfileLink.UserId,
-				)
-
-				userResp, err := s.identitySvc.GetUser(ctx, edge.ProfileLink.UserId)
-				if err != nil {
-					logger.L(ctx).Warnw("Failed to get user info by user_id",
-						"action", "fetch_guardians",
-						"profile_id", profileID,
-						"user_id", edge.ProfileLink.UserId,
-						"error", err.Error(),
-					)
-					// 即使查询失败，也至少返回关系信息
-					guardianInfo.Name = ""
-					guardianInfo.Phone = ""
-				} else if userResp != nil && userResp.User != nil {
-					guardianInfo.Name = userResp.User.GetNickname()
-
-					// 从 User 的 Contacts 中获取电话号码
-					phone := ""
-					if len(userResp.User.Contacts) > 0 {
-						for _, contact := range userResp.User.Contacts {
-							if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
-								phone = contact.GetValue()
-								break
-							}
-						}
-					}
-					guardianInfo.Phone = phone
-				}
-			} else {
-				logger.L(ctx).Warnw("Guardian is nil and cannot fetch user info",
-					"action", "fetch_guardians",
-					"profile_id", profileID,
-					"item_index", i,
-					"user_id", edge.ProfileLink.UserId,
-					"identity_svc_enabled", s.identitySvc != nil && s.identitySvc.IsEnabled(),
-				)
-				// 即使无法获取用户信息，也至少返回关系信息
-				guardianInfo.Name = ""
-				guardianInfo.Phone = ""
-			}
-		}
-
 		logger.L(ctx).Debugw("Processing guardian item",
 			"action", "fetch_guardians",
 			"profile_id", profileID,
 			"item_index", i,
 			"guardian_name", guardianInfo.Name,
-			"relation", relation,
+			"relation", guardianInfo.Relation,
 			"has_phone", guardianInfo.Phone != "",
 		)
-
 		guardians = append(guardians, guardianInfo)
 	}
 
 	logger.L(ctx).Debugw("Guardians processing completed",
 		"action", "fetch_guardians",
 		"profile_id", profileID,
-		"total_items", len(resp.Items),
+		"total_items", len(items),
 		"processed_count", len(guardians),
-		"skipped_count", skippedCount,
 	)
 
 	return guardians, nil

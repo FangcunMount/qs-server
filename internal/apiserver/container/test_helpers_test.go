@@ -12,7 +12,7 @@ import (
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -110,11 +110,11 @@ func (*qrCodeGeneratorStub) GenerateUnlimitedQRCode(context.Context, string, str
 
 type subscribeSenderStub struct{}
 
-func (*subscribeSenderStub) SendSubscribeMessage(context.Context, string, string, wechatPort.SubscribeMessage) error {
+func (*subscribeSenderStub) SendSubscribeMessage(context.Context, string, string, wechatmini.SubscribeMessage) error {
 	return nil
 }
 
-func (*subscribeSenderStub) ListTemplates(context.Context, string, string) ([]wechatPort.SubscribeTemplate, error) {
+func (*subscribeSenderStub) ListTemplates(context.Context, string, string) ([]wechatmini.SubscribeTemplate, error) {
 	return nil, nil
 }
 
@@ -144,7 +144,7 @@ func (*miniProgramTaskNotificationServiceStub) SendTaskOpened(context.Context, n
 
 var _ assembler.Module = (*fakeModule)(nil)
 var _ codesapp.CodesService = (*codesServiceStub)(nil)
-var _ wechatPort.QRCodeGenerator = (*qrCodeGeneratorStub)(nil)
-var _ wechatPort.MiniProgramSubscribeSender = (*subscribeSenderStub)(nil)
+var _ wechatmini.QRCodeGenerator = (*qrCodeGeneratorStub)(nil)
+var _ wechatmini.MiniProgramSubscribeSender = (*subscribeSenderStub)(nil)
 var _ qrcodeApp.QRCodeService = (*qrCodeServiceStub)(nil)
 var _ notificationApp.MiniProgramTaskNotificationService = (*miniProgramTaskNotificationServiceStub)(nil)

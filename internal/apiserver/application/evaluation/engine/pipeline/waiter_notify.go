@@ -5,23 +5,17 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
+	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
 // WaiterNotifyHandler 只负责长轮询 waiter 的本地通知，不承担事件投递。
 type WaiterNotifyHandler struct {
 	*BaseHandler
-	waiterRegistry interface {
-		Notify(ctx context.Context, assessmentID uint64, summary waiter.StatusSummary)
-		GetWaiterCount(assessmentID uint64) int
-	}
+	waiterRegistry evaluationwaiter.Notifier
 }
 
 // NewWaiterNotifyHandler 创建 waiter 通知处理器。
-func NewWaiterNotifyHandler(waiterRegistry interface {
-	Notify(ctx context.Context, assessmentID uint64, summary waiter.StatusSummary)
-	GetWaiterCount(assessmentID uint64) int
-}) *WaiterNotifyHandler {
+func NewWaiterNotifyHandler(waiterRegistry evaluationwaiter.Notifier) *WaiterNotifyHandler {
 	return &WaiterNotifyHandler{
 		BaseHandler:    NewBaseHandler("WaiterNotifyHandler"),
 		waiterRegistry: waiterRegistry,
@@ -37,7 +31,7 @@ func (h *WaiterNotifyHandler) Handle(ctx context.Context, evalCtx *Context) erro
 	result := evalCtx.EvaluationResult
 	assessmentID := evalCtx.Assessment.ID().Uint64()
 	riskLevelStr := string(result.RiskLevel)
-	summary := waiter.StatusSummary{
+	summary := evaluationwaiter.StatusSummary{
 		Status:     "interpreted",
 		TotalScore: &result.TotalScore,
 		RiskLevel:  &riskLevelStr,

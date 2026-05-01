@@ -21,22 +21,6 @@ func TestCurrentDayBounds(t *testing.T) {
 	}
 }
 
-func TestQuestionnaireStatsCacheKey(t *testing.T) {
-	t.Parallel()
-
-	if got := questionnaireStatsCacheKey(12, "PHQ9"); got != "questionnaire:12:PHQ9" {
-		t.Fatalf("cache key = %q", got)
-	}
-}
-
-func TestPlanStatsCacheKey(t *testing.T) {
-	t.Parallel()
-
-	if got := planStatsCacheKey(12, 1001); got != "plan:12:1001" {
-		t.Fatalf("cache key = %q", got)
-	}
-}
-
 func TestDaysAgoReturnsApproximateOffset(t *testing.T) {
 	t.Parallel()
 

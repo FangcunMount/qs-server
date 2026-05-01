@@ -9,7 +9,7 @@ import (
 	miniConfig "github.com/silenceper/wechat/v2/miniprogram/config"
 	miniSubscribe "github.com/silenceper/wechat/v2/miniprogram/subscribe"
 
-	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
+	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
 
 // SubscribeSender 小程序订阅消息发送器实现。
@@ -22,7 +22,7 @@ func NewSubscribeSender(sdkCache cache.Cache) *SubscribeSender {
 	return &SubscribeSender{cache: sdkCache}
 }
 
-func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatPort.SubscribeMessage) error {
+func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) error {
 	// subscribeClient, err := s.newSubscribeClient(appID, appSecret)
 	// if err != nil {
 	// 	return err
@@ -47,7 +47,7 @@ func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecr
 	return nil
 }
 
-func (s *SubscribeSender) ListTemplates(_ context.Context, appID, appSecret string) ([]wechatPort.SubscribeTemplate, error) {
+func (s *SubscribeSender) ListTemplates(_ context.Context, appID, appSecret string) ([]wechatmini.SubscribeTemplate, error) {
 	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
 	if err != nil {
 		return nil, err
@@ -58,9 +58,9 @@ func (s *SubscribeSender) ListTemplates(_ context.Context, appID, appSecret stri
 		return nil, fmt.Errorf("list subscribe templates: %w", err)
 	}
 
-	templates := make([]wechatPort.SubscribeTemplate, 0, len(list.Data))
+	templates := make([]wechatmini.SubscribeTemplate, 0, len(list.Data))
 	for _, item := range list.Data {
-		templates = append(templates, wechatPort.SubscribeTemplate{
+		templates = append(templates, wechatmini.SubscribeTemplate{
 			ID:      item.PriTmplID,
 			Title:   item.Title,
 			Content: item.Content,
@@ -84,4 +84,4 @@ func (s *SubscribeSender) newSubscribeClient(appID, appSecret string) (*miniSubs
 	return miniProgram.GetSubscribe(), nil
 }
 
-var _ wechatPort.MiniProgramSubscribeSender = (*SubscribeSender)(nil)
+var _ wechatmini.MiniProgramSubscribeSender = (*SubscribeSender)(nil)

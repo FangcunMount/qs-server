@@ -4,15 +4,11 @@ import (
 	"context"
 	"fmt"
 	"io"
-	"os"
-	"path"
-	"path/filepath"
-	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
-	wechatPort "github.com/FangcunMount/qs-server/internal/apiserver/infra/wechatapi/port"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	qrcodeasset "github.com/FangcunMount/qs-server/internal/apiserver/port/qrcodeasset"
+	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
 
 const (
@@ -39,24 +35,24 @@ type Config struct {
 
 // service 小程序码生成服务实现
 type service struct {
-	qrCodeGen        wechatPort.QRCodeGenerator
+	qrCodeGen        wechatmini.QRCodeGenerator
 	config           *Config
 	wechatAppService iambridge.WeChatAppConfigProvider
-	objectStore      objectstorageport.PublicObjectStore
+	imageStore       qrcodeasset.ImageStore
 }
 
 // NewService 创建小程序码生成服务
 func NewService(
-	qrCodeGen wechatPort.QRCodeGenerator,
+	qrCodeGen wechatmini.QRCodeGenerator,
 	config *Config,
 	wechatAppService iambridge.WeChatAppConfigProvider,
-	objectStore objectstorageport.PublicObjectStore,
+	imageStore qrcodeasset.ImageStore,
 ) QRCodeService {
 	return &service{
 		qrCodeGen:        qrCodeGen,
 		config:           config,
 		wechatAppService: wechatAppService,
-		objectStore:      objectStore,
+		imageStore:       imageStore,
 	}
 }
 
@@ -351,85 +347,8 @@ func (s *service) GenerateAssessmentEntryQRCode(ctx context.Context, token strin
 }
 
 func (s *service) persistQRCode(ctx context.Context, fileName string, data []byte) (string, error) {
-	if s.objectStore != nil {
-		objectKey := s.buildObjectKey(fileName)
-		if err := s.objectStore.Put(ctx, objectKey, "image/png", data); err != nil {
-			return "", err
-		}
-		qrCodeURL := s.buildQRCodeURL(fileName)
-		logger.L(ctx).Infow("二维码对象上传成功",
-			"action", "put_qrcode_object",
-			"object_key", objectKey,
-			"size", len(data),
-			"qrcode_url", qrCodeURL,
-		)
-		return qrCodeURL, nil
+	if s.imageStore == nil {
+		return "", fmt.Errorf("二维码存储未配置")
 	}
-
-	filePath, err := s.saveQRCodeFile(ctx, fileName, data)
-	if err != nil {
-		return "", err
-	}
-	return s.getQRCodeURL(ctx, filePath)
-}
-
-func (s *service) buildQRCodeURL(fileName string) string {
-	prefix := QRCodeURLPrefix
-	if s.config != nil && strings.TrimSpace(s.config.PublicURLPrefix) != "" {
-		prefix = strings.TrimRight(strings.TrimSpace(s.config.PublicURLPrefix), "/")
-	}
-	return fmt.Sprintf("%s/%s", prefix, fileName)
-}
-
-func (s *service) buildObjectKey(fileName string) string {
-	if s.config == nil {
-		return fileName
-	}
-	prefix := strings.Trim(s.config.ObjectKeyPrefix, "/")
-	if prefix == "" {
-		return fileName
-	}
-	return path.Join(prefix, fileName)
-}
-
-// saveQRCodeFile 保存二维码文件到指定目录
-func (s *service) saveQRCodeFile(ctx context.Context, fileName string, data []byte) (string, error) {
-	l := logger.L(ctx)
-
-	// 确保存储目录存在
-	if err := os.MkdirAll(QRCodeStorageDir, 0750); err != nil {
-		return "", fmt.Errorf("创建二维码存储目录失败: %w", err)
-	}
-
-	// 构建完整文件路径
-	filePath := filepath.Join(QRCodeStorageDir, fileName)
-
-	// 写入文件
-	if err := os.WriteFile(filePath, data, 0600); err != nil {
-		return "", fmt.Errorf("写入二维码文件失败: %w", err)
-	}
-
-	l.Infow("二维码文件保存成功",
-		"action", "save_qrcode_file",
-		"file_path", filePath,
-		"size", len(data),
-	)
-
-	return filePath, nil
-}
-
-// GetQRCodeURL 获取二维码URL
-func (s *service) getQRCodeURL(ctx context.Context, filePath string) (string, error) {
-	logger.L(ctx).Infow("获取二维码URL", "action", "get_qrcode_url", "file_path", filePath)
-
-	// 判断 filePaht 是否存在
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		logger.L(ctx).Errorw("二维码文件不存在", "action", "get_qrcode_url", "file_path", filePath, "error", err.Error())
-		return "", fmt.Errorf("二维码文件不存在: %w", err)
-	}
-
-	fileName := filepath.Base(filePath)
-	qrCodeURL := s.buildQRCodeURL(fileName)
-	logger.L(ctx).Infow("获取二维码URL成功", "action", "get_qrcode_url", "file_path", filePath, "qrcode_url", qrCodeURL)
-	return qrCodeURL, nil
+	return s.imageStore.StorePNG(ctx, fileName, data)
 }

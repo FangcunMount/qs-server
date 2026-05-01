@@ -2,26 +2,24 @@ package statistics
 
 import (
 	"context"
-	"encoding/json"
-	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
+	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
 )
 
 type systemStatisticsService struct {
 	query    StatisticsQueryReader
 	realtime StatisticsRealtimeReader
-	cache    *statisticsCache.StatisticsCache
+	cache    statisticscache.Cache
 	hotset   cachetarget.HotsetRecorder
 }
 
 func NewSystemStatisticsService(
 	query StatisticsQueryReader,
 	realtime StatisticsRealtimeReader,
-	cache *statisticsCache.StatisticsCache,
+	cache statisticscache.Cache,
 	hotset cachetarget.HotsetRecorder,
 ) SystemStatisticsService {
 	return &systemStatisticsService{
@@ -36,8 +34,7 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	l := logger.L(ctx)
 	l.Infow("获取系统整体统计", "org_id", orgID)
 
-	cacheKey := fmt.Sprintf("system:%d", orgID)
-	if stats, ok := s.loadCachedSystemStatistics(ctx, cacheKey); ok {
+	if stats, ok := s.loadCachedSystemStatistics(ctx, orgID); ok {
 		s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 		return stats, nil
 	}
@@ -48,7 +45,7 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 			return nil, err
 		}
 		if found {
-			s.cacheSystemStatistics(ctx, cacheKey, stats)
+			s.cacheSystemStatistics(ctx, orgID, stats)
 			l.Debugw("从MySQL统计表获取系统统计")
 			s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 			return stats, nil
@@ -60,39 +57,23 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 	if err != nil {
 		return nil, err
 	}
-	s.cacheSystemStatistics(ctx, cacheKey, stats)
+	s.cacheSystemStatistics(ctx, orgID, stats)
 	s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 	return stats, nil
 }
 
-func (s *systemStatisticsService) loadCachedSystemStatistics(ctx context.Context, cacheKey string) (*statistics.SystemStatistics, bool) {
+func (s *systemStatisticsService) loadCachedSystemStatistics(ctx context.Context, orgID int64) (*statistics.SystemStatistics, bool) {
 	if s.cache == nil {
 		return nil, false
 	}
-	cached, err := s.cache.GetQueryCache(ctx, cacheKey)
-	if err != nil || cached == "" {
-		return nil, false
-	}
-	var stats statistics.SystemStatistics
-	if err := json.Unmarshal([]byte(cached), &stats); err != nil {
-		return nil, false
-	}
-	logger.L(ctx).Debugw("从Redis缓存获取系统统计", "cache_key", cacheKey)
-	return &stats, true
+	return s.cache.LoadSystemStatistics(ctx, orgID)
 }
 
-func (s *systemStatisticsService) cacheSystemStatistics(ctx context.Context, cacheKey string, stats *statistics.SystemStatistics) {
+func (s *systemStatisticsService) cacheSystemStatistics(ctx context.Context, orgID int64, stats *statistics.SystemStatistics) {
 	if s.cache == nil || stats == nil {
 		return
 	}
-	data, err := json.Marshal(stats)
-	if err != nil {
-		logger.L(ctx).Warnw("序列化系统统计结果失败", "error", err)
-		return
-	}
-	if err := s.cache.SetQueryCache(ctx, cacheKey, string(data), 0); err != nil {
-		logger.L(ctx).Warnw("写入系统统计查询结果缓存失败", "cache_key", cacheKey, "error", err)
-	}
+	s.cache.StoreSystemStatistics(ctx, orgID, stats)
 }
 
 func (s *systemStatisticsService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
