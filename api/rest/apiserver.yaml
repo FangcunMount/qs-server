@@ -3741,8 +3741,9 @@ paths:
   /statistics/clinicians:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/clinicians
+      - Statistics
+      summary: 查询从业者统计列表
+      description: 按机构和时间窗口查询从业者统计列表；仅 qs:admin 可访问
       responses:
         '200':
           description: OK
@@ -3751,8 +3752,9 @@ paths:
   /statistics/clinicians/me/overview:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/clinicians/me/overview
+      - Statistics
+      summary: 查询当前从业者统计概览
+      description: 查询当前后台操作者绑定从业者的统计概览
       responses:
         '200':
           description: OK
@@ -3761,8 +3763,9 @@ paths:
   /statistics/clinicians/me/entries:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/clinicians/me/entries
+      - Statistics
+      summary: 查询当前从业者入口统计列表
+      description: 查询当前后台操作者绑定从业者的测评入口统计列表
       responses:
         '200':
           description: OK
@@ -3771,8 +3774,9 @@ paths:
   /statistics/clinicians/me/testees-summary:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/clinicians/me/testees-summary
+      - Statistics
+      summary: 查询当前从业者受试者摘要
+      description: 查询当前后台操作者绑定从业者可访问受试者摘要统计
       responses:
         '200':
           description: OK
@@ -3781,8 +3785,9 @@ paths:
   /statistics/clinicians/{id}:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/clinicians/{id}
+      - Statistics
+      summary: 查询单个从业者统计
+      description: 按从业者 ID 查询统计概览、窗口指标和漏斗指标；仅 qs:admin 可访问
       responses:
         '200':
           description: OK
@@ -3791,8 +3796,9 @@ paths:
   /statistics/entries:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/entries
+      - Statistics
+      summary: 查询测评入口统计列表
+      description: 查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问
       responses:
         '200':
           description: OK
@@ -3801,8 +3807,9 @@ paths:
   /statistics/entries/{id}:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/entries/{id}
+      - Statistics
+      summary: 查询单个测评入口统计
+      description: 按入口 ID 查询入口快照、窗口计数和最近事件时间；仅 qs:admin 可访问
       responses:
         '200':
           description: OK
@@ -3811,8 +3818,9 @@ paths:
   /statistics/testees/{testee_id}/periodic:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/testees/{testee_id}/periodic
+      - Statistics
+      summary: 查询受试者周期项目统计
+      description: 查询受试者周期计划项目、周次任务和完成情况；后台访问范围按 ClinicianTesteeRelation 收口
       responses:
         '200':
           description: OK
@@ -3821,8 +3829,9 @@ paths:
   /statistics/overview:
     get:
       tags:
-      - Transport-Contract
-      summary: GET /statistics/overview
+      - Statistics
+      summary: 查询机构统计总览
+      description: 查询机构总览、接入漏斗、测评服务、维度分析和计划任务统计；仅 qs:admin 可访问
       responses:
         '200':
           description: OK
@@ -4306,8 +4315,9 @@ paths:
   /statistics/questionnaires/batch:
     post:
       tags:
-      - Transport-Contract
-      summary: POST /statistics/questionnaires/batch
+      - Statistics
+      summary: 批量查询问卷统计
+      description: 按问卷 code 批量查询提交数、完成数和完成率；需要问卷或量表管理权限
       responses:
         '200':
           description: OK

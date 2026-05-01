@@ -162,7 +162,7 @@ func TestStatisticsHandlerListAssessmentEntryStatisticsParsesFiltersAndDefaultsP
 		listEntryResult: &domainStatistics.AssessmentEntryStatisticsList{},
 	}
 	handler := newStatisticsHandlerForTest(readService)
-	c, rec := newStatisticsTestContext(http.MethodGet, "/api/v1/statistics/assessment-entries?clinician_id=123&status=active&preset=today", nil)
+	c, rec := newStatisticsTestContext(http.MethodGet, "/api/v1/statistics/entries?clinician_id=123&status=active&preset=today", nil)
 	c.Set(restmiddleware.OrgIDKey, uint64(66))
 
 	handler.ListAssessmentEntryStatistics(c)
@@ -191,7 +191,7 @@ func TestStatisticsHandlerListAssessmentEntryStatisticsRejectsInvalidClinicianID
 	gin.SetMode(gin.TestMode)
 
 	handler := newStatisticsHandlerForTest(&stubStatisticsReadService{})
-	c, rec := newStatisticsTestContext(http.MethodGet, "/api/v1/statistics/assessment-entries?clinician_id=bad", nil)
+	c, rec := newStatisticsTestContext(http.MethodGet, "/api/v1/statistics/entries?clinician_id=bad", nil)
 	c.Set(restmiddleware.OrgIDKey, uint64(66))
 
 	handler.ListAssessmentEntryStatistics(c)
@@ -208,7 +208,7 @@ func TestStatisticsHandlerGetCurrentClinicianOverviewUsesProtectedScope(t *testi
 		currentClinicianResult: &domainStatistics.ClinicianStatistics{},
 	}
 	handler := newStatisticsHandlerForTest(readService)
-	c, rec := newStatisticsTestContext(http.MethodGet, "/api/v1/statistics/me/overview?preset=30d", nil)
+	c, rec := newStatisticsTestContext(http.MethodGet, "/api/v1/statistics/clinicians/me/overview?preset=30d", nil)
 	c.Set(restmiddleware.OrgIDKey, uint64(91))
 	c.Set(restmiddleware.UserIDKey, uint64(701))
 
@@ -229,7 +229,7 @@ func TestStatisticsHandlerBatchQuestionnaireStatisticsRejectsInvalidJSON(t *test
 	gin.SetMode(gin.TestMode)
 
 	handler := newStatisticsHandlerForTest(&stubStatisticsReadService{})
-	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/questionnaires:batch", []byte(`{"codes":`))
+	c, rec := newStatisticsTestContext(http.MethodPost, "/api/v1/statistics/questionnaires/batch", []byte(`{"codes":`))
 	c.Set(restmiddleware.OrgIDKey, uint64(91))
 
 	handler.BatchQuestionnaireStatistics(c)

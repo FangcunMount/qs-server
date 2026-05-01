@@ -225,6 +225,16 @@ flowchart LR
 
 | 路径 | 用途 |
 | ---- | ---- |
+| `/api/v1/statistics/overview` | 机构统计总览：org snapshot、journey/content/plan 窗口聚合 |
+| `/api/v1/statistics/clinicians` | 从业者统计列表 |
+| `/api/v1/statistics/clinicians/:id` | 单个从业者统计 |
+| `/api/v1/statistics/clinicians/me/overview` | 当前从业者统计概览 |
+| `/api/v1/statistics/clinicians/me/entries` | 当前从业者入口统计列表 |
+| `/api/v1/statistics/clinicians/me/testees-summary` | 当前从业者受试者摘要 |
+| `/api/v1/statistics/entries` | 测评入口统计列表 |
+| `/api/v1/statistics/entries/:id` | 单个测评入口统计 |
+| `/api/v1/statistics/questionnaires/batch` | 批量问卷统计 |
+| `/api/v1/statistics/testees/:testee_id/periodic` | 受试者周期项目统计 |
 | `/api/v1/statistics/system` | 系统统计 |
 | `/api/v1/statistics/questionnaires/:code` | 问卷统计 |
 | `/api/v1/statistics/testees/:testee_id` | 受试者统计 |

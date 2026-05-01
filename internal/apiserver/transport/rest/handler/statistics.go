@@ -140,6 +140,19 @@ type questionnaireBatchRequest struct {
 	Codes []string `json:"codes"`
 }
 
+// GetOverview 查询机构统计总览。
+// @Summary 查询机构统计总览
+// @Description 查询机构总览、接入漏斗、测评服务、维度分析和计划任务统计；仅 qs:admin 可访问
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Success 200 {object} core.Response{data=statistics.StatisticsOverview}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/overview [get]
 func (h *StatisticsHandler) GetOverview(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -155,6 +168,21 @@ func (h *StatisticsHandler) GetOverview(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// ListClinicianStatistics 查询从业者统计列表。
+// @Summary 查询从业者统计列表
+// @Description 按机构和时间窗口查询从业者统计列表；仅 qs:admin 可访问
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Param page query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 200 {object} core.Response{data=statistics.ClinicianStatisticsList}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/clinicians [get]
 func (h *StatisticsHandler) ListClinicianStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -175,6 +203,20 @@ func (h *StatisticsHandler) ListClinicianStatistics(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// GetClinicianStatistics 查询单个从业者统计。
+// @Summary 查询单个从业者统计
+// @Description 按从业者 ID 查询统计概览、窗口指标和漏斗指标；仅 qs:admin 可访问
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path uint64 true "从业者ID"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Success 200 {object} core.Response{data=statistics.ClinicianStatistics}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/clinicians/{id} [get]
 func (h *StatisticsHandler) GetClinicianStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -195,6 +237,23 @@ func (h *StatisticsHandler) GetClinicianStatistics(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// ListAssessmentEntryStatistics 查询测评入口统计列表。
+// @Summary 查询测评入口统计列表
+// @Description 查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param clinician_id query uint64 false "从业者ID"
+// @Param status query string false "入口状态：active/inactive"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Param page query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 200 {object} core.Response{data=statistics.AssessmentEntryStatisticsList}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/entries [get]
 func (h *StatisticsHandler) ListAssessmentEntryStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -229,6 +288,20 @@ func (h *StatisticsHandler) ListAssessmentEntryStatistics(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// GetAssessmentEntryStatistics 查询单个测评入口统计。
+// @Summary 查询单个测评入口统计
+// @Description 按入口 ID 查询入口快照、窗口计数和最近事件时间；仅 qs:admin 可访问
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path uint64 true "入口ID"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Success 200 {object} core.Response{data=statistics.AssessmentEntryStatistics}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/entries/{id} [get]
 func (h *StatisticsHandler) GetAssessmentEntryStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, err := h.RequireProtectedOrgID(c)
@@ -249,6 +322,19 @@ func (h *StatisticsHandler) GetAssessmentEntryStatistics(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// GetCurrentClinicianOverview 查询当前从业者统计概览。
+// @Summary 查询当前从业者统计概览
+// @Description 查询当前后台操作者绑定从业者的统计概览
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Success 200 {object} core.Response{data=statistics.ClinicianStatistics}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/clinicians/me/overview [get]
 func (h *StatisticsHandler) GetCurrentClinicianOverview(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
@@ -264,6 +350,21 @@ func (h *StatisticsHandler) GetCurrentClinicianOverview(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// ListCurrentClinicianEntryStatistics 查询当前从业者入口统计列表。
+// @Summary 查询当前从业者入口统计列表
+// @Description 查询当前后台操作者绑定从业者的测评入口统计列表
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Param page query int false "页码"
+// @Param page_size query int false "每页数量"
+// @Success 200 {object} core.Response{data=statistics.AssessmentEntryStatisticsList}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/clinicians/me/entries [get]
 func (h *StatisticsHandler) ListCurrentClinicianEntryStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
@@ -284,6 +385,19 @@ func (h *StatisticsHandler) ListCurrentClinicianEntryStatistics(c *gin.Context) 
 	h.Success(c, stats)
 }
 
+// GetCurrentClinicianTesteeSummary 查询当前从业者受试者摘要。
+// @Summary 查询当前从业者受试者摘要
+// @Description 查询当前后台操作者绑定从业者可访问受试者摘要统计
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param preset query string false "时间窗口预设：today/7d/30d"
+// @Param from query string false "自定义开始日期，格式 YYYY-MM-DD"
+// @Param to query string false "自定义结束日期，格式 YYYY-MM-DD"
+// @Success 200 {object} core.Response{data=statistics.ClinicianTesteeSummaryStatistics}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/clinicians/me/testees-summary [get]
 func (h *StatisticsHandler) GetCurrentClinicianTesteeSummary(c *gin.Context) {
 	ctx := c.Request.Context()
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
@@ -299,6 +413,17 @@ func (h *StatisticsHandler) GetCurrentClinicianTesteeSummary(c *gin.Context) {
 	h.Success(c, stats)
 }
 
+// GetTesteePeriodicStatistics 查询受试者周期项目统计。
+// @Summary 查询受试者周期项目统计
+// @Description 查询受试者周期计划项目、周次任务和完成情况；后台访问范围按 ClinicianTesteeRelation 收口
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param testee_id path uint64 true "受试者ID"
+// @Success 200 {object} core.Response{data=response.PeriodicStatsResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/testees/{testee_id}/periodic [get]
 func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
 	testeeID, err := strconv.ParseUint(c.Param("testee_id"), 10, 64)
@@ -323,6 +448,18 @@ func (h *StatisticsHandler) GetTesteePeriodicStatistics(c *gin.Context) {
 	h.Success(c, response.NewPeriodicStatsResponse(stats))
 }
 
+// BatchQuestionnaireStatistics 批量查询问卷统计。
+// @Summary 批量查询问卷统计
+// @Description 按问卷 code 批量查询提交数、完成数和完成率；需要问卷或量表管理权限
+// @Tags Statistics
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body questionnaireBatchRequest true "问卷编码列表"
+// @Success 200 {object} core.Response{data=statistics.QuestionnaireBatchStatisticsResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 429 {object} core.ErrResponse
+// @Router /api/v1/statistics/questionnaires/batch [post]
 func (h *StatisticsHandler) BatchQuestionnaireStatistics(c *gin.Context) {
 	var req questionnaireBatchRequest
 	if !h.bindJSON(c, &req) {
