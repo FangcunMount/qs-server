@@ -17,7 +17,6 @@ import (
 // 行为者：量表因子编辑者
 type factorService struct {
 	repo           scale.Repository
-	factorManager  scale.FactorManager
 	listCache      scalelistcache.PublishedListCache
 	eventPublisher event.EventPublisher
 }
@@ -26,7 +25,6 @@ type factorService struct {
 func NewFactorService(repo scale.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ScaleFactorService {
 	return &factorService{
 		repo:           repo,
-		factorManager:  scale.FactorManager{},
 		listCache:      listCache,
 		eventPublisher: eventPublisher,
 	}
@@ -64,7 +62,7 @@ func (s *factorService) AddFactor(ctx context.Context, dto AddFactorDTO) (*Scale
 	}
 
 	// 5. 添加因子
-	if err := s.factorManager.AddFactor(m, factor); err != nil {
+	if err := m.AddFactor(factor); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "添加因子失败")
 	}
 
@@ -108,7 +106,7 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (
 	}
 
 	// 5. 更新因子
-	if err := s.factorManager.UpdateFactor(m, factor); err != nil {
+	if err := m.UpdateFactor(factor); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新因子失败")
 	}
 
@@ -145,7 +143,7 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 	}
 
 	// 4. 删除因子
-	if err := s.factorManager.RemoveFactor(m, scale.NewFactorCode(factorCode)); err != nil {
+	if err := m.RemoveFactor(scale.NewFactorCode(factorCode)); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "删除因子失败")
 	}
 
@@ -207,7 +205,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 	}
 
 	// 5. 替换因子
-	if err := s.factorManager.ReplaceFactors(m, factors); err != nil {
+	if err := m.ReplaceFactors(factors); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "替换因子失败")
 	}
 
@@ -244,19 +242,10 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto Upda
 	}
 
 	// 4. 转换解读规则
-	rules := make([]scale.InterpretationRule, 0, len(dto.InterpretRules))
-	for _, ruleDTO := range dto.InterpretRules {
-		rule := scale.NewInterpretationRule(
-			scale.NewScoreRange(ruleDTO.MinScore, ruleDTO.MaxScore),
-			scale.RiskLevel(ruleDTO.RiskLevel),
-			ruleDTO.Conclusion,
-			ruleDTO.Suggestion,
-		)
-		rules = append(rules, rule)
-	}
+	rules := interpretRulesFromDTOs(dto.InterpretRules)
 
 	// 5. 更新解读规则
-	if err := s.factorManager.UpdateFactorInterpretRules(m, scale.NewFactorCode(dto.FactorCode), rules); err != nil {
+	if err := m.UpdateFactorInterpretRules(scale.NewFactorCode(dto.FactorCode), rules); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新解读规则失败")
 	}
 
@@ -298,20 +287,10 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 		}
 
-		// 转换解读规则
-		rules := make([]scale.InterpretationRule, 0, len(dto.InterpretRules))
-		for _, ruleDTO := range dto.InterpretRules {
-			rule := scale.NewInterpretationRule(
-				scale.NewScoreRange(ruleDTO.MinScore, ruleDTO.MaxScore),
-				scale.RiskLevel(ruleDTO.RiskLevel),
-				ruleDTO.Conclusion,
-				ruleDTO.Suggestion,
-			)
-			rules = append(rules, rule)
-		}
+		rules := interpretRulesFromDTOs(dto.InterpretRules)
 
 		// 更新解读规则
-		if err := s.factorManager.UpdateFactorInterpretRules(m, scale.NewFactorCode(dto.FactorCode), rules); err != nil {
+		if err := m.UpdateFactorInterpretRules(scale.NewFactorCode(dto.FactorCode), rules); err != nil {
 			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新因子[%s]解读规则失败", dto.FactorCode)
 		}
 	}
@@ -368,17 +347,7 @@ func toFactorDomain(
 		qCodes = append(qCodes, meta.NewCode(qc))
 	}
 
-	// 转换解读规则
-	rules := make([]scale.InterpretationRule, 0, len(interpretRules))
-	for _, ruleDTO := range interpretRules {
-		rule := scale.NewInterpretationRule(
-			scale.NewScoreRange(ruleDTO.MinScore, ruleDTO.MaxScore),
-			scale.RiskLevel(ruleDTO.RiskLevel),
-			ruleDTO.Conclusion,
-			ruleDTO.Suggestion,
-		)
-		rules = append(rules, rule)
-	}
+	rules := interpretRulesFromDTOs(interpretRules)
 
 	// 确定计分策略
 	strategy := scale.ScoringStrategySum

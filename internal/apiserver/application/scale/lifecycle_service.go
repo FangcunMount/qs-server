@@ -56,29 +56,7 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 		return nil, err
 	}
 
-	// 3. 转换标签列表
-	tags := make([]scale.Tag, 0, len(dto.Tags))
-	for _, tagStr := range dto.Tags {
-		tags = append(tags, scale.NewTag(tagStr))
-	}
-
-	// 4. 转换填报人列表
-	reporters := make([]scale.Reporter, 0, len(dto.Reporters))
-	for _, reporterStr := range dto.Reporters {
-		reporters = append(reporters, scale.NewReporter(reporterStr))
-	}
-
-	// 5. 转换阶段列表
-	stages := make([]scale.Stage, 0, len(dto.Stages))
-	for _, stageStr := range dto.Stages {
-		stages = append(stages, scale.NewStage(stageStr))
-	}
-
-	// 6. 转换使用年龄列表
-	applicableAges := make([]scale.ApplicableAge, 0, len(dto.ApplicableAges))
-	for _, ageStr := range dto.ApplicableAges {
-		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
-	}
+	classification := scaleClassificationFromDTO(dto.Category, dto.Stages, dto.ApplicableAges, dto.Reporters, dto.Tags)
 
 	if dto.QuestionnaireCode != "" {
 		if err := s.validateMedicalScaleQuestionnaireBinding(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, code.String()); err != nil {
@@ -91,11 +69,11 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 		code,
 		dto.Title,
 		scale.WithDescription(dto.Description),
-		scale.WithCategory(scale.NewCategory(dto.Category)),
-		scale.WithStages(stages),
-		scale.WithApplicableAges(applicableAges),
-		scale.WithReporters(reporters),
-		scale.WithTags(tags),
+		scale.WithCategory(classification.category),
+		scale.WithStages(classification.stages),
+		scale.WithApplicableAges(classification.applicableAges),
+		scale.WithReporters(classification.reporters),
+		scale.WithTags(classification.tags),
 		scale.WithQuestionnaire(meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion),
 		scale.WithStatus(scale.StatusDraft),
 	)
@@ -129,32 +107,10 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		return nil, err
 	}
 
-	// 3. 转换标签列表
-	tags := make([]scale.Tag, 0, len(dto.Tags))
-	for _, tagStr := range dto.Tags {
-		tags = append(tags, scale.NewTag(tagStr))
-	}
-
-	// 4. 转换填报人列表
-	reporters := make([]scale.Reporter, 0, len(dto.Reporters))
-	for _, reporterStr := range dto.Reporters {
-		reporters = append(reporters, scale.NewReporter(reporterStr))
-	}
-
-	// 5. 转换阶段列表
-	stages := make([]scale.Stage, 0, len(dto.Stages))
-	for _, stageStr := range dto.Stages {
-		stages = append(stages, scale.NewStage(stageStr))
-	}
-
-	// 6. 转换使用年龄列表
-	applicableAges := make([]scale.ApplicableAge, 0, len(dto.ApplicableAges))
-	for _, ageStr := range dto.ApplicableAges {
-		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
-	}
+	classification := scaleClassificationFromDTO(dto.Category, dto.Stages, dto.ApplicableAges, dto.Reporters, dto.Tags)
 
 	// 7. 更新基本信息和分类信息
-	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, scale.NewCategory(dto.Category), stages, applicableAges, reporters, tags); err != nil {
+	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, classification.category, classification.stages, classification.applicableAges, classification.reporters, classification.tags); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新基本信息失败")
 	}
 

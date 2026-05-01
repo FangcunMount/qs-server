@@ -76,3 +76,58 @@ func TestScaleMapperMapScoringParamsToDomainIgnoresParamsForStrategiesWithoutCon
 		t.Fatalf("cnt option contents = %#v, want empty", got.GetCntOptionContents())
 	}
 }
+
+func TestScaleMapperNormalizeRiskLevelSupportsLegacyValues(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		raw  string
+		want domainscale.RiskLevel
+	}{
+		{name: "normal alias", raw: "normal", want: domainscale.RiskLevelNone},
+		{name: "low chinese", raw: "低风险", want: domainscale.RiskLevelLow},
+		{name: "medium legacy", raw: "中度", want: domainscale.RiskLevelMedium},
+		{name: "high legacy", raw: "重度", want: domainscale.RiskLevelHigh},
+		{name: "severe legacy", raw: "严重", want: domainscale.RiskLevelSevere},
+		{name: "unknown stays raw", raw: "custom", want: domainscale.RiskLevel("custom")},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := normalizeRiskLevel(tc.raw); got != tc.want {
+				t.Fatalf("normalizeRiskLevel(%q) = %q, want %q", tc.raw, got, tc.want)
+			}
+		})
+	}
+}
+
+func TestScaleMapperToDomainSkipsLegacyCntFactorWithoutParams(t *testing.T) {
+	t.Parallel()
+
+	mapper := NewScaleMapper()
+	got := mapper.ToDomain(context.Background(), &ScalePO{
+		Code:   "SCALE_A",
+		Title:  "Scale A",
+		Status: domainscale.StatusDraft.String(),
+		Factors: []FactorPO{
+			{
+				Code:            "F_CNT",
+				Title:           "Cnt Factor",
+				FactorType:      domainscale.FactorTypePrimary.String(),
+				IsShow:          true,
+				QuestionCodes:   []string{"Q1"},
+				ScoringStrategy: domainscale.ScoringStrategyCnt.String(),
+			},
+		},
+	})
+	if got == nil {
+		t.Fatal("expected scale domain model")
+	}
+	if len(got.GetFactors()) != 0 {
+		t.Fatalf("factor count = %d, want 0", len(got.GetFactors()))
+	}
+}

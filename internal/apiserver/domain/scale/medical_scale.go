@@ -342,6 +342,120 @@ func (m *MedicalScale) GetNonTotalScoreFactors() []*Factor {
 	return result
 }
 
+// AddFactor 添加因子，并保持量表内因子编码唯一。
+func (m *MedicalScale) AddFactor(factor *Factor) error {
+	if factor == nil {
+		return errors.WithCode(code.ErrInvalidArgument, "因子对象不能为空")
+	}
+	return m.addFactor(factor)
+}
+
+// RemoveFactor 移除指定因子。
+func (m *MedicalScale) RemoveFactor(factorCode FactorCode) error {
+	if factorCode.IsEmpty() {
+		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+	}
+	return m.removeFactor(factorCode)
+}
+
+// RemoveAllFactors 清空量表因子。
+func (m *MedicalScale) RemoveAllFactors() {
+	m.factors = []*Factor{}
+}
+
+// ReplaceFactors 替换全部因子，并校验编码唯一和总分因子唯一。
+func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
+	if len(factors) == 0 {
+		return errors.WithCode(code.ErrInvalidArgument, "因子列表不能为空")
+	}
+
+	codes := make(map[string]bool)
+	hasTotalScore := false
+	for i, factor := range factors {
+		if factor == nil {
+			return errors.WithCode(code.ErrInvalidArgument, "第 %d 个因子对象为空", i+1)
+		}
+
+		factorCode := factor.GetCode().Value()
+		if factorCode == "" {
+			return errors.WithCode(code.ErrInvalidArgument, "第 %d 个因子的编码不能为空", i+1)
+		}
+		if codes[factorCode] {
+			return errors.WithCode(code.ErrInvalidArgument, "因子编码 %s 重复", factorCode)
+		}
+		codes[factorCode] = true
+
+		if factor.IsTotalScore() {
+			if hasTotalScore {
+				return errors.WithCode(code.ErrInvalidArgument, "量表只能有一个总分因子")
+			}
+			hasTotalScore = true
+		}
+	}
+
+	m.updateFactors(factors)
+	return nil
+}
+
+// UpdateFactor 按编码替换已有因子。
+func (m *MedicalScale) UpdateFactor(updatedFactor *Factor) error {
+	if updatedFactor == nil {
+		return errors.WithCode(code.ErrInvalidArgument, "因子对象不能为空")
+	}
+
+	factorCode := updatedFactor.GetCode()
+	if factorCode.IsEmpty() {
+		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+	}
+
+	for i, f := range m.factors {
+		if f.GetCode().Equals(factorCode) {
+			m.factors[i] = updatedFactor
+			return nil
+		}
+	}
+
+	return errors.WithCode(code.ErrInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
+}
+
+// UpdateFactorInterpretRules 更新指定因子的解读规则。
+func (m *MedicalScale) UpdateFactorInterpretRules(factorCode FactorCode, rules []InterpretationRule) error {
+	if factorCode.IsEmpty() {
+		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+	}
+
+	factor, found := m.FindFactorByCode(factorCode)
+	if !found {
+		return errors.WithCode(code.ErrInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
+	}
+
+	for i, rule := range rules {
+		if !rule.IsValid() {
+			return errors.WithCode(code.ErrInvalidArgument, "第 %d 个解读规则无效", i+1)
+		}
+	}
+
+	factor.updateInterpretRules(rules)
+	return nil
+}
+
+// AddFactorInterpretRule 为指定因子追加解读规则。
+func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule InterpretationRule) error {
+	if factorCode.IsEmpty() {
+		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+	}
+	if !rule.IsValid() {
+		return errors.WithCode(code.ErrInvalidArgument, "解读规则无效")
+	}
+
+	factor, found := m.FindFactorByCode(factorCode)
+	if !found {
+		return errors.WithCode(code.ErrInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
+	}
+	factor.addInterpretRule(rule)
+	return nil
+}
+
 // ===================== 包内私有方法（供领域服务调用）=================
 
 // updateBasicInfo 更新基本信息
