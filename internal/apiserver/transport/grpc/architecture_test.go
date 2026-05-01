@@ -21,6 +21,8 @@ func TestSurveyScaleGRPCServicesUseApplicationDTOs(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":          "survey/scale application QR-code use cases",
 	}
 	for _, path := range []string{
+		filepath.Join("service", "answersheet.go"),
+		filepath.Join("service", "internal.go"),
 		filepath.Join("service", "questionnaire.go"),
 		filepath.Join("service", "scale.go"),
 	} {

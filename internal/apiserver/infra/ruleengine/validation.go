@@ -29,14 +29,14 @@ func (v *AnswerValidator) ValidateAnswers(_ context.Context, tasks []ruleenginep
 			Valid: true,
 		}
 		for _, rule := range task.Rules {
-			strategy := strategies.Get(rule.GetRuleType())
+			strategy := strategies.Get(rule.RuleType)
 			if strategy == nil {
 				continue
 			}
 			if err := strategy.Validate(task.Value, rule); err != nil {
 				item.Valid = false
 				item.Errors = append(item.Errors, ruleengineport.ValidationError{
-					RuleType: string(rule.GetRuleType()),
+					RuleType: string(rule.RuleType),
 					Message:  err.Error(),
 				})
 			}

@@ -46,6 +46,7 @@ func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
 	for _, path := range []string{
 		filepath.Join("handler", "questionnaire.go"),
 		filepath.Join("handler", "scale.go"),
+		filepath.Join("response", "display.go"),
 	} {
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {

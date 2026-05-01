@@ -6,7 +6,6 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
@@ -383,4 +382,4 @@ func (*grpcQRCodeServiceStub) GenerateAssessmentEntryQRCode(context.Context, str
 func uint64Ptr(v uint64) *uint64 { return &v }
 func stringPtr(v string) *string { return &v }
 
-var _ qrcodeApp.QRCodeService = (*grpcQRCodeServiceStub)(nil)
+var _ surveyScaleQRCodeGenerator = (*grpcQRCodeServiceStub)(nil)

@@ -3,8 +3,6 @@ package service
 import (
 	"testing"
 	"time"
-
-	questionnairedomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 )
 
 func TestDecodeAnswerValue(t *testing.T) {
@@ -12,17 +10,17 @@ func TestDecodeAnswerValue(t *testing.T) {
 
 	cases := []struct {
 		name    string
-		qType   questionnairedomain.QuestionType
+		qType   string
 		raw     string
 		want    interface{}
 		wantErr bool
 	}{
-		{name: "checkbox json", qType: questionnairedomain.TypeCheckbox, raw: `["A","B"]`, want: []string{"A", "B"}},
-		{name: "checkbox blank", qType: questionnairedomain.TypeCheckbox, raw: ``, want: []string{}},
-		{name: "number json", qType: questionnairedomain.TypeNumber, raw: `12`, want: float64(12)},
-		{name: "number string", qType: questionnairedomain.TypeNumber, raw: `"12.5"`, want: float64(12.5)},
-		{name: "text raw", qType: questionnairedomain.TypeText, raw: `hello`, want: "hello"},
-		{name: "number invalid", qType: questionnairedomain.TypeNumber, raw: `abc`, wantErr: true},
+		{name: "checkbox json", qType: questionTypeCheckbox, raw: `["A","B"]`, want: []string{"A", "B"}},
+		{name: "checkbox blank", qType: questionTypeCheckbox, raw: ``, want: []string{}},
+		{name: "number json", qType: questionTypeNumber, raw: `12`, want: float64(12)},
+		{name: "number string", qType: questionTypeNumber, raw: `"12.5"`, want: float64(12.5)},
+		{name: "text raw", qType: "Text", raw: `hello`, want: "hello"},
+		{name: "number invalid", qType: questionTypeNumber, raw: `abc`, wantErr: true},
 	}
 
 	for _, tc := range cases {

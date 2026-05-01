@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -42,8 +41,13 @@ type Deps struct {
 	IAM        IAMDeps
 
 	WarmupCoordinator                  cachegov.Coordinator
-	QRCodeService                      qrcodeApp.QRCodeService
+	QRCodeService                      SurveyScaleQRCodeGenerator
 	MiniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
+}
+
+type SurveyScaleQRCodeGenerator interface {
+	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
+	GenerateScaleQRCode(ctx context.Context, code string) (string, error)
 }
 
 type SurveyDeps struct {

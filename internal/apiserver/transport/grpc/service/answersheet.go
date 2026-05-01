@@ -13,9 +13,13 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	questionnaireDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
+)
+
+const (
+	questionTypeCheckbox = "Checkbox"
+	questionTypeNumber   = "Number"
 )
 
 // AnswerSheetService 答卷 gRPC 服务 - C端接口
@@ -62,7 +66,7 @@ func (s *AnswerSheetService) SaveAnswerSheet(ctx context.Context, req *pb.SaveAn
 	// 转换请求为 DTO
 	answers := make([]answersheet.AnswerDTO, 0, len(req.Answers))
 	for _, a := range req.Answers {
-		rawValue, err := decodeAnswerValue(questionnaireDomain.QuestionType(a.QuestionType), a.Value)
+		rawValue, err := decodeAnswerValue(a.QuestionType, a.Value)
 		if err != nil {
 			return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("问题 %s 的答案格式不正确: %v", a.QuestionCode, err))
 		}
@@ -232,9 +236,9 @@ func (s *AnswerSheetService) valueToString(value interface{}) string {
 	}
 }
 
-func decodeAnswerValue(questionType questionnaireDomain.QuestionType, raw string) (interface{}, error) {
+func decodeAnswerValue(questionType string, raw string) (interface{}, error) {
 	switch questionType {
-	case questionnaireDomain.TypeCheckbox:
+	case questionTypeCheckbox:
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			return []string{}, nil
@@ -244,7 +248,7 @@ func decodeAnswerValue(questionType questionnaireDomain.QuestionType, raw string
 			return values, nil
 		}
 		return []string{raw}, nil
-	case questionnaireDomain.TypeNumber:
+	case questionTypeNumber:
 		raw = strings.TrimSpace(raw)
 		if raw == "" {
 			return nil, fmt.Errorf("empty numeric answer")

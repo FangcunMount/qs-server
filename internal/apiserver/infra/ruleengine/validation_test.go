@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	ruleengineport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -29,6 +28,10 @@ func (v validatableStub) AsNumber() (float64, error) {
 }
 func (v validatableStub) AsArray() []string { return v.array }
 
+func validationRule(ruleType ruleengineport.ValidationRuleType, target string) ruleengineport.ValidationRuleSpec {
+	return ruleengineport.ValidationRuleSpec{RuleType: ruleType, TargetValue: target}
+}
+
 func TestAnswerValidatorMapsValidationResultsToPortDTO(t *testing.T) {
 	t.Parallel()
 
@@ -36,7 +39,7 @@ func TestAnswerValidatorMapsValidationResultsToPortDTO(t *testing.T) {
 		{
 			ID:    "q1",
 			Value: validatableStub{empty: true},
-			Rules: []validation.ValidationRule{validation.NewValidationRule(validation.RuleTypeRequired, "")},
+			Rules: []ruleengineport.ValidationRuleSpec{validationRule(ruleengineport.ValidationRuleTypeRequired, "")},
 		},
 	})
 	if err != nil {
@@ -45,7 +48,7 @@ func TestAnswerValidatorMapsValidationResultsToPortDTO(t *testing.T) {
 	if len(results) != 1 || results[0].ID != "q1" || results[0].Valid || len(results[0].Errors) != 1 {
 		t.Fatalf("unexpected results: %+v", results)
 	}
-	if results[0].Errors[0].RuleType != string(validation.RuleTypeRequired) {
+	if results[0].Errors[0].RuleType != string(ruleengineport.ValidationRuleTypeRequired) {
 		t.Fatalf("rule type = %q, want required", results[0].Errors[0].RuleType)
 	}
 }
@@ -56,19 +59,19 @@ func TestAnswerValidatorAppliesBuiltInRules(t *testing.T) {
 	cases := []struct {
 		name  string
 		value validatableStub
-		rule  validation.ValidationRule
+		rule  ruleengineport.ValidationRuleSpec
 		valid bool
 	}{
-		{name: "required fails for empty", value: validatableStub{empty: true}, rule: validation.NewValidationRule(validation.RuleTypeRequired, ""), valid: false},
-		{name: "required passes for non empty", value: validatableStub{str: "x"}, rule: validation.NewValidationRule(validation.RuleTypeRequired, ""), valid: true},
-		{name: "min length counts runes", value: validatableStub{str: "你好"}, rule: validation.NewValidationRule(validation.RuleTypeMinLength, "2"), valid: true},
-		{name: "max length fails", value: validatableStub{str: "abcd"}, rule: validation.NewValidationRule(validation.RuleTypeMaxLength, "3"), valid: false},
-		{name: "min value passes", value: validatableStub{number: 3}, rule: validation.NewValidationRule(validation.RuleTypeMinValue, "2"), valid: true},
-		{name: "max value fails", value: validatableStub{number: 5}, rule: validation.NewValidationRule(validation.RuleTypeMaxValue, "4"), valid: false},
-		{name: "min selections passes", value: validatableStub{array: []string{"a", "b"}}, rule: validation.NewValidationRule(validation.RuleTypeMinSelections, "2"), valid: true},
-		{name: "max selections fails", value: validatableStub{array: []string{"a", "b", "c"}}, rule: validation.NewValidationRule(validation.RuleTypeMaxSelections, "2"), valid: false},
-		{name: "pattern passes", value: validatableStub{str: "abc-123"}, rule: validation.NewValidationRule(validation.RuleTypePattern, `^[a-z]+-\d+$`), valid: true},
-		{name: "pattern fails", value: validatableStub{str: "abc"}, rule: validation.NewValidationRule(validation.RuleTypePattern, `^\d+$`), valid: false},
+		{name: "required fails for empty", value: validatableStub{empty: true}, rule: validationRule(ruleengineport.ValidationRuleTypeRequired, ""), valid: false},
+		{name: "required passes for non empty", value: validatableStub{str: "x"}, rule: validationRule(ruleengineport.ValidationRuleTypeRequired, ""), valid: true},
+		{name: "min length counts runes", value: validatableStub{str: "你好"}, rule: validationRule(ruleengineport.ValidationRuleTypeMinLength, "2"), valid: true},
+		{name: "max length fails", value: validatableStub{str: "abcd"}, rule: validationRule(ruleengineport.ValidationRuleTypeMaxLength, "3"), valid: false},
+		{name: "min value passes", value: validatableStub{number: 3}, rule: validationRule(ruleengineport.ValidationRuleTypeMinValue, "2"), valid: true},
+		{name: "max value fails", value: validatableStub{number: 5}, rule: validationRule(ruleengineport.ValidationRuleTypeMaxValue, "4"), valid: false},
+		{name: "min selections passes", value: validatableStub{array: []string{"a", "b"}}, rule: validationRule(ruleengineport.ValidationRuleTypeMinSelections, "2"), valid: true},
+		{name: "max selections fails", value: validatableStub{array: []string{"a", "b", "c"}}, rule: validationRule(ruleengineport.ValidationRuleTypeMaxSelections, "2"), valid: false},
+		{name: "pattern passes", value: validatableStub{str: "abc-123"}, rule: validationRule(ruleengineport.ValidationRuleTypePattern, `^[a-z]+-\d+$`), valid: true},
+		{name: "pattern fails", value: validatableStub{str: "abc"}, rule: validationRule(ruleengineport.ValidationRuleTypePattern, `^\d+$`), valid: false},
 	}
 
 	validator := NewAnswerValidator()
@@ -78,7 +81,7 @@ func TestAnswerValidatorAppliesBuiltInRules(t *testing.T) {
 			t.Parallel()
 
 			results, err := validator.ValidateAnswers(context.Background(), []ruleengineport.AnswerValidationTask{
-				{ID: "q", Value: tc.value, Rules: []validation.ValidationRule{tc.rule}},
+				{ID: "q", Value: tc.value, Rules: []ruleengineport.ValidationRuleSpec{tc.rule}},
 			})
 			if err != nil {
 				t.Fatalf("ValidateAnswers returned error: %v", err)
@@ -94,8 +97,8 @@ func TestAnswerValidatorSkipsUnknownRuleType(t *testing.T) {
 	t.Parallel()
 
 	results, err := NewAnswerValidator().ValidateAnswers(context.Background(), []ruleengineport.AnswerValidationTask{
-		{ID: "q", Value: validatableStub{empty: true}, Rules: []validation.ValidationRule{
-			validation.NewValidationRule(validation.RuleType("unknown"), ""),
+		{ID: "q", Value: validatableStub{empty: true}, Rules: []ruleengineport.ValidationRuleSpec{
+			validationRule(ruleengineport.ValidationRuleType("unknown"), ""),
 		}},
 	})
 	if err != nil {
@@ -110,8 +113,8 @@ func TestNumberRuleReturnsValidationErrorWhenValueCannotConvert(t *testing.T) {
 	t.Parallel()
 
 	results, err := NewAnswerValidator().ValidateAnswers(context.Background(), []ruleengineport.AnswerValidationTask{
-		{ID: "q", Value: validatableStub{numberErr: errors.New("bad number")}, Rules: []validation.ValidationRule{
-			validation.NewValidationRule(validation.RuleTypeMinValue, "1"),
+		{ID: "q", Value: validatableStub{numberErr: errors.New("bad number")}, Rules: []ruleengineport.ValidationRuleSpec{
+			validationRule(ruleengineport.ValidationRuleTypeMinValue, "1"),
 		}},
 	})
 	if err != nil {
@@ -126,8 +129,8 @@ func TestAnswerValidatorKeepsTaskOrder(t *testing.T) {
 	t.Parallel()
 
 	results, err := NewAnswerValidator().ValidateAnswers(context.Background(), []ruleengineport.AnswerValidationTask{
-		{ID: "a", Value: validatableStub{str: "ok"}, Rules: []validation.ValidationRule{validation.NewValidationRule(validation.RuleTypeRequired, "")}},
-		{ID: "b", Value: validatableStub{empty: true}, Rules: []validation.ValidationRule{validation.NewValidationRule(validation.RuleTypeRequired, "")}},
+		{ID: "a", Value: validatableStub{str: "ok"}, Rules: []ruleengineport.ValidationRuleSpec{validationRule(ruleengineport.ValidationRuleTypeRequired, "")}},
+		{ID: "b", Value: validatableStub{empty: true}, Rules: []ruleengineport.ValidationRuleSpec{validationRule(ruleengineport.ValidationRuleTypeRequired, "")}},
 	})
 	if err != nil {
 		t.Fatalf("ValidateAnswers returned error: %v", err)

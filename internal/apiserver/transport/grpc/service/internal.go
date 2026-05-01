@@ -16,7 +16,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
@@ -47,9 +46,14 @@ type InternalService struct {
 	behaviorProjectorService  statisticsApp.BehaviorProjectorService
 	warmupCoordinator         cachegov.Coordinator
 	// 小程序码生成服务（可选）
-	qrCodeService qrcodeApp.QRCodeService
+	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService
+}
+
+type surveyScaleQRCodeGenerator interface {
+	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
+	GenerateScaleQRCode(ctx context.Context, code string) (string, error)
 }
 
 type assessmentScaleContext struct {
@@ -78,13 +82,9 @@ func NewInternalService(
 	operatorRoleSyncer operatorBootstrapRoleSyncer,
 	behaviorProjectorService statisticsApp.BehaviorProjectorService,
 	warmupCoordinator cachegov.Coordinator,
-	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
+	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 ) *InternalService {
-	var qrService qrcodeApp.QRCodeService
-	if q, ok := qrCodeService.(qrcodeApp.QRCodeService); ok {
-		qrService = q
-	}
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
 		submissionService:                  submissionService,
@@ -100,7 +100,7 @@ func NewInternalService(
 		operatorRoleSyncer:                 operatorRoleSyncer,
 		behaviorProjectorService:           behaviorProjectorService,
 		warmupCoordinator:                  warmupCoordinator,
-		qrCodeService:                      qrService,
+		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 	}
 }

@@ -10,7 +10,6 @@ import (
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
 const (
@@ -24,6 +23,14 @@ var (
 		"pending":   "待开放",
 		"overdue":   "已逾期",
 		"canceled":  "已取消",
+	}
+	riskLevelLabelMap = map[string]string{
+		"normal": "正常",
+		"none":   "正常",
+		"low":    "低风险",
+		"medium": "中风险",
+		"high":   "高风险",
+		"severe": "严重风险",
 	}
 )
 
@@ -150,12 +157,7 @@ func LabelForRiskLevel(value string) string {
 	if normalized == "" {
 		return "-"
 	}
-	switch normalized {
-	case "normal":
-		return "正常"
-	default:
-		return domainScale.RiskLevel(normalized).DisplayName()
-	}
+	return formatMappedLabel(value, riskLevelLabelMap, "-")
 }
 
 func LabelForAssessmentStatus(value string) string {

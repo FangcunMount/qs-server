@@ -21,7 +21,8 @@ func TestRuleEnginePortDoesNotDependOnCalculationExecutionModel(t *testing.T) {
 	}
 	for _, imported := range parsed.Imports {
 		importPath := strings.Trim(imported.Path.Value, `"`)
-		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation" {
+		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation" ||
+			importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/validation" {
 			t.Fatalf("port/ruleengine imports %s; execution value interfaces must be port-owned", importPath)
 		}
 	}

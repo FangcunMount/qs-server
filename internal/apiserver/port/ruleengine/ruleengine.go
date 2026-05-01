@@ -2,8 +2,6 @@ package ruleengine
 
 import (
 	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 )
 
 // ValidatableValue is the value surface needed by validation execution.
@@ -26,8 +24,28 @@ type ScorableValue interface {
 type AnswerValidationTask struct {
 	ID    string
 	Value ValidatableValue
-	Rules []validation.ValidationRule
+	Rules []ValidationRuleSpec
 }
+
+// ValidationRuleSpec is the execution-facing rule representation.
+type ValidationRuleSpec struct {
+	RuleType    ValidationRuleType
+	TargetValue string
+}
+
+// ValidationRuleType names built-in validation rules without importing domain rule packages.
+type ValidationRuleType string
+
+const (
+	ValidationRuleTypeRequired      ValidationRuleType = "required"
+	ValidationRuleTypeMinLength     ValidationRuleType = "min_length"
+	ValidationRuleTypeMaxLength     ValidationRuleType = "max_length"
+	ValidationRuleTypeMinValue      ValidationRuleType = "min_value"
+	ValidationRuleTypeMaxValue      ValidationRuleType = "max_value"
+	ValidationRuleTypeMinSelections ValidationRuleType = "min_selections"
+	ValidationRuleTypeMaxSelections ValidationRuleType = "max_selections"
+	ValidationRuleTypePattern       ValidationRuleType = "pattern"
+)
 
 // ValidationError is a stable application-facing validation error.
 type ValidationError struct {

@@ -232,11 +232,26 @@ func (s *submissionService) buildAnswerValuesAndTasks(
 		tasks = append(tasks, ruleengine.AnswerValidationTask{
 			ID:    answerDTO.QuestionCode,
 			Value: answersheet.NewAnswerValueAdapter(answerValue),
-			Rules: question.GetValidationRules(),
+			Rules: validationRuleSpecsFromQuestion(question),
 		})
 	}
 
 	return results, tasks, nil
+}
+
+func validationRuleSpecsFromQuestion(question questionnaire.Question) []ruleengine.ValidationRuleSpec {
+	rules := question.GetValidationRules()
+	if len(rules) == 0 {
+		return nil
+	}
+	specs := make([]ruleengine.ValidationRuleSpec, 0, len(rules))
+	for _, rule := range rules {
+		specs = append(specs, ruleengine.ValidationRuleSpec{
+			RuleType:    ruleengine.ValidationRuleType(rule.GetRuleType()),
+			TargetValue: rule.GetTargetValue(),
+		})
+	}
+	return specs
 }
 
 // validateAnswersBatch 批量校验答案
