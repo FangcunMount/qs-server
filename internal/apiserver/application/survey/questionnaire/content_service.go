@@ -6,9 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -16,18 +14,16 @@ import (
 // contentService 问卷内容编辑服务实现
 // 行为者：问卷内容编辑者
 type contentService struct {
-	repo        questionnaire.Repository
-	questionMgr questionnaire.QuestionManager
+	repo questionnaire.Repository
 }
 
 // NewContentService 创建问卷内容编辑服务
 func NewContentService(
 	repo questionnaire.Repository,
-	questionMgr questionnaire.QuestionManager,
+	_ questionnaire.QuestionManager,
 ) QuestionnaireContentService {
 	return &contentService{
-		repo:        repo,
-		questionMgr: questionMgr,
+		repo: repo,
 	}
 }
 
@@ -98,7 +94,7 @@ func (s *contentService) AddQuestion(ctx context.Context, dto AddQuestionDTO) (*
 	}
 
 	// 5. 添加问题到问卷
-	if err := s.questionMgr.AddQuestion(q, question); err != nil {
+	if err := q.AddQuestion(question); err != nil {
 		l.Errorw("添加问题失败",
 			"action", "add_question",
 			"questionnaire_code", dto.QuestionnaireCode,
@@ -180,7 +176,7 @@ func (s *contentService) UpdateQuestion(ctx context.Context, dto UpdateQuestionD
 	}
 
 	// 5. 更新问题
-	if err := s.questionMgr.UpdateQuestion(q, newQuestion); err != nil {
+	if err := q.UpdateQuestion(newQuestion); err != nil {
 		l.Errorw("更新问题失败",
 			"action", "update_question",
 			"questionnaire_code", dto.QuestionnaireCode,
@@ -237,7 +233,7 @@ func (s *contentService) RemoveQuestion(ctx context.Context, questionnaireCode, 
 	}
 
 	// 4. 删除问题
-	if err := s.questionMgr.RemoveQuestion(q, meta.NewCode(questionCode)); err != nil {
+	if err := q.RemoveQuestion(meta.NewCode(questionCode)); err != nil {
 		l.Errorw("删除问题失败",
 			"action", "remove_question",
 			"questionnaire_code", questionnaireCode,
@@ -306,7 +302,7 @@ func (s *contentService) ReorderQuestions(ctx context.Context, questionnaireCode
 	}
 
 	// 5. 重排问题顺序
-	if err := s.questionMgr.ReorderQuestions(q, metaCodes); err != nil {
+	if err := q.ReorderQuestions(metaCodes); err != nil {
 		l.Errorw("重排问题顺序失败",
 			"action", "reorder_questions",
 			"questionnaire_code", questionnaireCode,
@@ -388,7 +384,7 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 	}
 
 	// 5. 批量更新问题（使用 ReplaceQuestions）
-	if err := s.questionMgr.ReplaceQuestions(q, domainQuestions); err != nil {
+	if err := q.ReplaceQuestions(domainQuestions); err != nil {
 		l.Errorw("批量更新问题失败",
 			"action", "batch_update_questions",
 			"questionnaire_code", questionnaireCode,
@@ -488,91 +484,4 @@ func (s *contentService) logSuccess(ctx context.Context, action string, question
 	}
 	fields = append(fields, extraFields...)
 	logger.L(ctx).Debugw("操作成功", fields...)
-}
-
-// buildQuestionFromDTO 从 DTO 构建问题领域对象
-func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, required bool, description string, validationRules []validation.ValidationRule, calculationRule *calculation.CalculationRule, showController *questionnaire.ShowController) (questionnaire.Question, error) {
-
-	// 构建选项列表
-	opts := make([]questionnaire.Option, 0, len(options))
-	for i, optDTO := range options {
-		// 如果选项 code 为空（新增选项），自动生成一个
-		optionCode := optDTO.Value
-		if optionCode == "" {
-			generatedCode, err := meta.GenerateCode()
-			if err != nil {
-				return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "生成选项编码失败")
-			}
-			optionCode = generatedCode.String()
-		}
-
-		opt, err := questionnaire.NewOptionWithStringCode(optionCode, optDTO.Label, float64(optDTO.Score))
-		if err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "第 %d 个选项创建失败: %v", i+1, err)
-		}
-		opts = append(opts, opt)
-	}
-
-	qOptions := []questionnaire.QuestionParamsOption{
-		questionnaire.WithCode(meta.NewCode(code)),
-		questionnaire.WithStem(stem),
-		questionnaire.WithQuestionType(questionnaire.QuestionType(qType)),
-		questionnaire.WithOptions(opts),
-		questionnaire.WithTips(description),
-	}
-
-	if required {
-		qOptions = append(qOptions, questionnaire.WithRequired())
-	}
-
-	// 添加校验规则
-	if len(validationRules) > 0 {
-		qOptions = append(qOptions, questionnaire.WithValidationRules(validationRules))
-	}
-
-	// 添加计算规则
-	if calculationRule != nil {
-		qOptions = append(qOptions, questionnaire.WithCalculationRule(calculationRule.GetFormula()))
-	}
-
-	// 添加显示控制器
-	if showController != nil {
-		qOptions = append(qOptions, questionnaire.WithShowController(showController))
-	}
-
-	// 使用领域层工厂方法创建问题
-	return questionnaire.NewQuestion(qOptions...)
-}
-
-func toDomainValidationRules(rules []ValidationRuleDTO) []validation.ValidationRule {
-	result := make([]validation.ValidationRule, 0, len(rules))
-	for _, rule := range rules {
-		result = append(result, validation.NewValidationRule(validation.RuleType(rule.RuleType), rule.TargetValue))
-	}
-	return result
-}
-
-func toDomainCalculationRule(rule *CalculationRuleDTO) *calculation.CalculationRule {
-	if rule == nil || rule.FormulaType == "" {
-		return nil
-	}
-	return calculation.NewCalculationRule(calculation.FormulaType(rule.FormulaType), []string{})
-}
-
-func toDomainShowController(controller *ShowControllerDTO) *questionnaire.ShowController {
-	if controller == nil {
-		return nil
-	}
-	conditions := make([]questionnaire.ShowControllerCondition, 0, len(controller.Questions))
-	for _, cond := range controller.Questions {
-		optionCodes := make([]meta.Code, 0, len(cond.SelectOptionCodes))
-		for _, code := range cond.SelectOptionCodes {
-			optionCodes = append(optionCodes, meta.NewCode(code))
-		}
-		conditions = append(conditions, questionnaire.NewShowControllerCondition(
-			meta.NewCode(cond.Code),
-			optionCodes,
-		))
-	}
-	return questionnaire.NewShowController(controller.Rule, conditions)
 }

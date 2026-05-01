@@ -13,7 +13,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // submissionService 答卷提交服务实现
@@ -66,7 +65,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 3. 构建答案值对象和校验任务
-	answerResults, validationTasks, err := s.buildAnswerValuesAndTasks(l, dto.Answers, questionMap)
+	answerResults, validationTasks, err := buildAnswerValuesAndTasks(l, dto.Answers, questionMap)
 	if err != nil {
 		return nil, err
 	}
@@ -77,7 +76,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 5. 创建答案对象
-	answers, err := s.createAnswers(l, answerResults)
+	answers, err := createAnswers(l, answerResults)
 	if err != nil {
 		return nil, err
 	}
@@ -187,73 +186,6 @@ func (s *submissionService) fetchAndValidateQuestionnaire(
 	return qnr, questionMap, nil
 }
 
-// answerBuildResult 答案构建中间结果
-type answerBuildResult struct {
-	questionCode string
-	answerValue  answersheet.AnswerValue
-	questionType questionnaire.QuestionType
-}
-
-// buildAnswerValuesAndTasks 构建答案值对象和校验任务
-func (s *submissionService) buildAnswerValuesAndTasks(
-	l *logger.RequestLogger,
-	answerDTOs []AnswerDTO,
-	questionMap map[string]questionnaire.Question,
-) ([]answerBuildResult, []ruleengine.AnswerValidationTask, error) {
-	l.Infow("开始验证答案", "answer_count", len(answerDTOs), "action", "validate", "resource", "answer")
-
-	results := make([]answerBuildResult, 0, len(answerDTOs))
-	tasks := make([]ruleengine.AnswerValidationTask, 0, len(answerDTOs))
-
-	for i, answerDTO := range answerDTOs {
-		// 检查问题是否存在于问卷中
-		question, exists := questionMap[answerDTO.QuestionCode]
-		if !exists {
-			l.Warnw("问题不存在于问卷中", "question_code", answerDTO.QuestionCode, "answer_index", i, "result", "failed")
-			return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("问题 %s 不存在于问卷中", answerDTO.QuestionCode))
-		}
-
-		// 创建答案值对象
-		answerValue, err := answersheet.CreateAnswerValueFromRaw(
-			questionnaire.QuestionType(answerDTO.QuestionType),
-			answerDTO.Value,
-		)
-		if err != nil {
-			l.Warnw("创建答案值失败", "question_code", answerDTO.QuestionCode, "question_type", answerDTO.QuestionType, "error", err.Error(), "result", "failed")
-			return nil, nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("创建答案值失败 [%s]", answerDTO.QuestionCode))
-		}
-
-		results = append(results, answerBuildResult{
-			questionCode: answerDTO.QuestionCode,
-			answerValue:  answerValue,
-			questionType: questionnaire.QuestionType(answerDTO.QuestionType),
-		})
-
-		tasks = append(tasks, ruleengine.AnswerValidationTask{
-			ID:    answerDTO.QuestionCode,
-			Value: answersheet.NewAnswerValueAdapter(answerValue),
-			Rules: validationRuleSpecsFromQuestion(question),
-		})
-	}
-
-	return results, tasks, nil
-}
-
-func validationRuleSpecsFromQuestion(question questionnaire.Question) []ruleengine.ValidationRuleSpec {
-	rules := question.GetValidationRules()
-	if len(rules) == 0 {
-		return nil
-	}
-	specs := make([]ruleengine.ValidationRuleSpec, 0, len(rules))
-	for _, rule := range rules {
-		specs = append(specs, ruleengine.ValidationRuleSpec{
-			RuleType:    ruleengine.ValidationRuleType(rule.GetRuleType()),
-			TargetValue: rule.GetTargetValue(),
-		})
-	}
-	return specs
-}
-
 // validateAnswersBatch 批量校验答案
 func (s *submissionService) validateAnswersBatch(ctx context.Context, l *logger.RequestLogger, tasks []ruleengine.AnswerValidationTask) error {
 	if s.answerValidator == nil {
@@ -288,27 +220,6 @@ func (s *submissionService) validateAnswersBatch(ctx context.Context, l *logger.
 
 	l.Warnw("批量答案验证失败", "failed_count", len(failedQuestions), "failed_questions", failedQuestions, "validation_errors", errDetails, "result", "failed")
 	return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("答案验证失败: %v", errDetails))
-}
-
-// createAnswers 创建答案对象列表
-func (s *submissionService) createAnswers(l *logger.RequestLogger, results []answerBuildResult) ([]answersheet.Answer, error) {
-	answers := make([]answersheet.Answer, 0, len(results))
-
-	for _, ar := range results {
-		answer, err := answersheet.NewAnswer(
-			meta.NewCode(ar.questionCode),
-			ar.questionType,
-			ar.answerValue,
-			0, // 初始分数为0，后续由评分系统计算
-		)
-		if err != nil {
-			l.Errorw("创建答案对象失败", "question_code", ar.questionCode, "error", err.Error(), "result", "failed")
-			return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("创建答案失败 [%s]", ar.questionCode))
-		}
-		answers = append(answers, answer)
-	}
-
-	return answers, nil
 }
 
 // createAndSaveAnswerSheet 创建并保存答卷

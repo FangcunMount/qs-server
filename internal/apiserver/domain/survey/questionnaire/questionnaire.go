@@ -221,6 +221,101 @@ func (q *Questionnaire) GetQuestionCnt() int {
 	return len(q.questions)
 }
 
+// AddQuestion 添加问题，并保持问卷内问题编码唯一。
+func (q *Questionnaire) AddQuestion(question Question) error {
+	if question == nil {
+		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题对象不能为空")
+	}
+	return q.addQuestion(question)
+}
+
+// RemoveQuestion 移除指定问题。
+func (q *Questionnaire) RemoveQuestion(questionCode meta.Code) error {
+	if questionCode.Value() == "" {
+		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题编码不能为空")
+	}
+	return q.removeQuestion(questionCode)
+}
+
+// RemoveAllQuestions 清空问卷中的所有问题。
+func (q *Questionnaire) RemoveAllQuestions() {
+	q.questions = []Question{}
+	q.questionCnt = 0
+}
+
+// ReplaceQuestions 替换问卷中的全部问题，并校验问题编码唯一。
+func (q *Questionnaire) ReplaceQuestions(questions []Question) error {
+	if len(questions) == 0 {
+		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题列表不能为空")
+	}
+
+	codes := make(map[string]bool)
+	for i, question := range questions {
+		if question == nil {
+			return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "第 %d 个问题对象为空", i+1)
+		}
+
+		questionCode := question.GetCode().Value()
+		if questionCode == "" {
+			return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "第 %d 个问题的编码不能为空", i+1)
+		}
+		if codes[questionCode] {
+			return errors.WithCode(code.ErrQuestionAlreadyExists, "问题编码 %s 重复", questionCode)
+		}
+		codes[questionCode] = true
+	}
+
+	q.questions = append([]Question(nil), questions...)
+	q.questionCnt = len(q.questions)
+	return nil
+}
+
+// UpdateQuestion 按编码替换已有问题。
+func (q *Questionnaire) UpdateQuestion(updatedQuestion Question) error {
+	if updatedQuestion == nil {
+		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题对象不能为空")
+	}
+
+	targetCode := updatedQuestion.GetCode()
+	if targetCode.Value() == "" {
+		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题编码不能为空")
+	}
+
+	for i, existingQuestion := range q.questions {
+		if existingQuestion.GetCode() == targetCode {
+			q.questions[i] = updatedQuestion
+			return nil
+		}
+	}
+
+	return errors.WithCode(code.ErrQuestionnaireQuestionNotFound, "未找到编码为 %s 的问题", targetCode.Value())
+}
+
+// ReorderQuestions 按给定编码顺序重新排序问题。
+func (q *Questionnaire) ReorderQuestions(codes []meta.Code) error {
+	if len(codes) != q.QuestionCount() {
+		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "提供的编码数量与现有问题数量不匹配")
+	}
+
+	questionMap := make(map[string]Question)
+	for _, question := range q.questions {
+		questionMap[question.GetCode().Value()] = question
+	}
+
+	newQuestions := make([]Question, 0, len(codes))
+	for i, codeItem := range codes {
+		question, exists := questionMap[codeItem.Value()]
+		if !exists {
+			return errors.WithCode(code.ErrQuestionnaireQuestionNotFound, "第 %d 个编码 %s 对应的问题不存在", i+1, codeItem.Value())
+		}
+		newQuestions = append(newQuestions, question)
+	}
+
+	q.questions = newQuestions
+	q.questionCnt = len(q.questions)
+	return nil
+}
+
 // ===================== 包内私有方法，供领域服务调用 =====================
 
 // updateStatus 更新状态

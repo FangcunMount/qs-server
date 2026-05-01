@@ -127,7 +127,7 @@ func (r *Repository) FindByCodeVersion(ctx context.Context, code, version string
 
 // FindBaseByCode 根据编码查询工作版本基础信息
 func (r *Repository) FindBaseByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
-	po, err := r.aggregateOne(ctx, buildHeadBasePipeline(headFilter(code), 0, 1))
+	po, err := r.aggregateOne(ctx, commandHeadBasePipeline(headFilter(code)))
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, nil
@@ -140,7 +140,7 @@ func (r *Repository) FindBaseByCode(ctx context.Context, code string) (*domainQu
 // FindBasePublishedByCode 根据编码查询当前已发布版本基础信息。
 // 为兼容历史未迁移数据，若没有 active snapshot，会回退到已发布 head。
 func (r *Repository) FindBasePublishedByCode(ctx context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
-	pipeline := buildPublishedBasePipeline(codeOnlyPublishedMatch(code), 0, 1)
+	pipeline := commandPublishedBasePipeline(commandPublishedCodeMatch(code))
 	po, err := r.aggregateOne(ctx, pipeline)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
@@ -340,29 +340,6 @@ func (r *Repository) HasPublishedSnapshots(ctx context.Context, code string) (bo
 	})
 }
 
-func (r *Repository) aggregateList(ctx context.Context, pipeline []bson.M) ([]*domainQuestionnaire.Questionnaire, error) {
-	cursor, err := r.Collection().Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
-
-	var questionnaires []*domainQuestionnaire.Questionnaire
-	for cursor.Next(ctx) {
-		var po QuestionnairePO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, err
-		}
-		questionnaires = append(questionnaires, r.mapper.ToBO(&po))
-	}
-	if err := cursor.Err(); err != nil {
-		return nil, err
-	}
-	return questionnaires, nil
-}
-
 func (r *Repository) aggregateOne(ctx context.Context, pipeline []bson.M) (*QuestionnairePO, error) {
 	logger.L(ctx).Debugw("Mongo 查询问卷基础信息",
 		"collection", r.Collection().Name(),
@@ -418,178 +395,4 @@ func (r *Repository) findLatestPublishedPO(ctx context.Context, code string) (*Q
 		"deleted_at": nil,
 		"$or":        headRoleCandidates(),
 	}, options.FindOne().SetSort(bson.D{{Key: "updated_at", Value: -1}}))
-}
-
-func headRoleCandidates() bson.A {
-	return bson.A{
-		bson.M{"record_role": domainQuestionnaire.RecordRoleHead.String()},
-		bson.M{"record_role": bson.M{"$exists": false}},
-		bson.M{"record_role": ""},
-	}
-}
-
-func headFilter(code string) bson.M {
-	return bson.M{
-		"code":       code,
-		"deleted_at": nil,
-		"$or":        headRoleCandidates(),
-	}
-}
-
-func headVersionFilter(code, version string) bson.M {
-	filter := headFilter(code)
-	filter["version"] = version
-	return filter
-}
-
-func roleAwareQuestionFilter(q *domainQuestionnaire.Questionnaire) bson.M {
-	filter := bson.M{
-		"code":       q.GetCode().Value(),
-		"version":    q.GetVersion().Value(),
-		"deleted_at": nil,
-	}
-	if q.IsPublishedSnapshot() {
-		filter["record_role"] = domainQuestionnaire.RecordRolePublishedSnapshot.String()
-		return filter
-	}
-	filter["$or"] = headRoleCandidates()
-	return filter
-}
-
-func applyCommonConditions(filter bson.M, conditions map[string]interface{}) bson.M {
-	if filter == nil {
-		filter = bson.M{}
-	}
-	filter["deleted_at"] = nil
-	if code, ok := conditions["code"].(string); ok && code != "" {
-		filter["code"] = code
-	}
-	if title, ok := conditions["title"].(string); ok && title != "" {
-		filter["title"] = bson.M{"$regex": title, "$options": "i"}
-	}
-	if status, ok := conditions["status"]; ok && status != nil {
-		if value, ok := status.(string); ok && value != "" {
-			if parsed, ok := domainQuestionnaire.ParseStatus(value); ok {
-				filter["status"] = parsed.String()
-			}
-		}
-	}
-	if typ, ok := conditions["type"].(string); ok && typ != "" {
-		filter["type"] = typ
-	}
-	return filter
-}
-
-func buildHeadListFilter(conditions map[string]interface{}) bson.M {
-	filter := applyCommonConditions(bson.M{}, conditions)
-	filter["$or"] = headRoleCandidates()
-	return filter
-}
-
-func buildPublishedListFilter(conditions map[string]interface{}) bson.M {
-	filter := applyCommonConditions(bson.M{}, conditions)
-	statusValue, hasStatus := filter["status"]
-	if !hasStatus {
-		filter["status"] = domainQuestionnaire.STATUS_PUBLISHED.String()
-		statusValue = filter["status"]
-	}
-	delete(filter, "status")
-
-	filter["$or"] = bson.A{
-		bson.M{
-			"record_role":         domainQuestionnaire.RecordRolePublishedSnapshot.String(),
-			"is_active_published": true,
-			"status":              statusValue,
-		},
-		bson.M{
-			"status": statusValue,
-			"$or":    headRoleCandidates(),
-		},
-	}
-	return filter
-}
-
-func codeOnlyPublishedMatch(code string) bson.M {
-	return buildPublishedListFilter(map[string]interface{}{
-		"code":   code,
-		"status": domainQuestionnaire.STATUS_PUBLISHED.String(),
-	})
-}
-
-func paginationLimit(page, pageSize int) int64 {
-	if page <= 0 || pageSize <= 0 {
-		return 0
-	}
-	return int64(pageSize)
-}
-
-func paginationSkip(page, pageSize int) int64 {
-	if page <= 1 || pageSize <= 0 {
-		return 0
-	}
-	return int64((page - 1) * pageSize)
-}
-
-func publishedPriorityExpr() bson.M {
-	return bson.M{"$cond": bson.A{
-		bson.M{"$and": bson.A{
-			bson.M{"$eq": bson.A{"$record_role", domainQuestionnaire.RecordRolePublishedSnapshot.String()}},
-			bson.M{"$eq": bson.A{"$is_active_published", true}},
-		}},
-		2,
-		1,
-	}}
-}
-
-func buildHeadBasePipeline(filter bson.M, skip, limit int64) []bson.M {
-	pipeline := []bson.M{
-		{"$match": filter},
-		{"$sort": bson.M{"updated_at": -1}},
-	}
-	if skip > 0 {
-		pipeline = append(pipeline, bson.M{"$skip": skip})
-	}
-	if limit > 0 {
-		pipeline = append(pipeline, bson.M{"$limit": limit})
-	}
-	pipeline = append(pipeline, baseProjectStage())
-	return pipeline
-}
-
-func buildPublishedBasePipeline(filter bson.M, skip, limit int64) []bson.M {
-	pipeline := []bson.M{
-		{"$match": filter},
-		{"$addFields": bson.M{"published_priority": publishedPriorityExpr()}},
-		{"$sort": bson.M{"code": 1, "published_priority": -1, "updated_at": -1}},
-		{"$group": bson.M{"_id": "$code", "doc": bson.M{"$first": "$$ROOT"}}},
-		{"$replaceRoot": bson.M{"newRoot": "$doc"}},
-		{"$sort": bson.M{"updated_at": -1}},
-	}
-	if skip > 0 {
-		pipeline = append(pipeline, bson.M{"$skip": skip})
-	}
-	if limit > 0 {
-		pipeline = append(pipeline, bson.M{"$limit": limit})
-	}
-	pipeline = append(pipeline, baseProjectStage())
-	return pipeline
-}
-
-func baseProjectStage() bson.M {
-	return bson.M{"$project": bson.M{
-		"code":                1,
-		"title":               1,
-		"description":         1,
-		"img_url":             1,
-		"version":             1,
-		"status":              1,
-		"type":                1,
-		"record_role":         1,
-		"is_active_published": 1,
-		"question_count":      1,
-		"created_by":          1,
-		"created_at":          1,
-		"updated_by":          1,
-		"updated_at":          1,
-	}}
 }

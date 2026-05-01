@@ -3,10 +3,9 @@ package questionnaire
 import (
 	"context"
 
-	"go.mongodb.org/mongo-driver/bson"
-
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type questionnaireReadModel struct {
@@ -19,44 +18,35 @@ func NewQuestionnaireReadModel(repo *Repository) surveyreadmodel.QuestionnaireRe
 }
 
 func (r questionnaireReadModel) ListQuestionnaires(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter, page surveyreadmodel.PageRequest) ([]surveyreadmodel.QuestionnaireSummaryRow, error) {
-	pipeline := buildHeadBasePipeline(
-		buildHeadListFilter(questionnaireFilterToConditions(filter)),
-		paginationSkip(page.Page, page.PageSize),
-		paginationLimit(page.Page, page.PageSize),
-	)
-	items, err := r.repo.aggregateList(ctx, pipeline)
+	pipeline := questionnaireHeadReadModelPipeline(filter, page)
+	cursor, err := r.repo.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
-	return questionnaireRowsFromDomain(items), nil
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
+	return questionnaireRowsFromCursor(ctx, cursor)
 }
 
 func (r questionnaireReadModel) CountQuestionnaires(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter) (int64, error) {
-	return r.repo.CountDocuments(ctx, buildHeadListFilter(questionnaireFilterToConditions(filter)))
+	return r.repo.CountDocuments(ctx, questionnaireHeadReadModelFilter(filter))
 }
 
 func (r questionnaireReadModel) ListPublishedQuestionnaires(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter, page surveyreadmodel.PageRequest) ([]surveyreadmodel.QuestionnaireSummaryRow, error) {
-	pipeline := buildPublishedBasePipeline(
-		buildPublishedListFilter(questionnaireFilterToConditions(filter)),
-		paginationSkip(page.Page, page.PageSize),
-		paginationLimit(page.Page, page.PageSize),
-	)
-	items, err := r.repo.aggregateList(ctx, pipeline)
+	pipeline := questionnairePublishedReadModelPipeline(filter, page)
+	cursor, err := r.repo.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
 	}
-	return questionnaireRowsFromDomain(items), nil
+	defer func() {
+		_ = cursor.Close(ctx)
+	}()
+	return questionnaireRowsFromCursor(ctx, cursor)
 }
 
 func (r questionnaireReadModel) CountPublishedQuestionnaires(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter) (int64, error) {
-	pipeline := []bson.M{
-		{"$match": buildPublishedListFilter(questionnaireFilterToConditions(filter))},
-		{"$addFields": bson.M{"published_priority": publishedPriorityExpr()}},
-		{"$sort": bson.M{"code": 1, "published_priority": -1, "updated_at": -1}},
-		{"$group": bson.M{"_id": "$code"}},
-		{"$count": "total"},
-	}
-
+	pipeline := questionnairePublishedReadModelCountPipeline(filter)
 	cursor, err := r.repo.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
 		return 0, err
@@ -81,40 +71,45 @@ func (r questionnaireReadModel) CountPublishedQuestionnaires(ctx context.Context
 	return result.Total, nil
 }
 
-func questionnaireFilterToConditions(filter surveyreadmodel.QuestionnaireFilter) map[string]interface{} {
-	conditions := make(map[string]interface{})
-	if filter.Status != "" {
-		conditions["status"] = filter.Status
+func questionnaireRowsFromCursor(ctx context.Context, cursor *mongo.Cursor) ([]surveyreadmodel.QuestionnaireSummaryRow, error) {
+	var rows []surveyreadmodel.QuestionnaireSummaryRow
+	for cursor.Next(ctx) {
+		var po QuestionnairePO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		rows = append(rows, questionnaireRowFromPO(&po))
 	}
-	if filter.Title != "" {
-		conditions["title"] = filter.Title
+	if err := cursor.Err(); err != nil {
+		return nil, err
 	}
-	if filter.Type != "" {
-		conditions["type"] = filter.Type
-	}
-	return conditions
+	return rows, nil
 }
 
-func questionnaireRowsFromDomain(items []*domainQuestionnaire.Questionnaire) []surveyreadmodel.QuestionnaireSummaryRow {
+func questionnaireRowsFromPO(items []QuestionnairePO) []surveyreadmodel.QuestionnaireSummaryRow {
 	rows := make([]surveyreadmodel.QuestionnaireSummaryRow, 0, len(items))
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		rows = append(rows, surveyreadmodel.QuestionnaireSummaryRow{
-			Code:          item.GetCode().String(),
-			Version:       item.GetVersion().String(),
-			Title:         item.GetTitle(),
-			Description:   item.GetDescription(),
-			ImgURL:        item.GetImgUrl(),
-			Status:        item.GetStatus().String(),
-			Type:          item.GetType().String(),
-			QuestionCount: item.GetQuestionCnt(),
-			CreatedBy:     item.GetCreatedBy(),
-			CreatedAt:     item.GetCreatedAt(),
-			UpdatedBy:     item.GetUpdatedBy(),
-			UpdatedAt:     item.GetUpdatedAt(),
-		})
+	for i := range items {
+		rows = append(rows, questionnaireRowFromPO(&items[i]))
 	}
 	return rows
+}
+
+func questionnaireRowFromPO(item *QuestionnairePO) surveyreadmodel.QuestionnaireSummaryRow {
+	if item == nil {
+		return surveyreadmodel.QuestionnaireSummaryRow{}
+	}
+	return surveyreadmodel.QuestionnaireSummaryRow{
+		Code:          item.Code,
+		Version:       item.Version,
+		Title:         item.Title,
+		Description:   item.Description,
+		ImgURL:        item.ImgUrl,
+		Status:        item.Status,
+		Type:          item.Type,
+		QuestionCount: item.QuestionCount,
+		CreatedBy:     meta.FromUint64(item.CreatedBy),
+		CreatedAt:     item.CreatedAt,
+		UpdatedBy:     meta.FromUint64(item.UpdatedBy),
+		UpdatedAt:     item.UpdatedAt,
+	}
 }

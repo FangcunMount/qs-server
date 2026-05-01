@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -53,82 +52,15 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateQuestionnaireDT
 		"has_version", dto.Version != "",
 	)
 
-	// 1. 生成问卷编码（允许外部传入以支持导入场景）
-	var code meta.Code
-	var err error
-	if dto.Code != "" {
-		code = meta.NewCode(dto.Code)
-		l.Debugw("使用外部提供的问卷编码",
-			"action", "create",
-			"code", dto.Code,
-		)
-	} else {
-		code, err = meta.GenerateCode()
-		if err != nil {
-			l.Errorw("生成问卷编码失败",
-				"action", "create",
-				"result", "failed",
-				"error", err.Error(),
-			)
-			return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "生成问卷编码失败")
-		}
-		l.Debugw("生成新的问卷编码",
-			"action", "create",
-			"code", code.String(),
-		)
-	}
-
-	version := questionnaire.NewVersion("1.0")
-	if dto.Version != "" {
-		version = questionnaire.NewVersion(dto.Version)
-	}
-	qType := questionnaire.NormalizeQuestionnaireType(dto.Type)
-
-	// 2. 创建问卷领域模型
-	l.Debugw("创建问卷领域模型",
-		"action", "create",
-		"code", code.String(),
-		"version", version.String(),
-		"type", qType.String(),
-	)
-	q, err := questionnaire.NewQuestionnaire(
-		meta.NewCode(code.String()),
-		dto.Title,
-		questionnaire.WithDesc(dto.Description),
-		questionnaire.WithImgUrl(dto.ImgUrl),
-		questionnaire.WithVersion(version),
-		questionnaire.WithStatus(questionnaire.STATUS_DRAFT),
-		questionnaire.WithType(qType),
-	)
+	q, err := s.createQuestionnaire(ctx, l, dto)
 	if err != nil {
-		l.Errorw("创建问卷领域模型失败",
-			"action", "create",
-			"code", code.String(),
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "创建问卷失败")
-	}
-
-	// 3. 持久化
-	l.Debugw("保存问卷到数据库",
-		"action", "create",
-		"code", code.String(),
-	)
-	if err := s.repo.Create(ctx, q); err != nil {
-		l.Errorw("保存问卷失败",
-			"action", "create",
-			"code", code.String(),
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
+		return nil, err
 	}
 
 	duration := time.Since(startTime)
 	l.Debugw("创建问卷成功",
 		"action", "create",
-		"code", code.String(),
+		"code", q.GetCode().String(),
 		"status", q.GetStatus().String(),
 		"duration_ms", duration.Milliseconds(),
 	)
@@ -146,48 +78,8 @@ func (s *lifecycleService) SaveDraft(ctx context.Context, code string) (*Questio
 		"code", code,
 	)
 
-	// 1. 验证输入参数
-	if err := s.validateCode(ctx, code, "save_draft"); err != nil {
-		return nil, err
-	}
-
-	// 2. 获取现有问卷
-	q, err := s.findQuestionnaireByCode(ctx, code, "save_draft")
+	q, err := s.saveDraftQuestionnaire(ctx, l, code)
 	if err != nil {
-		return nil, err
-	}
-
-	// 3. 只能保存草稿状态的问卷
-	if !q.IsDraft() {
-		l.Warnw("只能保存草稿状态的问卷",
-			"action", "save_draft",
-			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "只能保存草稿状态的问卷")
-	}
-
-	// 4. 递增小版本号（使用 Versioning 领域服务）
-	oldVersion := q.GetVersion().String()
-	l.Debugw("递增小版本号",
-		"action", "save_draft",
-		"code", code,
-		"old_version", oldVersion,
-	)
-	versioning := questionnaire.Versioning{}
-	if err := versioning.IncrementMinorVersion(q); err != nil {
-		l.Errorw("更新版本号失败",
-			"action", "save_draft",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "更新版本号失败")
-	}
-
-	// 5. 持久化
-	if err := s.persistQuestionnaire(ctx, q, code, "save_draft", "草稿"); err != nil {
 		return nil, err
 	}
 
@@ -298,53 +190,10 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷已发布，不能重复发布")
 	}
 
-	// 4. 检查问题列表
-	questionsCount := len(q.GetQuestions())
-	l.Debugw("检查问题列表",
-		"action", "publish",
-		"code", code,
-		"questions_count", questionsCount,
-	)
-	if questionsCount == 0 {
-		l.Warnw("问卷没有问题，不能发布",
-			"action", "publish",
-			"code", code,
-			"result", "invalid_question",
-		)
-		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidQuestion, "问卷没有问题，不能发布")
-	}
-
-	// 5. 发布问卷（Lifecycle 会自动递增大版本号并更新状态为已发布）
-	l.Debugw("执行发布流程",
-		"action", "publish",
-		"code", code,
-		"current_version", q.GetVersion().String(),
-	)
-	if err := s.lifecycle.Publish(ctx, q); err != nil {
-		l.Errorw("发布问卷失败",
-			"action", "publish",
-			"code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
+	if err := s.publishQuestionnaireVersion(ctx, l, q, code); err != nil {
 		return nil, err
 	}
 
-	// 6. 持久化
-	if err := s.persistQuestionnaire(ctx, q, code, "publish", "状态"); err != nil {
-		return nil, err
-	}
-	if err := s.repo.CreatePublishedSnapshot(ctx, q, true); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存发布快照失败")
-	}
-	if err := s.repo.SetActivePublishedVersion(ctx, code, q.GetVersion().String()); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "切换发布快照失败")
-	}
-	if err := s.syncScaleQuestionnaireVersion(ctx, code, q.GetVersion().String()); err != nil {
-		return nil, err
-	}
-
-	// 7. 发布聚合根收集的领域事件
 	s.publishEvents(ctx, q)
 
 	s.logSuccess(ctx, "publish", code, startTime,
@@ -504,65 +353,8 @@ func (s *lifecycleService) Delete(ctx context.Context, code string) error {
 		"code", code,
 	)
 
-	// 1. 验证输入参数
-	if err := s.validateCode(ctx, code, "delete"); err != nil {
+	if err := s.deleteQuestionnaire(ctx, l, code); err != nil {
 		return err
-	}
-
-	// 2. 获取问卷
-	q, err := s.findQuestionnaireByCode(ctx, code, "delete")
-	if err != nil {
-		return err
-	}
-
-	// 3. 只能删除草稿状态的问卷
-	if !q.IsDraft() {
-		l.Warnw("只能删除草稿状态的问卷",
-			"action", "delete",
-			"code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "只能删除草稿状态的问卷")
-	}
-
-	hasSnapshots, err := s.repo.HasPublishedSnapshots(ctx, code)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "查询发布快照失败")
-	}
-	if !hasSnapshots {
-		l.Debugw("删除整个问卷族",
-			"action", "delete",
-			"code", code,
-		)
-		if err := s.repo.HardDeleteFamily(ctx, code); err != nil {
-			l.Errorw("删除问卷失败",
-				"action", "delete",
-				"code", code,
-				"result", "failed",
-				"error", err.Error(),
-			)
-			return errors.WrapC(err, errorCode.ErrDatabase, "删除问卷失败")
-		}
-		s.logSuccess(ctx, "delete", code, startTime)
-		return nil
-	}
-
-	latestPublished, err := s.repo.FindLatestPublishedByCode(ctx, code)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "加载历史发布快照失败")
-	}
-	if err := s.repo.HardDelete(ctx, code); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "删除工作版本失败")
-	}
-	if latestPublished != nil {
-		restored, err := cloneQuestionnaireAsHead(latestPublished)
-		if err != nil {
-			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidInput, "恢复工作版本失败")
-		}
-		if err := s.repo.Update(ctx, restored); err != nil {
-			return errors.WrapC(err, errorCode.ErrDatabase, "恢复工作版本失败")
-		}
 	}
 
 	s.logSuccess(ctx, "delete", code, startTime)

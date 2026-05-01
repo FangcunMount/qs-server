@@ -153,61 +153,10 @@ func (s *answerSheetScoringService) calculateAnswerSheetScore(ctx context.Contex
 	if s.answerScorer == nil {
 		return nil, errors.WithCode(errorCode.ErrAnswerSheetScoreCalculationFailed, "答卷计分器未配置")
 	}
-	questionMap := buildScoringQuestionMap(qnr.GetQuestions())
-	tasks := make([]ruleengine.AnswerScoreTask, 0, len(sheet.Answers()))
-	for _, ans := range sheet.Answers() {
-		question, found := questionMap[ans.QuestionCode()]
-		if !found {
-			continue
-		}
-		tasks = append(tasks, ruleengine.AnswerScoreTask{
-			ID:           ans.QuestionCode(),
-			Value:        answersheet.NewScorableValue(ans.Value()),
-			OptionScores: buildScoringOptionScoreMap(question.GetOptions()),
-		})
-	}
+	tasks := buildAnswerScoreTasks(sheet, qnr)
 	results, err := s.answerScorer.ScoreAnswers(ctx, tasks)
 	if err != nil {
 		return nil, err
 	}
-	resultMap := make(map[string]ruleengine.AnswerScoreResult, len(results))
-	for _, result := range results {
-		resultMap[result.ID] = result
-	}
-
-	scoredAnswers := make([]answersheet.ScoredAnswer, 0, len(sheet.Answers()))
-	var totalScore float64
-	for _, ans := range sheet.Answers() {
-		result, found := resultMap[ans.QuestionCode()]
-		if !found {
-			continue
-		}
-		scoredAnswers = append(scoredAnswers, answersheet.ScoredAnswer{
-			QuestionCode: ans.QuestionCode(),
-			Score:        result.Score,
-			MaxScore:     result.MaxScore,
-		})
-		totalScore += result.Score
-	}
-	return &answersheet.ScoredAnswerSheet{
-		AnswerSheetID: sheet.ID().Uint64(),
-		TotalScore:    totalScore,
-		ScoredAnswers: scoredAnswers,
-	}, nil
-}
-
-func buildScoringQuestionMap(questions []questionnaire.Question) map[string]questionnaire.Question {
-	questionMap := make(map[string]questionnaire.Question, len(questions))
-	for _, question := range questions {
-		questionMap[question.GetCode().Value()] = question
-	}
-	return questionMap
-}
-
-func buildScoringOptionScoreMap(options []questionnaire.Option) map[string]float64 {
-	optionScoreMap := make(map[string]float64, len(options))
-	for _, opt := range options {
-		optionScoreMap[opt.GetCode().Value()] = opt.GetScore()
-	}
-	return optionScoreMap
+	return scoredAnswerSheetFromResults(sheet, results), nil
 }

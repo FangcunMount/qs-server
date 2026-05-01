@@ -2,39 +2,20 @@ package questionnaire
 
 import (
 	"testing"
+	"time"
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
-func TestQuestionnaireFilterToConditionsMapsTypedFilter(t *testing.T) {
+func TestQuestionnaireHeadReadModelFilterAppliesTypedFilter(t *testing.T) {
 	t.Parallel()
 
-	got := questionnaireFilterToConditions(surveyreadmodel.QuestionnaireFilter{
+	filter := questionnaireHeadReadModelFilter(surveyreadmodel.QuestionnaireFilter{
 		Status: "published",
 		Title:  "PHQ",
 		Type:   "mental",
-	})
-
-	if got["status"] != "published" {
-		t.Fatalf("status = %#v, want published", got["status"])
-	}
-	if got["title"] != "PHQ" {
-		t.Fatalf("title = %#v, want PHQ", got["title"])
-	}
-	if got["type"] != "mental" {
-		t.Fatalf("type = %#v, want mental", got["type"])
-	}
-}
-
-func TestBuildHeadListFilterAppliesCommonConditions(t *testing.T) {
-	t.Parallel()
-
-	filter := buildHeadListFilter(map[string]interface{}{
-		"status": "published",
-		"title":  "PHQ",
-		"type":   "mental",
 	})
 
 	if got := filter["deleted_at"]; got != nil {
@@ -58,10 +39,10 @@ func TestBuildHeadListFilterAppliesCommonConditions(t *testing.T) {
 	}
 }
 
-func TestBuildPublishedListFilterDefaultsToPublishedSnapshotSemantics(t *testing.T) {
+func TestQuestionnairePublishedReadModelFilterDefaultsToPublishedSnapshotSemantics(t *testing.T) {
 	t.Parallel()
 
-	filter := buildPublishedListFilter(map[string]interface{}{"title": "PHQ"})
+	filter := questionnairePublishedReadModelFilter(surveyreadmodel.QuestionnaireFilter{Title: "PHQ"})
 	if _, ok := filter["status"]; ok {
 		t.Fatalf("top-level status should be folded into published $or, got %#v", filter["status"])
 	}
@@ -85,5 +66,50 @@ func TestBuildPublishedListFilterDefaultsToPublishedSnapshotSemantics(t *testing
 	}
 	if snapshotBranch["status"] != domainQuestionnaire.STATUS_PUBLISHED.String() {
 		t.Fatalf("status = %#v, want published", snapshotBranch["status"])
+	}
+}
+
+func TestQuestionnaireRowsFromPOMapsSummaryFieldsWithoutDomainAggregate(t *testing.T) {
+	t.Parallel()
+
+	now := time.Now().UTC()
+	rows := questionnaireRowsFromPO([]QuestionnairePO{
+		{
+			Code:          "Q_A",
+			Version:       "1.0",
+			Title:         "Questionnaire A",
+			Description:   "desc",
+			ImgUrl:        "https://example.test/q.png",
+			Status:        "published",
+			Type:          "MedicalScale",
+			QuestionCount: 7,
+		},
+	})
+	if len(rows) != 1 {
+		t.Fatalf("row count = %d, want 1", len(rows))
+	}
+	row := rows[0]
+	if row.Code != "Q_A" || row.Version != "1.0" || row.Title != "Questionnaire A" {
+		t.Fatalf("unexpected identity fields: %#v", row)
+	}
+	if row.Description != "desc" || row.ImgURL != "https://example.test/q.png" {
+		t.Fatalf("unexpected display fields: %#v", row)
+	}
+	if row.Status != "published" || row.Type != "MedicalScale" || row.QuestionCount != 7 {
+		t.Fatalf("unexpected status fields: %#v", row)
+	}
+
+	audited := QuestionnairePO{}
+	audited.CreatedBy = 1001
+	audited.CreatedAt = now
+	audited.UpdatedBy = 1002
+	audited.UpdatedAt = now.Add(time.Minute)
+	rows = questionnaireRowsFromPO([]QuestionnairePO{audited})
+	row = rows[0]
+	if row.CreatedBy.Uint64() != 1001 || row.UpdatedBy.Uint64() != 1002 {
+		t.Fatalf("audit ids = (%d,%d), want (1001,1002)", row.CreatedBy.Uint64(), row.UpdatedBy.Uint64())
+	}
+	if !row.CreatedAt.Equal(now) || !row.UpdatedAt.Equal(now.Add(time.Minute)) {
+		t.Fatalf("audit times = (%s,%s), want (%s,%s)", row.CreatedAt, row.UpdatedAt, now, now.Add(time.Minute))
 	}
 }
