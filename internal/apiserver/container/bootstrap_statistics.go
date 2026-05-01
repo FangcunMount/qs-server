@@ -28,8 +28,8 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 	}
 
 	var answerSheetReader surveyreadmodel.AnswerSheetReader
-	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
-		answerSheetReader = c.SurveyModule.AnswerSheet.Reader
+	if c.surveyScaleInfra != nil {
+		answerSheetReader = c.surveyScaleInfra.answerSheetReader
 	}
 	if !disableStatisticsCache {
 		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(

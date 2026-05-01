@@ -13,20 +13,17 @@ import (
 )
 
 func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
-	var scaleRepo scale.Repository
-	if c != nil && c.ScaleModule != nil {
-		scaleRepo = c.ScaleModule.Repo
+	var infra *surveyScaleInfra
+	if c != nil {
+		infra = c.surveyScaleInfra
 	}
-
+	var scaleRepo scale.Repository
 	var answerSheetRepo answersheet.Repository
 	var questionnaireRepo questionnaire.Repository
-	if c != nil && c.SurveyModule != nil {
-		if c.SurveyModule.AnswerSheet != nil {
-			answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
-		}
-		if c.SurveyModule.Questionnaire != nil {
-			questionnaireRepo = c.SurveyModule.Questionnaire.Repo
-		}
+	if infra != nil {
+		scaleRepo = infra.scaleRepo
+		answerSheetRepo = infra.answerSheetRepo
+		questionnaireRepo = infra.questionnaireRepo
 	}
 
 	redisClient := c.CacheClient(cacheplane.FamilyObject)

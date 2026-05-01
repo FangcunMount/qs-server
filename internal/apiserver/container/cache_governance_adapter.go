@@ -58,15 +58,15 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 }
 
 func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]string, error) {
-	c := a.container
-	if c == nil || c.ScaleModule == nil || c.ScaleModule.Reader == nil {
+	infra := a.containerSurveyScaleInfra()
+	if infra == nil || infra.scaleReader == nil {
 		return nil, nil
 	}
 	const pageSize = 200
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := c.ScaleModule.Reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
+		items, err := infra.scaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -85,15 +85,15 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 }
 
 func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Context) ([]string, error) {
-	c := a.container
-	if c == nil || c.SurveyModule == nil || c.SurveyModule.Questionnaire == nil || c.SurveyModule.Questionnaire.Reader == nil {
+	infra := a.containerSurveyScaleInfra()
+	if infra == nil || infra.questionnaireReader == nil {
 		return nil, nil
 	}
 	const pageSize = 200
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := c.SurveyModule.Questionnaire.Reader.ListPublishedQuestionnaires(ctx, surveyreadmodel.QuestionnaireFilter{Status: "published"}, surveyreadmodel.PageRequest{Page: page, PageSize: pageSize})
+		items, err := infra.questionnaireReader.ListPublishedQuestionnaires(ctx, surveyreadmodel.QuestionnaireFilter{Status: "published"}, surveyreadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -112,11 +112,11 @@ func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Cont
 }
 
 func (a cacheGovernanceAdapter) lookupScaleQuestionnaireCode(ctx context.Context, code string) (string, error) {
-	c := a.container
-	if c == nil || c.ScaleModule == nil || c.ScaleModule.Repo == nil {
+	infra := a.containerSurveyScaleInfra()
+	if infra == nil || infra.scaleRepo == nil {
 		return "", nil
 	}
-	item, err := c.ScaleModule.Repo.FindByCode(ctx, code)
+	item, err := infra.scaleRepo.FindByCode(ctx, code)
 	if err != nil || item == nil {
 		return "", err
 	}
@@ -124,35 +124,42 @@ func (a cacheGovernanceAdapter) lookupScaleQuestionnaireCode(ctx context.Context
 }
 
 func (a cacheGovernanceAdapter) warmScaleCacheTarget(ctx context.Context, code string) error {
-	c := a.container
-	if c == nil || c.ScaleModule == nil || c.ScaleModule.Repo == nil || strings.TrimSpace(code) == "" {
+	infra := a.containerSurveyScaleInfra()
+	if infra == nil || infra.scaleRepo == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	if cachedRepo, ok := c.ScaleModule.Repo.(*scaleCache.CachedScaleRepository); ok {
+	if cachedRepo, ok := infra.scaleRepo.(*scaleCache.CachedScaleRepository); ok {
 		return cachedRepo.WarmupCache(ctx, []string{code})
 	}
-	_, err := c.ScaleModule.Repo.FindByCode(ctx, code)
+	_, err := infra.scaleRepo.FindByCode(ctx, code)
 	return err
 }
 
 func (a cacheGovernanceAdapter) warmQuestionnaireCacheTarget(ctx context.Context, code string) error {
-	c := a.container
-	if c == nil || c.SurveyModule == nil || c.SurveyModule.Questionnaire == nil || c.SurveyModule.Questionnaire.Repo == nil || strings.TrimSpace(code) == "" {
+	infra := a.containerSurveyScaleInfra()
+	if infra == nil || infra.questionnaireRepo == nil || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	if cachedRepo, ok := c.SurveyModule.Questionnaire.Repo.(*scaleCache.CachedQuestionnaireRepository); ok {
+	if cachedRepo, ok := infra.questionnaireRepo.(*scaleCache.CachedQuestionnaireRepository); ok {
 		return cachedRepo.WarmupCache(ctx, []string{code})
 	}
-	_, err := c.SurveyModule.Questionnaire.Repo.FindBaseByCode(ctx, code)
+	_, err := infra.questionnaireRepo.FindBaseByCode(ctx, code)
 	return err
 }
 
 func (a cacheGovernanceAdapter) warmScaleListTarget(ctx context.Context) error {
-	c := a.container
-	if c == nil || c.ScaleModule == nil || c.ScaleModule.ListCache == nil {
+	infra := a.containerSurveyScaleInfra()
+	if infra == nil || infra.scaleListCache == nil {
 		return nil
 	}
-	return c.ScaleModule.ListCache.Rebuild(ctx)
+	return infra.scaleListCache.Rebuild(ctx)
+}
+
+func (a cacheGovernanceAdapter) containerSurveyScaleInfra() *surveyScaleInfra {
+	if a.container == nil {
+		return nil
+	}
+	return a.container.surveyScaleInfra
 }
 
 func (a cacheGovernanceAdapter) warmSystemStatsTarget(ctx context.Context, orgID int64) error {

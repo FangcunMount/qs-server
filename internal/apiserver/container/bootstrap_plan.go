@@ -10,9 +10,13 @@ import (
 )
 
 func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
+	var infra *surveyScaleInfra
+	if c != nil {
+		infra = c.surveyScaleInfra
+	}
 	var scaleRepo scale.Repository
-	if c != nil && c.ScaleModule != nil {
-		scaleRepo = c.ScaleModule.Repo
+	if infra != nil {
+		scaleRepo = infra.scaleRepo
 	}
 
 	return assembler.PlanModuleDeps{

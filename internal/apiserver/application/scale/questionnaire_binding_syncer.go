@@ -18,30 +18,12 @@ func NewQuestionnaireBindingSyncer(repo domainScale.Repository) *QuestionnaireBi
 	return &QuestionnaireBindingSyncer{repo: repo}
 }
 
-// LazyQuestionnaireBindingSyncer resolves the scale repository when the publish use case runs.
-type LazyQuestionnaireBindingSyncer struct {
-	repo func() domainScale.Repository
-}
-
-// NewLazyQuestionnaireBindingSyncer creates a survey-facing syncer without post-construction module mutation.
-func NewLazyQuestionnaireBindingSyncer(repo func() domainScale.Repository) *LazyQuestionnaireBindingSyncer {
-	return &LazyQuestionnaireBindingSyncer{repo: repo}
-}
-
 // SyncQuestionnaireVersion synchronizes a bound scale to the newly published questionnaire version.
 func (s *QuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
 	if s == nil {
 		return nil
 	}
 	return syncQuestionnaireVersion(ctx, s.repo, questionnaireCode, version)
-}
-
-// SyncQuestionnaireVersion synchronizes a bound scale to the newly published questionnaire version.
-func (s *LazyQuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
-	if s == nil || s.repo == nil {
-		return nil
-	}
-	return syncQuestionnaireVersion(ctx, s.repo(), questionnaireCode, version)
 }
 
 func syncQuestionnaireVersion(ctx context.Context, repo domainScale.Repository, questionnaireCode, version string) error {

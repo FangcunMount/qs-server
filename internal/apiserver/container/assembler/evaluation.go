@@ -262,7 +262,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	module.ScoreQueryService = assessmentApp.NewScoreQueryService(
 		module.ScoreRepo,
 		module.AssessmentRepo,
-		normalized.ScaleRepo, // 传入 scaleRepo（可能为 nil，但会在 SetScaleRepository 中更新）
+		normalized.ScaleRepo,
 	)
 
 	// ==================== 初始化 Interface 层 ====================
@@ -296,66 +296,6 @@ func normalizeEvaluationModuleDeps(deps EvaluationModuleDeps) (EvaluationModuleD
 		deps.EventPublisher = event.NewNopEventPublisher()
 	}
 	return deps, nil
-}
-
-// SetScaleRepository 设置量表仓储（用于跨模块依赖注入）
-// 注意：需要同时有 answerSheetRepo 和 questionnaireRepo 才能创建 EvaluationService
-func (m *EvaluationModule) SetScaleRepository(
-	scaleRepo scale.Repository,
-	answerSheetRepo answersheet.Repository,
-	questionnaireRepo questionnaire.Repository,
-) {
-	// 重新创建需要 scaleRepo、answerSheetRepo 和 questionnaireRepo 的服务
-	if answerSheetRepo == nil || questionnaireRepo == nil {
-		return
-	}
-	// 使用默认策略创建 SuggestionGenerator
-	// 注意：因子解读配置中的建议已通过 FactorInterpretationSuggestionStrategy 收集
-	// 当前不注册任何策略，完全依赖因子解读配置中的建议
-	var suggestionGenerator report.SuggestionGenerator
-	reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
-	if m.mysqlDB == nil {
-		return
-	}
-	serviceOpts := []engine.ServiceOption{}
-	if m.assessmentOutboxStore != nil {
-		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(newMySQLTransactionRunner(m.mysqlDB), m.assessmentOutboxStore))
-	}
-	if m.reportDurableSaver != nil {
-		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(m.reportDurableSaver))
-	}
-	serviceOpts = append(serviceOpts, engine.WithScaleFactorScorer(ruleengineInfra.NewScaleFactorScorer()))
-	m.EvaluationService = engine.NewService(
-		m.AssessmentRepo,
-		m.ScoreRepo,
-		m.ReportRepo,
-		scaleRepo,
-		answerSheetRepo,
-		questionnaireRepo,
-		reportBuilder,
-		serviceOpts...,
-	)
-
-	// 重新创建 ScoreQueryService，传入 scaleRepo
-	if scaleRepo != nil {
-		m.ScoreQueryService = assessmentApp.NewScoreQueryService(
-			m.ScoreRepo,
-			m.AssessmentRepo,
-			scaleRepo,
-		)
-		// 重新创建 Handler，因为 ScoreQueryService 已更新
-		// 注意：这里不传入 QRCodeService，因为它在容器初始化后才创建
-		// QRCodeService 需要通过 SetQRCodeService 方法单独设置
-		m.Handler = handler.NewEvaluationHandler(
-			m.ManagementService,
-			m.ReportQueryService,
-			m.ScoreQueryService,
-			m.EvaluationService,
-		)
-		if m.testeeAccessService != nil {
-			m.Handler.SetTesteeAccessService(m.testeeAccessService)
-		}
-	}
 }
 
 // SetQRCodeService 设置二维码服务（用于跨模块依赖注入）

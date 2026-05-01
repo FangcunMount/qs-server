@@ -5,8 +5,6 @@ import (
 
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
@@ -19,29 +17,34 @@ func (c *Container) resolveIdentityService() *iam.IdentityService {
 }
 
 func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
-	return assembler.SurveyModuleDeps{
-		MongoDB:             c.mongoDB,
-		EventPublisher:      c.eventPublisher,
-		RedisClient:         c.CacheClient(cacheplane.FamilyStatic),
-		CacheBuilder:        c.CacheBuilder(cacheplane.FamilyStatic),
-		RankRedisClient:     c.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder:    c.CacheBuilder(cacheplane.FamilyRank),
-		IdentityService:     c.resolveIdentityService(),
-		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
-		HotsetRecorder:      c.hotsetRecorder(),
-		Observer:            c.cacheObserver(),
-		TopicResolver:       c.eventCatalog,
-		MongoLimiter:        c.backpressure.Mongo,
-		ScaleSyncer: scaleApp.NewLazyQuestionnaireBindingSyncer(func() domainScale.Repository {
-			if c == nil || c.ScaleModule == nil {
-				return nil
-			}
-			return c.ScaleModule.Repo
-		}),
+	var infra *surveyScaleInfra
+	if c != nil {
+		infra = c.surveyScaleInfra
 	}
+	deps := assembler.SurveyModuleDeps{
+		MongoDB:          c.mongoDB,
+		EventPublisher:   c.eventPublisher,
+		RankRedisClient:  c.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder: c.CacheBuilder(cacheplane.FamilyRank),
+		IdentityService:  c.resolveIdentityService(),
+		HotsetRecorder:   c.hotsetRecorder(),
+		TopicResolver:    c.eventCatalog,
+		ScaleSyncer:      scaleApp.NewQuestionnaireBindingSyncer(nil),
+	}
+	if infra != nil {
+		deps.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.scaleRepo)
+		deps.QuestionnaireRepo = infra.questionnaireRepo
+		deps.QuestionnaireReader = infra.questionnaireReader
+		deps.AnswerSheetRepo = infra.answerSheetRepo
+		deps.AnswerSheetReader = infra.answerSheetReader
+	}
+	return deps
 }
 
 func (c *Container) buildSurveyModule() (*assembler.SurveyModule, error) {
+	if _, err := c.ensureSurveyScaleInfra(); err != nil {
+		return nil, err
+	}
 	return assembler.NewSurveyModule(c.buildSurveyModuleDeps())
 }
 

@@ -44,7 +44,7 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 	}
 }
 
-func TestContainerBuildSurveyModuleDepsUsesStaticCacheBuilderAndPolicy(t *testing.T) {
+func TestContainerBuildSurveyModuleDepsUsesSharedApplicationWiring(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
@@ -57,24 +57,18 @@ func TestContainerBuildSurveyModuleDepsUsesStaticCacheBuilderAndPolicy(t *testin
 	if deps.EventPublisher != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", deps.EventPublisher, c.eventPublisher)
 	}
-	if deps.CacheBuilder != c.CacheBuilder(cacheplane.FamilyStatic) {
-		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(cacheplane.FamilyStatic))
-	}
 	if deps.RankCacheBuilder != c.CacheBuilder(cacheplane.FamilyRank) {
 		t.Fatalf("rank cache builder = %#v, want %#v", deps.RankCacheBuilder, c.CacheBuilder(cacheplane.FamilyRank))
-	}
-	if deps.QuestionnairePolicy != c.CachePolicy(cachepolicy.PolicyQuestionnaire) {
-		t.Fatalf("policy = %#v, want %#v", deps.QuestionnairePolicy, c.CachePolicy(cachepolicy.PolicyQuestionnaire))
 	}
 	if deps.IdentityService != nil {
 		t.Fatalf("identity service = %#v, want nil without IAM", deps.IdentityService)
 	}
-	if deps.Observer != c.cacheObserver() {
-		t.Fatalf("observer = %#v, want %#v", deps.Observer, c.cacheObserver())
+	if deps.ScaleSyncer == nil {
+		t.Fatal("scale syncer = nil, want explicit syncer")
 	}
 }
 
-func TestContainerBuildScaleModuleDepsUsesStaticAndRankCacheBuilders(t *testing.T) {
+func TestContainerBuildScaleModuleDepsUsesSharedApplicationWiring(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
@@ -87,17 +81,8 @@ func TestContainerBuildScaleModuleDepsUsesStaticAndRankCacheBuilders(t *testing.
 	if deps.EventPublisher != c.eventPublisher {
 		t.Fatalf("event publisher = %#v, want %#v", deps.EventPublisher, c.eventPublisher)
 	}
-	if deps.CacheBuilder != c.CacheBuilder(cacheplane.FamilyStatic) {
-		t.Fatalf("cache builder = %#v, want %#v", deps.CacheBuilder, c.CacheBuilder(cacheplane.FamilyStatic))
-	}
 	if deps.RankCacheBuilder != c.CacheBuilder(cacheplane.FamilyRank) {
 		t.Fatalf("rank cache builder = %#v, want %#v", deps.RankCacheBuilder, c.CacheBuilder(cacheplane.FamilyRank))
-	}
-	if deps.ScalePolicy != c.CachePolicy(cachepolicy.PolicyScale) {
-		t.Fatalf("scale policy = %#v, want %#v", deps.ScalePolicy, c.CachePolicy(cachepolicy.PolicyScale))
-	}
-	if deps.ScaleListPolicy != c.CachePolicy(cachepolicy.PolicyScaleList) {
-		t.Fatalf("scale list policy = %#v, want %#v", deps.ScaleListPolicy, c.CachePolicy(cachepolicy.PolicyScaleList))
 	}
 }
 

@@ -52,6 +52,9 @@ type Container struct {
 	IAMModule        *IAMModule                  // IAM 集成模块
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
 
+	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
+	surveyScaleInfra *surveyScaleInfra
+
 	// 基础设施服务
 	QRCodeGenerator       wechatmini.QRCodeGenerator            // 小程序码生成器（可选）
 	SubscribeSender       wechatmini.MiniProgramSubscribeSender // 小程序订阅消息发送器（可选）

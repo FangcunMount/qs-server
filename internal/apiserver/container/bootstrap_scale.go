@@ -3,36 +3,37 @@ package container
 import (
 	"fmt"
 
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
-	var questionnaireRepo domainQuestionnaire.Repository
-	if c != nil && c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
-		questionnaireRepo = c.SurveyModule.Questionnaire.Repo
+	var infra *surveyScaleInfra
+	if c != nil {
+		infra = c.surveyScaleInfra
 	}
 
-	return assembler.ScaleModuleDeps{
-		MongoDB:           c.mongoDB,
-		EventPublisher:    c.eventPublisher,
-		QuestionnaireRepo: questionnaireRepo,
-		RedisClient:       c.CacheClient(cacheplane.FamilyStatic),
-		CacheBuilder:      c.CacheBuilder(cacheplane.FamilyStatic),
-		RankRedisClient:   c.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder:  c.CacheBuilder(cacheplane.FamilyRank),
-		IdentityService:   c.resolveIdentityService(),
-		ScalePolicy:       c.CachePolicy(cachepolicy.PolicyScale),
-		ScaleListPolicy:   c.CachePolicy(cachepolicy.PolicyScaleList),
-		HotsetRecorder:    c.hotsetRecorder(),
-		Observer:          c.cacheObserver(),
-		MongoLimiter:      c.backpressure.Mongo,
+	deps := assembler.ScaleModuleDeps{
+		EventPublisher:   c.eventPublisher,
+		RankRedisClient:  c.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder: c.CacheBuilder(cacheplane.FamilyRank),
+		IdentityService:  c.resolveIdentityService(),
+		HotsetRecorder:   c.hotsetRecorder(),
 	}
+	if infra != nil {
+		deps.Repo = infra.scaleRepo
+		deps.Reader = infra.scaleReader
+		deps.ListCache = infra.scaleListCache
+		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.questionnaireRepo)
+	}
+	return deps
 }
 
 func (c *Container) buildScaleModule() (*assembler.ScaleModule, error) {
+	if _, err := c.ensureSurveyScaleInfra(); err != nil {
+		return nil, err
+	}
 	return assembler.NewScaleModule(c.buildScaleModuleDeps())
 }
 

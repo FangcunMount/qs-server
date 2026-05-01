@@ -16,8 +16,7 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 
 	root := repoRoot(t)
 	allowedDefinitions := map[string]string{
-		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetScaleRepository": "compat_legacy",
-		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetQRCodeService":   "compat_noop",
+		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetQRCodeService": "compat_noop",
 	}
 
 	got := map[string]struct{}{}
@@ -149,6 +148,66 @@ func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestSurveyScaleModulesDoNotExposeInfraAdapters(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, tc := range []struct {
+		fileName string
+		types    []string
+	}{
+		{fileName: "survey.go", types: []string{"QuestionnaireSubModule", "AnswerSheetSubModule"}},
+		{fileName: "scale.go", types: []string{"ScaleModule"}},
+	} {
+		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", tc.fileName)
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		targetTypes := map[string]struct{}{}
+		for _, typeName := range tc.types {
+			targetTypes[typeName] = struct{}{}
+		}
+		for _, decl := range parsed.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok {
+					continue
+				}
+				if _, ok := targetTypes[typeSpec.Name.Name]; !ok {
+					continue
+				}
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				for _, field := range structType.Fields.List {
+					for _, name := range field.Names {
+						if name.Name == "Repo" || name.Name == "Reader" || name.Name == "ListCache" || strings.HasSuffix(name.Name, "Repo") {
+							t.Fatalf("%s exposes %s.%s; survey/scale modules must expose application services, not infra adapters", tc.fileName, typeSpec.Name.Name, name.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestSurveyScaleCompositionDoesNotUseLazySyncer(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanGoSourceFiles(t, filepath.Join(root, "internal", "apiserver", "container"), func(path, content string) {
+		if strings.Contains(content, "LazyQuestionnaireBindingSyncer") || strings.Contains(content, "NewLazyQuestionnaireBindingSyncer") {
+			t.Fatalf("%s uses lazy scale questionnaire syncer; survey/scale sync must be explicit container wiring", filepath.ToSlash(mustRel(t, root, path)))
+		}
+	})
 }
 
 func TestActorTransportsDoNotDependOnActorRepositoryImplementations(t *testing.T) {
