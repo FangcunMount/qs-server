@@ -32,6 +32,15 @@ func (g moduleGraph) postWireEvaluationDependencies() {
 	)
 }
 
+func (g moduleGraph) postWireCacheGovernanceDependencies() {
+	c := g.container
+	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.Handler == nil {
+		return
+	}
+	c.StatisticsModule.Handler.SetWarmupCoordinator(c.WarmupCoordinator())
+	c.StatisticsModule.Handler.SetCacheGovernanceStatusService(c.CacheGovernanceStatusService())
+}
+
 func (g moduleGraph) postWireProtectedScopeDependencies() {
 	// Protected-scope dependencies are now constructor dependencies for modules
 	// initialized after Actor. The hook stays as an explicit phase marker.

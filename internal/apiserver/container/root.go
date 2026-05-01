@@ -182,6 +182,7 @@ func (c *Container) Initialize() error {
 	if err := c.initWarmupCoordinator(); err != nil {
 		return fmt.Errorf("failed to initialize cache governance warmup coordinator: %w", err)
 	}
+	graph.postWireCacheGovernanceDependencies()
 
 	graph.postWireProtectedScopeDependencies()
 

@@ -2,6 +2,9 @@ package container
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
@@ -14,6 +17,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/gin-gonic/gin"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -310,6 +314,62 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	}
 	if deps.QRCodeObjectKeyPrefix != "rest-prefix" {
 		t.Fatalf("QRCodeObjectKeyPrefix = %q, want rest-prefix", deps.QRCodeObjectKeyPrefix)
+	}
+}
+
+func TestContainerInitWarmupCoordinatorRebindsStatisticsHandlerGovernance(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	c := NewContainer(nil, nil, nil)
+	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
+		Warmup: cachebootstrap.WarmupOptions{
+			Enable:        true,
+			StartupStatic: true,
+		},
+	}, nil)
+	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
+	c.StatisticsModule = &assembler.StatisticsModule{Handler: statisticsHandler}
+
+	if err := c.initWarmupCoordinator(); err != nil {
+		t.Fatalf("initWarmupCoordinator() error = %v", err)
+	}
+	newModuleGraph(c).postWireCacheGovernanceDependencies()
+
+	rec := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(rec)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/internal/v1/cache/governance/status", nil)
+	statisticsHandler.CacheGovernanceStatus(ctx)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	var payload struct {
+		Code int `json:"code"`
+		Data struct {
+			Summary struct {
+				FamilyTotal int `json:"family_total"`
+			} `json:"summary"`
+			Families []struct {
+				Family string `json:"family"`
+			} `json:"families"`
+			Warmup struct {
+				Enabled bool `json:"enabled"`
+			} `json:"warmup"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Code != 0 {
+		t.Fatalf("code = %d, want 0", payload.Code)
+	}
+	if payload.Data.Summary.FamilyTotal == 0 || len(payload.Data.Families) == 0 {
+		t.Fatalf("cache governance status was not rebound: summary=%+v families=%+v", payload.Data.Summary, payload.Data.Families)
+	}
+	if !payload.Data.Warmup.Enabled {
+		t.Fatal("warmup.enabled = false, want true")
 	}
 }
 
