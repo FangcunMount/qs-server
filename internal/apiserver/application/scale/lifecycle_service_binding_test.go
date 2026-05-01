@@ -7,7 +7,6 @@ import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type scaleRepoBindingStub struct {
@@ -18,13 +17,13 @@ func (r *scaleRepoBindingStub) Create(_ context.Context, _ *domainScale.MedicalS
 	return nil
 }
 func (r *scaleRepoBindingStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainScale.ErrNotFound
 }
 func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
 	if scale, ok := r.boundByQuestionnaire[questionnaireCode]; ok {
 		return scale, nil
 	}
-	return nil, mongo.ErrNoDocuments
+	return nil, domainScale.ErrNotFound
 }
 func (r *scaleRepoBindingStub) FindSummaryList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainScale.MedicalScale, error) {
 	return nil, nil
@@ -52,19 +51,19 @@ func (r *questionnaireRepoBindingStub) FindByCode(_ context.Context, code string
 	if q, ok := r.byCode[code]; ok {
 		return q, nil
 	}
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoBindingStub) FindPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoBindingStub) FindLatestPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoBindingStub) FindByCodeVersion(_ context.Context, code, version string) (*domainQuestionnaire.Questionnaire, error) {
 	if q, ok := r.byVersion[code+":"+version]; ok {
 		return q, nil
 	}
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoBindingStub) FindBaseByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
 	return nil, nil

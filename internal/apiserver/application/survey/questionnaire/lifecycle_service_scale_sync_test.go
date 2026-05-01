@@ -7,7 +7,6 @@ import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type questionnaireRepoSyncStub struct {
@@ -21,16 +20,16 @@ func (r *questionnaireRepoSyncStub) FindByCode(_ context.Context, code string) (
 	if q, ok := r.byCode[code]; ok {
 		return q, nil
 	}
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoSyncStub) FindPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoSyncStub) FindLatestPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoSyncStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainQuestionnaire.ErrNotFound
 }
 func (r *questionnaireRepoSyncStub) FindBaseByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
 	return nil, nil
@@ -89,11 +88,11 @@ type scaleRepoSyncStub struct {
 
 func (r *scaleRepoSyncStub) Create(_ context.Context, _ *domainScale.MedicalScale) error { return nil }
 func (r *scaleRepoSyncStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	return nil, mongo.ErrNoDocuments
+	return nil, domainScale.ErrNotFound
 }
 func (r *scaleRepoSyncStub) FindByQuestionnaireCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
 	if r.item == nil {
-		return nil, mongo.ErrNoDocuments
+		return nil, domainScale.ErrNotFound
 	}
 	return r.item, nil
 }

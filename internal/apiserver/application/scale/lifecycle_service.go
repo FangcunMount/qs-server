@@ -12,7 +12,6 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // lifecycleService 量表生命周期服务实现
@@ -400,7 +399,7 @@ func (s *lifecycleService) validateMedicalScaleQuestionnaireBinding(
 
 	q, err := s.questionnaireRepo.FindByCode(ctx, questionnaireCode)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		if domainQuestionnaire.IsNotFound(err) {
 			return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
 		}
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
@@ -415,7 +414,7 @@ func (s *lifecycleService) validateMedicalScaleQuestionnaireBinding(
 	if questionnaireVersion != "" {
 		versioned, err := s.questionnaireRepo.FindByCodeVersion(ctx, questionnaireCode, questionnaireVersion)
 		if err != nil {
-			if err == mongo.ErrNoDocuments {
+			if domainQuestionnaire.IsNotFound(err) {
 				return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷版本不存在")
 			}
 			return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷版本失败")
@@ -430,7 +429,7 @@ func (s *lifecycleService) validateMedicalScaleQuestionnaireBinding(
 
 	boundScale, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		if scale.IsNotFound(err) {
 			return nil
 		}
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询问卷关联量表失败")

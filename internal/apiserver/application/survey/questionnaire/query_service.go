@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -17,14 +17,14 @@ import (
 // 行为者：所有用户
 type queryService struct {
 	repo        questionnaire.Repository
-	identitySvc *iam.IdentityService
+	identitySvc iambridge.IdentityResolver
 	hotset      cachetarget.HotsetRecorder
 }
 
 // NewQueryService 创建问卷查询服务
 func NewQueryService(
 	repo questionnaire.Repository,
-	identitySvc *iam.IdentityService,
+	identitySvc iambridge.IdentityResolver,
 	hotset cachetarget.HotsetRecorder,
 ) QuestionnaireQueryService {
 	return &queryService{

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -164,15 +164,15 @@ func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire, userName
 		Status:        q.GetStatus().String(),
 		Type:          q.GetType().String(),
 		QuestionCount: q.GetQuestionCnt(),
-		CreatedBy:     iam.DisplayName(q.GetCreatedBy(), userNames),
+		CreatedBy:     displayIdentityName(q.GetCreatedBy(), userNames),
 		CreatedAt:     q.GetCreatedAt(),
-		UpdatedBy:     iam.DisplayName(q.GetUpdatedBy(), userNames),
+		UpdatedBy:     displayIdentityName(q.GetUpdatedBy(), userNames),
 		UpdatedAt:     q.GetUpdatedAt(),
 	}
 }
 
 // toQuestionnaireSummaryListResult 将问卷摘要列表转换为结果对象
-func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuestionnaire.Questionnaire, total int64, identitySvc *iam.IdentityService) *QuestionnaireSummaryListResult {
+func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuestionnaire.Questionnaire, total int64, identitySvc iambridge.IdentityResolver) *QuestionnaireSummaryListResult {
 	userNames := resolveUserNames(ctx, items, identitySvc)
 	result := &QuestionnaireSummaryListResult{
 		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
@@ -186,7 +186,7 @@ func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuesti
 	return result
 }
 
-func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Questionnaire, identitySvc *iam.IdentityService) map[string]string {
+func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Questionnaire, identitySvc iambridge.IdentityResolver) map[string]string {
 	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
 		if item == nil {
@@ -194,5 +194,20 @@ func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Question
 		}
 		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
 	}
-	return iam.ResolveUserNames(ctx, identitySvc, userIDs)
+	if identitySvc == nil || !identitySvc.IsEnabled() {
+		return nil
+	}
+	return identitySvc.ResolveUserNames(ctx, userIDs)
+}
+
+func displayIdentityName(id meta.ID, userNames map[string]string) string {
+	if id.IsZero() {
+		return ""
+	}
+	if userNames != nil {
+		if name, ok := userNames[id.String()]; ok && name != "" {
+			return name
+		}
+	}
+	return id.String()
 }

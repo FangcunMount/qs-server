@@ -54,7 +54,7 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.Medica
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, err
+			return nil, scale.ErrNotFound
 		}
 		return nil, err
 	}
@@ -73,7 +73,7 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, err
+			return nil, scale.ErrNotFound
 		}
 		return nil, err
 	}
@@ -167,7 +167,7 @@ func (r *Repository) Update(ctx context.Context, domain *scale.MedicalScale) err
 	}
 
 	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments
+		return scale.ErrNotFound
 	}
 
 	return nil
@@ -197,7 +197,7 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 	}
 
 	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments
+		return scale.ErrNotFound
 	}
 
 	return nil

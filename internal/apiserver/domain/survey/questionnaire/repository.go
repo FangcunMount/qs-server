@@ -2,7 +2,16 @@ package questionnaire
 
 import (
 	"context"
+	stderrors "errors"
 )
+
+// ErrNotFound 表示问卷仓储未找到目标记录。
+var ErrNotFound = stderrors.New("questionnaire not found")
+
+// IsNotFound 判断错误是否为问卷仓储未找到。
+func IsNotFound(err error) bool {
+	return stderrors.Is(err, ErrNotFound)
+}
 
 // Repository 问卷存储库接口（出站端口）
 // 定义了与存储相关的所有操作契约

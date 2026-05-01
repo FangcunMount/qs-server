@@ -310,7 +310,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, versio
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments
+		return domainQuestionnaire.ErrNotFound
 	}
 	return nil
 }
@@ -348,7 +348,7 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return mongo.ErrNoDocuments
+		return domainQuestionnaire.ErrNotFound
 	}
 	return nil
 }
@@ -360,7 +360,7 @@ func (r *Repository) HardDelete(ctx context.Context, code string) error {
 		return err
 	}
 	if result.DeletedCount == 0 {
-		return mongo.ErrNoDocuments
+		return domainQuestionnaire.ErrNotFound
 	}
 	return nil
 }
@@ -372,7 +372,7 @@ func (r *Repository) HardDeleteFamily(ctx context.Context, code string) error {
 		return err
 	}
 	if result.DeletedCount == 0 {
-		return mongo.ErrNoDocuments
+		return domainQuestionnaire.ErrNotFound
 	}
 	return nil
 }

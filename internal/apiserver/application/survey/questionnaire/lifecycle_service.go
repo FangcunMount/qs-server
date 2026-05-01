@@ -12,7 +12,6 @@ import (
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // lifecycleService 问卷生命周期服务实现
@@ -662,7 +661,7 @@ func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, qu
 
 	q, err := s.repo.FindByCode(ctx, questionnaireCode)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		if questionnaire.IsNotFound(err) {
 			return nil
 		}
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "查询问卷失败")
@@ -673,7 +672,7 @@ func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, qu
 
 	item, err := s.scaleRepo.FindByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
-		if err == mongo.ErrNoDocuments {
+		if domainScale.IsNotFound(err) {
 			return nil
 		}
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询关联量表失败")
