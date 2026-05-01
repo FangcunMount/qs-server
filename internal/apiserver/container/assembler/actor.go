@@ -99,6 +99,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		authzAssign = deps.OperatorAuthz.Assignment
 		authzSnap = deps.OperatorAuthz.Snapshot
 	}
+	authzSnapshotReader := iam.NewAuthzSnapshotReader(authzSnap)
 
 	txRunner := newMySQLTransactionRunner(mysqlDB)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
@@ -210,7 +211,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		module.ClinicianRepo,
 		module.RelationRepo,
 		module.TesteeRepo,
-		authzSnap,
+		authzSnapshotReader,
 	)
 	module.AssessmentEntryService = assessmentEntryApp.NewService(
 		module.AssessmentEntryRepo,

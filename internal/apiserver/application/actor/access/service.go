@@ -2,7 +2,6 @@ package access
 
 import (
 	"context"
-	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
@@ -10,7 +9,7 @@ import (
 	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -20,7 +19,7 @@ type service struct {
 	clinicianRepo domainClinician.Repository
 	relationRepo  domainRelation.Repository
 	testeeRepo    domainTestee.Repository
-	snapshot      *iam.AuthzSnapshotLoader
+	snapshot      iambridge.AuthzSnapshotReader
 }
 
 // NewTesteeAccessService 创建 testee 访问控制服务。
@@ -29,7 +28,7 @@ func NewTesteeAccessService(
 	clinicianRepo domainClinician.Repository,
 	relationRepo domainRelation.Repository,
 	testeeRepo domainTestee.Repository,
-	snapshot *iam.AuthzSnapshotLoader,
+	snapshot iambridge.AuthzSnapshotReader,
 ) TesteeAccessService {
 	return &service{
 		operatorRepo:  operatorRepo,
@@ -191,7 +190,7 @@ func domainTesteeIDFromUint64(field string, value uint64) (domainTestee.ID, erro
 	return domainTestee.ID(id), nil
 }
 
-func (s *service) resolveAuthzSnapshot(ctx context.Context, orgID int64, operatorUserID int64) (*authzapp.Snapshot, error) {
+func (s *service) resolveAuthzSnapshot(ctx context.Context, orgID int64, operatorUserID int64) (iambridge.AuthzSnapshot, error) {
 	if snap, ok := authzapp.FromContext(ctx); ok && snap != nil {
 		return snap, nil
 	}
@@ -199,9 +198,12 @@ func (s *service) resolveAuthzSnapshot(ctx context.Context, orgID int64, operato
 		return nil, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required")
 	}
 
-	snap, err := s.snapshot.Load(ctx, strconv.FormatInt(orgID, 10), strconv.FormatInt(operatorUserID, 10))
+	snap, err := s.snapshot.LoadAuthzSnapshot(ctx, orgID, operatorUserID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to load authorization snapshot")
+	}
+	if snap == nil {
+		return nil, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required")
 	}
 	return snap, nil
 }

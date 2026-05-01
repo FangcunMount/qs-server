@@ -10,7 +10,7 @@ import (
 	"testing"
 )
 
-func TestSurveyAndScaleApplicationsUsePortsForInfraBoundaries(t *testing.T) {
+func TestApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -19,6 +19,7 @@ func TestSurveyAndScaleApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/": "application ports, not infrastructure packages",
 	}
 	for _, dir := range []string{
+		filepath.Join(root, "internal", "apiserver", "application", "actor", "access"),
 		filepath.Join(root, "internal", "apiserver", "application", "scale"),
 		filepath.Join(root, "internal", "apiserver", "application", "survey", "questionnaire"),
 	} {
@@ -26,7 +27,7 @@ func TestSurveyAndScaleApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 			for forbidden, replacement := range forbiddenImports {
 				if strings.HasPrefix(importPath, forbidden) {
 					rel := filepath.ToSlash(mustRel(t, root, path))
-					t.Fatalf("%s imports %s; survey/scale application services must depend on %s", rel, importPath, replacement)
+					t.Fatalf("%s imports %s; application services must depend on %s", rel, importPath, replacement)
 				}
 			}
 		})

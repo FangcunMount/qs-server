@@ -21,6 +21,14 @@ type IdentityResolver interface {
 	ResolveUserNames(ctx context.Context, ids []meta.ID) map[string]string
 }
 
+type AuthzSnapshot interface {
+	IsQSAdmin() bool
+}
+
+type AuthzSnapshotReader interface {
+	LoadAuthzSnapshot(ctx context.Context, orgID, userID int64) (AuthzSnapshot, error)
+}
+
 type GuardianshipReader interface {
 	IsEnabled() bool
 	ValidateChildExists(ctx context.Context, childID string) error

@@ -4,12 +4,87 @@ import (
 	"context"
 	"testing"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
+
+func TestResolveAccessScopeLoadsSnapshotThroughReaderWhenContextMissing(t *testing.T) {
+	operatorItem := domainOperator.NewOperator(1, 101, "operator")
+	operatorItem.SetID(201)
+	reader := &stubAuthzSnapshotReader{snapshot: stubAuthzSnapshot{admin: true}}
+	svc := NewTesteeAccessService(
+		&stubOperatorRepository{item: operatorItem},
+		nil,
+		nil,
+		nil,
+		reader,
+	)
+
+	scope, err := svc.ResolveAccessScope(context.Background(), 1, 101)
+	if err != nil {
+		t.Fatalf("expected access scope to resolve: %v", err)
+	}
+	if scope == nil || !scope.IsAdmin {
+		t.Fatalf("expected admin access scope, got %#v", scope)
+	}
+	if reader.calls != 1 {
+		t.Fatalf("expected snapshot reader to be called once, got %d", reader.calls)
+	}
+	if reader.orgID != 1 || reader.userID != 101 {
+		t.Fatalf("expected snapshot reader args org=1 user=101, got org=%d user=%d", reader.orgID, reader.userID)
+	}
+}
+
+func TestResolveAccessScopeUsesContextSnapshotBeforeReader(t *testing.T) {
+	operatorItem := domainOperator.NewOperator(1, 101, "operator")
+	operatorItem.SetID(201)
+	reader := &stubAuthzSnapshotReader{snapshot: stubAuthzSnapshot{admin: false}}
+	svc := NewTesteeAccessService(
+		&stubOperatorRepository{item: operatorItem},
+		nil,
+		nil,
+		nil,
+		reader,
+	)
+
+	ctx := authzapp.WithSnapshot(context.Background(), &authzapp.Snapshot{Roles: []string{"qs:admin"}})
+	scope, err := svc.ResolveAccessScope(ctx, 1, 101)
+	if err != nil {
+		t.Fatalf("expected access scope to resolve: %v", err)
+	}
+	if scope == nil || !scope.IsAdmin {
+		t.Fatalf("expected admin access scope, got %#v", scope)
+	}
+	if reader.calls != 0 {
+		t.Fatalf("expected context snapshot to avoid reader call, got %d calls", reader.calls)
+	}
+}
+
+func TestResolveAccessScopeRejectsWhenSnapshotReaderMissing(t *testing.T) {
+	operatorItem := domainOperator.NewOperator(1, 101, "operator")
+	operatorItem.SetID(201)
+	svc := NewTesteeAccessService(
+		&stubOperatorRepository{item: operatorItem},
+		nil,
+		nil,
+		nil,
+		nil,
+	)
+
+	_, err := svc.ResolveAccessScope(context.Background(), 1, 101)
+	if err == nil {
+		t.Fatal("expected missing snapshot reader to reject access")
+	}
+	if !cberrors.IsCode(err, code.ErrPermissionDenied) {
+		t.Fatalf("expected permission denied, got %v", err)
+	}
+}
 
 func TestValidateTesteeAccessUsesAccessGrantRelations(t *testing.T) {
 	operatorItem := domainOperator.NewOperator(1, 101, "operator")
@@ -196,4 +271,30 @@ func (s *stubTesteeRepository) Count(context.Context, int64, domainTestee.ListFi
 }
 func (s *stubTesteeRepository) CountByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter) (int64, error) {
 	panic("unexpected call")
+}
+
+type stubAuthzSnapshot struct {
+	admin bool
+}
+
+func (s stubAuthzSnapshot) IsQSAdmin() bool {
+	return s.admin
+}
+
+type stubAuthzSnapshotReader struct {
+	snapshot iambridge.AuthzSnapshot
+	err      error
+	calls    int
+	orgID    int64
+	userID   int64
+}
+
+func (s *stubAuthzSnapshotReader) LoadAuthzSnapshot(_ context.Context, orgID, userID int64) (iambridge.AuthzSnapshot, error) {
+	s.calls++
+	s.orgID = orgID
+	s.userID = userID
+	if s.err != nil {
+		return nil, s.err
+	}
+	return s.snapshot, nil
 }

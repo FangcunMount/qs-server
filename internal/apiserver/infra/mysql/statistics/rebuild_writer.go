@@ -336,19 +336,19 @@ SELECT
 FROM (
   SELECT org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END AS content_type, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) AS content_code, COALESCE(origin_type, '') AS origin_type, DATE(created_at) AS stat_date, COUNT(*) AS submission_count, 0 AS completion_count, 0 AS answersheet_submitted_count, COUNT(*) AS assessment_created_count, 0 AS report_generated_count, 0 AS assessment_failed_count
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ? AND COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) <> ''
-  GROUP BY org_id, content_type, content_code, origin_type, DATE(created_at)
+  GROUP BY org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(created_at)
   UNION ALL
   SELECT org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(interpreted_at), 0, COUNT(*), 0, 0, COUNT(*), 0
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND interpreted_at IS NOT NULL AND interpreted_at >= ? AND interpreted_at < ? AND COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) <> ''
-  GROUP BY org_id, content_type, content_code, origin_type, DATE(interpreted_at)
+  GROUP BY org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(interpreted_at)
   UNION ALL
   SELECT org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(submitted_at), 0, 0, COUNT(*), 0, 0, 0
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND submitted_at IS NOT NULL AND submitted_at >= ? AND submitted_at < ? AND COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) <> ''
-  GROUP BY org_id, content_type, content_code, origin_type, DATE(submitted_at)
+  GROUP BY org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(submitted_at)
   UNION ALL
   SELECT org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(failed_at), 0, 0, 0, 0, 0, COUNT(*)
   FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND failed_at IS NOT NULL AND failed_at >= ? AND failed_at < ? AND COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) <> ''
-  GROUP BY org_id, content_type, content_code, origin_type, DATE(failed_at)
+  GROUP BY org_id, CASE WHEN COALESCE(medical_scale_code, '') <> '' THEN 'scale' ELSE 'questionnaire' END, COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code), COALESCE(origin_type, ''), DATE(failed_at)
 ) raw
 GROUP BY raw.org_id, raw.content_type, raw.content_code, raw.origin_type, raw.stat_date
 ON DUPLICATE KEY UPDATE
