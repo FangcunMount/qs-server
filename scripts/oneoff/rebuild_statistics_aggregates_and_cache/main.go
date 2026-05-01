@@ -38,6 +38,9 @@ type config struct {
 	redisAddr          string
 	redisQueryAddr     string
 	redisMetaAddr      string
+	redisUsername      string
+	redisQueryUsername string
+	redisMetaUsername  string
 	redisPassword      string
 	redisQueryDB       int
 	redisMetaDB        int
@@ -178,6 +181,9 @@ func parseFlags() config {
 	flag.StringVar(&cfg.redisAddr, "redis-addr", "", "Redis address used for both query and meta cache, e.g. 127.0.0.1:6379")
 	flag.StringVar(&cfg.redisQueryAddr, "redis-query-addr", "", "Redis query cache address; defaults to --redis-addr")
 	flag.StringVar(&cfg.redisMetaAddr, "redis-meta-addr", "", "Redis meta/version cache address; defaults to --redis-addr")
+	flag.StringVar(&cfg.redisUsername, "redis-username", "", "Redis ACL username used for both query and meta cache")
+	flag.StringVar(&cfg.redisQueryUsername, "redis-query-username", "", "Redis query cache ACL username; defaults to --redis-username")
+	flag.StringVar(&cfg.redisMetaUsername, "redis-meta-username", "", "Redis meta/version cache ACL username; defaults to --redis-username")
 	flag.StringVar(&cfg.redisPassword, "redis-password", "", "Redis password")
 	flag.IntVar(&cfg.redisQueryDB, "redis-query-db", 0, "Redis DB for query cache")
 	flag.IntVar(&cfg.redisMetaDB, "redis-meta-db", 0, "Redis DB for meta/version cache")
@@ -203,6 +209,12 @@ func parseFlags() config {
 	}
 	if cfg.redisMetaAddr == "" {
 		cfg.redisMetaAddr = cfg.redisAddr
+	}
+	if cfg.redisQueryUsername == "" {
+		cfg.redisQueryUsername = cfg.redisUsername
+	}
+	if cfg.redisMetaUsername == "" {
+		cfg.redisMetaUsername = cfg.redisUsername
 	}
 	return cfg
 }
@@ -428,13 +440,13 @@ func withinTx(ctx context.Context, db *gorm.DB, fn func(context.Context) error) 
 }
 
 func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmScope) error {
-	queryClient := newRedisClient(cfg.redisQueryAddr, cfg.redisPassword, cfg.redisQueryDB)
+	queryClient := newRedisClient(cfg.redisQueryAddr, cfg.redisQueryUsername, cfg.redisPassword, cfg.redisQueryDB)
 	defer func() {
 		if err := queryClient.Close(); err != nil {
 			log.Printf("close query redis: %v", err)
 		}
 	}()
-	metaClient := newRedisClient(cfg.redisMetaAddr, cfg.redisPassword, cfg.redisMetaDB)
+	metaClient := newRedisClient(cfg.redisMetaAddr, cfg.redisMetaUsername, cfg.redisPassword, cfg.redisMetaDB)
 	defer func() {
 		if err := metaClient.Close(); err != nil {
 			log.Printf("close meta redis: %v", err)
@@ -499,8 +511,8 @@ func rebuildCache(ctx context.Context, db *gorm.DB, cfg config, scopes []warmSco
 	return nil
 }
 
-func newRedisClient(addr, password string, db int) *redis.Client {
-	return redis.NewClient(&redis.Options{Addr: addr, Password: password, DB: db})
+func newRedisClient(addr, username, password string, db int) *redis.Client {
+	return redis.NewClient(&redis.Options{Addr: addr, Username: username, Password: password, DB: db})
 }
 
 func deleteRedisPattern(ctx context.Context, client redis.UniversalClient, pattern string) (int64, error) {
