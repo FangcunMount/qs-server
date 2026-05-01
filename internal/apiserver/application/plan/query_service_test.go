@@ -74,14 +74,6 @@ func (r *scaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*domai
 	return nil, nil
 }
 
-func (r *scaleRepoStub) FindSummaryList(context.Context, int, int, map[string]interface{}) ([]*domainScale.MedicalScale, error) {
-	return nil, nil
-}
-
-func (r *scaleRepoStub) CountWithConditions(context.Context, map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-
 func (r *scaleRepoStub) Update(context.Context, *domainScale.MedicalScale) error {
 	return nil
 }

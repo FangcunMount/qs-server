@@ -26,12 +26,6 @@ func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questi
 	}
 	return nil, domainScale.ErrNotFound
 }
-func (r *scaleRepoBindingStub) FindSummaryList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainScale.MedicalScale, error) {
-	return nil, nil
-}
-func (r *scaleRepoBindingStub) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
 func (r *scaleRepoBindingStub) Update(_ context.Context, _ *domainScale.MedicalScale) error {
 	return nil
 }
@@ -108,18 +102,6 @@ func (r *questionnaireRepoBindingStub) FindBaseByCodeVersion(_ context.Context, 
 }
 func (r *questionnaireRepoBindingStub) LoadQuestions(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
 	return nil
-}
-func (r *questionnaireRepoBindingStub) FindBaseList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoBindingStub) FindBasePublishedList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoBindingStub) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-func (r *questionnaireRepoBindingStub) CountPublishedWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
 }
 func (r *questionnaireRepoBindingStub) Update(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
 	return nil

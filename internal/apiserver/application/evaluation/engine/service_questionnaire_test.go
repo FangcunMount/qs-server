@@ -123,12 +123,6 @@ func (r *fakeScaleRepo) FindByCode(_ context.Context, _ string) (*domainScale.Me
 func (r *fakeScaleRepo) FindByQuestionnaireCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
 	return nil, nil
 }
-func (r *fakeScaleRepo) FindSummaryList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainScale.MedicalScale, error) {
-	return nil, nil
-}
-func (r *fakeScaleRepo) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
 func (r *fakeScaleRepo) Update(_ context.Context, _ *domainScale.MedicalScale) error { return nil }
 func (r *fakeScaleRepo) Remove(_ context.Context, _ string) error                    { return nil }
 func (r *fakeScaleRepo) ExistsByCode(_ context.Context, _ string) (bool, error)      { return false, nil }
@@ -145,21 +139,6 @@ func (r *fakeAnswerSheetRepo) Update(_ context.Context, _ *domainAnswerSheet.Ans
 }
 func (r *fakeAnswerSheetRepo) FindByID(_ context.Context, _ meta.ID) (*domainAnswerSheet.AnswerSheet, error) {
 	return r.answerSheet, nil
-}
-func (r *fakeAnswerSheetRepo) FindSummaryListByFiller(_ context.Context, _ uint64, _ int, _ int) ([]*domainAnswerSheet.AnswerSheetSummary, error) {
-	return nil, nil
-}
-func (r *fakeAnswerSheetRepo) FindSummaryListByQuestionnaire(_ context.Context, _ string, _ int, _ int) ([]*domainAnswerSheet.AnswerSheetSummary, error) {
-	return nil, nil
-}
-func (r *fakeAnswerSheetRepo) CountByFiller(_ context.Context, _ uint64) (int64, error) {
-	return 0, nil
-}
-func (r *fakeAnswerSheetRepo) CountByQuestionnaire(_ context.Context, _ string) (int64, error) {
-	return 0, nil
-}
-func (r *fakeAnswerSheetRepo) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
 }
 func (r *fakeAnswerSheetRepo) Delete(_ context.Context, _ meta.ID) error { return nil }
 
@@ -191,18 +170,6 @@ func (r *fakeQuestionnaireRepo) FindBaseByCodeVersion(_ context.Context, _ strin
 }
 func (r *fakeQuestionnaireRepo) LoadQuestions(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
 	return nil
-}
-func (r *fakeQuestionnaireRepo) FindBaseList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindBasePublishedList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-func (r *fakeQuestionnaireRepo) CountPublishedWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
 }
 func (r *fakeQuestionnaireRepo) Update(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
 	return nil

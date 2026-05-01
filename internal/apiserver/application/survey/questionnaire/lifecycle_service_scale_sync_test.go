@@ -44,18 +44,6 @@ func (r *questionnaireRepoSyncStub) FindBaseByCodeVersion(_ context.Context, _ s
 func (r *questionnaireRepoSyncStub) LoadQuestions(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
 	return nil
 }
-func (r *questionnaireRepoSyncStub) FindBaseList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoSyncStub) FindBasePublishedList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoSyncStub) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-func (r *questionnaireRepoSyncStub) CountPublishedWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
 func (r *questionnaireRepoSyncStub) Update(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
 	return nil
 }
@@ -96,12 +84,6 @@ func (r *scaleRepoSyncStub) FindByQuestionnaireCode(_ context.Context, _ string)
 		return nil, domainScale.ErrNotFound
 	}
 	return r.item, nil
-}
-func (r *scaleRepoSyncStub) FindSummaryList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainScale.MedicalScale, error) {
-	return nil, nil
-}
-func (r *scaleRepoSyncStub) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
 }
 func (r *scaleRepoSyncStub) Update(_ context.Context, item *domainScale.MedicalScale) error {
 	r.item = item

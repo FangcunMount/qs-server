@@ -6,11 +6,9 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // Repository Scale MongoDB 存储库
@@ -79,68 +77,6 @@ func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireC
 	}
 
 	return r.mapper.ToDomain(ctx, &po), nil
-}
-
-// FindSummaryList 分页查询量表摘要列表（不包含 factors）
-func (r *Repository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*scale.MedicalScale, error) {
-	filter := r.buildFilter(conditions)
-
-	// 设置分页选项和投影（排除 factors 字段）
-	skip := int64((page - 1) * pageSize)
-	limit := int64(pageSize)
-	opts := options.Find().
-		SetSkip(skip).
-		SetLimit(limit).
-		SetSort(bson.D{{Key: "created_at", Value: -1}}).
-		SetProjection(bson.M{
-			"code":               1,
-			"title":              1,
-			"description":        1,
-			"category":           1,
-			"stages":             1,
-			"applicable_ages":    1,
-			"reporters":          1,
-			"tags":               1,
-			"questionnaire_code": 1,
-			"status":             1,
-			"created_by":         1,
-			"created_at":         1,
-			"updated_by":         1,
-			"updated_at":         1,
-		})
-
-	cursor, err := r.Collection().Find(ctx, filter, opts)
-	if err != nil {
-		return nil, err
-	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
-
-	var poList []ScalePO
-	if err := cursor.All(ctx, &poList); err != nil {
-		return nil, err
-	}
-
-	// 转换为领域摘要对象
-	result := make([]*scale.MedicalScale, 0, len(poList))
-	for _, po := range poList {
-		domain := r.mapper.ToDomain(ctx, &po)
-		if domain == nil {
-			continue
-		}
-		domain.SetCreatedBy(meta.FromUint64(po.CreatedBy))
-		domain.SetUpdatedBy(meta.FromUint64(po.UpdatedBy))
-		result = append(result, domain)
-	}
-
-	return result, nil
-}
-
-// CountWithConditions 根据条件统计量表数量
-func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	filter := r.buildFilter(conditions)
-	return r.Collection().CountDocuments(ctx, filter)
 }
 
 // Update 更新量表
@@ -216,42 +152,4 @@ func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error
 	}
 
 	return count > 0, nil
-}
-
-// buildFilter 构建查询过滤条件
-func (r *Repository) buildFilter(conditions map[string]interface{}) bson.M {
-	filter := bson.M{
-		"deleted_at": nil, // 排除已软删除的记录
-	}
-
-	if conditions == nil {
-		return filter
-	}
-
-	// 状态过滤
-	if status, ok := conditions["status"]; ok && status != nil {
-		switch value := status.(type) {
-		case string:
-			if parsed, ok := scale.ParseStatus(value); ok {
-				filter["status"] = parsed.String()
-			}
-		}
-	}
-
-	// 标题模糊搜索
-	if title, ok := conditions["title"].(string); ok && title != "" {
-		filter["title"] = bson.M{"$regex": title, "$options": "i"}
-	}
-
-	// 问卷编码过滤
-	if qCode, ok := conditions["questionnaire_code"].(string); ok && qCode != "" {
-		filter["questionnaire_code"] = qCode
-	}
-
-	// 主类过滤
-	if category, ok := conditions["category"].(string); ok && category != "" {
-		filter["category"] = category
-	}
-
-	return filter
 }

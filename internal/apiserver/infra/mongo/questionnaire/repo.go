@@ -204,57 +204,6 @@ func (r *Repository) LoadQuestions(ctx context.Context, qDomain *domainQuestionn
 	return nil
 }
 
-// FindBaseList 查询工作版本列表
-func (r *Repository) FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	pipeline := buildHeadBasePipeline(buildHeadListFilter(conditions), paginationSkip(page, pageSize), paginationLimit(page, pageSize))
-	return r.aggregateList(ctx, pipeline)
-}
-
-// FindBasePublishedList 查询已发布问卷列表（按 code 去重，优先 active snapshot）
-func (r *Repository) FindBasePublishedList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	pipeline := buildPublishedBasePipeline(buildPublishedListFilter(conditions), paginationSkip(page, pageSize), paginationLimit(page, pageSize))
-	return r.aggregateList(ctx, pipeline)
-}
-
-// CountWithConditions 统计工作版本数量
-func (r *Repository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	return r.CountDocuments(ctx, buildHeadListFilter(conditions))
-}
-
-// CountPublishedWithConditions 统计已发布问卷数量（按 code 去重）
-func (r *Repository) CountPublishedWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	pipeline := []bson.M{
-		{"$match": buildPublishedListFilter(conditions)},
-		{"$addFields": bson.M{"published_priority": publishedPriorityExpr()}},
-		{"$sort": bson.M{"code": 1, "published_priority": -1, "updated_at": -1}},
-		{"$group": bson.M{"_id": "$code"}},
-		{"$count": "total"},
-	}
-
-	cursor, err := r.Collection().Aggregate(ctx, pipeline)
-	if err != nil {
-		return 0, err
-	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
-
-	if !cursor.Next(ctx) {
-		if err := cursor.Err(); err != nil {
-			return 0, err
-		}
-		return 0, nil
-	}
-
-	var result struct {
-		Total int64 `bson:"total"`
-	}
-	if err := cursor.Decode(&result); err != nil {
-		return 0, err
-	}
-	return result.Total, nil
-}
-
 // Update 更新或恢复 head 记录
 func (r *Repository) Update(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	qDomain.SetRecordRole(domainQuestionnaire.RecordRoleHead)

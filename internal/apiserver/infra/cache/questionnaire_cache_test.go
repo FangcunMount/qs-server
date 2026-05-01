@@ -72,22 +72,6 @@ func (s *questionnaireRepoStub) LoadQuestions(_ context.Context, _ *domainQuesti
 	return nil
 }
 
-func (s *questionnaireRepoStub) FindBaseList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-
-func (s *questionnaireRepoStub) FindBasePublishedList(_ context.Context, _ int, _ int, _ map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-
-func (s *questionnaireRepoStub) CountWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-
-func (s *questionnaireRepoStub) CountPublishedWithConditions(_ context.Context, _ map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-
 func (s *questionnaireRepoStub) Update(_ context.Context, q *domainQuestionnaire.Questionnaire) error {
 	s.head[q.GetCode().Value()] = q
 	return nil

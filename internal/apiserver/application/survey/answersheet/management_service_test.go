@@ -16,10 +16,8 @@ import (
 )
 
 type managementRepoStub struct {
-	findByIDFunc                   func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error)
-	findSummaryListByQuestionnaire func(context.Context, string, int, int) ([]*domainanswersheet.AnswerSheetSummary, error)
-	countWithConditionsFunc        func(context.Context, map[string]interface{}) (int64, error)
-	deleteFunc                     func(context.Context, meta.ID) error
+	findByIDFunc func(context.Context, meta.ID) (*domainanswersheet.AnswerSheet, error)
+	deleteFunc   func(context.Context, meta.ID) error
 }
 
 func (s *managementRepoStub) Create(context.Context, *domainanswersheet.AnswerSheet) error {
@@ -35,30 +33,6 @@ func (s *managementRepoStub) FindByID(ctx context.Context, id meta.ID) (*domaina
 		return s.findByIDFunc(ctx, id)
 	}
 	return nil, nil
-}
-
-func (s *managementRepoStub) FindSummaryListByFiller(context.Context, uint64, int, int) ([]*domainanswersheet.AnswerSheetSummary, error) {
-	return nil, nil
-}
-
-func (s *managementRepoStub) FindSummaryListByQuestionnaire(ctx context.Context, code string, page, pageSize int) ([]*domainanswersheet.AnswerSheetSummary, error) {
-	if s.findSummaryListByQuestionnaire != nil {
-		return s.findSummaryListByQuestionnaire(ctx, code, page, pageSize)
-	}
-	return nil, nil
-}
-
-func (s *managementRepoStub) CountByFiller(context.Context, uint64) (int64, error) { return 0, nil }
-
-func (s *managementRepoStub) CountByQuestionnaire(context.Context, string) (int64, error) {
-	return 0, nil
-}
-
-func (s *managementRepoStub) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	if s.countWithConditionsFunc != nil {
-		return s.countWithConditionsFunc(ctx, conditions)
-	}
-	return 0, nil
 }
 
 func (s *managementRepoStub) Delete(ctx context.Context, id meta.ID) error {

@@ -97,29 +97,6 @@ func toAnswerSheetResult(as *answersheet.AnswerSheet) *AnswerSheetResult {
 	return result
 }
 
-// toSummaryListResult 将答卷摘要列表转换为结果对象
-func toSummaryListResult(items []*answersheet.AnswerSheetSummary, total int64) *AnswerSheetSummaryListResult {
-	result := &AnswerSheetSummaryListResult{
-		Items: make([]*AnswerSheetSummaryResult, 0, len(items)),
-		Total: total,
-	}
-
-	for _, item := range items {
-		result.Items = append(result.Items, &AnswerSheetSummaryResult{
-			ID:                 item.ID.Uint64(),
-			QuestionnaireCode:  item.QuestionnaireCode,
-			QuestionnaireTitle: item.QuestionnaireTitle,
-			FillerID:           item.FillerID,
-			FillerType:         item.FillerType,
-			Score:              item.TotalScore,
-			AnswerCount:        item.AnswerCount,
-			FilledAt:           item.FilledAt,
-		})
-	}
-
-	return result
-}
-
 func toSummaryRowsResult(items []surveyreadmodel.AnswerSheetSummaryRow, total int64) *AnswerSheetSummaryListResult {
 	result := &AnswerSheetSummaryListResult{
 		Items: make([]*AnswerSheetSummaryResult, 0, len(items)),
