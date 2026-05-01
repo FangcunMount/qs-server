@@ -1,6 +1,7 @@
 package questionnaire
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -39,6 +40,33 @@ func TestQuestionnaireHeadReadModelFilterAppliesTypedFilter(t *testing.T) {
 	}
 }
 
+func TestQuestionnaireHeadReadModelPipelineAppliesSortPaginationAndProjection(t *testing.T) {
+	t.Parallel()
+
+	pipeline := questionnaireHeadReadModelPipeline(surveyreadmodel.QuestionnaireFilter{Status: "draft"}, surveyreadmodel.PageRequest{Page: 2, PageSize: 10})
+	if len(pipeline) != 5 {
+		t.Fatalf("pipeline length = %d, want 5: %#v", len(pipeline), pipeline)
+	}
+	if !reflect.DeepEqual(pipeline[1], bson.M{"$sort": bson.M{"updated_at": -1}}) {
+		t.Fatalf("sort stage = %#v, want updated_at desc", pipeline[1])
+	}
+	if !reflect.DeepEqual(pipeline[2], bson.M{"$skip": int64(10)}) {
+		t.Fatalf("skip stage = %#v, want 10", pipeline[2])
+	}
+	if !reflect.DeepEqual(pipeline[3], bson.M{"$limit": int64(10)}) {
+		t.Fatalf("limit stage = %#v, want 10", pipeline[3])
+	}
+	project, ok := pipeline[4]["$project"].(bson.M)
+	if !ok {
+		t.Fatalf("project stage = %#v, want bson.M", pipeline[4])
+	}
+	for _, field := range []string{"code", "title", "description", "img_url", "version", "status", "type", "question_count", "created_by", "updated_by"} {
+		if project[field] != 1 {
+			t.Fatalf("project[%s] = %#v, want 1", field, project[field])
+		}
+	}
+}
+
 func TestQuestionnairePublishedReadModelFilterDefaultsToPublishedSnapshotSemantics(t *testing.T) {
 	t.Parallel()
 
@@ -66,6 +94,49 @@ func TestQuestionnairePublishedReadModelFilterDefaultsToPublishedSnapshotSemanti
 	}
 	if snapshotBranch["status"] != domainQuestionnaire.STATUS_PUBLISHED.String() {
 		t.Fatalf("status = %#v, want published", snapshotBranch["status"])
+	}
+}
+
+func TestQuestionnairePublishedReadModelPipelineGroupsByCodeBeforePaging(t *testing.T) {
+	t.Parallel()
+
+	pipeline := questionnairePublishedReadModelPipeline(surveyreadmodel.QuestionnaireFilter{Type: "MedicalScale"}, surveyreadmodel.PageRequest{Page: 3, PageSize: 5})
+	wantStages := []string{"$match", "$addFields", "$sort", "$group", "$replaceRoot", "$sort", "$skip", "$limit", "$project"}
+	if len(pipeline) != len(wantStages) {
+		t.Fatalf("pipeline length = %d, want %d: %#v", len(pipeline), len(wantStages), pipeline)
+	}
+	for i, stageKey := range wantStages {
+		if _, ok := pipeline[i][stageKey]; !ok {
+			t.Fatalf("stage %d = %#v, want %s", i, pipeline[i], stageKey)
+		}
+	}
+	if !reflect.DeepEqual(pipeline[6], bson.M{"$skip": int64(10)}) {
+		t.Fatalf("skip stage = %#v, want 10", pipeline[6])
+	}
+	if !reflect.DeepEqual(pipeline[7], bson.M{"$limit": int64(5)}) {
+		t.Fatalf("limit stage = %#v, want 5", pipeline[7])
+	}
+}
+
+func TestQuestionnairePublishedReadModelCountPipelineCountsUniqueCodes(t *testing.T) {
+	t.Parallel()
+
+	pipeline := questionnairePublishedReadModelCountPipeline(surveyreadmodel.QuestionnaireFilter{Title: "PHQ"})
+	wantStages := []string{"$match", "$addFields", "$sort", "$group", "$count"}
+	if len(pipeline) != len(wantStages) {
+		t.Fatalf("pipeline length = %d, want %d: %#v", len(pipeline), len(wantStages), pipeline)
+	}
+	for i, stageKey := range wantStages {
+		if _, ok := pipeline[i][stageKey]; !ok {
+			t.Fatalf("stage %d = %#v, want %s", i, pipeline[i], stageKey)
+		}
+	}
+	group, ok := pipeline[3]["$group"].(bson.M)
+	if !ok || group["_id"] != "$code" {
+		t.Fatalf("group stage = %#v, want group by code", pipeline[3])
+	}
+	if pipeline[4]["$count"] != "total" {
+		t.Fatalf("count stage = %#v, want total", pipeline[4])
 	}
 }
 

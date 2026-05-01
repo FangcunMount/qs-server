@@ -3,9 +3,6 @@ package scale
 import (
 	"fmt"
 	"strings"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // ValidationError 验证错误
@@ -143,7 +140,7 @@ func ValidateFactor(f *Factor) []ValidationError {
 
 // ToError 将验证错误列表转换为单个 error
 // 如果没有错误返回 nil
-// 返回的错误实现了 errors.Coder 接口，会返回 400 状态码
+// 返回领域错误，由 application 层映射为 API 错误码。
 // 如果有多个错误，会将所有错误合并到一个错误消息中
 func ToError(errs []ValidationError) error {
 	if len(errs) == 0 {
@@ -153,7 +150,7 @@ func ToError(errs []ValidationError) error {
 	// 如果有多个错误，合并所有错误信息
 	if len(errs) == 1 {
 		firstErr := errs[0]
-		return errors.WithCode(errorCode.ErrInvalidArgument, "%s: %s", firstErr.Field, firstErr.Message)
+		return newError(ErrorKindInvalidArgument, "%s: %s", firstErr.Field, firstErr.Message)
 	}
 
 	// 多个错误时，合并所有错误信息
@@ -161,7 +158,7 @@ func ToError(errs []ValidationError) error {
 	for _, err := range errs {
 		messages = append(messages, fmt.Sprintf("%s: %s", err.Field, err.Message))
 	}
-	return errors.WithCode(errorCode.ErrInvalidArgument, "验证失败：%s", strings.Join(messages, "; "))
+	return newError(ErrorKindInvalidArgument, "验证失败：%s", strings.Join(messages, "; "))
 }
 
 // ToErrors 将验证错误列表转换为 error 切片

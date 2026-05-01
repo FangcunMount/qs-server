@@ -68,7 +68,7 @@ func (s *lifecycleService) applyPublishLifecycle(
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return err
+		return wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "发布问卷失败")
 	}
 	return nil
 }

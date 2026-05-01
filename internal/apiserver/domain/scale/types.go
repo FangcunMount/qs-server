@@ -2,9 +2,6 @@ package scale
 
 import (
 	"regexp"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // ===================== 量表状态 =================
@@ -251,37 +248,6 @@ func (p *ScoringParams) GetCntOptionContents() []string {
 		return nil
 	}
 	return p.CntOptionContents
-}
-
-// ToMap 转换为 map[string]interface{}（用于持久化）
-// 根据计分策略构建相应的参数结构
-func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]interface{} {
-	result := make(map[string]interface{})
-
-	if p == nil {
-		return result
-	}
-
-	// 根据策略类型处理参数
-	switch strategy {
-	case ScoringStrategyCnt:
-		// 计数策略：直接存储 cnt_option_contents
-		// 注意：在应用层已经验证了 cnt 策略必须提供非空的 CntOptionContents
-		// 所以这里应该总是有值，但为了防御性编程，仍然检查
-		if len(p.CntOptionContents) > 0 {
-			result["cnt_option_contents"] = p.CntOptionContents
-		}
-		// 如果为空数组，不存储该字段（读取时会返回空数组作为默认值）
-
-	case ScoringStrategySum, ScoringStrategyAvg:
-		// 求和和平均策略：当前不需要额外参数
-		// 如果需要扩展，可以在这里添加
-
-	default:
-		// 其他策略：当前不需要额外参数
-	}
-
-	return result
 }
 
 // ===================== 量表类别（主类）=================
@@ -565,16 +531,16 @@ func (t Tag) Validate() error {
 
 	value := t.String()
 	if len(value) == 0 {
-		return errors.WithCode(code.ErrInvalidArgument, "标签不能为空")
+		return newError(ErrorKindInvalidArgument, "标签不能为空")
 	}
 	if len(value) > 50 {
-		return errors.WithCode(code.ErrInvalidArgument, "标签长度不能超过50个字符")
+		return newError(ErrorKindInvalidArgument, "标签长度不能超过50个字符")
 	}
 
 	// 验证字符格式：只允许字母、数字、下划线、中文字符
 	matched, _ := regexp.MatchString(`^[\w\p{Han}]+$`, value)
 	if !matched {
-		return errors.WithCode(code.ErrInvalidArgument, "标签只能包含字母、数字、下划线和中文")
+		return newError(ErrorKindInvalidArgument, "标签只能包含字母、数字、下划线和中文")
 	}
 
 	return nil

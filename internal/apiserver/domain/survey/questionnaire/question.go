@@ -3,10 +3,8 @@ package questionnaire
 import (
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -236,7 +234,7 @@ func newSectionQuestionFactory(params *QuestionParams) (Question, error) {
 func newRadioQuestionFactory(params *QuestionParams) (Question, error) {
 	// 特定题型的参数校验
 	if len(params.GetOptions()) == 0 {
-		return nil, errors.WithCode(code.ErrOptionEmpty, "radio question options cannot be empty")
+		return nil, newError(ErrorKindOptionEmpty, "radio question options cannot be empty")
 	}
 
 	return &RadioQuestion{
@@ -251,7 +249,7 @@ func newRadioQuestionFactory(params *QuestionParams) (Question, error) {
 func newCheckboxQuestionFactory(params *QuestionParams) (Question, error) {
 	// 特定题型的参数校验
 	if len(params.GetOptions()) == 0 {
-		return nil, errors.WithCode(code.ErrOptionEmpty, "checkbox question options cannot be empty")
+		return nil, newError(ErrorKindOptionEmpty, "checkbox question options cannot be empty")
 	}
 
 	return &CheckboxQuestion{
@@ -325,13 +323,13 @@ func (b *QuestionParams) Apply(opts ...QuestionParamsOption) {
 // Validate 校验参数完整性
 func (b *QuestionParams) Validate() error {
 	if b.core.code.Value() == "" {
-		return errors.New("question code is required")
+		return newError(ErrorKindInvalidQuestion, "question code is required")
 	}
 	if b.core.stem == "" {
-		return errors.New("question stem is required")
+		return newError(ErrorKindInvalidQuestion, "question stem is required")
 	}
 	if b.core.typ == "" {
-		return errors.New("question type is required")
+		return newError(ErrorKindInvalidQuestion, "question type is required")
 	}
 	return nil
 }

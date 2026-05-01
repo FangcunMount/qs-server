@@ -71,58 +71,7 @@ func (s *queryService) GetByCode(ctx context.Context, code string) (*Questionnai
 
 // List 查询问卷摘要列表（轻量级，不包含问题详情）
 func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error) {
-	l := logger.L(ctx)
-	startTime := time.Now()
-
-	l.Debugw("查询问卷摘要列表",
-		"action", "list",
-		"page", dto.Page,
-		"page_size", dto.PageSize,
-		"filter", dto.Filter,
-	)
-
-	// 1. 验证分页参数
-	pageSize, err := s.validatePaginationParams(ctx, dto.Page, dto.PageSize, "list")
-	if err != nil {
-		return nil, err
-	}
-	dto.PageSize = pageSize
-
-	// 2. 获取问卷摘要列表（轻量级查询，不包含 questions 字段）
-	filter, err := s.normalizeQuestionnaireFilter(dto.Filter)
-	if err != nil {
-		return nil, err
-	}
-
-	questionnaires, err := s.reader.ListQuestionnaires(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
-	if err != nil {
-		l.Errorw("查询问卷摘要列表失败",
-			"action", "list",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷列表失败")
-	}
-
-	// 3. 获取总数
-	total, err := s.reader.CountQuestionnaires(ctx, filter)
-	if err != nil {
-		l.Errorw("获取问卷总数失败",
-			"action", "list",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
-	}
-
-	// 4. 转换为结果对象
-	result := toQuestionnaireSummaryRowsResult(ctx, questionnaires, total, s.identitySvc)
-	s.logSuccess(ctx, "list", startTime,
-		"total_count", total,
-		"page_count", len(questionnaires),
-	)
-
-	return result, nil
+	return s.listQuestionnaireSummaries(ctx, "list", dto, false)
 }
 
 // GetPublishedByCode 获取已发布的问卷
@@ -191,45 +140,49 @@ func (s *queryService) GetQuestionCount(ctx context.Context, code string) (int32
 
 // ListPublished 查询已发布问卷摘要列表（轻量级）
 func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error) {
+	return s.listQuestionnaireSummaries(ctx, "list_published", dto, true)
+}
+
+func (s *queryService) listQuestionnaireSummaries(ctx context.Context, action string, dto ListQuestionnairesDTO, publishedOnly bool) (*QuestionnaireSummaryListResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
-	l.Debugw("查询已发布问卷摘要列表",
-		"action", "list_published",
+	l.Debugw("查询问卷摘要列表",
+		"action", action,
 		"page", dto.Page,
 		"page_size", dto.PageSize,
+		"filter", dto.Filter,
+		"published_only", publishedOnly,
 	)
 
-	// 1. 验证分页参数
-	pageSize, err := s.validatePaginationParams(ctx, dto.Page, dto.PageSize, "list_published")
+	pageSize, err := s.validatePaginationParams(ctx, dto.Page, dto.PageSize, action)
 	if err != nil {
 		return nil, err
 	}
 	dto.PageSize = pageSize
 
-	// 2. 添加状态过滤条件
 	filter, err := s.normalizeQuestionnaireFilter(dto.Filter)
 	if err != nil {
 		return nil, err
 	}
-	filter.Status = questionnaire.STATUS_PUBLISHED.String()
+	if publishedOnly {
+		filter.Status = questionnaire.STATUS_PUBLISHED.String()
+	}
 
-	// 3. 获取问卷摘要列表（轻量级查询）
-	questionnaires, err := s.reader.ListPublishedQuestionnaires(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
+	questionnaires, err := s.listQuestionnaireRows(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize}, publishedOnly)
 	if err != nil {
-		l.Errorw("查询已发布问卷摘要列表失败",
-			"action", "list_published",
+		l.Errorw("查询问卷摘要列表失败",
+			"action", action,
 			"result", "failed",
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷列表失败")
 	}
 
-	// 4. 获取总数
-	total, err := s.reader.CountPublishedQuestionnaires(ctx, filter)
+	total, err := s.countQuestionnaireRows(ctx, filter, publishedOnly)
 	if err != nil {
-		l.Errorw("获取已发布问卷总数失败",
-			"action", "list_published",
+		l.Errorw("获取问卷总数失败",
+			"action", action,
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -237,12 +190,26 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	result := toQuestionnaireSummaryRowsResult(ctx, questionnaires, total, s.identitySvc)
-	s.logSuccess(ctx, "list_published", startTime,
+	s.logSuccess(ctx, action, startTime,
 		"total_count", total,
 		"page_count", len(questionnaires),
 	)
 
 	return result, nil
+}
+
+func (s *queryService) listQuestionnaireRows(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter, page surveyreadmodel.PageRequest, publishedOnly bool) ([]surveyreadmodel.QuestionnaireSummaryRow, error) {
+	if publishedOnly {
+		return s.reader.ListPublishedQuestionnaires(ctx, filter, page)
+	}
+	return s.reader.ListQuestionnaires(ctx, filter, page)
+}
+
+func (s *queryService) countQuestionnaireRows(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter, publishedOnly bool) (int64, error) {
+	if publishedOnly {
+		return s.reader.CountPublishedQuestionnaires(ctx, filter)
+	}
+	return s.reader.CountQuestionnaires(ctx, filter)
 }
 
 func (s *queryService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {

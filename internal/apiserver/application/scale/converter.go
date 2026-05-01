@@ -180,9 +180,6 @@ func toScaleResultWithUsers(ctx context.Context, m *scale.MedicalScale, identity
 
 // toFactorResult 将因子领域模型转换为结果对象
 func toFactorResult(f *scale.Factor) FactorResult {
-	// 转换计分参数为 map[string]interface{}（用于结果输出）
-	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
-
 	result := FactorResult{
 		Code:            f.GetCode().String(),
 		Title:           f.GetTitle(),
@@ -191,7 +188,7 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		IsShow:          f.IsShow(),
 		QuestionCodes:   make([]string, 0),
 		ScoringStrategy: f.GetScoringStrategy().String(),
-		ScoringParams:   scoringParamsMap,
+		ScoringParams:   scoringParamsResultMap(f.GetScoringParams(), f.GetScoringStrategy()),
 		MaxScore:        f.GetMaxScore(),
 		RiskLevel:       "", // 默认值，将从解读规则中提取
 		InterpretRules:  make([]InterpretRuleResult, 0),
@@ -224,6 +221,25 @@ func toFactorResult(f *scale.Factor) FactorResult {
 		result.RiskLevel = "none"
 	}
 
+	return result
+}
+
+func scoringParamsResultMap(params *scale.ScoringParams, strategy scale.ScoringStrategyCode) map[string]interface{} {
+	result := make(map[string]interface{})
+	if params == nil {
+		return result
+	}
+	switch strategy {
+	case scale.ScoringStrategyCnt:
+		contents := params.GetCntOptionContents()
+		if len(contents) > 0 {
+			result["cnt_option_contents"] = contents
+		}
+	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+		// These strategies currently do not expose additional params.
+	default:
+		// Keep unknown strategies empty; strategy validation belongs to the domain.
+	}
 	return result
 }
 

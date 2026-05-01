@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
@@ -57,7 +56,7 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*ScaleResu
 	}
 
 	// 3. 如果问卷版本为空，自动从问卷仓库获取最新版本
-	if err := s.ensureQuestionnaireVersion(ctx, code, m); err != nil {
+	if err := s.resolveQuestionnaireBinding().ensureQuestionnaireVersion(ctx, code, m); err != nil {
 		return nil, err
 	}
 
@@ -146,111 +145,6 @@ func (s *lifecycleService) getScaleAndValidateEditable(ctx context.Context, code
 	return m, nil
 }
 
-// ensureQuestionnaireVersion 确保量表有关联的问卷版本
-// 如果版本为空，自动从问卷仓库获取最新版本
-func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scaleCode string, m *scale.MedicalScale) error {
-	if m.GetQuestionnaireCode().IsEmpty() {
-		return nil
-	}
-
-	if err := s.validateMedicalScaleQuestionnaireBinding(ctx, m.GetQuestionnaireCode().Value(), m.GetQuestionnaireVersion(), scaleCode); err != nil {
-		return err
-	}
-
-	if m.GetQuestionnaireVersion() != "" {
-		return nil
-	}
-
-	questionnaireCode := m.GetQuestionnaireCode().Value()
-	logger.L(ctx).Infow("问卷版本为空，自动获取最新版本",
-		"scale_code", scaleCode,
-		"questionnaire_code", questionnaireCode,
-	)
-
-	// 从问卷仓库获取问卷
-	if s.questionnaireCatalog == nil {
-		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-	}
-	q, err := s.questionnaireCatalog.FindPublishedQuestionnaire(ctx, questionnaireCode)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
-	}
-	if q == nil {
-		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-	}
-
-	// 更新量表的问卷版本
-	latestVersion := q.Version
-	logger.L(ctx).Infow("自动设置问卷版本",
-		"scale_code", scaleCode,
-		"questionnaire_code", questionnaireCode,
-		"version", latestVersion,
-	)
-	if err := s.baseInfo.UpdateQuestionnaire(m, m.GetQuestionnaireCode(), latestVersion); err != nil {
-		return errors.WrapC(err, errorCode.ErrInvalidArgument, "更新问卷版本失败")
-	}
-
-	// 保存更新后的量表
-	if err := s.repo.Update(ctx, m); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷版本失败")
-	}
-
-	return nil
-}
-
-func (s *lifecycleService) validateMedicalScaleQuestionnaireBinding(
-	ctx context.Context,
-	questionnaireCode string,
-	questionnaireVersion string,
-	currentScaleCode string,
-) error {
-	if questionnaireCode == "" {
-		return nil
-	}
-
-	if s.questionnaireCatalog == nil {
-		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-	}
-	q, err := s.questionnaireCatalog.FindQuestionnaire(ctx, questionnaireCode)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
-	}
-	if q == nil {
-		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-	}
-	if q.Type != "MedicalScale" {
-		return errors.WithCode(errorCode.ErrInvalidArgument, "量表只能关联 MedicalScale 类型问卷")
-	}
-
-	if questionnaireVersion != "" {
-		versioned, err := s.questionnaireCatalog.FindQuestionnaireVersion(ctx, questionnaireCode, questionnaireVersion)
-		if err != nil {
-			return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷版本失败")
-		}
-		if versioned == nil {
-			return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷版本不存在")
-		}
-		if versioned.Type != "MedicalScale" {
-			return errors.WithCode(errorCode.ErrInvalidArgument, "量表只能关联 MedicalScale 类型问卷")
-		}
-	}
-
-	boundScale, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
-	if err != nil {
-		if scale.IsNotFound(err) {
-			return nil
-		}
-		return errors.WrapC(err, errorCode.ErrDatabase, "查询问卷关联量表失败")
-	}
-	if boundScale == nil {
-		return nil
-	}
-	if currentScaleCode != "" && boundScale.GetCode().String() == currentScaleCode {
-		return nil
-	}
-	return errors.WithCode(errorCode.ErrInvalidArgument, "该问卷已关联其他量表")
-}
-
 // lifecycleOperation 生命周期操作函数类型
 type lifecycleOperation func(ctx context.Context, scale *scale.MedicalScale) error
 
@@ -263,7 +157,7 @@ func (s *lifecycleService) executeLifecycleOperation(
 ) (*ScaleResult, error) {
 	// 1. 执行生命周期操作
 	if err := operation(ctx, m); err != nil {
-		return nil, err
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "执行量表生命周期操作失败")
 	}
 
 	// 2. 持久化

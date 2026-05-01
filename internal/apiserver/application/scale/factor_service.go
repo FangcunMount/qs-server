@@ -156,7 +156,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 
 	// 如果有验证错误，返回所有错误
 	if len(allValidationErrors) > 0 {
-		return nil, scale.ToError(allValidationErrors)
+		return nil, wrapScaleDomainError(scale.ToError(allValidationErrors), errorCode.ErrInvalidArgument, "验证因子失败")
 	}
 
 	// 4. 替换因子

@@ -2,9 +2,6 @@ package questionnaire
 
 import (
 	"fmt"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // ValidationError 验证错误
@@ -197,24 +194,15 @@ func validateQuestion(q Question) []ValidationError {
 // ValidateBasicInfo 验证基本信息
 func (Validator) ValidateBasicInfo(q *Questionnaire) error {
 	if q.title == "" {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidTitle, ""),
-			"标题不能为空",
-		)
+		return newError(ErrorKindInvalidTitle, "标题不能为空")
 	}
 
 	if len(q.title) > 100 {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidTitle, ""),
-			"标题长度不能超过100个字符",
-		)
+		return newError(ErrorKindInvalidTitle, "标题长度不能超过100个字符")
 	}
 
 	if len(q.desc) > 500 {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidInput, ""),
-			"描述长度不能超过500个字符",
-		)
+		return newError(ErrorKindInvalidInput, "描述长度不能超过500个字符")
 	}
 
 	return nil
@@ -223,24 +211,15 @@ func (Validator) ValidateBasicInfo(q *Questionnaire) error {
 // ValidateQuestion 验证问题是否有效
 func (Validator) ValidateQuestion(q Question) error {
 	if q == nil {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidQuestion, ""),
-			"问题对象不能为空",
-		)
+		return newError(ErrorKindInvalidQuestion, "问题对象不能为空")
 	}
 
 	if q.GetCode().Value() == "" {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidQuestion, ""),
-			"问题编码不能为空",
-		)
+		return newError(ErrorKindInvalidQuestion, "问题编码不能为空")
 	}
 
 	if q.GetStem() == "" {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidQuestion, ""),
-			"问题题干不能为空",
-		)
+		return newError(ErrorKindInvalidQuestion, "问题题干不能为空")
 	}
 
 	// 验证选择题的选项
@@ -248,10 +227,7 @@ func (Validator) ValidateQuestion(q Question) error {
 	if questionType == TypeRadio || questionType == TypeCheckbox {
 		options := q.GetOptions()
 		if len(options) < 2 {
-			return errors.WithMessage(
-				errors.WithCode(code.ErrQuestionnaireInvalidQuestion, ""),
-				"选择题至少需要2个选项",
-			)
+			return newError(ErrorKindInvalidQuestion, "选择题至少需要2个选项")
 		}
 	}
 
@@ -261,10 +237,7 @@ func (Validator) ValidateQuestion(q Question) error {
 // ValidateQuestions 批量验证问题列表
 func (v Validator) ValidateQuestions(questions []Question) error {
 	if len(questions) == 0 {
-		return errors.WithMessage(
-			errors.WithCode(code.ErrQuestionnaireInvalidQuestion, ""),
-			"问题列表不能为空",
-		)
+		return newError(ErrorKindInvalidQuestion, "问题列表不能为空")
 	}
 
 	// 验证编码唯一性

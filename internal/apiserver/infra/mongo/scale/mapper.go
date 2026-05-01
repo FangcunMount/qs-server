@@ -95,9 +95,6 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 		questionCodes = append(questionCodes, qc.String())
 	}
 
-	// 转换计分参数为 map[string]interface{}（用于持久化）
-	scoringParamsMap := f.GetScoringParams().ToMap(f.GetScoringStrategy())
-
 	return FactorPO{
 		Code:            f.GetCode().String(),
 		Title:           f.GetTitle(),
@@ -106,10 +103,29 @@ func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
 		IsShow:          f.IsShow(),
 		QuestionCodes:   questionCodes,
 		ScoringStrategy: f.GetScoringStrategy().String(),
-		ScoringParams:   scoringParamsMap,
+		ScoringParams:   scoringParamsToStoredMap(f.GetScoringParams(), f.GetScoringStrategy()),
 		MaxScore:        f.GetMaxScore(),
 		InterpretRules:  m.mapInterpretRulesToPO(f.GetInterpretRules()),
 	}
+}
+
+func scoringParamsToStoredMap(params *scale.ScoringParams, strategy scale.ScoringStrategyCode) map[string]interface{} {
+	result := make(map[string]interface{})
+	if params == nil {
+		return result
+	}
+	switch strategy {
+	case scale.ScoringStrategyCnt:
+		contents := params.GetCntOptionContents()
+		if len(contents) > 0 {
+			result["cnt_option_contents"] = contents
+		}
+	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+		// These strategies currently do not require persisted params.
+	default:
+		// Unknown strategies are validated by the domain factor constructor.
+	}
+	return result
 }
 
 // mapInterpretRulesToPO 将解读规则列表转换为持久化对象

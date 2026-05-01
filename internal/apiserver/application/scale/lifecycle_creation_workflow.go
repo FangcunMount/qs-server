@@ -23,7 +23,7 @@ func (s *lifecycleService) Create(ctx context.Context, dto CreateScaleDTO) (*Sca
 	classification := scaleClassificationFromDTO(dto.Category, dto.Stages, dto.ApplicableAges, dto.Reporters, dto.Tags)
 
 	if dto.QuestionnaireCode != "" {
-		if err := s.validateMedicalScaleQuestionnaireBinding(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, code.String()); err != nil {
+		if err := s.resolveQuestionnaireBinding().validate(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, code.String()); err != nil {
 			return nil, err
 		}
 	}

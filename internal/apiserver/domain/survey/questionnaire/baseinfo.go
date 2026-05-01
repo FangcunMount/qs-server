@@ -2,9 +2,6 @@ package questionnaire
 
 import (
 	"strings"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // BaseInfo 基础信息领域服务
@@ -16,10 +13,10 @@ type BaseInfo struct{}
 func (BaseInfo) UpdateTitle(q *Questionnaire, newTitle string) error {
 	newTitle = strings.TrimSpace(newTitle)
 	if len(newTitle) == 0 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidTitle, "标题不能为空")
+		return newError(ErrorKindInvalidTitle, "标题不能为空")
 	}
 	if len(newTitle) > 100 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidTitle, "标题长度不能超过 100 字符")
+		return newError(ErrorKindInvalidTitle, "标题长度不能超过 100 字符")
 	}
 
 	return q.updateBasicInfo(newTitle, q.desc, q.imgUrl)
@@ -28,7 +25,7 @@ func (BaseInfo) UpdateTitle(q *Questionnaire, newTitle string) error {
 // UpdateDescription 更新问卷描述
 func (BaseInfo) UpdateDescription(q *Questionnaire, newDescription string) error {
 	if len(newDescription) > 500 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidInput, "描述长度不能超过 500 字符")
+		return newError(ErrorKindInvalidInput, "描述长度不能超过 500 字符")
 	}
 
 	return q.updateBasicInfo(q.title, newDescription, q.imgUrl)
@@ -44,13 +41,13 @@ func (BaseInfo) UpdateCoverImage(q *Questionnaire, newImgUrl string) error {
 func (BaseInfo) UpdateAll(q *Questionnaire, title, description, imgUrl string, typ QuestionnaireType) error {
 	title = strings.TrimSpace(title)
 	if len(title) == 0 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidTitle, "标题不能为空")
+		return newError(ErrorKindInvalidTitle, "标题不能为空")
 	}
 	if len(title) > 100 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidTitle, "标题长度不能超过 100 字符")
+		return newError(ErrorKindInvalidTitle, "标题长度不能超过 100 字符")
 	}
 	if len(description) > 500 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidInput, "描述长度不能超过 500 字符")
+		return newError(ErrorKindInvalidInput, "描述长度不能超过 500 字符")
 	}
 
 	if err := q.updateBasicInfo(title, description, imgUrl); err != nil {

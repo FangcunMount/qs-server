@@ -1,8 +1,6 @@
 package scale
 
 import (
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -42,10 +40,10 @@ type FactorOption func(*Factor)
 // NewFactor 创建因子
 func NewFactor(factorCode FactorCode, title string, opts ...FactorOption) (*Factor, error) {
 	if factorCode.IsEmpty() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "factor code cannot be empty")
+		return nil, newError(ErrorKindInvalidArgument, "factor code cannot be empty")
 	}
 	if title == "" {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "factor title cannot be empty")
+		return nil, newError(ErrorKindInvalidArgument, "factor title cannot be empty")
 	}
 
 	f := &Factor{

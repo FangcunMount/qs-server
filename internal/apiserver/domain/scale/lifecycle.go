@@ -2,9 +2,6 @@ package scale
 
 import (
 	"context"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // Lifecycle 量表生命周期管理接口
@@ -36,7 +33,7 @@ var _ Lifecycle = (*lifecycle)(nil)
 func (l *lifecycle) Publish(_ context.Context, scale *MedicalScale) error {
 	// 1. 前置状态检查
 	if scale.IsArchived() {
-		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be published")
+		return newError(ErrorKindInvalidArgument, "archived scale cannot be published")
 	}
 
 	// 2. 业务规则验证
@@ -54,10 +51,10 @@ func (l *lifecycle) Publish(_ context.Context, scale *MedicalScale) error {
 func (l *lifecycle) Unpublish(_ context.Context, scale *MedicalScale) error {
 	// 1. 前置状态检查
 	if scale.IsArchived() {
-		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be unpublished")
+		return newError(ErrorKindInvalidArgument, "archived scale cannot be unpublished")
 	}
 	if !scale.IsPublished() {
-		return errors.WithCode(code.ErrInvalidArgument, "scale is not published")
+		return newError(ErrorKindInvalidArgument, "scale is not published")
 	}
 
 	// 2. 调用聚合根的包内方法（状态变更 + 事件触发）
@@ -68,7 +65,7 @@ func (l *lifecycle) Unpublish(_ context.Context, scale *MedicalScale) error {
 func (l *lifecycle) Archive(_ context.Context, scale *MedicalScale) error {
 	// 1. 前置状态检查
 	if scale.IsArchived() {
-		return errors.WithCode(code.ErrInvalidArgument, "scale is already archived")
+		return newError(ErrorKindInvalidArgument, "scale is already archived")
 	}
 
 	// 2. 调用聚合根的包内方法（状态变更 + 事件触发）

@@ -149,9 +149,9 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsSurveyQuestionnaire(t *t
 		},
 	}
 
-	err = svc.validateMedicalScaleQuestionnaireBinding(ctx, "Q-SURVEY", "", "S-001")
+	err = svc.resolveQuestionnaireBinding().validate(ctx, "Q-SURVEY", "", "S-001")
 	if err == nil {
-		t.Fatal("validateMedicalScaleQuestionnaireBinding() error = nil, want non-nil")
+		t.Fatal("validate() error = nil, want non-nil")
 	}
 }
 
@@ -191,9 +191,9 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsOtherScaleBinding(t *tes
 		},
 	}
 
-	err = svc.validateMedicalScaleQuestionnaireBinding(ctx, "Q-MS", "1.0", "S-001")
+	err = svc.resolveQuestionnaireBinding().validate(ctx, "Q-MS", "1.0", "S-001")
 	if err == nil {
-		t.Fatal("validateMedicalScaleQuestionnaireBinding() error = nil, want non-nil")
+		t.Fatal("validate() error = nil, want non-nil")
 	}
 }
 
@@ -233,7 +233,7 @@ func TestValidateMedicalScaleQuestionnaireBindingAllowsSameScaleRebind(t *testin
 		},
 	}
 
-	if err := svc.validateMedicalScaleQuestionnaireBinding(ctx, "Q-MS", "1.0", "S-001"); err != nil {
-		t.Fatalf("validateMedicalScaleQuestionnaireBinding() error = %v, want nil", err)
+	if err := svc.resolveQuestionnaireBinding().validate(ctx, "Q-MS", "1.0", "S-001"); err != nil {
+		t.Fatalf("validate() error = %v, want nil", err)
 	}
 }

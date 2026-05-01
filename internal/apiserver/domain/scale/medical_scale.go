@@ -3,8 +3,6 @@ package scale
 import (
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -54,10 +52,10 @@ type MedicalScaleOption func(*MedicalScale)
 // NewMedicalScale 创建医学量表
 func NewMedicalScale(scaleCode meta.Code, title string, opts ...MedicalScaleOption) (*MedicalScale, error) {
 	if scaleCode.IsEmpty() {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "scale code cannot be empty")
+		return nil, newError(ErrorKindInvalidArgument, "scale code cannot be empty")
 	}
 	if title == "" {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "scale title cannot be empty")
+		return nil, newError(ErrorKindInvalidArgument, "scale title cannot be empty")
 	}
 
 	m := &MedicalScale{
@@ -345,7 +343,7 @@ func (m *MedicalScale) GetNonTotalScoreFactors() []*Factor {
 // AddFactor 添加因子，并保持量表内因子编码唯一。
 func (m *MedicalScale) AddFactor(factor *Factor) error {
 	if factor == nil {
-		return errors.WithCode(code.ErrInvalidArgument, "因子对象不能为空")
+		return newError(ErrorKindInvalidArgument, "因子对象不能为空")
 	}
 	return m.addFactor(factor)
 }
@@ -353,7 +351,7 @@ func (m *MedicalScale) AddFactor(factor *Factor) error {
 // RemoveFactor 移除指定因子。
 func (m *MedicalScale) RemoveFactor(factorCode FactorCode) error {
 	if factorCode.IsEmpty() {
-		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
 	return m.removeFactor(factorCode)
 }
@@ -366,28 +364,28 @@ func (m *MedicalScale) RemoveAllFactors() {
 // ReplaceFactors 替换全部因子，并校验编码唯一和总分因子唯一。
 func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
 	if len(factors) == 0 {
-		return errors.WithCode(code.ErrInvalidArgument, "因子列表不能为空")
+		return newError(ErrorKindInvalidArgument, "因子列表不能为空")
 	}
 
 	codes := make(map[string]bool)
 	hasTotalScore := false
 	for i, factor := range factors {
 		if factor == nil {
-			return errors.WithCode(code.ErrInvalidArgument, "第 %d 个因子对象为空", i+1)
+			return newError(ErrorKindInvalidArgument, "第 %d 个因子对象为空", i+1)
 		}
 
 		factorCode := factor.GetCode().Value()
 		if factorCode == "" {
-			return errors.WithCode(code.ErrInvalidArgument, "第 %d 个因子的编码不能为空", i+1)
+			return newError(ErrorKindInvalidArgument, "第 %d 个因子的编码不能为空", i+1)
 		}
 		if codes[factorCode] {
-			return errors.WithCode(code.ErrInvalidArgument, "因子编码 %s 重复", factorCode)
+			return newError(ErrorKindInvalidArgument, "因子编码 %s 重复", factorCode)
 		}
 		codes[factorCode] = true
 
 		if factor.IsTotalScore() {
 			if hasTotalScore {
-				return errors.WithCode(code.ErrInvalidArgument, "量表只能有一个总分因子")
+				return newError(ErrorKindInvalidArgument, "量表只能有一个总分因子")
 			}
 			hasTotalScore = true
 		}
@@ -400,12 +398,12 @@ func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
 // UpdateFactor 按编码替换已有因子。
 func (m *MedicalScale) UpdateFactor(updatedFactor *Factor) error {
 	if updatedFactor == nil {
-		return errors.WithCode(code.ErrInvalidArgument, "因子对象不能为空")
+		return newError(ErrorKindInvalidArgument, "因子对象不能为空")
 	}
 
 	factorCode := updatedFactor.GetCode()
 	if factorCode.IsEmpty() {
-		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
 
 	for i, f := range m.factors {
@@ -415,23 +413,23 @@ func (m *MedicalScale) UpdateFactor(updatedFactor *Factor) error {
 		}
 	}
 
-	return errors.WithCode(code.ErrInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
+	return newError(ErrorKindInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
 }
 
 // UpdateFactorInterpretRules 更新指定因子的解读规则。
 func (m *MedicalScale) UpdateFactorInterpretRules(factorCode FactorCode, rules []InterpretationRule) error {
 	if factorCode.IsEmpty() {
-		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
 
 	factor, found := m.FindFactorByCode(factorCode)
 	if !found {
-		return errors.WithCode(code.ErrInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
+		return newError(ErrorKindInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
 	}
 
 	for i, rule := range rules {
 		if !rule.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "第 %d 个解读规则无效", i+1)
+			return newError(ErrorKindInvalidArgument, "第 %d 个解读规则无效", i+1)
 		}
 	}
 
@@ -442,15 +440,15 @@ func (m *MedicalScale) UpdateFactorInterpretRules(factorCode FactorCode, rules [
 // AddFactorInterpretRule 为指定因子追加解读规则。
 func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule InterpretationRule) error {
 	if factorCode.IsEmpty() {
-		return errors.WithCode(code.ErrInvalidArgument, "因子编码不能为空")
+		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
 	if !rule.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "解读规则无效")
+		return newError(ErrorKindInvalidArgument, "解读规则无效")
 	}
 
 	factor, found := m.FindFactorByCode(factorCode)
 	if !found {
-		return errors.WithCode(code.ErrInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
+		return newError(ErrorKindInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
 	}
 	factor.addInterpretRule(rule)
 	return nil
@@ -461,7 +459,7 @@ func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule Interp
 // updateBasicInfo 更新基本信息
 func (m *MedicalScale) updateBasicInfo(title, description string) error {
 	if title == "" {
-		return errors.WithCode(code.ErrInvalidArgument, "title cannot be empty")
+		return newError(ErrorKindInvalidArgument, "title cannot be empty")
 	}
 	m.title = title
 	m.description = description
@@ -497,7 +495,7 @@ func (m *MedicalScale) updateClassificationInfo(category Category, stages []Stag
 // updateStatus 更新状态
 func (m *MedicalScale) updateStatus(newStatus Status) error {
 	if m.status.IsArchived() && !newStatus.IsArchived() {
-		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot change status")
+		return newError(ErrorKindInvalidArgument, "archived scale cannot change status")
 	}
 	m.status = newStatus
 	return nil
@@ -506,7 +504,7 @@ func (m *MedicalScale) updateStatus(newStatus Status) error {
 // updateQuestionnaire 更新关联的问卷
 func (m *MedicalScale) updateQuestionnaire(qCode meta.Code, qVersion string) error {
 	if qCode.IsEmpty() {
-		return errors.WithCode(code.ErrInvalidArgument, "questionnaire code cannot be empty")
+		return newError(ErrorKindInvalidArgument, "questionnaire code cannot be empty")
 	}
 	m.questionnaireCode = qCode
 	m.questionnaireVersion = qVersion
@@ -518,7 +516,7 @@ func (m *MedicalScale) addFactor(f *Factor) error {
 	// 幂等性检查
 	for _, existingFactor := range m.factors {
 		if existingFactor.GetCode().Equals(f.GetCode()) {
-			return errors.WithCode(code.ErrInvalidArgument, "factor code already exists")
+			return newError(ErrorKindInvalidArgument, "factor code already exists")
 		}
 	}
 	m.factors = append(m.factors, f)
@@ -533,7 +531,7 @@ func (m *MedicalScale) removeFactor(factorCode FactorCode) error {
 			return nil
 		}
 	}
-	return errors.WithCode(code.ErrInvalidArgument, "factor not found")
+	return newError(ErrorKindInvalidArgument, "factor not found")
 }
 
 // updateFactors 更新因子列表

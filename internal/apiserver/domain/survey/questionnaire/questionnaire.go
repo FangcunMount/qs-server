@@ -3,8 +3,6 @@ package questionnaire
 import (
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -50,10 +48,10 @@ type QuestionnaireOption func(*Questionnaire)
 // NewQuestionnaire 创建问卷
 func NewQuestionnaire(c meta.Code, t string, opts ...QuestionnaireOption) (*Questionnaire, error) {
 	if c.Value() == "" {
-		return nil, errors.WithCode(code.ErrQuestionnaireInvalidCode, "code cannot be empty")
+		return nil, newError(ErrorKindInvalidCode, "code cannot be empty")
 	}
 	if t == "" {
-		return nil, errors.WithCode(code.ErrQuestionnaireInvalidTitle, "title cannot be empty")
+		return nil, newError(ErrorKindInvalidTitle, "title cannot be empty")
 	}
 
 	// 设置必填字段
@@ -69,7 +67,7 @@ func NewQuestionnaire(c meta.Code, t string, opts ...QuestionnaireOption) (*Ques
 		q.typ = DefaultQuestionnaireType()
 	}
 	if !q.typ.IsValid() {
-		return nil, errors.WithCode(code.ErrQuestionnaireInvalidInput, "invalid questionnaire type")
+		return nil, newError(ErrorKindInvalidInput, "invalid questionnaire type")
 	}
 	if q.recordRole == "" {
 		q.recordRole = RecordRoleHead
@@ -224,7 +222,7 @@ func (q *Questionnaire) GetQuestionCnt() int {
 // AddQuestion 添加问题，并保持问卷内问题编码唯一。
 func (q *Questionnaire) AddQuestion(question Question) error {
 	if question == nil {
-		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题对象不能为空")
+		return newError(ErrorKindInvalidQuestion, "问题对象不能为空")
 	}
 	return q.addQuestion(question)
 }
@@ -232,7 +230,7 @@ func (q *Questionnaire) AddQuestion(question Question) error {
 // RemoveQuestion 移除指定问题。
 func (q *Questionnaire) RemoveQuestion(questionCode meta.Code) error {
 	if questionCode.Value() == "" {
-		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题编码不能为空")
+		return newError(ErrorKindInvalidQuestion, "问题编码不能为空")
 	}
 	return q.removeQuestion(questionCode)
 }
@@ -246,21 +244,21 @@ func (q *Questionnaire) RemoveAllQuestions() {
 // ReplaceQuestions 替换问卷中的全部问题，并校验问题编码唯一。
 func (q *Questionnaire) ReplaceQuestions(questions []Question) error {
 	if len(questions) == 0 {
-		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题列表不能为空")
+		return newError(ErrorKindInvalidQuestion, "问题列表不能为空")
 	}
 
 	codes := make(map[string]bool)
 	for i, question := range questions {
 		if question == nil {
-			return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "第 %d 个问题对象为空", i+1)
+			return newError(ErrorKindInvalidQuestion, "第 %d 个问题对象为空", i+1)
 		}
 
 		questionCode := question.GetCode().Value()
 		if questionCode == "" {
-			return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "第 %d 个问题的编码不能为空", i+1)
+			return newError(ErrorKindInvalidQuestion, "第 %d 个问题的编码不能为空", i+1)
 		}
 		if codes[questionCode] {
-			return errors.WithCode(code.ErrQuestionAlreadyExists, "问题编码 %s 重复", questionCode)
+			return newError(ErrorKindQuestionExists, "问题编码 %s 重复", questionCode)
 		}
 		codes[questionCode] = true
 	}
@@ -273,12 +271,12 @@ func (q *Questionnaire) ReplaceQuestions(questions []Question) error {
 // UpdateQuestion 按编码替换已有问题。
 func (q *Questionnaire) UpdateQuestion(updatedQuestion Question) error {
 	if updatedQuestion == nil {
-		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题对象不能为空")
+		return newError(ErrorKindInvalidQuestion, "问题对象不能为空")
 	}
 
 	targetCode := updatedQuestion.GetCode()
 	if targetCode.Value() == "" {
-		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "问题编码不能为空")
+		return newError(ErrorKindInvalidQuestion, "问题编码不能为空")
 	}
 
 	for i, existingQuestion := range q.questions {
@@ -288,13 +286,13 @@ func (q *Questionnaire) UpdateQuestion(updatedQuestion Question) error {
 		}
 	}
 
-	return errors.WithCode(code.ErrQuestionnaireQuestionNotFound, "未找到编码为 %s 的问题", targetCode.Value())
+	return newError(ErrorKindQuestionNotFound, "未找到编码为 %s 的问题", targetCode.Value())
 }
 
 // ReorderQuestions 按给定编码顺序重新排序问题。
 func (q *Questionnaire) ReorderQuestions(codes []meta.Code) error {
 	if len(codes) != q.QuestionCount() {
-		return errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "提供的编码数量与现有问题数量不匹配")
+		return newError(ErrorKindInvalidQuestion, "提供的编码数量与现有问题数量不匹配")
 	}
 
 	questionMap := make(map[string]Question)
@@ -306,7 +304,7 @@ func (q *Questionnaire) ReorderQuestions(codes []meta.Code) error {
 	for i, codeItem := range codes {
 		question, exists := questionMap[codeItem.Value()]
 		if !exists {
-			return errors.WithCode(code.ErrQuestionnaireQuestionNotFound, "第 %d 个编码 %s 对应的问题不存在", i+1, codeItem.Value())
+			return newError(ErrorKindQuestionNotFound, "第 %d 个编码 %s 对应的问题不存在", i+1, codeItem.Value())
 		}
 		newQuestions = append(newQuestions, question)
 	}
@@ -321,7 +319,7 @@ func (q *Questionnaire) ReorderQuestions(codes []meta.Code) error {
 // updateStatus 更新状态
 func (q *Questionnaire) updateStatus(newStatus Status) error {
 	if q.status == STATUS_ARCHIVED && newStatus != STATUS_ARCHIVED {
-		return errors.WithCode(code.ErrQuestionnaireArchived, "archived questionnaire cannot change status")
+		return newError(ErrorKindArchived, "archived questionnaire cannot change status")
 	}
 
 	q.status = newStatus
@@ -331,7 +329,7 @@ func (q *Questionnaire) updateStatus(newStatus Status) error {
 // updateBasicInfo 更新基本信息
 func (q *Questionnaire) updateBasicInfo(title, desc, imgUrl string) error {
 	if title == "" {
-		return errors.WithCode(code.ErrQuestionnaireInvalidTitle, "title cannot be empty")
+		return newError(ErrorKindInvalidTitle, "title cannot be empty")
 	}
 
 	q.title, q.desc, q.imgUrl = title, desc, imgUrl
@@ -342,7 +340,7 @@ func (q *Questionnaire) updateBasicInfo(title, desc, imgUrl string) error {
 func (q *Questionnaire) updateType(newType QuestionnaireType) error {
 	normalized := NormalizeQuestionnaireType(newType.String())
 	if newType != "" && normalized != newType {
-		return errors.WithCode(code.ErrQuestionnaireInvalidInput, "invalid questionnaire type")
+		return newError(ErrorKindInvalidInput, "invalid questionnaire type")
 	}
 	q.typ = normalized
 	return nil
@@ -353,7 +351,7 @@ func (q *Questionnaire) addQuestion(que Question) error {
 	// 幂等性检查
 	for _, queExisted := range q.questions {
 		if queExisted.GetCode() == que.GetCode() {
-			return errors.WithCode(code.ErrQuestionAlreadyExists, "question code already exists")
+			return newError(ErrorKindQuestionExists, "question code already exists")
 		}
 	}
 
@@ -373,13 +371,13 @@ func (q *Questionnaire) removeQuestion(c meta.Code) error {
 		}
 	}
 
-	return errors.WithCode(code.ErrQuestionnaireQuestionNotFound, "question not found")
+	return newError(ErrorKindQuestionNotFound, "question not found")
 }
 
 // updateVersion 更新版本
 func (q *Questionnaire) updateVersion(newVersion Version) error {
 	if newVersion.IsEmpty() {
-		return errors.WithCode(code.ErrQuestionnaireInvalidInput, "version cannot be empty")
+		return newError(ErrorKindInvalidInput, "version cannot be empty")
 	}
 
 	q.version = newVersion

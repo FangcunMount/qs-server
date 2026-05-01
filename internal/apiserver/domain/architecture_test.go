@@ -27,6 +27,8 @@ func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":   "transport",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/":        "port",
 		"github.com/FangcunMount/component-base/pkg/logger":                 "technical logging",
+		"github.com/FangcunMount/component-base/pkg/errors":                 "API error wrappers",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":               "API error codes",
 	}
 
 	for _, scanRoot := range scanRoots {
@@ -38,6 +40,38 @@ func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestScaleDomainDoesNotExposePersistencePayloadMappers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "scale")
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range []string{
+			"map[string]interface{}",
+			"ToMap(",
+		} {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; persistence payload mapping belongs to infra mappers", filepath.ToSlash(mustRel(t, root, path)), token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }
 

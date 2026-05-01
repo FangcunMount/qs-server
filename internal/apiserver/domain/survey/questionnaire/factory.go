@@ -1,10 +1,5 @@
 package questionnaire
 
-import (
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
-)
-
 // QuestionFactory 题型工厂函数签名
 // 接收参数容器，返回具体的 Question 实例
 type QuestionFactory func(*QuestionParams) (Question, error)
@@ -31,17 +26,17 @@ func NewQuestion(opts ...QuestionParamsOption) (Question, error) {
 		// 即便参数校验失败，也尝试构建问题实例以便后续验证时使用
 		if factory, ok := questionRegistry[params.GetCore().typ]; ok {
 			if q, buildErr := factory(params); buildErr == nil {
-				return q, errors.WrapC(err, code.ErrQuestionnaireInvalidQuestion, "invalid question parameters")
+				return q, wrapError(ErrorKindInvalidQuestion, err, "invalid question parameters")
 			}
 		}
-		return nil, errors.WrapC(err, code.ErrQuestionnaireInvalidQuestion, "invalid question parameters")
+		return nil, wrapError(ErrorKindInvalidQuestion, err, "invalid question parameters")
 	}
 
 	// 3. 根据题型获取对应的工厂函数
 	factory, ok := questionRegistry[params.GetCore().typ]
 	if !ok {
-		return nil, errors.WithCode(
-			code.ErrQuestionnaireInvalidQuestion,
+		return nil, newError(
+			ErrorKindInvalidQuestion,
 			"unknown question type: %s",
 			string(params.GetCore().typ),
 		)

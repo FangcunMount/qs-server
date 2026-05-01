@@ -63,39 +63,31 @@ func (s *contentService) AddQuestion(ctx context.Context, dto AddQuestionDTO) (*
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问题类型不能为空")
 	}
 
-	// 2. 获取可编辑问卷
-	q, err := s.loadEditableHead(ctx, dto.QuestionnaireCode, "add_question")
+	q, err := s.applyQuestionMutation(ctx, dto.QuestionnaireCode, "add_question", func(q *questionnaire.Questionnaire) error {
+		question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil, nil)
+		if err != nil {
+			l.Errorw("创建问题失败",
+				"action", "add_question",
+				"questionnaire_code", dto.QuestionnaireCode,
+				"question_code", dto.Code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "创建问题失败")
+		}
+		if err := q.AddQuestion(question); err != nil {
+			l.Errorw("添加问题失败",
+				"action", "add_question",
+				"questionnaire_code", dto.QuestionnaireCode,
+				"question_code", dto.Code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "添加问题失败")
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	// 3. 构建问题领域对象
-	question, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil, nil)
-	if err != nil {
-		l.Errorw("创建问题失败",
-			"action", "add_question",
-			"questionnaire_code", dto.QuestionnaireCode,
-			"question_code", dto.Code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "创建问题失败")
-	}
-
-	// 4. 添加问题到问卷
-	if err := q.AddQuestion(question); err != nil {
-		l.Errorw("添加问题失败",
-			"action", "add_question",
-			"questionnaire_code", dto.QuestionnaireCode,
-			"question_code", dto.Code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "添加问题失败")
-	}
-
-	// 5. 持久化
-	if err := s.persistQuestionnaire(ctx, q, dto.QuestionnaireCode, "add_question"); err != nil {
 		return nil, err
 	}
 
@@ -137,39 +129,31 @@ func (s *contentService) UpdateQuestion(ctx context.Context, dto UpdateQuestionD
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问题题干不能为空")
 	}
 
-	// 2. 获取可编辑问卷
-	q, err := s.loadEditableHead(ctx, dto.QuestionnaireCode, "update_question")
+	q, err := s.applyQuestionMutation(ctx, dto.QuestionnaireCode, "update_question", func(q *questionnaire.Questionnaire) error {
+		newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil, nil)
+		if err != nil {
+			l.Errorw("创建问题失败",
+				"action", "update_question",
+				"questionnaire_code", dto.QuestionnaireCode,
+				"question_code", dto.Code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "创建问题失败")
+		}
+		if err := q.UpdateQuestion(newQuestion); err != nil {
+			l.Errorw("更新问题失败",
+				"action", "update_question",
+				"questionnaire_code", dto.QuestionnaireCode,
+				"question_code", dto.Code,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "更新问题失败")
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	// 3. 构建新的问题对象
-	newQuestion, err := buildQuestionFromDTO(dto.Code, dto.Stem, dto.Type, dto.Options, dto.Required, dto.Description, nil, nil, nil)
-	if err != nil {
-		l.Errorw("创建问题失败",
-			"action", "update_question",
-			"questionnaire_code", dto.QuestionnaireCode,
-			"question_code", dto.Code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "创建问题失败")
-	}
-
-	// 4. 更新问题
-	if err := q.UpdateQuestion(newQuestion); err != nil {
-		l.Errorw("更新问题失败",
-			"action", "update_question",
-			"questionnaire_code", dto.QuestionnaireCode,
-			"question_code", dto.Code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "更新问题失败")
-	}
-
-	// 5. 持久化
-	if err := s.persistQuestionnaire(ctx, q, dto.QuestionnaireCode, "update_question"); err != nil {
 		return nil, err
 	}
 
@@ -199,26 +183,20 @@ func (s *contentService) RemoveQuestion(ctx context.Context, questionnaireCode, 
 		return nil, err
 	}
 
-	// 2. 获取可编辑问卷
-	q, err := s.loadEditableHead(ctx, questionnaireCode, "remove_question")
+	q, err := s.applyQuestionMutation(ctx, questionnaireCode, "remove_question", func(q *questionnaire.Questionnaire) error {
+		if err := q.RemoveQuestion(meta.NewCode(questionCode)); err != nil {
+			l.Errorw("删除问题失败",
+				"action", "remove_question",
+				"questionnaire_code", questionnaireCode,
+				"question_code", questionCode,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "删除问题失败")
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	// 3. 删除问题
-	if err := q.RemoveQuestion(meta.NewCode(questionCode)); err != nil {
-		l.Errorw("删除问题失败",
-			"action", "remove_question",
-			"questionnaire_code", questionnaireCode,
-			"question_code", questionCode,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "删除问题失败")
-	}
-
-	// 4. 持久化
-	if err := s.persistQuestionnaire(ctx, q, questionnaireCode, "remove_question"); err != nil {
 		return nil, err
 	}
 
@@ -254,28 +232,19 @@ func (s *contentService) ReorderQuestions(ctx context.Context, questionnaireCode
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问题编码列表不能为空")
 	}
 
-	// 2. 获取可编辑问卷
-	q, err := s.loadEditableHead(ctx, questionnaireCode, "reorder_questions")
+	q, err := s.applyQuestionMutation(ctx, questionnaireCode, "reorder_questions", func(q *questionnaire.Questionnaire) error {
+		if err := q.ReorderQuestions(toMetaCodes(orderedCodes)); err != nil {
+			l.Errorw("重排问题顺序失败",
+				"action", "reorder_questions",
+				"questionnaire_code", questionnaireCode,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "重排问题顺序失败")
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	// 3. 转换 string 编码为 meta.Code
-	metaCodes := toMetaCodes(orderedCodes)
-
-	// 4. 重排问题顺序
-	if err := q.ReorderQuestions(metaCodes); err != nil {
-		l.Errorw("重排问题顺序失败",
-			"action", "reorder_questions",
-			"questionnaire_code", questionnaireCode,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "重排问题顺序失败")
-	}
-
-	// 5. 持久化
-	if err := s.persistQuestionnaire(ctx, q, questionnaireCode, "reorder_questions"); err != nil {
 		return nil, err
 	}
 
@@ -310,31 +279,25 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问题列表不能为空")
 	}
 
-	// 2. 获取可编辑问卷
-	q, err := s.loadEditableHead(ctx, questionnaireCode, "batch_update_questions")
+	var domainQuestions []questionnaire.Question
+	q, err := s.applyQuestionMutation(ctx, questionnaireCode, "batch_update_questions", func(q *questionnaire.Questionnaire) error {
+		var err error
+		domainQuestions, err = buildQuestionsFromDTOs(ctx, questionnaireCode, questions)
+		if err != nil {
+			return err
+		}
+		if err := q.ReplaceQuestions(domainQuestions); err != nil {
+			l.Errorw("批量更新问题失败",
+				"action", "batch_update_questions",
+				"questionnaire_code", questionnaireCode,
+				"result", "failed",
+				"error", err.Error(),
+			)
+			return errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "批量更新问题失败")
+		}
+		return nil
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	// 3. 转换 DTO 为领域对象
-	domainQuestions, err := buildQuestionsFromDTOs(ctx, questionnaireCode, questions)
-	if err != nil {
-		return nil, err
-	}
-
-	// 4. 批量更新问题（使用 ReplaceQuestions）
-	if err := q.ReplaceQuestions(domainQuestions); err != nil {
-		l.Errorw("批量更新问题失败",
-			"action", "batch_update_questions",
-			"questionnaire_code", questionnaireCode,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "批量更新问题失败")
-	}
-
-	// 5. 持久化
-	if err := s.persistQuestionnaire(ctx, q, questionnaireCode, "batch_update_questions"); err != nil {
 		return nil, err
 	}
 
@@ -343,129 +306,4 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 	)
 
 	return toQuestionnaireResult(q), nil
-}
-
-func buildQuestionsFromDTOs(ctx context.Context, questionnaireCode string, questions []QuestionDTO) ([]questionnaire.Question, error) {
-	domainQuestions := make([]questionnaire.Question, 0, len(questions))
-	for i, qDTO := range questions {
-		validationRules := toDomainValidationRules(qDTO.ValidationRules)
-		calculationRule := toDomainCalculationRule(qDTO.CalculationRule)
-		showController := toDomainShowController(qDTO.ShowController)
-		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description, validationRules, calculationRule, showController)
-		if err != nil {
-			logger.L(ctx).Errorw("创建问题失败",
-				"action", "batch_update_questions",
-				"questionnaire_code", questionnaireCode,
-				"question_index", i+1,
-				"question_code", qDTO.Code,
-				"result", "failed",
-				"error", err.Error(),
-			)
-			return nil, errors.WrapC(err, errorCode.ErrQuestionnaireInvalidQuestion, "第 %d 个问题创建失败", i+1)
-		}
-		domainQuestions = append(domainQuestions, question)
-	}
-	return domainQuestions, nil
-}
-
-func toMetaCodes(codes []string) []meta.Code {
-	metaCodes := make([]meta.Code, 0, len(codes))
-	for _, code := range codes {
-		metaCodes = append(metaCodes, meta.NewCode(code))
-	}
-	return metaCodes
-}
-
-// validateQuestionnaireCode 验证问卷编码
-func (s *contentService) validateQuestionnaireCode(ctx context.Context, code string, action string) error {
-	if code == "" {
-		logger.L(ctx).Warnw("问卷编码为空",
-			"action", action,
-			"result", "invalid_params",
-		)
-		return errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问卷编码不能为空")
-	}
-	return nil
-}
-
-// validateQuestionCode 验证问题编码
-func (s *contentService) validateQuestionCode(ctx context.Context, code string, questionnaireCode string, action string) error {
-	if code == "" {
-		logger.L(ctx).Warnw("问题编码为空",
-			"action", action,
-			"questionnaire_code", questionnaireCode,
-			"result", "invalid_params",
-		)
-		return errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "问题编码不能为空")
-	}
-	return nil
-}
-
-// findQuestionnaireByCode 根据编码查找问卷
-func (s *contentService) findQuestionnaireByCode(ctx context.Context, code string, action string) (*questionnaire.Questionnaire, error) {
-	q, err := s.repo.FindByCode(ctx, code)
-	if err != nil {
-		logger.L(ctx).Errorw("获取问卷失败",
-			"action", action,
-			"questionnaire_code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取问卷失败")
-	}
-	return q, nil
-}
-
-func (s *contentService) loadEditableHead(ctx context.Context, code string, action string) (*questionnaire.Questionnaire, error) {
-	q, err := s.findQuestionnaireByCode(ctx, code, action)
-	if err != nil {
-		return nil, err
-	}
-	if err := s.checkArchivedStatus(ctx, q, code, action); err != nil {
-		return nil, err
-	}
-	if err := ensureEditableHead(ctx, s.repo, q); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "派生工作草稿失败")
-	}
-	return q, nil
-}
-
-// checkArchivedStatus 检查问卷是否已归档
-func (s *contentService) checkArchivedStatus(ctx context.Context, q *questionnaire.Questionnaire, code string, action string) error {
-	if q.IsArchived() {
-		logger.L(ctx).Warnw("问卷已归档，不能编辑",
-			"action", action,
-			"questionnaire_code", code,
-			"status", q.GetStatus().String(),
-			"result", "invalid_status",
-		)
-		return errors.WithCode(errorCode.ErrQuestionnaireArchived, "问卷已归档，不能编辑")
-	}
-	return nil
-}
-
-// persistQuestionnaire 持久化问卷
-func (s *contentService) persistQuestionnaire(ctx context.Context, q *questionnaire.Questionnaire, code string, action string) error {
-	if err := s.repo.Update(ctx, q); err != nil {
-		logger.L(ctx).Errorw("保存问卷失败",
-			"action", action,
-			"questionnaire_code", code,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷失败")
-	}
-	return nil
-}
-
-// logSuccess 记录成功日志
-func (s *contentService) logSuccess(ctx context.Context, action string, questionnaireCode string, startTime time.Time, extraFields ...interface{}) {
-	duration := time.Since(startTime)
-	fields := []interface{}{
-		"action", action,
-		"questionnaire_code", questionnaireCode,
-		"duration_ms", duration.Milliseconds(),
-	}
-	fields = append(fields, extraFields...)
-	logger.L(ctx).Debugw("操作成功", fields...)
 }

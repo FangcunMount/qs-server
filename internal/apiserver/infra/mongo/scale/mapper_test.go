@@ -77,6 +77,23 @@ func TestScaleMapperMapScoringParamsToDomainIgnoresParamsForStrategiesWithoutCon
 	}
 }
 
+func TestScoringParamsToStoredMapKeepsPersistenceShapeInInfra(t *testing.T) {
+	t.Parallel()
+
+	params := domainscale.NewScoringParams().WithCntOptionContents([]string{"yes", "often"})
+	got := scoringParamsToStoredMap(params, domainscale.ScoringStrategyCnt)
+	if !reflect.DeepEqual(got["cnt_option_contents"], []string{"yes", "often"}) {
+		t.Fatalf("cnt_option_contents = %#v, want string slice", got["cnt_option_contents"])
+	}
+
+	if got := scoringParamsToStoredMap(params, domainscale.ScoringStrategySum); len(got) != 0 {
+		t.Fatalf("sum scoring params = %#v, want empty", got)
+	}
+	if got := scoringParamsToStoredMap(nil, domainscale.ScoringStrategyCnt); len(got) != 0 {
+		t.Fatalf("nil scoring params = %#v, want empty", got)
+	}
+}
+
 func TestScaleMapperNormalizeRiskLevelSupportsLegacyValues(t *testing.T) {
 	t.Parallel()
 

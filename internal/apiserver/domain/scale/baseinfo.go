@@ -3,8 +3,6 @@ package scale
 import (
 	"strings"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -17,10 +15,10 @@ type BaseInfo struct{}
 func (BaseInfo) UpdateTitle(m *MedicalScale, newTitle string) error {
 	newTitle = strings.TrimSpace(newTitle)
 	if len(newTitle) == 0 {
-		return errors.WithCode(code.ErrInvalidArgument, "标题不能为空")
+		return newError(ErrorKindInvalidArgument, "标题不能为空")
 	}
 	if len(newTitle) > 100 {
-		return errors.WithCode(code.ErrInvalidArgument, "标题长度不能超过 100 字符")
+		return newError(ErrorKindInvalidArgument, "标题长度不能超过 100 字符")
 	}
 
 	return m.updateBasicInfo(newTitle, m.description)
@@ -29,7 +27,7 @@ func (BaseInfo) UpdateTitle(m *MedicalScale, newTitle string) error {
 // UpdateDescription 更新量表描述
 func (BaseInfo) UpdateDescription(m *MedicalScale, newDescription string) error {
 	if len(newDescription) > 500 {
-		return errors.WithCode(code.ErrInvalidArgument, "描述长度不能超过 500 字符")
+		return newError(ErrorKindInvalidArgument, "描述长度不能超过 500 字符")
 	}
 
 	return m.updateBasicInfo(m.title, newDescription)
@@ -39,13 +37,13 @@ func (BaseInfo) UpdateDescription(m *MedicalScale, newDescription string) error 
 func (BaseInfo) UpdateAll(m *MedicalScale, title, description string) error {
 	title = strings.TrimSpace(title)
 	if len(title) == 0 {
-		return errors.WithCode(code.ErrInvalidArgument, "标题不能为空")
+		return newError(ErrorKindInvalidArgument, "标题不能为空")
 	}
 	if len(title) > 100 {
-		return errors.WithCode(code.ErrInvalidArgument, "标题长度不能超过 100 字符")
+		return newError(ErrorKindInvalidArgument, "标题长度不能超过 100 字符")
 	}
 	if len(description) > 500 {
-		return errors.WithCode(code.ErrInvalidArgument, "描述长度不能超过 500 字符")
+		return newError(ErrorKindInvalidArgument, "描述长度不能超过 500 字符")
 	}
 
 	return m.updateBasicInfo(title, description)
@@ -55,33 +53,33 @@ func (BaseInfo) UpdateAll(m *MedicalScale, title, description string) error {
 func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, stages []Stage, applicableAges []ApplicableAge, reporters []Reporter, tags []Tag) error {
 	// 验证类型值
 	if !category.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "类别值无效")
+		return newError(ErrorKindInvalidArgument, "类别值无效")
 	}
 
 	// 验证阶段列表
 	for _, stage := range stages {
 		if !stage.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "阶段值无效: %s", stage.String())
+			return newError(ErrorKindInvalidArgument, "阶段值无效: %s", stage.String())
 		}
 	}
 
 	// 验证使用年龄列表
 	for _, age := range applicableAges {
 		if !age.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效: %s", age.String())
+			return newError(ErrorKindInvalidArgument, "使用年龄值无效: %s", age.String())
 		}
 	}
 
 	// 验证填报人列表
 	for _, reporter := range reporters {
 		if !reporter.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "填报人值无效: %s", reporter.String())
+			return newError(ErrorKindInvalidArgument, "填报人值无效: %s", reporter.String())
 		}
 	}
 
 	// 验证标签（最多5个）
 	if len(tags) > 5 {
-		return errors.WithCode(code.ErrInvalidArgument, "标签数量不能超过5个")
+		return newError(ErrorKindInvalidArgument, "标签数量不能超过5个")
 	}
 	for _, tag := range tags {
 		if err := tag.Validate(); err != nil {
@@ -96,44 +94,44 @@ func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, sta
 func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description string, category Category, stages []Stage, applicableAges []ApplicableAge, reporters []Reporter, tags []Tag) error {
 	title = strings.TrimSpace(title)
 	if len(title) == 0 {
-		return errors.WithCode(code.ErrInvalidArgument, "标题不能为空")
+		return newError(ErrorKindInvalidArgument, "标题不能为空")
 	}
 	if len(title) > 100 {
-		return errors.WithCode(code.ErrInvalidArgument, "标题长度不能超过 100 字符")
+		return newError(ErrorKindInvalidArgument, "标题长度不能超过 100 字符")
 	}
 	if len(description) > 500 {
-		return errors.WithCode(code.ErrInvalidArgument, "描述长度不能超过 500 字符")
+		return newError(ErrorKindInvalidArgument, "描述长度不能超过 500 字符")
 	}
 
 	// 验证类型值
 	if !category.IsValid() {
-		return errors.WithCode(code.ErrInvalidArgument, "类别值无效")
+		return newError(ErrorKindInvalidArgument, "类别值无效")
 	}
 
 	// 验证阶段列表
 	for _, stage := range stages {
 		if !stage.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "阶段值无效: %s", stage.String())
+			return newError(ErrorKindInvalidArgument, "阶段值无效: %s", stage.String())
 		}
 	}
 
 	// 验证使用年龄列表
 	for _, age := range applicableAges {
 		if !age.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "使用年龄值无效: %s", age.String())
+			return newError(ErrorKindInvalidArgument, "使用年龄值无效: %s", age.String())
 		}
 	}
 
 	// 验证填报人列表
 	for _, reporter := range reporters {
 		if !reporter.IsValid() {
-			return errors.WithCode(code.ErrInvalidArgument, "填报人值无效: %s", reporter.String())
+			return newError(ErrorKindInvalidArgument, "填报人值无效: %s", reporter.String())
 		}
 	}
 
 	// 验证标签（最多5个）
 	if len(tags) > 5 {
-		return errors.WithCode(code.ErrInvalidArgument, "标签数量不能超过5个")
+		return newError(ErrorKindInvalidArgument, "标签数量不能超过5个")
 	}
 	for _, tag := range tags {
 		if err := tag.Validate(); err != nil {
@@ -152,7 +150,7 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 // 当问卷版本更新时，需要重新关联问卷版本
 func (BaseInfo) UpdateQuestionnaire(m *MedicalScale, questionnaireCode meta.Code, questionnaireVersion string) error {
 	if questionnaireCode.IsEmpty() {
-		return errors.WithCode(code.ErrInvalidArgument, "问卷编码不能为空")
+		return newError(ErrorKindInvalidArgument, "问卷编码不能为空")
 	}
 
 	return m.updateQuestionnaire(questionnaireCode, questionnaireVersion)

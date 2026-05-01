@@ -2,9 +2,6 @@ package questionnaire
 
 import (
 	"context"
-
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // Lifecycle 问卷生命周期管理接口
@@ -36,10 +33,10 @@ var _ Lifecycle = (*lifecycle)(nil)
 func (l *lifecycle) Publish(_ context.Context, q *Questionnaire) error {
 	// 1. 前置状态检查
 	if q.IsArchived() {
-		return errors.WithCode(code.ErrQuestionnaireArchived, "archived questionnaire cannot be published")
+		return newError(ErrorKindArchived, "archived questionnaire cannot be published")
 	}
 	if q.IsPublished() {
-		return errors.WithCode(code.ErrQuestionnaireInvalidStatus, "questionnaire is already published")
+		return newError(ErrorKindInvalidStatus, "questionnaire is already published")
 	}
 
 	// 2. 业务规则验证
@@ -63,10 +60,10 @@ func (l *lifecycle) Publish(_ context.Context, q *Questionnaire) error {
 func (l *lifecycle) Unpublish(_ context.Context, q *Questionnaire) error {
 	// 1. 前置状态检查
 	if q.IsArchived() {
-		return errors.WithCode(code.ErrQuestionnaireArchived, "questionnaire is already archived")
+		return newError(ErrorKindArchived, "questionnaire is already archived")
 	}
 	if !q.IsPublished() {
-		return errors.WithCode(code.ErrQuestionnaireInvalidStatus, "questionnaire is not published")
+		return newError(ErrorKindInvalidStatus, "questionnaire is not published")
 	}
 
 	// 2. 调用聚合根的包内方法（状态变更 + 事件触发）
@@ -77,7 +74,7 @@ func (l *lifecycle) Unpublish(_ context.Context, q *Questionnaire) error {
 func (l *lifecycle) Archive(_ context.Context, q *Questionnaire) error {
 	// 1. 前置状态检查
 	if q.IsArchived() {
-		return errors.WithCode(code.ErrQuestionnaireArchived, "questionnaire is already archived")
+		return newError(ErrorKindArchived, "questionnaire is already archived")
 	}
 
 	// 2. 调用聚合根的包内方法（状态变更 + 事件触发）

@@ -3,8 +3,6 @@ package questionnaire
 import (
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -21,10 +19,10 @@ type Option struct {
 // 参数验证确保创建的选项是有效的
 func NewOption(codeVal meta.Code, content string, score float64) (Option, error) {
 	if codeVal.Value() == "" {
-		return Option{}, errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "option code cannot be empty")
+		return Option{}, newError(ErrorKindInvalidQuestion, "option code cannot be empty")
 	}
 	if content == "" {
-		return Option{}, errors.WithCode(code.ErrQuestionnaireInvalidQuestion, "option content cannot be empty")
+		return Option{}, newError(ErrorKindInvalidQuestion, "option content cannot be empty")
 	}
 
 	return Option{

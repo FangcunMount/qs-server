@@ -38,7 +38,7 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*Questio
 				"result", "failed",
 				"error", err.Error(),
 			)
-			return nil, err
+			return nil, wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "下架问卷失败")
 		}
 		if err := s.persistQuestionnaire(ctx, q, code, "unpublish", "状态"); err != nil {
 			return nil, err
@@ -97,7 +97,7 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*Questionn
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, err
+		return nil, wrapQuestionnaireDomainError(err, errorCode.ErrQuestionnaireInvalidStatus, "归档问卷失败")
 	}
 
 	if err := s.persistQuestionnaire(ctx, q, code, "archive", "状态"); err != nil {
