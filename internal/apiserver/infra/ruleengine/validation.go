@@ -3,46 +3,41 @@ package ruleengine
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	ruleengineport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
-// AnswerValidator adapts the current validation batch engine to the application port.
+// AnswerValidator executes answer validation through infrastructure strategies.
 type AnswerValidator struct {
-	batch *validation.BatchValidator
+	strategies validationStrategies
 }
 
 // NewAnswerValidator creates a validation engine adapter.
-func NewAnswerValidator(batch *validation.BatchValidator) *AnswerValidator {
-	if batch == nil {
-		batch = validation.NewBatchValidator()
-	}
-	return &AnswerValidator{batch: batch}
+func NewAnswerValidator() *AnswerValidator {
+	return &AnswerValidator{strategies: newDefaultValidationStrategies()}
 }
 
-// ValidateAnswers executes answer validation with the current domain rule engine.
+// ValidateAnswers executes answer validation with the current rule engine.
 func (v *AnswerValidator) ValidateAnswers(_ context.Context, tasks []ruleengineport.AnswerValidationTask) ([]ruleengineport.AnswerValidationResult, error) {
-	validationTasks := make([]validation.ValidationTask, 0, len(tasks))
-	for _, task := range tasks {
-		validationTasks = append(validationTasks, validation.ValidationTask{
-			ID:    task.ID,
-			Value: task.Value,
-			Rules: task.Rules,
-		})
+	strategies := v.strategies
+	if strategies == nil {
+		strategies = newDefaultValidationStrategies()
 	}
-
-	results := v.batch.ValidateAll(validationTasks)
-	output := make([]ruleengineport.AnswerValidationResult, 0, len(results))
-	for _, result := range results {
+	output := make([]ruleengineport.AnswerValidationResult, 0, len(tasks))
+	for _, task := range tasks {
 		item := ruleengineport.AnswerValidationResult{
-			ID:    result.ID,
-			Valid: result.Result == nil || result.Result.IsValid(),
+			ID:    task.ID,
+			Valid: true,
 		}
-		if result.Result != nil {
-			for _, err := range result.Result.GetErrors() {
+		for _, rule := range task.Rules {
+			strategy := strategies.Get(rule.GetRuleType())
+			if strategy == nil {
+				continue
+			}
+			if err := strategy.Validate(task.Value, rule); err != nil {
+				item.Valid = false
 				item.Errors = append(item.Errors, ruleengineport.ValidationError{
-					RuleType: err.GetRuleType(),
-					Message:  err.GetMessage(),
+					RuleType: string(rule.GetRuleType()),
+					Message:  err.Error(),
 				})
 			}
 		}

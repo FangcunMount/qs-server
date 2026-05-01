@@ -3,8 +3,6 @@ package answersheet
 import (
 	"fmt"
 	"strconv"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 )
 
 // AnswerValueAdapter 将 AnswerValue 适配为 ValidatableValue
@@ -14,7 +12,7 @@ type AnswerValueAdapter struct {
 }
 
 // NewAnswerValueAdapter 创建答案值适配器
-func NewAnswerValueAdapter(value AnswerValue) validation.ValidatableValue {
+func NewAnswerValueAdapter(value AnswerValue) *AnswerValueAdapter {
 	return &AnswerValueAdapter{answerValue: value}
 }
 

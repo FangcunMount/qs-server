@@ -8,64 +8,99 @@ import (
 	ruleengineport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
-// AnswerScorer adapts the current calculation batch engine to the application port.
+// AnswerScorer executes answer scoring through the infrastructure rule engine.
 type AnswerScorer struct {
-	batch *calculation.BatchScorer
+	scorer *optionScorer
 }
 
 // NewAnswerScorer creates an answer scoring engine adapter.
-func NewAnswerScorer(batch *calculation.BatchScorer) *AnswerScorer {
-	if batch == nil {
-		batch = calculation.NewBatchScorer()
-	}
-	return &AnswerScorer{batch: batch}
+func NewAnswerScorer() *AnswerScorer {
+	return &AnswerScorer{scorer: &optionScorer{}}
 }
 
-// ScoreAnswers executes answer scoring with the current calculation engine.
+// ScoreAnswers executes answer scoring with the current rule engine.
 func (s *AnswerScorer) ScoreAnswers(_ context.Context, tasks []ruleengineport.AnswerScoreTask) ([]ruleengineport.AnswerScoreResult, error) {
-	scoreTasks := make([]calculation.ScoreTask, 0, len(tasks))
-	for _, task := range tasks {
-		scoreTasks = append(scoreTasks, calculation.ScoreTask{
-			ID:           task.ID,
-			Value:        task.Value,
-			OptionScores: task.OptionScores,
-		})
+	scorer := s.scorer
+	if scorer == nil {
+		scorer = &optionScorer{}
 	}
-
-	results := s.batch.ScoreAll(scoreTasks)
-	output := make([]ruleengineport.AnswerScoreResult, 0, len(results))
-	for _, result := range results {
+	output := make([]ruleengineport.AnswerScoreResult, 0, len(tasks))
+	for _, task := range tasks {
+		score, maxScore := scorer.scoreWithMax(task.Value, task.OptionScores)
 		output = append(output, ruleengineport.AnswerScoreResult{
-			ID:       result.ID,
-			Score:    result.Score,
-			MaxScore: result.MaxScore,
+			ID:       task.ID,
+			Score:    score,
+			MaxScore: maxScore,
 		})
 	}
 	return output, nil
 }
 
-// ScaleFactorScorer adapts the current calculation strategies to the factor-scoring port.
-type ScaleFactorScorer struct{}
+type optionScorer struct{}
+
+func (s *optionScorer) score(value ruleengineport.ScorableValue, optionScores map[string]float64) float64 {
+	if value == nil || value.IsEmpty() || len(optionScores) == 0 {
+		return 0
+	}
+	if selected, ok := value.AsSingleSelection(); ok {
+		if score, found := optionScores[selected]; found {
+			return score
+		}
+		return 0
+	}
+	if selections, ok := value.AsMultipleSelections(); ok {
+		var total float64
+		for _, selection := range selections {
+			if score, found := optionScores[selection]; found {
+				total += score
+			}
+		}
+		return total
+	}
+	if number, ok := value.AsNumber(); ok {
+		return number
+	}
+	return 0
+}
+
+func (s *optionScorer) scoreWithMax(value ruleengineport.ScorableValue, optionScores map[string]float64) (float64, float64) {
+	return s.score(value, optionScores), maxOptionScore(optionScores)
+}
+
+func maxOptionScore(optionScores map[string]float64) float64 {
+	var maxScore float64
+	for _, score := range optionScores {
+		if score > maxScore {
+			maxScore = score
+		}
+	}
+	return maxScore
+}
+
+// ScaleFactorScorer executes scale factor scoring through infrastructure strategies.
+type ScaleFactorScorer struct {
+	strategies scoringStrategies
+}
 
 // NewScaleFactorScorer creates a factor scoring engine adapter.
 func NewScaleFactorScorer() *ScaleFactorScorer {
-	return &ScaleFactorScorer{}
+	return &ScaleFactorScorer{strategies: newDefaultScoringStrategies()}
 }
 
 // ScoreFactor executes a factor aggregation strategy over prepared numeric values.
 func (s *ScaleFactorScorer) ScoreFactor(_ context.Context, factorCode string, values []float64, strategy string, params map[string]string) (float64, error) {
 	switch strategy {
 	case "sum":
-		return calculateWithFallback(calculation.StrategyTypeSum, values, params, sumValues), nil
+		return s.calculateWithFallback(calculation.StrategyTypeSum, values, params, sumValues), nil
 	case "avg", "average":
 		if len(values) == 0 {
 			return 0, nil
 		}
-		return calculateWithFallback(calculation.StrategyTypeAverage, values, params, func(values []float64) float64 {
+		return s.calculateWithFallback(calculation.StrategyTypeAverage, values, params, func(values []float64) float64 {
 			return sumValues(values) / float64(len(values))
 		}), nil
 	case "cnt", "count":
-		return calculateWithFallback(calculation.StrategyTypeCount, values, params, func(values []float64) float64 {
+		return s.calculateWithFallback(calculation.StrategyTypeCount, values, params, func(values []float64) float64 {
 			return float64(len(values))
 		}), nil
 	default:
@@ -73,8 +108,8 @@ func (s *ScaleFactorScorer) ScoreFactor(_ context.Context, factorCode string, va
 	}
 }
 
-func calculateWithFallback(strategyType calculation.StrategyType, values []float64, params map[string]string, fallback func([]float64) float64) float64 {
-	if strategy := calculation.GetStrategy(strategyType); strategy != nil {
+func (s *ScaleFactorScorer) calculateWithFallback(strategyType calculation.StrategyType, values []float64, params map[string]string, fallback func([]float64) float64) float64 {
+	if strategy := s.strategies.Get(strategyType); strategy != nil {
 		if score, err := strategy.Calculate(values, params); err == nil {
 			return score
 		}

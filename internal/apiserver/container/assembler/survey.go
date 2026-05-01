@@ -176,10 +176,10 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 	quesRepo := m.Questionnaire.Repo
 
 	// 创建答案校验引擎 adapter
-	batchValidator := ruleengineInfra.NewAnswerValidator(nil)
+	batchValidator := ruleengineInfra.NewAnswerValidator()
 
 	// 创建领域服务
-	answerScorer := ruleengineInfra.NewAnswerScorer(nil)
+	answerScorer := ruleengineInfra.NewAnswerScorer()
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	mongoTxRunner := newMongoTransactionRunner(mongoDB)
