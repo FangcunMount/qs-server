@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -17,12 +18,12 @@ import (
 type factorService struct {
 	repo           scale.Repository
 	factorManager  scale.FactorManager
-	listCache      *ScaleListCache
+	listCache      scalelistcache.PublishedListCache
 	eventPublisher event.EventPublisher
 }
 
 // NewFactorService 创建量表因子编辑服务
-func NewFactorService(repo scale.Repository, listCache *ScaleListCache, eventPublisher event.EventPublisher) ScaleFactorService {
+func NewFactorService(repo scale.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ScaleFactorService {
 	return &factorService{
 		repo:           repo,
 		factorManager:  scale.FactorManager{},

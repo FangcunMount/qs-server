@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -25,13 +26,13 @@ const (
 type queryService struct {
 	repo        scale.Repository
 	identitySvc iambridge.IdentityResolver
-	listCache   *ScaleListCache
+	listCache   scalelistcache.PublishedListCache
 	hotset      cachetarget.HotsetRecorder
 	hotRank     scale.ScaleHotRankReadModel
 }
 
 // NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache *ScaleListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
+func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
 	var hotRank scale.ScaleHotRankReadModel
 	if len(hotRankReaders) > 0 {
 		hotRank = hotRankReaders[0]
@@ -151,7 +152,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 	// 3. 尝试使用全量列表缓存（仅当没有额外筛选条件）
 	if len(conditions) == 1 && s.listCache != nil {
 		if cached, ok := s.listCache.GetPage(ctx, dto.Page, dto.PageSize); ok {
-			return cached, nil
+			return scaleSummaryListResultFromCachePage(cached), nil
 		}
 	}
 

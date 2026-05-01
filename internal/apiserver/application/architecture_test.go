@@ -15,8 +15,8 @@ func TestSurveyAndScaleApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := map[string]string{
-		"go.mongodb.org/mongo-driver":                                    "repository ports, not Mongo driver errors",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam": "iambridge ports, not IAM infra services",
+		"go.mongodb.org/mongo-driver":                                 "repository ports, not Mongo driver errors",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/": "application ports, not infrastructure packages",
 	}
 	for _, dir := range []string{
 		filepath.Join(root, "internal", "apiserver", "application", "scale"),
@@ -39,7 +39,7 @@ func scanGoImports(t *testing.T, root string, visit func(path, importPath string
 		if err != nil {
 			return err
 		}
-		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
 			return nil
 		}
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)

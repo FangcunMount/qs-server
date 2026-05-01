@@ -14,9 +14,11 @@ import (
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -39,7 +41,7 @@ type ScaleModule struct {
 	FactorService    scaleApp.ScaleFactorService
 	QueryService     scaleApp.ScaleQueryService
 	CategoryService  scaleApp.ScaleCategoryService
-	ListCache        *scaleApp.ScaleListCache
+	ListCache        scalelistcache.PublishedListCache
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher event.EventPublisher
@@ -82,9 +84,9 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	}
 
 	// 初始化量表全局列表缓存
-	var listCache *scaleApp.ScaleListCache
+	var listCache scalelistcache.PublishedListCache
 	if normalized.RedisClient != nil {
-		listCache = scaleApp.NewScaleListCacheWithPolicyAndKeyBuilder(
+		listCache = cachequery.NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 			cacheentry.NewRedisCache(normalized.RedisClient),
 			module.Repo,
 			normalized.IdentityService,

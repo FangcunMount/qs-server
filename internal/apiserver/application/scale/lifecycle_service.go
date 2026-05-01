@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -22,7 +23,7 @@ type lifecycleService struct {
 	lifecycle         scale.Lifecycle
 	baseInfo          scale.BaseInfo
 	eventPublisher    event.EventPublisher
-	listCache         *ScaleListCache
+	listCache         scalelistcache.PublishedListCache
 }
 
 // NewLifecycleService 创建量表生命周期服务
@@ -30,7 +31,7 @@ func NewLifecycleService(
 	repo scale.Repository,
 	questionnaireRepo domainQuestionnaire.Repository,
 	eventPublisher event.EventPublisher,
-	listCache *ScaleListCache,
+	listCache scalelistcache.PublishedListCache,
 ) ScaleLifecycleService {
 	return &lifecycleService{
 		repo:              repo,

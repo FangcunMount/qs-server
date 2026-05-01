@@ -1,4 +1,4 @@
-package scale
+package cachequery
 
 import (
 	"context"
@@ -6,24 +6,24 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 const (
-	defaultScaleListPageSize = 200
-	defaultScaleListCacheTTL = 10 * time.Minute
+	defaultScaleListPageSize        = 200
+	defaultScaleListCacheTTL        = 10 * time.Minute
+	defaultScaleListLocalMaxEntries = 64
 )
 
-// ScaleListCache 量表全局列表缓存重建器
-// 用于在数据变更后重建 Redis 中的全局列表键（scale:list:v1）
-type ScaleListCache struct {
+// PublishedScaleListCache 用 Redis 存储已发布量表全量列表，并提供分页读取端口。
+type PublishedScaleListCache struct {
 	repo        domainScale.Repository
 	entry       cacheentry.Cache
 	payload     *cacheentry.PayloadStore
@@ -31,20 +31,16 @@ type ScaleListCache struct {
 	keyBuilder  *keyspace.Builder
 	policy      cachepolicy.CachePolicy
 	pageSize    int
-	// 节点内短 TTL 内存缓存，减少 Redis GET/JSON 解码成本
-	memory *cachequery.LocalHotCache[*ScaleSummaryListResult]
+	memory      *LocalHotCache[*scalelistcache.Page]
 }
 
-const defaultScaleListLocalMaxEntries = 64
-
-// NewScaleListCacheWithPolicyAndKeyBuilder 创建带显式 key builder/policy 的全局量表列表缓存实例。
-func NewScaleListCacheWithPolicyAndKeyBuilder(
+func NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 	entry cacheentry.Cache,
 	repo domainScale.Repository,
 	identitySvc iambridge.IdentityResolver,
 	keyBuilder *keyspace.Builder,
 	policy cachepolicy.CachePolicy,
-) *ScaleListCache {
+) *PublishedScaleListCache {
 	if entry == nil || repo == nil {
 		return nil
 	}
@@ -52,7 +48,7 @@ func NewScaleListCacheWithPolicyAndKeyBuilder(
 		panic("cache key builder is required")
 	}
 
-	return &ScaleListCache{
+	return &PublishedScaleListCache{
 		repo:        repo,
 		entry:       entry,
 		payload:     cacheentry.NewPayloadStore(entry, cachepolicy.PolicyScaleList, policy),
@@ -60,13 +56,11 @@ func NewScaleListCacheWithPolicyAndKeyBuilder(
 		keyBuilder:  keyBuilder,
 		policy:      policy,
 		pageSize:    defaultScaleListPageSize,
-		memory:      cachequery.NewLocalHotCache[*ScaleSummaryListResult](30*time.Second, defaultScaleListLocalMaxEntries),
+		memory:      NewLocalHotCache[*scalelistcache.Page](30*time.Second, defaultScaleListLocalMaxEntries),
 	}
 }
 
-// Rebuild 重新拉取已发布量表列表并写入缓存
-// 若列表为空则删除缓存键
-func (c *ScaleListCache) Rebuild(ctx context.Context) error {
+func (c *PublishedScaleListCache) Rebuild(ctx context.Context) error {
 	if c == nil || c.entry == nil || c.payload == nil || c.repo == nil {
 		return nil
 	}
@@ -95,12 +89,12 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 		return err
 	}
 
-	summary := toSummaryListResult(ctx, items, total, c.identitySvc)
+	page := c.toPortPage(ctx, items, total)
 	payload := scaleSummaryListCache{
-		Scales:     toScaleSummaryCacheItems(summary.Items),
+		Scales:     toScaleSummaryCacheItems(page.Items),
 		TotalCount: total,
 		Page:       1,
-		PageSize:   len(summary.Items),
+		PageSize:   len(page.Items),
 	}
 
 	data, err := json.Marshal(payload)
@@ -118,9 +112,7 @@ func (c *ScaleListCache) Rebuild(ctx context.Context) error {
 	return nil
 }
 
-// GetPage 从缓存读取已发布量表列表并按页切片
-// 命中返回 result 和 true，未命中/解析失败返回 nil 和 false
-func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*ScaleSummaryListResult, bool) {
+func (c *PublishedScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*scalelistcache.Page, bool) {
 	if c == nil || c.payload == nil {
 		return nil, false
 	}
@@ -154,8 +146,8 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 
 	start := (page - 1) * pageSize
 	if start >= len(payload.Scales) {
-		return &ScaleSummaryListResult{
-			Items: []*ScaleSummaryResult{},
+		return &scalelistcache.Page{
+			Items: []scalelistcache.Summary{},
 			Total: payload.TotalCount,
 		}, true
 	}
@@ -165,9 +157,9 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 		end = len(payload.Scales)
 	}
 
-	items := make([]*ScaleSummaryResult, 0, end-start)
+	items := make([]scalelistcache.Summary, 0, end-start)
 	for _, item := range payload.Scales[start:end] {
-		items = append(items, &ScaleSummaryResult{
+		items = append(items, scalelistcache.Summary{
 			Code:              item.Code,
 			Title:             item.Title,
 			Description:       item.Description,
@@ -179,13 +171,13 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status,
 			CreatedBy:         item.CreatedBy,
-			CreatedAt:         parseTime(item.CreatedAt),
+			CreatedAt:         parseScaleListCacheTime(item.CreatedAt),
 			UpdatedBy:         item.UpdatedBy,
-			UpdatedAt:         parseTime(item.UpdatedAt),
+			UpdatedAt:         parseScaleListCacheTime(item.UpdatedAt),
 		})
 	}
 
-	result := &ScaleSummaryListResult{
+	result := &scalelistcache.Page{
 		Items: items,
 		Total: payload.TotalCount,
 	}
@@ -195,7 +187,7 @@ func (c *ScaleListCache) GetPage(ctx context.Context, page, pageSize int) (*Scal
 	return result, true
 }
 
-func (c *ScaleListCache) fetchAll(ctx context.Context, conditions map[string]interface{}, total int64) ([]*domainScale.MedicalScale, error) {
+func (c *PublishedScaleListCache) fetchAll(ctx context.Context, conditions map[string]interface{}, total int64) ([]*domainScale.MedicalScale, error) {
 	all := make([]*domainScale.MedicalScale, 0, int(total))
 	for page := 1; int64(len(all)) < total; page++ {
 		items, err := c.repo.FindSummaryList(ctx, page, c.pageSize, conditions)
@@ -211,6 +203,38 @@ func (c *ScaleListCache) fetchAll(ctx context.Context, conditions map[string]int
 		}
 	}
 	return all, nil
+}
+
+func (c *PublishedScaleListCache) toPortPage(ctx context.Context, items []*domainScale.MedicalScale, total int64) *scalelistcache.Page {
+	userNames := resolveScaleListUserNames(ctx, items, c.identitySvc)
+	result := &scalelistcache.Page{
+		Items: make([]scalelistcache.Summary, 0, len(items)),
+		Total: total,
+	}
+
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		result.Items = append(result.Items, scalelistcache.Summary{
+			Code:              item.GetCode().String(),
+			Title:             item.GetTitle(),
+			Description:       item.GetDescription(),
+			Category:          item.GetCategory().String(),
+			Stages:            scaleListStageStrings(item),
+			ApplicableAges:    scaleListApplicableAgeStrings(item),
+			Reporters:         scaleListReporterStrings(item),
+			Tags:              scaleListTagStrings(item),
+			QuestionnaireCode: item.GetQuestionnaireCode().String(),
+			Status:            item.GetStatus().String(),
+			CreatedBy:         displayScaleListIdentityName(item.GetCreatedBy(), userNames),
+			CreatedAt:         item.GetCreatedAt(),
+			UpdatedBy:         displayScaleListIdentityName(item.GetUpdatedBy(), userNames),
+			UpdatedAt:         item.GetUpdatedAt(),
+		})
+	}
+
+	return result
 }
 
 type scaleSummaryListCache struct {
@@ -237,16 +261,13 @@ type scaleSummaryCacheItem struct {
 	UpdatedAt         string   `json:"updated_at"`
 }
 
-func toScaleSummaryCacheItems(items []*ScaleSummaryResult) []scaleSummaryCacheItem {
+func toScaleSummaryCacheItems(items []scalelistcache.Summary) []scaleSummaryCacheItem {
 	if len(items) == 0 {
 		return []scaleSummaryCacheItem{}
 	}
 
 	list := make([]scaleSummaryCacheItem, 0, len(items))
 	for _, item := range items {
-		if item == nil {
-			continue
-		}
 		list = append(list, scaleSummaryCacheItem{
 			Code:              item.Code,
 			Title:             item.Title,
@@ -259,22 +280,22 @@ func toScaleSummaryCacheItems(items []*ScaleSummaryResult) []scaleSummaryCacheIt
 			QuestionnaireCode: item.QuestionnaireCode,
 			Status:            item.Status,
 			CreatedBy:         item.CreatedBy,
-			CreatedAt:         formatTime(item.CreatedAt),
+			CreatedAt:         formatScaleListCacheTime(item.CreatedAt),
 			UpdatedBy:         item.UpdatedBy,
-			UpdatedAt:         formatTime(item.UpdatedAt),
+			UpdatedAt:         formatScaleListCacheTime(item.UpdatedAt),
 		})
 	}
 	return list
 }
 
-func formatTime(t time.Time) string {
+func formatScaleListCacheTime(t time.Time) string {
 	if t.IsZero() {
 		return ""
 	}
 	return t.Format("2006-01-02 15:04:05")
 }
 
-func parseTime(val string) time.Time {
+func parseScaleListCacheTime(val string) time.Time {
 	if val == "" {
 		return time.Time{}
 	}
@@ -285,36 +306,85 @@ func parseTime(val string) time.Time {
 	return parsed
 }
 
-func logScaleListCacheError(ctx context.Context, err error) {
-	if err == nil {
-		return
-	}
-	logger.L(ctx).Warnw("failed to rebuild scale list cache", "error", err)
-}
-
-// ==================== 节点内缓存 ====================
-
-func (c *ScaleListCache) buildMemoryKey(page, pageSize int) string {
+func (c *PublishedScaleListCache) buildMemoryKey(page, pageSize int) string {
 	return fmt.Sprintf("page=%d:page_size=%d", page, pageSize)
 }
 
-func (c *ScaleListCache) getMemory(key string) (*ScaleSummaryListResult, bool) {
+func (c *PublishedScaleListCache) getMemory(key string) (*scalelistcache.Page, bool) {
 	if c == nil || c.memory == nil {
 		return nil, false
 	}
 	return c.memory.Get(key)
 }
 
-func (c *ScaleListCache) setMemory(key string, result *ScaleSummaryListResult) {
+func (c *PublishedScaleListCache) setMemory(key string, result *scalelistcache.Page) {
 	if c == nil || c.memory == nil {
 		return
 	}
 	c.memory.Set(key, result)
 }
 
-func (c *ScaleListCache) resetMemory() {
+func (c *PublishedScaleListCache) resetMemory() {
 	if c == nil || c.memory == nil {
 		return
 	}
 	c.memory.Clear()
+}
+
+func resolveScaleListUserNames(ctx context.Context, items []*domainScale.MedicalScale, identitySvc iambridge.IdentityResolver) map[string]string {
+	if identitySvc == nil || !identitySvc.IsEnabled() {
+		return nil
+	}
+	userIDs := make([]meta.ID, 0, len(items)*2)
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
+	}
+	return identitySvc.ResolveUserNames(ctx, userIDs)
+}
+
+func displayScaleListIdentityName(id meta.ID, userNames map[string]string) string {
+	if id.IsZero() {
+		return ""
+	}
+	if userNames != nil {
+		if name, ok := userNames[id.String()]; ok && name != "" {
+			return name
+		}
+	}
+	return id.String()
+}
+
+func scaleListTagStrings(item *domainScale.MedicalScale) []string {
+	tags := make([]string, 0, len(item.GetTags()))
+	for _, tag := range item.GetTags() {
+		tags = append(tags, tag.String())
+	}
+	return tags
+}
+
+func scaleListReporterStrings(item *domainScale.MedicalScale) []string {
+	reporters := make([]string, 0, len(item.GetReporters()))
+	for _, reporter := range item.GetReporters() {
+		reporters = append(reporters, reporter.String())
+	}
+	return reporters
+}
+
+func scaleListStageStrings(item *domainScale.MedicalScale) []string {
+	stages := make([]string, 0, len(item.GetStages()))
+	for _, stage := range item.GetStages() {
+		stages = append(stages, stage.String())
+	}
+	return stages
+}
+
+func scaleListApplicableAgeStrings(item *domainScale.MedicalScale) []string {
+	ages := make([]string, 0, len(item.GetApplicableAges()))
+	for _, age := range item.GetApplicableAges() {
+		ages = append(ages, age.String())
+	}
+	return ages
 }

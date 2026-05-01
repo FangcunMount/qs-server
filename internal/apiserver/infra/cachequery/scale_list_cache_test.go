@@ -1,4 +1,4 @@
-package scale
+package cachequery
 
 import (
 	"bytes"
@@ -15,7 +15,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 )
 
-func TestScaleListCacheCompressedRoundTrip(t *testing.T) {
+func TestPublishedScaleListCacheCompressedRoundTrip(t *testing.T) {
 	ctx := context.Background()
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -34,7 +34,7 @@ func TestScaleListCacheCompressedRoundTrip(t *testing.T) {
 			},
 		},
 	}
-	cache := NewScaleListCacheWithPolicyAndKeyBuilder(cacheentry.NewRedisCache(client), repo, nil, builder, cachepolicy.CachePolicy{
+	cache := NewPublishedScaleListCacheWithPolicyAndKeyBuilder(cacheentry.NewRedisCache(client), repo, nil, builder, cachepolicy.CachePolicy{
 		TTL:      time.Minute,
 		Compress: cachepolicy.PolicySwitchEnabled,
 	})
@@ -63,7 +63,7 @@ func TestScaleListCacheCompressedRoundTrip(t *testing.T) {
 	}
 }
 
-func TestScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
+func TestPublishedScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
 	ctx := context.Background()
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -72,7 +72,7 @@ func TestScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
 		mr.Close()
 	})
 
-	cache := NewScaleListCacheWithPolicyAndKeyBuilder(
+	cache := NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{},
 		nil,
@@ -87,7 +87,7 @@ func TestScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
 	if err := closedClient.Close(); err != nil {
 		t.Fatalf("Close() error = %v", err)
 	}
-	errorCache := NewScaleListCacheWithPolicyAndKeyBuilder(
+	errorCache := NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 		cacheentry.NewRedisCache(closedClient),
 		&scaleListCacheRepo{},
 		nil,
@@ -99,7 +99,7 @@ func TestScaleListCacheGetPageMissAndRedisErrorFallback(t *testing.T) {
 	}
 }
 
-func TestScaleListCacheRebuildDeletesCacheWhenListEmpty(t *testing.T) {
+func TestPublishedScaleListCacheRebuildDeletesCacheWhenListEmpty(t *testing.T) {
 	ctx := context.Background()
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -114,7 +114,7 @@ func TestScaleListCacheRebuildDeletesCacheWhenListEmpty(t *testing.T) {
 		t.Fatalf("redis Set() error = %v", err)
 	}
 
-	cache := NewScaleListCacheWithPolicyAndKeyBuilder(
+	cache := NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{count: 0},
 		nil,
@@ -129,7 +129,7 @@ func TestScaleListCacheRebuildDeletesCacheWhenListEmpty(t *testing.T) {
 	}
 }
 
-func TestScaleListCacheGetPageUsesLocalMemoryAfterRedisHit(t *testing.T) {
+func TestPublishedScaleListCacheGetPageUsesLocalMemoryAfterRedisHit(t *testing.T) {
 	ctx := context.Background()
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -139,7 +139,7 @@ func TestScaleListCacheGetPageUsesLocalMemoryAfterRedisHit(t *testing.T) {
 	})
 
 	builder := keyspace.NewBuilderWithNamespace("scale-list-memory")
-	cache := NewScaleListCacheWithPolicyAndKeyBuilder(
+	cache := NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{
 			count: 1,
