@@ -1,29 +1,22 @@
 package statistics
 
 import (
-	"context"
 	"testing"
 	"time"
 
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 )
 
-func TestAccumulatedPOToQuestionnaireStatistics(t *testing.T) {
+func TestContentTotalsToQuestionnaireStatistics(t *testing.T) {
 	t.Parallel()
 
 	repo := &StatisticsRepository{}
-	stats := repo.accumulatedPOToQuestionnaireStatistics(&StatisticsAccumulatedPO{
+	stats := repo.contentTotalsToQuestionnaireStatistics(questionnaireContentTotals{
 		TotalSubmissions:   20,
 		TotalCompletions:   15,
 		Last7dSubmissions:  3,
 		Last15dSubmissions: 8,
 		Last30dSubmissions: 10,
-		Distribution: JSONField{
-			"origin": map[string]interface{}{
-				"entry": float64(11),
-				"plan":  float64(9),
-			},
-		},
 	}, 9, "PHQ9")
 
 	if stats.OrgID != 9 || stats.QuestionnaireCode != "PHQ9" {
@@ -32,21 +25,15 @@ func TestAccumulatedPOToQuestionnaireStatistics(t *testing.T) {
 	if stats.TotalSubmissions != 20 || stats.TotalCompletions != 15 {
 		t.Fatalf("unexpected totals: %+v", stats)
 	}
-	if stats.OriginDistribution["entry"] != 11 || stats.OriginDistribution["plan"] != 9 {
-		t.Fatalf("unexpected origin distribution: %+v", stats.OriginDistribution)
-	}
 	if stats.CompletionRate != 75 {
 		t.Fatalf("completion rate = %v, want 75", stats.CompletionRate)
 	}
 }
 
-func TestPlanPOToPlanStatistics(t *testing.T) {
+func TestPlanStatisticsFromTaskTotals(t *testing.T) {
 	t.Parallel()
 
-	repo := &StatisticsRepository{}
-	stats := repo.planPOToPlanStatistics(context.Background(), &StatisticsPlanPO{
-		OrgID:           3,
-		PlanID:          1001,
+	stats := planStatisticsFromTaskTotals(3, 1001, planTaskTotals{
 		TotalTasks:      10,
 		CompletedTasks:  4,
 		PendingTasks:    5,

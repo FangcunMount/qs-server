@@ -15,6 +15,11 @@ import (
 	"github.com/redis/go-redis/v9/maintnotifications"
 )
 
+// Deprecated: use scripts/oneoff/rebuild_operating_statistics after the
+// statistics_journey_daily/statistics_content_daily/statistics_plan_daily/
+// statistics_org_snapshot consolidation. This legacy script still targets the
+// old analytics_* and statistics_* read models for historical rollback only.
+//
 // rebuild_statistics rebuilds statistics-side derived data from repaired source facts.
 //
 // It intentionally does not modify behavior_footprint, assessment_episode,

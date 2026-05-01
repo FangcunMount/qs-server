@@ -37,6 +37,21 @@ func NewReadModel(db *gorm.DB) statisticsreadmodel.ReadModel {
 func (m *readModel) GetOrgOverviewSnapshot(ctx context.Context, orgID int64) (domainStatistics.OrgOverviewSnapshot, error) {
 	snapshot := domainStatistics.OrgOverviewSnapshot{}
 
+	var stored statisticsInfra.StatisticsOrgSnapshotPO
+	if err := m.db.WithContext(ctx).
+		Where("org_id = ? AND deleted_at IS NULL", orgID).
+		First(&stored).Error; err == nil {
+		return domainStatistics.OrgOverviewSnapshot{
+			TesteeCount:                stored.TesteeCount,
+			ClinicianCount:             stored.ClinicianCount,
+			ActiveEntryCount:           stored.ActiveEntryCount,
+			AssessmentCount:            stored.AssessmentCount,
+			InterpretedAssessmentCount: stored.ReportCount,
+		}, nil
+	} else if !errors.Is(err, gorm.ErrRecordNotFound) {
+		return snapshot, err
+	}
+
 	if err := m.db.WithContext(ctx).Model(&actorInfra.TesteePO{}).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		Count(&snapshot.TesteeCount).Error; err != nil {
@@ -88,7 +103,7 @@ func (m *readModel) GetOrgOverviewWindow(ctx context.Context, orgID int64, from,
 
 	var row behaviorRow
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsProjectionOrgDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
 			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
 			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
@@ -97,8 +112,9 @@ func (m *readModel) GetOrgOverviewWindow(ctx context.Context, orgID int64, from,
 			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count,
 			COALESCE(SUM(report_generated_count), 0) AS report_generated_count
 		`).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
 			orgID,
+			statisticsInfra.StatisticsJourneySubjectOrg,
 			beginningOfDay(from),
 			beginningOfDay(to),
 		).
@@ -130,10 +146,11 @@ func (m *readModel) ListOrgOverviewTrend(ctx context.Context, orgID int64, metri
 
 	var rows []row
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsProjectionOrgDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(fmt.Sprintf("stat_date, COALESCE(%s, 0) AS count", field)).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
 			orgID,
+			statisticsInfra.StatisticsJourneySubjectOrg,
 			beginningOfDay(from),
 			beginningOfDay(to),
 		).
@@ -155,7 +172,7 @@ func (m *readModel) ListOrgOverviewTrend(ctx context.Context, orgID int64, metri
 func (m *readModel) GetOrganizationOverview(ctx context.Context, orgID int64) (domainStatistics.OrganizationOverview, error) {
 	overview := domainStatistics.OrganizationOverview{}
 
-	var snapshot statisticsInfra.AnalyticsOrganizationSnapshotPO
+	var snapshot statisticsInfra.StatisticsOrgSnapshotPO
 	if err := m.db.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		First(&snapshot).Error; err == nil {
@@ -208,14 +225,15 @@ func (m *readModel) GetAccessFunnel(ctx context.Context, orgID int64, from, to t
 		CareRelationshipEstablishedCount sql.NullInt64
 	}
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsAccessOrgDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
-			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
-			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
-			COALESCE(SUM(testee_created_count), 0) AS testee_created_count,
-			COALESCE(SUM(care_relationship_established_count), 0) AS care_relationship_established_count
+			COALESCE(SUM(access_entry_opened_count), 0) AS entry_opened_count,
+			COALESCE(SUM(access_intake_confirmed_count), 0) AS intake_confirmed_count,
+			COALESCE(SUM(access_testee_created_count), 0) AS testee_created_count,
+			COALESCE(SUM(access_care_relationship_established_count), 0) AS care_relationship_established_count
 		`).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID, statisticsInfra.StatisticsJourneySubjectOrg, beginningOfDay(from), beginningOfDay(to)).
 		Scan(&row).Error; err != nil {
 		return domainStatistics.AccessFunnelWindow{}, err
 	}
@@ -232,7 +250,7 @@ func (m *readModel) ListAccessFunnelTrend(ctx context.Context, orgID int64, metr
 	if !ok {
 		return []domainStatistics.DailyCount{}
 	}
-	return m.listOrgDailyTrend(ctx, &statisticsInfra.AnalyticsAccessOrgDailyPO{}, field, orgID, from, to)
+	return m.listJourneyOrgDailyTrend(ctx, field, orgID, from, to)
 }
 
 func (m *readModel) GetAccessFunnelTrend(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AccessFunnelTrend, error) {
@@ -245,15 +263,16 @@ func (m *readModel) GetAccessFunnelTrend(ctx context.Context, orgID int64, from,
 	}
 	var rows []row
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsAccessOrgDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
 			stat_date,
-			COALESCE(entry_opened_count, 0) AS entry_opened_count,
-			COALESCE(intake_confirmed_count, 0) AS intake_confirmed_count,
-			COALESCE(testee_created_count, 0) AS testee_created_count,
-			COALESCE(care_relationship_established_count, 0) AS care_relationship_established_count
+			COALESCE(access_entry_opened_count, 0) AS entry_opened_count,
+			COALESCE(access_intake_confirmed_count, 0) AS intake_confirmed_count,
+			COALESCE(access_testee_created_count, 0) AS testee_created_count,
+			COALESCE(access_care_relationship_established_count, 0) AS care_relationship_established_count
 		`).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID, statisticsInfra.StatisticsJourneySubjectOrg, beginningOfDay(from), beginningOfDay(to)).
 		Order("stat_date ASC").
 		Scan(&rows).Error; err != nil {
 		return domainStatistics.AccessFunnelTrend{}, err
@@ -276,14 +295,15 @@ func (m *readModel) GetAssessmentService(ctx context.Context, orgID int64, from,
 		AssessmentFailedCount     sql.NullInt64
 	}
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsAssessmentServiceOrgDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
-			COALESCE(SUM(answersheet_submitted_count), 0) AS answersheet_submitted_count,
-			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count,
-			COALESCE(SUM(report_generated_count), 0) AS report_generated_count,
-			COALESCE(SUM(assessment_failed_count), 0) AS assessment_failed_count
+			COALESCE(SUM(service_answersheet_submitted_count), 0) AS answersheet_submitted_count,
+			COALESCE(SUM(service_assessment_created_count), 0) AS assessment_created_count,
+			COALESCE(SUM(service_report_generated_count), 0) AS report_generated_count,
+			COALESCE(SUM(service_assessment_failed_count), 0) AS assessment_failed_count
 		`).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID, statisticsInfra.StatisticsJourneySubjectOrg, beginningOfDay(from), beginningOfDay(to)).
 		Scan(&row).Error; err != nil {
 		return domainStatistics.AssessmentServiceWindow{}, err
 	}
@@ -300,7 +320,7 @@ func (m *readModel) ListAssessmentServiceTrend(ctx context.Context, orgID int64,
 	if !ok {
 		return []domainStatistics.DailyCount{}
 	}
-	return m.listOrgDailyTrend(ctx, &statisticsInfra.AnalyticsAssessmentServiceOrgDailyPO{}, field, orgID, from, to)
+	return m.listJourneyOrgDailyTrend(ctx, field, orgID, from, to)
 }
 
 func (m *readModel) GetAssessmentServiceTrend(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceTrend, error) {
@@ -313,15 +333,16 @@ func (m *readModel) GetAssessmentServiceTrend(ctx context.Context, orgID int64, 
 	}
 	var rows []row
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsAssessmentServiceOrgDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
 			stat_date,
-			COALESCE(answersheet_submitted_count, 0) AS answersheet_submitted_count,
-			COALESCE(assessment_created_count, 0) AS assessment_created_count,
-			COALESCE(report_generated_count, 0) AS report_generated_count,
-			COALESCE(assessment_failed_count, 0) AS assessment_failed_count
+			COALESCE(service_answersheet_submitted_count, 0) AS answersheet_submitted_count,
+			COALESCE(service_assessment_created_count, 0) AS assessment_created_count,
+			COALESCE(service_report_generated_count, 0) AS report_generated_count,
+			COALESCE(service_assessment_failed_count, 0) AS assessment_failed_count
 		`).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID, statisticsInfra.StatisticsJourneySubjectOrg, beginningOfDay(from), beginningOfDay(to)).
 		Order("stat_date ASC").
 		Scan(&rows).Error; err != nil {
 		return domainStatistics.AssessmentServiceTrend{}, err
@@ -338,7 +359,7 @@ func (m *readModel) GetAssessmentServiceTrend(ctx context.Context, orgID int64, 
 
 func (m *readModel) GetDimensionAnalysisSummary(ctx context.Context, orgID int64) (domainStatistics.DimensionAnalysisSummary, error) {
 	summary := domainStatistics.DimensionAnalysisSummary{}
-	var snapshot statisticsInfra.AnalyticsOrganizationSnapshotPO
+	var snapshot statisticsInfra.StatisticsOrgSnapshotPO
 	if err := m.db.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", orgID).
 		First(&snapshot).Error; err == nil {
@@ -399,7 +420,7 @@ func (m *readModel) ListPlanTaskTrend(ctx context.Context, orgID int64, planID *
 		Count    int64
 	}
 	query := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsPlanTaskDailyPO{}).
+		Model(&statisticsInfra.StatisticsPlanDailyPO{}).
 		Select(fmt.Sprintf("stat_date, COALESCE(SUM(%s), 0) AS count", field)).
 		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
 		Group("stat_date").
@@ -427,7 +448,7 @@ func (m *readModel) GetPlanTaskTrend(ctx context.Context, orgID int64, planID *u
 		TaskExpiredCount   int64
 	}
 	query := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsPlanTaskDailyPO{}).
+		Model(&statisticsInfra.StatisticsPlanDailyPO{}).
 		Select(`
 			stat_date,
 			COALESCE(SUM(task_created_count), 0) AS task_created_count,
@@ -583,7 +604,7 @@ func (m *readModel) GetClinicianProjection(ctx context.Context, orgID int64, cli
 
 	var row behaviorRow
 	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsProjectionClinicianDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
 			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
 			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
@@ -591,8 +612,9 @@ func (m *readModel) GetClinicianProjection(ctx context.Context, orgID int64, cli
 			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count,
 			COALESCE(SUM(report_generated_count), 0) AS report_generated_count
 		`).
-		Where("org_id = ? AND clinician_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+		Where("org_id = ? AND subject_type = ? AND subject_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
 			orgID,
+			statisticsInfra.StatisticsJourneySubjectClinician,
 			clinicianID,
 			beginningOfDay(from),
 			beginningOfDay(to),
@@ -703,15 +725,16 @@ func (m *readModel) GetAssessmentEntryCounts(ctx context.Context, orgID int64, e
 	}
 
 	query := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsProjectionEntryDailyPO{}).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
 			COALESCE(SUM(entry_opened_count), 0) AS entry_opened_count,
 			COALESCE(SUM(intake_confirmed_count), 0) AS intake_confirmed_count,
 			COALESCE(SUM(care_relationship_established_count), 0) AS care_established_count,
 			COALESCE(SUM(assessment_created_count), 0) AS assessment_created_count
 		`).
-		Where("org_id = ? AND entry_id = ? AND deleted_at IS NULL",
+		Where("org_id = ? AND subject_type = ? AND subject_id = ? AND deleted_at IS NULL",
 			orgID,
+			statisticsInfra.StatisticsJourneySubjectEntry,
 			entryID,
 		)
 	if from != nil && to != nil {
@@ -753,11 +776,11 @@ func (m *readModel) GetQuestionnaireBatchTotals(ctx context.Context, orgID int64
 
 	var rows []row
 	if err := m.db.WithContext(ctx).
-		Table("assessment").
-		Select("COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) AS code, COUNT(*) AS total_submissions, SUM(CASE WHEN status = 'interpreted' THEN 1 ELSE 0 END) AS total_completions").
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Where("COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code) IN ?", codes).
-		Group("COALESCE(NULLIF(medical_scale_code, ''), questionnaire_code)").
+		Model(&statisticsInfra.StatisticsContentDailyPO{}).
+		Select("content_code AS code, COALESCE(SUM(submission_count), 0) AS total_submissions, COALESCE(SUM(completion_count), 0) AS total_completions").
+		Where("org_id = ? AND content_type = ? AND deleted_at IS NULL", orgID, statisticsInfra.StatisticsContentTypeQuestionnaire).
+		Where("content_code IN ?", codes).
+		Group("content_code").
 		Scan(&rows).Error; err != nil {
 		return nil, err
 	}
@@ -800,16 +823,17 @@ func (m *readModel) enrichAssessmentEntryMeta(ctx context.Context, orgID int64, 
 	return metaItem, nil
 }
 
-func (m *readModel) listOrgDailyTrend(ctx context.Context, model interface{}, field string, orgID int64, from, to time.Time) []domainStatistics.DailyCount {
+func (m *readModel) listJourneyOrgDailyTrend(ctx context.Context, field string, orgID int64, from, to time.Time) []domainStatistics.DailyCount {
 	type row struct {
 		StatDate time.Time
 		Count    int64
 	}
 	var rows []row
 	if err := m.db.WithContext(ctx).
-		Model(model).
+		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(fmt.Sprintf("stat_date, COALESCE(%s, 0) AS count", field)).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+			orgID, statisticsInfra.StatisticsJourneySubjectOrg, beginningOfDay(from), beginningOfDay(to)).
 		Order("stat_date ASC").
 		Scan(&rows).Error; err != nil {
 		return []domainStatistics.DailyCount{}
@@ -823,12 +847,6 @@ func (m *readModel) listOrgDailyTrend(ctx context.Context, model interface{}, fi
 }
 
 func (m *readModel) getPlanTaskOverview(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskWindow, error) {
-	if snapshot, ok, err := m.getPlanTaskWindowSnapshot(ctx, orgID, planID, from, to); err != nil {
-		return domainStatistics.PlanTaskWindow{}, err
-	} else if ok {
-		return snapshot, nil
-	}
-
 	var row struct {
 		TaskCreatedCount   sql.NullInt64
 		TaskOpenedCount    sql.NullInt64
@@ -836,7 +854,7 @@ func (m *readModel) getPlanTaskOverview(ctx context.Context, orgID int64, planID
 		TaskExpiredCount   sql.NullInt64
 	}
 	query := m.db.WithContext(ctx).
-		Model(&statisticsInfra.AnalyticsPlanTaskDailyPO{}).
+		Model(&statisticsInfra.StatisticsPlanDailyPO{}).
 		Select(`
 			COALESCE(SUM(task_created_count), 0) AS task_created_count,
 			COALESCE(SUM(task_opened_count), 0) AS task_opened_count,
@@ -868,31 +886,6 @@ func (m *readModel) getPlanTaskOverview(ctx context.Context, orgID int64, planID
 		EnrolledTestees:    enrolledTestees,
 		ActiveTestees:      activeTestees,
 	}, nil
-}
-
-func (m *readModel) getPlanTaskWindowSnapshot(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskWindow, bool, error) {
-	if planID != nil {
-		return domainStatistics.PlanTaskWindow{}, false, nil
-	}
-	var snapshot statisticsInfra.AnalyticsPlanTaskWindowSnapshotPO
-	err := m.db.WithContext(ctx).
-		Where("org_id = ? AND window_start = ? AND window_end = ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
-		Order("updated_at DESC").
-		First(&snapshot).Error
-	if err == nil {
-		return domainStatistics.PlanTaskWindow{
-			TaskCreatedCount:   snapshot.TaskCreatedCount,
-			TaskOpenedCount:    snapshot.TaskOpenedCount,
-			TaskCompletedCount: snapshot.TaskCompletedCount,
-			TaskExpiredCount:   snapshot.TaskExpiredCount,
-			EnrolledTestees:    snapshot.EnrolledTestees,
-			ActiveTestees:      snapshot.ActiveTestees,
-		}, true, nil
-	}
-	if errors.Is(err, gorm.ErrRecordNotFound) {
-		return domainStatistics.PlanTaskWindow{}, false, nil
-	}
-	return domainStatistics.PlanTaskWindow{}, false, err
 }
 
 func (m *readModel) countPlanTaskDistinctTestees(ctx context.Context, orgID int64, planID *uint64, timeField, status string, from, to time.Time) (int64, error) {
@@ -931,13 +924,13 @@ func overviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) (string, b
 func accessFunnelTrendField(metric statisticsreadmodel.AccessFunnelMetric) (string, bool) {
 	switch metric {
 	case statisticsreadmodel.AccessFunnelMetricEntryOpened:
-		return "entry_opened_count", true
+		return "access_entry_opened_count", true
 	case statisticsreadmodel.AccessFunnelMetricIntakeConfirmed:
-		return "intake_confirmed_count", true
+		return "access_intake_confirmed_count", true
 	case statisticsreadmodel.AccessFunnelMetricTesteeCreated:
-		return "testee_created_count", true
+		return "access_testee_created_count", true
 	case statisticsreadmodel.AccessFunnelMetricCareRelationshipEstablished:
-		return "care_relationship_established_count", true
+		return "access_care_relationship_established_count", true
 	default:
 		return "", false
 	}
@@ -946,13 +939,13 @@ func accessFunnelTrendField(metric statisticsreadmodel.AccessFunnelMetric) (stri
 func assessmentServiceTrendField(metric statisticsreadmodel.AssessmentServiceMetric) (string, bool) {
 	switch metric {
 	case statisticsreadmodel.AssessmentServiceMetricAnswerSheetSubmitted:
-		return "answersheet_submitted_count", true
+		return "service_answersheet_submitted_count", true
 	case statisticsreadmodel.AssessmentServiceMetricAssessmentCreated:
-		return "assessment_created_count", true
+		return "service_assessment_created_count", true
 	case statisticsreadmodel.AssessmentServiceMetricReportGenerated:
-		return "report_generated_count", true
+		return "service_report_generated_count", true
 	case statisticsreadmodel.AssessmentServiceMetricAssessmentFailed:
-		return "assessment_failed_count", true
+		return "service_assessment_failed_count", true
 	default:
 		return "", false
 	}

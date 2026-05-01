@@ -6,7 +6,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 投影目标 | 把行为 footprint 和测评过程串成可统计的 `assessment_episode`，再更新 analytics projection |
+| 投影目标 | 把行为 footprint 和测评过程串成可统计的 `assessment_episode`，再更新 `statistics_journey_daily` |
 | 主路径 | footprint durable outbox -> worker behavior handler -> apiserver internal gRPC -> statistics projector |
 | 乱序处理 | 缺少归因条件时进入 pending；后续事件或 reconcile scheduler 再补偿 |
 | 边界 | 这是统计读侧投影，不是业务写模型，不改变 AnswerSheet / Assessment / Report 权威状态 |
@@ -46,4 +46,3 @@ flowchart LR
 go test ./internal/apiserver/application/statistics ./internal/worker/handlers
 python scripts/check_docs_hygiene.py
 ```
-

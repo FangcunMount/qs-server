@@ -44,7 +44,7 @@
 
 - system / questionnaire / testee / plan 统计查询
 - Redis 查询结果缓存
-- 从原始业务表重建 `statistics_daily / statistics_accumulated / statistics_plan`
+- 从原始业务表重建四张 MySQL 聚合读模型：`statistics_journey_daily / statistics_content_daily / statistics_plan_daily / statistics_org_snapshot`
 - 通过调度器执行统计同步，并在完成后触发统计缓存预热
 
 ### 不负责什么
@@ -64,7 +64,7 @@
 ```mermaid
 flowchart LR
     Redis[(Redis)]
-    MySQL[(MySQL statistics_*)]
+    MySQL[(MySQL consolidated statistics)]
     Raw["业务原始表"]
 
     subgraph API["qs-apiserver / statistics"]
@@ -73,10 +73,10 @@ flowchart LR
     end
 
     Query -->|stats:query:*| Redis
-    Query -->|statistics_*| MySQL
+    Query -->|statistics_journey/content/plan/snapshot| MySQL
     Query -->|必要时回源| Raw
     Sync -->|读取原始表| Raw
-    Sync -->|重建 statistics_*| MySQL
+    Sync -->|重建四张聚合表| MySQL
     Sync -->|statistics_sync_* 锁| Redis
 ```
 
@@ -170,9 +170,9 @@ flowchart LR
 | 服务 | 当前作用 | 代码锚点 |
 | ---- | -------- | -------- |
 | `StatisticsSyncRunner` | 定时触发 nightly sync，获取 leader / task lock，并在完成后触发统计 warmup | [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
-| `StatisticsSyncService.SyncDailyStatistics` | 从原始业务表重建 `statistics_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
-| `StatisticsSyncService.SyncAccumulatedStatistics` | 基于 `statistics_daily` 与原始表重建 `statistics_accumulated` | 同上 |
-| `StatisticsSyncService.SyncPlanStatistics` | 从 `assessment_task` 等业务表重建 `statistics_plan` | 同上 |
+| `StatisticsSyncService.SyncDailyStatistics` | 从事实表重建 `statistics_journey_daily / statistics_content_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
+| `StatisticsSyncService.SyncAccumulatedStatistics` | 刷新 `statistics_org_snapshot` | 同上 |
+| `StatisticsSyncService.SyncPlanStatistics` | 从 `assessment_task` 等业务表重建 `statistics_plan_daily` | 同上 |
 | `WarmupCoordinator.HandleStatisticsSync` | 在 nightly sync 之后执行统计查询缓存预热 | [../../internal/apiserver/application/cachegovernance/coordinator.go](../../internal/apiserver/application/cachegovernance/coordinator.go) |
 
 ### 当前配置边界
@@ -195,17 +195,18 @@ flowchart LR
 
 | 表 | 用途 |
 | --- | ---- |
-| `statistics_daily` | 问卷日粒度统计 |
-| `statistics_accumulated` | 问卷累计统计 |
-| `statistics_plan` | 计划维度统计 |
+| `statistics_journey_daily` | org / clinician / entry 维度的行为旅程、接入漏斗、测评服务日聚合 |
+| `statistics_content_daily` | questionnaire / scale / content 维度的提交、完成、失败、报告日聚合 |
+| `statistics_plan_daily` | 计划任务日聚合 |
+| `statistics_org_snapshot` | 机构总览快照 |
 
 ### 当前同步逻辑
 
 | 服务 | 当前作用 | 代码锚点 |
 | ---- | -------- | -------- |
-| `StatisticsSyncService.SyncDailyStatistics` | 从原始业务表重建 `statistics_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
-| `StatisticsSyncService.SyncAccumulatedStatistics` | 基于 `statistics_daily` / 原始业务表重建 `statistics_accumulated` | 同上 |
-| `StatisticsSyncService.SyncPlanStatistics` | 从业务表聚合计划统计到 `statistics_plan` | 同上 |
+| `StatisticsSyncService.SyncDailyStatistics` | 从原始业务表重建 journey/content daily | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
+| `StatisticsSyncService.SyncAccumulatedStatistics` | 从原始业务表刷新 org snapshot | 同上 |
+| `StatisticsSyncService.SyncPlanStatistics` | 从业务表聚合计划统计到 `statistics_plan_daily` | 同上 |
 | `StatisticsSyncRunner` | 负责 nightly 调度、获取 Redis 锁、触发 warmup | [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
 
 ### 当前最重要的现实边界
@@ -213,6 +214,7 @@ flowchart LR
 - `statistics` 模块当前不再依赖 worker 写入 Redis daily 中转
 - `plan` 统计一直是独立重建，不走 Redis daily
 - `testee` 统计不依赖 MySQL accumulated，也不依赖旧 Redis 累计链路
+- 旧 `statistics_daily / statistics_accumulated / statistics_plan` 与拆散的 `analytics_*_daily` 已退出运行时代码路径，物理删表放在迁移确认后的后续阶段
 - Redis 在统计模块中的职责已经收口为“查询结果缓存 + 调度锁”
 
 ---

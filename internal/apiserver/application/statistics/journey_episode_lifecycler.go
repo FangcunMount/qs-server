@@ -197,11 +197,12 @@ func (l episodeLifecycler) applyAssessmentFailed(ctx context.Context, input Beha
 		return BehaviorProjectEventStatusCompleted, err
 	}
 	if err := l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
-		OrgID:              input.OrgID,
-		ClinicianID:        valueOrZero(episode.ClinicianID),
-		EntryID:            valueOrZero(episode.EntryID),
-		StatDate:           input.OccurredAt,
-		EpisodeFailedCount: 1,
+		OrgID:                 input.OrgID,
+		ClinicianID:           valueOrZero(episode.ClinicianID),
+		EntryID:               valueOrZero(episode.EntryID),
+		StatDate:              input.OccurredAt,
+		EpisodeFailedCount:    1,
+		AssessmentFailedCount: 1,
 	}); err != nil {
 		return BehaviorProjectEventStatusCompleted, err
 	}

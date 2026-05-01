@@ -48,7 +48,7 @@ func NewSyncServiceWithTransactionRunner(
 	}
 }
 
-// SyncDailyStatistics 同步每日统计（MySQL 原始表 → statistics_daily）。
+// SyncDailyStatistics 同步每日统计（MySQL 原始表 → consolidated statistics daily read models）。
 func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64, opts SyncDailyOptions) error {
 	l := logger.L(ctx)
 	l.Infow("开始重建每日统计", "action", "sync_daily_statistics", "org_id", orgID)
@@ -85,7 +85,7 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64, opts
 	return nil
 }
 
-// SyncAccumulatedStatistics 从 statistics_daily / 原始表重建累计统计。
+// SyncAccumulatedStatistics 刷新机构级统计快照。
 func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64) error {
 	l := logger.L(ctx)
 	l.Infow("开始重建累计统计", "action", "sync_accumulated_statistics", "org_id", orgID)

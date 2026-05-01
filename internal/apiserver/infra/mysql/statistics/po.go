@@ -5,88 +5,144 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"gorm.io/gorm"
 )
 
-// ==================== StatisticsDaily 持久化对象 ====================
+const (
+	StatisticsJourneySubjectOrg       = "org"
+	StatisticsJourneySubjectClinician = "clinician"
+	StatisticsJourneySubjectEntry     = "entry"
 
-// StatisticsDailyPO 每日统计持久化对象
-type StatisticsDailyPO struct {
-	mysql.AuditFields
+	StatisticsContentTypeQuestionnaire = "questionnaire"
+	StatisticsContentTypeScale         = "scale"
+)
 
-	OrgID         int64     `gorm:"column:org_id;not null;index:idx_org_date"`
-	StatisticType string    `gorm:"column:statistic_type;size:50;not null"`
-	StatisticKey  string    `gorm:"column:statistic_key;size:255;not null"`
-	StatDate      time.Time `gorm:"column:stat_date;type:date;not null"`
+// StatisticsJourneyDailyPO 统一承载机构、医生、入口维度的行为旅程日聚合。
+type StatisticsJourneyDailyPO struct {
+	ID          uint64         `gorm:"column:id;primaryKey"`
+	OrgID       int64          `gorm:"column:org_id;not null;uniqueIndex:uniq_statistics_journey_daily,priority:1;index:idx_statistics_journey_org_date,priority:1"`
+	SubjectType string         `gorm:"column:subject_type;size:32;not null;uniqueIndex:uniq_statistics_journey_daily,priority:2"`
+	SubjectID   uint64         `gorm:"column:subject_id;not null;default:0;uniqueIndex:uniq_statistics_journey_daily,priority:3"`
+	ClinicianID uint64         `gorm:"column:clinician_id;not null;default:0;index:idx_statistics_journey_clinician_date,priority:2"`
+	EntryID     uint64         `gorm:"column:entry_id;not null;default:0;index:idx_statistics_journey_entry_date,priority:2"`
+	StatDate    time.Time      `gorm:"column:stat_date;type:date;not null;uniqueIndex:uniq_statistics_journey_daily,priority:4;index:idx_statistics_journey_org_date,priority:2;index:idx_statistics_journey_clinician_date,priority:3;index:idx_statistics_journey_entry_date,priority:3"`
+	CreatedAt   time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
-	SubmissionCount int64     `gorm:"column:submission_count;not null;default:0"`
-	CompletionCount int64     `gorm:"column:completion_count;not null;default:0"`
-	ExtraMetrics    JSONField `gorm:"column:extra_metrics;type:json"`
+	EntryOpenedCount                 int64 `gorm:"column:entry_opened_count;not null;default:0"`
+	IntakeConfirmedCount             int64 `gorm:"column:intake_confirmed_count;not null;default:0"`
+	TesteeProfileCreatedCount        int64 `gorm:"column:testee_profile_created_count;not null;default:0"`
+	CareRelationshipEstablishedCount int64 `gorm:"column:care_relationship_established_count;not null;default:0"`
+	CareRelationshipTransferredCount int64 `gorm:"column:care_relationship_transferred_count;not null;default:0"`
+	AnswerSheetSubmittedCount        int64 `gorm:"column:answersheet_submitted_count;not null;default:0"`
+	AssessmentCreatedCount           int64 `gorm:"column:assessment_created_count;not null;default:0"`
+	ReportGeneratedCount             int64 `gorm:"column:report_generated_count;not null;default:0"`
+	EpisodeCompletedCount            int64 `gorm:"column:episode_completed_count;not null;default:0"`
+	EpisodeFailedCount               int64 `gorm:"column:episode_failed_count;not null;default:0"`
+	AssessmentFailedCount            int64 `gorm:"column:assessment_failed_count;not null;default:0"`
 
-	CreatedAt time.Time `gorm:"column:created_at;type:timestamp;default:CURRENT_TIMESTAMP"`
-	UpdatedAt time.Time `gorm:"column:updated_at;type:timestamp;default:CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"`
+	AccessEntryOpenedCount                 int64 `gorm:"column:access_entry_opened_count;not null;default:0"`
+	AccessIntakeConfirmedCount             int64 `gorm:"column:access_intake_confirmed_count;not null;default:0"`
+	AccessTesteeCreatedCount               int64 `gorm:"column:access_testee_created_count;not null;default:0"`
+	AccessCareRelationshipEstablishedCount int64 `gorm:"column:access_care_relationship_established_count;not null;default:0"`
+
+	ServiceAnswerSheetSubmittedCount int64 `gorm:"column:service_answersheet_submitted_count;not null;default:0"`
+	ServiceAssessmentCreatedCount    int64 `gorm:"column:service_assessment_created_count;not null;default:0"`
+	ServiceReportGeneratedCount      int64 `gorm:"column:service_report_generated_count;not null;default:0"`
+	ServiceAssessmentFailedCount     int64 `gorm:"column:service_assessment_failed_count;not null;default:0"`
 }
 
-// TableName 指定表名
-func (StatisticsDailyPO) TableName() string {
-	return "statistics_daily"
+func (StatisticsJourneyDailyPO) TableName() string { return "statistics_journey_daily" }
+
+func (p *StatisticsJourneyDailyPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = meta.New().Uint64()
+	}
+	return nil
 }
 
-// ==================== StatisticsAccumulated 持久化对象 ====================
+// StatisticsContentDailyPO 承载问卷、量表等内容维度的日聚合。
+type StatisticsContentDailyPO struct {
+	ID          uint64         `gorm:"column:id;primaryKey"`
+	OrgID       int64          `gorm:"column:org_id;not null;uniqueIndex:uniq_statistics_content_daily,priority:1;index:idx_statistics_content_org_date,priority:1"`
+	ContentType string         `gorm:"column:content_type;size:50;not null;uniqueIndex:uniq_statistics_content_daily,priority:2"`
+	ContentCode string         `gorm:"column:content_code;size:100;not null;uniqueIndex:uniq_statistics_content_daily,priority:3"`
+	OriginType  string         `gorm:"column:origin_type;size:50;not null;default:'';uniqueIndex:uniq_statistics_content_daily,priority:4"`
+	StatDate    time.Time      `gorm:"column:stat_date;type:date;not null;uniqueIndex:uniq_statistics_content_daily,priority:5;index:idx_statistics_content_org_date,priority:2"`
+	CreatedAt   time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt   time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt   gorm.DeletedAt `gorm:"column:deleted_at;index"`
 
-// StatisticsAccumulatedPO 累计统计持久化对象
-type StatisticsAccumulatedPO struct {
-	mysql.AuditFields
-
-	OrgID         int64  `gorm:"column:org_id;not null;index:idx_org_type"`
-	StatisticType string `gorm:"column:statistic_type;size:50;not null"`
-	StatisticKey  string `gorm:"column:statistic_key;size:255;not null"`
-
-	TotalSubmissions int64 `gorm:"column:total_submissions;not null;default:0"`
-	TotalCompletions int64 `gorm:"column:total_completions;not null;default:0"`
-
-	Last7dSubmissions  int64 `gorm:"column:last7d_submissions;not null;default:0"`
-	Last15dSubmissions int64 `gorm:"column:last15d_submissions;not null;default:0"`
-	Last30dSubmissions int64 `gorm:"column:last30d_submissions;not null;default:0"`
-
-	Distribution JSONField `gorm:"column:distribution;type:json"`
-
-	FirstOccurredAt *time.Time `gorm:"column:first_occurred_at;type:timestamp"`
-	LastOccurredAt  *time.Time `gorm:"column:last_occurred_at;type:timestamp"`
-
-	LastUpdatedAt time.Time `gorm:"column:last_updated_at;type:timestamp;default:CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"`
+	SubmissionCount           int64 `gorm:"column:submission_count;not null;default:0"`
+	CompletionCount           int64 `gorm:"column:completion_count;not null;default:0"`
+	AnswerSheetSubmittedCount int64 `gorm:"column:answersheet_submitted_count;not null;default:0"`
+	AssessmentCreatedCount    int64 `gorm:"column:assessment_created_count;not null;default:0"`
+	ReportGeneratedCount      int64 `gorm:"column:report_generated_count;not null;default:0"`
+	AssessmentFailedCount     int64 `gorm:"column:assessment_failed_count;not null;default:0"`
 }
 
-// TableName 指定表名
-func (StatisticsAccumulatedPO) TableName() string {
-	return "statistics_accumulated"
+func (StatisticsContentDailyPO) TableName() string { return "statistics_content_daily" }
+
+func (p *StatisticsContentDailyPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = meta.New().Uint64()
+	}
+	return nil
 }
 
-// ==================== StatisticsPlan 持久化对象 ====================
-
-// StatisticsPlanPO 计划统计持久化对象
-type StatisticsPlanPO struct {
-	mysql.AuditFields
-
-	OrgID  int64  `gorm:"column:org_id;not null;index:idx_org_id"`
-	PlanID uint64 `gorm:"column:plan_id;not null"`
-
-	TotalTasks     int64 `gorm:"column:total_tasks;not null;default:0"`
-	CompletedTasks int64 `gorm:"column:completed_tasks;not null;default:0"`
-	PendingTasks   int64 `gorm:"column:pending_tasks;not null;default:0"`
-	ExpiredTasks   int64 `gorm:"column:expired_tasks;not null;default:0"`
-
-	EnrolledTestees int64 `gorm:"column:enrolled_testees;not null;default:0"`
-	ActiveTestees   int64 `gorm:"column:active_testees;not null;default:0"`
-
-	LastUpdatedAt time.Time `gorm:"column:last_updated_at;type:timestamp;default:CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP"`
+// StatisticsPlanDailyPO 承载计划任务日聚合。
+type StatisticsPlanDailyPO struct {
+	ID                 uint64         `gorm:"column:id;primaryKey"`
+	OrgID              int64          `gorm:"column:org_id;not null;uniqueIndex:uniq_statistics_plan_daily,priority:1;index:idx_statistics_plan_org_date,priority:1"`
+	PlanID             uint64         `gorm:"column:plan_id;not null;uniqueIndex:uniq_statistics_plan_daily,priority:2"`
+	StatDate           time.Time      `gorm:"column:stat_date;type:date;not null;uniqueIndex:uniq_statistics_plan_daily,priority:3;index:idx_statistics_plan_org_date,priority:2"`
+	TaskCreatedCount   int64          `gorm:"column:task_created_count;not null;default:0"`
+	TaskOpenedCount    int64          `gorm:"column:task_opened_count;not null;default:0"`
+	TaskCompletedCount int64          `gorm:"column:task_completed_count;not null;default:0"`
+	TaskExpiredCount   int64          `gorm:"column:task_expired_count;not null;default:0"`
+	EnrolledTestees    int64          `gorm:"column:enrolled_testees;not null;default:0"`
+	ActiveTestees      int64          `gorm:"column:active_testees;not null;default:0"`
+	CreatedAt          time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt          time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt          gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
-// TableName 指定表名
-func (StatisticsPlanPO) TableName() string {
-	return "statistics_plan"
+func (StatisticsPlanDailyPO) TableName() string { return "statistics_plan_daily" }
+
+func (p *StatisticsPlanDailyPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = meta.New().Uint64()
+	}
+	return nil
+}
+
+// StatisticsOrgSnapshotPO 承载机构级总览快照。
+type StatisticsOrgSnapshotPO struct {
+	ID                      uint64         `gorm:"column:id;primaryKey"`
+	OrgID                   int64          `gorm:"column:org_id;not null;uniqueIndex:uniq_statistics_org_snapshot_org"`
+	TesteeCount             int64          `gorm:"column:testee_count;not null;default:0"`
+	ClinicianCount          int64          `gorm:"column:clinician_count;not null;default:0"`
+	ActiveEntryCount        int64          `gorm:"column:active_entry_count;not null;default:0"`
+	AssessmentCount         int64          `gorm:"column:assessment_count;not null;default:0"`
+	ReportCount             int64          `gorm:"column:report_count;not null;default:0"`
+	DimensionClinicianCount int64          `gorm:"column:dimension_clinician_count;not null;default:0"`
+	DimensionEntryCount     int64          `gorm:"column:dimension_entry_count;not null;default:0"`
+	DimensionContentCount   int64          `gorm:"column:dimension_content_count;not null;default:0"`
+	SnapshotAt              time.Time      `gorm:"column:snapshot_at;not null"`
+	CreatedAt               time.Time      `gorm:"column:created_at;autoCreateTime"`
+	UpdatedAt               time.Time      `gorm:"column:updated_at;autoUpdateTime"`
+	DeletedAt               gorm.DeletedAt `gorm:"column:deleted_at;index"`
+}
+
+func (StatisticsOrgSnapshotPO) TableName() string { return "statistics_org_snapshot" }
+
+func (p *StatisticsOrgSnapshotPO) BeforeCreate(_ *gorm.DB) error {
+	if p.ID == 0 {
+		p.ID = meta.New().Uint64()
+	}
+	return nil
 }
 
 // AssessmentEntryResolveLogPO 入口解析日志。

@@ -53,7 +53,7 @@ func main() {
 		}
 	}
 	if !cfg.apply {
-		log.Print("dry-run only; re-run with --apply to rebuild operating statistics projections")
+		log.Print("dry-run only; re-run with --apply to rebuild consolidated statistics read models")
 		return
 	}
 
@@ -66,7 +66,7 @@ func main() {
 			log.Fatalf("summary after org %d: %v", orgID, err)
 		}
 	}
-	log.Print("operating statistics rebuild completed")
+	log.Print("consolidated statistics rebuild completed")
 }
 
 func parseFlags() config {
@@ -142,15 +142,15 @@ func rebuildOrg(ctx context.Context, db *gorm.DB, repo *statisticsInfra.Statisti
 	txCtx := dbmysql.WithTx(ctx, tx)
 	if err := repo.RebuildDailyStatistics(txCtx, orgID, cfg.from, cfg.to); err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("rebuild daily projections: %w", err)
+		return fmt.Errorf("rebuild daily statistics read models: %w", err)
 	}
 	if err := repo.RebuildAccumulatedStatistics(txCtx, orgID, cfg.to); err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("rebuild accumulated statistics: %w", err)
+		return fmt.Errorf("rebuild organization snapshot: %w", err)
 	}
 	if err := repo.RebuildPlanStatistics(txCtx, orgID); err != nil {
 		_ = tx.Rollback()
-		return fmt.Errorf("rebuild plan statistics: %w", err)
+		return fmt.Errorf("rebuild plan daily statistics: %w", err)
 	}
 	if err := tx.Commit().Error; err != nil {
 		return err
@@ -168,11 +168,10 @@ func printSummary(ctx context.Context, db *gorm.DB, orgID int64, cfg config, sta
 		{"source assessment.created", "SELECT COUNT(*) AS count FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ?", []interface{}{orgID, cfg.from, cfg.to}},
 		{"source assessment.report", "SELECT COUNT(*) AS count FROM assessment WHERE org_id = ? AND deleted_at IS NULL AND interpreted_at IS NOT NULL AND interpreted_at >= ? AND interpreted_at < ?", []interface{}{orgID, cfg.from, cfg.to}},
 		{"source plan.tasks", "SELECT COUNT(*) AS count FROM assessment_task WHERE org_id = ? AND deleted_at IS NULL", []interface{}{orgID}},
-		{"projection access_org_daily", "SELECT COUNT(*) AS count FROM analytics_access_org_daily WHERE org_id = ? AND stat_date >= ? AND stat_date < ?", []interface{}{orgID, cfg.from, cfg.to}},
-		{"projection assessment_service_org_daily", "SELECT COUNT(*) AS count FROM analytics_assessment_service_org_daily WHERE org_id = ? AND stat_date >= ? AND stat_date < ?", []interface{}{orgID, cfg.from, cfg.to}},
-		{"projection plan_task_daily", "SELECT COUNT(*) AS count FROM analytics_plan_task_daily WHERE org_id = ?", []interface{}{orgID}},
-		{"snapshot organization", "SELECT COUNT(*) AS count FROM analytics_organization_snapshot WHERE org_id = ? AND deleted_at IS NULL", []interface{}{orgID}},
-		{"snapshot plan_task_window", "SELECT COUNT(*) AS count FROM analytics_plan_task_window_snapshot WHERE org_id = ? AND deleted_at IS NULL", []interface{}{orgID}},
+		{"readmodel journey_daily", "SELECT COUNT(*) AS count FROM statistics_journey_daily WHERE org_id = ? AND stat_date >= ? AND stat_date < ?", []interface{}{orgID, cfg.from, cfg.to}},
+		{"readmodel content_daily", "SELECT COUNT(*) AS count FROM statistics_content_daily WHERE org_id = ? AND stat_date >= ? AND stat_date < ?", []interface{}{orgID, cfg.from, cfg.to}},
+		{"readmodel plan_daily", "SELECT COUNT(*) AS count FROM statistics_plan_daily WHERE org_id = ?", []interface{}{orgID}},
+		{"readmodel org_snapshot", "SELECT COUNT(*) AS count FROM statistics_org_snapshot WHERE org_id = ? AND deleted_at IS NULL", []interface{}{orgID}},
 	}
 	for _, item := range items {
 		count, err := countQuery(ctx, db, item.sql, item.args...)

@@ -58,7 +58,7 @@ flowchart TB
     footprint["BehaviorFootprint\n原始事实"] --> matcher["EpisodeMatcher\n按 answer_sheet/assessment/report 关联"]
     matcher --> episode["AssessmentEpisode\n统计旅程"]
     episode --> mutation["AnalyticsProjectionMutation"]
-    mutation --> projection["analytics_projection_*"]
+    mutation --> projection["statistics_journey_daily"]
     pending["PendingEvent"] --> matcher
 ```
 

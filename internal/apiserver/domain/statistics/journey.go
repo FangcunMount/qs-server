@@ -97,6 +97,7 @@ type AnalyticsProjectionMutation struct {
 	ReportGeneratedCount             int64
 	EpisodeCompletedCount            int64
 	EpisodeFailedCount               int64
+	AssessmentFailedCount            int64
 }
 
 const (

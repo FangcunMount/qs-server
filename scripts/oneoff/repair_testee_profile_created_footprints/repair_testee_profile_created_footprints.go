@@ -26,9 +26,9 @@ import (
 //	  --mysql-dsn 'app_user:pass@tcp(127.0.0.1:3306)/qs?parseTime=true' \
 //	  --org-id 1
 //
-// Re-run with --apply after reviewing the dry-run output. Run the statistics
-// rebuild script afterwards so analytics projections consume the repaired
-// behavior facts.
+// Re-run with --apply after reviewing the dry-run output. Run
+// scripts/oneoff/rebuild_operating_statistics afterwards so
+// statistics_journey_daily consumes the repaired behavior facts.
 type config struct {
 	mysqlDSN              string
 	orgID                 int64
@@ -171,7 +171,7 @@ func main() {
 
 	log.Printf("repair completed: source_testees=%d soft_deleted_noncanonical=%d canonical_upsert_rows_affected=%d",
 		summary.SourceTestees, softDeleted, upsertAffected)
-	log.Print("run scripts/oneoff/rebuild_statistic/rebuild_statistics.go afterwards to refresh analytics_projection_* and cached statistics")
+	log.Print("run scripts/oneoff/rebuild_operating_statistics afterwards to refresh statistics_journey_daily and cached statistics")
 }
 
 func parseFlags() config {

@@ -18,7 +18,7 @@
 
 | 维度 | 当前事实 |
 | ---- | -------- |
-| projector 作用 | 把行为事件投影成 `behavior_footprint`、`assessment_episode` 和 `analytics_projection_*` |
+| projector 作用 | 把行为事件投影成 `behavior_footprint`、`assessment_episode` 和 `statistics_journey_daily` |
 | 真正创建 `assessment_episode` 的事件 | `footprint.answersheet_submitted` |
 | 后续补状态的事件 | `footprint.assessment_created`、`footprint.report_generated`、`assessment.failed` |
 | 为什么会有 pending | 事件允许乱序到达，后序事件可能先到，前序 episode 还不存在 |
@@ -45,9 +45,7 @@
 
 然后再把这些事实继续汇总成：
 
-3. `analytics_projection_org_daily`
-4. `analytics_projection_clinician_daily`
-5. `analytics_projection_entry_daily`
+3. `statistics_journey_daily`
 
 当前 projector 就是这三层之间的桥。
 
@@ -94,7 +92,7 @@
 
 它不是原始业务主表，而是一个**服务过程视角的 runtime 事实表**。
 
-### 3. `analytics_projection_*`
+### 3. `statistics_journey_daily`
 
 日粒度分析投影表，按：
 
@@ -537,7 +535,7 @@ WHERE org_id = 1 AND assessment_id = ? ...
 
 ### 2. 读侧模型统一
 
-`behavior_footprint`、`assessment_episode`、`analytics_projection_*` 都在 MySQL，可以被 seeddata / backfill 统一消费。
+`behavior_footprint`、`assessment_episode`、`statistics_journey_daily` 都在 MySQL，可以被 seeddata / backfill 统一消费。
 
 ### 3. 历史重建可行
 

@@ -122,26 +122,34 @@ func (r *StatisticsRepository) ListEpisodesForAttribution(ctx context.Context, o
 
 func (r *StatisticsRepository) ApplyAnalyticsProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
 	statDate := dateOnly(mutation.StatDate)
-	if err := r.upsertAnalyticsOrgProjection(ctx, mutation, statDate); err != nil {
+	if err := r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectOrg, 0, statDate); err != nil {
 		return err
 	}
 	if mutation.ClinicianID != 0 {
-		if err := r.upsertAnalyticsClinicianProjection(ctx, mutation, statDate); err != nil {
+		if err := r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectClinician, mutation.ClinicianID, statDate); err != nil {
 			return err
 		}
 	}
 	if mutation.EntryID != 0 {
-		if err := r.upsertAnalyticsEntryProjection(ctx, mutation, statDate); err != nil {
+		if err := r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectEntry, mutation.EntryID, statDate); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *StatisticsRepository) upsertAnalyticsOrgProjection(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation, statDate time.Time) error {
+func (r *StatisticsRepository) upsertStatisticsJourneyProjection(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation, subjectType string, subjectID uint64, statDate time.Time) error {
+	clinicianID := mutation.ClinicianID
+	entryID := mutation.EntryID
+	if subjectType == StatisticsJourneySubjectOrg {
+		clinicianID = 0
+		entryID = 0
+	}
 	return r.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "org_id"}, {Name: "stat_date"}},
+		Columns: []clause.Column{{Name: "org_id"}, {Name: "subject_type"}, {Name: "subject_id"}, {Name: "stat_date"}},
 		DoUpdates: clause.Assignments(map[string]interface{}{
+			"clinician_id":                        clinicianID,
+			"entry_id":                            entryID,
 			"entry_opened_count":                  gorm.Expr("entry_opened_count + ?", mutation.EntryOpenedCount),
 			"intake_confirmed_count":              gorm.Expr("intake_confirmed_count + ?", mutation.IntakeConfirmedCount),
 			"testee_profile_created_count":        gorm.Expr("testee_profile_created_count + ?", mutation.TesteeProfileCreatedCount),
@@ -152,9 +160,14 @@ func (r *StatisticsRepository) upsertAnalyticsOrgProjection(ctx context.Context,
 			"report_generated_count":              gorm.Expr("report_generated_count + ?", mutation.ReportGeneratedCount),
 			"episode_completed_count":             gorm.Expr("episode_completed_count + ?", mutation.EpisodeCompletedCount),
 			"episode_failed_count":                gorm.Expr("episode_failed_count + ?", mutation.EpisodeFailedCount),
+			"assessment_failed_count":             gorm.Expr("assessment_failed_count + ?", mutation.AssessmentFailedCount),
 		}),
-	}).Create(&AnalyticsProjectionOrgDailyPO{
+	}).Create(&StatisticsJourneyDailyPO{
 		OrgID:                            mutation.OrgID,
+		SubjectType:                      subjectType,
+		SubjectID:                        subjectID,
+		ClinicianID:                      clinicianID,
+		EntryID:                          entryID,
 		StatDate:                         statDate,
 		EntryOpenedCount:                 mutation.EntryOpenedCount,
 		IntakeConfirmedCount:             mutation.IntakeConfirmedCount,
@@ -166,38 +179,7 @@ func (r *StatisticsRepository) upsertAnalyticsOrgProjection(ctx context.Context,
 		ReportGeneratedCount:             mutation.ReportGeneratedCount,
 		EpisodeCompletedCount:            mutation.EpisodeCompletedCount,
 		EpisodeFailedCount:               mutation.EpisodeFailedCount,
-	}).Error
-}
-
-func (r *StatisticsRepository) upsertAnalyticsClinicianProjection(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation, statDate time.Time) error {
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "org_id"}, {Name: "clinician_id"}, {Name: "stat_date"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"entry_opened_count":                  gorm.Expr("entry_opened_count + ?", mutation.EntryOpenedCount),
-			"intake_confirmed_count":              gorm.Expr("intake_confirmed_count + ?", mutation.IntakeConfirmedCount),
-			"testee_profile_created_count":        gorm.Expr("testee_profile_created_count + ?", mutation.TesteeProfileCreatedCount),
-			"care_relationship_established_count": gorm.Expr("care_relationship_established_count + ?", mutation.CareRelationshipEstablishedCount),
-			"care_relationship_transferred_count": gorm.Expr("care_relationship_transferred_count + ?", mutation.CareRelationshipTransferredCount),
-			"answersheet_submitted_count":         gorm.Expr("answersheet_submitted_count + ?", mutation.AnswerSheetSubmittedCount),
-			"assessment_created_count":            gorm.Expr("assessment_created_count + ?", mutation.AssessmentCreatedCount),
-			"report_generated_count":              gorm.Expr("report_generated_count + ?", mutation.ReportGeneratedCount),
-			"episode_completed_count":             gorm.Expr("episode_completed_count + ?", mutation.EpisodeCompletedCount),
-			"episode_failed_count":                gorm.Expr("episode_failed_count + ?", mutation.EpisodeFailedCount),
-		}),
-	}).Create(&AnalyticsProjectionClinicianDailyPO{
-		OrgID:                            mutation.OrgID,
-		ClinicianID:                      mutation.ClinicianID,
-		StatDate:                         statDate,
-		EntryOpenedCount:                 mutation.EntryOpenedCount,
-		IntakeConfirmedCount:             mutation.IntakeConfirmedCount,
-		TesteeProfileCreatedCount:        mutation.TesteeProfileCreatedCount,
-		CareRelationshipEstablishedCount: mutation.CareRelationshipEstablishedCount,
-		CareRelationshipTransferredCount: mutation.CareRelationshipTransferredCount,
-		AnswerSheetSubmittedCount:        mutation.AnswerSheetSubmittedCount,
-		AssessmentCreatedCount:           mutation.AssessmentCreatedCount,
-		ReportGeneratedCount:             mutation.ReportGeneratedCount,
-		EpisodeCompletedCount:            mutation.EpisodeCompletedCount,
-		EpisodeFailedCount:               mutation.EpisodeFailedCount,
+		AssessmentFailedCount:            mutation.AssessmentFailedCount,
 	}).Error
 }
 
@@ -205,48 +187,14 @@ func (r *StatisticsRepository) ApplyAnalyticsClinicianProjectionMutation(ctx con
 	if mutation.ClinicianID == 0 {
 		return nil
 	}
-	return r.upsertAnalyticsClinicianProjection(ctx, mutation, dateOnly(mutation.StatDate))
-}
-
-func (r *StatisticsRepository) upsertAnalyticsEntryProjection(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation, statDate time.Time) error {
-	return r.WithContext(ctx).Clauses(clause.OnConflict{
-		Columns: []clause.Column{{Name: "org_id"}, {Name: "entry_id"}, {Name: "stat_date"}},
-		DoUpdates: clause.Assignments(map[string]interface{}{
-			"clinician_id":                        mutation.ClinicianID,
-			"entry_opened_count":                  gorm.Expr("entry_opened_count + ?", mutation.EntryOpenedCount),
-			"intake_confirmed_count":              gorm.Expr("intake_confirmed_count + ?", mutation.IntakeConfirmedCount),
-			"testee_profile_created_count":        gorm.Expr("testee_profile_created_count + ?", mutation.TesteeProfileCreatedCount),
-			"care_relationship_established_count": gorm.Expr("care_relationship_established_count + ?", mutation.CareRelationshipEstablishedCount),
-			"care_relationship_transferred_count": gorm.Expr("care_relationship_transferred_count + ?", mutation.CareRelationshipTransferredCount),
-			"answersheet_submitted_count":         gorm.Expr("answersheet_submitted_count + ?", mutation.AnswerSheetSubmittedCount),
-			"assessment_created_count":            gorm.Expr("assessment_created_count + ?", mutation.AssessmentCreatedCount),
-			"report_generated_count":              gorm.Expr("report_generated_count + ?", mutation.ReportGeneratedCount),
-			"episode_completed_count":             gorm.Expr("episode_completed_count + ?", mutation.EpisodeCompletedCount),
-			"episode_failed_count":                gorm.Expr("episode_failed_count + ?", mutation.EpisodeFailedCount),
-		}),
-	}).Create(&AnalyticsProjectionEntryDailyPO{
-		OrgID:                            mutation.OrgID,
-		EntryID:                          mutation.EntryID,
-		ClinicianID:                      mutation.ClinicianID,
-		StatDate:                         statDate,
-		EntryOpenedCount:                 mutation.EntryOpenedCount,
-		IntakeConfirmedCount:             mutation.IntakeConfirmedCount,
-		TesteeProfileCreatedCount:        mutation.TesteeProfileCreatedCount,
-		CareRelationshipEstablishedCount: mutation.CareRelationshipEstablishedCount,
-		CareRelationshipTransferredCount: mutation.CareRelationshipTransferredCount,
-		AnswerSheetSubmittedCount:        mutation.AnswerSheetSubmittedCount,
-		AssessmentCreatedCount:           mutation.AssessmentCreatedCount,
-		ReportGeneratedCount:             mutation.ReportGeneratedCount,
-		EpisodeCompletedCount:            mutation.EpisodeCompletedCount,
-		EpisodeFailedCount:               mutation.EpisodeFailedCount,
-	}).Error
+	return r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectClinician, mutation.ClinicianID, dateOnly(mutation.StatDate))
 }
 
 func (r *StatisticsRepository) ApplyAnalyticsEntryProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
 	if mutation.EntryID == 0 {
 		return nil
 	}
-	return r.upsertAnalyticsEntryProjection(ctx, mutation, dateOnly(mutation.StatDate))
+	return r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectEntry, mutation.EntryID, dateOnly(mutation.StatDate))
 }
 
 func dateOnly(v time.Time) time.Time {

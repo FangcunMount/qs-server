@@ -221,13 +221,33 @@ func (r *StatisticsRepository) fillRealtimeTodayFields(ctx context.Context, orgI
 func (r *StatisticsRepository) dailyTrend(ctx context.Context, orgID int64, statType domainStatistics.StatisticType, statKey string) []domainStatistics.DailyCount {
 	endDate := time.Now()
 	startDate := endDate.AddDate(0, 0, -30)
-	dailyPOs, err := r.GetDailyStatistics(ctx, orgID, statType, statKey, startDate, endDate)
-	if err != nil || len(dailyPOs) == 0 {
+	endExclusive := dateOnly(endDate).AddDate(0, 0, 1)
+	query := r.WithContext(ctx).Order("stat_date ASC")
+	if statType == domainStatistics.StatisticTypeQuestionnaire {
+		query = query.
+			Model(&StatisticsContentDailyPO{}).
+			Select("stat_date, COALESCE(SUM(submission_count), 0) AS count").
+			Where("org_id = ? AND content_type = ? AND content_code = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+				orgID, StatisticsContentTypeQuestionnaire, statKey, dateOnly(startDate), endExclusive).
+			Group("stat_date")
+	} else {
+		query = query.
+			Model(&StatisticsJourneyDailyPO{}).
+			Select("stat_date, COALESCE(SUM(service_assessment_created_count), 0) AS count").
+			Where("org_id = ? AND subject_type = ? AND subject_id = 0 AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL",
+				orgID, StatisticsJourneySubjectOrg, dateOnly(startDate), endExclusive).
+			Group("stat_date")
+	}
+	var rows []struct {
+		StatDate time.Time
+		Count    int64
+	}
+	if err := query.Scan(&rows).Error; err != nil || len(rows) == 0 {
 		return []domainStatistics.DailyCount{}
 	}
-	trend := make([]domainStatistics.DailyCount, 0, len(dailyPOs))
-	for _, po := range dailyPOs {
-		trend = append(trend, domainStatistics.DailyCount{Date: po.StatDate, Count: po.SubmissionCount})
+	trend := make([]domainStatistics.DailyCount, 0, len(rows))
+	for _, row := range rows {
+		trend = append(trend, domainStatistics.DailyCount{Date: row.StatDate, Count: row.Count})
 	}
 	return trend
 }

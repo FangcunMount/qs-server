@@ -99,9 +99,10 @@ func episodeProjectionMutations(episode *domainStatistics.AssessmentEpisode) []d
 	}
 	if episode.Status == domainStatistics.EpisodeStatusFailed && episode.FailedAt != nil {
 		mutations = append(mutations, domainStatistics.AnalyticsProjectionMutation{
-			OrgID:              episode.OrgID,
-			StatDate:           *episode.FailedAt,
-			EpisodeFailedCount: 1,
+			OrgID:                 episode.OrgID,
+			StatDate:              *episode.FailedAt,
+			EpisodeFailedCount:    1,
+			AssessmentFailedCount: 1,
 		})
 	}
 	return mutations
@@ -121,6 +122,7 @@ func invertAnalyticsProjectionMutation(mutation *domainStatistics.AnalyticsProje
 	mutation.ReportGeneratedCount *= -1
 	mutation.EpisodeCompletedCount *= -1
 	mutation.EpisodeFailedCount *= -1
+	mutation.AssessmentFailedCount *= -1
 }
 
 func timePtr(v time.Time) *time.Time {

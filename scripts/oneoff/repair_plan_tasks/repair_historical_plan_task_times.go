@@ -17,6 +17,11 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// Deprecated: this historical repair script updates legacy statistics_* and
+// analytics_projection_* read models. After the four-table statistics
+// consolidation, run scripts/oneoff/rebuild_operating_statistics to refresh the
+// active read models instead of relying on this script's legacy refresh step.
+
 type config struct {
 	mysqlDSN         string
 	mongoURI         string
