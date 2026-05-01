@@ -65,12 +65,28 @@ type ScaleSummaryOutput struct {
 	QuestionCount        int32
 }
 
+// HotScaleSummaryOutput 热门量表摘要输出。
+type HotScaleSummaryOutput struct {
+	ScaleSummaryOutput
+	Rank            int32
+	SubmissionCount int64
+	HeatScore       int64
+}
+
 // ListScalesOutput 量表列表输出
 type ListScalesOutput struct {
 	Scales   []ScaleSummaryOutput
 	Total    int64
 	Page     int32
 	PageSize int32
+}
+
+// ListHotScalesOutput 热门量表列表输出。
+type ListHotScalesOutput struct {
+	Scales     []HotScaleSummaryOutput
+	Total      int64
+	Limit      int32
+	WindowDays int32
 }
 
 // ScaleCategoriesOutput 量表分类输出
@@ -173,20 +189,7 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 	// 转换摘要列表
 	scales := make([]ScaleSummaryOutput, len(resp.GetScales()))
 	for i, s := range resp.GetScales() {
-		scales[i] = ScaleSummaryOutput{
-			Code:                 s.GetCode(),
-			Title:                s.GetTitle(),
-			Description:          s.GetDescription(),
-			Category:             s.GetCategory(),
-			Stages:               s.GetStages(),
-			ApplicableAges:       s.GetApplicableAges(),
-			Reporters:            s.GetReporters(),
-			Tags:                 s.GetTags(),
-			QuestionnaireCode:    s.GetQuestionnaireCode(),
-			QuestionnaireVersion: s.GetQuestionnaireVersion(),
-			Status:               s.GetStatus(),
-			QuestionCount:        s.GetQuestionCount(),
-		}
+		scales[i] = scaleSummaryOutputFromProto(s)
 	}
 
 	return &ListScalesOutput{
@@ -194,6 +197,41 @@ func (c *ScaleClient) ListScales(ctx context.Context, page, pageSize int32, stat
 		Total:    resp.GetTotal(),
 		Page:     resp.GetPage(),
 		PageSize: resp.GetPageSize(),
+	}, nil
+}
+
+// ListHotScales 获取热门量表列表（摘要）。
+func (c *ScaleClient) ListHotScales(ctx context.Context, limit, windowDays int32) (*ListHotScalesOutput, error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+
+	resp, err := c.grpcClient.ListHotScales(ctx, &pb.ListHotScalesRequest{
+		Limit:      limit,
+		WindowDays: windowDays,
+	})
+	if err != nil {
+		return nil, err
+	}
+
+	scales := make([]HotScaleSummaryOutput, 0, len(resp.GetScales()))
+	for _, item := range resp.GetScales() {
+		summary := item.GetScale()
+		if summary == nil {
+			continue
+		}
+		scales = append(scales, HotScaleSummaryOutput{
+			ScaleSummaryOutput: scaleSummaryOutputFromProto(summary),
+			Rank:               item.GetRank(),
+			SubmissionCount:    item.GetSubmissionCount(),
+			HeatScore:          item.GetHeatScore(),
+		})
+	}
+
+	return &ListHotScalesOutput{
+		Scales:     scales,
+		Total:      resp.GetTotal(),
+		Limit:      resp.GetLimit(),
+		WindowDays: resp.GetWindowDays(),
 	}, nil
 }
 
@@ -257,6 +295,23 @@ func (c *ScaleClient) GetScaleCategories(ctx context.Context) (*ScaleCategoriesO
 		Reporters:      reporters,
 		Tags:           tags,
 	}, nil
+}
+
+func scaleSummaryOutputFromProto(s *pb.ScaleSummary) ScaleSummaryOutput {
+	return ScaleSummaryOutput{
+		Code:                 s.GetCode(),
+		Title:                s.GetTitle(),
+		Description:          s.GetDescription(),
+		Category:             s.GetCategory(),
+		Stages:               s.GetStages(),
+		ApplicableAges:       s.GetApplicableAges(),
+		Reporters:            s.GetReporters(),
+		Tags:                 s.GetTags(),
+		QuestionnaireCode:    s.GetQuestionnaireCode(),
+		QuestionnaireVersion: s.GetQuestionnaireVersion(),
+		Status:               s.GetStatus(),
+		QuestionCount:        s.GetQuestionCount(),
+	}
 }
 
 // convertScale 转换 protobuf 量表到输出类型

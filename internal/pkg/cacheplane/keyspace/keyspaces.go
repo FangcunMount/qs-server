@@ -24,6 +24,14 @@ func (k CacheKeyspace) ScaleList() string {
 	return k.keyspace.Prefix("scale:list:v1")
 }
 
+func (k CacheKeyspace) ScaleHotDaily(day string) string {
+	return k.keyspace.Prefix("scale:hot:{rank}:daily:" + day)
+}
+
+func (k CacheKeyspace) ScaleHotWindow(token string) string {
+	return k.keyspace.Prefix("scale:hot:{rank}:window:" + token)
+}
+
 func (k CacheKeyspace) Questionnaire(code, version string) string {
 	if version == "" {
 		return k.keyspace.Prefix("questionnaire:" + code)

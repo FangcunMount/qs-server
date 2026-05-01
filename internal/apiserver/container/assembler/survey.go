@@ -15,7 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
-	questionnaireCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	cacheInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -118,7 +118,7 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 	}
 
 	// 初始化答卷子模块
-	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.MongoLimiter); err != nil {
+	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.RedisClient, normalized.CacheBuilder, normalized.MongoLimiter); err != nil {
 		return nil, err
 	}
 
@@ -143,7 +143,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	baseRepo := quesMongoInfra.NewRepository(mongoDB, mongoBase.BaseRepositoryOptions{Limiter: limiter})
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
-		sub.Repo = questionnaireCache.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(baseRepo, redisClient, cacheBuilder, policy, observer)
+		sub.Repo = cacheInfra.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(baseRepo, redisClient, cacheBuilder, policy, observer)
 	} else {
 		sub.Repo = baseRepo
 	}
@@ -210,7 +210,7 @@ func (m *SurveyModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
-func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, limiter backpressure.Acquirer) error {
+func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *keyspace.Builder, limiter backpressure.Acquirer) error {
 	sub := m.AnswerSheet
 
 	// 初始化 repository 层
@@ -232,7 +232,8 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, limiter
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	mongoTxRunner := newMongoTransactionRunner(mongoDB)
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, baseRepo, baseRepo)
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)
+	hotRankRecorder := cacheInfra.NewRedisScaleHotRank(redisClient, cacheBuilder)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator, hotRankRecorder)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
 	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)

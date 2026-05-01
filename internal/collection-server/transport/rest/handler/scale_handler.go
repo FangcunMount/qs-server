@@ -99,6 +99,32 @@ func (h *ScaleHandler) List(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// ListHot 获取热门量表列表
+// @Summary 获取热门量表列表
+// @Description 获取当前热门量表排行榜，用于小程序首页展示 3~5 个可填写量表。默认按近 30 天答卷提交量排序。
+// @Tags 量表
+// @Produce json
+// @Param limit query int false "返回数量，服务端限制为 3~5" default(5)
+// @Param window_days query int false "热度统计窗口天数" default(30)
+// @Success 200 {object} core.Response{data=scale.ListHotScalesResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /api/v1/scales/hot [get]
+func (h *ScaleHandler) ListHot(c *gin.Context) {
+	var req scale.ListHotScalesRequest
+	if err := h.BindQuery(c, &req); err != nil {
+		return
+	}
+
+	result, err := h.queryService.ListHot(c.Request.Context(), &req)
+	if err != nil {
+		h.InternalErrorResponse(c, "list hot scales failed", err)
+		return
+	}
+
+	h.Success(c, result)
+}
+
 // GetCategories 获取量表分类列表
 // @Summary 获取量表分类列表
 // @Description 获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。

@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
@@ -22,6 +23,7 @@ type submissionService struct {
 	durableStore      SubmissionDurableStore
 	questionnaireRepo questionnaire.Repository
 	batchValidator    *validation.BatchValidator
+	hotRankRecorder   domainScale.HotRankRecorder
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -30,12 +32,18 @@ func NewSubmissionService(
 	durableStore SubmissionDurableStore,
 	questionnaireRepo questionnaire.Repository,
 	batchValidator *validation.BatchValidator,
+	hotRankRecorders ...domainScale.HotRankRecorder,
 ) AnswerSheetSubmissionService {
+	var hotRankRecorder domainScale.HotRankRecorder
+	if len(hotRankRecorders) > 0 {
+		hotRankRecorder = hotRankRecorders[0]
+	}
 	return &submissionService{
 		repo:              repo,
 		durableStore:      durableStore,
 		questionnaireRepo: questionnaireRepo,
 		batchValidator:    batchValidator,
+		hotRankRecorder:   hotRankRecorder,
 	}
 }
 
@@ -338,9 +346,29 @@ func (s *submissionService) createAndSaveAnswerSheet(
 			"answersheet_id", storedSheet.ID().Uint64(),
 			"result", "idempotent_hit",
 		)
+	} else {
+		s.recordScaleHotRank(ctx, l, storedSheet)
 	}
 
 	return storedSheet, nil
+}
+
+func (s *submissionService) recordScaleHotRank(ctx context.Context, l *logger.RequestLogger, sheet *answersheet.AnswerSheet) {
+	if s == nil || s.hotRankRecorder == nil || sheet == nil {
+		return
+	}
+	questionnaireCode, _, _ := sheet.QuestionnaireInfo()
+	if questionnaireCode == "" {
+		return
+	}
+	if err := s.hotRankRecorder.RecordSubmission(ctx, questionnaireCode, sheet.FilledAt()); err != nil {
+		l.Warnw("记录量表热度失败",
+			"action", "record_scale_hot_rank",
+			"resource", "scale_hot_rank",
+			"questionnaire_code", questionnaireCode,
+			"error", err,
+		)
+	}
 }
 
 // GetMyAnswerSheet 获取我的答卷

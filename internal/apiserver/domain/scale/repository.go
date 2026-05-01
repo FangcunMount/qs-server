@@ -16,3 +16,9 @@ type Repository interface {
 	Remove(ctx context.Context, code string) error
 	ExistsByCode(ctx context.Context, code string) (bool, error)
 }
+
+// HotScaleSummary 表示按填写热度聚合后的量表摘要。
+type HotScaleSummary struct {
+	Scale           *MedicalScale
+	SubmissionCount int64
+}

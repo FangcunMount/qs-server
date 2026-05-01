@@ -24,6 +24,9 @@ func TestBuilderWithoutNamespace(t *testing.T) {
 	if got := builder.BuildVersionedQueryKey("assessment:list", "42", 3, "deadbeef"); got != "query:assessment:list:42:v3:deadbeef" {
 		t.Fatalf("unexpected versioned query key: %s", got)
 	}
+	if got := builder.BuildScaleHotDailyKey("20260501"); got != "scale:hot:{rank}:daily:20260501" {
+		t.Fatalf("unexpected scale hot daily key: %s", got)
+	}
 }
 
 func TestBuilderWithNamespace(t *testing.T) {
@@ -58,5 +61,8 @@ func TestBuilderWithExplicitNamespace(t *testing.T) {
 	}
 	if got := builder.BuildScaleKey("SDS"); got != "prod:cache:query:scale:SDS" {
 		t.Fatalf("unexpected explicit namespaced scale key: %s", got)
+	}
+	if got := builder.BuildScaleHotWindowKey("20260501:30"); got != "prod:cache:query:scale:hot:{rank}:window:20260501:30" {
+		t.Fatalf("unexpected explicit namespaced scale hot window key: %s", got)
 	}
 }

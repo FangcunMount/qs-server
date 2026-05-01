@@ -56,6 +56,14 @@ type ScaleSummaryResponse struct {
 	QuestionCount        int32    `json:"question_count"`
 }
 
+// HotScaleSummaryResponse 热门量表摘要响应。
+type HotScaleSummaryResponse struct {
+	ScaleSummaryResponse
+	Rank            int32 `json:"rank"`
+	SubmissionCount int64 `json:"submission_count"`
+	HeatScore       int64 `json:"heat_score"`
+}
+
 // ListScalesRequest 量表列表请求
 type ListScalesRequest struct {
 	Page           int32    `form:"page"`
@@ -69,12 +77,26 @@ type ListScalesRequest struct {
 	Tags           []string `form:"tags"`
 }
 
+// ListHotScalesRequest 热门量表列表请求。
+type ListHotScalesRequest struct {
+	Limit      int32 `form:"limit"`
+	WindowDays int32 `form:"window_days"`
+}
+
 // ListScalesResponse 量表列表响应
 type ListScalesResponse struct {
 	Scales   []ScaleSummaryResponse `json:"scales"`
 	Total    int64                  `json:"total"`
 	Page     int32                  `json:"page"`
 	PageSize int32                  `json:"page_size"`
+}
+
+// ListHotScalesResponse 热门量表列表响应。
+type ListHotScalesResponse struct {
+	Scales     []HotScaleSummaryResponse `json:"scales"`
+	Total      int64                     `json:"total"`
+	Limit      int32                     `json:"limit"`
+	WindowDays int32                     `json:"window_days"`
 }
 
 // ScaleCategoriesResponse 量表分类响应

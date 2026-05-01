@@ -110,3 +110,9 @@ type ListScalesDTO struct {
 	PageSize   int                    // 每页数量
 	Conditions map[string]interface{} // 查询条件
 }
+
+// ListHotScalesDTO 查询热门量表列表 DTO。
+type ListHotScalesDTO struct {
+	Limit      int // 返回数量，面向首页限制在 3~5
+	WindowDays int // 热度统计窗口，默认近 30 天
+}

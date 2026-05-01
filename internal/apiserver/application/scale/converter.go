@@ -89,6 +89,22 @@ type ScaleSummaryListResult struct {
 	Total int64                 // 总数
 }
 
+// HotScaleSummaryResult 热门量表摘要结果。
+type HotScaleSummaryResult struct {
+	ScaleSummaryResult
+	Rank            int   // 排名，从 1 开始
+	SubmissionCount int64 // 统计窗口内提交数
+	HeatScore       int64 // 当前热度分，现阶段等于提交数
+}
+
+// HotScaleListResult 热门量表列表结果。
+type HotScaleListResult struct {
+	Items      []*HotScaleSummaryResult
+	Total      int64
+	Limit      int
+	WindowDays int
+}
+
 // ============= Converter 转换器 =============
 
 // toScaleResult 将领域模型转换为结果对象
@@ -261,6 +277,35 @@ func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total
 		})
 	}
 
+	return result
+}
+
+func toHotScaleListResult(ctx context.Context, items []scale.HotScaleSummary, limit, windowDays int, identitySvc iambridge.IdentityResolver) *HotScaleListResult {
+	hotItems := make([]scale.HotScaleSummary, 0, len(items))
+	scales := make([]*scale.MedicalScale, 0, len(items))
+	for _, item := range items {
+		if item.Scale != nil {
+			hotItems = append(hotItems, item)
+			scales = append(scales, item.Scale)
+		}
+	}
+	summary := toSummaryListResult(ctx, scales, int64(len(scales)), identitySvc)
+
+	result := &HotScaleListResult{
+		Items:      make([]*HotScaleSummaryResult, 0, len(summary.Items)),
+		Total:      int64(len(summary.Items)),
+		Limit:      limit,
+		WindowDays: windowDays,
+	}
+	for i, summaryItem := range summary.Items {
+		submissionCount := hotItems[i].SubmissionCount
+		result.Items = append(result.Items, &HotScaleSummaryResult{
+			ScaleSummaryResult: *summaryItem,
+			Rank:               i + 1,
+			SubmissionCount:    submissionCount,
+			HeatScore:          submissionCount,
+		})
+	}
 	return result
 }
 

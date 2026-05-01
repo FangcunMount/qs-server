@@ -175,6 +175,7 @@ func isPublicScaleReadOnly(c *gin.Context) bool {
 	// path 白名单
 	whitelist := []string{
 		"/api/v1/scales",
+		"/api/v1/scales/hot",
 		"/api/v1/scales/categories",
 	}
 
@@ -455,6 +456,8 @@ func (r *Router) registerScaleRoutes(api *gin.RouterGroup) {
 	{
 		// 获取量表分类列表（放在 :code 前面避免路由冲突）
 		scales.GET("/categories", scaleHandler.GetCategories)
+		// 获取热门量表列表（放在 :code 前面避免路由冲突）
+		scales.GET("/hot", scaleHandler.ListHot)
 		// 获取量表列表
 		scales.GET("", scaleHandler.List)
 		// 获取量表详情

@@ -52,6 +52,14 @@ func (b *Builder) BuildScaleListKey() string {
 	return NewCacheKeyspace(b.namespace()).ScaleList()
 }
 
+func (b *Builder) BuildScaleHotDailyKey(day string) string {
+	return NewCacheKeyspace(b.namespace()).ScaleHotDaily(day)
+}
+
+func (b *Builder) BuildScaleHotWindowKey(token string) string {
+	return NewCacheKeyspace(b.namespace()).ScaleHotWindow(token)
+}
+
 func (b *Builder) BuildQuestionnaireKey(code, version string) string {
 	return NewCacheKeyspace(b.namespace()).Questionnaire(code, version)
 }

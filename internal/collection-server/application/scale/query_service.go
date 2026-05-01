@@ -95,6 +95,53 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 	}, nil
 }
 
+// ListHot 获取热门量表列表。
+func (s *QueryService) ListHot(ctx context.Context, req *ListHotScalesRequest) (*ListHotScalesResponse, error) {
+	if req == nil {
+		req = &ListHotScalesRequest{}
+	}
+	log.Infof("Listing hot scales: limit=%d, windowDays=%d", req.Limit, req.WindowDays)
+
+	result, err := s.scaleClient.ListHotScales(ctx, req.Limit, req.WindowDays)
+	if err != nil {
+		log.Errorf("Failed to list hot scales via gRPC: %v", err)
+		return nil, err
+	}
+
+	scales := make([]HotScaleSummaryResponse, 0, len(result.Scales))
+	for _, scale := range result.Scales {
+		if !domainScale.NewCategory(scale.Category).IsOpen() {
+			continue
+		}
+		scales = append(scales, HotScaleSummaryResponse{
+			ScaleSummaryResponse: ScaleSummaryResponse{
+				Code:                 scale.Code,
+				Title:                scale.Title,
+				Description:          scale.Description,
+				Category:             scale.Category,
+				Stages:               scale.Stages,
+				ApplicableAges:       scale.ApplicableAges,
+				Reporters:            scale.Reporters,
+				Tags:                 scale.Tags,
+				QuestionnaireCode:    scale.QuestionnaireCode,
+				QuestionnaireVersion: scale.QuestionnaireVersion,
+				Status:               scale.Status,
+				QuestionCount:        scale.QuestionCount,
+			},
+			Rank:            scale.Rank,
+			SubmissionCount: scale.SubmissionCount,
+			HeatScore:       scale.HeatScore,
+		})
+	}
+
+	return &ListHotScalesResponse{
+		Scales:     scales,
+		Total:      int64(len(scales)),
+		Limit:      result.Limit,
+		WindowDays: result.WindowDays,
+	}, nil
+}
+
 // GetCategories 获取量表分类列表
 func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesResponse, error) {
 	log.Info("Getting scale categories")

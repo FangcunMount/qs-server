@@ -115,6 +115,34 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 	}, nil
 }
 
+// ListHotScales 获取热门已发布量表列表（C端）。
+func (s *ScaleService) ListHotScales(ctx context.Context, req *pb.ListHotScalesRequest) (*pb.ListHotScalesResponse, error) {
+	result, err := s.queryService.ListHotPublished(ctx, appScale.ListHotScalesDTO{
+		Limit:      int(req.GetLimit()),
+		WindowDays: int(req.GetWindowDays()),
+	})
+	if err != nil {
+		return nil, status.Error(codes.Internal, err.Error())
+	}
+
+	protoScales := make([]*pb.HotScaleSummary, 0, len(result.Items))
+	for _, item := range result.Items {
+		protoScales = append(protoScales, &pb.HotScaleSummary{
+			Scale:           s.toProtoScaleSummary(ctx, &item.ScaleSummaryResult),
+			Rank:            int32(item.Rank),
+			SubmissionCount: item.SubmissionCount,
+			HeatScore:       item.HeatScore,
+		})
+	}
+
+	return &pb.ListHotScalesResponse{
+		Scales:     protoScales,
+		Total:      result.Total,
+		Limit:      int32(result.Limit),
+		WindowDays: int32(result.WindowDays),
+	}, nil
+}
+
 // GetScaleCategories 获取量表分类列表
 func (s *ScaleService) GetScaleCategories(ctx context.Context, _ *pb.GetScaleCategoriesRequest) (*pb.GetScaleCategoriesResponse, error) {
 	// 调用应用层类别服务

@@ -854,6 +854,48 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /scales/hot:
+    get:
+      tags:
+      - 量表
+      summary: 获取热门量表列表
+      description: 获取当前热门量表排行榜，用于小程序首页展示 3~5 个可填写量表。默认按近 30 天答卷提交量排序。
+      operationId: 获取热门量表列表
+      parameters:
+      - type: integer
+        default: 5
+        description: 返回数量，服务端限制为 3~5
+        name: limit
+        in: query
+      - type: integer
+        default: 30
+        description: 热度统计窗口天数
+        name: window_days
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /scales/categories:
     get:
       tags:
@@ -1679,6 +1721,19 @@ components:
             $ref: '#/components/schemas/scale.ScaleSummaryResponse'
         total:
           type: integer
+    github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse:
+      type: object
+      properties:
+        limit:
+          type: integer
+        scales:
+          type: array
+          items:
+            $ref: '#/components/schemas/scale.HotScaleSummaryResponse'
+        total:
+          type: integer
+        window_days:
+          type: integer
     meta.Birthday:
       type: object
     questionnaire.CalculationRuleResponse:
@@ -1936,6 +1991,17 @@ components:
             type: string
         title:
           type: string
+    scale.HotScaleSummaryResponse:
+      allOf:
+      - $ref: '#/components/schemas/scale.ScaleSummaryResponse'
+      - type: object
+        properties:
+          heat_score:
+            type: integer
+          rank:
+            type: integer
+          submission_count:
+            type: integer
     scale.StageResponse:
       type: object
       properties:

@@ -11,6 +11,9 @@ service ScaleService {
   
   // 获取量表列表（返回摘要信息，不含 factors）
   rpc ListScales(ListScalesRequest) returns (ListScalesResponse);
+
+  // 获取热门量表列表（返回摘要信息，不含 factors）
+  rpc ListHotScales(ListHotScalesRequest) returns (ListHotScalesResponse);
   
   // 获取量表分类列表
   rpc GetScaleCategories(GetScaleCategoriesRequest) returns (GetScaleCategoriesResponse);
@@ -106,6 +109,28 @@ message ListScalesResponse {
   int64 total = 2;
   int32 page = 3;
   int32 page_size = 4;
+}
+
+// 热门量表摘要
+message HotScaleSummary {
+  ScaleSummary scale = 1;
+  int32 rank = 2;
+  int64 submission_count = 3;
+  int64 heat_score = 4;
+}
+
+// 获取热门量表列表请求
+message ListHotScalesRequest {
+  int32 limit = 1;       // 返回数量，服务端限制为 3~5，默认 5
+  int32 window_days = 2; // 热度统计窗口，默认近 30 天
+}
+
+// 获取热门量表列表响应
+message ListHotScalesResponse {
+  repeated HotScaleSummary scales = 1;
+  int64 total = 2;
+  int32 limit = 3;
+  int32 window_days = 4;
 }
 
 // 获取量表分类列表请求
