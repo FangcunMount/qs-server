@@ -16,17 +16,8 @@ type Repository interface {
 	// FindByUser 根据用户ID查找员工
 	FindByUser(ctx context.Context, orgID int64, userID int64) (*Operator, error)
 
-	// ListByOrg 列出机构下的员工
-	ListByOrg(ctx context.Context, orgID int64, offset, limit int) ([]*Operator, error)
-
-	// ListByRole 根据角色查找员工
-	ListByRole(ctx context.Context, orgID int64, role Role, offset, limit int) ([]*Operator, error)
-
 	// Delete 删除员工
 	Delete(ctx context.Context, id ID) error
-
-	// Count 统计机构下的员工数量
-	Count(ctx context.Context, orgID int64) (int64, error)
 }
 
 // Factory 员工工厂领域服务

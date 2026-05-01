@@ -5,37 +5,35 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
-	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
-	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 type service struct {
-	operatorRepo  domainOperator.Repository
-	clinicianRepo domainClinician.Repository
-	relationRepo  domainRelation.Repository
-	testeeRepo    domainTestee.Repository
-	snapshot      iambridge.AuthzSnapshotReader
+	operatorReader  actorreadmodel.OperatorReader
+	clinicianReader actorreadmodel.ClinicianReader
+	relationReader  actorreadmodel.RelationReader
+	testeeReader    actorreadmodel.TesteeReader
+	snapshot        iambridge.AuthzSnapshotReader
 }
 
 // NewTesteeAccessService 创建 testee 访问控制服务。
 func NewTesteeAccessService(
-	operatorRepo domainOperator.Repository,
-	clinicianRepo domainClinician.Repository,
-	relationRepo domainRelation.Repository,
-	testeeRepo domainTestee.Repository,
+	operatorReader actorreadmodel.OperatorReader,
+	clinicianReader actorreadmodel.ClinicianReader,
+	relationReader actorreadmodel.RelationReader,
+	testeeReader actorreadmodel.TesteeReader,
 	snapshot iambridge.AuthzSnapshotReader,
 ) TesteeAccessService {
 	return &service{
-		operatorRepo:  operatorRepo,
-		clinicianRepo: clinicianRepo,
-		relationRepo:  relationRepo,
-		testeeRepo:    testeeRepo,
-		snapshot:      snapshot,
+		operatorReader:  operatorReader,
+		clinicianReader: clinicianReader,
+		relationReader:  relationReader,
+		testeeReader:    testeeReader,
+		snapshot:        snapshot,
 	}
 }
 
@@ -47,14 +45,14 @@ func (s *service) ResolveAccessScope(ctx context.Context, orgID int64, operatorU
 		return nil, errors.WithCode(code.ErrPermissionDenied, "protected route requires user identity from JWT")
 	}
 
-	operatorItem, err := s.operatorRepo.FindByUser(ctx, orgID, operatorUserID)
+	operatorItem, err := s.operatorReader.FindOperatorByUser(ctx, orgID, operatorUserID)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrPermissionDenied, "operator not found in current organization")
 		}
 		return nil, errors.Wrap(err, "failed to find operator")
 	}
-	if !operatorItem.IsActive() {
+	if !operatorItem.IsActive {
 		return nil, errors.WithCode(code.ErrPermissionDenied, "operator is inactive")
 	}
 	snap, err := s.resolveAuthzSnapshot(ctx, orgID, operatorUserID)
@@ -65,18 +63,18 @@ func (s *service) ResolveAccessScope(ctx context.Context, orgID int64, operatorU
 		return &TesteeAccessScope{IsAdmin: true}, nil
 	}
 
-	clinicianItem, err := s.clinicianRepo.FindByOperator(ctx, orgID, operatorItem.ID().Uint64())
+	clinicianItem, err := s.clinicianReader.FindClinicianByOperator(ctx, orgID, operatorItem.ID)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrPermissionDenied, "operator is not bound to clinician")
 		}
 		return nil, errors.Wrap(err, "failed to find clinician by operator")
 	}
-	if !clinicianItem.IsActive() {
+	if !clinicianItem.IsActive {
 		return nil, errors.WithCode(code.ErrPermissionDenied, "clinician is inactive")
 	}
 
-	clinicianID := clinicianItem.ID().Uint64()
+	clinicianID := clinicianItem.ID
 	return &TesteeAccessScope{
 		IsAdmin:     false,
 		ClinicianID: &clinicianID,
@@ -88,16 +86,14 @@ func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operato
 	if err != nil {
 		return err
 	}
-	targetTesteeID, err := accessTesteeIDFromUint64("testee_id", testeeID)
-	if err != nil {
+	if err := ensureAccessIDFromUint64("testee_id", testeeID); err != nil {
 		return err
 	}
-
-	testeeItem, err := s.testeeRepo.FindByID(ctx, targetTesteeID)
+	testeeItem, err := s.testeeReader.GetTestee(ctx, testeeID)
 	if err != nil {
 		return errors.Wrap(err, "failed to find testee")
 	}
-	if testeeItem.OrgID() != orgID {
+	if testeeItem.OrgID != orgID {
 		return errors.WithCode(code.ErrPermissionDenied, "testee does not belong to current organization")
 	}
 	if scope.IsAdmin {
@@ -106,17 +102,12 @@ func (s *service) ValidateTesteeAccess(ctx context.Context, orgID int64, operato
 	if scope.ClinicianID == nil {
 		return errors.WithCode(code.ErrPermissionDenied, "clinician scope is required")
 	}
-	clinicianID, err := accessClinicianIDFromUint64("clinician_id", *scope.ClinicianID)
-	if err != nil {
-		return err
-	}
-
-	allowed, err := s.relationRepo.HasActiveRelationForTestee(
+	allowed, err := s.relationReader.HasActiveRelationForTestee(
 		ctx,
 		orgID,
-		clinicianID,
-		targetTesteeID,
-		domainRelation.AccessGrantRelationTypes(),
+		*scope.ClinicianID,
+		testeeID,
+		accessRelationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
 	)
 	if err != nil {
 		return errors.Wrap(err, "failed to validate testee relation access")
@@ -138,16 +129,11 @@ func (s *service) ListAccessibleTesteeIDs(ctx context.Context, orgID int64, oper
 	if scope.ClinicianID == nil {
 		return []uint64{}, nil
 	}
-	clinicianID, err := accessClinicianIDFromUint64("clinician_id", *scope.ClinicianID)
-	if err != nil {
-		return nil, err
-	}
-
-	ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
+	ids, err := s.relationReader.ListActiveTesteeIDsByClinician(
 		ctx,
 		orgID,
-		clinicianID,
-		domainRelation.AccessGrantRelationTypes(),
+		*scope.ClinicianID,
+		accessRelationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list accessible testee ids")
@@ -156,38 +142,21 @@ func (s *service) ListAccessibleTesteeIDs(ctx context.Context, orgID int64, oper
 	seen := make(map[uint64]struct{}, len(ids))
 	result := make([]uint64, 0, len(ids))
 	for _, id := range ids {
-		rawID := id.Uint64()
-		if _, ok := seen[rawID]; ok {
+		if _, ok := seen[id]; ok {
 			continue
 		}
-		seen[rawID] = struct{}{}
-		result = append(result, rawID)
+		seen[id] = struct{}{}
+		result = append(result, id)
 	}
 	return result, nil
 }
 
-func accessClinicianIDFromUint64(field string, value uint64) (domainClinician.ID, error) {
-	id, err := domainTesteeIDFromUint64(field, value)
+func ensureAccessIDFromUint64(field string, value uint64) error {
+	_, err := safeconv.Uint64ToMetaID(value)
 	if err != nil {
-		return 0, err
+		return errors.WithCode(code.ErrInvalidArgument, "%s exceeds int64", field)
 	}
-	return domainClinician.ID(id), nil
-}
-
-func accessTesteeIDFromUint64(field string, value uint64) (domainTestee.ID, error) {
-	id, err := domainTesteeIDFromUint64(field, value)
-	if err != nil {
-		return 0, err
-	}
-	return domainTestee.ID(id), nil
-}
-
-func domainTesteeIDFromUint64(field string, value uint64) (domainTestee.ID, error) {
-	id, err := safeconv.Uint64ToMetaID(value)
-	if err != nil {
-		return 0, errors.WithCode(code.ErrInvalidArgument, "%s exceeds int64", field)
-	}
-	return domainTestee.ID(id), nil
+	return nil
 }
 
 func (s *service) resolveAuthzSnapshot(ctx context.Context, orgID int64, operatorUserID int64) (iambridge.AuthzSnapshot, error) {
@@ -206,4 +175,15 @@ func (s *service) resolveAuthzSnapshot(ctx context.Context, orgID int64, operato
 		return nil, errors.WithCode(code.ErrPermissionDenied, "authorization snapshot required")
 	}
 	return snap, nil
+}
+
+func accessRelationTypesToStrings(items []domainRelation.RelationType) []string {
+	if len(items) == 0 {
+		return nil
+	}
+	result := make([]string, 0, len(items))
+	for _, item := range items {
+		result = append(result, string(item))
+	}
+	return result
 }

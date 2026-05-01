@@ -35,6 +35,7 @@ type ClinicianRelationshipService interface {
 	ListAssignedTesteeIDs(ctx context.Context, orgID int64, clinicianID uint64) ([]uint64, error)
 	ListTesteeRelations(ctx context.Context, dto ListTesteeRelationDTO) (*TesteeRelationListResult, error)
 	ListClinicianRelations(ctx context.Context, dto ListClinicianRelationDTO) (*ClinicianRelationListResult, error)
+	GetTesteeCareContext(ctx context.Context, orgID int64, testeeID uint64) (*TesteeCareContextResult, error)
 }
 
 // BehaviorEventStager 将看护关系行为事件暂存到 outbox。
@@ -202,4 +203,12 @@ type ClinicianRelationListResult struct {
 	TotalCount int64
 	Offset     int
 	Limit      int
+}
+
+type TesteeCareContextResult struct {
+	ClinicianName   string
+	ClinicianRole   string
+	RelationType    string
+	EntrySourceType string
+	EntryTitle      string
 }

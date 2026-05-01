@@ -6,11 +6,15 @@ import (
 	"time"
 
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
+	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -62,10 +66,20 @@ type ScaleDeps struct {
 }
 
 type ActorDeps struct {
-	TesteeHandler                 *handler.TesteeHandler
-	OperatorClinicianHandler      *handler.OperatorClinicianHandler
-	AssessmentEntryHandler        *handler.AssessmentEntryHandler
-	ActiveOperatorRepo            domainoperator.Repository
+	TesteeManagementService       testeeApp.TesteeManagementService
+	TesteeQueryService            testeeApp.TesteeQueryService
+	TesteeBackendQueryService     testeeApp.TesteeBackendQueryService
+	TesteeAccessService           actorAccessApp.TesteeAccessService
+	TesteeScaleAnalysisService    testeeApp.ScaleAnalysisQueryService
+	OperatorLifecycleService      operatorapp.OperatorLifecycleService
+	OperatorAuthorizationService  operatorapp.OperatorAuthorizationService
+	OperatorQueryService          operatorapp.OperatorQueryService
+	ClinicianLifecycleService     clinicianApp.ClinicianLifecycleService
+	ClinicianQueryService         clinicianApp.ClinicianQueryService
+	ClinicianRelationshipService  clinicianApp.ClinicianRelationshipService
+	AssessmentEntryService        assessmentEntryApp.AssessmentEntryService
+	QRCodeService                 qrcodeApp.QRCodeService
+	ActiveOperatorChecker         operatorapp.ActiveOperatorChecker
 	OperatorRoleProjectionUpdater operatorapp.OperatorRoleProjectionUpdater
 }
 

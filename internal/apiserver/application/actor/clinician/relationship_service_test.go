@@ -9,6 +9,7 @@ import (
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -133,22 +134,16 @@ func (passthroughTxRunner) WithinTransaction(ctx context.Context, fn func(contex
 	return fn(ctx)
 }
 
-func TestListAssignedTesteesBatchLoadsTestees(t *testing.T) {
-	relationRepo := &relationshipServiceRelationRepo{
-		activeByClinician: []*domainRelation.ClinicianTesteeRelation{
-			makeActiveRelation(10, 21),
-			makeActiveRelation(10, 20),
+func TestListAssignedTesteesUsesReadModel(t *testing.T) {
+	relationReader := &relationshipServiceRelationReader{
+		assignedRows: []actorreadmodel.TesteeRow{
+			{ID: 21, OrgID: 1, Name: "testee-21"},
+			{ID: 20, OrgID: 1, Name: "testee-20"},
 		},
-	}
-	testeeRepo := &relationshipServiceTesteeRepo{
-		byID: map[domainTestee.ID]*domainTestee.Testee{
-			20: makeTestee(20),
-			21: makeTestee(21),
-		},
+		assignedTotal: 2,
 	}
 	svc := &relationshipService{
-		relationRepo: relationRepo,
-		testeeRepo:   testeeRepo,
+		relationReader: relationReader,
 	}
 
 	result, err := svc.ListAssignedTestees(context.Background(), ListAssignedTesteeDTO{
@@ -160,11 +155,8 @@ func TestListAssignedTesteesBatchLoadsTestees(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected list assigned testees to succeed: %v", err)
 	}
-	if testeeRepo.findByIDsCalls != 1 {
-		t.Fatalf("expected FindByIDs to be called once, got %d", testeeRepo.findByIDsCalls)
-	}
-	if testeeRepo.findByIDCalls != 0 {
-		t.Fatalf("expected FindByID not to be called, got %d", testeeRepo.findByIDCalls)
+	if relationReader.listAssignedCalls != 1 {
+		t.Fatalf("expected read model to be called once, got %d", relationReader.listAssignedCalls)
 	}
 	if len(result.Items) != 2 {
 		t.Fatalf("expected 2 assigned testees, got %d", len(result.Items))
@@ -174,22 +166,22 @@ func TestListAssignedTesteesBatchLoadsTestees(t *testing.T) {
 	}
 }
 
-func TestListClinicianRelationsBatchLoadsTestees(t *testing.T) {
-	relationRepo := &relationshipServiceRelationRepo{
-		activeByClinician: []*domainRelation.ClinicianTesteeRelation{
-			makeActiveRelation(10, 30),
-			makeActiveRelation(10, 31),
+func TestListClinicianRelationsUsesReadModel(t *testing.T) {
+	relationReader := &relationshipServiceRelationReader{
+		clinicianRelations: []actorreadmodel.ClinicianRelationRow{
+			{
+				Relation: actorreadmodel.RelationRow{ID: 30, OrgID: 1, ClinicianID: 10, TesteeID: 30, RelationType: string(domainRelation.RelationTypeAttending), IsActive: true},
+				Testee:   actorreadmodel.TesteeRow{ID: 30, OrgID: 1, Name: "testee-30"},
+			},
+			{
+				Relation: actorreadmodel.RelationRow{ID: 31, OrgID: 1, ClinicianID: 10, TesteeID: 31, RelationType: string(domainRelation.RelationTypeAttending), IsActive: true},
+				Testee:   actorreadmodel.TesteeRow{ID: 31, OrgID: 1, Name: "testee-31"},
+			},
 		},
-	}
-	testeeRepo := &relationshipServiceTesteeRepo{
-		byID: map[domainTestee.ID]*domainTestee.Testee{
-			30: makeTestee(30),
-			31: makeTestee(31),
-		},
+		clinicianRelationsTotal: 2,
 	}
 	svc := &relationshipService{
-		relationRepo: relationRepo,
-		testeeRepo:   testeeRepo,
+		relationReader: relationReader,
 	}
 
 	result, err := svc.ListClinicianRelations(context.Background(), ListClinicianRelationDTO{
@@ -202,11 +194,8 @@ func TestListClinicianRelationsBatchLoadsTestees(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected list clinician relations to succeed: %v", err)
 	}
-	if testeeRepo.findByIDsCalls != 1 {
-		t.Fatalf("expected FindByIDs to be called once, got %d", testeeRepo.findByIDsCalls)
-	}
-	if testeeRepo.findByIDCalls != 0 {
-		t.Fatalf("expected FindByID not to be called, got %d", testeeRepo.findByIDCalls)
+	if relationReader.listClinicianRelationsCalls != 1 {
+		t.Fatalf("expected read model to be called once, got %d", relationReader.listClinicianRelationsCalls)
 	}
 	if len(result.Items) != 2 {
 		t.Fatalf("expected 2 clinician relations, got %d", len(result.Items))
@@ -315,6 +304,47 @@ func (s *relationshipServiceRelationRepo) ListActiveTesteeIDsByClinician(context
 	return nil, nil
 }
 
+type relationshipServiceRelationReader struct {
+	assignedRows                 []actorreadmodel.TesteeRow
+	assignedTotal                int64
+	clinicianRelations           []actorreadmodel.ClinicianRelationRow
+	clinicianRelationsTotal      int64
+	testeeRelations              []actorreadmodel.TesteeRelationRow
+	activeTesteeIDs              []uint64
+	listAssignedCalls            int
+	listClinicianRelationsCalls  int
+	listTesteeRelationsCalls     int
+	listActiveTesteeIDsCalls     int
+	hasActiveRelationForTesteeFn func(context.Context, int64, uint64, uint64, []string) (bool, error)
+}
+
+func (s *relationshipServiceRelationReader) ListAssignedTestees(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRow, int64, error) {
+	s.listAssignedCalls++
+	return s.assignedRows, s.assignedTotal, nil
+}
+
+func (s *relationshipServiceRelationReader) ListActiveTesteeIDsByClinician(context.Context, int64, uint64, []string) ([]uint64, error) {
+	s.listActiveTesteeIDsCalls++
+	return s.activeTesteeIDs, nil
+}
+
+func (s *relationshipServiceRelationReader) ListTesteeRelations(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRelationRow, error) {
+	s.listTesteeRelationsCalls++
+	return s.testeeRelations, nil
+}
+
+func (s *relationshipServiceRelationReader) ListClinicianRelations(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.ClinicianRelationRow, int64, error) {
+	s.listClinicianRelationsCalls++
+	return s.clinicianRelations, s.clinicianRelationsTotal, nil
+}
+
+func (s *relationshipServiceRelationReader) HasActiveRelationForTestee(ctx context.Context, orgID int64, clinicianID, testeeID uint64, relationTypes []string) (bool, error) {
+	if s.hasActiveRelationForTesteeFn != nil {
+		return s.hasActiveRelationForTesteeFn(ctx, orgID, clinicianID, testeeID, relationTypes)
+	}
+	return false, nil
+}
+
 type relationshipServiceClinicianRepo struct {
 	item *domainClinician.Clinician
 }
@@ -348,10 +378,8 @@ func (s *relationshipServiceClinicianRepo) Delete(context.Context, domainClinici
 }
 
 type relationshipServiceTesteeRepo struct {
-	item           *domainTestee.Testee
-	byID           map[domainTestee.ID]*domainTestee.Testee
-	findByIDCalls  int
-	findByIDsCalls int
+	item          *domainTestee.Testee
+	findByIDCalls int
 }
 
 func (s *relationshipServiceTesteeRepo) Save(context.Context, *domainTestee.Testee) error {
@@ -364,70 +392,13 @@ func (s *relationshipServiceTesteeRepo) Update(context.Context, *domainTestee.Te
 
 func (s *relationshipServiceTesteeRepo) FindByID(_ context.Context, id domainTestee.ID) (*domainTestee.Testee, error) {
 	s.findByIDCalls++
-	if s.byID != nil {
-		item := s.byID[id]
-		if item == nil {
-			return nil, cbErrors.WithCode(code.ErrUserNotFound, "testee not found")
-		}
-		return item, nil
-	}
 	return s.item, nil
-}
-
-func (s *relationshipServiceTesteeRepo) FindByIDs(_ context.Context, ids []domainTestee.ID) ([]*domainTestee.Testee, error) {
-	s.findByIDsCalls++
-	if s.byID == nil {
-		if s.item == nil {
-			return []*domainTestee.Testee{}, nil
-		}
-		return []*domainTestee.Testee{s.item}, nil
-	}
-
-	items := make([]*domainTestee.Testee, 0, len(ids))
-	for i := len(ids) - 1; i >= 0; i-- {
-		if item := s.byID[ids[i]]; item != nil {
-			items = append(items, item)
-		}
-	}
-	return items, nil
 }
 
 func (s *relationshipServiceTesteeRepo) FindByProfile(context.Context, int64, uint64) (*domainTestee.Testee, error) {
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "testee not found")
 }
 
-func (s *relationshipServiceTesteeRepo) FindByOrgAndName(context.Context, int64, string) ([]*domainTestee.Testee, error) {
-	return nil, nil
-}
-
-func (s *relationshipServiceTesteeRepo) ListByOrg(context.Context, int64, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
-	return nil, nil
-}
-
-func (s *relationshipServiceTesteeRepo) ListByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
-	return nil, nil
-}
-
-func (s *relationshipServiceTesteeRepo) ListByTags(context.Context, int64, []string, int, int) ([]*domainTestee.Testee, error) {
-	return nil, nil
-}
-
-func (s *relationshipServiceTesteeRepo) ListKeyFocus(context.Context, int64, int, int) ([]*domainTestee.Testee, error) {
-	return nil, nil
-}
-
-func (s *relationshipServiceTesteeRepo) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domainTestee.Testee, error) {
-	return nil, nil
-}
-
 func (s *relationshipServiceTesteeRepo) Delete(context.Context, domainTestee.ID) error {
 	return nil
-}
-
-func (s *relationshipServiceTesteeRepo) Count(context.Context, int64, domainTestee.ListFilter) (int64, error) {
-	return 0, nil
-}
-
-func (s *relationshipServiceTesteeRepo) CountByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter) (int64, error) {
-	return 0, nil
 }

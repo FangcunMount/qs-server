@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -86,6 +87,78 @@ func TestActorDomainDoesNotImportUpperLayers(t *testing.T) {
 				if strings.HasPrefix(importPath, forbidden) {
 					rel := filepath.ToSlash(mustRel(t, root, path))
 					t.Fatalf("%s imports %s; actor domain must not depend on %s", rel, importPath, description)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestActorDomainRepositoriesDoNotExposeReadModels(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	actorDomainRoot := filepath.Join(root, "internal", "apiserver", "domain", "actor")
+	forbiddenMethods := map[string]string{
+		"FindByIDs":                      "bulk read model lookup",
+		"FindByOrgAndName":               "search read model lookup",
+		"ListByOrg":                      "list read model query",
+		"ListByOrgAndIDs":                "scoped list read model query",
+		"ListByTags":                     "tag list read model query",
+		"ListKeyFocus":                   "key-focus list read model query",
+		"ListByProfileIDs":               "profile list read model query",
+		"Count":                          "count read model query",
+		"CountByOrgAndIDs":               "scoped count read model query",
+		"ListByRole":                     "role list read model query",
+		"ListActiveByClinician":          "relation list read model query",
+		"ListHistoryByClinician":         "relation history read model query",
+		"CountActiveByClinician":         "relation count read model query",
+		"ListActiveByTestee":             "testee relation read model query",
+		"ListHistoryByTestee":            "testee relation history read model query",
+		"HasActiveRelationForTestee":     "access read model query",
+		"ListActiveTesteeIDsByClinician": "scope read model query",
+		"ListByClinician":                "assessment entry read model query",
+		"CountByClinician":               "assessment entry count read model query",
+	}
+
+	fset := token.NewFileSet()
+	err := filepath.WalkDir(actorDomainRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		parsed, err := parser.ParseFile(fset, path, nil, 0)
+		if err != nil {
+			return err
+		}
+		for _, decl := range parsed.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != "Repository" {
+					continue
+				}
+				iface, ok := typeSpec.Type.(*ast.InterfaceType)
+				if !ok {
+					continue
+				}
+				for _, method := range iface.Methods.List {
+					if len(method.Names) == 0 {
+						continue
+					}
+					methodName := method.Names[0].Name
+					if reason, ok := forbiddenMethods[methodName]; ok {
+						rel := filepath.ToSlash(mustRel(t, root, path))
+						t.Fatalf("%s Repository.%s exposes %s; actor read queries must live in port/actorreadmodel", rel, methodName, reason)
+					}
 				}
 			}
 		}

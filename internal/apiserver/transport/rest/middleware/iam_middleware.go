@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/gin-gonic/gin"
 
-	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	pkgmiddleware "github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -116,9 +116,9 @@ func RequireNumericOrgScopeMiddleware() gin.HandlerFunc {
 }
 
 // RequireActiveOperatorMiddleware 要求当前租户下存在且已激活的 Operator（在 IAM 授权快照之前执行）。
-func RequireActiveOperatorMiddleware(repo domainOperator.Repository) gin.HandlerFunc {
+func RequireActiveOperatorMiddleware(checker operatorapp.ActiveOperatorChecker) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if repo == nil {
+		if checker == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "operator repository not configured"})
 			c.Abort()
 			return
@@ -141,19 +141,19 @@ func RequireActiveOperatorMiddleware(repo domainOperator.Repository) gin.Handler
 			c.Abort()
 			return
 		}
-		op, err := repo.FindByUser(c.Request.Context(), orgID, userID)
+		op, err := checker.RequireActive(c.Request.Context(), orgID, userID)
 		if err != nil {
+			if errors.IsCode(err, code.ErrPermissionDenied) {
+				c.JSON(http.StatusForbidden, gin.H{"error": err.Error()})
+				c.Abort()
+				return
+			}
 			if errors.IsCode(err, code.ErrUserNotFound) {
 				c.JSON(http.StatusForbidden, gin.H{"error": "operator not found in current organization"})
 				c.Abort()
 				return
 			}
 			c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("operator lookup failed: %v", err)})
-			c.Abort()
-			return
-		}
-		if !op.IsActive() {
-			c.JSON(http.StatusForbidden, gin.H{"error": "operator is inactive"})
 			c.Abort()
 			return
 		}
@@ -323,12 +323,12 @@ func GetRoles(c *gin.Context) []string {
 }
 
 // GetCurrentOperator 获取当前租户下的已激活 operator。
-func GetCurrentOperator(c *gin.Context) *domainOperator.Operator {
+func GetCurrentOperator(c *gin.Context) *operatorapp.OperatorResult {
 	v, ok := c.Get(CurrentOperatorKey)
 	if !ok {
 		return nil
 	}
-	op, _ := v.(*domainOperator.Operator)
+	op, _ := v.(*operatorapp.OperatorResult)
 	return op
 }
 

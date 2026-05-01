@@ -5,6 +5,7 @@ import (
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 )
 
 func toAssessmentEntryResult(item *domainAssessmentEntry.AssessmentEntry) *AssessmentEntryResult {
@@ -22,6 +23,23 @@ func toAssessmentEntryResult(item *domainAssessmentEntry.AssessmentEntry) *Asses
 		TargetVersion: item.TargetVersion(),
 		IsActive:      item.IsActive(),
 		ExpiresAt:     item.ExpiresAt(),
+	}
+}
+
+func toAssessmentEntryResultFromRow(row *actorreadmodel.AssessmentEntryRow) *AssessmentEntryResult {
+	if row == nil {
+		return nil
+	}
+	return &AssessmentEntryResult{
+		ID:            row.ID,
+		OrgID:         row.OrgID,
+		ClinicianID:   row.ClinicianID,
+		Token:         row.Token,
+		TargetType:    row.TargetType,
+		TargetCode:    row.TargetCode,
+		TargetVersion: row.TargetVersion,
+		IsActive:      row.IsActive,
+		ExpiresAt:     row.ExpiresAt,
 	}
 }
 

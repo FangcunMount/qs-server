@@ -121,7 +121,7 @@ func buildGRPCServer(cfg *config.Config, deps container.ServerGRPCBootstrapDeps)
 	if loader := deps.AuthzSnapshotLoader; loader != nil {
 		// 授权快照拦截器只负责权限视图，不替代前面的 JWT 权威在线校验。
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
-			grpctransport.NewAuthzSnapshotUnaryInterceptor(loader, deps.ActiveOperatorRepo))
+			grpctransport.NewAuthzSnapshotUnaryInterceptor(loader, deps.OperatorRoleProjectionUpdater))
 		log.Info("gRPC server: IAM authorization snapshot interceptor enabled (after JWT auth)")
 	}
 

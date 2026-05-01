@@ -4,6 +4,8 @@ import (
 	"context"
 	"testing"
 
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
@@ -18,7 +20,7 @@ import (
 func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {
 	t.Parallel()
 
-	operatorRepo := &fakeOperatorRepo{}
+	roleUpdater := &serverBootstrapRoleUpdaterStub{}
 	authzSnapshot := &iaminfra.AuthzSnapshotLoader{}
 
 	c := NewContainer(nil, nil, nil)
@@ -27,7 +29,7 @@ func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {
 		authzSnapshotLoader: authzSnapshot,
 	}
 	c.ActorModule = &assembler.ActorModule{
-		OperatorRepo: operatorRepo,
+		OperatorRoleProjectionUpdater: roleUpdater,
 	}
 
 	deps := c.BuildServerGRPCBootstrapDeps()
@@ -37,8 +39,8 @@ func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {
 	if deps.AuthzSnapshotLoader != authzSnapshot {
 		t.Fatalf("AuthzSnapshotLoader = %#v, want %#v", deps.AuthzSnapshotLoader, authzSnapshot)
 	}
-	if deps.ActiveOperatorRepo != operatorRepo {
-		t.Fatalf("ActiveOperatorRepo = %#v, want %#v", deps.ActiveOperatorRepo, operatorRepo)
+	if deps.OperatorRoleProjectionUpdater != roleUpdater {
+		t.Fatalf("OperatorRoleProjectionUpdater = %#v, want %#v", deps.OperatorRoleProjectionUpdater, roleUpdater)
 	}
 }
 
@@ -172,6 +174,17 @@ func (*behaviorProjectorServiceStub) ReconcilePendingBehaviorEvents(context.Cont
 }
 
 var _ domainoperator.Repository = (*fakeOperatorRepo)(nil)
+
+type serverBootstrapRoleUpdaterStub struct{}
+
+func (*serverBootstrapRoleUpdaterStub) PersistFromSnapshot(context.Context, *operatorApp.OperatorResult, *authzapp.Snapshot) error {
+	return nil
+}
+func (*serverBootstrapRoleUpdaterStub) PersistFromSnapshotByUser(context.Context, int64, int64, *authzapp.Snapshot) error {
+	return nil
+}
+func (*serverBootstrapRoleUpdaterStub) SyncRoles(context.Context, int64, uint64) error { return nil }
+
 var _ appEventing.OutboxRelay = (*outboxRelayStub)(nil)
 var _ planApp.PlanCommandService = (*planCommandServiceStub)(nil)
 var _ statisticsApp.StatisticsSyncService = (*statisticsSyncServiceStub)(nil)

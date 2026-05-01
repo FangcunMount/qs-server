@@ -9,6 +9,7 @@ import (
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -16,6 +17,8 @@ type relationshipService struct {
 	relationRepo   domainRelation.Repository
 	clinicianRepo  domainClinician.Repository
 	testeeRepo     domainTestee.Repository
+	relationReader actorreadmodel.RelationReader
+	entryReader    actorreadmodel.AssessmentEntryReader
 	assignmentRule domainRelation.AssignmentPolicy
 	behaviorEvents BehaviorEventStager
 	uow            apptransaction.Runner
@@ -50,11 +53,18 @@ func NewRelationshipService(
 	testeeRepo domainTestee.Repository,
 	behaviorEvents BehaviorEventStager,
 	uow apptransaction.Runner,
+	readModels ...actorreadmodel.ReadModel,
 ) ClinicianRelationshipService {
+	var readModel actorreadmodel.ReadModel
+	if len(readModels) > 0 {
+		readModel = readModels[0]
+	}
 	return &relationshipService{
 		relationRepo:   relationRepo,
 		clinicianRepo:  clinicianRepo,
 		testeeRepo:     testeeRepo,
+		relationReader: readModel,
+		entryReader:    readModel,
 		assignmentRule: domainRelation.NewAssignmentPolicy(),
 		behaviorEvents: behaviorEvents,
 		uow:            uow,
@@ -209,42 +219,24 @@ func (s *relationshipService) ListAssignedTestees(ctx context.Context, dto ListA
 	if err != nil {
 		return nil, err
 	}
-	relations, err := s.relationRepo.ListActiveByClinician(
-		ctx,
-		dto.OrgID,
-		clinicianID,
-		domainRelation.AccessGrantRelationTypes(),
-		dto.Offset,
-		dto.Limit,
-	)
+	if s.relationReader == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
+	}
+	rows, totalCount, err := s.relationReader.ListAssignedTestees(ctx, actorreadmodel.RelationFilter{
+		OrgID:         dto.OrgID,
+		ClinicianID:   clinicianID.Uint64(),
+		RelationTypes: relationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
+		ActiveOnly:    true,
+		Offset:        dto.Offset,
+		Limit:         dto.Limit,
+	})
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list relations")
+		return nil, errors.Wrap(err, "failed to list assigned testees")
 	}
-
-	totalCount, err := s.relationRepo.CountActiveByClinician(
-		ctx,
-		dto.OrgID,
-		clinicianID,
-		domainRelation.AccessGrantRelationTypes(),
-	)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to count relations")
+	items := make([]*AssignedTesteeResult, 0, len(rows))
+	for i := range rows {
+		items = append(items, toAssignedTesteeResultFromRow(&rows[i]))
 	}
-
-	testeesByID, err := s.loadTesteesByID(ctx, extractRelationTesteeIDs(relations))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to batch load assigned testees")
-	}
-
-	items := make([]*AssignedTesteeResult, 0, len(relations))
-	for _, item := range relations {
-		testeeItem := testeesByID[item.TesteeID()]
-		if testeeItem == nil {
-			continue
-		}
-		items = append(items, toAssignedTesteeResult(testeeItem))
-	}
-
 	return &AssignedTesteeListResult{
 		Items:      items,
 		TotalCount: totalCount,
@@ -258,11 +250,14 @@ func (s *relationshipService) ListAssignedTesteeIDs(ctx context.Context, orgID i
 	if err != nil {
 		return nil, err
 	}
-	ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
+	if s.relationReader == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
+	}
+	ids, err := s.relationReader.ListActiveTesteeIDsByClinician(
 		ctx,
 		orgID,
-		targetClinicianID,
-		domainRelation.AccessGrantRelationTypes(),
+		targetClinicianID.Uint64(),
+		relationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
 	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list assigned testee ids")
@@ -271,7 +266,7 @@ func (s *relationshipService) ListAssignedTesteeIDs(ctx context.Context, orgID i
 	seen := make(map[uint64]struct{}, len(ids))
 	result := make([]uint64, 0, len(ids))
 	for _, id := range ids {
-		rawID := id.Uint64()
+		rawID := id
 		if _, ok := seen[rawID]; ok {
 			continue
 		}
@@ -282,36 +277,26 @@ func (s *relationshipService) ListAssignedTesteeIDs(ctx context.Context, orgID i
 }
 
 func (s *relationshipService) ListTesteeRelations(ctx context.Context, dto ListTesteeRelationDTO) (*TesteeRelationListResult, error) {
-	var (
-		relations []*domainRelation.ClinicianTesteeRelation
-		err       error
-	)
 	testeeID, err := testeeIDFromUint64("testee_id", dto.TesteeID)
 	if err != nil {
 		return nil, err
 	}
-
-	if dto.ActiveOnly {
-		relations, err = s.relationRepo.ListActiveByTestee(ctx, dto.OrgID, testeeID, nil)
-	} else {
-		relations, err = s.relationRepo.ListHistoryByTestee(ctx, dto.OrgID, testeeID)
+	if s.relationReader == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
 	}
+	rows, err := s.relationReader.ListTesteeRelations(ctx, actorreadmodel.RelationFilter{
+		OrgID:      dto.OrgID,
+		TesteeID:   testeeID.Uint64(),
+		ActiveOnly: dto.ActiveOnly,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list testee relations")
 	}
-
-	items := make([]*TesteeRelationResult, 0, len(relations))
-	for _, relationItem := range relations {
-		clinicianItem, err := s.clinicianRepo.FindByID(ctx, relationItem.ClinicianID())
-		if err != nil {
-			if errors.IsCode(err, code.ErrUserNotFound) {
-				continue
-			}
-			return nil, errors.Wrap(err, "failed to find clinician")
-		}
+	items := make([]*TesteeRelationResult, 0, len(rows))
+	for i := range rows {
 		items = append(items, &TesteeRelationResult{
-			Relation:  toRelationResult(relationItem),
-			Clinician: toClinicianResult(clinicianItem),
+			Relation:  toRelationResultFromRow(&rows[i].Relation),
+			Clinician: toClinicianResultFromRow(&rows[i].Clinician),
 		})
 	}
 
@@ -319,53 +304,28 @@ func (s *relationshipService) ListTesteeRelations(ctx context.Context, dto ListT
 }
 
 func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto ListClinicianRelationDTO) (*ClinicianRelationListResult, error) {
-	var (
-		relations []*domainRelation.ClinicianTesteeRelation
-		err       error
-	)
 	clinicianID, err := clinicianIDFromUint64("clinician_id", dto.ClinicianID)
 	if err != nil {
 		return nil, err
 	}
-
-	if dto.ActiveOnly {
-		relations, err = s.relationRepo.ListActiveByClinician(
-			ctx,
-			dto.OrgID,
-			clinicianID,
-			nil,
-			dto.Offset,
-			dto.Limit,
-		)
-	} else {
-		relations, err = s.relationRepo.ListHistoryByClinician(ctx, dto.OrgID, clinicianID)
+	if s.relationReader == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "relation reader is not configured")
 	}
+	rows, totalCount, err := s.relationReader.ListClinicianRelations(ctx, actorreadmodel.RelationFilter{
+		OrgID:       dto.OrgID,
+		ClinicianID: clinicianID.Uint64(),
+		ActiveOnly:  dto.ActiveOnly,
+		Offset:      dto.Offset,
+		Limit:       dto.Limit,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list clinician relations")
 	}
-
-	totalCount := int64(len(relations))
-	if dto.ActiveOnly {
-		totalCount, err = s.relationRepo.CountActiveByClinician(ctx, dto.OrgID, clinicianID, nil)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to count clinician relations")
-		}
-	}
-
-	testeesByID, err := s.loadTesteesByID(ctx, extractRelationTesteeIDs(relations))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to batch load clinician relation testees")
-	}
-
-	items := make([]*ClinicianRelationResult, 0, len(relations))
-	for _, relationItem := range relations {
-		testeeItem := testeesByID[relationItem.TesteeID()]
-		if testeeItem == nil {
-			continue
-		}
+	items := make([]*ClinicianRelationResult, 0, len(rows))
+	for i := range rows {
 		items = append(items, &ClinicianRelationResult{
-			Relation: toRelationResult(relationItem),
-			Testee:   toAssignedTesteeResult(testeeItem),
+			Relation: toRelationResultFromRow(&rows[i].Relation),
+			Testee:   toAssignedTesteeResultFromRow(&rows[i].Testee),
 		})
 	}
 
@@ -375,6 +335,36 @@ func (s *relationshipService) ListClinicianRelations(ctx context.Context, dto Li
 		Offset:     dto.Offset,
 		Limit:      dto.Limit,
 	}, nil
+}
+
+func (s *relationshipService) GetTesteeCareContext(ctx context.Context, orgID int64, testeeID uint64) (*TesteeCareContextResult, error) {
+	relations, err := s.ListTesteeRelations(ctx, ListTesteeRelationDTO{
+		OrgID:      orgID,
+		TesteeID:   testeeID,
+		ActiveOnly: true,
+	})
+	if err != nil {
+		return nil, err
+	}
+	item := pickPreferredCareContext(relations)
+	if item == nil || item.Relation == nil || item.Clinician == nil {
+		return nil, nil
+	}
+	result := &TesteeCareContextResult{
+		ClinicianName: item.Clinician.Name,
+		ClinicianRole: resolveClinicianRole(item.Clinician),
+		RelationType:  item.Relation.RelationType,
+	}
+	if item.Relation.SourceType != "" {
+		result.EntrySourceType = item.Relation.SourceType
+	}
+	if item.Relation.SourceType == string(domainRelation.SourceTypeAssessmentEntry) && item.Relation.SourceID != nil && s.entryReader != nil {
+		title, err := s.entryReader.GetAssessmentEntryTitle(ctx, *item.Relation.SourceID)
+		if err == nil {
+			result.EntryTitle = title
+		}
+	}
+	return result, nil
 }
 
 func normalizeAssignmentRelationType(raw string) (domainRelation.RelationType, error) {
@@ -520,39 +510,61 @@ func (s *relationshipService) assignmentPolicyForUse() domainRelation.Assignment
 	return domainRelation.NewAssignmentPolicy()
 }
 
-func extractRelationTesteeIDs(relations []*domainRelation.ClinicianTesteeRelation) []domainTestee.ID {
-	ids := make([]domainTestee.ID, 0, len(relations))
-	seen := make(map[domainTestee.ID]struct{}, len(relations))
-	for _, relationItem := range relations {
-		if relationItem == nil {
+func uniqueUint64(ids []uint64) []uint64 {
+	seen := make(map[uint64]struct{}, len(ids))
+	result := make([]uint64, 0, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
 			continue
 		}
-		testeeID := relationItem.TesteeID()
-		if _, ok := seen[testeeID]; ok {
-			continue
-		}
-		seen[testeeID] = struct{}{}
-		ids = append(ids, testeeID)
+		seen[id] = struct{}{}
+		result = append(result, id)
 	}
-	return ids
+	return result
 }
 
-func (s *relationshipService) loadTesteesByID(ctx context.Context, ids []domainTestee.ID) (map[domainTestee.ID]*domainTestee.Testee, error) {
-	if len(ids) == 0 {
-		return map[domainTestee.ID]*domainTestee.Testee{}, nil
+func pickPreferredCareContext(result *TesteeRelationListResult) *TesteeRelationResult {
+	if result == nil || len(result.Items) == 0 {
+		return nil
 	}
-
-	items, err := s.testeeRepo.FindByIDs(ctx, ids)
-	if err != nil {
-		return nil, err
-	}
-
-	result := make(map[domainTestee.ID]*domainTestee.Testee, len(items))
-	for _, item := range items {
-		if item == nil {
+	var selected *TesteeRelationResult
+	bestPriority := 1 << 30
+	for _, item := range result.Items {
+		if item == nil || item.Relation == nil || item.Clinician == nil {
 			continue
 		}
-		result[item.ID()] = item
+		priority := relationTypePriority(item.Relation.RelationType)
+		if priority < bestPriority {
+			selected = item
+			bestPriority = priority
+		}
 	}
-	return result, nil
+	return selected
+}
+
+func relationTypePriority(raw string) int {
+	switch domainRelation.RelationType(raw) {
+	case domainRelation.RelationTypePrimary:
+		return 0
+	case domainRelation.RelationTypeAttending:
+		return 1
+	case domainRelation.RelationTypeCollaborator:
+		return 2
+	case domainRelation.RelationTypeAssigned:
+		return 3
+	case domainRelation.RelationTypeCreator:
+		return 4
+	default:
+		return 100
+	}
+}
+
+func resolveClinicianRole(item *ClinicianResult) string {
+	if item == nil {
+		return ""
+	}
+	if item.Title != "" {
+		return item.Title
+	}
+	return item.ClinicianType
 }

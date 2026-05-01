@@ -299,9 +299,6 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	questionnaireHandler := handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil)
 	answerSheetHandler := handlerpkg.NewAnswerSheetHandler(nil, nil)
 	scaleHandler := handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil)
-	testeeHandler := handlerpkg.NewTesteeHandler(nil, nil, nil, nil, nil, nil, nil, nil)
-	operatorClinicianHandler := handlerpkg.NewOperatorClinicianHandler(nil, nil, nil, nil, nil, nil, nil, nil)
-	assessmentEntryHandler := handlerpkg.NewAssessmentEntryHandler(nil, nil, nil, nil)
 	evaluationHandler := handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
 	planHandler := handlerpkg.NewPlanHandler(nil, nil)
 	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
@@ -311,11 +308,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 		AnswerSheet:   &assembler.AnswerSheetSubModule{Handler: answerSheetHandler},
 	}
 	c.ScaleModule = &assembler.ScaleModule{Handler: scaleHandler}
-	c.ActorModule = &assembler.ActorModule{
-		TesteeHandler:            testeeHandler,
-		OperatorClinicianHandler: operatorClinicianHandler,
-		AssessmentEntryHandler:   assessmentEntryHandler,
-	}
+	c.ActorModule = &assembler.ActorModule{}
 	c.EvaluationModule = &assembler.EvaluationModule{Handler: evaluationHandler}
 	c.PlanModule = &assembler.PlanModule{Handler: planHandler}
 	c.StatisticsModule = &assembler.StatisticsModule{Handler: statisticsHandler}
@@ -327,8 +320,8 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.Survey.QuestionnaireHandler != questionnaireHandler || deps.Survey.AnswerSheetHandler != answerSheetHandler {
 		t.Fatalf("survey handlers not extracted correctly: %#v", deps.Survey)
 	}
-	if deps.Scale.Handler != scaleHandler || deps.Actor.TesteeHandler != testeeHandler || deps.Actor.OperatorClinicianHandler != operatorClinicianHandler || deps.Actor.AssessmentEntryHandler != assessmentEntryHandler {
-		t.Fatalf("actor/scale handlers not extracted correctly: %#v %#v", deps.Scale, deps.Actor)
+	if deps.Scale.Handler != scaleHandler {
+		t.Fatalf("scale handler not extracted correctly: %#v", deps.Scale)
 	}
 	if deps.Evaluation.Handler != evaluationHandler || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
 		t.Fatalf("evaluation/plan/statistics handlers not extracted correctly")

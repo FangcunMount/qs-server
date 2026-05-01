@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -20,11 +19,9 @@ import (
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domaintestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -65,26 +62,6 @@ type operatorBootstrapRoleSyncer interface {
 	SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error
 }
 
-type authzSnapshotOperatorRoleSyncer struct {
-	operatorRepo  domainoperator.Repository
-	authzSnapshot *iaminfra.AuthzSnapshotLoader
-}
-
-func (s authzSnapshotOperatorRoleSyncer) SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error {
-	if s.operatorRepo == nil || s.authzSnapshot == nil {
-		return nil
-	}
-
-	op, err := s.operatorRepo.FindByID(ctx, domainoperator.ID(meta.FromUint64(operatorID)))
-	if err != nil {
-		return fmt.Errorf("load operator aggregate failed: %w", err)
-	}
-	if _, err := iaminfra.SyncAndPersistOperatorRolesFromSnapshot(ctx, s.authzSnapshot, s.operatorRepo, orgID, op); err != nil {
-		return fmt.Errorf("sync operator roles from snapshot failed: %w", err)
-	}
-	return nil
-}
-
 // NewInternalService 创建内部 gRPC 服务
 func NewInternalService(
 	answerSheetScoringService answerSheetApp.AnswerSheetScoringService,
@@ -98,8 +75,7 @@ func NewInternalService(
 	operatorLifecycleService operatorApp.OperatorLifecycleService,
 	operatorAuthService operatorApp.OperatorAuthorizationService,
 	operatorQueryService operatorApp.OperatorQueryService,
-	operatorRepo domainoperator.Repository,
-	authzSnapshot *iaminfra.AuthzSnapshotLoader,
+	operatorRoleSyncer operatorBootstrapRoleSyncer,
 	behaviorProjectorService statisticsApp.BehaviorProjectorService,
 	warmupCoordinator cachegov.Coordinator,
 	qrCodeService interface{}, // qrcodeApp.QRCodeService，可能为 nil
@@ -109,14 +85,6 @@ func NewInternalService(
 	if q, ok := qrCodeService.(qrcodeApp.QRCodeService); ok {
 		qrService = q
 	}
-	var roleSyncer operatorBootstrapRoleSyncer
-	if operatorRepo != nil || authzSnapshot != nil {
-		roleSyncer = authzSnapshotOperatorRoleSyncer{
-			operatorRepo:  operatorRepo,
-			authzSnapshot: authzSnapshot,
-		}
-	}
-
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
 		submissionService:                  submissionService,
@@ -129,7 +97,7 @@ func NewInternalService(
 		operatorLifecycleService:           operatorLifecycleService,
 		operatorAuthService:                operatorAuthService,
 		operatorQueryService:               operatorQueryService,
-		operatorRoleSyncer:                 roleSyncer,
+		operatorRoleSyncer:                 operatorRoleSyncer,
 		behaviorProjectorService:           behaviorProjectorService,
 		warmupCoordinator:                  warmupCoordinator,
 		qrCodeService:                      qrService,

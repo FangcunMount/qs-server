@@ -1,7 +1,10 @@
 package testee
 
 import (
+	"time"
+
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 )
 
 // toTesteeResult 将领域对象转换为应用层 DTO
@@ -38,4 +41,39 @@ func toTesteeResult(testee *domain.Testee) *TesteeResult {
 	}
 
 	return result
+}
+
+func toTesteeResultFromRow(row *actorreadmodel.TesteeRow) *TesteeResult {
+	if row == nil {
+		return nil
+	}
+	return &TesteeResult{
+		ID:               row.ID,
+		OrgID:            row.OrgID,
+		ProfileID:        row.ProfileID,
+		Name:             row.Name,
+		Gender:           row.Gender,
+		Birthday:         row.Birthday,
+		CreatedAt:        row.CreatedAt,
+		UpdatedAt:        row.UpdatedAt,
+		Age:              ageFromBirthday(row.Birthday),
+		Tags:             append([]string(nil), row.Tags...),
+		Source:           row.Source,
+		IsKeyFocus:       row.IsKeyFocus,
+		LastAssessmentAt: row.LastAssessmentAt,
+		TotalAssessments: row.TotalAssessments,
+		LastRiskLevel:    row.LastRiskLevel,
+	}
+}
+
+func ageFromBirthday(birthday *time.Time) int {
+	if birthday == nil {
+		return 0
+	}
+	now := time.Now()
+	age := now.Year() - birthday.Year()
+	if now.YearDay() < birthday.YearDay() {
+		age--
+	}
+	return age
 }

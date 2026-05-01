@@ -4,20 +4,20 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 操作者查询服务实现
 // 行为者：所有需要查询后台操作者信息的用户
 type queryService struct {
-	repo domain.Repository
+	reader actorreadmodel.OperatorReader
 }
 
 // NewQueryService 创建操作者查询服务
-func NewQueryService(repo domain.Repository) OperatorQueryService {
+func NewQueryService(reader actorreadmodel.OperatorReader) OperatorQueryService {
 	return &queryService{
-		repo: repo,
+		reader: reader,
 	}
 }
 
@@ -27,17 +27,17 @@ func (s *queryService) GetByID(ctx context.Context, operatorID uint64) (*Operato
 	if err != nil {
 		return nil, err
 	}
-	st, err := s.repo.FindByID(ctx, targetOperatorID)
+	st, err := s.reader.GetOperator(ctx, targetOperatorID.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find operator")
 	}
 
-	return toOperatorResult(st), nil
+	return toOperatorResultFromRow(st), nil
 }
 
 // GetByUser 根据用户ID查询操作者
 func (s *queryService) GetByUser(ctx context.Context, orgID int64, userID int64) (*OperatorResult, error) {
-	st, err := s.repo.FindByUser(ctx, orgID, userID)
+	st, err := s.reader.FindOperatorByUser(ctx, orgID, userID)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "operator not found")
@@ -45,35 +45,31 @@ func (s *queryService) GetByUser(ctx context.Context, orgID int64, userID int64)
 		return nil, errors.Wrap(err, "failed to find operator by user")
 	}
 
-	return toOperatorResult(st), nil
+	return toOperatorResultFromRow(st), nil
 }
 
 // ListOperators 列出操作者
 func (s *queryService) ListOperators(ctx context.Context, dto ListOperatorDTO) (*OperatorListResult, error) {
-	var operators []*domain.Operator
-	var err error
-
-	if dto.Role != "" {
-		role := domain.Role(dto.Role)
-		operators, err = s.repo.ListByRole(ctx, dto.OrgID, role, dto.Offset, dto.Limit)
-	} else {
-		operators, err = s.repo.ListByOrg(ctx, dto.OrgID, dto.Offset, dto.Limit)
-	}
-
+	operators, err := s.reader.ListOperators(ctx, actorreadmodel.OperatorFilter{
+		OrgID:  dto.OrgID,
+		Role:   dto.Role,
+		Offset: dto.Offset,
+		Limit:  dto.Limit,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list operators")
 	}
 
 	// 获取总数
-	totalCount, err := s.repo.Count(ctx, dto.OrgID)
+	totalCount, err := s.reader.CountOperators(ctx, dto.OrgID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count operators")
 	}
 
 	// 转换为 DTO
 	items := make([]*OperatorResult, len(operators))
-	for i, item := range operators {
-		items[i] = toOperatorResult(item)
+	for i := range operators {
+		items[i] = toOperatorResultFromRow(&operators[i])
 	}
 
 	return &OperatorListResult{

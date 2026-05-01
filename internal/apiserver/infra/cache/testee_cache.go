@@ -93,10 +93,6 @@ func (r *CachedTesteeRepository) FindByID(ctx context.Context, id testee.ID) (*t
 	return domain, nil
 }
 
-func (r *CachedTesteeRepository) FindByIDs(ctx context.Context, ids []testee.ID) ([]*testee.Testee, error) {
-	return r.repo.FindByIDs(ctx, ids)
-}
-
 // Save 保存受试者（同时失效缓存）
 func (r *CachedTesteeRepository) Save(ctx context.Context, domain *testee.Testee) error {
 	err := r.repo.Save(ctx, domain)
@@ -132,36 +128,4 @@ func (r *CachedTesteeRepository) deleteCache(ctx context.Context, id testee.ID) 
 // 实现其他 Repository 方法（透传，不缓存）
 func (r *CachedTesteeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*testee.Testee, error) {
 	return r.repo.FindByProfile(ctx, orgID, profileID)
-}
-
-func (r *CachedTesteeRepository) FindByOrgAndName(ctx context.Context, orgID int64, name string) ([]*testee.Testee, error) {
-	return r.repo.FindByOrgAndName(ctx, orgID, name)
-}
-
-func (r *CachedTesteeRepository) ListByOrg(ctx context.Context, orgID int64, filter testee.ListFilter, offset, limit int) ([]*testee.Testee, error) {
-	return r.repo.ListByOrg(ctx, orgID, filter, offset, limit)
-}
-
-func (r *CachedTesteeRepository) ListByOrgAndIDs(ctx context.Context, orgID int64, ids []testee.ID, filter testee.ListFilter, offset, limit int) ([]*testee.Testee, error) {
-	return r.repo.ListByOrgAndIDs(ctx, orgID, ids, filter, offset, limit)
-}
-
-func (r *CachedTesteeRepository) ListByTags(ctx context.Context, orgID int64, tags []string, offset, limit int) ([]*testee.Testee, error) {
-	return r.repo.ListByTags(ctx, orgID, tags, offset, limit)
-}
-
-func (r *CachedTesteeRepository) ListKeyFocus(ctx context.Context, orgID int64, offset, limit int) ([]*testee.Testee, error) {
-	return r.repo.ListKeyFocus(ctx, orgID, offset, limit)
-}
-
-func (r *CachedTesteeRepository) ListByProfileIDs(ctx context.Context, profileIDs []uint64, offset, limit int) ([]*testee.Testee, error) {
-	return r.repo.ListByProfileIDs(ctx, profileIDs, offset, limit)
-}
-
-func (r *CachedTesteeRepository) Count(ctx context.Context, orgID int64, filter testee.ListFilter) (int64, error) {
-	return r.repo.Count(ctx, orgID, filter)
-}
-
-func (r *CachedTesteeRepository) CountByOrgAndIDs(ctx context.Context, orgID int64, ids []testee.ID, filter testee.ListFilter) (int64, error) {
-	return r.repo.CountByOrgAndIDs(ctx, orgID, ids, filter)
 }

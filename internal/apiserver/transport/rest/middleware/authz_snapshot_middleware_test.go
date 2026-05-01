@@ -8,25 +8,32 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/gin-gonic/gin"
 )
 
 type stubOperatorRoleProjectionUpdater struct {
 	lastCtx  context.Context
-	lastOp   *domainoperator.Operator
+	lastOp   *operatorapp.OperatorResult
 	lastSnap *authzapp.Snapshot
 	err      error
 	calls    int
 }
 
-func (s *stubOperatorRoleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *domainoperator.Operator, snap *authzapp.Snapshot) error {
+func (s *stubOperatorRoleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *operatorapp.OperatorResult, snap *authzapp.Snapshot) error {
 	s.calls++
 	s.lastCtx = ctx
 	s.lastOp = op
 	s.lastSnap = snap
 	return s.err
+}
+
+func (s *stubOperatorRoleProjectionUpdater) PersistFromSnapshotByUser(context.Context, int64, int64, *authzapp.Snapshot) error {
+	panic("unexpected call")
+}
+func (s *stubOperatorRoleProjectionUpdater) SyncRoles(context.Context, int64, uint64) error {
+	panic("unexpected call")
 }
 
 func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.T) {
@@ -78,7 +85,7 @@ func TestAuthzSnapshotMiddlewarePersistsProjectionWhenCurrentOperatorExists(t *t
 
 	snap := &authzapp.Snapshot{Roles: []string{"qs:admin"}}
 	updater := &stubOperatorRoleProjectionUpdater{}
-	operator := domainoperator.NewOperator(88, 701, "Router User")
+	operator := &operatorapp.OperatorResult{ID: 801, OrgID: 88, UserID: 701, Name: "Router User", IsActive: true}
 
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {
@@ -116,7 +123,7 @@ func TestAuthzSnapshotMiddlewareUpdaterFailureDoesNotAbortRequest(t *testing.T) 
 	gin.SetMode(gin.TestMode)
 
 	updater := &stubOperatorRoleProjectionUpdater{err: errors.New("boom")}
-	operator := domainoperator.NewOperator(88, 701, "Router User")
+	operator := &operatorapp.OperatorResult{ID: 801, OrgID: 88, UserID: 701, Name: "Router User", IsActive: true}
 
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {

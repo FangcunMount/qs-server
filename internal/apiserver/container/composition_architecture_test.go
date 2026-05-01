@@ -16,8 +16,6 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 
 	root := repoRoot(t)
 	allowedDefinitions := map[string]string{
-		"internal/apiserver/container/assembler/actor.go:ActorModule.SetEvaluationServices":        "post_wire_dependency",
-		"internal/apiserver/container/assembler/actor.go:ActorModule.SetQRCodeService":             "qrcode_fanout",
 		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetScaleRepository": "compat_legacy",
 		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetQRCodeService":   "compat_noop",
 		"internal/apiserver/container/assembler/scale.go:ScaleModule.SetQRCodeService":             "qrcode_fanout",
@@ -82,6 +80,112 @@ func TestAPIServerPostWireCallsStayInModuleGraph(t *testing.T) {
 	})
 }
 
+func TestActorAssemblerDoesNotImportRESTHandlers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "actor.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imported := range parsed.Imports {
+		importPath := strings.Trim(imported.Path.Value, `"`)
+		if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler") {
+			t.Fatalf("internal/apiserver/container/assembler/actor.go imports %s; actor REST handlers must be composed inside transport/rest", importPath)
+		}
+	}
+}
+
+func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "actor.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, decl := range parsed.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || typeSpec.Name.Name != "ActorModule" {
+				continue
+			}
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			for _, field := range structType.Fields.List {
+				for _, name := range field.Names {
+					if strings.HasSuffix(name.Name, "Repo") {
+						t.Fatalf("ActorModule exposes %s; actor repositories must stay private to the actor assembler", name.Name)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestActorTransportsDoNotDependOnActorRepositoryImplementations(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, relRoot := range []string{
+		filepath.Join("internal", "apiserver", "transport", "rest"),
+		filepath.Join("internal", "apiserver", "transport", "grpc"),
+	} {
+		scanGoFiles(t, filepath.Join(root, relRoot), func(path string, file *ast.File) {
+			for _, imported := range file.Imports {
+				importPath := strings.Trim(imported.Path.Value, `"`)
+				switch {
+				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"):
+					rel := filepath.ToSlash(mustRel(t, root, path))
+					t.Fatalf("%s imports %s; actor transport must consume application ports/read models, not actor infra repositories", rel, importPath)
+				case strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"):
+					rel := filepath.ToSlash(mustRel(t, root, path))
+					t.Fatalf("%s imports %s; actor transport must not depend on cached actor repositories", rel, importPath)
+				}
+			}
+		})
+	}
+}
+
+func TestActorTransportsDoNotReferToActorDomainRepositories(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, relRoot := range []string{
+		filepath.Join("internal", "apiserver", "transport", "rest"),
+		filepath.Join("internal", "apiserver", "transport", "grpc"),
+	} {
+		scanGoSourceFiles(t, filepath.Join(root, relRoot), func(path, content string) {
+			parsed, err := parser.ParseFile(token.NewFileSet(), path, []byte(content), parser.ImportsOnly)
+			if err != nil {
+				t.Fatal(err)
+			}
+			for _, imported := range parsed.Imports {
+				importPath := strings.Trim(imported.Path.Value, `"`)
+				if !strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/") {
+					continue
+				}
+				alias := importAlias(imported, importPath)
+				if alias == "" {
+					continue
+				}
+				if strings.Contains(content, alias+".Repository") {
+					rel := filepath.ToSlash(mustRel(t, root, path))
+					t.Fatalf("%s refers to %s.Repository; actor transport must not hold actor domain repositories", rel, alias)
+				}
+			}
+		})
+	}
+}
+
 func receiverTypeName(fn *ast.FuncDecl) string {
 	if fn == nil || fn.Recv == nil || len(fn.Recv.List) == 0 {
 		return ""
@@ -95,6 +199,19 @@ func receiverTypeName(fn *ast.FuncDecl) string {
 		}
 	}
 	return ""
+}
+
+func importAlias(imported *ast.ImportSpec, importPath string) string {
+	if imported.Name != nil {
+		if imported.Name.Name == "_" || imported.Name.Name == "." {
+			return ""
+		}
+		return imported.Name.Name
+	}
+	if idx := strings.LastIndex(importPath, "/"); idx >= 0 {
+		return importPath[idx+1:]
+	}
+	return importPath
 }
 
 func repoRoot(t *testing.T) string {

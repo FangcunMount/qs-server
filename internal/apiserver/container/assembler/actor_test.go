@@ -4,7 +4,6 @@ import (
 	"testing"
 	"time"
 
-	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
@@ -19,7 +18,7 @@ func TestNewActorModuleRequiresMySQLDB(t *testing.T) {
 	}
 }
 
-func TestNewActorModuleUsesCachedTesteeRepoWhenRedisConfigured(t *testing.T) {
+func TestNewActorModuleAcceptsRedisConfiguredTesteeCache(t *testing.T) {
 	t.Parallel()
 
 	redisClient := redis.NewClient(&redis.Options{Addr: "127.0.0.1:0"})
@@ -34,7 +33,7 @@ func TestNewActorModuleUsesCachedTesteeRepoWhenRedisConfigured(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewActorModule() error = %v", err)
 	}
-	if _, ok := module.TesteeRepo.(*testeeCache.CachedTesteeRepository); !ok {
-		t.Fatalf("TesteeRepo type = %T, want *cache.CachedTesteeRepository", module.TesteeRepo)
+	if module.TesteeRegistrationService == nil || module.TesteeQueryService == nil {
+		t.Fatalf("actor module services were not initialized")
 	}
 }

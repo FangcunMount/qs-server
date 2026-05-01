@@ -2,7 +2,6 @@ package handler
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -12,11 +11,9 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/gin-gonic/gin"
 )
 
@@ -29,8 +26,7 @@ type TesteeHandler struct {
 	clinicianQueryService        clinicianApp.ClinicianQueryService
 	clinicianRelationshipService clinicianApp.ClinicianRelationshipService
 	testeeAccessService          actorAccessApp.TesteeAccessService
-	assessmentManagementService  assessmentApp.AssessmentManagementService
-	scoreQueryService            assessmentApp.ScoreQueryService
+	scaleAnalysisQueryService    testeeApp.ScaleAnalysisQueryService
 }
 
 type testeeListQuery struct {
@@ -49,8 +45,7 @@ func NewTesteeHandler(
 	clinicianQueryService clinicianApp.ClinicianQueryService,
 	clinicianRelationshipService clinicianApp.ClinicianRelationshipService,
 	testeeAccessService actorAccessApp.TesteeAccessService,
-	assessmentManagementService assessmentApp.AssessmentManagementService,
-	scoreQueryService assessmentApp.ScoreQueryService,
+	scaleAnalysisQueryService testeeApp.ScaleAnalysisQueryService,
 ) *TesteeHandler {
 	return &TesteeHandler{
 		BaseHandler:                  NewBaseHandler(),
@@ -60,8 +55,7 @@ func NewTesteeHandler(
 		clinicianQueryService:        clinicianQueryService,
 		clinicianRelationshipService: clinicianRelationshipService,
 		testeeAccessService:          testeeAccessService,
-		assessmentManagementService:  assessmentManagementService,
-		scoreQueryService:            scoreQueryService,
+		scaleAnalysisQueryService:    scaleAnalysisQueryService,
 	}
 }
 
@@ -171,12 +165,15 @@ func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	assessments, err := h.listTesteeAssessments(c, orgID, id)
+	result, err := h.scaleAnalysisQueryService.GetScaleAnalysis(c.Request.Context(), testeeApp.ScaleAnalysisQueryDTO{
+		OrgID:    orgID,
+		TesteeID: id,
+	})
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	h.Success(c, h.buildScaleAnalysisResponse(c, assessments))
+	h.Success(c, toScaleAnalysisResponse(result))
 }
 
 // GetPeriodicStats 获取受试者周期统计。
@@ -387,70 +384,6 @@ func (h *TesteeHandler) ensureTesteeExists(c *gin.Context, action string, testee
 	return nil
 }
 
-func (h *TesteeHandler) listTesteeAssessments(c *gin.Context, orgID int64, testeeID uint64) ([]*assessmentApp.AssessmentResult, error) {
-	orgScope, err := safeconv.Int64ToUint64(orgID)
-	if err != nil {
-		return nil, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64")
-	}
-	listDTO := assessmentApp.ListAssessmentsDTO{
-		OrgID:    orgScope,
-		Page:     1,
-		PageSize: 1000,
-		Conditions: map[string]string{
-			"testee_id": strconv.FormatUint(testeeID, 10),
-		},
-	}
-
-	assessmentList, err := h.assessmentManagementService.List(c.Request.Context(), listDTO)
-	if err != nil {
-		logger.L(c.Request.Context()).Errorw("Failed to list assessments",
-			"action", "get_scale_analysis",
-			"testee_id", testeeID,
-			"error", err.Error(),
-		)
-		return nil, err
-	}
-	return assessmentList.Items, nil
-}
-
-func (h *TesteeHandler) buildScaleAnalysisResponse(c *gin.Context, assessments []*assessmentApp.AssessmentResult) *response.ScaleAnalysisResponse {
-	scaleMap := make(map[string]*response.ScaleTrendResponse)
-	for _, assessment := range assessments {
-		if !isInterpretedScaleAssessment(assessment) {
-			continue
-		}
-		h.appendScaleTrendRecord(c, scaleMap, assessment)
-	}
-	return &response.ScaleAnalysisResponse{Scales: flattenScaleTrendMap(scaleMap)}
-}
-
-func (h *TesteeHandler) appendScaleTrendRecord(c *gin.Context, scaleMap map[string]*response.ScaleTrendResponse, assessment *assessmentApp.AssessmentResult) {
-	scaleTrend := ensureScaleTrend(scaleMap, assessment)
-	scaleTrend.Tests = append(scaleTrend.Tests, buildScaleTestRecord(assessment, h.loadScaleFactors(c, assessment.ID)))
-}
-
-func (h *TesteeHandler) loadScaleFactors(c *gin.Context, assessmentID uint64) []response.ScaleFactorResponse {
-	if h == nil || h.scoreQueryService == nil {
-		return []response.ScaleFactorResponse{}
-	}
-	scoreResult, err := h.scoreQueryService.GetByAssessmentID(c.Request.Context(), assessmentID)
-	if err != nil || scoreResult == nil {
-		return []response.ScaleFactorResponse{}
-	}
-
-	factors := make([]response.ScaleFactorResponse, 0, len(scoreResult.FactorScores))
-	for _, factorScore := range scoreResult.FactorScores {
-		factors = append(factors, response.ScaleFactorResponse{
-			FactorCode:     factorScore.FactorCode,
-			FactorName:     factorScore.FactorName,
-			RawScore:       factorScore.RawScore,
-			RiskLevel:      factorScore.RiskLevel,
-			RiskLevelLabel: response.LabelForRiskLevel(factorScore.RiskLevel),
-		})
-	}
-	return factors
-}
-
 func (h *TesteeHandler) parseTesteeListQuery(c *gin.Context) (*testeeListQuery, error) {
 	var req request.ListTesteeRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -563,14 +496,6 @@ func (h *TesteeHandler) validateProtectedTesteeAccess(c *gin.Context, testeeID u
 		return 0, 0, err
 	}
 	return orgID, operatorUserID, nil
-}
-
-func (h *TesteeHandler) SetEvaluationServices(
-	assessmentManagementService assessmentApp.AssessmentManagementService,
-	scoreQueryService assessmentApp.ScoreQueryService,
-) {
-	h.assessmentManagementService = assessmentManagementService
-	h.scoreQueryService = scoreQueryService
 }
 
 func parseInclusiveLocalDateRange(startRaw, endRaw string) (*time.Time, *time.Time, error) {
@@ -756,87 +681,43 @@ func toTesteeListResponse(results []*testeeApp.TesteeResult, total int64, page, 
 	}
 }
 
-func ensureScaleTrend(scaleMap map[string]*response.ScaleTrendResponse, assessment *assessmentApp.AssessmentResult) *response.ScaleTrendResponse {
-	scaleCode := *assessment.MedicalScaleCode
-	if scaleTrend, exists := scaleMap[scaleCode]; exists {
-		return scaleTrend
+func toScaleAnalysisResponse(result *testeeApp.ScaleAnalysisQueryResult) *response.ScaleAnalysisResponse {
+	resp := &response.ScaleAnalysisResponse{Scales: []response.ScaleTrendResponse{}}
+	if result == nil {
+		return resp
 	}
-
-	scaleTrend := &response.ScaleTrendResponse{
-		ScaleID:   scaleIDForAssessment(assessment),
-		ScaleCode: scaleCode,
-		ScaleName: scaleNameForAssessment(assessment),
-		Tests:     []response.ScaleTestResponse{},
+	resp.Scales = make([]response.ScaleTrendResponse, 0, len(result.Scales))
+	for _, scale := range result.Scales {
+		tests := make([]response.ScaleTestResponse, 0, len(scale.Tests))
+		for _, test := range scale.Tests {
+			factors := make([]response.ScaleFactorResponse, 0, len(test.Factors))
+			for _, factor := range test.Factors {
+				factors = append(factors, response.ScaleFactorResponse{
+					FactorCode:     factor.FactorCode,
+					FactorName:     factor.FactorName,
+					RawScore:       factor.RawScore,
+					RiskLevel:      factor.RiskLevel,
+					RiskLevelLabel: response.LabelForRiskLevel(factor.RiskLevel),
+				})
+			}
+			tests = append(tests, response.ScaleTestResponse{
+				AssessmentID:   strconv.FormatUint(test.AssessmentID, 10),
+				TestDate:       response.FormatDateTimeValue(test.TestDate),
+				TotalScore:     test.TotalScore,
+				RiskLevel:      test.RiskLevel,
+				RiskLevelLabel: response.LabelForRiskLevel(test.RiskLevel),
+				Result:         test.Result,
+				Factors:        factors,
+			})
+		}
+		resp.Scales = append(resp.Scales, response.ScaleTrendResponse{
+			ScaleID:   scale.ScaleID,
+			ScaleCode: scale.ScaleCode,
+			ScaleName: scale.ScaleName,
+			Tests:     tests,
+		})
 	}
-	scaleMap[scaleCode] = scaleTrend
-	return scaleTrend
-}
-
-func buildScaleTestRecord(assessment *assessmentApp.AssessmentResult, factors []response.ScaleFactorResponse) response.ScaleTestResponse {
-	totalScore := 0.0
-	if assessment.TotalScore != nil {
-		totalScore = *assessment.TotalScore
-	}
-	riskLevel := ""
-	if assessment.RiskLevel != nil {
-		riskLevel = *assessment.RiskLevel
-	}
-
-	return response.ScaleTestResponse{
-		AssessmentID:   strconv.FormatUint(assessment.ID, 10),
-		TestDate:       response.FormatDateTimeValue(scaleTestDate(assessment)),
-		TotalScore:     totalScore,
-		RiskLevel:      riskLevel,
-		RiskLevelLabel: response.LabelForRiskLevel(riskLevel),
-		Result:         "",
-		Factors:        factors,
-	}
-}
-
-func isInterpretedScaleAssessment(assessment *assessmentApp.AssessmentResult) bool {
-	return assessment != nil && assessment.Status == "interpreted" && assessment.MedicalScaleCode != nil
-}
-
-func scaleIDForAssessment(assessment *assessmentApp.AssessmentResult) string {
-	if assessment.MedicalScaleID == nil {
-		return ""
-	}
-	return strconv.FormatUint(*assessment.MedicalScaleID, 10)
-}
-
-func scaleNameForAssessment(assessment *assessmentApp.AssessmentResult) string {
-	if assessment.MedicalScaleName == nil {
-		return ""
-	}
-	return *assessment.MedicalScaleName
-}
-
-func scaleTestDate(assessment *assessmentApp.AssessmentResult) time.Time {
-	if assessment.InterpretedAt != nil {
-		return *assessment.InterpretedAt
-	}
-	if assessment.SubmittedAt != nil {
-		return *assessment.SubmittedAt
-	}
-	return time.Time{}
-}
-
-func flattenScaleTrendMap(scaleMap map[string]*response.ScaleTrendResponse) []response.ScaleTrendResponse {
-	scales := make([]response.ScaleTrendResponse, 0, len(scaleMap))
-	for _, scaleTrend := range scaleMap {
-		sortScaleTrendTests(scaleTrend.Tests)
-		scales = append(scales, *scaleTrend)
-	}
-	sort.Slice(scales, func(i, j int) bool {
-		return scales[i].ScaleCode < scales[j].ScaleCode
-	})
-	return scales
-}
-
-func sortScaleTrendTests(tests []response.ScaleTestResponse) {
-	sort.Slice(tests, func(i, j int) bool {
-		return tests[i].TestDate < tests[j].TestDate
-	})
+	return resp
 }
 
 func containsUint64(items []uint64, target uint64) bool {

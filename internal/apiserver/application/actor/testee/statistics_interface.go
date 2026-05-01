@@ -21,6 +21,43 @@ type TesteeStatisticsService interface {
 	GetPeriodicStats(ctx context.Context, testeeID uint64) (*PeriodicStatsResult, error)
 }
 
+type ScaleAnalysisQueryService interface {
+	GetScaleAnalysis(ctx context.Context, dto ScaleAnalysisQueryDTO) (*ScaleAnalysisQueryResult, error)
+}
+
+type ScaleAnalysisQueryDTO struct {
+	OrgID    int64
+	TesteeID uint64
+}
+
+type ScaleAnalysisQueryResult struct {
+	TesteeID uint64
+	Scales   []ScaleTrendQueryResult
+}
+
+type ScaleTrendQueryResult struct {
+	ScaleID   string
+	ScaleCode string
+	ScaleName string
+	Tests     []ScaleTestQueryResult
+}
+
+type ScaleTestQueryResult struct {
+	AssessmentID uint64
+	TestDate     time.Time
+	TotalScore   float64
+	RiskLevel    string
+	Result       string
+	Factors      []ScaleFactorQueryResult
+}
+
+type ScaleFactorQueryResult struct {
+	FactorCode string
+	FactorName string
+	RawScore   float64
+	RiskLevel  string
+}
+
 // ============= Statistics DTOs =============
 
 // ScaleAnalysisResult 量表趋势分析结果

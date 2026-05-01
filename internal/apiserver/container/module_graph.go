@@ -21,17 +21,6 @@ func (g moduleGraph) postWireScaleDependencies() {
 	c.SurveyModule.SetScaleRepository(c.ScaleModule.Repo)
 }
 
-func (g moduleGraph) postWireEvaluationDependencies() {
-	c := g.container
-	if c == nil || c.ActorModule == nil || c.EvaluationModule == nil {
-		return
-	}
-	c.ActorModule.SetEvaluationServices(
-		c.EvaluationModule.ManagementService,
-		c.EvaluationModule.ScoreQueryService,
-	)
-}
-
 func (g moduleGraph) postWireCacheGovernanceDependencies() {
 	c := g.container
 	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.Handler == nil {
@@ -59,8 +48,5 @@ func (g moduleGraph) postWireQRCodeService() {
 	}
 	if c.ScaleModule != nil {
 		c.ScaleModule.SetQRCodeService(c.QRCodeService)
-	}
-	if c.ActorModule != nil {
-		c.ActorModule.SetQRCodeService(c.QRCodeService)
 	}
 }

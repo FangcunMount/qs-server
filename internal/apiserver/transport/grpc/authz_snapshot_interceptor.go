@@ -7,8 +7,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
+	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	grpcctx "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	grpcapi "google.golang.org/grpc"
@@ -20,7 +20,7 @@ import (
 // 与 HTTP 的 AuthzSnapshotMiddleware 对齐，供 TesteeAccessService、Capability 等使用。
 func NewAuthzSnapshotUnaryInterceptor(
 	loader *iam.AuthzSnapshotLoader,
-	repo domainoperator.Repository,
+	updater operatorapp.OperatorRoleProjectionUpdater,
 ) grpcapi.UnaryServerInterceptor {
 	if loader == nil {
 		return func(ctx context.Context, req interface{}, _ *grpcapi.UnaryServerInfo, handler grpcapi.UnaryHandler) (interface{}, error) {
@@ -44,18 +44,16 @@ func NewAuthzSnapshotUnaryInterceptor(
 		if err != nil {
 			return nil, status.Errorf(codes.Unavailable, "failed to load authorization snapshot: %v", err)
 		}
-		if repo != nil {
+		if updater != nil {
 			orgID, orgErr := strconv.ParseInt(tenantID, 10, 64)
 			userID, userErr := strconv.ParseInt(userIDStr, 10, 64)
 			if orgErr == nil && userErr == nil {
-				if op, err := repo.FindByUser(ctx, orgID, userID); err == nil {
-					if _, err := iam.PersistOperatorRolesProjectionFromSnapshot(ctx, repo, op, snap); err != nil {
-						logger.L(ctx).Warnw("failed to persist operator roles projection from IAM snapshot",
-							"org_id", orgID,
-							"user_id", userID,
-							"error", err.Error(),
-						)
-					}
+				if err := updater.PersistFromSnapshotByUser(ctx, orgID, userID, snap); err != nil {
+					logger.L(ctx).Warnw("failed to persist operator roles projection from IAM snapshot",
+						"org_id", orgID,
+						"user_id", userID,
+						"error", err.Error(),
+					)
 				}
 			}
 		}

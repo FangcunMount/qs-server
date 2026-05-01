@@ -2,12 +2,12 @@ package container
 
 import (
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answersheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -17,9 +17,9 @@ import (
 // ServerGRPCBootstrapDeps describes the narrow container-owned dependencies
 // needed to build the process gRPC server.
 type ServerGRPCBootstrapDeps struct {
-	AuthzSnapshotLoader *iaminfra.AuthzSnapshotLoader
-	ActiveOperatorRepo  domainoperator.Repository
-	TokenVerifier       *auth.TokenVerifier
+	AuthzSnapshotLoader           *iaminfra.AuthzSnapshotLoader
+	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater
+	TokenVerifier                 *auth.TokenVerifier
 }
 
 // ServerRuntimeDeps describes the narrow container-owned dependencies needed by
@@ -45,7 +45,7 @@ func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
 		deps.TokenVerifier = c.IAMModule.SDKTokenVerifier()
 	}
 	if c.ActorModule != nil {
-		deps.ActiveOperatorRepo = c.ActorModule.OperatorRepo
+		deps.OperatorRoleProjectionUpdater = c.ActorModule.OperatorRoleProjectionUpdater
 	}
 	return deps
 }

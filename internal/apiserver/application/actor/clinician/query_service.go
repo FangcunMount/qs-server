@@ -4,27 +4,26 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
-	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 )
 
 type queryService struct {
-	repo                domainClinician.Repository
-	relationRepo        domainRelation.Repository
-	assessmentEntryRepo assessmentEntryDomain.Repository
+	clinicianReader       actorreadmodel.ClinicianReader
+	relationReader        actorreadmodel.RelationReader
+	assessmentEntryReader actorreadmodel.AssessmentEntryReader
 }
 
 // NewQueryService 创建从业者查询服务。
 func NewQueryService(
-	repo domainClinician.Repository,
-	relationRepo domainRelation.Repository,
-	assessmentEntryRepo assessmentEntryDomain.Repository,
+	clinicianReader actorreadmodel.ClinicianReader,
+	relationReader actorreadmodel.RelationReader,
+	assessmentEntryReader actorreadmodel.AssessmentEntryReader,
 ) ClinicianQueryService {
 	return &queryService{
-		repo:                repo,
-		relationRepo:        relationRepo,
-		assessmentEntryRepo: assessmentEntryRepo,
+		clinicianReader:       clinicianReader,
+		relationReader:        relationReader,
+		assessmentEntryReader: assessmentEntryReader,
 	}
 }
 
@@ -33,35 +32,39 @@ func (s *queryService) GetByID(ctx context.Context, clinicianID uint64) (*Clinic
 	if err != nil {
 		return nil, err
 	}
-	item, err := s.repo.FindByID(ctx, targetClinicianID)
+	item, err := s.clinicianReader.GetClinician(ctx, targetClinicianID.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find clinician")
 	}
-	return s.enrichCounts(ctx, toClinicianResult(item))
+	return s.enrichCounts(ctx, toClinicianResultFromRow(item))
 }
 
 func (s *queryService) GetByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianResult, error) {
-	item, err := s.repo.FindByOperator(ctx, orgID, operatorID)
+	item, err := s.clinicianReader.FindClinicianByOperator(ctx, orgID, operatorID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find clinician by operator")
 	}
-	return s.enrichCounts(ctx, toClinicianResult(item))
+	return s.enrichCounts(ctx, toClinicianResultFromRow(item))
 }
 
 func (s *queryService) ListClinicians(ctx context.Context, dto ListClinicianDTO) (*ClinicianListResult, error) {
-	items, err := s.repo.ListByOrg(ctx, dto.OrgID, dto.Offset, dto.Limit)
+	items, err := s.clinicianReader.ListClinicians(ctx, actorreadmodel.ClinicianFilter{
+		OrgID:  dto.OrgID,
+		Offset: dto.Offset,
+		Limit:  dto.Limit,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list clinicians")
 	}
 
-	totalCount, err := s.repo.Count(ctx, dto.OrgID)
+	totalCount, err := s.clinicianReader.CountClinicians(ctx, dto.OrgID)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count clinicians")
 	}
 
 	results := make([]*ClinicianResult, 0, len(items))
-	for _, item := range items {
-		enriched, err := s.enrichCounts(ctx, toClinicianResult(item))
+	for i := range items {
+		enriched, err := s.enrichCounts(ctx, toClinicianResultFromRow(&items[i]))
 		if err != nil {
 			return nil, err
 		}
@@ -80,32 +83,24 @@ func (s *queryService) enrichCounts(ctx context.Context, item *ClinicianResult) 
 	if item == nil {
 		return nil, nil
 	}
-	if s.relationRepo != nil {
-		clinicianID, err := clinicianIDFromUint64("clinician_id", item.ID)
-		if err != nil {
-			return nil, err
-		}
-		ids, err := s.relationRepo.ListActiveTesteeIDsByClinician(
+	if s.relationReader != nil {
+		ids, err := s.relationReader.ListActiveTesteeIDsByClinician(
 			ctx,
 			item.OrgID,
-			clinicianID,
-			domainRelation.AccessGrantRelationTypes(),
+			item.ID,
+			relationTypesToStrings(domainRelation.AccessGrantRelationTypes()),
 		)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to count accessible testees")
 		}
 		seen := make(map[uint64]struct{}, len(ids))
 		for _, id := range ids {
-			seen[id.Uint64()] = struct{}{}
+			seen[id] = struct{}{}
 		}
 		item.AssignedTesteeCount = int64(len(seen))
 	}
-	if s.assessmentEntryRepo != nil {
-		clinicianID, err := clinicianIDFromUint64("clinician_id", item.ID)
-		if err != nil {
-			return nil, err
-		}
-		count, err := s.assessmentEntryRepo.CountByClinician(ctx, item.OrgID, clinicianID)
+	if s.assessmentEntryReader != nil {
+		count, err := s.assessmentEntryReader.CountAssessmentEntriesByClinician(ctx, item.OrgID, item.ID)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to count assessment entries")
 		}

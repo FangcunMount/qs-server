@@ -109,8 +109,8 @@ func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, r
 			group.Use(restmiddleware.UserIdentityMiddleware())
 			group.Use(restmiddleware.RequireTenantIDMiddleware())
 			group.Use(restmiddleware.RequireNumericOrgScopeMiddleware())
-			if r.deps.Actor.ActiveOperatorRepo != nil {
-				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.deps.Actor.ActiveOperatorRepo))
+			if r.deps.Actor.ActiveOperatorChecker != nil {
+				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.deps.Actor.ActiveOperatorChecker))
 			}
 			if loader := r.deps.IAM.SnapshotLoader; loader != nil {
 				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, r.deps.Actor.OperatorRoleProjectionUpdater))

@@ -17,12 +17,30 @@ func NewRoleProjectionUpdater(repo domain.Repository) OperatorRoleProjectionUpda
 	return roleProjectionUpdater{repo: repo}
 }
 
-func (u roleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *domain.Operator, snap *authzapp.Snapshot) error {
+func (u roleProjectionUpdater) PersistFromSnapshot(ctx context.Context, op *OperatorResult, snap *authzapp.Snapshot) error {
 	if u.repo == nil || op == nil || snap == nil {
 		return nil
 	}
+	item, err := u.repo.FindByID(ctx, domain.ID(op.ID))
+	if err != nil {
+		return err
+	}
+	return persistOperatorRolesFromNames(ctx, u.repo, item, snap.RoleNames())
+}
 
+func (u roleProjectionUpdater) PersistFromSnapshotByUser(ctx context.Context, orgID int64, userID int64, snap *authzapp.Snapshot) error {
+	if u.repo == nil || snap == nil {
+		return nil
+	}
+	op, err := u.repo.FindByUser(ctx, orgID, userID)
+	if err != nil {
+		return err
+	}
 	return persistOperatorRolesFromNames(ctx, u.repo, op, snap.RoleNames())
+}
+
+func (u roleProjectionUpdater) SyncRoles(ctx context.Context, orgID int64, operatorID uint64) error {
+	return nil
 }
 
 func persistOperatorRolesFromNames(ctx context.Context, repo domain.Repository, op *domain.Operator, roles []string) error {

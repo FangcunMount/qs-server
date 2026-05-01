@@ -31,38 +31,4 @@ type Repository interface {
 		testeeID testee.ID,
 		relationTypes []RelationType,
 	) (*ClinicianTesteeRelation, error)
-	ListActiveByClinician(
-		ctx context.Context,
-		orgID int64,
-		clinicianID clinician.ID,
-		relationTypes []RelationType,
-		offset, limit int,
-	) ([]*ClinicianTesteeRelation, error)
-	ListHistoryByClinician(ctx context.Context, orgID int64, clinicianID clinician.ID) ([]*ClinicianTesteeRelation, error)
-	CountActiveByClinician(
-		ctx context.Context,
-		orgID int64,
-		clinicianID clinician.ID,
-		relationTypes []RelationType,
-	) (int64, error)
-	ListActiveByTestee(
-		ctx context.Context,
-		orgID int64,
-		testeeID testee.ID,
-		relationTypes []RelationType,
-	) ([]*ClinicianTesteeRelation, error)
-	ListHistoryByTestee(ctx context.Context, orgID int64, testeeID testee.ID) ([]*ClinicianTesteeRelation, error)
-	HasActiveRelationForTestee(
-		ctx context.Context,
-		orgID int64,
-		clinicianID clinician.ID,
-		testeeID testee.ID,
-		relationTypes []RelationType,
-	) (bool, error)
-	ListActiveTesteeIDsByClinician(
-		ctx context.Context,
-		orgID int64,
-		clinicianID clinician.ID,
-		relationTypes []RelationType,
-	) ([]testee.ID, error)
 }

@@ -18,9 +18,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
-	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	scaleDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -58,17 +55,15 @@ type SurveyDeps struct {
 }
 
 type ActorDeps struct {
-	TesteeRegistrationService    testeeApp.TesteeRegistrationService
-	TesteeManagementService      testeeApp.TesteeManagementService
-	TesteeQueryService           testeeApp.TesteeQueryService
-	ClinicianRelationshipService clinicianApp.ClinicianRelationshipService
-	AssessmentEntryRepo          assessmentEntryDomain.Repository
-	TesteeRepo                   testee.Repository
-	TesteeTaggingService         testeeApp.TesteeTaggingService
-	OperatorLifecycleService     operatorApp.OperatorLifecycleService
-	OperatorAuthorizationService operatorApp.OperatorAuthorizationService
-	OperatorQueryService         operatorApp.OperatorQueryService
-	OperatorRepo                 domainoperator.Repository
+	TesteeRegistrationService     testeeApp.TesteeRegistrationService
+	TesteeManagementService       testeeApp.TesteeManagementService
+	TesteeQueryService            testeeApp.TesteeQueryService
+	ClinicianRelationshipService  clinicianApp.ClinicianRelationshipService
+	TesteeTaggingService          testeeApp.TesteeTaggingService
+	OperatorLifecycleService      operatorApp.OperatorLifecycleService
+	OperatorAuthorizationService  operatorApp.OperatorAuthorizationService
+	OperatorQueryService          operatorApp.OperatorQueryService
+	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater
 }
 
 type EvaluationDeps struct {
@@ -174,8 +169,7 @@ func (r *Registry) registerActorService() error {
 	if r.deps.Actor.TesteeRegistrationService == nil ||
 		r.deps.Actor.TesteeManagementService == nil ||
 		r.deps.Actor.TesteeQueryService == nil ||
-		r.deps.Actor.ClinicianRelationshipService == nil ||
-		r.deps.Actor.AssessmentEntryRepo == nil {
+		r.deps.Actor.ClinicianRelationshipService == nil {
 		log.Warn("ActorModule is not initialized, skipping actor service registration")
 		return nil
 	}
@@ -185,7 +179,6 @@ func (r *Registry) registerActorService() error {
 		r.deps.Actor.TesteeManagementService,
 		r.deps.Actor.TesteeQueryService,
 		r.deps.Actor.ClinicianRelationshipService,
-		r.deps.Actor.AssessmentEntryRepo,
 	)
 	r.server.RegisterService(actorService)
 	log.Info("   👥 Actor service registered")
@@ -196,7 +189,6 @@ func (r *Registry) registerEvaluationService() error {
 	if r.deps.Evaluation.SubmissionService == nil ||
 		r.deps.Evaluation.ReportQueryService == nil ||
 		r.deps.Evaluation.ScoreQueryService == nil ||
-		r.deps.Actor.TesteeRepo == nil ||
 		r.deps.Evaluation.AssessmentRepo == nil {
 		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
 		return nil
@@ -206,7 +198,6 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ReportQueryService,
 		r.deps.Evaluation.ScoreQueryService,
-		r.deps.Actor.TesteeRepo,
 		r.deps.Evaluation.AssessmentRepo,
 	)
 	r.server.RegisterService(evaluationService)
@@ -247,8 +238,7 @@ func (r *Registry) registerInternalService() error {
 	if r.deps.Actor.TesteeTaggingService == nil ||
 		r.deps.Actor.OperatorLifecycleService == nil ||
 		r.deps.Actor.OperatorAuthorizationService == nil ||
-		r.deps.Actor.OperatorQueryService == nil ||
-		r.deps.Actor.OperatorRepo == nil {
+		r.deps.Actor.OperatorQueryService == nil {
 		log.Warn("ActorModule is not initialized, skipping internal service registration")
 		return nil
 	}
@@ -273,8 +263,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Actor.OperatorLifecycleService,
 		r.deps.Actor.OperatorAuthorizationService,
 		r.deps.Actor.OperatorQueryService,
-		r.deps.Actor.OperatorRepo,
-		r.deps.IAM.AuthzSnapshotLoader,
+		r.deps.Actor.OperatorRoleProjectionUpdater,
 		r.deps.Statistics.BehaviorProjectorService,
 		r.deps.WarmupCoordinator,
 		r.deps.QRCodeService,
@@ -310,14 +299,12 @@ func (r *Registry) GetRegisteredServices() []string {
 	if r.deps.Actor.TesteeRegistrationService != nil &&
 		r.deps.Actor.TesteeManagementService != nil &&
 		r.deps.Actor.TesteeQueryService != nil &&
-		r.deps.Actor.ClinicianRelationshipService != nil &&
-		r.deps.Actor.AssessmentEntryRepo != nil {
+		r.deps.Actor.ClinicianRelationshipService != nil {
 		services = append(services, "ActorService")
 	}
 	if r.deps.Evaluation.SubmissionService != nil &&
 		r.deps.Evaluation.ReportQueryService != nil &&
 		r.deps.Evaluation.ScoreQueryService != nil &&
-		r.deps.Actor.TesteeRepo != nil &&
 		r.deps.Evaluation.AssessmentRepo != nil {
 		services = append(services, "EvaluationService")
 	}

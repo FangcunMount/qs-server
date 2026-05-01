@@ -1,6 +1,7 @@
 package container
 
 import (
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
@@ -33,14 +34,29 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Scale.Handler = c.ScaleModule.Handler
 	}
 	if c.ActorModule != nil {
-		deps.Actor.TesteeHandler = c.ActorModule.TesteeHandler
-		deps.Actor.OperatorClinicianHandler = c.ActorModule.OperatorClinicianHandler
-		deps.Actor.AssessmentEntryHandler = c.ActorModule.AssessmentEntryHandler
-		deps.Actor.ActiveOperatorRepo = c.ActorModule.OperatorRepo
+		deps.Actor.TesteeManagementService = c.ActorModule.TesteeManagementService
+		deps.Actor.TesteeQueryService = c.ActorModule.TesteeQueryService
+		deps.Actor.TesteeBackendQueryService = c.ActorModule.TesteeBackendQueryService
+		deps.Actor.TesteeAccessService = c.ActorModule.TesteeAccessService
+		deps.Actor.OperatorLifecycleService = c.ActorModule.OperatorLifecycleService
+		deps.Actor.OperatorAuthorizationService = c.ActorModule.OperatorAuthorizationService
+		deps.Actor.OperatorQueryService = c.ActorModule.OperatorQueryService
+		deps.Actor.ClinicianLifecycleService = c.ActorModule.ClinicianLifecycleService
+		deps.Actor.ClinicianQueryService = c.ActorModule.ClinicianQueryService
+		deps.Actor.ClinicianRelationshipService = c.ActorModule.ClinicianRelationshipService
+		deps.Actor.AssessmentEntryService = c.ActorModule.AssessmentEntryService
+		deps.Actor.QRCodeService = c.QRCodeService
+		deps.Actor.ActiveOperatorChecker = c.ActorModule.ActiveOperatorChecker
 		deps.Actor.OperatorRoleProjectionUpdater = c.ActorModule.OperatorRoleProjectionUpdater
 	}
 	if c.EvaluationModule != nil {
 		deps.Evaluation.Handler = c.EvaluationModule.Handler
+		if c.ActorModule != nil {
+			deps.Actor.TesteeScaleAnalysisService = testeeApp.NewScaleAnalysisQueryService(
+				c.EvaluationModule.ManagementService,
+				c.EvaluationModule.ScoreQueryService,
+			)
+		}
 	}
 	if c.PlanModule != nil {
 		deps.Plan.Handler = c.PlanModule.Handler
@@ -131,13 +147,11 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		deps.Actor.TesteeManagementService = c.ActorModule.TesteeManagementService
 		deps.Actor.TesteeQueryService = c.ActorModule.TesteeQueryService
 		deps.Actor.ClinicianRelationshipService = c.ActorModule.ClinicianRelationshipService
-		deps.Actor.AssessmentEntryRepo = c.ActorModule.AssessmentEntryRepo
-		deps.Actor.TesteeRepo = c.ActorModule.TesteeRepo
 		deps.Actor.TesteeTaggingService = c.ActorModule.TesteeTaggingService
 		deps.Actor.OperatorLifecycleService = c.ActorModule.OperatorLifecycleService
 		deps.Actor.OperatorAuthorizationService = c.ActorModule.OperatorAuthorizationService
 		deps.Actor.OperatorQueryService = c.ActorModule.OperatorQueryService
-		deps.Actor.OperatorRepo = c.ActorModule.OperatorRepo
+		deps.Actor.OperatorRoleProjectionUpdater = c.ActorModule.OperatorRoleProjectionUpdater
 	}
 	if c.EvaluationModule != nil {
 		deps.Evaluation.SubmissionService = c.EvaluationModule.SubmissionService

@@ -4,20 +4,20 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 受试者查询服务实现
 // 行为者：所有需要查询受试者信息的用户
 type queryService struct {
-	repo domain.Repository
+	reader actorreadmodel.TesteeReader
 }
 
 // NewQueryService 创建受试者查询服务
-func NewQueryService(repo domain.Repository) TesteeQueryService {
+func NewQueryService(reader actorreadmodel.TesteeReader) TesteeQueryService {
 	return &queryService{
-		repo: repo,
+		reader: reader,
 	}
 }
 
@@ -28,17 +28,17 @@ func (s *queryService) GetByID(ctx context.Context, testeeID uint64) (*TesteeRes
 		return nil, err
 	}
 
-	testee, err := s.repo.FindByID(ctx, resolvedID)
+	testee, err := s.reader.GetTestee(ctx, resolvedID.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find testee")
 	}
 
-	return toTesteeResult(testee), nil
+	return toTesteeResultFromRow(testee), nil
 }
 
 // FindByProfile 根据用户档案ID查询受试者
 func (s *queryService) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*TesteeResult, error) {
-	testee, err := s.repo.FindByProfile(ctx, orgID, profileID)
+	testee, err := s.reader.FindTesteeByProfile(ctx, orgID, profileID)
 	if err != nil {
 		if errors.IsCode(err, code.ErrUserNotFound) {
 			return nil, errors.WithCode(code.ErrUserNotFound, "testee not found")
@@ -46,59 +46,45 @@ func (s *queryService) FindByProfile(ctx context.Context, orgID int64, profileID
 		return nil, errors.Wrap(err, "failed to find testee by profile")
 	}
 
-	return toTesteeResult(testee), nil
+	return toTesteeResultFromRow(testee), nil
 }
 
 // ListTestees 列出受试者
 func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*TesteeListResult, error) {
-	var testees []*domain.Testee
-	var err error
-	var totalCount int64
-
-	filter := domain.ListFilter{
-		Name:           dto.Name,
-		Tags:           dto.Tags,
-		KeyFocus:       dto.KeyFocus,
-		CreatedAtStart: dto.CreatedAtStart,
-		CreatedAtEnd:   dto.CreatedAtEnd,
-	}
-
 	if dto.RestrictToAccessScope {
-		testeeIDs := make([]domain.ID, 0, len(dto.AccessibleTesteeIDs))
 		for _, id := range dto.AccessibleTesteeIDs {
-			resolvedID, err := testeeIDFromUint64("accessible_testee_id", id)
-			if err != nil {
+			if _, err := testeeIDFromUint64("accessible_testee_id", id); err != nil {
 				return nil, err
 			}
-			testeeIDs = append(testeeIDs, resolvedID)
 		}
+	}
 
-		testees, err = s.repo.ListByOrgAndIDs(ctx, dto.OrgID, testeeIDs, filter, dto.Offset, dto.Limit)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to list restricted testees")
-		}
+	filter := actorreadmodel.TesteeFilter{
+		OrgID:                 dto.OrgID,
+		Name:                  dto.Name,
+		Tags:                  dto.Tags,
+		KeyFocus:              dto.KeyFocus,
+		CreatedAtStart:        dto.CreatedAtStart,
+		CreatedAtEnd:          dto.CreatedAtEnd,
+		AccessibleTesteeIDs:   append([]uint64(nil), dto.AccessibleTesteeIDs...),
+		RestrictToAccessScope: dto.RestrictToAccessScope,
+		Offset:                dto.Offset,
+		Limit:                 dto.Limit,
+	}
 
-		totalCount, err = s.repo.CountByOrgAndIDs(ctx, dto.OrgID, testeeIDs, filter)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to count restricted testees")
-		}
-	} else {
-		testees, err = s.repo.ListByOrg(ctx, dto.OrgID, filter, dto.Offset, dto.Limit)
-
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to list testees")
-		}
-
-		totalCount, err = s.repo.Count(ctx, dto.OrgID, filter)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to count testees")
-		}
+	testees, err := s.reader.ListTestees(ctx, filter)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to list testees")
+	}
+	totalCount, err := s.reader.CountTestees(ctx, filter)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to count testees")
 	}
 
 	// 转换为 DTO
 	items := make([]*TesteeResult, len(testees))
-	for i, testee := range testees {
-		items[i] = toTesteeResult(testee)
+	for i := range testees {
+		items[i] = toTesteeResultFromRow(&testees[i])
 	}
 
 	return &TesteeListResult{
@@ -131,23 +117,20 @@ func (s *queryService) ListByProfileIDs(ctx context.Context, profileIDs []uint64
 		}, nil
 	}
 
-	testees, err := s.repo.ListByProfileIDs(ctx, profileIDs, offset, limit)
+	testees, err := s.reader.ListTesteesByProfileIDs(ctx, profileIDs, offset, limit)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list testees by profile IDs")
 	}
 
-	// 注意：这里的总数是所有 profileIDs 的受试者总数
-	// 为了精确计数，我们需要单独查询（不带分页）
-	allTestees, err := s.repo.ListByProfileIDs(ctx, profileIDs, 0, 999999)
+	totalCount, err := s.reader.CountTesteesByProfileIDs(ctx, profileIDs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count testees by profile IDs")
 	}
-	totalCount := int64(len(allTestees))
 
 	// 转换为 DTO
 	items := make([]*TesteeResult, len(testees))
-	for i, testee := range testees {
-		items[i] = toTesteeResult(testee)
+	for i := range testees {
+		items[i] = toTesteeResultFromRow(&testees[i])
 	}
 
 	return &TesteeListResult{

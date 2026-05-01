@@ -9,7 +9,9 @@ import (
 	"strings"
 	"testing"
 
+	assessmentEntryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/assessmententry"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
@@ -34,6 +36,58 @@ func (*routerClinicianQueryStub) ListClinicians(context.Context, clinicianApp.Li
 	return &clinicianApp.ClinicianListResult{
 		Items: []*clinicianApp.ClinicianResult{{ID: 1, OrgID: 88, Name: "Dr. Router", IsActive: true}},
 	}, nil
+}
+
+type routerTesteeQueryStub struct{}
+
+func (*routerTesteeQueryStub) GetByID(context.Context, uint64) (*testeeApp.TesteeResult, error) {
+	return nil, nil
+}
+
+func (*routerTesteeQueryStub) FindByProfile(context.Context, int64, uint64) (*testeeApp.TesteeResult, error) {
+	return nil, nil
+}
+
+func (*routerTesteeQueryStub) ListTestees(context.Context, testeeApp.ListTesteeDTO) (*testeeApp.TesteeListResult, error) {
+	return nil, nil
+}
+
+func (*routerTesteeQueryStub) ListKeyFocus(context.Context, int64, int, int) (*testeeApp.TesteeListResult, error) {
+	return nil, nil
+}
+
+func (*routerTesteeQueryStub) ListByProfileIDs(context.Context, []uint64, int, int) (*testeeApp.TesteeListResult, error) {
+	return nil, nil
+}
+
+type routerAssessmentEntryServiceStub struct{}
+
+func (*routerAssessmentEntryServiceStub) Create(context.Context, assessmentEntryApp.CreateAssessmentEntryDTO) (*assessmentEntryApp.AssessmentEntryResult, error) {
+	return nil, nil
+}
+
+func (*routerAssessmentEntryServiceStub) GetByID(context.Context, uint64) (*assessmentEntryApp.AssessmentEntryResult, error) {
+	return nil, nil
+}
+
+func (*routerAssessmentEntryServiceStub) Deactivate(context.Context, uint64) (*assessmentEntryApp.AssessmentEntryResult, error) {
+	return nil, nil
+}
+
+func (*routerAssessmentEntryServiceStub) Reactivate(context.Context, uint64) (*assessmentEntryApp.AssessmentEntryResult, error) {
+	return nil, nil
+}
+
+func (*routerAssessmentEntryServiceStub) ListByClinician(context.Context, assessmentEntryApp.ListAssessmentEntryDTO) (*assessmentEntryApp.AssessmentEntryListResult, error) {
+	return nil, nil
+}
+
+func (*routerAssessmentEntryServiceStub) Resolve(context.Context, string) (*assessmentEntryApp.ResolvedAssessmentEntryResult, error) {
+	return nil, nil
+}
+
+func (*routerAssessmentEntryServiceStub) Intake(context.Context, string, assessmentEntryApp.IntakeByAssessmentEntryDTO) (*assessmentEntryApp.AssessmentEntryIntakeResult, error) {
+	return nil, nil
 }
 
 func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
@@ -220,16 +274,13 @@ func newRouterTestContainer() *container.Container {
 	evaluationModule := &assembler.EvaluationModule{
 		Handler: handlerpkg.NewEvaluationHandler(nil, nil, nil, nil),
 	}
-	testeeHandler := handlerpkg.NewTesteeHandler(nil, nil, nil, nil, nil, nil, nil, nil)
-	operatorClinicianHandler := handlerpkg.NewOperatorClinicianHandler(nil, nil, nil, nil, clinicianQuery, nil, nil, nil)
-	assessmentEntryHandler := handlerpkg.NewAssessmentEntryHandler(nil, clinicianQuery, nil, nil)
 	return &container.Container{
 		SurveyModule: surveyModule,
 		ScaleModule:  scaleModule,
 		ActorModule: &assembler.ActorModule{
-			TesteeHandler:            testeeHandler,
-			OperatorClinicianHandler: operatorClinicianHandler,
-			AssessmentEntryHandler:   assessmentEntryHandler,
+			TesteeQueryService:     &routerTesteeQueryStub{},
+			ClinicianQueryService:  clinicianQuery,
+			AssessmentEntryService: &routerAssessmentEntryServiceStub{},
 		},
 		EvaluationModule: evaluationModule,
 		PlanModule: &assembler.PlanModule{

@@ -93,47 +93,11 @@ func (s *taggingRepoStub) FindByID(_ context.Context, id domain.ID) (*domain.Tes
 	return s.item, nil
 }
 
-func (s *taggingRepoStub) FindByIDs(context.Context, []domain.ID) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
 func (s *taggingRepoStub) FindByProfile(context.Context, int64, uint64) (*domain.Testee, error) {
 	return nil, nil
 }
 
-func (s *taggingRepoStub) FindByOrgAndName(context.Context, int64, string) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
-func (s *taggingRepoStub) ListByOrg(context.Context, int64, domain.ListFilter, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
-func (s *taggingRepoStub) ListByOrgAndIDs(context.Context, int64, []domain.ID, domain.ListFilter, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
-func (s *taggingRepoStub) ListByTags(context.Context, int64, []string, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
-func (s *taggingRepoStub) ListKeyFocus(context.Context, int64, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
-func (s *taggingRepoStub) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-
 func (s *taggingRepoStub) Delete(context.Context, domain.ID) error { return nil }
-
-func (s *taggingRepoStub) Count(context.Context, int64, domain.ListFilter) (int64, error) {
-	return 0, nil
-}
-
-func (s *taggingRepoStub) CountByOrgAndIDs(context.Context, int64, []domain.ID, domain.ListFilter) (int64, error) {
-	return 0, nil
-}
 
 func assertStrings(t *testing.T, actual, expected []string) {
 	t.Helper()

@@ -72,8 +72,8 @@ func newAuthzSnapshotMiddleware(
 			if op := GetCurrentOperator(c); op != nil {
 				if err := updater.PersistFromSnapshot(c.Request.Context(), op, snap); err != nil {
 					logger.L(c.Request.Context()).Warnw("failed to persist operator roles projection from IAM snapshot",
-						"org_id", op.OrgID(),
-						"user_id", op.UserID(),
+						"org_id", op.OrgID,
+						"user_id", op.UserID,
 						"error", err.Error(),
 					)
 				}

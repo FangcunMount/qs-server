@@ -5,13 +5,13 @@ import (
 	"testing"
 	"time"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 )
 
 func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 	repo := &queryServiceRepoStub{
-		listByOrgItems: []*domain.Testee{makeQueryServiceTestee(21, time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC))},
-		countValue:     7,
+		listItems:  []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(21, time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC))},
+		countValue: 7,
 	}
 	service := NewQueryService(repo)
 	keyFocus := false
@@ -31,11 +31,11 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTestees returned error: %v", err)
 	}
-	if repo.listByOrgCalls != 1 || repo.countCalls != 1 {
-		t.Fatalf("expected unrestricted list/count to be called once, got list=%d count=%d", repo.listByOrgCalls, repo.countCalls)
+	if repo.listCalls != 1 || repo.countCalls != 1 {
+		t.Fatalf("expected unrestricted list/count to be called once, got list=%d count=%d", repo.listCalls, repo.countCalls)
 	}
-	if repo.listByOrgAndIDsCalls != 0 || repo.countByOrgAndIDsCalls != 0 {
-		t.Fatalf("expected restricted methods not to be used")
+	if repo.lastFilter.RestrictToAccessScope {
+		t.Fatalf("expected unrestricted filter, got %+v", repo.lastFilter)
 	}
 	if repo.lastFilter.Name != "张" || len(repo.lastFilter.Tags) != 1 || repo.lastFilter.Tags[0] != "重点" {
 		t.Fatalf("unexpected filter passed to repo: %+v", repo.lastFilter)
@@ -56,8 +56,8 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 
 func TestListTesteesUsesUnifiedFilterForRestrictedQueries(t *testing.T) {
 	repo := &queryServiceRepoStub{
-		listByOrgAndIDsItems:  []*domain.Testee{makeQueryServiceTestee(31, time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC))},
-		countByOrgAndIDsValue: 1,
+		listItems:  []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(31, time.Date(2026, 4, 16, 10, 0, 0, 0, time.UTC))},
+		countValue: 1,
 	}
 	service := NewQueryService(repo)
 	keyFocus := true
@@ -73,11 +73,11 @@ func TestListTesteesUsesUnifiedFilterForRestrictedQueries(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListTestees returned error: %v", err)
 	}
-	if repo.listByOrgAndIDsCalls != 1 || repo.countByOrgAndIDsCalls != 1 {
-		t.Fatalf("expected restricted list/count to be called once, got list=%d count=%d", repo.listByOrgAndIDsCalls, repo.countByOrgAndIDsCalls)
+	if repo.listCalls != 1 || repo.countCalls != 1 {
+		t.Fatalf("expected restricted list/count to be called once, got list=%d count=%d", repo.listCalls, repo.countCalls)
 	}
-	if len(repo.lastRestrictedIDs) != 2 || repo.lastRestrictedIDs[0] != 31 || repo.lastRestrictedIDs[1] != 32 {
-		t.Fatalf("unexpected restricted ids: %+v", repo.lastRestrictedIDs)
+	if len(repo.lastFilter.AccessibleTesteeIDs) != 2 || repo.lastFilter.AccessibleTesteeIDs[0] != 31 || repo.lastFilter.AccessibleTesteeIDs[1] != 32 {
+		t.Fatalf("unexpected restricted ids: %+v", repo.lastFilter.AccessibleTesteeIDs)
 	}
 	if repo.lastFilter.KeyFocus == nil || *repo.lastFilter.KeyFocus != true {
 		t.Fatalf("expected key focus filter=true, got %+v", repo.lastFilter.KeyFocus)
@@ -89,8 +89,8 @@ func TestListTesteesUsesUnifiedFilterForRestrictedQueries(t *testing.T) {
 
 func TestListKeyFocusDelegatesToUnifiedListFlow(t *testing.T) {
 	repo := &queryServiceRepoStub{
-		listByOrgItems: []*domain.Testee{makeQueryServiceTestee(41, time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC))},
-		countValue:     3,
+		listItems:  []actorreadmodel.TesteeRow{makeQueryServiceTesteeRow(41, time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC))},
+		countValue: 3,
 	}
 	service := NewQueryService(repo)
 
@@ -98,8 +98,8 @@ func TestListKeyFocusDelegatesToUnifiedListFlow(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListKeyFocus returned error: %v", err)
 	}
-	if repo.listByOrgCalls != 1 || repo.countCalls != 1 {
-		t.Fatalf("expected ListKeyFocus to use unified unrestricted list/count, got list=%d count=%d", repo.listByOrgCalls, repo.countCalls)
+	if repo.listCalls != 1 || repo.countCalls != 1 {
+		t.Fatalf("expected ListKeyFocus to use unified unrestricted list/count, got list=%d count=%d", repo.listCalls, repo.countCalls)
 	}
 	if repo.lastFilter.KeyFocus == nil || *repo.lastFilter.KeyFocus != true {
 		t.Fatalf("expected key focus filter=true, got %+v", repo.lastFilter.KeyFocus)
@@ -110,69 +110,44 @@ func TestListKeyFocusDelegatesToUnifiedListFlow(t *testing.T) {
 }
 
 type queryServiceRepoStub struct {
-	listByOrgItems        []*domain.Testee
-	listByOrgAndIDsItems  []*domain.Testee
-	countValue            int64
-	countByOrgAndIDsValue int64
-	listByOrgCalls        int
-	listByOrgAndIDsCalls  int
-	countCalls            int
-	countByOrgAndIDsCalls int
-	lastFilter            domain.ListFilter
-	lastRestrictedIDs     []domain.ID
+	item       *actorreadmodel.TesteeRow
+	listItems  []actorreadmodel.TesteeRow
+	countValue int64
+	listCalls  int
+	countCalls int
+	lastFilter actorreadmodel.TesteeFilter
 }
 
-func (s *queryServiceRepoStub) Save(context.Context, *domain.Testee) error   { return nil }
-func (s *queryServiceRepoStub) Update(context.Context, *domain.Testee) error { return nil }
-func (s *queryServiceRepoStub) FindByID(context.Context, domain.ID) (*domain.Testee, error) {
-	return nil, nil
+func (s *queryServiceRepoStub) GetTestee(context.Context, uint64) (*actorreadmodel.TesteeRow, error) {
+	return s.item, nil
 }
-func (s *queryServiceRepoStub) FindByIDs(context.Context, []domain.ID) ([]*domain.Testee, error) {
-	return nil, nil
+func (s *queryServiceRepoStub) FindTesteeByProfile(context.Context, int64, uint64) (*actorreadmodel.TesteeRow, error) {
+	return s.item, nil
 }
-func (s *queryServiceRepoStub) FindByProfile(context.Context, int64, uint64) (*domain.Testee, error) {
-	return nil, nil
-}
-func (s *queryServiceRepoStub) FindByOrgAndName(context.Context, int64, string) ([]*domain.Testee, error) {
-	return nil, nil
-}
-func (s *queryServiceRepoStub) ListByOrg(_ context.Context, _ int64, filter domain.ListFilter, _ int, _ int) ([]*domain.Testee, error) {
-	s.listByOrgCalls++
+func (s *queryServiceRepoStub) ListTestees(_ context.Context, filter actorreadmodel.TesteeFilter) ([]actorreadmodel.TesteeRow, error) {
+	s.listCalls++
 	s.lastFilter = filter
-	return s.listByOrgItems, nil
+	return s.listItems, nil
 }
-func (s *queryServiceRepoStub) ListByOrgAndIDs(_ context.Context, _ int64, ids []domain.ID, filter domain.ListFilter, _ int, _ int) ([]*domain.Testee, error) {
-	s.listByOrgAndIDsCalls++
-	s.lastFilter = filter
-	s.lastRestrictedIDs = append([]domain.ID(nil), ids...)
-	return s.listByOrgAndIDsItems, nil
-}
-func (s *queryServiceRepoStub) ListByTags(context.Context, int64, []string, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-func (s *queryServiceRepoStub) ListKeyFocus(context.Context, int64, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-func (s *queryServiceRepoStub) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domain.Testee, error) {
-	return nil, nil
-}
-func (s *queryServiceRepoStub) Delete(context.Context, domain.ID) error { return nil }
-func (s *queryServiceRepoStub) Count(_ context.Context, _ int64, filter domain.ListFilter) (int64, error) {
+func (s *queryServiceRepoStub) CountTestees(_ context.Context, filter actorreadmodel.TesteeFilter) (int64, error) {
 	s.countCalls++
 	s.lastFilter = filter
 	return s.countValue, nil
 }
-func (s *queryServiceRepoStub) CountByOrgAndIDs(_ context.Context, _ int64, ids []domain.ID, filter domain.ListFilter) (int64, error) {
-	s.countByOrgAndIDsCalls++
-	s.lastFilter = filter
-	s.lastRestrictedIDs = append([]domain.ID(nil), ids...)
-	return s.countByOrgAndIDsValue, nil
+func (s *queryServiceRepoStub) ListTesteesByProfileIDs(context.Context, []uint64, int, int) ([]actorreadmodel.TesteeRow, error) {
+	return s.listItems, nil
+}
+func (s *queryServiceRepoStub) CountTesteesByProfileIDs(context.Context, []uint64) (int64, error) {
+	return s.countValue, nil
 }
 
-func makeQueryServiceTestee(id uint64, createdAt time.Time) *domain.Testee {
-	item := domain.NewTestee(1, "testee", domain.GenderMale, nil)
-	item.SetID(domain.ID(id))
-	item.SetCreatedAt(createdAt)
-	item.SetUpdatedAt(createdAt)
-	return item
+func makeQueryServiceTesteeRow(id uint64, createdAt time.Time) actorreadmodel.TesteeRow {
+	return actorreadmodel.TesteeRow{
+		ID:        id,
+		OrgID:     1,
+		Name:      "testee",
+		Gender:    1,
+		CreatedAt: createdAt,
+		UpdatedAt: createdAt,
+	}
 }

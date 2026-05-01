@@ -167,9 +167,6 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize evaluation module: %w", err)
 	}
 
-	// 将评估服务注入到 Actor 模块（因为 Actor 模块在 Evaluation 模块之前初始化）。
-	graph.postWireEvaluationDependencies()
-
 	// 初始化 Plan 模块
 	if err := c.initPlanModule(); err != nil {
 		return fmt.Errorf("failed to initialize plan module: %w", err)

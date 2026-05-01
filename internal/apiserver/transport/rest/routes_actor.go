@@ -1,24 +1,70 @@
 package rest
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
+type actorHandlers struct {
+	testee            *handler.TesteeHandler
+	operatorClinician *handler.OperatorClinicianHandler
+	assessmentEntry   *handler.AssessmentEntryHandler
+}
+
+func (r *Router) actorHandlers() actorHandlers {
+	deps := r.deps.Actor
+	handlers := actorHandlers{}
+	if deps.TesteeQueryService != nil || deps.TesteeManagementService != nil || deps.TesteeBackendQueryService != nil || deps.TesteeAccessService != nil {
+		handlers.testee = handler.NewTesteeHandler(
+			deps.TesteeManagementService,
+			deps.TesteeQueryService,
+			deps.TesteeBackendQueryService,
+			deps.ClinicianQueryService,
+			deps.ClinicianRelationshipService,
+			deps.TesteeAccessService,
+			deps.TesteeScaleAnalysisService,
+		)
+	}
+	if deps.OperatorQueryService != nil || deps.ClinicianQueryService != nil || deps.ClinicianRelationshipService != nil {
+		handlers.operatorClinician = handler.NewOperatorClinicianHandler(
+			deps.OperatorLifecycleService,
+			deps.OperatorAuthorizationService,
+			deps.OperatorQueryService,
+			deps.ClinicianLifecycleService,
+			deps.ClinicianQueryService,
+			deps.ClinicianRelationshipService,
+			deps.TesteeQueryService,
+			deps.TesteeAccessService,
+		)
+	}
+	if deps.AssessmentEntryService != nil {
+		handlers.assessmentEntry = handler.NewAssessmentEntryHandler(
+			deps.OperatorQueryService,
+			deps.ClinicianQueryService,
+			deps.AssessmentEntryService,
+			deps.QRCodeService,
+		)
+	}
+	return handlers
+}
+
 func (r *Router) registerActorPublicRoutes(publicAPI *gin.RouterGroup) {
-	if r.deps.Actor.AssessmentEntryHandler == nil {
+	handlers := r.actorHandlers()
+	if handlers.assessmentEntry == nil {
 		return
 	}
 
-	publicAPI.GET("/assessment-entries/:token", r.deps.Actor.AssessmentEntryHandler.ResolveAssessmentEntry)
-	publicAPI.POST("/assessment-entries/:token/intake", r.deps.Actor.AssessmentEntryHandler.IntakeAssessmentEntry)
+	publicAPI.GET("/assessment-entries/:token", handlers.assessmentEntry.ResolveAssessmentEntry)
+	publicAPI.POST("/assessment-entries/:token/intake", handlers.assessmentEntry.IntakeAssessmentEntry)
 }
 
 // registerActorProtectedRoutes 注册 Actor 模块相关的受保护路由。
 func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
-	testeeHandler := r.deps.Actor.TesteeHandler
-	operatorClinicianHandler := r.deps.Actor.OperatorClinicianHandler
-	assessmentEntryHandler := r.deps.Actor.AssessmentEntryHandler
+	handlers := r.actorHandlers()
+	testeeHandler := handlers.testee
+	operatorClinicianHandler := handlers.operatorClinician
+	assessmentEntryHandler := handlers.assessmentEntry
 	if testeeHandler == nil && operatorClinicianHandler == nil && assessmentEntryHandler == nil {
 		return
 	}
@@ -244,7 +290,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			operatorClinicianHandler.ListClinicianRelations,
 		)...)
-		if assessmentEntryHandler := r.deps.Actor.AssessmentEntryHandler; assessmentEntryHandler != nil {
+		if assessmentEntryHandler != nil {
 			me.POST("/assessment-entries", r.rateLimitedHandlers(
 				r.rateCfg,
 				r.rateCfg.SubmitGlobalQPS,
@@ -364,7 +410,7 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 		}
 	}
 
-	if assessmentEntryHandler := r.deps.Actor.AssessmentEntryHandler; assessmentEntryHandler != nil {
+	if assessmentEntryHandler != nil {
 		assessmentEntries := apiV1.Group("/assessment-entries", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
 		{
 			assessmentEntries.GET("/:id", r.rateLimitedHandlers(

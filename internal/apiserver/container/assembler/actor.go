@@ -11,13 +11,10 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	assessmentEntryDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/assessmententry"
 	clinicianDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
-	relationDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	testeeCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -25,7 +22,6 @@ import (
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -36,18 +32,6 @@ import (
 
 // ActorModule Actor 模块（测评对象和工作人员）
 type ActorModule struct {
-	// repository 层
-	TesteeRepo          testee.Repository
-	OperatorRepo        operator.Repository
-	ClinicianRepo       clinicianDomain.Repository
-	RelationRepo        relationDomain.Repository
-	AssessmentEntryRepo assessmentEntryDomain.Repository
-
-	// handler 层
-	TesteeHandler            *handler.TesteeHandler
-	OperatorClinicianHandler *handler.OperatorClinicianHandler
-	AssessmentEntryHandler   *handler.AssessmentEntryHandler
-
 	// testee service 层（按行为者组织）
 	TesteeRegistrationService testeeApp.TesteeRegistrationService // 注册服务 - C端用户
 	TesteeManagementService   testeeApp.TesteeManagementService   // 管理服务 - B端员工
@@ -64,6 +48,7 @@ type ActorModule struct {
 	ClinicianRelationshipService  clinicianApp.ClinicianRelationshipService // 关系服务 - 建立从业者-受试者关系、查询名下受试者
 	AssessmentEntryService        assessmentEntryApp.AssessmentEntryService // 创建测评入口、解析 token、扫码 intake
 	TesteeAccessService           actorAccessApp.TesteeAccessService        // 解析后台访问范围：admin bypass / ClinicianTesteeRelation
+	ActiveOperatorChecker         operatorApp.ActiveOperatorChecker         // REST/gRPC 认证期 active operator 检查
 	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater // 将 IAM 角色快照投影回本地 operator
 }
 
@@ -111,32 +96,34 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	// 初始化 repository 层
 	baseTesteeRepo := actorInfra.NewTesteeRepository(mysqlDB, mysqlOptions)
 
+	var testeeRepo testee.Repository
 	if deps.RedisClient != nil {
-		module.TesteeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
+		testeeRepo = testeeCache.NewCachedTesteeRepositoryWithBuilderPolicyAndObserver(baseTesteeRepo, deps.RedisClient, deps.CacheBuilder, deps.TesteePolicy, deps.Observer)
 	} else {
-		module.TesteeRepo = baseTesteeRepo
+		testeeRepo = baseTesteeRepo
 	}
 
-	module.OperatorRepo = actorInfra.NewOperatorRepository(mysqlDB, mysqlOptions)
-	module.ClinicianRepo = actorInfra.NewClinicianRepository(mysqlDB, mysqlOptions)
-	module.RelationRepo = actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
-	module.AssessmentEntryRepo = actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
+	operatorRepo := actorInfra.NewOperatorRepository(mysqlDB, mysqlOptions)
+	clinicianRepo := actorInfra.NewClinicianRepository(mysqlDB, mysqlOptions)
+	relationRepo := actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
+	assessmentEntryRepo := actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
+	actorReadModel := actorInfra.NewReadModel(mysqlDB, mysqlOptions)
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB, mysqlOptions)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
 	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStoreWithTopicResolver(mysqlDB, deps.TopicResolver))
 
 	// 初始化 testee domain services
-	testeeValidator := testee.NewValidator(module.TesteeRepo)
-	testeeFactory := testee.NewFactory(module.TesteeRepo, testeeValidator)
+	testeeValidator := testee.NewValidator(testeeRepo)
+	testeeFactory := testee.NewFactory(testeeRepo, testeeValidator)
 	testeeEditor := testee.NewEditor(testeeValidator)
-	testeeBinder := testee.NewBinder(module.TesteeRepo)
+	testeeBinder := testee.NewBinder(testeeRepo)
 	testeeTagger := testee.NewTagger(testeeValidator)
 	testeeRiskTagPolicy := testee.NewRiskTagPolicy()
 
 	// 初始化 operator domain services
 	operatorValidator := operator.NewValidator()
-	operatorFactory := operator.NewFactory(module.OperatorRepo, operatorValidator)
+	operatorFactory := operator.NewFactory(operatorRepo, operatorValidator)
 	operatorEditor := operator.NewEditor(operatorValidator)
 	operatorRoleAllocator := operator.NewRoleAllocator(operatorValidator)
 	operatorLifecycler := operator.NewLifecycler(operatorRoleAllocator)
@@ -144,7 +131,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	assessmentEntryValidator := assessmentEntryDomain.NewValidator()
 
 	module.TesteeRegistrationService = testeeApp.NewRegistrationService(
-		module.TesteeRepo,
+		testeeRepo,
 		testeeFactory,
 		testeeValidator,
 		testeeBinder,
@@ -152,15 +139,15 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		guardianshipSvc,
 	)
 	module.TesteeManagementService = testeeApp.NewManagementService(
-		module.TesteeRepo,
+		testeeRepo,
 		testeeEditor,
 		testeeBinder,
 		testeeTagger,
 		txRunner,
 	)
-	module.TesteeQueryService = testeeApp.NewQueryService(module.TesteeRepo)
+	module.TesteeQueryService = testeeApp.NewQueryService(actorReadModel)
 	module.TesteeTaggingService = testeeApp.NewTaggingService(
-		module.TesteeRepo,
+		testeeRepo,
 		testeeRiskTagPolicy,
 		txRunner,
 	)
@@ -170,7 +157,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		guardianDirectory,
 	)
 	module.OperatorLifecycleService = operatorApp.NewLifecycleService(
-		module.OperatorRepo,
+		operatorRepo,
 		operatorFactory,
 		operatorValidator,
 		operatorEditor,
@@ -182,41 +169,43 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		operatorAuthzGateway,
 	)
 	module.OperatorAuthorizationService = operatorApp.NewAuthorizationService(
-		module.OperatorRepo,
+		operatorRepo,
 		operatorValidator,
 		operatorRoleAllocator,
 		operatorLifecycler,
 		txRunner,
 		operatorAuthzGateway,
 	)
-	module.OperatorQueryService = operatorApp.NewQueryService(module.OperatorRepo)
-	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(module.OperatorRepo)
+	module.OperatorQueryService = operatorApp.NewQueryService(actorReadModel)
+	module.ActiveOperatorChecker = operatorApp.NewActiveOperatorChecker(actorReadModel)
+	module.OperatorRoleProjectionUpdater = operatorApp.NewRoleProjectionUpdater(operatorRepo)
 	module.ClinicianLifecycleService = clinicianApp.NewLifecycleService(
-		module.ClinicianRepo,
-		module.OperatorRepo,
+		clinicianRepo,
+		operatorRepo,
 		clinicianValidator,
 		txRunner,
 	)
-	module.ClinicianQueryService = clinicianApp.NewQueryService(module.ClinicianRepo, module.RelationRepo, module.AssessmentEntryRepo)
+	module.ClinicianQueryService = clinicianApp.NewQueryService(actorReadModel, actorReadModel, actorReadModel)
 	module.ClinicianRelationshipService = clinicianApp.NewRelationshipService(
-		module.RelationRepo,
-		module.ClinicianRepo,
-		module.TesteeRepo,
+		relationRepo,
+		clinicianRepo,
+		testeeRepo,
 		behaviorEvents,
 		txRunner,
+		actorReadModel,
 	)
 	module.TesteeAccessService = actorAccessApp.NewTesteeAccessService(
-		module.OperatorRepo,
-		module.ClinicianRepo,
-		module.RelationRepo,
-		module.TesteeRepo,
+		actorReadModel,
+		actorReadModel,
+		actorReadModel,
+		actorReadModel,
 		authzSnapshotReader,
 	)
 	module.AssessmentEntryService = assessmentEntryApp.NewService(
-		module.AssessmentEntryRepo,
-		module.ClinicianRepo,
-		module.RelationRepo,
-		module.TesteeRepo,
+		assessmentEntryRepo,
+		clinicianRepo,
+		relationRepo,
+		testeeRepo,
 		testeeFactory,
 		assessmentEntryValidator,
 		guardianshipSvc,
@@ -224,53 +213,10 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		intakeLogWriter,
 		behaviorEvents,
 		txRunner,
-	)
-
-	module.TesteeHandler = handler.NewTesteeHandler(
-		module.TesteeManagementService,
-		module.TesteeQueryService,
-		module.TesteeBackendQueryService,
-		module.ClinicianQueryService,
-		module.ClinicianRelationshipService,
-		module.TesteeAccessService,
-		nil,
-		nil,
-	)
-	module.OperatorClinicianHandler = handler.NewOperatorClinicianHandler(
-		module.OperatorLifecycleService,
-		module.OperatorAuthorizationService,
-		module.OperatorQueryService,
-		module.ClinicianLifecycleService,
-		module.ClinicianQueryService,
-		module.ClinicianRelationshipService,
-		module.TesteeQueryService,
-		module.TesteeAccessService,
-	)
-	module.AssessmentEntryHandler = handler.NewAssessmentEntryHandler(
-		module.OperatorQueryService,
-		module.ClinicianQueryService,
-		module.AssessmentEntryService,
-		nil,
+		actorReadModel,
 	)
 
 	return module, nil
-}
-
-// SetEvaluationServices 设置评估服务（用于延迟注入）
-func (m *ActorModule) SetEvaluationServices(
-	assessmentManagementService assessmentApp.AssessmentManagementService,
-	scoreQueryService assessmentApp.ScoreQueryService,
-) {
-	if m.TesteeHandler != nil {
-		m.TesteeHandler.SetEvaluationServices(assessmentManagementService, scoreQueryService)
-	}
-}
-
-// SetQRCodeService 设置二维码服务（用于测评入口二维码生成）。
-func (m *ActorModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
-	if m.AssessmentEntryHandler != nil {
-		m.AssessmentEntryHandler.SetQRCodeService(qrCodeService)
-	}
 }
 
 // Cleanup 清理模块资源

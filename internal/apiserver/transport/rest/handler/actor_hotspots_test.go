@@ -1,60 +1,28 @@
 package handler
 
 import (
-	"net/http"
-	"net/http/httptest"
 	"testing"
 	"time"
 
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/gin-gonic/gin"
+	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 )
 
-func TestBuildScaleAnalysisResponseFiltersAndSorts(t *testing.T) {
-	gin.SetMode(gin.TestMode)
-
-	rec := httptest.NewRecorder()
-	c, _ := gin.CreateTestContext(rec)
-	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/testees/1/scale-analysis", nil)
-
-	scaleID := uint64(9)
-	scaleCode := "SAS"
-	scaleName := "Sleep"
+func TestScaleAnalysisResponseMapping(t *testing.T) {
 	earlier := time.Date(2026, 4, 10, 9, 0, 0, 0, time.Local)
 	later := time.Date(2026, 4, 12, 9, 0, 0, 0, time.Local)
-	pendingTime := time.Date(2026, 4, 9, 9, 0, 0, 0, time.Local)
-	riskLevel := "low"
-	totalScore := 10.0
 
-	handler := &TesteeHandler{}
-	result := handler.buildScaleAnalysisResponse(c, []*assessmentApp.AssessmentResult{
-		{
-			ID:               2,
-			Status:           "interpreted",
-			MedicalScaleID:   &scaleID,
-			MedicalScaleCode: &scaleCode,
-			MedicalScaleName: &scaleName,
-			InterpretedAt:    &later,
-			RiskLevel:        &riskLevel,
-			TotalScore:       &totalScore,
-		},
-		{
-			ID:               1,
-			Status:           "interpreted",
-			MedicalScaleID:   &scaleID,
-			MedicalScaleCode: &scaleCode,
-			MedicalScaleName: &scaleName,
-			SubmittedAt:      &earlier,
-			RiskLevel:        &riskLevel,
-			TotalScore:       &totalScore,
-		},
-		{
-			ID:               3,
-			Status:           "pending",
-			MedicalScaleID:   &scaleID,
-			MedicalScaleCode: &scaleCode,
-			MedicalScaleName: &scaleName,
-			SubmittedAt:      &pendingTime,
+	result := toScaleAnalysisResponse(&testeeApp.ScaleAnalysisQueryResult{
+		TesteeID: 1,
+		Scales: []testeeApp.ScaleTrendQueryResult{
+			{
+				ScaleID:   "9",
+				ScaleCode: "SAS",
+				ScaleName: "Sleep",
+				Tests: []testeeApp.ScaleTestQueryResult{
+					{AssessmentID: 1, TestDate: earlier, TotalScore: 10, RiskLevel: "low"},
+					{AssessmentID: 2, TestDate: later, TotalScore: 12, RiskLevel: "medium"},
+				},
+			},
 		},
 	})
 

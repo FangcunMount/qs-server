@@ -11,6 +11,7 @@ import (
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -21,6 +22,7 @@ type service struct {
 	clinicianRepo   domainClinician.Repository
 	relationRepo    domainRelation.Repository
 	testeeRepo      domainTestee.Repository
+	entryReader     actorreadmodel.AssessmentEntryReader
 	testeeFactory   domainTestee.Factory
 	validator       domainAssessmentEntry.Validator
 	guardianshipSvc iambridge.GuardianshipReader
@@ -54,12 +56,18 @@ func NewService(
 	intakeLog IntakeLogWriter,
 	behaviorEvents BehaviorEventStager,
 	uow apptransaction.Runner,
+	entryReaders ...actorreadmodel.AssessmentEntryReader,
 ) AssessmentEntryService {
+	var entryReader actorreadmodel.AssessmentEntryReader
+	if len(entryReaders) > 0 {
+		entryReader = entryReaders[0]
+	}
 	return &service{
 		repo:            repo,
 		clinicianRepo:   clinicianRepo,
 		relationRepo:    relationRepo,
 		testeeRepo:      testeeRepo,
+		entryReader:     entryReader,
 		testeeFactory:   testeeFactory,
 		validator:       validator,
 		guardianshipSvc: guardianshipSvc,
@@ -153,27 +161,26 @@ func (s *service) ListByClinician(ctx context.Context, dto ListAssessmentEntryDT
 	if err != nil {
 		return nil, err
 	}
-	items, err := s.repo.ListByClinician(
-		ctx,
-		dto.OrgID,
-		clinicianID,
-		dto.Offset,
-		dto.Limit,
-	)
+	if s.entryReader == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "assessment entry reader is not configured")
+	}
+	rows, err := s.entryReader.ListAssessmentEntriesByClinician(ctx, actorreadmodel.AssessmentEntryFilter{
+		OrgID:       dto.OrgID,
+		ClinicianID: clinicianID.Uint64(),
+		Offset:      dto.Offset,
+		Limit:       dto.Limit,
+	})
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list assessment entries")
 	}
-
-	totalCount, err := s.repo.CountByClinician(ctx, dto.OrgID, clinicianID)
+	totalCount, err := s.entryReader.CountAssessmentEntriesByClinician(ctx, dto.OrgID, clinicianID.Uint64())
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to count assessment entries")
 	}
-
-	results := make([]*AssessmentEntryResult, 0, len(items))
-	for _, item := range items {
-		results = append(results, toAssessmentEntryResult(item))
+	results := make([]*AssessmentEntryResult, 0, len(rows))
+	for i := range rows {
+		results = append(results, toAssessmentEntryResultFromRow(&rows[i]))
 	}
-
 	return &AssessmentEntryListResult{
 		Items:      results,
 		TotalCount: totalCount,
@@ -212,48 +219,7 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 }
 
 func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessmentEntryDTO) (*AssessmentEntryIntakeResult, error) {
-	state := &intakeState{intakeAt: time.Now()}
-
-	err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		var err error
-		state.entry, state.clinician, err = s.resolveEntry(txCtx, token)
-		if err != nil {
-			return err
-		}
-
-		if err := s.validateIntakeProfile(txCtx, dto); err != nil {
-			return err
-		}
-
-		state.testee, state.testeeCreated, err = s.resolveIntakeTestee(txCtx, state.entry, dto)
-		if err != nil {
-			return err
-		}
-
-		state.relation, err = s.ensureCreatorRelation(txCtx, state.entry, state.testee)
-		if err != nil {
-			return err
-		}
-
-		assignedRelation, assignmentCreated, err := s.ensureAssignmentRelation(txCtx, state.entry, state.testee)
-		if err != nil {
-			return err
-		}
-		state.assignmentCreated = assignmentCreated
-		state.assignment = toRelationSummaryResult(assignedRelation)
-		return s.stageIntakeBehaviorEvents(txCtx, state)
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	return &AssessmentEntryIntakeResult{
-		Entry:      toAssessmentEntryResult(state.entry),
-		Clinician:  toClinicianSummaryResult(state.clinician),
-		Testee:     toTesteeSummaryResult(state.testee),
-		Relation:   toRelationSummaryResult(state.relation),
-		Assignment: state.assignment,
-	}, nil
+	return newIntakeUseCase(s).Execute(ctx, token, dto)
 }
 
 func (s *service) validateIntakeProfile(ctx context.Context, dto IntakeByAssessmentEntryDTO) error {
@@ -304,7 +270,6 @@ func (s *service) resolveIntakeTestee(
 	}
 	return testeeItem, testeeCreated, nil
 }
-
 func (s *service) isNewProfileTestee(ctx context.Context, orgID int64, profileID uint64) (bool, error) {
 	_, err := s.testeeRepo.FindByProfile(ctx, orgID, profileID)
 	switch {

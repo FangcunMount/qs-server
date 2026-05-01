@@ -196,6 +196,10 @@ func (*stubActorClinicianRelationshipService) ListClinicianRelations(context.Con
 	return nil, nil
 }
 
+func (*stubActorClinicianRelationshipService) GetTesteeCareContext(context.Context, int64, uint64) (*clinicianApp.TesteeCareContextResult, error) {
+	return nil, nil
+}
+
 type stubActorAssessmentEntryService struct {
 	resolveResult *assessmentEntryApp.ResolvedAssessmentEntryResult
 	resolveErr    error

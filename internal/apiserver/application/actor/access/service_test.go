@@ -6,20 +6,17 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
-	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
-	domainOperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
-	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 func TestResolveAccessScopeLoadsSnapshotThroughReaderWhenContextMissing(t *testing.T) {
-	operatorItem := domainOperator.NewOperator(1, 101, "operator")
-	operatorItem.SetID(201)
+	operatorItem := actorreadmodel.OperatorRow{ID: 201, OrgID: 1, UserID: 101, Name: "operator", IsActive: true}
 	reader := &stubAuthzSnapshotReader{snapshot: stubAuthzSnapshot{admin: true}}
 	svc := NewTesteeAccessService(
-		&stubOperatorRepository{item: operatorItem},
+		&stubOperatorReader{item: operatorItem},
 		nil,
 		nil,
 		nil,
@@ -42,11 +39,10 @@ func TestResolveAccessScopeLoadsSnapshotThroughReaderWhenContextMissing(t *testi
 }
 
 func TestResolveAccessScopeUsesContextSnapshotBeforeReader(t *testing.T) {
-	operatorItem := domainOperator.NewOperator(1, 101, "operator")
-	operatorItem.SetID(201)
+	operatorItem := actorreadmodel.OperatorRow{ID: 201, OrgID: 1, UserID: 101, Name: "operator", IsActive: true}
 	reader := &stubAuthzSnapshotReader{snapshot: stubAuthzSnapshot{admin: false}}
 	svc := NewTesteeAccessService(
-		&stubOperatorRepository{item: operatorItem},
+		&stubOperatorReader{item: operatorItem},
 		nil,
 		nil,
 		nil,
@@ -67,10 +63,9 @@ func TestResolveAccessScopeUsesContextSnapshotBeforeReader(t *testing.T) {
 }
 
 func TestResolveAccessScopeRejectsWhenSnapshotReaderMissing(t *testing.T) {
-	operatorItem := domainOperator.NewOperator(1, 101, "operator")
-	operatorItem.SetID(201)
+	operatorItem := actorreadmodel.OperatorRow{ID: 201, OrgID: 1, UserID: 101, Name: "operator", IsActive: true}
 	svc := NewTesteeAccessService(
-		&stubOperatorRepository{item: operatorItem},
+		&stubOperatorReader{item: operatorItem},
 		nil,
 		nil,
 		nil,
@@ -87,21 +82,16 @@ func TestResolveAccessScopeRejectsWhenSnapshotReaderMissing(t *testing.T) {
 }
 
 func TestValidateTesteeAccessUsesAccessGrantRelations(t *testing.T) {
-	operatorItem := domainOperator.NewOperator(1, 101, "operator")
-	operatorItem.SetID(201)
+	operatorItem := actorreadmodel.OperatorRow{ID: 201, OrgID: 1, UserID: 101, Name: "operator", IsActive: true}
+	clinicianItem := actorreadmodel.ClinicianRow{ID: 301, OrgID: 1, Name: "clinician", IsActive: true}
+	testeeItem := actorreadmodel.TesteeRow{ID: 401, OrgID: 1, Name: "child"}
 
-	clinicianItem := domainClinician.NewClinician(1, nil, "clinician", "", "", domainClinician.TypeCounselor, "", true)
-	clinicianItem.SetID(301)
-
-	testeeItem := domainTestee.NewTestee(1, "child", domainTestee.GenderMale, nil)
-	testeeItem.SetID(401)
-
-	relationRepo := &stubRelationRepository{activeAllowed: true}
+	relationRepo := &stubRelationReader{activeAllowed: true}
 	svc := NewTesteeAccessService(
-		&stubOperatorRepository{item: operatorItem},
-		&stubClinicianRepository{item: clinicianItem},
+		&stubOperatorReader{item: operatorItem},
+		&stubClinicianReader{item: clinicianItem},
 		relationRepo,
-		&stubTesteeRepository{item: testeeItem},
+		&stubTesteeReader{item: testeeItem},
 		nil,
 	)
 
@@ -110,7 +100,7 @@ func TestValidateTesteeAccessUsesAccessGrantRelations(t *testing.T) {
 		t.Fatalf("expected access validation to pass: %v", err)
 	}
 
-	expected := domainRelation.AccessGrantRelationTypes()
+	expected := accessRelationTypesToStrings(domainRelation.AccessGrantRelationTypes())
 	if len(relationRepo.lastRelationTypes) != len(expected) {
 		t.Fatalf("expected access validation to check %v, got %v", expected, relationRepo.lastRelationTypes)
 	}
@@ -121,155 +111,83 @@ func TestValidateTesteeAccessUsesAccessGrantRelations(t *testing.T) {
 	}
 }
 
-type stubOperatorRepository struct {
-	item *domainOperator.Operator
+type stubOperatorReader struct {
+	item actorreadmodel.OperatorRow
 }
 
-func (s *stubOperatorRepository) Save(context.Context, *domainOperator.Operator) error {
+func (s *stubOperatorReader) GetOperator(context.Context, uint64) (*actorreadmodel.OperatorRow, error) {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) Update(context.Context, *domainOperator.Operator) error {
+func (s *stubOperatorReader) FindOperatorByUser(context.Context, int64, int64) (*actorreadmodel.OperatorRow, error) {
+	return &s.item, nil
+}
+func (s *stubOperatorReader) ListOperators(context.Context, actorreadmodel.OperatorFilter) ([]actorreadmodel.OperatorRow, error) {
 	panic("unexpected call")
 }
-func (s *stubOperatorRepository) FindByID(context.Context, domainOperator.ID) (*domainOperator.Operator, error) {
-	panic("unexpected call")
-}
-func (s *stubOperatorRepository) FindByUser(context.Context, int64, int64) (*domainOperator.Operator, error) {
-	return s.item, nil
-}
-func (s *stubOperatorRepository) ListByOrg(context.Context, int64, int, int) ([]*domainOperator.Operator, error) {
-	panic("unexpected call")
-}
-func (s *stubOperatorRepository) ListByRole(context.Context, int64, domainOperator.Role, int, int) ([]*domainOperator.Operator, error) {
-	panic("unexpected call")
-}
-func (s *stubOperatorRepository) Delete(context.Context, domainOperator.ID) error {
-	panic("unexpected call")
-}
-func (s *stubOperatorRepository) Count(context.Context, int64) (int64, error) {
+func (s *stubOperatorReader) CountOperators(context.Context, int64) (int64, error) {
 	panic("unexpected call")
 }
 
-type stubClinicianRepository struct {
-	item *domainClinician.Clinician
+type stubClinicianReader struct {
+	item actorreadmodel.ClinicianRow
 }
 
-func (s *stubClinicianRepository) Save(context.Context, *domainClinician.Clinician) error {
+func (s *stubClinicianReader) GetClinician(context.Context, uint64) (*actorreadmodel.ClinicianRow, error) {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) Update(context.Context, *domainClinician.Clinician) error {
+func (s *stubClinicianReader) FindClinicianByOperator(context.Context, int64, uint64) (*actorreadmodel.ClinicianRow, error) {
+	return &s.item, nil
+}
+func (s *stubClinicianReader) ListClinicians(context.Context, actorreadmodel.ClinicianFilter) ([]actorreadmodel.ClinicianRow, error) {
 	panic("unexpected call")
 }
-func (s *stubClinicianRepository) FindByID(context.Context, domainClinician.ID) (*domainClinician.Clinician, error) {
-	panic("unexpected call")
-}
-func (s *stubClinicianRepository) FindByOperator(context.Context, int64, uint64) (*domainClinician.Clinician, error) {
-	return s.item, nil
-}
-func (s *stubClinicianRepository) ListByOrg(context.Context, int64, int, int) ([]*domainClinician.Clinician, error) {
-	panic("unexpected call")
-}
-func (s *stubClinicianRepository) Count(context.Context, int64) (int64, error) {
-	panic("unexpected call")
-}
-func (s *stubClinicianRepository) Delete(context.Context, domainClinician.ID) error {
+func (s *stubClinicianReader) CountClinicians(context.Context, int64) (int64, error) {
 	panic("unexpected call")
 }
 
-type stubRelationRepository struct {
-	lastRelationTypes []domainRelation.RelationType
+type stubRelationReader struct {
+	lastRelationTypes []string
 	activeAllowed     bool
 }
 
-func (s *stubRelationRepository) Save(context.Context, *domainRelation.ClinicianTesteeRelation) error {
+func (s *stubRelationReader) ListAssignedTestees(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRow, int64, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) Update(context.Context, *domainRelation.ClinicianTesteeRelation) error {
+func (s *stubRelationReader) ListActiveTesteeIDsByClinician(_ context.Context, _ int64, _ uint64, relationTypes []string) ([]uint64, error) {
+	s.lastRelationTypes = append([]string(nil), relationTypes...)
+	return []uint64{401}, nil
+}
+func (s *stubRelationReader) ListTesteeRelations(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRelationRow, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) FindByID(context.Context, domainRelation.ID) (*domainRelation.ClinicianTesteeRelation, error) {
+func (s *stubRelationReader) ListClinicianRelations(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.ClinicianRelationRow, int64, error) {
 	panic("unexpected call")
 }
-func (s *stubRelationRepository) FindActive(context.Context, int64, domainClinician.ID, domainTestee.ID, domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) FindActivePrimaryByTestee(context.Context, int64, domainTestee.ID) (*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) FindActiveByTypes(context.Context, int64, domainClinician.ID, domainTestee.ID, []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) ListActiveByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType, int, int) ([]*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) ListHistoryByClinician(context.Context, int64, domainClinician.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) CountActiveByClinician(context.Context, int64, domainClinician.ID, []domainRelation.RelationType) (int64, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) ListActiveByTestee(context.Context, int64, domainTestee.ID, []domainRelation.RelationType) ([]*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) ListHistoryByTestee(context.Context, int64, domainTestee.ID) ([]*domainRelation.ClinicianTesteeRelation, error) {
-	panic("unexpected call")
-}
-func (s *stubRelationRepository) HasActiveRelationForTestee(_ context.Context, _ int64, _ domainClinician.ID, _ domainTestee.ID, relationTypes []domainRelation.RelationType) (bool, error) {
-	s.lastRelationTypes = append([]domainRelation.RelationType(nil), relationTypes...)
+func (s *stubRelationReader) HasActiveRelationForTestee(_ context.Context, _ int64, _, _ uint64, relationTypes []string) (bool, error) {
+	s.lastRelationTypes = append([]string(nil), relationTypes...)
 	return s.activeAllowed, nil
 }
-func (s *stubRelationRepository) ListActiveTesteeIDsByClinician(_ context.Context, _ int64, _ domainClinician.ID, relationTypes []domainRelation.RelationType) ([]domainTestee.ID, error) {
-	s.lastRelationTypes = append([]domainRelation.RelationType(nil), relationTypes...)
-	return []domainTestee.ID{domainTestee.ID(401)}, nil
+
+type stubTesteeReader struct {
+	item actorreadmodel.TesteeRow
 }
 
-type stubTesteeRepository struct {
-	item *domainTestee.Testee
+func (s *stubTesteeReader) GetTestee(context.Context, uint64) (*actorreadmodel.TesteeRow, error) {
+	return &s.item, nil
 }
-
-func (s *stubTesteeRepository) Save(context.Context, *domainTestee.Testee) error {
+func (s *stubTesteeReader) FindTesteeByProfile(context.Context, int64, uint64) (*actorreadmodel.TesteeRow, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) Update(context.Context, *domainTestee.Testee) error {
+func (s *stubTesteeReader) ListTestees(context.Context, actorreadmodel.TesteeFilter) ([]actorreadmodel.TesteeRow, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) FindByID(context.Context, domainTestee.ID) (*domainTestee.Testee, error) {
-	return s.item, nil
-}
-func (s *stubTesteeRepository) FindByIDs(context.Context, []domainTestee.ID) ([]*domainTestee.Testee, error) {
-	if s.item == nil {
-		return []*domainTestee.Testee{}, nil
-	}
-	return []*domainTestee.Testee{s.item}, nil
-}
-func (s *stubTesteeRepository) FindByProfile(context.Context, int64, uint64) (*domainTestee.Testee, error) {
+func (s *stubTesteeReader) CountTestees(context.Context, actorreadmodel.TesteeFilter) (int64, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) FindByOrgAndName(context.Context, int64, string) ([]*domainTestee.Testee, error) {
+func (s *stubTesteeReader) ListTesteesByProfileIDs(context.Context, []uint64, int, int) ([]actorreadmodel.TesteeRow, error) {
 	panic("unexpected call")
 }
-func (s *stubTesteeRepository) ListByOrg(context.Context, int64, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) ListByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter, int, int) ([]*domainTestee.Testee, error) {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) ListByTags(context.Context, int64, []string, int, int) ([]*domainTestee.Testee, error) {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) ListKeyFocus(context.Context, int64, int, int) ([]*domainTestee.Testee, error) {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) ListByProfileIDs(context.Context, []uint64, int, int) ([]*domainTestee.Testee, error) {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) Delete(context.Context, domainTestee.ID) error {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) Count(context.Context, int64, domainTestee.ListFilter) (int64, error) {
-	panic("unexpected call")
-}
-func (s *stubTesteeRepository) CountByOrgAndIDs(context.Context, int64, []domainTestee.ID, domainTestee.ListFilter) (int64, error) {
+func (s *stubTesteeReader) CountTesteesByProfileIDs(context.Context, []uint64) (int64, error) {
 	panic("unexpected call")
 }
 

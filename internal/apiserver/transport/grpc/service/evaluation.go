@@ -10,7 +10,6 @@ import (
 	"google.golang.org/grpc/status"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -24,7 +23,6 @@ type EvaluationService struct {
 	submissionService  assessmentApp.AssessmentSubmissionService
 	reportQueryService assessmentApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
-	testeeRepo         testee.Repository
 	assessmentRepo     assessment.Repository
 }
 
@@ -33,14 +31,12 @@ func NewEvaluationService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
-	testeeRepo testee.Repository,
 	assessmentRepo assessment.Repository,
 ) *EvaluationService {
 	return &EvaluationService{
 		submissionService:  submissionService,
 		reportQueryService: reportQueryService,
 		scoreQueryService:  scoreQueryService,
-		testeeRepo:         testeeRepo,
 		assessmentRepo:     assessmentRepo,
 	}
 }
