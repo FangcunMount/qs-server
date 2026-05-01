@@ -8,11 +8,11 @@ import (
 )
 
 type answerSheetReadModel struct {
-	repo domainanswersheet.Repository
+	repo *Repository
 }
 
 // NewAnswerSheetReadModel adapts answer-sheet Mongo repositories to the read-model port.
-func NewAnswerSheetReadModel(repo domainanswersheet.Repository) surveyreadmodel.AnswerSheetReader {
+func NewAnswerSheetReadModel(repo *Repository) surveyreadmodel.AnswerSheetReader {
 	return answerSheetReadModel{repo: repo}
 }
 

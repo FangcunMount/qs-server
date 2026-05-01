@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -39,6 +40,7 @@ type service struct {
 	txRunner       apptransaction.Runner
 	eventStager    EventStager
 	reportSaver    pipeline.ReportDurableSaver
+	factorScorer   ruleengine.ScaleFactorScorer
 
 	// 处理器链
 	pipeline *pipeline.Chain
@@ -68,6 +70,12 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 func WithReportDurableSaver(saver pipeline.ReportDurableSaver) ServiceOption {
 	return func(s *service) {
 		s.reportSaver = saver
+	}
+}
+
+func WithScaleFactorScorer(scorer ruleengine.ScaleFactorScorer) ServiceOption {
+	return func(s *service) {
+		s.factorScorer = scorer
 	}
 }
 
@@ -112,7 +120,7 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	chain.AddHandler(pipeline.NewValidationHandler())
 
 	// 2. 因子分数计算处理器（从答卷读取预计算分数，按因子聚合）
-	chain.AddHandler(pipeline.NewFactorScoreHandler())
+	chain.AddHandler(pipeline.NewFactorScoreHandler(s.factorScorer))
 
 	// 3. 风险等级计算处理器（计算风险等级，保存分数）
 	chain.AddHandler(pipeline.NewRiskLevelHandler(s.scoreRepo))

@@ -7,9 +7,8 @@ import (
 	"time"
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 )
 
 type statisticsReadModelStub struct {
@@ -201,33 +200,13 @@ type answerSheetRepoStub struct {
 	countsByQuestionnaire map[string]int64
 }
 
-func (*answerSheetRepoStub) Create(context.Context, *domainAnswerSheet.AnswerSheet) error { return nil }
-
-func (*answerSheetRepoStub) Update(context.Context, *domainAnswerSheet.AnswerSheet) error { return nil }
-
-func (*answerSheetRepoStub) FindByID(context.Context, meta.ID) (*domainAnswerSheet.AnswerSheet, error) {
+func (*answerSheetRepoStub) ListAnswerSheets(context.Context, surveyreadmodel.AnswerSheetFilter, surveyreadmodel.PageRequest) ([]surveyreadmodel.AnswerSheetSummaryRow, error) {
 	return nil, nil
 }
 
-func (*answerSheetRepoStub) FindSummaryListByFiller(context.Context, uint64, int, int) ([]*domainAnswerSheet.AnswerSheetSummary, error) {
-	return nil, nil
+func (s *answerSheetRepoStub) CountAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter) (int64, error) {
+	return s.countsByQuestionnaire[filter.QuestionnaireCode], nil
 }
-
-func (*answerSheetRepoStub) FindSummaryListByQuestionnaire(context.Context, string, int, int) ([]*domainAnswerSheet.AnswerSheetSummary, error) {
-	return nil, nil
-}
-
-func (*answerSheetRepoStub) CountByFiller(context.Context, uint64) (int64, error) { return 0, nil }
-
-func (s *answerSheetRepoStub) CountByQuestionnaire(_ context.Context, questionnaireCode string) (int64, error) {
-	return s.countsByQuestionnaire[questionnaireCode], nil
-}
-
-func (*answerSheetRepoStub) CountWithConditions(context.Context, map[string]interface{}) (int64, error) {
-	return 0, nil
-}
-
-func (*answerSheetRepoStub) Delete(context.Context, meta.ID) error { return nil }
 
 func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *testing.T) {
 	t.Parallel()
@@ -448,5 +427,5 @@ func statisticsCacheOverviewKey(orgID int64, timeRange domainStatistics.Statisti
 }
 
 var _ StatisticsReadModel = (*statisticsReadModelStub)(nil)
-var _ domainAnswerSheet.Repository = (*answerSheetRepoStub)(nil)
+var _ surveyreadmodel.AnswerSheetReader = (*answerSheetRepoStub)(nil)
 var _ statisticscache.Cache = (*memoryStatisticsCache)(nil)

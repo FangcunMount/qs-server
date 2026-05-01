@@ -404,8 +404,8 @@ func TestContainerBuildGRPCDepsExposesTransportSpecificDependencies(t *testing.T
 	authzSnapshot := &iaminfra.AuthzSnapshotLoader{}
 	c.IAMModule = &IAMModule{authzSnapshotLoader: authzSnapshot}
 
-	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil)
-	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil)
+	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
+	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil, nil)
 	categoryService := scaleApp.NewCategoryService()
 	c.SurveyModule = &assembler.SurveyModule{
 		Questionnaire: &assembler.QuestionnaireSubModule{QueryService: questionnaireQuery},

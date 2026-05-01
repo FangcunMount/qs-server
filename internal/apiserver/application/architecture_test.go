@@ -29,6 +29,48 @@ func TestApplicationsUsePortsForInfraBoundaries(t *testing.T) {
 	})
 }
 
+func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/application/survey/questionnaire",
+		"internal/apiserver/application/survey/answersheet",
+		"internal/apiserver/application/scale",
+	} {
+		dir := filepath.Join(root, filepath.FromSlash(rel))
+		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range []string{
+				"RepositoryReadModel",
+				"repositoryReadModel",
+				"FindBaseList(",
+				"FindBasePublishedList(",
+				"FindSummaryList(",
+				"CountWithConditions(",
+			} {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains %q; survey/scale application read paths must use typed read-model ports", filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {

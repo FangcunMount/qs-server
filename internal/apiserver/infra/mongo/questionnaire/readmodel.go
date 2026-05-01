@@ -8,11 +8,11 @@ import (
 )
 
 type questionnaireReadModel struct {
-	repo domainQuestionnaire.Repository
+	repo *Repository
 }
 
 // NewQuestionnaireReadModel adapts questionnaire Mongo repositories to the read-model port.
-func NewQuestionnaireReadModel(repo domainQuestionnaire.Repository) surveyreadmodel.QuestionnaireReader {
+func NewQuestionnaireReadModel(repo *Repository) surveyreadmodel.QuestionnaireReader {
 	return questionnaireReadModel{repo: repo}
 }
 

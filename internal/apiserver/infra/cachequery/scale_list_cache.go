@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -24,7 +25,7 @@ const (
 
 // PublishedScaleListCache 用 Redis 存储已发布量表全量列表，并提供分页读取端口。
 type PublishedScaleListCache struct {
-	repo        domainScale.Repository
+	reader      scalereadmodel.ScaleReader
 	entry       cacheentry.Cache
 	payload     *cacheentry.PayloadStore
 	identitySvc iambridge.IdentityResolver
@@ -36,12 +37,12 @@ type PublishedScaleListCache struct {
 
 func NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 	entry cacheentry.Cache,
-	repo domainScale.Repository,
+	reader scalereadmodel.ScaleReader,
 	identitySvc iambridge.IdentityResolver,
 	keyBuilder *keyspace.Builder,
 	policy cachepolicy.CachePolicy,
 ) *PublishedScaleListCache {
-	if entry == nil || repo == nil {
+	if entry == nil || reader == nil {
 		return nil
 	}
 	if keyBuilder == nil {
@@ -49,7 +50,7 @@ func NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 	}
 
 	return &PublishedScaleListCache{
-		repo:        repo,
+		reader:      reader,
 		entry:       entry,
 		payload:     cacheentry.NewPayloadStore(entry, cachepolicy.PolicyScaleList, policy),
 		identitySvc: identitySvc,
@@ -61,15 +62,15 @@ func NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 }
 
 func (c *PublishedScaleListCache) Rebuild(ctx context.Context) error {
-	if c == nil || c.entry == nil || c.payload == nil || c.repo == nil {
+	if c == nil || c.entry == nil || c.payload == nil || c.reader == nil {
 		return nil
 	}
 
-	conditions := map[string]interface{}{
-		"status": domainScale.StatusPublished.Value(),
+	filter := scalereadmodel.ScaleFilter{
+		Status: domainScale.StatusPublished.Value(),
 	}
 
-	total, err := c.repo.CountWithConditions(ctx, conditions)
+	total, err := c.reader.CountScales(ctx, filter)
 	if err != nil {
 		return err
 	}
@@ -84,7 +85,7 @@ func (c *PublishedScaleListCache) Rebuild(ctx context.Context) error {
 		return nil
 	}
 
-	items, err := c.fetchAll(ctx, conditions, total)
+	items, err := c.fetchAll(ctx, filter, total)
 	if err != nil {
 		return err
 	}
@@ -187,10 +188,10 @@ func (c *PublishedScaleListCache) GetPage(ctx context.Context, page, pageSize in
 	return result, true
 }
 
-func (c *PublishedScaleListCache) fetchAll(ctx context.Context, conditions map[string]interface{}, total int64) ([]*domainScale.MedicalScale, error) {
-	all := make([]*domainScale.MedicalScale, 0, int(total))
+func (c *PublishedScaleListCache) fetchAll(ctx context.Context, filter scalereadmodel.ScaleFilter, total int64) ([]scalereadmodel.ScaleSummaryRow, error) {
+	all := make([]scalereadmodel.ScaleSummaryRow, 0, int(total))
 	for page := 1; int64(len(all)) < total; page++ {
-		items, err := c.repo.FindSummaryList(ctx, page, c.pageSize, conditions)
+		items, err := c.reader.ListScales(ctx, filter, scalereadmodel.PageRequest{Page: page, PageSize: c.pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -205,7 +206,7 @@ func (c *PublishedScaleListCache) fetchAll(ctx context.Context, conditions map[s
 	return all, nil
 }
 
-func (c *PublishedScaleListCache) toPortPage(ctx context.Context, items []*domainScale.MedicalScale, total int64) *scalelistcache.Page {
+func (c *PublishedScaleListCache) toPortPage(ctx context.Context, items []scalereadmodel.ScaleSummaryRow, total int64) *scalelistcache.Page {
 	userNames := resolveScaleListUserNames(ctx, items, c.identitySvc)
 	result := &scalelistcache.Page{
 		Items: make([]scalelistcache.Summary, 0, len(items)),
@@ -213,24 +214,21 @@ func (c *PublishedScaleListCache) toPortPage(ctx context.Context, items []*domai
 	}
 
 	for _, item := range items {
-		if item == nil {
-			continue
-		}
 		result.Items = append(result.Items, scalelistcache.Summary{
-			Code:              item.GetCode().String(),
-			Title:             item.GetTitle(),
-			Description:       item.GetDescription(),
-			Category:          item.GetCategory().String(),
-			Stages:            scaleListStageStrings(item),
-			ApplicableAges:    scaleListApplicableAgeStrings(item),
-			Reporters:         scaleListReporterStrings(item),
-			Tags:              scaleListTagStrings(item),
-			QuestionnaireCode: item.GetQuestionnaireCode().String(),
-			Status:            item.GetStatus().String(),
-			CreatedBy:         displayScaleListIdentityName(item.GetCreatedBy(), userNames),
-			CreatedAt:         item.GetCreatedAt(),
-			UpdatedBy:         displayScaleListIdentityName(item.GetUpdatedBy(), userNames),
-			UpdatedAt:         item.GetUpdatedAt(),
+			Code:              item.Code,
+			Title:             item.Title,
+			Description:       item.Description,
+			Category:          item.Category,
+			Stages:            item.Stages,
+			ApplicableAges:    item.ApplicableAges,
+			Reporters:         item.Reporters,
+			Tags:              item.Tags,
+			QuestionnaireCode: item.QuestionnaireCode,
+			Status:            item.Status,
+			CreatedBy:         displayScaleListIdentityName(item.CreatedBy, userNames),
+			CreatedAt:         item.CreatedAt,
+			UpdatedBy:         displayScaleListIdentityName(item.UpdatedBy, userNames),
+			UpdatedAt:         item.UpdatedAt,
 		})
 	}
 
@@ -331,16 +329,13 @@ func (c *PublishedScaleListCache) resetMemory() {
 	c.memory.Clear()
 }
 
-func resolveScaleListUserNames(ctx context.Context, items []*domainScale.MedicalScale, identitySvc iambridge.IdentityResolver) map[string]string {
+func resolveScaleListUserNames(ctx context.Context, items []scalereadmodel.ScaleSummaryRow, identitySvc iambridge.IdentityResolver) map[string]string {
 	if identitySvc == nil || !identitySvc.IsEnabled() {
 		return nil
 	}
 	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
+		userIDs = append(userIDs, item.CreatedBy, item.UpdatedBy)
 	}
 	return identitySvc.ResolveUserNames(ctx, userIDs)
 }
@@ -355,36 +350,4 @@ func displayScaleListIdentityName(id meta.ID, userNames map[string]string) strin
 		}
 	}
 	return id.String()
-}
-
-func scaleListTagStrings(item *domainScale.MedicalScale) []string {
-	tags := make([]string, 0, len(item.GetTags()))
-	for _, tag := range item.GetTags() {
-		tags = append(tags, tag.String())
-	}
-	return tags
-}
-
-func scaleListReporterStrings(item *domainScale.MedicalScale) []string {
-	reporters := make([]string, 0, len(item.GetReporters()))
-	for _, reporter := range item.GetReporters() {
-		reporters = append(reporters, reporter.String())
-	}
-	return reporters
-}
-
-func scaleListStageStrings(item *domainScale.MedicalScale) []string {
-	stages := make([]string, 0, len(item.GetStages()))
-	for _, stage := range item.GetStages() {
-		stages = append(stages, stage.String())
-	}
-	return stages
-}
-
-func scaleListApplicableAgeStrings(item *domainScale.MedicalScale) []string {
-	ages := make([]string, 0, len(item.GetApplicableAges()))
-	for _, age := range item.GetApplicableAges() {
-		ages = append(ages, age.String())
-	}
-	return ages
 }

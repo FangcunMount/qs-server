@@ -28,12 +28,8 @@ func NewQueryService(
 	repo questionnaire.Repository,
 	identitySvc iambridge.IdentityResolver,
 	hotset cachetarget.HotsetRecorder,
-	readers ...surveyreadmodel.QuestionnaireReader,
+	reader surveyreadmodel.QuestionnaireReader,
 ) QuestionnaireQueryService {
-	reader := surveyreadmodel.QuestionnaireReader(questionnaireRepositoryReadModel{repo: repo})
-	if len(readers) > 0 && readers[0] != nil {
-		reader = readers[0]
-	}
 	return &queryService{
 		repo:        repo,
 		reader:      reader,

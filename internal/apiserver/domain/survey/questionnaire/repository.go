@@ -26,10 +26,6 @@ type Repository interface {
 	FindBasePublishedByCode(ctx context.Context, code string) (*Questionnaire, error)
 	FindBaseByCodeVersion(ctx context.Context, code, version string) (*Questionnaire, error)
 	LoadQuestions(ctx context.Context, qDomain *Questionnaire) error
-	FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*Questionnaire, error)
-	FindBasePublishedList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*Questionnaire, error)
-	CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error)
-	CountPublishedWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error)
 	Update(ctx context.Context, qDomain *Questionnaire) error
 	CreatePublishedSnapshot(ctx context.Context, qDomain *Questionnaire, active bool) error
 	SetActivePublishedVersion(ctx context.Context, code, version string) error

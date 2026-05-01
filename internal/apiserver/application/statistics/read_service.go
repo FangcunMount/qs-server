@@ -8,15 +8,15 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type readService struct {
 	readModel       StatisticsReadModel
-	answerSheetRepo surveyAnswerSheet.Repository
+	answerSheetRead surveyreadmodel.AnswerSheetReader
 	cache           statisticscache.Cache
 	hotset          cachetarget.HotsetRecorder
 }
@@ -36,8 +36,8 @@ func WithReadServiceHotset(hotset cachetarget.HotsetRecorder) ReadServiceOption 
 }
 
 // NewReadService 创建统一统计读服务。
-func NewReadService(readModel StatisticsReadModel, answerSheetRepo surveyAnswerSheet.Repository, opts ...ReadServiceOption) ReadService {
-	service := &readService{readModel: readModel, answerSheetRepo: answerSheetRepo}
+func NewReadService(readModel StatisticsReadModel, answerSheetRead surveyreadmodel.AnswerSheetReader, opts ...ReadServiceOption) ReadService {
+	service := &readService{readModel: readModel, answerSheetRead: answerSheetRead}
 	for _, opt := range opts {
 		if opt != nil {
 			opt(service)
@@ -328,12 +328,12 @@ func (s *readService) GetQuestionnaireBatchStatistics(ctx context.Context, orgID
 		items = append(items, resultByCode[codeValue])
 	}
 
-	if s.answerSheetRepo != nil {
+	if s.answerSheetRead != nil {
 		for _, item := range items {
 			if item.TotalSubmissions > 0 {
 				continue
 			}
-			count, err := s.answerSheetRepo.CountByQuestionnaire(ctx, item.Code)
+			count, err := s.answerSheetRead.CountAnswerSheets(ctx, surveyreadmodel.AnswerSheetFilter{QuestionnaireCode: item.Code})
 			if err != nil {
 				return nil, err
 			}

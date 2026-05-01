@@ -1,6 +1,7 @@
 package domain_test
 
 import (
+	"go/ast"
 	"go/parser"
 	"go/token"
 	"os"
@@ -38,6 +39,79 @@ func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestSurveyScaleDomainRepositoriesStayCommandSide(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/domain/survey/questionnaire/repository.go",
+		"internal/apiserver/domain/survey/answersheet/repository.go",
+		"internal/apiserver/domain/scale/repository.go",
+	} {
+		path := filepath.Join(root, filepath.FromSlash(rel))
+		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range file.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != "Repository" {
+					continue
+				}
+				iface, ok := typeSpec.Type.(*ast.InterfaceType)
+				if !ok {
+					continue
+				}
+				for _, method := range iface.Methods.List {
+					if len(method.Names) == 0 {
+						continue
+					}
+					name := method.Names[0].Name
+					if strings.Contains(name, "List") || strings.Contains(name, "Count") {
+						t.Fatalf("%s Repository.%s is a read-model method; domain repositories must stay command-side", rel, name)
+					}
+					if fieldListContainsMapStringInterface(method.Type) {
+						t.Fatalf("%s Repository.%s uses map[string]interface{}; typed read filters belong to read-model ports", rel, name)
+					}
+				}
+			}
+		}
+	}
+}
+
+func fieldListContainsMapStringInterface(expr ast.Expr) bool {
+	fn, ok := expr.(*ast.FuncType)
+	if !ok {
+		return false
+	}
+	return astFieldListContainsMapStringInterface(fn.Params) || astFieldListContainsMapStringInterface(fn.Results)
+}
+
+func astFieldListContainsMapStringInterface(fields *ast.FieldList) bool {
+	if fields == nil {
+		return false
+	}
+	for _, field := range fields.List {
+		mapType, ok := field.Type.(*ast.MapType)
+		if !ok {
+			continue
+		}
+		key, keyOK := mapType.Key.(*ast.Ident)
+		if !keyOK || key.Name != "string" {
+			continue
+		}
+		if iface, ok := mapType.Value.(*ast.InterfaceType); ok && iface.Methods != nil && len(iface.Methods.List) == 0 {
+			return true
+		}
+	}
+	return false
 }
 
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {

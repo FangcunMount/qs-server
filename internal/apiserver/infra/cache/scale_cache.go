@@ -119,17 +119,6 @@ func (r *CachedScaleRepository) FindByQuestionnaireCode(ctx context.Context, que
 	return r.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
 
-// FindSummaryList 查询量表摘要列表
-func (r *CachedScaleRepository) FindSummaryList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*scale.MedicalScale, error) {
-	// 列表查询不缓存（条件多样，缓存命中率低）
-	return r.repo.FindSummaryList(ctx, page, pageSize, conditions)
-}
-
-// CountWithConditions 统计量表数量
-func (r *CachedScaleRepository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	return r.repo.CountWithConditions(ctx, conditions)
-}
-
 // Update 更新量表（同时失效缓存）
 func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.MedicalScale) error {
 	oldCode := domain.GetCode().String()

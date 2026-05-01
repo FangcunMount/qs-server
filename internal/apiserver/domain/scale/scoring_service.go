@@ -10,6 +10,7 @@ import (
 )
 
 // ScoringService 计分服务（领域服务）
+// Deprecated: evaluation scoring now executes through port/ruleengine.ScaleFactorScorer.
 // 职责：根据量表的计分配置，计算因子得分
 type ScoringService interface {
 	// CalculateFactorScore 计算因子得分
@@ -25,6 +26,7 @@ type ScoringService interface {
 type defaultScoringService struct{}
 
 // NewScoringService 创建计分服务
+// Deprecated: use infra/ruleengine.ScaleFactorScorer through application ports.
 func NewScoringService() ScoringService {
 	return &defaultScoringService{}
 }

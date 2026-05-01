@@ -33,19 +33,20 @@ type queryService struct {
 	hotRank     scale.ScaleHotRankReadModel
 }
 
-// NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
-	return NewQueryServiceWithReadModel(repo, nil, identitySvc, listCache, hotset, hotRankReaders...)
+// NewQueryService 创建量表查询服务。
+func NewQueryService(repo scale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
+	return newQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
 }
 
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
 func NewQueryServiceWithReadModel(repo scale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
+	return newQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
+}
+
+func newQueryService(repo scale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
 	var hotRank scale.ScaleHotRankReadModel
 	if len(hotRankReaders) > 0 {
 		hotRank = hotRankReaders[0]
-	}
-	if reader == nil {
-		reader = scaleRepositoryReadModel{repo: repo}
 	}
 	return &queryService{
 		repo:        repo,
@@ -324,16 +325,21 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 		seen[item.Scale.GetCode().String()] = struct{}{}
 	}
 
-	conditions := map[string]interface{}{
-		"status": scale.StatusPublished.Value(),
-	}
-	items, err := s.repo.FindSummaryList(ctx, 1, 100, conditions)
+	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取热门量表兜底列表失败")
 	}
 
 	result := make([]scale.HotScaleSummary, 0, limit-len(existing))
-	for _, item := range items {
+	for _, row := range rows {
+		item, err := s.repo.FindByCode(ctx, row.Code)
+		if err != nil {
+			logger.L(ctx).Warnw("failed to resolve fallback hot scale",
+				"scale_code", row.Code,
+				"error", err,
+			)
+			continue
+		}
 		if item == nil || !item.IsPublished() || !item.GetCategory().IsOpen() {
 			continue
 		}

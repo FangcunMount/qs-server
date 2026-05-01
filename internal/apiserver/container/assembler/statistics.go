@@ -6,12 +6,12 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -52,7 +52,7 @@ type StatisticsModuleDeps struct {
 	MySQLDB           *gorm.DB
 	RedisClient       redis.UniversalClient
 	CacheBuilder      *keyspace.Builder
-	AnswerSheetRepo   surveyAnswerSheet.Repository
+	AnswerSheetReader surveyreadmodel.AnswerSheetReader
 	RepairWindowDays  int
 	QueryPolicy       cachepolicy.CachePolicy
 	HotsetRecorder    cachetarget.HotsetRecorder
@@ -102,7 +102,7 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
 	module.ReadService = statisticsApp.NewReadService(
 		statisticsReadModelInfra.NewReadModel(normalized.MySQLDB),
-		normalized.AnswerSheetRepo,
+		normalized.AnswerSheetReader,
 		statisticsApp.WithReadServiceCache(module.Cache),
 		statisticsApp.WithReadServiceHotset(normalized.HotsetRecorder),
 	)

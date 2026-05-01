@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
 // FactorScoreHandler 因子分数计算处理器
@@ -15,14 +16,14 @@ import (
 // 输出：填充 Context.FactorScores
 type FactorScoreHandler struct {
 	*BaseHandler
-	scoringService scale.ScoringService // 量表计分服务（领域服务）
+	scorer ruleengine.ScaleFactorScorer
 }
 
 // NewFactorScoreHandler 创建因子分数计算处理器
-func NewFactorScoreHandler() *FactorScoreHandler {
+func NewFactorScoreHandler(scorer ruleengine.ScaleFactorScorer) *FactorScoreHandler {
 	return &FactorScoreHandler{
-		BaseHandler:    NewBaseHandler("FactorScoreHandler"),
-		scoringService: scale.NewScoringService(),
+		BaseHandler: NewBaseHandler("FactorScoreHandler"),
+		scorer:      scorer,
 	}
 }
 
@@ -98,14 +99,74 @@ func (h *FactorScoreHandler) calculateFactorRawScore(
 		return h.simulateFactorScore(factor)
 	}
 
-	// 委托给领域服务计算因子得分
-	score, err := h.scoringService.CalculateFactorScore(ctx, factor, sheet, qnr)
+	if h.scorer == nil {
+		return 0
+	}
+
+	values, err := h.collectFactorValues(factor, sheet, qnr)
+	if err != nil {
+		return 0
+	}
+	score, err := h.scorer.ScoreFactor(ctx, factor.GetCode().String(), values, factor.GetScoringStrategy().String(), nil)
 	if err != nil {
 		// 计算失败，返回 0
 		return 0
 	}
 
 	return score
+}
+
+func (h *FactorScoreHandler) collectFactorValues(factor *scale.Factor, sheet *answersheet.AnswerSheet, qnr *questionnaire.Questionnaire) ([]float64, error) {
+	switch factor.GetScoringStrategy() {
+	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+		return h.collectQuestionScores(factor, sheet), nil
+	case scale.ScoringStrategyCnt:
+		if qnr == nil {
+			return nil, NewHandlerError("questionnaire is required")
+		}
+		return h.collectCntMatches(factor, sheet, qnr), nil
+	default:
+		return nil, nil
+	}
+}
+
+func (h *FactorScoreHandler) collectQuestionScores(factor *scale.Factor, sheet *answersheet.AnswerSheet) []float64 {
+	answerMap := factorScoreAnswerMap(sheet)
+	scores := make([]float64, 0, len(factor.GetQuestionCodes()))
+	for _, qCode := range factor.GetQuestionCodes() {
+		if answer, found := answerMap[qCode.String()]; found {
+			scores = append(scores, answer.Score())
+		}
+	}
+	return scores
+}
+
+func (h *FactorScoreHandler) collectCntMatches(factor *scale.Factor, sheet *answersheet.AnswerSheet, qnr *questionnaire.Questionnaire) []float64 {
+	targetContents := factor.GetScoringParams().GetCntOptionContents()
+	if len(targetContents) == 0 {
+		return nil
+	}
+	optionContentMap := factorScoreOptionContentMap(qnr)
+	answerMap := factorScoreAnswerMap(sheet)
+	matchValues := make([]float64, 0, len(factor.GetQuestionCodes()))
+	for _, qCode := range factor.GetQuestionCodes() {
+		answer, found := answerMap[qCode.String()]
+		if !found {
+			continue
+		}
+		optionID := factorScoreOptionID(answer)
+		if optionID == "" {
+			continue
+		}
+		optionContent, found := optionContentMap[optionID]
+		if !found {
+			continue
+		}
+		if factorScoreContainsString(targetContents, optionContent) {
+			matchValues = append(matchValues, 1.0)
+		}
+	}
+	return matchValues
 }
 
 // simulateFactorScore 模拟因子得分（当没有答卷数据时使用）
@@ -118,4 +179,49 @@ func (h *FactorScoreHandler) simulateFactorScore(factor *scale.Factor) float64 {
 
 	// 假设每题平均分为 2.5 分
 	return float64(questionCount) * 2.5
+}
+
+func factorScoreOptionContentMap(qnr *questionnaire.Questionnaire) map[string]string {
+	contentMap := make(map[string]string)
+	for _, q := range qnr.GetQuestions() {
+		for _, opt := range q.GetOptions() {
+			contentMap[opt.GetCode().Value()] = opt.GetContent()
+		}
+	}
+	return contentMap
+}
+
+func factorScoreAnswerMap(sheet *answersheet.AnswerSheet) map[string]answersheet.Answer {
+	answerMap := make(map[string]answersheet.Answer)
+	for _, ans := range sheet.Answers() {
+		answerMap[ans.QuestionCode()] = ans
+	}
+	return answerMap
+}
+
+func factorScoreOptionID(answer answersheet.Answer) string {
+	value := answer.Value()
+	if value == nil {
+		return ""
+	}
+	raw := value.Raw()
+	if raw == nil {
+		return ""
+	}
+	if str, ok := raw.(string); ok {
+		return str
+	}
+	if arr, ok := raw.([]string); ok && len(arr) > 0 {
+		return arr[0]
+	}
+	return ""
+}
+
+func factorScoreContainsString(values []string, target string) bool {
+	for _, value := range values {
+		if value == target {
+			return true
+		}
+	}
+	return false
 }

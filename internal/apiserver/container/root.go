@@ -155,7 +155,6 @@ func (c *Container) Initialize() error {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
 	}
 	graph := newModuleGraph(c)
-	graph.postWireScaleDependencies()
 
 	// 初始化 Actor 模块
 	if err := c.initActorModule(); err != nil {

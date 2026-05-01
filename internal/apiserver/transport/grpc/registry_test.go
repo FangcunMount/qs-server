@@ -13,12 +13,12 @@ func TestRegistryGetRegisteredServicesReflectsTypedDeps(t *testing.T) {
 
 	registry := NewRegistry(Deps{
 		Survey: SurveyDeps{
-			AnswerSheetSubmissionService: answerSheetApp.NewSubmissionService(nil, nil, nil, nil),
-			AnswerSheetManagementService: answerSheetApp.NewManagementService(nil),
-			QuestionnaireQueryService:    appQuestionnaire.NewQueryService(nil, nil, nil),
+			AnswerSheetSubmissionService: answerSheetApp.NewSubmissionService(nil, nil, nil, nil, nil),
+			AnswerSheetManagementService: answerSheetApp.NewManagementService(nil, nil),
+			QuestionnaireQueryService:    appQuestionnaire.NewQueryService(nil, nil, nil, nil),
 		},
 		Scale: ScaleDeps{
-			QueryService:    scaleApp.NewQueryService(nil, nil, nil, nil),
+			QueryService:    scaleApp.NewQueryService(nil, nil, nil, nil, nil),
 			CategoryService: scaleApp.NewCategoryService(),
 		},
 	})

@@ -145,22 +145,6 @@ func (r *CachedQuestionnaireRepository) LoadQuestions(ctx context.Context, qDoma
 	return r.repo.LoadQuestions(ctx, qDomain)
 }
 
-func (r *CachedQuestionnaireRepository) FindBaseList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return r.repo.FindBaseList(ctx, page, pageSize, conditions)
-}
-
-func (r *CachedQuestionnaireRepository) FindBasePublishedList(ctx context.Context, page, pageSize int, conditions map[string]interface{}) ([]*domainQuestionnaire.Questionnaire, error) {
-	return r.repo.FindBasePublishedList(ctx, page, pageSize, conditions)
-}
-
-func (r *CachedQuestionnaireRepository) CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	return r.repo.CountWithConditions(ctx, conditions)
-}
-
-func (r *CachedQuestionnaireRepository) CountPublishedWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error) {
-	return r.repo.CountPublishedWithConditions(ctx, conditions)
-}
-
 func (r *CachedQuestionnaireRepository) Update(ctx context.Context, qDomain *domainQuestionnaire.Questionnaire) error {
 	if err := r.repo.Update(ctx, qDomain); err != nil {
 		return err

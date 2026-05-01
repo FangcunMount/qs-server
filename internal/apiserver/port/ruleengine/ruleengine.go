@@ -3,14 +3,29 @@ package ruleengine
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 )
+
+// ValidatableValue is the value surface needed by validation execution.
+type ValidatableValue interface {
+	IsEmpty() bool
+	AsString() string
+	AsNumber() (float64, error)
+	AsArray() []string
+}
+
+// ScorableValue is the value surface needed by answer scoring execution.
+type ScorableValue interface {
+	IsEmpty() bool
+	AsSingleSelection() (string, bool)
+	AsMultipleSelections() ([]string, bool)
+	AsNumber() (float64, bool)
+}
 
 // AnswerValidationTask describes one answer validation execution request.
 type AnswerValidationTask struct {
 	ID    string
-	Value validation.ValidatableValue
+	Value ValidatableValue
 	Rules []validation.ValidationRule
 }
 
@@ -35,7 +50,7 @@ type AnswerValidator interface {
 // AnswerScoreTask describes one answer score execution request.
 type AnswerScoreTask struct {
 	ID           string
-	Value        calculation.ScorableValue
+	Value        ScorableValue
 	OptionScores map[string]float64
 }
 

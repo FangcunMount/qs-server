@@ -19,6 +19,7 @@ import (
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -38,6 +39,7 @@ type ScaleModule struct {
 	QueryService     scaleApp.ScaleQueryService
 	CategoryService  scaleApp.ScaleCategoryService
 	ListCache        scalelistcache.PublishedListCache
+	Reader           scalereadmodel.ScaleReader
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher event.EventPublisher
@@ -72,6 +74,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := scaleInfra.NewRepository(normalized.MongoDB, mongoBase.BaseRepositoryOptions{Limiter: normalized.MongoLimiter})
+	module.Reader = scaleInfra.NewScaleReadModel(baseRepo)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if normalized.RedisClient != nil {
 		module.Repo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(baseRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.ScalePolicy, normalized.Observer)
@@ -84,7 +87,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	if normalized.RedisClient != nil {
 		listCache = cachequery.NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
 			cacheentry.NewRedisCache(normalized.RedisClient),
-			module.Repo,
+			module.Reader,
 			normalized.IdentityService,
 			normalized.CacheBuilder,
 			normalized.ScaleListPolicy,
@@ -96,7 +99,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	module.LifecycleService = scaleApp.NewLifecycleService(module.Repo, quesApp.NewPublishedQuestionnaireCatalog(normalized.QuestionnaireRepo), module.eventPublisher, listCache)
 	module.FactorService = scaleApp.NewFactorService(module.Repo, listCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
-	module.QueryService = scaleApp.NewQueryServiceWithReadModel(module.Repo, scaleInfra.NewScaleReadModel(module.Repo), normalized.IdentityService, listCache, normalized.HotsetRecorder, hotRankReader)
+	module.QueryService = scaleApp.NewQueryService(module.Repo, module.Reader, normalized.IdentityService, listCache, normalized.HotsetRecorder, hotRankReader)
 	module.CategoryService = scaleApp.NewCategoryService()
 
 	return module, nil

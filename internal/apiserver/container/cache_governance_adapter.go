@@ -8,6 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
@@ -57,16 +59,14 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 
 func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]string, error) {
 	c := a.container
-	if c == nil || c.ScaleModule == nil || c.ScaleModule.Repo == nil {
+	if c == nil || c.ScaleModule == nil || c.ScaleModule.Reader == nil {
 		return nil, nil
 	}
 	const pageSize = 200
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := c.ScaleModule.Repo.FindSummaryList(ctx, page, pageSize, map[string]interface{}{
-			"status": scale.StatusPublished.Value(),
-		})
+		items, err := c.ScaleModule.Reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -74,10 +74,7 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 			break
 		}
 		for _, item := range items {
-			if item == nil {
-				continue
-			}
-			codes = append(codes, item.GetCode().String())
+			codes = append(codes, item.Code)
 		}
 		if len(items) < pageSize {
 			break
@@ -89,16 +86,14 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 
 func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Context) ([]string, error) {
 	c := a.container
-	if c == nil || c.SurveyModule == nil || c.SurveyModule.Questionnaire == nil || c.SurveyModule.Questionnaire.Repo == nil {
+	if c == nil || c.SurveyModule == nil || c.SurveyModule.Questionnaire == nil || c.SurveyModule.Questionnaire.Reader == nil {
 		return nil, nil
 	}
 	const pageSize = 200
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := c.SurveyModule.Questionnaire.Repo.FindBasePublishedList(ctx, page, pageSize, map[string]interface{}{
-			"status": "published",
-		})
+		items, err := c.SurveyModule.Questionnaire.Reader.ListPublishedQuestionnaires(ctx, surveyreadmodel.QuestionnaireFilter{Status: "published"}, surveyreadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}
@@ -106,10 +101,7 @@ func (a cacheGovernanceAdapter) listPublishedQuestionnaireCodes(ctx context.Cont
 			break
 		}
 		for _, item := range items {
-			if item == nil {
-				continue
-			}
-			codes = append(codes, item.GetCode().String())
+			codes = append(codes, item.Code)
 		}
 		if len(items) < pageSize {
 			break

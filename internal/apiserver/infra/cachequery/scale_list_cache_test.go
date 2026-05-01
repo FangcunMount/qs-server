@@ -9,6 +9,7 @@ import (
 	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/alicebob/miniredis/v2"
@@ -27,7 +28,7 @@ func TestPublishedScaleListCacheCompressedRoundTrip(t *testing.T) {
 	builder := keyspace.NewBuilderWithNamespace("scale-list-test")
 	repo := &scaleListCacheRepo{
 		count: 2,
-		pages: map[int][]*domainscale.MedicalScale{
+		pages: map[int][]scalereadmodel.ScaleSummaryRow{
 			1: {
 				newScaleListCacheScale(t, "SCALE_A", "Scale A"),
 				newScaleListCacheScale(t, "SCALE_B", "Scale B"),
@@ -143,7 +144,7 @@ func TestPublishedScaleListCacheGetPageUsesLocalMemoryAfterRedisHit(t *testing.T
 		cacheentry.NewRedisCache(client),
 		&scaleListCacheRepo{
 			count: 1,
-			pages: map[int][]*domainscale.MedicalScale{
+			pages: map[int][]scalereadmodel.ScaleSummaryRow{
 				1: {newScaleListCacheScale(t, "SCALE_MEMORY", "Memory Scale")},
 			},
 		},
@@ -173,46 +174,22 @@ func TestPublishedScaleListCacheGetPageUsesLocalMemoryAfterRedisHit(t *testing.T
 type scaleListCacheRepo struct {
 	count    int64
 	countErr error
-	pages    map[int][]*domainscale.MedicalScale
+	pages    map[int][]scalereadmodel.ScaleSummaryRow
 	findErr  error
 }
 
-func (r *scaleListCacheRepo) Create(context.Context, *domainscale.MedicalScale) error {
-	return nil
-}
-
-func (r *scaleListCacheRepo) FindByCode(context.Context, string) (*domainscale.MedicalScale, error) {
-	return nil, nil
-}
-
-func (r *scaleListCacheRepo) FindByQuestionnaireCode(context.Context, string) (*domainscale.MedicalScale, error) {
-	return nil, nil
-}
-
-func (r *scaleListCacheRepo) FindSummaryList(_ context.Context, page, _ int, _ map[string]interface{}) ([]*domainscale.MedicalScale, error) {
+func (r *scaleListCacheRepo) ListScales(_ context.Context, _ scalereadmodel.ScaleFilter, page scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	if r.findErr != nil {
 		return nil, r.findErr
 	}
-	return r.pages[page], nil
+	return r.pages[page.Page], nil
 }
 
-func (r *scaleListCacheRepo) CountWithConditions(context.Context, map[string]interface{}) (int64, error) {
+func (r *scaleListCacheRepo) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
 	return r.count, r.countErr
 }
 
-func (r *scaleListCacheRepo) Update(context.Context, *domainscale.MedicalScale) error {
-	return nil
-}
-
-func (r *scaleListCacheRepo) Remove(context.Context, string) error {
-	return nil
-}
-
-func (r *scaleListCacheRepo) ExistsByCode(context.Context, string) (bool, error) {
-	return false, nil
-}
-
-func newScaleListCacheScale(t *testing.T, code, title string) *domainscale.MedicalScale {
+func newScaleListCacheScale(t *testing.T, code, title string) scalereadmodel.ScaleSummaryRow {
 	t.Helper()
 
 	now := time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC)
@@ -231,5 +208,20 @@ func newScaleListCacheScale(t *testing.T, code, title string) *domainscale.Medic
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
 	}
-	return scale
+	return scalereadmodel.ScaleSummaryRow{
+		Code:              scale.GetCode().String(),
+		Title:             scale.GetTitle(),
+		Description:       scale.GetDescription(),
+		Category:          scale.GetCategory().String(),
+		Stages:            []string{domainscale.StageDeepAssessment.String()},
+		ApplicableAges:    []string{domainscale.ApplicableAgeSchoolChild.String()},
+		Reporters:         []string{domainscale.ReporterParent.String()},
+		Tags:              []string{"tag"},
+		QuestionnaireCode: scale.GetQuestionnaireCode().String(),
+		Status:            scale.GetStatus().String(),
+		CreatedBy:         scale.GetCreatedBy(),
+		CreatedAt:         scale.GetCreatedAt(),
+		UpdatedBy:         scale.GetUpdatedBy(),
+		UpdatedAt:         scale.GetUpdatedAt(),
+	}
 }

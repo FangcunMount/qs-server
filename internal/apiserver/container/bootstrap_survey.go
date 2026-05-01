@@ -3,7 +3,9 @@ package container
 import (
 	"fmt"
 
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -30,6 +32,12 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 		Observer:            c.cacheObserver(),
 		TopicResolver:       c.eventCatalog,
 		MongoLimiter:        c.backpressure.Mongo,
+		ScaleSyncer: scaleApp.NewLazyQuestionnaireBindingSyncer(func() domainScale.Repository {
+			if c == nil || c.ScaleModule == nil {
+				return nil
+			}
+			return c.ScaleModule.Repo
+		}),
 	}
 }
 

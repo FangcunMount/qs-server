@@ -13,14 +13,6 @@ func newModuleGraph(c *Container) moduleGraph {
 	return moduleGraph{container: c}
 }
 
-func (g moduleGraph) postWireScaleDependencies() {
-	c := g.container
-	if c == nil || c.SurveyModule == nil || c.ScaleModule == nil {
-		return
-	}
-	c.SurveyModule.SetScaleRepository(c.ScaleModule.Repo)
-}
-
 func (g moduleGraph) postWireCacheGovernanceDependencies() {
 	c := g.container
 	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.Handler == nil {

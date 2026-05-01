@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	surveyAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
@@ -27,9 +27,9 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 		redisClient = nil
 	}
 
-	var answerSheetRepo surveyAnswerSheet.Repository
+	var answerSheetReader surveyreadmodel.AnswerSheetReader
 	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
-		answerSheetRepo = c.SurveyModule.AnswerSheet.Repo
+		answerSheetReader = c.SurveyModule.AnswerSheet.Reader
 	}
 	if !disableStatisticsCache {
 		versionStore = cachequery.NewRedisVersionTokenStoreWithKindAndObserver(
@@ -46,7 +46,7 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 		MySQLDB:           c.mysqlDB,
 		RedisClient:       redisClient,
 		CacheBuilder:      c.CacheBuilder(cacheplane.FamilyQuery),
-		AnswerSheetRepo:   answerSheetRepo,
+		AnswerSheetReader: answerSheetReader,
 		RepairWindowDays:  c.statisticsRepairWindowDays,
 		QueryPolicy:       c.CachePolicy(cachepolicy.PolicyStatsQuery),
 		HotsetRecorder:    c.hotsetRecorder(),

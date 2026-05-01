@@ -20,7 +20,7 @@ type Repository struct {
 }
 
 // NewRepository 创建问卷 MongoDB 存储库
-func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) domainQuestionnaire.Repository {
+func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
 	po := &QuestionnairePO{}
 	return &Repository{
 		BaseRepository: mongoBase.NewBaseRepository(db, po.CollectionName(), opts...),

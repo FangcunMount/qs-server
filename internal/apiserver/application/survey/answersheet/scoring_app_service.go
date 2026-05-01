@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -20,19 +21,19 @@ type AnswerSheetScoringService interface {
 type answerSheetScoringService struct {
 	answerSheetRepo   answersheet.Repository
 	questionnaireRepo questionnaire.Repository
-	scoringService    answersheet.ScoringService
+	answerScorer      ruleengine.AnswerScorer
 }
 
 // NewAnswerSheetScoringService 创建答卷计分应用服务
 func NewAnswerSheetScoringService(
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
-	scoringService answersheet.ScoringService,
+	answerScorer ruleengine.AnswerScorer,
 ) AnswerSheetScoringService {
 	return &answerSheetScoringService{
 		answerSheetRepo:   answerSheetRepo,
 		questionnaireRepo: questionnaireRepo,
-		scoringService:    scoringService,
+		answerScorer:      answerScorer,
 	}
 }
 
@@ -79,7 +80,7 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 	l.Debugw("问卷加载成功", "questionnaire_code", qnr.GetCode().Value(), "questionnaire_version", qnr.GetVersion().Value(), "question_count", len(qnr.GetQuestions()))
 
 	// 3. 计算分数
-	scoredSheet, err := s.scoringService.CalculateAnswerSheetScore(ctx, sheet, qnr)
+	scoredSheet, err := s.calculateAnswerSheetScore(ctx, sheet, qnr)
 	if err != nil {
 		l.Errorw("计算分数失败", "answersheet_id", answerSheetID, "error", err.Error())
 		return errors.WrapC(err, errorCode.ErrAnswerSheetScoreCalculationFailed, "计算分数失败")
@@ -146,4 +147,67 @@ func (s *answerSheetScoringService) CalculateAndSave(ctx context.Context, answer
 	)
 
 	return nil
+}
+
+func (s *answerSheetScoringService) calculateAnswerSheetScore(ctx context.Context, sheet *answersheet.AnswerSheet, qnr *questionnaire.Questionnaire) (*answersheet.ScoredAnswerSheet, error) {
+	if s.answerScorer == nil {
+		return nil, errors.WithCode(errorCode.ErrAnswerSheetScoreCalculationFailed, "答卷计分器未配置")
+	}
+	questionMap := buildScoringQuestionMap(qnr.GetQuestions())
+	tasks := make([]ruleengine.AnswerScoreTask, 0, len(sheet.Answers()))
+	for _, ans := range sheet.Answers() {
+		question, found := questionMap[ans.QuestionCode()]
+		if !found {
+			continue
+		}
+		tasks = append(tasks, ruleengine.AnswerScoreTask{
+			ID:           ans.QuestionCode(),
+			Value:        answersheet.NewScorableValue(ans.Value()),
+			OptionScores: buildScoringOptionScoreMap(question.GetOptions()),
+		})
+	}
+	results, err := s.answerScorer.ScoreAnswers(ctx, tasks)
+	if err != nil {
+		return nil, err
+	}
+	resultMap := make(map[string]ruleengine.AnswerScoreResult, len(results))
+	for _, result := range results {
+		resultMap[result.ID] = result
+	}
+
+	scoredAnswers := make([]answersheet.ScoredAnswer, 0, len(sheet.Answers()))
+	var totalScore float64
+	for _, ans := range sheet.Answers() {
+		result, found := resultMap[ans.QuestionCode()]
+		if !found {
+			continue
+		}
+		scoredAnswers = append(scoredAnswers, answersheet.ScoredAnswer{
+			QuestionCode: ans.QuestionCode(),
+			Score:        result.Score,
+			MaxScore:     result.MaxScore,
+		})
+		totalScore += result.Score
+	}
+	return &answersheet.ScoredAnswerSheet{
+		AnswerSheetID: sheet.ID().Uint64(),
+		TotalScore:    totalScore,
+		ScoredAnswers: scoredAnswers,
+	}, nil
+}
+
+func buildScoringQuestionMap(questions []questionnaire.Question) map[string]questionnaire.Question {
+	questionMap := make(map[string]questionnaire.Question, len(questions))
+	for _, question := range questions {
+		questionMap[question.GetCode().Value()] = question
+	}
+	return questionMap
+}
+
+func buildScoringOptionScoreMap(options []questionnaire.Option) map[string]float64 {
+	optionScoreMap := make(map[string]float64, len(options))
+	for _, opt := range options {
+		optionScoreMap[opt.GetCode().Value()] = opt.GetScore()
+	}
+	return optionScoreMap
 }

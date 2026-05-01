@@ -31,6 +31,7 @@ import (
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
+	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
@@ -192,6 +193,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		}
 		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore))
 		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(module.reportDurableSaver))
+		serviceOpts = append(serviceOpts, engine.WithScaleFactorScorer(ruleengineInfra.NewScaleFactorScorer()))
 
 		module.EvaluationService = engine.NewService(
 			module.AssessmentRepo,
@@ -322,6 +324,7 @@ func (m *EvaluationModule) SetScaleRepository(
 	if m.reportDurableSaver != nil {
 		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(m.reportDurableSaver))
 	}
+	serviceOpts = append(serviceOpts, engine.WithScaleFactorScorer(ruleengineInfra.NewScaleFactorScorer()))
 	m.EvaluationService = engine.NewService(
 		m.AssessmentRepo,
 		m.ScoreRepo,

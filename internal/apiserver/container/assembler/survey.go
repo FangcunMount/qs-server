@@ -11,7 +11,6 @@ import (
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	cacheInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -21,6 +20,7 @@ import (
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -57,6 +57,7 @@ type SurveyModuleDeps struct {
 	Observer            *observability.ComponentObserver
 	TopicResolver       eventcatalog.TopicResolver
 	MongoLimiter        backpressure.Acquirer
+	ScaleSyncer         quesApp.ScaleQuestionnaireBindingSyncer
 }
 
 // QuestionnaireSubModule 问卷子模块
@@ -68,6 +69,7 @@ type QuestionnaireSubModule struct {
 	LifecycleService quesApp.QuestionnaireLifecycleService
 	ContentService   quesApp.QuestionnaireContentService
 	QueryService     quesApp.QuestionnaireQueryService
+	Reader           surveyreadmodel.QuestionnaireReader
 }
 
 // AnswerSheetSubModule 答卷子模块
@@ -79,6 +81,7 @@ type AnswerSheetSubModule struct {
 	SubmissionService          asApp.AnswerSheetSubmissionService
 	ManagementService          asApp.AnswerSheetManagementService
 	ScoringService             asApp.AnswerSheetScoringService // 新增：计分服务
+	Reader                     surveyreadmodel.AnswerSheetReader
 	SubmittedEventRelay        asApp.SubmittedEventRelay
 	SubmittedEventStatusReader appEventing.NamedOutboxStatusReader
 }
@@ -108,6 +111,7 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 		normalized.HotsetRecorder,
 		normalized.Observer,
 		normalized.MongoLimiter,
+		normalized.ScaleSyncer,
 	); err != nil {
 		return nil, err
 	}
@@ -131,11 +135,12 @@ func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) 
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *keyspace.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *observability.ComponentObserver, limiter backpressure.Acquirer) error {
+func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *keyspace.Builder, identitySvc *iam.IdentityService, policy cachepolicy.CachePolicy, hotset cachetarget.HotsetRecorder, observer *observability.ComponentObserver, limiter backpressure.Acquirer, scaleSyncer quesApp.ScaleQuestionnaireBindingSyncer) error {
 	sub := m.Questionnaire
 
 	// 初始化 repository 层（基础实现）
 	baseRepo := quesMongoInfra.NewRepository(mongoDB, mongoBase.BaseRepositoryOptions{Limiter: limiter})
+	sub.Reader = quesMongoInfra.NewQuestionnaireReadModel(baseRepo)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if redisClient != nil {
 		sub.Repo = cacheInfra.NewCachedQuestionnaireRepositoryWithBuilderPolicyAndObserver(baseRepo, redisClient, cacheBuilder, policy, observer)
@@ -149,29 +154,11 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	questionMgr := questionnaire.QuestionManager{}
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, nil, validator, lifecycle, m.eventPublisher)
+	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, scaleSyncer, validator, lifecycle, m.eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
-	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc, hotset, quesMongoInfra.NewQuestionnaireReadModel(sub.Repo))
+	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc, hotset, sub.Reader)
 
 	return nil
-}
-
-// SetScaleRepository 设置量表仓储，用于问卷发布时同步量表问卷版本。
-func (m *SurveyModule) SetScaleRepository(scaleRepo domainScale.Repository) {
-	if m == nil || m.Questionnaire == nil {
-		return
-	}
-
-	validator := questionnaire.Validator{}
-	lifecycle := questionnaire.NewLifecycle()
-	m.Questionnaire.LifecycleService = quesApp.NewLifecycleService(
-		m.Questionnaire.Repo,
-		scaleApp.NewQuestionnaireBindingSyncer(scaleRepo),
-		validator,
-		lifecycle,
-		m.eventPublisher,
-	)
-
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
@@ -192,15 +179,15 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 	batchValidator := ruleengineInfra.NewAnswerValidator(nil)
 
 	// 创建领域服务
-	scoringDomainService := answersheet.NewScoringService()
+	answerScorer := ruleengineInfra.NewAnswerScorer(nil)
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	mongoTxRunner := newMongoTransactionRunner(mongoDB)
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, baseRepo, baseRepo)
-	answerSheetReader := asMongoInfra.NewAnswerSheetReadModel(sub.Repo)
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator, answerSheetReader)
-	sub.ManagementService = asApp.NewManagementService(sub.Repo, answerSheetReader)
-	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
+	sub.Reader = asMongoInfra.NewAnswerSheetReadModel(baseRepo)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator, sub.Reader)
+	sub.ManagementService = asApp.NewManagementService(sub.Repo, sub.Reader)
+	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, answerScorer)
 	hotRankProjection := cacheInfra.NewRedisScaleHotRankProjection(rankRedisClient, rankCacheBuilder)
 	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelayWithHooks(
 		"mongo-domain-events",

@@ -32,12 +32,8 @@ func NewSubmissionService(
 	durableStore SubmissionDurableStore,
 	questionnaireRepo questionnaire.Repository,
 	answerValidator ruleengine.AnswerValidator,
-	readers ...surveyreadmodel.AnswerSheetReader,
+	reader surveyreadmodel.AnswerSheetReader,
 ) AnswerSheetSubmissionService {
-	reader := surveyreadmodel.AnswerSheetReader(answerSheetRepositoryReadModel{repo: repo})
-	if len(readers) > 0 && readers[0] != nil {
-		reader = readers[0]
-	}
 	return &submissionService{
 		repo:              repo,
 		reader:            reader,

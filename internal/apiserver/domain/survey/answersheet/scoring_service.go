@@ -77,6 +77,7 @@ func (a *answerValueAdapter) AsNumber() (float64, bool) {
 // ==================== 计分服务接口 ====================
 
 // ScoringService 答卷计分领域服务
+// Deprecated: application scoring now executes through port/ruleengine.AnswerScorer.
 // 职责：根据问卷的选项配置计算答案得分
 // 设计原则：不关心题型，只关心选项和值的匹配
 type ScoringService interface {
@@ -108,6 +109,7 @@ type ScoredAnswer struct {
 type scoringService struct{}
 
 // NewScoringService 创建计分服务
+// Deprecated: use infra/ruleengine.AnswerScorer through application ports.
 func NewScoringService() ScoringService {
 	return &scoringService{}
 }

@@ -7,17 +7,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// AnswerSheetSummary 答卷摘要（用于列表展示，不包含答题详情）
+// AnswerSheetSummary 是旧 Mongo 读模型的过渡行结构。
+// Deprecated: read-side callers should use port/surveyreadmodel.AnswerSheetSummaryRow.
 type AnswerSheetSummary struct {
-	ID                   meta.ID   // 答卷ID
-	QuestionnaireCode    string    // 问卷编码
-	QuestionnaireVersion string    // 问卷版本
-	QuestionnaireTitle   string    // 问卷标题
-	FillerID             uint64    // 填写者ID
-	FillerType           string    // 填写者类型
-	TotalScore           float64   // 总分
-	AnswerCount          int       // 答案数量
-	FilledAt             time.Time // 填写时间
+	ID                   meta.ID
+	QuestionnaireCode    string
+	QuestionnaireVersion string
+	QuestionnaireTitle   string
+	FillerID             uint64
+	FillerType           string
+	TotalScore           float64
+	AnswerCount          int
+	FilledAt             time.Time
 }
 
 // Repository 答卷仓储接口（出站端口）
@@ -31,21 +32,6 @@ type Repository interface {
 
 	// FindByID 根据 ID 查询答卷（返回完整答卷，包含所有答题）
 	FindByID(ctx context.Context, id meta.ID) (*AnswerSheet, error)
-
-	// FindSummaryListByFiller 查询填写者的答卷摘要列表（轻量级，不包含答题详情）
-	FindSummaryListByFiller(ctx context.Context, fillerID uint64, page, pageSize int) ([]*AnswerSheetSummary, error)
-
-	// FindSummaryListByQuestionnaire 查询问卷的答卷摘要列表（轻量级，不包含答题详情）
-	FindSummaryListByQuestionnaire(ctx context.Context, questionnaireCode string, page, pageSize int) ([]*AnswerSheetSummary, error)
-
-	// CountByFiller 统计填写者的答卷数量
-	CountByFiller(ctx context.Context, fillerID uint64) (int64, error)
-
-	// CountByQuestionnaire 统计问卷的答卷数量
-	CountByQuestionnaire(ctx context.Context, questionnaireCode string) (int64, error)
-
-	// CountWithConditions 根据条件统计数量
-	CountWithConditions(ctx context.Context, conditions map[string]interface{}) (int64, error)
 
 	// Delete 删除答卷
 	Delete(ctx context.Context, id meta.ID) error

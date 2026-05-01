@@ -8,11 +8,11 @@ import (
 )
 
 type scaleReadModel struct {
-	repo domainScale.Repository
+	repo *Repository
 }
 
 // NewScaleReadModel adapts scale Mongo repositories to the read-model port.
-func NewScaleReadModel(repo domainScale.Repository) scalereadmodel.ScaleReader {
+func NewScaleReadModel(repo *Repository) scalereadmodel.ScaleReader {
 	return scaleReadModel{repo: repo}
 }
 

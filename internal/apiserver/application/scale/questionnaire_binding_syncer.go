@@ -18,13 +18,38 @@ func NewQuestionnaireBindingSyncer(repo domainScale.Repository) *QuestionnaireBi
 	return &QuestionnaireBindingSyncer{repo: repo}
 }
 
+// LazyQuestionnaireBindingSyncer resolves the scale repository when the publish use case runs.
+type LazyQuestionnaireBindingSyncer struct {
+	repo func() domainScale.Repository
+}
+
+// NewLazyQuestionnaireBindingSyncer creates a survey-facing syncer without post-construction module mutation.
+func NewLazyQuestionnaireBindingSyncer(repo func() domainScale.Repository) *LazyQuestionnaireBindingSyncer {
+	return &LazyQuestionnaireBindingSyncer{repo: repo}
+}
+
 // SyncQuestionnaireVersion synchronizes a bound scale to the newly published questionnaire version.
 func (s *QuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
-	if s == nil || s.repo == nil || questionnaireCode == "" || version == "" {
+	if s == nil {
+		return nil
+	}
+	return syncQuestionnaireVersion(ctx, s.repo, questionnaireCode, version)
+}
+
+// SyncQuestionnaireVersion synchronizes a bound scale to the newly published questionnaire version.
+func (s *LazyQuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
+	if s == nil || s.repo == nil {
+		return nil
+	}
+	return syncQuestionnaireVersion(ctx, s.repo(), questionnaireCode, version)
+}
+
+func syncQuestionnaireVersion(ctx context.Context, repo domainScale.Repository, questionnaireCode, version string) error {
+	if repo == nil || questionnaireCode == "" || version == "" {
 		return nil
 	}
 
-	item, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	item, err := repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
 		if domainScale.IsNotFound(err) {
 			return nil
@@ -39,7 +64,7 @@ func (s *QuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Contex
 	if err := baseInfo.UpdateQuestionnaire(item, item.GetQuestionnaireCode(), version); err != nil {
 		return errors.WrapC(err, errorCode.ErrInvalidArgument, "同步量表问卷版本失败")
 	}
-	if err := s.repo.Update(ctx, item); err != nil {
+	if err := repo.Update(ctx, item); err != nil {
 		return errors.WrapC(err, errorCode.ErrDatabase, "保存量表问卷版本失败")
 	}
 	return nil

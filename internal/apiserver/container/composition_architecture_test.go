@@ -18,7 +18,6 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 	allowedDefinitions := map[string]string{
 		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetScaleRepository": "compat_legacy",
 		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetQRCodeService":   "compat_noop",
-		"internal/apiserver/container/assembler/survey.go:SurveyModule.SetScaleRepository":         "post_wire_dependency",
 	}
 
 	got := map[string]struct{}{}

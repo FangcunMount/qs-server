@@ -19,12 +19,8 @@ type managementService struct {
 // NewManagementService 创建答卷管理服务
 func NewManagementService(
 	repo answersheet.Repository,
-	readers ...surveyreadmodel.AnswerSheetReader,
+	reader surveyreadmodel.AnswerSheetReader,
 ) AnswerSheetManagementService {
-	reader := surveyreadmodel.AnswerSheetReader(answerSheetRepositoryReadModel{repo: repo})
-	if len(readers) > 0 && readers[0] != nil {
-		reader = readers[0]
-	}
 	return &managementService{
 		repo:   repo,
 		reader: reader,

@@ -9,6 +9,7 @@ import (
 
 	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -26,7 +27,7 @@ func TestScaleQueryServiceListPublishedUsesCachePort(t *testing.T) {
 			}},
 		},
 	}
-	service := NewQueryService(repo, nil, cache, nil)
+	service := NewQueryService(repo, repo, nil, cache, nil)
 
 	got, err := service.ListPublished(context.Background(), ListScalesDTO{Page: 1, PageSize: 10})
 	if err != nil {
@@ -50,7 +51,7 @@ func TestScaleQueryServiceListPublishedFallsBackWhenCacheMisses(t *testing.T) {
 		},
 	}
 	cache := &publishedScaleListCacheStub{hit: false}
-	service := NewQueryService(repo, nil, cache, nil)
+	service := NewQueryService(repo, repo, nil, cache, nil)
 
 	got, err := service.ListPublished(context.Background(), ListScalesDTO{Page: 1, PageSize: 10})
 	if err != nil {
@@ -126,12 +127,12 @@ func (r *scaleCacheQueryRepo) FindByQuestionnaireCode(context.Context, string) (
 	return nil, domainscale.ErrNotFound
 }
 
-func (r *scaleCacheQueryRepo) FindSummaryList(_ context.Context, page, _ int, _ map[string]interface{}) ([]*domainscale.MedicalScale, error) {
+func (r *scaleCacheQueryRepo) ListScales(_ context.Context, _ scalereadmodel.ScaleFilter, page scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	r.findSummaryCalls.Add(1)
-	return r.pages[page], nil
+	return scaleCacheQueryRows(r.pages[page.Page]), nil
 }
 
-func (r *scaleCacheQueryRepo) CountWithConditions(context.Context, map[string]interface{}) (int64, error) {
+func (r *scaleCacheQueryRepo) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
 	r.countCalls.Add(1)
 	return r.count, nil
 }
@@ -147,6 +148,28 @@ func (r *scaleCacheQueryRepo) Remove(context.Context, string) error {
 
 func (r *scaleCacheQueryRepo) ExistsByCode(context.Context, string) (bool, error) {
 	return false, nil
+}
+
+func scaleCacheQueryRows(items []*domainscale.MedicalScale) []scalereadmodel.ScaleSummaryRow {
+	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		rows = append(rows, scalereadmodel.ScaleSummaryRow{
+			Code:              item.GetCode().String(),
+			Title:             item.GetTitle(),
+			Description:       item.GetDescription(),
+			Category:          item.GetCategory().String(),
+			QuestionnaireCode: item.GetQuestionnaireCode().String(),
+			Status:            item.GetStatus().String(),
+			CreatedBy:         item.GetCreatedBy(),
+			CreatedAt:         item.GetCreatedAt(),
+			UpdatedBy:         item.GetUpdatedBy(),
+			UpdatedAt:         item.GetUpdatedAt(),
+		})
+	}
+	return rows
 }
 
 func newScaleCacheQueryScale(t *testing.T, code, title string, status domainscale.Status) *domainscale.MedicalScale {

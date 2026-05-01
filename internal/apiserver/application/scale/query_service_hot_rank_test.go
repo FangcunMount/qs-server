@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -25,24 +26,28 @@ func (s *hotRankReadModelStub) Top(_ context.Context, query domainScale.ScaleHot
 
 type hotScaleRepoStub struct {
 	byQuestionnaire          map[string]*domainScale.MedicalScale
+	byCode                   map[string]*domainScale.MedicalScale
 	summaries                []*domainScale.MedicalScale
 	findByQuestionnaireCalls []string
 	findSummaryCalls         int
 }
 
 func (r *hotScaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error { return nil }
-func (r *hotScaleRepoStub) FindByCode(context.Context, string) (*domainScale.MedicalScale, error) {
-	return nil, errors.New("not implemented")
+func (r *hotScaleRepoStub) FindByCode(_ context.Context, code string) (*domainScale.MedicalScale, error) {
+	if item, ok := r.findByCode(code); ok {
+		return item, nil
+	}
+	return nil, errors.New("not found")
 }
 func (r *hotScaleRepoStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
 	r.findByQuestionnaireCalls = append(r.findByQuestionnaireCalls, questionnaireCode)
 	return r.byQuestionnaire[questionnaireCode], nil
 }
-func (r *hotScaleRepoStub) FindSummaryList(context.Context, int, int, map[string]interface{}) ([]*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) ListScales(context.Context, scalereadmodel.ScaleFilter, scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	r.findSummaryCalls++
-	return r.summaries, nil
+	return hotScaleRows(r.summaries), nil
 }
-func (r *hotScaleRepoStub) CountWithConditions(context.Context, map[string]interface{}) (int64, error) {
+func (r *hotScaleRepoStub) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
 	return int64(len(r.summaries)), nil
 }
 func (r *hotScaleRepoStub) Update(context.Context, *domainScale.MedicalScale) error { return nil }
@@ -66,7 +71,8 @@ func TestListHotPublishedUsesHotRankReadModelOrdering(t *testing.T) {
 			{QuestionnaireCode: "Q-A", Score: 5},
 		},
 	}
-	svc := NewQueryService(repo, nil, nil, nil, rank)
+	repo.byCode = hotScaleByCode(scaleA, scaleB, scaleC)
+	svc := NewQueryService(repo, repo, nil, nil, nil, rank)
 
 	result, err := svc.ListHotPublished(context.Background(), ListHotScalesDTO{Limit: 3, WindowDays: 14})
 	if err != nil {
@@ -105,7 +111,8 @@ func TestListHotPublishedFallsBackWhenHotRankEmptyOrUnavailable(t *testing.T) {
 				byQuestionnaire: map[string]*domainScale.MedicalScale{},
 				summaries:       []*domainScale.MedicalScale{scaleA, scaleB},
 			}
-			svc := NewQueryService(repo, nil, nil, nil, tc.rank)
+			repo.byCode = hotScaleByCode(scaleA, scaleB)
+			svc := NewQueryService(repo, repo, nil, nil, nil, tc.rank)
 
 			result, err := svc.ListHotPublished(context.Background(), ListHotScalesDTO{Limit: 3})
 			if err != nil {
@@ -122,6 +129,46 @@ func TestListHotPublishedFallsBackWhenHotRankEmptyOrUnavailable(t *testing.T) {
 			}
 		})
 	}
+}
+
+func (r *hotScaleRepoStub) findByCode(code string) (*domainScale.MedicalScale, bool) {
+	if r.byCode == nil {
+		return nil, false
+	}
+	item, ok := r.byCode[code]
+	return item, ok
+}
+
+func hotScaleByCode(items ...*domainScale.MedicalScale) map[string]*domainScale.MedicalScale {
+	result := make(map[string]*domainScale.MedicalScale, len(items))
+	for _, item := range items {
+		if item != nil {
+			result[item.GetCode().String()] = item
+		}
+	}
+	return result
+}
+
+func hotScaleRows(items []*domainScale.MedicalScale) []scalereadmodel.ScaleSummaryRow {
+	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
+	for _, item := range items {
+		if item == nil {
+			continue
+		}
+		rows = append(rows, scalereadmodel.ScaleSummaryRow{
+			Code:              item.GetCode().String(),
+			Title:             item.GetTitle(),
+			Description:       item.GetDescription(),
+			Category:          item.GetCategory().String(),
+			QuestionnaireCode: item.GetQuestionnaireCode().String(),
+			Status:            item.GetStatus().String(),
+			CreatedBy:         item.GetCreatedBy(),
+			CreatedAt:         item.GetCreatedAt(),
+			UpdatedBy:         item.GetUpdatedBy(),
+			UpdatedAt:         item.GetUpdatedAt(),
+		})
+	}
+	return rows
 }
 
 func mustHotScale(t *testing.T, code, questionnaireCode string) *domainScale.MedicalScale {
