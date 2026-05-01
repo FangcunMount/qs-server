@@ -141,51 +141,6 @@ func (s *submissionService) validateSubmitDTO(l *logger.RequestLogger, dto Submi
 	return nil
 }
 
-// fetchAndValidateQuestionnaire 获取并验证问卷
-// 返回问卷对象和问题映射表
-func (s *submissionService) fetchAndValidateQuestionnaire(
-	ctx context.Context,
-	l *logger.RequestLogger,
-	dto *SubmitAnswerSheetDTO,
-) (*questionnaire.Questionnaire, map[string]questionnaire.Question, error) {
-	l.Debugw("开始获取问卷信息", "questionnaire_code", dto.QuestionnaireCode, "action", "read", "resource", "questionnaire")
-
-	var qnr *questionnaire.Questionnaire
-	var err error
-	if dto.QuestionnaireVer == "" {
-		qnr, err = s.questionnaireRepo.FindPublishedByCode(ctx, dto.QuestionnaireCode)
-		if err != nil {
-			l.Errorw("获取已发布问卷失败", "questionnaire_code", dto.QuestionnaireCode, "action", "read", "resource", "questionnaire", "result", "failed", "error", err.Error())
-			return nil, nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
-		}
-		if qnr == nil {
-			return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "当前没有可提交的已发布问卷版本")
-		}
-		dto.QuestionnaireVer = qnr.GetVersion().Value()
-		l.Debugw("使用当前已发布问卷版本", "questionnaire_code", dto.QuestionnaireCode, "version", dto.QuestionnaireVer)
-	} else {
-		qnr, err = s.questionnaireRepo.FindByCodeVersion(ctx, dto.QuestionnaireCode, dto.QuestionnaireVer)
-		if err != nil {
-			l.Errorw("获取指定问卷版本失败", "questionnaire_code", dto.QuestionnaireCode, "questionnaire_version", dto.QuestionnaireVer, "action", "read", "resource", "questionnaire", "result", "failed", "error", err.Error())
-			return nil, nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "问卷不存在")
-		}
-		if qnr == nil || !qnr.IsPublished() {
-			return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "只能提交已发布的问卷版本")
-		}
-	}
-
-	l.Debugw("问卷信息获取成功", "questionnaire_code", dto.QuestionnaireCode, "questionnaire_title", qnr.GetTitle(), "question_count", len(qnr.GetQuestions()), "questionnaire_version", dto.QuestionnaireVer, "result", "success")
-
-	// 构建问题映射表
-	questionMap := make(map[string]questionnaire.Question, len(qnr.GetQuestions()))
-	for _, q := range qnr.GetQuestions() {
-		questionMap[q.GetCode().Value()] = q
-	}
-
-	l.Debugw("问卷验证通过", "questionnaire_code", dto.QuestionnaireCode, "version", dto.QuestionnaireVer, "question_count", len(questionMap))
-	return qnr, questionMap, nil
-}
-
 // validateAnswersBatch 批量校验答案
 func (s *submissionService) validateAnswersBatch(ctx context.Context, l *logger.RequestLogger, tasks []ruleengine.AnswerValidationTask) error {
 	if s.answerValidator == nil {
@@ -220,63 +175,6 @@ func (s *submissionService) validateAnswersBatch(ctx context.Context, l *logger.
 
 	l.Warnw("批量答案验证失败", "failed_count", len(failedQuestions), "failed_questions", failedQuestions, "validation_errors", errDetails, "result", "failed")
 	return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("答案验证失败: %v", errDetails))
-}
-
-// createAndSaveAnswerSheet 创建并保存答卷
-func (s *submissionService) createAndSaveAnswerSheet(
-	ctx context.Context,
-	l *logger.RequestLogger,
-	dto SubmitAnswerSheetDTO,
-	qnr *questionnaire.Questionnaire,
-	answers []answersheet.Answer,
-) (*answersheet.AnswerSheet, error) {
-	// 构建问卷引用
-	questionnaireRef := answersheet.NewQuestionnaireRef(
-		dto.QuestionnaireCode,
-		dto.QuestionnaireVer,
-		qnr.GetTitle(),
-	)
-
-	// 构建填写人引用
-	fillerUserID, err := fillerUserIDFromUint64("filler_id", dto.FillerID)
-	if err != nil {
-		return nil, err
-	}
-	fillerRef := actor.NewFillerRef(fillerUserID, actor.FillerTypeSelf)
-
-	l.Debugw("开始创建答卷领域对象", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "answer_count", len(answers))
-
-	// 创建答卷领域对象
-	sheet, err := answersheet.NewAnswerSheet(questionnaireRef, fillerRef, answers, time.Now())
-	if err != nil {
-		l.Errorw("创建答卷领域对象失败", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
-		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷失败")
-	}
-
-	// 持久化
-	l.Infow("开始保存答卷", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode)
-	storedSheet, existing, err := s.durableStore.CreateDurably(ctx, sheet, DurableSubmitMeta{
-		IdempotencyKey: dto.IdempotencyKey,
-		WriterID:       dto.FillerID,
-		TesteeID:       dto.TesteeID,
-		OrgID:          dto.OrgID,
-		TaskID:         dto.TaskID,
-	})
-	if err != nil {
-		l.Errorw("保存答卷失败", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存答卷失败")
-	}
-	if existing {
-		l.Infow("答卷提交命中业务幂等键，返回已存在答卷",
-			"action", "create",
-			"resource", "answersheet",
-			"idempotency_key", dto.IdempotencyKey,
-			"answersheet_id", storedSheet.ID().Uint64(),
-			"result", "idempotent_hit",
-		)
-	}
-
-	return storedSheet, nil
 }
 
 // GetMyAnswerSheet 获取我的答卷
@@ -359,71 +257,13 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 		"page_size", dto.PageSize,
 	)
 
-	// 1. 验证输入参数
-	if dto.FillerID == 0 {
-		l.Warnw("填写人 ID 为空",
-			"action", "list_my_answersheets",
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "填写人ID不能为空")
-	}
-	if dto.Page <= 0 {
-		l.Warnw("页码有效性检查失败",
-			"action", "list_my_answersheets",
-			"page", dto.Page,
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "页码必须大于0")
-	}
-	if dto.PageSize <= 0 {
-		l.Warnw("每页数量有效性检查失败",
-			"action", "list_my_answersheets",
-			"page_size", dto.PageSize,
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量必须大于0")
-	}
-	if dto.PageSize > 100 {
-		l.Warnw("每页数量超限",
-			"action", "list_my_answersheets",
-			"page_size", dto.PageSize,
-			"max_size", 100,
-			"result", "invalid_params",
-		)
-		return nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "每页数量不能超过100")
+	if err := validateListMyAnswerSheetsDTO(l, dto); err != nil {
+		return nil, err
 	}
 
-	// 2. 查询答卷摘要列表（使用 FillerID）
-	l.Debugw("开始查询答卷列表",
-		"filler_id", dto.FillerID,
-		"page", dto.Page,
-		"page_size", dto.PageSize,
-	)
-	filter := surveyreadmodel.AnswerSheetFilter{FillerID: &dto.FillerID}
-	sheets, err := s.reader.ListAnswerSheets(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
+	sheets, total, err := s.listMyAnswerSheetRows(ctx, l, dto)
 	if err != nil {
-		l.Errorw("查询答卷列表失败",
-			"action", "list_my_answersheets",
-			"filler_id", dto.FillerID,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询答卷列表失败")
-	}
-
-	// 3. 获取总数
-	l.Debugw("查询答卷总数",
-		"filler_id", dto.FillerID,
-	)
-	total, err := s.reader.CountAnswerSheets(ctx, filter)
-	if err != nil {
-		l.Errorw("获取答卷总数失败",
-			"action", "list_my_answersheets",
-			"filler_id", dto.FillerID,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取答卷总数失败")
+		return nil, err
 	}
 
 	duration := time.Since(startTime)

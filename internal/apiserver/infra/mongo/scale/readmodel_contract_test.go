@@ -1,6 +1,7 @@
 package scale
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
@@ -44,6 +45,30 @@ func TestScaleFilterToBSONIgnoresUnknownStatus(t *testing.T) {
 	query := scaleFilterToBSON(scalereadmodel.ScaleFilter{Status: "unknown"})
 	if _, ok := query["status"]; ok {
 		t.Fatalf("status should be omitted for unknown status, got %#v", query["status"])
+	}
+}
+
+func TestScaleReadModelFindOptionsAppliesPaginationSortAndProjection(t *testing.T) {
+	t.Parallel()
+
+	opts := scaleReadModelFindOptions(scalereadmodel.PageRequest{Page: 3, PageSize: 20})
+	if opts.Skip == nil || *opts.Skip != 40 {
+		t.Fatalf("skip = %#v, want 40", opts.Skip)
+	}
+	if opts.Limit == nil || *opts.Limit != 20 {
+		t.Fatalf("limit = %#v, want 20", opts.Limit)
+	}
+	if !reflect.DeepEqual(opts.Sort, bson.D{{Key: "created_at", Value: -1}}) {
+		t.Fatalf("sort = %#v, want created_at desc", opts.Sort)
+	}
+	projection, ok := opts.Projection.(bson.M)
+	if !ok {
+		t.Fatalf("projection = %#v, want bson.M", opts.Projection)
+	}
+	for _, field := range []string{"code", "title", "description", "category", "stages", "applicable_ages", "reporters", "tags", "questionnaire_code", "status", "created_by", "created_at", "updated_by", "updated_at"} {
+		if projection[field] != 1 {
+			t.Fatalf("projection[%s] = %#v, want 1", field, projection[field])
+		}
 	}
 }
 

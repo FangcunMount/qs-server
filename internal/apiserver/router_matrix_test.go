@@ -267,7 +267,7 @@ func newRouterTestContainer() *container.Container {
 	surveyModule := &assembler.SurveyModule{
 		Questionnaire: &assembler.QuestionnaireSubModule{
 			LifecycleService: questionnaireApp.NewLifecycleService(nil, nil, domainQuestionnaire.Validator{}, domainQuestionnaire.NewLifecycle(), nil),
-			ContentService:   questionnaireApp.NewContentService(nil, domainQuestionnaire.QuestionManager{}),
+			ContentService:   questionnaireApp.NewContentService(nil),
 			QueryService:     questionnaireApp.NewQueryService(nil, nil, nil, nil),
 		},
 		AnswerSheet: &assembler.AnswerSheetSubModule{

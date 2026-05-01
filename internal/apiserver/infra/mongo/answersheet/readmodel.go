@@ -23,39 +23,10 @@ func (r answerSheetReadModel) ListAnswerSheets(ctx context.Context, filter surve
 		return []surveyreadmodel.AnswerSheetSummaryRow{}, nil
 	}
 
-	query := bson.M{
-		"questionnaire_code": filter.QuestionnaireCode,
-		"deleted_at":         nil,
+	pipeline, err := answerSheetListPipeline(filter, page)
+	if err != nil {
+		return nil, err
 	}
-	switch {
-	case filter.FillerID != nil && *filter.FillerID > 0:
-		fillerID, err := safeconv.Uint64ToInt64(*filter.FillerID)
-		if err != nil {
-			return nil, err
-		}
-		query = bson.M{
-			"filler_id":  fillerID,
-			"deleted_at": nil,
-		}
-	}
-
-	pipeline := []bson.M{
-		{"$match": query},
-		{"$sort": bson.M{"filled_at": -1}},
-		{"$skip": answerSheetPaginationSkip(page.Page, page.PageSize)},
-		{"$limit": answerSheetPaginationLimit(page.Page, page.PageSize)},
-		{"$project": bson.M{
-			"domain_id":           1,
-			"questionnaire_code":  1,
-			"questionnaire_title": 1,
-			"filler_id":           1,
-			"filler_type":         1,
-			"total_score":         1,
-			"filled_at":           1,
-			"answer_count":        bson.M{"$size": bson.M{"$ifNull": []interface{}{"$answers", []interface{}{}}}},
-		}},
-	}
-
 	cursor, err := r.repo.Collection().Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err
@@ -68,7 +39,52 @@ func (r answerSheetReadModel) ListAnswerSheets(ctx context.Context, filter surve
 }
 
 func (r answerSheetReadModel) CountAnswerSheets(ctx context.Context, filter surveyreadmodel.AnswerSheetFilter) (int64, error) {
-	return r.repo.CountDocuments(ctx, answerSheetFilterToBSON(filter))
+	return r.repo.Collection().CountDocuments(ctx, answerSheetFilterToBSON(filter))
+}
+
+func answerSheetListPipeline(filter surveyreadmodel.AnswerSheetFilter, page surveyreadmodel.PageRequest) ([]bson.M, error) {
+	query, err := answerSheetListFilterToBSON(filter)
+	if err != nil {
+		return nil, err
+	}
+	return []bson.M{
+		{"$match": query},
+		{"$sort": bson.M{"filled_at": -1}},
+		{"$skip": answerSheetPaginationSkip(page.Page, page.PageSize)},
+		{"$limit": answerSheetPaginationLimit(page.Page, page.PageSize)},
+		{"$project": answerSheetSummaryProjection()},
+	}, nil
+}
+
+func answerSheetListFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) (bson.M, error) {
+	query := bson.M{
+		"questionnaire_code": filter.QuestionnaireCode,
+		"deleted_at":         nil,
+	}
+	if filter.FillerID != nil && *filter.FillerID > 0 {
+		fillerID, err := safeconv.Uint64ToInt64(*filter.FillerID)
+		if err != nil {
+			return nil, err
+		}
+		query = bson.M{
+			"filler_id":  fillerID,
+			"deleted_at": nil,
+		}
+	}
+	return query, nil
+}
+
+func answerSheetSummaryProjection() bson.M {
+	return bson.M{
+		"domain_id":           1,
+		"questionnaire_code":  1,
+		"questionnaire_title": 1,
+		"filler_id":           1,
+		"filler_type":         1,
+		"total_score":         1,
+		"filled_at":           1,
+		"answer_count":        bson.M{"$size": bson.M{"$ifNull": []interface{}{"$answers", []interface{}{}}}},
+	}
 }
 
 func answerSheetFilterToBSON(filter surveyreadmodel.AnswerSheetFilter) bson.M {

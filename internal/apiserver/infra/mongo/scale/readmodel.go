@@ -20,26 +20,7 @@ func NewScaleReadModel(repo *Repository) scalereadmodel.ScaleReader {
 }
 
 func (r scaleReadModel) ListScales(ctx context.Context, filter scalereadmodel.ScaleFilter, page scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
-	opts := options.Find().
-		SetSkip(scalePaginationSkip(page.Page, page.PageSize)).
-		SetLimit(scalePaginationLimit(page.Page, page.PageSize)).
-		SetSort(bson.D{{Key: "created_at", Value: -1}}).
-		SetProjection(bson.M{
-			"code":               1,
-			"title":              1,
-			"description":        1,
-			"category":           1,
-			"stages":             1,
-			"applicable_ages":    1,
-			"reporters":          1,
-			"tags":               1,
-			"questionnaire_code": 1,
-			"status":             1,
-			"created_by":         1,
-			"created_at":         1,
-			"updated_by":         1,
-			"updated_at":         1,
-		})
+	opts := scaleReadModelFindOptions(page)
 
 	cursor, err := r.repo.Collection().Find(ctx, scaleFilterToBSON(filter), opts)
 	if err != nil {
@@ -54,6 +35,33 @@ func (r scaleReadModel) ListScales(ctx context.Context, filter scalereadmodel.Sc
 		return nil, err
 	}
 	return scaleRowsFromPO(poList), nil
+}
+
+func scaleReadModelFindOptions(page scalereadmodel.PageRequest) *options.FindOptions {
+	return options.Find().
+		SetSkip(scalePaginationSkip(page.Page, page.PageSize)).
+		SetLimit(scalePaginationLimit(page.Page, page.PageSize)).
+		SetSort(bson.D{{Key: "created_at", Value: -1}}).
+		SetProjection(scaleSummaryProjection())
+}
+
+func scaleSummaryProjection() bson.M {
+	return bson.M{
+		"code":               1,
+		"title":              1,
+		"description":        1,
+		"category":           1,
+		"stages":             1,
+		"applicable_ages":    1,
+		"reporters":          1,
+		"tags":               1,
+		"questionnaire_code": 1,
+		"status":             1,
+		"created_by":         1,
+		"created_at":         1,
+		"updated_by":         1,
+		"updated_at":         1,
+	}
 }
 
 func (r scaleReadModel) CountScales(ctx context.Context, filter scalereadmodel.ScaleFilter) (int64, error) {

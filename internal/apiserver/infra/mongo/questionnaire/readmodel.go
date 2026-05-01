@@ -30,7 +30,7 @@ func (r questionnaireReadModel) ListQuestionnaires(ctx context.Context, filter s
 }
 
 func (r questionnaireReadModel) CountQuestionnaires(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter) (int64, error) {
-	return r.repo.CountDocuments(ctx, questionnaireHeadReadModelFilter(filter))
+	return r.repo.Collection().CountDocuments(ctx, questionnaireHeadReadModelFilter(filter))
 }
 
 func (r questionnaireReadModel) ListPublishedQuestionnaires(ctx context.Context, filter surveyreadmodel.QuestionnaireFilter, page surveyreadmodel.PageRequest) ([]surveyreadmodel.QuestionnaireSummaryRow, error) {

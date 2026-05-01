@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -43,38 +42,25 @@ func (s *factorService) AddFactor(ctx context.Context, dto AddFactorDTO) (*Scale
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子标题不能为空")
 	}
 
-	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, dto.ScaleCode)
+	// 2. 获取可编辑量表
+	m, err := s.loadEditableScale(ctx, dto.ScaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 检查量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 创建因子
+	// 3. 创建因子
 	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
 	}
 
-	// 5. 添加因子
+	// 4. 添加因子
 	if err := m.AddFactor(factor); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "添加因子失败")
 	}
 
-	// 6. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
-	}
-
-	s.publishScaleUpdated(ctx, m)
-	s.refreshListCache(ctx)
-
-	return toScaleResult(m), nil
+	return s.persistFactorMutation(ctx, m)
 }
 
 // UpdateFactor 更新因子
@@ -87,38 +73,25 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, dto.ScaleCode)
+	// 2. 获取可编辑量表
+	m, err := s.loadEditableScale(ctx, dto.ScaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 检查量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 创建更新后的因子
+	// 3. 创建更新后的因子
 	factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
 		dto.QuestionCodes, dto.ScoringStrategy, dto.ScoringParams, dto.MaxScore, dto.InterpretRules)
 	if err != nil {
 		return nil, err
 	}
 
-	// 5. 更新因子
+	// 4. 更新因子
 	if err := m.UpdateFactor(factor); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新因子失败")
 	}
 
-	// 6. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
-	}
-
-	s.publishScaleUpdated(ctx, m)
-	s.refreshListCache(ctx)
-
-	return toScaleResult(m), nil
+	return s.persistFactorMutation(ctx, m)
 }
 
 // RemoveFactor 删除因子
@@ -131,31 +104,18 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, scaleCode)
+	// 2. 获取可编辑量表
+	m, err := s.loadEditableScale(ctx, scaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 检查量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 删除因子
+	// 3. 删除因子
 	if err := m.RemoveFactor(scale.NewFactorCode(factorCode)); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "删除因子失败")
 	}
 
-	// 5. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
-	}
-
-	s.publishScaleUpdated(ctx, m)
-	s.refreshListCache(ctx)
-
-	return toScaleResult(m), nil
+	return s.persistFactorMutation(ctx, m)
 }
 
 // ReplaceFactors 替换所有因子
@@ -168,18 +128,13 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子列表不能为空")
 	}
 
-	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, scaleCode)
+	// 2. 获取可编辑量表
+	m, err := s.loadEditableScale(ctx, scaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 检查量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 转换因子列表并验证
+	// 3. 转换因子列表并验证
 	factors := make([]*scale.Factor, 0, len(factorDTOs))
 	var allValidationErrors []scale.ValidationError
 
@@ -204,20 +159,12 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, scale.ToError(allValidationErrors)
 	}
 
-	// 5. 替换因子
+	// 4. 替换因子
 	if err := m.ReplaceFactors(factors); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "替换因子失败")
 	}
 
-	// 6. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
-	}
-
-	s.publishScaleUpdated(ctx, m)
-	s.refreshListCache(ctx)
-
-	return toScaleResult(m), nil
+	return s.persistFactorMutation(ctx, m)
 }
 
 // UpdateFactorInterpretRules 更新因子解读规则
@@ -230,34 +177,21 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto Upda
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
 	}
 
-	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, dto.ScaleCode)
+	// 2. 获取可编辑量表
+	m, err := s.loadEditableScale(ctx, dto.ScaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 检查量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 转换解读规则
+	// 3. 转换解读规则
 	rules := interpretRulesFromDTOs(dto.InterpretRules)
 
-	// 5. 更新解读规则
+	// 4. 更新解读规则
 	if err := m.UpdateFactorInterpretRules(scale.NewFactorCode(dto.FactorCode), rules); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新解读规则失败")
 	}
 
-	// 6. 持久化
-	if err := s.repo.Update(ctx, m); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
-	}
-
-	s.publishScaleUpdated(ctx, m)
-	s.refreshListCache(ctx)
-
-	return toScaleResult(m), nil
+	return s.persistFactorMutation(ctx, m)
 }
 
 // ReplaceInterpretRules 批量设置所有因子的解读规则
@@ -270,18 +204,13 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子解读规则列表不能为空")
 	}
 
-	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, scaleCode)
+	// 2. 获取可编辑量表
+	m, err := s.loadEditableScale(ctx, scaleCode)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+		return nil, err
 	}
 
-	// 3. 检查量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	// 4. 批量更新各因子的解读规则
+	// 3. 批量更新各因子的解读规则
 	for _, dto := range dtos {
 		if dto.FactorCode == "" {
 			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
@@ -295,7 +224,21 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 		}
 	}
 
-	// 5. 持久化
+	return s.persistFactorMutation(ctx, m)
+}
+
+func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string) (*scale.MedicalScale, error) {
+	m, err := s.repo.FindByCode(ctx, scaleCode)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	}
+	if m.IsArchived() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
+	}
+	return m, nil
+}
+
+func (s *factorService) persistFactorMutation(ctx context.Context, m *scale.MedicalScale) (*ScaleResult, error) {
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
@@ -327,72 +270,4 @@ func (s *factorService) publishScaleUpdated(ctx context.Context, m *scale.Medica
 			time.Now(),
 		),
 	), nil, nil)
-}
-
-// ============= 辅助函数 =============
-
-// toFactorDomain 将 DTO 转换为因子领域对象
-func toFactorDomain(
-	code, title, factorType string,
-	isTotalScore, isShow bool,
-	questionCodes []string,
-	scoringStrategy string,
-	scoringParams *ScoringParamsDTO,
-	maxScore *float64,
-	interpretRules []InterpretRuleDTO,
-) (*scale.Factor, error) {
-	// 转换题目编码
-	qCodes := make([]meta.Code, 0, len(questionCodes))
-	for _, qc := range questionCodes {
-		qCodes = append(qCodes, meta.NewCode(qc))
-	}
-
-	rules := interpretRulesFromDTOs(interpretRules)
-
-	// 确定计分策略
-	strategy := scale.ScoringStrategySum
-	if scoringStrategy != "" {
-		strategy = scale.ScoringStrategyCode(scoringStrategy)
-	}
-
-	// 确定因子类型
-	fType := scale.FactorTypePrimary
-	if factorType != "" {
-		fType = scale.FactorType(factorType)
-	}
-
-	// 转换计分参数为领域层的 ScoringParams
-	var scoringParamsDomain *scale.ScoringParams
-	if scoringParams != nil {
-		scoringParamsDomain = scale.NewScoringParams().
-			WithCntOptionContents(scoringParams.CntOptionContents)
-	} else {
-		scoringParamsDomain = scale.NewScoringParams()
-	}
-
-	// 验证：cnt 策略必须提供非空的 CntOptionContents
-	if strategy == scale.ScoringStrategyCnt {
-		if scoringParamsDomain == nil || len(scoringParamsDomain.GetCntOptionContents()) == 0 {
-			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "cnt 计分策略必须提供 cnt_option_contents 参数")
-		}
-	}
-
-	// 创建因子
-	factor, err := scale.NewFactor(
-		scale.NewFactorCode(code),
-		title,
-		scale.WithFactorType(fType),
-		scale.WithIsTotalScore(isTotalScore),
-		scale.WithIsShow(isShow),
-		scale.WithQuestionCodes(qCodes),
-		scale.WithScoringStrategy(strategy),
-		scale.WithScoringParams(scoringParamsDomain),
-		scale.WithMaxScore(maxScore),
-		scale.WithInterpretRules(rules),
-	)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建因子失败")
-	}
-
-	return factor, nil
 }

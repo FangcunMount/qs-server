@@ -1,11 +1,13 @@
 package answersheet
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestAnswerSheetFilterToBSONMapsTypedFilter(t *testing.T) {
@@ -35,6 +37,59 @@ func TestAnswerSheetFilterToBSONMapsTypedFilter(t *testing.T) {
 	}
 	if got := query["deleted_at"]; got != nil {
 		t.Fatalf("deleted_at = %#v, want nil", got)
+	}
+}
+
+func TestAnswerSheetListPipelinePreservesListQuerySemantics(t *testing.T) {
+	t.Parallel()
+
+	fillerID := uint64(1001)
+	pipeline, err := answerSheetListPipeline(surveyreadmodel.AnswerSheetFilter{
+		QuestionnaireCode: "Q_A",
+		FillerID:          &fillerID,
+	}, surveyreadmodel.PageRequest{Page: 3, PageSize: 20})
+	if err != nil {
+		t.Fatalf("answerSheetListPipeline() error = %v", err)
+	}
+	if len(pipeline) != 5 {
+		t.Fatalf("pipeline stage count = %d, want 5", len(pipeline))
+	}
+
+	match := pipeline[0]["$match"]
+	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"filler_id": int64(1001), "deleted_at": nil})) {
+		t.Fatalf("match = %#v, want filler_id int64 query without questionnaire_code", match)
+	}
+	if !reflect.DeepEqual(pipeline[1]["$sort"], mapAsBSONM(map[string]any{"filled_at": -1})) {
+		t.Fatalf("sort = %#v, want filled_at desc", pipeline[1]["$sort"])
+	}
+	if pipeline[2]["$skip"] != int64(40) {
+		t.Fatalf("skip = %#v, want 40", pipeline[2]["$skip"])
+	}
+	if pipeline[3]["$limit"] != int64(20) {
+		t.Fatalf("limit = %#v, want 20", pipeline[3]["$limit"])
+	}
+	project, ok := pipeline[4]["$project"].(bson.M)
+	if !ok {
+		t.Fatalf("project = %#v, want bson.M", pipeline[4]["$project"])
+	}
+	if project["answer_count"] == nil {
+		t.Fatalf("project should compute answer_count, got %#v", project)
+	}
+}
+
+func TestAnswerSheetListPipelineUsesQuestionnaireCodeWhenFillerAbsent(t *testing.T) {
+	t.Parallel()
+
+	pipeline, err := answerSheetListPipeline(surveyreadmodel.AnswerSheetFilter{
+		QuestionnaireCode: "Q_A",
+	}, surveyreadmodel.PageRequest{Page: 1, PageSize: 10})
+	if err != nil {
+		t.Fatalf("answerSheetListPipeline() error = %v", err)
+	}
+
+	match := pipeline[0]["$match"]
+	if !reflect.DeepEqual(match, mapAsBSONM(map[string]any{"questionnaire_code": "Q_A", "deleted_at": nil})) {
+		t.Fatalf("match = %#v, want questionnaire_code query", match)
 	}
 }
 
@@ -79,4 +134,12 @@ func TestAnswerSheetRowFromPOMapsSummaryProjection(t *testing.T) {
 	if !row.FilledAt.Equal(filledAt) {
 		t.Fatalf("filled_at = %s, want %s", row.FilledAt, filledAt)
 	}
+}
+
+func mapAsBSONM(values map[string]any) bson.M {
+	result := bson.M{}
+	for key, value := range values {
+		result[key] = value
+	}
+	return result
 }

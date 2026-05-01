@@ -133,11 +133,10 @@ func (m *SurveyModule) initQuestionnaireSubModule(identitySvc *iam.IdentityServi
 	// 初始化领域服务
 	validator := questionnaire.Validator{}
 	lifecycle := questionnaire.NewLifecycle()
-	questionMgr := questionnaire.QuestionManager{}
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	sub.LifecycleService = quesApp.NewLifecycleService(repo, scaleSyncer, validator, lifecycle, m.eventPublisher)
-	sub.ContentService = quesApp.NewContentService(repo, questionMgr)
+	sub.ContentService = quesApp.NewContentService(repo)
 	sub.QueryService = quesApp.NewQueryService(repo, identitySvc, hotset, reader)
 
 	return nil

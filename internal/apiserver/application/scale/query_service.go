@@ -2,7 +2,6 @@ package scale
 
 import (
 	"context"
-	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -93,34 +92,15 @@ func (s *queryService) GetByQuestionnaireCode(ctx context.Context, questionnaire
 
 // List 查询量表摘要列表
 func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error) {
-	// 1. 验证分页参数
-	if dto.Page <= 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "页码必须大于0")
-	}
-	if dto.PageSize <= 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "每页数量必须大于0")
-	}
-	if dto.PageSize > 100 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "每页数量不能超过100")
+	if err := validateScaleListPage(dto.Page, dto.PageSize); err != nil {
+		return nil, err
 	}
 	filter, err := s.normalizeScaleFilter(dto.Filter)
 	if err != nil {
 		return nil, err
 	}
 
-	// 2. 获取量表摘要列表
-	items, err := s.reader.ListScales(ctx, filter, scalereadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表列表失败")
-	}
-
-	// 3. 获取总数
-	total, err := s.reader.CountScales(ctx, filter)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
-	}
-
-	return toSummaryRowsResult(ctx, items, total, s.identitySvc), nil
+	return s.listScaleSummaryRows(ctx, filter, dto.Page, dto.PageSize)
 }
 
 // GetPublishedByCode 获取已发布的量表
@@ -143,86 +123,6 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Sc
 	s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
 
 	return toScaleResultWithUsers(ctx, m, s.identitySvc), nil
-}
-
-// ListPublished 查询已发布量表摘要列表
-func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*ScaleSummaryListResult, error) {
-	// 1. 验证分页参数
-	if dto.Page <= 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "页码必须大于0")
-	}
-	if dto.PageSize <= 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "每页数量必须大于0")
-	}
-	if dto.PageSize > 100 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "每页数量不能超过100")
-	}
-
-	// 2. 添加状态过滤条件
-	filter, err := s.normalizeScaleFilter(dto.Filter)
-	if err != nil {
-		return nil, err
-	}
-	filter.Status = scale.StatusPublished.Value()
-
-	// 3. 尝试使用全量列表缓存（仅当没有额外筛选条件）
-	if filter.Title == "" && filter.Category == "" && s.listCache != nil {
-		if cached, ok := s.listCache.GetPage(ctx, dto.Page, dto.PageSize); ok {
-			return scaleSummaryListResultFromCachePage(cached), nil
-		}
-	}
-
-	// 3. 获取量表摘要列表
-	items, err := s.reader.ListScales(ctx, filter, scalereadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表列表失败")
-	}
-
-	// 4. 获取总数
-	total, err := s.reader.CountScales(ctx, filter)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
-	}
-
-	result := toSummaryRowsResult(ctx, items, total, s.identitySvc)
-
-	// 6. 缓存回填：仅在纯已发布列表且缓存启用时尝试重建
-	if filter.Title == "" && filter.Category == "" && s.listCache != nil {
-		go func() {
-			_ = s.listCache.Rebuild(context.Background())
-		}()
-	}
-	s.recordHotset(ctx, cachetarget.NewStaticScaleListWarmupTarget())
-
-	return result, nil
-}
-
-// ListHotPublished 查询热门已发布量表摘要列表。
-func (s *queryService) ListHotPublished(ctx context.Context, dto ListHotScalesDTO) (*HotScaleListResult, error) {
-	limit := normalizeHotScaleLimit(dto.Limit)
-	windowDays := normalizeHotScaleWindowDays(dto.WindowDays)
-
-	hotItems, err := s.loadHotScaleRank(ctx, limit, windowDays)
-	if err != nil {
-		logger.L(ctx).Warnw("failed to load hot scale rank from redis",
-			"window_days", windowDays,
-			"limit", limit,
-			"error", err,
-		)
-	}
-
-	if len(hotItems) < limit {
-		fallback, err := s.loadHotScaleFallback(ctx, limit, hotItems)
-		if err != nil {
-			return nil, err
-		}
-		hotItems = append(hotItems, fallback...)
-	}
-	if len(hotItems) > limit {
-		hotItems = hotItems[:limit]
-	}
-
-	return toHotScaleListResult(ctx, hotItems, limit, windowDays, s.identitySvc), nil
 }
 
 // GetFactors 获取量表的因子列表
@@ -297,125 +197,4 @@ func (s *queryService) normalizeScaleFilter(filter ScaleListFilter) (scalereadmo
 		normalized.Status = parsed.Value()
 	}
 	return normalized, nil
-}
-
-func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]scale.HotScaleSummary, error) {
-	if s == nil || s.hotRank == nil {
-		return []scale.HotScaleSummary{}, nil
-	}
-	rankItems, err := s.hotRank.Top(ctx, scale.ScaleHotRankQuery{
-		WindowDays: windowDays,
-		Limit:      hotRankCandidateLimit(limit),
-	})
-	if err != nil {
-		return nil, err
-	}
-
-	result := make([]scale.HotScaleSummary, 0, limit)
-	seen := make(map[string]struct{}, len(rankItems))
-	for _, rankItem := range rankItems {
-		questionnaireCode := strings.TrimSpace(rankItem.QuestionnaireCode)
-		if questionnaireCode == "" {
-			continue
-		}
-		item, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
-		if err != nil {
-			logger.L(ctx).Warnw("failed to resolve hot scale by questionnaire code",
-				"questionnaire_code", questionnaireCode,
-				"error", err,
-			)
-			continue
-		}
-		if item == nil || !item.IsPublished() || !item.GetCategory().IsOpen() {
-			continue
-		}
-		code := item.GetCode().String()
-		if _, ok := seen[code]; ok {
-			continue
-		}
-		seen[code] = struct{}{}
-		result = append(result, scale.HotScaleSummary{
-			Scale:           item,
-			SubmissionCount: rankItem.Score,
-		})
-		if len(result) >= limit {
-			break
-		}
-	}
-
-	return result, nil
-}
-
-func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, existing []scale.HotScaleSummary) ([]scale.HotScaleSummary, error) {
-	seen := make(map[string]struct{}, len(existing))
-	for _, item := range existing {
-		if item.Scale == nil {
-			continue
-		}
-		seen[item.Scale.GetCode().String()] = struct{}{}
-	}
-
-	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取热门量表兜底列表失败")
-	}
-
-	result := make([]scale.HotScaleSummary, 0, limit-len(existing))
-	for _, row := range rows {
-		item, err := s.repo.FindByCode(ctx, row.Code)
-		if err != nil {
-			logger.L(ctx).Warnw("failed to resolve fallback hot scale",
-				"scale_code", row.Code,
-				"error", err,
-			)
-			continue
-		}
-		if item == nil || !item.IsPublished() || !item.GetCategory().IsOpen() {
-			continue
-		}
-		code := item.GetCode().String()
-		if _, ok := seen[code]; ok {
-			continue
-		}
-		seen[code] = struct{}{}
-		result = append(result, scale.HotScaleSummary{Scale: item})
-		if len(existing)+len(result) >= limit {
-			break
-		}
-	}
-	return result, nil
-}
-
-func hotRankCandidateLimit(limit int) int {
-	candidateLimit := limit * 4
-	if candidateLimit < 20 {
-		return 20
-	}
-	if candidateLimit > 100 {
-		return 100
-	}
-	return candidateLimit
-}
-
-func normalizeHotScaleLimit(limit int) int {
-	if limit <= 0 {
-		return defaultHotScaleLimit
-	}
-	if limit < minHotScaleLimit {
-		return minHotScaleLimit
-	}
-	if limit > maxHotScaleLimit {
-		return maxHotScaleLimit
-	}
-	return limit
-}
-
-func normalizeHotScaleWindowDays(windowDays int) int {
-	if windowDays <= 0 {
-		return defaultHotScaleWindowDays
-	}
-	if windowDays > maxHotScaleWindowDays {
-		return maxHotScaleWindowDays
-	}
-	return windowDays
 }
