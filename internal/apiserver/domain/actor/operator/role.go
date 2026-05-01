@@ -36,6 +36,17 @@ func NewRoleAllocator(validator Validator) RoleAllocator {
 	}
 }
 
+// IsSupportedRole 判断角色是否为当前 QS 支持的角色。
+func IsSupportedRole(role Role) bool {
+	switch role {
+	case RoleQSAdmin, RoleContentManager, RoleEvaluatorQS, RoleOperator,
+		RoleEvaluationPlanManager:
+		return true
+	default:
+		return false
+	}
+}
+
 // AssignRole 分配角色
 func (ra *roleAllocator) AssignRole(staff *Operator, role Role) error {
 	// 1. 验证角色合法性
@@ -43,20 +54,7 @@ func (ra *roleAllocator) AssignRole(staff *Operator, role Role) error {
 		return err
 	}
 
-	// 2. 检查员工是否激活
-	if !staff.IsActive() {
-		return errors.WithCode(code.ErrValidation, "cannot assign role to inactive staff")
-	}
-
-	// 3. 检查是否已有该角色（幂等）
-	if staff.HasRole(role) {
-		return nil
-	}
-
-	// 4. 执行分配
-	staff.assignRole(role)
-
-	return nil
+	return staff.AssignRole(role)
 }
 
 // RemoveRole 移除角色
@@ -66,21 +64,12 @@ func (ra *roleAllocator) RemoveRole(staff *Operator, role Role) error {
 		return err
 	}
 
-	// 2. 检查是否有该角色
-	if !staff.HasRole(role) {
-		return nil // 幂等操作
-	}
-
-	// 3. 执行移除
-	staff.removeRole(role)
-
-	return nil
+	return staff.RemoveRole(role)
 }
 
 // ClearRoles 清空所有角色
 func (ra *roleAllocator) ClearRoles(staff *Operator) error {
-	// 清空角色列表
-	staff.roles = make([]Role, 0)
+	staff.ClearRoles()
 	return nil
 }
 
@@ -91,15 +80,12 @@ func (ra *roleAllocator) AssignRoles(staff *Operator, roles []Role) error {
 		return err
 	}
 
-	// 2. 检查员工是否激活
-	if !staff.IsActive() {
-		return errors.WithCode(code.ErrValidation, "cannot assign roles to inactive staff")
-	}
-
-	// 3. 批量分配（去重）
 	for _, role := range roles {
-		if !staff.HasRole(role) {
-			staff.assignRole(role)
+		if err := staff.AssignRole(role); err != nil {
+			if !staff.IsActive() {
+				return inactiveRoleAssignmentError("cannot assign roles to inactive staff")
+			}
+			return err
 		}
 	}
 
@@ -113,22 +99,13 @@ func (ra *roleAllocator) ReplaceRoles(staff *Operator, roles []Role) error {
 		return err
 	}
 
-	// 2. 检查员工是否激活
-	if !staff.IsActive() {
-		return errors.WithCode(code.ErrValidation, "cannot replace roles for inactive staff")
-	}
+	return staff.ReplaceRoles(roles)
+}
 
-	// 3. 清空现有角色
-	staff.roles = make([]Role, 0)
+func invalidRoleError() error {
+	return errors.WithCode(code.ErrValidation, "invalid role")
+}
 
-	// 4. 设置新角色（去重）
-	seen := make(map[Role]bool)
-	for _, role := range roles {
-		if !seen[role] {
-			staff.assignRole(role)
-			seen[role] = true
-		}
-	}
-
-	return nil
+func inactiveRoleAssignmentError(message string) error {
+	return errors.WithCode(code.ErrValidation, "%s", message)
 }

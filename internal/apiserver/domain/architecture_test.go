@@ -51,6 +51,51 @@ func TestDomainDoesNotImportInfrastructureDrivers(t *testing.T) {
 	}
 }
 
+func TestActorDomainDoesNotImportUpperLayers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	actorDomainRoot := filepath.Join(root, "internal", "apiserver", "domain", "actor")
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/iam/":                                      "IAM generated packages",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "application layer",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":       "infrastructure layer",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/":        "application-facing ports",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":   "transport layer",
+		"github.com/go-redis/":                                              "Redis driver",
+		"github.com/redis/":                                                 "Redis driver",
+		"go.mongodb.org/mongo-driver":                                       "Mongo driver",
+		"gorm.io/":                                                          "GORM driver",
+	}
+
+	err := filepath.WalkDir(actorDomainRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			for forbidden, description := range forbiddenImports {
+				if strings.HasPrefix(importPath, forbidden) {
+					rel := filepath.ToSlash(mustRel(t, root, path))
+					t.Fatalf("%s imports %s; actor domain must not depend on %s", rel, importPath, description)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)

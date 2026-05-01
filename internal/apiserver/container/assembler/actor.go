@@ -132,12 +132,12 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	testeeEditor := testee.NewEditor(testeeValidator)
 	testeeBinder := testee.NewBinder(module.TesteeRepo)
 	testeeTagger := testee.NewTagger(testeeValidator)
+	testeeRiskTagPolicy := testee.NewRiskTagPolicy()
 
 	// 初始化 operator domain services
 	operatorValidator := operator.NewValidator()
 	operatorFactory := operator.NewFactory(module.OperatorRepo, operatorValidator)
 	operatorEditor := operator.NewEditor(operatorValidator)
-	operatorBinder := operator.NewBinder(module.OperatorRepo, operatorValidator)
 	operatorRoleAllocator := operator.NewRoleAllocator(operatorValidator)
 	operatorLifecycler := operator.NewLifecycler(operatorRoleAllocator)
 	clinicianValidator := clinicianDomain.NewValidator()
@@ -161,8 +161,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	module.TesteeQueryService = testeeApp.NewQueryService(module.TesteeRepo)
 	module.TesteeTaggingService = testeeApp.NewTaggingService(
 		module.TesteeRepo,
-		module.TesteeManagementService,
-		module.TesteeQueryService,
+		testeeRiskTagPolicy,
 		txRunner,
 	)
 
@@ -177,7 +176,6 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		operatorEditor,
 		operatorLifecycler,
 		operatorRoleAllocator,
-		operatorBinder,
 		txRunner,
 		userDirectory,
 		accountRegistrar,

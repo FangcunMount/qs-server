@@ -84,6 +84,49 @@ func TestTransferPrimaryUnbindsExistingPrimary(t *testing.T) {
 	}
 }
 
+func TestAssignPrimaryReplacesExistingAccessRelation(t *testing.T) {
+	existingAccess := domainRelation.NewClinicianTesteeRelation(
+		1,
+		domainClinician.ID(11),
+		domainTestee.ID(20),
+		domainRelation.RelationTypeAttending,
+		domainRelation.SourceTypeManual,
+		nil,
+		true,
+		time.Date(2026, 4, 13, 10, 0, 0, 0, time.UTC),
+		nil,
+	)
+	existingAccess.SetID(domainRelation.ID(9002))
+
+	relationRepo := &relationshipServiceRelationRepo{
+		activeAccessByTypes: existingAccess,
+	}
+	svc := &relationshipService{
+		relationRepo:  relationRepo,
+		clinicianRepo: &relationshipServiceClinicianRepo{item: makeActiveClinician(11)},
+		testeeRepo:    &relationshipServiceTesteeRepo{item: makeTestee(20)},
+		uow:           passthroughTxRunner{},
+	}
+
+	result, err := svc.AssignPrimary(context.Background(), AssignTesteeDTO{
+		OrgID:       1,
+		ClinicianID: 11,
+		TesteeID:    20,
+	})
+	if err != nil {
+		t.Fatalf("expected assign primary to succeed: %v", err)
+	}
+	if len(relationRepo.updatedItems) != 1 || relationRepo.updatedItems[0].IsActive() {
+		t.Fatalf("expected existing access relation to be unbound")
+	}
+	if relationRepo.saved == nil || relationRepo.saved.RelationType() != domainRelation.RelationTypePrimary {
+		t.Fatalf("expected new primary relation to be saved")
+	}
+	if result.RelationType != string(domainRelation.RelationTypePrimary) {
+		t.Fatalf("expected primary result, got %s", result.RelationType)
+	}
+}
+
 type passthroughTxRunner struct{}
 
 func (passthroughTxRunner) WithinTransaction(ctx context.Context, fn func(context.Context) error) error {
@@ -204,7 +247,9 @@ func makeTestee(id uint64) *domainTestee.Testee {
 type relationshipServiceRelationRepo struct {
 	saved                 *domainRelation.ClinicianTesteeRelation
 	updated               *domainRelation.ClinicianTesteeRelation
+	updatedItems          []*domainRelation.ClinicianTesteeRelation
 	activePrimaryByTestee *domainRelation.ClinicianTesteeRelation
+	activeAccessByTypes   *domainRelation.ClinicianTesteeRelation
 	activeByClinician     []*domainRelation.ClinicianTesteeRelation
 	historyByClinician    []*domainRelation.ClinicianTesteeRelation
 }
@@ -216,6 +261,7 @@ func (s *relationshipServiceRelationRepo) Save(_ context.Context, item *domainRe
 
 func (s *relationshipServiceRelationRepo) Update(_ context.Context, item *domainRelation.ClinicianTesteeRelation) error {
 	s.updated = item
+	s.updatedItems = append(s.updatedItems, item)
 	return nil
 }
 
@@ -235,6 +281,9 @@ func (s *relationshipServiceRelationRepo) FindActivePrimaryByTestee(context.Cont
 }
 
 func (s *relationshipServiceRelationRepo) FindActiveByTypes(context.Context, int64, domainClinician.ID, domainTestee.ID, []domainRelation.RelationType) (*domainRelation.ClinicianTesteeRelation, error) {
+	if s.activeAccessByTypes != nil {
+		return s.activeAccessByTypes, nil
+	}
 	return nil, cbErrors.WithCode(code.ErrUserNotFound, "relation not found")
 }
 

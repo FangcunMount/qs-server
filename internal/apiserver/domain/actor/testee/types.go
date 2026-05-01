@@ -51,6 +51,13 @@ func (g Gender) DisplayName() string {
 // Tag 标签类型
 type Tag string
 
+const (
+	TagRiskHigh   Tag = "risk_high"
+	TagRiskMedium Tag = "risk_medium"
+	TagRiskSevere Tag = "risk_severe"
+	TagKeyFocus   Tag = "key_focus"
+)
+
 func (t Tag) String() string {
 	return string(t)
 }
@@ -58,15 +65,15 @@ func (t Tag) String() string {
 // DisplayName 返回标签的中文展示名称。
 func (t Tag) DisplayName() string {
 	switch t {
-	case "risk_high":
+	case TagRiskHigh:
 		return "高风险"
-	case "risk_medium":
+	case TagRiskMedium:
 		return "中风险"
 	case "risk_low":
 		return "低风险"
-	case "risk_severe":
+	case TagRiskSevere:
 		return "严重风险"
-	case "key_focus":
+	case TagKeyFocus:
 		return "重点关注"
 	case "daily_simulation":
 		return "日常模拟"

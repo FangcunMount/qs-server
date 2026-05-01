@@ -16,6 +16,7 @@ type relationshipService struct {
 	relationRepo   domainRelation.Repository
 	clinicianRepo  domainClinician.Repository
 	testeeRepo     domainTestee.Repository
+	assignmentRule domainRelation.AssignmentPolicy
 	behaviorEvents BehaviorEventStager
 	uow            apptransaction.Runner
 }
@@ -30,6 +31,18 @@ type relationAssignmentInput struct {
 	now          time.Time
 }
 
+func (i *relationAssignmentInput) toAssignmentRequest() domainRelation.AssignmentRequest {
+	return domainRelation.AssignmentRequest{
+		OrgID:        i.orgID,
+		ClinicianID:  i.clinicianID,
+		TesteeID:     i.testeeID,
+		RelationType: i.relationType,
+		SourceType:   i.sourceType,
+		SourceID:     i.sourceID,
+		Now:          i.now,
+	}
+}
+
 // NewRelationshipService 创建从业者关系服务。
 func NewRelationshipService(
 	relationRepo domainRelation.Repository,
@@ -42,6 +55,7 @@ func NewRelationshipService(
 		relationRepo:   relationRepo,
 		clinicianRepo:  clinicianRepo,
 		testeeRepo:     testeeRepo,
+		assignmentRule: domainRelation.NewAssignmentPolicy(),
 		behaviorEvents: behaviorEvents,
 		uow:            uow,
 	}
@@ -137,16 +151,27 @@ func (s *relationshipService) assignRelationTx(ctx context.Context, dto AssignTe
 		return nil, err
 	}
 
-	existingPrimaryRelation, err := s.handlePrimaryAssignment(ctx, input)
-	if err != nil || existingPrimaryRelation != nil {
-		return existingPrimaryRelation, err
+	activePrimary, err := s.loadActivePrimaryForAssignment(ctx, input)
+	if err != nil {
+		return nil, err
+	}
+	if activePrimary != nil && activePrimary.ClinicianID() == input.clinicianID {
+		plan, err := s.assignmentPolicyForUse().PlanAssignment(input.toAssignmentRequest(), activePrimary, nil)
+		if err != nil {
+			return nil, err
+		}
+		return s.applyAssignmentPlan(ctx, plan)
 	}
 
-	existingRelation, err := s.handleExistingAccessRelation(ctx, input)
-	if err != nil || existingRelation != nil {
-		return existingRelation, err
+	activeAccessRelation, err := s.loadActiveAccessRelation(ctx, input)
+	if err != nil {
+		return nil, err
 	}
-	return s.createRelation(ctx, input)
+	plan, err := s.assignmentPolicyForUse().PlanAssignment(input.toAssignmentRequest(), activePrimary, activeAccessRelation)
+	if err != nil {
+		return nil, err
+	}
+	return s.applyAssignmentPlan(ctx, plan)
 }
 
 func (s *relationshipService) UnbindRelation(ctx context.Context, relationID uint64) (*RelationResult, error) {
@@ -419,7 +444,7 @@ func (s *relationshipService) ensureAssignmentActorsInOrg(
 	return nil
 }
 
-func (s *relationshipService) handlePrimaryAssignment(
+func (s *relationshipService) loadActivePrimaryForAssignment(
 	ctx context.Context,
 	input *relationAssignmentInput,
 ) (*domainRelation.ClinicianTesteeRelation, error) {
@@ -431,21 +456,13 @@ func (s *relationshipService) handlePrimaryAssignment(
 	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
 		return nil, errors.Wrap(err, "failed to find active primary relation")
 	}
-	if err != nil || existingPrimaryRelation == nil {
+	if err != nil {
 		return nil, nil
 	}
-	if existingPrimaryRelation.ClinicianID() == input.clinicianID {
-		return existingPrimaryRelation, nil
-	}
-
-	existingPrimaryRelation.Unbind(input.now)
-	if err := s.relationRepo.Update(ctx, existingPrimaryRelation); err != nil {
-		return nil, errors.Wrap(err, "failed to unbind existing primary relation")
-	}
-	return nil, nil
+	return existingPrimaryRelation, nil
 }
 
-func (s *relationshipService) handleExistingAccessRelation(
+func (s *relationshipService) loadActiveAccessRelation(
 	ctx context.Context,
 	input *relationAssignmentInput,
 ) (*domainRelation.ClinicianTesteeRelation, error) {
@@ -459,39 +476,48 @@ func (s *relationshipService) handleExistingAccessRelation(
 	if err != nil && !errors.IsCode(err, code.ErrUserNotFound) {
 		return nil, errors.Wrap(err, "failed to find existing access relation")
 	}
-	if err != nil || existingRelation == nil {
+	if err != nil {
 		return nil, nil
 	}
-	if existingRelation.RelationType() == input.relationType {
-		return existingRelation, nil
-	}
-
-	existingRelation.Unbind(input.now)
-	if err := s.relationRepo.Update(ctx, existingRelation); err != nil {
-		return nil, errors.Wrap(err, "failed to replace existing access relation")
-	}
-	return nil, nil
+	return existingRelation, nil
 }
 
-func (s *relationshipService) createRelation(
-	ctx context.Context,
-	input *relationAssignmentInput,
-) (*domainRelation.ClinicianTesteeRelation, error) {
-	result := domainRelation.NewClinicianTesteeRelation(
-		input.orgID,
-		input.clinicianID,
-		input.testeeID,
-		input.relationType,
-		input.sourceType,
-		input.sourceID,
-		true,
-		input.now,
-		nil,
-	)
-	if err := s.relationRepo.Save(ctx, result); err != nil {
+func (s *relationshipService) applyAssignmentPlan(ctx context.Context, plan *domainRelation.AssignmentPlan) (*domainRelation.ClinicianTesteeRelation, error) {
+	if plan == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "relation assignment plan is nil")
+	}
+	if plan.ReuseRelation != nil {
+		return plan.ReuseRelation, nil
+	}
+	for _, item := range plan.Unbind {
+		if item == nil {
+			continue
+		}
+		if err := s.relationRepo.Update(ctx, item); err != nil {
+			return nil, errors.Wrap(err, assignmentUnbindErrorMessage(item))
+		}
+	}
+	if plan.Create == nil {
+		return nil, errors.WithCode(code.ErrInternalServerError, "relation assignment plan missing create relation")
+	}
+	if err := s.relationRepo.Save(ctx, plan.Create); err != nil {
 		return nil, errors.Wrap(err, "failed to save relation")
 	}
-	return result, nil
+	return plan.Create, nil
+}
+
+func assignmentUnbindErrorMessage(item *domainRelation.ClinicianTesteeRelation) string {
+	if item.RelationType() == domainRelation.RelationTypePrimary {
+		return "failed to unbind existing primary relation"
+	}
+	return "failed to replace existing access relation"
+}
+
+func (s *relationshipService) assignmentPolicyForUse() domainRelation.AssignmentPolicy {
+	if s.assignmentRule != nil {
+		return s.assignmentRule
+	}
+	return domainRelation.NewAssignmentPolicy()
 }
 
 func extractRelationTesteeIDs(relations []*domainRelation.ClinicianTesteeRelation) []domainTestee.ID {

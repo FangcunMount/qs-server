@@ -21,7 +21,6 @@ type lifecycleService struct {
 	editor        domain.Editor
 	lifecycler    domain.Lifecycler
 	roleAllocator domain.RoleAllocator
-	binder        domain.Binder
 	uow           apptransaction.Runner
 	identitySvc   iambridge.UserDirectory
 	accountSvc    iambridge.OperationAccountRegistrar
@@ -36,7 +35,6 @@ func NewLifecycleService(
 	editor domain.Editor,
 	lifecycler domain.Lifecycler,
 	roleAllocator domain.RoleAllocator,
-	binder domain.Binder,
 	uow apptransaction.Runner,
 	identitySvc iambridge.UserDirectory,
 	accountSvc iambridge.OperationAccountRegistrar,
@@ -49,7 +47,6 @@ func NewLifecycleService(
 		editor:        editor,
 		lifecycler:    lifecycler,
 		roleAllocator: roleAllocator,
-		binder:        binder,
 		uow:           uow,
 		identitySvc:   identitySvc,
 		accountSvc:    accountSvc,

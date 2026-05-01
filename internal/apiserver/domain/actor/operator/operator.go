@@ -56,7 +56,9 @@ func (s *Operator) UserID() int64 {
 
 // Roles 获取角色列表
 func (s *Operator) Roles() []Role {
-	return s.roles
+	roles := make([]Role, len(s.roles))
+	copy(roles, s.roles)
+	return roles
 }
 
 // Name 获取姓名
@@ -99,6 +101,18 @@ func (s *Operator) assignRole(role Role) {
 	s.roles = append(s.roles, role)
 }
 
+// AssignRole 分配角色。
+func (s *Operator) AssignRole(role Role) error {
+	if !IsSupportedRole(role) {
+		return invalidRoleError()
+	}
+	if !s.IsActive() {
+		return inactiveRoleAssignmentError("cannot assign role to inactive staff")
+	}
+	s.assignRole(role)
+	return nil
+}
+
 // removeRole 移除角色（包内方法，应通过 RoleManager 调用）
 func (s *Operator) removeRole(role Role) {
 	for i, existing := range s.roles {
@@ -107,6 +121,43 @@ func (s *Operator) removeRole(role Role) {
 			return
 		}
 	}
+}
+
+// RemoveRole 移除角色。
+func (s *Operator) RemoveRole(role Role) error {
+	if !IsSupportedRole(role) {
+		return invalidRoleError()
+	}
+	s.removeRole(role)
+	return nil
+}
+
+// ClearRoles 清空角色集合。
+func (s *Operator) ClearRoles() {
+	s.roles = make([]Role, 0)
+}
+
+// ReplaceRoles 替换角色集合，自动去重并保持输入顺序。
+func (s *Operator) ReplaceRoles(roles []Role) error {
+	if !s.IsActive() {
+		return inactiveRoleAssignmentError("cannot replace roles for inactive staff")
+	}
+
+	nextRoles := make([]Role, 0, len(roles))
+	seen := make(map[Role]bool, len(roles))
+	for _, role := range roles {
+		if !IsSupportedRole(role) {
+			return invalidRoleError()
+		}
+		if seen[role] {
+			continue
+		}
+		nextRoles = append(nextRoles, role)
+		seen[role] = true
+	}
+
+	s.roles = nextRoles
+	return nil
 }
 
 // HasRole 检查是否有某个角色
