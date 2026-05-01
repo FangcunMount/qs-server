@@ -159,7 +159,7 @@ type statisticsSyncServiceStub struct{}
 func (*statisticsSyncServiceStub) SyncDailyStatistics(context.Context, int64, statisticsApp.SyncDailyOptions) error {
 	return nil
 }
-func (*statisticsSyncServiceStub) SyncAccumulatedStatistics(context.Context, int64) error { return nil }
+func (*statisticsSyncServiceStub) SyncOrgSnapshotStatistics(context.Context, int64) error { return nil }
 func (*statisticsSyncServiceStub) SyncPlanStatistics(context.Context, int64) error        { return nil }
 
 type behaviorProjectorServiceStub struct{}

@@ -5305,11 +5305,11 @@ paths:
       summary: 查询任务窗口
       tags:
       - Task-Query
-  /internal/v1/statistics/sync/accumulated:
+  /internal/v1/statistics/sync/org-snapshot:
     post:
       consumes:
       - application/json
-      description: 从 MySQL 原始表与每日统计表重建累计统计；仅 qs:admin 可访问
+      description: 从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌（或内部调用token）
         in: header
@@ -5327,7 +5327,7 @@ paths:
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
-      summary: 同步累计统计
+      summary: 同步机构总览快照
       tags:
       - Statistics-Sync
   /internal/v1/statistics/sync/daily:

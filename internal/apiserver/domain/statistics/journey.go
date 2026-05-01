@@ -80,8 +80,8 @@ type AssessmentEpisodeRepository interface {
 	FindEpisodeByAssessmentID(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentEpisode, error)
 }
 
-// AnalyticsProjectionMutation 日级分析投影增量。
-type AnalyticsProjectionMutation struct {
+// StatisticsJourneyMutation 统计旅程日聚合增量。
+type StatisticsJourneyMutation struct {
 	OrgID       int64
 	ClinicianID uint64
 	EntryID     uint64
@@ -113,11 +113,11 @@ type AnalyticsPendingEvent struct {
 	AttemptCount int64
 }
 
-// AnalyticsProjectionRepository 维护分析投影。
-type AnalyticsProjectionRepository interface {
-	ApplyAnalyticsProjectionMutation(ctx context.Context, mutation AnalyticsProjectionMutation) error
-	ApplyAnalyticsClinicianProjectionMutation(ctx context.Context, mutation AnalyticsProjectionMutation) error
-	ApplyAnalyticsEntryProjectionMutation(ctx context.Context, mutation AnalyticsProjectionMutation) error
+// StatisticsJourneyRepository 维护统计旅程日聚合和 projector runtime 状态。
+type StatisticsJourneyRepository interface {
+	ApplyStatisticsJourneyMutation(ctx context.Context, mutation StatisticsJourneyMutation) error
+	ApplyStatisticsJourneyClinicianMutation(ctx context.Context, mutation StatisticsJourneyMutation) error
+	ApplyStatisticsJourneyEntryMutation(ctx context.Context, mutation StatisticsJourneyMutation) error
 	ListEpisodesForAttribution(ctx context.Context, orgID int64, testeeID uint64, intakeAt time.Time, window time.Duration) ([]*AssessmentEpisode, error)
 	TryBeginAnalyticsProjectorCheckpoint(ctx context.Context, eventID, eventType string) (string, error)
 	MarkAnalyticsProjectorCheckpointStatus(ctx context.Context, eventID, status string) error

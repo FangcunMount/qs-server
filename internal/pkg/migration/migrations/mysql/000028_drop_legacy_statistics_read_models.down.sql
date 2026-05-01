@@ -1,0 +1,3 @@
+-- Intentionally no-op.
+-- Legacy statistics read models are not restored after the four-table
+-- statistics_journey/content/plan/snapshot consolidation.

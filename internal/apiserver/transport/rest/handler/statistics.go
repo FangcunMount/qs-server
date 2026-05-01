@@ -561,37 +561,37 @@ func (h *StatisticsHandler) SyncDailyStatistics(c *gin.Context) {
 	h.Success(c, gin.H{"message": "每日统计同步完成"})
 }
 
-// SyncAccumulatedStatistics 同步累计统计（定时任务调用）
-// @Summary 同步累计统计
-// @Description 从 MySQL 原始表与每日统计表重建累计统计；仅 qs:admin 可访问
+// SyncOrgSnapshotStatistics 同步机构总览快照（内部系统动作）
+// @Summary 同步机构总览快照
+// @Description 从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问
 // @Tags Statistics-Sync
 // @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌（或内部调用token）"
 // @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
-// @Router /internal/v1/statistics/sync/accumulated [post]
-func (h *StatisticsHandler) SyncAccumulatedStatistics(c *gin.Context) {
+// @Router /internal/v1/statistics/sync/org-snapshot [post]
+func (h *StatisticsHandler) SyncOrgSnapshotStatistics(c *gin.Context) {
 	ctx := c.Request.Context()
-	logger.L(ctx).Infow("同步累计统计", "action", "sync_accumulated_statistics")
+	logger.L(ctx).Infow("同步机构总览快照", "action", "sync_org_snapshot_statistics")
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	if err := h.syncService.SyncAccumulatedStatistics(ctx, orgID); err != nil {
-		logger.L(ctx).Errorw("同步累计统计失败",
-			"action", "sync_accumulated_statistics",
+	if err := h.syncService.SyncOrgSnapshotStatistics(ctx, orgID); err != nil {
+		logger.L(ctx).Errorw("同步机构总览快照失败",
+			"action", "sync_org_snapshot_statistics",
 			"org_id", orgID,
 			"error", err.Error(),
 		)
 		h.Error(c, err)
 		return
 	}
-	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_accumulated_statistics")
+	h.governance().TriggerStatisticsWarmup(ctx, orgID, "sync_org_snapshot_statistics")
 
-	h.Success(c, gin.H{"message": "累计统计同步完成"})
+	h.Success(c, gin.H{"message": "机构总览快照同步完成"})
 }
 
 // SyncPlanStatistics 同步计划统计（定时任务调用）

@@ -94,7 +94,7 @@
 
 ### 3. `statistics_journey_daily`
 
-日粒度分析投影表，按：
+统计旅程日聚合表，按：
 
 - org
 - clinician
@@ -102,7 +102,7 @@
 
 聚合各种行为和 episode 结果。
 
-projector 在处理事件时，会边写事实、边增量更新这些投影。
+projector 在处理事件时，会边写事实、边增量更新这些统计旅程日聚合。
 
 ### 4. `analytics_projector_checkpoint`
 

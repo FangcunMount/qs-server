@@ -15,7 +15,7 @@ import (
 
 type statisticsSyncService interface {
 	SyncDailyStatistics(ctx context.Context, orgID int64, opts statisticsApp.SyncDailyOptions) error
-	SyncAccumulatedStatistics(ctx context.Context, orgID int64) error
+	SyncOrgSnapshotStatistics(ctx context.Context, orgID int64) error
 	SyncPlanStatistics(ctx context.Context, orgID int64) error
 }
 
@@ -171,8 +171,8 @@ func (r *StatisticsSyncRunner) runOnce(ctx context.Context) error {
 				log.Warnf("statistics nightly daily sync failed (org=%d): %v", orgID, err)
 				continue
 			}
-			if err := r.syncService.SyncAccumulatedStatistics(ctx, orgID); err != nil {
-				log.Warnf("statistics nightly accumulated sync failed (org=%d): %v", orgID, err)
+			if err := r.syncService.SyncOrgSnapshotStatistics(ctx, orgID); err != nil {
+				log.Warnf("statistics nightly org_snapshot sync failed (org=%d): %v", orgID, err)
 				continue
 			}
 			if err := r.syncService.SyncPlanStatistics(ctx, orgID); err != nil {

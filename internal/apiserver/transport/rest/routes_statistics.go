@@ -151,13 +151,13 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 		r.rateCfg.SubmitUserBurst,
 		statisticsHandler.SyncDailyStatistics,
 	)...)
-	sync.POST("/accumulated", r.rateLimitedHandlers(
+	sync.POST("/org-snapshot", r.rateLimitedHandlers(
 		r.rateCfg,
 		r.rateCfg.SubmitGlobalQPS,
 		r.rateCfg.SubmitGlobalBurst,
 		r.rateCfg.SubmitUserQPS,
 		r.rateCfg.SubmitUserBurst,
-		statisticsHandler.SyncAccumulatedStatistics,
+		statisticsHandler.SyncOrgSnapshotStatistics,
 	)...)
 	sync.POST("/plan", r.rateLimitedHandlers(
 		r.rateCfg,

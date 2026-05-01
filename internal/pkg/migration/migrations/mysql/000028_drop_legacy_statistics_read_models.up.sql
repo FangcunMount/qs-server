@@ -1,0 +1,16 @@
+DROP TABLE IF EXISTS `analytics_plan_task_window_snapshot`;
+DROP TABLE IF EXISTS `analytics_organization_snapshot`;
+DROP TABLE IF EXISTS `analytics_plan_task_daily`;
+DROP TABLE IF EXISTS `analytics_assessment_service_content_daily`;
+DROP TABLE IF EXISTS `analytics_assessment_service_entry_daily`;
+DROP TABLE IF EXISTS `analytics_assessment_service_clinician_daily`;
+DROP TABLE IF EXISTS `analytics_assessment_service_org_daily`;
+DROP TABLE IF EXISTS `analytics_access_entry_daily`;
+DROP TABLE IF EXISTS `analytics_access_clinician_daily`;
+DROP TABLE IF EXISTS `analytics_access_org_daily`;
+DROP TABLE IF EXISTS `analytics_projection_entry_daily`;
+DROP TABLE IF EXISTS `analytics_projection_clinician_daily`;
+DROP TABLE IF EXISTS `analytics_projection_org_daily`;
+DROP TABLE IF EXISTS `statistics_plan`;
+DROP TABLE IF EXISTS `statistics_accumulated`;
+DROP TABLE IF EXISTS `statistics_daily`;

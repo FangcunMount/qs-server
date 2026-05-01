@@ -19,7 +19,7 @@ func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID
 	if err := deleteDailyWindow(ctx, tx, "statistics_content_daily", orgID, startDate, endDate); err != nil {
 		return err
 	}
-	if err := r.rebuildJourneyProjectionDaily(ctx, tx, orgID, startDate, endDate); err != nil {
+	if err := r.rebuildJourneyDaily(ctx, tx, orgID, startDate, endDate); err != nil {
 		return err
 	}
 	if err := r.rebuildAccessFunnelDaily(ctx, tx, orgID, startDate, endDate); err != nil {
@@ -31,7 +31,7 @@ func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID
 	return r.rebuildContentDaily(ctx, tx, orgID, startDate, endDate)
 }
 
-func (r *StatisticsRepository) RebuildAccumulatedStatistics(ctx context.Context, orgID int64, _ time.Time) error {
+func (r *StatisticsRepository) RebuildOrgSnapshotStatistics(ctx context.Context, orgID int64, _ time.Time) error {
 	tx, err := gormuow.RequireTx(ctx)
 	if err != nil {
 		return err
@@ -50,20 +50,20 @@ func (r *StatisticsRepository) RebuildPlanStatistics(ctx context.Context, orgID 
 	return tx.WithContext(ctx).Exec(planDailyInsertSQL, orgID, orgID, orgID, orgID).Error
 }
 
-func (r *StatisticsRepository) rebuildJourneyProjectionDaily(ctx context.Context, tx *gorm.DB, orgID int64, startDate, endDate time.Time) error {
-	if err := tx.WithContext(ctx).Exec(journeyProjectionOrgInsertSQL,
+func (r *StatisticsRepository) rebuildJourneyDaily(ctx context.Context, tx *gorm.DB, orgID int64, startDate, endDate time.Time) error {
+	if err := tx.WithContext(ctx).Exec(journeyDailyOrgInsertSQL,
 		orgID, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate,
 		orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate,
 	).Error; err != nil {
 		return err
 	}
-	if err := tx.WithContext(ctx).Exec(journeyProjectionClinicianInsertSQL,
+	if err := tx.WithContext(ctx).Exec(journeyDailyClinicianInsertSQL,
 		orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate,
 		orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate,
 	).Error; err != nil {
 		return err
 	}
-	return tx.WithContext(ctx).Exec(journeyProjectionEntryInsertSQL,
+	return tx.WithContext(ctx).Exec(journeyDailyEntryInsertSQL,
 		orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate,
 		orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate, orgID, startDate, endDate,
 	).Error
@@ -120,7 +120,7 @@ func deleteDailyWindow(ctx context.Context, tx *gorm.DB, table string, orgID int
 		Error
 }
 
-const journeyProjectionOrgInsertSQL = `
+const journeyDailyOrgInsertSQL = `
 INSERT INTO statistics_journey_daily (
   org_id, subject_type, subject_id, stat_date,
   entry_opened_count, intake_confirmed_count, testee_profile_created_count,
@@ -169,7 +169,7 @@ ON DUPLICATE KEY UPDATE
   assessment_failed_count = VALUES(assessment_failed_count),
   updated_at = NOW(3)`
 
-const journeyProjectionClinicianInsertSQL = `
+const journeyDailyClinicianInsertSQL = `
 INSERT INTO statistics_journey_daily (
   org_id, subject_type, subject_id, clinician_id, stat_date,
   entry_opened_count, intake_confirmed_count, testee_profile_created_count,
@@ -219,7 +219,7 @@ ON DUPLICATE KEY UPDATE
   assessment_failed_count = VALUES(assessment_failed_count),
   updated_at = NOW(3)`
 
-const journeyProjectionEntryInsertSQL = `
+const journeyDailyEntryInsertSQL = `
 INSERT INTO statistics_journey_daily (
   org_id, subject_type, subject_id, clinician_id, entry_id, stat_date,
   entry_opened_count, intake_confirmed_count, testee_profile_created_count,

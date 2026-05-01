@@ -95,17 +95,17 @@ func (s *behaviorEventStager) StageCareRelationshipTransferred(ctx context.Conte
 
 type assessmentEpisodeProjector struct {
 	uow     apptransaction.Runner
-	repo    BehaviorProjectionRepository
+	repo    BehaviorJourneyRepository
 	router  behaviorEventRouter
 	pending pendingRetryQueue
 }
 
-func NewAssessmentEpisodeProjectorWithTransactionRunner(runner apptransaction.Runner, repo BehaviorProjectionRepository) BehaviorProjectorService {
+func NewAssessmentEpisodeProjectorWithTransactionRunner(runner apptransaction.Runner, repo BehaviorJourneyRepository) BehaviorProjectorService {
 	if runner == nil || repo == nil {
 		return nil
 	}
-	projection := projectionWriter{repo: repo}
-	lifecycler := episodeLifecycler{repo: repo, projection: projection}
+	journey := journeyWriter{repo: repo}
+	lifecycler := episodeLifecycler{repo: repo, journey: journey}
 	return &assessmentEpisodeProjector{
 		uow:     runner,
 		repo:    repo,

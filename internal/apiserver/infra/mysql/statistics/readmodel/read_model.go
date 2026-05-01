@@ -584,7 +584,7 @@ func (m *readModel) GetClinicianSnapshot(ctx context.Context, orgID int64, clini
 	return snapshot, nil
 }
 
-func (m *readModel) GetClinicianProjection(ctx context.Context, orgID int64, clinicianID uint64, from, to time.Time) (domainStatistics.ClinicianStatisticsWindow, domainStatistics.ClinicianStatisticsFunnel, error) {
+func (m *readModel) GetClinicianJourneyStats(ctx context.Context, orgID int64, clinicianID uint64, from, to time.Time) (domainStatistics.ClinicianStatisticsWindow, domainStatistics.ClinicianStatisticsFunnel, error) {
 	type behaviorRow struct {
 		EntryOpenedCount       sql.NullInt64
 		IntakeConfirmedCount   sql.NullInt64
@@ -717,7 +717,7 @@ func (m *readModel) GetAssessmentEntryMeta(ctx context.Context, orgID int64, ent
 }
 
 func (m *readModel) GetAssessmentEntryCounts(ctx context.Context, orgID int64, entryID uint64, from, to *time.Time) (domainStatistics.AssessmentEntryStatisticsCounts, error) {
-	type projectionRow struct {
+	type journeyRow struct {
 		EntryOpenedCount       sql.NullInt64
 		IntakeConfirmedCount   sql.NullInt64
 		CareEstablishedCount   sql.NullInt64
@@ -741,7 +741,7 @@ func (m *readModel) GetAssessmentEntryCounts(ctx context.Context, orgID int64, e
 		query = query.Where("stat_date >= ? AND stat_date < ?", beginningOfDay(*from), beginningOfDay(*to))
 	}
 
-	var row projectionRow
+	var row journeyRow
 	if err := query.Scan(&row).Error; err != nil {
 		return domainStatistics.AssessmentEntryStatisticsCounts{}, err
 	}

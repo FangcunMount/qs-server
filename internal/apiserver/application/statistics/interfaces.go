@@ -96,8 +96,8 @@ type SyncDailyOptions struct {
 type StatisticsSyncService interface {
 	// SyncDailyStatistics 同步每日统计（原始表 → MySQL）
 	SyncDailyStatistics(ctx context.Context, orgID int64, opts SyncDailyOptions) error
-	// SyncAccumulatedStatistics 同步累计统计（MySQL 重建）
-	SyncAccumulatedStatistics(ctx context.Context, orgID int64) error
+	// SyncOrgSnapshotStatistics 同步机构总览快照（原始表 → statistics_org_snapshot）
+	SyncOrgSnapshotStatistics(ctx context.Context, orgID int64) error
 	// SyncPlanStatistics 同步计划统计
 	SyncPlanStatistics(ctx context.Context, orgID int64) error
 }

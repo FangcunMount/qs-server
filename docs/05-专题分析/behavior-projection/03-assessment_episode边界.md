@@ -44,9 +44,9 @@ classDiagram
         FailedAt
     }
     class BehaviorFootprint
-    class AnalyticsProjectionMutation
+    class StatisticsJourneyMutation
     BehaviorFootprint --> AssessmentEpisode
-    AssessmentEpisode --> AnalyticsProjectionMutation
+    AssessmentEpisode --> StatisticsJourneyMutation
 ```
 
 episode 把一组跨时间、跨事件的事实串成统计旅程。它服务统计读模型，不参与业务命令校验。
@@ -57,7 +57,7 @@ episode 把一组跨时间、跨事件的事实串成统计旅程。它服务统
 flowchart TB
     footprint["BehaviorFootprint\n原始事实"] --> matcher["EpisodeMatcher\n按 answer_sheet/assessment/report 关联"]
     matcher --> episode["AssessmentEpisode\n统计旅程"]
-    episode --> mutation["AnalyticsProjectionMutation"]
+    episode --> mutation["StatisticsJourneyMutation"]
     mutation --> projection["statistics_journey_daily"]
     pending["PendingEvent"] --> matcher
 ```

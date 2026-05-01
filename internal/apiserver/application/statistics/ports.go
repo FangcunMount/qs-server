@@ -22,7 +22,7 @@ type StatisticsRealtimeReader interface {
 
 type StatisticsRebuildWriter interface {
 	RebuildDailyStatistics(ctx context.Context, orgID int64, startDate, endDate time.Time) error
-	RebuildAccumulatedStatistics(ctx context.Context, orgID int64, todayStart time.Time) error
+	RebuildOrgSnapshotStatistics(ctx context.Context, orgID int64, todayStart time.Time) error
 	RebuildPlanStatistics(ctx context.Context, orgID int64) error
 }
 
@@ -30,8 +30,8 @@ type PeriodicStatsReader interface {
 	GetPeriodicStats(ctx context.Context, orgID int64, testeeID uint64) (*domainStatistics.TesteePeriodicStatisticsResponse, error)
 }
 
-type BehaviorProjectionRepository interface {
+type BehaviorJourneyRepository interface {
 	domainStatistics.BehaviorFootprintWriter
 	domainStatistics.AssessmentEpisodeRepository
-	domainStatistics.AnalyticsProjectionRepository
+	domainStatistics.StatisticsJourneyRepository
 }

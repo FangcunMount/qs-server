@@ -358,7 +358,7 @@ func (s *readService) buildClinicianStatistics(ctx context.Context, orgID int64,
 	if err != nil {
 		return nil, err
 	}
-	window, funnel, err := s.readModel.GetClinicianProjection(ctx, orgID, subject.ID.Uint64(), timeRange.From, timeRange.To)
+	window, funnel, err := s.readModel.GetClinicianJourneyStats(ctx, orgID, subject.ID.Uint64(), timeRange.From, timeRange.To)
 	if err != nil {
 		return nil, err
 	}

@@ -7,15 +7,15 @@ import (
 )
 
 type episodeLifecycler struct {
-	repo       BehaviorProjectionRepository
-	projection projectionWriter
+	repo    BehaviorJourneyRepository
+	journey journeyWriter
 }
 
 func (l episodeLifecycler) applyEntryOpened(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventEntryOpened, "assessment_entry", input.EntryID, "assessment_entry", input.EntryID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventEntryOpened, "assessment_entry", input.EntryID, "assessment_entry", input.EntryID); err != nil {
 		return err
 	}
-	return l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	return l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:            input.OrgID,
 		ClinicianID:      input.ClinicianID,
 		EntryID:          input.EntryID,
@@ -25,10 +25,10 @@ func (l episodeLifecycler) applyEntryOpened(ctx context.Context, input BehaviorP
 }
 
 func (l episodeLifecycler) applyIntakeConfirmed(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventIntakeConfirmed, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventIntakeConfirmed, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
 		return err
 	}
-	if err := l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	if err := l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                input.OrgID,
 		ClinicianID:          input.ClinicianID,
 		EntryID:              input.EntryID,
@@ -41,10 +41,10 @@ func (l episodeLifecycler) applyIntakeConfirmed(ctx context.Context, input Behav
 }
 
 func (l episodeLifecycler) applyTesteeProfileCreated(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventTesteeProfileCreated, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventTesteeProfileCreated, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
 		return err
 	}
-	return l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	return l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                     input.OrgID,
 		ClinicianID:               input.ClinicianID,
 		EntryID:                   input.EntryID,
@@ -54,10 +54,10 @@ func (l episodeLifecycler) applyTesteeProfileCreated(ctx context.Context, input 
 }
 
 func (l episodeLifecycler) applyCareRelationshipEstablished(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipEstablished, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipEstablished, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
 		return err
 	}
-	return l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	return l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                            input.OrgID,
 		ClinicianID:                      input.ClinicianID,
 		EntryID:                          input.EntryID,
@@ -67,10 +67,10 @@ func (l episodeLifecycler) applyCareRelationshipEstablished(ctx context.Context,
 }
 
 func (l episodeLifecycler) applyCareRelationshipTransferred(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipTransferred, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventCareRelationshipTransferred, "testee", input.TesteeID, "clinician", input.ClinicianID); err != nil {
 		return err
 	}
-	return l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	return l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                            input.OrgID,
 		ClinicianID:                      input.ClinicianID,
 		StatDate:                         input.OccurredAt,
@@ -79,7 +79,7 @@ func (l episodeLifecycler) applyCareRelationshipTransferred(ctx context.Context,
 }
 
 func (l episodeLifecycler) applyAnswerSheetSubmitted(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAnswerSheetSubmitted, "answersheet", input.AnswerSheetID, "testee", input.TesteeID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAnswerSheetSubmitted, "answersheet", input.AnswerSheetID, "testee", input.TesteeID); err != nil {
 		return err
 	}
 	episode, err := l.repo.FindEpisodeByAnswerSheetID(ctx, input.OrgID, input.AnswerSheetID)
@@ -114,7 +114,7 @@ func (l episodeLifecycler) applyAnswerSheetSubmitted(ctx context.Context, input 
 			return err
 		}
 	}
-	return l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	return l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                     input.OrgID,
 		ClinicianID:               valueOrZero(episode.ClinicianID),
 		EntryID:                   valueOrZero(episode.EntryID),
@@ -124,7 +124,7 @@ func (l episodeLifecycler) applyAnswerSheetSubmitted(ctx context.Context, input 
 }
 
 func (l episodeLifecycler) applyAssessmentCreated(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAssessmentCreated, "assessment", input.AssessmentID, "testee", input.TesteeID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventAssessmentCreated, "assessment", input.AssessmentID, "testee", input.TesteeID); err != nil {
 		return BehaviorProjectEventStatusCompleted, err
 	}
 	episode, err := l.repo.FindEpisodeByAnswerSheetID(ctx, input.OrgID, input.AnswerSheetID)
@@ -146,7 +146,7 @@ func (l episodeLifecycler) applyAssessmentCreated(ctx context.Context, input Beh
 }
 
 func (l episodeLifecycler) applyReportGenerated(ctx context.Context, input BehaviorProjectEventInput) (BehaviorProjectEventStatus, error) {
-	if err := l.projection.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventReportGenerated, "report", input.ReportID, "assessment", input.AssessmentID); err != nil {
+	if err := l.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventReportGenerated, "report", input.ReportID, "assessment", input.AssessmentID); err != nil {
 		return BehaviorProjectEventStatusCompleted, err
 	}
 	episode, err := l.repo.FindEpisodeByAssessmentID(ctx, input.OrgID, input.AssessmentID)
@@ -165,7 +165,7 @@ func (l episodeLifecycler) applyReportGenerated(ctx context.Context, input Behav
 	if err := l.repo.SaveEpisode(ctx, episode); err != nil {
 		return BehaviorProjectEventStatusCompleted, err
 	}
-	if err := l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	if err := l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                  input.OrgID,
 		ClinicianID:            valueOrZero(episode.ClinicianID),
 		EntryID:                valueOrZero(episode.EntryID),
@@ -196,7 +196,7 @@ func (l episodeLifecycler) applyAssessmentFailed(ctx context.Context, input Beha
 	if err := l.repo.SaveEpisode(ctx, episode); err != nil {
 		return BehaviorProjectEventStatusCompleted, err
 	}
-	if err := l.repo.ApplyAnalyticsProjectionMutation(ctx, domainStatistics.AnalyticsProjectionMutation{
+	if err := l.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
 		OrgID:                 input.OrgID,
 		ClinicianID:           valueOrZero(episode.ClinicianID),
 		EntryID:               valueOrZero(episode.EntryID),
@@ -229,7 +229,7 @@ func (l episodeLifecycler) rebindEpisodesToIntake(ctx context.Context, input Beh
 		if err := l.repo.SaveEpisode(ctx, episode); err != nil {
 			return err
 		}
-		if err := l.projection.reallocateEpisodeProjection(ctx, episode, oldClinicianID, oldEntryID, input.ClinicianID, input.EntryID); err != nil {
+		if err := l.journey.reallocateEpisodeJourney(ctx, episode, oldClinicianID, oldEntryID, input.ClinicianID, input.EntryID); err != nil {
 			return err
 		}
 	}

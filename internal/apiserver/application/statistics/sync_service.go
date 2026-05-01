@@ -85,26 +85,26 @@ func (s *syncService) SyncDailyStatistics(ctx context.Context, orgID int64, opts
 	return nil
 }
 
-// SyncAccumulatedStatistics 刷新机构级统计快照。
-func (s *syncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64) error {
+// SyncOrgSnapshotStatistics 刷新机构级统计快照。
+func (s *syncService) SyncOrgSnapshotStatistics(ctx context.Context, orgID int64) error {
 	l := logger.L(ctx)
-	l.Infow("开始重建累计统计", "action", "sync_accumulated_statistics", "org_id", orgID)
+	l.Infow("开始重建机构统计快照", "action", "sync_org_snapshot_statistics", "org_id", orgID)
 	if orgID <= 0 {
-		l.Warnw("无效的 org_id，跳过累计统计同步", "org_id", orgID)
+		l.Warnw("无效的 org_id，跳过机构统计快照同步", "org_id", orgID)
 		return nil
 	}
 
 	todayStart, _ := currentDayBounds(time.Now().In(time.Local))
-	lockName := fmt.Sprintf("statistics:accumulated:%d:%s", orgID, todayStart.Format("2006-01-02"))
+	lockName := fmt.Sprintf("statistics:org_snapshot:%d:%s", orgID, todayStart.Format("2006-01-02"))
 	if err := s.withLockLease(ctx, lockName, func(lockCtx context.Context) error {
 		return s.uow.WithinTransaction(lockCtx, func(txCtx context.Context) error {
-			return s.writer.RebuildAccumulatedStatistics(txCtx, orgID, todayStart)
+			return s.writer.RebuildOrgSnapshotStatistics(txCtx, orgID, todayStart)
 		})
 	}); err != nil {
 		return err
 	}
 
-	l.Infow("累计统计重建完成", "action", "sync_accumulated_statistics", "org_id", orgID)
+	l.Infow("机构统计快照重建完成", "action", "sync_org_snapshot_statistics", "org_id", orgID)
 	return nil
 }
 

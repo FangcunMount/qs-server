@@ -2,6 +2,7 @@ package statistics
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
@@ -38,7 +39,7 @@ type syncCtxMarker struct{}
 
 type syncWriterStub struct {
 	dailyCalled       bool
-	accumulatedCalled bool
+	orgSnapshotCalled bool
 	planCalled        bool
 	txCtxSeen         bool
 }
@@ -49,8 +50,8 @@ func (s *syncWriterStub) RebuildDailyStatistics(ctx context.Context, _ int64, _,
 	return nil
 }
 
-func (s *syncWriterStub) RebuildAccumulatedStatistics(ctx context.Context, _ int64, _ time.Time) error {
-	s.accumulatedCalled = true
+func (s *syncWriterStub) RebuildOrgSnapshotStatistics(ctx context.Context, _ int64, _ time.Time) error {
+	s.orgSnapshotCalled = true
 	s.txCtxSeen = ctx.Value(syncCtxMarker{}) == true
 	return nil
 }
@@ -63,10 +64,12 @@ func (s *syncWriterStub) RebuildPlanStatistics(ctx context.Context, _ int64) err
 
 type lockManagerStub struct {
 	acquired bool
+	key      string
 }
 
 func (s *lockManagerStub) AcquireSpec(_ context.Context, spec locklease.Spec, key string, _ ...time.Duration) (*locklease.Lease, bool, error) {
 	s.acquired = true
+	s.key = key
 	return &locklease.Lease{Key: spec.Identity(key).Key, Token: "lease"}, true, nil
 }
 
@@ -94,6 +97,25 @@ func TestSyncDailyStatisticsUsesTransactionContextWriter(t *testing.T) {
 	}
 	if !writer.dailyCalled || !writer.txCtxSeen {
 		t.Fatalf("writer dailyCalled=%v txCtxSeen=%v, want both true", writer.dailyCalled, writer.txCtxSeen)
+	}
+}
+
+func TestSyncOrgSnapshotStatisticsUsesSnapshotLockAndWriter(t *testing.T) {
+	writer := &syncWriterStub{}
+	locker := &lockManagerStub{}
+	runner := apptransaction.RunnerFunc(func(ctx context.Context, fn func(context.Context) error) error {
+		return fn(context.WithValue(ctx, syncCtxMarker{}, true))
+	})
+	service := NewSyncServiceWithTransactionRunner(runner, writer, 7, locker)
+
+	if err := service.SyncOrgSnapshotStatistics(context.Background(), 9); err != nil {
+		t.Fatalf("SyncOrgSnapshotStatistics returned error: %v", err)
+	}
+	if !writer.orgSnapshotCalled || !writer.txCtxSeen {
+		t.Fatalf("writer orgSnapshotCalled=%v txCtxSeen=%v, want both true", writer.orgSnapshotCalled, writer.txCtxSeen)
+	}
+	if !strings.HasPrefix(locker.key, "statistics:org_snapshot:9:") {
+		t.Fatalf("lock key = %q, want statistics:org_snapshot prefix", locker.key)
 	}
 }
 

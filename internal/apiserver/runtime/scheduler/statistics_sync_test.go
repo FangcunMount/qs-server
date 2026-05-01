@@ -27,8 +27,8 @@ func (f *fakeStatisticsSyncService) SyncDailyStatistics(ctx context.Context, org
 	return f.recordCall(ctx, "daily", orgID)
 }
 
-func (f *fakeStatisticsSyncService) SyncAccumulatedStatistics(ctx context.Context, orgID int64) error {
-	return f.recordCall(ctx, "accumulated", orgID)
+func (f *fakeStatisticsSyncService) SyncOrgSnapshotStatistics(ctx context.Context, orgID int64) error {
+	return f.recordCall(ctx, "org_snapshot", orgID)
 }
 
 func (f *fakeStatisticsSyncService) SyncPlanStatistics(ctx context.Context, orgID int64) error {
@@ -253,10 +253,10 @@ func TestStatisticsSyncRunnerRunOnceSchedulesEachOrgInOrder(t *testing.T) {
 
 	wantCalls := []string{
 		statisticsSyncCall("daily", 11),
-		statisticsSyncCall("accumulated", 11),
+		statisticsSyncCall("org_snapshot", 11),
 		statisticsSyncCall("plan", 11),
 		statisticsSyncCall("daily", 22),
-		statisticsSyncCall("accumulated", 22),
+		statisticsSyncCall("org_snapshot", 22),
 		statisticsSyncCall("plan", 22),
 	}
 	if got := syncService.callOrder(); len(got) != len(wantCalls) {
@@ -301,11 +301,11 @@ func TestStatisticsSyncRunnerRunOnceContinuesAfterOrgFailure(t *testing.T) {
 
 	wantCalls := []string{
 		statisticsSyncCall("daily", 1),
-		statisticsSyncCall("accumulated", 1),
+		statisticsSyncCall("org_snapshot", 1),
 		statisticsSyncCall("plan", 1),
 		statisticsSyncCall("daily", 2),
 		statisticsSyncCall("daily", 3),
-		statisticsSyncCall("accumulated", 3),
+		statisticsSyncCall("org_snapshot", 3),
 		statisticsSyncCall("plan", 3),
 	}
 	if got := syncService.callOrder(); len(got) != len(wantCalls) {

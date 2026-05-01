@@ -5340,9 +5340,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/internal/v1/statistics/sync/accumulated": {
+        "/internal/v1/statistics/sync/org-snapshot": {
             "post": {
-                "description": "从 MySQL 原始表与每日统计表重建累计统计；仅 qs:admin 可访问",
+                "description": "从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问",
                 "consumes": [
                     "application/json"
                 ],
@@ -5352,7 +5352,7 @@ const docTemplate = `{
                 "tags": [
                     "Statistics-Sync"
                 ],
-                "summary": "同步累计统计",
+                "summary": "同步机构总览快照",
                 "parameters": [
                     {
                         "type": "string",

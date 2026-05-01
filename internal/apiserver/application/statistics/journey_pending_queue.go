@@ -9,7 +9,7 @@ import (
 )
 
 type pendingRetryQueue struct {
-	repo BehaviorProjectionRepository
+	repo BehaviorJourneyRepository
 }
 
 func (q pendingRetryQueue) enqueue(ctx context.Context, input BehaviorProjectEventInput, attemptCount int64, reason string) error {

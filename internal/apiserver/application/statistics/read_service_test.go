@@ -165,7 +165,7 @@ func (*statisticsReadModelStub) GetClinicianSnapshot(context.Context, int64, uin
 	return domainStatistics.ClinicianStatisticsSnapshot{}, nil
 }
 
-func (*statisticsReadModelStub) GetClinicianProjection(context.Context, int64, uint64, time.Time, time.Time) (domainStatistics.ClinicianStatisticsWindow, domainStatistics.ClinicianStatisticsFunnel, error) {
+func (*statisticsReadModelStub) GetClinicianJourneyStats(context.Context, int64, uint64, time.Time, time.Time) (domainStatistics.ClinicianStatisticsWindow, domainStatistics.ClinicianStatisticsFunnel, error) {
 	return domainStatistics.ClinicianStatisticsWindow{}, domainStatistics.ClinicianStatisticsFunnel{}, nil
 }
 

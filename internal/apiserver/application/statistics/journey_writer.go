@@ -7,11 +7,11 @@ import (
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
-type projectionWriter struct {
-	repo BehaviorProjectionRepository
+type journeyWriter struct {
+	repo BehaviorJourneyRepository
 }
 
-func (w projectionWriter) appendBehaviorFootprint(ctx context.Context, input BehaviorProjectEventInput, eventName domainStatistics.BehaviorEventName, subjectType string, subjectID uint64, actorType string, actorID uint64) error {
+func (w journeyWriter) appendBehaviorFootprint(ctx context.Context, input BehaviorProjectEventInput, eventName domainStatistics.BehaviorEventName, subjectType string, subjectID uint64, actorType string, actorID uint64) error {
 	return w.repo.AppendBehaviorFootprint(ctx, &domainStatistics.BehaviorFootprint{
 		ID:                input.EventID,
 		OrgID:             input.OrgID,
@@ -35,8 +35,8 @@ func (w projectionWriter) appendBehaviorFootprint(ctx context.Context, input Beh
 	})
 }
 
-func (w projectionWriter) reallocateEpisodeProjection(ctx context.Context, episode *domainStatistics.AssessmentEpisode, oldClinicianID, oldEntryID, newClinicianID, newEntryID uint64) error {
-	mutations := episodeProjectionMutations(episode)
+func (w journeyWriter) reallocateEpisodeJourney(ctx context.Context, episode *domainStatistics.AssessmentEpisode, oldClinicianID, oldEntryID, newClinicianID, newEntryID uint64) error {
+	mutations := episodeJourneyMutations(episode)
 	if oldClinicianID == newClinicianID && oldEntryID == newEntryID {
 		return nil
 	}
@@ -45,8 +45,8 @@ func (w projectionWriter) reallocateEpisodeProjection(ctx context.Context, episo
 			negative := mutation
 			negative.ClinicianID = oldClinicianID
 			negative.EntryID = 0
-			invertAnalyticsProjectionMutation(&negative)
-			if err := w.repo.ApplyAnalyticsClinicianProjectionMutation(ctx, negative); err != nil {
+			invertStatisticsJourneyMutation(&negative)
+			if err := w.repo.ApplyStatisticsJourneyClinicianMutation(ctx, negative); err != nil {
 				return err
 			}
 		}
@@ -54,8 +54,8 @@ func (w projectionWriter) reallocateEpisodeProjection(ctx context.Context, episo
 			negative := mutation
 			negative.ClinicianID = oldClinicianID
 			negative.EntryID = oldEntryID
-			invertAnalyticsProjectionMutation(&negative)
-			if err := w.repo.ApplyAnalyticsEntryProjectionMutation(ctx, negative); err != nil {
+			invertStatisticsJourneyMutation(&negative)
+			if err := w.repo.ApplyStatisticsJourneyEntryMutation(ctx, negative); err != nil {
 				return err
 			}
 		}
@@ -63,7 +63,7 @@ func (w projectionWriter) reallocateEpisodeProjection(ctx context.Context, episo
 			positive := mutation
 			positive.ClinicianID = newClinicianID
 			positive.EntryID = 0
-			if err := w.repo.ApplyAnalyticsClinicianProjectionMutation(ctx, positive); err != nil {
+			if err := w.repo.ApplyStatisticsJourneyClinicianMutation(ctx, positive); err != nil {
 				return err
 			}
 		}
@@ -71,7 +71,7 @@ func (w projectionWriter) reallocateEpisodeProjection(ctx context.Context, episo
 			positive := mutation
 			positive.ClinicianID = newClinicianID
 			positive.EntryID = newEntryID
-			if err := w.repo.ApplyAnalyticsEntryProjectionMutation(ctx, positive); err != nil {
+			if err := w.repo.ApplyStatisticsJourneyEntryMutation(ctx, positive); err != nil {
 				return err
 			}
 		}
@@ -79,17 +79,17 @@ func (w projectionWriter) reallocateEpisodeProjection(ctx context.Context, episo
 	return nil
 }
 
-func episodeProjectionMutations(episode *domainStatistics.AssessmentEpisode) []domainStatistics.AnalyticsProjectionMutation {
+func episodeJourneyMutations(episode *domainStatistics.AssessmentEpisode) []domainStatistics.StatisticsJourneyMutation {
 	if episode == nil {
 		return nil
 	}
-	mutations := []domainStatistics.AnalyticsProjectionMutation{{
+	mutations := []domainStatistics.StatisticsJourneyMutation{{
 		OrgID:                     episode.OrgID,
 		StatDate:                  episode.SubmittedAt,
 		AnswerSheetSubmittedCount: 1,
 	}}
 	if episode.ReportGeneratedAt != nil {
-		mutations = append(mutations, domainStatistics.AnalyticsProjectionMutation{
+		mutations = append(mutations, domainStatistics.StatisticsJourneyMutation{
 			OrgID:                  episode.OrgID,
 			StatDate:               *episode.ReportGeneratedAt,
 			AssessmentCreatedCount: 1,
@@ -98,7 +98,7 @@ func episodeProjectionMutations(episode *domainStatistics.AssessmentEpisode) []d
 		})
 	}
 	if episode.Status == domainStatistics.EpisodeStatusFailed && episode.FailedAt != nil {
-		mutations = append(mutations, domainStatistics.AnalyticsProjectionMutation{
+		mutations = append(mutations, domainStatistics.StatisticsJourneyMutation{
 			OrgID:                 episode.OrgID,
 			StatDate:              *episode.FailedAt,
 			EpisodeFailedCount:    1,
@@ -108,7 +108,7 @@ func episodeProjectionMutations(episode *domainStatistics.AssessmentEpisode) []d
 	return mutations
 }
 
-func invertAnalyticsProjectionMutation(mutation *domainStatistics.AnalyticsProjectionMutation) {
+func invertStatisticsJourneyMutation(mutation *domainStatistics.StatisticsJourneyMutation) {
 	if mutation == nil {
 		return
 	}

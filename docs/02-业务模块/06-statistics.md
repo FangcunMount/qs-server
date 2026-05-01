@@ -171,7 +171,7 @@ flowchart LR
 | ---- | -------- | -------- |
 | `StatisticsSyncRunner` | 定时触发 nightly sync，获取 leader / task lock，并在完成后触发统计 warmup | [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
 | `StatisticsSyncService.SyncDailyStatistics` | 从事实表重建 `statistics_journey_daily / statistics_content_daily` | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
-| `StatisticsSyncService.SyncAccumulatedStatistics` | 刷新 `statistics_org_snapshot` | 同上 |
+| `StatisticsSyncService.SyncOrgSnapshotStatistics` | 刷新 `statistics_org_snapshot` | 同上 |
 | `StatisticsSyncService.SyncPlanStatistics` | 从 `assessment_task` 等业务表重建 `statistics_plan_daily` | 同上 |
 | `WarmupCoordinator.HandleStatisticsSync` | 在 nightly sync 之后执行统计查询缓存预热 | [../../internal/apiserver/application/cachegovernance/coordinator.go](../../internal/apiserver/application/cachegovernance/coordinator.go) |
 
@@ -205,7 +205,7 @@ flowchart LR
 | 服务 | 当前作用 | 代码锚点 |
 | ---- | -------- | -------- |
 | `StatisticsSyncService.SyncDailyStatistics` | 从原始业务表重建 journey/content daily | [../../internal/apiserver/application/statistics/sync_service.go](../../internal/apiserver/application/statistics/sync_service.go) |
-| `StatisticsSyncService.SyncAccumulatedStatistics` | 从原始业务表刷新 org snapshot | 同上 |
+| `StatisticsSyncService.SyncOrgSnapshotStatistics` | 从原始业务表刷新 org snapshot | 同上 |
 | `StatisticsSyncService.SyncPlanStatistics` | 从业务表聚合计划统计到 `statistics_plan_daily` | 同上 |
 | `StatisticsSyncRunner` | 负责 nightly 调度、获取 Redis 锁、触发 warmup | [../../internal/apiserver/runtime/scheduler/statistics_sync.go](../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
 
@@ -214,7 +214,7 @@ flowchart LR
 - `statistics` 模块当前不再依赖 worker 写入 Redis daily 中转
 - `plan` 统计一直是独立重建，不走 Redis daily
 - `testee` 统计不依赖 MySQL accumulated，也不依赖旧 Redis 累计链路
-- 旧 `statistics_daily / statistics_accumulated / statistics_plan` 与拆散的 `analytics_*_daily` 已退出运行时代码路径，物理删表放在迁移确认后的后续阶段
+- 旧 `statistics_daily / statistics_accumulated / statistics_plan` 与拆散的 `analytics_*_daily` 已退出运行时代码路径，并由 `000028_drop_legacy_statistics_read_models` 物理删表
 - Redis 在统计模块中的职责已经收口为“查询结果缓存 + 调度锁”
 
 ---
@@ -235,7 +235,7 @@ flowchart LR
 | 路径 | 用途 |
 | ---- | ---- |
 | `/internal/v1/statistics/sync/daily` | 同步 daily |
-| `/internal/v1/statistics/sync/accumulated` | 同步 accumulated |
+| `/internal/v1/statistics/sync/org-snapshot` | 同步 org snapshot |
 | `/internal/v1/statistics/sync/plan` | 同步 plan |
 
 代码锚点：

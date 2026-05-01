@@ -11,7 +11,7 @@ import (
 
 var _ domainStatistics.BehaviorFootprintWriter = (*StatisticsRepository)(nil)
 var _ domainStatistics.AssessmentEpisodeRepository = (*StatisticsRepository)(nil)
-var _ domainStatistics.AnalyticsProjectionRepository = (*StatisticsRepository)(nil)
+var _ domainStatistics.StatisticsJourneyRepository = (*StatisticsRepository)(nil)
 
 func (r *StatisticsRepository) AppendBehaviorFootprint(ctx context.Context, footprint *domainStatistics.BehaviorFootprint) error {
 	if footprint == nil {
@@ -120,25 +120,25 @@ func (r *StatisticsRepository) ListEpisodesForAttribution(ctx context.Context, o
 	return items, nil
 }
 
-func (r *StatisticsRepository) ApplyAnalyticsProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
+func (r *StatisticsRepository) ApplyStatisticsJourneyMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	statDate := dateOnly(mutation.StatDate)
-	if err := r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectOrg, 0, statDate); err != nil {
+	if err := r.upsertStatisticsJourneyDaily(ctx, mutation, StatisticsJourneySubjectOrg, 0, statDate); err != nil {
 		return err
 	}
 	if mutation.ClinicianID != 0 {
-		if err := r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectClinician, mutation.ClinicianID, statDate); err != nil {
+		if err := r.upsertStatisticsJourneyDaily(ctx, mutation, StatisticsJourneySubjectClinician, mutation.ClinicianID, statDate); err != nil {
 			return err
 		}
 	}
 	if mutation.EntryID != 0 {
-		if err := r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectEntry, mutation.EntryID, statDate); err != nil {
+		if err := r.upsertStatisticsJourneyDaily(ctx, mutation, StatisticsJourneySubjectEntry, mutation.EntryID, statDate); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (r *StatisticsRepository) upsertStatisticsJourneyProjection(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation, subjectType string, subjectID uint64, statDate time.Time) error {
+func (r *StatisticsRepository) upsertStatisticsJourneyDaily(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation, subjectType string, subjectID uint64, statDate time.Time) error {
 	clinicianID := mutation.ClinicianID
 	entryID := mutation.EntryID
 	if subjectType == StatisticsJourneySubjectOrg {
@@ -183,18 +183,18 @@ func (r *StatisticsRepository) upsertStatisticsJourneyProjection(ctx context.Con
 	}).Error
 }
 
-func (r *StatisticsRepository) ApplyAnalyticsClinicianProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
+func (r *StatisticsRepository) ApplyStatisticsJourneyClinicianMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	if mutation.ClinicianID == 0 {
 		return nil
 	}
-	return r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectClinician, mutation.ClinicianID, dateOnly(mutation.StatDate))
+	return r.upsertStatisticsJourneyDaily(ctx, mutation, StatisticsJourneySubjectClinician, mutation.ClinicianID, dateOnly(mutation.StatDate))
 }
 
-func (r *StatisticsRepository) ApplyAnalyticsEntryProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
+func (r *StatisticsRepository) ApplyStatisticsJourneyEntryMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	if mutation.EntryID == 0 {
 		return nil
 	}
-	return r.upsertStatisticsJourneyProjection(ctx, mutation, StatisticsJourneySubjectEntry, mutation.EntryID, dateOnly(mutation.StatDate))
+	return r.upsertStatisticsJourneyDaily(ctx, mutation, StatisticsJourneySubjectEntry, mutation.EntryID, dateOnly(mutation.StatDate))
 }
 
 func dateOnly(v time.Time) time.Time {

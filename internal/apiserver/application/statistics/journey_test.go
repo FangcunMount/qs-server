@@ -8,7 +8,7 @@ import (
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
 
-func TestEpisodeProjectionMutationsCountFormedAssessmentsWhenReportIsReady(t *testing.T) {
+func TestEpisodeJourneyMutationsCountFormedAssessmentsWhenReportIsReady(t *testing.T) {
 	t.Parallel()
 
 	submittedAt := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
@@ -22,7 +22,7 @@ func TestEpisodeProjectionMutationsCountFormedAssessmentsWhenReportIsReady(t *te
 		Status:              domainStatistics.EpisodeStatusCompleted,
 	}
 
-	got := episodeProjectionMutations(episode)
+	got := episodeJourneyMutations(episode)
 	if len(got) != 2 {
 		t.Fatalf("mutation count = %d, want 2", len(got))
 	}
@@ -37,7 +37,7 @@ func TestEpisodeProjectionMutationsCountFormedAssessmentsWhenReportIsReady(t *te
 	}
 }
 
-func TestEpisodeProjectionMutationsDoNotCountRawAssessmentCreationAsFormedAssessment(t *testing.T) {
+func TestEpisodeJourneyMutationsDoNotCountRawAssessmentCreationAsFormedAssessment(t *testing.T) {
 	t.Parallel()
 
 	submittedAt := time.Date(2026, 4, 1, 9, 0, 0, 0, time.UTC)
@@ -49,7 +49,7 @@ func TestEpisodeProjectionMutationsDoNotCountRawAssessmentCreationAsFormedAssess
 		Status:              domainStatistics.EpisodeStatusActive,
 	}
 
-	got := episodeProjectionMutations(episode)
+	got := episodeJourneyMutations(episode)
 	if len(got) != 1 {
 		t.Fatalf("mutation count = %d, want only submitted mutation", len(got))
 	}
@@ -78,9 +78,9 @@ type behaviorProjectorRepoStub struct {
 
 	footprints         []*domainStatistics.BehaviorFootprint
 	savedEpisodes      []*domainStatistics.AssessmentEpisode
-	mutations          []domainStatistics.AnalyticsProjectionMutation
-	clinicianMutations []domainStatistics.AnalyticsProjectionMutation
-	entryMutations     []domainStatistics.AnalyticsProjectionMutation
+	mutations          []domainStatistics.StatisticsJourneyMutation
+	clinicianMutations []domainStatistics.StatisticsJourneyMutation
+	entryMutations     []domainStatistics.StatisticsJourneyMutation
 	pendingPayload     string
 	pendingReason      string
 	rescheduled        []string
@@ -122,19 +122,19 @@ func (r *behaviorProjectorRepoStub) FindEpisodeByAssessmentID(ctx context.Contex
 	return r.episodeByAssess, nil
 }
 
-func (r *behaviorProjectorRepoStub) ApplyAnalyticsProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
+func (r *behaviorProjectorRepoStub) ApplyStatisticsJourneyMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	r.markTx(ctx)
 	r.mutations = append(r.mutations, mutation)
 	return nil
 }
 
-func (r *behaviorProjectorRepoStub) ApplyAnalyticsClinicianProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
+func (r *behaviorProjectorRepoStub) ApplyStatisticsJourneyClinicianMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	r.markTx(ctx)
 	r.clinicianMutations = append(r.clinicianMutations, mutation)
 	return nil
 }
 
-func (r *behaviorProjectorRepoStub) ApplyAnalyticsEntryProjectionMutation(ctx context.Context, mutation domainStatistics.AnalyticsProjectionMutation) error {
+func (r *behaviorProjectorRepoStub) ApplyStatisticsJourneyEntryMutation(ctx context.Context, mutation domainStatistics.StatisticsJourneyMutation) error {
 	r.markTx(ctx)
 	r.entryMutations = append(r.entryMutations, mutation)
 	return nil
@@ -179,7 +179,7 @@ func (r *behaviorProjectorRepoStub) DeleteAnalyticsPendingEvent(ctx context.Cont
 	return nil
 }
 
-func TestBehaviorProjectorAnswerSheetSubmittedCreatesEpisodeFootprintAndProjectionInTransaction(t *testing.T) {
+func TestBehaviorProjectorAnswerSheetSubmittedCreatesEpisodeFootprintAndJourneyDailyInTransaction(t *testing.T) {
 	occurredAt := time.Date(2026, 4, 28, 9, 0, 0, 0, time.UTC)
 	repo := &behaviorProjectorRepoStub{}
 	runner := &behaviorProjectorRunnerStub{}
