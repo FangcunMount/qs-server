@@ -3,11 +3,8 @@ package handler
 import (
 	"strconv"
 
-	"context"
-
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -24,7 +21,7 @@ type ScaleHandler struct {
 	factorService    scale.ScaleFactorService
 	queryService     scale.ScaleQueryService
 	categoryService  scale.ScaleCategoryService
-	qrCodeService    qrcode.QRCodeService // 小程序码生成服务（可选）
+	qrCodeService    scale.ScaleQRCodeQueryService // 小程序码生成服务（可选）
 }
 
 // NewScaleHandler 创建量表处理器
@@ -33,7 +30,7 @@ func NewScaleHandler(
 	factorService scale.ScaleFactorService,
 	queryService scale.ScaleQueryService,
 	categoryService scale.ScaleCategoryService,
-	qrCodeService qrcode.QRCodeService, // 小程序码生成服务（可选）
+	qrCodeService scale.ScaleQRCodeQueryService, // 小程序码生成服务（可选）
 ) *ScaleHandler {
 	return &ScaleHandler{
 		lifecycleService: lifecycleService,
@@ -779,8 +776,7 @@ func (h *ScaleHandler) GetQRCode(c *gin.Context) {
 		return
 	}
 
-	ctx := context.Background()
-	qrCodeURL, err := h.qrCodeService.GenerateScaleQRCode(ctx, scaleCode)
+	qrCodeURL, err := h.qrCodeService.GetQRCode(c.Request.Context(), scaleCode)
 	if err != nil {
 		h.Error(c, err)
 		return

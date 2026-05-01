@@ -131,6 +131,27 @@ func TestListHotPublishedFallsBackWhenHotRankEmptyOrUnavailable(t *testing.T) {
 	}
 }
 
+func TestResolveAssessmentScaleContextUsesScaleRepositoryBehindApplicationPort(t *testing.T) {
+	item := mustHotScale(t, "S-A", "Q-A")
+	repo := &hotScaleRepoStub{
+		byQuestionnaire: map[string]*domainScale.MedicalScale{
+			"Q-A": item,
+		},
+	}
+	svc := NewQueryService(repo, repo, nil, nil, nil)
+
+	result, err := svc.ResolveAssessmentScaleContext(context.Background(), "Q-A")
+	if err != nil {
+		t.Fatalf("ResolveAssessmentScaleContext() error = %v", err)
+	}
+	if result == nil || result.MedicalScaleCode == nil || *result.MedicalScaleCode != "S-A" {
+		t.Fatalf("ResolveAssessmentScaleContext() = %+v, want scale code S-A", result)
+	}
+	if result.MedicalScaleID == nil || *result.MedicalScaleID == 0 {
+		t.Fatalf("MedicalScaleID = %+v, want non-zero id", result.MedicalScaleID)
+	}
+}
+
 func (r *hotScaleRepoStub) findByCode(code string) (*domainScale.MedicalScale, bool) {
 	if r.byCode == nil {
 		return nil, false
@@ -176,6 +197,7 @@ func mustHotScale(t *testing.T, code, questionnaireCode string) *domainScale.Med
 	scale, err := domainScale.NewMedicalScale(
 		meta.NewCode(code),
 		code+" title",
+		domainScale.WithID(meta.ID(901)),
 		domainScale.WithQuestionnaire(meta.NewCode(questionnaireCode), "1.0.0"),
 		domainScale.WithStatus(domainScale.StatusPublished),
 		domainScale.WithCategory(domainScale.CategoryADHD),

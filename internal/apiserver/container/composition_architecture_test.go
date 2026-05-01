@@ -96,6 +96,27 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 	}
 }
 
+func TestTransportDepsDoesNotComposeSurveyScaleRESTHandlers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "transport_deps.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, token := range []string{
+		"NewQuestionnaireHandler(",
+		"NewAnswerSheetHandler(",
+		"NewScaleHandler(",
+	} {
+		if strings.Contains(content, token) {
+			t.Fatalf("transport_deps.go calls %s; survey/scale REST handlers must be composed inside transport/rest", token)
+		}
+	}
+}
+
 func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
 	t.Parallel()
 

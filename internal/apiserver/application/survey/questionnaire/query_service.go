@@ -252,18 +252,23 @@ func (s *queryService) recordHotset(ctx context.Context, target cachetarget.Warm
 	_ = s.hotset.Record(ctx, target)
 }
 
-func (s *queryService) normalizeQuestionnaireFilter(filter surveyreadmodel.QuestionnaireFilter) (surveyreadmodel.QuestionnaireFilter, error) {
-	if filter.Status != "" {
-		parsed, ok := questionnaire.ParseStatus(filter.Status)
+func (s *queryService) normalizeQuestionnaireFilter(filter QuestionnaireListFilter) (surveyreadmodel.QuestionnaireFilter, error) {
+	normalized := surveyreadmodel.QuestionnaireFilter{
+		Status: filter.Status,
+		Title:  filter.Title,
+		Type:   filter.Type,
+	}
+	if normalized.Status != "" {
+		parsed, ok := questionnaire.ParseStatus(normalized.Status)
 		if !ok {
 			return surveyreadmodel.QuestionnaireFilter{}, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "状态无效")
 		}
-		filter.Status = parsed.String()
+		normalized.Status = parsed.String()
 	}
-	if filter.Type != "" {
-		filter.Type = questionnaire.NormalizeQuestionnaireType(filter.Type).String()
+	if normalized.Type != "" {
+		normalized.Type = questionnaire.NormalizeQuestionnaireType(normalized.Type).String()
 	}
-	return filter, nil
+	return normalized, nil
 }
 
 // validateCode 验证问卷编码

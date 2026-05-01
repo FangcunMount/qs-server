@@ -8,30 +8,25 @@ import (
 	"google.golang.org/grpc/status"
 
 	appScale "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 )
 
 // ScaleService 量表 gRPC 服务 - C端接口
 // 提供量表的查询功能：列表查询、详情查看、分类列表
 type ScaleService struct {
 	pb.UnimplementedScaleServiceServer
-	queryService              appScale.ScaleQueryService
-	categoryService           appScale.ScaleCategoryService
-	questionnaireQueryService appQuestionnaire.QuestionnaireQueryService
+	queryService    appScale.ScaleQueryService
+	categoryService appScale.ScaleCategoryService
 }
 
 // NewScaleService 创建量表 gRPC 服务
 func NewScaleService(
 	queryService appScale.ScaleQueryService,
 	categoryService appScale.ScaleCategoryService,
-	questionnaireQueryService appQuestionnaire.QuestionnaireQueryService,
 ) *ScaleService {
 	return &ScaleService{
-		queryService:              queryService,
-		categoryService:           categoryService,
-		questionnaireQueryService: questionnaireQueryService,
+		queryService:    queryService,
+		categoryService: categoryService,
 	}
 }
 
@@ -64,7 +59,7 @@ func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest
 	dto := appScale.ListScalesDTO{
 		Page:     int(req.Page),
 		PageSize: int(req.PageSize),
-		Filter: scalereadmodel.ScaleFilter{
+		Filter: appScale.ScaleListFilter{
 			Status:   req.Status,
 			Title:    req.Title,
 			Category: req.Category,

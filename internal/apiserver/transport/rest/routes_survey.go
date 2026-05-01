@@ -10,10 +10,16 @@ import (
 
 // registerQuestionnaireProtectedRoutes 注册问卷相关的受保护路由。
 func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
-	quesHandler := r.deps.Survey.QuestionnaireHandler
-	if quesHandler == nil {
+	deps := r.deps.Survey
+	if deps.QuestionnaireLifecycleService == nil || deps.QuestionnaireContentService == nil || deps.QuestionnaireQueryService == nil {
 		return
 	}
+	quesHandler := codesHandler.NewQuestionnaireHandler(
+		deps.QuestionnaireLifecycleService,
+		deps.QuestionnaireContentService,
+		deps.QuestionnaireQueryService,
+		deps.QuestionnaireQRCodeService,
+	)
 
 	questionnaires := apiV1.Group("/questionnaires")
 	{
@@ -26,10 +32,14 @@ func (r *Router) registerQuestionnaireProtectedRoutes(apiV1 *gin.RouterGroup) {
 
 // registerAnswersheetProtectedRoutes 注册答卷相关的受保护路由。
 func (r *Router) registerAnswersheetProtectedRoutes(apiV1 *gin.RouterGroup) {
-	answersheetHandler := r.deps.Survey.AnswerSheetHandler
-	if answersheetHandler == nil {
+	deps := r.deps.Survey
+	if deps.AnswerSheetManagementService == nil || deps.AnswerSheetSubmissionService == nil {
 		return
 	}
+	answersheetHandler := codesHandler.NewAnswerSheetHandler(
+		deps.AnswerSheetManagementService,
+		deps.AnswerSheetSubmissionService,
+	)
 
 	answersheets := apiV1.Group("/answersheets")
 	{

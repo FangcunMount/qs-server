@@ -1,11 +1,9 @@
 package handler
 
 import (
-	"context"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -21,7 +19,7 @@ type QuestionnaireHandler struct {
 	lifecycleService questionnaire.QuestionnaireLifecycleService
 	contentService   questionnaire.QuestionnaireContentService
 	queryService     questionnaire.QuestionnaireQueryService
-	qrCodeService    qrcode.QRCodeService // 小程序码生成服务（可选）
+	qrCodeService    questionnaire.QuestionnaireQRCodeQueryService // 小程序码生成服务（可选）
 }
 
 // NewQuestionnaireHandler 创建问卷处理器
@@ -29,7 +27,7 @@ func NewQuestionnaireHandler(
 	lifecycleService questionnaire.QuestionnaireLifecycleService,
 	contentService questionnaire.QuestionnaireContentService,
 	queryService questionnaire.QuestionnaireQueryService,
-	qrCodeService qrcode.QRCodeService, // 小程序码生成服务（可选）
+	qrCodeService questionnaire.QuestionnaireQRCodeQueryService, // 小程序码生成服务（可选）
 ) *QuestionnaireHandler {
 	return &QuestionnaireHandler{
 		lifecycleService: lifecycleService,
@@ -687,24 +685,8 @@ func (h *QuestionnaireHandler) GetQRCode(c *gin.Context) {
 		return
 	}
 
-	// 获取版本（可选）
 	version := c.Query("version")
-	if version == "" {
-		// 如果没有指定版本，查询已发布的最新版本
-		result, err := h.queryService.GetPublishedByCode(c.Request.Context(), questionnaireCode)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		if result == nil {
-			h.Error(c, errors.WithCode(code.ErrQuestionnaireNotFound, "问卷不存在或未发布"))
-			return
-		}
-		version = result.Version
-	}
-
-	ctx := context.Background()
-	qrCodeURL, err := h.qrCodeService.GenerateQuestionnaireQRCode(ctx, questionnaireCode, version)
+	qrCodeURL, err := h.qrCodeService.GetQRCode(c.Request.Context(), questionnaireCode, version)
 	if err != nil {
 		h.Error(c, err)
 		return

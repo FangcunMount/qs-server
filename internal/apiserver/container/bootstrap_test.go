@@ -299,12 +299,15 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	evaluationHandler := handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
 	planHandler := handlerpkg.NewPlanHandler(nil, nil)
 	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
+	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
+	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil, nil)
+	categoryService := scaleApp.NewCategoryService()
 
 	c.SurveyModule = &assembler.SurveyModule{
-		Questionnaire: &assembler.QuestionnaireSubModule{},
+		Questionnaire: &assembler.QuestionnaireSubModule{QueryService: questionnaireQuery},
 		AnswerSheet:   &assembler.AnswerSheetSubModule{},
 	}
-	c.ScaleModule = &assembler.ScaleModule{}
+	c.ScaleModule = &assembler.ScaleModule{QueryService: scaleQuery, CategoryService: categoryService}
 	c.ActorModule = &assembler.ActorModule{}
 	c.EvaluationModule = &assembler.EvaluationModule{Handler: evaluationHandler}
 	c.PlanModule = &assembler.PlanModule{Handler: planHandler}
@@ -314,11 +317,11 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.RateLimit != nil {
 		t.Fatalf("RateLimit = %#v, want nil passthrough before router defaulting", deps.RateLimit)
 	}
-	if deps.Survey.QuestionnaireHandler == nil || deps.Survey.AnswerSheetHandler == nil {
-		t.Fatalf("survey handlers not composed correctly: %#v", deps.Survey)
+	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
+		t.Fatalf("survey query service not extracted correctly: %#v", deps.Survey)
 	}
-	if deps.Scale.Handler == nil {
-		t.Fatalf("scale handler not composed correctly: %#v", deps.Scale)
+	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
+		t.Fatalf("scale application services not extracted correctly: %#v", deps.Scale)
 	}
 	if deps.Evaluation.Handler != evaluationHandler || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
 		t.Fatalf("evaluation/plan/statistics handlers not extracted correctly")
@@ -421,9 +424,6 @@ func TestContainerBuildGRPCDepsExposesTransportSpecificDependencies(t *testing.T
 	}
 	if deps.Survey.QuestionnaireQueryService != questionnaireQuery {
 		t.Fatalf("Survey.QuestionnaireQueryService = %#v, want %#v", deps.Survey.QuestionnaireQueryService, questionnaireQuery)
-	}
-	if deps.Scale.QuestionnaireQueryService != questionnaireQuery {
-		t.Fatalf("Scale.QuestionnaireQueryService = %#v, want %#v", deps.Scale.QuestionnaireQueryService, questionnaireQuery)
 	}
 	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
 		t.Fatalf("scale deps not extracted correctly: %#v", deps.Scale)

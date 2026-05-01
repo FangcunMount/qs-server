@@ -37,8 +37,11 @@ func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
 	t.Parallel()
 
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation": "application DTO mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":  "application DTO mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation":   "application DTO mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":    "application DTO mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":   "survey/scale application QR-code use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel": "application query DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel":  "application query DTOs",
 	}
 	for _, path := range []string{
 		filepath.Join("handler", "questionnaire.go"),

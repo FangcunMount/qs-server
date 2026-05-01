@@ -3,10 +3,11 @@ package container
 import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
@@ -25,28 +26,22 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 
 	if c.SurveyModule != nil {
 		if c.SurveyModule.Questionnaire != nil {
-			deps.Survey.QuestionnaireHandler = handler.NewQuestionnaireHandler(
-				c.SurveyModule.Questionnaire.LifecycleService,
-				c.SurveyModule.Questionnaire.ContentService,
-				c.SurveyModule.Questionnaire.QueryService,
-				c.QRCodeService,
-			)
+			deps.Survey.QuestionnaireLifecycleService = c.SurveyModule.Questionnaire.LifecycleService
+			deps.Survey.QuestionnaireContentService = c.SurveyModule.Questionnaire.ContentService
+			deps.Survey.QuestionnaireQueryService = c.SurveyModule.Questionnaire.QueryService
+			deps.Survey.QuestionnaireQRCodeService = questionnaireApp.NewQRCodeQueryService(c.SurveyModule.Questionnaire.QueryService, c.QRCodeService)
 		}
 		if c.SurveyModule.AnswerSheet != nil {
-			deps.Survey.AnswerSheetHandler = handler.NewAnswerSheetHandler(
-				c.SurveyModule.AnswerSheet.ManagementService,
-				c.SurveyModule.AnswerSheet.SubmissionService,
-			)
+			deps.Survey.AnswerSheetManagementService = c.SurveyModule.AnswerSheet.ManagementService
+			deps.Survey.AnswerSheetSubmissionService = c.SurveyModule.AnswerSheet.SubmissionService
 		}
 	}
 	if c.ScaleModule != nil {
-		deps.Scale.Handler = handler.NewScaleHandler(
-			c.ScaleModule.LifecycleService,
-			c.ScaleModule.FactorService,
-			c.ScaleModule.QueryService,
-			c.ScaleModule.CategoryService,
-			c.QRCodeService,
-		)
+		deps.Scale.LifecycleService = c.ScaleModule.LifecycleService
+		deps.Scale.FactorService = c.ScaleModule.FactorService
+		deps.Scale.QueryService = c.ScaleModule.QueryService
+		deps.Scale.CategoryService = c.ScaleModule.CategoryService
+		deps.Scale.QRCodeService = scaleApp.NewQRCodeQueryService(c.QRCodeService)
 	}
 	if c.ActorModule != nil {
 		deps.Actor.TesteeManagementService = c.ActorModule.TesteeManagementService
@@ -154,7 +149,6 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		}
 		if c.SurveyModule.Questionnaire != nil {
 			deps.Survey.QuestionnaireQueryService = c.SurveyModule.Questionnaire.QueryService
-			deps.Scale.QuestionnaireQueryService = c.SurveyModule.Questionnaire.QueryService
 		}
 	}
 	if c.ActorModule != nil {
@@ -179,7 +173,6 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.ScaleModule != nil {
 		deps.Scale.QueryService = c.ScaleModule.QueryService
 		deps.Scale.CategoryService = c.ScaleModule.CategoryService
-		deps.Scale.Repo = c.ScaleModule.Repo
 	}
 	if c.PlanModule != nil {
 		deps.Plan.CommandService = c.PlanModule.CommandService

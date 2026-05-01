@@ -251,6 +251,31 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]Fact
 	return result, nil
 }
 
+// ResolveAssessmentScaleContext 按问卷编码解析创建测评所需的量表上下文。
+func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) (*AssessmentScaleContextResult, error) {
+	if s == nil || s.repo == nil || questionnaireCode == "" {
+		return &AssessmentScaleContextResult{}, nil
+	}
+	medicalScale, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	if err != nil || medicalScale == nil {
+		if err != nil && !scale.IsNotFound(err) {
+			logger.L(ctx).Infow("问卷未关联量表，将创建纯问卷模式的测评",
+				"questionnaire_code", questionnaireCode,
+				"error", err,
+			)
+		}
+		return &AssessmentScaleContextResult{}, nil
+	}
+	scaleID := medicalScale.GetID().Uint64()
+	scaleCode := medicalScale.GetCode().Value()
+	scaleName := medicalScale.GetTitle()
+	return &AssessmentScaleContextResult{
+		MedicalScaleID:   &scaleID,
+		MedicalScaleCode: &scaleCode,
+		MedicalScaleName: &scaleName,
+	}, nil
+}
+
 func (s *queryService) recordHotset(ctx context.Context, target cachetarget.WarmupTarget) {
 	if s == nil || s.hotset == nil {
 		return
@@ -258,15 +283,20 @@ func (s *queryService) recordHotset(ctx context.Context, target cachetarget.Warm
 	_ = s.hotset.Record(ctx, target)
 }
 
-func (s *queryService) normalizeScaleFilter(filter scalereadmodel.ScaleFilter) (scalereadmodel.ScaleFilter, error) {
-	if filter.Status != "" {
-		parsed, ok := scale.ParseStatus(filter.Status)
+func (s *queryService) normalizeScaleFilter(filter ScaleListFilter) (scalereadmodel.ScaleFilter, error) {
+	normalized := scalereadmodel.ScaleFilter{
+		Status:   filter.Status,
+		Title:    filter.Title,
+		Category: filter.Category,
+	}
+	if normalized.Status != "" {
+		parsed, ok := scale.ParseStatus(normalized.Status)
 		if !ok {
 			return scalereadmodel.ScaleFilter{}, errors.WithCode(errorCode.ErrInvalidArgument, "状态无效")
 		}
-		filter.Status = parsed.Value()
+		normalized.Status = parsed.Value()
 	}
-	return filter, nil
+	return normalized, nil
 }
 
 func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]scale.HotScaleSummary, error) {

@@ -10,10 +10,17 @@ import (
 
 // registerScaleProtectedRoutes 注册量表相关的受保护路由。
 func (r *Router) registerScaleProtectedRoutes(apiV1 *gin.RouterGroup) {
-	scaleHandler := r.deps.Scale.Handler
-	if scaleHandler == nil {
+	deps := r.deps.Scale
+	if deps.LifecycleService == nil || deps.FactorService == nil || deps.QueryService == nil || deps.CategoryService == nil {
 		return
 	}
+	scaleHandler := codesHandler.NewScaleHandler(
+		deps.LifecycleService,
+		deps.FactorService,
+		deps.QueryService,
+		deps.CategoryService,
+		deps.QRCodeService,
+	)
 
 	scales := apiV1.Group("/scales")
 	{

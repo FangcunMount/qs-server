@@ -15,6 +15,9 @@ import (
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -57,12 +60,20 @@ type Deps struct {
 }
 
 type SurveyDeps struct {
-	QuestionnaireHandler *handler.QuestionnaireHandler
-	AnswerSheetHandler   *handler.AnswerSheetHandler
+	QuestionnaireLifecycleService questionnaireApp.QuestionnaireLifecycleService
+	QuestionnaireContentService   questionnaireApp.QuestionnaireContentService
+	QuestionnaireQueryService     questionnaireApp.QuestionnaireQueryService
+	QuestionnaireQRCodeService    questionnaireApp.QuestionnaireQRCodeQueryService
+	AnswerSheetManagementService  answerSheetApp.AnswerSheetManagementService
+	AnswerSheetSubmissionService  answerSheetApp.AnswerSheetSubmissionService
 }
 
 type ScaleDeps struct {
-	Handler *handler.ScaleHandler
+	LifecycleService scaleApp.ScaleLifecycleService
+	FactorService    scaleApp.ScaleFactorService
+	QueryService     scaleApp.ScaleQueryService
+	CategoryService  scaleApp.ScaleCategoryService
+	QRCodeService    scaleApp.ScaleQRCodeQueryService
 }
 
 type ActorDeps struct {

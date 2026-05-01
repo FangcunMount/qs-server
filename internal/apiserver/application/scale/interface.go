@@ -109,6 +109,14 @@ type ScaleQueryService interface {
 	// GetFactors 获取量表的因子列表
 	// 场景：查询指定量表的所有因子
 	GetFactors(ctx context.Context, scaleCode string) ([]FactorResult, error)
+
+	// ResolveAssessmentScaleContext 按问卷编码解析创建测评所需的量表上下文。
+	ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) (*AssessmentScaleContextResult, error)
+}
+
+// AssessmentScaleContextResolver 是内部集成层创建测评时消费的量表上下文端口。
+type AssessmentScaleContextResolver interface {
+	ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) (*AssessmentScaleContextResult, error)
 }
 
 // ScaleCategoryService 量表分类服务

@@ -1,7 +1,8 @@
 package questionnaire
 
-import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+const (
+	QuestionnaireTypeSurvey       = "Survey"
+	QuestionnaireTypeMedicalScale = "MedicalScale"
 )
 
 // ============= DTO 定义 =============
@@ -93,7 +94,14 @@ type ShowControllerConditionDTO struct {
 
 // ListQuestionnairesDTO 查询问卷列表 DTO
 type ListQuestionnairesDTO struct {
-	Page     int                                 // 页码
-	PageSize int                                 // 每页数量
-	Filter   surveyreadmodel.QuestionnaireFilter // 查询条件
+	Page     int                     // 页码
+	PageSize int                     // 每页数量
+	Filter   QuestionnaireListFilter // 查询条件
+}
+
+// QuestionnaireListFilter 是应用层对外暴露的问卷列表查询条件。
+type QuestionnaireListFilter struct {
+	Status string
+	Title  string
+	Type   string
 }

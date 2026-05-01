@@ -9,9 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 )
 
 // QuestionnaireService 问卷 gRPC 服务 - C端接口
@@ -39,9 +37,9 @@ func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.L
 	dto := questionnaire.ListQuestionnairesDTO{
 		Page:     int(req.Page),
 		PageSize: int(req.PageSize),
-		Filter: surveyreadmodel.QuestionnaireFilter{
+		Filter: questionnaire.QuestionnaireListFilter{
 			Title: req.Title,
-			Type:  domainQuestionnaire.TypeMedicalScale.String(),
+			Type:  questionnaire.QuestionnaireTypeMedicalScale,
 		},
 	}
 
@@ -81,7 +79,7 @@ func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.Get
 	}
 
 	// 仅允许访问医学量表
-	if result.Type != domainQuestionnaire.TypeMedicalScale.String() {
+	if result.Type != questionnaire.QuestionnaireTypeMedicalScale {
 		return nil, status.Error(codes.NotFound, "问卷不存在或未发布")
 	}
 

@@ -1,7 +1,5 @@
 package scale
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
-
 // ============= DTO 定义 =============
 // DTOs 用于应用服务层的输入参数
 
@@ -108,13 +106,27 @@ type UpdateFactorInterpretRulesDTO struct {
 
 // ListScalesDTO 查询量表列表 DTO
 type ListScalesDTO struct {
-	Page     int                        // 页码
-	PageSize int                        // 每页数量
-	Filter   scalereadmodel.ScaleFilter // 查询条件
+	Page     int             // 页码
+	PageSize int             // 每页数量
+	Filter   ScaleListFilter // 查询条件
+}
+
+// ScaleListFilter 是应用层对外暴露的量表列表查询条件。
+type ScaleListFilter struct {
+	Status   string
+	Title    string
+	Category string
 }
 
 // ListHotScalesDTO 查询热门量表列表 DTO。
 type ListHotScalesDTO struct {
 	Limit      int // 返回数量，面向首页限制在 3~5
 	WindowDays int // 热度统计窗口，默认近 30 天
+}
+
+// AssessmentScaleContextResult 是创建测评时需要的量表上下文。
+type AssessmentScaleContextResult struct {
+	MedicalScaleID   *uint64
+	MedicalScaleCode *string
+	MedicalScaleName *string
 }

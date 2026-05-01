@@ -17,11 +17,11 @@ import (
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domaintestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -36,7 +36,7 @@ type InternalService struct {
 	submissionService         assessmentApp.AssessmentSubmissionService
 	managementService         assessmentApp.AssessmentManagementService
 	engineService             engine.Service
-	scaleRepo                 scale.Repository
+	scaleContextResolver      scaleApp.AssessmentScaleContextResolver
 	testeeTaggingService      testeeApp.TesteeTaggingService
 	planTaskRepo              planDomain.AssessmentTaskRepository
 	planCommandService        planApp.PlanCommandService
@@ -68,7 +68,7 @@ func NewInternalService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
-	scaleRepo scale.Repository,
+	scaleContextResolver scaleApp.AssessmentScaleContextResolver,
 	testeeTaggingService testeeApp.TesteeTaggingService,
 	planTaskRepo planDomain.AssessmentTaskRepository,
 	planCommandService planApp.PlanCommandService,
@@ -90,7 +90,7 @@ func NewInternalService(
 		submissionService:                  submissionService,
 		managementService:                  managementService,
 		engineService:                      engineService,
-		scaleRepo:                          scaleRepo,
+		scaleContextResolver:               scaleContextResolver,
 		testeeTaggingService:               testeeTaggingService,
 		planTaskRepo:                       planTaskRepo,
 		planCommandService:                 planCommandService,
@@ -156,31 +156,28 @@ func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFrom
 
 func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) assessmentScaleContext {
 	l := logger.L(ctx)
-	if s.scaleRepo == nil || questionnaireCode == "" {
+	if s.scaleContextResolver == nil || questionnaireCode == "" {
 		return assessmentScaleContext{}
 	}
 
-	medicalScale, err := s.scaleRepo.FindByQuestionnaireCode(ctx, questionnaireCode)
-	if err != nil || medicalScale == nil {
+	result, err := s.scaleContextResolver.ResolveAssessmentScaleContext(ctx, questionnaireCode)
+	if err != nil || result == nil || result.MedicalScaleCode == nil {
 		l.Infow("问卷未关联量表，将创建纯问卷模式的测评",
 			"questionnaire_code", questionnaireCode,
 		)
 		return assessmentScaleContext{}
 	}
 
-	scaleID := medicalScale.GetID().Uint64()
-	scaleCode := medicalScale.GetCode().Value()
-	scaleName := medicalScale.GetTitle()
 	l.Infow("找到关联量表",
-		"scale_id", scaleID,
-		"scale_code", scaleCode,
-		"scale_name", scaleName,
+		"scale_id", result.MedicalScaleID,
+		"scale_code", result.MedicalScaleCode,
+		"scale_name", result.MedicalScaleName,
 	)
 
 	return assessmentScaleContext{
-		medicalScaleID:   &scaleID,
-		medicalScaleCode: &scaleCode,
-		medicalScaleName: &scaleName,
+		medicalScaleID:   result.MedicalScaleID,
+		medicalScaleCode: result.MedicalScaleCode,
+		medicalScaleName: result.MedicalScaleName,
 	}
 }
 

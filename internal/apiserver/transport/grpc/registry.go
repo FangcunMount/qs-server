@@ -20,7 +20,6 @@ import (
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	scaleDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
@@ -76,10 +75,8 @@ type EvaluationDeps struct {
 }
 
 type ScaleDeps struct {
-	QueryService              scaleApp.ScaleQueryService
-	CategoryService           scaleApp.ScaleCategoryService
-	QuestionnaireQueryService appQuestionnaire.QuestionnaireQueryService
-	Repo                      scaleDomain.Repository
+	QueryService    scaleApp.ScaleQueryService
+	CategoryService scaleApp.ScaleCategoryService
 }
 
 type PlanDeps struct {
@@ -214,7 +211,6 @@ func (r *Registry) registerScaleService() error {
 	scaleService := service.NewScaleService(
 		r.deps.Scale.QueryService,
 		r.deps.Scale.CategoryService,
-		r.deps.Scale.QuestionnaireQueryService,
 	)
 
 	r.server.RegisterService(scaleService)
@@ -227,7 +223,7 @@ func (r *Registry) registerInternalService() error {
 		log.Warn("EvaluationModule is not initialized, skipping internal service registration")
 		return nil
 	}
-	if r.deps.Scale.Repo == nil {
+	if r.deps.Scale.QueryService == nil {
 		log.Warn("ScaleModule is not initialized, skipping internal service registration")
 		return nil
 	}
@@ -256,7 +252,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
-		r.deps.Scale.Repo,
+		r.deps.Scale.QueryService,
 		r.deps.Actor.TesteeTaggingService,
 		r.deps.Plan.TaskRepo,
 		r.deps.Plan.CommandService,
