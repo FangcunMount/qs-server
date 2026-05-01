@@ -96,7 +96,7 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 		},
 	}
 	access := &stubTesteeAccessService{}
-	handler := NewEvaluationHandler(management, nil, nil, nil)
+	handler := NewEvaluationHandler(management, nil, nil, nil, assessmentapp.NewWaitService(management, nil))
 	handler.SetTesteeAccessService(access)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
@@ -150,7 +150,7 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 			RiskLevel:  &riskLevel,
 		},
 	}
-	handler := NewEvaluationHandler(management, nil, nil, nil)
+	handler := NewEvaluationHandler(management, nil, nil, nil, assessmentapp.NewWaitService(management, nil))
 	handler.SetTesteeAccessService(&stubTesteeAccessService{})
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
@@ -195,7 +195,7 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 			Status:   "submitted",
 		},
 	}
-	handler := NewEvaluationHandler(management, nil, nil, nil)
+	handler := NewEvaluationHandler(management, nil, nil, nil, assessmentapp.NewWaitService(management, nil))
 	handler.SetTesteeAccessService(&stubTesteeAccessService{})
 
 	baseCtx, cancel := context.WithCancel(context.Background())

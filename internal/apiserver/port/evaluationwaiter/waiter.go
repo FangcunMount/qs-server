@@ -15,3 +15,9 @@ type Notifier interface {
 	Notify(ctx context.Context, assessmentID uint64, summary StatusSummary)
 	GetWaiterCount(assessmentID uint64) int
 }
+
+type Registry interface {
+	Notifier
+	Add(assessmentID uint64, ch chan StatusSummary)
+	Remove(assessmentID uint64, ch chan StatusSummary)
+}

@@ -10,10 +10,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // EvaluationService 测评 gRPC 服务 - C端接口
@@ -23,7 +21,6 @@ type EvaluationService struct {
 	submissionService  assessmentApp.AssessmentSubmissionService
 	reportQueryService assessmentApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
-	assessmentRepo     assessment.Repository
 }
 
 // NewEvaluationService 创建测评 gRPC 服务
@@ -31,13 +28,11 @@ func NewEvaluationService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
-	assessmentRepo assessment.Repository,
 ) *EvaluationService {
 	return &EvaluationService{
 		submissionService:  submissionService,
 		reportQueryService: reportQueryService,
 		scoreQueryService:  scoreQueryService,
-		assessmentRepo:     assessmentRepo,
 	}
 }
 
@@ -396,17 +391,19 @@ func (s *EvaluationService) ListMyReports(ctx context.Context, req *pb.ListMyRep
 
 // validateTesteeAssessmentAccess 验证受试者是否有权访问指定测评
 func (s *EvaluationService) validateTesteeAssessmentAccess(ctx context.Context, testeeID uint64, assessmentID uint64) error {
-	// 1. 查询测评记录
-	assessmentEntity, err := s.assessmentRepo.FindByID(ctx, assessment.ID(meta.FromUint64(assessmentID)))
+	if s.submissionService == nil {
+		return status.Error(codes.FailedPrecondition, "测评服务未初始化")
+	}
+	result, err := s.submissionService.GetMyAssessment(ctx, testeeID, assessmentID)
 	if err != nil {
+		return toAssessmentQueryGRPCError(err)
+	}
+	if result == nil {
 		return status.Error(codes.NotFound, "测评不存在")
 	}
-
-	// 2. 验证测评是否属于该受试者
-	if assessmentEntity.TesteeID().Uint64() != testeeID {
+	if result.TesteeID != testeeID {
 		return status.Error(codes.PermissionDenied, "无权访问该测评")
 	}
-
 	return nil
 }
 

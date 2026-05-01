@@ -11,7 +11,6 @@ import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -26,8 +25,8 @@ type EvaluationHandler struct {
 	reportQueryService  assessmentApp.ReportQueryService
 	scoreQueryService   assessmentApp.ScoreQueryService
 	evaluationService   engine.Service
+	waitService         assessmentApp.AssessmentWaitService
 	testeeAccessService actorAccessApp.TesteeAccessService
-	waiterRegistry      *waiter.WaiterRegistry
 }
 
 type accessibleAssessmentContext struct {
@@ -42,24 +41,25 @@ func NewEvaluationHandler(
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 	evaluationService engine.Service,
+	waitServices ...assessmentApp.AssessmentWaitService,
 ) *EvaluationHandler {
+	var waitService assessmentApp.AssessmentWaitService
+	if len(waitServices) > 0 {
+		waitService = waitServices[0]
+	}
 	return &EvaluationHandler{
 		BaseHandler:        &BaseHandler{},
 		managementService:  managementService,
 		reportQueryService: reportQueryService,
 		scoreQueryService:  scoreQueryService,
 		evaluationService:  evaluationService,
+		waitService:        waitService,
 	}
 }
 
 // SetTesteeAccessService 设置 testee 访问控制服务。
 func (h *EvaluationHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
 	h.testeeAccessService = testeeAccessService
-}
-
-// SetWaiterRegistry 设置等待队列注册表（可选）
-func (h *EvaluationHandler) SetWaiterRegistry(waiterRegistry *waiter.WaiterRegistry) {
-	h.waiterRegistry = waiterRegistry
 }
 
 // ============= Assessment 查询接口（后台管理）=============
@@ -407,6 +407,10 @@ func (h *EvaluationHandler) BatchEvaluate(c *gin.Context) {
 	}
 
 	ctx := c.Request.Context()
+	if h.evaluationService == nil {
+		h.Error(c, errors.WithCode(code.ErrModuleInitializationFailed, "评估引擎服务未初始化"))
+		return
+	}
 	result, err := h.evaluationService.EvaluateBatch(ctx, orgID, req.AssessmentIDs)
 	if err != nil {
 		h.Error(c, err)
@@ -455,7 +459,7 @@ func (h *EvaluationHandler) RetryFailed(c *gin.Context) {
 // @Produce json
 // @Param id path string true "测评ID"
 // @Param timeout query int false "超时时间（秒）" default(15) minimum(5) maximum(60)
-// @Success 200 {object} core.Response{data=waiter.StatusSummary}
+// @Success 200 {object} core.Response
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/assessments/{id}/wait-report [get]
 func (h *EvaluationHandler) WaitReport(c *gin.Context) {
@@ -473,17 +477,17 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), parseWaitReportTimeout(c.DefaultQuery("timeout", "15")))
 	defer cancel()
 
-	assessmentCtx, err := h.loadAccessibleAssessment(ctx, id, orgID, operatorUserID)
+	_, err = h.loadAccessibleAssessment(ctx, id, orgID, operatorUserID)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	if summary, done := assessmentStatusSummary(assessmentCtx.assessment); done {
-		h.Success(c, summary)
+	if h.waitService == nil {
+		h.Success(c, gin.H{"status": "pending", "updated_at": time.Now().Unix()})
 		return
 	}
 
-	h.Success(c, h.waitForReportSummary(ctx, id))
+	h.Success(c, h.waitService.WaitReport(ctx, id))
 }
 
 // ============= 辅助方法 =============
@@ -525,96 +529,4 @@ func parseWaitReportTimeout(raw string) time.Duration {
 		timeoutSeconds = 15
 	}
 	return time.Duration(timeoutSeconds) * time.Second
-}
-
-func assessmentStatusSummary(result *assessmentApp.AssessmentResult) (waiter.StatusSummary, bool) {
-	if result == nil || !isTerminalAssessmentStatus(result.Status) {
-		return waiter.StatusSummary{}, false
-	}
-	return buildAssessmentStatusSummary(result), true
-}
-
-func isTerminalAssessmentStatus(status string) bool {
-	return status == "interpreted" || status == "failed"
-}
-
-func buildAssessmentStatusSummary(result *assessmentApp.AssessmentResult) waiter.StatusSummary {
-	var totalScore *float64
-	if result.TotalScore != nil {
-		value := *result.TotalScore
-		totalScore = &value
-	}
-
-	var riskLevel *string
-	if result.RiskLevel != nil {
-		value := *result.RiskLevel
-		riskLevel = &value
-	}
-
-	return waiter.StatusSummary{
-		Status:     result.Status,
-		TotalScore: totalScore,
-		RiskLevel:  riskLevel,
-		UpdatedAt:  time.Now().Unix(),
-	}
-}
-
-func pendingAssessmentStatusSummary() waiter.StatusSummary {
-	return waiter.StatusSummary{
-		Status:    "pending",
-		UpdatedAt: time.Now().Unix(),
-	}
-}
-
-func (h *EvaluationHandler) waitForReportSummary(ctx context.Context, assessmentID uint64) waiter.StatusSummary {
-	if h.waiterRegistry == nil {
-		return h.waitForReportByPolling(ctx, assessmentID)
-	}
-	return h.waitForReportWithRegistry(ctx, assessmentID)
-}
-
-func (h *EvaluationHandler) waitForReportByPolling(ctx context.Context, assessmentID uint64) waiter.StatusSummary {
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return pendingAssessmentStatusSummary()
-		case <-ticker.C:
-			if summary, done := h.loadTerminalAssessmentSummary(ctx, assessmentID); done {
-				return summary
-			}
-		}
-	}
-}
-
-func (h *EvaluationHandler) waitForReportWithRegistry(ctx context.Context, assessmentID uint64) waiter.StatusSummary {
-	ch := make(chan waiter.StatusSummary, 1)
-	h.waiterRegistry.Add(assessmentID, ch)
-	defer h.waiterRegistry.Remove(assessmentID, ch)
-
-	ticker := time.NewTicker(time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return pendingAssessmentStatusSummary()
-		case summary := <-ch:
-			return summary
-		case <-ticker.C:
-			if summary, done := h.loadTerminalAssessmentSummary(ctx, assessmentID); done {
-				return summary
-			}
-		}
-	}
-}
-
-func (h *EvaluationHandler) loadTerminalAssessmentSummary(ctx context.Context, assessmentID uint64) (waiter.StatusSummary, bool) {
-	result, err := h.managementService.GetByID(ctx, assessmentID)
-	if err != nil || result == nil {
-		return waiter.StatusSummary{}, false
-	}
-	return assessmentStatusSummary(result)
 }

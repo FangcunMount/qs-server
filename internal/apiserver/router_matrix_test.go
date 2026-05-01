@@ -13,6 +13,7 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -282,7 +283,9 @@ func newRouterTestContainer() *container.Container {
 		CategoryService:  scaleApp.NewCategoryService(),
 	}
 	evaluationModule := &assembler.EvaluationModule{
-		Handler: handlerpkg.NewEvaluationHandler(nil, nil, nil, nil),
+		ManagementService:  assessmentApp.NewManagementService(nil, nil),
+		ReportQueryService: assessmentApp.NewReportQueryService(nil),
+		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil),
 	}
 	return &container.Container{
 		SurveyModule: surveyModule,

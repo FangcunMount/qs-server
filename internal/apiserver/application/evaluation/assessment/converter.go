@@ -5,6 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -76,6 +77,45 @@ func toAssessmentResult(a *assessment.Assessment) (*AssessmentResult, error) {
 	return result, nil
 }
 
+func assessmentRowToResult(row evaluationreadmodel.AssessmentRow) (*AssessmentResult, error) {
+	orgID, err := safeconv.Int64ToUint64(row.OrgID)
+	if err != nil {
+		return nil, errors.WithCode(errorCode.ErrDatabase, "测评机构ID超出安全范围")
+	}
+	return &AssessmentResult{
+		ID:                   row.ID,
+		OrgID:                orgID,
+		TesteeID:             row.TesteeID,
+		QuestionnaireCode:    row.QuestionnaireCode,
+		QuestionnaireVersion: row.QuestionnaireVersion,
+		AnswerSheetID:        row.AnswerSheetID,
+		MedicalScaleID:       row.MedicalScaleID,
+		MedicalScaleCode:     row.MedicalScaleCode,
+		MedicalScaleName:     row.MedicalScaleName,
+		OriginType:           row.OriginType,
+		OriginID:             row.OriginID,
+		Status:               row.Status,
+		TotalScore:           row.TotalScore,
+		RiskLevel:            row.RiskLevel,
+		SubmittedAt:          row.SubmittedAt,
+		InterpretedAt:        row.InterpretedAt,
+		FailedAt:             row.FailedAt,
+		FailureReason:        row.FailureReason,
+	}, nil
+}
+
+func assessmentRowsToResults(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentResult, error) {
+	results := make([]*AssessmentResult, 0, len(rows))
+	for _, row := range rows {
+		result, err := assessmentRowToResult(row)
+		if err != nil {
+			return nil, err
+		}
+		results = append(results, result)
+	}
+	return results, nil
+}
+
 // toReportResult 将领域模型转换为 ReportResult
 func toReportResult(r *report.InterpretReport) *ReportResult {
 	if r == nil {
@@ -106,6 +146,40 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 		Dimensions:   dimensions,
 		Suggestions:  toSuggestionDTOs(r.Suggestions()),
 		CreatedAt:    r.CreatedAt(),
+	}
+}
+
+func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
+	dimensions := make([]DimensionResult, 0, len(row.Dimensions))
+	for _, d := range row.Dimensions {
+		dimensions = append(dimensions, DimensionResult{
+			FactorCode:  d.FactorCode,
+			FactorName:  d.FactorName,
+			RawScore:    d.RawScore,
+			MaxScore:    d.MaxScore,
+			RiskLevel:   d.RiskLevel,
+			Description: d.Description,
+			Suggestion:  d.Suggestion,
+		})
+	}
+	suggestions := make([]SuggestionDTO, 0, len(row.Suggestions))
+	for _, s := range row.Suggestions {
+		suggestions = append(suggestions, SuggestionDTO{
+			Category:   s.Category,
+			Content:    s.Content,
+			FactorCode: s.FactorCode,
+		})
+	}
+	return &ReportResult{
+		AssessmentID: row.AssessmentID,
+		ScaleName:    row.ScaleName,
+		ScaleCode:    row.ScaleCode,
+		TotalScore:   row.TotalScore,
+		RiskLevel:    row.RiskLevel,
+		Conclusion:   row.Conclusion,
+		Dimensions:   dimensions,
+		Suggestions:  suggestions,
+		CreatedAt:    row.CreatedAt,
 	}
 }
 
@@ -163,6 +237,63 @@ func toScoreResult(s *assessment.AssessmentScore, medicalScale *scale.MedicalSca
 		TotalScore:   s.TotalScore(),
 		RiskLevel:    string(s.RiskLevel()),
 		FactorScores: factorScores,
+	}
+}
+
+func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *scale.MedicalScale) *ScoreResult {
+	if row == nil {
+		return nil
+	}
+	factorMaxScoreMap := make(map[string]*float64)
+	if medicalScale != nil {
+		for _, f := range medicalScale.GetFactors() {
+			factorMaxScoreMap[string(f.GetCode())] = f.GetMaxScore()
+		}
+	}
+	factorScores := make([]FactorScoreResult, 0, len(row.FactorScores))
+	for _, fs := range row.FactorScores {
+		factorScores = append(factorScores, FactorScoreResult{
+			FactorCode:   fs.FactorCode,
+			FactorName:   fs.FactorName,
+			RawScore:     fs.RawScore,
+			MaxScore:     factorMaxScoreMap[fs.FactorCode],
+			RiskLevel:    fs.RiskLevel,
+			Conclusion:   fs.Conclusion,
+			Suggestion:   fs.Suggestion,
+			IsTotalScore: fs.IsTotalScore,
+		})
+	}
+	return &ScoreResult{
+		AssessmentID: row.AssessmentID,
+		TotalScore:   row.TotalScore,
+		RiskLevel:    row.RiskLevel,
+		FactorScores: factorScores,
+	}
+}
+
+func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadmodel.ScoreRow, medicalScale *scale.MedicalScale) *HighRiskFactorsResult {
+	if row == nil {
+		return &HighRiskFactorsResult{
+			AssessmentID:    assessmentID,
+			HasHighRisk:     false,
+			HighRiskFactors: nil,
+			NeedsUrgentCare: false,
+		}
+	}
+
+	scoreResult := scoreRowToResult(row, medicalScale)
+	highRiskFactors := make([]FactorScoreResult, 0)
+	for _, fs := range scoreResult.FactorScores {
+		if fs.RiskLevel == string(assessment.RiskLevelHigh) || fs.RiskLevel == string(assessment.RiskLevelSevere) {
+			highRiskFactors = append(highRiskFactors, fs)
+		}
+	}
+	needsUrgentCare := row.RiskLevel == string(assessment.RiskLevelSevere) || len(highRiskFactors) >= 3
+	return &HighRiskFactorsResult{
+		AssessmentID:    assessmentID,
+		HasHighRisk:     len(highRiskFactors) > 0,
+		HighRiskFactors: highRiskFactors,
+		NeedsUrgentCare: needsUrgentCare,
 	}
 }
 

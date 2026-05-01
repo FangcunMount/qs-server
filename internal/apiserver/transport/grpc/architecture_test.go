@@ -58,3 +58,23 @@ func TestGRPCTransportDoesNotHoldScaleDomainRepository(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluationGRPCTransportDoesNotHoldEvaluationDomainRepository(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{
+		"registry.go",
+		filepath.Join("service", "evaluation.go"),
+	} {
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
+				t.Fatalf("%s imports %s; gRPC transport must validate evaluation access through application service", path, importPath)
+			}
+		}
+	}
+}

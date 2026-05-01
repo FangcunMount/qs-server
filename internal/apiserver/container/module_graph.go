@@ -28,11 +28,5 @@ func (g moduleGraph) postWireProtectedScopeDependencies() {
 }
 
 func (g moduleGraph) postWireQRCodeService() {
-	c := g.container
-	if c == nil || c.QRCodeService == nil {
-		return
-	}
-	if c.EvaluationModule != nil {
-		c.EvaluationModule.SetQRCodeService(c.QRCodeService)
-	}
+	// QRCode dependencies are constructor dependencies for modules that need them.
 }

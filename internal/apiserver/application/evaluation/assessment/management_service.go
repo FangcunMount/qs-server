@@ -10,6 +10,7 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -28,6 +29,7 @@ type assessmentListConditions struct {
 // 行为者：管理员 (Staff/Admin)
 type managementService struct {
 	repo        assessment.Repository
+	reader      evaluationreadmodel.AssessmentReader
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 }
@@ -39,6 +41,17 @@ func NewManagementService(repo assessment.Repository, _ event.EventPublisher) As
 	}
 }
 
+func NewManagementServiceWithReadModel(
+	repo assessment.Repository,
+	reader evaluationreadmodel.AssessmentReader,
+	_ event.EventPublisher,
+) AssessmentManagementService {
+	return &managementService{
+		repo:   repo,
+		reader: reader,
+	}
+}
+
 func NewManagementServiceWithTransactionalOutbox(
 	repo assessment.Repository,
 	_ event.EventPublisher,
@@ -47,6 +60,21 @@ func NewManagementServiceWithTransactionalOutbox(
 ) AssessmentManagementService {
 	return &managementService{
 		repo:        repo,
+		txRunner:    txRunner,
+		eventStager: eventStager,
+	}
+}
+
+func NewManagementServiceWithTransactionalOutboxAndReadModel(
+	repo assessment.Repository,
+	reader evaluationreadmodel.AssessmentReader,
+	_ event.EventPublisher,
+	txRunner apptransaction.Runner,
+	eventStager EventStager,
+) AssessmentManagementService {
+	return &managementService{
+		repo:        repo,
+		reader:      reader,
 		txRunner:    txRunner,
 		eventStager: eventStager,
 	}
@@ -127,17 +155,7 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 		)
 	}
 
-	assessments, total, err := s.queryAssessments(ctx, dto, orgID, pagination, conditions)
-	if err != nil {
-		return nil, err
-	}
-
-	filteredAssessments, err := filterAssessmentsForList(dto, assessments, conditions)
-	if err != nil {
-		return nil, err
-	}
-
-	results, err := toAssessmentListResults(filteredAssessments)
+	results, total, err := s.listAssessmentResults(ctx, dto, orgID, pagination, conditions)
 	if err != nil {
 		return nil, err
 	}
@@ -205,6 +223,39 @@ func parseAssessmentListConditions(raw map[string]string) (*assessmentListCondit
 	return conditions, nil
 }
 
+func (s *managementService) listAssessmentResults(
+	ctx context.Context,
+	dto ListAssessmentsDTO,
+	orgID int64,
+	pagination assessment.Pagination,
+	conditions *assessmentListConditions,
+) ([]*AssessmentResult, int64, error) {
+	if s.reader != nil {
+		rows, total, err := s.queryAssessmentRows(ctx, dto, orgID, pagination, conditions)
+		if err != nil {
+			return nil, 0, err
+		}
+		results, err := assessmentRowsToResults(rows)
+		return results, total, err
+	}
+
+	assessments, total, err := s.queryAssessments(ctx, dto, orgID, pagination, conditions)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	filteredAssessments, err := filterAssessmentsForList(dto, assessments, conditions)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	results, err := toAssessmentListResults(filteredAssessments)
+	if err != nil {
+		return nil, 0, err
+	}
+	return results, total, nil
+}
+
 func (s *managementService) queryAssessments(
 	ctx context.Context,
 	dto ListAssessmentsDTO,
@@ -258,6 +309,53 @@ func (s *managementService) queryAssessments(
 		}
 		return assessments, total, nil
 	}
+}
+
+func (s *managementService) queryAssessmentRows(
+	ctx context.Context,
+	dto ListAssessmentsDTO,
+	orgID int64,
+	pagination assessment.Pagination,
+	conditions *assessmentListConditions,
+) ([]evaluationreadmodel.AssessmentRow, int64, error) {
+	l := logger.L(ctx)
+	if conditions.invalidStatus {
+		return []evaluationreadmodel.AssessmentRow{}, 0, nil
+	}
+
+	filter := evaluationreadmodel.AssessmentFilter{
+		OrgID:                 orgID,
+		RestrictToAccessScope: dto.RestrictToAccessScope,
+		AccessibleTesteeIDs:   dto.AccessibleTesteeIDs,
+	}
+	if conditions.testeeID != nil {
+		id := conditions.testeeID.Uint64()
+		filter.TesteeID = &id
+	}
+	if conditions.status != nil {
+		filter.Statuses = []string{conditions.status.String()}
+	}
+	if dto.OrgID == 0 && conditions.testeeID == nil {
+		l.Warnw("未提供 testee_id 和 org_id，无法查询",
+			"org_id", dto.OrgID,
+		)
+		return []evaluationreadmodel.AssessmentRow{}, 0, nil
+	}
+
+	rows, total, err := s.reader.ListAssessments(
+		ctx,
+		filter,
+		evaluationreadmodel.PageRequest{Page: pagination.Page(), PageSize: pagination.PageSize()},
+	)
+	if err != nil {
+		l.Errorw("通过 read model 查询测评列表失败",
+			"org_id", dto.OrgID,
+			"testee_id", conditions.rawTesteeID,
+			"error", err.Error(),
+		)
+		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
+	}
+	return rows, total, nil
 }
 
 func toAccessibleTesteeIDs(ids []uint64) []testee.ID {

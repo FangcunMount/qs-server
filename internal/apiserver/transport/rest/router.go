@@ -13,6 +13,8 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
@@ -95,7 +97,12 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	Handler *handler.EvaluationHandler
+	ManagementService   assessmentApp.AssessmentManagementService
+	ReportQueryService  assessmentApp.ReportQueryService
+	ScoreQueryService   assessmentApp.ScoreQueryService
+	EvaluationService   engine.Service
+	WaitService         assessmentApp.AssessmentWaitService
+	TesteeAccessService actorAccessApp.TesteeAccessService
 }
 
 type PlanDeps struct {

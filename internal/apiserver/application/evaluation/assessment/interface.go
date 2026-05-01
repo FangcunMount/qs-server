@@ -1,6 +1,10 @@
 package assessment
 
-import "context"
+import (
+	"context"
+
+	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
+)
 
 // ============= 按行为者组织的应用服务接口（Driving Ports）=============
 //
@@ -61,6 +65,10 @@ type AssessmentManagementService interface {
 	// Retry 重试失败的测评
 	// 场景：管理员对评估失败的测评进行重试
 	Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error)
+}
+
+type AssessmentWaitService interface {
+	WaitReport(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary
 }
 
 // ==================== 评估引擎服务 ====================

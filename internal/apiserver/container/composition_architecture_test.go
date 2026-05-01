@@ -15,9 +15,7 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	allowedDefinitions := map[string]string{
-		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetQRCodeService": "compat_noop",
-	}
+	allowedDefinitions := map[string]string{}
 
 	got := map[string]struct{}{}
 	scanGoFiles(t, filepath.Join(root, "internal", "apiserver", "container", "assembler"), func(path string, file *ast.File) {
@@ -80,7 +78,7 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for _, fileName := range []string{"actor.go", "survey.go", "scale.go"} {
+	for _, fileName := range []string{"actor.go", "survey.go", "scale.go", "evaluation.go"} {
 		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", fileName)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
@@ -143,6 +141,43 @@ func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
 				for _, name := range field.Names {
 					if strings.HasSuffix(name.Name, "Repo") {
 						t.Fatalf("ActorModule exposes %s; actor repositories must stay private to the actor assembler", name.Name)
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "evaluation.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, decl := range parsed.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || typeSpec.Name.Name != "EvaluationModule" {
+				continue
+			}
+			structType, ok := typeSpec.Type.(*ast.StructType)
+			if !ok {
+				continue
+			}
+			for _, field := range structType.Fields.List {
+				for _, name := range field.Names {
+					if !name.IsExported() {
+						continue
+					}
+					if name.Name == "Handler" || strings.HasSuffix(name.Name, "Repo") {
+						t.Fatalf("EvaluationModule exposes %s; evaluation repositories and REST handlers must stay private to assembler/transport composition", name.Name)
 					}
 				}
 			}

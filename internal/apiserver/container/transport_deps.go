@@ -60,7 +60,14 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Actor.OperatorRoleProjectionUpdater = c.ActorModule.OperatorRoleProjectionUpdater
 	}
 	if c.EvaluationModule != nil {
-		deps.Evaluation.Handler = c.EvaluationModule.Handler
+		deps.Evaluation.ManagementService = c.EvaluationModule.ManagementService
+		deps.Evaluation.ReportQueryService = c.EvaluationModule.ReportQueryService
+		deps.Evaluation.ScoreQueryService = c.EvaluationModule.ScoreQueryService
+		deps.Evaluation.EvaluationService = c.EvaluationModule.EvaluationService
+		deps.Evaluation.WaitService = c.EvaluationModule.WaitService
+		if c.ActorModule != nil {
+			deps.Evaluation.TesteeAccessService = c.ActorModule.TesteeAccessService
+		}
 		if c.ActorModule != nil {
 			deps.Actor.TesteeScaleAnalysisService = testeeApp.NewScaleAnalysisQueryService(
 				c.EvaluationModule.ManagementService,
@@ -168,7 +175,6 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		deps.Evaluation.ReportQueryService = c.EvaluationModule.ReportQueryService
 		deps.Evaluation.ScoreQueryService = c.EvaluationModule.ScoreQueryService
 		deps.Evaluation.EvaluationService = c.EvaluationModule.EvaluationService
-		deps.Evaluation.AssessmentRepo = c.EvaluationModule.AssessmentRepo
 	}
 	if c.ScaleModule != nil {
 		deps.Scale.QueryService = c.ScaleModule.QueryService

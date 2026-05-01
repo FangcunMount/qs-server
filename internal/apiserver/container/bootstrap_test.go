@@ -7,6 +7,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
@@ -281,7 +282,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.CodesService = &codesServiceStub{}
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
-	evaluationHandler := handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
+	evaluationManagement := assessmentApp.NewManagementService(nil, nil)
 	planHandler := handlerpkg.NewPlanHandler(nil, nil)
 	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
@@ -294,7 +295,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	}
 	c.ScaleModule = &assembler.ScaleModule{QueryService: scaleQuery, CategoryService: categoryService}
 	c.ActorModule = &assembler.ActorModule{}
-	c.EvaluationModule = &assembler.EvaluationModule{Handler: evaluationHandler}
+	c.EvaluationModule = &assembler.EvaluationModule{ManagementService: evaluationManagement}
 	c.PlanModule = &assembler.PlanModule{Handler: planHandler}
 	c.StatisticsModule = &assembler.StatisticsModule{Handler: statisticsHandler}
 
@@ -308,7 +309,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
 		t.Fatalf("scale application services not extracted correctly: %#v", deps.Scale)
 	}
-	if deps.Evaluation.Handler != evaluationHandler || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
+	if deps.Evaluation.ManagementService != evaluationManagement || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
 		t.Fatalf("evaluation/plan/statistics handlers not extracted correctly")
 	}
 	if deps.CodesService != c.CodesService {

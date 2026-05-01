@@ -1,38 +1,14 @@
-package handler
+package assessment
 
 import (
 	"testing"
-	"time"
-
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 )
-
-func TestParseWaitReportTimeout(t *testing.T) {
-	tests := []struct {
-		name string
-		raw  string
-		want time.Duration
-	}{
-		{name: "uses valid timeout", raw: "30", want: 30 * time.Second},
-		{name: "falls back on invalid timeout", raw: "bad", want: 15 * time.Second},
-		{name: "falls back on too small timeout", raw: "3", want: 15 * time.Second},
-		{name: "falls back on too large timeout", raw: "90", want: 15 * time.Second},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if got := parseWaitReportTimeout(tt.raw); got != tt.want {
-				t.Fatalf("parseWaitReportTimeout(%q) = %v, want %v", tt.raw, got, tt.want)
-			}
-		})
-	}
-}
 
 func TestAssessmentStatusSummary(t *testing.T) {
 	score := 12.5
 	riskLevel := "high"
 
-	summary, done := assessmentStatusSummary(&assessmentApp.AssessmentResult{
+	summary, done := assessmentStatusSummary(&AssessmentResult{
 		Status:     "interpreted",
 		TotalScore: &score,
 		RiskLevel:  &riskLevel,
@@ -50,7 +26,7 @@ func TestAssessmentStatusSummary(t *testing.T) {
 		t.Fatalf("risk_level = %v, want %v", summary.RiskLevel, riskLevel)
 	}
 
-	pendingSummary, pendingDone := assessmentStatusSummary(&assessmentApp.AssessmentResult{Status: "submitted"})
+	pendingSummary, pendingDone := assessmentStatusSummary(&AssessmentResult{Status: "submitted"})
 	if pendingDone {
 		t.Fatal("pending done = true, want false")
 	}
@@ -64,7 +40,7 @@ func TestBuildAssessmentStatusSummaryCopiesValues(t *testing.T) {
 
 	score := 18.5
 	riskLevel := "medium"
-	summary := buildAssessmentStatusSummary(&assessmentApp.AssessmentResult{
+	summary := buildAssessmentStatusSummary(&AssessmentResult{
 		Status:     "failed",
 		TotalScore: &score,
 		RiskLevel:  &riskLevel,

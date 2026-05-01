@@ -16,7 +16,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -33,7 +32,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -46,14 +45,15 @@ import (
 // EvaluationModule 评估模块（测评、得分、报告）
 // 整合 evaluation 子域的所有功能
 type EvaluationModule struct {
-	// ==================== Interface 层 ====================
-	Handler *handler.EvaluationHandler
 	mysqlDB *gorm.DB
 
-	// ==================== Repository 层 ====================
-	AssessmentRepo               assessment.Repository
-	ScoreRepo                    assessment.ScoreRepository
-	ReportRepo                   report.ReportRepository
+	// ==================== Repository / Read Model 层 ====================
+	assessmentRepo               assessment.Repository
+	scoreRepo                    assessment.ScoreRepository
+	reportRepo                   report.ReportRepository
+	assessmentReader             evaluationreadmodel.AssessmentReader
+	scoreReader                  evaluationreadmodel.ScoreReader
+	reportReader                 evaluationreadmodel.ReportReader
 	AssessmentOutboxRelay        appEventing.OutboxRelay
 	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
@@ -71,6 +71,9 @@ type EvaluationModule struct {
 
 	// 得分查询服务 - 服务于数据分析
 	ScoreQueryService assessmentApp.ScoreQueryService
+
+	// 等待报告服务 - 服务于 REST 长轮询
+	WaitService assessmentApp.AssessmentWaitService
 
 	// ==================== 评估引擎 ====================
 
@@ -135,17 +138,20 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlOptions)
 	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if normalized.RedisClient != nil {
-		module.AssessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
+		module.assessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
 	} else {
-		module.AssessmentRepo = baseAssessmentRepo
+		module.assessmentRepo = baseAssessmentRepo
 	}
 
-	module.ScoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
+	module.assessmentReader = mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
+	module.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
+	module.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
 	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(normalized.MongoDB, normalized.TopicResolver, mongoOptions)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
-	module.ReportRepo = reportRepo
+	module.reportRepo = reportRepo
+	module.reportReader = mongoEval.NewReportReadModel(normalized.MongoDB, mongoOptions)
 	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
 	mongoTxRunner := newMongoTransactionRunner(normalized.MongoDB)
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
@@ -196,9 +202,9 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		serviceOpts = append(serviceOpts, engine.WithScaleFactorScorer(ruleengineInfra.NewScaleFactorScorer()))
 
 		module.EvaluationService = engine.NewService(
-			module.AssessmentRepo,
-			module.ScoreRepo,
-			module.ReportRepo,
+			module.assessmentRepo,
+			module.scoreRepo,
+			module.reportRepo,
 			normalized.ScaleRepo,
 			normalized.AnswerSheetRepo,
 			normalized.QuestionnaireRepo,
@@ -211,16 +217,16 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 
 	// 建议服务
 	module.SuggestionService = reportApp.NewSuggestionService(
-		module.ReportRepo,
+		module.reportRepo,
 		suggestionGenerator,
 	)
 
 	// 报告生成服务
-	module.ReportGenerationService = reportApp.NewReportGenerationService(module.ReportRepo)
+	module.ReportGenerationService = reportApp.NewReportGenerationService(module.reportRepo)
 
 	// 报告导出服务
 	module.ReportExportService = reportApp.NewReportExportService(
-		module.ReportRepo,
+		module.reportRepo,
 		reportExporter,
 	)
 
@@ -235,16 +241,18 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 			normalized.AssessmentListPolicy,
 			normalized.Observer,
 		)
-		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutbox(
-			module.AssessmentRepo,
+		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutboxAndReadModel(
+			module.assessmentRepo,
+			module.assessmentReader,
 			assessmentCreator,
 			txRunner,
 			assessmentOutboxStore,
 			listCache,
 		)
 	} else {
-		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutbox(
-			module.AssessmentRepo,
+		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutboxAndReadModel(
+			module.assessmentRepo,
+			module.assessmentReader,
 			assessmentCreator,
 			txRunner,
 			assessmentOutboxStore,
@@ -253,34 +261,21 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	}
 
 	// 管理服务 - 服务于管理员 (Staff/Admin)
-	module.ManagementService = assessmentApp.NewManagementServiceWithTransactionalOutbox(module.AssessmentRepo, module.eventPublisher, txRunner, assessmentOutboxStore)
+	module.ManagementService = assessmentApp.NewManagementServiceWithTransactionalOutboxAndReadModel(module.assessmentRepo, module.assessmentReader, module.eventPublisher, txRunner, assessmentOutboxStore)
 
 	// 报告查询服务 - 服务于报告查询者
-	module.ReportQueryService = assessmentApp.NewReportQueryService(module.ReportRepo)
+	module.ReportQueryService = assessmentApp.NewReportQueryServiceWithReadModel(module.reportRepo, module.reportReader)
 
 	// 得分查询服务 - 服务于数据分析
-	module.ScoreQueryService = assessmentApp.NewScoreQueryService(
-		module.ScoreRepo,
-		module.AssessmentRepo,
+	module.ScoreQueryService = assessmentApp.NewScoreQueryServiceWithReadModel(
+		module.scoreRepo,
+		module.assessmentRepo,
+		module.scoreReader,
+		module.assessmentReader,
 		normalized.ScaleRepo,
 	)
 
-	// ==================== 初始化 Interface 层 ====================
-	module.Handler = handler.NewEvaluationHandler(
-		module.ManagementService,
-		module.ReportQueryService,
-		module.ScoreQueryService,
-		module.EvaluationService,
-	)
-
-	if module.testeeAccessService != nil {
-		module.Handler.SetTesteeAccessService(module.testeeAccessService)
-	}
-
-	// 注入等待队列注册表（如果可用，用于长轮询接口）
-	if waiterRegistry != nil {
-		module.Handler.SetWaiterRegistry(waiterRegistry)
-	}
+	module.WaitService = assessmentApp.NewWaitService(module.ManagementService, waiterRegistry)
 
 	return module, nil
 }
@@ -296,12 +291,6 @@ func normalizeEvaluationModuleDeps(deps EvaluationModuleDeps) (EvaluationModuleD
 		deps.EventPublisher = event.NewNopEventPublisher()
 	}
 	return deps, nil
-}
-
-// SetQRCodeService 设置二维码服务（用于跨模块依赖注入）
-// 注意：EvaluationHandler 不再需要 QRCodeService，此方法保留以保持接口一致性
-func (m *EvaluationModule) SetQRCodeService(_ qrcodeApp.QRCodeService) {
-	// EvaluationHandler 不再需要 QRCodeService，因为二维码查询已移至问卷和量表 Handler
 }
 
 // Cleanup 清理模块资源

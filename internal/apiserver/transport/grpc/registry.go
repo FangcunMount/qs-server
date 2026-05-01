@@ -17,7 +17,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
@@ -75,7 +74,6 @@ type EvaluationDeps struct {
 	ReportQueryService assessmentApp.ReportQueryService
 	ScoreQueryService  assessmentApp.ScoreQueryService
 	EvaluationService  engine.Service
-	AssessmentRepo     assessmentDomain.Repository
 }
 
 type ScaleDeps struct {
@@ -189,8 +187,7 @@ func (r *Registry) registerActorService() error {
 func (r *Registry) registerEvaluationService() error {
 	if r.deps.Evaluation.SubmissionService == nil ||
 		r.deps.Evaluation.ReportQueryService == nil ||
-		r.deps.Evaluation.ScoreQueryService == nil ||
-		r.deps.Evaluation.AssessmentRepo == nil {
+		r.deps.Evaluation.ScoreQueryService == nil {
 		log.Warn("EvaluationModule is not initialized, skipping evaluation service registration")
 		return nil
 	}
@@ -199,7 +196,6 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ReportQueryService,
 		r.deps.Evaluation.ScoreQueryService,
-		r.deps.Evaluation.AssessmentRepo,
 	)
 	r.server.RegisterService(evaluationService)
 	log.Info("   📊 Evaluation service registered")
@@ -304,8 +300,7 @@ func (r *Registry) GetRegisteredServices() []string {
 	}
 	if r.deps.Evaluation.SubmissionService != nil &&
 		r.deps.Evaluation.ReportQueryService != nil &&
-		r.deps.Evaluation.ScoreQueryService != nil &&
-		r.deps.Evaluation.AssessmentRepo != nil {
+		r.deps.Evaluation.ScoreQueryService != nil {
 		services = append(services, "EvaluationService")
 	}
 	if r.deps.Plan.CommandService != nil {

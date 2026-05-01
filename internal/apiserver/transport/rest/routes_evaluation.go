@@ -1,16 +1,26 @@
 package rest
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
 // registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由。
 func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
-	evalHandler := r.deps.Evaluation.Handler
-	if evalHandler == nil {
+	if r.deps.Evaluation.ManagementService == nil ||
+		r.deps.Evaluation.ReportQueryService == nil ||
+		r.deps.Evaluation.ScoreQueryService == nil {
 		return
 	}
+	evalHandler := handler.NewEvaluationHandler(
+		r.deps.Evaluation.ManagementService,
+		r.deps.Evaluation.ReportQueryService,
+		r.deps.Evaluation.ScoreQueryService,
+		r.deps.Evaluation.EvaluationService,
+		r.deps.Evaluation.WaitService,
+	)
+	evalHandler.SetTesteeAccessService(r.deps.Evaluation.TesteeAccessService)
 
 	evaluations := apiV1.Group("/evaluations")
 	{

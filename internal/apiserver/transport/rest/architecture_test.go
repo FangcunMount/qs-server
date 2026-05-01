@@ -60,3 +60,24 @@ func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluationRESTTransportDoesNotImportWaiterInfra(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{
+		filepath.Join("handler", "evaluation.go"),
+		"routes_evaluation.go",
+		"router.go",
+	} {
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter" {
+				t.Fatalf("%s imports %s; wait-report must go through evaluation application wait service", path, importPath)
+			}
+		}
+	}
+}

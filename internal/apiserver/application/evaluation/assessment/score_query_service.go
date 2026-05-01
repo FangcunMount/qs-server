@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -14,9 +15,11 @@ import (
 // scoreQueryService 得分查询服务实现
 // 行为者：报告查询者、数据分析系统
 type scoreQueryService struct {
-	scoreRepo      assessment.ScoreRepository
-	assessmentRepo assessment.Repository
-	scaleRepo      scale.Repository
+	scoreRepo        assessment.ScoreRepository
+	assessmentRepo   assessment.Repository
+	scoreReader      evaluationreadmodel.ScoreReader
+	assessmentReader evaluationreadmodel.AssessmentReader
+	scaleRepo        scale.Repository
 }
 
 // NewScoreQueryService 创建得分查询服务
@@ -32,8 +35,33 @@ func NewScoreQueryService(
 	}
 }
 
+func NewScoreQueryServiceWithReadModel(
+	scoreRepo assessment.ScoreRepository,
+	assessmentRepo assessment.Repository,
+	scoreReader evaluationreadmodel.ScoreReader,
+	assessmentReader evaluationreadmodel.AssessmentReader,
+	scaleRepo scale.Repository,
+) ScoreQueryService {
+	return &scoreQueryService{
+		scoreRepo:        scoreRepo,
+		assessmentRepo:   assessmentRepo,
+		scoreReader:      scoreReader,
+		assessmentReader: assessmentReader,
+		scaleRepo:        scaleRepo,
+	}
+}
+
 // GetByAssessmentID 获取测评的所有因子得分
 func (s *scoreQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ScoreResult, error) {
+	if s.scoreReader != nil {
+		scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
+		}
+		medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
+		return scoreRowToResult(scoreRow, medicalScale), nil
+	}
+
 	id := meta.FromUint64(assessmentID)
 
 	// 获取得分
@@ -84,9 +112,42 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 		limit = 50
 	}
 
+	if s.scoreReader != nil {
+		rows, err := s.scoreReader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
+			TesteeID:   dto.TesteeID,
+			FactorCode: dto.FactorCode,
+			Limit:      limit,
+		})
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询得分趋势失败")
+		}
+		dataPoints := make([]TrendDataPoint, 0, len(rows))
+		factorName := ""
+		for _, row := range rows {
+			for _, fs := range row.FactorScores {
+				if fs.FactorCode != dto.FactorCode {
+					continue
+				}
+				if factorName == "" {
+					factorName = fs.FactorName
+				}
+				dataPoints = append(dataPoints, TrendDataPoint{
+					AssessmentID: row.AssessmentID,
+					RawScore:     fs.RawScore,
+					RiskLevel:    fs.RiskLevel,
+				})
+			}
+		}
+		return &FactorTrendResult{
+			TesteeID:   dto.TesteeID,
+			FactorCode: dto.FactorCode,
+			FactorName: factorName,
+			DataPoints: dataPoints,
+		}, nil
+	}
+
 	testeeID := testee.NewID(dto.TesteeID)
 	factorCode := assessment.NewFactorCode(dto.FactorCode)
-
 	scores, err := s.scoreRepo.FindByTesteeIDAndFactorCode(ctx, testeeID, factorCode, limit)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询得分趋势失败")
@@ -121,6 +182,23 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 
 // GetHighRiskFactors 获取高风险因子
 func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID uint64) (*HighRiskFactorsResult, error) {
+	if s.scoreReader != nil {
+		scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
+		if err != nil {
+			if errors.ParseCoder(err).Code() == errorCode.ErrAssessmentScoreNotFound {
+				return &HighRiskFactorsResult{
+					AssessmentID:    assessmentID,
+					HasHighRisk:     false,
+					HighRiskFactors: nil,
+					NeedsUrgentCare: false,
+				}, nil
+			}
+			return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
+		}
+		medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
+		return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil
+	}
+
 	id := meta.FromUint64(assessmentID)
 
 	scores, err := s.scoreRepo.FindByAssessmentID(ctx, id)
@@ -155,4 +233,19 @@ func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID
 	}
 
 	return toHighRiskFactorsResult(assessmentID, scores[0], medicalScale), nil
+}
+
+func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *scale.MedicalScale {
+	if s.scaleRepo == nil || s.assessmentReader == nil {
+		return nil
+	}
+	row, err := s.assessmentReader.GetAssessment(ctx, assessmentID)
+	if err != nil || row == nil || row.MedicalScaleCode == nil {
+		return nil
+	}
+	medicalScale, err := s.scaleRepo.FindByCode(ctx, *row.MedicalScaleCode)
+	if err != nil {
+		return nil
+	}
+	return medicalScale
 }

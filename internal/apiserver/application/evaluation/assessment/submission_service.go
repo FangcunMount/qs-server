@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -26,6 +27,7 @@ type assessmentListCache interface {
 // 行为者：答题者 (Testee)
 type submissionService struct {
 	repo        assessment.Repository
+	reader      evaluationreadmodel.AssessmentReader
 	creator     assessment.AssessmentCreator
 	txRunner    apptransaction.Runner
 	eventStager EventStager
@@ -40,6 +42,19 @@ func NewSubmissionService(
 ) AssessmentSubmissionService {
 	return &submissionService{
 		repo:    repo,
+		creator: creator,
+	}
+}
+
+func NewSubmissionServiceWithReadModel(
+	repo assessment.Repository,
+	reader evaluationreadmodel.AssessmentReader,
+	creator assessment.AssessmentCreator,
+	_ event.EventPublisher,
+) AssessmentSubmissionService {
+	return &submissionService{
+		repo:    repo,
+		reader:  reader,
 		creator: creator,
 	}
 }
@@ -67,6 +82,24 @@ func NewSubmissionServiceWithTransactionalOutbox(
 ) AssessmentSubmissionService {
 	return &submissionService{
 		repo:        repo,
+		creator:     creator,
+		txRunner:    txRunner,
+		eventStager: eventStager,
+		listCache:   listCache,
+	}
+}
+
+func NewSubmissionServiceWithTransactionalOutboxAndReadModel(
+	repo assessment.Repository,
+	reader evaluationreadmodel.AssessmentReader,
+	creator assessment.AssessmentCreator,
+	txRunner apptransaction.Runner,
+	eventStager EventStager,
+	listCache assessmentListCache,
+) AssessmentSubmissionService {
+	return &submissionService{
+		repo:        repo,
+		reader:      reader,
 		creator:     creator,
 		txRunner:    txRunner,
 		eventStager: eventStager,
@@ -407,10 +440,6 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		}
 	}
 
-	// 3. 构造查询参数
-	testeeID := testee.NewID(dto.TesteeID)
-	pagination := assessment.NewPagination(page, pageSize)
-
 	l.Debugw("开始查询测评列表",
 		"testee_id", dto.TesteeID,
 		"page", page,
@@ -421,16 +450,7 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"date_from", dateFromKey,
 		"date_to", dateToKey,
 	)
-	list, total, err := s.repo.FindByTesteeIDWithFilters(
-		ctx,
-		testeeID,
-		dto.Status,
-		dto.ScaleCode,
-		dto.RiskLevel,
-		dto.DateFrom,
-		dto.DateTo,
-		pagination,
-	)
+	items, total, err := s.listMyAssessmentRows(ctx, dto, page, pageSize)
 	if err != nil {
 		l.Errorw("查询测评列表失败",
 			"testee_id", dto.TesteeID,
@@ -439,16 +459,6 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
-	}
-
-	// 5. 转换结果
-	items := make([]*AssessmentResult, len(list))
-	for i, a := range list {
-		item, convErr := toAssessmentResult(a)
-		if convErr != nil {
-			return nil, convErr
-		}
-		items[i] = item
 	}
 
 	totalInt, err := safeconv.Int64ToInt(total)
@@ -461,7 +471,7 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"result", "success",
 		"testee_id", dto.TesteeID,
 		"total_count", totalInt,
-		"page_count", len(list),
+		"page_count", len(items),
 		"duration_ms", duration.Milliseconds(),
 	)
 
@@ -489,6 +499,67 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 	}
 
 	return result, nil
+}
+
+func (s *submissionService) listMyAssessmentRows(
+	ctx context.Context,
+	dto ListMyAssessmentsDTO,
+	page int,
+	pageSize int,
+) ([]*AssessmentResult, int64, error) {
+	if s.reader != nil {
+		rows, total, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{
+			TesteeID:  &dto.TesteeID,
+			Statuses:  normalizeMyAssessmentStatuses(dto.Status),
+			ScaleCode: dto.ScaleCode,
+			RiskLevel: dto.RiskLevel,
+			DateFrom:  dto.DateFrom,
+			DateTo:    dto.DateTo,
+		}, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
+		if err != nil {
+			return nil, 0, err
+		}
+		items, err := assessmentRowsToResults(rows)
+		return items, total, err
+	}
+
+	testeeID := testee.NewID(dto.TesteeID)
+	pagination := assessment.NewPagination(page, pageSize)
+	list, total, err := s.repo.FindByTesteeIDWithFilters(
+		ctx,
+		testeeID,
+		dto.Status,
+		dto.ScaleCode,
+		dto.RiskLevel,
+		dto.DateFrom,
+		dto.DateTo,
+		pagination,
+	)
+	if err != nil {
+		return nil, 0, err
+	}
+	items := make([]*AssessmentResult, len(list))
+	for i, a := range list {
+		item, convErr := toAssessmentResult(a)
+		if convErr != nil {
+			return nil, 0, convErr
+		}
+		items[i] = item
+	}
+	return items, total, nil
+}
+
+func normalizeMyAssessmentStatuses(raw string) []string {
+	switch raw {
+	case "":
+		return nil
+	case "pending":
+		return []string{assessment.StatusPending.String(), assessment.StatusSubmitted.String()}
+	case "done":
+		return []string{assessment.StatusInterpreted.String()}
+	default:
+		return []string{raw}
+	}
 }
 
 func formatAssessmentListDateKey(value *time.Time) string {
