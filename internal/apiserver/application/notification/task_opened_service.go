@@ -12,8 +12,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
-	idpv1 "github.com/FangcunMount/iam/api/grpc/iam/idp/v1"
+	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	idpv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/idp/v2"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -51,17 +51,17 @@ type scaleLookup interface {
 
 type guardianshipLookup interface {
 	IsEnabled() bool
-	ListGuardians(ctx context.Context, childID string) (*identityv1.ListGuardiansResponse, error)
+	ListGuardians(ctx context.Context, childID string) (*identityv2.ListProfileLinksResponse, error)
 }
 
 type userLookup interface {
 	IsEnabled() bool
-	GetUser(ctx context.Context, userID string) (*identityv1.GetUserResponse, error)
+	GetUser(ctx context.Context, userID string) (*identityv2.GetUserResponse, error)
 }
 
 type wechatAppLookup interface {
 	IsEnabled() bool
-	GetWechatApp(ctx context.Context, appID string) (*idpv1.GetWechatAppResponse, error)
+	GetWechatApp(ctx context.Context, appID string) (*idpv2.GetWechatAppResponse, error)
 }
 
 type templateSpec struct {
@@ -314,12 +314,12 @@ func (s *taskOpenedService) resolveGuardianOpenIDs(ctx context.Context, childID 
 		if edge == nil {
 			continue
 		}
-		if edge.Guardian != nil {
-			recipients = append(recipients, extractMiniProgramOpenIDs(edge.Guardian)...)
+		if edge.User != nil {
+			recipients = append(recipients, extractMiniProgramOpenIDs(edge.User)...)
 			continue
 		}
-		if edge.Guardianship != nil && edge.Guardianship.UserId != "" {
-			recipients = append(recipients, s.resolveUserOpenIDs(ctx, edge.Guardianship.UserId)...)
+		if edge.ProfileLink != nil && edge.ProfileLink.UserId != "" {
+			recipients = append(recipients, s.resolveUserOpenIDs(ctx, edge.ProfileLink.UserId)...)
 		}
 	}
 	return uniqueStrings(recipients), nil
@@ -344,7 +344,7 @@ func (s *taskOpenedService) resolveUserOpenIDs(ctx context.Context, userID strin
 	return extractMiniProgramOpenIDs(resp.User)
 }
 
-func extractMiniProgramOpenIDs(user *identityv1.User) []string {
+func extractMiniProgramOpenIDs(user *identityv2.User) []string {
 	if user == nil {
 		return nil
 	}

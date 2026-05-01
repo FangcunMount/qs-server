@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
-	"github.com/FangcunMount/iam/pkg/sdk/identity"
+	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v2/pkg/sdk/identity"
 )
 
 // IdentityService 身份服务封装
@@ -45,7 +45,7 @@ func (s *IdentityService) IsEnabled() bool {
 }
 
 // GetUser 获取用户信息
-func (s *IdentityService) GetUser(ctx context.Context, userID string) (*identityv1.GetUserResponse, error) {
+func (s *IdentityService) GetUser(ctx context.Context, userID string) (*identityv2.GetUserResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
@@ -53,7 +53,7 @@ func (s *IdentityService) GetUser(ctx context.Context, userID string) (*identity
 }
 
 // BatchGetUsers 批量获取用户
-func (s *IdentityService) BatchGetUsers(ctx context.Context, userIDs []string) (*identityv1.BatchGetUsersResponse, error) {
+func (s *IdentityService) BatchGetUsers(ctx context.Context, userIDs []string) (*identityv2.BatchGetUsersResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}
@@ -61,7 +61,7 @@ func (s *IdentityService) BatchGetUsers(ctx context.Context, userIDs []string) (
 }
 
 // SearchUsers 搜索用户
-func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv1.SearchUsersRequest) (*identityv1.SearchUsersResponse, error) {
+func (s *IdentityService) SearchUsers(ctx context.Context, req *identityv2.SearchUsersRequest) (*identityv2.SearchUsersResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("identity service not enabled")
 	}

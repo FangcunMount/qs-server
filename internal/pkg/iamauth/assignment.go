@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	authzv1 "github.com/FangcunMount/iam/api/grpc/iam/authz/v1"
+	authzv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authz/v2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 )
 
@@ -26,7 +26,7 @@ func (a *AssignmentClient) Grant(ctx context.Context, domain, targetUserIDStr, r
 	if a == nil || a.client == nil {
 		return fmt.Errorf("iam assignment client not available")
 	}
-	_, err := a.client.SDK().Authz().GrantAssignment(ctx, &authzv1.GrantAssignmentRequest{
+	_, err := a.client.SDK().Authz().GrantAssignment(ctx, &authzv2.GrantAssignmentRequest{
 		Subject:   authz.SubjectKey(targetUserIDStr),
 		Domain:    domain,
 		RoleName:  roleName,
@@ -40,7 +40,7 @@ func (a *AssignmentClient) Revoke(ctx context.Context, domain, targetUserIDStr, 
 	if a == nil || a.client == nil {
 		return fmt.Errorf("iam assignment client not available")
 	}
-	_, err := a.client.SDK().Authz().RevokeAssignment(ctx, &authzv1.RevokeAssignmentRequest{
+	_, err := a.client.SDK().Authz().RevokeAssignment(ctx, &authzv2.RevokeAssignmentRequest{
 		Subject:  authz.SubjectKey(targetUserIDStr),
 		Domain:   domain,
 		RoleName: roleName,

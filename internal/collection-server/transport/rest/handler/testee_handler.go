@@ -197,8 +197,8 @@ func (h *TesteeHandler) List(c *gin.Context) {
 			// 不返回错误，允许继续查询（返回空列表）
 		} else if childrenResp != nil && len(childrenResp.Items) > 0 {
 			for _, edge := range childrenResp.Items {
-				if edge.Child != nil && edge.Child.Id != "" {
-					if childID, err := strconv.ParseUint(edge.Child.Id, 10, 64); err == nil {
+				if edge.Profile != nil && edge.Profile.Id != "" {
+					if childID, err := strconv.ParseUint(edge.Profile.Id, 10, 64); err == nil {
 						childIDs = append(childIDs, childID)
 					}
 				}

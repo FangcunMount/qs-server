@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	sdk "github.com/FangcunMount/iam/pkg/sdk"
-	sdkconfig "github.com/FangcunMount/iam/pkg/sdk/config"
+	sdk "github.com/FangcunMount/iam/v2/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam/v2/pkg/sdk/config"
 )
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）

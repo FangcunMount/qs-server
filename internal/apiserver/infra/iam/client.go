@@ -7,9 +7,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv1 "github.com/FangcunMount/iam/api/grpc/iam/authn/v1"
-	sdk "github.com/FangcunMount/iam/pkg/sdk"
-	sdkconfig "github.com/FangcunMount/iam/pkg/sdk/config"
+	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
+	sdk "github.com/FangcunMount/iam/v2/pkg/sdk"
+	sdkconfig "github.com/FangcunMount/iam/v2/pkg/sdk/config"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
@@ -202,7 +202,7 @@ func (c *Client) HealthCheck(ctx context.Context) error {
 	// 尝试使用一个空的 token 调用 VerifyToken
 	// 如果 IAM 服务可达，应该返回 token 无效的错误，而不是连接错误
 	// 这样可以验证 gRPC 连接和证书是否正常
-	_, err := c.sdk.Auth().VerifyToken(ctx, &authnv1.VerifyTokenRequest{
+	_, err := c.sdk.Auth().VerifyToken(ctx, &authnv2.VerifyTokenRequest{
 		AccessToken: "", // 空 token，预期返回无效错误
 	})
 	if err != nil {

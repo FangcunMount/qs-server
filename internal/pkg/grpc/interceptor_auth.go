@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"

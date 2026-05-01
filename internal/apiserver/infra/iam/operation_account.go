@@ -6,8 +6,8 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv1 "github.com/FangcunMount/iam/api/grpc/iam/authn/v1"
-	auth "github.com/FangcunMount/iam/pkg/sdk/auth/client"
+	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
+	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/client"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
@@ -77,7 +77,7 @@ func (s *OperationAccountService) RegisterOperationAccount(ctx context.Context, 
 	}
 	defer release()
 
-	resp, err := s.client.RegisterOperationAccount(ctx, &authnv1.RegisterOperationAccountRequest{
+	resp, err := s.client.CreateOperationAccount(ctx, &authnv2.CreateOperationAccountRequest{
 		ExistingUserId: input.ExistingUserID,
 		Name:           input.Name,
 		Phone:          input.Phone,

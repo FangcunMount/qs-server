@@ -8,7 +8,7 @@ import (
 	"sync"
 	"time"
 
-	authzv1 "github.com/FangcunMount/iam/api/grpc/iam/authz/v1"
+	authzv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authz/v2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"golang.org/x/sync/singleflight"
 )
@@ -137,7 +137,7 @@ func (l *SnapshotLoader) Load(ctx context.Context, jwtTenantID, userIDStr string
 			return snap, nil
 		}
 		sub := authz.SubjectKey(userIDStr)
-		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv1.GetAuthorizationSnapshotRequest{
+		resp, err := l.client.SDK().Authz().GetAuthorizationSnapshot(ctx, &authzv2.GetAuthorizationSnapshotRequest{
 			Subject: sub,
 			Domain:  domain,
 			AppName: l.opts.AppName,

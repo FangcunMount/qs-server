@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	idpv1 "github.com/FangcunMount/iam/api/grpc/iam/idp/v1"
-	"github.com/FangcunMount/iam/pkg/sdk/idp"
+	idpv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/idp/v2"
+	"github.com/FangcunMount/iam/v2/pkg/sdk/idp"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
@@ -52,7 +52,7 @@ func (s *WeChatAppService) IsEnabled() bool {
 
 // GetWechatApp 获取微信应用信息
 // appID: 微信应用ID（wechatappId），例如 "597792321089581614"
-func (s *WeChatAppService) GetWechatApp(ctx context.Context, appID string) (*idpv1.GetWechatAppResponse, error) {
+func (s *WeChatAppService) GetWechatApp(ctx context.Context, appID string) (*idpv2.GetWechatAppResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("wechat app service not enabled")
 	}

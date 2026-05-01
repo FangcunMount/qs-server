@@ -6,7 +6,7 @@ import (
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
+	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/actorctx"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
@@ -319,7 +319,7 @@ func (s *lifecycleService) findExistingUserByPhone(ctx context.Context, phone st
 		return 0, false, nil
 	}
 
-	searchReq := &identityv1.SearchUsersRequest{Phones: []string{phone}}
+	searchReq := &identityv2.SearchUsersRequest{Phones: []string{phone}}
 	searchResp, err := s.identitySvc.SearchUsers(ctx, searchReq)
 	if err != nil {
 		return 0, false, err

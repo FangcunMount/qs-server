@@ -7,8 +7,8 @@ import (
 	"testing"
 	"time"
 
-	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
-	idpv1 "github.com/FangcunMount/iam/api/grpc/iam/idp/v1"
+	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	idpv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/idp/v2"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -59,25 +59,25 @@ func (s *scaleLookupStub) GetByCode(context.Context, string) (*scaleApp.ScaleRes
 
 type guardianshipLookupStub struct {
 	enabled   bool
-	resp      *identityv1.ListGuardiansResponse
+	resp      *identityv2.ListProfileLinksResponse
 	err       error
 	callCount int
 }
 
 func (s *guardianshipLookupStub) IsEnabled() bool { return s.enabled }
-func (s *guardianshipLookupStub) ListGuardians(context.Context, string) (*identityv1.ListGuardiansResponse, error) {
+func (s *guardianshipLookupStub) ListGuardians(context.Context, string) (*identityv2.ListProfileLinksResponse, error) {
 	s.callCount++
 	return s.resp, s.err
 }
 
 type userLookupStub struct {
 	enabled bool
-	users   map[string]*identityv1.GetUserResponse
+	users   map[string]*identityv2.GetUserResponse
 	errs    map[string]error
 }
 
 func (s *userLookupStub) IsEnabled() bool { return s.enabled }
-func (s *userLookupStub) GetUser(_ context.Context, userID string) (*identityv1.GetUserResponse, error) {
+func (s *userLookupStub) GetUser(_ context.Context, userID string) (*identityv2.GetUserResponse, error) {
 	if err := s.errs[userID]; err != nil {
 		return nil, err
 	}
@@ -90,7 +90,7 @@ func (s *userLookupStub) GetUser(_ context.Context, userID string) (*identityv1.
 type wechatAppLookupStub struct{}
 
 func (s *wechatAppLookupStub) IsEnabled() bool { return false }
-func (s *wechatAppLookupStub) GetWechatApp(context.Context, string) (*idpv1.GetWechatAppResponse, error) {
+func (s *wechatAppLookupStub) GetWechatApp(context.Context, string) (*idpv2.GetWechatAppResponse, error) {
 	return nil, fmt.Errorf("disabled")
 }
 
@@ -138,12 +138,12 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	planAggregate, task, tasks := buildTaskOpenedFixture(t, 12, 2, 4)
 	guardians := &guardianshipLookupStub{
 		enabled: true,
-		resp: &identityv1.ListGuardiansResponse{
-			Items: []*identityv1.GuardianshipEdge{
+		resp: &identityv2.ListProfileLinksResponse{
+			Items: []*identityv2.ProfileLinkEdge{
 				{
-					Guardian: &identityv1.User{
+					User: &identityv2.User{
 						Id: "guardian-1",
-						ExternalIdentities: []*identityv1.ExternalIdentity{
+						ExternalIdentities: []*identityv2.ExternalIdentity{
 							{Provider: "wx:minip", ExternalId: "openid-guardian"},
 						},
 					},
@@ -154,7 +154,7 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	identitySvc := &userLookupStub{
 		enabled: true,
 		errs:    map[string]error{"1001": fmt.Errorf("not found")},
-		users:   map[string]*identityv1.GetUserResponse{},
+		users:   map[string]*identityv2.GetUserResponse{},
 	}
 	sender := &senderStub{
 		templates: []port.SubscribeTemplate{
@@ -224,11 +224,11 @@ func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 	guardians := &guardianshipLookupStub{enabled: true}
 	identitySvc := &userLookupStub{
 		enabled: true,
-		users: map[string]*identityv1.GetUserResponse{
+		users: map[string]*identityv2.GetUserResponse{
 			"2002": {
-				User: &identityv1.User{
+				User: &identityv2.User{
 					Id: "2002",
-					ExternalIdentities: []*identityv1.ExternalIdentity{
+					ExternalIdentities: []*identityv2.ExternalIdentity{
 						{Provider: "wx:minip", ExternalId: "openid-testee"},
 					},
 				},
@@ -314,11 +314,11 @@ func TestSendTaskOpenedFailsWhenTemplateKeysMismatch(t *testing.T) {
 		&guardianshipLookupStub{enabled: true},
 		&userLookupStub{
 			enabled: true,
-			users: map[string]*identityv1.GetUserResponse{
+			users: map[string]*identityv2.GetUserResponse{
 				"3003": {
-					User: &identityv1.User{
+					User: &identityv2.User{
 						Id: "3003",
-						ExternalIdentities: []*identityv1.ExternalIdentity{
+						ExternalIdentities: []*identityv2.ExternalIdentity{
 							{Provider: "wx:minip", ExternalId: "openid-testee"},
 						},
 					},

@@ -176,8 +176,8 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 	guardians := make([]GuardianInfo, 0, len(resp.Items))
 	skippedCount := 0
 	for i, edge := range resp.Items {
-		if edge.Guardianship == nil {
-			logger.L(ctx).Warnw("Skipping guardian item: Guardianship is nil",
+		if edge.ProfileLink == nil {
+			logger.L(ctx).Warnw("Skipping guardian item: ProfileLink is nil",
 				"action", "fetch_guardians",
 				"profile_id", profileID,
 				"item_index", i,
@@ -187,18 +187,18 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 		}
 
 		// 获取监护关系
-		relation := edge.Guardianship.GetRelation().String()
+		relation := edge.ProfileLink.GetRelation().String()
 
 		var guardianInfo GuardianInfo
 		guardianInfo.Relation = relation
 
-		// 如果 edge.Guardian 不为 nil，直接使用
-		if edge.Guardian != nil {
+		// 如果 edge.User 不为 nil，直接使用
+		if edge.User != nil {
 			// 从 Guardian 的 Contacts 中获取电话号码
 			phone := ""
-			if len(edge.Guardian.Contacts) > 0 {
+			if len(edge.User.Contacts) > 0 {
 				// 优先获取手机号
-				for _, contact := range edge.Guardian.Contacts {
+				for _, contact := range edge.User.Contacts {
 					if contact.GetType().String() == "CONTACT_TYPE_PHONE" {
 						phone = contact.GetValue()
 						break
@@ -206,24 +206,24 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 				}
 			}
 
-			guardianInfo.Name = edge.Guardian.GetNickname()
+			guardianInfo.Name = edge.User.GetNickname()
 			guardianInfo.Phone = phone
 		} else {
-			// 如果 edge.Guardian 为 nil，根据 guardianship.user_id 查询用户信息
-			if s.identitySvc != nil && s.identitySvc.IsEnabled() && edge.Guardianship.UserId != "" {
+			// 如果 edge.User 为 nil，根据 profile_link.user_id 查询用户信息
+			if s.identitySvc != nil && s.identitySvc.IsEnabled() && edge.ProfileLink.UserId != "" {
 				logger.L(ctx).Debugw("Guardian is nil, fetching user info by user_id",
 					"action", "fetch_guardians",
 					"profile_id", profileID,
 					"item_index", i,
-					"user_id", edge.Guardianship.UserId,
+					"user_id", edge.ProfileLink.UserId,
 				)
 
-				userResp, err := s.identitySvc.GetUser(ctx, edge.Guardianship.UserId)
+				userResp, err := s.identitySvc.GetUser(ctx, edge.ProfileLink.UserId)
 				if err != nil {
 					logger.L(ctx).Warnw("Failed to get user info by user_id",
 						"action", "fetch_guardians",
 						"profile_id", profileID,
-						"user_id", edge.Guardianship.UserId,
+						"user_id", edge.ProfileLink.UserId,
 						"error", err.Error(),
 					)
 					// 即使查询失败，也至少返回关系信息
@@ -249,7 +249,7 @@ func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint
 					"action", "fetch_guardians",
 					"profile_id", profileID,
 					"item_index", i,
-					"user_id", edge.Guardianship.UserId,
+					"user_id", edge.ProfileLink.UserId,
 					"identity_svc_enabled", s.identitySvc != nil && s.identitySvc.IsEnabled(),
 				)
 				// 即使无法获取用户信息，也至少返回关系信息

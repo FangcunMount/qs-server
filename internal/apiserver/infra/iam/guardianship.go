@@ -5,17 +5,18 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	identityv1 "github.com/FangcunMount/iam/api/grpc/iam/identity/v1"
-	"github.com/FangcunMount/iam/pkg/sdk/identity"
+	identityv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/identity/v2"
+	"github.com/FangcunMount/iam/v2/pkg/sdk/identity"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 // GuardianshipService 监护关系服务封装
 // 提供监护关系查询和管理功能
 type GuardianshipService struct {
-	client  *identity.GuardianshipClient
-	enabled bool
-	limiter backpressure.Acquirer
+	client         *identity.ProfileLinkClient
+	identityClient *identity.Client
+	enabled        bool
+	limiter        backpressure.Acquirer
 }
 
 // NewGuardianshipService 创建监护关系服务
@@ -29,9 +30,13 @@ func NewGuardianshipService(client *Client) (*GuardianshipService, error) {
 		return nil, fmt.Errorf("SDK client is nil")
 	}
 
-	guardianshipClient := sdkClient.Guardianship()
-	if guardianshipClient == nil {
-		return nil, fmt.Errorf("guardianship client is nil")
+	profileLinkClient := sdkClient.ProfileLink()
+	if profileLinkClient == nil {
+		return nil, fmt.Errorf("profile link client is nil")
+	}
+	identityClient := sdkClient.Identity()
+	if identityClient == nil {
+		return nil, fmt.Errorf("identity client is nil")
 	}
 
 	logger.L(context.Background()).Infow("GuardianshipService initialized",
@@ -39,9 +44,10 @@ func NewGuardianshipService(client *Client) (*GuardianshipService, error) {
 		"result", "success",
 	)
 	return &GuardianshipService{
-		client:  guardianshipClient,
-		enabled: true,
-		limiter: client.Limiter(),
+		client:         profileLinkClient,
+		identityClient: identityClient,
+		enabled:        true,
+		limiter:        client.Limiter(),
 	}, nil
 }
 
@@ -63,16 +69,16 @@ func (s *GuardianshipService) IsGuardian(ctx context.Context, userID, childID st
 	}
 	defer release()
 
-	resp, err := s.client.IsGuardian(ctx, userID, childID)
+	resp, err := s.client.HasProfileLink(ctx, userID, childID)
 	if err != nil {
 		return false, err
 	}
 
-	return resp.IsGuardian, nil
+	return resp.GetHasProfileLink(), nil
 }
 
 // IsGuardianWithDetails 检查是否是监护人（返回详细信息）
-func (s *GuardianshipService) IsGuardianWithDetails(ctx context.Context, userID, childID string) (*identityv1.IsGuardianResponse, error) {
+func (s *GuardianshipService) IsGuardianWithDetails(ctx context.Context, userID, childID string) (*identityv2.HasProfileLinkResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -81,7 +87,7 @@ func (s *GuardianshipService) IsGuardianWithDetails(ctx context.Context, userID,
 		return nil, err
 	}
 	defer release()
-	return s.client.IsGuardian(ctx, userID, childID)
+	return s.client.HasProfileLink(ctx, userID, childID)
 }
 
 // ValidateChildExists 验证儿童是否存在
@@ -97,16 +103,13 @@ func (s *GuardianshipService) ValidateChildExists(ctx context.Context, childID s
 		return nil
 	}
 
-	// 通过查询监护人列表来验证 child 是否存在
 	ctx, release, err := s.acquire(ctx)
 	if err != nil {
 		return err
 	}
 	defer release()
 
-	resp, err := s.client.ListGuardians(ctx, &identityv1.ListGuardiansRequest{
-		ChildId: childID,
-	})
+	resp, err := s.identityClient.GetProfile(ctx, childID)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to validate child existence",
 			"component", "iam.guardianship",
@@ -116,21 +119,19 @@ func (s *GuardianshipService) ValidateChildExists(ctx context.Context, childID s
 		return fmt.Errorf("failed to validate child existence in IAM: %w", err)
 	}
 
-	// 检查是否有返回结果（即使没有监护人，child 存在也应该返回空列表）
-	if resp == nil {
-		return fmt.Errorf("child %s does not exist in IAM system", childID)
+	if resp == nil || resp.GetProfile() == nil {
+		return fmt.Errorf("profile %s does not exist in IAM system", childID)
 	}
 
 	logger.L(ctx).Debugw("Child validation passed",
 		"component", "iam.guardianship",
 		"child_id", childID,
-		"guardians_count", len(resp.Items),
 	)
 	return nil
 }
 
 // ListChildren 列出用户的所有被监护儿童
-func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (*identityv1.ListChildrenResponse, error) {
+func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (*identityv2.ListProfilesResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -139,13 +140,13 @@ func (s *GuardianshipService) ListChildren(ctx context.Context, userID string) (
 		return nil, err
 	}
 	defer release()
-	return s.client.ListChildren(ctx, &identityv1.ListChildrenRequest{
+	return s.client.ListProfiles(ctx, &identityv2.ListProfilesRequest{
 		UserId: userID,
 	})
 }
 
 // ListGuardians 列出儿童的所有监护人
-func (s *GuardianshipService) ListGuardians(ctx context.Context, childID string) (*identityv1.ListGuardiansResponse, error) {
+func (s *GuardianshipService) ListGuardians(ctx context.Context, childID string) (*identityv2.ListProfileLinksResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -154,13 +155,13 @@ func (s *GuardianshipService) ListGuardians(ctx context.Context, childID string)
 		return nil, err
 	}
 	defer release()
-	return s.client.ListGuardians(ctx, &identityv1.ListGuardiansRequest{
-		ChildId: childID,
+	return s.client.ListProfileLinks(ctx, &identityv2.ListProfileLinksRequest{
+		ProfileId: childID,
 	})
 }
 
-// AddGuardian 添加监护关系
-func (s *GuardianshipService) AddGuardian(ctx context.Context, req *identityv1.AddGuardianRequest) (*identityv1.AddGuardianResponse, error) {
+// EstablishProfileLink 添加监护关系。
+func (s *GuardianshipService) EstablishProfileLink(ctx context.Context, req *identityv2.EstablishProfileLinkRequest) (*identityv2.EstablishProfileLinkResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -169,11 +170,11 @@ func (s *GuardianshipService) AddGuardian(ctx context.Context, req *identityv1.A
 		return nil, err
 	}
 	defer release()
-	return s.client.AddGuardian(ctx, req)
+	return s.client.EstablishProfileLink(ctx, req)
 }
 
-// RevokeGuardian 撤销监护关系
-func (s *GuardianshipService) RevokeGuardian(ctx context.Context, req *identityv1.RevokeGuardianRequest) (*identityv1.RevokeGuardianResponse, error) {
+// RevokeProfileLink 撤销监护关系。
+func (s *GuardianshipService) RevokeProfileLink(ctx context.Context, req *identityv2.RevokeProfileLinkRequest) (*identityv2.RevokeProfileLinkResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -182,11 +183,11 @@ func (s *GuardianshipService) RevokeGuardian(ctx context.Context, req *identityv
 		return nil, err
 	}
 	defer release()
-	return s.client.RevokeGuardian(ctx, req)
+	return s.client.RevokeProfileLink(ctx, req)
 }
 
-// BatchRevokeGuardians 批量撤销监护关系（SDK v0.0.5 新增）
-func (s *GuardianshipService) BatchRevokeGuardians(ctx context.Context, req *identityv1.BatchRevokeGuardiansRequest) (*identityv1.BatchRevokeGuardiansResponse, error) {
+// BatchRevokeProfileLinks 批量撤销监护关系。
+func (s *GuardianshipService) BatchRevokeProfileLinks(ctx context.Context, req *identityv2.BatchRevokeProfileLinksRequest) (*identityv2.BatchRevokeProfileLinksResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -195,11 +196,11 @@ func (s *GuardianshipService) BatchRevokeGuardians(ctx context.Context, req *ide
 		return nil, err
 	}
 	defer release()
-	return s.client.BatchRevokeGuardians(ctx, req)
+	return s.client.BatchRevokeProfileLinks(ctx, req)
 }
 
-// ImportGuardians 批量导入监护关系（SDK v0.0.5 新增）
-func (s *GuardianshipService) ImportGuardians(ctx context.Context, req *identityv1.ImportGuardiansRequest) (*identityv1.ImportGuardiansResponse, error) {
+// ImportProfileLinks 批量导入监护关系。
+func (s *GuardianshipService) ImportProfileLinks(ctx context.Context, req *identityv2.ImportProfileLinksRequest) (*identityv2.ImportProfileLinksResponse, error) {
 	if !s.enabled {
 		return nil, fmt.Errorf("guardianship service not enabled")
 	}
@@ -208,11 +209,11 @@ func (s *GuardianshipService) ImportGuardians(ctx context.Context, req *identity
 		return nil, err
 	}
 	defer release()
-	return s.client.ImportGuardians(ctx, req)
+	return s.client.ImportProfileLinks(ctx, req)
 }
 
 // Raw 返回原始 SDK 客户端（用于高级用法）
-func (s *GuardianshipService) Raw() *identity.GuardianshipClient {
+func (s *GuardianshipService) Raw() *identity.ProfileLinkClient {
 	return s.client
 }
 

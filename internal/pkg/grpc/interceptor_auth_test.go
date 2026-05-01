@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	authnv1 "github.com/FangcunMount/iam/api/grpc/iam/authn/v1"
-	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
+	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
+	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 )
 
@@ -28,8 +28,8 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 			},
 		},
 		Metadata: &auth.VerifyMetadata{
-			TokenType: authnv1.TokenType_TOKEN_TYPE_ACCESS,
-			Status:    authnv1.TokenStatus_TOKEN_STATUS_VALID,
+			TokenType: authnv2.TokenType_TOKEN_TYPE_ACCESS,
+			Status:    authnv2.TokenStatus_TOKEN_STATUS_VALID,
 			IssuedAt:  now,
 			ExpiresAt: now.Add(time.Hour),
 		},

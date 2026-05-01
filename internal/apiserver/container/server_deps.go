@@ -1,7 +1,7 @@
 package container
 
 import (
-	auth "github.com/FangcunMount/iam/pkg/sdk/auth/verifier"
+	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
