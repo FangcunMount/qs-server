@@ -278,13 +278,13 @@ type ReportBuilder interface {
 3. **聚合边界清晰**：三个聚合各司其职，不越界
 - 引用 `scale.MedicalScaleID`
 - 引用 `actor.TesteeID`
-- 使用 `calculation` 域进行计分
-- 使用 `interpretation` 域进行解读
+- 使用规则引擎端口进行计分
+- 使用解读引擎端口进行解读
 
 ## 设计原则
 
 1. **单一职责**：计算、解读、测评管理各自独立
-2. **无状态设计**：calculation 和 interpretation 为无状态功能域
+2. **规则/执行分离**：calculation 和 interpretation 只保留规则语言，执行器位于 infra adapter
 3. **聚合边界清晰**：三个聚合各司其职，不越界
 4. **单向依赖**：依赖其他子域，不被其他子域依赖
 5. **事件驱动**：通过领域事件实现异步解耦
@@ -296,7 +296,7 @@ type ReportBuilder interface {
 ### 新增计分策略
 
 ```go
-// 1. 创建新策略文件 my_strategy.go
+// 1. 在 infra/ruleengine 创建新策略文件 my_strategy.go
 type MyStrategy struct{}
 
 func (s *MyStrategy) Calculate(values []float64, params map[string]string) (float64, error) {
@@ -307,18 +307,15 @@ func (s *MyStrategy) StrategyType() StrategyType {
     return StrategyTypeMyStrategy
 }
 
-// 2. 在 types.go 中添加策略类型常量
+// 2. 在规则语言中添加策略类型常量
 const StrategyTypeMyStrategy StrategyType = "my_strategy"
 
-// 3. 在 strategy.go 的 init() 中注册
-func init() {
-    RegisterStrategy(&MyStrategy{})
-}
+// 3. 由 infra/ruleengine adapter 在构造执行器时注册
 ```
 
 ### 新增解读策略
 
-同理，实现 `InterpretStrategy` 接口并注册。
+同理，在 `infra/interpretengine` 实现策略，并通过 `port/interpretengine` 暴露给 application。
 
 ### 新增业务来源
 

@@ -6,7 +6,6 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -123,74 +122,6 @@ func (r *ReportRepository) FindByID(ctx context.Context, id report.ID) (*report.
 	}
 
 	return r.mapper.ToDomain(&po), nil
-}
-
-// FindByAssessmentID 根据测评ID查找报告
-func (r *ReportRepository) FindByAssessmentID(ctx context.Context, assessmentID report.AssessmentID) (*report.InterpretReport, error) {
-	// 由于 Report.ID == Assessment.ID，直接使用 FindByID
-	return r.FindByID(ctx, report.ID(assessmentID))
-}
-
-// FindByTesteeID 查询受试者的报告列表
-func (r *ReportRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination report.Pagination) ([]*report.InterpretReport, int64, error) {
-	filter := bson.M{
-		"testee_id":  testeeID.Uint64(),
-		"deleted_at": nil,
-	}
-	return r.findByFilter(ctx, filter, pagination)
-}
-
-// FindByTesteeIDs 查询受试者集合范围内的报告列表。
-func (r *ReportRepository) FindByTesteeIDs(ctx context.Context, testeeIDs []testee.ID, pagination report.Pagination) ([]*report.InterpretReport, int64, error) {
-	if len(testeeIDs) == 0 {
-		return []*report.InterpretReport{}, 0, nil
-	}
-
-	rawIDs := make([]uint64, 0, len(testeeIDs))
-	for _, id := range testeeIDs {
-		rawIDs = append(rawIDs, id.Uint64())
-	}
-
-	filter := bson.M{
-		"testee_id":  bson.M{"$in": rawIDs},
-		"deleted_at": nil,
-	}
-	return r.findByFilter(ctx, filter, pagination)
-}
-
-func (r *ReportRepository) findByFilter(ctx context.Context, filter bson.M, pagination report.Pagination) ([]*report.InterpretReport, int64, error) {
-	total, err := r.CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, 0, fmt.Errorf("统计报告数量失败: %w", err)
-	}
-
-	findOptions := options.Find()
-	findOptions.SetSkip(int64(pagination.Offset()))
-	findOptions.SetLimit(int64(pagination.Limit()))
-	findOptions.SetSort(bson.M{"created_at": -1})
-
-	cursor, err := r.Find(ctx, filter, findOptions)
-	if err != nil {
-		return nil, 0, fmt.Errorf("查询报告列表失败: %w", err)
-	}
-	defer func() {
-		_ = cursor.Close(ctx)
-	}()
-
-	var pos []*InterpretReportPO
-	for cursor.Next(ctx) {
-		var po InterpretReportPO
-		if err := cursor.Decode(&po); err != nil {
-			return nil, 0, fmt.Errorf("解析报告数据失败: %w", err)
-		}
-		pos = append(pos, &po)
-	}
-
-	if err := cursor.Err(); err != nil {
-		return nil, 0, fmt.Errorf("遍历报告数据失败: %w", err)
-	}
-
-	return r.mapper.ToDomainList(pos), total, nil
 }
 
 // Update 更新报告

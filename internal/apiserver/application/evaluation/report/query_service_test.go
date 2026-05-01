@@ -5,69 +5,48 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-type queryReportRepoStub struct {
-	items []*domainReport.InterpretReport
-	total int64
+type queryReportReaderStub struct {
+	rows   []evaluationreadmodel.ReportRow
+	total  int64
+	filter evaluationreadmodel.ReportFilter
+	page   evaluationreadmodel.PageRequest
 }
 
-func (r *queryReportRepoStub) Save(context.Context, *domainReport.InterpretReport) error { return nil }
-
-func (r *queryReportRepoStub) SaveWithTesteeAndEvents(context.Context, *domainReport.InterpretReport, testee.ID, []event.DomainEvent) error {
-	return nil
-}
-
-func (r *queryReportRepoStub) FindByID(context.Context, domainReport.ID) (*domainReport.InterpretReport, error) {
+func (r *queryReportReaderStub) GetReportByID(context.Context, uint64) (*evaluationreadmodel.ReportRow, error) {
 	return nil, nil
 }
 
-func (r *queryReportRepoStub) FindByAssessmentID(context.Context, domainReport.AssessmentID) (*domainReport.InterpretReport, error) {
+func (r *queryReportReaderStub) GetReportByAssessmentID(context.Context, uint64) (*evaluationreadmodel.ReportRow, error) {
 	return nil, nil
 }
 
-func (r *queryReportRepoStub) FindByTesteeID(context.Context, testee.ID, domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return r.items, r.total, nil
-}
-
-func (r *queryReportRepoStub) FindByTesteeIDs(context.Context, []testee.ID, domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
-}
-
-func (r *queryReportRepoStub) Update(context.Context, *domainReport.InterpretReport) error {
-	return nil
-}
-
-func (r *queryReportRepoStub) Delete(context.Context, domainReport.ID) error { return nil }
-
-func (r *queryReportRepoStub) ExistsByID(context.Context, domainReport.ID) (bool, error) {
-	return false, nil
+func (r *queryReportReaderStub) ListReports(_ context.Context, filter evaluationreadmodel.ReportFilter, page evaluationreadmodel.PageRequest) ([]evaluationreadmodel.ReportRow, int64, error) {
+	r.filter = filter
+	r.page = page
+	return r.rows, r.total, nil
 }
 
 func TestReportQueryServiceListByTesteeIDBuildsPaginationResult(t *testing.T) {
 	createdAt := time.Date(2026, time.April, 22, 10, 30, 0, 0, time.Local)
-	repo := &queryReportRepoStub{
-		items: []*domainReport.InterpretReport{
-			domainReport.ReconstructInterpretReport(
-				domainReport.NewID(1001),
-				"Scale",
-				"scale-code",
-				88,
-				domainReport.RiskLevelHigh,
-				"high risk",
-				nil,
-				nil,
-				createdAt,
-				nil,
-			),
+	reader := &queryReportReaderStub{
+		rows: []evaluationreadmodel.ReportRow{
+			{
+				AssessmentID: 1001,
+				ScaleName:    "Scale",
+				ScaleCode:    "scale-code",
+				TotalScore:   88,
+				RiskLevel:    "high",
+				Conclusion:   "high risk",
+				CreatedAt:    createdAt,
+			},
 		},
 		total: 1,
 	}
 
-	svc := NewReportQueryService(repo)
+	svc := NewReportQueryServiceWithReadModel(nil, reader)
 	result, err := svc.ListByTesteeID(context.Background(), ListReportsDTO{
 		TesteeID: 2001,
 		Page:     1,
@@ -81,5 +60,11 @@ func TestReportQueryServiceListByTesteeIDBuildsPaginationResult(t *testing.T) {
 	}
 	if len(result.Items) != 1 || result.Items[0].ScaleCode != "scale-code" {
 		t.Fatalf("unexpected items: %+v", result.Items)
+	}
+	if reader.filter.TesteeID == nil || *reader.filter.TesteeID != 2001 {
+		t.Fatalf("reader did not receive testee filter: %+v", reader.filter)
+	}
+	if reader.page.Page != 1 || reader.page.PageSize != 10 {
+		t.Fatalf("reader did not receive pagination: %+v", reader.page)
 	}
 }

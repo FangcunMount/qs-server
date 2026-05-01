@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -30,6 +31,27 @@ type managementRepoStub struct {
 	findByScopeTesteeIDs   []testee.ID
 	findByScopeStatus      *domain.Status
 	saveCtxHadTxMarker     bool
+}
+
+type managementAssessmentReaderStub struct {
+	rows   []evaluationreadmodel.AssessmentRow
+	total  int64
+	filter evaluationreadmodel.AssessmentFilter
+	page   evaluationreadmodel.PageRequest
+}
+
+func (r *managementAssessmentReaderStub) GetAssessment(context.Context, uint64) (*evaluationreadmodel.AssessmentRow, error) {
+	return nil, fmt.Errorf("assessment not found")
+}
+
+func (r *managementAssessmentReaderStub) GetAssessmentByAnswerSheetID(context.Context, uint64) (*evaluationreadmodel.AssessmentRow, error) {
+	return nil, fmt.Errorf("assessment not found")
+}
+
+func (r *managementAssessmentReaderStub) ListAssessments(_ context.Context, filter evaluationreadmodel.AssessmentFilter, page evaluationreadmodel.PageRequest) ([]evaluationreadmodel.AssessmentRow, int64, error) {
+	r.filter = filter
+	r.page = page
+	return r.rows, r.total, nil
 }
 
 type txCtxMarker struct{}
@@ -273,15 +295,13 @@ func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *test
 
 func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.T) {
 	submitted := domain.StatusSubmitted
-	repo := &managementRepoStub{
-		findByTesteeIDAssessments: []*domain.Assessment{
-			managementAssessmentForList(9001, 9, 3001, domain.StatusSubmitted),
-			managementAssessmentForList(9002, 10, 3001, domain.StatusSubmitted),
-			managementAssessmentForList(9003, 9, 3001, domain.StatusFailed),
+	reader := &managementAssessmentReaderStub{
+		rows: []evaluationreadmodel.AssessmentRow{
+			managementAssessmentRowForList(9001, 9, 3001, domain.StatusSubmitted),
 		},
-		findByTesteeIDTotal: 3,
+		total: 3,
 	}
-	svc := NewManagementService(repo, nil)
+	svc := NewManagementServiceWithReadModel(&managementRepoStub{}, reader, nil)
 
 	result, err := svc.List(context.Background(), ListAssessmentsDTO{
 		OrgID:    9,
@@ -305,19 +325,25 @@ func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.
 		t.Fatalf("expected normalized pagination 1/10, got %d/%d", result.Page, result.PageSize)
 	}
 	if result.Total != 3 {
-		t.Fatalf("expected total to keep repository count 3, got %d", result.Total)
+		t.Fatalf("expected total to keep read model count 3, got %d", result.Total)
+	}
+	if reader.filter.TesteeID == nil || *reader.filter.TesteeID != 3001 {
+		t.Fatalf("expected read model testee filter 3001, got %+v", reader.filter)
+	}
+	if len(reader.filter.Statuses) != 1 || reader.filter.Statuses[0] != submitted.String() {
+		t.Fatalf("expected submitted status filter, got %+v", reader.filter.Statuses)
 	}
 }
 
 func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
 	submitted := domain.StatusSubmitted
-	repo := &managementRepoStub{
-		findByScopeAssessments: []*domain.Assessment{
-			managementAssessmentForList(9001, 9, 3001, submitted),
+	reader := &managementAssessmentReaderStub{
+		rows: []evaluationreadmodel.AssessmentRow{
+			managementAssessmentRowForList(9001, 9, 3001, submitted),
 		},
-		findByScopeTotal: 1,
+		total: 1,
 	}
-	svc := NewManagementService(repo, nil)
+	svc := NewManagementServiceWithReadModel(&managementRepoStub{}, reader, nil)
 
 	_, err := svc.List(context.Background(), ListAssessmentsDTO{
 		OrgID:                 9,
@@ -332,14 +358,27 @@ func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
-	if repo.findByScopeOrgID != 9 {
-		t.Fatalf("expected scope org id 9, got %d", repo.findByScopeOrgID)
+	if reader.filter.OrgID != 9 {
+		t.Fatalf("expected scope org id 9, got %d", reader.filter.OrgID)
 	}
-	if len(repo.findByScopeTesteeIDs) != 2 {
-		t.Fatalf("expected 2 scoped testee IDs, got %d", len(repo.findByScopeTesteeIDs))
+	if len(reader.filter.AccessibleTesteeIDs) != 2 {
+		t.Fatalf("expected 2 scoped testee IDs, got %d", len(reader.filter.AccessibleTesteeIDs))
 	}
-	if repo.findByScopeStatus == nil || *repo.findByScopeStatus != submitted {
-		t.Fatalf("expected submitted status filter, got %#v", repo.findByScopeStatus)
+	if len(reader.filter.Statuses) != 1 || reader.filter.Statuses[0] != submitted.String() {
+		t.Fatalf("expected submitted status filter, got %#v", reader.filter.Statuses)
+	}
+}
+
+func managementAssessmentRowForList(id uint64, orgID int64, testeeID uint64, status domain.Status) evaluationreadmodel.AssessmentRow {
+	return evaluationreadmodel.AssessmentRow{
+		ID:                   id,
+		OrgID:                orgID,
+		TesteeID:             testeeID,
+		QuestionnaireCode:    "q-code",
+		QuestionnaireVersion: "v1",
+		AnswerSheetID:        id + 1000,
+		OriginType:           string(domain.OriginAdhoc),
+		Status:               status.String(),
 	}
 }
 

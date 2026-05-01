@@ -25,6 +25,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	interpretengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretengine"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
@@ -200,6 +201,10 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore))
 		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(module.reportDurableSaver))
 		serviceOpts = append(serviceOpts, engine.WithScaleFactorScorer(ruleengineInfra.NewScaleFactorScorer()))
+		serviceOpts = append(serviceOpts, engine.WithInterpretEngine(
+			interpretengineInfra.NewInterpreter(),
+			interpretengineInfra.NewDefaultProvider(),
+		))
 
 		module.EvaluationService = engine.NewService(
 			module.assessmentRepo,

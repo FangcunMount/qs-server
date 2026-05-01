@@ -9,6 +9,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -16,24 +17,39 @@ import (
 // 行为者：管理员、数据分析系统
 // 职责：提供受试者的测评数据统计和分析能力
 type statisticsService struct {
-	testeeRepo     domain.Repository
-	assessmentRepo assessment.Repository
-	scoreRepo      assessment.ScoreRepository
-	reportRepo     report.ReportRepository
+	testeeRepo       domain.Repository
+	assessmentReader evaluationreadmodel.AssessmentReader
+	scoreReader      evaluationreadmodel.ScoreReader
+	reportReader     evaluationreadmodel.ReportReader
 }
 
-// NewStatisticsService 创建受试者统计服务
+// NewStatisticsService 创建受试者统计服务。
+//
+// Deprecated: evaluation command repositories no longer expose read-model
+// methods. Use NewStatisticsServiceWithReadModels when this legacy service is
+// still needed.
 func NewStatisticsService(
 	testeeRepo domain.Repository,
-	assessmentRepo assessment.Repository,
-	scoreRepo assessment.ScoreRepository,
-	reportRepo report.ReportRepository,
+	_ assessment.Repository,
+	_ assessment.ScoreRepository,
+	_ report.ReportRepository,
 ) TesteeStatisticsService {
 	return &statisticsService{
-		testeeRepo:     testeeRepo,
-		assessmentRepo: assessmentRepo,
-		scoreRepo:      scoreRepo,
-		reportRepo:     reportRepo,
+		testeeRepo: testeeRepo,
+	}
+}
+
+func NewStatisticsServiceWithReadModels(
+	testeeRepo domain.Repository,
+	assessmentReader evaluationreadmodel.AssessmentReader,
+	scoreReader evaluationreadmodel.ScoreReader,
+	reportReader evaluationreadmodel.ReportReader,
+) TesteeStatisticsService {
+	return &statisticsService{
+		testeeRepo:       testeeRepo,
+		assessmentReader: assessmentReader,
+		scoreReader:      scoreReader,
+		reportReader:     reportReader,
 	}
 }
 
@@ -46,12 +62,12 @@ func (s *statisticsService) GetScaleAnalysis(ctx context.Context, testeeID uint6
 		return nil, err
 	}
 
-	assessments, err := s.loadAssessments(ctx, testeeItem.ID())
+	rows, err := s.loadAssessmentRows(ctx, testeeItem.ID().Uint64())
 	if err != nil {
 		return nil, err
 	}
 
-	scales := s.buildScaleAnalyses(ctx, filterScaleAnalysisAssessments(assessments))
+	scales := s.buildScaleAnalyses(ctx, filterScaleAnalysisRows(rows))
 
 	return &ScaleAnalysisResult{
 		TesteeID: testeeID,
@@ -59,10 +75,10 @@ func (s *statisticsService) GetScaleAnalysis(ctx context.Context, testeeID uint6
 	}, nil
 }
 
-func filterScaleAnalysisAssessments(items []*assessment.Assessment) []*assessment.Assessment {
-	filtered := make([]*assessment.Assessment, 0, len(items))
+func filterScaleAnalysisRows(items []evaluationreadmodel.AssessmentRow) []evaluationreadmodel.AssessmentRow {
+	filtered := make([]evaluationreadmodel.AssessmentRow, 0, len(items))
 	for _, item := range items {
-		if item == nil || item.Status() != assessment.StatusInterpreted || !item.HasMedicalScale() {
+		if assessment.Status(item.Status) != assessment.StatusInterpreted || item.MedicalScaleID == nil {
 			continue
 		}
 		filtered = append(filtered, item)
@@ -70,7 +86,7 @@ func filterScaleAnalysisAssessments(items []*assessment.Assessment) []*assessmen
 	return filtered
 }
 
-func (s *statisticsService) buildScaleAnalyses(ctx context.Context, items []*assessment.Assessment) []ScaleTrendAnalysis {
+func (s *statisticsService) buildScaleAnalyses(ctx context.Context, items []evaluationreadmodel.AssessmentRow) []ScaleTrendAnalysis {
 	scaleMap := make(map[uint64]*ScaleTrendAnalysis)
 	for _, item := range items {
 		scaleTrend := ensureScaleTrendAnalysis(scaleMap, item)
@@ -79,33 +95,39 @@ func (s *statisticsService) buildScaleAnalyses(ctx context.Context, items []*ass
 	return finalizeScaleTrendAnalyses(scaleMap)
 }
 
-func ensureScaleTrendAnalysis(scaleMap map[uint64]*ScaleTrendAnalysis, item *assessment.Assessment) *ScaleTrendAnalysis {
-	scaleRef := item.MedicalScaleRef()
-	scaleID := scaleRef.ID().Uint64()
+func ensureScaleTrendAnalysis(scaleMap map[uint64]*ScaleTrendAnalysis, item evaluationreadmodel.AssessmentRow) *ScaleTrendAnalysis {
+	scaleID := uint64(0)
+	if item.MedicalScaleID != nil {
+		scaleID = *item.MedicalScaleID
+	}
 	if existing, ok := scaleMap[scaleID]; ok {
 		return existing
 	}
 
 	scaleTrend := &ScaleTrendAnalysis{
 		ScaleID:   scaleID,
-		ScaleCode: string(scaleRef.Code()),
-		ScaleName: scaleRef.Name(),
+		ScaleCode: derefString(item.MedicalScaleCode),
+		ScaleName: derefString(item.MedicalScaleName),
 		Tests:     make([]TestRecordData, 0),
 	}
 	scaleMap[scaleID] = scaleTrend
 	return scaleTrend
 }
 
-func (s *statisticsService) buildScaleTestRecord(ctx context.Context, item *assessment.Assessment) TestRecordData {
+func (s *statisticsService) buildScaleTestRecord(ctx context.Context, item evaluationreadmodel.AssessmentRow) TestRecordData {
 	record := TestRecordData{
-		AssessmentID: item.ID().Uint64(),
-		TestDate:     *item.SubmittedAt(),
+		AssessmentID: item.ID,
 	}
-	if item.TotalScore() != nil {
-		record.TotalScore = *item.TotalScore()
+	if item.InterpretedAt != nil {
+		record.TestDate = *item.InterpretedAt
+	} else if item.SubmittedAt != nil {
+		record.TestDate = *item.SubmittedAt
 	}
-	if item.RiskLevel() != nil {
-		record.RiskLevel = string(*item.RiskLevel())
+	if item.TotalScore != nil {
+		record.TotalScore = *item.TotalScore
+	}
+	if item.RiskLevel != nil {
+		record.RiskLevel = *item.RiskLevel
 	}
 
 	s.applyScaleReport(ctx, item, &record)
@@ -113,31 +135,35 @@ func (s *statisticsService) buildScaleTestRecord(ctx context.Context, item *asse
 	return record
 }
 
-func (s *statisticsService) applyScaleReport(ctx context.Context, item *assessment.Assessment, record *TestRecordData) {
-	reportItem, err := s.reportRepo.FindByAssessmentID(ctx, item.ID())
+func (s *statisticsService) applyScaleReport(ctx context.Context, item evaluationreadmodel.AssessmentRow, record *TestRecordData) {
+	if s.reportReader == nil {
+		return
+	}
+	reportItem, err := s.reportReader.GetReportByAssessmentID(ctx, item.ID)
 	if err == nil && reportItem != nil {
-		record.Result = reportItem.Conclusion()
+		record.Result = reportItem.Conclusion
 	}
 }
 
-func (s *statisticsService) appendScaleFactorScores(ctx context.Context, item *assessment.Assessment, record *TestRecordData) {
-	scores, err := s.scoreRepo.FindByAssessmentID(ctx, item.ID())
-	if err != nil {
+func (s *statisticsService) appendScaleFactorScores(ctx context.Context, item evaluationreadmodel.AssessmentRow, record *TestRecordData) {
+	if s.scoreReader == nil {
+		return
+	}
+	score, err := s.scoreReader.GetScoreByAssessmentID(ctx, item.ID)
+	if err != nil || score == nil {
 		return
 	}
 
-	for _, score := range scores {
-		for _, factorScore := range score.FactorScores() {
-			if factorScore.IsTotalScore() {
-				continue
-			}
-			record.Factors = append(record.Factors, FactorScoreData{
-				FactorCode: string(factorScore.FactorCode()),
-				FactorName: factorScore.FactorName(),
-				RawScore:   factorScore.RawScore(),
-				RiskLevel:  string(factorScore.RiskLevel()),
-			})
+	for _, factorScore := range score.FactorScores {
+		if factorScore.IsTotalScore {
+			continue
 		}
+		record.Factors = append(record.Factors, FactorScoreData{
+			FactorCode: factorScore.FactorCode,
+			FactorName: factorScore.FactorName,
+			RawScore:   factorScore.RawScore,
+			RiskLevel:  factorScore.RiskLevel,
+		})
 	}
 }
 
@@ -164,12 +190,12 @@ func (s *statisticsService) GetPeriodicStats(ctx context.Context, testeeID uint6
 		return nil, err
 	}
 
-	assessments, err := s.loadAssessments(ctx, testeeItem.ID())
+	rows, err := s.loadAssessmentRows(ctx, testeeItem.ID().Uint64())
 	if err != nil {
 		return nil, err
 	}
 
-	projects, activeCount := buildPeriodicProjects(groupAssessmentsByPlan(assessments))
+	projects, activeCount := buildPeriodicProjects(groupAssessmentRowsByPlan(rows))
 
 	return &PeriodicStatsResult{
 		TesteeID:       testeeID,
@@ -194,31 +220,36 @@ func (s *statisticsService) loadTestee(ctx context.Context, testeeID uint64) (*d
 	return testeeItem, nil
 }
 
-func (s *statisticsService) loadAssessments(ctx context.Context, testeeID domain.ID) ([]*assessment.Assessment, error) {
-	pagination := assessment.NewPagination(1, 1000)
-	assessments, _, err := s.assessmentRepo.FindByTesteeID(ctx, testeeID, pagination)
+func (s *statisticsService) loadAssessmentRows(ctx context.Context, testeeID uint64) ([]evaluationreadmodel.AssessmentRow, error) {
+	if s.assessmentReader == nil {
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment read model is not configured")
+	}
+	rows, _, err := s.assessmentReader.ListAssessments(
+		ctx,
+		evaluationreadmodel.AssessmentFilter{TesteeID: &testeeID},
+		evaluationreadmodel.PageRequest{Page: 1, PageSize: 1000},
+	)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find assessments")
 	}
-	return assessments, nil
+	return rows, nil
 }
 
-func groupAssessmentsByPlan(items []*assessment.Assessment) map[string][]*assessment.Assessment {
-	planMap := make(map[string][]*assessment.Assessment)
+func groupAssessmentRowsByPlan(items []evaluationreadmodel.AssessmentRow) map[string][]evaluationreadmodel.AssessmentRow {
+	planMap := make(map[string][]evaluationreadmodel.AssessmentRow)
 	for _, item := range items {
-		if item == nil || item.Origin().Type() != assessment.OriginPlan {
+		if assessment.OriginType(item.OriginType) != assessment.OriginPlan {
 			continue
 		}
-		planID := item.Origin().ID()
-		if planID == nil || *planID == "" {
+		if item.OriginID == nil || *item.OriginID == "" {
 			continue
 		}
-		planMap[*planID] = append(planMap[*planID], item)
+		planMap[*item.OriginID] = append(planMap[*item.OriginID], item)
 	}
 	return planMap
 }
 
-func buildPeriodicProjects(planMap map[string][]*assessment.Assessment) ([]PeriodicProjectStats, int) {
+func buildPeriodicProjects(planMap map[string][]evaluationreadmodel.AssessmentRow) ([]PeriodicProjectStats, int) {
 	projects := make([]PeriodicProjectStats, 0, len(planMap))
 	activeCount := 0
 
@@ -236,10 +267,10 @@ func buildPeriodicProjects(planMap map[string][]*assessment.Assessment) ([]Perio
 	return projects, activeCount
 }
 
-func buildPeriodicProject(planID string, planAssessments []*assessment.Assessment) (PeriodicProjectStats, bool) {
-	sortAssessmentsBySubmittedAt(planAssessments)
+func buildPeriodicProject(planID string, planAssessments []evaluationreadmodel.AssessmentRow) (PeriodicProjectStats, bool) {
+	sortAssessmentRowsBySubmittedAt(planAssessments)
 
-	completedCount := countCompletedAssessments(planAssessments)
+	completedCount := countCompletedAssessmentRows(planAssessments)
 	tasks, startDate, endDate := buildPeriodicTasks(planAssessments)
 	totalWeeks := len(planAssessments)
 
@@ -257,10 +288,10 @@ func buildPeriodicProject(planID string, planAssessments []*assessment.Assessmen
 	}, completedCount < totalWeeks
 }
 
-func sortAssessmentsBySubmittedAt(items []*assessment.Assessment) {
+func sortAssessmentRowsBySubmittedAt(items []evaluationreadmodel.AssessmentRow) {
 	sort.Slice(items, func(i, j int) bool {
-		left := items[i].SubmittedAt()
-		right := items[j].SubmittedAt()
+		left := items[i].SubmittedAt
+		right := items[j].SubmittedAt
 		if left == nil {
 			return false
 		}
@@ -271,41 +302,41 @@ func sortAssessmentsBySubmittedAt(items []*assessment.Assessment) {
 	})
 }
 
-func countCompletedAssessments(items []*assessment.Assessment) int {
+func countCompletedAssessmentRows(items []evaluationreadmodel.AssessmentRow) int {
 	count := 0
 	for _, item := range items {
-		if item.Status() == assessment.StatusInterpreted {
+		if assessment.Status(item.Status) == assessment.StatusInterpreted {
 			count++
 		}
 	}
 	return count
 }
 
-func buildPeriodicTasks(items []*assessment.Assessment) ([]PeriodicTask, *time.Time, *time.Time) {
+func buildPeriodicTasks(items []evaluationreadmodel.AssessmentRow) ([]PeriodicTask, *time.Time, *time.Time) {
 	tasks := make([]PeriodicTask, 0, len(items))
 	var startDate *time.Time
 	var endDate *time.Time
 
 	for index, item := range items {
 		task := buildPeriodicTask(index+1, item)
-		startDate, endDate = expandPeriodicWindow(startDate, endDate, item.SubmittedAt())
+		startDate, endDate = expandPeriodicWindow(startDate, endDate, item.SubmittedAt)
 		tasks = append(tasks, task)
 	}
 
 	return tasks, startDate, endDate
 }
 
-func buildPeriodicTask(week int, item *assessment.Assessment) PeriodicTask {
+func buildPeriodicTask(week int, item evaluationreadmodel.AssessmentRow) PeriodicTask {
 	task := PeriodicTask{
 		Week:    week,
-		DueDate: item.SubmittedAt(),
+		DueDate: item.SubmittedAt,
 	}
 
-	switch item.Status() {
+	switch assessment.Status(item.Status) {
 	case assessment.StatusInterpreted:
 		task.Status = "completed"
-		task.CompletedAt = item.InterpretedAt()
-		assessmentID := item.ID().Uint64()
+		task.CompletedAt = item.InterpretedAt
+		assessmentID := item.ID
 		task.AssessmentID = &assessmentID
 	case assessment.StatusFailed:
 		task.Status = "overdue"
@@ -329,10 +360,10 @@ func expandPeriodicWindow(startDate, endDate, submittedAt *time.Time) (*time.Tim
 	return startDate, endDate
 }
 
-func periodicScaleName(items []*assessment.Assessment) string {
+func periodicScaleName(items []evaluationreadmodel.AssessmentRow) string {
 	for _, item := range items {
-		if item != nil && item.HasMedicalScale() {
-			return item.MedicalScaleRef().Name()
+		if item.MedicalScaleName != nil {
+			return *item.MedicalScaleName
 		}
 	}
 	return ""
@@ -351,4 +382,11 @@ func calculateCurrentWeek(completedCount, totalWeeks int) int {
 		return totalWeeks
 	}
 	return currentWeek
+}
+
+func derefString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

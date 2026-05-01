@@ -9,10 +9,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
-func metaIDToUint64(value meta.ID) (uint64, error) {
-	return safeconv.MetaIDToUint64(value)
-}
-
 func mustUint64FromMetaID(field string, value meta.ID) uint64 {
 	converted, err := safeconv.MetaIDToUint64(value)
 	if err != nil {

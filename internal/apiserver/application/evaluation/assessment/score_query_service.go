@@ -4,12 +4,10 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // scoreQueryService 得分查询服务实现
@@ -53,46 +51,15 @@ func NewScoreQueryServiceWithReadModel(
 
 // GetByAssessmentID 获取测评的所有因子得分
 func (s *scoreQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ScoreResult, error) {
-	if s.scoreReader != nil {
-		scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
-		if err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
-		}
-		medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
-		return scoreRowToResult(scoreRow, medicalScale), nil
+	if s.scoreReader == nil {
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score read model is not configured")
 	}
-
-	id := meta.FromUint64(assessmentID)
-
-	// 获取得分
-	scores, err := s.scoreRepo.FindByAssessmentID(ctx, id)
+	scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
 	}
-
-	if len(scores) == 0 {
-		return nil, errors.WithCode(errorCode.ErrAssessmentScoreNotFound, "得分不存在")
-	}
-
-	// 获取测评信息以获取量表引用
-	assessmentDomain, err := s.assessmentRepo.FindByID(ctx, id)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
-	}
-
-	// 获取量表信息（如果存在）
-	var medicalScale *scale.MedicalScale
-	if scaleRef := assessmentDomain.MedicalScaleRef(); scaleRef != nil {
-		scaleCode := scaleRef.Code().String()
-		medicalScale, err = s.scaleRepo.FindByCode(ctx, scaleCode)
-		if err != nil {
-			// 量表不存在时，不返回错误，只是没有 max_score 信息
-			medicalScale = nil
-		}
-	}
-
-	// 使用第一个得分（假设一个测评只有一个 AssessmentScore）
-	return toScoreResult(scores[0], medicalScale), nil
+	medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
+	return scoreRowToResult(scoreRow, medicalScale), nil
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -112,66 +79,34 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 		limit = 50
 	}
 
-	if s.scoreReader != nil {
-		rows, err := s.scoreReader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
-			TesteeID:   dto.TesteeID,
-			FactorCode: dto.FactorCode,
-			Limit:      limit,
-		})
-		if err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询得分趋势失败")
-		}
-		dataPoints := make([]TrendDataPoint, 0, len(rows))
-		factorName := ""
-		for _, row := range rows {
-			for _, fs := range row.FactorScores {
-				if fs.FactorCode != dto.FactorCode {
-					continue
-				}
-				if factorName == "" {
-					factorName = fs.FactorName
-				}
-				dataPoints = append(dataPoints, TrendDataPoint{
-					AssessmentID: row.AssessmentID,
-					RawScore:     fs.RawScore,
-					RiskLevel:    fs.RiskLevel,
-				})
-			}
-		}
-		return &FactorTrendResult{
-			TesteeID:   dto.TesteeID,
-			FactorCode: dto.FactorCode,
-			FactorName: factorName,
-			DataPoints: dataPoints,
-		}, nil
+	if s.scoreReader == nil {
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score read model is not configured")
 	}
-
-	testeeID := testee.NewID(dto.TesteeID)
-	factorCode := assessment.NewFactorCode(dto.FactorCode)
-	scores, err := s.scoreRepo.FindByTesteeIDAndFactorCode(ctx, testeeID, factorCode, limit)
+	rows, err := s.scoreReader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
+		TesteeID:   dto.TesteeID,
+		FactorCode: dto.FactorCode,
+		Limit:      limit,
+	})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询得分趋势失败")
 	}
-
-	// 构造趋势数据点
-	dataPoints := make([]TrendDataPoint, 0, len(scores))
+	dataPoints := make([]TrendDataPoint, 0, len(rows))
 	factorName := ""
-
-	for _, score := range scores {
-		// 从 AssessmentScore 中找到对应因子
-		fs := score.GetFactorScore(factorCode)
-		if fs != nil {
+	for _, row := range rows {
+		for _, fs := range row.FactorScores {
+			if fs.FactorCode != dto.FactorCode {
+				continue
+			}
 			if factorName == "" {
-				factorName = fs.FactorName()
+				factorName = fs.FactorName
 			}
 			dataPoints = append(dataPoints, TrendDataPoint{
-				AssessmentID: score.AssessmentID().Uint64(),
-				RawScore:     fs.RawScore(),
-				RiskLevel:    string(fs.RiskLevel()),
+				AssessmentID: row.AssessmentID,
+				RawScore:     fs.RawScore,
+				RiskLevel:    fs.RiskLevel,
 			})
 		}
 	}
-
 	return &FactorTrendResult{
 		TesteeID:   dto.TesteeID,
 		FactorCode: dto.FactorCode,
@@ -182,57 +117,23 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 
 // GetHighRiskFactors 获取高风险因子
 func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID uint64) (*HighRiskFactorsResult, error) {
-	if s.scoreReader != nil {
-		scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
-		if err != nil {
-			if errors.ParseCoder(err).Code() == errorCode.ErrAssessmentScoreNotFound {
-				return &HighRiskFactorsResult{
-					AssessmentID:    assessmentID,
-					HasHighRisk:     false,
-					HighRiskFactors: nil,
-					NeedsUrgentCare: false,
-				}, nil
-			}
-			return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
-		}
-		medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
-		return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil
+	if s.scoreReader == nil {
+		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score read model is not configured")
 	}
-
-	id := meta.FromUint64(assessmentID)
-
-	scores, err := s.scoreRepo.FindByAssessmentID(ctx, id)
+	scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
 	if err != nil {
+		if errors.ParseCoder(err).Code() == errorCode.ErrAssessmentScoreNotFound {
+			return &HighRiskFactorsResult{
+				AssessmentID:    assessmentID,
+				HasHighRisk:     false,
+				HighRiskFactors: nil,
+				NeedsUrgentCare: false,
+			}, nil
+		}
 		return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
 	}
-
-	if len(scores) == 0 {
-		return &HighRiskFactorsResult{
-			AssessmentID:    assessmentID,
-			HasHighRisk:     false,
-			HighRiskFactors: nil,
-			NeedsUrgentCare: false,
-		}, nil
-	}
-
-	// 获取测评信息以获取量表引用
-	assessmentDomain, err := s.assessmentRepo.FindByID(ctx, id)
-	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
-	}
-
-	// 获取量表信息（如果存在）
-	var medicalScale *scale.MedicalScale
-	if scaleRef := assessmentDomain.MedicalScaleRef(); scaleRef != nil {
-		scaleCode := scaleRef.Code().String()
-		medicalScale, err = s.scaleRepo.FindByCode(ctx, scaleCode)
-		if err != nil {
-			// 量表不存在时，不返回错误，只是没有 max_score 信息
-			medicalScale = nil
-		}
-	}
-
-	return toHighRiskFactorsResult(assessmentID, scores[0], medicalScale), nil
+	medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
+	return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil
 }
 
 func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *scale.MedicalScale {

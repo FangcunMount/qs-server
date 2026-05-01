@@ -153,10 +153,12 @@ func TestInterpretationHandlerStagesInterpretedAndReportGeneratedInOrder(t *test
 	assessmentRepo := &interpretationAssessmentRepoStub{}
 	reportRepo := &interpretationReportRepoStub{}
 	handler := &InterpretationHandler{
-		BaseHandler:    NewBaseHandler("InterpretationHandler"),
-		assessmentRepo: assessmentRepo,
-		reportSaver:    reportRepo,
-		reportBuilder:  &reportBuilderAdapter{report: rpt},
+		BaseHandler: NewBaseHandler("InterpretationHandler"),
+		generator:   &InterpretationGenerator{},
+		finalizer: &InterpretationFinalizer{
+			assessmentWriter: NewAssessmentResultWriter(assessmentRepo),
+			reportWriter:     NewInterpretReportWriter(&reportBuilderAdapter{report: rpt}, reportRepo),
+		},
 	}
 
 	evalCtx := NewContext(a, nil, nil)

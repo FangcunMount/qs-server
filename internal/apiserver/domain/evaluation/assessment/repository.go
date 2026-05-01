@@ -2,9 +2,7 @@ package assessment
 
 import (
 	"context"
-	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -35,54 +33,6 @@ type Repository interface {
 
 	// FindByAnswerSheetID 根据答卷ID查找
 	FindByAnswerSheetID(ctx context.Context, answerSheetID AnswerSheetRef) (*Assessment, error)
-
-	// FindByTesteeID 查询受试者的测评列表（支持分页）
-	FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination Pagination) ([]*Assessment, int64, error)
-
-	// FindByTesteeIDWithFilters 查询受试者的测评列表（支持分页和筛选）
-	FindByTesteeIDWithFilters(
-		ctx context.Context,
-		testeeID testee.ID,
-		status string,
-		scaleCode string,
-		riskLevel string,
-		dateFrom *time.Time,
-		dateTo *time.Time,
-		pagination Pagination,
-	) ([]*Assessment, int64, error)
-
-	// FindByTesteeIDAndScaleID 查询受试者在某个量表下的测评列表
-	FindByTesteeIDAndScaleID(ctx context.Context, testeeID testee.ID, scaleRef MedicalScaleRef, pagination Pagination) ([]*Assessment, int64, error)
-
-	// === 按业务来源查询 ===
-
-	// FindByPlanID 查询计划下的测评列表
-	FindByPlanID(ctx context.Context, planID string, pagination Pagination) ([]*Assessment, int64, error)
-
-	// === 统计查询 ===
-
-	// CountByStatus 按状态统计数量
-	CountByStatus(ctx context.Context, status Status) (int64, error)
-
-	// CountByTesteeIDAndStatus 按受试者和状态统计
-	CountByTesteeIDAndStatus(ctx context.Context, testeeID testee.ID, status Status) (int64, error)
-
-	// CountByOrgIDAndStatus 按组织和状态统计
-	CountByOrgIDAndStatus(ctx context.Context, orgID int64, status Status) (int64, error)
-
-	// === 批量查询 ===
-
-	// FindByIDs 批量查询（根据ID列表）
-	FindByIDs(ctx context.Context, ids []ID) ([]*Assessment, error)
-
-	// FindPendingSubmission 查找待提交的测评
-	FindPendingSubmission(ctx context.Context, pagination Pagination) ([]*Assessment, int64, error)
-
-	// FindByOrgID 按组织ID查询测评列表（支持分页和条件筛选）
-	FindByOrgID(ctx context.Context, orgID int64, status *Status, pagination Pagination) ([]*Assessment, int64, error)
-
-	// FindByOrgIDAndTesteeIDs 按组织和受试者集合查询测评列表。
-	FindByOrgIDAndTesteeIDs(ctx context.Context, orgID int64, testeeIDs []testee.ID, status *Status, pagination Pagination) ([]*Assessment, int64, error)
 }
 
 // ==================== AssessmentScore Repository ====================
@@ -99,17 +49,6 @@ type ScoreRepository interface {
 	SaveScoresWithContext(ctx context.Context, assessmentDomain *Assessment, score *AssessmentScore) error
 
 	// === 基础查询 ===
-
-	// FindByAssessmentID 查询测评的所有得分
-	FindByAssessmentID(ctx context.Context, assessmentID ID) ([]*AssessmentScore, error)
-
-	// === 趋势分析查询 ===
-
-	// FindByTesteeIDAndFactorCode 查询受试者在某个因子上的历史得分（用于趋势分析）
-	FindByTesteeIDAndFactorCode(ctx context.Context, testeeID testee.ID, factorCode FactorCode, limit int) ([]*AssessmentScore, error)
-
-	// FindLatestByTesteeIDAndScaleID 查询受试者在某个量表下所有因子的最新得分
-	FindLatestByTesteeIDAndScaleID(ctx context.Context, testeeID testee.ID, scaleRef MedicalScaleRef) ([]*AssessmentScore, error)
 
 	// === 删除 ===
 

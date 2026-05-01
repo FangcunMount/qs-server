@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -25,22 +26,22 @@ type waiterNotifier = evaluationwaiter.Notifier
 // service 评估引擎服务实现
 type service struct {
 	// 仓储依赖
-	assessmentRepo    assessment.Repository
-	scoreRepo         assessment.ScoreRepository
-	reportRepo        report.ReportRepository
-	scaleRepo         scale.Repository
-	answerSheetRepo   answersheet.Repository
-	questionnaireRepo questionnaire.Repository
+	assessmentRepo assessment.Repository
+	scoreRepo      assessment.ScoreRepository
+	reportRepo     report.ReportRepository
+	inputResolver  EvaluationInputResolver
 
 	// 领域服务依赖
 	reportBuilder report.ReportBuilder
 
 	// 等待队列注册表（可选，用于长轮询）
-	waiterRegistry waiterNotifier
-	txRunner       apptransaction.Runner
-	eventStager    EventStager
-	reportSaver    pipeline.ReportDurableSaver
-	factorScorer   ruleengine.ScaleFactorScorer
+	waiterRegistry  waiterNotifier
+	txRunner        apptransaction.Runner
+	eventStager     EventStager
+	reportSaver     pipeline.ReportDurableSaver
+	factorScorer    ruleengine.ScaleFactorScorer
+	interpreter     interpretengine.Interpreter
+	defaultProvider interpretengine.DefaultProvider
 
 	// 处理器链
 	pipeline *pipeline.Chain
@@ -79,6 +80,21 @@ func WithScaleFactorScorer(scorer ruleengine.ScaleFactorScorer) ServiceOption {
 	}
 }
 
+func WithInterpretEngine(interpreter interpretengine.Interpreter, defaultProvider interpretengine.DefaultProvider) ServiceOption {
+	return func(s *service) {
+		s.interpreter = interpreter
+		s.defaultProvider = defaultProvider
+	}
+}
+
+func WithInputResolver(resolver EvaluationInputResolver) ServiceOption {
+	return func(s *service) {
+		if resolver != nil {
+			s.inputResolver = resolver
+		}
+	}
+}
+
 // NewService 创建评估引擎服务
 func NewService(
 	assessmentRepo assessment.Repository,
@@ -91,13 +107,11 @@ func NewService(
 	opts ...ServiceOption,
 ) Service {
 	svc := &service{
-		assessmentRepo:    assessmentRepo,
-		scoreRepo:         scoreRepo,
-		reportRepo:        reportRepo,
-		scaleRepo:         scaleRepo,
-		answerSheetRepo:   answerSheetRepo,
-		questionnaireRepo: questionnaireRepo,
-		reportBuilder:     reportBuilder,
+		assessmentRepo: assessmentRepo,
+		scoreRepo:      scoreRepo,
+		reportRepo:     reportRepo,
+		inputResolver:  NewRepositoryInputResolver(scaleRepo, answerSheetRepo, questionnaireRepo),
+		reportBuilder:  reportBuilder,
 	}
 
 	// 应用选项
@@ -128,6 +142,7 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	// 4. 测评分析解读处理器
 	interpretationHandler := pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder)
 	interpretationHandler.SetReportDurableSaver(s.reportSaver)
+	interpretationHandler.SetInterpretEngine(s.interpreter, s.defaultProvider)
 	chain.AddHandler(interpretationHandler)
 
 	// 5. 本地 waiter 通知处理器
@@ -200,109 +215,29 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 
-	// 2. 加载 MedicalScale
-	scaleCode := a.MedicalScaleRef().Code().String()
-	l.Debugw("加载量表数据",
-		"scale_code", scaleCode,
-		"action", "read",
-		"resource", "scale",
-	)
-
-	medicalScale, err := s.scaleRepo.FindByCode(ctx, scaleCode)
-	if err != nil {
-		l.Errorw("加载量表失败",
-			"scale_code", scaleCode,
-			"action", "read",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		s.markAsFailed(ctx, a, "加载量表失败: "+err.Error())
-		return errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "量表不存在")
+	if s.inputResolver == nil {
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "evaluation input resolver is not configured")
 	}
-
-	l.Debugw("量表数据加载成功",
-		"scale_code", scaleCode,
-		"scale_title", medicalScale.GetTitle(),
-		"result", "success",
-	)
-
-	// 3. 加载答卷数据
-	answerSheetID := a.AnswerSheetRef().ID()
-	l.Debugw("加载答卷数据",
-		"answer_sheet_id", answerSheetID,
-		"action", "read",
-		"resource", "answersheet",
-	)
-
-	answerSheet, err := s.answerSheetRepo.FindByID(ctx, answerSheetID)
+	input, err := s.inputResolver.Resolve(ctx, a)
 	if err != nil {
-		l.Errorw("加载答卷失败",
-			"answer_sheet_id", answerSheetID,
-			"action", "evaluate_assessment",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		s.markAsFailed(ctx, a, "加载答卷失败: "+err.Error())
-		return errors.WrapC(err, errorCode.ErrAnswerSheetNotFound, "答卷不存在")
-	}
-
-	l.Debugw("答卷数据加载成功",
-		"answer_sheet_id", answerSheetID,
-		"questionnaire_code", func() string { code, _, _ := answerSheet.QuestionnaireInfo(); return code }(),
-		"result", "success",
-	)
-
-	// 4. 加载问卷数据（用于 cnt 等计分规则）
-	qCode, qVersion, _ := answerSheet.QuestionnaireInfo()
-	l.Debugw("加载问卷数据",
-		"questionnaire_code", qCode,
-		"questionnaire_version", qVersion,
-		"action", "read",
-		"resource", "questionnaire",
-	)
-
-	qnr, err := s.questionnaireRepo.FindByCodeVersion(ctx, qCode, qVersion)
-	if err != nil {
-		l.Errorw("加载问卷失败，评估终止",
-			"questionnaire_code", qCode,
-			"questionnaire_version", qVersion,
-			"error", err.Error(),
-		)
-		s.markAsFailed(ctx, a, "加载问卷失败: "+err.Error())
-		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "加载问卷失败")
-	}
-	if qnr == nil {
-		err = errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在或版本不匹配")
-		l.Errorw("加载问卷失败，未命中答卷要求的精确版本",
-			"questionnaire_code", qCode,
-			"questionnaire_version", qVersion,
-			"error", err.Error(),
-		)
-		s.markAsFailed(ctx, a, "加载问卷失败: "+err.Error())
+		s.markAsFailed(ctx, a, inputResolveFailureReason(err))
 		return err
 	}
 
-	l.Debugw("问卷数据加载成功",
-		"questionnaire_code", qCode,
-		"questionnaire_version", qVersion,
-		"question_count", len(qnr.GetQuestions()),
-		"result", "success",
-	)
+	// 2. 创建评估上下文
+	evalCtx := pipeline.NewContext(a, input.MedicalScale, input.AnswerSheet)
+	evalCtx.Questionnaire = input.Questionnaire
 
-	// 5. 创建评估上下文
-	evalCtx := pipeline.NewContext(a, medicalScale, answerSheet)
-	evalCtx.Questionnaire = qnr // 设置问卷数据
-
-	// 6. 执行处理器链
+	// 3. 执行处理器链
 	l.Infow("开始执行评估处理器链",
 		"assessment_id", assessmentID,
-		"scale_code", scaleCode,
+		"scale_code", a.MedicalScaleRef().Code().String(),
 	)
 
 	if err := s.pipeline.Execute(ctx, evalCtx); err != nil {
 		l.Errorw("评估处理器链执行失败",
 			"assessment_id", assessmentID,
-			"scale_code", scaleCode,
+			"scale_code", a.MedicalScaleRef().Code().String(),
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -316,7 +251,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"resource", "assessment",
 		"result", "success",
 		"assessment_id", assessmentID,
-		"scale_code", scaleCode,
+		"scale_code", a.MedicalScaleRef().Code().String(),
 		"duration_ms", duration.Milliseconds(),
 	)
 

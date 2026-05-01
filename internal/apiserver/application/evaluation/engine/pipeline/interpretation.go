@@ -2,18 +2,11 @@ package pipeline
 
 import (
 	"context"
-	"strconv"
-	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/interpretation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/event"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 )
 
 // InterpretationHandler 测评分析解读处理器
@@ -25,11 +18,18 @@ import (
 // 输出：填充 Context.Conclusion, Suggestion, EvaluationResult
 type InterpretationHandler struct {
 	*BaseHandler
-	assessmentRepo  assessment.Repository
-	reportSaver     ReportDurableSaver
-	reportBuilder   domainReport.ReportBuilder
-	interpreter     interpretation.Interpreter                    // 解读服务
-	defaultProvider *interpretation.DefaultInterpretationProvider // 默认解读提供者
+	generator *InterpretationGenerator
+	finalizer *InterpretationFinalizer
+}
+
+type InterpretationGenerator struct {
+	interpreter     interpretengine.Interpreter
+	defaultProvider interpretengine.DefaultProvider
+}
+
+type InterpretationFinalizer struct {
+	assessmentWriter AssessmentResultWriter
+	reportWriter     InterpretReportWriter
 }
 
 // NewInterpretationHandler 创建测评分析解读处理器
@@ -39,18 +39,34 @@ func NewInterpretationHandler(
 	reportBuilder domainReport.ReportBuilder,
 ) *InterpretationHandler {
 	return &InterpretationHandler{
-		BaseHandler:     NewBaseHandler("InterpretationHandler"),
-		assessmentRepo:  assessmentRepo,
-		reportSaver:     NewReportDurableSaver(reportRepo),
-		reportBuilder:   reportBuilder,
-		interpreter:     interpretation.GetDefaultInterpreter(), // 使用默认解读器
-		defaultProvider: interpretation.GetDefaultProvider(),    // 使用默认解读提供者
+		BaseHandler: NewBaseHandler("InterpretationHandler"),
+		generator:   &InterpretationGenerator{},
+		finalizer: &InterpretationFinalizer{
+			assessmentWriter: NewAssessmentResultWriter(assessmentRepo),
+			reportWriter:     NewInterpretReportWriter(reportBuilder, NewReportDurableSaver(reportRepo)),
+		},
 	}
 }
 
 func (h *InterpretationHandler) SetReportDurableSaver(saver ReportDurableSaver) {
-	if saver != nil {
-		h.reportSaver = saver
+	if saver == nil {
+		return
+	}
+	if h.finalizer == nil {
+		h.finalizer = &InterpretationFinalizer{}
+	}
+	h.finalizer.SetReportDurableSaver(saver)
+}
+
+func (h *InterpretationHandler) SetInterpretEngine(interpreter interpretengine.Interpreter, defaultProvider interpretengine.DefaultProvider) {
+	if h.generator == nil {
+		h.generator = &InterpretationGenerator{}
+	}
+	if interpreter != nil {
+		h.generator.interpreter = interpreter
+	}
+	if defaultProvider != nil {
+		h.generator.defaultProvider = defaultProvider
 	}
 }
 
@@ -64,46 +80,14 @@ func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) er
 		"total_score", evalCtx.TotalScore,
 		"risk_level", evalCtx.RiskLevel)
 
-	// 1. 生成因子解读
-	h.generateFactorInterpretations(ctx, evalCtx)
-
-	// 2. 生成整体解读
-	h.generateOverallInterpretation(ctx, evalCtx)
-
-	// 3. 构建完整的评估结果
-	evalResult := h.buildEvaluationResult(evalCtx)
-	evalCtx.EvaluationResult = evalResult
+	h.ensureGenerator().Generate(ctx, evalCtx)
 	l.Debugw("Evaluation result built",
-		"conclusion", evalResult.Conclusion,
-		"suggestion", evalResult.Suggestion)
+		"conclusion", evalCtx.EvaluationResult.Conclusion,
+		"suggestion", evalCtx.EvaluationResult.Suggestion)
 
-	// 4. 应用评估结果到 Assessment
-	if err := evalCtx.Assessment.ApplyEvaluation(evalResult); err != nil {
+	if err := h.ensureFinalizer().Finalize(ctx, evalCtx); err != nil {
 		assessmentID, _ := evalCtx.Assessment.ID().Value()
-		l.Errorw("Failed to apply evaluation result",
-			"assessment_id", assessmentID,
-			"error", err)
-		evalCtx.SetError(errors.WrapC(err, errorCode.ErrAssessmentInterpretFailed, "应用评估结果失败"))
-		return evalCtx.Error
-	}
-
-	// 5. 保存 Assessment
-	if err := h.assessmentRepo.Save(ctx, evalCtx.Assessment); err != nil {
-		assessmentID, _ := evalCtx.Assessment.ID().Value()
-		l.Errorw("Failed to save assessment",
-			"assessment_id", assessmentID,
-			"error", err)
-		evalCtx.SetError(errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败"))
-		return evalCtx.Error
-	}
-	assessmentID, _ = evalCtx.Assessment.ID().Value()
-	l.Infow("Assessment saved successfully",
-		"assessment_id", assessmentID)
-
-	// 6. 生成并保存报告
-	if err := h.generateAndSaveReport(ctx, evalCtx); err != nil {
-		assessmentID, _ := evalCtx.Assessment.ID().Value()
-		l.Errorw("Failed to generate and save report",
+		l.Errorw("Failed to finalize interpretation",
 			"assessment_id", assessmentID,
 			"error", err)
 		evalCtx.SetError(err)
@@ -118,376 +102,66 @@ func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) er
 	return h.Next(ctx, evalCtx)
 }
 
-// generateFactorInterpretations 生成因子解读
-func (h *InterpretationHandler) generateFactorInterpretations(ctx context.Context, evalCtx *Context) {
-	l := logger.L(ctx)
-	l.Infow("Generating factor interpretations", "factor_count", len(evalCtx.FactorScores))
+func (h *InterpretationHandler) ensureGenerator() *InterpretationGenerator {
+	if h.generator == nil {
+		h.generator = &InterpretationGenerator{}
+	}
+	return h.generator
+}
 
-	updatedScores := make([]assessment.FactorScoreResult, 0, len(evalCtx.FactorScores))
+func (h *InterpretationHandler) ensureFinalizer() *InterpretationFinalizer {
+	if h.finalizer == nil {
+		h.finalizer = &InterpretationFinalizer{}
+	}
+	return h.finalizer
+}
 
-	for _, fs := range evalCtx.FactorScores {
-		// 尝试从量表获取因子的解读规则
-		conclusion, suggestion := h.interpretFactorWithRules(ctx, evalCtx, fs)
+func (g *InterpretationGenerator) Generate(ctx context.Context, evalCtx *Context) {
+	g.generateFactorInterpretations(ctx, evalCtx)
+	g.generateOverallInterpretation(ctx, evalCtx)
+	evalCtx.EvaluationResult = g.buildEvaluationResult(evalCtx)
+}
 
-		updatedScore := assessment.NewFactorScoreResult(
-			fs.FactorCode,
-			fs.FactorName,
-			fs.RawScore,
-			fs.RiskLevel,
-			conclusion,
-			suggestion,
-			fs.IsTotalScore,
+func (f *InterpretationFinalizer) Finalize(ctx context.Context, evalCtx *Context) error {
+	evalResult := evalCtx.EvaluationResult
+	if evalResult == nil {
+		evalResult = assessment.NewEvaluationResult(
+			evalCtx.TotalScore,
+			evalCtx.RiskLevel,
+			evalCtx.Conclusion,
+			evalCtx.Suggestion,
+			evalCtx.FactorScores,
 		)
-		updatedScores = append(updatedScores, updatedScore)
-
-		h.logInterpretation(ctx, string(fs.FactorCode), fs.FactorName, fs.RawScore, conclusion, suggestion)
+		evalCtx.EvaluationResult = evalResult
 	}
 
-	evalCtx.FactorScores = updatedScores
-	l.Infow("Factor interpretations generated", "factor_count", len(updatedScores))
-}
-
-// interpretFactorWithRules 使用量表规则解读因子
-func (h *InterpretationHandler) interpretFactorWithRules(ctx context.Context, evalCtx *Context, fs assessment.FactorScoreResult) (conclusion, suggestion string) {
-	l := logger.L(ctx)
-
-	// 卫语句：没有量表配置，直接使用默认解读
-	if evalCtx.MedicalScale == nil {
-		h.logUseDefault(ctx, string(fs.FactorCode), fs.RawScore)
-		return h.interpretFactorDefault(fs.FactorName, fs.RiskLevel, fs.RawScore)
+	if err := f.ensureAssessmentWriter().ApplyAndSave(ctx, evalCtx); err != nil {
+		return err
 	}
-
-	// 卫语句：查找因子
-	scaleFactorCode := scale.NewFactorCode(string(fs.FactorCode))
-	factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode)
-	if !found {
-		l.Warnw("Factor not found in scale",
-			"factor_code", string(fs.FactorCode))
-		h.logUseDefault(ctx, string(fs.FactorCode), fs.RawScore)
-		return h.interpretFactorDefault(fs.FactorName, fs.RiskLevel, fs.RawScore)
+	if err := f.ensureReportWriter().BuildAndSave(ctx, evalCtx); err != nil {
+		return err
 	}
-
-	l.Debugw("Found factor in scale",
-		"factor_code", string(fs.FactorCode),
-		"score", fs.RawScore)
-
-	// 卫语句：构建解读配置
-	config := h.buildInterpretConfig(factor)
-	if config == nil || len(config.Rules) == 0 {
-		l.Debugw("No interpret rules in factor config",
-			"factor_code", string(fs.FactorCode))
-		h.logUseDefault(ctx, string(fs.FactorCode), fs.RawScore)
-		return h.interpretFactorDefault(fs.FactorName, fs.RiskLevel, fs.RawScore)
-	}
-
-	// 使用解读服务进行解读（默认使用区间策略）
-	result, err := h.interpreter.InterpretFactor(
-		fs.RawScore,
-		config,
-		interpretation.StrategyTypeRange,
-	)
-	if err != nil || result == nil {
-		l.Warnw("Failed to interpret factor",
-			"factor_code", string(fs.FactorCode),
-			"error", err)
-		h.logUseDefault(ctx, string(fs.FactorCode), fs.RawScore)
-		return h.interpretFactorDefault(fs.FactorName, fs.RiskLevel, fs.RawScore)
-	}
-
-	// 成功使用规则解读
-	h.logRuleMatch(ctx, string(fs.FactorCode), fs.RawScore, result)
-	return result.Description, result.Suggestion
-}
-
-// buildInterpretConfig 将 scale.Factor 的解读规则转换为 interpretation.InterpretConfig
-func (h *InterpretationHandler) buildInterpretConfig(factor *scale.Factor) *interpretation.InterpretConfig {
-	scaleRules := factor.GetInterpretRules()
-	if len(scaleRules) == 0 {
-		return nil
-	}
-
-	// 转换为领域解读规则
-	// 注意：scale.ScoreRange 和 interpretation.InterpretRule 都使用左闭右开区间 [min, max)
-	// 直接使用 Min() 和 Max() 即可保持区间类型一致
-	rules := make([]interpretation.InterpretRule, 0, len(scaleRules))
-	for _, scaleRule := range scaleRules {
-		rules = append(rules, interpretation.InterpretRule{
-			Min:         scaleRule.GetScoreRange().Min(),
-			Max:         scaleRule.GetScoreRange().Max(),
-			RiskLevel:   interpretation.RiskLevel(scaleRule.GetRiskLevel()),
-			Label:       string(scaleRule.GetRiskLevel()),
-			Description: scaleRule.GetConclusion(),
-			Suggestion:  scaleRule.GetSuggestion(),
-		})
-	}
-
-	return &interpretation.InterpretConfig{
-		FactorCode: factor.GetCode().Value(),
-		Rules:      rules,
-		Params:     nil,
-	}
-}
-
-// interpretFactorDefault 使用默认模板解读因子
-func (h *InterpretationHandler) interpretFactorDefault(factorName string, riskLevel assessment.RiskLevel, score float64) (conclusion, suggestion string) {
-	// 转换风险等级
-	interpretRiskLevel := interpretation.RiskLevel(riskLevel)
-
-	// 使用领域服务提供默认解读
-	result := h.defaultProvider.ProvideFactor(factorName, score, interpretRiskLevel)
-	return result.Description, result.Suggestion
-}
-
-// generateOverallInterpretation 生成整体解读
-func (h *InterpretationHandler) generateOverallInterpretation(ctx context.Context, evalCtx *Context) {
-	l := logger.L(ctx)
-	l.Infow("Generating overall interpretation",
-		"total_score", evalCtx.TotalScore,
-		"risk_level", evalCtx.RiskLevel)
-
-	// 卫语句：没有量表配置，使用默认解读
-	if evalCtx.MedicalScale == nil {
-		l.Debugw("No medical scale, using default template for overall interpretation")
-		h.generateOverallInterpretationDefault(evalCtx)
-		l.Infow("Overall interpretation generated",
-			"conclusion", evalCtx.Conclusion)
-		return
-	}
-
-	// 尝试从总分因子的解读规则获取整体解读
-	totalScoreFactor := h.findTotalScoreFactor(evalCtx)
-	if totalScoreFactor == nil {
-		l.Debugw("No total score factor found, using default template")
-		h.generateOverallInterpretationDefault(evalCtx)
-		l.Infow("Overall interpretation generated",
-			"conclusion", evalCtx.Conclusion)
-		return
-	}
-
-	l.Debugw("Found total score factor",
-		"factor_code", string(totalScoreFactor.FactorCode),
-		"score", totalScoreFactor.RawScore)
-
-	// 尝试使用总分因子的解读规则
-	if h.tryInterpretWithTotalScoreRule(ctx, evalCtx, totalScoreFactor) {
-		l.Infow("Overall interpretation from total score rule",
-			"conclusion", evalCtx.Conclusion)
-		return
-	}
-
-	// 降级使用默认模板
-	l.Debugw("No matching rule for total score, using default template")
-	h.generateOverallInterpretationDefault(evalCtx)
-	l.Infow("Overall interpretation generated",
-		"conclusion", evalCtx.Conclusion)
-}
-
-// findTotalScoreFactor 查找总分因子
-func (h *InterpretationHandler) findTotalScoreFactor(evalCtx *Context) *assessment.FactorScoreResult {
-	for _, fs := range evalCtx.FactorScores {
-		if fs.IsTotalScore {
-			return &fs
-		}
-	}
-	return nil
-}
-
-// tryInterpretWithTotalScoreRule 尝试使用总分因子的规则进行解读
-// 返回 true 表示成功解读，false 表示失败需要降级
-func (h *InterpretationHandler) tryInterpretWithTotalScoreRule(
-	ctx context.Context,
-	evalCtx *Context,
-	totalScoreFactor *assessment.FactorScoreResult,
-) bool {
-	l := logger.L(ctx)
-
-	// 查找因子配置
-	scaleFactorCode := scale.NewFactorCode(string(totalScoreFactor.FactorCode))
-	factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode)
-	if !found {
-		l.Warnw("Total score factor not found in scale",
-			"factor_code", string(totalScoreFactor.FactorCode))
-		return false
-	}
-
-	// 查找匹配的解读规则
-	rule := factor.FindInterpretRule(totalScoreFactor.RawScore)
-	if rule == nil {
-		l.Debugw("No interpret rule matched for total score",
-			"factor_code", string(totalScoreFactor.FactorCode),
-			"score", totalScoreFactor.RawScore)
-		return false
-	}
-
-	// 检查规则是否有内容
-	if rule.GetConclusion() == "" {
-		l.Debugw("Interpret rule has empty conclusion",
-			"factor_code", string(totalScoreFactor.FactorCode))
-		return false
-	}
-
-	// 应用规则解读
-	evalCtx.Conclusion = rule.GetConclusion()
-	evalCtx.Suggestion = rule.GetSuggestion()
-	return true
-}
-
-// generateOverallInterpretationDefault 使用默认模板生成整体解读
-func (h *InterpretationHandler) generateOverallInterpretationDefault(evalCtx *Context) {
-	// 转换风险等级
-	interpretRiskLevel := interpretation.RiskLevel(evalCtx.RiskLevel)
-
-	// 使用领域服务提供默认整体解读
-	result := h.defaultProvider.ProvideOverall(evalCtx.TotalScore, interpretRiskLevel)
-	evalCtx.Conclusion = result.Description
-	evalCtx.Suggestion = result.Suggestion
-}
-
-// buildEvaluationResult 构建评估结果
-func (h *InterpretationHandler) buildEvaluationResult(evalCtx *Context) *assessment.EvaluationResult {
-	return assessment.NewEvaluationResult(
-		evalCtx.TotalScore,
-		evalCtx.RiskLevel,
-		evalCtx.Conclusion,
-		evalCtx.Suggestion,
-		evalCtx.FactorScores,
-	)
-}
-
-// generateAndSaveReport 生成并保存报告
-func (h *InterpretationHandler) generateAndSaveReport(ctx context.Context, evalCtx *Context) error {
-	l := logger.L(ctx)
-	assessmentID, _ := evalCtx.Assessment.ID().Value()
-	l.Infow("Generating report", "assessment_id", assessmentID)
-
-	// 生成报告
-	rpt, err := h.reportBuilder.Build(evalCtx.Assessment, evalCtx.MedicalScale, evalCtx.EvaluationResult)
-	if err != nil {
-		l.Errorw("Failed to build report",
-			"assessment_id", assessmentID,
-			"error", err)
-		return errors.WrapC(err, errorCode.ErrAssessmentInterpretFailed, "生成报告失败")
-	}
-	reportID, _ := rpt.ID().Value()
-	l.Debugw("Report built successfully", "report_id", reportID)
-
-	// 保存报告，并在报告成功落库时可靠暂存评估成功事件。
-	if err := h.reportSaver.SaveReportDurably(ctx, rpt, evalCtx.Assessment.TesteeID(), h.buildSuccessEvents(evalCtx, rpt)); err != nil {
-		reportID, _ := rpt.ID().Value()
-		assessmentID, _ := evalCtx.Assessment.ID().Value()
-		l.Errorw("Failed to save report",
-			"report_id", reportID,
-			"assessment_id", assessmentID,
-			"error", err)
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存报告失败")
-	}
-	reportID, _ = rpt.ID().Value()
-	assessmentID, _ = evalCtx.Assessment.ID().Value()
-	l.Infow("Report saved successfully", "report_id", reportID, "assessment_id", assessmentID)
-
-	// 将报告添加到 Context，供后续处理器使用
-	evalCtx.Report = rpt
 
 	return nil
 }
 
-func (h *InterpretationHandler) buildSuccessEvents(evalCtx *Context, rpt *domainReport.InterpretReport) []event.DomainEvent {
-	now := time.Now()
-	assessmentRef := evalCtx.Assessment.MedicalScaleRef()
-	if assessmentRef == nil {
-		return nil
+func (f *InterpretationFinalizer) SetReportDurableSaver(saver ReportDurableSaver) {
+	if saver == nil {
+		return
 	}
-
-	scaleVersion := ""
-	if evalCtx.MedicalScale != nil {
-		scaleVersion = evalCtx.MedicalScale.GetQuestionnaireVersion()
-	} else if !evalCtx.Assessment.QuestionnaireRef().IsEmpty() {
-		scaleVersion = evalCtx.Assessment.QuestionnaireRef().Version()
-	}
-
-	scaleRef := assessment.NewMedicalScaleRef(
-		assessmentRef.ID(),
-		assessmentRef.Code(),
-		scaleVersion,
-	)
-
-	assessmentID := evalCtx.Assessment.ID().Uint64()
-	reportID := rpt.ID().Uint64()
-	testeeID := evalCtx.Assessment.TesteeID().Uint64()
-
-	return []event.DomainEvent{
-		assessment.NewAssessmentInterpretedEvent(
-			evalCtx.Assessment.OrgID(),
-			evalCtx.Assessment.ID(),
-			evalCtx.Assessment.TesteeID(),
-			scaleRef,
-			evalCtx.EvaluationResult.TotalScore,
-			evalCtx.EvaluationResult.RiskLevel,
-			now,
-		),
-		domainReport.NewReportGeneratedEvent(
-			strconv.FormatUint(reportID, 10),
-			strconv.FormatUint(assessmentID, 10),
-			testeeID,
-			rpt.ScaleCode(),
-			scaleVersion,
-			rpt.TotalScore(),
-			string(rpt.RiskLevel()),
-			now,
-		),
-		domainStatistics.NewFootprintReportGeneratedEvent(
-			evalCtx.Assessment.OrgID(),
-			testeeID,
-			assessmentID,
-			reportID,
-			now,
-		),
-	}
+	f.ensureReportWriter().SetReportDurableSaver(saver)
 }
 
-// ==================== 日志辅助方法 ====================
-
-// logInterpretation 记录因子解读结果
-func (h *InterpretationHandler) logInterpretation(
-	ctx context.Context,
-	factorCode string,
-	factorName string,
-	score float64,
-	conclusion string,
-	suggestion string,
-) {
-	l := logger.L(ctx)
-	l.Infow("Factor interpretation generated",
-		"factor_code", factorCode,
-		"factor_name", factorName,
-		"score", score,
-		"conclusion", conclusion,
-		"suggestion", suggestion)
+func (f *InterpretationFinalizer) ensureAssessmentWriter() AssessmentResultWriter {
+	if f.assessmentWriter == nil {
+		f.assessmentWriter = repositoryAssessmentResultWriter{}
+	}
+	return f.assessmentWriter
 }
 
-// logRuleMatch 记录规则匹配
-func (h *InterpretationHandler) logRuleMatch(
-	ctx context.Context,
-	factorCode string,
-	score float64,
-	result *interpretation.InterpretResult,
-) {
-	l := logger.L(ctx)
-	l.Infow("Interpretation rule matched",
-		"factor_code", factorCode,
-		"score", score,
-		"risk_level", result.RiskLevel,
-		"label", result.Label)
-}
-
-// logUseDefault 记录使用默认模板
-func (h *InterpretationHandler) logUseDefault(
-	ctx context.Context,
-	factorCode string,
-	score float64,
-) {
-	l := logger.L(ctx)
-	l.Debugw("Using default interpretation template",
-		"factor_code", factorCode,
-		"score", score)
+func (f *InterpretationFinalizer) ensureReportWriter() InterpretReportWriter {
+	if f.reportWriter == nil {
+		f.reportWriter = &durableInterpretReportWriter{}
+	}
+	return f.reportWriter
 }

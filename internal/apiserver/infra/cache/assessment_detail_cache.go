@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	assessmentInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
@@ -132,63 +131,4 @@ func (r *CachedAssessmentRepository) deleteCache(ctx context.Context, id assessm
 // 实现其他 Repository 方法（透传，不缓存）
 func (r *CachedAssessmentRepository) FindByAnswerSheetID(ctx context.Context, answerSheetID assessment.AnswerSheetRef) (*assessment.Assessment, error) {
 	return r.repo.FindByAnswerSheetID(ctx, answerSheetID)
-}
-
-func (r *CachedAssessmentRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByTesteeID(ctx, testeeID, pagination)
-}
-
-func (r *CachedAssessmentRepository) FindByTesteeIDWithFilters(
-	ctx context.Context,
-	testeeID testee.ID,
-	status string,
-	scaleCode string,
-	riskLevel string,
-	dateFrom *time.Time,
-	dateTo *time.Time,
-	pagination assessment.Pagination,
-) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByTesteeIDWithFilters(ctx, testeeID, status, scaleCode, riskLevel, dateFrom, dateTo, pagination)
-}
-
-func (r *CachedAssessmentRepository) FindByTesteeIDAndScaleID(ctx context.Context, testeeID testee.ID, scaleRef assessment.MedicalScaleRef, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByTesteeIDAndScaleID(ctx, testeeID, scaleRef, pagination)
-}
-
-func (r *CachedAssessmentRepository) FindByPlanID(ctx context.Context, planID string, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByPlanID(ctx, planID, pagination)
-}
-
-func (r *CachedAssessmentRepository) CountByStatus(ctx context.Context, status assessment.Status) (int64, error) {
-	return r.repo.CountByStatus(ctx, status)
-}
-
-func (r *CachedAssessmentRepository) CountByTesteeIDAndStatus(ctx context.Context, testeeID testee.ID, status assessment.Status) (int64, error) {
-	return r.repo.CountByTesteeIDAndStatus(ctx, testeeID, status)
-}
-
-func (r *CachedAssessmentRepository) CountByOrgIDAndStatus(ctx context.Context, orgID int64, status assessment.Status) (int64, error) {
-	return r.repo.CountByOrgIDAndStatus(ctx, orgID, status)
-}
-
-func (r *CachedAssessmentRepository) FindByIDs(ctx context.Context, ids []assessment.ID) ([]*assessment.Assessment, error) {
-	return r.repo.FindByIDs(ctx, ids)
-}
-
-func (r *CachedAssessmentRepository) FindByOrgID(ctx context.Context, orgID int64, status *assessment.Status, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByOrgID(ctx, orgID, status, pagination)
-}
-
-func (r *CachedAssessmentRepository) FindByOrgIDAndTesteeIDs(
-	ctx context.Context,
-	orgID int64,
-	testeeIDs []testee.ID,
-	status *assessment.Status,
-	pagination assessment.Pagination,
-) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindByOrgIDAndTesteeIDs(ctx, orgID, testeeIDs, status, pagination)
-}
-
-func (r *CachedAssessmentRepository) FindPendingSubmission(ctx context.Context, pagination assessment.Pagination) ([]*assessment.Assessment, int64, error) {
-	return r.repo.FindPendingSubmission(ctx, pagination)
 }

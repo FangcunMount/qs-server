@@ -283,14 +283,16 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 	)
 
 	svc := &service{
-		assessmentRepo:    aRepo,
-		scoreRepo:         &noopScoreRepo{},
-		reportRepo:        &noopReportRepo{},
-		scaleRepo:         &fakeScaleRepo{scale: scaleDomain},
-		answerSheetRepo:   &fakeAnswerSheetRepo{answerSheet: answerSheet},
-		questionnaireRepo: &fakeQuestionnaireRepo{},
-		txRunner:          &engineRecordingTxRunner{},
-		eventStager:       &engineRecordingEventStager{},
+		assessmentRepo: aRepo,
+		scoreRepo:      &noopScoreRepo{},
+		reportRepo:     &noopReportRepo{},
+		inputResolver: NewRepositoryInputResolver(
+			&fakeScaleRepo{scale: scaleDomain},
+			&fakeAnswerSheetRepo{answerSheet: answerSheet},
+			&fakeQuestionnaireRepo{},
+		),
+		txRunner:    &engineRecordingTxRunner{},
+		eventStager: &engineRecordingEventStager{},
 	}
 
 	err = svc.Evaluate(context.Background(), 101)

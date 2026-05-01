@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -507,46 +506,22 @@ func (s *submissionService) listMyAssessmentRows(
 	page int,
 	pageSize int,
 ) ([]*AssessmentResult, int64, error) {
-	if s.reader != nil {
-		rows, total, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{
-			TesteeID:  &dto.TesteeID,
-			Statuses:  normalizeMyAssessmentStatuses(dto.Status),
-			ScaleCode: dto.ScaleCode,
-			RiskLevel: dto.RiskLevel,
-			DateFrom:  dto.DateFrom,
-			DateTo:    dto.DateTo,
-		}, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
-		if err != nil {
-			return nil, 0, err
-		}
-		items, err := assessmentRowsToResults(rows)
-		return items, total, err
+	if s.reader == nil {
+		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
 	}
-
-	testeeID := testee.NewID(dto.TesteeID)
-	pagination := assessment.NewPagination(page, pageSize)
-	list, total, err := s.repo.FindByTesteeIDWithFilters(
-		ctx,
-		testeeID,
-		dto.Status,
-		dto.ScaleCode,
-		dto.RiskLevel,
-		dto.DateFrom,
-		dto.DateTo,
-		pagination,
-	)
+	rows, total, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{
+		TesteeID:  &dto.TesteeID,
+		Statuses:  normalizeMyAssessmentStatuses(dto.Status),
+		ScaleCode: dto.ScaleCode,
+		RiskLevel: dto.RiskLevel,
+		DateFrom:  dto.DateFrom,
+		DateTo:    dto.DateTo,
+	}, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
 	if err != nil {
 		return nil, 0, err
 	}
-	items := make([]*AssessmentResult, len(list))
-	for i, a := range list {
-		item, convErr := toAssessmentResult(a)
-		if convErr != nil {
-			return nil, 0, convErr
-		}
-		items[i] = item
-	}
-	return items, total, nil
+	items, err := assessmentRowsToResults(rows)
+	return items, total, err
 }
 
 func normalizeMyAssessmentStatuses(raw string) []string {

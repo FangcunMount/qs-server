@@ -3,28 +3,30 @@ package pipeline
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // RiskLevelHandler 风险等级计算处理器
 // 职责：
 // 1. 根据因子得分和量表解读规则计算风险等级
-// 2. 保存 AssessmentScore 到仓储
+// 2. 委托 writer 保存 AssessmentScore
 // 输入：Context.FactorScores, Context.TotalScore
 // 输出：填充 Context.RiskLevel，更新 Context.FactorScores 的风险等级
 type RiskLevelHandler struct {
 	*BaseHandler
-	scoreRepo assessment.ScoreRepository
+	scoreWriter AssessmentScoreWriter
 }
 
 // NewRiskLevelHandler 创建风险等级计算处理器
 func NewRiskLevelHandler(scoreRepo assessment.ScoreRepository) *RiskLevelHandler {
+	return NewRiskLevelHandlerWithWriter(NewAssessmentScoreWriter(scoreRepo))
+}
+
+func NewRiskLevelHandlerWithWriter(scoreWriter AssessmentScoreWriter) *RiskLevelHandler {
 	return &RiskLevelHandler{
 		BaseHandler: NewBaseHandler("RiskLevelHandler"),
-		scoreRepo:   scoreRepo,
+		scoreWriter: scoreWriter,
 	}
 }
 
@@ -46,7 +48,7 @@ func (h *RiskLevelHandler) Handle(ctx context.Context, evalCtx *Context) error {
 	evalCtx.RiskLevel = riskLevel
 
 	// 3. 保存 AssessmentScore
-	if err := h.saveAssessmentScore(ctx, evalCtx); err != nil {
+	if err := h.scoreWriter.SaveAssessmentScore(ctx, evalCtx); err != nil {
 		evalCtx.SetError(err)
 		return err
 	}
@@ -179,34 +181,4 @@ func riskLevelOrder(level assessment.RiskLevel) int {
 	default:
 		return 0
 	}
-}
-
-// saveAssessmentScore 保存测评得分
-func (h *RiskLevelHandler) saveAssessmentScore(ctx context.Context, evalCtx *Context) error {
-	// 转换因子得分
-	factorScores := make([]assessment.FactorScore, 0, len(evalCtx.FactorScores))
-	for _, fs := range evalCtx.FactorScores {
-		factorScores = append(factorScores, assessment.NewFactorScore(
-			fs.FactorCode,
-			fs.FactorName,
-			fs.RawScore,
-			fs.RiskLevel,
-			fs.IsTotalScore,
-		))
-	}
-
-	// 创建 AssessmentScore
-	score := assessment.NewAssessmentScore(
-		evalCtx.Assessment.ID(),
-		evalCtx.TotalScore,
-		evalCtx.RiskLevel,
-		factorScores,
-	)
-
-	// 保存到仓储（使用带上下文的方法，传入 Assessment 对象获取必要的辅助信息）
-	if err := h.scoreRepo.SaveScoresWithContext(ctx, evalCtx.Assessment, score); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存测评得分失败")
-	}
-
-	return nil
 }

@@ -23,16 +23,6 @@ type ReportRepository interface {
 	// FindByID 根据ID查找报告
 	FindByID(ctx context.Context, id ID) (*InterpretReport, error)
 
-	// FindByAssessmentID 根据测评ID查找报告
-	// 由于 Report.ID == Assessment.ID，此方法等价于 FindByID
-	FindByAssessmentID(ctx context.Context, assessmentID AssessmentID) (*InterpretReport, error)
-
-	// FindByTesteeID 查询受试者的报告列表
-	FindByTesteeID(ctx context.Context, testeeID testee.ID, pagination Pagination) ([]*InterpretReport, int64, error)
-
-	// FindByTesteeIDs 查询受试者集合范围内的报告列表
-	FindByTesteeIDs(ctx context.Context, testeeIDs []testee.ID, pagination Pagination) ([]*InterpretReport, int64, error)
-
 	// Update 更新报告
 	Update(ctx context.Context, report *InterpretReport) error
 
@@ -41,38 +31,6 @@ type ReportRepository interface {
 
 	// ExistsByID 检查报告是否存在
 	ExistsByID(ctx context.Context, id ID) (bool, error)
-}
-
-// ==================== 查询规格 ====================
-
-// ReportQuerySpec 报告查询规格
-type ReportQuerySpec struct {
-	// 量表编码过滤
-	ScaleCode string
-
-	// 风险等级过滤
-	RiskLevel *RiskLevel
-
-	// 仅高风险
-	HighRiskOnly bool
-
-	// 分页
-	Offset int
-	Limit  int
-}
-
-// ReportQueryRepository 报告查询仓储接口（扩展查询能力）
-type ReportQueryRepository interface {
-	ReportRepository
-
-	// FindBySpec 根据规格查询报告
-	FindBySpec(ctx context.Context, spec ReportQuerySpec) ([]*InterpretReport, error)
-
-	// CountBySpec 根据规格统计报告数量
-	CountBySpec(ctx context.Context, spec ReportQuerySpec) (int64, error)
-
-	// FindHighRiskReports 查找高风险报告
-	FindHighRiskReports(ctx context.Context, offset, limit int) ([]*InterpretReport, error)
 }
 
 // ==================== 分页参数 ====================

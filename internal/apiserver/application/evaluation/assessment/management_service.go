@@ -230,85 +230,15 @@ func (s *managementService) listAssessmentResults(
 	pagination assessment.Pagination,
 	conditions *assessmentListConditions,
 ) ([]*AssessmentResult, int64, error) {
-	if s.reader != nil {
-		rows, total, err := s.queryAssessmentRows(ctx, dto, orgID, pagination, conditions)
-		if err != nil {
-			return nil, 0, err
-		}
-		results, err := assessmentRowsToResults(rows)
-		return results, total, err
+	if s.reader == nil {
+		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
 	}
-
-	assessments, total, err := s.queryAssessments(ctx, dto, orgID, pagination, conditions)
+	rows, total, err := s.queryAssessmentRows(ctx, dto, orgID, pagination, conditions)
 	if err != nil {
 		return nil, 0, err
 	}
-
-	filteredAssessments, err := filterAssessmentsForList(dto, assessments, conditions)
-	if err != nil {
-		return nil, 0, err
-	}
-
-	results, err := toAssessmentListResults(filteredAssessments)
-	if err != nil {
-		return nil, 0, err
-	}
-	return results, total, nil
-}
-
-func (s *managementService) queryAssessments(
-	ctx context.Context,
-	dto ListAssessmentsDTO,
-	orgID int64,
-	pagination assessment.Pagination,
-	conditions *assessmentListConditions,
-) ([]*assessment.Assessment, int64, error) {
-	l := logger.L(ctx)
-
-	switch {
-	case dto.RestrictToAccessScope:
-		assessments, total, err := s.repo.FindByOrgIDAndTesteeIDs(
-			ctx,
-			orgID,
-			toAccessibleTesteeIDs(dto.AccessibleTesteeIDs),
-			conditions.status,
-			pagination,
-		)
-		if err != nil {
-			l.Errorw("按访问范围查询测评列表失败",
-				"org_id", dto.OrgID,
-				"accessible_testees", len(dto.AccessibleTesteeIDs),
-				"error", err.Error(),
-			)
-			return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
-		}
-		return assessments, total, nil
-	case conditions.testeeID != nil:
-		assessments, total, err := s.repo.FindByTesteeID(ctx, *conditions.testeeID, pagination)
-		if err != nil {
-			l.Errorw("查询受试者测评列表失败",
-				"testee_id", conditions.rawTesteeID,
-				"error", err.Error(),
-			)
-			return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
-		}
-		return assessments, total, nil
-	case dto.OrgID == 0:
-		l.Warnw("未提供 testee_id 和 org_id，无法查询",
-			"org_id", dto.OrgID,
-		)
-		return make([]*assessment.Assessment, 0), 0, nil
-	default:
-		assessments, total, err := s.repo.FindByOrgID(ctx, orgID, conditions.status, pagination)
-		if err != nil {
-			l.Errorw("查询组织测评列表失败",
-				"org_id", dto.OrgID,
-				"error", err.Error(),
-			)
-			return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
-		}
-		return assessments, total, nil
-	}
+	results, err := assessmentRowsToResults(rows)
+	return results, total, err
 }
 
 func (s *managementService) queryAssessmentRows(
@@ -358,69 +288,6 @@ func (s *managementService) queryAssessmentRows(
 	return rows, total, nil
 }
 
-func toAccessibleTesteeIDs(ids []uint64) []testee.ID {
-	testeeIDs := make([]testee.ID, 0, len(ids))
-	for _, id := range ids {
-		testeeIDs = append(testeeIDs, testee.NewID(id))
-	}
-	return testeeIDs
-}
-
-func filterAssessmentsForList(
-	dto ListAssessmentsDTO,
-	assessments []*assessment.Assessment,
-	conditions *assessmentListConditions,
-) ([]*assessment.Assessment, error) {
-	if conditions.testeeID == nil {
-		return assessments, nil
-	}
-	if conditions.invalidStatus {
-		return make([]*assessment.Assessment, 0), nil
-	}
-
-	filteredAssessments := make([]*assessment.Assessment, 0, len(assessments))
-	for _, item := range assessments {
-		matchesOrg, err := assessmentMatchesOrg(item, dto.OrgID)
-		if err != nil {
-			return nil, err
-		}
-		if !matchesOrg {
-			continue
-		}
-		if conditions.status != nil && item.Status() != *conditions.status {
-			continue
-		}
-		filteredAssessments = append(filteredAssessments, item)
-	}
-
-	return filteredAssessments, nil
-}
-
-func assessmentMatchesOrg(item *assessment.Assessment, orgID uint64) (bool, error) {
-	if orgID == 0 {
-		return true, nil
-	}
-
-	assessmentOrgID, err := safeconv.Int64ToUint64(item.OrgID())
-	if err != nil {
-		return false, errors.WithCode(errorCode.ErrDatabase, "测评机构ID超出安全范围")
-	}
-	return assessmentOrgID == orgID, nil
-}
-
-func toAssessmentListResults(assessments []*assessment.Assessment) ([]*AssessmentResult, error) {
-	results := make([]*AssessmentResult, 0, len(assessments))
-	for _, item := range assessments {
-		result, err := toAssessmentResult(item)
-		if err != nil {
-			return nil, err
-		}
-		results = append(results, result)
-	}
-	return results, nil
-}
-
-// Retry 重试失败的测评
 func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
