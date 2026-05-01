@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -25,6 +26,7 @@ const (
 // 行为者：所有用户
 type queryService struct {
 	repo        scale.Repository
+	reader      scalereadmodel.ScaleReader
 	identitySvc iambridge.IdentityResolver
 	listCache   scalelistcache.PublishedListCache
 	hotset      cachetarget.HotsetRecorder
@@ -33,12 +35,21 @@ type queryService struct {
 
 // NewQueryService 创建量表查询服务
 func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
+	return NewQueryServiceWithReadModel(repo, nil, identitySvc, listCache, hotset, hotRankReaders...)
+}
+
+// NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
+func NewQueryServiceWithReadModel(repo scale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
 	var hotRank scale.ScaleHotRankReadModel
 	if len(hotRankReaders) > 0 {
 		hotRank = hotRankReaders[0]
 	}
+	if reader == nil {
+		reader = scaleRepositoryReadModel{repo: repo}
+	}
 	return &queryService{
 		repo:        repo,
+		reader:      reader,
 		identitySvc: identitySvc,
 		listCache:   listCache,
 		hotset:      hotset,
@@ -91,20 +102,24 @@ func (s *queryService) List(ctx context.Context, dto ListScalesDTO) (*ScaleSumma
 	if dto.PageSize > 100 {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "每页数量不能超过100")
 	}
+	filter, err := s.normalizeScaleFilter(dto.Filter)
+	if err != nil {
+		return nil, err
+	}
 
 	// 2. 获取量表摘要列表
-	items, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	items, err := s.reader.ListScales(ctx, filter, scalereadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表列表失败")
 	}
 
 	// 3. 获取总数
-	total, err := s.repo.CountWithConditions(ctx, dto.Conditions)
+	total, err := s.reader.CountScales(ctx, filter)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	return toSummaryListResult(ctx, items, total, s.identitySvc), nil
+	return toSummaryRowsResult(ctx, items, total, s.identitySvc), nil
 }
 
 // GetPublishedByCode 获取已发布的量表
@@ -143,35 +158,35 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListScalesDTO) (*S
 	}
 
 	// 2. 添加状态过滤条件
-	conditions := dto.Conditions
-	if conditions == nil {
-		conditions = make(map[string]interface{})
+	filter, err := s.normalizeScaleFilter(dto.Filter)
+	if err != nil {
+		return nil, err
 	}
-	conditions["status"] = scale.StatusPublished.Value()
+	filter.Status = scale.StatusPublished.Value()
 
 	// 3. 尝试使用全量列表缓存（仅当没有额外筛选条件）
-	if len(conditions) == 1 && s.listCache != nil {
+	if filter.Title == "" && filter.Category == "" && s.listCache != nil {
 		if cached, ok := s.listCache.GetPage(ctx, dto.Page, dto.PageSize); ok {
 			return scaleSummaryListResultFromCachePage(cached), nil
 		}
 	}
 
 	// 3. 获取量表摘要列表
-	items, err := s.repo.FindSummaryList(ctx, dto.Page, dto.PageSize, conditions)
+	items, err := s.reader.ListScales(ctx, filter, scalereadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表列表失败")
 	}
 
 	// 4. 获取总数
-	total, err := s.repo.CountWithConditions(ctx, conditions)
+	total, err := s.reader.CountScales(ctx, filter)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取量表总数失败")
 	}
 
-	result := toSummaryListResult(ctx, items, total, s.identitySvc)
+	result := toSummaryRowsResult(ctx, items, total, s.identitySvc)
 
 	// 6. 缓存回填：仅在纯已发布列表且缓存启用时尝试重建
-	if len(conditions) == 1 && s.listCache != nil {
+	if filter.Title == "" && filter.Category == "" && s.listCache != nil {
 		go func() {
 			_ = s.listCache.Rebuild(context.Background())
 		}()
@@ -240,6 +255,17 @@ func (s *queryService) recordHotset(ctx context.Context, target cachetarget.Warm
 		return
 	}
 	_ = s.hotset.Record(ctx, target)
+}
+
+func (s *queryService) normalizeScaleFilter(filter scalereadmodel.ScaleFilter) (scalereadmodel.ScaleFilter, error) {
+	if filter.Status != "" {
+		parsed, ok := scale.ParseStatus(filter.Status)
+		if !ok {
+			return scalereadmodel.ScaleFilter{}, errors.WithCode(errorCode.ErrInvalidArgument, "状态无效")
+		}
+		filter.Status = parsed.Value()
+	}
+	return filter, nil
 }
 
 func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]scale.HotScaleSummary, error) {

@@ -43,10 +43,4 @@ func (g moduleGraph) postWireQRCodeService() {
 	if c.EvaluationModule != nil {
 		c.EvaluationModule.SetQRCodeService(c.QRCodeService)
 	}
-	if c.SurveyModule != nil {
-		c.SurveyModule.SetQRCodeService(c.QRCodeService)
-	}
-	if c.ScaleModule != nil {
-		c.ScaleModule.SetQRCodeService(c.QRCodeService)
-	}
 }

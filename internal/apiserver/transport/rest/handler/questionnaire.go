@@ -7,13 +7,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -464,44 +460,43 @@ func (h *QuestionnaireHandler) BatchUpdateQuestions(c *gin.Context) {
 			})
 		}
 
-		// 转换 validation_rules（直接使用前端传递的值，不做任何转换）
-		validationRules := make([]validation.ValidationRule, 0, len(q.ValidationRules))
+		validationRules := make([]questionnaire.ValidationRuleDTO, 0, len(q.ValidationRules))
 		for _, rule := range q.ValidationRules {
-			ruleType := validation.RuleType(rule.RuleType)
-			validationRules = append(validationRules, validation.NewValidationRule(ruleType, rule.TargetValue))
+			validationRules = append(validationRules, questionnaire.ValidationRuleDTO{
+				RuleType:    rule.RuleType,
+				TargetValue: rule.TargetValue,
+			})
 		}
 
 		// 从 validation_rules 中判断是否必填（用于兼容性）
 		required := false
 		for _, rule := range validationRules {
-			if rule.GetRuleType() == validation.RuleTypeRequired {
+			if rule.RuleType == "required" {
 				required = true
 				break
 			}
 		}
 
 		// 转换 calculation_rule
-		var calculationRule *calculation.CalculationRule
+		var calculationRule *questionnaire.CalculationRuleDTO
 		if q.CalculationRule != nil && q.CalculationRule.FormulaType != "" {
-			formulaType := calculation.FormulaType(q.CalculationRule.FormulaType)
-			calculationRule = calculation.NewCalculationRule(formulaType, []string{})
+			calculationRule = &questionnaire.CalculationRuleDTO{FormulaType: q.CalculationRule.FormulaType}
 		}
 
 		// 转换 show_controller
-		var showController *domainQuestionnaire.ShowController
+		var showController *questionnaire.ShowControllerDTO
 		if q.ShowController != nil {
-			conditions := make([]domainQuestionnaire.ShowControllerCondition, 0, len(q.ShowController.Questions))
+			conditions := make([]questionnaire.ShowControllerConditionDTO, 0, len(q.ShowController.Questions))
 			for _, condDTO := range q.ShowController.Questions {
-				optionCodes := make([]meta.Code, 0, len(condDTO.SelectOptionCodes))
-				for _, codeStr := range condDTO.SelectOptionCodes {
-					optionCodes = append(optionCodes, meta.NewCode(codeStr))
-				}
-				conditions = append(conditions, domainQuestionnaire.NewShowControllerCondition(
-					meta.NewCode(condDTO.Code),
-					optionCodes,
-				))
+				conditions = append(conditions, questionnaire.ShowControllerConditionDTO{
+					Code:              condDTO.Code,
+					SelectOptionCodes: append([]string(nil), condDTO.SelectOptionCodes...),
+				})
 			}
-			showController = domainQuestionnaire.NewShowController(q.ShowController.Rule, conditions)
+			showController = &questionnaire.ShowControllerDTO{
+				Rule:      q.ShowController.Rule,
+				Questions: conditions,
+			}
 		}
 
 		questions = append(questions, questionnaire.QuestionDTO{
@@ -580,29 +575,21 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 		return
 	}
 
-	conditions := make(map[string]interface{})
+	filter := questionnaire.ListQuestionnairesDTO{
+		Page:     page,
+		PageSize: pageSize,
+	}
 	if status := c.Query("status"); status != "" {
-		if parsed, ok := domainQuestionnaire.ParseStatus(status); ok {
-			conditions["status"] = parsed.String()
-		} else {
-			h.Error(c, errors.WithCode(code.ErrQuestionnaireInvalidInput, "状态无效"))
-			return
-		}
+		filter.Filter.Status = status
 	}
 	if title := c.Query("title"); title != "" {
-		conditions["title"] = title
+		filter.Filter.Title = title
 	}
 	if typ := c.Query("type"); typ != "" {
-		conditions["type"] = typ
+		filter.Filter.Type = typ
 	}
 
-	dto := questionnaire.ListQuestionnairesDTO{
-		Page:       page,
-		PageSize:   pageSize,
-		Conditions: conditions,
-	}
-
-	result, err := h.queryService.List(c.Request.Context(), dto)
+	result, err := h.queryService.List(c.Request.Context(), filter)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -660,12 +647,11 @@ func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 	}
 
 	dto := questionnaire.ListQuestionnairesDTO{
-		Page:       page,
-		PageSize:   pageSize,
-		Conditions: make(map[string]interface{}),
+		Page:     page,
+		PageSize: pageSize,
 	}
 	if typ := c.Query("type"); typ != "" {
-		dto.Conditions["type"] = typ
+		dto.Filter.Type = typ
 	}
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)

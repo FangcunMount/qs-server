@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -521,25 +520,19 @@ func (h *ScaleHandler) List(c *gin.Context) {
 	}
 
 	dto := scale.ListScalesDTO{
-		Page:       page,
-		PageSize:   pageSize,
-		Conditions: make(map[string]interface{}),
+		Page:     page,
+		PageSize: pageSize,
 	}
 
 	// 解析查询条件
 	if status := c.Query("status"); status != "" {
-		if parsed, ok := domainScale.ParseStatus(status); ok {
-			dto.Conditions["status"] = parsed.String()
-		} else {
-			h.Error(c, errors.WithCode(code.ErrInvalidArgument, "状态无效"))
-			return
-		}
+		dto.Filter.Status = status
 	}
 	if title := c.Query("title"); title != "" {
-		dto.Conditions["title"] = title
+		dto.Filter.Title = title
 	}
 	if category := c.Query("category"); category != "" {
-		dto.Conditions["category"] = category
+		dto.Filter.Category = category
 	}
 
 	result, err := h.queryService.List(c.Request.Context(), dto)
@@ -613,9 +606,8 @@ func (h *ScaleHandler) ListPublished(c *gin.Context) {
 	}
 
 	dto := scale.ListScalesDTO{
-		Page:       page,
-		PageSize:   pageSize,
-		Conditions: make(map[string]interface{}),
+		Page:     page,
+		PageSize: pageSize,
 	}
 
 	result, err := h.queryService.ListPublished(c.Request.Context(), dto)

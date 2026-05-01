@@ -1,5 +1,7 @@
 package scale
 
+import "github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
+
 // ============= DTO 定义 =============
 // DTOs 用于应用服务层的输入参数
 
@@ -106,9 +108,9 @@ type UpdateFactorInterpretRulesDTO struct {
 
 // ListScalesDTO 查询量表列表 DTO
 type ListScalesDTO struct {
-	Page       int                    // 页码
-	PageSize   int                    // 每页数量
-	Conditions map[string]interface{} // 查询条件
+	Page     int                        // 页码
+	PageSize int                        // 每页数量
+	Filter   scalereadmodel.ScaleFilter // 查询条件
 }
 
 // ListHotScalesDTO 查询热门量表列表 DTO。

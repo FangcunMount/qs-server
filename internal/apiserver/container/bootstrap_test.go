@@ -296,18 +296,15 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.CodesService = &codesServiceStub{}
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
-	questionnaireHandler := handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil)
-	answerSheetHandler := handlerpkg.NewAnswerSheetHandler(nil, nil)
-	scaleHandler := handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil)
 	evaluationHandler := handlerpkg.NewEvaluationHandler(nil, nil, nil, nil)
 	planHandler := handlerpkg.NewPlanHandler(nil, nil)
 	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
 
 	c.SurveyModule = &assembler.SurveyModule{
-		Questionnaire: &assembler.QuestionnaireSubModule{Handler: questionnaireHandler},
-		AnswerSheet:   &assembler.AnswerSheetSubModule{Handler: answerSheetHandler},
+		Questionnaire: &assembler.QuestionnaireSubModule{},
+		AnswerSheet:   &assembler.AnswerSheetSubModule{},
 	}
-	c.ScaleModule = &assembler.ScaleModule{Handler: scaleHandler}
+	c.ScaleModule = &assembler.ScaleModule{}
 	c.ActorModule = &assembler.ActorModule{}
 	c.EvaluationModule = &assembler.EvaluationModule{Handler: evaluationHandler}
 	c.PlanModule = &assembler.PlanModule{Handler: planHandler}
@@ -317,11 +314,11 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.RateLimit != nil {
 		t.Fatalf("RateLimit = %#v, want nil passthrough before router defaulting", deps.RateLimit)
 	}
-	if deps.Survey.QuestionnaireHandler != questionnaireHandler || deps.Survey.AnswerSheetHandler != answerSheetHandler {
-		t.Fatalf("survey handlers not extracted correctly: %#v", deps.Survey)
+	if deps.Survey.QuestionnaireHandler == nil || deps.Survey.AnswerSheetHandler == nil {
+		t.Fatalf("survey handlers not composed correctly: %#v", deps.Survey)
 	}
-	if deps.Scale.Handler != scaleHandler {
-		t.Fatalf("scale handler not extracted correctly: %#v", deps.Scale)
+	if deps.Scale.Handler == nil {
+		t.Fatalf("scale handler not composed correctly: %#v", deps.Scale)
 	}
 	if deps.Evaluation.Handler != evaluationHandler || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
 		t.Fatalf("evaluation/plan/statistics handlers not extracted correctly")

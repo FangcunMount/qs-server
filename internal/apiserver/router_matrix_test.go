@@ -261,16 +261,10 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 func newRouterTestContainer() *container.Container {
 	clinicianQuery := &routerClinicianQueryStub{}
 	surveyModule := &assembler.SurveyModule{
-		Questionnaire: &assembler.QuestionnaireSubModule{
-			Handler: handlerpkg.NewQuestionnaireHandler(nil, nil, nil, nil),
-		},
-		AnswerSheet: &assembler.AnswerSheetSubModule{
-			Handler: handlerpkg.NewAnswerSheetHandler(nil, nil),
-		},
+		Questionnaire: &assembler.QuestionnaireSubModule{},
+		AnswerSheet:   &assembler.AnswerSheetSubModule{},
 	}
-	scaleModule := &assembler.ScaleModule{
-		Handler: handlerpkg.NewScaleHandler(nil, nil, nil, nil, nil),
-	}
+	scaleModule := &assembler.ScaleModule{}
 	evaluationModule := &assembler.EvaluationModule{
 		Handler: handlerpkg.NewEvaluationHandler(nil, nil, nil, nil),
 	}

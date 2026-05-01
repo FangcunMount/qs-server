@@ -6,6 +6,7 @@ import (
 
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -42,6 +43,37 @@ func (r *scaleRepoBindingStub) ExistsByCode(_ context.Context, _ string) (bool, 
 type questionnaireRepoBindingStub struct {
 	byCode    map[string]*domainQuestionnaire.Questionnaire
 	byVersion map[string]*domainQuestionnaire.Questionnaire
+}
+
+type questionnaireCatalogBindingStub struct {
+	byCode    map[string]*questionnairecatalog.Item
+	byVersion map[string]*questionnairecatalog.Item
+}
+
+func (s *questionnaireCatalogBindingStub) FindQuestionnaire(_ context.Context, code string) (*questionnairecatalog.Item, error) {
+	if q, ok := s.byCode[code]; ok {
+		return q, nil
+	}
+	return nil, domainQuestionnaire.ErrNotFound
+}
+
+func (s *questionnaireCatalogBindingStub) FindQuestionnaireVersion(_ context.Context, code, version string) (*questionnairecatalog.Item, error) {
+	if q, ok := s.byVersion[code+":"+version]; ok {
+		return q, nil
+	}
+	return nil, domainQuestionnaire.ErrNotFound
+}
+
+func (s *questionnaireCatalogBindingStub) FindPublishedQuestionnaire(_ context.Context, code string) (*questionnairecatalog.Item, error) {
+	return s.FindQuestionnaire(context.Background(), code)
+}
+
+func questionnaireCatalogItem(q *domainQuestionnaire.Questionnaire) *questionnairecatalog.Item {
+	return &questionnairecatalog.Item{
+		Code:    q.GetCode().String(),
+		Version: q.GetVersion().String(),
+		Type:    q.GetType().String(),
+	}
 }
 
 func (r *questionnaireRepoBindingStub) Create(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
@@ -128,9 +160,9 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsSurveyQuestionnaire(t *t
 
 	svc := &lifecycleService{
 		repo: &scaleRepoBindingStub{},
-		questionnaireRepo: &questionnaireRepoBindingStub{
-			byCode: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-SURVEY": q,
+		questionnaireCatalog: &questionnaireCatalogBindingStub{
+			byCode: map[string]*questionnairecatalog.Item{
+				"Q-SURVEY": questionnaireCatalogItem(q),
 			},
 		},
 	}
@@ -167,12 +199,12 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsOtherScaleBinding(t *tes
 				"Q-MS": otherScale,
 			},
 		},
-		questionnaireRepo: &questionnaireRepoBindingStub{
-			byCode: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-MS": q,
+		questionnaireCatalog: &questionnaireCatalogBindingStub{
+			byCode: map[string]*questionnairecatalog.Item{
+				"Q-MS": questionnaireCatalogItem(q),
 			},
-			byVersion: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-MS:1.0": q,
+			byVersion: map[string]*questionnairecatalog.Item{
+				"Q-MS:1.0": questionnaireCatalogItem(q),
 			},
 		},
 	}
@@ -209,12 +241,12 @@ func TestValidateMedicalScaleQuestionnaireBindingAllowsSameScaleRebind(t *testin
 				"Q-MS": scaleItem,
 			},
 		},
-		questionnaireRepo: &questionnaireRepoBindingStub{
-			byCode: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-MS": q,
+		questionnaireCatalog: &questionnaireCatalogBindingStub{
+			byCode: map[string]*questionnairecatalog.Item{
+				"Q-MS": questionnaireCatalogItem(q),
 			},
-			byVersion: map[string]*domainQuestionnaire.Questionnaire{
-				"Q-MS:1.0": q,
+			byVersion: map[string]*questionnairecatalog.Item{
+				"Q-MS:1.0": questionnaireCatalogItem(q),
 			},
 		},
 	}

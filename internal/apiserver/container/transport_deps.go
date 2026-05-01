@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
@@ -24,14 +25,28 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 
 	if c.SurveyModule != nil {
 		if c.SurveyModule.Questionnaire != nil {
-			deps.Survey.QuestionnaireHandler = c.SurveyModule.Questionnaire.Handler
+			deps.Survey.QuestionnaireHandler = handler.NewQuestionnaireHandler(
+				c.SurveyModule.Questionnaire.LifecycleService,
+				c.SurveyModule.Questionnaire.ContentService,
+				c.SurveyModule.Questionnaire.QueryService,
+				c.QRCodeService,
+			)
 		}
 		if c.SurveyModule.AnswerSheet != nil {
-			deps.Survey.AnswerSheetHandler = c.SurveyModule.AnswerSheet.Handler
+			deps.Survey.AnswerSheetHandler = handler.NewAnswerSheetHandler(
+				c.SurveyModule.AnswerSheet.ManagementService,
+				c.SurveyModule.AnswerSheet.SubmissionService,
+			)
 		}
 	}
 	if c.ScaleModule != nil {
-		deps.Scale.Handler = c.ScaleModule.Handler
+		deps.Scale.Handler = handler.NewScaleHandler(
+			c.ScaleModule.LifecycleService,
+			c.ScaleModule.FactorService,
+			c.ScaleModule.QueryService,
+			c.ScaleModule.CategoryService,
+			c.QRCodeService,
+		)
 	}
 	if c.ActorModule != nil {
 		deps.Actor.TesteeManagementService = c.ActorModule.TesteeManagementService

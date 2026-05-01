@@ -98,3 +98,8 @@ type QuestionnaireQueryService interface {
 	// 场景：答题者浏览可答题的问卷列表
 	ListPublished(ctx context.Context, dto ListQuestionnairesDTO) (*QuestionnaireSummaryListResult, error)
 }
+
+// ScaleQuestionnaireBindingSyncer 同步量表绑定的问卷版本。
+type ScaleQuestionnaireBindingSyncer interface {
+	SyncQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error
+}

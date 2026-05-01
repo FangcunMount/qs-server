@@ -4,6 +4,7 @@ import (
 	"context"
 	"testing"
 
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -163,7 +164,7 @@ func TestSyncScaleQuestionnaireVersion(t *testing.T) {
 						tt.code: q,
 					},
 				},
-				scaleRepo: scaleRepo,
+				scaleSyncer: scaleApp.NewQuestionnaireBindingSyncer(scaleRepo),
 			}
 
 			if err := svc.syncScaleQuestionnaireVersion(ctx, tt.code, "2.0"); err != nil {

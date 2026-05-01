@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -18,7 +17,7 @@ import (
 // 行为者：问卷设计者/管理员
 type lifecycleService struct {
 	repo           questionnaire.Repository
-	scaleRepo      domainScale.Repository
+	scaleSyncer    ScaleQuestionnaireBindingSyncer
 	validator      questionnaire.Validator
 	lifecycle      questionnaire.Lifecycle
 	eventPublisher event.EventPublisher
@@ -27,14 +26,14 @@ type lifecycleService struct {
 // NewLifecycleService 创建问卷生命周期服务
 func NewLifecycleService(
 	repo questionnaire.Repository,
-	scaleRepo domainScale.Repository,
+	scaleSyncer ScaleQuestionnaireBindingSyncer,
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
 	eventPublisher event.EventPublisher,
 ) QuestionnaireLifecycleService {
 	return &lifecycleService{
 		repo:           repo,
-		scaleRepo:      scaleRepo,
+		scaleSyncer:    scaleSyncer,
 		validator:      validator,
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
@@ -655,7 +654,7 @@ func (s *lifecycleService) publishEvents(ctx context.Context, q *questionnaire.Q
 }
 
 func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {
-	if s.scaleRepo == nil || questionnaireCode == "" || version == "" {
+	if s.scaleSyncer == nil || questionnaireCode == "" || version == "" {
 		return nil
 	}
 
@@ -670,24 +669,5 @@ func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, qu
 		return nil
 	}
 
-	item, err := s.scaleRepo.FindByQuestionnaireCode(ctx, questionnaireCode)
-	if err != nil {
-		if domainScale.IsNotFound(err) {
-			return nil
-		}
-		return errors.WrapC(err, errorCode.ErrDatabase, "查询关联量表失败")
-	}
-	if item == nil || item.GetQuestionnaireVersion() == version {
-		return nil
-	}
-
-	baseInfo := domainScale.BaseInfo{}
-	if err := baseInfo.UpdateQuestionnaire(item, item.GetQuestionnaireCode(), version); err != nil {
-		return errors.WrapC(err, errorCode.ErrInvalidArgument, "同步量表问卷版本失败")
-	}
-	if err := s.scaleRepo.Update(ctx, item); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存量表问卷版本失败")
-	}
-
-	return nil
+	return s.scaleSyncer.SyncQuestionnaireVersion(ctx, questionnaireCode, version)
 }

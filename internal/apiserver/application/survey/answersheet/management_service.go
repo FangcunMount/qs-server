@@ -5,21 +5,29 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // managementService 答卷管理服务实现
 // 行为者：管理员
 type managementService struct {
-	repo answersheet.Repository
+	repo   answersheet.Repository
+	reader surveyreadmodel.AnswerSheetReader
 }
 
 // NewManagementService 创建答卷管理服务
 func NewManagementService(
 	repo answersheet.Repository,
+	readers ...surveyreadmodel.AnswerSheetReader,
 ) AnswerSheetManagementService {
+	reader := surveyreadmodel.AnswerSheetReader(answerSheetRepositoryReadModel{repo: repo})
+	if len(readers) > 0 && readers[0] != nil {
+		reader = readers[0]
+	}
 	return &managementService{
-		repo: repo,
+		repo:   repo,
+		reader: reader,
 	}
 }
 
@@ -48,21 +56,21 @@ func (s *managementService) List(ctx context.Context, dto ListAnswerSheetsDTO) (
 	if err := validateManagementListDTO(dto); err != nil {
 		return nil, err
 	}
-	conditions := buildListConditions(dto)
+	filter := buildListFilter(dto)
 
 	// 3. 查询答卷摘要列表
-	sheets, err := s.repo.FindSummaryListByQuestionnaire(ctx, dto.QuestionnaireCode, dto.Page, dto.PageSize)
+	sheets, err := s.reader.ListAnswerSheets(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询答卷列表失败")
 	}
 
 	// 4. 获取总数
-	total, err := s.repo.CountWithConditions(ctx, conditions)
+	total, err := s.reader.CountAnswerSheets(ctx, filter)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取答卷总数失败")
 	}
 
-	return toSummaryListResult(sheets, total), nil
+	return toSummaryRowsResult(sheets, total), nil
 }
 
 func validateManagementListDTO(dto ListAnswerSheetsDTO) error {
@@ -78,24 +86,13 @@ func validateManagementListDTO(dto ListAnswerSheetsDTO) error {
 	return nil
 }
 
-func buildListConditions(dto ListAnswerSheetsDTO) map[string]interface{} {
-	conditions := make(map[string]interface{})
-	if dto.QuestionnaireCode != "" {
-		conditions["questionnaire_code"] = dto.QuestionnaireCode
+func buildListFilter(dto ListAnswerSheetsDTO) surveyreadmodel.AnswerSheetFilter {
+	return surveyreadmodel.AnswerSheetFilter{
+		QuestionnaireCode: dto.QuestionnaireCode,
+		FillerID:          dto.FillerID,
+		StartTime:         dto.StartTime,
+		EndTime:           dto.EndTime,
 	}
-	if dto.FillerID != nil && *dto.FillerID > 0 {
-		conditions["filler_id"] = *dto.FillerID
-	}
-	if dto.StartTime != nil {
-		conditions["start_time"] = dto.StartTime
-	}
-	if dto.EndTime != nil {
-		conditions["end_time"] = dto.EndTime
-	}
-	for k, v := range dto.Conditions {
-		conditions[k] = v
-	}
-	return conditions
 }
 
 // Delete 删除答卷

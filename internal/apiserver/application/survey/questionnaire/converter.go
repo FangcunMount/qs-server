@@ -6,6 +6,7 @@ import (
 
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -186,6 +187,33 @@ func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuesti
 	return result
 }
 
+func toQuestionnaireSummaryRowsResult(ctx context.Context, items []surveyreadmodel.QuestionnaireSummaryRow, total int64, identitySvc iambridge.IdentityResolver) *QuestionnaireSummaryListResult {
+	userNames := resolveQuestionnaireRowUserNames(ctx, items, identitySvc)
+	result := &QuestionnaireSummaryListResult{
+		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
+		Total: total,
+	}
+
+	for _, item := range items {
+		result.Items = append(result.Items, &QuestionnaireSummaryResult{
+			Code:          item.Code,
+			Version:       item.Version,
+			Title:         item.Title,
+			Description:   item.Description,
+			ImgUrl:        item.ImgURL,
+			Status:        item.Status,
+			Type:          item.Type,
+			QuestionCount: item.QuestionCount,
+			CreatedBy:     displayIdentityName(item.CreatedBy, userNames),
+			CreatedAt:     item.CreatedAt,
+			UpdatedBy:     displayIdentityName(item.UpdatedBy, userNames),
+			UpdatedAt:     item.UpdatedAt,
+		})
+	}
+
+	return result
+}
+
 func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Questionnaire, identitySvc iambridge.IdentityResolver) map[string]string {
 	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
@@ -193,6 +221,17 @@ func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Question
 			continue
 		}
 		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
+	}
+	if identitySvc == nil || !identitySvc.IsEnabled() {
+		return nil
+	}
+	return identitySvc.ResolveUserNames(ctx, userIDs)
+}
+
+func resolveQuestionnaireRowUserNames(ctx context.Context, items []surveyreadmodel.QuestionnaireSummaryRow, identitySvc iambridge.IdentityResolver) map[string]string {
+	userIDs := make([]meta.ID, 0, len(items)*2)
+	for _, item := range items {
+		userIDs = append(userIDs, item.CreatedBy, item.UpdatedBy)
 	}
 	if identitySvc == nil || !identitySvc.IsEnabled() {
 		return nil

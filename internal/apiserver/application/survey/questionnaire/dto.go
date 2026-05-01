@@ -1,9 +1,7 @@
 package questionnaire
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 )
 
 // ============= DTO 定义 =============
@@ -59,20 +57,43 @@ type OptionDTO struct {
 
 // QuestionDTO 问题 DTO（用于批量更新）
 type QuestionDTO struct {
-	Code            string                        // 问题编码
-	Stem            string                        // 题干
-	Type            string                        // 问题类型
-	Options         []OptionDTO                   // 选项列表
-	Required        bool                          // 是否必填
-	Description     string                        // 问题描述
-	ValidationRules []validation.ValidationRule   // 校验规则
-	CalculationRule *calculation.CalculationRule  // 计算规则
-	ShowController  *questionnaire.ShowController // 显示控制器
+	Code            string              // 问题编码
+	Stem            string              // 题干
+	Type            string              // 问题类型
+	Options         []OptionDTO         // 选项列表
+	Required        bool                // 是否必填
+	Description     string              // 问题描述
+	ValidationRules []ValidationRuleDTO // 校验规则
+	CalculationRule *CalculationRuleDTO // 计算规则
+	ShowController  *ShowControllerDTO  // 显示控制器
+}
+
+// ValidationRuleDTO 是应用层接收的校验规则 DTO。
+type ValidationRuleDTO struct {
+	RuleType    string // 规则类型
+	TargetValue string // 目标值
+}
+
+// CalculationRuleDTO 是应用层接收的计算规则 DTO。
+type CalculationRuleDTO struct {
+	FormulaType string // 公式类型
+}
+
+// ShowControllerDTO 是应用层接收的显示控制器 DTO。
+type ShowControllerDTO struct {
+	Rule      string                       // 逻辑规则
+	Questions []ShowControllerConditionDTO // 条件问题列表
+}
+
+// ShowControllerConditionDTO 是应用层接收的显示控制条件 DTO。
+type ShowControllerConditionDTO struct {
+	Code              string   // 问题编码
+	SelectOptionCodes []string // 被选中的选项编码
 }
 
 // ListQuestionnairesDTO 查询问卷列表 DTO
 type ListQuestionnairesDTO struct {
-	Page       int                    // 页码
-	PageSize   int                    // 每页数量
-	Conditions map[string]interface{} // 查询条件
+	Page     int                                 // 页码
+	PageSize int                                 // 每页数量
+	Filter   surveyreadmodel.QuestionnaireFilter // 查询条件
 }

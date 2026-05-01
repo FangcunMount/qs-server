@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
@@ -17,6 +18,7 @@ import (
 // 行为者：所有用户
 type queryService struct {
 	repo        questionnaire.Repository
+	reader      surveyreadmodel.QuestionnaireReader
 	identitySvc iambridge.IdentityResolver
 	hotset      cachetarget.HotsetRecorder
 }
@@ -26,9 +28,15 @@ func NewQueryService(
 	repo questionnaire.Repository,
 	identitySvc iambridge.IdentityResolver,
 	hotset cachetarget.HotsetRecorder,
+	readers ...surveyreadmodel.QuestionnaireReader,
 ) QuestionnaireQueryService {
+	reader := surveyreadmodel.QuestionnaireReader(questionnaireRepositoryReadModel{repo: repo})
+	if len(readers) > 0 && readers[0] != nil {
+		reader = readers[0]
+	}
 	return &queryService{
 		repo:        repo,
+		reader:      reader,
 		identitySvc: identitySvc,
 		hotset:      hotset,
 	}
@@ -74,7 +82,7 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 		"action", "list",
 		"page", dto.Page,
 		"page_size", dto.PageSize,
-		"conditions", dto.Conditions,
+		"filter", dto.Filter,
 	)
 
 	// 1. 验证分页参数
@@ -85,11 +93,12 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	dto.PageSize = pageSize
 
 	// 2. 获取问卷摘要列表（轻量级查询，不包含 questions 字段）
-	if t, ok := dto.Conditions["type"].(string); ok && t != "" {
-		dto.Conditions["type"] = questionnaire.NormalizeQuestionnaireType(t).String()
+	filter, err := s.normalizeQuestionnaireFilter(dto.Filter)
+	if err != nil {
+		return nil, err
 	}
 
-	questionnaires, err := s.repo.FindBaseList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	questionnaires, err := s.reader.ListQuestionnaires(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		l.Errorw("查询问卷摘要列表失败",
 			"action", "list",
@@ -100,7 +109,7 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	}
 
 	// 3. 获取总数
-	total, err := s.repo.CountWithConditions(ctx, dto.Conditions)
+	total, err := s.reader.CountQuestionnaires(ctx, filter)
 	if err != nil {
 		l.Errorw("获取问卷总数失败",
 			"action", "list",
@@ -111,7 +120,7 @@ func (s *queryService) List(ctx context.Context, dto ListQuestionnairesDTO) (*Qu
 	}
 
 	// 4. 转换为结果对象
-	result := toQuestionnaireSummaryListResult(ctx, questionnaires, total, s.identitySvc)
+	result := toQuestionnaireSummaryRowsResult(ctx, questionnaires, total, s.identitySvc)
 	s.logSuccess(ctx, "list", startTime,
 		"total_count", total,
 		"page_count", len(questionnaires),
@@ -203,16 +212,14 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	dto.PageSize = pageSize
 
 	// 2. 添加状态过滤条件
-	if dto.Conditions == nil {
-		dto.Conditions = make(map[string]interface{})
+	filter, err := s.normalizeQuestionnaireFilter(dto.Filter)
+	if err != nil {
+		return nil, err
 	}
-	dto.Conditions["status"] = questionnaire.STATUS_PUBLISHED.String()
-	if t, ok := dto.Conditions["type"].(string); ok && t != "" {
-		dto.Conditions["type"] = questionnaire.NormalizeQuestionnaireType(t).String()
-	}
+	filter.Status = questionnaire.STATUS_PUBLISHED.String()
 
 	// 3. 获取问卷摘要列表（轻量级查询）
-	questionnaires, err := s.repo.FindBasePublishedList(ctx, dto.Page, dto.PageSize, dto.Conditions)
+	questionnaires, err := s.reader.ListPublishedQuestionnaires(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		l.Errorw("查询已发布问卷摘要列表失败",
 			"action", "list_published",
@@ -223,7 +230,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 	}
 
 	// 4. 获取总数
-	total, err := s.repo.CountPublishedWithConditions(ctx, dto.Conditions)
+	total, err := s.reader.CountPublishedQuestionnaires(ctx, filter)
 	if err != nil {
 		l.Errorw("获取已发布问卷总数失败",
 			"action", "list_published",
@@ -233,7 +240,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto ListQuestionnaires
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取问卷总数失败")
 	}
 
-	result := toQuestionnaireSummaryListResult(ctx, questionnaires, total, s.identitySvc)
+	result := toQuestionnaireSummaryRowsResult(ctx, questionnaires, total, s.identitySvc)
 	s.logSuccess(ctx, "list_published", startTime,
 		"total_count", total,
 		"page_count", len(questionnaires),
@@ -247,6 +254,20 @@ func (s *queryService) recordHotset(ctx context.Context, target cachetarget.Warm
 		return
 	}
 	_ = s.hotset.Record(ctx, target)
+}
+
+func (s *queryService) normalizeQuestionnaireFilter(filter surveyreadmodel.QuestionnaireFilter) (surveyreadmodel.QuestionnaireFilter, error) {
+	if filter.Status != "" {
+		parsed, ok := questionnaire.ParseStatus(filter.Status)
+		if !ok {
+			return surveyreadmodel.QuestionnaireFilter{}, errors.WithCode(errorCode.ErrQuestionnaireInvalidInput, "状态无效")
+		}
+		filter.Status = parsed.String()
+	}
+	if filter.Type != "" {
+		filter.Type = questionnaire.NormalizeQuestionnaireType(filter.Type).String()
+	}
+	return filter, nil
 }
 
 // validateCode 验证问卷编码

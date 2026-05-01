@@ -369,7 +369,10 @@ func (s *contentService) BatchUpdateQuestions(ctx context.Context, questionnaire
 	// 4. 转换 DTO 为领域对象
 	domainQuestions := make([]questionnaire.Question, 0, len(questions))
 	for i, qDTO := range questions {
-		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description, qDTO.ValidationRules, qDTO.CalculationRule, qDTO.ShowController)
+		validationRules := toDomainValidationRules(qDTO.ValidationRules)
+		calculationRule := toDomainCalculationRule(qDTO.CalculationRule)
+		showController := toDomainShowController(qDTO.ShowController)
+		question, err := buildQuestionFromDTO(qDTO.Code, qDTO.Stem, qDTO.Type, qDTO.Options, qDTO.Required, qDTO.Description, validationRules, calculationRule, showController)
 		if err != nil {
 			l.Errorw("创建问题失败",
 				"action", "batch_update_questions",
@@ -539,4 +542,37 @@ func buildQuestionFromDTO(code, stem, qType string, options []OptionDTO, require
 
 	// 使用领域层工厂方法创建问题
 	return questionnaire.NewQuestion(qOptions...)
+}
+
+func toDomainValidationRules(rules []ValidationRuleDTO) []validation.ValidationRule {
+	result := make([]validation.ValidationRule, 0, len(rules))
+	for _, rule := range rules {
+		result = append(result, validation.NewValidationRule(validation.RuleType(rule.RuleType), rule.TargetValue))
+	}
+	return result
+}
+
+func toDomainCalculationRule(rule *CalculationRuleDTO) *calculation.CalculationRule {
+	if rule == nil || rule.FormulaType == "" {
+		return nil
+	}
+	return calculation.NewCalculationRule(calculation.FormulaType(rule.FormulaType), []string{})
+}
+
+func toDomainShowController(controller *ShowControllerDTO) *questionnaire.ShowController {
+	if controller == nil {
+		return nil
+	}
+	conditions := make([]questionnaire.ShowControllerCondition, 0, len(controller.Questions))
+	for _, cond := range controller.Questions {
+		optionCodes := make([]meta.Code, 0, len(cond.SelectOptionCodes))
+		for _, code := range cond.SelectOptionCodes {
+			optionCodes = append(optionCodes, meta.NewCode(code))
+		}
+		conditions = append(conditions, questionnaire.NewShowControllerCondition(
+			meta.NewCode(cond.Code),
+			optionCodes,
+		))
+	}
+	return questionnaire.NewShowController(controller.Rule, conditions)
 }

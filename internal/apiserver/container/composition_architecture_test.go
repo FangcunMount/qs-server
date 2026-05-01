@@ -18,9 +18,7 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 	allowedDefinitions := map[string]string{
 		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetScaleRepository": "compat_legacy",
 		"internal/apiserver/container/assembler/evaluation.go:EvaluationModule.SetQRCodeService":   "compat_noop",
-		"internal/apiserver/container/assembler/scale.go:ScaleModule.SetQRCodeService":             "qrcode_fanout",
 		"internal/apiserver/container/assembler/survey.go:SurveyModule.SetScaleRepository":         "post_wire_dependency",
-		"internal/apiserver/container/assembler/survey.go:SurveyModule.SetQRCodeService":           "qrcode_fanout",
 	}
 
 	got := map[string]struct{}{}
@@ -80,19 +78,21 @@ func TestAPIServerPostWireCallsStayInModuleGraph(t *testing.T) {
 	})
 }
 
-func TestActorAssemblerDoesNotImportRESTHandlers(t *testing.T) {
+func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "actor.go")
-	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
-	if err != nil {
-		t.Fatal(err)
-	}
-	for _, imported := range parsed.Imports {
-		importPath := strings.Trim(imported.Path.Value, `"`)
-		if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler") {
-			t.Fatalf("internal/apiserver/container/assembler/actor.go imports %s; actor REST handlers must be composed inside transport/rest", importPath)
+	for _, fileName := range []string{"actor.go", "survey.go", "scale.go"} {
+		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", fileName)
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler") {
+				t.Fatalf("internal/apiserver/container/assembler/%s imports %s; business REST handlers must be composed outside module assemblers", fileName, importPath)
+			}
 		}
 	}
 }

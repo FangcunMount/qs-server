@@ -9,8 +9,8 @@ import (
 
 	appScale "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 )
 
 // ScaleService 量表 gRPC 服务 - C端接口
@@ -62,37 +62,13 @@ func (s *ScaleService) GetScale(ctx context.Context, req *pb.GetScaleRequest) (*
 func (s *ScaleService) ListScales(ctx context.Context, req *pb.ListScalesRequest) (*pb.ListScalesResponse, error) {
 	// 构建查询条件
 	dto := appScale.ListScalesDTO{
-		Page:       int(req.Page),
-		PageSize:   int(req.PageSize),
-		Conditions: make(map[string]interface{}),
-	}
-
-	if req.Status != "" {
-		if parsed, ok := domainScale.ParseStatus(req.Status); ok {
-			dto.Conditions["status"] = parsed.String()
-		} else {
-			return nil, status.Error(codes.InvalidArgument, "invalid status")
-		}
-	}
-	if req.Title != "" {
-		dto.Conditions["title"] = req.Title
-	}
-	if req.Category != "" {
-		dto.Conditions["category"] = req.Category
-	}
-	// 注意：stages 和 applicable_ages 是数组，查询条件暂时不支持多值过滤，后续可以扩展
-	if len(req.Stages) > 0 {
-		// 使用第一个阶段作为过滤条件（或可以扩展为支持多个）
-		dto.Conditions["stage"] = req.Stages[0]
-	}
-	if len(req.ApplicableAges) > 0 {
-		// 使用第一个使用年龄作为过滤条件（或可以扩展为支持多个）
-		dto.Conditions["applicable_age"] = req.ApplicableAges[0]
-	}
-	// 注意：reporters 是数组，查询条件暂时不支持多值过滤，后续可以扩展
-	if len(req.Reporters) > 0 {
-		// 使用第一个填报人作为过滤条件（或可以扩展为支持多个）
-		dto.Conditions["reporters"] = req.Reporters[0]
+		Page:     int(req.Page),
+		PageSize: int(req.PageSize),
+		Filter: scalereadmodel.ScaleFilter{
+			Status:   req.Status,
+			Title:    req.Title,
+			Category: req.Category,
+		},
 	}
 
 	// 调用应用服务 - 使用已发布列表

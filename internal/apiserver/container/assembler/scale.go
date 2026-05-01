@@ -6,8 +6,8 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -19,7 +19,6 @@ import (
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -32,9 +31,6 @@ import (
 type ScaleModule struct {
 	// repository 层
 	Repo scale.Repository
-
-	// handler 层
-	Handler *handler.ScaleHandler
 
 	// service 层 - 按行为者组织
 	LifecycleService scaleApp.ScaleLifecycleService
@@ -97,21 +93,11 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	module.ListCache = listCache
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	module.LifecycleService = scaleApp.NewLifecycleService(module.Repo, normalized.QuestionnaireRepo, module.eventPublisher, listCache)
+	module.LifecycleService = scaleApp.NewLifecycleService(module.Repo, quesApp.NewPublishedQuestionnaireCatalog(normalized.QuestionnaireRepo), module.eventPublisher, listCache)
 	module.FactorService = scaleApp.NewFactorService(module.Repo, listCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
-	module.QueryService = scaleApp.NewQueryService(module.Repo, normalized.IdentityService, listCache, normalized.HotsetRecorder, hotRankReader)
+	module.QueryService = scaleApp.NewQueryServiceWithReadModel(module.Repo, scaleInfra.NewScaleReadModel(module.Repo), normalized.IdentityService, listCache, normalized.HotsetRecorder, hotRankReader)
 	module.CategoryService = scaleApp.NewCategoryService()
-
-	// 初始化 handler 层
-	// 注意：QRCodeService 在容器初始化后才创建，需要通过 SetQRCodeService 方法单独设置
-	module.Handler = handler.NewScaleHandler(
-		module.LifecycleService,
-		module.FactorService,
-		module.QueryService,
-		module.CategoryService,
-		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
-	)
 
 	return module, nil
 }
@@ -129,20 +115,6 @@ func normalizeScaleModuleDeps(deps ScaleModuleDeps) (ScaleModuleDeps, error) {
 // Cleanup 清理模块资源
 func (m *ScaleModule) Cleanup() error {
 	return nil
-}
-
-// SetQRCodeService 设置二维码服务（用于跨模块依赖注入）
-func (m *ScaleModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
-	if m.Handler != nil {
-		// 重新创建 Handler，传入 QRCodeService
-		m.Handler = handler.NewScaleHandler(
-			m.LifecycleService,
-			m.FactorService,
-			m.QueryService,
-			m.CategoryService,
-			qrCodeService,
-		)
-	}
 }
 
 // CheckHealth 检查模块健康状态

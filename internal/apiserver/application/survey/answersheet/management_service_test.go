@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	questionnairedomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -89,49 +90,36 @@ func TestBuildListConditionsIncludesOptionalFilters(t *testing.T) {
 	fillerID := uint64(42)
 	startTime := time.Date(2026, 4, 1, 0, 0, 0, 0, time.UTC)
 	endTime := startTime.Add(24 * time.Hour)
-	conditions := buildListConditions(ListAnswerSheetsDTO{
+	filter := buildListFilter(ListAnswerSheetsDTO{
 		QuestionnaireCode: "QNR-001",
 		FillerID:          &fillerID,
 		StartTime:         &startTime,
 		EndTime:           &endTime,
-		Conditions: map[string]string{
-			"status": "completed",
-		},
 	})
 
-	if got := conditions["questionnaire_code"]; got != "QNR-001" {
+	if got := filter.QuestionnaireCode; got != "QNR-001" {
 		t.Fatalf("questionnaire_code = %v, want QNR-001", got)
 	}
-	if got := conditions["filler_id"]; got != fillerID {
-		t.Fatalf("filler_id = %v, want %d", got, fillerID)
+	if filter.FillerID == nil || *filter.FillerID != fillerID {
+		t.Fatalf("filler_id = %v, want %d", filter.FillerID, fillerID)
 	}
-	if got := conditions["status"]; got != "completed" {
-		t.Fatalf("status = %v, want completed", got)
-	}
-	if got := conditions["start_time"]; got != &startTime {
+	if got := filter.StartTime; got != &startTime {
 		t.Fatalf("start_time = %v, want %v", got, &startTime)
 	}
-	if got := conditions["end_time"]; got != &endTime {
+	if got := filter.EndTime; got != &endTime {
 		t.Fatalf("end_time = %v, want %v", got, &endTime)
 	}
 }
 
-func TestManagementServiceListUsesBuiltConditions(t *testing.T) {
+func TestManagementServiceListUsesReadModelFilter(t *testing.T) {
 	t.Parallel()
 
 	fillerID := uint64(9)
 	startTime := time.Date(2026, 4, 2, 0, 0, 0, 0, time.UTC)
-	var captured map[string]interface{}
+	reader := &answerSheetReaderStub{}
 	service := &managementService{
-		repo: &managementRepoStub{
-			findSummaryListByQuestionnaire: func(context.Context, string, int, int) ([]*domainanswersheet.AnswerSheetSummary, error) {
-				return []*domainanswersheet.AnswerSheetSummary{}, nil
-			},
-			countWithConditionsFunc: func(_ context.Context, conditions map[string]interface{}) (int64, error) {
-				captured = conditions
-				return 0, nil
-			},
-		},
+		repo:   &managementRepoStub{},
+		reader: reader,
 	}
 
 	_, err := service.List(context.Background(), ListAnswerSheetsDTO{
@@ -140,16 +128,31 @@ func TestManagementServiceListUsesBuiltConditions(t *testing.T) {
 		StartTime:         &startTime,
 		Page:              1,
 		PageSize:          20,
-		Conditions: map[string]string{
-			"kind": "manual",
-		},
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
-	if captured["questionnaire_code"] != "QNR-009" || captured["filler_id"] != fillerID || captured["kind"] != "manual" {
-		t.Fatalf("captured conditions = %#v", captured)
+	if reader.listFilter.QuestionnaireCode != "QNR-009" || reader.listFilter.FillerID == nil || *reader.listFilter.FillerID != fillerID {
+		t.Fatalf("captured list filter = %#v", reader.listFilter)
 	}
+	if reader.countFilter.QuestionnaireCode != "QNR-009" || reader.countFilter.FillerID == nil || *reader.countFilter.FillerID != fillerID {
+		t.Fatalf("captured count filter = %#v", reader.countFilter)
+	}
+}
+
+type answerSheetReaderStub struct {
+	listFilter  surveyreadmodel.AnswerSheetFilter
+	countFilter surveyreadmodel.AnswerSheetFilter
+}
+
+func (s *answerSheetReaderStub) ListAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter, _ surveyreadmodel.PageRequest) ([]surveyreadmodel.AnswerSheetSummaryRow, error) {
+	s.listFilter = filter
+	return []surveyreadmodel.AnswerSheetSummaryRow{}, nil
+}
+
+func (s *answerSheetReaderStub) CountAnswerSheets(_ context.Context, filter surveyreadmodel.AnswerSheetFilter) (int64, error) {
+	s.countFilter = filter
+	return 0, nil
 }
 
 func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {

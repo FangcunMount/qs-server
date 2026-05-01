@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 )
 
 // QuestionnaireService 问卷 gRPC 服务 - C端接口
@@ -35,19 +36,13 @@ func (s *QuestionnaireService) RegisterService(server *grpc.Server) {
 // ListQuestionnaires 获取已发布的问卷列表（C端）
 // @Description C端用户查看可用的问卷列表，使用轻量级摘要查询（不包含问题详情）
 func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.ListQuestionnairesRequest) (*pb.ListQuestionnairesResponse, error) {
-	// 构建查询条件
-	conditions := make(map[string]interface{})
-	if req.Title != "" {
-		conditions["title"] = req.Title
-	}
-	// 仅返回医学量表
-	conditions["type"] = domainQuestionnaire.TypeMedicalScale.String()
-	// C端只查询已发布的问卷
-
 	dto := questionnaire.ListQuestionnairesDTO{
-		Page:       int(req.Page),
-		PageSize:   int(req.PageSize),
-		Conditions: conditions,
+		Page:     int(req.Page),
+		PageSize: int(req.PageSize),
+		Filter: surveyreadmodel.QuestionnaireFilter{
+			Title: req.Title,
+			Type:  domainQuestionnaire.TypeMedicalScale.String(),
+		},
 	}
 
 	// 调用应用服务 - 使用轻量级摘要查询

@@ -1,6 +1,8 @@
 package rest
 
 import (
+	"go/parser"
+	"go/token"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,5 +30,29 @@ func TestRESTTransportDoesNotDependOnLegacyRESTImplementation(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestSurveyScaleRESTHandlersDoNotConstructDomainRules(t *testing.T) {
+	t.Parallel()
+
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation": "application DTO mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":  "application DTO mapping",
+	}
+	for _, path := range []string{
+		filepath.Join("handler", "questionnaire.go"),
+		filepath.Join("handler", "scale.go"),
+	} {
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if replacement, ok := forbiddenImports[importPath]; ok {
+				t.Fatalf("%s imports %s; survey/scale REST handlers should leave rule construction to %s", path, importPath, replacement)
+			}
+		}
 	}
 }

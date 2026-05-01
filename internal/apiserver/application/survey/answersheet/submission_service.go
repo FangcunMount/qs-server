@@ -10,7 +10,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -19,9 +20,10 @@ import (
 // 行为者：答题者
 type submissionService struct {
 	repo              answersheet.Repository
+	reader            surveyreadmodel.AnswerSheetReader
 	durableStore      SubmissionDurableStore
 	questionnaireRepo questionnaire.Repository
-	batchValidator    *validation.BatchValidator
+	answerValidator   ruleengine.AnswerValidator
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -29,13 +31,19 @@ func NewSubmissionService(
 	repo answersheet.Repository,
 	durableStore SubmissionDurableStore,
 	questionnaireRepo questionnaire.Repository,
-	batchValidator *validation.BatchValidator,
+	answerValidator ruleengine.AnswerValidator,
+	readers ...surveyreadmodel.AnswerSheetReader,
 ) AnswerSheetSubmissionService {
+	reader := surveyreadmodel.AnswerSheetReader(answerSheetRepositoryReadModel{repo: repo})
+	if len(readers) > 0 && readers[0] != nil {
+		reader = readers[0]
+	}
 	return &submissionService{
 		repo:              repo,
+		reader:            reader,
 		durableStore:      durableStore,
 		questionnaireRepo: questionnaireRepo,
-		batchValidator:    batchValidator,
+		answerValidator:   answerValidator,
 	}
 }
 
@@ -68,7 +76,7 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 4. 批量校验答案
-	if err := s.validateAnswersBatch(l, validationTasks); err != nil {
+	if err := s.validateAnswersBatch(ctx, l, validationTasks); err != nil {
 		return nil, err
 	}
 
@@ -195,11 +203,11 @@ func (s *submissionService) buildAnswerValuesAndTasks(
 	l *logger.RequestLogger,
 	answerDTOs []AnswerDTO,
 	questionMap map[string]questionnaire.Question,
-) ([]answerBuildResult, []validation.ValidationTask, error) {
+) ([]answerBuildResult, []ruleengine.AnswerValidationTask, error) {
 	l.Infow("开始验证答案", "answer_count", len(answerDTOs), "action", "validate", "resource", "answer")
 
 	results := make([]answerBuildResult, 0, len(answerDTOs))
-	tasks := make([]validation.ValidationTask, 0, len(answerDTOs))
+	tasks := make([]ruleengine.AnswerValidationTask, 0, len(answerDTOs))
 
 	for i, answerDTO := range answerDTOs {
 		// 检查问题是否存在于问卷中
@@ -225,7 +233,7 @@ func (s *submissionService) buildAnswerValuesAndTasks(
 			questionType: questionnaire.QuestionType(answerDTO.QuestionType),
 		})
 
-		tasks = append(tasks, validation.ValidationTask{
+		tasks = append(tasks, ruleengine.AnswerValidationTask{
 			ID:    answerDTO.QuestionCode,
 			Value: answersheet.NewAnswerValueAdapter(answerValue),
 			Rules: question.GetValidationRules(),
@@ -236,15 +244,21 @@ func (s *submissionService) buildAnswerValuesAndTasks(
 }
 
 // validateAnswersBatch 批量校验答案
-func (s *submissionService) validateAnswersBatch(l *logger.RequestLogger, tasks []validation.ValidationTask) error {
-	results := s.batchValidator.ValidateAll(tasks)
+func (s *submissionService) validateAnswersBatch(ctx context.Context, l *logger.RequestLogger, tasks []ruleengine.AnswerValidationTask) error {
+	if s.answerValidator == nil {
+		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "答案验证器未配置")
+	}
+	results, err := s.answerValidator.ValidateAnswers(ctx, tasks)
+	if err != nil {
+		return errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "答案验证失败")
+	}
 
 	// 收集失败的问题
 	var failedQuestions []string
-	resultMap := make(map[string]*validation.ValidationResult, len(results))
+	resultMap := make(map[string]ruleengine.AnswerValidationResult, len(results))
 	for _, tr := range results {
-		resultMap[tr.ID] = tr.Result
-		if !tr.Result.IsValid() {
+		resultMap[tr.ID] = tr
+		if !tr.Valid {
 			failedQuestions = append(failedQuestions, tr.ID)
 		}
 	}
@@ -256,8 +270,8 @@ func (s *submissionService) validateAnswersBatch(l *logger.RequestLogger, tasks 
 	// 构建错误详情
 	errDetails := make([]string, 0, len(failedQuestions))
 	for _, qCode := range failedQuestions {
-		for _, validationErr := range resultMap[qCode].GetErrors() {
-			errDetails = append(errDetails, fmt.Sprintf("%s: %s", qCode, validationErr.GetMessage()))
+		for _, validationErr := range resultMap[qCode].Errors {
+			errDetails = append(errDetails, fmt.Sprintf("%s: %s", qCode, validationErr.Message))
 		}
 	}
 
@@ -463,7 +477,8 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 		"page", dto.Page,
 		"page_size", dto.PageSize,
 	)
-	sheets, err := s.repo.FindSummaryListByFiller(ctx, dto.FillerID, dto.Page, dto.PageSize)
+	filter := surveyreadmodel.AnswerSheetFilter{FillerID: &dto.FillerID}
+	sheets, err := s.reader.ListAnswerSheets(ctx, filter, surveyreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
 	if err != nil {
 		l.Errorw("查询答卷列表失败",
 			"action", "list_my_answersheets",
@@ -478,9 +493,7 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 	l.Debugw("查询答卷总数",
 		"filler_id", dto.FillerID,
 	)
-	total, err := s.repo.CountWithConditions(ctx, map[string]interface{}{
-		"filler_id": dto.FillerID,
-	})
+	total, err := s.reader.CountAnswerSheets(ctx, filter)
 	if err != nil {
 		l.Errorw("获取答卷总数失败",
 			"action", "list_my_answersheets",
@@ -501,5 +514,5 @@ func (s *submissionService) ListMyAnswerSheets(ctx context.Context, dto ListMyAn
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return toSummaryListResult(sheets, total), nil
+	return toSummaryRowsResult(sheets, total), nil
 }

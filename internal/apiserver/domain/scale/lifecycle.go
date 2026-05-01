@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -34,7 +33,7 @@ func NewLifecycle() Lifecycle {
 var _ Lifecycle = (*lifecycle)(nil)
 
 // Publish 发布量表
-func (l *lifecycle) Publish(ctx context.Context, scale *MedicalScale) error {
+func (l *lifecycle) Publish(_ context.Context, scale *MedicalScale) error {
 	// 1. 前置状态检查
 	if scale.IsArchived() {
 		return errors.WithCode(code.ErrInvalidArgument, "archived scale cannot be published")
@@ -44,19 +43,6 @@ func (l *lifecycle) Publish(ctx context.Context, scale *MedicalScale) error {
 	validator := Validator{}
 	validationErrors := validator.ValidateForPublish(scale)
 	if len(validationErrors) > 0 {
-		// 记录所有验证错误，方便调试
-		logger.L(ctx).Warnw("Publish validation failed",
-			"scale_code", scale.GetCode().Value(),
-			"error_count", len(validationErrors),
-		)
-		for i, err := range validationErrors {
-			logger.L(ctx).Warnw("Validation error",
-				"scale_code", scale.GetCode().Value(),
-				"error_index", i+1,
-				"field", err.Field,
-				"message", err.Message,
-			)
-		}
 		return ToError(validationErrors)
 	}
 

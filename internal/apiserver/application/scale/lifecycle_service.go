@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -18,28 +18,28 @@ import (
 // lifecycleService 量表生命周期服务实现
 // 行为者：量表设计者/管理员
 type lifecycleService struct {
-	repo              scale.Repository
-	questionnaireRepo domainQuestionnaire.Repository
-	lifecycle         scale.Lifecycle
-	baseInfo          scale.BaseInfo
-	eventPublisher    event.EventPublisher
-	listCache         scalelistcache.PublishedListCache
+	repo                 scale.Repository
+	questionnaireCatalog questionnairecatalog.Catalog
+	lifecycle            scale.Lifecycle
+	baseInfo             scale.BaseInfo
+	eventPublisher       event.EventPublisher
+	listCache            scalelistcache.PublishedListCache
 }
 
 // NewLifecycleService 创建量表生命周期服务
 func NewLifecycleService(
 	repo scale.Repository,
-	questionnaireRepo domainQuestionnaire.Repository,
+	questionnaireCatalog questionnairecatalog.Catalog,
 	eventPublisher event.EventPublisher,
 	listCache scalelistcache.PublishedListCache,
 ) ScaleLifecycleService {
 	return &lifecycleService{
-		repo:              repo,
-		questionnaireRepo: questionnaireRepo,
-		lifecycle:         scale.NewLifecycle(),
-		baseInfo:          scale.BaseInfo{},
-		eventPublisher:    eventPublisher,
-		listCache:         listCache,
+		repo:                 repo,
+		questionnaireCatalog: questionnaireCatalog,
+		lifecycle:            scale.NewLifecycle(),
+		baseInfo:             scale.BaseInfo{},
+		eventPublisher:       eventPublisher,
+		listCache:            listCache,
 	}
 }
 
@@ -361,7 +361,10 @@ func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scale
 	)
 
 	// 从问卷仓库获取问卷
-	q, err := s.questionnaireRepo.FindPublishedByCode(ctx, questionnaireCode)
+	if s.questionnaireCatalog == nil {
+		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
+	}
+	q, err := s.questionnaireCatalog.FindPublishedQuestionnaire(ctx, questionnaireCode)
 	if err != nil {
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
 	}
@@ -370,7 +373,7 @@ func (s *lifecycleService) ensureQuestionnaireVersion(ctx context.Context, scale
 	}
 
 	// 更新量表的问卷版本
-	latestVersion := q.GetVersion().Value()
+	latestVersion := q.Version
 	logger.L(ctx).Infow("自动设置问卷版本",
 		"scale_code", scaleCode,
 		"questionnaire_code", questionnaireCode,
@@ -398,32 +401,29 @@ func (s *lifecycleService) validateMedicalScaleQuestionnaireBinding(
 		return nil
 	}
 
-	q, err := s.questionnaireRepo.FindByCode(ctx, questionnaireCode)
+	if s.questionnaireCatalog == nil {
+		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
+	}
+	q, err := s.questionnaireCatalog.FindQuestionnaire(ctx, questionnaireCode)
 	if err != nil {
-		if domainQuestionnaire.IsNotFound(err) {
-			return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-		}
 		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
 	}
 	if q == nil {
 		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
 	}
-	if q.GetType() != domainQuestionnaire.TypeMedicalScale {
+	if q.Type != "MedicalScale" {
 		return errors.WithCode(errorCode.ErrInvalidArgument, "量表只能关联 MedicalScale 类型问卷")
 	}
 
 	if questionnaireVersion != "" {
-		versioned, err := s.questionnaireRepo.FindByCodeVersion(ctx, questionnaireCode, questionnaireVersion)
+		versioned, err := s.questionnaireCatalog.FindQuestionnaireVersion(ctx, questionnaireCode, questionnaireVersion)
 		if err != nil {
-			if domainQuestionnaire.IsNotFound(err) {
-				return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷版本不存在")
-			}
 			return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷版本失败")
 		}
 		if versioned == nil {
 			return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷版本不存在")
 		}
-		if versioned.GetType() != domainQuestionnaire.TypeMedicalScale {
+		if versioned.Type != "MedicalScale" {
 			return errors.WithCode(errorCode.ErrInvalidArgument, "量表只能关联 MedicalScale 类型问卷")
 		}
 	}

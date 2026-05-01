@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -15,14 +14,13 @@ import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation"
 	cacheInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	asMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/answersheet"
 	quesMongoInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
+	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -66,9 +64,6 @@ type QuestionnaireSubModule struct {
 	// repository 层
 	Repo questionnaire.Repository
 
-	// handler 层
-	Handler *handler.QuestionnaireHandler
-
 	// service 层 - 按行为者组织
 	LifecycleService quesApp.QuestionnaireLifecycleService
 	ContentService   quesApp.QuestionnaireContentService
@@ -79,9 +74,6 @@ type QuestionnaireSubModule struct {
 type AnswerSheetSubModule struct {
 	// repository 层
 	Repo answersheet.Repository
-
-	// handler 层
-	Handler *handler.AnswerSheetHandler
 
 	// service 层 - 按行为者组织
 	SubmissionService          asApp.AnswerSheetSubmissionService
@@ -159,16 +151,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(mongoDB *mongo.Database, redis
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	sub.LifecycleService = quesApp.NewLifecycleService(sub.Repo, nil, validator, lifecycle, m.eventPublisher)
 	sub.ContentService = quesApp.NewContentService(sub.Repo, questionMgr)
-	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc, hotset)
-
-	// 初始化 handler 层
-	// 注意：QRCodeService 在容器初始化后才创建，需要通过 SetQRCodeService 方法单独设置
-	sub.Handler = handler.NewQuestionnaireHandler(
-		sub.LifecycleService,
-		sub.ContentService,
-		sub.QueryService,
-		nil, // QRCodeService 稍后通过 SetQRCodeService 设置
-	)
+	sub.QueryService = quesApp.NewQueryService(sub.Repo, identitySvc, hotset, quesMongoInfra.NewQuestionnaireReadModel(sub.Repo))
 
 	return nil
 }
@@ -183,33 +166,12 @@ func (m *SurveyModule) SetScaleRepository(scaleRepo domainScale.Repository) {
 	lifecycle := questionnaire.NewLifecycle()
 	m.Questionnaire.LifecycleService = quesApp.NewLifecycleService(
 		m.Questionnaire.Repo,
-		scaleRepo,
+		scaleApp.NewQuestionnaireBindingSyncer(scaleRepo),
 		validator,
 		lifecycle,
 		m.eventPublisher,
 	)
 
-	if m.Questionnaire.Handler != nil {
-		m.Questionnaire.Handler = handler.NewQuestionnaireHandler(
-			m.Questionnaire.LifecycleService,
-			m.Questionnaire.ContentService,
-			m.Questionnaire.QueryService,
-			nil,
-		)
-	}
-}
-
-// SetQRCodeService 设置二维码服务（用于跨模块依赖注入）
-func (m *SurveyModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
-	if m.Questionnaire != nil && m.Questionnaire.Handler != nil {
-		// 重新创建 Handler，传入 QRCodeService
-		m.Questionnaire.Handler = handler.NewQuestionnaireHandler(
-			m.Questionnaire.LifecycleService,
-			m.Questionnaire.ContentService,
-			m.Questionnaire.QueryService,
-			qrCodeService,
-		)
-	}
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
@@ -226,8 +188,8 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 	// 获取问卷仓储（答卷服务需要依赖问卷仓储进行验证）
 	quesRepo := m.Questionnaire.Repo
 
-	// 创建批量验证器
-	batchValidator := validation.NewBatchValidator()
+	// 创建答案校验引擎 adapter
+	batchValidator := ruleengineInfra.NewAnswerValidator(nil)
 
 	// 创建领域服务
 	scoringDomainService := answersheet.NewScoringService()
@@ -235,8 +197,9 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	mongoTxRunner := newMongoTransactionRunner(mongoDB)
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, baseRepo, baseRepo)
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)
-	sub.ManagementService = asApp.NewManagementService(sub.Repo)
+	answerSheetReader := asMongoInfra.NewAnswerSheetReadModel(sub.Repo)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator, answerSheetReader)
+	sub.ManagementService = asApp.NewManagementService(sub.Repo, answerSheetReader)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
 	hotRankProjection := cacheInfra.NewRedisScaleHotRankProjection(rankRedisClient, rankCacheBuilder)
 	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelayWithHooks(
@@ -249,12 +212,6 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 		Name:   "mongo-domain-events",
 		Reader: baseRepo,
 	}
-
-	// 初始化 handler 层
-	sub.Handler = handler.NewAnswerSheetHandler(
-		sub.ManagementService,
-		sub.SubmissionService,
-	)
 
 	return nil
 }

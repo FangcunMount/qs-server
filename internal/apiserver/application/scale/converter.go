@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -280,6 +281,36 @@ func toSummaryListResult(ctx context.Context, items []*scale.MedicalScale, total
 	return result
 }
 
+func toSummaryRowsResult(ctx context.Context, items []scalereadmodel.ScaleSummaryRow, total int64, identitySvc iambridge.IdentityResolver) *ScaleSummaryListResult {
+	userNames := resolveScaleRowUserNames(ctx, items, identitySvc)
+	result := &ScaleSummaryListResult{
+		Items: make([]*ScaleSummaryResult, 0, len(items)),
+		Total: total,
+	}
+
+	for _, item := range items {
+		result.Items = append(result.Items, &ScaleSummaryResult{
+			Code:              item.Code,
+			Title:             item.Title,
+			Description:       item.Description,
+			Category:          item.Category,
+			Stages:            append([]string(nil), item.Stages...),
+			ApplicableAges:    append([]string(nil), item.ApplicableAges...),
+			Reporters:         append([]string(nil), item.Reporters...),
+			Tags:              append([]string(nil), item.Tags...),
+			QuestionnaireCode: item.QuestionnaireCode,
+			QuestionCount:     item.QuestionCount,
+			Status:            item.Status,
+			CreatedBy:         displayIdentityName(item.CreatedBy, userNames),
+			CreatedAt:         item.CreatedAt,
+			UpdatedBy:         displayIdentityName(item.UpdatedBy, userNames),
+			UpdatedAt:         item.UpdatedAt,
+		})
+	}
+
+	return result
+}
+
 func toHotScaleListResult(ctx context.Context, items []scale.HotScaleSummary, limit, windowDays int, identitySvc iambridge.IdentityResolver) *HotScaleListResult {
 	hotItems := make([]scale.HotScaleSummary, 0, len(items))
 	scales := make([]*scale.MedicalScale, 0, len(items))
@@ -316,6 +347,14 @@ func resolveSummaryUserNames(ctx context.Context, items []*scale.MedicalScale, i
 			continue
 		}
 		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
+	}
+	return resolveIdentityNames(ctx, identitySvc, userIDs)
+}
+
+func resolveScaleRowUserNames(ctx context.Context, items []scalereadmodel.ScaleSummaryRow, identitySvc iambridge.IdentityResolver) map[string]string {
+	userIDs := make([]meta.ID, 0, len(items)*2)
+	for _, item := range items {
+		userIDs = append(userIDs, item.CreatedBy, item.UpdatedBy)
 	}
 	return resolveIdentityNames(ctx, identitySvc, userIDs)
 }
