@@ -354,7 +354,12 @@ ORDER BY questionnaire_code`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		err := rows.Close()
+		if err != nil {
+			log.Printf("close questionnaire rows: %v", err)
+		}
+	}()
 	var codes []string
 	for rows.Next() {
 		var code string
@@ -387,7 +392,11 @@ ORDER BY p.id`
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() {
+		if err := rows.Close(); err != nil {
+			log.Printf("close plan rows: %v", err)
+		}
+	}()
 	var ids []uint64
 	for rows.Next() {
 		var id uint64

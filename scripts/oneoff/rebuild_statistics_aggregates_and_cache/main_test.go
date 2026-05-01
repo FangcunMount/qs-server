@@ -4,7 +4,12 @@ import "testing"
 
 func TestNewRedisClientUsesACLUsername(t *testing.T) {
 	client := newRedisClient("127.0.0.1:6379", "stats-user", "secret", 3)
-	defer client.Close()
+	defer func() {
+		err := client.Close()
+		if err != nil {
+			t.Fatalf("failed to close redis client: %v", err)
+		}
+	}()
 
 	opts := client.Options()
 	if opts.Username != "stats-user" {
