@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ScaleMapper 量表映射器
@@ -229,7 +230,8 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 		"scoring_params_type", getTypeName(po.ScoringParams),
 	)
 
-	scoringParams := scale.ScoringParamsFromMap(ctx, po.ScoringParams, scale.ScoringStrategyCode(po.ScoringStrategy))
+	strategy := scale.ScoringStrategyCode(po.ScoringStrategy)
+	scoringParams := m.mapScoringParamsToDomain(ctx, po.ScoringParams, strategy)
 
 	// 添加日志：记录转换后的 ScoringParams
 	if scoringParams != nil {
@@ -241,7 +243,6 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	}
 
 	// 验证：cnt 策略必须提供非空的 CntOptionContents
-	strategy := scale.ScoringStrategyCode(po.ScoringStrategy)
 	if strategy == scale.ScoringStrategyCnt {
 		if scoringParams == nil || len(scoringParams.GetCntOptionContents()) == 0 {
 			logger.L(ctx).Warnw("mapFactorToDomain: cnt strategy requires non-empty cnt_option_contents, skipping factor",
@@ -276,6 +277,98 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	}
 
 	return factor
+}
+
+func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[string]interface{}, strategy scale.ScoringStrategyCode) *scale.ScoringParams {
+	paramsJSON, _ := json.Marshal(params)
+	logger.L(ctx).Infow("mapScoringParamsToDomain: input",
+		"strategy", strategy,
+		"params", string(paramsJSON),
+		"params_type", getTypeName(params),
+	)
+
+	if len(params) == 0 {
+		logger.L(ctx).Debugw("mapScoringParamsToDomain: params is nil or empty",
+			"strategy", strategy,
+		)
+		return scale.NewScoringParams()
+	}
+
+	result := scale.NewScoringParams()
+	switch strategy {
+	case scale.ScoringStrategyCnt:
+		contents, ok := params["cnt_option_contents"]
+		if !ok || contents == nil {
+			logger.L(ctx).Warnw("mapScoringParamsToDomain: cnt_option_contents not found",
+				"strategy", strategy,
+				"params_keys", getMapKeys(params),
+			)
+			break
+		}
+
+		result.WithCntOptionContents(stringSliceFromStoredArray(ctx, contents))
+	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+		// These strategies currently do not require persisted params.
+	default:
+		// Unknown strategies are validated later by the domain factor constructor.
+	}
+
+	resultJSON, _ := json.Marshal(result.GetCntOptionContents())
+	logger.L(ctx).Infow("mapScoringParamsToDomain: final result",
+		"cnt_option_contents", string(resultJSON),
+	)
+	return result
+}
+
+func stringSliceFromStoredArray(ctx context.Context, value interface{}) []string {
+	var values []interface{}
+	switch v := value.(type) {
+	case primitive.A:
+		values = []interface{}(v)
+	case []interface{}:
+		values = v
+	case []string:
+		logger.L(ctx).Infow("mapScoringParamsToDomain: extracted cnt_option_contents (direct string array)",
+			"count", len(v),
+			"contents", v,
+		)
+		return v
+	default:
+		logger.L(ctx).Warnw("mapScoringParamsToDomain: cnt_option_contents is not array type",
+			"contents_type", getTypeName(value),
+		)
+		return []string{}
+	}
+
+	result := make([]string, 0, len(values))
+	for _, item := range values {
+		str, ok := item.(string)
+		if !ok {
+			logger.L(ctx).Warnw("mapScoringParamsToDomain: array item is not string",
+				"item_type", getTypeName(item),
+				"item_value", item,
+			)
+			continue
+		}
+		result = append(result, str)
+	}
+	logger.L(ctx).Infow("mapScoringParamsToDomain: extracted cnt_option_contents",
+		"count", len(result),
+		"contents", result,
+	)
+	return result
+}
+
+// getMapKeys 获取 map 的键列表（用于日志记录）
+func getMapKeys(m map[string]interface{}) []string {
+	if m == nil {
+		return []string{}
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // getTypeName 获取类型的字符串表示

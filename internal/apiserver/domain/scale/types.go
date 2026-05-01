@@ -1,15 +1,10 @@
 package scale
 
 import (
-	"context"
-	"encoding/json"
-	"reflect"
 	"regexp"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ===================== 量表状态 =================
@@ -287,114 +282,6 @@ func (p *ScoringParams) ToMap(strategy ScoringStrategyCode) map[string]interface
 	}
 
 	return result
-}
-
-// FromMap 从 map[string]interface{} 创建（用于从持久化层恢复）
-func ScoringParamsFromMap(ctx context.Context, params map[string]interface{}, strategy ScoringStrategyCode) *ScoringParams {
-	// 添加日志：记录输入参数
-	paramsJSON, _ := json.Marshal(params)
-	logger.L(ctx).Infow("ScoringParamsFromMap: input",
-		"strategy", strategy,
-		"params", string(paramsJSON),
-		"params_type", getTypeName(params),
-	)
-
-	// 处理 nil 或空 map 的情况（nil map 的 len() 返回 0）
-	if len(params) == 0 {
-		logger.L(ctx).Debugw("ScoringParamsFromMap: params is nil or empty",
-			"strategy", strategy,
-		)
-		return NewScoringParams()
-	}
-
-	result := NewScoringParams()
-
-	// 根据策略类型解析参数
-	switch strategy {
-	case ScoringStrategyCnt:
-		// 从 cnt_option_contents 字段读取
-		contents, ok := params["cnt_option_contents"]
-		if !ok || contents == nil {
-			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents not found",
-				"strategy", strategy,
-				"params_keys", getMapKeys(params),
-			)
-			break
-		}
-
-		// 处理数组类型
-		// 优先处理 MongoDB 的 primitive.A 类型
-		var contentsArray []interface{}
-		switch v := contents.(type) {
-		case primitive.A:
-			contentsArray = []interface{}(v)
-		case []interface{}:
-			contentsArray = v
-		case []string:
-			// 直接是字符串数组
-			result.CntOptionContents = v
-			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents (direct string array)",
-				"count", len(result.CntOptionContents),
-				"contents", result.CntOptionContents,
-			)
-		default:
-			logger.L(ctx).Warnw("ScoringParamsFromMap: cnt_option_contents is not array type",
-				"contents_type", getTypeName(contents),
-			)
-		}
-
-		// 处理 interface{} 数组，转换为字符串数组
-		if contentsArray != nil {
-			result.CntOptionContents = make([]string, 0, len(contentsArray))
-			for _, item := range contentsArray {
-				if str, ok := item.(string); ok {
-					result.CntOptionContents = append(result.CntOptionContents, str)
-				} else {
-					logger.L(ctx).Warnw("ScoringParamsFromMap: array item is not string",
-						"item_type", getTypeName(item),
-						"item_value", item,
-					)
-				}
-			}
-			logger.L(ctx).Infow("ScoringParamsFromMap: extracted cnt_option_contents",
-				"count", len(result.CntOptionContents),
-				"contents", result.CntOptionContents,
-			)
-		}
-
-	case ScoringStrategySum, ScoringStrategyAvg:
-		// 求和和平均策略：当前不需要额外参数
-
-	default:
-		// 其他策略：当前不需要额外参数
-	}
-
-	resultJSON, _ := json.Marshal(result.GetCntOptionContents())
-	logger.L(ctx).Infow("ScoringParamsFromMap: final result",
-		"cnt_option_contents", string(resultJSON),
-	)
-
-	return result
-}
-
-// getTypeName 获取类型的字符串表示
-func getTypeName(v interface{}) string {
-	if v == nil {
-		return "nil"
-	}
-	return reflect.TypeOf(v).String()
-}
-
-// getMapKeys 获取 map 的键列表（用于日志记录）
-func getMapKeys(m map[string]interface{}) []string {
-	if m == nil {
-		return []string{}
-	}
-	keys := make([]string, 0, len(m))
-	for k := range m {
-		keys = append(keys, k)
-	}
-	return keys
 }
 
 // ===================== 量表类别（主类）=================
