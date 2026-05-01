@@ -27,6 +27,9 @@ func TestBuilderWithoutNamespace(t *testing.T) {
 	if got := builder.BuildScaleHotDailyKey("20260501"); got != "scale:hot:{rank}:daily:20260501" {
 		t.Fatalf("unexpected scale hot daily key: %s", got)
 	}
+	if got := builder.BuildScaleHotProjectedKey("evt-1"); got != "scale:hot:{rank}:projected:evt-1" {
+		t.Fatalf("unexpected scale hot projected key: %s", got)
+	}
 }
 
 func TestBuilderWithNamespace(t *testing.T) {

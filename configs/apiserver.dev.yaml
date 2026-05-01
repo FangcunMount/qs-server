@@ -173,6 +173,12 @@ redis_profiles:
     username: "app"
     password: "dev_app_123"
     database: 6
+  rank_cache:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 7
   sdk_cache:
     host: "127.0.0.1"
     port: 6379
@@ -206,6 +212,10 @@ redis_runtime:
     meta_hotset:
       redis_profile: "meta_cache"
       namespace_suffix: "cache:meta"
+      allow_fallback_default: true
+    business_rank:
+      redis_profile: "rank_cache"
+      namespace_suffix: "cache:rank"
       allow_fallback_default: true
     sdk_token:
       redis_profile: "sdk_cache"

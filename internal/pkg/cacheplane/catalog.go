@@ -15,6 +15,7 @@ const (
 	FamilyObject  Family = "object_view"
 	FamilyQuery   Family = "query_result"
 	FamilyMeta    Family = "meta_hotset"
+	FamilyRank    Family = "business_rank"
 	FamilySDK     Family = "sdk_token"
 	FamilyLock    Family = "lock_lease"
 	FamilyOps     Family = "ops_runtime"

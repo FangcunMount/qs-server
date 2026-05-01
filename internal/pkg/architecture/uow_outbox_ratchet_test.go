@@ -105,7 +105,9 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	text := string(data)
 	required := []string{
 		"asApp.NewTransactionalSubmissionDurableStore(",
-		"asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator, hotRankRecorder)",
+		"asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)",
+		"appEventing.NewDurableOutboxRelayWithHooks(",
+		"scaleApp.NewScaleHotRankProjectionHook(hotRankProjection)",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {

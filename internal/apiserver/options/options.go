@@ -88,6 +88,11 @@ func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
 		NamespaceSuffix:      "cache:meta",
 		AllowFallbackDefault: boolPtr(true),
 	}
+	opts.Families["business_rank"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "rank_cache",
+		NamespaceSuffix:      "cache:rank",
+		AllowFallbackDefault: boolPtr(true),
+	}
 	opts.Families["sdk_token"] = &genericoptions.RedisRuntimeFamilyRoute{
 		RedisProfile:         "sdk_cache",
 		NamespaceSuffix:      "cache:sdk",

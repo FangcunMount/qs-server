@@ -32,6 +32,10 @@ func (k CacheKeyspace) ScaleHotWindow(token string) string {
 	return k.keyspace.Prefix("scale:hot:{rank}:window:" + token)
 }
 
+func (k CacheKeyspace) ScaleHotProjected(eventID string) string {
+	return k.keyspace.Prefix("scale:hot:{rank}:projected:" + eventID)
+}
+
 func (k CacheKeyspace) Questionnaire(code, version string) string {
 	if version == "" {
 		return k.keyspace.Prefix("questionnaire:" + code)

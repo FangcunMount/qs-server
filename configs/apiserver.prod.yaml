@@ -167,6 +167,8 @@ redis_profiles:
     database: 4
   meta_cache:
     database: 7
+  rank_cache:
+    database: 8
   sdk_cache:
     database: 5
   lock_cache:
@@ -192,6 +194,10 @@ redis_runtime:
     meta_hotset:
       redis_profile: "meta_cache"
       namespace_suffix: "cache:meta"
+      allow_fallback_default: true
+    business_rank:
+      redis_profile: "rank_cache"
+      namespace_suffix: "cache:rank"
       allow_fallback_default: true
     sdk_token:
       redis_profile: "sdk_cache"

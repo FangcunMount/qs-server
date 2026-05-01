@@ -40,6 +40,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 				cacheplane.FamilyObject,
 				cacheplane.FamilyQuery,
 				cacheplane.FamilyMeta,
+				cacheplane.FamilyRank,
 				cacheplane.FamilySDK,
 				cacheplane.FamilyLock,
 			})

@@ -25,19 +25,6 @@ func (s *durableStoreCaptureStub) CreateDurably(_ context.Context, sheet *domain
 	return sheet, s.existing, nil
 }
 
-type hotRankRecorderCaptureStub struct {
-	calls             int
-	questionnaireCode string
-	submittedAt       time.Time
-}
-
-func (s *hotRankRecorderCaptureStub) RecordSubmission(_ context.Context, questionnaireCode string, submittedAt time.Time) error {
-	s.calls++
-	s.questionnaireCode = questionnaireCode
-	s.submittedAt = submittedAt
-	return nil
-}
-
 func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *testing.T) {
 	store := &durableStoreCaptureStub{existing: true}
 	svc := &submissionService{durableStore: store}
@@ -101,43 +88,6 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testin
 	}
 	if result != existing {
 		t.Fatalf("expected existing sheet to be returned")
-	}
-}
-
-func TestSubmissionServiceCreateAndSaveAnswerSheetRecordsHotRankOnlyForNewSubmission(t *testing.T) {
-	recorder := &hotRankRecorderCaptureStub{}
-	store := &durableStoreCaptureStub{existing: false}
-	svc := &submissionService{durableStore: store, hotRankRecorder: recorder}
-	qnr, _ := domainQuestionnaire.NewQuestionnaire(meta.NewCode("QNR-1"), "Questionnaire")
-
-	result, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
-		FillerID:          301,
-		TesteeID:          401,
-		QuestionnaireCode: "QNR-1",
-		QuestionnaireVer:  "1.0.0",
-	}, qnr, mustAnswersForSubmissionTest(t))
-	if err != nil {
-		t.Fatalf("createAndSaveAnswerSheet() error = %v", err)
-	}
-	if result == nil {
-		t.Fatal("createAndSaveAnswerSheet() returned nil sheet")
-	}
-	if recorder.calls != 1 || recorder.questionnaireCode != "QNR-1" {
-		t.Fatalf("unexpected hot rank record: calls=%d code=%q", recorder.calls, recorder.questionnaireCode)
-	}
-
-	recorder.calls = 0
-	store.existing = true
-	if _, err := svc.createAndSaveAnswerSheet(context.Background(), logger.L(context.Background()), SubmitAnswerSheetDTO{
-		FillerID:          301,
-		TesteeID:          401,
-		QuestionnaireCode: "QNR-1",
-		QuestionnaireVer:  "1.0.0",
-	}, qnr, mustAnswersForSubmissionTest(t)); err != nil {
-		t.Fatalf("createAndSaveAnswerSheet() existing error = %v", err)
-	}
-	if recorder.calls != 0 {
-		t.Fatalf("expected idempotent hit not to record hot rank, calls=%d", recorder.calls)
 	}
 }
 

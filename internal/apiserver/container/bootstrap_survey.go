@@ -22,6 +22,8 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 		EventPublisher:      c.eventPublisher,
 		RedisClient:         c.CacheClient(cacheplane.FamilyStatic),
 		CacheBuilder:        c.CacheBuilder(cacheplane.FamilyStatic),
+		RankRedisClient:     c.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder:    c.CacheBuilder(cacheplane.FamilyRank),
 		IdentityService:     c.resolveIdentityService(),
 		QuestionnairePolicy: c.CachePolicy(cachepolicy.PolicyQuestionnaire),
 		HotsetRecorder:      c.hotsetRecorder(),

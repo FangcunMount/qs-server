@@ -52,6 +52,8 @@ type ScaleModuleDeps struct {
 	QuestionnaireRepo domainQuestionnaire.Repository
 	RedisClient       redis.UniversalClient
 	CacheBuilder      *keyspace.Builder
+	RankRedisClient   redis.UniversalClient
+	RankCacheBuilder  *keyspace.Builder
 	IdentityService   *iam.IdentityService
 	ScalePolicy       cachepolicy.CachePolicy
 	ScaleListPolicy   cachepolicy.CachePolicy
@@ -95,7 +97,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
 	module.LifecycleService = scaleApp.NewLifecycleService(module.Repo, normalized.QuestionnaireRepo, module.eventPublisher, listCache)
 	module.FactorService = scaleApp.NewFactorService(module.Repo, listCache, module.eventPublisher)
-	hotRankReader := scaleCache.NewRedisScaleHotRank(normalized.RedisClient, normalized.CacheBuilder)
+	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
 	module.QueryService = scaleApp.NewQueryService(module.Repo, normalized.IdentityService, listCache, normalized.HotsetRecorder, hotRankReader)
 	module.CategoryService = scaleApp.NewCategoryService()
 

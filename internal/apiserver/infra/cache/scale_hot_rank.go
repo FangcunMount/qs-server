@@ -14,23 +14,33 @@ import (
 
 const defaultScaleHotRankRetention = 400 * 24 * time.Hour
 
-// RedisScaleHotRank 用 Redis ZSET 维护量表热度榜。
+var projectScaleHotSubmissionScript = redis.NewScript(`
+if redis.call("EXISTS", KEYS[1]) == 1 then
+	return 0
+end
+redis.call("ZINCRBY", KEYS[2], 1, ARGV[2])
+redis.call("EXPIRE", KEYS[2], tonumber(ARGV[1]))
+redis.call("SET", KEYS[1], "1", "EX", tonumber(ARGV[1]))
+return 1
+`)
+
+// RedisScaleHotRankProjection 用 Redis ZSET 维护量表热度榜读模型。
 // 计数按提交日期分桶，读取时合并最近 N 天，支持首页的滚动窗口热度。
-type RedisScaleHotRank struct {
+type RedisScaleHotRankProjection struct {
 	client    redis.UniversalClient
 	keys      *keyspace.Builder
 	retention time.Duration
 	now       func() time.Time
 }
 
-var _ domainScale.HotRankRecorder = (*RedisScaleHotRank)(nil)
-var _ domainScale.HotRankReader = (*RedisScaleHotRank)(nil)
+var _ domainScale.ScaleHotRankProjection = (*RedisScaleHotRankProjection)(nil)
+var _ domainScale.ScaleHotRankReadModel = (*RedisScaleHotRankProjection)(nil)
 
-func NewRedisScaleHotRank(client redis.UniversalClient, builder *keyspace.Builder) *RedisScaleHotRank {
+func NewRedisScaleHotRankProjection(client redis.UniversalClient, builder *keyspace.Builder) *RedisScaleHotRankProjection {
 	if client == nil || builder == nil {
 		return nil
 	}
-	return &RedisScaleHotRank{
+	return &RedisScaleHotRankProjection{
 		client:    client,
 		keys:      builder,
 		retention: defaultScaleHotRankRetention,
@@ -38,34 +48,42 @@ func NewRedisScaleHotRank(client redis.UniversalClient, builder *keyspace.Builde
 	}
 }
 
-func (r *RedisScaleHotRank) RecordSubmission(ctx context.Context, questionnaireCode string, submittedAt time.Time) error {
+func (r *RedisScaleHotRankProjection) ProjectSubmission(ctx context.Context, fact domainScale.ScaleHotRankSubmissionFact) error {
 	if r == nil || r.client == nil || r.keys == nil {
 		return nil
 	}
-	questionnaireCode = strings.TrimSpace(questionnaireCode)
+	eventID := strings.TrimSpace(fact.EventID)
+	questionnaireCode := strings.TrimSpace(fact.QuestionnaireCode)
 	if questionnaireCode == "" {
 		return nil
 	}
+	if eventID == "" {
+		return fmt.Errorf("scale hot rank projection event id is empty")
+	}
+	submittedAt := fact.SubmittedAt
 	if submittedAt.IsZero() {
 		submittedAt = r.now()
 	}
 
-	key := r.keys.BuildScaleHotDailyKey(submittedAt.Local().Format("20060102"))
-	pipe := r.client.Pipeline()
-	pipe.ZIncrBy(ctx, key, 1, questionnaireCode)
-	pipe.Expire(ctx, key, r.retention)
-	_, err := pipe.Exec(ctx)
-	return err
+	ttlSeconds := int64(r.retention.Seconds())
+	if ttlSeconds <= 0 {
+		ttlSeconds = int64(defaultScaleHotRankRetention.Seconds())
+	}
+	processedKey := r.keys.BuildScaleHotProjectedKey(eventID)
+	dailyKey := r.keys.BuildScaleHotDailyKey(submittedAt.Local().Format("20060102"))
+	return projectScaleHotSubmissionScript.Run(ctx, r.client, []string{processedKey, dailyKey}, ttlSeconds, questionnaireCode).Err()
 }
 
-func (r *RedisScaleHotRank) TopSubmissions(ctx context.Context, windowDays, limit int) ([]domainScale.HotRankItem, error) {
+func (r *RedisScaleHotRankProjection) Top(ctx context.Context, query domainScale.ScaleHotRankQuery) ([]domainScale.ScaleHotRankEntry, error) {
+	windowDays := query.WindowDays
+	limit := query.Limit
 	if r == nil || r.client == nil || r.keys == nil || limit <= 0 || windowDays <= 0 {
-		return []domainScale.HotRankItem{}, nil
+		return []domainScale.ScaleHotRankEntry{}, nil
 	}
 
 	keys := r.windowKeys(windowDays)
 	if len(keys) == 0 {
-		return []domainScale.HotRankItem{}, nil
+		return []domainScale.ScaleHotRankEntry{}, nil
 	}
 	if len(keys) == 1 {
 		values, err := r.client.ZRevRangeWithScores(ctx, keys[0], 0, int64(limit-1)).Result()
@@ -92,7 +110,7 @@ func (r *RedisScaleHotRank) TopSubmissions(ctx context.Context, windowDays, limi
 	return hotRankItemsFromZ(values), nil
 }
 
-func (r *RedisScaleHotRank) windowKeys(windowDays int) []string {
+func (r *RedisScaleHotRankProjection) windowKeys(windowDays int) []string {
 	now := r.now().Local()
 	keys := make([]string, 0, windowDays)
 	for i := 0; i < windowDays; i++ {
@@ -102,14 +120,14 @@ func (r *RedisScaleHotRank) windowKeys(windowDays int) []string {
 	return keys
 }
 
-func hotRankItemsFromZ(values []redis.Z) []domainScale.HotRankItem {
-	items := make([]domainScale.HotRankItem, 0, len(values))
+func hotRankItemsFromZ(values []redis.Z) []domainScale.ScaleHotRankEntry {
+	items := make([]domainScale.ScaleHotRankEntry, 0, len(values))
 	for _, value := range values {
 		member, ok := value.Member.(string)
 		if !ok || strings.TrimSpace(member) == "" {
 			continue
 		}
-		items = append(items, domainScale.HotRankItem{
+		items = append(items, domainScale.ScaleHotRankEntry{
 			QuestionnaireCode: member,
 			Score:             int64(math.Round(value.Score)),
 		})

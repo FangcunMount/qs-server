@@ -60,6 +60,10 @@ func (b *Builder) BuildScaleHotWindowKey(token string) string {
 	return NewCacheKeyspace(b.namespace()).ScaleHotWindow(token)
 }
 
+func (b *Builder) BuildScaleHotProjectedKey(eventID string) string {
+	return NewCacheKeyspace(b.namespace()).ScaleHotProjected(eventID)
+}
+
 func (b *Builder) BuildQuestionnaireKey(code, version string) string {
 	return NewCacheKeyspace(b.namespace()).Questionnaire(code, version)
 }

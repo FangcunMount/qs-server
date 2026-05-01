@@ -5,18 +5,31 @@ import (
 	"time"
 )
 
-// HotRankItem 表示 Redis 热度榜中的一个问卷提交热度项。
-type HotRankItem struct {
+// ScaleHotRankSubmissionFact 表示可投影到量表热度榜的一次答卷提交事实。
+type ScaleHotRankSubmissionFact struct {
+	EventID           string
+	QuestionnaireCode string
+	SubmittedAt       time.Time
+}
+
+// ScaleHotRankQuery 表示热度榜读模型查询条件。
+type ScaleHotRankQuery struct {
+	WindowDays int
+	Limit      int
+}
+
+// ScaleHotRankEntry 表示量表热度榜读模型中的一个问卷提交热度项。
+type ScaleHotRankEntry struct {
 	QuestionnaireCode string
 	Score             int64
 }
 
-// HotRankRecorder 记录量表相关问卷提交热度。
-type HotRankRecorder interface {
-	RecordSubmission(ctx context.Context, questionnaireCode string, submittedAt time.Time) error
+// ScaleHotRankProjection 投影答卷提交事实，维护量表热度读模型。
+type ScaleHotRankProjection interface {
+	ProjectSubmission(ctx context.Context, fact ScaleHotRankSubmissionFact) error
 }
 
-// HotRankReader 读取量表相关问卷提交热度榜。
-type HotRankReader interface {
-	TopSubmissions(ctx context.Context, windowDays, limit int) ([]HotRankItem, error)
+// ScaleHotRankReadModel 读取量表热度排行榜。
+type ScaleHotRankReadModel interface {
+	Top(ctx context.Context, query ScaleHotRankQuery) ([]ScaleHotRankEntry, error)
 }

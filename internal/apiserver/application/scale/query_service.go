@@ -27,12 +27,12 @@ type queryService struct {
 	identitySvc iambridge.IdentityResolver
 	listCache   *ScaleListCache
 	hotset      cachetarget.HotsetRecorder
-	hotRank     scale.HotRankReader
+	hotRank     scale.ScaleHotRankReadModel
 }
 
 // NewQueryService 创建量表查询服务
-func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache *ScaleListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.HotRankReader) ScaleQueryService {
-	var hotRank scale.HotRankReader
+func NewQueryService(repo scale.Repository, identitySvc iambridge.IdentityResolver, listCache *ScaleListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...scale.ScaleHotRankReadModel) ScaleQueryService {
+	var hotRank scale.ScaleHotRankReadModel
 	if len(hotRankReaders) > 0 {
 		hotRank = hotRankReaders[0]
 	}
@@ -245,7 +245,10 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 	if s == nil || s.hotRank == nil {
 		return []scale.HotScaleSummary{}, nil
 	}
-	rankItems, err := s.hotRank.TopSubmissions(ctx, windowDays, hotRankCandidateLimit(limit))
+	rankItems, err := s.hotRank.Top(ctx, scale.ScaleHotRankQuery{
+		WindowDays: windowDays,
+		Limit:      hotRankCandidateLimit(limit),
+	})
 	if err != nil {
 		return nil, err
 	}

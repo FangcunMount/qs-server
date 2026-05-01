@@ -21,6 +21,8 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 		QuestionnaireRepo: questionnaireRepo,
 		RedisClient:       c.CacheClient(cacheplane.FamilyStatic),
 		CacheBuilder:      c.CacheBuilder(cacheplane.FamilyStatic),
+		RankRedisClient:   c.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder:  c.CacheBuilder(cacheplane.FamilyRank),
 		IdentityService:   c.resolveIdentityService(),
 		ScalePolicy:       c.CachePolicy(cachepolicy.PolicyScale),
 		ScaleListPolicy:   c.CachePolicy(cachepolicy.PolicyScaleList),

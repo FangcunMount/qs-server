@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
@@ -50,6 +51,8 @@ type SurveyModuleDeps struct {
 	EventPublisher      event.EventPublisher
 	RedisClient         redis.UniversalClient
 	CacheBuilder        *keyspace.Builder
+	RankRedisClient     redis.UniversalClient
+	RankCacheBuilder    *keyspace.Builder
 	IdentityService     *iam.IdentityService
 	QuestionnairePolicy cachepolicy.CachePolicy
 	HotsetRecorder      cachetarget.HotsetRecorder
@@ -118,7 +121,7 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 	}
 
 	// 初始化答卷子模块
-	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.RedisClient, normalized.CacheBuilder, normalized.MongoLimiter); err != nil {
+	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.RankRedisClient, normalized.RankCacheBuilder, normalized.MongoLimiter); err != nil {
 		return nil, err
 	}
 
@@ -210,7 +213,7 @@ func (m *SurveyModule) SetQRCodeService(qrCodeService qrcodeApp.QRCodeService) {
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
-func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, redisClient redis.UniversalClient, cacheBuilder *keyspace.Builder, limiter backpressure.Acquirer) error {
+func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, limiter backpressure.Acquirer) error {
 	sub := m.AnswerSheet
 
 	// 初始化 repository 层
@@ -232,11 +235,16 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, redisCl
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	mongoTxRunner := newMongoTransactionRunner(mongoDB)
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, baseRepo, baseRepo)
-	hotRankRecorder := cacheInfra.NewRedisScaleHotRank(redisClient, cacheBuilder)
-	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator, hotRankRecorder)
+	sub.SubmissionService = asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)
 	sub.ManagementService = asApp.NewManagementService(sub.Repo)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(sub.Repo, quesRepo, scoringDomainService)
-	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelay("mongo-domain-events", baseRepo, m.eventPublisher)
+	hotRankProjection := cacheInfra.NewRedisScaleHotRankProjection(rankRedisClient, rankCacheBuilder)
+	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelayWithHooks(
+		"mongo-domain-events",
+		baseRepo,
+		m.eventPublisher,
+		scaleApp.NewScaleHotRankProjectionHook(hotRankProjection),
+	)
 	sub.SubmittedEventStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "mongo-domain-events",
 		Reader: baseRepo,

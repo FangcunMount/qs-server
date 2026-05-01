@@ -49,6 +49,16 @@ type durableFakePublisher struct {
 	mqBacked bool
 }
 
+type fakeBeforePublishHook struct {
+	calls    []string
+	failWith error
+}
+
+func (h *fakeBeforePublishHook) BeforePublish(_ context.Context, pending PendingOutboxEvent) error {
+	h.calls = append(h.calls, pending.EventID)
+	return h.failWith
+}
+
 func (p *durableFakePublisher) IsMQBacked() bool {
 	return p.mqBacked
 }
@@ -152,6 +162,64 @@ func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {
 	if len(store.published) != 1 || store.published[0] != "evt-2" {
 		t.Fatalf("published markers = %#v, want evt-2", store.published)
 	}
+}
+
+func TestOutboxRelayRunsBeforePublishHook(t *testing.T) {
+	hook := &fakeBeforePublishHook{}
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AnswerSheetSubmitted)},
+	}
+	publisher := &fakePublisher{}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:               "test-relay",
+		Store:              store,
+		Publisher:          publisher,
+		BeforePublishHooks: []OutboxBeforePublishHook{hook},
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	if len(hook.calls) != 1 || hook.calls[0] != "evt-1" {
+		t.Fatalf("hook calls = %#v, want evt-1", hook.calls)
+	}
+	if len(publisher.published) != 1 || publisher.published[0] != eventcatalog.AnswerSheetSubmitted {
+		t.Fatalf("published events = %#v, want %q", publisher.published, eventcatalog.AnswerSheetSubmitted)
+	}
+	if len(store.published) != 1 || store.published[0] != "evt-1" {
+		t.Fatalf("published markers = %#v, want evt-1", store.published)
+	}
+}
+
+func TestOutboxRelayBeforePublishFailureMarksFailedAndSkipsPublish(t *testing.T) {
+	observer := &outboxObserver{}
+	hookErr := errors.New("projection failed")
+	hook := &fakeBeforePublishHook{failWith: hookErr}
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AnswerSheetSubmitted)},
+	}
+	publisher := &fakePublisher{}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:               "test-relay",
+		Store:              store,
+		Publisher:          publisher,
+		Observer:           observer,
+		BeforePublishHooks: []OutboxBeforePublishHook{hook},
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	if len(publisher.published) != 0 {
+		t.Fatalf("publish attempts = %d, want 0", len(publisher.published))
+	}
+	if len(store.failed) != 1 || store.failed[0] != "evt-1" {
+		t.Fatalf("failed markers = %#v, want evt-1", store.failed)
+	}
+	if len(store.published) != 0 {
+		t.Fatalf("published markers = %#v, want none", store.published)
+	}
+	assertOutboxContainsOutcome(t, observer, eventobservability.OutboxOutcomePublishFailed)
 }
 
 func TestOutboxRelayObservesMarkFailedFailed(t *testing.T) {

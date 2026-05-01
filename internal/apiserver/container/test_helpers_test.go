@@ -54,12 +54,13 @@ func newTestCacheSubsystem(t *testing.T, opts ContainerCacheOptions, profileClie
 	runtimeOpts := &genericoptions.RedisRuntimeOptions{
 		Namespace: "test",
 		Families: map[string]*genericoptions.RedisRuntimeFamilyRoute{
-			"static_meta":  {RedisProfile: "static", NamespaceSuffix: "static"},
-			"object_view":  {RedisProfile: "object", NamespaceSuffix: "object"},
-			"query_result": {RedisProfile: "query", NamespaceSuffix: "query"},
-			"meta_hotset":  {RedisProfile: "meta", NamespaceSuffix: "meta"},
-			"sdk_token":    {RedisProfile: "sdk", NamespaceSuffix: "sdk"},
-			"lock_lease":   {RedisProfile: "lock", NamespaceSuffix: "lock"},
+			"static_meta":   {RedisProfile: "static", NamespaceSuffix: "static"},
+			"object_view":   {RedisProfile: "object", NamespaceSuffix: "object"},
+			"query_result":  {RedisProfile: "query", NamespaceSuffix: "query"},
+			"meta_hotset":   {RedisProfile: "meta", NamespaceSuffix: "meta"},
+			"business_rank": {RedisProfile: "rank", NamespaceSuffix: "rank"},
+			"sdk_token":     {RedisProfile: "sdk", NamespaceSuffix: "sdk"},
+			"lock_lease":    {RedisProfile: "lock", NamespaceSuffix: "lock"},
 		},
 	}
 

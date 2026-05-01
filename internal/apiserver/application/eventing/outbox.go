@@ -29,6 +29,19 @@ type OutboxStatusReporter interface {
 	ReportOutboxStatus(ctx context.Context)
 }
 
+type OutboxBeforePublishHook interface {
+	BeforePublish(ctx context.Context, pending PendingOutboxEvent) error
+}
+
+type OutboxBeforePublishFunc func(context.Context, PendingOutboxEvent) error
+
+func (f OutboxBeforePublishFunc) BeforePublish(ctx context.Context, pending PendingOutboxEvent) error {
+	if f == nil {
+		return nil
+	}
+	return f(ctx, pending)
+}
+
 // OutboxRelay dispatches due outbox events.
 type OutboxRelay interface {
 	DispatchDue(ctx context.Context) error
@@ -42,6 +55,7 @@ type outboxRelay struct {
 	status     OutboxStatusReporter
 	batchSize  int
 	retryDelay time.Duration
+	hooks      []OutboxBeforePublishHook
 }
 
 // NewOutboxRelay creates a generic relay for outbox-backed events.
@@ -62,6 +76,7 @@ type OutboxRelayOptions struct {
 	BatchSize               int
 	RetryDelay              time.Duration
 	RequireDurablePublisher bool
+	BeforePublishHooks      []OutboxBeforePublishHook
 }
 
 func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
@@ -90,6 +105,7 @@ func NewOutboxRelayWithOptions(opts OutboxRelayOptions) OutboxRelay {
 		status:     opts.Status,
 		batchSize:  opts.BatchSize,
 		retryDelay: opts.RetryDelay,
+		hooks:      compactBeforePublishHooks(opts.BeforePublishHooks),
 	}
 }
 
@@ -99,6 +115,16 @@ func NewDurableOutboxRelay(name string, store OutboxStore, publisher event.Event
 		Store:                   store,
 		Publisher:               publisher,
 		RequireDurablePublisher: true,
+	})
+}
+
+func NewDurableOutboxRelayWithHooks(name string, store OutboxStore, publisher event.EventPublisher, hooks ...OutboxBeforePublishHook) OutboxRelay {
+	return NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:                    name,
+		Store:                   store,
+		Publisher:               publisher,
+		RequireDurablePublisher: true,
+		BeforePublishHooks:      hooks,
 	})
 }
 
@@ -128,6 +154,17 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 
 	l := logger.L(ctx)
 	for _, pending := range pendingEvents {
+		if err := r.runBeforePublishHooks(ctx, pending); err != nil {
+			l.Warnw("outbox before publish hook failed",
+				"relay", r.name,
+				"event_id", pending.EventID,
+				"event_type", eventTypeOf(pending),
+				"error", err.Error(),
+			)
+			r.markEventFailed(ctx, l, pending, err)
+			continue
+		}
+
 		if err := r.publisher.Publish(ctx, pending.Event); err != nil {
 			l.Warnw("outbox publish failed",
 				"relay", r.name,
@@ -135,15 +172,7 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 				"event_type", pending.Event.EventType(),
 				"error", err.Error(),
 			)
-			if markErr := r.store.MarkEventFailed(ctx, pending.EventID, err.Error(), time.Now().Add(r.retryDelay)); markErr != nil {
-				r.observe(ctx, "", pending.Event.EventType(), eventobservability.OutboxOutcomeMarkFailedFailed)
-				l.Errorw("outbox mark failed failed",
-					"relay", r.name,
-					"event_id", pending.EventID,
-					"error", markErr.Error(),
-				)
-			}
-			r.observe(ctx, "", pending.Event.EventType(), eventobservability.OutboxOutcomePublishFailed)
+			r.markEventFailed(ctx, l, pending, err)
 			continue
 		}
 
@@ -160,6 +189,51 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func compactBeforePublishHooks(hooks []OutboxBeforePublishHook) []OutboxBeforePublishHook {
+	if len(hooks) == 0 {
+		return nil
+	}
+	compacted := make([]OutboxBeforePublishHook, 0, len(hooks))
+	for _, hook := range hooks {
+		if hook != nil {
+			compacted = append(compacted, hook)
+		}
+	}
+	return compacted
+}
+
+func (r *outboxRelay) runBeforePublishHooks(ctx context.Context, pending PendingOutboxEvent) error {
+	for _, hook := range r.hooks {
+		if hook == nil {
+			continue
+		}
+		if err := hook.BeforePublish(ctx, pending); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogger, pending PendingOutboxEvent, cause error) {
+	eventType := eventTypeOf(pending)
+	if markErr := r.store.MarkEventFailed(ctx, pending.EventID, cause.Error(), time.Now().Add(r.retryDelay)); markErr != nil {
+		r.observe(ctx, "", eventType, eventobservability.OutboxOutcomeMarkFailedFailed)
+		l.Errorw("outbox mark failed failed",
+			"relay", r.name,
+			"event_id", pending.EventID,
+			"error", markErr.Error(),
+		)
+	}
+	r.observe(ctx, "", eventType, eventobservability.OutboxOutcomePublishFailed)
+}
+
+func eventTypeOf(pending PendingOutboxEvent) string {
+	if pending.Event == nil {
+		return ""
+	}
+	return pending.Event.EventType()
 }
 
 func (r *outboxRelay) reportStatus(ctx context.Context) {

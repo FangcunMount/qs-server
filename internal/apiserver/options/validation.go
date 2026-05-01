@@ -29,6 +29,7 @@ func (o *Options) Validate() []error {
 			cacheplane.FamilyObject,
 			cacheplane.FamilyQuery,
 			cacheplane.FamilyMeta,
+			cacheplane.FamilyRank,
 			cacheplane.FamilySDK,
 			cacheplane.FamilyLock,
 		},
