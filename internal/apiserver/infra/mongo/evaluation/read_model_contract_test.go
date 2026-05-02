@@ -1,11 +1,14 @@
 package evaluation
 
 import (
+	"reflect"
 	"testing"
 	"time"
 
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
@@ -68,5 +71,28 @@ func TestReportPOToReadRowToleratesNilLegacySlices(t *testing.T) {
 	}
 	if row.Suggestions == nil {
 		t.Fatalf("suggestions should be an empty slice for stable response mapping")
+	}
+}
+
+func TestBuildReportReadModelQueryDocumentsFilterContract(t *testing.T) {
+	testeeID := uint64(8001)
+	riskLevel := "high"
+
+	query := buildReportReadModelQuery(evaluationreadmodel.ReportFilter{
+		TesteeID:     &testeeID,
+		TesteeIDs:    []uint64{8001, 8002},
+		HighRiskOnly: true,
+		ScaleCode:    "SDS",
+		RiskLevel:    &riskLevel,
+	})
+
+	want := bson.M{
+		"deleted_at": nil,
+		"testee_id":  bson.M{"$in": []uint64{8001, 8002}},
+		"risk_level": "high",
+		"scale_code": "SDS",
+	}
+	if !reflect.DeepEqual(query, want) {
+		t.Fatalf("query = %#v, want %#v", query, want)
 	}
 }

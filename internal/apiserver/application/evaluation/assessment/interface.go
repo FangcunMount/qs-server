@@ -96,6 +96,7 @@ type AssessmentAccessQueryService interface {
 	ValidateTesteeAccess(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) error
 	ScopeListAssessments(ctx context.Context, orgID int64, operatorUserID int64, dto ListAssessmentsDTO) (ListAssessmentsDTO, error)
 	ScopeListReports(ctx context.Context, orgID int64, operatorUserID int64, dto ListReportsDTO) (ListReportsDTO, error)
+	ScopeFactorTrend(ctx context.Context, orgID int64, operatorUserID int64, dto GetFactorTrendDTO) (GetFactorTrendDTO, error)
 }
 
 // ==================== 评估引擎服务 ====================

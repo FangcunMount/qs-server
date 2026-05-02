@@ -3,9 +3,11 @@ package pipeline
 import (
 	"context"
 
+	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // InterpretationHandler 测评分析解读处理器
@@ -70,12 +72,22 @@ func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) er
 		"total_score", evalCtx.TotalScore,
 		"risk_level", evalCtx.RiskLevel)
 
-	h.ensureGenerator().Generate(ctx, evalCtx)
+	if h.generator == nil {
+		err := errors.WithCode(errorCode.ErrModuleInitializationFailed, "interpretation generator is not configured")
+		evalCtx.SetError(err)
+		return err
+	}
+	h.generator.Generate(ctx, evalCtx)
 	l.Debugw("Evaluation result built",
 		"conclusion", evalCtx.EvaluationResult.Conclusion,
 		"suggestion", evalCtx.EvaluationResult.Suggestion)
 
-	if err := h.ensureFinalizer().Finalize(ctx, evalCtx); err != nil {
+	if h.finalizer == nil {
+		err := errors.WithCode(errorCode.ErrModuleInitializationFailed, "interpretation finalizer is not configured")
+		evalCtx.SetError(err)
+		return err
+	}
+	if err := h.finalizer.Finalize(ctx, evalCtx); err != nil {
 		assessmentID, _ := evalCtx.Assessment.ID().Value()
 		l.Errorw("Failed to finalize interpretation",
 			"assessment_id", assessmentID,
@@ -90,20 +102,6 @@ func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) er
 
 	// 继续下一个处理器
 	return h.Next(ctx, evalCtx)
-}
-
-func (h *InterpretationHandler) ensureGenerator() *InterpretationGenerator {
-	if h.generator == nil {
-		h.generator = &InterpretationGenerator{}
-	}
-	return h.generator
-}
-
-func (h *InterpretationHandler) ensureFinalizer() *InterpretationFinalizer {
-	if h.finalizer == nil {
-		h.finalizer = &InterpretationFinalizer{}
-	}
-	return h.finalizer
 }
 
 func (g *InterpretationGenerator) Generate(ctx context.Context, evalCtx *Context) {
@@ -125,26 +123,18 @@ func (f *InterpretationFinalizer) Finalize(ctx context.Context, evalCtx *Context
 		evalCtx.EvaluationResult = evalResult
 	}
 
-	if err := f.ensureAssessmentWriter().ApplyAndSave(ctx, evalCtx); err != nil {
+	if f.assessmentWriter == nil {
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment result writer is not configured")
+	}
+	if err := f.assessmentWriter.ApplyAndSave(ctx, evalCtx); err != nil {
 		return err
 	}
-	if err := f.ensureReportWriter().BuildAndSave(ctx, evalCtx); err != nil {
+	if f.reportWriter == nil {
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "interpret report writer is not configured")
+	}
+	if err := f.reportWriter.BuildAndSave(ctx, evalCtx); err != nil {
 		return err
 	}
 
 	return nil
-}
-
-func (f *InterpretationFinalizer) ensureAssessmentWriter() AssessmentResultWriter {
-	if f.assessmentWriter == nil {
-		f.assessmentWriter = repositoryAssessmentResultWriter{}
-	}
-	return f.assessmentWriter
-}
-
-func (f *InterpretationFinalizer) ensureReportWriter() InterpretReportWriter {
-	if f.reportWriter == nil {
-		f.reportWriter = &durableInterpretReportWriter{}
-	}
-	return f.reportWriter
 }

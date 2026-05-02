@@ -36,7 +36,9 @@ type ListAssessmentsDTO struct {
 	OrgID                 uint64            // 组织ID
 	Page                  int               // 页码
 	PageSize              int               // 每页数量
-	Conditions            map[string]string // 查询条件
+	TesteeID              *uint64           // 受试者ID筛选（可选）
+	Status                string            // 状态筛选（可选）
+	Conditions            map[string]string // Deprecated: 兼容旧调用方，优先使用 typed fields
 	AccessibleTesteeIDs   []uint64          // 可访问的受试者范围（可选）
 	RestrictToAccessScope bool              // 是否按可访问范围过滤
 }

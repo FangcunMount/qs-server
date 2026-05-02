@@ -60,33 +60,12 @@ func (r *assessmentReadModel) ListAssessments(
 		Model(&AssessmentPO{}).
 		Where("deleted_at IS NULL")
 
-	if filter.OrgID != 0 {
-		query = query.Where("org_id = ?", filter.OrgID)
-	}
-	if filter.TesteeID != nil {
-		query = query.Where("testee_id = ?", *filter.TesteeID)
-	}
 	if filter.RestrictToAccessScope {
 		if len(filter.AccessibleTesteeIDs) == 0 {
 			return []evaluationreadmodel.AssessmentRow{}, 0, nil
 		}
-		query = query.Where("testee_id IN ?", filter.AccessibleTesteeIDs)
 	}
-	if len(filter.Statuses) > 0 {
-		query = query.Where("status IN ?", filter.Statuses)
-	}
-	if filter.ScaleCode != "" {
-		query = query.Where("medical_scale_code = ?", filter.ScaleCode)
-	}
-	if filter.RiskLevel != "" {
-		query = query.Where("risk_level = ?", strings.ToLower(filter.RiskLevel))
-	}
-	if filter.DateFrom != nil {
-		query = query.Where("created_at >= ?", *filter.DateFrom)
-	}
-	if filter.DateTo != nil {
-		query = query.Where("created_at < ?", *filter.DateTo)
-	}
+	query = applyAssessmentReadModelFilter(query, filter)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -107,6 +86,34 @@ func (r *assessmentReadModel) ListAssessments(
 		rows = append(rows, assessmentPOToReadRow(po))
 	}
 	return rows, total, nil
+}
+
+func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.AssessmentFilter) *gorm.DB {
+	if filter.OrgID != 0 {
+		query = query.Where("org_id = ?", filter.OrgID)
+	}
+	if filter.TesteeID != nil {
+		query = query.Where("testee_id = ?", *filter.TesteeID)
+	}
+	if filter.RestrictToAccessScope {
+		query = query.Where("testee_id IN ?", filter.AccessibleTesteeIDs)
+	}
+	if len(filter.Statuses) > 0 {
+		query = query.Where("status IN ?", filter.Statuses)
+	}
+	if filter.ScaleCode != "" {
+		query = query.Where("medical_scale_code = ?", filter.ScaleCode)
+	}
+	if filter.RiskLevel != "" {
+		query = query.Where("risk_level = ?", strings.ToLower(filter.RiskLevel))
+	}
+	if filter.DateFrom != nil {
+		query = query.Where("created_at >= ?", *filter.DateFrom)
+	}
+	if filter.DateTo != nil {
+		query = query.Where("created_at < ?", *filter.DateTo)
+	}
+	return query
 }
 
 func assessmentPOToReadRow(po *AssessmentPO) evaluationreadmodel.AssessmentRow {

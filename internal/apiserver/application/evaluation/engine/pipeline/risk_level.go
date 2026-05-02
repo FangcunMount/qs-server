@@ -2,6 +2,9 @@ package pipeline
 
 import (
 	"context"
+
+	"github.com/FangcunMount/component-base/pkg/errors"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // RiskLevelHandler 风险等级计算处理器
@@ -38,6 +41,11 @@ func (h *RiskLevelHandler) Handle(ctx context.Context, evalCtx *Context) error {
 	evalCtx.FactorScores, evalCtx.RiskLevel = h.classifier.Classify(evalCtx.MedicalScale, evalCtx.FactorScores)
 
 	// 3. 保存 AssessmentScore
+	if h.scoreWriter == nil {
+		err := errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score writer is not configured")
+		evalCtx.SetError(err)
+		return err
+	}
 	if err := h.scoreWriter.SaveAssessmentScore(ctx, evalCtx); err != nil {
 		evalCtx.SetError(err)
 		return err

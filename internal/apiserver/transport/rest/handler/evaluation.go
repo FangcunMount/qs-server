@@ -118,12 +118,9 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		req.PageSize = 10
 	}
 
-	conditions := make(map[string]string)
-	if req.Status != "" {
-		conditions["status"] = req.Status
-	}
+	var testeeID *uint64
 	if req.TesteeID > 0 {
-		conditions["testee_id"] = strconv.FormatUint(req.TesteeID, 10)
+		testeeID = &req.TesteeID
 	}
 	orgScope, err := safeconv.Int64ToUint64(orgID)
 	if err != nil {
@@ -132,10 +129,11 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 	}
 
 	dto := assessmentApp.ListAssessmentsDTO{
-		OrgID:      orgScope,
-		Page:       req.Page,
-		PageSize:   req.PageSize,
-		Conditions: conditions,
+		OrgID:    orgScope,
+		Page:     req.Page,
+		PageSize: req.PageSize,
+		TesteeID: testeeID,
+		Status:   req.Status,
 	}
 
 	dto, err = h.accessQueryService.ScopeListAssessments(c.Request.Context(), orgID, operatorUserID, dto)
@@ -205,18 +203,15 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 		return
 	}
 
-	if req.Limit <= 0 {
-		req.Limit = 10
-	}
-	if err := h.accessQueryService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
-
 	dto := assessmentApp.GetFactorTrendDTO{
 		TesteeID:   req.TesteeID,
 		FactorCode: req.FactorCode,
 		Limit:      req.Limit,
+	}
+	dto, err = h.accessQueryService.ScopeFactorTrend(c.Request.Context(), orgID, operatorUserID, dto)
+	if err != nil {
+		h.Error(c, err)
+		return
 	}
 
 	ctx := c.Request.Context()

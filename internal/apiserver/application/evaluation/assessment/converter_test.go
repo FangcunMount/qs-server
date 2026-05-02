@@ -59,8 +59,7 @@ func TestToAssessmentResultRejectsNegativeOrgID(t *testing.T) {
 }
 
 func TestBuildCreateRequestRejectsOverflowOrgID(t *testing.T) {
-	svc := &submissionService{}
-	_, err := svc.buildCreateRequest(CreateAssessmentDTO{
+	_, err := assessmentCreateRequestAssembler{}.Assemble(CreateAssessmentDTO{
 		OrgID:                uint64(math.MaxInt64) + 1,
 		TesteeID:             2001,
 		QuestionnaireCode:    "q-code",

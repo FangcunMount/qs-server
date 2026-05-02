@@ -69,11 +69,19 @@ func (s *assessmentAccessQueryService) ScopeListAssessments(
 	if s.checker == nil {
 		return dto, errors.WithCode(code.ErrModuleInitializationFailed, "testee access checker is not configured")
 	}
+	if dto.TesteeID != nil {
+		testeeID := *dto.TesteeID
+		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
+			return dto, err
+		}
+		return dto, nil
+	}
 	if dto.Conditions != nil && dto.Conditions["testee_id"] != "" {
 		testeeID, err := parseUintCondition(dto.Conditions["testee_id"])
 		if err != nil {
 			return dto, errors.WithCode(code.ErrInvalidArgument, "无效的受试者ID")
 		}
+		dto.TesteeID = &testeeID
 		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
 			return dto, err
 		}
@@ -92,6 +100,21 @@ func (s *assessmentAccessQueryService) ScopeListAssessments(
 	}
 	dto.AccessibleTesteeIDs = allowedTesteeIDs
 	dto.RestrictToAccessScope = true
+	return dto, nil
+}
+
+func (s *assessmentAccessQueryService) ScopeFactorTrend(
+	ctx context.Context,
+	orgID int64,
+	operatorUserID int64,
+	dto GetFactorTrendDTO,
+) (GetFactorTrendDTO, error) {
+	if dto.Limit <= 0 {
+		dto.Limit = 10
+	}
+	if err := s.ValidateTesteeAccess(ctx, orgID, operatorUserID, dto.TesteeID); err != nil {
+		return dto, err
+	}
 	return dto, nil
 }
 

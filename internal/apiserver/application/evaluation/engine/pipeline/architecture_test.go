@@ -20,6 +20,11 @@ func TestPipelineHandlersDoNotOwnPersistenceOrNotificationDetails(t *testing.T) 
 		"NewFootprintReportGeneratedEvent",
 		"ReportRepository",
 		"ReportBuilder",
+		"repositoryAssessmentResultWriter{}",
+		"durableInterpretReportWriter{}",
+		"ensureFinalizer",
+		"ensureAssessmentWriter",
+		"ensureReportWriter",
 	})
 	assertFileDoesNotContain(t, "waiter_notify.go", []string{
 		"StatusSummary",

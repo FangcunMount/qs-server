@@ -1,11 +1,16 @@
 package evaluation
 
 import (
+	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	mysqlDriver "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
@@ -94,4 +99,68 @@ func TestScorePOsToReadRowUsesTotalScoreFactorForSummaryAndOrdersRowsAsProvided(
 	if !rows.FactorScores[0].IsTotalScore || rows.FactorScores[0].Conclusion != "high risk" || rows.FactorScores[0].Suggestion != "follow" {
 		t.Fatalf("unexpected total factor row: %#v", rows.FactorScores[0])
 	}
+}
+
+func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) {
+	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_dry_run?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		t.Fatalf("open dry-run sql db: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	db, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{
+		Conn:                      conn,
+		SkipInitializeWithVersion: true,
+	}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatalf("open dry-run gorm db: %v", err)
+	}
+	testeeID := uint64(2001)
+	from := time.Date(2026, 5, 2, 10, 0, 0, 0, time.UTC)
+	to := from.Add(time.Hour)
+
+	query := applyAssessmentReadModelFilter(
+		db.Session(&gorm.Session{DryRun: true}).Model(&AssessmentPO{}).Where("deleted_at IS NULL"),
+		evaluationreadmodel.AssessmentFilter{
+			OrgID:                 9,
+			TesteeID:              &testeeID,
+			RestrictToAccessScope: true,
+			AccessibleTesteeIDs:   []uint64{2001, 2002},
+			Statuses:              []string{"submitted"},
+			ScaleCode:             "SDS",
+			RiskLevel:             "HIGH",
+			DateFrom:              &from,
+			DateTo:                &to,
+		},
+	)
+
+	var rows []AssessmentPO
+	stmt := query.Find(&rows).Statement
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"deleted_at IS NULL",
+		"org_id = ?",
+		"testee_id = ?",
+		"testee_id IN",
+		"status IN",
+		"medical_scale_code = ?",
+		"risk_level = ?",
+		"created_at >= ?",
+		"created_at < ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	if !containsVar(stmt.Vars, "high") {
+		t.Fatalf("query vars = %#v, want lower-case risk level", stmt.Vars)
+	}
+}
+
+func containsVar(values []interface{}, want interface{}) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+	}
+	return false
 }

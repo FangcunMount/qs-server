@@ -128,10 +128,10 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 
-	conditions, err := parseAssessmentListConditions(dto.Conditions)
+	conditions, err := parseAssessmentListConditions(dto)
 	if err != nil {
 		l.Errorw("解析受试者ID失败",
-			"testee_id", dto.Conditions["testee_id"],
+			"conditions", dto.Conditions,
 			"error", err.Error(),
 		)
 		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "无效的受试者ID")

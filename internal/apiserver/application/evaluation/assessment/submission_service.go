@@ -8,11 +8,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -156,7 +154,7 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 	l.Debugw("构造创建请求",
 		"testee_id", dto.TesteeID,
 	)
-	req, err := s.buildCreateRequest(dto)
+	req, err := assessmentCreateRequestAssembler{}.Assemble(dto)
 	if err != nil {
 		l.Warnw("来源类型无效",
 			"origin_type", dto.OriginType,
@@ -186,11 +184,13 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 		"assessment_id", a.ID().Uint64(),
 		"action", "save",
 	)
-	occurredAt := time.Now()
-	additionalEvents := []event.DomainEvent{
-		domainStatistics.NewFootprintAssessmentCreatedEvent(req.OrgID, dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
+	finalizer := assessmentCreateFinalizer{
+		repo:        s.repo,
+		txRunner:    s.txRunner,
+		eventStager: s.eventStager,
+		cache:       s.listCache,
 	}
-	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, additionalEvents); err != nil {
+	if err := finalizer.SaveAndStage(ctx, a, req, dto); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", a.ID().Uint64(),
 			"action", "create_assessment",
@@ -209,7 +209,7 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	myAssessmentListCacheHelper{cache: s.listCache}.Invalidate(ctx, dto.TesteeID)
+	finalizer.InvalidateCache(ctx, dto.TesteeID)
 
 	result, convErr := toAssessmentResult(a)
 	if convErr != nil {
@@ -276,7 +276,13 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 		"assessment_id", assessmentID,
 		"new_status", a.Status().String(),
 	)
-	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, nil); err != nil {
+	finalizer := assessmentSubmitFinalizer{
+		repo:        s.repo,
+		txRunner:    s.txRunner,
+		eventStager: s.eventStager,
+		cache:       s.listCache,
+	}
+	if err := finalizer.SaveAndStage(ctx, a); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", assessmentID,
 			"action", "submit_assessment",
@@ -294,7 +300,7 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	myAssessmentListCacheHelper{cache: s.listCache}.Invalidate(ctx, a.TesteeID().Uint64())
+	finalizer.InvalidateCache(ctx, a.TesteeID().Uint64())
 
 	result, convErr := toAssessmentResult(a)
 	if convErr != nil {
@@ -317,58 +323,6 @@ func (s *submissionService) GetMyAssessmentByAnswerSheetID(ctx context.Context, 
 // ListMyAssessments 查询我的测评列表
 func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error) {
 	return myAssessmentListWorkflow{service: s}.List(ctx, dto)
-}
-
-// buildCreateRequest 构造创建请求
-func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) (assessment.CreateAssessmentRequest, error) {
-	orgID, err := safeconv.Uint64ToInt64(dto.OrgID)
-	if err != nil {
-		return assessment.CreateAssessmentRequest{}, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID超出 int64 范围")
-	}
-
-	req := assessment.CreateAssessmentRequest{
-		OrgID:    orgID,
-		TesteeID: meta.FromUint64(dto.TesteeID),
-		QuestionnaireRef: assessment.NewQuestionnaireRefByCode(
-			meta.NewCode(dto.QuestionnaireCode),
-			dto.QuestionnaireVersion,
-		),
-		AnswerSheetRef: assessment.NewAnswerSheetRef(
-			meta.FromUint64(dto.AnswerSheetID),
-		),
-	}
-
-	// 设置量表引用（可选）
-	if dto.MedicalScaleID != nil {
-		scaleCode := ""
-		if dto.MedicalScaleCode != nil {
-			scaleCode = *dto.MedicalScaleCode
-		}
-		scaleName := ""
-		if dto.MedicalScaleName != nil {
-			scaleName = *dto.MedicalScaleName
-		}
-		scaleRef := assessment.NewMedicalScaleRef(
-			meta.FromUint64(*dto.MedicalScaleID),
-			meta.NewCode(scaleCode),
-			scaleName,
-		)
-		req.MedicalScaleRef = &scaleRef
-	}
-
-	// 设置来源
-	switch dto.OriginType {
-	case "", "adhoc":
-		req.Origin = assessment.NewAdhocOrigin()
-	case "plan":
-		if dto.OriginID != nil {
-			req.Origin = assessment.NewPlanOrigin(*dto.OriginID)
-		}
-	default:
-		return assessment.CreateAssessmentRequest{}, errors.WithCode(errorCode.ErrInvalidArgument, "不支持的来源类型: %s", dto.OriginType)
-	}
-
-	return req, nil
 }
 
 // normalizePagination 规范化分页参数

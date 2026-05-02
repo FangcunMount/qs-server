@@ -135,6 +135,52 @@ func TestInterpretationHandlerStagesInterpretedAndReportGeneratedInOrder(t *test
 	}
 }
 
+func TestInterpretationHandlerMissingFinalizerFailsClosed(t *testing.T) {
+	handler := NewInterpretationHandler(NewInterpretationGenerator(nil, nil), nil)
+	evalCtx := NewContext(interpretationSubmittedAssessment(t), nil)
+
+	err := handler.Handle(context.Background(), evalCtx)
+	if err == nil {
+		t.Fatal("expected missing finalizer to return an initialization error")
+	}
+	if evalCtx.Error == nil {
+		t.Fatal("expected evaluation context error to be set")
+	}
+}
+
+func TestInterpretationFinalizerMissingWritersFailsClosed(t *testing.T) {
+	finalizer := NewInterpretationFinalizer(nil, nil)
+	evalCtx := NewContext(interpretationSubmittedAssessment(t), nil)
+	evalCtx.TotalScore = 88
+	evalCtx.RiskLevel = domainAssessment.RiskLevelHigh
+
+	err := finalizer.Finalize(context.Background(), evalCtx)
+	if err == nil {
+		t.Fatal("expected missing assessment writer to return an initialization error")
+	}
+}
+
+func interpretationSubmittedAssessment(t *testing.T) *domainAssessment.Assessment {
+	t.Helper()
+	a, err := domainAssessment.NewAssessment(
+		1,
+		testee.NewID(8001),
+		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		domainAssessment.NewAnswerSheetRef(meta.FromUint64(6001)),
+		domainAssessment.NewAdhocOrigin(),
+		domainAssessment.WithID(domainAssessment.NewID(7001)),
+		domainAssessment.WithMedicalScale(domainAssessment.NewMedicalScaleRef(meta.FromUint64(9001), meta.NewCode("scale-code"), "scale-name")),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	a.ClearEvents()
+	return a
+}
+
 type reportBuilderAdapter struct {
 	report *domainReport.InterpretReport
 }

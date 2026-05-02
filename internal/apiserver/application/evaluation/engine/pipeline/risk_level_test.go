@@ -59,3 +59,38 @@ func TestRiskLevelHandlerCalculatesRiskBeforeDelegatingScoreWriter(t *testing.T)
 		t.Fatalf("expected score writer to receive evaluation context")
 	}
 }
+
+func TestRiskLevelHandlerMissingScoreWriterFailsClosed(t *testing.T) {
+	a, err := domainAssessment.NewAssessment(
+		1,
+		testee.NewID(8001),
+		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		domainAssessment.NewAnswerSheetRef(meta.FromUint64(6001)),
+		domainAssessment.NewAdhocOrigin(),
+		domainAssessment.WithID(domainAssessment.NewID(7001)),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+
+	handler := NewRiskLevelHandler(NewRiskClassifier(), nil)
+	evalCtx := NewContext(a, nil)
+	evalCtx.FactorScores = []domainAssessment.FactorScoreResult{
+		domainAssessment.NewFactorScoreResult(
+			domainAssessment.NewFactorCode("total"),
+			"总分",
+			88,
+			domainAssessment.RiskLevelNone,
+			"",
+			"",
+			true,
+		),
+	}
+
+	if err := handler.Handle(context.Background(), evalCtx); err == nil {
+		t.Fatal("expected missing score writer to return an initialization error")
+	}
+	if evalCtx.Error == nil {
+		t.Fatal("expected evaluation context error to be set")
+	}
+}

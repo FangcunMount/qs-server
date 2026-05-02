@@ -4,11 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -59,30 +58,6 @@ func (r *fakeAssessmentRepo) FindByAnswerSheetID(_ context.Context, _ domainAsse
 	return nil, nil
 }
 
-var _ domainAssessment.ScoreRepository = (*noopScoreRepo)(nil)
-var _ domainReport.ReportRepository = (*noopReportRepo)(nil)
-
-type noopScoreRepo struct{}
-
-func (r *noopScoreRepo) SaveScoresWithContext(_ context.Context, _ *domainAssessment.Assessment, _ *domainAssessment.AssessmentScore) error {
-	return nil
-}
-func (r *noopScoreRepo) DeleteByAssessmentID(_ context.Context, _ domainAssessment.ID) error {
-	return nil
-}
-
-type noopReportRepo struct{}
-
-func (r *noopReportRepo) Save(_ context.Context, _ *domainReport.InterpretReport) error { return nil }
-func (r *noopReportRepo) FindByID(_ context.Context, _ domainReport.ID) (*domainReport.InterpretReport, error) {
-	return nil, nil
-}
-func (r *noopReportRepo) Update(_ context.Context, _ *domainReport.InterpretReport) error { return nil }
-func (r *noopReportRepo) Delete(_ context.Context, _ domainReport.ID) error               { return nil }
-func (r *noopReportRepo) ExistsByID(_ context.Context, _ domainReport.ID) (bool, error) {
-	return false, nil
-}
-
 func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire(t *testing.T) {
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(
@@ -105,8 +80,6 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 
 	svc := &service{
 		assessmentRepo: aRepo,
-		scoreRepo:      &noopScoreRepo{},
-		reportRepo:     &noopReportRepo{},
 		inputResolver:  failingInputResolver{err: inputFailure{reason: "加载问卷失败: 问卷不存在或版本不匹配"}},
 		txRunner:       &engineRecordingTxRunner{},
 		eventStager:    &engineRecordingEventStager{},
@@ -197,20 +170,10 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 	)
 }
 
-func ptr[T any](v T) *T {
-	return &v
-}
+type pipelineRunnerStub struct{}
 
-type waiterNotifierStub struct{}
-
-func (w *waiterNotifierStub) Notify(context.Context, uint64, evaluationwaiter.StatusSummary) {}
-
-func (w *waiterNotifierStub) GetWaiterCount(uint64) int { return 0 }
-
-type noopReportBuilder struct{}
-
-func (b *noopReportBuilder) Build(domainReport.GenerateReportInput) (*domainReport.InterpretReport, error) {
-	return nil, nil
+func (r *pipelineRunnerStub) Execute(context.Context, *pipeline.Context) error {
+	return nil
 }
 
 type failingInputResolver struct {
@@ -233,26 +196,23 @@ func (e inputFailure) FailureReason() string {
 	return e.reason
 }
 
-func TestNewServiceAcceptsWaiterPort(t *testing.T) {
-	waiterRegistry := &waiterNotifierStub{}
+func ptr[T any](v T) *T {
+	return &v
+}
 
+func TestNewServiceAcceptsPipelineRunner(t *testing.T) {
+	runner := &pipelineRunnerStub{}
 	svc := NewService(
 		&fakeAssessmentRepo{},
-		&noopScoreRepo{},
-		&noopReportRepo{},
 		failingInputResolver{},
-		&noopReportBuilder{},
-		WithWaiterRegistry(waiterRegistry),
+		runner,
 	)
 
 	impl, ok := svc.(*service)
 	if !ok {
 		t.Fatalf("expected *service, got %T", svc)
 	}
-	if impl.waiterRegistry != waiterRegistry {
-		t.Fatal("expected waiter registry port to be stored on service")
-	}
-	if impl.pipeline == nil {
-		t.Fatal("expected pipeline to be initialized")
+	if impl.pipelineRunner != runner {
+		t.Fatal("expected pipeline runner to be stored on service")
 	}
 }

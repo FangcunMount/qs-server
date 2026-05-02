@@ -2,6 +2,7 @@ package evaluationinput
 
 import (
 	"context"
+	stderrors "errors"
 	"testing"
 	"time"
 
@@ -164,6 +165,18 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	}
 }
 
+func TestQuestionnaireSnapshotReaderExactVersionMissCarriesFailureReason(t *testing.T) {
+	reader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepoStub{})
+
+	_, err := reader.GetQuestionnaire(context.Background(), "Q-SDS", "9.9.9")
+	if err == nil {
+		t.Fatal("expected exact version miss to fail")
+	}
+	if got := FailureReason(err); got == "" || got == err.Error() {
+		t.Fatalf("expected domain failure reason to wrap api error, got %q", got)
+	}
+}
+
 type scaleCatalogStub struct {
 	snapshot *port.ScaleSnapshot
 	err      error
@@ -193,4 +206,53 @@ func (s *questionnaireReaderStub) GetQuestionnaire(_ context.Context, code, vers
 	s.code = code
 	s.version = version
 	return s.snapshot, s.err
+}
+
+type questionnaireRepoStub struct{}
+
+func (questionnaireRepoStub) Create(context.Context, *questionnaire.Questionnaire) error { return nil }
+func (questionnaireRepoStub) FindByCode(context.Context, string) (*questionnaire.Questionnaire, error) {
+	return nil, stderrors.New("not implemented")
+}
+func (questionnaireRepoStub) FindPublishedByCode(context.Context, string) (*questionnaire.Questionnaire, error) {
+	return nil, stderrors.New("not implemented")
+}
+func (questionnaireRepoStub) FindLatestPublishedByCode(context.Context, string) (*questionnaire.Questionnaire, error) {
+	return nil, stderrors.New("not implemented")
+}
+func (questionnaireRepoStub) FindByCodeVersion(context.Context, string, string) (*questionnaire.Questionnaire, error) {
+	return nil, nil
+}
+func (questionnaireRepoStub) FindBaseByCode(context.Context, string) (*questionnaire.Questionnaire, error) {
+	return nil, stderrors.New("not implemented")
+}
+func (questionnaireRepoStub) FindBasePublishedByCode(context.Context, string) (*questionnaire.Questionnaire, error) {
+	return nil, stderrors.New("not implemented")
+}
+func (questionnaireRepoStub) FindBaseByCodeVersion(context.Context, string, string) (*questionnaire.Questionnaire, error) {
+	return nil, stderrors.New("not implemented")
+}
+func (questionnaireRepoStub) LoadQuestions(context.Context, *questionnaire.Questionnaire) error {
+	return nil
+}
+func (questionnaireRepoStub) Update(context.Context, *questionnaire.Questionnaire) error { return nil }
+func (questionnaireRepoStub) CreatePublishedSnapshot(context.Context, *questionnaire.Questionnaire, bool) error {
+	return nil
+}
+func (questionnaireRepoStub) SetActivePublishedVersion(context.Context, string, string) error {
+	return nil
+}
+func (questionnaireRepoStub) ClearActivePublishedVersion(context.Context, string) error {
+	return nil
+}
+func (questionnaireRepoStub) Remove(context.Context, string) error     { return nil }
+func (questionnaireRepoStub) HardDelete(context.Context, string) error { return nil }
+func (questionnaireRepoStub) HardDeleteFamily(context.Context, string) error {
+	return nil
+}
+func (questionnaireRepoStub) ExistsByCode(context.Context, string) (bool, error) {
+	return false, nil
+}
+func (questionnaireRepoStub) HasPublishedSnapshots(context.Context, string) (bool, error) {
+	return false, nil
 }

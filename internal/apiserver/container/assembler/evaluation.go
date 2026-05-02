@@ -32,6 +32,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	interpretenginePort "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
+	ruleenginePort "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -192,25 +194,22 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
-		serviceOpts := []engine.ServiceOption{}
-		if waiterRegistry != nil {
-			serviceOpts = append(serviceOpts, engine.WithWaiterRegistry(waiterRegistry))
-		}
-		serviceOpts = append(serviceOpts, engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore))
-		serviceOpts = append(serviceOpts, engine.WithReportDurableSaver(module.reportDurableSaver))
-		serviceOpts = append(serviceOpts, engine.WithScaleFactorScorer(ruleengineInfra.NewScaleFactorScorer()))
-		serviceOpts = append(serviceOpts, engine.WithInterpretEngine(
-			interpretengineInfra.NewInterpreter(),
-			interpretengineInfra.NewDefaultProvider(),
-		))
+		pipelineRunner := newEvaluationPipelineRunner(evaluationPipelineDeps{
+			AssessmentRepo:  module.assessmentRepo,
+			ScoreRepo:       module.scoreRepo,
+			ReportBuilder:   reportBuilder,
+			ReportSaver:     module.reportDurableSaver,
+			WaiterRegistry:  waiterRegistry,
+			FactorScorer:    ruleengineInfra.NewScaleFactorScorer(),
+			Interpreter:     interpretengineInfra.NewInterpreter(),
+			DefaultProvider: interpretengineInfra.NewDefaultProvider(),
+		})
 
 		module.EvaluationService = engine.NewService(
 			module.assessmentRepo,
-			module.scoreRepo,
-			module.reportRepo,
 			normalized.InputResolver,
-			reportBuilder,
-			serviceOpts...,
+			pipelineRunner,
+			engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore),
 		)
 	}
 
@@ -281,6 +280,38 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	)
 
 	return module, nil
+}
+
+type evaluationPipelineDeps struct {
+	AssessmentRepo  assessment.Repository
+	ScoreRepo       assessment.ScoreRepository
+	ReportBuilder   report.ReportBuilder
+	ReportSaver     pipeline.ReportDurableSaver
+	WaiterRegistry  *waiter.WaiterRegistry
+	FactorScorer    ruleenginePort.ScaleFactorScorer
+	Interpreter     interpretenginePort.Interpreter
+	DefaultProvider interpretenginePort.DefaultProvider
+}
+
+func newEvaluationPipelineRunner(deps evaluationPipelineDeps) *pipeline.Chain {
+	chain := pipeline.NewChain()
+	chain.AddHandler(pipeline.NewValidationHandler())
+	chain.AddHandler(pipeline.NewFactorScoreHandler(deps.FactorScorer))
+	chain.AddHandler(pipeline.NewRiskLevelHandler(
+		pipeline.NewRiskClassifier(),
+		pipeline.NewAssessmentScoreWriter(deps.ScoreRepo),
+	))
+	chain.AddHandler(pipeline.NewInterpretationHandler(
+		pipeline.NewInterpretationGenerator(deps.Interpreter, deps.DefaultProvider),
+		pipeline.NewInterpretationFinalizer(
+			pipeline.NewAssessmentResultWriter(deps.AssessmentRepo),
+			pipeline.NewInterpretReportWriter(deps.ReportBuilder, deps.ReportSaver),
+		),
+	))
+	if deps.WaiterRegistry != nil {
+		chain.AddHandler(pipeline.NewWaiterNotifyHandler(deps.WaiterRegistry))
+	}
+	return chain
 }
 
 func normalizeEvaluationModuleDeps(deps EvaluationModuleDeps) (EvaluationModuleDeps, error) {

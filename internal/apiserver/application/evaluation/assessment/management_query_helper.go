@@ -24,29 +24,50 @@ type assessmentAdminQuery struct {
 	reader evaluationreadmodel.AssessmentReader
 }
 
-func parseAssessmentListConditions(raw map[string]string) (*assessmentListConditions, error) {
+func parseAssessmentListConditions(dto ListAssessmentsDTO) (*assessmentListConditions, error) {
 	conditions := &assessmentListConditions{}
-	if raw == nil {
-		return conditions, nil
-	}
-
-	if testeeIDStr := raw["testee_id"]; testeeIDStr != "" {
-		testeeIDUint, err := strconv.ParseUint(testeeIDStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		testeeID := testee.NewID(testeeIDUint)
-		conditions.rawTesteeID = testeeIDStr
+	if dto.TesteeID != nil {
+		testeeID := testee.NewID(*dto.TesteeID)
+		conditions.rawTesteeID = strconv.FormatUint(*dto.TesteeID, 10)
 		conditions.testeeID = &testeeID
 	}
-
-	if statusStr := raw["status"]; statusStr != "" {
-		status := assessment.Status(statusStr)
-		conditions.rawStatus = statusStr
+	if dto.Status != "" {
+		status := assessment.Status(dto.Status)
+		conditions.rawStatus = dto.Status
 		if status.IsValid() {
 			conditions.status = &status
 		} else {
 			conditions.invalidStatus = true
+		}
+	}
+
+	if dto.Conditions == nil {
+		return conditions, nil
+	}
+
+	if conditions.testeeID == nil {
+		testeeIDStr := dto.Conditions["testee_id"]
+		if testeeIDStr != "" {
+			testeeIDUint, err := strconv.ParseUint(testeeIDStr, 10, 64)
+			if err != nil {
+				return nil, err
+			}
+			testeeID := testee.NewID(testeeIDUint)
+			conditions.rawTesteeID = testeeIDStr
+			conditions.testeeID = &testeeID
+		}
+	}
+
+	if conditions.rawStatus == "" {
+		statusStr := dto.Conditions["status"]
+		if statusStr != "" {
+			status := assessment.Status(statusStr)
+			conditions.rawStatus = statusStr
+			if status.IsValid() {
+				conditions.status = &status
+			} else {
+				conditions.invalidStatus = true
+			}
 		}
 	}
 

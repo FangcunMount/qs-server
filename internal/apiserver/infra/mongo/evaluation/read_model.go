@@ -38,23 +38,7 @@ func (r *reportReadModel) ListReports(
 	filter evaluationreadmodel.ReportFilter,
 	page evaluationreadmodel.PageRequest,
 ) ([]evaluationreadmodel.ReportRow, int64, error) {
-	query := bson.M{"deleted_at": nil}
-	if filter.TesteeID != nil {
-		query["testee_id"] = *filter.TesteeID
-	}
-	if len(filter.TesteeIDs) > 0 {
-		query["testee_id"] = bson.M{"$in": filter.TesteeIDs}
-	}
-	if filter.HighRiskOnly {
-		query["risk_level"] = bson.M{"$in": []string{"high", "severe"}}
-	}
-	if filter.ScaleCode != "" {
-		query["scale_code"] = filter.ScaleCode
-	}
-	if filter.RiskLevel != nil {
-		query["risk_level"] = *filter.RiskLevel
-	}
-
+	query := buildReportReadModelQuery(filter)
 	total, err := r.CountDocuments(ctx, query)
 	if err != nil {
 		return nil, 0, err
@@ -82,6 +66,26 @@ func (r *reportReadModel) ListReports(
 		return nil, 0, err
 	}
 	return rows, total, nil
+}
+
+func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
+	query := bson.M{"deleted_at": nil}
+	if filter.TesteeID != nil {
+		query["testee_id"] = *filter.TesteeID
+	}
+	if len(filter.TesteeIDs) > 0 {
+		query["testee_id"] = bson.M{"$in": filter.TesteeIDs}
+	}
+	if filter.HighRiskOnly {
+		query["risk_level"] = bson.M{"$in": []string{"high", "severe"}}
+	}
+	if filter.ScaleCode != "" {
+		query["scale_code"] = filter.ScaleCode
+	}
+	if filter.RiskLevel != nil {
+		query["risk_level"] = *filter.RiskLevel
+	}
+	return query
 }
 
 func (r *reportReadModel) getReport(ctx context.Context, filter bson.M) (*evaluationreadmodel.ReportRow, error) {
