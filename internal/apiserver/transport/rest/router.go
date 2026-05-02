@@ -97,12 +97,12 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	ManagementService   assessmentApp.AssessmentManagementService
-	ReportQueryService  assessmentApp.ReportQueryService
-	ScoreQueryService   assessmentApp.ScoreQueryService
-	EvaluationService   engine.Service
-	WaitService         assessmentApp.AssessmentWaitService
-	TesteeAccessService actorAccessApp.TesteeAccessService
+	ManagementService  assessmentApp.AssessmentManagementService
+	ReportQueryService assessmentApp.ReportQueryService
+	ScoreQueryService  assessmentApp.ScoreQueryService
+	EvaluationService  engine.Service
+	WaitService        assessmentApp.AssessmentWaitService
+	AccessQueryService assessmentApp.AssessmentAccessQueryService
 }
 
 type PlanDeps struct {

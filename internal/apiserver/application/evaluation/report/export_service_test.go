@@ -5,10 +5,8 @@ import (
 	"testing"
 
 	cbErrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type reportRepoStub struct {
@@ -16,9 +14,6 @@ type reportRepoStub struct {
 }
 
 func (r *reportRepoStub) Save(context.Context, *domainReport.InterpretReport) error { return nil }
-func (r *reportRepoStub) SaveWithTesteeAndEvents(context.Context, *domainReport.InterpretReport, testee.ID, []event.DomainEvent) error {
-	return nil
-}
 func (r *reportRepoStub) Update(context.Context, *domainReport.InterpretReport) error {
 	return nil
 }
@@ -28,15 +23,6 @@ func (r *reportRepoStub) ExistsByID(context.Context, domainReport.ID) (bool, err
 }
 func (r *reportRepoStub) FindByID(context.Context, domainReport.ID) (*domainReport.InterpretReport, error) {
 	return r.report, nil
-}
-func (r *reportRepoStub) FindByAssessmentID(context.Context, domainReport.AssessmentID) (*domainReport.InterpretReport, error) {
-	return r.report, nil
-}
-func (r *reportRepoStub) FindByTesteeID(context.Context, testee.ID, domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
-}
-func (r *reportRepoStub) FindByTesteeIDs(context.Context, []testee.ID, domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
 }
 
 func TestReportExportServiceWithoutExporterReturnsUnsupported(t *testing.T) {

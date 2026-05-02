@@ -81,3 +81,23 @@ func TestEvaluationRESTTransportDoesNotImportWaiterInfra(t *testing.T) {
 		}
 	}
 }
+
+func TestEvaluationRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{
+		filepath.Join("handler", "evaluation.go"),
+		"routes_evaluation.go",
+	} {
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
+				t.Fatalf("%s imports %s; evaluation REST access control must go through evaluation application access query service", path, importPath)
+			}
+		}
+	}
+}

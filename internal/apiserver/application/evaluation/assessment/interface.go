@@ -71,6 +71,33 @@ type AssessmentWaitService interface {
 	WaitReport(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary
 }
 
+// TesteeAccessScope 描述 evaluation 查询用例看到的 testee 可见范围。
+type TesteeAccessScope struct {
+	IsAdmin     bool
+	ClinicianID *uint64
+}
+
+// TesteeAccessChecker 是 evaluation application 消费的窄权限端口。
+type TesteeAccessChecker interface {
+	ResolveAccessScope(ctx context.Context, orgID int64, operatorUserID int64) (*TesteeAccessScope, error)
+	ValidateTesteeAccess(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) error
+	ListAccessibleTesteeIDs(ctx context.Context, orgID int64, operatorUserID int64) ([]uint64, error)
+}
+
+// AccessibleAssessmentContext 是已完成 testee 访问校验的测评上下文。
+type AccessibleAssessmentContext struct {
+	AssessmentID uint64
+	Assessment   *AssessmentResult
+}
+
+// AssessmentAccessQueryService 收口 evaluation REST 查询所需的访问控制编排。
+type AssessmentAccessQueryService interface {
+	LoadAccessibleAssessment(ctx context.Context, orgID int64, operatorUserID int64, assessmentID uint64) (*AccessibleAssessmentContext, error)
+	ValidateTesteeAccess(ctx context.Context, orgID int64, operatorUserID int64, testeeID uint64) error
+	ScopeListAssessments(ctx context.Context, orgID int64, operatorUserID int64, dto ListAssessmentsDTO) (ListAssessmentsDTO, error)
+	ScopeListReports(ctx context.Context, orgID int64, operatorUserID int64, dto ListReportsDTO) (ListReportsDTO, error)
+}
+
 // ==================== 评估引擎服务 ====================
 //
 // 注意：EvaluationService 已独立到 engine 包中

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -13,36 +12,17 @@ import (
 // scoreQueryService 得分查询服务实现
 // 行为者：报告查询者、数据分析系统
 type scoreQueryService struct {
-	scoreRepo        assessment.ScoreRepository
-	assessmentRepo   assessment.Repository
 	scoreReader      evaluationreadmodel.ScoreReader
 	assessmentReader evaluationreadmodel.AssessmentReader
 	scaleCatalog     evaluationinput.ScaleCatalog
 }
 
-// NewScoreQueryService 创建得分查询服务
-func NewScoreQueryService(
-	scoreRepo assessment.ScoreRepository,
-	assessmentRepo assessment.Repository,
-	scaleCatalog evaluationinput.ScaleCatalog,
-) ScoreQueryService {
-	return &scoreQueryService{
-		scoreRepo:      scoreRepo,
-		assessmentRepo: assessmentRepo,
-		scaleCatalog:   scaleCatalog,
-	}
-}
-
 func NewScoreQueryServiceWithReadModel(
-	scoreRepo assessment.ScoreRepository,
-	assessmentRepo assessment.Repository,
 	scoreReader evaluationreadmodel.ScoreReader,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 	scaleCatalog evaluationinput.ScaleCatalog,
 ) ScoreQueryService {
 	return &scoreQueryService{
-		scoreRepo:        scoreRepo,
-		assessmentRepo:   assessmentRepo,
 		scoreReader:      scoreReader,
 		assessmentReader: assessmentReader,
 		scaleCatalog:     scaleCatalog,

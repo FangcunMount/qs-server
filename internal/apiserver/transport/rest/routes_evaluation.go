@@ -18,9 +18,9 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 		r.deps.Evaluation.ReportQueryService,
 		r.deps.Evaluation.ScoreQueryService,
 		r.deps.Evaluation.EvaluationService,
+		r.deps.Evaluation.AccessQueryService,
 		r.deps.Evaluation.WaitService,
 	)
-	evalHandler.SetTesteeAccessService(r.deps.Evaluation.TesteeAccessService)
 
 	evaluations := apiV1.Group("/evaluations")
 	{

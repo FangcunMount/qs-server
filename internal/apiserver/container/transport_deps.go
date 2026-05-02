@@ -65,9 +65,7 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Evaluation.ScoreQueryService = c.EvaluationModule.ScoreQueryService
 		deps.Evaluation.EvaluationService = c.EvaluationModule.EvaluationService
 		deps.Evaluation.WaitService = c.EvaluationModule.WaitService
-		if c.ActorModule != nil {
-			deps.Evaluation.TesteeAccessService = c.ActorModule.TesteeAccessService
-		}
+		deps.Evaluation.AccessQueryService = c.EvaluationModule.AccessQueryService
 		if c.ActorModule != nil {
 			deps.Actor.TesteeScaleAnalysisService = testeeApp.NewScaleAnalysisQueryService(
 				c.EvaluationModule.ManagementService,

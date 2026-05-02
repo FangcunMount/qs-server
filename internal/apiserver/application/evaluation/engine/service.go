@@ -2,7 +2,6 @@ package engine
 
 import (
 	"context"
-	stderrors "errors"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -16,7 +15,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -134,13 +132,23 @@ func (s *service) buildPipeline() *pipeline.Chain {
 	chain.AddHandler(pipeline.NewFactorScoreHandler(s.factorScorer))
 
 	// 3. 风险等级计算处理器（计算风险等级，保存分数）
-	chain.AddHandler(pipeline.NewRiskLevelHandler(s.scoreRepo))
+	chain.AddHandler(pipeline.NewRiskLevelHandler(
+		pipeline.NewRiskClassifier(),
+		pipeline.NewAssessmentScoreWriter(s.scoreRepo),
+	))
 
 	// 4. 测评分析解读处理器
-	interpretationHandler := pipeline.NewInterpretationHandler(s.assessmentRepo, s.reportRepo, s.reportBuilder)
-	interpretationHandler.SetReportDurableSaver(s.reportSaver)
-	interpretationHandler.SetInterpretEngine(s.interpreter, s.defaultProvider)
-	chain.AddHandler(interpretationHandler)
+	reportSaver := s.reportSaver
+	if reportSaver == nil {
+		reportSaver = pipeline.NewReportDurableSaver(s.reportRepo)
+	}
+	chain.AddHandler(pipeline.NewInterpretationHandler(
+		pipeline.NewInterpretationGenerator(s.interpreter, s.defaultProvider),
+		pipeline.NewInterpretationFinalizer(
+			pipeline.NewAssessmentResultWriter(s.assessmentRepo),
+			pipeline.NewInterpretReportWriter(s.reportBuilder, reportSaver),
+		),
+	))
 
 	// 5. 本地 waiter 通知处理器
 	if s.waiterRegistry != nil {
@@ -167,63 +175,18 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return errors.WithCode(errorCode.ErrInvalidArgument, "测评ID不能为空")
 	}
 
-	// 1. 加载 Assessment
-	l.Debugw("加载测评数据",
-		"assessment_id", assessmentID,
-		"action", "read",
-	)
-
-	id := meta.FromUint64(assessmentID)
-	a, err := s.assessmentRepo.FindByID(ctx, id)
+	loaded, err := s.assessmentLoader().LoadForEvaluation(ctx, assessmentID)
 	if err != nil {
-		l.Errorw("加载测评数据失败",
-			"assessment_id", assessmentID,
-			"action", "read",
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return err
 	}
-
-	l.Debugw("测评数据加载成功",
-		"assessment_id", assessmentID,
-		"status", a.Status().String(),
-		"result", "success",
-	)
-
-	// 检查状态
-	if !a.Status().IsSubmitted() {
-		l.Warnw("测评状态不正确",
-			"assessment_id", assessmentID,
-			"status", a.Status().String(),
-			"expected_status", "submitted",
-			"result", "failed",
-		)
-		return errors.WithCode(errorCode.ErrAssessmentInvalidStatus, "测评状态不正确，无法评估")
-	}
-
-	// 检查是否有关联量表（纯问卷模式不需要评估）
-	if a.MedicalScaleRef() == nil {
-		l.Infow("纯问卷模式，跳过评估",
-			"assessment_id", assessmentID,
-			"mode", "questionnaire_only",
-			"result", "skipped",
-		)
+	if loaded.skipEvaluation {
 		return nil
 	}
+	a := loaded.assessment
 
-	if s.inputResolver == nil {
-		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "evaluation input resolver is not configured")
-	}
-	input, err := s.inputResolver.Resolve(ctx, evaluationinput.InputRef{
-		AssessmentID:         assessmentID,
-		MedicalScaleCode:     a.MedicalScaleRef().Code().String(),
-		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
-		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
-		QuestionnaireVersion: a.QuestionnaireRef().Version(),
-	})
+	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
-		s.markAsFailed(ctx, a, inputResolveFailureReason(err))
+		s.failureFinalizer().MarkAsFailed(ctx, a, inputResolveFailureReason(err))
 		return err
 	}
 
@@ -243,7 +206,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"result", "failed",
 			"error", err.Error(),
 		)
-		s.markAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
 
@@ -260,134 +223,22 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	return nil
 }
 
-func inputResolveFailureReason(err error) string {
-	var carrier evaluationinput.FailureReasonCarrier
-	if stderrors.As(err, &carrier) {
-		return carrier.FailureReason()
-	}
-	return "评估输入加载失败: " + err.Error()
-}
-
 // EvaluateBatch 批量评估
 func (s *service) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error) {
-	l := logger.L(ctx)
-	startTime := time.Now()
-
-	l.Infow("开始批量评估",
-		"action", "evaluate_batch",
-		"resource", "assessment",
-		"org_id", orgID,
-		"total_count", len(assessmentIDs),
-	)
-
-	if orgID == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID不能为空")
-	}
-
-	for _, id := range assessmentIDs {
-		if err := s.ensureAssessmentInOrg(ctx, orgID, id); err != nil {
-			l.Warnw("批量评估的机构范围校验失败",
-				"assessment_id", id,
-				"org_id", orgID,
-				"error", err.Error(),
-			)
-			return nil, err
-		}
-	}
-
-	result := &BatchResult{
-		TotalCount:   len(assessmentIDs),
-		SuccessCount: 0,
-		FailedCount:  0,
-		FailedIDs:    make([]uint64, 0),
-	}
-
-	for _, id := range assessmentIDs {
-		if err := s.Evaluate(ctx, id); err != nil {
-			result.FailedCount++
-			result.FailedIDs = append(result.FailedIDs, id)
-			l.Warnw("单个评估失败",
-				"assessment_id", id,
-				"error", err.Error(),
-			)
-		} else {
-			result.SuccessCount++
-		}
-	}
-
-	duration := time.Since(startTime)
-	l.Infow("批量评估完成",
-		"action", "evaluate_batch",
-		"resource", "assessment",
-		"result", "success",
-		"total_count", result.TotalCount,
-		"success_count", result.SuccessCount,
-		"failed_count", result.FailedCount,
-		"duration_ms", duration.Milliseconds(),
-	)
-
-	return result, nil
+	return batchEvaluator{
+		loader:   s.assessmentLoader(),
+		evaluate: s.Evaluate,
+	}.EvaluateBatch(ctx, orgID, assessmentIDs)
 }
 
-func (s *service) ensureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
-	id := meta.FromUint64(assessmentID)
-	a, err := s.assessmentRepo.FindByID(ctx, id)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
-	}
-
-	if a.OrgID() != orgID {
-		return errors.WithCode(errorCode.ErrPermissionDenied, "测评不属于当前机构")
-	}
-
-	return nil
+func (s *service) assessmentLoader() assessmentLoader {
+	return assessmentLoader{repo: s.assessmentRepo}
 }
 
-// markAsFailed 标记测评为失败
-func (s *service) markAsFailed(ctx context.Context, a *assessment.Assessment, reason string) {
-	l := logger.L(ctx)
-
-	l.Warnw("标记测评为失败",
-		"assessment_id", a.ID().Uint64(),
-		"reason", reason,
-		"action", "mark_failed",
-	)
-
-	if err := a.MarkAsFailed(reason); err != nil {
-		l.Warnw("failed to transition assessment to failed",
-			"assessment_id", a.ID().Uint64(),
-			"error", err.Error(),
-		)
-		return
+func (s *service) failureFinalizer() evaluationFailureFinalizer {
+	return evaluationFailureFinalizer{
+		repo:        s.assessmentRepo,
+		txRunner:    s.txRunner,
+		eventStager: s.eventStager,
 	}
-	if err := s.saveAssessmentWithEvents(ctx, a); err != nil {
-		l.Warnw("failed to persist failed assessment with outbox",
-			"assessment_id", a.ID().Uint64(),
-			"error", err.Error(),
-		)
-	}
-}
-
-func (s *service) saveAssessmentWithEvents(ctx context.Context, a *assessment.Assessment) error {
-	if s.txRunner == nil || s.eventStager == nil {
-		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment engine transactional outbox requires transaction runner and event stager")
-	}
-	if a == nil {
-		return nil
-	}
-	err := s.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
-		if err := s.assessmentRepo.Save(txCtx, a); err != nil {
-			return err
-		}
-		eventsToStage := a.Events()
-		if len(eventsToStage) == 0 {
-			return nil
-		}
-		return s.eventStager.Stage(txCtx, eventsToStage...)
-	})
-	if err != nil {
-		return err
-	}
-	a.ClearEvents()
-	return nil
 }

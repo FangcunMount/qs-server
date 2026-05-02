@@ -7,7 +7,6 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	actoraccess "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
@@ -49,17 +48,17 @@ type stubTesteeAccessService struct {
 	lastValidateTesteeID uint64
 
 	validateErr       error
-	resolveScopeValue *actoraccess.TesteeAccessScope
+	resolveScopeValue *assessmentapp.TesteeAccessScope
 	resolveScopeErr   error
 	accessibleIDs     []uint64
 	accessibleIDsErr  error
 }
 
-func (s *stubTesteeAccessService) ResolveAccessScope(context.Context, int64, int64) (*actoraccess.TesteeAccessScope, error) {
+func (s *stubTesteeAccessService) ResolveAccessScope(context.Context, int64, int64) (*assessmentapp.TesteeAccessScope, error) {
 	if s.resolveScopeValue != nil || s.resolveScopeErr != nil {
 		return s.resolveScopeValue, s.resolveScopeErr
 	}
-	return &actoraccess.TesteeAccessScope{IsAdmin: true}, nil
+	return &assessmentapp.TesteeAccessScope{IsAdmin: true}, nil
 }
 
 func (s *stubTesteeAccessService) ValidateTesteeAccess(_ context.Context, orgID int64, operatorUserID int64, testeeID uint64) error {
@@ -96,8 +95,14 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 		},
 	}
 	access := &stubTesteeAccessService{}
-	handler := NewEvaluationHandler(management, nil, nil, nil, assessmentapp.NewWaitService(management, nil))
-	handler.SetTesteeAccessService(access)
+	handler := NewEvaluationHandler(
+		management,
+		nil,
+		nil,
+		nil,
+		assessmentapp.NewAssessmentAccessQueryService(management, access),
+		assessmentapp.NewWaitService(management, nil),
+	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
 	c.Params = gin.Params{{Key: "id", Value: "301"}}
@@ -150,8 +155,14 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 			RiskLevel:  &riskLevel,
 		},
 	}
-	handler := NewEvaluationHandler(management, nil, nil, nil, assessmentapp.NewWaitService(management, nil))
-	handler.SetTesteeAccessService(&stubTesteeAccessService{})
+	handler := NewEvaluationHandler(
+		management,
+		nil,
+		nil,
+		nil,
+		assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{}),
+		assessmentapp.NewWaitService(management, nil),
+	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
 	c.Params = gin.Params{{Key: "id", Value: "302"}}
@@ -195,8 +206,14 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 			Status:   "submitted",
 		},
 	}
-	handler := NewEvaluationHandler(management, nil, nil, nil, assessmentapp.NewWaitService(management, nil))
-	handler.SetTesteeAccessService(&stubTesteeAccessService{})
+	handler := NewEvaluationHandler(
+		management,
+		nil,
+		nil,
+		nil,
+		assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{}),
+		assessmentapp.NewWaitService(management, nil),
+	)
 
 	baseCtx, cancel := context.WithCancel(context.Background())
 	cancel()

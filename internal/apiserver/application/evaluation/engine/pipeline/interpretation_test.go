@@ -3,7 +3,6 @@ package pipeline
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -21,17 +20,6 @@ func (r *interpretationAssessmentRepoStub) Save(_ context.Context, a *domainAsse
 	return nil
 }
 
-func (r *interpretationAssessmentRepoStub) SaveWithEvents(_ context.Context, a *domainAssessment.Assessment) error {
-	r.saved = a
-	a.ClearEvents()
-	return nil
-}
-func (r *interpretationAssessmentRepoStub) SaveWithAdditionalEvents(_ context.Context, a *domainAssessment.Assessment, _ []event.DomainEvent) error {
-	r.saved = a
-	a.ClearEvents()
-	return nil
-}
-
 func (r *interpretationAssessmentRepoStub) FindByID(context.Context, domainAssessment.ID) (*domainAssessment.Assessment, error) {
 	return nil, nil
 }
@@ -40,39 +28,6 @@ func (r *interpretationAssessmentRepoStub) Delete(context.Context, domainAssessm
 }
 func (r *interpretationAssessmentRepoStub) FindByAnswerSheetID(context.Context, domainAssessment.AnswerSheetRef) (*domainAssessment.Assessment, error) {
 	return nil, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByTesteeID(context.Context, testee.ID, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByTesteeIDWithFilters(context.Context, testee.ID, string, string, string, *time.Time, *time.Time, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByTesteeIDAndScaleID(context.Context, testee.ID, domainAssessment.MedicalScaleRef, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByPlanID(context.Context, string, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationAssessmentRepoStub) CountByStatus(context.Context, domainAssessment.Status) (int64, error) {
-	return 0, nil
-}
-func (r *interpretationAssessmentRepoStub) CountByTesteeIDAndStatus(context.Context, testee.ID, domainAssessment.Status) (int64, error) {
-	return 0, nil
-}
-func (r *interpretationAssessmentRepoStub) CountByOrgIDAndStatus(context.Context, int64, domainAssessment.Status) (int64, error) {
-	return 0, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByIDs(context.Context, []domainAssessment.ID) ([]*domainAssessment.Assessment, error) {
-	return nil, nil
-}
-func (r *interpretationAssessmentRepoStub) FindPendingSubmission(context.Context, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByOrgID(context.Context, int64, *domainAssessment.Status, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationAssessmentRepoStub) FindByOrgIDAndTesteeIDs(context.Context, int64, []testee.ID, *domainAssessment.Status, domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
 }
 
 type interpretationReportRepoStub struct {
@@ -84,7 +39,7 @@ type interpretationReportRepoStub struct {
 func (r *interpretationReportRepoStub) Save(context.Context, *domainReport.InterpretReport) error {
 	return nil
 }
-func (r *interpretationReportRepoStub) SaveWithTesteeAndEvents(_ context.Context, report *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
+func (r *interpretationReportRepoStub) SaveReportDurably(_ context.Context, report *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
 	r.report = report
 	r.testeeID = testeeID
 	r.stagedTypes = r.stagedTypes[:0]
@@ -93,20 +48,8 @@ func (r *interpretationReportRepoStub) SaveWithTesteeAndEvents(_ context.Context
 	}
 	return nil
 }
-func (r *interpretationReportRepoStub) SaveReportDurably(ctx context.Context, report *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
-	return r.SaveWithTesteeAndEvents(ctx, report, testeeID, events)
-}
 func (r *interpretationReportRepoStub) FindByID(context.Context, domainReport.ID) (*domainReport.InterpretReport, error) {
 	return nil, nil
-}
-func (r *interpretationReportRepoStub) FindByAssessmentID(context.Context, domainReport.AssessmentID) (*domainReport.InterpretReport, error) {
-	return nil, nil
-}
-func (r *interpretationReportRepoStub) FindByTesteeID(context.Context, testee.ID, domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
-}
-func (r *interpretationReportRepoStub) FindByTesteeIDs(context.Context, []testee.ID, domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
 }
 func (r *interpretationReportRepoStub) Update(context.Context, *domainReport.InterpretReport) error {
 	return nil
@@ -151,14 +94,13 @@ func TestInterpretationHandlerStagesInterpretedAndReportGeneratedInOrder(t *test
 
 	assessmentRepo := &interpretationAssessmentRepoStub{}
 	reportRepo := &interpretationReportRepoStub{}
-	handler := &InterpretationHandler{
-		BaseHandler: NewBaseHandler("InterpretationHandler"),
-		generator:   &InterpretationGenerator{},
-		finalizer: &InterpretationFinalizer{
-			assessmentWriter: NewAssessmentResultWriter(assessmentRepo),
-			reportWriter:     NewInterpretReportWriter(&reportBuilderAdapter{report: rpt}, reportRepo),
-		},
-	}
+	handler := NewInterpretationHandler(
+		NewInterpretationGenerator(nil, nil),
+		NewInterpretationFinalizer(
+			NewAssessmentResultWriter(assessmentRepo),
+			NewInterpretReportWriter(&reportBuilderAdapter{report: rpt}, reportRepo),
+		),
+	)
 
 	evalCtx := NewContext(a, nil)
 	evalCtx.TotalScore = 88
@@ -197,6 +139,6 @@ type reportBuilderAdapter struct {
 	report *domainReport.InterpretReport
 }
 
-func (b *reportBuilderAdapter) Build(_ *domainAssessment.Assessment, _ *domainReport.ScaleSnapshot, _ *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
+func (b *reportBuilderAdapter) Build(domainReport.GenerateReportInput) (*domainReport.InterpretReport, error) {
 	return b.report, nil
 }

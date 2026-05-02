@@ -16,9 +16,9 @@ import (
 )
 
 type RepositoryResolver struct {
-	scaleRepo         scale.Repository
-	answerSheetRepo   answersheet.Repository
-	questionnaireRepo questionnaire.Repository
+	scaleCatalog        port.ScaleCatalog
+	answerSheetReader   port.AnswerSheetReader
+	questionnaireReader port.QuestionnaireReader
 }
 
 func NewRepositoryResolver(
@@ -26,23 +26,35 @@ func NewRepositoryResolver(
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 ) *RepositoryResolver {
+	return NewResolver(
+		NewRepositoryScaleSnapshotCatalog(scaleRepo),
+		NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo),
+		NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo),
+	)
+}
+
+func NewResolver(
+	scaleCatalog port.ScaleCatalog,
+	answerSheetReader port.AnswerSheetReader,
+	questionnaireReader port.QuestionnaireReader,
+) *RepositoryResolver {
 	return &RepositoryResolver{
-		scaleRepo:         scaleRepo,
-		answerSheetRepo:   answerSheetRepo,
-		questionnaireRepo: questionnaireRepo,
+		scaleCatalog:        scaleCatalog,
+		answerSheetReader:   answerSheetReader,
+		questionnaireReader: questionnaireReader,
 	}
 }
 
 func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	medicalScale, err := r.GetScale(ctx, ref.MedicalScaleCode)
+	medicalScale, err := r.scaleCatalog.GetScale(ctx, ref.MedicalScaleCode)
 	if err != nil {
 		return nil, err
 	}
-	answerSheet, err := r.loadAnswerSheet(ctx, ref.AnswerSheetID)
+	answerSheet, err := r.answerSheetReader.GetAnswerSheet(ctx, ref.AnswerSheetID)
 	if err != nil {
 		return nil, err
 	}
-	qnr, err := r.loadQuestionnaire(ctx, answerSheet.QuestionnaireCode, answerSheet.QuestionnaireVersion)
+	qnr, err := r.questionnaireReader.GetQuestionnaire(ctx, answerSheet.QuestionnaireCode, answerSheet.QuestionnaireVersion)
 	if err != nil {
 		return nil, err
 	}
@@ -55,6 +67,18 @@ func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*p
 }
 
 func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
+	return r.scaleCatalog.GetScale(ctx, code)
+}
+
+type RepositoryScaleSnapshotCatalog struct {
+	repo scale.Repository
+}
+
+func NewRepositoryScaleSnapshotCatalog(repo scale.Repository) *RepositoryScaleSnapshotCatalog {
+	return &RepositoryScaleSnapshotCatalog{repo: repo}
+}
+
+func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载量表数据",
 		"scale_code", code,
@@ -62,7 +86,7 @@ func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.S
 		"resource", "scale",
 	)
 
-	medicalScale, err := r.scaleRepo.FindByCode(ctx, code)
+	medicalScale, err := r.repo.FindByCode(ctx, code)
 	if err != nil {
 		l.Errorw("加载量表失败",
 			"scale_code", code,
@@ -81,7 +105,15 @@ func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.S
 	return scaleToSnapshot(medicalScale), nil
 }
 
-func (r *RepositoryResolver) loadAnswerSheet(ctx context.Context, answerSheetID uint64) (*port.AnswerSheetSnapshot, error) {
+type RepositoryAnswerSheetSnapshotReader struct {
+	repo answersheet.Repository
+}
+
+func NewRepositoryAnswerSheetSnapshotReader(repo answersheet.Repository) *RepositoryAnswerSheetSnapshotReader {
+	return &RepositoryAnswerSheetSnapshotReader{repo: repo}
+}
+
+func (r *RepositoryAnswerSheetSnapshotReader) GetAnswerSheet(ctx context.Context, answerSheetID uint64) (*port.AnswerSheetSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载答卷数据",
 		"answer_sheet_id", answerSheetID,
@@ -89,7 +121,7 @@ func (r *RepositoryResolver) loadAnswerSheet(ctx context.Context, answerSheetID 
 		"resource", "answersheet",
 	)
 
-	answerSheet, err := r.answerSheetRepo.FindByID(ctx, meta.FromUint64(answerSheetID))
+	answerSheet, err := r.repo.FindByID(ctx, meta.FromUint64(answerSheetID))
 	if err != nil {
 		l.Errorw("加载答卷失败",
 			"answer_sheet_id", answerSheetID,
@@ -109,7 +141,15 @@ func (r *RepositoryResolver) loadAnswerSheet(ctx context.Context, answerSheetID 
 	return snapshot, nil
 }
 
-func (r *RepositoryResolver) loadQuestionnaire(ctx context.Context, code, version string) (*port.QuestionnaireSnapshot, error) {
+type RepositoryQuestionnaireSnapshotReader struct {
+	repo questionnaire.Repository
+}
+
+func NewRepositoryQuestionnaireSnapshotReader(repo questionnaire.Repository) *RepositoryQuestionnaireSnapshotReader {
+	return &RepositoryQuestionnaireSnapshotReader{repo: repo}
+}
+
+func (r *RepositoryQuestionnaireSnapshotReader) GetQuestionnaire(ctx context.Context, code, version string) (*port.QuestionnaireSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载问卷数据",
 		"questionnaire_code", code,
@@ -118,7 +158,7 @@ func (r *RepositoryResolver) loadQuestionnaire(ctx context.Context, code, versio
 		"resource", "questionnaire",
 	)
 
-	qnr, err := r.questionnaireRepo.FindByCodeVersion(ctx, code, version)
+	qnr, err := r.repo.FindByCodeVersion(ctx, code, version)
 	if err != nil {
 		l.Errorw("加载问卷失败，评估终止",
 			"questionnaire_code", code,

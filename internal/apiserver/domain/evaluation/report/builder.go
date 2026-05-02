@@ -2,8 +2,6 @@ package report
 
 import (
 	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 // ==================== ReportBuilder 领域服务 ====================
@@ -13,31 +11,7 @@ import (
 // 实现方式：调用 scale 域的解读服务获取解读信息
 type ReportBuilder interface {
 	// Build 构建解读报告
-	// 参数：
-	//   - assess: 测评实体
-	//   - medicalScale: 量表实体
-	//   - evaluationResult: 评估结果
-	// 返回：
-	//   - *InterpretReport: 解读报告
-	//   - error: 构建失败时返回错误
-	Build(
-		assess *assessment.Assessment,
-		medicalScale *ScaleSnapshot,
-		evaluationResult *assessment.EvaluationResult,
-	) (*InterpretReport, error)
-}
-
-// ScaleSnapshot 是报告构建需要的量表只读快照。
-type ScaleSnapshot struct {
-	Code    string
-	Title   string
-	Factors []ScaleFactorSnapshot
-}
-
-type ScaleFactorSnapshot struct {
-	Code     string
-	Title    string
-	MaxScore *float64
+	Build(input GenerateReportInput) (*InterpretReport, error)
 }
 
 // ==================== 默认实现 ====================
@@ -57,41 +31,24 @@ func NewDefaultReportBuilder(suggestionGenerator SuggestionGenerator) *DefaultRe
 }
 
 // Build 构建解读报告
-func (b *DefaultReportBuilder) Build(
-	assess *assessment.Assessment,
-	medicalScale *ScaleSnapshot,
-	result *assessment.EvaluationResult,
-) (*InterpretReport, error) {
-	if assess == nil {
-		return nil, ErrInvalidArgument
-	}
-	if medicalScale == nil {
-		return nil, ErrInvalidArgument
-	}
-	if result == nil {
+func (b *DefaultReportBuilder) Build(input GenerateReportInput) (*InterpretReport, error) {
+	if input.AssessmentID.IsZero() {
 		return nil, ErrInvalidArgument
 	}
 
-	// 1. 转换 assessmentID 为 report.ID
-	reportID := ID(assess.ID())
+	conclusion := b.buildConclusion(input)
 
-	// 2. 获取总体结论
-	conclusion := b.buildConclusion(medicalScale, result)
+	dimensions := b.buildDimensions(input)
 
-	// 3. 构建维度解读
-	dimensions := b.buildDimensions(medicalScale, result)
-
-	// 4. 生成建议
 	// 优先使用评估结果中的建议，然后使用 SuggestionGenerator 增强
-	suggestions := b.buildSuggestions(context.Background(), result, reportID, medicalScale, dimensions)
+	suggestions := b.buildSuggestions(context.Background(), input, dimensions)
 
-	// 5. 创建报告
 	report := NewInterpretReport(
-		reportID,
-		medicalScale.Title,
-		medicalScale.Code,
-		result.TotalScore,
-		RiskLevel(result.RiskLevel),
+		input.AssessmentID,
+		input.ScaleName,
+		input.ScaleCode,
+		input.TotalScore,
+		input.RiskLevel,
 		conclusion,
 		dimensions,
 		suggestions,
@@ -101,17 +58,17 @@ func (b *DefaultReportBuilder) Build(
 }
 
 // buildConclusion 构建总体结论
-func (b *DefaultReportBuilder) buildConclusion(_ *ScaleSnapshot, result *assessment.EvaluationResult) string {
+func (b *DefaultReportBuilder) buildConclusion(input GenerateReportInput) string {
 	// 优先使用总分因子的解读作为总体结论
-	for _, fs := range result.FactorScores {
-		if fs.IsTotalScore && fs.Conclusion != "" {
-			return fs.Conclusion
+	for _, fs := range input.FactorScores {
+		if fs.IsTotalScore && fs.Description != "" {
+			return fs.Description
 		}
 	}
 
 	// 如果没有总分因子解读，使用评估结果的总体结论
-	if result.Conclusion != "" {
-		return result.Conclusion
+	if input.Conclusion != "" {
+		return input.Conclusion
 	}
 
 	// 如果都没有，返回空字符串
@@ -119,37 +76,20 @@ func (b *DefaultReportBuilder) buildConclusion(_ *ScaleSnapshot, result *assessm
 }
 
 // buildDimensions 构建维度解读
-func (b *DefaultReportBuilder) buildDimensions(medicalScale *ScaleSnapshot, result *assessment.EvaluationResult) []DimensionInterpret {
-	if result == nil || len(result.FactorScores) == 0 {
+func (b *DefaultReportBuilder) buildDimensions(input GenerateReportInput) []DimensionInterpret {
+	if len(input.FactorScores) == 0 {
 		return nil
 	}
 
-	// 构建因子名称映射
-	factorNameMap := make(map[string]string)
-	factorMaxScoreMap := make(map[string]*float64)
-	for _, f := range medicalScale.Factors {
-		factorNameMap[f.Code] = f.Title
-		factorMaxScoreMap[f.Code] = f.MaxScore
-	}
-
-	dimensions := make([]DimensionInterpret, 0, len(result.FactorScores))
-	for _, fs := range result.FactorScores {
-		factorName := factorNameMap[string(fs.FactorCode)]
-		if factorName == "" {
-			factorName = string(fs.FactorCode)
-		}
-
-		// 直接使用评估引擎已生成的解读内容
-		// 不使用默认文案兜底，如果没有生成解读则为空
-		description := fs.Conclusion
-
+	dimensions := make([]DimensionInterpret, 0, len(input.FactorScores))
+	for _, fs := range input.FactorScores {
 		dim := NewDimensionInterpret(
-			FactorCode(fs.FactorCode),
-			factorName,
+			fs.FactorCode,
+			fs.FactorName,
 			fs.RawScore,
-			factorMaxScoreMap[string(fs.FactorCode)],
-			RiskLevel(fs.RiskLevel),
-			description,
+			fs.MaxScore,
+			fs.RiskLevel,
+			fs.Description,
 			fs.Suggestion,
 		)
 		dimensions = append(dimensions, dim)
@@ -165,15 +105,13 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *ScaleSnapshot, resu
 // 3. 合并去重
 func (b *DefaultReportBuilder) buildSuggestions(
 	ctx context.Context,
-	result *assessment.EvaluationResult,
-	reportID ID,
-	medicalScale *ScaleSnapshot,
+	input GenerateReportInput,
 	dimensions []DimensionInterpret,
 ) []Suggestion {
 	var allSuggestions []Suggestion
 
 	// 1. 首先收集因子解读配置中的建议（通过 FactorInterpretationSuggestionStrategy）
-	factorStrategy := NewFactorInterpretationSuggestionStrategy(result)
+	factorStrategy := NewFactorInterpretationSuggestionStrategy(input)
 	if factorStrategy.CanHandle(nil) {
 		factorSuggestions, err := factorStrategy.GenerateSuggestions(ctx, nil)
 		if err == nil {
@@ -185,12 +123,12 @@ func (b *DefaultReportBuilder) buildSuggestions(
 	if b.suggestionGenerator != nil {
 		// 构建临时报告用于生成建议
 		tempReport := NewInterpretReport(
-			reportID,
-			medicalScale.Title,
-			medicalScale.Code,
-			result.TotalScore,
-			RiskLevel(result.RiskLevel),
-			b.buildConclusion(medicalScale, result),
+			input.AssessmentID,
+			input.ScaleName,
+			input.ScaleCode,
+			input.TotalScore,
+			input.RiskLevel,
+			b.buildConclusion(input),
 			dimensions,
 			nil, // 建议稍后填充
 		)

@@ -123,6 +123,14 @@ type ScaleCatalog interface {
 	GetScale(ctx context.Context, code string) (*ScaleSnapshot, error)
 }
 
+type AnswerSheetReader interface {
+	GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetSnapshot, error)
+}
+
+type QuestionnaireReader interface {
+	GetQuestionnaire(ctx context.Context, code, version string) (*QuestionnaireSnapshot, error)
+}
+
 type FailureReasonCarrier interface {
 	FailureReason() string
 }

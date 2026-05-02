@@ -14,23 +14,9 @@ import (
 )
 
 type managementRepoStub struct {
-	assessment      *domain.Assessment
-	saved           *domain.Assessment
-	savedWithEvents *domain.Assessment
-	savedEventTypes []string
-
-	findByTesteeIDAssessments []*domain.Assessment
-	findByTesteeIDTotal       int64
-
-	findByOrgIDAssessments []*domain.Assessment
-	findByOrgIDTotal       int64
-
-	findByScopeAssessments []*domain.Assessment
-	findByScopeTotal       int64
-	findByScopeOrgID       int64
-	findByScopeTesteeIDs   []testee.ID
-	findByScopeStatus      *domain.Status
-	saveCtxHadTxMarker     bool
+	assessment         *domain.Assessment
+	saved              *domain.Assessment
+	saveCtxHadTxMarker bool
 }
 
 type managementAssessmentReaderStub struct {
@@ -85,31 +71,6 @@ func (r *managementRepoStub) Save(ctx context.Context, a *domain.Assessment) err
 	return nil
 }
 
-func (r *managementRepoStub) SaveWithEvents(_ context.Context, a *domain.Assessment) error {
-	r.savedWithEvents = a
-	r.assessment = a
-	r.savedEventTypes = r.savedEventTypes[:0]
-	for _, evt := range a.Events() {
-		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
-	}
-	a.ClearEvents()
-	return nil
-}
-
-func (r *managementRepoStub) SaveWithAdditionalEvents(_ context.Context, a *domain.Assessment, additional []event.DomainEvent) error {
-	r.savedWithEvents = a
-	r.assessment = a
-	r.savedEventTypes = r.savedEventTypes[:0]
-	for _, evt := range a.Events() {
-		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
-	}
-	for _, evt := range additional {
-		r.savedEventTypes = append(r.savedEventTypes, evt.EventType())
-	}
-	a.ClearEvents()
-	return nil
-}
-
 func (r *managementRepoStub) FindByID(_ context.Context, id domain.ID) (*domain.Assessment, error) {
 	if r.assessment != nil && r.assessment.ID() == id {
 		return r.assessment, nil
@@ -120,42 +81,6 @@ func (r *managementRepoStub) FindByID(_ context.Context, id domain.ID) (*domain.
 func (r *managementRepoStub) Delete(context.Context, domain.ID) error { return nil }
 func (r *managementRepoStub) FindByAnswerSheetID(context.Context, domain.AnswerSheetRef) (*domain.Assessment, error) {
 	return nil, fmt.Errorf("assessment not found")
-}
-func (r *managementRepoStub) FindByTesteeID(context.Context, testee.ID, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return r.findByTesteeIDAssessments, r.findByTesteeIDTotal, nil
-}
-func (r *managementRepoStub) FindByTesteeIDWithFilters(context.Context, testee.ID, string, string, string, *time.Time, *time.Time, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *managementRepoStub) FindByTesteeIDAndScaleID(context.Context, testee.ID, domain.MedicalScaleRef, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *managementRepoStub) FindByPlanID(context.Context, string, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *managementRepoStub) CountByStatus(context.Context, domain.Status) (int64, error) {
-	return 0, nil
-}
-func (r *managementRepoStub) CountByTesteeIDAndStatus(context.Context, testee.ID, domain.Status) (int64, error) {
-	return 0, nil
-}
-func (r *managementRepoStub) CountByOrgIDAndStatus(context.Context, int64, domain.Status) (int64, error) {
-	return 0, nil
-}
-func (r *managementRepoStub) FindByIDs(context.Context, []domain.ID) ([]*domain.Assessment, error) {
-	return nil, nil
-}
-func (r *managementRepoStub) FindPendingSubmission(context.Context, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *managementRepoStub) FindByOrgID(context.Context, int64, *domain.Status, domain.Pagination) ([]*domain.Assessment, int64, error) {
-	return r.findByOrgIDAssessments, r.findByOrgIDTotal, nil
-}
-func (r *managementRepoStub) FindByOrgIDAndTesteeIDs(_ context.Context, orgID int64, testeeIDs []testee.ID, status *domain.Status, _ domain.Pagination) ([]*domain.Assessment, int64, error) {
-	r.findByScopeOrgID = orgID
-	r.findByScopeTesteeIDs = append([]testee.ID(nil), testeeIDs...)
-	r.findByScopeStatus = status
-	return r.findByScopeAssessments, r.findByScopeTotal, nil
 }
 
 func TestManagementServiceRetryRequiresTransactionalOutbox(t *testing.T) {
@@ -191,9 +116,6 @@ func TestManagementServiceRetryRequiresTransactionalOutbox(t *testing.T) {
 	if repo.saved != nil {
 		t.Fatal("expected repository Save not to be called without transactional outbox")
 	}
-	if repo.savedWithEvents != nil {
-		t.Fatal("expected deprecated SaveWithEvents fallback not to be called")
-	}
 }
 
 func TestSaveAssessmentAndStageEventsRequiresCompleteTransactionalOutboxConfig(t *testing.T) {
@@ -225,9 +147,6 @@ func TestSaveAssessmentAndStageEventsRequiresCompleteTransactionalOutboxConfig(t
 		}
 		if repo.saved != nil {
 			t.Fatal("expected repository Save not to be called")
-		}
-		if repo.savedWithEvents != nil {
-			t.Fatal("expected deprecated eventful save fallback not to be called")
 		}
 	}
 
@@ -281,9 +200,6 @@ func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *test
 	}
 	if !stager.ctxHadTxMarker {
 		t.Fatal("expected outbox stager to receive transaction context")
-	}
-	if repo.savedWithEvents != nil {
-		t.Fatal("expected compatibility SaveWithEvents path not to be used")
 	}
 	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domain.EventTypeSubmitted {
 		t.Fatalf("staged event types = %#v, want assessment submitted", stager.eventTypes)

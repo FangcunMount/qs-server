@@ -1,17 +1,14 @@
 package report
 
-import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-)
+import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 
 // ==================== ID 类型定义 ====================
 
 // ID 报告ID类型（与 AssessmentID 一致，使用 meta.ID）
 type ID = meta.ID
 
-// AssessmentID 测评ID类型（用于关联 assessment 域）
-type AssessmentID = assessment.ID
+// AssessmentID 测评ID类型（用于关联 assessment 聚合）
+type AssessmentID = ID
 
 // NewID 创建报告ID
 func NewID(id uint64) ID {
@@ -118,6 +115,7 @@ type GenerateReportInput struct {
 	TotalScore float64
 	RiskLevel  RiskLevel
 	Conclusion string
+	Suggestion string
 
 	// 因子得分列表
 	FactorScores []FactorScoreInput
@@ -128,8 +126,10 @@ type FactorScoreInput struct {
 	FactorCode   FactorCode
 	FactorName   string
 	RawScore     float64
+	MaxScore     *float64
 	RiskLevel    RiskLevel
 	Description  string
+	Suggestion   string
 	IsTotalScore bool
 }
 

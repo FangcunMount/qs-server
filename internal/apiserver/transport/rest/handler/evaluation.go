@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/gin-gonic/gin"
 
-	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
@@ -21,18 +20,12 @@ import (
 // 提供测评管理、得分查询、报告查询等 RESTful API
 type EvaluationHandler struct {
 	*BaseHandler
-	managementService   assessmentApp.AssessmentManagementService
-	reportQueryService  assessmentApp.ReportQueryService
-	scoreQueryService   assessmentApp.ScoreQueryService
-	evaluationService   engine.Service
-	waitService         assessmentApp.AssessmentWaitService
-	testeeAccessService actorAccessApp.TesteeAccessService
-}
-
-type accessibleAssessmentContext struct {
-	ctx          context.Context
-	assessmentID uint64
-	assessment   *assessmentApp.AssessmentResult
+	managementService  assessmentApp.AssessmentManagementService
+	reportQueryService assessmentApp.ReportQueryService
+	scoreQueryService  assessmentApp.ScoreQueryService
+	evaluationService  engine.Service
+	waitService        assessmentApp.AssessmentWaitService
+	accessQueryService assessmentApp.AssessmentAccessQueryService
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
@@ -41,6 +34,7 @@ func NewEvaluationHandler(
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
 	evaluationService engine.Service,
+	accessQueryService assessmentApp.AssessmentAccessQueryService,
 	waitServices ...assessmentApp.AssessmentWaitService,
 ) *EvaluationHandler {
 	var waitService assessmentApp.AssessmentWaitService
@@ -54,12 +48,8 @@ func NewEvaluationHandler(
 		scoreQueryService:  scoreQueryService,
 		evaluationService:  evaluationService,
 		waitService:        waitService,
+		accessQueryService: accessQueryService,
 	}
-}
-
-// SetTesteeAccessService 设置 testee 访问控制服务。
-func (h *EvaluationHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
-	h.testeeAccessService = testeeAccessService
 }
 
 // ============= Assessment 查询接口（后台管理）=============
@@ -86,18 +76,13 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 		return
 	}
 
-	ctx := c.Request.Context()
-	result, err := h.managementService.GetByID(ctx, id)
+	assessmentCtx, err := h.loadAccessibleAssessment(c.Request.Context(), id, orgID, operatorUserID)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, result.TesteeID); err != nil {
-		h.Error(c, err)
-		return
-	}
 
-	h.Success(c, response.NewAssessmentResponse(result))
+	h.Success(c, response.NewAssessmentResponse(assessmentCtx.Assessment))
 }
 
 // ListAssessments 查询测评列表
@@ -138,10 +123,6 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		conditions["status"] = req.Status
 	}
 	if req.TesteeID > 0 {
-		if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
-			h.Error(c, err)
-			return
-		}
 		conditions["testee_id"] = strconv.FormatUint(req.TesteeID, 10)
 	}
 	orgScope, err := safeconv.Int64ToUint64(orgID)
@@ -157,19 +138,10 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		Conditions: conditions,
 	}
 
-	scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
+	dto, err = h.accessQueryService.ScopeListAssessments(c.Request.Context(), orgID, operatorUserID, dto)
 	if err != nil {
 		h.Error(c, err)
 		return
-	}
-	if !scope.IsAdmin && req.TesteeID == 0 {
-		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		dto.AccessibleTesteeIDs = allowedTesteeIDs
-		dto.RestrictToAccessScope = true
 	}
 
 	ctx := c.Request.Context()
@@ -200,7 +172,7 @@ func (h *EvaluationHandler) GetScores(c *gin.Context) {
 		return
 	}
 
-	result, err := h.scoreQueryService.GetByAssessmentID(assessmentCtx.ctx, assessmentCtx.assessmentID)
+	result, err := h.scoreQueryService.GetByAssessmentID(c.Request.Context(), assessmentCtx.AssessmentID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -236,7 +208,7 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 	if req.Limit <= 0 {
 		req.Limit = 10
 	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
+	if err := h.accessQueryService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
 		h.Error(c, err)
 		return
 	}
@@ -273,7 +245,7 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 		return
 	}
 
-	result, err := h.scoreQueryService.GetHighRiskFactors(assessmentCtx.ctx, assessmentCtx.assessmentID)
+	result, err := h.scoreQueryService.GetHighRiskFactors(c.Request.Context(), assessmentCtx.AssessmentID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -302,7 +274,7 @@ func (h *EvaluationHandler) GetReport(c *gin.Context) {
 		return
 	}
 
-	result, err := h.reportQueryService.GetByAssessmentID(assessmentCtx.ctx, assessmentCtx.assessmentID)
+	result, err := h.reportQueryService.GetByAssessmentID(c.Request.Context(), assessmentCtx.AssessmentID)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -347,28 +319,10 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}
-	if req.TesteeID != 0 {
-		if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, req.TesteeID); err != nil {
-			h.Error(c, err)
-			return
-		}
-	} else {
-		scope, err := h.testeeAccessService.ResolveAccessScope(c.Request.Context(), orgID, operatorUserID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		if scope.IsAdmin {
-			h.BadRequestResponse(c, "受试者ID不能为空", nil)
-			return
-		}
-		allowedTesteeIDs, err := h.testeeAccessService.ListAccessibleTesteeIDs(c.Request.Context(), orgID, operatorUserID)
-		if err != nil {
-			h.Error(c, err)
-			return
-		}
-		dto.AccessibleTesteeIDs = allowedTesteeIDs
-		dto.RestrictToAccessScope = true
+	dto, err = h.accessQueryService.ScopeListReports(c.Request.Context(), orgID, operatorUserID, dto)
+	if err != nil {
+		h.Error(c, err)
+		return
 	}
 
 	ctx := c.Request.Context()
@@ -496,7 +450,7 @@ func (h *EvaluationHandler) parseAssessmentID(c *gin.Context) (uint64, error) {
 	return strconv.ParseUint(c.Param("id"), 10, 64)
 }
 
-func (h *EvaluationHandler) loadAccessibleAssessmentContext(c *gin.Context) (*accessibleAssessmentContext, error) {
+func (h *EvaluationHandler) loadAccessibleAssessmentContext(c *gin.Context) (*assessmentApp.AccessibleAssessmentContext, error) {
 	id, err := h.parseAssessmentID(c)
 	if err != nil {
 		return nil, err
@@ -508,19 +462,8 @@ func (h *EvaluationHandler) loadAccessibleAssessmentContext(c *gin.Context) (*ac
 	return h.loadAccessibleAssessment(c.Request.Context(), id, orgID, operatorUserID)
 }
 
-func (h *EvaluationHandler) loadAccessibleAssessment(ctx context.Context, assessmentID uint64, orgID, operatorUserID int64) (*accessibleAssessmentContext, error) {
-	assessmentResult, err := h.managementService.GetByID(ctx, assessmentID)
-	if err != nil {
-		return nil, err
-	}
-	if err := h.testeeAccessService.ValidateTesteeAccess(ctx, orgID, operatorUserID, assessmentResult.TesteeID); err != nil {
-		return nil, err
-	}
-	return &accessibleAssessmentContext{
-		ctx:          ctx,
-		assessmentID: assessmentID,
-		assessment:   assessmentResult,
-	}, nil
+func (h *EvaluationHandler) loadAccessibleAssessment(ctx context.Context, assessmentID uint64, orgID, operatorUserID int64) (*assessmentApp.AccessibleAssessmentContext, error) {
+	return h.accessQueryService.LoadAccessibleAssessment(ctx, orgID, operatorUserID, assessmentID)
 }
 
 func parseWaitReportTimeout(raw string) time.Duration {

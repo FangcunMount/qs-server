@@ -3,7 +3,6 @@ package engine
 import (
 	"context"
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -17,7 +16,6 @@ import (
 type fakeAssessmentRepo struct {
 	assessment         *domainAssessment.Assessment
 	saveCalls          int
-	eventfulSaveCalls  int
 	saveCtxHadTxMarker bool
 }
 
@@ -52,22 +50,6 @@ func (r *fakeAssessmentRepo) Save(ctx context.Context, assessment *domainAssessm
 	return nil
 }
 
-func (r *fakeAssessmentRepo) SaveWithEvents(_ context.Context, assessment *domainAssessment.Assessment) error {
-	r.assessment = assessment
-	r.eventfulSaveCalls++
-	r.saveCalls++
-	assessment.ClearEvents()
-	return nil
-}
-
-func (r *fakeAssessmentRepo) SaveWithAdditionalEvents(_ context.Context, assessment *domainAssessment.Assessment, _ []event.DomainEvent) error {
-	r.assessment = assessment
-	r.eventfulSaveCalls++
-	r.saveCalls++
-	assessment.ClearEvents()
-	return nil
-}
-
 func (r *fakeAssessmentRepo) FindByID(_ context.Context, _ domainAssessment.ID) (*domainAssessment.Assessment, error) {
 	return r.assessment, nil
 }
@@ -76,59 +58,14 @@ func (r *fakeAssessmentRepo) Delete(_ context.Context, _ domainAssessment.ID) er
 func (r *fakeAssessmentRepo) FindByAnswerSheetID(_ context.Context, _ domainAssessment.AnswerSheetRef) (*domainAssessment.Assessment, error) {
 	return nil, nil
 }
-func (r *fakeAssessmentRepo) FindByTesteeID(_ context.Context, _ testee.ID, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *fakeAssessmentRepo) FindByTesteeIDWithFilters(_ context.Context, _ testee.ID, _ string, _ string, _ string, _ *time.Time, _ *time.Time, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *fakeAssessmentRepo) FindByTesteeIDAndScaleID(_ context.Context, _ testee.ID, _ domainAssessment.MedicalScaleRef, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *fakeAssessmentRepo) FindByPlanID(_ context.Context, _ string, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *fakeAssessmentRepo) CountByStatus(_ context.Context, _ domainAssessment.Status) (int64, error) {
-	return 0, nil
-}
-func (r *fakeAssessmentRepo) CountByTesteeIDAndStatus(_ context.Context, _ testee.ID, _ domainAssessment.Status) (int64, error) {
-	return 0, nil
-}
-func (r *fakeAssessmentRepo) CountByOrgIDAndStatus(_ context.Context, _ int64, _ domainAssessment.Status) (int64, error) {
-	return 0, nil
-}
-func (r *fakeAssessmentRepo) FindByIDs(_ context.Context, _ []domainAssessment.ID) ([]*domainAssessment.Assessment, error) {
-	return nil, nil
-}
-func (r *fakeAssessmentRepo) FindPendingSubmission(_ context.Context, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *fakeAssessmentRepo) FindByOrgID(_ context.Context, _ int64, _ *domainAssessment.Status, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
-func (r *fakeAssessmentRepo) FindByOrgIDAndTesteeIDs(_ context.Context, _ int64, _ []testee.ID, _ *domainAssessment.Status, _ domainAssessment.Pagination) ([]*domainAssessment.Assessment, int64, error) {
-	return nil, 0, nil
-}
 
 var _ domainAssessment.ScoreRepository = (*noopScoreRepo)(nil)
 var _ domainReport.ReportRepository = (*noopReportRepo)(nil)
 
 type noopScoreRepo struct{}
 
-func (r *noopScoreRepo) SaveScores(_ context.Context, _ []*domainAssessment.AssessmentScore) error {
-	return nil
-}
 func (r *noopScoreRepo) SaveScoresWithContext(_ context.Context, _ *domainAssessment.Assessment, _ *domainAssessment.AssessmentScore) error {
 	return nil
-}
-func (r *noopScoreRepo) FindByAssessmentID(_ context.Context, _ domainAssessment.ID) ([]*domainAssessment.AssessmentScore, error) {
-	return nil, nil
-}
-func (r *noopScoreRepo) FindByTesteeIDAndFactorCode(_ context.Context, _ testee.ID, _ domainAssessment.FactorCode, _ int) ([]*domainAssessment.AssessmentScore, error) {
-	return nil, nil
-}
-func (r *noopScoreRepo) FindLatestByTesteeIDAndScaleID(_ context.Context, _ testee.ID, _ domainAssessment.MedicalScaleRef) ([]*domainAssessment.AssessmentScore, error) {
-	return nil, nil
 }
 func (r *noopScoreRepo) DeleteByAssessmentID(_ context.Context, _ domainAssessment.ID) error {
 	return nil
@@ -137,20 +74,8 @@ func (r *noopScoreRepo) DeleteByAssessmentID(_ context.Context, _ domainAssessme
 type noopReportRepo struct{}
 
 func (r *noopReportRepo) Save(_ context.Context, _ *domainReport.InterpretReport) error { return nil }
-func (r *noopReportRepo) SaveWithTesteeAndEvents(_ context.Context, _ *domainReport.InterpretReport, _ testee.ID, _ []event.DomainEvent) error {
-	return nil
-}
 func (r *noopReportRepo) FindByID(_ context.Context, _ domainReport.ID) (*domainReport.InterpretReport, error) {
 	return nil, nil
-}
-func (r *noopReportRepo) FindByAssessmentID(_ context.Context, _ domainReport.AssessmentID) (*domainReport.InterpretReport, error) {
-	return nil, nil
-}
-func (r *noopReportRepo) FindByTesteeID(_ context.Context, _ testee.ID, _ domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
-}
-func (r *noopReportRepo) FindByTesteeIDs(_ context.Context, _ []testee.ID, _ domainReport.Pagination) ([]*domainReport.InterpretReport, int64, error) {
-	return nil, 0, nil
 }
 func (r *noopReportRepo) Update(_ context.Context, _ *domainReport.InterpretReport) error { return nil }
 func (r *noopReportRepo) Delete(_ context.Context, _ domainReport.ID) error               { return nil }
@@ -197,9 +122,6 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 	if aRepo.saveCalls == 0 {
 		t.Fatal("assessment should be persisted after markAsFailed")
 	}
-	if aRepo.eventfulSaveCalls != 0 {
-		t.Fatal("deprecated SaveWithEvents fallback should not be used")
-	}
 	if !aRepo.saveCtxHadTxMarker {
 		t.Fatal("assessment Save should receive transaction context")
 	}
@@ -211,17 +133,14 @@ func TestSaveAssessmentWithEventsRequiresTransactionalOutbox(t *testing.T) {
 		t.Fatalf("MarkAsFailed returned error: %v", err)
 	}
 	repo := &fakeAssessmentRepo{}
-	svc := &service{assessmentRepo: repo}
+	finalizer := evaluationFailureFinalizer{repo: repo}
 
-	err := svc.saveAssessmentWithEvents(context.Background(), a)
+	err := finalizer.SaveAssessmentWithEvents(context.Background(), a)
 	if err == nil {
 		t.Fatal("expected missing transactional outbox dependencies to fail")
 	}
 	if repo.saveCalls != 0 {
 		t.Fatalf("repository save calls = %d, want 0", repo.saveCalls)
-	}
-	if repo.eventfulSaveCalls != 0 {
-		t.Fatal("deprecated SaveWithEvents fallback should not be used")
 	}
 }
 
@@ -233,19 +152,16 @@ func TestSaveAssessmentWithEventsStagesThroughApplicationTransaction(t *testing.
 	repo := &fakeAssessmentRepo{}
 	txRunner := &engineRecordingTxRunner{}
 	stager := &engineRecordingEventStager{}
-	svc := &service{assessmentRepo: repo, txRunner: txRunner, eventStager: stager}
+	finalizer := evaluationFailureFinalizer{repo: repo, txRunner: txRunner, eventStager: stager}
 
-	if err := svc.saveAssessmentWithEvents(context.Background(), a); err != nil {
-		t.Fatalf("saveAssessmentWithEvents returned error: %v", err)
+	if err := finalizer.SaveAssessmentWithEvents(context.Background(), a); err != nil {
+		t.Fatalf("SaveAssessmentWithEvents returned error: %v", err)
 	}
 	if !txRunner.called {
 		t.Fatal("expected transaction runner to be used")
 	}
 	if repo.saveCalls != 1 {
 		t.Fatalf("repository save calls = %d, want 1", repo.saveCalls)
-	}
-	if repo.eventfulSaveCalls != 0 {
-		t.Fatal("deprecated SaveWithEvents fallback should not be used")
 	}
 	if !repo.saveCtxHadTxMarker {
 		t.Fatal("assessment Save should receive transaction context")
@@ -293,7 +209,7 @@ func (w *waiterNotifierStub) GetWaiterCount(uint64) int { return 0 }
 
 type noopReportBuilder struct{}
 
-func (b *noopReportBuilder) Build(*domainAssessment.Assessment, *domainReport.ScaleSnapshot, *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
+func (b *noopReportBuilder) Build(domainReport.GenerateReportInput) (*domainReport.InterpretReport, error) {
 	return nil, nil
 }
 

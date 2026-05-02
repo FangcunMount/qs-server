@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -12,21 +11,12 @@ import (
 // reportQueryService 报告查询服务实现
 // 行为者：报告查询者（答题者或管理员）
 type reportQueryService struct {
-	reportRepo report.ReportRepository
-	reader     evaluationreadmodel.ReportReader
+	reader evaluationreadmodel.ReportReader
 }
 
-// NewReportQueryService 创建报告查询服务
-func NewReportQueryService(reportRepo report.ReportRepository) ReportQueryService {
+func NewReportQueryServiceWithReadModel(reader evaluationreadmodel.ReportReader) ReportQueryService {
 	return &reportQueryService{
-		reportRepo: reportRepo,
-	}
-}
-
-func NewReportQueryServiceWithReadModel(reportRepo report.ReportRepository, reader evaluationreadmodel.ReportReader) ReportQueryService {
-	return &reportQueryService{
-		reportRepo: reportRepo,
-		reader:     reader,
+		reader: reader,
 	}
 }
 

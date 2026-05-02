@@ -11,12 +11,15 @@ func TestPipelineHandlersDoNotOwnPersistenceOrNotificationDetails(t *testing.T) 
 
 	assertFileDoesNotContain(t, "risk_level.go", []string{
 		"SaveScoresWithContext",
+		"ScoreRepository",
 	})
 	assertFileDoesNotContain(t, "interpretation.go", []string{
 		"SaveReportDurably",
 		"ApplyEvaluation(",
 		"NewReportGeneratedEvent",
 		"NewFootprintReportGeneratedEvent",
+		"ReportRepository",
+		"ReportBuilder",
 	})
 	assertFileDoesNotContain(t, "waiter_notify.go", []string{
 		"StatusSummary",

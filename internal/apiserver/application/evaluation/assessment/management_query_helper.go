@@ -57,13 +57,14 @@ func (q assessmentAdminQuery) List(
 	ctx context.Context,
 	dto ListAssessmentsDTO,
 	orgID int64,
-	pagination assessment.Pagination,
+	page int,
+	pageSize int,
 	conditions *assessmentListConditions,
 ) ([]*AssessmentResult, int64, error) {
 	if q.reader == nil {
 		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
 	}
-	rows, total, err := q.queryRows(ctx, dto, orgID, pagination, conditions)
+	rows, total, err := q.queryRows(ctx, dto, orgID, page, pageSize, conditions)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -75,7 +76,8 @@ func (q assessmentAdminQuery) queryRows(
 	ctx context.Context,
 	dto ListAssessmentsDTO,
 	orgID int64,
-	pagination assessment.Pagination,
+	page int,
+	pageSize int,
 	conditions *assessmentListConditions,
 ) ([]evaluationreadmodel.AssessmentRow, int64, error) {
 	l := logger.L(ctx)
@@ -105,7 +107,7 @@ func (q assessmentAdminQuery) queryRows(
 	rows, total, err := q.reader.ListAssessments(
 		ctx,
 		filter,
-		evaluationreadmodel.PageRequest{Page: pagination.Page(), PageSize: pagination.PageSize()},
+		evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize},
 	)
 	if err != nil {
 		l.Errorw("通过 read model 查询测评列表失败",

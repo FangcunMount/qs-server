@@ -1,9 +1,15 @@
 package evaluationinput
 
 import (
+	"context"
 	"testing"
+	"time"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -59,4 +65,132 @@ func TestScaleToSnapshotMapsFactorScoringAndInterpretRules(t *testing.T) {
 	if len(got.InterpretRules) != 2 || got.InterpretRules[1].RiskLevel != "high" || got.InterpretRules[1].Conclusion != "高风险" {
 		t.Fatalf("unexpected interpret rules: %#v", got.InterpretRules)
 	}
+}
+
+func TestAnswerSheetToSnapshotPreservesRawValuesAndScores(t *testing.T) {
+	answer, err := answersheet.NewAnswer(
+		meta.NewCode("Q1"),
+		questionnaire.TypeRadio,
+		answersheet.NewOptionValue("A"),
+		3.5,
+	)
+	if err != nil {
+		t.Fatalf("NewAnswer returned error: %v", err)
+	}
+	sheet := answersheet.Reconstruct(
+		meta.FromUint64(9001),
+		answersheet.NewQuestionnaireRef("Q-SDS", "1.0.0", "SDS Questionnaire"),
+		actor.NewFillerRef(101, actor.FillerTypeSelf),
+		[]answersheet.Answer{answer},
+		time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC),
+		3.5,
+	)
+
+	snapshot := answerSheetToSnapshot(sheet)
+	if snapshot.ID != 9001 || snapshot.QuestionnaireCode != "Q-SDS" || snapshot.QuestionnaireVersion != "1.0.0" {
+		t.Fatalf("unexpected answer sheet snapshot: %#v", snapshot)
+	}
+	if len(snapshot.Answers) != 1 {
+		t.Fatalf("answer count = %d, want 1", len(snapshot.Answers))
+	}
+	got := snapshot.Answers[0]
+	if got.QuestionCode != "Q1" || got.Score != 3.5 || got.Value != "A" {
+		t.Fatalf("unexpected answer snapshot: %#v", got)
+	}
+}
+
+func TestQuestionnaireToSnapshotPreservesOptionScores(t *testing.T) {
+	question, err := questionnaire.NewQuestion(
+		questionnaire.WithCode(meta.NewCode("Q1")),
+		questionnaire.WithStem("How often?"),
+		questionnaire.WithQuestionType(questionnaire.TypeRadio),
+		questionnaire.WithOption("A", "Never", 0),
+		questionnaire.WithOption("B", "Often", 3),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestion returned error: %v", err)
+	}
+	qnr, err := questionnaire.NewQuestionnaire(
+		meta.NewCode("Q-SDS"),
+		"SDS Questionnaire",
+		questionnaire.WithVersion(questionnaire.Version("1.0.0")),
+		questionnaire.WithQuestions([]questionnaire.Question{question}),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestionnaire returned error: %v", err)
+	}
+
+	snapshot := questionnaireToSnapshot(qnr)
+	if snapshot.Code != "Q-SDS" || snapshot.Version != "1.0.0" || snapshot.Title != "SDS Questionnaire" {
+		t.Fatalf("unexpected questionnaire snapshot: %#v", snapshot)
+	}
+	if len(snapshot.Questions) != 1 || len(snapshot.Questions[0].Options) != 2 {
+		t.Fatalf("unexpected question/options: %#v", snapshot.Questions)
+	}
+	if got := snapshot.Questions[0].Options[1]; got.Code != "B" || got.Content != "Often" || got.Score != 3 {
+		t.Fatalf("unexpected option snapshot: %#v", got)
+	}
+}
+
+func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.T) {
+	scaleSnapshot := &port.ScaleSnapshot{Code: "SDS"}
+	answerSnapshot := &port.AnswerSheetSnapshot{
+		ID:                   2001,
+		QuestionnaireCode:    "Q-SDS",
+		QuestionnaireVersion: "2.0.0",
+	}
+	questionnaireSnapshot := &port.QuestionnaireSnapshot{Code: "Q-SDS", Version: "2.0.0"}
+	qReader := &questionnaireReaderStub{snapshot: questionnaireSnapshot}
+	resolver := NewResolver(
+		scaleCatalogStub{snapshot: scaleSnapshot},
+		answerSheetReaderStub{snapshot: answerSnapshot},
+		qReader,
+	)
+
+	snapshot, err := resolver.Resolve(context.Background(), port.InputRef{
+		MedicalScaleCode:     "SDS",
+		AnswerSheetID:        2001,
+		QuestionnaireCode:    "ignored",
+		QuestionnaireVersion: "ignored",
+	})
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if snapshot.MedicalScale != scaleSnapshot || snapshot.AnswerSheet != answerSnapshot || snapshot.Questionnaire != questionnaireSnapshot {
+		t.Fatalf("unexpected composed snapshot: %#v", snapshot)
+	}
+	if qReader.code != "Q-SDS" || qReader.version != "2.0.0" {
+		t.Fatalf("questionnaire reader called with %s/%s, want answer sheet exact version", qReader.code, qReader.version)
+	}
+}
+
+type scaleCatalogStub struct {
+	snapshot *port.ScaleSnapshot
+	err      error
+}
+
+func (s scaleCatalogStub) GetScale(context.Context, string) (*port.ScaleSnapshot, error) {
+	return s.snapshot, s.err
+}
+
+type answerSheetReaderStub struct {
+	snapshot *port.AnswerSheetSnapshot
+	err      error
+}
+
+func (s answerSheetReaderStub) GetAnswerSheet(context.Context, uint64) (*port.AnswerSheetSnapshot, error) {
+	return s.snapshot, s.err
+}
+
+type questionnaireReaderStub struct {
+	snapshot *port.QuestionnaireSnapshot
+	err      error
+	code     string
+	version  string
+}
+
+func (s *questionnaireReaderStub) GetQuestionnaire(_ context.Context, code, version string) (*port.QuestionnaireSnapshot, error) {
+	s.code = code
+	s.version = version
+	return s.snapshot, s.err
 }

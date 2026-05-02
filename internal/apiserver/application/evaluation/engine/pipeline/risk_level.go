@@ -2,8 +2,6 @@ package pipeline
 
 import (
 	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 // RiskLevelHandler 风险等级计算处理器
@@ -18,16 +16,14 @@ type RiskLevelHandler struct {
 	classifier  RiskClassifier
 }
 
-// NewRiskLevelHandler 创建风险等级计算处理器
-func NewRiskLevelHandler(scoreRepo assessment.ScoreRepository) *RiskLevelHandler {
-	return NewRiskLevelHandlerWithWriter(NewAssessmentScoreWriter(scoreRepo))
-}
-
-func NewRiskLevelHandlerWithWriter(scoreWriter AssessmentScoreWriter) *RiskLevelHandler {
+func NewRiskLevelHandler(classifier RiskClassifier, scoreWriter AssessmentScoreWriter) *RiskLevelHandler {
+	if classifier == nil {
+		classifier = NewRiskClassifier()
+	}
 	return &RiskLevelHandler{
 		BaseHandler: NewBaseHandler("RiskLevelHandler"),
 		scoreWriter: scoreWriter,
-		classifier:  NewRiskClassifier(),
+		classifier:  classifier,
 	}
 }
 

@@ -74,6 +74,9 @@ type EvaluationModule struct {
 	// 等待报告服务 - 服务于 REST 长轮询
 	WaitService assessmentApp.AssessmentWaitService
 
+	// 访问控制查询服务 - 服务于 REST 查询访问收口
+	AccessQueryService assessmentApp.AssessmentAccessQueryService
+
 	// ==================== 评估引擎 ====================
 
 	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
@@ -92,7 +95,6 @@ type EvaluationModule struct {
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher        event.EventPublisher
-	testeeAccessService   actorAccessApp.TesteeAccessService
 	assessmentOutboxStore *mysqlEventOutbox.Store
 	reportDurableSaver    pipeline.ReportDurableSaver
 }
@@ -127,7 +129,6 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	module := &EvaluationModule{}
 	module.mysqlDB = normalized.MySQLDB
 	module.eventPublisher = normalized.EventPublisher
-	module.testeeAccessService = normalized.TesteeAccessService
 
 	// ==================== 初始化 Repository 层 ====================
 	// 初始化基础 Repository
@@ -264,18 +265,20 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	module.ManagementService = assessmentApp.NewManagementServiceWithTransactionalOutboxAndReadModel(module.assessmentRepo, module.assessmentReader, module.eventPublisher, txRunner, assessmentOutboxStore)
 
 	// 报告查询服务 - 服务于报告查询者
-	module.ReportQueryService = assessmentApp.NewReportQueryServiceWithReadModel(module.reportRepo, module.reportReader)
+	module.ReportQueryService = assessmentApp.NewReportQueryServiceWithReadModel(module.reportReader)
 
 	// 得分查询服务 - 服务于数据分析
 	module.ScoreQueryService = assessmentApp.NewScoreQueryServiceWithReadModel(
-		module.scoreRepo,
-		module.assessmentRepo,
 		module.scoreReader,
 		module.assessmentReader,
 		normalized.ScaleCatalog,
 	)
 
 	module.WaitService = assessmentApp.NewWaitService(module.ManagementService, waiterRegistry)
+	module.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
+		module.ManagementService,
+		newEvaluationTesteeAccessChecker(normalized.TesteeAccessService),
+	)
 
 	return module, nil
 }

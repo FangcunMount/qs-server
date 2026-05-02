@@ -9,7 +9,7 @@ import (
 )
 
 func TestReportQueryServiceExportPDFReturnsUnsupported(t *testing.T) {
-	svc := NewReportQueryService(nil)
+	svc := NewReportQueryServiceWithReadModel(nil)
 
 	_, err := svc.ExportPDF(context.Background(), 1001)
 	if err == nil {

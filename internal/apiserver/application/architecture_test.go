@@ -144,6 +144,104 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 	}
 }
 
+func TestEvaluationDoesNotUseDeprecatedRepositoryFallbacks(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/application/evaluation",
+		"internal/apiserver/domain/evaluation",
+	} {
+		dir := filepath.Join(root, filepath.FromSlash(rel))
+		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range []string{
+				"SaveWithEvents",
+				"SaveWithAdditionalEvents",
+				"SaveWithTesteeAndEvents",
+				"SaveScores(",
+			} {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains %q; evaluation must use application transaction/outbox ports instead of repository fallback methods", filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/domain/evaluation/assessment",
+		"internal/apiserver/domain/evaluation/report",
+	} {
+		dir := filepath.Join(root, filepath.FromSlash(rel))
+		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			if strings.Contains(string(data), "type Pagination") || strings.Contains(string(data), "NewPagination") {
+				t.Fatalf("%s contains pagination read-model value object; pagination belongs to application/read-model ports", filepath.ToSlash(mustRel(t, root, path)))
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                 "application error mapping/use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                       "infrastructure adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                   "transport adapters",
+		"github.com/FangcunMount/component-base/pkg/logger":                                 "application/infra observability",
+		"github.com/FangcunMount/component-base/pkg/errors":                                 "domain-native errors",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                               "application API error mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":                 "evaluation-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "report-local snapshots/value objects",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
+		for forbidden, replacement := range forbiddenImports {
+			if strings.HasPrefix(importPath, forbidden) {
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				if strings.Contains(rel, "domain/evaluation/assessment/") && forbidden == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
+					continue
+				}
+				t.Fatalf("%s imports %s; evaluation domain should depend on %s", rel, importPath, replacement)
+			}
+		}
+	})
+}
+
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {

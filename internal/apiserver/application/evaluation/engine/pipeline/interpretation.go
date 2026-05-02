@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 )
 
@@ -32,41 +31,32 @@ type InterpretationFinalizer struct {
 	reportWriter     InterpretReportWriter
 }
 
-// NewInterpretationHandler 创建测评分析解读处理器
+func NewInterpretationGenerator(interpreter interpretengine.Interpreter, defaultProvider interpretengine.DefaultProvider) *InterpretationGenerator {
+	return &InterpretationGenerator{
+		interpreter:     interpreter,
+		defaultProvider: defaultProvider,
+	}
+}
+
+func NewInterpretationFinalizer(
+	assessmentWriter AssessmentResultWriter,
+	reportWriter InterpretReportWriter,
+) *InterpretationFinalizer {
+	return &InterpretationFinalizer{
+		assessmentWriter: assessmentWriter,
+		reportWriter:     reportWriter,
+	}
+}
+
+// NewInterpretationHandler 创建测评分析解读处理器。
 func NewInterpretationHandler(
-	assessmentRepo assessment.Repository,
-	reportRepo domainReport.ReportRepository,
-	reportBuilder domainReport.ReportBuilder,
+	generator *InterpretationGenerator,
+	finalizer *InterpretationFinalizer,
 ) *InterpretationHandler {
 	return &InterpretationHandler{
 		BaseHandler: NewBaseHandler("InterpretationHandler"),
-		generator:   &InterpretationGenerator{},
-		finalizer: &InterpretationFinalizer{
-			assessmentWriter: NewAssessmentResultWriter(assessmentRepo),
-			reportWriter:     NewInterpretReportWriter(reportBuilder, NewReportDurableSaver(reportRepo)),
-		},
-	}
-}
-
-func (h *InterpretationHandler) SetReportDurableSaver(saver ReportDurableSaver) {
-	if saver == nil {
-		return
-	}
-	if h.finalizer == nil {
-		h.finalizer = &InterpretationFinalizer{}
-	}
-	h.finalizer.SetReportDurableSaver(saver)
-}
-
-func (h *InterpretationHandler) SetInterpretEngine(interpreter interpretengine.Interpreter, defaultProvider interpretengine.DefaultProvider) {
-	if h.generator == nil {
-		h.generator = &InterpretationGenerator{}
-	}
-	if interpreter != nil {
-		h.generator.interpreter = interpreter
-	}
-	if defaultProvider != nil {
-		h.generator.defaultProvider = defaultProvider
+		generator:   generator,
+		finalizer:   finalizer,
 	}
 }
 
@@ -143,13 +133,6 @@ func (f *InterpretationFinalizer) Finalize(ctx context.Context, evalCtx *Context
 	}
 
 	return nil
-}
-
-func (f *InterpretationFinalizer) SetReportDurableSaver(saver ReportDurableSaver) {
-	if saver == nil {
-		return
-	}
-	f.ensureReportWriter().SetReportDurableSaver(saver)
 }
 
 func (f *InterpretationFinalizer) ensureAssessmentWriter() AssessmentResultWriter {

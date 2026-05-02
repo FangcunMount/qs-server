@@ -1,10 +1,6 @@
 package report
 
-import (
-	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-)
+import "context"
 
 // SuggestionCategory 建议分类
 type SuggestionCategory string
@@ -128,13 +124,13 @@ func uniqueSuggestions(suggestions []Suggestion) []Suggestion {
 // 从因子解读规则配置中收集 suggestion 数据
 type FactorInterpretationSuggestionStrategy struct {
 	// evaluationResult 评估结果，包含所有因子的建议
-	evaluationResult *assessment.EvaluationResult
+	input GenerateReportInput
 }
 
 // NewFactorInterpretationSuggestionStrategy 创建基于因子解读配置的建议策略
-func NewFactorInterpretationSuggestionStrategy(evaluationResult *assessment.EvaluationResult) *FactorInterpretationSuggestionStrategy {
+func NewFactorInterpretationSuggestionStrategy(input GenerateReportInput) *FactorInterpretationSuggestionStrategy {
 	return &FactorInterpretationSuggestionStrategy{
-		evaluationResult: evaluationResult,
+		input: input,
 	}
 }
 
@@ -146,35 +142,35 @@ func (s *FactorInterpretationSuggestionStrategy) Name() string {
 // CanHandle 是否可以处理
 func (s *FactorInterpretationSuggestionStrategy) CanHandle(_ *InterpretReport) bool {
 	// 只要有评估结果就可以处理
-	return s.evaluationResult != nil && len(s.evaluationResult.FactorScores) > 0
+	return len(s.input.FactorScores) > 0
 }
 
 // GenerateSuggestions 生成建议
 // 从因子解读规则配置中收集 suggestion 数据
 func (s *FactorInterpretationSuggestionStrategy) GenerateSuggestions(_ context.Context, _ *InterpretReport) ([]Suggestion, error) {
-	if s.evaluationResult == nil {
+	if len(s.input.FactorScores) == 0 {
 		return []Suggestion{}, nil
 	}
 
 	var suggestions []Suggestion
 
 	// 收集总体建议
-	if s.evaluationResult.Suggestion != "" {
+	if s.input.Suggestion != "" {
 		suggestions = append(suggestions, Suggestion{
 			Category: SuggestionCategoryGeneral,
-			Content:  s.evaluationResult.Suggestion,
+			Content:  s.input.Suggestion,
 		})
 	}
 
 	// 收集所有因子的建议（来自因子解读规则配置）
 	// 优先收集总分因子的建议，然后收集其他因子的建议
-	for _, fs := range s.evaluationResult.FactorScores {
+	for _, fs := range s.input.FactorScores {
 		if fs.Suggestion == "" {
 			continue
 		}
 		// 如果是总分因子，且与总体建议不同，则添加
 		if fs.IsTotalScore {
-			if fs.Suggestion != s.evaluationResult.Suggestion {
+			if fs.Suggestion != s.input.Suggestion {
 				suggestions = append(suggestions, Suggestion{
 					Category: SuggestionCategoryGeneral,
 					Content:  fs.Suggestion,
@@ -182,7 +178,7 @@ func (s *FactorInterpretationSuggestionStrategy) GenerateSuggestions(_ context.C
 			}
 		} else {
 			// 非总分因子的建议也收集
-			factorCode := FactorCode(fs.FactorCode)
+			factorCode := fs.FactorCode
 			suggestions = append(suggestions, Suggestion{
 				Category:   SuggestionCategoryDimension,
 				Content:    fs.Suggestion,

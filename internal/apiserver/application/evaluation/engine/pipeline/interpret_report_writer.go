@@ -2,33 +2,30 @@ package pipeline
 
 import (
 	"context"
-	"strconv"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type InterpretReportWriter interface {
 	BuildAndSave(ctx context.Context, evalCtx *Context) error
-	SetReportDurableSaver(saver ReportDurableSaver)
 }
 
 type durableInterpretReportWriter struct {
-	reportSaver   ReportDurableSaver
-	reportBuilder domainReport.ReportBuilder
+	reportSaver    ReportDurableSaver
+	reportBuilder  domainReport.ReportBuilder
+	eventAssembler InterpretationEventAssembler
 }
 
 func NewInterpretReportWriter(reportBuilder domainReport.ReportBuilder, reportSaver ReportDurableSaver) InterpretReportWriter {
 	return &durableInterpretReportWriter{
-		reportSaver:   reportSaver,
-		reportBuilder: reportBuilder,
+		reportSaver:    reportSaver,
+		reportBuilder:  reportBuilder,
+		eventAssembler: NewInterpretationEventAssembler(),
 	}
 }
 
@@ -41,7 +38,7 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "report durable saver is not configured")
 	}
 
-	rpt, err := w.reportBuilder.Build(evalCtx.Assessment, reportScaleSnapshot(evalCtx.MedicalScale), evalCtx.EvaluationResult)
+	rpt, err := w.reportBuilder.Build(reportInputFromContext(evalCtx))
 	if err != nil {
 		l.Errorw("Failed to build report",
 			"assessment_id", assessmentID,
@@ -51,7 +48,7 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 	reportID, _ := rpt.ID().Value()
 	l.Debugw("Report built successfully", "report_id", reportID)
 
-	if err := w.reportSaver.SaveReportDurably(ctx, rpt, evalCtx.Assessment.TesteeID(), w.buildSuccessEvents(evalCtx, rpt)); err != nil {
+	if err := w.reportSaver.SaveReportDurably(ctx, rpt, evalCtx.Assessment.TesteeID(), w.eventAssembler.BuildSuccessEvents(evalCtx, rpt)); err != nil {
 		reportID, _ := rpt.ID().Value()
 		assessmentID, _ := evalCtx.Assessment.ID().Value()
 		l.Errorw("Failed to save report",
@@ -68,81 +65,62 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 	return nil
 }
 
-func (w *durableInterpretReportWriter) SetReportDurableSaver(saver ReportDurableSaver) {
-	if saver != nil {
-		w.reportSaver = saver
+func reportInputFromContext(evalCtx *Context) domainReport.GenerateReportInput {
+	input := domainReport.GenerateReportInput{}
+	if evalCtx == nil {
+		return input
 	}
-}
-
-func (w *durableInterpretReportWriter) buildSuccessEvents(evalCtx *Context, rpt *domainReport.InterpretReport) []event.DomainEvent {
-	now := time.Now()
-	assessmentRef := evalCtx.Assessment.MedicalScaleRef()
-	if assessmentRef == nil {
-		return nil
+	if evalCtx.Assessment != nil {
+		input.AssessmentID = domainReport.ID(evalCtx.Assessment.ID())
 	}
-
-	scaleVersion := ""
 	if evalCtx.MedicalScale != nil {
-		scaleVersion = evalCtx.MedicalScale.QuestionnaireVersion
-	} else if !evalCtx.Assessment.QuestionnaireRef().IsEmpty() {
-		scaleVersion = evalCtx.Assessment.QuestionnaireRef().Version()
+		input.ScaleName = evalCtx.MedicalScale.Title
+		input.ScaleCode = evalCtx.MedicalScale.Code
 	}
-
-	scaleRef := assessment.NewMedicalScaleRef(
-		assessmentRef.ID(),
-		assessmentRef.Code(),
-		scaleVersion,
-	)
-
-	assessmentID := evalCtx.Assessment.ID().Uint64()
-	reportID := rpt.ID().Uint64()
-	testeeID := evalCtx.Assessment.TesteeID().Uint64()
-
-	return []event.DomainEvent{
-		assessment.NewAssessmentInterpretedEvent(
-			evalCtx.Assessment.OrgID(),
-			evalCtx.Assessment.ID(),
-			evalCtx.Assessment.TesteeID(),
-			scaleRef,
-			evalCtx.EvaluationResult.TotalScore,
-			evalCtx.EvaluationResult.RiskLevel,
-			now,
-		),
-		domainReport.NewReportGeneratedEvent(
-			strconv.FormatUint(reportID, 10),
-			strconv.FormatUint(assessmentID, 10),
-			testeeID,
-			rpt.ScaleCode(),
-			scaleVersion,
-			rpt.TotalScore(),
-			string(rpt.RiskLevel()),
-			now,
-		),
-		domainStatistics.NewFootprintReportGeneratedEvent(
-			evalCtx.Assessment.OrgID(),
-			testeeID,
-			assessmentID,
-			reportID,
-			now,
-		),
+	if evalCtx.EvaluationResult != nil {
+		input.TotalScore = evalCtx.EvaluationResult.TotalScore
+		input.RiskLevel = domainReport.RiskLevel(evalCtx.EvaluationResult.RiskLevel)
+		input.Conclusion = evalCtx.EvaluationResult.Conclusion
+		input.Suggestion = evalCtx.EvaluationResult.Suggestion
+		input.FactorScores = reportFactorScoreInputs(evalCtx.EvaluationResult.FactorScores, evalCtx.MedicalScale)
 	}
+	return input
 }
 
-func reportScaleSnapshot(scaleSnapshot *evaluationinput.ScaleSnapshot) *domainReport.ScaleSnapshot {
-	if scaleSnapshot == nil {
-		return nil
+func reportFactorScoreInputs(
+	factorScores []assessment.FactorScoreResult,
+	scaleSnapshot *evaluationinput.ScaleSnapshot,
+) []domainReport.FactorScoreInput {
+	factorMeta := make(map[string]evaluationinput.FactorSnapshot)
+	if scaleSnapshot != nil {
+		for _, f := range scaleSnapshot.Factors {
+			factorMeta[f.Code] = f
+		}
 	}
-	factors := make([]domainReport.ScaleFactorSnapshot, 0, len(scaleSnapshot.Factors))
-	for _, f := range scaleSnapshot.Factors {
-		factors = append(factors, domainReport.ScaleFactorSnapshot{
-			Code:     f.Code,
-			Title:    f.Title,
-			MaxScore: f.MaxScore,
+	inputs := make([]domainReport.FactorScoreInput, 0, len(factorScores))
+	for _, fs := range factorScores {
+		meta, ok := factorMeta[string(fs.FactorCode)]
+		factorName := fs.FactorName
+		var maxScore *float64
+		if ok {
+			if factorName == "" {
+				factorName = meta.Title
+			}
+			maxScore = meta.MaxScore
+		}
+		if factorName == "" {
+			factorName = string(fs.FactorCode)
+		}
+		inputs = append(inputs, domainReport.FactorScoreInput{
+			FactorCode:   domainReport.FactorCode(fs.FactorCode),
+			FactorName:   factorName,
+			RawScore:     fs.RawScore,
+			MaxScore:     maxScore,
+			RiskLevel:    domainReport.RiskLevel(fs.RiskLevel),
+			Description:  fs.Conclusion,
+			Suggestion:   fs.Suggestion,
+			IsTotalScore: fs.IsTotalScore,
 		})
 	}
-	return &domainReport.ScaleSnapshot{
-		Code:    scaleSnapshot.Code,
-		Title:   scaleSnapshot.Title,
-		Factors: factors,
-	}
+	return inputs
 }

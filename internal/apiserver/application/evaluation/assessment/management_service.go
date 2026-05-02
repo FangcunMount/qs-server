@@ -126,10 +126,7 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID超出 int64 范围")
 	}
 
-	// 构建分页参数
-	pagination := assessment.NewPagination(dto.Page, dto.PageSize)
-	page := pagination.Page()
-	pageSize := pagination.PageSize()
+	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 
 	conditions, err := parseAssessmentListConditions(dto.Conditions)
 	if err != nil {
@@ -145,7 +142,7 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 		)
 	}
 
-	results, total, err := assessmentAdminQuery{reader: s.reader}.List(ctx, dto, orgID, pagination, conditions)
+	results, total, err := assessmentAdminQuery{reader: s.reader}.List(ctx, dto, orgID, page, pageSize, conditions)
 	if err != nil {
 		return nil, err
 	}
