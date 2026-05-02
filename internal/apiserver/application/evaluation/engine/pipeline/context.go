@@ -3,9 +3,7 @@ package pipeline
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 // Context 评估上下文
@@ -13,9 +11,10 @@ import (
 type Context struct {
 	// 输入数据
 	Assessment    *assessment.Assessment
-	MedicalScale  *scale.MedicalScale
-	AnswerSheet   *answersheet.AnswerSheet     // 答卷数据
-	Questionnaire *questionnaire.Questionnaire // 问卷数据（用于获取选项内容等）
+	Input         *evaluationinput.InputSnapshot
+	MedicalScale  *evaluationinput.ScaleSnapshot
+	AnswerSheet   *evaluationinput.AnswerSheetSnapshot   // 答卷数据
+	Questionnaire *evaluationinput.QuestionnaireSnapshot // 问卷数据（用于获取选项内容等）
 
 	// 中间结果（由各处理器填充）
 	FactorScores     []assessment.FactorScoreResult // 因子得分列表
@@ -33,15 +32,19 @@ type Context struct {
 // NewContext 创建评估上下文
 func NewContext(
 	a *assessment.Assessment,
-	medicalScale *scale.MedicalScale,
-	answerSheet *answersheet.AnswerSheet,
+	input *evaluationinput.InputSnapshot,
 ) *Context {
-	return &Context{
+	ctx := &Context{
 		Assessment:   a,
-		MedicalScale: medicalScale,
-		AnswerSheet:  answerSheet,
+		Input:        input,
 		FactorScores: make([]assessment.FactorScoreResult, 0),
 	}
+	if input != nil {
+		ctx.MedicalScale = input.MedicalScale
+		ctx.AnswerSheet = input.AnswerSheet
+		ctx.Questionnaire = input.Questionnaire
+	}
+	return ctx
 }
 
 // HasError 检查是否有错误

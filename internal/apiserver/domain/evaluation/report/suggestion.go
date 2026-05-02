@@ -182,7 +182,7 @@ func (s *FactorInterpretationSuggestionStrategy) GenerateSuggestions(_ context.C
 			}
 		} else {
 			// 非总分因子的建议也收集
-			factorCode := fs.FactorCode
+			factorCode := FactorCode(fs.FactorCode)
 			suggestions = append(suggestions, Suggestion{
 				Category:   SuggestionCategoryDimension,
 				Content:    fs.Suggestion,

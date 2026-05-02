@@ -29,23 +29,6 @@ func NewScoreRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) assess
 	return repo
 }
 
-// ==================== 批量保存 ====================
-
-// SaveScores 批量保存得分
-// 注意：需要传入辅助信息来扁平化存储
-func (r *scoreRepository) SaveScores(_ context.Context, scores []*assessment.AssessmentScore) error {
-	if len(scores) == 0 {
-		return nil
-	}
-
-	// 这个方法需要外部传入 testeeID 和 scaleInfo
-	// 由于当前领域模型中 AssessmentScore 不包含这些信息，
-	// 需要从 Assessment 中获取或通过其他方式传递
-	// 暂时使用占位实现，后续需要优化
-
-	return errors.WithCode(code.ErrAssessmentScoreSaveFailed, "SaveScores requires additional context, use SaveScoresWithContext instead")
-}
-
 // SaveScoresWithContext 带上下文保存得分（包含受试者和量表信息）
 func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentDomain *assessment.Assessment, score *assessment.AssessmentScore) error {
 	if score == nil || assessmentDomain == nil {

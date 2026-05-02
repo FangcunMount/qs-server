@@ -18,9 +18,6 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -33,6 +30,7 @@ import (
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -103,9 +101,8 @@ type EvaluationModule struct {
 type EvaluationModuleDeps struct {
 	MySQLDB              *gorm.DB
 	MongoDB              *mongo.Database
-	ScaleRepo            scale.Repository
-	AnswerSheetRepo      answersheet.Repository
-	QuestionnaireRepo    questionnaire.Repository
+	InputResolver        evaluationinput.Resolver
+	ScaleCatalog         evaluationinput.ScaleCatalog
 	EventPublisher       event.EventPublisher
 	RedisClient          redis.UniversalClient
 	CacheBuilder         *keyspace.Builder
@@ -185,12 +182,12 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	// ====================  初始化评估引擎 ====================
 	// 创建等待队列注册表（用于长轮询，在创建 EvaluationService 和 Handler 时使用）
 	var waiterRegistry *waiter.WaiterRegistry
-	if normalized.ScaleRepo != nil && normalized.AnswerSheetRepo != nil && normalized.QuestionnaireRepo != nil {
+	if normalized.InputResolver != nil {
 		waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
 	}
 
-	// 注意：如果有 scaleRepo、answerSheetRepo 和 questionnaireRepo，则初始化 EvaluationService
-	if normalized.ScaleRepo != nil && normalized.AnswerSheetRepo != nil && normalized.QuestionnaireRepo != nil {
+	// 注意：如果有输入解析器，则初始化 EvaluationService
+	if normalized.InputResolver != nil {
 		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
@@ -210,9 +207,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 			module.assessmentRepo,
 			module.scoreRepo,
 			module.reportRepo,
-			normalized.ScaleRepo,
-			normalized.AnswerSheetRepo,
-			normalized.QuestionnaireRepo,
+			normalized.InputResolver,
 			reportBuilder,
 			serviceOpts...,
 		)
@@ -277,7 +272,7 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		module.assessmentRepo,
 		module.scoreReader,
 		module.assessmentReader,
-		normalized.ScaleRepo,
+		normalized.ScaleCatalog,
 	)
 
 	module.WaitService = assessmentApp.NewWaitService(module.ManagementService, waiterRegistry)

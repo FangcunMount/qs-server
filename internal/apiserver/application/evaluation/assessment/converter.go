@@ -4,7 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -204,7 +204,7 @@ func toSuggestionDTOs(items []report.Suggestion) []SuggestionDTO {
 }
 
 // toScoreResult 将领域模型转换为 ScoreResult
-func toScoreResult(s *assessment.AssessmentScore, medicalScale *scale.MedicalScale) *ScoreResult {
+func toScoreResult(s *assessment.AssessmentScore, medicalScale *evaluationinput.ScaleSnapshot) *ScoreResult {
 	if s == nil {
 		return nil
 	}
@@ -212,9 +212,8 @@ func toScoreResult(s *assessment.AssessmentScore, medicalScale *scale.MedicalSca
 	// 构建因子 max_score 映射
 	factorMaxScoreMap := make(map[string]*float64)
 	if medicalScale != nil {
-		factors := medicalScale.GetFactors()
-		for _, f := range factors {
-			factorMaxScoreMap[string(f.GetCode())] = f.GetMaxScore()
+		for _, f := range medicalScale.Factors {
+			factorMaxScoreMap[f.Code] = f.MaxScore
 		}
 	}
 
@@ -240,14 +239,14 @@ func toScoreResult(s *assessment.AssessmentScore, medicalScale *scale.MedicalSca
 	}
 }
 
-func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *scale.MedicalScale) *ScoreResult {
+func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *evaluationinput.ScaleSnapshot) *ScoreResult {
 	if row == nil {
 		return nil
 	}
 	factorMaxScoreMap := make(map[string]*float64)
 	if medicalScale != nil {
-		for _, f := range medicalScale.GetFactors() {
-			factorMaxScoreMap[string(f.GetCode())] = f.GetMaxScore()
+		for _, f := range medicalScale.Factors {
+			factorMaxScoreMap[f.Code] = f.MaxScore
 		}
 	}
 	factorScores := make([]FactorScoreResult, 0, len(row.FactorScores))
@@ -271,7 +270,7 @@ func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *scale.Med
 	}
 }
 
-func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadmodel.ScoreRow, medicalScale *scale.MedicalScale) *HighRiskFactorsResult {
+func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadmodel.ScoreRow, medicalScale *evaluationinput.ScaleSnapshot) *HighRiskFactorsResult {
 	if row == nil {
 		return &HighRiskFactorsResult{
 			AssessmentID:    assessmentID,
@@ -298,7 +297,7 @@ func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadm
 }
 
 // toHighRiskFactorsResult 转换高风险因子结果
-func toHighRiskFactorsResult(assessmentID uint64, s *assessment.AssessmentScore, medicalScale *scale.MedicalScale) *HighRiskFactorsResult {
+func toHighRiskFactorsResult(assessmentID uint64, s *assessment.AssessmentScore, medicalScale *evaluationinput.ScaleSnapshot) *HighRiskFactorsResult {
 	if s == nil {
 		return &HighRiskFactorsResult{
 			AssessmentID:    assessmentID,
@@ -311,9 +310,8 @@ func toHighRiskFactorsResult(assessmentID uint64, s *assessment.AssessmentScore,
 	// 构建因子 max_score 映射
 	factorMaxScoreMap := make(map[string]*float64)
 	if medicalScale != nil {
-		factors := medicalScale.GetFactors()
-		for _, f := range factors {
-			factorMaxScoreMap[string(f.GetCode())] = f.GetMaxScore()
+		for _, f := range medicalScale.Factors {
+			factorMaxScoreMap[f.Code] = f.MaxScore
 		}
 	}
 

@@ -1,9 +1,6 @@
 package assessment
 
-import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-)
+import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 
 // ==================== ID 类型定义 ====================
 
@@ -135,19 +132,22 @@ func (o OriginType) IsValid() bool {
 	}
 }
 
-// ==================== 风险等级（复用 scale 子域定义）====================
+// ==================== 风险等级 ====================
 
-// RiskLevel 风险等级（复用 scale 子域的定义，保持一致性）
-type RiskLevel = scale.RiskLevel
+// RiskLevel 风险等级
+type RiskLevel string
 
-// 风险等级常量（复用 scale 子域定义）
 const (
-	RiskLevelNone   = scale.RiskLevelNone
-	RiskLevelLow    = scale.RiskLevelLow
-	RiskLevelMedium = scale.RiskLevelMedium
-	RiskLevelHigh   = scale.RiskLevelHigh
-	RiskLevelSevere = scale.RiskLevelSevere
+	RiskLevelNone   RiskLevel = "none"
+	RiskLevelLow    RiskLevel = "low"
+	RiskLevelMedium RiskLevel = "medium"
+	RiskLevelHigh   RiskLevel = "high"
+	RiskLevelSevere RiskLevel = "severe"
 )
+
+func (r RiskLevel) String() string {
+	return string(r)
+}
 
 // RiskLevelFromString 从字符串解析风险等级
 func RiskLevelFromString(s string) RiskLevel {
@@ -313,14 +313,30 @@ func ReconstructOrigin(originType OriginType, originID *string) Origin {
 	}
 }
 
-// ==================== 因子编码（复用 scale 子域定义） ====================
+// ==================== 因子编码 ====================
 
-// FactorCode 因子编码（复用 scale 子域的定义）
-type FactorCode = scale.FactorCode
+// FactorCode 因子编码
+type FactorCode string
 
 // NewFactorCode 创建因子编码
 func NewFactorCode(code string) FactorCode {
-	return scale.NewFactorCode(code)
+	return FactorCode(code)
+}
+
+func (c FactorCode) Value() string {
+	return string(c)
+}
+
+func (c FactorCode) String() string {
+	return string(c)
+}
+
+func (c FactorCode) IsEmpty() bool {
+	return c == ""
+}
+
+func (c FactorCode) Equals(other FactorCode) bool {
+	return c == other
 }
 
 // ==================== 评估结果值对象 ====================

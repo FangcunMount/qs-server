@@ -2,17 +2,14 @@ package evaluation
 
 import (
 	"testing"
-
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
-func TestNewAssessmentRepositoryWithTopicResolverInjectsOutboxResolver(t *testing.T) {
-	resolver := eventcatalog.NewCatalog(nil)
-	repo, ok := NewAssessmentRepositoryWithTopicResolver(nil, resolver).(*assessmentRepository)
+func TestNewAssessmentRepositoryWithTopicResolverCreatesCommandRepository(t *testing.T) {
+	repo, ok := NewAssessmentRepositoryWithTopicResolver(nil, nil).(*assessmentRepository)
 	if !ok {
 		t.Fatalf("repository type = %T, want *assessmentRepository", repo)
 	}
-	if repo.outboxStore == nil {
-		t.Fatalf("outbox store = nil")
+	if repo.mapper == nil {
+		t.Fatalf("mapper = nil")
 	}
 }

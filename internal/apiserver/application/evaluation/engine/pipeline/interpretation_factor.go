@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 )
 
@@ -49,8 +48,7 @@ func (g *InterpretationGenerator) interpretFactorWithRules(ctx context.Context, 
 	}
 
 	// 卫语句：查找因子
-	scaleFactorCode := scale.NewFactorCode(string(fs.FactorCode))
-	factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode)
+	factor, found := evalCtx.MedicalScale.FindFactor(string(fs.FactorCode))
 	if !found {
 		l.Warnw("Factor not found in scale",
 			"factor_code", string(fs.FactorCode))

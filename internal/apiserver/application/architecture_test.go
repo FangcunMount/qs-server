@@ -109,6 +109,41 @@ func TestSurveyScaleApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
 	}
 }
 
+func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	engineRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "engine")
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":  "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey": "evaluationinput snapshots",
+	}
+	err := filepath.WalkDir(engineRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+		if err != nil {
+			return err
+		}
+		for _, imported := range parsed.Imports {
+			importPath := strings.Trim(imported.Path.Value, `"`)
+			for forbidden, replacement := range forbiddenImports {
+				if strings.HasPrefix(importPath, forbidden) {
+					t.Fatalf("%s imports %s; evaluation engine should consume %s instead of survey/scale aggregates", filepath.ToSlash(mustRel(t, root, path)), importPath, replacement)
+				}
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {
 	t.Helper()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {

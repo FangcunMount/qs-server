@@ -106,8 +106,17 @@ func NewSubmissionServiceWithTransactionalOutboxAndReadModel(
 	}
 }
 
-// Create 创建测评
 func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO) (*AssessmentResult, error) {
+	return assessmentCreatorWorkflow{service: s}.Create(ctx, dto)
+}
+
+type assessmentCreatorWorkflow struct {
+	service *submissionService
+}
+
+// Create 创建测评
+func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessmentDTO) (*AssessmentResult, error) {
+	s := w.service
 	l := logger.L(ctx)
 	startTime := time.Now()
 
@@ -200,7 +209,7 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	s.invalidateMyListCache(ctx, dto.TesteeID)
+	myAssessmentListCacheHelper{cache: s.listCache}.Invalidate(ctx, dto.TesteeID)
 
 	result, convErr := toAssessmentResult(a)
 	if convErr != nil {
@@ -210,8 +219,17 @@ func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO)
 	return result, nil
 }
 
-// Submit 提交测评
 func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*AssessmentResult, error) {
+	return assessmentSubmitWorkflow{service: s}.Submit(ctx, assessmentID)
+}
+
+type assessmentSubmitWorkflow struct {
+	service *submissionService
+}
+
+// Submit 提交测评
+func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint64) (*AssessmentResult, error) {
+	s := w.service
 	l := logger.L(ctx)
 	startTime := time.Now()
 
@@ -276,7 +294,7 @@ func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*A
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	s.invalidateMyListCache(ctx, a.TesteeID().Uint64())
+	myAssessmentListCacheHelper{cache: s.listCache}.Invalidate(ctx, a.TesteeID().Uint64())
 
 	result, convErr := toAssessmentResult(a)
 	if convErr != nil {
@@ -417,26 +435,12 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"page_size", dto.PageSize,
 	)
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
-	dateFromKey := formatAssessmentListDateKey(dto.DateFrom)
-	dateToKey := formatAssessmentListDateKey(dto.DateTo)
+	cacheKey := newMyAssessmentListCacheKey(dto, page, pageSize)
+	cacheHelper := myAssessmentListCacheHelper{cache: s.listCache}
 
 	// 2.1 尝试缓存（按用户+状态+分页）
-	if s.listCache != nil {
-		var cached AssessmentListResult
-		if err := s.listCache.Get(
-			ctx,
-			dto.TesteeID,
-			page,
-			pageSize,
-			dto.Status,
-			dto.ScaleCode,
-			dto.RiskLevel,
-			dateFromKey,
-			dateToKey,
-			&cached,
-		); err == nil {
-			return &cached, nil
-		}
+	if cached, ok := cacheHelper.Get(ctx, cacheKey); ok {
+		return cached, nil
 	}
 
 	l.Debugw("开始查询测评列表",
@@ -446,10 +450,10 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		"status", dto.Status,
 		"scale_code", dto.ScaleCode,
 		"risk_level", dto.RiskLevel,
-		"date_from", dateFromKey,
-		"date_to", dateToKey,
+		"date_from", cacheKey.dateFrom,
+		"date_to", cacheKey.dateTo,
 	)
-	items, total, err := s.listMyAssessmentRows(ctx, dto, page, pageSize)
+	items, total, err := myAssessmentQuery{reader: s.reader}.List(ctx, dto, page, pageSize)
 	if err != nil {
 		l.Errorw("查询测评列表失败",
 			"testee_id", dto.TesteeID,
@@ -482,66 +486,9 @@ func (s *submissionService) ListMyAssessments(ctx context.Context, dto ListMyAss
 		TotalPages: (totalInt + pageSize - 1) / pageSize,
 	}
 
-	if s.listCache != nil {
-		s.listCache.Set(
-			ctx,
-			dto.TesteeID,
-			page,
-			pageSize,
-			dto.Status,
-			dto.ScaleCode,
-			dto.RiskLevel,
-			dateFromKey,
-			dateToKey,
-			result,
-		)
-	}
+	cacheHelper.Set(ctx, cacheKey, result)
 
 	return result, nil
-}
-
-func (s *submissionService) listMyAssessmentRows(
-	ctx context.Context,
-	dto ListMyAssessmentsDTO,
-	page int,
-	pageSize int,
-) ([]*AssessmentResult, int64, error) {
-	if s.reader == nil {
-		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
-	}
-	rows, total, err := s.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{
-		TesteeID:  &dto.TesteeID,
-		Statuses:  normalizeMyAssessmentStatuses(dto.Status),
-		ScaleCode: dto.ScaleCode,
-		RiskLevel: dto.RiskLevel,
-		DateFrom:  dto.DateFrom,
-		DateTo:    dto.DateTo,
-	}, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
-	if err != nil {
-		return nil, 0, err
-	}
-	items, err := assessmentRowsToResults(rows)
-	return items, total, err
-}
-
-func normalizeMyAssessmentStatuses(raw string) []string {
-	switch raw {
-	case "":
-		return nil
-	case "pending":
-		return []string{assessment.StatusPending.String(), assessment.StatusSubmitted.String()}
-	case "done":
-		return []string{assessment.StatusInterpreted.String()}
-	default:
-		return []string{raw}
-	}
-}
-
-func formatAssessmentListDateKey(value *time.Time) string {
-	if value == nil {
-		return ""
-	}
-	return value.UTC().Format(time.RFC3339)
 }
 
 // buildCreateRequest 构造创建请求
@@ -594,38 +541,6 @@ func (s *submissionService) buildCreateRequest(dto CreateAssessmentDTO) (assessm
 	}
 
 	return req, nil
-}
-
-func (s *submissionService) invalidateMyListCache(ctx context.Context, userID uint64) {
-	if s.listCache == nil || userID == 0 {
-		return
-	}
-
-	l := logger.L(ctx)
-	startTime := time.Now()
-
-	// 列表缓存失效属于最佳努力，不应把主写路径拖到 gRPC 超时边缘。
-	cacheCtx, cancel := context.WithTimeout(context.Background(), 500*time.Millisecond)
-	defer cancel()
-
-	if err := s.listCache.Invalidate(cacheCtx, userID); err != nil {
-		l.Warnw("失效我的测评列表缓存失败",
-			"action", "invalidate_my_assessment_list_cache",
-			"user_id", userID,
-			"duration_ms", time.Since(startTime).Milliseconds(),
-			"error", err.Error(),
-		)
-		return
-	}
-
-	duration := time.Since(startTime)
-	if duration > 200*time.Millisecond {
-		l.Warnw("失效我的测评列表缓存较慢",
-			"action", "invalidate_my_assessment_list_cache",
-			"user_id", userID,
-			"duration_ms", duration.Milliseconds(),
-		)
-	}
 }
 
 // normalizePagination 规范化分页参数

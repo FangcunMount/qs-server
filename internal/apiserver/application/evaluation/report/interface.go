@@ -9,23 +9,6 @@ import (
 
 // ==================== 报告应用服务接口 ====================
 
-// ReportQueryService 报告查询服务接口
-// 行为者：报告查询者（受试者、管理员）
-// 职责：提供报告查询能力
-type ReportQueryService interface {
-	// GetByID 根据报告ID获取报告
-	GetByID(ctx context.Context, reportID uint64) (*ReportResult, error)
-
-	// GetByAssessmentID 根据测评ID获取报告
-	GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportResult, error)
-
-	// ListByTesteeID 获取受试者的报告列表
-	ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error)
-
-	// ListHighRiskReports 获取高风险报告列表
-	ListHighRiskReports(ctx context.Context, dto ListHighRiskReportsDTO) (*ReportListResult, error)
-}
-
 // ReportGenerationService 报告生成服务接口
 // 行为者：评估引擎 (qs-worker)
 // 职责：根据评估结果生成报告
@@ -60,19 +43,6 @@ type ReportExportService interface {
 }
 
 // ==================== 输入 DTO ====================
-
-// ListReportsDTO 查询报告列表输入
-type ListReportsDTO struct {
-	TesteeID uint64
-	Page     int
-	PageSize int
-}
-
-// ListHighRiskReportsDTO 查询高风险报告列表输入
-type ListHighRiskReportsDTO struct {
-	Page     int
-	PageSize int
-}
 
 // GenerateReportDTO 生成报告输入
 type GenerateReportDTO struct {

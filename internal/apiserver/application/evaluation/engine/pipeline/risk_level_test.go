@@ -35,7 +35,7 @@ func TestRiskLevelHandlerCalculatesRiskBeforeDelegatingScoreWriter(t *testing.T)
 
 	writer := &riskScoreWriterStub{}
 	handler := NewRiskLevelHandlerWithWriter(writer)
-	evalCtx := NewContext(a, nil, nil)
+	evalCtx := NewContext(a, nil)
 	evalCtx.TotalScore = 88
 	evalCtx.FactorScores = []domainAssessment.FactorScoreResult{
 		domainAssessment.NewFactorScoreResult(

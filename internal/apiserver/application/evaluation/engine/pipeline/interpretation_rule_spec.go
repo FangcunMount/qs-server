@@ -1,13 +1,13 @@
 package pipeline
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 )
 
-// buildInterpretConfig 将 scale.Factor 的解读规则转换为 interpretation.InterpretConfig
-func (g *InterpretationGenerator) buildInterpretConfig(factor *scale.Factor) *interpretengine.Config {
-	scaleRules := factor.GetInterpretRules()
+// buildInterpretConfig 将输入快照中的解读规则转换为 interpretengine.Config
+func (g *InterpretationGenerator) buildInterpretConfig(factor *evaluationinput.FactorSnapshot) *interpretengine.Config {
+	scaleRules := factor.InterpretRules
 	if len(scaleRules) == 0 {
 		return nil
 	}
@@ -18,17 +18,17 @@ func (g *InterpretationGenerator) buildInterpretConfig(factor *scale.Factor) *in
 	rules := make([]interpretengine.RuleSpec, 0, len(scaleRules))
 	for _, scaleRule := range scaleRules {
 		rules = append(rules, interpretengine.RuleSpec{
-			Min:         scaleRule.GetScoreRange().Min(),
-			Max:         scaleRule.GetScoreRange().Max(),
-			RiskLevel:   string(scaleRule.GetRiskLevel()),
-			Label:       string(scaleRule.GetRiskLevel()),
-			Description: scaleRule.GetConclusion(),
-			Suggestion:  scaleRule.GetSuggestion(),
+			Min:         scaleRule.Min,
+			Max:         scaleRule.Max,
+			RiskLevel:   scaleRule.RiskLevel,
+			Label:       scaleRule.RiskLevel,
+			Description: scaleRule.Conclusion,
+			Suggestion:  scaleRule.Suggestion,
 		})
 	}
 
 	return &interpretengine.Config{
-		FactorCode: factor.GetCode().Value(),
+		FactorCode: factor.Code,
 		Rules:      rules,
 		Params:     nil,
 	}

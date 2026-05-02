@@ -8,9 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -112,89 +110,6 @@ func (r *fakeAssessmentRepo) FindByOrgIDAndTesteeIDs(_ context.Context, _ int64,
 	return nil, 0, nil
 }
 
-type fakeScaleRepo struct {
-	scale *domainScale.MedicalScale
-}
-
-func (r *fakeScaleRepo) Create(_ context.Context, _ *domainScale.MedicalScale) error { return nil }
-func (r *fakeScaleRepo) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	return r.scale, nil
-}
-func (r *fakeScaleRepo) FindByQuestionnaireCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	return nil, nil
-}
-func (r *fakeScaleRepo) Update(_ context.Context, _ *domainScale.MedicalScale) error { return nil }
-func (r *fakeScaleRepo) Remove(_ context.Context, _ string) error                    { return nil }
-func (r *fakeScaleRepo) ExistsByCode(_ context.Context, _ string) (bool, error)      { return false, nil }
-
-type fakeAnswerSheetRepo struct {
-	answerSheet *domainAnswerSheet.AnswerSheet
-}
-
-func (r *fakeAnswerSheetRepo) Create(_ context.Context, _ *domainAnswerSheet.AnswerSheet) error {
-	return nil
-}
-func (r *fakeAnswerSheetRepo) Update(_ context.Context, _ *domainAnswerSheet.AnswerSheet) error {
-	return nil
-}
-func (r *fakeAnswerSheetRepo) FindByID(_ context.Context, _ meta.ID) (*domainAnswerSheet.AnswerSheet, error) {
-	return r.answerSheet, nil
-}
-func (r *fakeAnswerSheetRepo) Delete(_ context.Context, _ meta.ID) error { return nil }
-
-type fakeQuestionnaireRepo struct{}
-
-func (r *fakeQuestionnaireRepo) Create(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) FindByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindLatestPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindBaseByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindBasePublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) FindBaseByCodeVersion(_ context.Context, _ string, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *fakeQuestionnaireRepo) LoadQuestions(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) Update(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) CreatePublishedSnapshot(_ context.Context, _ *domainQuestionnaire.Questionnaire, _ bool) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) SetActivePublishedVersion(_ context.Context, _ string, _ string) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) ClearActivePublishedVersion(_ context.Context, _ string) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) Remove(_ context.Context, _ string) error     { return nil }
-func (r *fakeQuestionnaireRepo) HardDelete(_ context.Context, _ string) error { return nil }
-func (r *fakeQuestionnaireRepo) HardDeleteFamily(_ context.Context, _ string) error {
-	return nil
-}
-func (r *fakeQuestionnaireRepo) ExistsByCode(_ context.Context, _ string) (bool, error) {
-	return false, nil
-}
-func (r *fakeQuestionnaireRepo) HasPublishedSnapshots(_ context.Context, _ string) (bool, error) {
-	return false, nil
-}
-
 var _ domainAssessment.ScoreRepository = (*noopScoreRepo)(nil)
 var _ domainReport.ReportRepository = (*noopReportRepo)(nil)
 
@@ -263,39 +178,16 @@ func TestEvaluateFailsWhenQuestionnaireVersionDoesNotResolveCurrentQuestionnaire
 		),
 	}
 
-	scaleDomain, err := domainScale.NewMedicalScale(
-		meta.NewCode("S-001"),
-		"Scale",
-		domainScale.WithQuestionnaire(meta.NewCode("Q-001"), "0.9.0"),
-		domainScale.WithStatus(domainScale.StatusPublished),
-	)
-	if err != nil {
-		t.Fatalf("NewMedicalScale() error = %v", err)
-	}
-
-	answerSheet := domainAnswerSheet.Reconstruct(
-		meta.FromUint64(303),
-		domainAnswerSheet.NewQuestionnaireRef("Q-001", "0.9.0", "Questionnaire"),
-		nil,
-		nil,
-		time.Now(),
-		0,
-	)
-
 	svc := &service{
 		assessmentRepo: aRepo,
 		scoreRepo:      &noopScoreRepo{},
 		reportRepo:     &noopReportRepo{},
-		inputResolver: NewRepositoryInputResolver(
-			&fakeScaleRepo{scale: scaleDomain},
-			&fakeAnswerSheetRepo{answerSheet: answerSheet},
-			&fakeQuestionnaireRepo{},
-		),
-		txRunner:    &engineRecordingTxRunner{},
-		eventStager: &engineRecordingEventStager{},
+		inputResolver:  failingInputResolver{err: inputFailure{reason: "加载问卷失败: 问卷不存在或版本不匹配"}},
+		txRunner:       &engineRecordingTxRunner{},
+		eventStager:    &engineRecordingEventStager{},
 	}
 
-	err = svc.Evaluate(context.Background(), 101)
+	err := svc.Evaluate(context.Background(), 101)
 	if err == nil {
 		t.Fatal("Evaluate() error = nil, want questionnaire version failure")
 	}
@@ -401,8 +293,28 @@ func (w *waiterNotifierStub) GetWaiterCount(uint64) int { return 0 }
 
 type noopReportBuilder struct{}
 
-func (b *noopReportBuilder) Build(*domainAssessment.Assessment, *domainScale.MedicalScale, *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
+func (b *noopReportBuilder) Build(*domainAssessment.Assessment, *domainReport.ScaleSnapshot, *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
 	return nil, nil
+}
+
+type failingInputResolver struct {
+	err error
+}
+
+func (r failingInputResolver) Resolve(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
+	return nil, r.err
+}
+
+type inputFailure struct {
+	reason string
+}
+
+func (e inputFailure) Error() string {
+	return e.reason
+}
+
+func (e inputFailure) FailureReason() string {
+	return e.reason
 }
 
 func TestNewServiceAcceptsWaiterPort(t *testing.T) {
@@ -412,9 +324,7 @@ func TestNewServiceAcceptsWaiterPort(t *testing.T) {
 		&fakeAssessmentRepo{},
 		&noopScoreRepo{},
 		&noopReportRepo{},
-		&fakeScaleRepo{},
-		&fakeAnswerSheetRepo{},
-		&fakeQuestionnaireRepo{},
+		failingInputResolver{},
 		&noopReportBuilder{},
 		WithWaiterRegistry(waiterRegistry),
 	)

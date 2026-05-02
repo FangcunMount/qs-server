@@ -5,7 +5,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
 // generateOverallInterpretation 生成整体解读
@@ -72,8 +71,7 @@ func (g *InterpretationGenerator) tryInterpretWithTotalScoreRule(
 	l := logger.L(ctx)
 
 	// 查找因子配置
-	scaleFactorCode := scale.NewFactorCode(string(totalScoreFactor.FactorCode))
-	factor, found := evalCtx.MedicalScale.FindFactorByCode(scaleFactorCode)
+	factor, found := evalCtx.MedicalScale.FindFactor(string(totalScoreFactor.FactorCode))
 	if !found {
 		l.Warnw("Total score factor not found in scale",
 			"factor_code", string(totalScoreFactor.FactorCode))
@@ -90,15 +88,15 @@ func (g *InterpretationGenerator) tryInterpretWithTotalScoreRule(
 	}
 
 	// 检查规则是否有内容
-	if rule.GetConclusion() == "" {
+	if rule.Conclusion == "" {
 		l.Debugw("Interpret rule has empty conclusion",
 			"factor_code", string(totalScoreFactor.FactorCode))
 		return false
 	}
 
 	// 应用规则解读
-	evalCtx.Conclusion = rule.GetConclusion()
-	evalCtx.Suggestion = rule.GetSuggestion()
+	evalCtx.Conclusion = rule.Conclusion
+	evalCtx.Suggestion = rule.Suggestion
 	return true
 }
 

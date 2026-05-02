@@ -10,7 +10,6 @@ import (
 	assessmentInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
-	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -92,23 +91,6 @@ func (r *CachedAssessmentRepository) Save(ctx context.Context, domain *assessmen
 	err := r.repo.Save(ctx, domain)
 	if err == nil && domain != nil {
 		// 保存成功后失效缓存，确保下次读取最新数据
-		_ = r.deleteCache(ctx, domain.ID())
-	}
-	return err
-}
-
-// SaveWithEvents 保存测评并暂存事件（同时失效缓存）。
-func (r *CachedAssessmentRepository) SaveWithEvents(ctx context.Context, domain *assessment.Assessment) error {
-	err := r.repo.SaveWithEvents(ctx, domain)
-	if err == nil && domain != nil {
-		_ = r.deleteCache(ctx, domain.ID())
-	}
-	return err
-}
-
-func (r *CachedAssessmentRepository) SaveWithAdditionalEvents(ctx context.Context, domain *assessment.Assessment, additional []event.DomainEvent) error {
-	err := r.repo.SaveWithAdditionalEvents(ctx, domain, additional)
-	if err == nil && domain != nil {
 		_ = r.deleteCache(ctx, domain.ID())
 	}
 	return err

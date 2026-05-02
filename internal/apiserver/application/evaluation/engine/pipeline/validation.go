@@ -55,7 +55,7 @@ func (h *ValidationHandler) Handle(ctx context.Context, evalCtx *Context) error 
 // validateMedicalScale 校验量表有效性
 func (h *ValidationHandler) validateMedicalScale(evalCtx *Context) error {
 	// 检查量表是否有因子
-	factors := evalCtx.MedicalScale.GetFactors()
+	factors := evalCtx.MedicalScale.Factors
 	if len(factors) == 0 {
 		return ErrMedicalScaleNoFactors
 	}
@@ -66,7 +66,7 @@ func (h *ValidationHandler) validateMedicalScale(evalCtx *Context) error {
 	}
 
 	// 检查量表与问卷的匹配性
-	if evalCtx.MedicalScale.GetQuestionnaireCode() != evalCtx.Assessment.QuestionnaireRef().Code() {
+	if evalCtx.MedicalScale.QuestionnaireCode != evalCtx.Assessment.QuestionnaireRef().Code().String() {
 		return ErrMedicalScaleQuestionnaireMismatch
 	}
 

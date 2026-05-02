@@ -164,6 +164,9 @@ func TestEvaluationDomainRepositoriesStayCommandSide(t *testing.T) {
 					if isEvaluationReadModelMethod(name) {
 						t.Fatalf("%s %s.%s is a read-model method; evaluation domain repositories must stay command-side", target.rel, typeSpec.Name.Name, name)
 					}
+					if strings.Contains(name, "SaveWith") || name == "SaveScores" {
+						t.Fatalf("%s %s.%s is a deprecated persistence fallback; use application UoW/outbox ports instead", target.rel, typeSpec.Name.Name, name)
+					}
 					if fieldListContainsMapStringInterface(method.Type) {
 						t.Fatalf("%s %s.%s uses map[string]interface{}; typed read filters belong to read-model ports", target.rel, typeSpec.Name.Name, name)
 					}
@@ -171,6 +174,32 @@ func TestEvaluationDomainRepositoriesStayCommandSide(t *testing.T) {
 			}
 		}
 	}
+}
+
+func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":   "application",
+		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":    "infrastructure",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":     "transport",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/":          "port",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":   "scale domain",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "survey domain",
+		"github.com/FangcunMount/component-base/pkg/logger":                   "technical logging",
+		"github.com/FangcunMount/component-base/pkg/errors":                   "API error wrappers",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                 "API error codes",
+	}
+	scanGoImports(t, scanRoot, func(path, importPath string) {
+		for forbidden, label := range forbiddenImports {
+			if strings.HasPrefix(importPath, forbidden) {
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				t.Fatalf("%s imports %s; evaluation domain must not depend on %s", rel, importPath, label)
+			}
+		}
+	})
 }
 
 func TestCalculationAndValidationDomainStayRuleOnly(t *testing.T) {

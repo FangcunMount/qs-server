@@ -33,6 +33,9 @@ func TestEvaluationCommandRepositoriesDoNotExposeReadModelHelpers(t *testing.T) 
 			if isEvaluationReadModelHelper(fn.Name.Name) {
 				t.Fatalf("%s defines %s; evaluation command repositories must keep list/count/trend reads in read-model adapters", rel, fn.Name.Name)
 			}
+			if strings.Contains(fn.Name.Name, "SaveWith") || fn.Name.Name == "SaveScores" {
+				t.Fatalf("%s defines %s; evaluation command repositories must not expose deprecated outbox fallback writes", rel, fn.Name.Name)
+			}
 		}
 	}
 }

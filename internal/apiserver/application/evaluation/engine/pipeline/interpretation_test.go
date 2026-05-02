@@ -8,7 +8,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -161,7 +160,7 @@ func TestInterpretationHandlerStagesInterpretedAndReportGeneratedInOrder(t *test
 		},
 	}
 
-	evalCtx := NewContext(a, nil, nil)
+	evalCtx := NewContext(a, nil)
 	evalCtx.TotalScore = 88
 	evalCtx.RiskLevel = domainAssessment.RiskLevelHigh
 	evalCtx.Conclusion = "high risk"
@@ -198,6 +197,6 @@ type reportBuilderAdapter struct {
 	report *domainReport.InterpretReport
 }
 
-func (b *reportBuilderAdapter) Build(_ *domainAssessment.Assessment, _ *domainScale.MedicalScale, _ *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
+func (b *reportBuilderAdapter) Build(_ *domainAssessment.Assessment, _ *domainReport.ScaleSnapshot, _ *domainAssessment.EvaluationResult) (*domainReport.InterpretReport, error) {
 	return b.report, nil
 }

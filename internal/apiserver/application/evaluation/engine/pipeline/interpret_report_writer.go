@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -36,8 +37,11 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 	l := logger.L(ctx)
 	assessmentID, _ := evalCtx.Assessment.ID().Value()
 	l.Infow("Generating report", "assessment_id", assessmentID)
+	if w.reportSaver == nil {
+		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "report durable saver is not configured")
+	}
 
-	rpt, err := w.reportBuilder.Build(evalCtx.Assessment, evalCtx.MedicalScale, evalCtx.EvaluationResult)
+	rpt, err := w.reportBuilder.Build(evalCtx.Assessment, reportScaleSnapshot(evalCtx.MedicalScale), evalCtx.EvaluationResult)
 	if err != nil {
 		l.Errorw("Failed to build report",
 			"assessment_id", assessmentID,
@@ -79,7 +83,7 @@ func (w *durableInterpretReportWriter) buildSuccessEvents(evalCtx *Context, rpt 
 
 	scaleVersion := ""
 	if evalCtx.MedicalScale != nil {
-		scaleVersion = evalCtx.MedicalScale.GetQuestionnaireVersion()
+		scaleVersion = evalCtx.MedicalScale.QuestionnaireVersion
 	} else if !evalCtx.Assessment.QuestionnaireRef().IsEmpty() {
 		scaleVersion = evalCtx.Assessment.QuestionnaireRef().Version()
 	}
@@ -121,5 +125,24 @@ func (w *durableInterpretReportWriter) buildSuccessEvents(evalCtx *Context, rpt 
 			reportID,
 			now,
 		),
+	}
+}
+
+func reportScaleSnapshot(scaleSnapshot *evaluationinput.ScaleSnapshot) *domainReport.ScaleSnapshot {
+	if scaleSnapshot == nil {
+		return nil
+	}
+	factors := make([]domainReport.ScaleFactorSnapshot, 0, len(scaleSnapshot.Factors))
+	for _, f := range scaleSnapshot.Factors {
+		factors = append(factors, domainReport.ScaleFactorSnapshot{
+			Code:     f.Code,
+			Title:    f.Title,
+			MaxScore: f.MaxScore,
+		})
+	}
+	return &domainReport.ScaleSnapshot{
+		Code:    scaleSnapshot.Code,
+		Title:   scaleSnapshot.Title,
+		Factors: factors,
 	}
 }

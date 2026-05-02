@@ -2,13 +2,11 @@ package assessment
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -16,14 +14,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
-
-type assessmentListConditions struct {
-	testeeID      *testee.ID
-	rawTesteeID   string
-	status        *assessment.Status
-	rawStatus     string
-	invalidStatus bool
-}
 
 // managementService 测评管理服务实现
 // 行为者：管理员 (Staff/Admin)
@@ -155,7 +145,7 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 		)
 	}
 
-	results, total, err := s.listAssessmentResults(ctx, dto, orgID, pagination, conditions)
+	results, total, err := assessmentAdminQuery{reader: s.reader}.List(ctx, dto, orgID, pagination, conditions)
 	if err != nil {
 		return nil, err
 	}
@@ -194,101 +184,16 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 	}, nil
 }
 
-func parseAssessmentListConditions(raw map[string]string) (*assessmentListConditions, error) {
-	conditions := &assessmentListConditions{}
-	if raw == nil {
-		return conditions, nil
-	}
-
-	if testeeIDStr := raw["testee_id"]; testeeIDStr != "" {
-		testeeIDUint, err := strconv.ParseUint(testeeIDStr, 10, 64)
-		if err != nil {
-			return nil, err
-		}
-		testeeID := testee.NewID(testeeIDUint)
-		conditions.rawTesteeID = testeeIDStr
-		conditions.testeeID = &testeeID
-	}
-
-	if statusStr := raw["status"]; statusStr != "" {
-		status := assessment.Status(statusStr)
-		conditions.rawStatus = statusStr
-		if status.IsValid() {
-			conditions.status = &status
-		} else {
-			conditions.invalidStatus = true
-		}
-	}
-
-	return conditions, nil
-}
-
-func (s *managementService) listAssessmentResults(
-	ctx context.Context,
-	dto ListAssessmentsDTO,
-	orgID int64,
-	pagination assessment.Pagination,
-	conditions *assessmentListConditions,
-) ([]*AssessmentResult, int64, error) {
-	if s.reader == nil {
-		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
-	}
-	rows, total, err := s.queryAssessmentRows(ctx, dto, orgID, pagination, conditions)
-	if err != nil {
-		return nil, 0, err
-	}
-	results, err := assessmentRowsToResults(rows)
-	return results, total, err
-}
-
-func (s *managementService) queryAssessmentRows(
-	ctx context.Context,
-	dto ListAssessmentsDTO,
-	orgID int64,
-	pagination assessment.Pagination,
-	conditions *assessmentListConditions,
-) ([]evaluationreadmodel.AssessmentRow, int64, error) {
-	l := logger.L(ctx)
-	if conditions.invalidStatus {
-		return []evaluationreadmodel.AssessmentRow{}, 0, nil
-	}
-
-	filter := evaluationreadmodel.AssessmentFilter{
-		OrgID:                 orgID,
-		RestrictToAccessScope: dto.RestrictToAccessScope,
-		AccessibleTesteeIDs:   dto.AccessibleTesteeIDs,
-	}
-	if conditions.testeeID != nil {
-		id := conditions.testeeID.Uint64()
-		filter.TesteeID = &id
-	}
-	if conditions.status != nil {
-		filter.Statuses = []string{conditions.status.String()}
-	}
-	if dto.OrgID == 0 && conditions.testeeID == nil {
-		l.Warnw("未提供 testee_id 和 org_id，无法查询",
-			"org_id", dto.OrgID,
-		)
-		return []evaluationreadmodel.AssessmentRow{}, 0, nil
-	}
-
-	rows, total, err := s.reader.ListAssessments(
-		ctx,
-		filter,
-		evaluationreadmodel.PageRequest{Page: pagination.Page(), PageSize: pagination.PageSize()},
-	)
-	if err != nil {
-		l.Errorw("通过 read model 查询测评列表失败",
-			"org_id", dto.OrgID,
-			"testee_id", conditions.rawTesteeID,
-			"error", err.Error(),
-		)
-		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
-	}
-	return rows, total, nil
-}
-
 func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
+	return assessmentRetryWorkflow{service: s}.Retry(ctx, orgID, assessmentID)
+}
+
+type assessmentRetryWorkflow struct {
+	service *managementService
+}
+
+func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
+	s := w.service
 	l := logger.L(ctx)
 	startTime := time.Now()
 

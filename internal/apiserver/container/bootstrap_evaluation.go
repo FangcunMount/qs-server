@@ -4,11 +4,10 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
@@ -17,13 +16,16 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 	if c != nil {
 		infra = c.surveyScaleInfra
 	}
-	var scaleRepo scale.Repository
-	var answerSheetRepo answersheet.Repository
-	var questionnaireRepo questionnaire.Repository
+	var inputResolver evaluationinput.Resolver
+	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra != nil {
-		scaleRepo = infra.scaleRepo
-		answerSheetRepo = infra.answerSheetRepo
-		questionnaireRepo = infra.questionnaireRepo
+		resolver := evaluationinputInfra.NewRepositoryResolver(
+			infra.scaleRepo,
+			infra.answerSheetRepo,
+			infra.questionnaireRepo,
+		)
+		inputResolver = resolver
+		scaleCatalog = resolver
 	}
 
 	redisClient := c.CacheClient(cacheplane.FamilyObject)
@@ -45,9 +47,8 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 	return assembler.EvaluationModuleDeps{
 		MySQLDB:              c.mysqlDB,
 		MongoDB:              c.mongoDB,
-		ScaleRepo:            scaleRepo,
-		AnswerSheetRepo:      answerSheetRepo,
-		QuestionnaireRepo:    questionnaireRepo,
+		InputResolver:        inputResolver,
+		ScaleCatalog:         scaleCatalog,
 		EventPublisher:       c.eventPublisher,
 		RedisClient:          redisClient,
 		CacheBuilder:         c.CacheBuilder(cacheplane.FamilyObject),

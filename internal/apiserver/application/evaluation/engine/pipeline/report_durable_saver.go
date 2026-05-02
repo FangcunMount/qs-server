@@ -22,24 +22,17 @@ type ReportEventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
-type eventfulReportRepositoryAdapter struct {
-	repo domainReport.ReportRepository
-}
-
 type transactionalReportDurableSaver struct {
 	runner apptransaction.Runner
 	writer ReportDurableWriter
 	stager ReportEventStager
 }
 
-func NewReportDurableSaver(repo domainReport.ReportRepository) ReportDurableSaver {
-	if repo == nil {
-		return nil
-	}
-	if saver, ok := repo.(ReportDurableSaver); ok {
+func NewReportDurableSaver(candidate any) ReportDurableSaver {
+	if saver, ok := candidate.(ReportDurableSaver); ok {
 		return saver
 	}
-	return eventfulReportRepositoryAdapter{repo: repo}
+	return nil
 }
 
 func NewTransactionalReportDurableSaver(
@@ -52,10 +45,6 @@ func NewTransactionalReportDurableSaver(
 		writer: writer,
 		stager: stager,
 	}
-}
-
-func (a eventfulReportRepositoryAdapter) SaveReportDurably(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
-	return a.repo.SaveWithTesteeAndEvents(ctx, rpt, testeeID, events)
 }
 
 func (s transactionalReportDurableSaver) SaveReportDurably(ctx context.Context, rpt *domainReport.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {

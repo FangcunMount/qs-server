@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
 // ==================== ReportBuilder 领域服务 ====================
@@ -23,9 +22,22 @@ type ReportBuilder interface {
 	//   - error: 构建失败时返回错误
 	Build(
 		assess *assessment.Assessment,
-		medicalScale *scale.MedicalScale,
+		medicalScale *ScaleSnapshot,
 		evaluationResult *assessment.EvaluationResult,
 	) (*InterpretReport, error)
+}
+
+// ScaleSnapshot 是报告构建需要的量表只读快照。
+type ScaleSnapshot struct {
+	Code    string
+	Title   string
+	Factors []ScaleFactorSnapshot
+}
+
+type ScaleFactorSnapshot struct {
+	Code     string
+	Title    string
+	MaxScore *float64
 }
 
 // ==================== 默认实现 ====================
@@ -47,7 +59,7 @@ func NewDefaultReportBuilder(suggestionGenerator SuggestionGenerator) *DefaultRe
 // Build 构建解读报告
 func (b *DefaultReportBuilder) Build(
 	assess *assessment.Assessment,
-	medicalScale *scale.MedicalScale,
+	medicalScale *ScaleSnapshot,
 	result *assessment.EvaluationResult,
 ) (*InterpretReport, error) {
 	if assess == nil {
@@ -76,8 +88,8 @@ func (b *DefaultReportBuilder) Build(
 	// 5. 创建报告
 	report := NewInterpretReport(
 		reportID,
-		medicalScale.GetTitle(),
-		medicalScale.GetCode().String(),
+		medicalScale.Title,
+		medicalScale.Code,
 		result.TotalScore,
 		RiskLevel(result.RiskLevel),
 		conclusion,
@@ -89,7 +101,7 @@ func (b *DefaultReportBuilder) Build(
 }
 
 // buildConclusion 构建总体结论
-func (b *DefaultReportBuilder) buildConclusion(_ *scale.MedicalScale, result *assessment.EvaluationResult) string {
+func (b *DefaultReportBuilder) buildConclusion(_ *ScaleSnapshot, result *assessment.EvaluationResult) string {
 	// 优先使用总分因子的解读作为总体结论
 	for _, fs := range result.FactorScores {
 		if fs.IsTotalScore && fs.Conclusion != "" {
@@ -107,16 +119,17 @@ func (b *DefaultReportBuilder) buildConclusion(_ *scale.MedicalScale, result *as
 }
 
 // buildDimensions 构建维度解读
-func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale, result *assessment.EvaluationResult) []DimensionInterpret {
+func (b *DefaultReportBuilder) buildDimensions(medicalScale *ScaleSnapshot, result *assessment.EvaluationResult) []DimensionInterpret {
 	if result == nil || len(result.FactorScores) == 0 {
 		return nil
 	}
 
 	// 构建因子名称映射
-	factors := medicalScale.GetFactors()
 	factorNameMap := make(map[string]string)
-	for _, f := range factors {
-		factorNameMap[string(f.GetCode())] = f.GetTitle()
+	factorMaxScoreMap := make(map[string]*float64)
+	for _, f := range medicalScale.Factors {
+		factorNameMap[f.Code] = f.Title
+		factorMaxScoreMap[f.Code] = f.MaxScore
 	}
 
 	dimensions := make([]DimensionInterpret, 0, len(result.FactorScores))
@@ -130,20 +143,11 @@ func (b *DefaultReportBuilder) buildDimensions(medicalScale *scale.MedicalScale,
 		// 不使用默认文案兜底，如果没有生成解读则为空
 		description := fs.Conclusion
 
-		// 从量表中获取因子的 maxScore
-		var maxScore *float64
-		for _, f := range factors {
-			if string(f.GetCode()) == string(fs.FactorCode) {
-				maxScore = f.GetMaxScore()
-				break
-			}
-		}
-
 		dim := NewDimensionInterpret(
 			FactorCode(fs.FactorCode),
 			factorName,
 			fs.RawScore,
-			maxScore,
+			factorMaxScoreMap[string(fs.FactorCode)],
 			RiskLevel(fs.RiskLevel),
 			description,
 			fs.Suggestion,
@@ -163,7 +167,7 @@ func (b *DefaultReportBuilder) buildSuggestions(
 	ctx context.Context,
 	result *assessment.EvaluationResult,
 	reportID ID,
-	medicalScale *scale.MedicalScale,
+	medicalScale *ScaleSnapshot,
 	dimensions []DimensionInterpret,
 ) []Suggestion {
 	var allSuggestions []Suggestion
@@ -182,8 +186,8 @@ func (b *DefaultReportBuilder) buildSuggestions(
 		// 构建临时报告用于生成建议
 		tempReport := NewInterpretReport(
 			reportID,
-			medicalScale.GetTitle(),
-			medicalScale.GetCode().String(),
+			medicalScale.Title,
+			medicalScale.Code,
 			result.TotalScore,
 			RiskLevel(result.RiskLevel),
 			b.buildConclusion(medicalScale, result),

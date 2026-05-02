@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -17,19 +17,19 @@ type scoreQueryService struct {
 	assessmentRepo   assessment.Repository
 	scoreReader      evaluationreadmodel.ScoreReader
 	assessmentReader evaluationreadmodel.AssessmentReader
-	scaleRepo        scale.Repository
+	scaleCatalog     evaluationinput.ScaleCatalog
 }
 
 // NewScoreQueryService 创建得分查询服务
 func NewScoreQueryService(
 	scoreRepo assessment.ScoreRepository,
 	assessmentRepo assessment.Repository,
-	scaleRepo scale.Repository,
+	scaleCatalog evaluationinput.ScaleCatalog,
 ) ScoreQueryService {
 	return &scoreQueryService{
 		scoreRepo:      scoreRepo,
 		assessmentRepo: assessmentRepo,
-		scaleRepo:      scaleRepo,
+		scaleCatalog:   scaleCatalog,
 	}
 }
 
@@ -38,14 +38,14 @@ func NewScoreQueryServiceWithReadModel(
 	assessmentRepo assessment.Repository,
 	scoreReader evaluationreadmodel.ScoreReader,
 	assessmentReader evaluationreadmodel.AssessmentReader,
-	scaleRepo scale.Repository,
+	scaleCatalog evaluationinput.ScaleCatalog,
 ) ScoreQueryService {
 	return &scoreQueryService{
 		scoreRepo:        scoreRepo,
 		assessmentRepo:   assessmentRepo,
 		scoreReader:      scoreReader,
 		assessmentReader: assessmentReader,
-		scaleRepo:        scaleRepo,
+		scaleCatalog:     scaleCatalog,
 	}
 }
 
@@ -136,15 +136,15 @@ func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID
 	return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil
 }
 
-func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *scale.MedicalScale {
-	if s.scaleRepo == nil || s.assessmentReader == nil {
+func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *evaluationinput.ScaleSnapshot {
+	if s.scaleCatalog == nil || s.assessmentReader == nil {
 		return nil
 	}
 	row, err := s.assessmentReader.GetAssessment(ctx, assessmentID)
 	if err != nil || row == nil || row.MedicalScaleCode == nil {
 		return nil
 	}
-	medicalScale, err := s.scaleRepo.FindByCode(ctx, *row.MedicalScaleCode)
+	medicalScale, err := s.scaleCatalog.GetScale(ctx, *row.MedicalScaleCode)
 	if err != nil {
 		return nil
 	}

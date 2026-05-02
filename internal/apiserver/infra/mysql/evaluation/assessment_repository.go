@@ -5,19 +5,16 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/pkg/event"
 	"gorm.io/gorm"
 )
 
 // assessmentRepository 测评仓储实现
 type assessmentRepository struct {
 	mysql.BaseRepository[*AssessmentPO]
-	mapper      *AssessmentMapper
-	outboxStore *mysqlEventOutbox.Store
+	mapper *AssessmentMapper
 }
 
 // NewAssessmentRepository 创建测评仓储
@@ -29,7 +26,6 @@ func NewAssessmentRepositoryWithTopicResolver(db *gorm.DB, resolver eventcatalog
 	repo := &assessmentRepository{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db, opts...),
 		mapper:         NewAssessmentMapper(),
-		outboxStore:    mysqlEventOutbox.NewStoreWithTopicResolver(db, resolver),
 	}
 	// 设置错误转换器
 	repo.SetErrorTranslator(translateAssessmentError)
@@ -56,40 +52,6 @@ func (r *assessmentRepository) Save(ctx context.Context, a *assessment.Assessmen
 	return r.UpdateAndSync(ctx, po, func(po *AssessmentPO) {
 		r.mapper.SyncID(po, a)
 	})
-}
-
-// SaveWithEvents 保存测评并将聚合上的事件落到 MySQL outbox。
-// Deprecated: application use cases should use UoW + outbox stager explicitly.
-func (r *assessmentRepository) SaveWithEvents(ctx context.Context, a *assessment.Assessment) error {
-	return r.SaveWithAdditionalEvents(ctx, a, nil)
-}
-
-// SaveWithAdditionalEvents 保存测评并在同一事务里暂存聚合事件与补充事件。
-// Deprecated: application use cases should use UoW + outbox stager explicitly.
-func (r *assessmentRepository) SaveWithAdditionalEvents(ctx context.Context, a *assessment.Assessment, additional []event.DomainEvent) error {
-	if a == nil {
-		return nil
-	}
-
-	err := r.BaseRepository.DB().WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		txCtx := mysql.WithTx(ctx, tx)
-		if err := r.Save(txCtx, a); err != nil {
-			return err
-		}
-		eventsToStage := make([]event.DomainEvent, 0, len(a.Events())+len(additional))
-		eventsToStage = append(eventsToStage, a.Events()...)
-		eventsToStage = append(eventsToStage, additional...)
-		if len(eventsToStage) == 0 {
-			return nil
-		}
-		return r.outboxStore.Stage(txCtx, eventsToStage...)
-	})
-	if err != nil {
-		return err
-	}
-
-	a.ClearEvents()
-	return nil
 }
 
 // FindByID 根据ID查找

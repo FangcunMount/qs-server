@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	stderrors "errors"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -10,9 +11,7 @@ import (
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -29,7 +28,7 @@ type service struct {
 	assessmentRepo assessment.Repository
 	scoreRepo      assessment.ScoreRepository
 	reportRepo     report.ReportRepository
-	inputResolver  EvaluationInputResolver
+	inputResolver  evaluationinput.Resolver
 
 	// 领域服务依赖
 	reportBuilder report.ReportBuilder
@@ -87,7 +86,7 @@ func WithInterpretEngine(interpreter interpretengine.Interpreter, defaultProvide
 	}
 }
 
-func WithInputResolver(resolver EvaluationInputResolver) ServiceOption {
+func WithInputResolver(resolver evaluationinput.Resolver) ServiceOption {
 	return func(s *service) {
 		if resolver != nil {
 			s.inputResolver = resolver
@@ -100,9 +99,7 @@ func NewService(
 	assessmentRepo assessment.Repository,
 	scoreRepo assessment.ScoreRepository,
 	reportRepo report.ReportRepository,
-	scaleRepo scale.Repository,
-	answerSheetRepo answersheet.Repository,
-	questionnaireRepo questionnaire.Repository,
+	inputResolver evaluationinput.Resolver,
 	reportBuilder report.ReportBuilder,
 	opts ...ServiceOption,
 ) Service {
@@ -110,7 +107,7 @@ func NewService(
 		assessmentRepo: assessmentRepo,
 		scoreRepo:      scoreRepo,
 		reportRepo:     reportRepo,
-		inputResolver:  NewRepositoryInputResolver(scaleRepo, answerSheetRepo, questionnaireRepo),
+		inputResolver:  inputResolver,
 		reportBuilder:  reportBuilder,
 	}
 
@@ -218,15 +215,20 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if s.inputResolver == nil {
 		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "evaluation input resolver is not configured")
 	}
-	input, err := s.inputResolver.Resolve(ctx, a)
+	input, err := s.inputResolver.Resolve(ctx, evaluationinput.InputRef{
+		AssessmentID:         assessmentID,
+		MedicalScaleCode:     a.MedicalScaleRef().Code().String(),
+		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
+		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
+		QuestionnaireVersion: a.QuestionnaireRef().Version(),
+	})
 	if err != nil {
 		s.markAsFailed(ctx, a, inputResolveFailureReason(err))
 		return err
 	}
 
 	// 2. 创建评估上下文
-	evalCtx := pipeline.NewContext(a, input.MedicalScale, input.AnswerSheet)
-	evalCtx.Questionnaire = input.Questionnaire
+	evalCtx := pipeline.NewContext(a, input)
 
 	// 3. 执行处理器链
 	l.Infow("开始执行评估处理器链",
@@ -256,6 +258,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	)
 
 	return nil
+}
+
+func inputResolveFailureReason(err error) string {
+	var carrier evaluationinput.FailureReasonCarrier
+	if stderrors.As(err, &carrier) {
+		return carrier.FailureReason()
+	}
+	return "评估输入加载失败: " + err.Error()
 }
 
 // EvaluateBatch 批量评估

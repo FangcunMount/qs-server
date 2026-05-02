@@ -3,10 +3,6 @@ package pipeline
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -16,14 +12,14 @@ import (
 // 输出：填充 Context.FactorScores
 type FactorScoreHandler struct {
 	*BaseHandler
-	scorer ruleengine.ScaleFactorScorer
+	calculator FactorScoreCalculator
 }
 
 // NewFactorScoreHandler 创建因子分数计算处理器
 func NewFactorScoreHandler(scorer ruleengine.ScaleFactorScorer) *FactorScoreHandler {
 	return &FactorScoreHandler{
 		BaseHandler: NewBaseHandler("FactorScoreHandler"),
-		scorer:      scorer,
+		calculator:  NewFactorScoreCalculator(scorer),
 	}
 }
 
@@ -39,189 +35,13 @@ func (h *FactorScoreHandler) Handle(ctx context.Context, evalCtx *Context) error
 		return evalCtx.Error
 	}
 
-	// 获取量表因子
-	factors := evalCtx.MedicalScale.GetFactors()
-	factorScores := make([]assessment.FactorScoreResult, 0, len(factors))
-
-	// 计算每个因子的原始得分
-	for _, factor := range factors {
-		rawScore := h.calculateFactorRawScore(ctx, factor, evalCtx.AnswerSheet, evalCtx.Questionnaire)
-
-		factorScore := assessment.NewFactorScoreResult(
-			assessment.NewFactorCode(string(factor.GetCode())),
-			factor.GetTitle(),
-			rawScore,
-			assessment.RiskLevelNone, // 风险等级由后续处理器计算
-			"",                       // 结论由后续处理器填充
-			"",                       // 建议由后续处理器填充
-			factor.IsTotalScore(),
-		)
-		factorScores = append(factorScores, factorScore)
-	}
-
-	// 填充评估上下文
-	evalCtx.FactorScores = factorScores
-
-	// 计算总分
-	evalCtx.TotalScore = h.calculateTotalScore(factorScores)
+	evalCtx.FactorScores, evalCtx.TotalScore = h.calculator.Calculate(
+		ctx,
+		evalCtx.MedicalScale,
+		evalCtx.AnswerSheet,
+		evalCtx.Questionnaire,
+	)
 
 	// 继续下一个处理器
 	return h.Next(ctx, evalCtx)
-}
-
-// calculateTotalScore 计算总分
-// 如果有标记为总分的因子，直接使用；否则累加所有因子得分
-func (h *FactorScoreHandler) calculateTotalScore(factorScores []assessment.FactorScoreResult) float64 {
-	var totalScore float64
-
-	for _, fs := range factorScores {
-		// 如果有明确标记为总分的因子，直接使用
-		if fs.IsTotalScore {
-			return fs.RawScore
-		}
-		totalScore += fs.RawScore
-	}
-
-	// 如果没有总分因子，返回所有因子得分之和
-	return totalScore
-}
-
-// calculateFactorRawScore 计算因子原始得分
-// 委托给量表领域的计分服务
-func (h *FactorScoreHandler) calculateFactorRawScore(
-	ctx context.Context,
-	factor *scale.Factor,
-	sheet *answersheet.AnswerSheet,
-	qnr *questionnaire.Questionnaire,
-) float64 {
-	// 如果没有答卷数据，使用模拟数据
-	if sheet == nil {
-		return h.simulateFactorScore(factor)
-	}
-
-	if h.scorer == nil {
-		return 0
-	}
-
-	values, err := h.collectFactorValues(factor, sheet, qnr)
-	if err != nil {
-		return 0
-	}
-	score, err := h.scorer.ScoreFactor(ctx, factor.GetCode().String(), values, factor.GetScoringStrategy().String(), nil)
-	if err != nil {
-		// 计算失败，返回 0
-		return 0
-	}
-
-	return score
-}
-
-func (h *FactorScoreHandler) collectFactorValues(factor *scale.Factor, sheet *answersheet.AnswerSheet, qnr *questionnaire.Questionnaire) ([]float64, error) {
-	switch factor.GetScoringStrategy() {
-	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
-		return h.collectQuestionScores(factor, sheet), nil
-	case scale.ScoringStrategyCnt:
-		if qnr == nil {
-			return nil, NewHandlerError("questionnaire is required")
-		}
-		return h.collectCntMatches(factor, sheet, qnr), nil
-	default:
-		return nil, nil
-	}
-}
-
-func (h *FactorScoreHandler) collectQuestionScores(factor *scale.Factor, sheet *answersheet.AnswerSheet) []float64 {
-	answerMap := factorScoreAnswerMap(sheet)
-	scores := make([]float64, 0, len(factor.GetQuestionCodes()))
-	for _, qCode := range factor.GetQuestionCodes() {
-		if answer, found := answerMap[qCode.String()]; found {
-			scores = append(scores, answer.Score())
-		}
-	}
-	return scores
-}
-
-func (h *FactorScoreHandler) collectCntMatches(factor *scale.Factor, sheet *answersheet.AnswerSheet, qnr *questionnaire.Questionnaire) []float64 {
-	targetContents := factor.GetScoringParams().GetCntOptionContents()
-	if len(targetContents) == 0 {
-		return nil
-	}
-	optionContentMap := factorScoreOptionContentMap(qnr)
-	answerMap := factorScoreAnswerMap(sheet)
-	matchValues := make([]float64, 0, len(factor.GetQuestionCodes()))
-	for _, qCode := range factor.GetQuestionCodes() {
-		answer, found := answerMap[qCode.String()]
-		if !found {
-			continue
-		}
-		optionID := factorScoreOptionID(answer)
-		if optionID == "" {
-			continue
-		}
-		optionContent, found := optionContentMap[optionID]
-		if !found {
-			continue
-		}
-		if factorScoreContainsString(targetContents, optionContent) {
-			matchValues = append(matchValues, 1.0)
-		}
-	}
-	return matchValues
-}
-
-// simulateFactorScore 模拟因子得分（当没有答卷数据时使用）
-func (h *FactorScoreHandler) simulateFactorScore(factor *scale.Factor) float64 {
-	// 模拟得分：基于因子包含的题目数量生成模拟值
-	questionCount := factor.QuestionCount()
-	if questionCount == 0 {
-		return 50.0 // 默认模拟值
-	}
-
-	// 假设每题平均分为 2.5 分
-	return float64(questionCount) * 2.5
-}
-
-func factorScoreOptionContentMap(qnr *questionnaire.Questionnaire) map[string]string {
-	contentMap := make(map[string]string)
-	for _, q := range qnr.GetQuestions() {
-		for _, opt := range q.GetOptions() {
-			contentMap[opt.GetCode().Value()] = opt.GetContent()
-		}
-	}
-	return contentMap
-}
-
-func factorScoreAnswerMap(sheet *answersheet.AnswerSheet) map[string]answersheet.Answer {
-	answerMap := make(map[string]answersheet.Answer)
-	for _, ans := range sheet.Answers() {
-		answerMap[ans.QuestionCode()] = ans
-	}
-	return answerMap
-}
-
-func factorScoreOptionID(answer answersheet.Answer) string {
-	value := answer.Value()
-	if value == nil {
-		return ""
-	}
-	raw := value.Raw()
-	if raw == nil {
-		return ""
-	}
-	if str, ok := raw.(string); ok {
-		return str
-	}
-	if arr, ok := raw.([]string); ok && len(arr) > 0 {
-		return arr[0]
-	}
-	return ""
-}
-
-func factorScoreContainsString(values []string, target string) bool {
-	for _, value := range values {
-		if value == target {
-			return true
-		}
-	}
-	return false
 }

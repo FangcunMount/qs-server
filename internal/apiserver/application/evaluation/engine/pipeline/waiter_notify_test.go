@@ -31,7 +31,7 @@ func TestWaiterNotifyHandlerDelegatesCompletionNotification(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)
 	}
-	evalCtx := NewContext(a, nil, nil)
+	evalCtx := NewContext(a, nil)
 	evalCtx.EvaluationResult = domainAssessment.NewEvaluationResult(
 		88,
 		domainAssessment.RiskLevelHigh,

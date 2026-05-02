@@ -3,8 +3,6 @@ package interpretation
 import (
 	"fmt"
 	"sort"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
 // ==================== 策略类型定义 ====================
@@ -29,16 +27,19 @@ const (
 // ==================== 风险等级定义 ====================
 
 // RiskLevel 风险等级
-// 直接复用 scale 子域的定义
-type RiskLevel = scale.RiskLevel
+type RiskLevel string
 
 const (
-	RiskLevelNone   = scale.RiskLevelNone
-	RiskLevelLow    = scale.RiskLevelLow
-	RiskLevelMedium = scale.RiskLevelMedium
-	RiskLevelHigh   = scale.RiskLevelHigh
-	RiskLevelSevere = scale.RiskLevelSevere
+	RiskLevelNone   RiskLevel = "none"
+	RiskLevelLow    RiskLevel = "low"
+	RiskLevelMedium RiskLevel = "medium"
+	RiskLevelHigh   RiskLevel = "high"
+	RiskLevelSevere RiskLevel = "severe"
 )
+
+func (r RiskLevel) String() string {
+	return string(r)
+}
 
 // ==================== 解读规则定义 ====================
 

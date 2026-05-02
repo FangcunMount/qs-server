@@ -1,10 +1,6 @@
 package assessment
 
-import (
-	"context"
-
-	"github.com/FangcunMount/qs-server/pkg/event"
-)
+import "context"
 
 // ==================== Assessment Repository ====================
 
@@ -14,14 +10,6 @@ type Repository interface {
 
 	// Save 保存测评（新增或更新）
 	Save(ctx context.Context, assessment *Assessment) error
-
-	// SaveWithEvents 保存测评并将聚合上的领域事件暂存到可靠出站存储。
-	// Deprecated: 新应用用例应使用应用层 UoW + outbox stager 组合显式表达事务边界。
-	SaveWithEvents(ctx context.Context, assessment *Assessment) error
-
-	// SaveWithAdditionalEvents 保存测评，并在同一事务里额外暂存补充事件。
-	// Deprecated: 新应用用例应使用应用层 UoW + outbox stager 组合显式表达事务边界。
-	SaveWithAdditionalEvents(ctx context.Context, assessment *Assessment, additional []event.DomainEvent) error
 
 	// FindByID 根据ID查找
 	FindByID(ctx context.Context, id ID) (*Assessment, error)
@@ -40,9 +28,6 @@ type Repository interface {
 // ScoreRepository 测评得分仓储接口
 type ScoreRepository interface {
 	// === 批量保存 ===
-
-	// SaveScores 批量保存得分（已废弃，使用 SaveScoresWithContext）
-	SaveScores(ctx context.Context, scores []*AssessmentScore) error
 
 	// SaveScoresWithContext 带上下文保存得分（包含受试者和量表信息）
 	// 需要传入 Assessment 对象来获取必要的辅助信息（testeeID, scaleID 等）
