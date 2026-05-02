@@ -33,10 +33,7 @@ func repoRoot(t *testing.T) string {
 		t.Fatal("resolve current file")
 	}
 	dir := filepath.Dir(file)
-	for {
-		if strings.HasSuffix(dir, string(filepath.Separator)+"internal") {
-			break
-		}
+	for !strings.HasSuffix(dir, string(filepath.Separator)+"internal") {
 		parent := filepath.Dir(dir)
 		if parent == dir {
 			t.Fatal("repo root not found")

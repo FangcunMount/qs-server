@@ -202,6 +202,44 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 	})
 }
 
+func TestEvaluationReportDomainDoesNotContainUnusedExportModel(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "report")
+	forbiddenTokens := []string{
+		"ReportExporter",
+		"ExportFormat",
+		"ExportOptions",
+		"PDFExporter",
+		"ExportEvent",
+		"ErrExportFailed",
+		"ErrUnsupportedFormat",
+	}
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; report export belongs to a real application adapter, not unused domain surface", filepath.ToSlash(mustRel(t, root, path)), token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestCalculationAndValidationDomainStayRuleOnly(t *testing.T) {
 	t.Parallel()
 

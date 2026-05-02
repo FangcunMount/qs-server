@@ -107,3 +107,43 @@ func TestEvaluationRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) 
 		}
 	}
 }
+
+func TestEvaluationRESTTransportUsesProtectedQueryFacade(t *testing.T) {
+	t.Parallel()
+
+	handlerData, err := os.ReadFile(filepath.Join("handler", "evaluation.go"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	handlerText := string(handlerData)
+	for _, token := range []string{
+		"AssessmentAccessQueryService",
+		"AssessmentWaitService",
+		"ReportQueryService",
+		"ScoreQueryService",
+		"LoadAccessibleAssessment",
+		"ScopeListAssessments",
+		"ScopeListReports",
+		"ScopeFactorTrend",
+	} {
+		if strings.Contains(handlerText, token) {
+			t.Fatalf("handler/evaluation.go contains %q; REST evaluation handler must delegate access/query orchestration to AssessmentProtectedQueryService", token)
+		}
+	}
+
+	routerData, err := os.ReadFile("router.go")
+	if err != nil {
+		t.Fatal(err)
+	}
+	routerText := string(routerData)
+	for _, token := range []string{
+		"ReportQueryService assessmentApp.ReportQueryService",
+		"ScoreQueryService assessmentApp.ScoreQueryService",
+		"WaitService assessmentApp.AssessmentWaitService",
+		"AccessQueryService assessmentApp.AssessmentAccessQueryService",
+	} {
+		if strings.Contains(routerText, token) {
+			t.Fatalf("router.go exposes %q; REST evaluation deps should expose the protected query facade, not query/access internals", token)
+		}
+	}
+}

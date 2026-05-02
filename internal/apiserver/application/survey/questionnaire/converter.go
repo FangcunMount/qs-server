@@ -150,43 +150,6 @@ func toQuestionResult(q domainQuestionnaire.Question) QuestionResult {
 	return result
 }
 
-// toQuestionnaireSummaryResult 将问卷领域模型转换为摘要结果对象
-func toQuestionnaireSummaryResult(q *domainQuestionnaire.Questionnaire, userNames map[string]string) *QuestionnaireSummaryResult {
-	if q == nil {
-		return nil
-	}
-
-	return &QuestionnaireSummaryResult{
-		Code:          q.GetCode().String(),
-		Version:       q.GetVersion().String(),
-		Title:         q.GetTitle(),
-		Description:   q.GetDescription(),
-		ImgUrl:        q.GetImgUrl(),
-		Status:        q.GetStatus().String(),
-		Type:          q.GetType().String(),
-		QuestionCount: q.GetQuestionCnt(),
-		CreatedBy:     displayIdentityName(q.GetCreatedBy(), userNames),
-		CreatedAt:     q.GetCreatedAt(),
-		UpdatedBy:     displayIdentityName(q.GetUpdatedBy(), userNames),
-		UpdatedAt:     q.GetUpdatedAt(),
-	}
-}
-
-// toQuestionnaireSummaryListResult 将问卷摘要列表转换为结果对象
-func toQuestionnaireSummaryListResult(ctx context.Context, items []*domainQuestionnaire.Questionnaire, total int64, identitySvc iambridge.IdentityResolver) *QuestionnaireSummaryListResult {
-	userNames := resolveUserNames(ctx, items, identitySvc)
-	result := &QuestionnaireSummaryListResult{
-		Items: make([]*QuestionnaireSummaryResult, 0, len(items)),
-		Total: total,
-	}
-
-	for _, item := range items {
-		result.Items = append(result.Items, toQuestionnaireSummaryResult(item, userNames))
-	}
-
-	return result
-}
-
 func toQuestionnaireSummaryRowsResult(ctx context.Context, items []surveyreadmodel.QuestionnaireSummaryRow, total int64, identitySvc iambridge.IdentityResolver) *QuestionnaireSummaryListResult {
 	userNames := resolveQuestionnaireRowUserNames(ctx, items, identitySvc)
 	result := &QuestionnaireSummaryListResult{
@@ -212,20 +175,6 @@ func toQuestionnaireSummaryRowsResult(ctx context.Context, items []surveyreadmod
 	}
 
 	return result
-}
-
-func resolveUserNames(ctx context.Context, items []*domainQuestionnaire.Questionnaire, identitySvc iambridge.IdentityResolver) map[string]string {
-	userIDs := make([]meta.ID, 0, len(items)*2)
-	for _, item := range items {
-		if item == nil {
-			continue
-		}
-		userIDs = append(userIDs, item.GetCreatedBy(), item.GetUpdatedBy())
-	}
-	if identitySvc == nil || !identitySvc.IsEnabled() {
-		return nil
-	}
-	return identitySvc.ResolveUserNames(ctx, userIDs)
 }
 
 func resolveQuestionnaireRowUserNames(ctx context.Context, items []surveyreadmodel.QuestionnaireSummaryRow, identitySvc iambridge.IdentityResolver) map[string]string {

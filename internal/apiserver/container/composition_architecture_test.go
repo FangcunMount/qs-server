@@ -173,6 +173,22 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 			}
 			for _, field := range structType.Fields.List {
 				for _, name := range field.Names {
+					for _, privateInfra := range []string{
+						"mysqlDB",
+						"assessmentRepo",
+						"scoreRepo",
+						"reportRepo",
+						"assessmentReader",
+						"scoreReader",
+						"reportReader",
+						"eventPublisher",
+						"assessmentOutboxStore",
+						"reportDurableSaver",
+					} {
+						if name.Name == privateInfra {
+							t.Fatalf("EvaluationModule keeps private infra field %s; evaluation repositories/read models/stores must stay in local assembler factories", name.Name)
+						}
+					}
 					if !name.IsExported() {
 						continue
 					}

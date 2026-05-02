@@ -9,17 +9,13 @@ import (
 // registerEvaluationProtectedRoutes 注册评估模块相关的受保护路由。
 func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 	if r.deps.Evaluation.ManagementService == nil ||
-		r.deps.Evaluation.ReportQueryService == nil ||
-		r.deps.Evaluation.ScoreQueryService == nil {
+		r.deps.Evaluation.ProtectedQueryService == nil {
 		return
 	}
 	evalHandler := handler.NewEvaluationHandler(
 		r.deps.Evaluation.ManagementService,
-		r.deps.Evaluation.ReportQueryService,
-		r.deps.Evaluation.ScoreQueryService,
 		r.deps.Evaluation.EvaluationService,
-		r.deps.Evaluation.AccessQueryService,
-		r.deps.Evaluation.WaitService,
+		r.deps.Evaluation.ProtectedQueryService,
 	)
 
 	evaluations := apiV1.Group("/evaluations")

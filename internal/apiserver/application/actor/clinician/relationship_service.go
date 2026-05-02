@@ -510,19 +510,6 @@ func (s *relationshipService) assignmentPolicyForUse() domainRelation.Assignment
 	return domainRelation.NewAssignmentPolicy()
 }
 
-func uniqueUint64(ids []uint64) []uint64 {
-	seen := make(map[uint64]struct{}, len(ids))
-	result := make([]uint64, 0, len(ids))
-	for _, id := range ids {
-		if _, ok := seen[id]; ok {
-			continue
-		}
-		seen[id] = struct{}{}
-		result = append(result, id)
-	}
-	return result
-}
-
 func pickPreferredCareContext(result *TesteeRelationListResult) *TesteeRelationResult {
 	if result == nil || len(result.Items) == 0 {
 		return nil

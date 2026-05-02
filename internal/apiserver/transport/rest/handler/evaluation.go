@@ -13,42 +13,28 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
 // EvaluationHandler 评估模块 Handler
 // 提供测评管理、得分查询、报告查询等 RESTful API
 type EvaluationHandler struct {
 	*BaseHandler
-	managementService  assessmentApp.AssessmentManagementService
-	reportQueryService assessmentApp.ReportQueryService
-	scoreQueryService  assessmentApp.ScoreQueryService
-	evaluationService  engine.Service
-	waitService        assessmentApp.AssessmentWaitService
-	accessQueryService assessmentApp.AssessmentAccessQueryService
+	managementService     assessmentApp.AssessmentManagementService
+	evaluationService     engine.Service
+	protectedQueryService assessmentApp.AssessmentProtectedQueryService
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
 	managementService assessmentApp.AssessmentManagementService,
-	reportQueryService assessmentApp.ReportQueryService,
-	scoreQueryService assessmentApp.ScoreQueryService,
 	evaluationService engine.Service,
-	accessQueryService assessmentApp.AssessmentAccessQueryService,
-	waitServices ...assessmentApp.AssessmentWaitService,
+	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
 ) *EvaluationHandler {
-	var waitService assessmentApp.AssessmentWaitService
-	if len(waitServices) > 0 {
-		waitService = waitServices[0]
-	}
 	return &EvaluationHandler{
-		BaseHandler:        &BaseHandler{},
-		managementService:  managementService,
-		reportQueryService: reportQueryService,
-		scoreQueryService:  scoreQueryService,
-		evaluationService:  evaluationService,
-		waitService:        waitService,
-		accessQueryService: accessQueryService,
+		BaseHandler:           &BaseHandler{},
+		managementService:     managementService,
+		evaluationService:     evaluationService,
+		protectedQueryService: protectedQueryService,
 	}
 }
 
@@ -76,13 +62,13 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 		return
 	}
 
-	assessmentCtx, err := h.loadAccessibleAssessment(c.Request.Context(), id, orgID, operatorUserID)
+	result, err := h.protectedQueryService.GetAssessment(c.Request.Context(), protectedScope(orgID, operatorUserID), id)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	h.Success(c, response.NewAssessmentResponse(assessmentCtx.Assessment))
+	h.Success(c, response.NewAssessmentResponse(result))
 }
 
 // ListAssessments 查询测评列表
@@ -110,40 +96,18 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 		return
 	}
 
-	// 设置默认值
-	if req.Page <= 0 {
-		req.Page = 1
-	}
-	if req.PageSize <= 0 {
-		req.PageSize = 10
-	}
-
 	var testeeID *uint64
 	if req.TesteeID > 0 {
 		testeeID = &req.TesteeID
 	}
-	orgScope, err := safeconv.Int64ToUint64(orgID)
-	if err != nil {
-		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "org scope exceeds uint64"))
-		return
-	}
-
 	dto := assessmentApp.ListAssessmentsDTO{
-		OrgID:    orgScope,
 		Page:     req.Page,
 		PageSize: req.PageSize,
 		TesteeID: testeeID,
 		Status:   req.Status,
 	}
 
-	dto, err = h.accessQueryService.ScopeListAssessments(c.Request.Context(), orgID, operatorUserID, dto)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
-
-	ctx := c.Request.Context()
-	result, err := h.managementService.List(ctx, dto)
+	result, err := h.protectedQueryService.ListAssessments(c.Request.Context(), protectedScope(orgID, operatorUserID), dto)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -164,13 +128,13 @@ func (h *EvaluationHandler) ListAssessments(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetScores(c *gin.Context) {
-	assessmentCtx, err := h.loadAccessibleAssessmentContext(c)
+	id, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	result, err := h.scoreQueryService.GetByAssessmentID(c.Request.Context(), assessmentCtx.AssessmentID)
+	result, err := h.protectedQueryService.GetScores(c.Request.Context(), scope, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -208,14 +172,8 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 		FactorCode: req.FactorCode,
 		Limit:      req.Limit,
 	}
-	dto, err = h.accessQueryService.ScopeFactorTrend(c.Request.Context(), orgID, operatorUserID, dto)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
 
-	ctx := c.Request.Context()
-	result, err := h.scoreQueryService.GetFactorTrend(ctx, dto)
+	result, err := h.protectedQueryService.GetFactorTrend(c.Request.Context(), protectedScope(orgID, operatorUserID), dto)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -234,13 +192,13 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/high-risk-factors [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
-	assessmentCtx, err := h.loadAccessibleAssessmentContext(c)
+	id, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	result, err := h.scoreQueryService.GetHighRiskFactors(c.Request.Context(), assessmentCtx.AssessmentID)
+	result, err := h.protectedQueryService.GetHighRiskFactors(c.Request.Context(), scope, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -263,13 +221,13 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/evaluations/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetReport(c *gin.Context) {
-	assessmentCtx, err := h.loadAccessibleAssessmentContext(c)
+	id, scope, err := h.parseProtectedAssessmentQuery(c)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
 
-	result, err := h.reportQueryService.GetByAssessmentID(c.Request.Context(), assessmentCtx.AssessmentID)
+	result, err := h.protectedQueryService.GetReport(c.Request.Context(), scope, id)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -302,26 +260,13 @@ func (h *EvaluationHandler) ListReports(c *gin.Context) {
 		return
 	}
 
-	if req.Page <= 0 {
-		req.Page = 1
-	}
-	if req.PageSize <= 0 {
-		req.PageSize = 10
-	}
-
 	dto := assessmentApp.ListReportsDTO{
 		TesteeID: req.TesteeID,
 		Page:     req.Page,
 		PageSize: req.PageSize,
 	}
-	dto, err = h.accessQueryService.ScopeListReports(c.Request.Context(), orgID, operatorUserID, dto)
-	if err != nil {
-		h.Error(c, err)
-		return
-	}
 
-	ctx := c.Request.Context()
-	result, err := h.reportQueryService.ListByTesteeID(ctx, dto)
+	result, err := h.protectedQueryService.ListReports(c.Request.Context(), protectedScope(orgID, operatorUserID), dto)
 	if err != nil {
 		h.Error(c, err)
 		return
@@ -426,17 +371,12 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	ctx, cancel := context.WithTimeout(c.Request.Context(), parseWaitReportTimeout(c.DefaultQuery("timeout", "15")))
 	defer cancel()
 
-	_, err = h.loadAccessibleAssessment(ctx, id, orgID, operatorUserID)
+	summary, err := h.protectedQueryService.WaitReport(ctx, protectedScope(orgID, operatorUserID), id)
 	if err != nil {
 		h.Error(c, err)
 		return
 	}
-	if h.waitService == nil {
-		h.Success(c, gin.H{"status": "pending", "updated_at": time.Now().Unix()})
-		return
-	}
-
-	h.Success(c, h.waitService.WaitReport(ctx, id))
+	h.Success(c, summary)
 }
 
 // ============= 辅助方法 =============
@@ -445,20 +385,23 @@ func (h *EvaluationHandler) parseAssessmentID(c *gin.Context) (uint64, error) {
 	return strconv.ParseUint(c.Param("id"), 10, 64)
 }
 
-func (h *EvaluationHandler) loadAccessibleAssessmentContext(c *gin.Context) (*assessmentApp.AccessibleAssessmentContext, error) {
+func (h *EvaluationHandler) parseProtectedAssessmentQuery(c *gin.Context) (uint64, assessmentApp.ProtectedQueryScope, error) {
 	id, err := h.parseAssessmentID(c)
 	if err != nil {
-		return nil, err
+		return 0, assessmentApp.ProtectedQueryScope{}, err
 	}
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
-		return nil, err
+		return 0, assessmentApp.ProtectedQueryScope{}, err
 	}
-	return h.loadAccessibleAssessment(c.Request.Context(), id, orgID, operatorUserID)
+	return id, protectedScope(orgID, operatorUserID), nil
 }
 
-func (h *EvaluationHandler) loadAccessibleAssessment(ctx context.Context, assessmentID uint64, orgID, operatorUserID int64) (*assessmentApp.AccessibleAssessmentContext, error) {
-	return h.accessQueryService.LoadAccessibleAssessment(ctx, orgID, operatorUserID, assessmentID)
+func protectedScope(orgID, operatorUserID int64) assessmentApp.ProtectedQueryScope {
+	return assessmentApp.ProtectedQueryScope{
+		OrgID:          orgID,
+		OperatorUserID: operatorUserID,
+	}
 }
 
 func parseWaitReportTimeout(raw string) time.Duration {

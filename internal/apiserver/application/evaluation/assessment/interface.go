@@ -99,6 +99,24 @@ type AssessmentAccessQueryService interface {
 	ScopeFactorTrend(ctx context.Context, orgID int64, operatorUserID int64, dto GetFactorTrendDTO) (GetFactorTrendDTO, error)
 }
 
+// ProtectedQueryScope 是 REST/gRPC 管理端查询传入 evaluation application 的保护域上下文。
+type ProtectedQueryScope struct {
+	OrgID          int64
+	OperatorUserID int64
+}
+
+// AssessmentProtectedQueryService 收口 evaluation 查询用例的访问控制与查询编排。
+type AssessmentProtectedQueryService interface {
+	GetAssessment(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentResult, error)
+	ListAssessments(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentListResult, error)
+	GetScores(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ScoreResult, error)
+	GetHighRiskFactors(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*HighRiskFactorsResult, error)
+	GetFactorTrend(ctx context.Context, scope ProtectedQueryScope, dto GetFactorTrendDTO) (*FactorTrendResult, error)
+	GetReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportResult, error)
+	ListReports(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportListResult, error)
+	WaitReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (evaluationwaiter.StatusSummary, error)
+}
+
 // ==================== 评估引擎服务 ====================
 //
 // 注意：EvaluationService 已独立到 engine 包中

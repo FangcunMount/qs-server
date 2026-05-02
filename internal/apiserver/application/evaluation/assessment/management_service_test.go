@@ -294,22 +294,3 @@ func managementAssessmentRowForList(id uint64, orgID int64, testeeID uint64, sta
 		Status:               status.String(),
 	}
 }
-
-func managementAssessmentForList(id uint64, orgID int64, testeeID uint64, status domain.Status) *domain.Assessment {
-	return domain.Reconstruct(
-		domain.NewID(id),
-		orgID,
-		testee.NewID(testeeID),
-		domain.NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
-		domain.NewAnswerSheetRef(meta.FromUint64(id+1000)),
-		nil,
-		domain.NewAdhocOrigin(),
-		status,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-		nil,
-	)
-}

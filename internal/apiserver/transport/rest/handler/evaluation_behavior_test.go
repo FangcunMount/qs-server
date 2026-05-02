@@ -95,13 +95,11 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 		},
 	}
 	access := &stubTesteeAccessService{}
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, access)
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		nil,
-		nil,
-		assessmentapp.NewAssessmentAccessQueryService(management, access),
-		assessmentapp.NewWaitService(management, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, assessmentapp.NewWaitService(management, nil), accessQuery),
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
@@ -155,13 +153,12 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 			RiskLevel:  &riskLevel,
 		},
 	}
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{})
+	waitService := assessmentapp.NewWaitService(management, nil)
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		nil,
-		nil,
-		assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{}),
-		assessmentapp.NewWaitService(management, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery),
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
@@ -206,13 +203,12 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 			Status:   "submitted",
 		},
 	}
+	accessQuery := assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{})
+	waitService := assessmentapp.NewWaitService(management, nil)
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		nil,
-		nil,
-		assessmentapp.NewAssessmentAccessQueryService(management, &stubTesteeAccessService{}),
-		assessmentapp.NewWaitService(management, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery),
 	)
 
 	baseCtx, cancel := context.WithCancel(context.Background())

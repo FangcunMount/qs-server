@@ -5,7 +5,6 @@ import (
 
 	domainClinician "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	domainRelation "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/relation"
-	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 )
 
@@ -62,25 +61,6 @@ func toRelationResult(item *domainRelation.ClinicianTesteeRelation) *RelationRes
 		IsActive:     item.IsActive(),
 		BoundAt:      item.BoundAt(),
 		UnboundAt:    item.UnboundAt(),
-	}
-}
-
-func toAssignedTesteeResult(item *domainTestee.Testee) *AssignedTesteeResult {
-	if item == nil {
-		return nil
-	}
-
-	return &AssignedTesteeResult{
-		ID:         item.ID().Uint64(),
-		OrgID:      item.OrgID(),
-		ProfileID:  item.ProfileID(),
-		Name:       item.Name(),
-		Gender:     int8(item.Gender()),
-		Birthday:   item.Birthday(),
-		Age:        item.GetAge(),
-		Tags:       item.TagsAsStrings(),
-		Source:     item.Source(),
-		IsKeyFocus: item.IsKeyFocus(),
 	}
 }
 

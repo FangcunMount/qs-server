@@ -68,37 +68,6 @@ func (c FactorCode) Equals(other FactorCode) bool {
 	return c == other
 }
 
-// ==================== 导出格式枚举 ====================
-
-// ExportFormat 报告导出格式
-type ExportFormat string
-
-const (
-	// ExportFormatPDF PDF格式
-	ExportFormatPDF ExportFormat = "pdf"
-
-	// ExportFormatHTML HTML格式
-	ExportFormatHTML ExportFormat = "html"
-
-	// ExportFormatJSON JSON格式
-	ExportFormatJSON ExportFormat = "json"
-)
-
-// String 返回格式的字符串表示
-func (f ExportFormat) String() string {
-	return string(f)
-}
-
-// IsValid 检查格式是否有效
-func (f ExportFormat) IsValid() bool {
-	switch f {
-	case ExportFormatPDF, ExportFormatHTML, ExportFormatJSON:
-		return true
-	default:
-		return false
-	}
-}
-
 // ==================== 报告生成输入 ====================
 
 // GenerateReportInput 生成报告的输入参数

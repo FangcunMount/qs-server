@@ -23,13 +23,6 @@ func newError(kind ErrorKind, format string, args ...interface{}) error {
 	return &DomainError{kind: kind, message: fmt.Sprintf(format, args...)}
 }
 
-func wrapError(kind ErrorKind, err error, format string, args ...interface{}) error {
-	if err == nil {
-		return nil
-	}
-	return &DomainError{kind: kind, message: fmt.Sprintf(format, args...), cause: err}
-}
-
 func (e *DomainError) Error() string {
 	if e == nil {
 		return ""

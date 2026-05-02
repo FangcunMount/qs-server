@@ -14,10 +14,4 @@ var (
 
 	// ErrReportAlreadyExists 报告已存在
 	ErrReportAlreadyExists = errors.New("report already exists")
-
-	// ErrExportFailed 导出失败
-	ErrExportFailed = errors.New("export failed")
-
-	// ErrUnsupportedFormat 不支持的导出格式
-	ErrUnsupportedFormat = errors.New("unsupported export format")
 )

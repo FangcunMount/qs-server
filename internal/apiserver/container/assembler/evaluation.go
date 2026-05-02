@@ -45,15 +45,6 @@ import (
 // EvaluationModule 评估模块（测评、得分、报告）
 // 整合 evaluation 子域的所有功能
 type EvaluationModule struct {
-	mysqlDB *gorm.DB
-
-	// ==================== Repository / Read Model 层 ====================
-	assessmentRepo               assessment.Repository
-	scoreRepo                    assessment.ScoreRepository
-	reportRepo                   report.ReportRepository
-	assessmentReader             evaluationreadmodel.AssessmentReader
-	scoreReader                  evaluationreadmodel.ScoreReader
-	reportReader                 evaluationreadmodel.ReportReader
 	AssessmentOutboxRelay        appEventing.OutboxRelay
 	AssessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 
@@ -78,15 +69,13 @@ type EvaluationModule struct {
 	// 访问控制查询服务 - 服务于 REST 查询访问收口
 	AccessQueryService assessmentApp.AssessmentAccessQueryService
 
+	// 受保护查询服务 - 服务于 REST 查询访问与查询编排收口
+	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
+
 	// ==================== 评估引擎 ====================
 
 	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
 	EvaluationService engine.Service
-
-	// 事件发布器（由容器统一注入）
-	eventPublisher        event.EventPublisher
-	assessmentOutboxStore *mysqlEventOutbox.Store
-	reportDurableSaver    pipeline.ReportDurableSaver
 }
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
@@ -116,66 +105,78 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	if err != nil {
 		return nil, err
 	}
-	module := &EvaluationModule{}
-	module.mysqlDB = normalized.MySQLDB
-	module.eventPublisher = normalized.EventPublisher
-
-	txRunner, waiterRegistry, err := module.wireEvaluationPersistence(normalized)
+	infra, err := newEvaluationInfra(normalized)
 	if err != nil {
 		return nil, err
 	}
 
-	module.wireEvaluationEngine(normalized, txRunner, waiterRegistry)
-	module.wireAssessmentApplications(normalized, txRunner, waiterRegistry)
+	module := &EvaluationModule{
+		AssessmentOutboxRelay:        infra.assessmentOutboxRelay,
+		AssessmentOutboxStatusReader: infra.assessmentOutboxStatusReader,
+	}
+	module.wireEvaluationEngine(normalized, infra)
+	module.wireAssessmentApplications(normalized, infra)
 
 	return module, nil
 }
 
-func (m *EvaluationModule) wireEvaluationPersistence(normalized EvaluationModuleDeps) (apptransaction.Runner, *waiter.WaiterRegistry, error) {
+type evaluationInfra struct {
+	assessmentRepo               assessment.Repository
+	scoreRepo                    assessment.ScoreRepository
+	assessmentReader             evaluationreadmodel.AssessmentReader
+	scoreReader                  evaluationreadmodel.ScoreReader
+	reportReader                 evaluationreadmodel.ReportReader
+	assessmentOutboxStore        *mysqlEventOutbox.Store
+	reportDurableSaver           pipeline.ReportDurableSaver
+	txRunner                     apptransaction.Runner
+	waiterRegistry               *waiter.WaiterRegistry
+	assessmentOutboxRelay        appEventing.OutboxRelay
+	assessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
+}
+
+func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, error) {
+	infra := &evaluationInfra{}
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: normalized.MongoLimiter}
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlOptions)
 	if normalized.RedisClient != nil {
-		m.assessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
+		infra.assessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
 	} else {
-		m.assessmentRepo = baseAssessmentRepo
+		infra.assessmentRepo = baseAssessmentRepo
 	}
 
-	m.assessmentReader = mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
-	m.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
-	m.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
+	infra.assessmentReader = mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
+	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
+	infra.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
 	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(normalized.MongoDB, normalized.TopicResolver, mongoOptions)
 	if err != nil {
-		return nil, nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
-	m.reportRepo = reportRepo
-	m.reportReader = mongoEval.NewReportReadModel(normalized.MongoDB, mongoOptions)
-	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
+	infra.reportReader = mongoEval.NewReportReadModel(normalized.MongoDB, mongoOptions)
+	infra.txRunner = newMySQLTransactionRunner(normalized.MySQLDB)
 	mongoTxRunner := newMongoTransactionRunner(normalized.MongoDB)
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
 	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(normalized.MongoDB, normalized.TopicResolver)
 	if err != nil {
-		return nil, nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
+		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
 	}
-	m.reportDurableSaver = pipeline.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
-	m.assessmentOutboxStore = assessmentOutboxStore
-	m.AssessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, m.eventPublisher)
-	m.AssessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
+	infra.reportDurableSaver = pipeline.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
+	infra.assessmentOutboxStore = assessmentOutboxStore
+	infra.assessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, normalized.EventPublisher)
+	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
 		Reader: assessmentOutboxStore,
 	}
 
-	var waiterRegistry *waiter.WaiterRegistry
 	if normalized.InputResolver != nil {
-		waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
+		infra.waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
 	}
-	return txRunner, waiterRegistry, nil
+	return infra, nil
 }
 
 func (m *EvaluationModule) wireEvaluationEngine(
 	normalized EvaluationModuleDeps,
-	txRunner apptransaction.Runner,
-	waiterRegistry *waiter.WaiterRegistry,
+	infra *evaluationInfra,
 ) {
 	var suggestionGenerator report.SuggestionGenerator
 
@@ -183,29 +184,28 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
 		pipelineRunner := newEvaluationPipelineRunner(evaluationPipelineDeps{
-			AssessmentRepo:  m.assessmentRepo,
-			ScoreRepo:       m.scoreRepo,
+			AssessmentRepo:  infra.assessmentRepo,
+			ScoreRepo:       infra.scoreRepo,
 			ReportBuilder:   reportBuilder,
-			ReportSaver:     m.reportDurableSaver,
-			WaiterRegistry:  waiterRegistry,
+			ReportSaver:     infra.reportDurableSaver,
+			WaiterRegistry:  infra.waiterRegistry,
 			FactorScorer:    ruleengineInfra.NewScaleFactorScorer(),
 			Interpreter:     interpretengineInfra.NewInterpreter(),
 			DefaultProvider: interpretengineInfra.NewDefaultProvider(),
 		})
 
 		m.EvaluationService = engine.NewService(
-			m.assessmentRepo,
+			infra.assessmentRepo,
 			normalized.InputResolver,
 			pipelineRunner,
-			engine.WithTransactionalOutbox(txRunner, m.assessmentOutboxStore),
+			engine.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 		)
 	}
 }
 
 func (m *EvaluationModule) wireAssessmentApplications(
 	normalized EvaluationModuleDeps,
-	txRunner apptransaction.Runner,
-	waiterRegistry *waiter.WaiterRegistry,
+	infra *evaluationInfra,
 ) {
 	assessmentCreator := assessment.NewDefaultAssessmentCreator()
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
@@ -217,36 +217,43 @@ func (m *EvaluationModule) wireAssessmentApplications(
 			normalized.Observer,
 		)
 		m.SubmissionService = assessmentApp.NewSubmissionService(
-			m.assessmentRepo,
-			m.assessmentReader,
+			infra.assessmentRepo,
+			infra.assessmentReader,
 			assessmentCreator,
-			txRunner,
-			m.assessmentOutboxStore,
+			infra.txRunner,
+			infra.assessmentOutboxStore,
 			listCache,
 		)
 	} else {
 		m.SubmissionService = assessmentApp.NewSubmissionService(
-			m.assessmentRepo,
-			m.assessmentReader,
+			infra.assessmentRepo,
+			infra.assessmentReader,
 			assessmentCreator,
-			txRunner,
-			m.assessmentOutboxStore,
+			infra.txRunner,
+			infra.assessmentOutboxStore,
 			nil,
 		)
 	}
 
-	m.ManagementService = assessmentApp.NewManagementService(m.assessmentRepo, m.assessmentReader, txRunner, m.assessmentOutboxStore)
-	m.ReportQueryService = assessmentApp.NewReportQueryService(m.reportReader)
+	m.ManagementService = assessmentApp.NewManagementService(infra.assessmentRepo, infra.assessmentReader, infra.txRunner, infra.assessmentOutboxStore)
+	m.ReportQueryService = assessmentApp.NewReportQueryService(infra.reportReader)
 	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
-		m.scoreReader,
-		m.assessmentReader,
+		infra.scoreReader,
+		infra.assessmentReader,
 		normalized.ScaleCatalog,
 	)
 
-	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, waiterRegistry)
+	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, infra.waiterRegistry)
 	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
 		m.ManagementService,
 		normalized.TesteeAccessChecker,
+	)
+	m.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
+		m.ManagementService,
+		m.ReportQueryService,
+		m.ScoreQueryService,
+		m.WaitService,
+		m.AccessQueryService,
 	)
 }
 

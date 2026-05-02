@@ -211,22 +211,6 @@ func makeActiveClinician(id uint64) *domainClinician.Clinician {
 	return item
 }
 
-func makeActiveRelation(clinicianID, testeeID uint64) *domainRelation.ClinicianTesteeRelation {
-	item := domainRelation.NewClinicianTesteeRelation(
-		1,
-		domainClinician.ID(clinicianID),
-		domainTestee.ID(testeeID),
-		domainRelation.RelationTypeAttending,
-		domainRelation.SourceTypeManual,
-		nil,
-		true,
-		time.Date(2026, 4, 17, 10, 0, 0, 0, time.UTC),
-		nil,
-	)
-	item.SetID(domainRelation.ID(testeeID))
-	return item
-}
-
 func makeTestee(id uint64) *domainTestee.Testee {
 	item := domainTestee.NewTestee(1, "testee", domainTestee.GenderMale, nil)
 	item.SetID(domainTestee.ID(id))

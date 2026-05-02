@@ -84,7 +84,7 @@ func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 	}
 	text := string(data)
 	required := []string{
-		"engine.WithTransactionalOutbox(txRunner, m.assessmentOutboxStore)",
+		"engine.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore)",
 		"assessmentApp.NewSubmissionService(",
 		"assessmentApp.NewManagementService(",
 	}
@@ -140,7 +140,7 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 	text := string(data)
 	required := []string{
 		"pipeline.NewTransactionalReportDurableSaver(",
-		"ReportSaver:     m.reportDurableSaver",
+		"ReportSaver:     infra.reportDurableSaver",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {

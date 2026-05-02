@@ -287,6 +287,14 @@ func newRouterTestContainer() *container.Container {
 		ReportQueryService: assessmentApp.NewReportQueryService(nil),
 		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil),
 	}
+	evaluationModule.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(evaluationModule.ManagementService, nil)
+	evaluationModule.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
+		evaluationModule.ManagementService,
+		evaluationModule.ReportQueryService,
+		evaluationModule.ScoreQueryService,
+		nil,
+		evaluationModule.AccessQueryService,
+	)
 	return &container.Container{
 		SurveyModule: surveyModule,
 		ScaleModule:  scaleModule,

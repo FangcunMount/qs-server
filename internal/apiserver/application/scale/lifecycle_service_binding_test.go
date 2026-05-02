@@ -34,11 +34,6 @@ func (r *scaleRepoBindingStub) ExistsByCode(_ context.Context, _ string) (bool, 
 	return false, nil
 }
 
-type questionnaireRepoBindingStub struct {
-	byCode    map[string]*domainQuestionnaire.Questionnaire
-	byVersion map[string]*domainQuestionnaire.Questionnaire
-}
-
 type questionnaireCatalogBindingStub struct {
 	byCode    map[string]*questionnairecatalog.Item
 	byVersion map[string]*questionnairecatalog.Item
@@ -68,65 +63,6 @@ func questionnaireCatalogItem(q *domainQuestionnaire.Questionnaire) *questionnai
 		Version: q.GetVersion().String(),
 		Type:    q.GetType().String(),
 	}
-}
-
-func (r *questionnaireRepoBindingStub) Create(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) FindByCode(_ context.Context, code string) (*domainQuestionnaire.Questionnaire, error) {
-	if q, ok := r.byCode[code]; ok {
-		return q, nil
-	}
-	return nil, domainQuestionnaire.ErrNotFound
-}
-func (r *questionnaireRepoBindingStub) FindPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, domainQuestionnaire.ErrNotFound
-}
-func (r *questionnaireRepoBindingStub) FindLatestPublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, domainQuestionnaire.ErrNotFound
-}
-func (r *questionnaireRepoBindingStub) FindByCodeVersion(_ context.Context, code, version string) (*domainQuestionnaire.Questionnaire, error) {
-	if q, ok := r.byVersion[code+":"+version]; ok {
-		return q, nil
-	}
-	return nil, domainQuestionnaire.ErrNotFound
-}
-func (r *questionnaireRepoBindingStub) FindBaseByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoBindingStub) FindBasePublishedByCode(_ context.Context, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoBindingStub) FindBaseByCodeVersion(_ context.Context, _ string, _ string) (*domainQuestionnaire.Questionnaire, error) {
-	return nil, nil
-}
-func (r *questionnaireRepoBindingStub) LoadQuestions(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) Update(_ context.Context, _ *domainQuestionnaire.Questionnaire) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) CreatePublishedSnapshot(_ context.Context, _ *domainQuestionnaire.Questionnaire, _ bool) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) SetActivePublishedVersion(_ context.Context, _ string, _ string) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) ClearActivePublishedVersion(_ context.Context, _ string) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) Remove(_ context.Context, _ string) error { return nil }
-func (r *questionnaireRepoBindingStub) HardDelete(_ context.Context, _ string) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) HardDeleteFamily(_ context.Context, _ string) error {
-	return nil
-}
-func (r *questionnaireRepoBindingStub) ExistsByCode(_ context.Context, _ string) (bool, error) {
-	return false, nil
-}
-func (r *questionnaireRepoBindingStub) HasPublishedSnapshots(_ context.Context, _ string) (bool, error) {
-	return false, nil
 }
 
 func TestValidateMedicalScaleQuestionnaireBindingRejectsSurveyQuestionnaire(t *testing.T) {
