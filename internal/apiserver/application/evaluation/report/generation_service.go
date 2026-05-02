@@ -3,9 +3,8 @@ package report
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -24,7 +23,7 @@ func NewReportGenerationService(reportRepo domainReport.ReportRepository) Report
 // GenerateFromEvaluation 根据评估结果生成报告
 func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dto GenerateReportDTO) (*ReportResult, error) {
 	if dto.AssessmentID == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "测评ID不能为空")
+		return nil, evalerrors.InvalidArgument("测评ID不能为空")
 	}
 
 	// 转换维度
@@ -56,7 +55,7 @@ func (s *reportGenerationService) GenerateFromEvaluation(ctx context.Context, dt
 
 	// 保存报告
 	if err := s.reportRepo.Save(ctx, report); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存报告失败")
+		return nil, evalerrors.Database(err, "保存报告失败")
 	}
 
 	return ToReportResult(report), nil

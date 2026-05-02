@@ -4,9 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -35,16 +34,16 @@ func (s *reportExportService) ExportPDF(ctx context.Context, reportID uint64, op
 	id := meta.FromUint64(reportID)
 	report, err := s.reportRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInterpretReportNotFound, "报告不存在")
+		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
 	}
 
 	exportOptions := toExportOptions(options)
 	reader, err := s.exporter.Export(ctx, report, domainReport.ExportFormatPDF, exportOptions)
 	if err != nil {
-		if errors.IsCode(err, errorCode.ErrUnsupportedOperation) {
+		if evalerrors.IsUnsupportedOperation(err) {
 			return nil, err
 		}
-		return nil, errors.WrapC(err, errorCode.ErrInterpretReportGenerationFailed, "导出PDF失败")
+		return nil, evalerrors.InterpretReportGenerationFailed(err, "导出PDF失败")
 	}
 
 	return reader, nil
@@ -55,16 +54,16 @@ func (s *reportExportService) ExportHTML(ctx context.Context, reportID uint64, o
 	id := meta.FromUint64(reportID)
 	report, err := s.reportRepo.FindByID(ctx, id)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInterpretReportNotFound, "报告不存在")
+		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
 	}
 
 	exportOptions := toExportOptions(options)
 	reader, err := s.exporter.Export(ctx, report, domainReport.ExportFormatHTML, exportOptions)
 	if err != nil {
-		if errors.IsCode(err, errorCode.ErrUnsupportedOperation) {
+		if evalerrors.IsUnsupportedOperation(err) {
 			return nil, err
 		}
-		return nil, errors.WrapC(err, errorCode.ErrInterpretReportGenerationFailed, "导出HTML失败")
+		return nil, evalerrors.InterpretReportGenerationFailed(err, "导出HTML失败")
 	}
 
 	return reader, nil

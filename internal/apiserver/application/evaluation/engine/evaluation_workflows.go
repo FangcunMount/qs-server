@@ -5,12 +5,11 @@ import (
 	stderrors "errors"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -38,7 +37,7 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	log.Debugw("测评数据加载成功",
@@ -54,7 +53,7 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 			"expected_status", "submitted",
 			"result", "failed",
 		)
-		return nil, errors.WithCode(errorCode.ErrAssessmentInvalidStatus, "测评状态不正确，无法评估")
+		return nil, evalerrors.AssessmentInvalidStatus("测评状态不正确，无法评估")
 	}
 
 	if a.MedicalScaleRef() == nil {
@@ -72,11 +71,11 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 func (l assessmentLoader) EnsureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
 	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
 	if err != nil {
-		return errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	if a.OrgID() != orgID {
-		return errors.WithCode(errorCode.ErrPermissionDenied, "测评不属于当前机构")
+		return evalerrors.PermissionDenied("测评不属于当前机构")
 	}
 
 	return nil
@@ -88,7 +87,7 @@ type evaluationInputWorkflow struct {
 
 func (w evaluationInputWorkflow) Resolve(ctx context.Context, a *assessment.Assessment, assessmentID uint64) (*evaluationinput.InputSnapshot, error) {
 	if w.resolver == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "evaluation input resolver is not configured")
+		return nil, evalerrors.ModuleNotConfigured("evaluation input resolver is not configured")
 	}
 	return w.resolver.Resolve(ctx, evaluationinput.InputRef{
 		AssessmentID:         assessmentID,
@@ -139,7 +138,7 @@ func (f evaluationFailureFinalizer) MarkAsFailed(ctx context.Context, a *assessm
 
 func (f evaluationFailureFinalizer) SaveAssessmentWithEvents(ctx context.Context, a *assessment.Assessment) error {
 	if f.txRunner == nil || f.eventStager == nil {
-		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment engine transactional outbox requires transaction runner and event stager")
+		return evalerrors.ModuleNotConfigured("assessment engine transactional outbox requires transaction runner and event stager")
 	}
 	if a == nil {
 		return nil
@@ -178,7 +177,7 @@ func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessme
 	)
 
 	if orgID == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID不能为空")
+		return nil, evalerrors.InvalidArgument("机构ID不能为空")
 	}
 
 	for _, id := range assessmentIDs {

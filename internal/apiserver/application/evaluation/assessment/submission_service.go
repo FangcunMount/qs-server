@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -132,7 +131,7 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 			"action", "create_assessment",
 			"result", "invalid_params",
 		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
+		return nil, evalerrors.InvalidArgument("受试者ID不能为空")
 	}
 	// 问卷编码验证
 	if dto.QuestionnaireCode == "" {
@@ -140,14 +139,14 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 			"action", "create_assessment",
 			"result", "invalid_params",
 		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷编码不能为空")
+		return nil, evalerrors.InvalidArgument("问卷编码不能为空")
 	}
 	if dto.AnswerSheetID == 0 {
 		l.Warnw("答卷ID为空",
 			"action", "create_assessment",
 			"result", "invalid_params",
 		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "答卷ID不能为空")
+		return nil, evalerrors.InvalidArgument("答卷ID不能为空")
 	}
 
 	// 2. 构造创建请求
@@ -176,7 +175,7 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentCreateFailed, "创建测评失败")
+		return nil, evalerrors.AssessmentCreateFailed(err, "创建测评失败")
 	}
 
 	// 4. 持久化
@@ -197,7 +196,7 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+		return nil, evalerrors.Database(err, "保存测评失败")
 	}
 
 	duration := time.Since(startTime)
@@ -253,7 +252,7 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	// 2. 提交测评
@@ -268,7 +267,7 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentSubmitFailed, "提交测评失败")
+		return nil, evalerrors.AssessmentSubmitFailed(err, "提交测评失败")
 	}
 
 	// 3. 持久化
@@ -289,7 +288,7 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+		return nil, evalerrors.Database(err, "保存测评失败")
 	}
 
 	duration := time.Since(startTime)

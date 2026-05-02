@@ -3,11 +3,10 @@ package pipeline
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // InterpretationHandler 测评分析解读处理器
@@ -73,7 +72,7 @@ func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) er
 		"risk_level", evalCtx.RiskLevel)
 
 	if h.generator == nil {
-		err := errors.WithCode(errorCode.ErrModuleInitializationFailed, "interpretation generator is not configured")
+		err := evalerrors.ModuleNotConfigured("interpretation generator is not configured")
 		evalCtx.SetError(err)
 		return err
 	}
@@ -83,7 +82,7 @@ func (h *InterpretationHandler) Handle(ctx context.Context, evalCtx *Context) er
 		"suggestion", evalCtx.EvaluationResult.Suggestion)
 
 	if h.finalizer == nil {
-		err := errors.WithCode(errorCode.ErrModuleInitializationFailed, "interpretation finalizer is not configured")
+		err := evalerrors.ModuleNotConfigured("interpretation finalizer is not configured")
 		evalCtx.SetError(err)
 		return err
 	}
@@ -124,13 +123,13 @@ func (f *InterpretationFinalizer) Finalize(ctx context.Context, evalCtx *Context
 	}
 
 	if f.assessmentWriter == nil {
-		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment result writer is not configured")
+		return evalerrors.ModuleNotConfigured("assessment result writer is not configured")
 	}
 	if err := f.assessmentWriter.ApplyAndSave(ctx, evalCtx); err != nil {
 		return err
 	}
 	if f.reportWriter == nil {
-		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "interpret report writer is not configured")
+		return evalerrors.ModuleNotConfigured("interpret report writer is not configured")
 	}
 	if err := f.reportWriter.BuildAndSave(ctx, evalCtx); err != nil {
 		return err

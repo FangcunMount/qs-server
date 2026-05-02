@@ -3,10 +3,9 @@ package pipeline
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type AssessmentResultWriter interface {
@@ -28,7 +27,7 @@ func (w repositoryAssessmentResultWriter) ApplyAndSave(ctx context.Context, eval
 		l.Errorw("Failed to apply evaluation result",
 			"assessment_id", assessmentID,
 			"error", err)
-		return errors.WrapC(err, errorCode.ErrAssessmentInterpretFailed, "应用评估结果失败")
+		return evalerrors.AssessmentInterpretFailed(err, "应用评估结果失败")
 	}
 
 	if err := w.assessmentRepo.Save(ctx, evalCtx.Assessment); err != nil {
@@ -36,7 +35,7 @@ func (w repositoryAssessmentResultWriter) ApplyAndSave(ctx context.Context, eval
 		l.Errorw("Failed to save assessment",
 			"assessment_id", assessmentID,
 			"error", err)
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+		return evalerrors.Database(err, "保存测评失败")
 	}
 	assessmentID, _ := evalCtx.Assessment.ID().Value()
 	l.Infow("Assessment saved successfully",

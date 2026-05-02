@@ -4,8 +4,7 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 )
 
 type assessmentAccessQueryService struct {
@@ -30,10 +29,10 @@ func (s *assessmentAccessQueryService) LoadAccessibleAssessment(
 	assessmentID uint64,
 ) (*AccessibleAssessmentContext, error) {
 	if s.managementService == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "assessment management service is not configured")
+		return nil, evalerrors.ModuleNotConfigured("assessment management service is not configured")
 	}
 	if s.checker == nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "testee access checker is not configured")
+		return nil, evalerrors.ModuleNotConfigured("testee access checker is not configured")
 	}
 	result, err := s.managementService.GetByID(ctx, assessmentID)
 	if err != nil {
@@ -55,7 +54,7 @@ func (s *assessmentAccessQueryService) ValidateTesteeAccess(
 	testeeID uint64,
 ) error {
 	if s.checker == nil {
-		return errors.WithCode(code.ErrModuleInitializationFailed, "testee access checker is not configured")
+		return evalerrors.ModuleNotConfigured("testee access checker is not configured")
 	}
 	return s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID)
 }
@@ -67,7 +66,7 @@ func (s *assessmentAccessQueryService) ScopeListAssessments(
 	dto ListAssessmentsDTO,
 ) (ListAssessmentsDTO, error) {
 	if s.checker == nil {
-		return dto, errors.WithCode(code.ErrModuleInitializationFailed, "testee access checker is not configured")
+		return dto, evalerrors.ModuleNotConfigured("testee access checker is not configured")
 	}
 	if dto.TesteeID != nil {
 		testeeID := *dto.TesteeID
@@ -79,7 +78,7 @@ func (s *assessmentAccessQueryService) ScopeListAssessments(
 	if dto.Conditions != nil && dto.Conditions["testee_id"] != "" {
 		testeeID, err := parseUintCondition(dto.Conditions["testee_id"])
 		if err != nil {
-			return dto, errors.WithCode(code.ErrInvalidArgument, "无效的受试者ID")
+			return dto, evalerrors.InvalidArgument("无效的受试者ID")
 		}
 		dto.TesteeID = &testeeID
 		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
@@ -125,7 +124,7 @@ func (s *assessmentAccessQueryService) ScopeListReports(
 	dto ListReportsDTO,
 ) (ListReportsDTO, error) {
 	if s.checker == nil {
-		return dto, errors.WithCode(code.ErrModuleInitializationFailed, "testee access checker is not configured")
+		return dto, evalerrors.ModuleNotConfigured("testee access checker is not configured")
 	}
 	if dto.TesteeID != 0 {
 		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, dto.TesteeID); err != nil {
@@ -138,7 +137,7 @@ func (s *assessmentAccessQueryService) ScopeListReports(
 		return dto, err
 	}
 	if scope != nil && scope.IsAdmin {
-		return dto, errors.WithCode(code.ErrBind, "受试者ID不能为空")
+		return dto, evalerrors.Bind("受试者ID不能为空")
 	}
 	allowedTesteeIDs, err := s.checker.ListAccessibleTesteeIDs(ctx, orgID, operatorUserID)
 	if err != nil {

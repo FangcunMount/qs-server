@@ -3,10 +3,9 @@ package assessment
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // scoreQueryService 得分查询服务实现
@@ -32,11 +31,11 @@ func NewScoreQueryServiceWithReadModel(
 // GetByAssessmentID 获取测评的所有因子得分
 func (s *scoreQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ScoreResult, error) {
 	if s.scoreReader == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score read model is not configured")
+		return nil, evalerrors.ModuleNotConfigured("assessment score read model is not configured")
 	}
 	scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
+		return nil, evalerrors.AssessmentScoreNotFound(err, "得分不存在")
 	}
 	medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
 	return scoreRowToResult(scoreRow, medicalScale), nil
@@ -45,10 +44,10 @@ func (s *scoreQueryService) GetByAssessmentID(ctx context.Context, assessmentID 
 // GetFactorTrend 获取因子得分趋势
 func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTrendDTO) (*FactorTrendResult, error) {
 	if dto.TesteeID == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
+		return nil, evalerrors.InvalidArgument("受试者ID不能为空")
 	}
 	if dto.FactorCode == "" {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "因子编码不能为空")
+		return nil, evalerrors.InvalidArgument("因子编码不能为空")
 	}
 
 	limit := dto.Limit
@@ -60,7 +59,7 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 	}
 
 	if s.scoreReader == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score read model is not configured")
+		return nil, evalerrors.ModuleNotConfigured("assessment score read model is not configured")
 	}
 	rows, err := s.scoreReader.ListFactorTrend(ctx, evaluationreadmodel.FactorTrendFilter{
 		TesteeID:   dto.TesteeID,
@@ -68,7 +67,7 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 		Limit:      limit,
 	})
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询得分趋势失败")
+		return nil, evalerrors.Database(err, "查询得分趋势失败")
 	}
 	dataPoints := make([]TrendDataPoint, 0, len(rows))
 	factorName := ""
@@ -98,11 +97,11 @@ func (s *scoreQueryService) GetFactorTrend(ctx context.Context, dto GetFactorTre
 // GetHighRiskFactors 获取高风险因子
 func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID uint64) (*HighRiskFactorsResult, error) {
 	if s.scoreReader == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment score read model is not configured")
+		return nil, evalerrors.ModuleNotConfigured("assessment score read model is not configured")
 	}
 	scoreRow, err := s.scoreReader.GetScoreByAssessmentID(ctx, assessmentID)
 	if err != nil {
-		if errors.ParseCoder(err).Code() == errorCode.ErrAssessmentScoreNotFound {
+		if evalerrors.IsAssessmentScoreNotFound(err) {
 			return &HighRiskFactorsResult{
 				AssessmentID:    assessmentID,
 				HasHighRisk:     false,
@@ -110,7 +109,7 @@ func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID
 				NeedsUrgentCare: false,
 			}, nil
 		}
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentScoreNotFound, "得分不存在")
+		return nil, evalerrors.AssessmentScoreNotFound(err, "得分不存在")
 	}
 	medicalScale := s.loadScaleForAssessmentRow(ctx, assessmentID)
 	return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil

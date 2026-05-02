@@ -1,12 +1,11 @@
 package assessment
 
 import (
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -20,7 +19,7 @@ func toAssessmentResult(a *assessment.Assessment) (*AssessmentResult, error) {
 
 	orgID, err := safeconv.Int64ToUint64(a.OrgID())
 	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrDatabase, "测评机构ID超出安全范围")
+		return nil, evalerrors.DatabaseMessage("测评机构ID超出安全范围")
 	}
 
 	result := &AssessmentResult{
@@ -80,7 +79,7 @@ func toAssessmentResult(a *assessment.Assessment) (*AssessmentResult, error) {
 func assessmentRowToResult(row evaluationreadmodel.AssessmentRow) (*AssessmentResult, error) {
 	orgID, err := safeconv.Int64ToUint64(row.OrgID)
 	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrDatabase, "测评机构ID超出安全范围")
+		return nil, evalerrors.DatabaseMessage("测评机构ID超出安全范围")
 	}
 	return &AssessmentResult{
 		ID:                   row.ID,

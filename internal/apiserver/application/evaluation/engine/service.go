@@ -4,13 +4,12 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -80,7 +79,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	// 参数校验
 	if assessmentID == 0 {
 		l.Warnw("测评ID为空", "action", "evaluate", "result", "invalid_params")
-		return errors.WithCode(errorCode.ErrInvalidArgument, "测评ID不能为空")
+		return evalerrors.InvalidArgument("测评ID不能为空")
 	}
 
 	loaded, err := s.assessmentLoader().LoadForEvaluation(ctx, assessmentID)
@@ -108,7 +107,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	)
 
 	if s.pipelineRunner == nil {
-		err := errors.WithCode(errorCode.ErrModuleInitializationFailed, "evaluation pipeline runner is not configured")
+		err := evalerrors.ModuleNotConfigured("evaluation pipeline runner is not configured")
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}

@@ -183,6 +183,28 @@ func TestEvaluationDoesNotUseDeprecatedRepositoryFallbacks(t *testing.T) {
 	}
 }
 
+func TestEvaluationApplicationUsesCentralErrorMapper(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowedMapperDir := filepath.ToSlash(filepath.Join("internal", "apiserver", "application", "evaluation", "apperrors")) + "/"
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/component-base/pkg/errors":   "evaluation/apperrors",
+		"github.com/FangcunMount/qs-server/internal/pkg/code": "evaluation/apperrors",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation"), func(path, importPath string) {
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if strings.HasSuffix(path, "_test.go") || strings.HasPrefix(rel, allowedMapperDir) {
+			return
+		}
+		for forbidden, replacement := range forbiddenImports {
+			if importPath == forbidden {
+				t.Fatalf("%s imports %s; evaluation application error code mapping should be centralized in %s", rel, importPath, replacement)
+			}
+		}
+	})
+}
+
 func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
 	t.Parallel()
 

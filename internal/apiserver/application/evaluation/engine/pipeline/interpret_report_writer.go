@@ -3,12 +3,11 @@ package pipeline
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type InterpretReportWriter interface {
@@ -35,7 +34,7 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 	assessmentID, _ := evalCtx.Assessment.ID().Value()
 	l.Infow("Generating report", "assessment_id", assessmentID)
 	if w.reportSaver == nil {
-		return errors.WithCode(errorCode.ErrModuleInitializationFailed, "report durable saver is not configured")
+		return evalerrors.ModuleNotConfigured("report durable saver is not configured")
 	}
 
 	rpt, err := w.reportBuilder.Build(reportInputFromContext(evalCtx))
@@ -43,7 +42,7 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 		l.Errorw("Failed to build report",
 			"assessment_id", assessmentID,
 			"error", err)
-		return errors.WrapC(err, errorCode.ErrAssessmentInterpretFailed, "生成报告失败")
+		return evalerrors.AssessmentInterpretFailed(err, "生成报告失败")
 	}
 	reportID, _ := rpt.ID().Value()
 	l.Debugw("Report built successfully", "report_id", reportID)
@@ -55,7 +54,7 @@ func (w *durableInterpretReportWriter) BuildAndSave(ctx context.Context, evalCtx
 			"report_id", reportID,
 			"assessment_id", assessmentID,
 			"error", err)
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存报告失败")
+		return evalerrors.Database(err, "保存报告失败")
 	}
 	reportID, _ = rpt.ID().Value()
 	assessmentID, _ = evalCtx.Assessment.ID().Value()

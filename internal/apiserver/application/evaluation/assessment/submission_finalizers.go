@@ -4,11 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -30,7 +29,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 		domainStatistics.NewFootprintAssessmentCreatedEvent(req.OrgID, dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
 	}
 	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, additionalEvents); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
 }
@@ -48,7 +47,7 @@ type assessmentSubmitFinalizer struct {
 
 func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAssessment.Assessment) error {
 	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, nil); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
 }

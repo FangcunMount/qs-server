@@ -4,11 +4,10 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -36,7 +35,7 @@ func (w myAssessmentListWorkflow) List(ctx context.Context, dto ListMyAssessment
 			"action", "list_my_assessments",
 			"result", "invalid_params",
 		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
+		return nil, evalerrors.InvalidArgument("受试者ID不能为空")
 	}
 
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
@@ -64,12 +63,12 @@ func (w myAssessmentListWorkflow) List(ctx context.Context, dto ListMyAssessment
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
+		return nil, evalerrors.Database(err, "查询测评列表失败")
 	}
 
 	totalInt, err := safeconv.Int64ToInt(total)
 	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrDatabase, "测评总数超出安全范围")
+		return nil, evalerrors.DatabaseMessage("测评总数超出安全范围")
 	}
 	l.Debugw("查询我的测评列表成功",
 		"action", "list_my_assessments",
@@ -102,7 +101,7 @@ func (q myAssessmentQuery) List(
 	pageSize int,
 ) ([]*AssessmentResult, int64, error) {
 	if q.reader == nil {
-		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
+		return nil, 0, evalerrors.ModuleNotConfigured("assessment read model is not configured")
 	}
 	rows, total, err := q.reader.ListAssessments(ctx, evaluationreadmodel.AssessmentFilter{
 		TesteeID:  &dto.TesteeID,

@@ -4,12 +4,11 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -90,7 +89,7 @@ func (s *managementService) GetByID(ctx context.Context, id uint64) (*Assessment
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	duration := time.Since(startTime)
@@ -123,7 +122,7 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 
 	orgID, err := safeconv.Uint64ToInt64(dto.OrgID)
 	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "机构ID超出 int64 范围")
+		return nil, evalerrors.InvalidArgument("机构ID超出 int64 范围")
 	}
 
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
@@ -134,7 +133,7 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 			"conditions", dto.Conditions,
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "无效的受试者ID")
+		return nil, evalerrors.AssessmentNotFound(err, "无效的受试者ID")
 	}
 	if conditions.invalidStatus {
 		l.Warnw("无效的状态值",
@@ -150,14 +149,14 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 	// 计算总页数
 	totalPages, err := safeconv.Int64ToInt((total + int64(pageSize) - 1) / int64(pageSize))
 	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrDatabase, "测评总页数超出安全范围")
+		return nil, evalerrors.DatabaseMessage("测评总页数超出安全范围")
 	}
 	if totalPages == 0 && total > 0 {
 		totalPages = 1
 	}
 	totalInt, err := safeconv.Int64ToInt(total)
 	if err != nil {
-		return nil, errors.WithCode(errorCode.ErrDatabase, "测评总数超出安全范围")
+		return nil, evalerrors.DatabaseMessage("测评总数超出安全范围")
 	}
 
 	duration := time.Since(startTime)
@@ -218,7 +217,7 @@ func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessm
 			"status", a.Status().String(),
 			"result", "invalid_status",
 		)
-		return nil, errors.WithCode(errorCode.ErrAssessmentInvalidStatus, "只能重试失败的测评")
+		return nil, evalerrors.AssessmentInvalidStatus("只能重试失败的测评")
 	}
 
 	// 重新提交，触发评估流程
@@ -235,7 +234,7 @@ func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessm
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentInvalidStatus, "重置测评状态失败")
+		return nil, evalerrors.WrapAssessmentInvalidStatus(err, "重置测评状态失败")
 	}
 
 	l.Debugw("保存重试后的测评",
@@ -250,7 +249,7 @@ func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessm
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存测评失败")
+		return nil, evalerrors.Database(err, "保存测评失败")
 	}
 
 	duration := time.Since(startTime)
@@ -281,7 +280,7 @@ func (s *managementService) loadAssessmentInOrg(ctx context.Context, orgID int64
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	if a.OrgID() != orgID {
@@ -291,7 +290,7 @@ func (s *managementService) loadAssessmentInOrg(ctx context.Context, orgID int64
 			"request_org_id", orgID,
 			"resource_org_id", a.OrgID(),
 		)
-		return nil, errors.WithCode(errorCode.ErrPermissionDenied, "测评不属于当前机构")
+		return nil, evalerrors.PermissionDenied("测评不属于当前机构")
 	}
 
 	return a, nil

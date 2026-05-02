@@ -3,9 +3,8 @@ package assessment
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // reportQueryService 报告查询服务实现
@@ -23,11 +22,11 @@ func NewReportQueryServiceWithReadModel(reader evaluationreadmodel.ReportReader)
 // GetByAssessmentID 根据测评ID获取报告
 func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportResult, error) {
 	if s.reader == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "report read model is not configured")
+		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
 	row, err := s.reader.GetReportByAssessmentID(ctx, assessmentID)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInterpretReportNotFound, "报告不存在")
+		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
 	}
 	return reportRowToResult(*row), nil
 }
@@ -36,11 +35,11 @@ func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID
 func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error) {
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 	if s.reader == nil {
-		return nil, errors.WithCode(errorCode.ErrModuleInitializationFailed, "report read model is not configured")
+		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
 	rows, total, err := s.listReportRows(ctx, dto, page, pageSize)
 	if err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询报告列表失败")
+		return nil, evalerrors.Database(err, "查询报告列表失败")
 	}
 	items := make([]*ReportResult, 0, len(rows))
 	for _, row := range rows {
@@ -72,12 +71,12 @@ func (s *reportQueryService) listReportRows(
 		}
 		filter.TesteeIDs = dto.AccessibleTesteeIDs
 	default:
-		return nil, 0, errors.WithCode(errorCode.ErrInvalidArgument, "受试者ID不能为空")
+		return nil, 0, evalerrors.InvalidArgument("受试者ID不能为空")
 	}
 	return s.reader.ListReports(ctx, filter, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
 }
 
 // ExportPDF 导出PDF报告
 func (s *reportQueryService) ExportPDF(_ context.Context, _ uint64) ([]byte, error) {
-	return nil, errors.WithCode(errorCode.ErrUnsupportedOperation, "PDF导出当前不支持")
+	return nil, evalerrors.UnsupportedOperation("PDF导出当前不支持")
 }

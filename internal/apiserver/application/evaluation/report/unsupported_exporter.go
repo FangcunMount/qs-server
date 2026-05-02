@@ -4,9 +4,8 @@ import (
 	"context"
 	"io"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type unsupportedReportExporter struct{}
@@ -23,7 +22,7 @@ func (unsupportedReportExporter) Export(
 	_ domainReport.ExportFormat,
 	_ domainReport.ExportOptions,
 ) (io.Reader, error) {
-	return nil, errors.WithCode(errorCode.ErrUnsupportedOperation, "报告导出当前不支持")
+	return nil, evalerrors.UnsupportedOperation("报告导出当前不支持")
 }
 
 func (unsupportedReportExporter) SupportedFormats() []domainReport.ExportFormat {

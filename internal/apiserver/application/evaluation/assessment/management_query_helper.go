@@ -4,12 +4,11 @@ import (
 	"context"
 	"strconv"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type assessmentListConditions struct {
@@ -83,7 +82,7 @@ func (q assessmentAdminQuery) List(
 	conditions *assessmentListConditions,
 ) ([]*AssessmentResult, int64, error) {
 	if q.reader == nil {
-		return nil, 0, errors.WithCode(errorCode.ErrModuleInitializationFailed, "assessment read model is not configured")
+		return nil, 0, evalerrors.ModuleNotConfigured("assessment read model is not configured")
 	}
 	rows, total, err := q.queryRows(ctx, dto, orgID, page, pageSize, conditions)
 	if err != nil {
@@ -136,7 +135,7 @@ func (q assessmentAdminQuery) queryRows(
 			"testee_id", conditions.rawTesteeID,
 			"error", err.Error(),
 		)
-		return nil, 0, errors.WrapC(err, errorCode.ErrDatabase, "查询测评列表失败")
+		return nil, 0, evalerrors.Database(err, "查询测评列表失败")
 	}
 	return rows, total, nil
 }

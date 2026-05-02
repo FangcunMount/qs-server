@@ -4,10 +4,9 @@ import (
 	"context"
 	"time"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -35,7 +34,7 @@ func (g assessmentGetter) GetMyAssessment(ctx context.Context, testeeID, assessm
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	if a.TesteeID().Uint64() != testeeID {
@@ -45,7 +44,7 @@ func (g assessmentGetter) GetMyAssessment(ctx context.Context, testeeID, assessm
 			"assessment_testee_id", a.TesteeID().Uint64(),
 			"result", "permission_denied",
 		)
-		return nil, errors.WithCode(errorCode.ErrForbidden, "无权访问此测评")
+		return nil, evalerrors.Forbidden("无权访问此测评")
 	}
 
 	l.Debugw("获取我的测评成功",
@@ -76,7 +75,7 @@ func (g assessmentGetter) GetMyAssessmentByAnswerSheetID(ctx context.Context, an
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, errors.WrapC(err, errorCode.ErrAssessmentNotFound, "测评不存在")
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
 
 	l.Debugw("通过答卷ID获取测评成功",

@@ -3,9 +3,8 @@ package pipeline
 import (
 	"context"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // AssessmentScoreWriter 封装 risk 计算后的 score 持久化副作用。
@@ -42,7 +41,7 @@ func (w repositoryAssessmentScoreWriter) SaveAssessmentScore(ctx context.Context
 	)
 
 	if err := w.scoreRepo.SaveScoresWithContext(ctx, evalCtx.Assessment, score); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存测评得分失败")
+		return evalerrors.Database(err, "保存测评得分失败")
 	}
 	return nil
 }
