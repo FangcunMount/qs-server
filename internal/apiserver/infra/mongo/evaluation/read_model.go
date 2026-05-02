@@ -44,10 +44,7 @@ func (r *reportReadModel) ListReports(
 		return nil, 0, err
 	}
 
-	findOptions := options.Find().
-		SetSkip(int64(page.Offset())).
-		SetLimit(int64(page.Limit())).
-		SetSort(bson.M{"created_at": -1})
+	findOptions := buildReportReadModelFindOptions(page)
 	cursor, err := r.Find(ctx, query, findOptions)
 	if err != nil {
 		return nil, 0, err
@@ -86,6 +83,13 @@ func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
 		query["risk_level"] = *filter.RiskLevel
 	}
 	return query
+}
+
+func buildReportReadModelFindOptions(page evaluationreadmodel.PageRequest) *options.FindOptions {
+	return options.Find().
+		SetSkip(int64(page.Offset())).
+		SetLimit(int64(page.Limit())).
+		SetSort(bson.M{"created_at": -1})
 }
 
 func (r *reportReadModel) getReport(ctx context.Context, filter bson.M) (*evaluationreadmodel.ReportRow, error) {

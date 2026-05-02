@@ -41,7 +41,7 @@ func TestWaiterNotifyHandlerDelegatesCompletionNotification(t *testing.T) {
 	)
 
 	notifier := &completionNotifierStub{}
-	handler := NewWaiterNotifyHandlerWithNotifier(notifier)
+	handler := NewWaiterNotifyHandler(notifier)
 	if err := handler.Handle(context.Background(), evalCtx); err != nil {
 		t.Fatalf("Handle returned error: %v", err)
 	}

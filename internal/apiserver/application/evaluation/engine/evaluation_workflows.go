@@ -89,13 +89,37 @@ func (w evaluationInputWorkflow) Resolve(ctx context.Context, a *assessment.Asse
 	if w.resolver == nil {
 		return nil, evalerrors.ModuleNotConfigured("evaluation input resolver is not configured")
 	}
-	return w.resolver.Resolve(ctx, evaluationinput.InputRef{
+	snapshot, err := w.resolver.Resolve(ctx, evaluationinput.InputRef{
 		AssessmentID:         assessmentID,
 		MedicalScaleCode:     a.MedicalScaleRef().Code().String(),
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),
 	})
+	if err != nil {
+		return nil, mapInputResolveError(err)
+	}
+	return snapshot, nil
+}
+
+func mapInputResolveError(err error) error {
+	var carrier evaluationinput.FailureKindCarrier
+	if !stderrors.As(err, &carrier) {
+		return err
+	}
+
+	switch carrier.FailureKind() {
+	case evaluationinput.FailureKindScaleNotFound:
+		return evalerrors.MedicalScaleNotFound(err, "量表不存在")
+	case evaluationinput.FailureKindAnswerSheetNotFound:
+		return evalerrors.AnswerSheetNotFound(err, "答卷不存在")
+	case evaluationinput.FailureKindQuestionnaireNotFound:
+		return evalerrors.QuestionnaireNotFound(err, "加载问卷失败")
+	case evaluationinput.FailureKindQuestionnaireVersionMismatch:
+		return evalerrors.QuestionnaireNotFound(err, "问卷不存在或版本不匹配")
+	default:
+		return err
+	}
 }
 
 func inputResolveFailureReason(err error) string {

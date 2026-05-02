@@ -2,12 +2,15 @@ package engine
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -114,6 +117,36 @@ func TestSaveAssessmentWithEventsRequiresTransactionalOutbox(t *testing.T) {
 	}
 	if repo.saveCalls != 0 {
 		t.Fatalf("repository save calls = %d, want 0", repo.saveCalls)
+	}
+}
+
+func TestMapInputResolveErrorPreservesExternalAPICodes(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		kind evaluationinput.FailureKind
+		code int
+	}{
+		{name: "scale", kind: evaluationinput.FailureKindScaleNotFound, code: errorCode.ErrMedicalScaleNotFound},
+		{name: "answer sheet", kind: evaluationinput.FailureKindAnswerSheetNotFound, code: errorCode.ErrAnswerSheetNotFound},
+		{name: "questionnaire", kind: evaluationinput.FailureKindQuestionnaireNotFound, code: errorCode.ErrQuestionnaireNotFound},
+		{name: "questionnaire version", kind: evaluationinput.FailureKindQuestionnaireVersionMismatch, code: errorCode.ErrQuestionnaireNotFound},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			err := evaluationinput.NewResolveError(tc.kind, errors.New("missing"), "missing", "load failed")
+			mapped := mapInputResolveError(err)
+			if !cberrors.IsCode(mapped, tc.code) {
+				t.Fatalf("mapped code = %d, want %d", cberrors.ParseCoder(mapped).Code(), tc.code)
+			}
+			var reason evaluationinput.FailureReasonCarrier
+			if !errors.As(mapped, &reason) || reason.FailureReason() != "load failed: missing" {
+				t.Fatalf("mapped error should preserve failure reason, got %v", mapped)
+			}
+		})
 	}
 }
 

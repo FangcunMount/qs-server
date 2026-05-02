@@ -25,6 +25,18 @@ func AssessmentNotFound(err error, format string, args ...interface{}) error {
 	return cberrors.WrapC(err, errorCode.ErrAssessmentNotFound, format, args...)
 }
 
+func MedicalScaleNotFound(err error, format string, args ...interface{}) error {
+	return cberrors.WrapC(err, errorCode.ErrMedicalScaleNotFound, format, args...)
+}
+
+func AnswerSheetNotFound(err error, format string, args ...interface{}) error {
+	return cberrors.WrapC(err, errorCode.ErrAnswerSheetNotFound, format, args...)
+}
+
+func QuestionnaireNotFound(err error, format string, args ...interface{}) error {
+	return cberrors.WrapC(err, errorCode.ErrQuestionnaireNotFound, format, args...)
+}
+
 func AssessmentInvalidStatus(format string, args ...interface{}) error {
 	return cberrors.WithCode(errorCode.ErrAssessmentInvalidStatus, format, args...)
 }

@@ -36,13 +36,12 @@ func (s *scaleAnalysisQueryService) GetScaleAnalysis(ctx context.Context, dto Sc
 		return &ScaleAnalysisQueryResult{TesteeID: dto.TesteeID, Scales: []ScaleTrendQueryResult{}}, nil
 	}
 
+	testeeID := dto.TesteeID
 	assessmentList, err := s.assessmentManagement.List(ctx, assessmentApp.ListAssessmentsDTO{
 		OrgID:    orgScope,
 		Page:     1,
 		PageSize: 1000,
-		Conditions: map[string]string{
-			"testee_id": strconv.FormatUint(dto.TesteeID, 10),
-		},
+		TesteeID: &testeeID,
 	})
 	if err != nil {
 		return nil, err

@@ -46,11 +46,6 @@ type ListReportsRequest struct {
 	PageSize int    `form:"page_size" json:"page_size"` // 每页数量
 }
 
-// ExportReportRequest 导出报告请求
-type ExportReportRequest struct {
-	Format string `form:"format" json:"format"` // 导出格式：pdf/html
-}
-
 // ============= Evaluation 相关请求 =============
 
 // BatchEvaluateRequest 批量评估请求

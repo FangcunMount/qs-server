@@ -16,10 +16,6 @@ type waiterCompletionNotifier struct {
 	waiterRegistry evaluationwaiter.Notifier
 }
 
-func NewWaiterNotifyHandler(waiterRegistry evaluationwaiter.Notifier) *WaiterNotifyHandler {
-	return NewWaiterNotifyHandlerWithNotifier(NewWaiterCompletionNotifier(waiterRegistry))
-}
-
 func NewWaiterCompletionNotifier(waiterRegistry evaluationwaiter.Notifier) CompletionNotifier {
 	return waiterCompletionNotifier{waiterRegistry: waiterRegistry}
 }

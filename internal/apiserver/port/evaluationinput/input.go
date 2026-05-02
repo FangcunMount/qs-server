@@ -1,6 +1,9 @@
 package evaluationinput
 
-import "context"
+import (
+	"context"
+	"fmt"
+)
 
 type InputRef struct {
 	AssessmentID         uint64
@@ -133,4 +136,84 @@ type QuestionnaireReader interface {
 
 type FailureReasonCarrier interface {
 	FailureReason() string
+}
+
+type FailureKind string
+
+const (
+	FailureKindUnknown                      FailureKind = "unknown"
+	FailureKindScaleNotFound                FailureKind = "scale_not_found"
+	FailureKindAnswerSheetNotFound          FailureKind = "answersheet_not_found"
+	FailureKindQuestionnaireNotFound        FailureKind = "questionnaire_not_found"
+	FailureKindQuestionnaireVersionMismatch FailureKind = "questionnaire_version_mismatch"
+)
+
+type FailureKindCarrier interface {
+	FailureKind() FailureKind
+}
+
+type ResolveError struct {
+	kind          FailureKind
+	message       string
+	cause         error
+	failureReason string
+}
+
+func NewResolveError(kind FailureKind, cause error, message, failurePrefix string) *ResolveError {
+	return &ResolveError{
+		kind:          kind,
+		message:       message,
+		cause:         cause,
+		failureReason: failureReason(failurePrefix, cause),
+	}
+}
+
+func (e *ResolveError) Error() string {
+	if e == nil {
+		return ""
+	}
+	if e.message != "" {
+		return e.message
+	}
+	if e.cause != nil {
+		return e.cause.Error()
+	}
+	if e.kind != "" {
+		return string(e.kind)
+	}
+	return string(FailureKindUnknown)
+}
+
+func (e *ResolveError) Unwrap() error {
+	if e == nil {
+		return nil
+	}
+	return e.cause
+}
+
+func (e *ResolveError) FailureKind() FailureKind {
+	if e == nil || e.kind == "" {
+		return FailureKindUnknown
+	}
+	return e.kind
+}
+
+func (e *ResolveError) FailureReason() string {
+	if e == nil {
+		return ""
+	}
+	if e.failureReason != "" {
+		return e.failureReason
+	}
+	return failureReason("评估输入加载失败", e.cause)
+}
+
+func failureReason(prefix string, cause error) string {
+	if prefix == "" {
+		prefix = "评估输入加载失败"
+	}
+	if cause == nil {
+		return prefix
+	}
+	return fmt.Sprintf("%s: %s", prefix, cause.Error())
 }

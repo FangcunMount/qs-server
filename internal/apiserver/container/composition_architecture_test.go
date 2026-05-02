@@ -179,8 +179,30 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 					if name.Name == "Handler" || strings.HasSuffix(name.Name, "Repo") {
 						t.Fatalf("EvaluationModule exposes %s; evaluation repositories and REST handlers must stay private to assembler/transport composition", name.Name)
 					}
+					for _, unused := range []string{"ReportGenerationService", "ReportExportService", "SuggestionService"} {
+						if name.Name == unused {
+							t.Fatalf("EvaluationModule exposes %s; unused report command services must not be part of module public surface", name.Name)
+						}
+					}
 				}
 			}
+		}
+	}
+}
+
+func TestEvaluationAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "evaluation.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imported := range parsed.Imports {
+		importPath := strings.Trim(imported.Path.Value, `"`)
+		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
+			t.Fatalf("evaluation assembler imports %s; actor access adaptation must stay in container/bootstrap composition", importPath)
 		}
 	}
 }

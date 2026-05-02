@@ -8,7 +8,7 @@ type WaiterNotifyHandler struct {
 	notifier CompletionNotifier
 }
 
-func NewWaiterNotifyHandlerWithNotifier(notifier CompletionNotifier) *WaiterNotifyHandler {
+func NewWaiterNotifyHandler(notifier CompletionNotifier) *WaiterNotifyHandler {
 	return &WaiterNotifyHandler{
 		BaseHandler: NewBaseHandler("WaiterNotifyHandler"),
 		notifier:    notifier,

@@ -96,3 +96,30 @@ func TestBuildReportReadModelQueryDocumentsFilterContract(t *testing.T) {
 		t.Fatalf("query = %#v, want %#v", query, want)
 	}
 }
+
+func TestBuildReportReadModelQueryExactRiskOverridesHighRiskOnly(t *testing.T) {
+	riskLevel := "medium"
+
+	query := buildReportReadModelQuery(evaluationreadmodel.ReportFilter{
+		HighRiskOnly: true,
+		RiskLevel:    &riskLevel,
+	})
+
+	if got := query["risk_level"]; got != "medium" {
+		t.Fatalf("risk filter = %#v, want exact risk level", got)
+	}
+}
+
+func TestBuildReportReadModelFindOptionsDocumentsPageAndSortContract(t *testing.T) {
+	opts := buildReportReadModelFindOptions(evaluationreadmodel.PageRequest{Page: 3, PageSize: 20})
+
+	if opts.Skip == nil || *opts.Skip != 40 {
+		t.Fatalf("skip = %v, want 40", opts.Skip)
+	}
+	if opts.Limit == nil || *opts.Limit != 20 {
+		t.Fatalf("limit = %v, want 20", opts.Limit)
+	}
+	if !reflect.DeepEqual(opts.Sort, bson.M{"created_at": -1}) {
+		t.Fatalf("sort = %#v, want created_at desc", opts.Sort)
+	}
+}

@@ -11,7 +11,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // managementService 测评管理服务实现
@@ -23,41 +22,9 @@ type managementService struct {
 	eventStager EventStager
 }
 
-// NewManagementService 创建测评管理服务
-func NewManagementService(repo assessment.Repository, _ event.EventPublisher) AssessmentManagementService {
-	return &managementService{
-		repo: repo,
-	}
-}
-
-func NewManagementServiceWithReadModel(
+func NewManagementService(
 	repo assessment.Repository,
 	reader evaluationreadmodel.AssessmentReader,
-	_ event.EventPublisher,
-) AssessmentManagementService {
-	return &managementService{
-		repo:   repo,
-		reader: reader,
-	}
-}
-
-func NewManagementServiceWithTransactionalOutbox(
-	repo assessment.Repository,
-	_ event.EventPublisher,
-	txRunner apptransaction.Runner,
-	eventStager EventStager,
-) AssessmentManagementService {
-	return &managementService{
-		repo:        repo,
-		txRunner:    txRunner,
-		eventStager: eventStager,
-	}
-}
-
-func NewManagementServiceWithTransactionalOutboxAndReadModel(
-	repo assessment.Repository,
-	reader evaluationreadmodel.AssessmentReader,
-	_ event.EventPublisher,
 	txRunner apptransaction.Runner,
 	eventStager EventStager,
 ) AssessmentManagementService {
@@ -117,7 +84,6 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 		"org_id", dto.OrgID,
 		"page", dto.Page,
 		"page_size", dto.PageSize,
-		"conditions", dto.Conditions,
 	)
 
 	orgID, err := safeconv.Uint64ToInt64(dto.OrgID)
@@ -127,21 +93,20 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 
-	conditions, err := parseAssessmentListConditions(dto)
+	listFilter, err := parseAssessmentListFilter(dto)
 	if err != nil {
 		l.Errorw("解析受试者ID失败",
-			"conditions", dto.Conditions,
 			"error", err.Error(),
 		)
 		return nil, evalerrors.AssessmentNotFound(err, "无效的受试者ID")
 	}
-	if conditions.invalidStatus {
+	if listFilter.invalidStatus {
 		l.Warnw("无效的状态值",
-			"status", conditions.rawStatus,
+			"status", listFilter.rawStatus,
 		)
 	}
 
-	results, total, err := assessmentAdminQuery{reader: s.reader}.List(ctx, dto, orgID, page, pageSize, conditions)
+	results, total, err := assessmentAdminQuery{reader: s.reader}.List(ctx, dto, orgID, page, pageSize, listFilter)
 	if err != nil {
 		return nil, err
 	}

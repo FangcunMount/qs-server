@@ -108,7 +108,7 @@ func TestManagementServiceRetryRequiresTransactionalOutbox(t *testing.T) {
 	)
 
 	repo := &managementRepoStub{assessment: a}
-	svc := NewManagementService(repo, nil)
+	svc := NewManagementService(repo, nil, nil, nil)
 
 	if _, err := svc.Retry(context.Background(), 9, id.Uint64()); err == nil {
 		t.Fatal("expected Retry to fail when transactional outbox is not configured")
@@ -187,7 +187,7 @@ func TestManagementServiceRetryStagesEventsThroughApplicationTransaction(t *test
 	repo := &managementRepoStub{assessment: a}
 	txRunner := &recordingTxRunner{}
 	stager := &recordingEventStager{}
-	svc := NewManagementServiceWithTransactionalOutbox(repo, nil, txRunner, stager)
+	svc := NewManagementService(repo, nil, txRunner, stager)
 
 	if _, err := svc.Retry(context.Background(), 9, id.Uint64()); err != nil {
 		t.Fatalf("Retry returned error: %v", err)
@@ -217,16 +217,15 @@ func TestManagementServiceListFiltersTesteeAssessmentsByOrgAndStatus(t *testing.
 		},
 		total: 3,
 	}
-	svc := NewManagementServiceWithReadModel(&managementRepoStub{}, reader, nil)
+	svc := NewManagementService(&managementRepoStub{}, reader, nil, nil)
+	testeeID := uint64(3001)
 
 	result, err := svc.List(context.Background(), ListAssessmentsDTO{
 		OrgID:    9,
 		Page:     0,
 		PageSize: 0,
-		Conditions: map[string]string{
-			"testee_id": "3001",
-			"status":    submitted.String(),
-		},
+		TesteeID: &testeeID,
+		Status:   submitted.String(),
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
@@ -259,7 +258,7 @@ func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
 		},
 		total: 1,
 	}
-	svc := NewManagementServiceWithReadModel(&managementRepoStub{}, reader, nil)
+	svc := NewManagementService(&managementRepoStub{}, reader, nil, nil)
 
 	_, err := svc.List(context.Background(), ListAssessmentsDTO{
 		OrgID:                 9,
@@ -267,9 +266,7 @@ func TestManagementServiceListUsesAccessScopeStatusFilter(t *testing.T) {
 		PageSize:              20,
 		AccessibleTesteeIDs:   []uint64{3001, 3002},
 		RestrictToAccessScope: true,
-		Conditions: map[string]string{
-			"status": submitted.String(),
-		},
+		Status:                submitted.String(),
 	})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)

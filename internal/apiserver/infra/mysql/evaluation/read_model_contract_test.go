@@ -101,6 +101,28 @@ func TestScorePOsToReadRowUsesTotalScoreFactorForSummaryAndOrdersRowsAsProvided(
 	}
 }
 
+func TestScorePOsToReadRowUsesSingleNonTotalFactorForTrendRows(t *testing.T) {
+	scaleID := uint64(3001)
+	row := scorePOsToReadRow([]*AssessmentScorePO{
+		{
+			AssessmentID:     102,
+			MedicalScaleID:   scaleID,
+			MedicalScaleCode: "SDS",
+			FactorCode:       "sleep",
+			FactorName:       "睡眠",
+			RawScore:         12,
+			RiskLevel:        "medium",
+		},
+	})
+
+	if row.AssessmentID != 102 || row.TotalScore != 12 || row.RiskLevel != "medium" {
+		t.Fatalf("unexpected trend row summary: %#v", row)
+	}
+	if len(row.FactorScores) != 1 || row.FactorScores[0].FactorCode != "sleep" || row.FactorScores[0].IsTotalScore {
+		t.Fatalf("unexpected trend factor rows: %#v", row.FactorScores)
+	}
+}
+
 func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) {
 	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_dry_run?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
@@ -153,6 +175,44 @@ func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) 
 	}
 	if !containsVar(stmt.Vars, "high") {
 		t.Fatalf("query vars = %#v, want lower-case risk level", stmt.Vars)
+	}
+}
+
+func TestBuildFactorTrendQueryDocumentsFilterOrderAndLimit(t *testing.T) {
+	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_dry_run?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		t.Fatalf("open dry-run sql db: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	db, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{
+		Conn:                      conn,
+		SkipInitializeWithVersion: true,
+	}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatalf("open dry-run gorm db: %v", err)
+	}
+
+	var rows []AssessmentScorePO
+	stmt := buildFactorTrendQuery(
+		db.Session(&gorm.Session{DryRun: true}).Model(&AssessmentScorePO{}),
+		evaluationreadmodel.FactorTrendFilter{TesteeID: 2001, FactorCode: "sleep", Limit: 5},
+	).Find(&rows).Statement
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"testee_id = ?",
+		"factor_code = ?",
+		"deleted_at IS NULL",
+		"ORDER BY id DESC",
+		"LIMIT ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{uint64(2001), "sleep", 5} {
+		if !containsVar(stmt.Vars, want) {
+			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
 	}
 }
 

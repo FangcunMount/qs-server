@@ -13,7 +13,7 @@ type reportQueryService struct {
 	reader evaluationreadmodel.ReportReader
 }
 
-func NewReportQueryServiceWithReadModel(reader evaluationreadmodel.ReportReader) ReportQueryService {
+func NewReportQueryService(reader evaluationreadmodel.ReportReader) ReportQueryService {
 	return &reportQueryService{
 		reader: reader,
 	}
@@ -74,9 +74,4 @@ func (s *reportQueryService) listReportRows(
 		return nil, 0, evalerrors.InvalidArgument("受试者ID不能为空")
 	}
 	return s.reader.ListReports(ctx, filter, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
-}
-
-// ExportPDF 导出PDF报告
-func (s *reportQueryService) ExportPDF(_ context.Context, _ uint64) ([]byte, error) {
-	return nil, evalerrors.UnsupportedOperation("PDF导出当前不支持")
 }

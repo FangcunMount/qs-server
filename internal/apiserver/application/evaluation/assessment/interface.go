@@ -122,10 +122,6 @@ type ReportQueryService interface {
 	// GetByTesteeID 获取受试者的报告列表
 	// 场景：用户查看自己的所有报告
 	ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error)
-
-	// ExportPDF 导出PDF报告
-	// 场景：用户下载PDF格式的测评报告
-	ExportPDF(ctx context.Context, assessmentID uint64) ([]byte, error)
 }
 
 // ==================== 得分查询服务 ====================

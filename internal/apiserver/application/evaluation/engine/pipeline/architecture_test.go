@@ -32,6 +32,23 @@ func TestPipelineHandlersDoNotOwnPersistenceOrNotificationDetails(t *testing.T) 
 	})
 }
 
+func TestPipelineHandlersDoNotHoldRepositories(t *testing.T) {
+	t.Parallel()
+
+	for _, path := range []string{
+		"factor_score.go",
+		"risk_level.go",
+		"interpretation.go",
+		"waiter_notify.go",
+	} {
+		assertFileDoesNotContain(t, path, []string{
+			"Repository",
+			"SaveScoresWithContext",
+			"SaveReportDurably",
+		})
+	}
+}
+
 func TestInterpretationHandlerFileDoesNotOwnGeneratorDetails(t *testing.T) {
 	t.Parallel()
 

@@ -283,9 +283,9 @@ func newRouterTestContainer() *container.Container {
 		CategoryService:  scaleApp.NewCategoryService(),
 	}
 	evaluationModule := &assembler.EvaluationModule{
-		ManagementService:  assessmentApp.NewManagementService(nil, nil),
-		ReportQueryService: assessmentApp.NewReportQueryServiceWithReadModel(nil),
-		ScoreQueryService:  assessmentApp.NewScoreQueryServiceWithReadModel(nil, nil, nil),
+		ManagementService:  assessmentApp.NewManagementService(nil, nil, nil, nil),
+		ReportQueryService: assessmentApp.NewReportQueryService(nil),
+		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil),
 	}
 	return &container.Container{
 		SurveyModule: surveyModule,

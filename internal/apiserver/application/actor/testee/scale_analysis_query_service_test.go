@@ -50,7 +50,7 @@ func TestScaleAnalysisQueryGroupsAndSortsInterpretedAssessments(t *testing.T) {
 	if assessmentManagement.listCalls != 1 {
 		t.Fatalf("expected assessment list to be called once, got %d", assessmentManagement.listCalls)
 	}
-	if assessmentManagement.lastDTO.OrgID != 1 || assessmentManagement.lastDTO.Conditions["testee_id"] != "20" {
+	if assessmentManagement.lastDTO.OrgID != 1 || assessmentManagement.lastDTO.TesteeID == nil || *assessmentManagement.lastDTO.TesteeID != 20 {
 		t.Fatalf("unexpected assessment list dto: %+v", assessmentManagement.lastDTO)
 	}
 	if len(result.Scales) != 2 {

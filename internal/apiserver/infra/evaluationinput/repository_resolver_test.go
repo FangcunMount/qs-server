@@ -175,6 +175,13 @@ func TestQuestionnaireSnapshotReaderExactVersionMissCarriesFailureReason(t *test
 	if got := FailureReason(err); got == "" || got == err.Error() {
 		t.Fatalf("expected domain failure reason to wrap api error, got %q", got)
 	}
+	var kindCarrier port.FailureKindCarrier
+	if !stderrors.As(err, &kindCarrier) {
+		t.Fatalf("expected failure kind carrier, got %T", err)
+	}
+	if got := kindCarrier.FailureKind(); got != port.FailureKindQuestionnaireVersionMismatch {
+		t.Fatalf("failure kind = %s, want %s", got, port.FailureKindQuestionnaireVersionMismatch)
+	}
 }
 
 type scaleCatalogStub struct {

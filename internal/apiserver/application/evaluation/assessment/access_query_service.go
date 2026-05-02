@@ -2,7 +2,6 @@ package assessment
 
 import (
 	"context"
-	"strconv"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 )
@@ -75,17 +74,6 @@ func (s *assessmentAccessQueryService) ScopeListAssessments(
 		}
 		return dto, nil
 	}
-	if dto.Conditions != nil && dto.Conditions["testee_id"] != "" {
-		testeeID, err := parseUintCondition(dto.Conditions["testee_id"])
-		if err != nil {
-			return dto, evalerrors.InvalidArgument("无效的受试者ID")
-		}
-		dto.TesteeID = &testeeID
-		if err := s.checker.ValidateTesteeAccess(ctx, orgID, operatorUserID, testeeID); err != nil {
-			return dto, err
-		}
-		return dto, nil
-	}
 	scope, err := s.checker.ResolveAccessScope(ctx, orgID, operatorUserID)
 	if err != nil {
 		return dto, err
@@ -146,8 +134,4 @@ func (s *assessmentAccessQueryService) ScopeListReports(
 	dto.AccessibleTesteeIDs = allowedTesteeIDs
 	dto.RestrictToAccessScope = true
 	return dto, nil
-}
-
-func parseUintCondition(raw string) (uint64, error) {
-	return strconv.ParseUint(raw, 10, 64)
 }

@@ -10,12 +10,11 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
-	reportApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/report"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -84,17 +83,6 @@ type EvaluationModule struct {
 	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
 	EvaluationService engine.Service
 
-	// ==================== Report 应用服务 ====================
-
-	// 报告生成服务 - 服务于评估引擎
-	ReportGenerationService reportApp.ReportGenerationService
-
-	// 报告导出服务 - 服务于用户
-	ReportExportService reportApp.ReportExportService
-
-	// 建议服务 - 服务于评估引擎
-	SuggestionService reportApp.SuggestionService
-
 	// 事件发布器（由容器统一注入）
 	eventPublisher        event.EventPublisher
 	assessmentOutboxStore *mysqlEventOutbox.Store
@@ -119,7 +107,7 @@ type EvaluationModuleDeps struct {
 	TopicResolver        eventcatalog.TopicResolver
 	MySQLLimiter         backpressure.Acquirer
 	MongoLimiter         backpressure.Acquirer
-	TesteeAccessService  actorAccessApp.TesteeAccessService
+	TesteeAccessChecker  assessmentApp.TesteeAccessChecker
 }
 
 // NewEvaluationModule 创建评估模块。
@@ -132,107 +120,94 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	module.mysqlDB = normalized.MySQLDB
 	module.eventPublisher = normalized.EventPublisher
 
-	// ==================== 初始化 Repository 层 ====================
-	// 初始化基础 Repository
+	txRunner, waiterRegistry, err := module.wireEvaluationPersistence(normalized)
+	if err != nil {
+		return nil, err
+	}
+
+	module.wireEvaluationEngine(normalized, txRunner, waiterRegistry)
+	module.wireAssessmentApplications(normalized, txRunner, waiterRegistry)
+
+	return module, nil
+}
+
+func (m *EvaluationModule) wireEvaluationPersistence(normalized EvaluationModuleDeps) (apptransaction.Runner, *waiter.WaiterRegistry, error) {
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: normalized.MySQLLimiter}
 	mongoOptions := mongoBase.BaseRepositoryOptions{Limiter: normalized.MongoLimiter}
 	baseAssessmentRepo := mysqlEval.NewAssessmentRepositoryWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlOptions)
-	// 如果提供了 Redis 客户端，使用缓存装饰器
 	if normalized.RedisClient != nil {
-		module.assessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
+		m.assessmentRepo = assessmentCache.NewCachedAssessmentRepositoryWithBuilderPolicyAndObserver(baseAssessmentRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.AssessmentPolicy, normalized.Observer)
 	} else {
-		module.assessmentRepo = baseAssessmentRepo
+		m.assessmentRepo = baseAssessmentRepo
 	}
 
-	module.assessmentReader = mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
-	module.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
-	module.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
+	m.assessmentReader = mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
+	m.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
+	m.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
 	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(normalized.MongoDB, normalized.TopicResolver, mongoOptions)
 	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
+		return nil, nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report repository: %v", err)
 	}
-	module.reportRepo = reportRepo
-	module.reportReader = mongoEval.NewReportReadModel(normalized.MongoDB, mongoOptions)
+	m.reportRepo = reportRepo
+	m.reportReader = mongoEval.NewReportReadModel(normalized.MongoDB, mongoOptions)
 	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
 	mongoTxRunner := newMongoTransactionRunner(normalized.MongoDB)
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
 	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(normalized.MongoDB, normalized.TopicResolver)
 	if err != nil {
-		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
+		return nil, nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
 	}
-	module.reportDurableSaver = pipeline.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
-	module.assessmentOutboxStore = assessmentOutboxStore
-	module.AssessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, module.eventPublisher)
-	module.AssessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
+	m.reportDurableSaver = pipeline.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
+	m.assessmentOutboxStore = assessmentOutboxStore
+	m.AssessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, m.eventPublisher)
+	m.AssessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
 		Reader: assessmentOutboxStore,
 	}
 
-	// ==================== 初始化领域服务 ====================
-
-	// 创建 AssessmentCreator（领域服务）
-	assessmentCreator := assessment.NewDefaultAssessmentCreator()
-
-	// 创建 SuggestionGenerator（领域服务）
-	// 注意：因子解读配置中的建议已通过 FactorInterpretationSuggestionStrategy 收集
-	// 如果需要额外的建议生成策略，可以在这里注册
-	// 当前不注册任何策略，完全依赖因子解读配置中的建议
-	var suggestionGenerator report.SuggestionGenerator
-
-	// 当前导出能力保留入口，但显式收口为 unsupported，避免主路径继续装配空实现。
-	reportExporter := reportApp.NewUnsupportedReportExporter()
-
-	// ====================  初始化评估引擎 ====================
-	// 创建等待队列注册表（用于长轮询，在创建 EvaluationService 和 Handler 时使用）
 	var waiterRegistry *waiter.WaiterRegistry
 	if normalized.InputResolver != nil {
 		waiterRegistry = waiter.NewWaiterRegistry(logger.L(context.Background()))
 	}
+	return txRunner, waiterRegistry, nil
+}
 
-	// 注意：如果有输入解析器，则初始化 EvaluationService
+func (m *EvaluationModule) wireEvaluationEngine(
+	normalized EvaluationModuleDeps,
+	txRunner apptransaction.Runner,
+	waiterRegistry *waiter.WaiterRegistry,
+) {
+	var suggestionGenerator report.SuggestionGenerator
+
 	if normalized.InputResolver != nil {
-		// 创建 ReportBuilder，注入 SuggestionGenerator
 		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
 
 		pipelineRunner := newEvaluationPipelineRunner(evaluationPipelineDeps{
-			AssessmentRepo:  module.assessmentRepo,
-			ScoreRepo:       module.scoreRepo,
+			AssessmentRepo:  m.assessmentRepo,
+			ScoreRepo:       m.scoreRepo,
 			ReportBuilder:   reportBuilder,
-			ReportSaver:     module.reportDurableSaver,
+			ReportSaver:     m.reportDurableSaver,
 			WaiterRegistry:  waiterRegistry,
 			FactorScorer:    ruleengineInfra.NewScaleFactorScorer(),
 			Interpreter:     interpretengineInfra.NewInterpreter(),
 			DefaultProvider: interpretengineInfra.NewDefaultProvider(),
 		})
 
-		module.EvaluationService = engine.NewService(
-			module.assessmentRepo,
+		m.EvaluationService = engine.NewService(
+			m.assessmentRepo,
 			normalized.InputResolver,
 			pipelineRunner,
-			engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore),
+			engine.WithTransactionalOutbox(txRunner, m.assessmentOutboxStore),
 		)
 	}
+}
 
-	// ==================== 初始化 Report 应用服务 ====================
-
-	// 建议服务
-	module.SuggestionService = reportApp.NewSuggestionService(
-		module.reportRepo,
-		suggestionGenerator,
-	)
-
-	// 报告生成服务
-	module.ReportGenerationService = reportApp.NewReportGenerationService(module.reportRepo)
-
-	// 报告导出服务
-	module.ReportExportService = reportApp.NewReportExportService(
-		module.reportRepo,
-		reportExporter,
-	)
-
-	// ==================== 初始化 Assessment 应用服务 ====================
-
-	// 提交服务 - 服务于答题者 (Testee)
+func (m *EvaluationModule) wireAssessmentApplications(
+	normalized EvaluationModuleDeps,
+	txRunner apptransaction.Runner,
+	waiterRegistry *waiter.WaiterRegistry,
+) {
+	assessmentCreator := assessment.NewDefaultAssessmentCreator()
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
 		listCache := cachequery.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
 			cacheentry.NewRedisCache(normalized.QueryRedisClient),
@@ -241,45 +216,38 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 			normalized.AssessmentListPolicy,
 			normalized.Observer,
 		)
-		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutboxAndReadModel(
-			module.assessmentRepo,
-			module.assessmentReader,
+		m.SubmissionService = assessmentApp.NewSubmissionService(
+			m.assessmentRepo,
+			m.assessmentReader,
 			assessmentCreator,
 			txRunner,
-			assessmentOutboxStore,
+			m.assessmentOutboxStore,
 			listCache,
 		)
 	} else {
-		module.SubmissionService = assessmentApp.NewSubmissionServiceWithTransactionalOutboxAndReadModel(
-			module.assessmentRepo,
-			module.assessmentReader,
+		m.SubmissionService = assessmentApp.NewSubmissionService(
+			m.assessmentRepo,
+			m.assessmentReader,
 			assessmentCreator,
 			txRunner,
-			assessmentOutboxStore,
+			m.assessmentOutboxStore,
 			nil,
 		)
 	}
 
-	// 管理服务 - 服务于管理员 (Staff/Admin)
-	module.ManagementService = assessmentApp.NewManagementServiceWithTransactionalOutboxAndReadModel(module.assessmentRepo, module.assessmentReader, module.eventPublisher, txRunner, assessmentOutboxStore)
-
-	// 报告查询服务 - 服务于报告查询者
-	module.ReportQueryService = assessmentApp.NewReportQueryServiceWithReadModel(module.reportReader)
-
-	// 得分查询服务 - 服务于数据分析
-	module.ScoreQueryService = assessmentApp.NewScoreQueryServiceWithReadModel(
-		module.scoreReader,
-		module.assessmentReader,
+	m.ManagementService = assessmentApp.NewManagementService(m.assessmentRepo, m.assessmentReader, txRunner, m.assessmentOutboxStore)
+	m.ReportQueryService = assessmentApp.NewReportQueryService(m.reportReader)
+	m.ScoreQueryService = assessmentApp.NewScoreQueryService(
+		m.scoreReader,
+		m.assessmentReader,
 		normalized.ScaleCatalog,
 	)
 
-	module.WaitService = assessmentApp.NewWaitService(module.ManagementService, waiterRegistry)
-	module.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
-		module.ManagementService,
-		newEvaluationTesteeAccessChecker(normalized.TesteeAccessService),
+	m.WaitService = assessmentApp.NewWaitService(m.ManagementService, waiterRegistry)
+	m.AccessQueryService = assessmentApp.NewAssessmentAccessQueryService(
+		m.ManagementService,
+		normalized.TesteeAccessChecker,
 	)
-
-	return module, nil
 }
 
 type evaluationPipelineDeps struct {
@@ -309,7 +277,9 @@ func newEvaluationPipelineRunner(deps evaluationPipelineDeps) *pipeline.Chain {
 		),
 	))
 	if deps.WaiterRegistry != nil {
-		chain.AddHandler(pipeline.NewWaiterNotifyHandler(deps.WaiterRegistry))
+		chain.AddHandler(pipeline.NewWaiterNotifyHandler(
+			pipeline.NewWaiterCompletionNotifier(deps.WaiterRegistry),
+		))
 	}
 	return chain
 }

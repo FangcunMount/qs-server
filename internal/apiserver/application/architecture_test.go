@@ -170,9 +170,14 @@ func TestEvaluationDoesNotUseDeprecatedRepositoryFallbacks(t *testing.T) {
 				"SaveWithAdditionalEvents",
 				"SaveWithTesteeAndEvents",
 				"SaveScores(",
+				"NewSubmissionServiceWith",
+				"NewManagementServiceWith",
+				"NewScoreQueryServiceWithReadModel",
+				"NewReportQueryServiceWithReadModel",
+				"NewWaiterNotifyHandlerWithNotifier",
 			} {
 				if strings.Contains(text, token) {
-					t.Fatalf("%s contains %q; evaluation must use application transaction/outbox ports instead of repository fallback methods", filepath.ToSlash(mustRel(t, root, path)), token)
+					t.Fatalf("%s contains %q; evaluation must not reintroduce deprecated repository fallback methods or transition constructors", filepath.ToSlash(mustRel(t, root, path)), token)
 				}
 			}
 			return nil
@@ -200,6 +205,38 @@ func TestEvaluationApplicationUsesCentralErrorMapper(t *testing.T) {
 		for forbidden, replacement := range forbiddenImports {
 			if importPath == forbidden {
 				t.Fatalf("%s imports %s; evaluation application error code mapping should be centralized in %s", rel, importPath, replacement)
+			}
+		}
+	})
+}
+
+func TestEvaluationApplicationDoesNotDependOnActorAccessApplication(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		if importPath == forbidden {
+			t.Fatalf("%s imports %s; evaluation application must use evaluation-owned access ports", filepath.ToSlash(mustRel(t, root, path)), importPath)
+		}
+	})
+}
+
+func TestEvaluationInputInfraReturnsPortErrors(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/component-base/pkg/errors":   "port/evaluationinput ResolveError plus application error mapper",
+		"github.com/FangcunMount/qs-server/internal/pkg/code": "port/evaluationinput FailureKind plus application error mapper",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
+		for forbidden, replacement := range forbiddenImports {
+			if importPath == forbidden {
+				t.Fatalf("%s imports %s; evaluation input infra must return %s", filepath.ToSlash(mustRel(t, root, path)), importPath, replacement)
 			}
 		}
 	})
@@ -246,6 +283,7 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                   "transport adapters",
 		"github.com/FangcunMount/component-base/pkg/logger":                                 "application/infra observability",
 		"github.com/FangcunMount/component-base/pkg/errors":                                 "domain-native errors",
+		"github.com/FangcunMount/component-base/pkg/code":                                   "domain-native errors",
 		"github.com/FangcunMount/qs-server/internal/pkg/code":                               "application API error mapping",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":                 "evaluation-local snapshots/value objects",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "evaluationinput snapshots",

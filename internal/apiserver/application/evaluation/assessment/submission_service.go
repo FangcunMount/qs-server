@@ -10,7 +10,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type assessmentListCache interface {
@@ -30,62 +29,7 @@ type submissionService struct {
 	listCache   assessmentListCache
 }
 
-// NewSubmissionService 创建测评提交服务
 func NewSubmissionService(
-	repo assessment.Repository,
-	creator assessment.AssessmentCreator,
-	_ event.EventPublisher,
-) AssessmentSubmissionService {
-	return &submissionService{
-		repo:    repo,
-		creator: creator,
-	}
-}
-
-func NewSubmissionServiceWithReadModel(
-	repo assessment.Repository,
-	reader evaluationreadmodel.AssessmentReader,
-	creator assessment.AssessmentCreator,
-	_ event.EventPublisher,
-) AssessmentSubmissionService {
-	return &submissionService{
-		repo:    repo,
-		reader:  reader,
-		creator: creator,
-	}
-}
-
-// NewSubmissionServiceWithListCache 创建带“我的测评列表”缓存的测评提交服务
-func NewSubmissionServiceWithListCache(
-	repo assessment.Repository,
-	creator assessment.AssessmentCreator,
-	_ event.EventPublisher,
-	listCache assessmentListCache,
-) AssessmentSubmissionService {
-	return &submissionService{
-		repo:      repo,
-		creator:   creator,
-		listCache: listCache,
-	}
-}
-
-func NewSubmissionServiceWithTransactionalOutbox(
-	repo assessment.Repository,
-	creator assessment.AssessmentCreator,
-	txRunner apptransaction.Runner,
-	eventStager EventStager,
-	listCache assessmentListCache,
-) AssessmentSubmissionService {
-	return &submissionService{
-		repo:        repo,
-		creator:     creator,
-		txRunner:    txRunner,
-		eventStager: eventStager,
-		listCache:   listCache,
-	}
-}
-
-func NewSubmissionServiceWithTransactionalOutboxAndReadModel(
 	repo assessment.Repository,
 	reader evaluationreadmodel.AssessmentReader,
 	creator assessment.AssessmentCreator,

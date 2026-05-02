@@ -16,7 +16,7 @@ type scoreQueryService struct {
 	scaleCatalog     evaluationinput.ScaleCatalog
 }
 
-func NewScoreQueryServiceWithReadModel(
+func NewScoreQueryService(
 	scoreReader evaluationreadmodel.ScoreReader,
 	assessmentReader evaluationreadmodel.AssessmentReader,
 	scaleCatalog evaluationinput.ScaleCatalog,

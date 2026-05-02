@@ -282,7 +282,7 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.CodesService = &codesServiceStub{}
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
-	evaluationManagement := assessmentApp.NewManagementService(nil, nil)
+	evaluationManagement := assessmentApp.NewManagementService(nil, nil, nil, nil)
 	planHandler := handlerpkg.NewPlanHandler(nil, nil)
 	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)

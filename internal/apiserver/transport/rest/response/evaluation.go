@@ -143,13 +143,6 @@ type ReportListResponse struct {
 	TotalPages int               `json:"total_pages"` // 总页数
 }
 
-// ReportExportResponse 报告导出响应
-type ReportExportResponse struct {
-	FileName    string `json:"file_name"`    // 文件名
-	ContentType string `json:"content_type"` // 内容类型
-	DownloadURL string `json:"download_url"` // 下载地址
-}
-
 // ============= 转换函数 =============
 
 // NewAssessmentResponse 从应用层 Result 创建响应

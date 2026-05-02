@@ -5,13 +5,11 @@ import (
 	stderrors "errors"
 	"fmt"
 
-	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -94,7 +92,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, newResolveError(err, errorCode.ErrMedicalScaleNotFound, "量表不存在", "加载量表失败")
+		return nil, port.NewResolveError(port.FailureKindScaleNotFound, err, "量表不存在", "加载量表失败")
 	}
 
 	l.Debugw("量表数据加载成功",
@@ -129,7 +127,7 @@ func (r *RepositoryAnswerSheetSnapshotReader) GetAnswerSheet(ctx context.Context
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return nil, newResolveError(err, errorCode.ErrAnswerSheetNotFound, "答卷不存在", "加载答卷失败")
+		return nil, port.NewResolveError(port.FailureKindAnswerSheetNotFound, err, "答卷不存在", "加载答卷失败")
 	}
 
 	snapshot := answerSheetToSnapshot(answerSheet)
@@ -165,16 +163,16 @@ func (r *RepositoryQuestionnaireSnapshotReader) GetQuestionnaire(ctx context.Con
 			"questionnaire_version", version,
 			"error", err.Error(),
 		)
-		return nil, newResolveError(err, errorCode.ErrQuestionnaireNotFound, "加载问卷失败", "加载问卷失败")
+		return nil, port.NewResolveError(port.FailureKindQuestionnaireNotFound, err, "加载问卷失败", "加载问卷失败")
 	}
 	if qnr == nil {
-		err = errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在或版本不匹配")
+		err = fmt.Errorf("问卷不存在或版本不匹配")
 		l.Errorw("加载问卷失败，未命中答卷要求的精确版本",
 			"questionnaire_code", code,
 			"questionnaire_version", version,
 			"error", err.Error(),
 		)
-		return nil, &resolveError{apiErr: err, failureReason: "加载问卷失败: " + err.Error()}
+		return nil, port.NewResolveError(port.FailureKindQuestionnaireVersionMismatch, err, "问卷不存在或版本不匹配", "加载问卷失败")
 	}
 
 	l.Debugw("问卷数据加载成功",
@@ -186,34 +184,10 @@ func (r *RepositoryQuestionnaireSnapshotReader) GetQuestionnaire(ctx context.Con
 	return questionnaireToSnapshot(qnr), nil
 }
 
-type resolveError struct {
-	apiErr        error
-	failureReason string
-}
-
-func (e *resolveError) Error() string {
-	return e.apiErr.Error()
-}
-
-func (e *resolveError) Unwrap() error {
-	return e.apiErr
-}
-
-func (e *resolveError) FailureReason() string {
-	return e.failureReason
-}
-
-func newResolveError(err error, code int, message, failurePrefix string) error {
-	return &resolveError{
-		apiErr:        errors.WrapC(err, code, "%s", message),
-		failureReason: fmt.Sprintf("%s: %s", failurePrefix, err.Error()),
-	}
-}
-
 func FailureReason(err error) string {
-	var resolveErr *resolveError
-	if stderrors.As(err, &resolveErr) {
-		return resolveErr.FailureReason()
+	var carrier port.FailureReasonCarrier
+	if stderrors.As(err, &carrier) {
+		return carrier.FailureReason()
 	}
 	return "评估输入加载失败: " + err.Error()
 }

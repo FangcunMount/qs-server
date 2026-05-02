@@ -24,13 +24,12 @@ type Service interface {
 	// Evaluate 执行评估
 	// 场景：qs-worker 消费 AssessmentSubmittedEvent 后调用
 	// 流程：
-	//   1. 加载 Assessment、MedicalScale、Questionnaire、AnswerSheet
-	//   2. 调用 calculation 功能域计算各因子得分
-	//   3. 调用 interpretation 功能域生成解读
-	//   4. 组装 EvaluationResult
-	//   5. 应用评估结果到 Assessment
-	//   6. 保存 AssessmentScore
-	//   7. 生成并保存 InterpretReport
+	//   1. 加载 Assessment 并解析 evaluationinput snapshot
+	//   2. ValidationHandler 校验输入快照完整性
+	//   3. FactorScoreHandler 调用 ruleengine port 计算因子分
+	//   4. RiskLevelHandler 分类风险并通过 writer 保存得分
+	//   5. InterpretationHandler 调用 interpretengine port 生成解读并保存报告
+	//   6. WaiterNotifyHandler 通知 wait-report waiter
 	Evaluate(ctx context.Context, assessmentID uint64) error
 
 	// EvaluateBatch 批量评估

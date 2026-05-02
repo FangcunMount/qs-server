@@ -169,12 +169,7 @@ func (r *scoreReadModel) GetScoreByAssessmentID(ctx context.Context, assessmentI
 }
 
 func (r *scoreReadModel) ListFactorTrend(ctx context.Context, filter evaluationreadmodel.FactorTrendFilter) ([]evaluationreadmodel.ScoreRow, error) {
-	query := r.WithContext(ctx).
-		Where("testee_id = ? AND factor_code = ? AND deleted_at IS NULL", filter.TesteeID, filter.FactorCode).
-		Order("id DESC")
-	if filter.Limit > 0 {
-		query = query.Limit(filter.Limit)
-	}
+	query := buildFactorTrendQuery(r.WithContext(ctx), filter)
 
 	var pos []*AssessmentScorePO
 	if err := query.Find(&pos).Error; err != nil {
@@ -186,6 +181,16 @@ func (r *scoreReadModel) ListFactorTrend(ctx context.Context, filter evaluationr
 		rows = append(rows, scorePOsToReadRow([]*AssessmentScorePO{po}))
 	}
 	return rows, nil
+}
+
+func buildFactorTrendQuery(db *gorm.DB, filter evaluationreadmodel.FactorTrendFilter) *gorm.DB {
+	query := db.
+		Where("testee_id = ? AND factor_code = ? AND deleted_at IS NULL", filter.TesteeID, filter.FactorCode).
+		Order("id DESC")
+	if filter.Limit > 0 {
+		query = query.Limit(filter.Limit)
+	}
+	return query
 }
 
 func scorePOsToReadRow(pos []*AssessmentScorePO) evaluationreadmodel.ScoreRow {

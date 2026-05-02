@@ -84,9 +84,9 @@ func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 	}
 	text := string(data)
 	required := []string{
-		"engine.WithTransactionalOutbox(txRunner, assessmentOutboxStore)",
-		"assessmentApp.NewSubmissionServiceWithTransactionalOutbox(",
-		"assessmentApp.NewManagementServiceWithTransactionalOutbox(",
+		"engine.WithTransactionalOutbox(txRunner, m.assessmentOutboxStore)",
+		"assessmentApp.NewSubmissionService(",
+		"assessmentApp.NewManagementService(",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {
@@ -105,7 +105,7 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	text := string(data)
 	required := []string{
 		"asApp.NewTransactionalSubmissionDurableStore(",
-		"asApp.NewSubmissionService(sub.Repo, durableStore, quesRepo, batchValidator)",
+		"asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)",
 		"appEventing.NewDurableOutboxRelayWithHooks(",
 		"scaleApp.NewScaleHotRankProjectionHook(hotRankProjection)",
 	}
@@ -119,21 +119,14 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	}
 }
 
-func TestMongoReportEventfulSaveCompatibilityEntrypointsStayContained(t *testing.T) {
+func TestMongoReportEventfulSaveCompatibilityEntrypointsAreRemoved(t *testing.T) {
 	root := repoRoot(t)
-	allowed := map[string]struct{}{
-		"internal/apiserver/application/evaluation/engine/pipeline/report_durable_saver.go": {},
-		"internal/apiserver/domain/evaluation/report/repository.go":                         {},
-		"internal/apiserver/infra/mongo/evaluation/repo.go":                                 {},
-	}
 	walkGoFiles(t, filepath.Join(root, "internal/apiserver"), func(path string, text string) {
 		if strings.HasSuffix(path, "_test.go") || !strings.Contains(text, "SaveWithTesteeAndEvents(") {
 			return
 		}
 		rel := filepath.ToSlash(mustRel(t, root, path))
-		if _, ok := allowed[rel]; !ok {
-			t.Fatalf("%s must use ReportDurableSaver instead of calling SaveWithTesteeAndEvents directly", rel)
-		}
+		t.Fatalf("%s still contains SaveWithTesteeAndEvents; report persistence must use ReportDurableSaver", rel)
 	})
 }
 
@@ -147,7 +140,7 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 	text := string(data)
 	required := []string{
 		"pipeline.NewTransactionalReportDurableSaver(",
-		"engine.WithReportDurableSaver(module.reportDurableSaver)",
+		"ReportSaver:     m.reportDurableSaver",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {

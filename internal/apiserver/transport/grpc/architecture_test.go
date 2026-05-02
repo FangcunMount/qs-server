@@ -62,6 +62,12 @@ func TestGRPCTransportDoesNotHoldScaleDomainRepository(t *testing.T) {
 func TestEvaluationGRPCTransportDoesNotHoldEvaluationDomainRepository(t *testing.T) {
 	t.Parallel()
 
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "evaluation application service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report":     "evaluation application service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter":                 "evaluation application wait service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access":     "evaluation application access query service",
+	}
 	for _, path := range []string{
 		"registry.go",
 		filepath.Join("service", "evaluation.go"),
@@ -72,8 +78,8 @@ func TestEvaluationGRPCTransportDoesNotHoldEvaluationDomainRepository(t *testing
 		}
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
-			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
-				t.Fatalf("%s imports %s; gRPC transport must validate evaluation access through application service", path, importPath)
+			if replacement, ok := forbiddenImports[importPath]; ok {
+				t.Fatalf("%s imports %s; gRPC evaluation transport must use %s", path, importPath, replacement)
 			}
 		}
 	}

@@ -6,13 +6,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-type assessmentListConditions struct {
-	testeeID      *testee.ID
+type assessmentListFilter struct {
+	testeeID      *uint64
 	rawTesteeID   string
 	status        *assessment.Status
 	rawStatus     string
@@ -23,54 +22,24 @@ type assessmentAdminQuery struct {
 	reader evaluationreadmodel.AssessmentReader
 }
 
-func parseAssessmentListConditions(dto ListAssessmentsDTO) (*assessmentListConditions, error) {
-	conditions := &assessmentListConditions{}
+func parseAssessmentListFilter(dto ListAssessmentsDTO) (*assessmentListFilter, error) {
+	filter := &assessmentListFilter{}
 	if dto.TesteeID != nil {
-		testeeID := testee.NewID(*dto.TesteeID)
-		conditions.rawTesteeID = strconv.FormatUint(*dto.TesteeID, 10)
-		conditions.testeeID = &testeeID
+		testeeID := *dto.TesteeID
+		filter.rawTesteeID = strconv.FormatUint(testeeID, 10)
+		filter.testeeID = &testeeID
 	}
 	if dto.Status != "" {
 		status := assessment.Status(dto.Status)
-		conditions.rawStatus = dto.Status
+		filter.rawStatus = dto.Status
 		if status.IsValid() {
-			conditions.status = &status
+			filter.status = &status
 		} else {
-			conditions.invalidStatus = true
+			filter.invalidStatus = true
 		}
 	}
 
-	if dto.Conditions == nil {
-		return conditions, nil
-	}
-
-	if conditions.testeeID == nil {
-		testeeIDStr := dto.Conditions["testee_id"]
-		if testeeIDStr != "" {
-			testeeIDUint, err := strconv.ParseUint(testeeIDStr, 10, 64)
-			if err != nil {
-				return nil, err
-			}
-			testeeID := testee.NewID(testeeIDUint)
-			conditions.rawTesteeID = testeeIDStr
-			conditions.testeeID = &testeeID
-		}
-	}
-
-	if conditions.rawStatus == "" {
-		statusStr := dto.Conditions["status"]
-		if statusStr != "" {
-			status := assessment.Status(statusStr)
-			conditions.rawStatus = statusStr
-			if status.IsValid() {
-				conditions.status = &status
-			} else {
-				conditions.invalidStatus = true
-			}
-		}
-	}
-
-	return conditions, nil
+	return filter, nil
 }
 
 func (q assessmentAdminQuery) List(
@@ -79,12 +48,12 @@ func (q assessmentAdminQuery) List(
 	orgID int64,
 	page int,
 	pageSize int,
-	conditions *assessmentListConditions,
+	filter *assessmentListFilter,
 ) ([]*AssessmentResult, int64, error) {
 	if q.reader == nil {
 		return nil, 0, evalerrors.ModuleNotConfigured("assessment read model is not configured")
 	}
-	rows, total, err := q.queryRows(ctx, dto, orgID, page, pageSize, conditions)
+	rows, total, err := q.queryRows(ctx, dto, orgID, page, pageSize, filter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -98,10 +67,10 @@ func (q assessmentAdminQuery) queryRows(
 	orgID int64,
 	page int,
 	pageSize int,
-	conditions *assessmentListConditions,
+	listFilter *assessmentListFilter,
 ) ([]evaluationreadmodel.AssessmentRow, int64, error) {
 	l := logger.L(ctx)
-	if conditions.invalidStatus {
+	if listFilter.invalidStatus {
 		return []evaluationreadmodel.AssessmentRow{}, 0, nil
 	}
 
@@ -110,14 +79,13 @@ func (q assessmentAdminQuery) queryRows(
 		RestrictToAccessScope: dto.RestrictToAccessScope,
 		AccessibleTesteeIDs:   dto.AccessibleTesteeIDs,
 	}
-	if conditions.testeeID != nil {
-		id := conditions.testeeID.Uint64()
-		filter.TesteeID = &id
+	if listFilter.testeeID != nil {
+		filter.TesteeID = listFilter.testeeID
 	}
-	if conditions.status != nil {
-		filter.Statuses = []string{conditions.status.String()}
+	if listFilter.status != nil {
+		filter.Statuses = []string{listFilter.status.String()}
 	}
-	if dto.OrgID == 0 && conditions.testeeID == nil {
+	if dto.OrgID == 0 && listFilter.testeeID == nil {
 		l.Warnw("未提供 testee_id 和 org_id，无法查询",
 			"org_id", dto.OrgID,
 		)
@@ -132,7 +100,7 @@ func (q assessmentAdminQuery) queryRows(
 	if err != nil {
 		l.Errorw("通过 read model 查询测评列表失败",
 			"org_id", dto.OrgID,
-			"testee_id", conditions.rawTesteeID,
+			"testee_id", listFilter.rawTesteeID,
 			"error", err.Error(),
 		)
 		return nil, 0, evalerrors.Database(err, "查询测评列表失败")

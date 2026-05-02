@@ -85,6 +85,12 @@ func TestEvaluationRESTTransportDoesNotImportWaiterInfra(t *testing.T) {
 func TestEvaluationRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) {
 	t.Parallel()
 
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access":     "evaluation application access query service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter":                 "evaluation application wait service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "evaluation application service DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report":     "evaluation application service DTOs",
+	}
 	for _, path := range []string{
 		filepath.Join("handler", "evaluation.go"),
 		"routes_evaluation.go",
@@ -95,8 +101,8 @@ func TestEvaluationRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) 
 		}
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
-			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
-				t.Fatalf("%s imports %s; evaluation REST access control must go through evaluation application access query service", path, importPath)
+			if replacement, ok := forbiddenImports[importPath]; ok {
+				t.Fatalf("%s imports %s; evaluation REST transport must use %s", path, importPath, replacement)
 			}
 		}
 	}

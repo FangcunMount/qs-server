@@ -61,7 +61,7 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		TopicResolver:        c.eventCatalog,
 		MySQLLimiter:         c.backpressure.MySQL,
 		MongoLimiter:         c.backpressure.Mongo,
-		TesteeAccessService:  c.actorTesteeAccessService(),
+		TesteeAccessChecker:  newEvaluationTesteeAccessChecker(c.actorTesteeAccessService()),
 	}
 }
 
