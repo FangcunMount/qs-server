@@ -32,6 +32,7 @@ flowchart LR
 4. [03-Report与Suggestion](./03-Report与Suggestion.md)
 5. [04-Outbox与事件](./04-Outbox与事件.md)
 6. [05-失败补偿与排障](./05-失败补偿与排障.md)
+7. [06-InputSnapshot与Contract测试](./06-InputSnapshot与Contract测试.md)
 
 ## 代码与测试锚点
 

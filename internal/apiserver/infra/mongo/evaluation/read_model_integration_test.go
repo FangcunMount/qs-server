@@ -21,7 +21,7 @@ func openEvaluationMongoContractDB(t *testing.T) *mongo.Database {
 
 	uri := os.Getenv("QS_SERVER_TEST_MONGO_URI")
 	if uri == "" {
-		t.Skip("set QS_SERVER_TEST_MONGO_URI to run Mongo evaluation read model contract tests")
+		skipEvaluationMongoContract(t)
 	}
 	dbName := os.Getenv("QS_SERVER_TEST_MONGO_DB")
 	if dbName == "" {
@@ -44,6 +44,16 @@ func openEvaluationMongoContractDB(t *testing.T) *mongo.Database {
 	})
 
 	return client.Database(dbName)
+}
+
+func skipEvaluationMongoContract(t *testing.T) {
+	t.Helper()
+	message := "QS_SERVER_TEST_MONGO_URI is not set; skipping Mongo evaluation report read model contract tests. " +
+		"Coverage: testee/testeeIDs, high-risk/risk/scale filters, pagination/sort, not-found and legacy nil field mapping. " +
+		"Run: QS_SERVER_TEST_MONGO_URI='mongodb://127.0.0.1:27017' QS_SERVER_TEST_MONGO_DB='qs_server_contract_test' " +
+		"go test ./internal/apiserver/infra/mongo/evaluation -run 'Integration|AgainstMongo' -v"
+	fmt.Fprintln(os.Stderr, message)
+	t.Skip(message)
 }
 
 func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {

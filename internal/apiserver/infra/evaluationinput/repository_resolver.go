@@ -19,6 +19,10 @@ type RepositoryResolver struct {
 	questionnaireReader port.QuestionnaireReader
 }
 
+// NewRepositoryResolver builds the current compatibility adapter from Survey/Scale
+// command repositories. New snapshot sources should implement the catalog/read-model
+// ports and be wired through NewResolver instead of adding more repository/domain
+// dependencies outside repository_resolver.go and snapshot_mappers.go.
 func NewRepositoryResolver(
 	scaleRepo scale.Repository,
 	answerSheetRepo answersheet.Repository,

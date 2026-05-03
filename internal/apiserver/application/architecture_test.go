@@ -242,6 +242,57 @@ func TestEvaluationInputInfraReturnsPortErrors(t *testing.T) {
 	})
 }
 
+func TestEvaluationInputPortStaysIndependentFromSurveyScaleDomain(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/":      "evaluationinput-owned snapshot DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "evaluationinput-owned snapshot DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":       "evaluationinput-owned snapshot DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":   "evaluationinput-owned snapshot DTOs",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "port", "evaluationinput"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for forbidden, replacement := range forbiddenImports {
+			if strings.HasPrefix(importPath, forbidden) {
+				t.Fatalf("%s imports %s; evaluationinput port must stay neutral and depend on %s", filepath.ToSlash(mustRel(t, root, path)), importPath, replacement)
+			}
+		}
+	})
+}
+
+func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowedFiles := map[string]struct{}{
+		"internal/apiserver/infra/evaluationinput/repository_resolver.go": {},
+		"internal/apiserver/infra/evaluationinput/snapshot_mappers.go":    {},
+	}
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":   "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "catalog/read-model snapshot adapters",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for forbidden, replacement := range forbiddenImports {
+			if !strings.HasPrefix(importPath, forbidden) {
+				continue
+			}
+			rel := filepath.ToSlash(mustRel(t, root, path))
+			if _, ok := allowedFiles[rel]; ok {
+				return
+			}
+			t.Fatalf("%s imports %s; command repository/domain dependencies must stay isolated in compatibility adapter files until replaced by %s", rel, importPath, replacement)
+		}
+	})
+}
+
 func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
 	t.Parallel()
 

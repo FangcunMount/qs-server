@@ -19,7 +19,7 @@ func openEvaluationMySQLContractDB(t *testing.T) *gorm.DB {
 
 	dsn := os.Getenv("QS_SERVER_TEST_MYSQL_DSN")
 	if dsn == "" {
-		t.Skip("set QS_SERVER_TEST_MYSQL_DSN to run MySQL evaluation read model contract tests")
+		skipEvaluationMySQLContract(t)
 	}
 
 	db, err := gorm.Open(mysqlDriver.Open(dsn), &gorm.Config{})
@@ -30,6 +30,16 @@ func openEvaluationMySQLContractDB(t *testing.T) *gorm.DB {
 		t.Fatalf("auto migrate evaluation tables: %v", err)
 	}
 	return db
+}
+
+func skipEvaluationMySQLContract(t *testing.T) {
+	t.Helper()
+	message := "QS_SERVER_TEST_MYSQL_DSN is not set; skipping MySQL evaluation read model contract tests. " +
+		"Coverage: assessment org/testee/status/date/access-scope filters, pagination/order/count, score order and factor trend. " +
+		"Run: QS_SERVER_TEST_MYSQL_DSN='user:pass@tcp(127.0.0.1:3306)/qs_server_contract?charset=utf8mb4&parseTime=True&loc=Local' " +
+		"go test ./internal/apiserver/infra/mysql/evaluation -run 'Integration|AgainstDatabase' -v"
+	fmt.Fprintln(os.Stderr, message)
+	t.Skip(message)
 }
 
 func TestAssessmentReadModelListAssessmentsFiltersAgainstDatabase(t *testing.T) {
