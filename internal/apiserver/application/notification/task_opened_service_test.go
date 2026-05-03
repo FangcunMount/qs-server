@@ -8,6 +8,7 @@ import (
 	"time"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
@@ -22,29 +23,6 @@ type testeeLookupStub struct {
 
 func (s *testeeLookupStub) GetByID(context.Context, uint64) (*testeeApp.TesteeResult, error) {
 	return s.result, s.err
-}
-
-type taskLookupStub struct {
-	task  *domainPlan.AssessmentTask
-	tasks []*domainPlan.AssessmentTask
-	err   error
-}
-
-func (s *taskLookupStub) FindByID(context.Context, domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error) {
-	return s.task, s.err
-}
-
-func (s *taskLookupStub) FindByTesteeID(context.Context, testeeDomain.ID) ([]*domainPlan.AssessmentTask, error) {
-	return s.tasks, s.err
-}
-
-type planLookupStub struct {
-	plan *domainPlan.AssessmentPlan
-	err  error
-}
-
-func (s *planLookupStub) FindByID(context.Context, domainPlan.AssessmentPlanID) (*domainPlan.AssessmentPlan, error) {
-	return s.plan, s.err
 }
 
 type scaleLookupStub struct {
@@ -117,6 +95,36 @@ func buildTaskOpenedFixture(t *testing.T, testeeID uint64, seq int, totalTimes i
 	return planAggregate, currentTask, []*domainPlan.AssessmentTask{currentTask, peerTask}
 }
 
+type taskNotificationContextReaderStub struct {
+	result *planApp.TaskNotificationContext
+	err    error
+}
+
+func (s *taskNotificationContextReaderStub) GetTaskNotificationContext(context.Context, string) (*planApp.TaskNotificationContext, error) {
+	return s.result, s.err
+}
+
+func notificationContextFromFixture(planAggregate *domainPlan.AssessmentPlan, task *domainPlan.AssessmentTask, tasks []*domainPlan.AssessmentTask) *planApp.TaskNotificationContext {
+	count := 0
+	for _, item := range tasks {
+		if item == nil || item.GetStatus().IsTerminal() {
+			continue
+		}
+		if item.GetPlannedAt().Equal(task.GetPlannedAt()) {
+			count++
+		}
+	}
+	return &planApp.TaskNotificationContext{
+		TaskID:                     task.GetID().String(),
+		PlanID:                     task.GetPlanID().String(),
+		ScaleCode:                  task.GetScaleCode(),
+		PlannedAt:                  task.GetPlannedAt(),
+		Seq:                        task.GetSeq(),
+		TotalTimes:                 planAggregate.GetTotalTimes(),
+		UnfinishedSameDayTaskCount: count,
+	}
+}
+
 func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	profileID := uint64(1001)
 	planAggregate, task, tasks := buildTaskOpenedFixture(t, 12, 2, 4)
@@ -142,8 +150,7 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 			ProfileID: &profileID,
 			Name:      "张三",
 		}},
-		&taskLookupStub{task: task, tasks: tasks},
-		&planLookupStub{plan: planAggregate},
+		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
 		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "儿童抑郁量表"}},
 		resolver,
 		&wechatAppLookupStub{},
@@ -213,8 +220,7 @@ func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 			ProfileID: &profileID,
 			Name:      "李四",
 		}},
-		&taskLookupStub{task: task, tasks: tasks[:1]},
-		&planLookupStub{plan: planAggregate},
+		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks[:1])},
 		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "执行功能测评"}},
 		resolver,
 		&wechatAppLookupStub{},
@@ -269,8 +275,7 @@ func TestSendTaskOpenedFailsWhenTemplateKeysMismatch(t *testing.T) {
 			ProfileID: &profileID,
 			Name:      "王五",
 		}},
-		&taskLookupStub{task: task, tasks: tasks},
-		&planLookupStub{plan: planAggregate},
+		&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
 		&scaleLookupStub{result: &scaleApp.ScaleResult{Code: "scale-code", Title: "儿童抑郁量表"}},
 		&recipientResolverStub{
 			enabled: true,

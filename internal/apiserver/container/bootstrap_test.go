@@ -2,23 +2,19 @@ package container
 
 import (
 	"context"
-	"encoding/json"
-	"net/http"
-	"net/http/httptest"
 	"testing"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/pkg/event"
-	"github.com/gin-gonic/gin"
 	redis "github.com/redis/go-redis/v9"
 )
 
@@ -283,8 +279,8 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.QRCodeObjectKeyPrefix = "rest-prefix"
 
 	evaluationManagement := assessmentApp.NewManagementService(nil, nil, nil, nil)
-	planHandler := handlerpkg.NewPlanHandler(nil, nil)
-	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
+	planCommand := planApp.NewCommandService(nil, nil, nil, nil, nil, nil)
+	planQuery := planApp.NewQueryService(nil, nil, nil)
 	questionnaireQuery := appQuestionnaire.NewQueryService(nil, nil, nil, nil)
 	scaleQuery := scaleApp.NewQueryService(nil, nil, nil, nil, nil)
 	categoryService := scaleApp.NewCategoryService()
@@ -296,8 +292,8 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	c.ScaleModule = &assembler.ScaleModule{QueryService: scaleQuery, CategoryService: categoryService}
 	c.ActorModule = &assembler.ActorModule{}
 	c.EvaluationModule = &assembler.EvaluationModule{ManagementService: evaluationManagement}
-	c.PlanModule = &assembler.PlanModule{Handler: planHandler}
-	c.StatisticsModule = &assembler.StatisticsModule{Handler: statisticsHandler}
+	c.PlanModule = &assembler.PlanModule{CommandService: planCommand, QueryService: planQuery}
+	c.StatisticsModule = &assembler.StatisticsModule{}
 
 	deps := c.BuildRESTDeps(nil)
 	if deps.RateLimit != nil {
@@ -309,8 +305,8 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	if deps.Scale.QueryService != scaleQuery || deps.Scale.CategoryService != categoryService {
 		t.Fatalf("scale application services not extracted correctly: %#v", deps.Scale)
 	}
-	if deps.Evaluation.ManagementService != evaluationManagement || deps.Plan.Handler != planHandler || deps.Statistics.Handler != statisticsHandler {
-		t.Fatalf("evaluation/plan/statistics handlers not extracted correctly")
+	if deps.Evaluation.ManagementService != evaluationManagement || deps.Plan.CommandService != planCommand || deps.Plan.QueryService != planQuery || !deps.Statistics.Enabled {
+		t.Fatalf("evaluation/plan/statistics dependencies not extracted correctly")
 	}
 	if deps.CodesService != c.CodesService {
 		t.Fatalf("CodesService = %#v, want %#v", deps.CodesService, c.CodesService)
@@ -326,9 +322,8 @@ func TestContainerBuildRESTDepsExposesRouterFacingDependencies(t *testing.T) {
 	}
 }
 
-func TestContainerInitWarmupCoordinatorRebindsStatisticsHandlerGovernance(t *testing.T) {
+func TestContainerBuildRESTDepsWiresStatisticsGovernanceDependencies(t *testing.T) {
 	t.Parallel()
-	gin.SetMode(gin.TestMode)
 
 	c := NewContainer(nil, nil, nil)
 	c.cache = newTestCacheSubsystem(t, ContainerCacheOptions{
@@ -337,48 +332,21 @@ func TestContainerInitWarmupCoordinatorRebindsStatisticsHandlerGovernance(t *tes
 			StartupStatic: true,
 		},
 	}, nil)
-	statisticsHandler := handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil)
-	c.StatisticsModule = &assembler.StatisticsModule{Handler: statisticsHandler}
+	c.StatisticsModule = &assembler.StatisticsModule{}
 
 	if err := c.initWarmupCoordinator(); err != nil {
 		t.Fatalf("initWarmupCoordinator() error = %v", err)
 	}
-	newModuleGraph(c).postWireCacheGovernanceDependencies()
 
-	rec := httptest.NewRecorder()
-	ctx, _ := gin.CreateTestContext(rec)
-	ctx.Request = httptest.NewRequest(http.MethodGet, "/internal/v1/cache/governance/status", nil)
-	statisticsHandler.CacheGovernanceStatus(ctx)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	deps := c.BuildRESTDeps(nil)
+	if !deps.Statistics.Enabled {
+		t.Fatal("statistics deps disabled, want enabled")
 	}
-
-	var payload struct {
-		Code int `json:"code"`
-		Data struct {
-			Summary struct {
-				FamilyTotal int `json:"family_total"`
-			} `json:"summary"`
-			Families []struct {
-				Family string `json:"family"`
-			} `json:"families"`
-			Warmup struct {
-				Enabled bool `json:"enabled"`
-			} `json:"warmup"`
-		} `json:"data"`
+	if deps.Statistics.WarmupCoordinator == nil {
+		t.Fatal("warmup coordinator = nil, want wired dependency")
 	}
-	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
-		t.Fatalf("unmarshal response: %v", err)
-	}
-	if payload.Code != 0 {
-		t.Fatalf("code = %d, want 0", payload.Code)
-	}
-	if payload.Data.Summary.FamilyTotal == 0 || len(payload.Data.Families) == 0 {
-		t.Fatalf("cache governance status was not rebound: summary=%+v families=%+v", payload.Data.Summary, payload.Data.Families)
-	}
-	if !payload.Data.Warmup.Enabled {
-		t.Fatal("warmup.enabled = false, want true")
+	if deps.Statistics.CacheGovernanceStatusService == nil {
+		t.Fatal("cache governance status service = nil, want wired dependency")
 	}
 }
 

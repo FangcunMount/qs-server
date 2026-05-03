@@ -14,6 +14,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	authzapp "github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -21,7 +22,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
-	handlerpkg "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 	"gopkg.in/yaml.v3"
@@ -305,11 +305,10 @@ func newRouterTestContainer() *container.Container {
 		},
 		EvaluationModule: evaluationModule,
 		PlanModule: &assembler.PlanModule{
-			Handler: handlerpkg.NewPlanHandler(nil, nil),
+			CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
+			QueryService:   planApp.NewQueryService(nil, nil, nil),
 		},
-		StatisticsModule: &assembler.StatisticsModule{
-			Handler: handlerpkg.NewStatisticsHandler(nil, nil, nil, nil, nil, nil, nil),
-		},
+		StatisticsModule: &assembler.StatisticsModule{},
 	}
 }
 

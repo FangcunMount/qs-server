@@ -1,13 +1,39 @@
 package rest
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
+func (r *Router) newStatisticsHandler() *handler.StatisticsHandler {
+	if !r.deps.Statistics.Enabled {
+		return nil
+	}
+	statisticsHandler := handler.NewStatisticsHandler(
+		r.deps.Statistics.SystemStatisticsService,
+		r.deps.Statistics.QuestionnaireStatisticsService,
+		r.deps.Statistics.TesteeStatisticsService,
+		r.deps.Statistics.PlanStatisticsService,
+		r.deps.Statistics.ReadService,
+		r.deps.Statistics.PeriodicStatsService,
+		r.deps.Statistics.SyncService,
+	)
+	if r.deps.Statistics.TesteeAccessService != nil {
+		statisticsHandler.SetTesteeAccessService(r.deps.Statistics.TesteeAccessService)
+	}
+	if r.deps.Statistics.WarmupCoordinator != nil {
+		statisticsHandler.SetWarmupCoordinator(r.deps.Statistics.WarmupCoordinator)
+	}
+	if r.deps.Statistics.CacheGovernanceStatusService != nil {
+		statisticsHandler.SetCacheGovernanceStatusService(r.deps.Statistics.CacheGovernanceStatusService)
+	}
+	return statisticsHandler
+}
+
 // registerStatisticsProtectedRoutes 注册 Statistics 模块相关的受保护路由。
 func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
-	statisticsHandler := r.deps.Statistics.Handler
+	statisticsHandler := r.newStatisticsHandler()
 	if statisticsHandler == nil {
 		return
 	}
@@ -136,7 +162,7 @@ func (r *Router) registerStatisticsProtectedRoutes(apiV1 *gin.RouterGroup) {
 }
 
 func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
-	statisticsHandler := r.deps.Statistics.Handler
+	statisticsHandler := r.newStatisticsHandler()
 	if statisticsHandler == nil {
 		return
 	}
@@ -170,7 +196,7 @@ func (r *Router) registerStatisticsInternalRoutes(internalV1 *gin.RouterGroup) {
 }
 
 func (r *Router) registerCacheGovernanceInternalRoutes(internalV1 *gin.RouterGroup) {
-	statisticsHandler := r.deps.Statistics.Handler
+	statisticsHandler := r.newStatisticsHandler()
 	if statisticsHandler == nil {
 		return
 	}

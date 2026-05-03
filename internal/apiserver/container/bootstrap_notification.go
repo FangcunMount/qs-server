@@ -60,8 +60,8 @@ func (c *Container) InitMiniProgramTaskNotificationService(wechatOptions *option
 		c.printf("⚠️  MiniProgram task notification service not initialized (testee query service not available)\n")
 		return
 	}
-	if c.PlanModule == nil || c.PlanModule.TaskRepo == nil || c.PlanModule.PlanRepo == nil {
-		c.printf("⚠️  MiniProgram task notification service not initialized (plan repositories not available)\n")
+	if c.PlanModule == nil || c.PlanModule.TaskNotificationContextReader == nil {
+		c.printf("⚠️  MiniProgram task notification service not initialized (plan task notification context reader not available)\n")
 		return
 	}
 	if wechatOptions == nil {
@@ -80,8 +80,7 @@ func (c *Container) InitMiniProgramTaskNotificationService(wechatOptions *option
 	deps := c.resolveMiniProgramTaskNotificationDeps()
 	c.MiniProgramTaskNotificationService = notificationApp.NewMiniProgramTaskNotificationService(
 		c.ActorModule.TesteeQueryService,
-		c.PlanModule.TaskRepo,
-		c.PlanModule.PlanRepo,
+		c.PlanModule.TaskNotificationContextReader,
 		deps.scaleQuery,
 		deps.recipientResolver,
 		deps.wechatAppService,

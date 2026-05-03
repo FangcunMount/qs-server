@@ -1,13 +1,25 @@
 package rest
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/gin-gonic/gin"
 )
 
+func (r *Router) newPlanHandler() *handler.PlanHandler {
+	if r.deps.Plan.CommandService == nil || r.deps.Plan.QueryService == nil {
+		return nil
+	}
+	planHandler := handler.NewPlanHandler(r.deps.Plan.CommandService, r.deps.Plan.QueryService)
+	if r.deps.Plan.TesteeAccessService != nil {
+		planHandler.SetTesteeAccessService(r.deps.Plan.TesteeAccessService)
+	}
+	return planHandler
+}
+
 // registerPlanProtectedRoutes 注册 Plan 模块相关的受保护路由。
 func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
-	planHandler := r.deps.Plan.Handler
+	planHandler := r.newPlanHandler()
 	if planHandler == nil {
 		return
 	}
@@ -166,7 +178,7 @@ func (r *Router) registerPlanProtectedRoutes(apiV1 *gin.RouterGroup) {
 }
 
 func (r *Router) registerPlanInternalRoutes(internalV1 *gin.RouterGroup) {
-	planHandler := r.deps.Plan.Handler
+	planHandler := r.newPlanHandler()
 	if planHandler == nil {
 		return
 	}

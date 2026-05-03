@@ -78,7 +78,7 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for _, fileName := range []string{"actor.go", "survey.go", "scale.go", "evaluation.go"} {
+	for _, fileName := range []string{"actor.go", "survey.go", "scale.go", "evaluation.go", "plan.go", "statistics.go"} {
 		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", fileName)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
@@ -90,6 +90,71 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 				t.Fatalf("internal/apiserver/container/assembler/%s imports %s; business REST handlers must be composed outside module assemblers", fileName, importPath)
 			}
 		}
+	}
+}
+
+func TestPlanStatisticsModulesDoNotExposeInfraAdaptersOrHandlers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, tc := range []struct {
+		fileName string
+		typeName string
+	}{
+		{fileName: "plan.go", typeName: "PlanModule"},
+		{fileName: "statistics.go", typeName: "StatisticsModule"},
+	} {
+		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", tc.fileName)
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		for _, decl := range parsed.Decls {
+			gen, ok := decl.(*ast.GenDecl)
+			if !ok {
+				continue
+			}
+			for _, spec := range gen.Specs {
+				typeSpec, ok := spec.(*ast.TypeSpec)
+				if !ok || typeSpec.Name.Name != tc.typeName {
+					continue
+				}
+				structType, ok := typeSpec.Type.(*ast.StructType)
+				if !ok {
+					continue
+				}
+				for _, field := range structType.Fields.List {
+					for _, name := range field.Names {
+						if name.Name == "Handler" || name.Name == "Cache" || name.Name == "Repo" || strings.HasSuffix(name.Name, "Repo") {
+							t.Fatalf("%s exposes %s.%s; plan/statistics modules must expose application ports, not repositories, caches, or REST handlers", tc.fileName, tc.typeName, name.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+func TestPlanStatisticsTransportsDoNotDependOnPlanRepositories(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, relRoot := range []string{
+		"internal/apiserver/transport/rest",
+		"internal/apiserver/transport/grpc",
+	} {
+		scanGoSourceFiles(t, filepath.Join(root, filepath.FromSlash(relRoot)), func(path, content string) {
+			for _, token := range []string{
+				"AssessmentPlanRepository",
+				"AssessmentTaskRepository",
+				"TaskRepo",
+				"PlanRepo",
+			} {
+				if strings.Contains(content, token) {
+					t.Fatalf("%s references %s; plan transport must use application ports instead of repositories", filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+		})
 	}
 }
 

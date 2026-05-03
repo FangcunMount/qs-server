@@ -19,8 +19,6 @@ import (
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	domaintestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -37,7 +35,7 @@ type InternalService struct {
 	engineService             engine.Service
 	scaleContextResolver      scaleApp.AssessmentScaleContextResolver
 	testeeTaggingService      testeeApp.TesteeTaggingService
-	planTaskRepo              planDomain.AssessmentTaskRepository
+	taskAssessmentResolver    planApp.TaskAssessmentResolver
 	planCommandService        planApp.PlanCommandService
 	operatorLifecycleService  operatorApp.OperatorLifecycleService
 	operatorAuthService       operatorApp.OperatorAuthorizationService
@@ -74,7 +72,7 @@ func NewInternalService(
 	engineService engine.Service,
 	scaleContextResolver scaleApp.AssessmentScaleContextResolver,
 	testeeTaggingService testeeApp.TesteeTaggingService,
-	planTaskRepo planDomain.AssessmentTaskRepository,
+	taskAssessmentResolver planApp.TaskAssessmentResolver,
 	planCommandService planApp.PlanCommandService,
 	operatorLifecycleService operatorApp.OperatorLifecycleService,
 	operatorAuthService operatorApp.OperatorAuthorizationService,
@@ -92,7 +90,7 @@ func NewInternalService(
 		engineService:                      engineService,
 		scaleContextResolver:               scaleContextResolver,
 		testeeTaggingService:               testeeTaggingService,
-		planTaskRepo:                       planTaskRepo,
+		taskAssessmentResolver:             taskAssessmentResolver,
 		planCommandService:                 planCommandService,
 		operatorLifecycleService:           operatorLifecycleService,
 		operatorAuthService:                operatorAuthService,
@@ -211,23 +209,41 @@ func (s *InternalService) applyMatchedTaskOrigin(
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
 	medicalScaleCode *string,
 	dto *assessmentApp.CreateAssessmentDTO,
-) *planDomain.AssessmentTask {
-	var matchedTask *planDomain.AssessmentTask
+) *planApp.TaskAssessmentContext {
+	if s.taskAssessmentResolver == nil {
+		return nil
+	}
+
+	var matchedTask *planApp.TaskAssessmentContext
 	switch {
 	case req.TaskId != "":
-		matchedTask = s.resolvePlanTaskByID(ctx, req, medicalScaleCode)
+		scaleCode := ""
+		if medicalScaleCode != nil {
+			scaleCode = *medicalScaleCode
+		}
+		matchedTask = s.taskAssessmentResolver.ResolveTaskByIDForAssessment(ctx, planApp.TaskAssessmentResolveInput{
+			TaskID:            req.TaskId,
+			OrgID:             req.OrgId,
+			TesteeID:          req.TesteeId,
+			ScaleCode:         scaleCode,
+			QuestionnaireCode: req.QuestionnaireCode,
+		})
 	case medicalScaleCode != nil:
-		matchedTask = s.resolveOpenedPlanTask(ctx, req.OrgId, req.TesteeId, *medicalScaleCode)
+		matchedTask = s.taskAssessmentResolver.ResolveOpenedTaskForAssessment(ctx, planApp.OpenedTaskResolveInput{
+			OrgID:     req.OrgId,
+			TesteeID:  req.TesteeId,
+			ScaleCode: *medicalScaleCode,
+		})
 	}
 	if matchedTask == nil {
 		return nil
 	}
 
-	planID := matchedTask.GetPlanID().String()
+	planID := matchedTask.PlanID
 	dto.OriginType = "plan"
 	dto.OriginID = &planID
 	l.Infow("识别到计划任务上下文",
-		"task_id", matchedTask.GetID().String(),
+		"task_id", matchedTask.TaskID,
 		"plan_id", planID,
 		"testee_id", req.TesteeId,
 	)
@@ -239,7 +255,7 @@ func (s *InternalService) loadExistingAssessmentResponse(
 	l *logger.RequestLogger,
 	answerSheetID uint64,
 	orgID uint64,
-	matchedTask *planDomain.AssessmentTask,
+	matchedTask *planApp.TaskAssessmentContext,
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, bool) {
 	existing, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, answerSheetID)
 	if err != nil || existing == nil {
@@ -259,7 +275,7 @@ func (s *InternalService) createAssessmentFromAnswerSheet(
 	l *logger.RequestLogger,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
 	dto assessmentApp.CreateAssessmentDTO,
-	matchedTask *planDomain.AssessmentTask,
+	matchedTask *planApp.TaskAssessmentContext,
 	shouldAutoSubmit bool,
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
 	result, err := s.submissionService.Create(ctx, dto)
@@ -329,146 +345,17 @@ func createdAssessmentResponse(assessmentID uint64, autoSubmitted bool) *pb.Crea
 	}
 }
 
-func (s *InternalService) resolvePlanTaskByID(
-	ctx context.Context,
-	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	medicalScaleCode *string,
-) *planDomain.AssessmentTask {
-	if s.planTaskRepo == nil || req.TaskId == "" {
-		return nil
-	}
-
-	taskID, err := planDomain.ParseAssessmentTaskID(req.TaskId)
-	if err != nil {
-		logger.L(ctx).Warnw("计划任务ID格式非法，跳过显式任务识别",
-			"task_id", req.TaskId,
-			"error", err.Error(),
-		)
-		return nil
-	}
-
-	task, err := s.planTaskRepo.FindByID(ctx, taskID)
-	if err != nil || task == nil {
-		logger.L(ctx).Warnw("查询计划任务失败，跳过显式任务识别",
-			"task_id", req.TaskId,
-			"error", err,
-		)
-		return nil
-	}
-
-	requestOrgID, convErr := safeconv.Uint64ToInt64(req.OrgId)
-	if convErr != nil {
-		logger.L(ctx).Warnw("请求机构ID超出 int64 范围，跳过显式任务识别",
-			"org_id", req.OrgId,
-			"error", convErr.Error(),
-		)
-		return nil
-	}
-	if task.GetOrgID() != requestOrgID {
-		logger.L(ctx).Warnw("计划任务机构不匹配，跳过显式任务识别",
-			"task_id", req.TaskId,
-			"request_org_id", req.OrgId,
-			"task_org_id", task.GetOrgID(),
-		)
-		return nil
-	}
-	if task.GetTesteeID().Uint64() != req.TesteeId {
-		logger.L(ctx).Warnw("计划任务受试者不匹配，跳过显式任务识别",
-			"task_id", req.TaskId,
-			"request_testee_id", req.TesteeId,
-			"task_testee_id", task.GetTesteeID().Uint64(),
-		)
-		return nil
-	}
-	if !task.IsOpened() {
-		logger.L(ctx).Warnw("计划任务未处于 opened 状态，跳过显式任务识别",
-			"task_id", req.TaskId,
-			"task_status", task.GetStatus().String(),
-		)
-		return nil
-	}
-	if medicalScaleCode == nil {
-		logger.L(ctx).Warnw("计划任务已传入，但问卷未关联量表，无法建立计划测评关系",
-			"task_id", req.TaskId,
-			"questionnaire_code", req.QuestionnaireCode,
-		)
-		return nil
-	}
-	if task.GetScaleCode() != *medicalScaleCode {
-		logger.L(ctx).Warnw("计划任务量表不匹配，跳过显式任务识别",
-			"task_id", req.TaskId,
-			"task_scale_code", task.GetScaleCode(),
-			"request_scale_code", *medicalScaleCode,
-		)
-		return nil
-	}
-
-	return task
-}
-
-func (s *InternalService) resolveOpenedPlanTask(
-	ctx context.Context,
-	orgID uint64,
-	testeeID uint64,
-	scaleCode string,
-) *planDomain.AssessmentTask {
-	if s.planTaskRepo == nil || scaleCode == "" || testeeID == 0 {
-		return nil
-	}
-
-	tasks, err := s.planTaskRepo.FindByTesteeID(ctx, domaintestee.ID(meta.FromUint64(testeeID)))
-	if err != nil {
-		logger.L(ctx).Warnw("查询受试者计划任务失败",
-			"testee_id", testeeID,
-			"scale_code", scaleCode,
-			"error", err.Error(),
-		)
-		return nil
-	}
-
-	var matched *planDomain.AssessmentTask
-	targetOrgID, convErr := safeconv.Uint64ToInt64(orgID)
-	if convErr != nil {
-		logger.L(ctx).Warnw("机构ID超出 int64 范围，跳过自动 plan 识别",
-			"org_id", orgID,
-			"error", convErr.Error(),
-		)
-		return nil
-	}
-	for _, task := range tasks {
-		if task == nil {
-			continue
-		}
-		if task.GetOrgID() != targetOrgID || task.GetScaleCode() != scaleCode || !task.IsOpened() {
-			continue
-		}
-		if matched != nil {
-			logger.L(ctx).Warnw("存在多个候选 opened task，跳过自动 plan 识别",
-				"testee_id", testeeID,
-				"org_id", orgID,
-				"scale_code", scaleCode,
-				"first_task_id", matched.GetID().String(),
-				"second_task_id", task.GetID().String(),
-			)
-			return nil
-		}
-		matched = task
-	}
-
-	return matched
-}
-
 func (s *InternalService) completeMatchedTask(
 	ctx context.Context,
 	l *logger.RequestLogger,
 	orgID uint64,
-	task *planDomain.AssessmentTask,
+	task *planApp.TaskAssessmentContext,
 	assessmentID uint64,
 ) {
 	if task == nil || s.planCommandService == nil || assessmentID == 0 {
 		return
 	}
-	if task.IsCompleted() {
+	if task.Completed {
 		return
 	}
 	targetOrgID, err := safeconv.Uint64ToInt64(orgID)
@@ -484,11 +371,11 @@ func (s *InternalService) completeMatchedTask(
 	if _, err := s.planCommandService.CompleteTask(
 		ctx,
 		targetOrgID,
-		task.GetID().String(),
+		task.TaskID,
 		meta.FromUint64(assessmentID).String(),
 	); err != nil {
 		l.Warnw("回写计划任务完成状态失败",
-			"task_id", task.GetID().String(),
+			"task_id", task.TaskID,
 			"assessment_id", assessmentID,
 			"error", err.Error(),
 		)
@@ -496,8 +383,8 @@ func (s *InternalService) completeMatchedTask(
 	}
 
 	l.Infow("已回写计划任务完成状态",
-		"task_id", task.GetID().String(),
-		"plan_id", task.GetPlanID().String(),
+		"task_id", task.TaskID,
+		"plan_id", task.PlanID,
 		"assessment_id", assessmentID,
 	)
 }

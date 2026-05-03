@@ -13,9 +13,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
@@ -35,15 +34,6 @@ type testeeLookup interface {
 	GetByID(ctx context.Context, testeeID uint64) (*testeeApp.TesteeResult, error)
 }
 
-type taskLookup interface {
-	FindByID(ctx context.Context, id domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error)
-	FindByTesteeID(ctx context.Context, testeeID domainTestee.ID) ([]*domainPlan.AssessmentTask, error)
-}
-
-type planLookup interface {
-	FindByID(ctx context.Context, id domainPlan.AssessmentPlanID) (*domainPlan.AssessmentPlan, error)
-}
-
 type scaleLookup interface {
 	GetByCode(ctx context.Context, code string) (*scaleApp.ScaleResult, error)
 }
@@ -61,8 +51,7 @@ type taskOpenedTemplateData struct {
 
 type taskOpenedService struct {
 	testeeQueryService testeeLookup
-	taskRepo           taskLookup
-	planRepo           planLookup
+	taskContextReader  planApp.TaskNotificationContextReader
 	scaleQueryService  scaleLookup
 	recipientResolver  iambridge.MiniProgramRecipientResolver
 	wechatAppService   iambridge.WeChatAppConfigProvider
@@ -75,8 +64,7 @@ type taskOpenedService struct {
 // NewMiniProgramTaskNotificationService 创建 task.opened 小程序通知服务。
 func NewMiniProgramTaskNotificationService(
 	testeeQueryService testeeLookup,
-	taskRepo taskLookup,
-	planRepo planLookup,
+	taskContextReader planApp.TaskNotificationContextReader,
 	scaleQueryService scaleLookup,
 	recipientResolver iambridge.MiniProgramRecipientResolver,
 	wechatAppService iambridge.WeChatAppConfigProvider,
@@ -85,8 +73,7 @@ func NewMiniProgramTaskNotificationService(
 ) MiniProgramTaskNotificationService {
 	return &taskOpenedService{
 		testeeQueryService: testeeQueryService,
-		taskRepo:           taskRepo,
-		planRepo:           planRepo,
+		taskContextReader:  taskContextReader,
 		scaleQueryService:  scaleQueryService,
 		recipientResolver:  recipientResolver,
 		wechatAppService:   wechatAppService,
@@ -356,11 +343,11 @@ func (s *taskOpenedService) resolveTaskOpenedTemplateData(ctx context.Context, d
 		planProgress: "1/1",
 		warmPrompt:   "请及时完成本次测评任务",
 	}
-	if s == nil || s.taskRepo == nil || strings.TrimSpace(dto.TaskID) == "" {
+	if s == nil || s.taskContextReader == nil || strings.TrimSpace(dto.TaskID) == "" {
 		return data
 	}
 
-	taskID, err := domainPlan.ParseAssessmentTaskID(dto.TaskID)
+	taskContext, err := s.taskContextReader.GetTaskNotificationContext(ctx, dto.TaskID)
 	if err != nil {
 		logger.L(ctx).Warnw("failed to parse task id for mini program notification",
 			"action", "resolve_task_opened_template_data",
@@ -369,48 +356,27 @@ func (s *taskOpenedService) resolveTaskOpenedTemplateData(ctx context.Context, d
 		)
 		return data
 	}
-
-	task, err := s.taskRepo.FindByID(ctx, taskID)
-	if err != nil {
-		logger.L(ctx).Warnw("failed to load task for mini program notification",
-			"action", "resolve_task_opened_template_data",
-			"task_id", dto.TaskID,
-			"error", err.Error(),
-		)
-		return data
-	}
-	if task == nil {
+	if taskContext == nil {
 		return data
 	}
 
-	if !task.GetPlannedAt().IsZero() {
-		data.planDate = formatTaskOpenedDate(task.GetPlannedAt())
+	if !taskContext.PlannedAt.IsZero() {
+		data.planDate = formatTaskOpenedDate(taskContext.PlannedAt)
 	}
-	if task.GetSeq() > 0 {
-		data.planProgress = strconv.Itoa(task.GetSeq())
+	if taskContext.Seq > 0 {
+		data.planProgress = strconv.Itoa(taskContext.Seq)
 	}
-
-	if s.planRepo != nil {
-		parentPlan, err := s.planRepo.FindByID(ctx, task.GetPlanID())
-		if err != nil {
-			logger.L(ctx).Warnw("failed to load plan for mini program notification",
-				"action", "resolve_task_opened_template_data",
-				"task_id", dto.TaskID,
-				"plan_id", task.GetPlanID().String(),
-				"error", err.Error(),
-			)
-		} else if parentPlan != nil && parentPlan.GetTotalTimes() > 0 && task.GetSeq() > 0 {
-			data.planProgress = fmt.Sprintf("%d/%d", task.GetSeq(), parentPlan.GetTotalTimes())
-		}
+	if taskContext.TotalTimes > 0 && taskContext.Seq > 0 {
+		data.planProgress = fmt.Sprintf("%d/%d", taskContext.Seq, taskContext.TotalTimes)
 	}
 
-	if scaleTitle := s.resolveScaleTitle(ctx, task.GetScaleCode()); scaleTitle != "" {
+	if scaleTitle := s.resolveScaleTitle(ctx, taskContext.ScaleCode); scaleTitle != "" {
 		data.planName = scaleTitle
-	} else if code := strings.TrimSpace(task.GetScaleCode()); code != "" {
+	} else if code := strings.TrimSpace(taskContext.ScaleCode); code != "" {
 		data.planName = code
 	}
 
-	data.warmPrompt = s.buildWarmPrompt(ctx, task)
+	data.warmPrompt = buildWarmPrompt(taskContext.UnfinishedSameDayTaskCount)
 	return data
 }
 
@@ -433,32 +399,8 @@ func (s *taskOpenedService) resolveScaleTitle(ctx context.Context, scaleCode str
 	return strings.TrimSpace(result.Title)
 }
 
-func (s *taskOpenedService) buildWarmPrompt(ctx context.Context, task *domainPlan.AssessmentTask) string {
+func buildWarmPrompt(count int) string {
 	const fallback = "请及时完成本次测评任务"
-
-	if s == nil || s.taskRepo == nil || task == nil {
-		return fallback
-	}
-	tasks, err := s.taskRepo.FindByTesteeID(ctx, task.GetTesteeID())
-	if err != nil {
-		logger.L(ctx).Warnw("failed to count unfinished tasks for mini program notification",
-			"action", "resolve_task_opened_template_data",
-			"task_id", task.GetID().String(),
-			"testee_id", task.GetTesteeID().String(),
-			"error", err.Error(),
-		)
-		return fallback
-	}
-
-	count := 0
-	for _, item := range tasks {
-		if item == nil || item.GetStatus().IsTerminal() {
-			continue
-		}
-		if sameLocalDate(item.GetPlannedAt(), task.GetPlannedAt()) {
-			count++
-		}
-	}
 	if count <= 0 {
 		return fallback
 	}
@@ -470,15 +412,6 @@ func formatTaskOpenedDate(openAt time.Time) string {
 		return time.Now().Local().Format("2006.01.02")
 	}
 	return openAt.Local().Format("2006.01.02")
-}
-
-func sameLocalDate(left, right time.Time) bool {
-	if left.IsZero() || right.IsZero() {
-		return false
-	}
-	left = left.Local()
-	right = right.Local()
-	return left.Year() == right.Year() && left.Month() == right.Month() && left.Day() == right.Day()
 }
 
 func (s *taskOpenedService) buildPagePath(entryURL string) string {

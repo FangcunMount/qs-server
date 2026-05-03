@@ -9,15 +9,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 // queryService 计划查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	planRepo  domainPlan.AssessmentPlanRepository
-	taskRepo  domainPlan.AssessmentTaskRepository
-	scaleRepo domainScale.Repository
+	planRepo     domainPlan.AssessmentPlanRepository
+	taskRepo     domainPlan.AssessmentTaskRepository
+	planReader   planreadmodel.PlanReader
+	taskReader   planreadmodel.TaskReader
+	scaleCatalog ScaleCatalog
 }
 
 // NewQueryService 创建计划查询服务
@@ -27,9 +30,22 @@ func NewQueryService(
 	scaleRepo domainScale.Repository,
 ) PlanQueryService {
 	return &queryService{
-		planRepo:  planRepo,
-		taskRepo:  taskRepo,
-		scaleRepo: scaleRepo,
+		planRepo:     planRepo,
+		taskRepo:     taskRepo,
+		scaleCatalog: newRepositoryScaleCatalog(scaleRepo),
+	}
+}
+
+// NewQueryServiceWithReadModel 创建基于 read model 的计划查询服务。
+func NewQueryServiceWithReadModel(
+	planReader planreadmodel.PlanReader,
+	taskReader planreadmodel.TaskReader,
+	scaleCatalog ScaleCatalog,
+) PlanQueryService {
+	return &queryService{
+		planReader:   planReader,
+		taskReader:   taskReader,
+		scaleCatalog: scaleCatalog,
 	}
 }
 
@@ -39,6 +55,16 @@ func (s *queryService) GetPlan(ctx context.Context, orgID int64, planID string) 
 	id, err := toPlanID(planID)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的计划ID: %v", err)
+	}
+
+	if s.planReader != nil {
+		row, err := s.planReader.GetPlan(ctx, orgID, id.Uint64())
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
+		}
+		result := toPlanResultFromRow(*row)
+		result.ScaleTitle = s.resolveScaleTitle(ctx, result.ScaleCode)
+		return result, nil
 	}
 
 	// 2. 查询计划
@@ -66,6 +92,25 @@ func (s *queryService) ListPlans(ctx context.Context, dto ListPlansDTO) (*PlanLi
 	}
 	if dto.PageSize > 100 {
 		dto.PageSize = 100 // 限制最大每页数量
+	}
+
+	if s.planReader != nil {
+		page, err := s.planReader.ListPlans(ctx, planreadmodel.PlanFilter{
+			OrgID:     dto.OrgID,
+			ScaleCode: dto.ScaleCode,
+			Status:    dto.Status,
+		}, planreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询计划列表失败")
+		}
+		scaleTitles := s.resolveScaleTitles(ctx, collectPlanScaleCodesFromRows(page.Items))
+		items := make([]*PlanResult, 0, len(page.Items))
+		for _, row := range page.Items {
+			item := toPlanResultFromRow(row)
+			item.ScaleTitle = scaleTitles[item.ScaleCode]
+			items = append(items, item)
+		}
+		return &PlanListResult{Items: items, Total: page.Total, Page: dto.Page, PageSize: dto.PageSize}, nil
 	}
 
 	// 2. 查询计划列表
@@ -97,6 +142,16 @@ func (s *queryService) GetTask(ctx context.Context, orgID int64, taskID string) 
 	id, err := toTaskID(taskID)
 	if err != nil {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务ID: %v", err)
+	}
+
+	if s.taskReader != nil {
+		row, err := s.taskReader.GetTask(ctx, orgID, id.Uint64())
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrPageNotFound, "任务不存在")
+		}
+		result := toTaskResultFromRow(*row)
+		result.ScaleTitle = s.resolveScaleTitle(ctx, result.ScaleCode)
+		return result, nil
 	}
 
 	// 2. 查询任务
@@ -152,6 +207,45 @@ func (s *queryService) ListTasks(ctx context.Context, dto ListTasksDTO) (*TaskLi
 			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的任务状态: %s", dto.Status)
 		}
 		status = &statusVal
+	}
+
+	if s.taskReader != nil {
+		filter := planreadmodel.TaskFilter{
+			OrgID:                 dto.OrgID,
+			RestrictToAccessScope: dto.RestrictToAccessScope,
+		}
+		if planID != nil {
+			rawPlanID := planID.Uint64()
+			filter.PlanID = &rawPlanID
+		}
+		if testeeID != nil {
+			rawTesteeID := testeeID.Uint64()
+			filter.TesteeID = &rawTesteeID
+		}
+		if status != nil {
+			rawStatus := status.String()
+			filter.Status = &rawStatus
+		}
+		if dto.RestrictToAccessScope {
+			filter.AccessibleTesteeIDs = make([]uint64, 0, len(dto.AccessibleTesteeIDs))
+			for _, rawID := range dto.AccessibleTesteeIDs {
+				id, err := toTesteeID(rawID)
+				if err != nil {
+					return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的受试者ID: %v", err)
+				}
+				filter.AccessibleTesteeIDs = append(filter.AccessibleTesteeIDs, id.Uint64())
+			}
+		}
+		page, err := s.taskReader.ListTasks(ctx, filter, planreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务列表失败")
+		}
+		return &TaskListResult{
+			Items:    s.toTaskResultsWithScaleTitlesFromRows(ctx, page.Items),
+			Total:    page.Total,
+			Page:     dto.Page,
+			PageSize: dto.PageSize,
+		}, nil
 	}
 
 	var tasks []*domainPlan.AssessmentTask
@@ -229,6 +323,34 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 		testeeIDs = append(testeeIDs, id)
 	}
 
+	if s.taskReader != nil {
+		filter := planreadmodel.TaskWindowFilter{
+			OrgID:         dto.OrgID,
+			PlanID:        planID.Uint64(),
+			PlannedBefore: plannedBefore,
+		}
+		if status != nil {
+			rawStatus := status.String()
+			filter.Status = &rawStatus
+		}
+		if len(testeeIDs) > 0 {
+			filter.TesteeIDs = make([]uint64, 0, len(testeeIDs))
+			for _, id := range testeeIDs {
+				filter.TesteeIDs = append(filter.TesteeIDs, id.Uint64())
+			}
+		}
+		window, err := s.taskReader.ListTaskWindow(ctx, filter, planreadmodel.PageRequest{Page: dto.Page, PageSize: dto.PageSize})
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务窗口失败")
+		}
+		return &TaskWindowResult{
+			Items:    s.toTaskResultsWithScaleTitlesFromRows(ctx, window.Items),
+			Page:     dto.Page,
+			PageSize: dto.PageSize,
+			HasMore:  window.HasMore,
+		}, nil
+	}
+
 	tasks, hasMore, err := s.taskRepo.FindWindow(ctx, dto.OrgID, planID, testeeIDs, status, plannedBefore, dto.Page, dto.PageSize)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务窗口失败")
@@ -254,6 +376,13 @@ func (s *queryService) ListTasksByPlan(ctx context.Context, orgID int64, planID 
 	}
 
 	// 2. 查询任务
+	if s.taskReader != nil {
+		rows, err := s.taskReader.ListTasksByPlanID(ctx, id.Uint64())
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
+		}
+		return s.toTaskResultsWithScaleTitlesFromRows(ctx, rows), nil
+	}
 	tasks, err := s.taskRepo.FindByPlanID(ctx, id)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
@@ -281,6 +410,18 @@ func (s *queryService) ListTasksByPlanInScope(ctx context.Context, orgID int64, 
 		testeeIDs = append(testeeIDs, testeeID)
 	}
 
+	if s.taskReader != nil {
+		rawIDs := make([]uint64, 0, len(testeeIDs))
+		for _, id := range testeeIDs {
+			rawIDs = append(rawIDs, id.Uint64())
+		}
+		rows, err := s.taskReader.ListTasksByPlanIDAndTesteeIDs(ctx, id.Uint64(), rawIDs)
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
+		}
+		return s.toTaskResultsWithScaleTitlesFromRows(ctx, rows), nil
+	}
+
 	tasks, err := s.taskRepo.FindByPlanIDAndTesteeIDs(ctx, id, testeeIDs)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
@@ -289,6 +430,12 @@ func (s *queryService) ListTasksByPlanInScope(ctx context.Context, orgID int64, 
 }
 
 func (s *queryService) ensurePlanInOrg(ctx context.Context, orgID int64, planID domainPlan.AssessmentPlanID) error {
+	if s.planReader != nil {
+		if _, err := s.planReader.GetPlan(ctx, orgID, planID.Uint64()); err != nil {
+			return errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
+		}
+		return nil
+	}
 	item, err := s.planRepo.FindByID(ctx, planID)
 	if err != nil {
 		return errors.WithCode(errorCode.ErrPageNotFound, "计划不存在")
@@ -308,6 +455,13 @@ func (s *queryService) ListTasksByTestee(ctx context.Context, testeeID string) (
 	}
 
 	// 2. 查询任务
+	if s.taskReader != nil {
+		rows, err := s.taskReader.ListTasksByTesteeID(ctx, testeeIDDomain.Uint64())
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
+		}
+		return s.toTaskResultsWithScaleTitlesFromRows(ctx, rows), nil
+	}
 	tasks, err := s.taskRepo.FindByTesteeID(ctx, testeeIDDomain)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
@@ -325,6 +479,20 @@ func (s *queryService) ListPlansByTestee(ctx context.Context, testeeID string) (
 	}
 
 	// 2. 查询计划
+	if s.planReader != nil {
+		rows, err := s.planReader.ListPlansByTesteeID(ctx, testeeIDDomain.Uint64())
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询计划失败")
+		}
+		scaleTitles := s.resolveScaleTitles(ctx, collectPlanScaleCodesFromRows(rows))
+		results := make([]*PlanResult, 0, len(rows))
+		for _, row := range rows {
+			result := toPlanResultFromRow(row)
+			result.ScaleTitle = scaleTitles[result.ScaleCode]
+			results = append(results, result)
+		}
+		return results, nil
+	}
 	plans, err := s.planRepo.FindByTesteeID(ctx, testeeIDDomain)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询计划失败")
@@ -356,6 +524,13 @@ func (s *queryService) ListTasksByTesteeAndPlan(ctx context.Context, testeeID st
 	}
 
 	// 2. 查询任务
+	if s.taskReader != nil {
+		rows, err := s.taskReader.ListTasksByTesteeIDAndPlanID(ctx, testeeIDDomain.Uint64(), planIDDomain.Uint64())
+		if err != nil {
+			return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
+		}
+		return s.toTaskResultsWithScaleTitlesFromRows(ctx, rows), nil
+	}
 	tasks, err := s.taskRepo.FindByTesteeIDAndPlanID(ctx, testeeIDDomain, planIDDomain)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "查询任务失败")
@@ -376,6 +551,18 @@ func (s *queryService) toTaskResultsWithScaleTitles(ctx context.Context, tasks [
 	return results
 }
 
+func (s *queryService) toTaskResultsWithScaleTitlesFromRows(ctx context.Context, rows []planreadmodel.TaskRow) []*TaskResult {
+	results := toTaskResultsFromRows(rows)
+	if len(results) == 0 {
+		return results
+	}
+	scaleTitles := s.resolveScaleTitles(ctx, collectTaskScaleCodesFromRows(rows))
+	for idx, row := range rows {
+		results[idx].ScaleTitle = scaleTitles[row.ScaleCode]
+	}
+	return results
+}
+
 func (s *queryService) resolveScaleTitle(ctx context.Context, scaleCode string) string {
 	if scaleCode == "" {
 		return ""
@@ -384,32 +571,10 @@ func (s *queryService) resolveScaleTitle(ctx context.Context, scaleCode string) 
 }
 
 func (s *queryService) resolveScaleTitles(ctx context.Context, scaleCodes []string) map[string]string {
-	titles := make(map[string]string, len(scaleCodes))
-	if s == nil || s.scaleRepo == nil || len(scaleCodes) == 0 {
-		return titles
+	if s == nil || s.scaleCatalog == nil || len(scaleCodes) == 0 {
+		return make(map[string]string, len(scaleCodes))
 	}
-
-	seen := make(map[string]struct{}, len(scaleCodes))
-	for _, code := range scaleCodes {
-		code = strings.TrimSpace(code)
-		if code == "" {
-			continue
-		}
-		if _, ok := seen[code]; ok {
-			continue
-		}
-		seen[code] = struct{}{}
-
-		scaleItem, err := s.scaleRepo.FindByCode(ctx, code)
-		if err != nil || scaleItem == nil {
-			continue
-		}
-		title := strings.TrimSpace(scaleItem.GetTitle())
-		if title != "" {
-			titles[code] = title
-		}
-	}
-	return titles
+	return s.scaleCatalog.ResolveTitles(ctx, scaleCodes)
 }
 
 func collectPlanScaleCodes(plans []*domainPlan.AssessmentPlan) []string {
@@ -423,6 +588,14 @@ func collectPlanScaleCodes(plans []*domainPlan.AssessmentPlan) []string {
 	return codes
 }
 
+func collectPlanScaleCodesFromRows(rows []planreadmodel.PlanRow) []string {
+	codes := make([]string, 0, len(rows))
+	for _, item := range rows {
+		codes = append(codes, item.ScaleCode)
+	}
+	return codes
+}
+
 func collectTaskScaleCodes(tasks []*domainPlan.AssessmentTask) []string {
 	codes := make([]string, 0, len(tasks))
 	for _, item := range tasks {
@@ -430,6 +603,14 @@ func collectTaskScaleCodes(tasks []*domainPlan.AssessmentTask) []string {
 			continue
 		}
 		codes = append(codes, item.GetScaleCode())
+	}
+	return codes
+}
+
+func collectTaskScaleCodesFromRows(rows []planreadmodel.TaskRow) []string {
+	codes := make([]string, 0, len(rows))
+	for _, item := range rows {
+		codes = append(codes, item.ScaleCode)
 	}
 	return codes
 }

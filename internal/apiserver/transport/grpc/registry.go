@@ -17,7 +17,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
@@ -82,8 +81,8 @@ type ScaleDeps struct {
 }
 
 type PlanDeps struct {
-	CommandService planApp.PlanCommandService
-	TaskRepo       planDomain.AssessmentTaskRepository
+	CommandService         planApp.PlanCommandService
+	TaskAssessmentResolver planApp.TaskAssessmentResolver
 }
 
 type StatisticsDeps struct {
@@ -238,7 +237,7 @@ func (r *Registry) registerInternalService() error {
 		log.Warn("ActorModule is not initialized, skipping internal service registration")
 		return nil
 	}
-	if r.deps.Plan.TaskRepo == nil || r.deps.Plan.CommandService == nil {
+	if r.deps.Plan.TaskAssessmentResolver == nil || r.deps.Plan.CommandService == nil {
 		log.Warn("PlanModule is not initialized, skipping internal service registration")
 		return nil
 	}
@@ -254,7 +253,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.EvaluationService,
 		r.deps.Scale.QueryService,
 		r.deps.Actor.TesteeTaggingService,
-		r.deps.Plan.TaskRepo,
+		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,
 		r.deps.Actor.OperatorLifecycleService,
 		r.deps.Actor.OperatorAuthorizationService,

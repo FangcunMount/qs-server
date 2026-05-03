@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -132,6 +133,21 @@ func toPlanResult(p *plan.AssessmentPlan) *PlanResult {
 	}
 }
 
+func toPlanResultFromRow(row planreadmodel.PlanRow) *PlanResult {
+	return &PlanResult{
+		ID:            meta.FromUint64(row.ID).String(),
+		OrgID:         row.OrgID,
+		ScaleCode:     row.ScaleCode,
+		ScheduleType:  row.ScheduleType,
+		TriggerTime:   row.TriggerTime,
+		Interval:      row.Interval,
+		TotalTimes:    row.TotalTimes,
+		FixedDates:    append([]string(nil), row.FixedDates...),
+		RelativeWeeks: append([]int(nil), row.RelativeWeeks...),
+		Status:        row.Status,
+	}
+}
+
 // toTaskResult 将领域对象转换为结果对象
 func toTaskResult(t *plan.AssessmentTask) *TaskResult {
 	if t == nil {
@@ -171,6 +187,38 @@ func toTaskResult(t *plan.AssessmentTask) *TaskResult {
 	return result
 }
 
+func toTaskResultFromRow(row planreadmodel.TaskRow) *TaskResult {
+	result := &TaskResult{
+		ID:         meta.FromUint64(row.ID).String(),
+		PlanID:     meta.FromUint64(row.PlanID).String(),
+		Seq:        row.Seq,
+		OrgID:      row.OrgID,
+		TesteeID:   meta.FromUint64(row.TesteeID).String(),
+		ScaleCode:  row.ScaleCode,
+		PlannedAt:  row.PlannedAt.Format("2006-01-02 15:04:05"),
+		Status:     row.Status,
+		EntryToken: row.EntryToken,
+		EntryURL:   row.EntryURL,
+	}
+	if row.OpenAt != nil {
+		openAt := row.OpenAt.Format("2006-01-02 15:04:05")
+		result.OpenAt = &openAt
+	}
+	if row.ExpireAt != nil {
+		expireAt := row.ExpireAt.Format("2006-01-02 15:04:05")
+		result.ExpireAt = &expireAt
+	}
+	if row.CompletedAt != nil {
+		completedAt := row.CompletedAt.Format("2006-01-02 15:04:05")
+		result.CompletedAt = &completedAt
+	}
+	if row.AssessmentID != nil {
+		assessmentID := meta.FromUint64(*row.AssessmentID).String()
+		result.AssessmentID = &assessmentID
+	}
+	return result
+}
+
 // toTaskResults 批量转换任务结果
 func toTaskResults(tasks []*plan.AssessmentTask) []*TaskResult {
 	if len(tasks) == 0 {
@@ -179,6 +227,17 @@ func toTaskResults(tasks []*plan.AssessmentTask) []*TaskResult {
 	results := make([]*TaskResult, 0, len(tasks))
 	for _, task := range tasks {
 		results = append(results, toTaskResult(task))
+	}
+	return results
+}
+
+func toTaskResultsFromRows(rows []planreadmodel.TaskRow) []*TaskResult {
+	if len(rows) == 0 {
+		return nil
+	}
+	results := make([]*TaskResult, 0, len(rows))
+	for _, row := range rows {
+		results = append(results, toTaskResultFromRow(row))
 	}
 	return results
 }

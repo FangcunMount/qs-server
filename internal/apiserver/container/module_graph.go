@@ -14,12 +14,8 @@ func newModuleGraph(c *Container) moduleGraph {
 }
 
 func (g moduleGraph) postWireCacheGovernanceDependencies() {
-	c := g.container
-	if c == nil || c.StatisticsModule == nil || c.StatisticsModule.Handler == nil {
-		return
-	}
-	c.StatisticsModule.Handler.SetWarmupCoordinator(c.WarmupCoordinator())
-	c.StatisticsModule.Handler.SetCacheGovernanceStatusService(c.CacheGovernanceStatusService())
+	// Cache-governance dependencies are now passed through REST deps and wired
+	// when the transport constructs StatisticsHandler.
 }
 
 func (g moduleGraph) postWireProtectedScopeDependencies() {

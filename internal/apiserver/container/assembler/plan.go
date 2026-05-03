@@ -10,14 +10,12 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	planDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	planCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -29,16 +27,11 @@ import (
 // PlanModule Plan 模块（测评计划子域）
 // 按照 DDD 限界上下文组织
 type PlanModule struct {
-	// repository 层
-	PlanRepo planDomain.AssessmentPlanRepository
-	TaskRepo planDomain.AssessmentTaskRepository
-
-	// handler 层
-	Handler *handler.PlanHandler
-
 	// service 层
-	CommandService planApp.PlanCommandService
-	QueryService   planApp.PlanQueryService
+	CommandService                planApp.PlanCommandService
+	QueryService                  planApp.PlanQueryService
+	TaskAssessmentResolver        planApp.TaskAssessmentResolver
+	TaskNotificationContextReader planApp.TaskNotificationContextReader
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher      event.EventPublisher
@@ -76,40 +69,34 @@ func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
 	basePlanRepo := planInfra.NewPlanRepository(normalized.MySQLDB, mysqlOptions)
 
 	// 如果提供了 Redis 客户端，使用缓存装饰器
+	planRepo := basePlanRepo
 	if normalized.RedisClient != nil {
-		module.PlanRepo = planCache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.PlanPolicy, normalized.Observer)
-	} else {
-		module.PlanRepo = basePlanRepo
+		planRepo = planCache.NewCachedPlanRepositoryWithBuilderPolicyAndObserver(basePlanRepo, normalized.RedisClient, normalized.CacheBuilder, normalized.PlanPolicy, normalized.Observer)
 	}
 
-	module.TaskRepo = planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)
+	taskRepo := planInfra.NewTaskRepository(normalized.MySQLDB, mysqlOptions)
 
 	// 初始化基础设施层（入口生成器）
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
+	scaleCatalog := planApp.NewRepositoryScaleCatalog(normalized.ScaleRepo)
+	planReadModel := planInfra.NewReadModel(normalized.MySQLDB)
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	lifecycleService := planApp.NewLifecycleService(module.PlanRepo, module.TaskRepo, normalized.ScaleRepo, module.eventPublisher)
-	enrollmentService := planApp.NewEnrollmentService(module.PlanRepo, module.TaskRepo, module.eventPublisher)
-	taskSchedulerService := planApp.NewTaskSchedulerService(module.TaskRepo, module.PlanRepo, entryGenerator, module.eventPublisher)
-	taskManagementService := planApp.NewTaskManagementService(module.TaskRepo, module.eventPublisher)
+	lifecycleService := planApp.NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, scaleCatalog, module.eventPublisher)
+	enrollmentService := planApp.NewEnrollmentService(planRepo, taskRepo, module.eventPublisher)
+	taskSchedulerService := planApp.NewTaskSchedulerService(taskRepo, planRepo, entryGenerator, module.eventPublisher)
+	taskManagementService := planApp.NewTaskManagementService(taskRepo, module.eventPublisher)
 	module.CommandService = planApp.NewCommandService(
 		lifecycleService,
 		enrollmentService,
 		taskSchedulerService,
 		taskManagementService,
-		module.PlanRepo,
-		module.TaskRepo,
+		planRepo,
+		taskRepo,
 	)
-	module.QueryService = planApp.NewQueryService(module.PlanRepo, module.TaskRepo, normalized.ScaleRepo)
-
-	// 初始化 handler 层
-	module.Handler = handler.NewPlanHandler(
-		module.CommandService,
-		module.QueryService,
-	)
-	if module.testeeAccessService != nil {
-		module.Handler.SetTesteeAccessService(module.testeeAccessService)
-	}
+	module.QueryService = planApp.NewQueryServiceWithReadModel(planReadModel, planReadModel, scaleCatalog)
+	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
+	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 
 	return module, nil
 }

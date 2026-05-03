@@ -19,7 +19,7 @@ import (
 type lifecycleService struct {
 	planRepo       plan.AssessmentPlanRepository
 	taskRepo       plan.AssessmentTaskRepository
-	scaleRepo      scale.Repository
+	scaleCatalog   ScaleCatalog
 	validator      *plan.PlanValidator
 	lifecycle      *plan.PlanLifecycle
 	eventPublisher event.EventPublisher
@@ -42,6 +42,16 @@ func NewLifecycleService(
 	scaleRepo scale.Repository,
 	eventPublisher event.EventPublisher,
 ) PlanLifecycleService {
+	return NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, newRepositoryScaleCatalog(scaleRepo), eventPublisher)
+}
+
+// NewLifecycleServiceWithScaleCatalog 创建使用 scale catalog 防腐接口的计划生命周期服务。
+func NewLifecycleServiceWithScaleCatalog(
+	planRepo plan.AssessmentPlanRepository,
+	taskRepo plan.AssessmentTaskRepository,
+	scaleCatalog ScaleCatalog,
+	eventPublisher event.EventPublisher,
+) PlanLifecycleService {
 	taskGenerator := plan.NewTaskGenerator()
 	taskLifecycle := plan.NewTaskLifecycle()
 	lifecycle := plan.NewPlanLifecycle(taskRepo, taskGenerator, taskLifecycle)
@@ -49,7 +59,7 @@ func NewLifecycleService(
 	return &lifecycleService{
 		planRepo:       planRepo,
 		taskRepo:       taskRepo,
-		scaleRepo:      scaleRepo,
+		scaleCatalog:   scaleCatalog,
 		validator:      plan.NewPlanValidator(),
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
@@ -75,8 +85,8 @@ func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*
 		"action", "create_plan",
 		"scale_code", dto.ScaleCode,
 	)
-	if s.scaleRepo != nil {
-		exists, err := s.scaleRepo.ExistsByCode(ctx, dto.ScaleCode)
+	if s.scaleCatalog != nil {
+		exists, err := s.scaleCatalog.ExistsByCode(ctx, dto.ScaleCode)
 		if err != nil {
 			logger.L(ctx).Errorw("CreatePlan scale validation error",
 				"action", "create_plan",

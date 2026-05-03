@@ -16,14 +16,15 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -103,11 +104,24 @@ type EvaluationDeps struct {
 }
 
 type PlanDeps struct {
-	Handler *handler.PlanHandler
+	CommandService      planApp.PlanCommandService
+	QueryService        planApp.PlanQueryService
+	TesteeAccessService actorAccessApp.TesteeAccessService
 }
 
 type StatisticsDeps struct {
-	Handler *handler.StatisticsHandler
+	Enabled bool
+
+	SystemStatisticsService        statisticsApp.SystemStatisticsService
+	QuestionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
+	TesteeStatisticsService        statisticsApp.TesteeStatisticsService
+	PlanStatisticsService          statisticsApp.PlanStatisticsService
+	ReadService                    statisticsApp.ReadService
+	PeriodicStatsService           statisticsApp.PeriodicStatsService
+	SyncService                    statisticsApp.StatisticsSyncService
+	TesteeAccessService            actorAccessApp.TesteeAccessService
+	WarmupCoordinator              cachegov.Coordinator
+	CacheGovernanceStatusService   cachegov.StatusService
 }
 
 type IAMDeps struct {

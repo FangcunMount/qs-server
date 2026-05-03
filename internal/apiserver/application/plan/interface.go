@@ -1,6 +1,9 @@
 package plan
 
-import "context"
+import (
+	"context"
+	"time"
+)
 
 // ============= 按行为者组织的应用服务接口（Driving Ports）=============
 //
@@ -146,4 +149,49 @@ type PlanQueryService interface {
 	// ListTasksByTesteeAndPlan 查询受试者在某个计划下的所有任务
 	// 场景：查看某个受试者在某个计划下的所有任务
 	ListTasksByTesteeAndPlan(ctx context.Context, testeeID string, planID string) ([]*TaskResult, error)
+}
+
+// TaskAssessmentResolver 为答卷转测评流程识别计划任务上下文。
+// 行为者：内部 worker / gRPC internal service
+// 职责：隐藏 plan 任务仓储与领域对象，只暴露创建测评所需的 plan/task 上下文。
+type TaskAssessmentResolver interface {
+	ResolveTaskByIDForAssessment(ctx context.Context, input TaskAssessmentResolveInput) *TaskAssessmentContext
+	ResolveOpenedTaskForAssessment(ctx context.Context, input OpenedTaskResolveInput) *TaskAssessmentContext
+}
+
+type TaskAssessmentResolveInput struct {
+	TaskID            string
+	OrgID             uint64
+	TesteeID          uint64
+	ScaleCode         string
+	QuestionnaireCode string
+}
+
+type OpenedTaskResolveInput struct {
+	OrgID     uint64
+	TesteeID  uint64
+	ScaleCode string
+}
+
+type TaskAssessmentContext struct {
+	TaskID    string
+	PlanID    string
+	Completed bool
+}
+
+// TaskNotificationContextReader 为 task.opened 通知提供计划任务上下文。
+// 行为者：通知服务
+// 职责：隐藏 plan/task 仓储与领域对象，只暴露模板渲染需要的数据。
+type TaskNotificationContextReader interface {
+	GetTaskNotificationContext(ctx context.Context, taskID string) (*TaskNotificationContext, error)
+}
+
+type TaskNotificationContext struct {
+	TaskID                     string
+	PlanID                     string
+	ScaleCode                  string
+	PlannedAt                  time.Time
+	Seq                        int
+	TotalTimes                 int
+	UnfinishedSameDayTaskCount int
 }

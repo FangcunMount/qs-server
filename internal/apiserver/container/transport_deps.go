@@ -71,10 +71,26 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		}
 	}
 	if c.PlanModule != nil {
-		deps.Plan.Handler = c.PlanModule.Handler
+		deps.Plan.CommandService = c.PlanModule.CommandService
+		deps.Plan.QueryService = c.PlanModule.QueryService
+		if c.ActorModule != nil {
+			deps.Plan.TesteeAccessService = c.ActorModule.TesteeAccessService
+		}
 	}
 	if c.StatisticsModule != nil {
-		deps.Statistics.Handler = c.StatisticsModule.Handler
+		deps.Statistics.Enabled = true
+		deps.Statistics.SystemStatisticsService = c.StatisticsModule.SystemStatisticsService
+		deps.Statistics.QuestionnaireStatisticsService = c.StatisticsModule.QuestionnaireStatisticsService
+		deps.Statistics.TesteeStatisticsService = c.StatisticsModule.TesteeStatisticsService
+		deps.Statistics.PlanStatisticsService = c.StatisticsModule.PlanStatisticsService
+		deps.Statistics.ReadService = c.StatisticsModule.ReadService
+		deps.Statistics.PeriodicStatsService = c.StatisticsModule.PeriodicStatsService
+		deps.Statistics.SyncService = c.StatisticsModule.SyncService
+		if c.ActorModule != nil {
+			deps.Statistics.TesteeAccessService = c.ActorModule.TesteeAccessService
+		}
+		deps.Statistics.WarmupCoordinator = c.WarmupCoordinator()
+		deps.Statistics.CacheGovernanceStatusService = c.CacheGovernanceStatusService()
 	}
 	if c.IAMModule != nil {
 		deps.IAM.Enabled = c.IAMModule.IsEnabled()
@@ -177,7 +193,7 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	}
 	if c.PlanModule != nil {
 		deps.Plan.CommandService = c.PlanModule.CommandService
-		deps.Plan.TaskRepo = c.PlanModule.TaskRepo
+		deps.Plan.TaskAssessmentResolver = c.PlanModule.TaskAssessmentResolver
 	}
 	if c.StatisticsModule != nil {
 		deps.Statistics.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService

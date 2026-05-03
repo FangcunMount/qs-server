@@ -12,7 +12,6 @@ import (
 	statisticsReadModelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics/readmodel"
 	statisticsCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -25,15 +24,6 @@ import (
 
 // StatisticsModule 统计模块
 type StatisticsModule struct {
-	// repository 层
-	Repo *statisticsInfra.StatisticsRepository
-
-	// cache 层
-	Cache *statisticsCache.StatisticsCache
-
-	// handler 层
-	Handler *handler.StatisticsHandler
-
 	// service 层
 	SystemStatisticsService        statisticsApp.SystemStatisticsService
 	QuestionnaireStatisticsService statisticsApp.QuestionnaireStatisticsService
@@ -43,8 +33,6 @@ type StatisticsModule struct {
 	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	BehaviorProjectorService       statisticsApp.BehaviorProjectorService
-	testeeAccessService            actorAccessApp.TesteeAccessService
-	warmupCoordinator              cachegov.Coordinator
 }
 
 // StatisticsModuleDeps 定义 Statistics 模块的显式构造依赖。
@@ -72,17 +60,16 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 		return nil, err
 	}
 	module := &StatisticsModule{}
-	module.testeeAccessService = normalized.TesteeAccess
-	module.warmupCoordinator = normalized.WarmupCoordinator
 
 	// 初始化 repository 层
-	module.Repo = statisticsInfra.NewStatisticsRepository(normalized.MySQLDB, mysql.BaseRepositoryOptions{
+	repo := statisticsInfra.NewStatisticsRepository(normalized.MySQLDB, mysql.BaseRepositoryOptions{
 		Limiter: normalized.MySQLLimiter,
 	})
 
 	// 初始化 cache 层
+	var cache *statisticsCache.StatisticsCache
 	if normalized.RedisClient != nil {
-		module.Cache = statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
+		cache = statisticsCache.NewStatisticsCacheWithBuilderPolicyVersionStoreAndObserver(
 			normalized.RedisClient,
 			normalized.CacheBuilder,
 			normalized.QueryPolicy,
@@ -91,44 +78,24 @@ func NewStatisticsModule(deps StatisticsModuleDeps) (*StatisticsModule, error) {
 		)
 	} else {
 		// Redis不可用时，创建空实现（查询时会降级到MySQL）
-		module.Cache = nil
+		cache = nil
 	}
 	txRunner := newMySQLTransactionRunner(normalized.MySQLDB)
 
 	// 初始化 service 层
-	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
-	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
-	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(module.Repo, module.Cache)
-	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(module.Repo, module.Repo, module.Cache, normalized.HotsetRecorder)
+	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
+	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
+	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(repo, cache)
+	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
 	module.ReadService = statisticsApp.NewReadService(
 		statisticsReadModelInfra.NewReadModel(normalized.MySQLDB),
 		normalized.AnswerSheetReader,
-		statisticsApp.WithReadServiceCache(module.Cache),
+		statisticsApp.WithReadServiceCache(cache),
 		statisticsApp.WithReadServiceHotset(normalized.HotsetRecorder),
 	)
-	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(module.Repo)
-	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, module.Repo)
-	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, module.Repo, normalized.RepairWindowDays, normalized.LockManager)
-
-	// 初始化 handler 层
-	module.Handler = handler.NewStatisticsHandler(
-		module.SystemStatisticsService,
-		module.QuestionnaireStatisticsService,
-		module.TesteeStatisticsService,
-		module.PlanStatisticsService,
-		module.ReadService,
-		module.PeriodicStatsService,
-		module.SyncService,
-	)
-	if module.testeeAccessService != nil {
-		module.Handler.SetTesteeAccessService(module.testeeAccessService)
-	}
-	if module.warmupCoordinator != nil {
-		module.Handler.SetWarmupCoordinator(module.warmupCoordinator)
-	}
-	if normalized.StatusService != nil {
-		module.Handler.SetCacheGovernanceStatusService(normalized.StatusService)
-	}
+	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(repo)
+	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, repo)
+	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, repo, normalized.RepairWindowDays, normalized.LockManager)
 
 	return module, nil
 }
