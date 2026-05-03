@@ -221,53 +221,66 @@ cache:
   disable_evaluation_cache: false # 开启测评结果缓存
   disable_statistics_cache: false # 开启统计缓存
   compress_payload: false         # 是否压缩缓存 payload
-  static:
-    compress: false
-    singleflight: true
-    negative: false
-  object:
-    compress: false
-    singleflight: true
-    negative: false
-  query:
-    ttl: "5m"
-    compress: false
-    singleflight: false
-    negative: false
-  meta:
-  sdk:
-    compress: false
-    singleflight: false
-    negative: false
-  lock:
-    compress: false
-    singleflight: false
-    negative: false
-  ttl:                        # 缓存时间，可配置
-    scale: "2h"              # 量表缓存时间
-    scale_list: "10m"        # 量表列表缓存时间
-    questionnaire: "2h"      # 问卷缓存时间
-    assessment_detail: "1h"    # 测评详情缓存时间
-    assessment_list: "10m"     # 我的测评列表缓存时间
-    testee: "30m"              # 受试者缓存时间
-    plan: "12h"                # 计划缓存时间
-    negative: "5m"             # 负缓存时间（穿透保护）
-  ttl_jitter_ratio: 0.1       # 缓存时间抖动比例
+  
+  static:               # 静态数据缓存（如量表、问卷定义等），适合长期缓存，穿透保护优先
+    compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
+    singleflight: true  # 启用单飞，避免缓存穿透时的雪崩效应
+    negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
+  
+  object:               # 对象数据缓存（如测评结果等），适合短期缓存，性能优先
+    compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
+    singleflight: true  # 启用单飞，避免缓存穿透时的雪崩效应
+    negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
+  
+  query:                # 查询结果缓存（如统计数据等），适合短期缓存，性能优先    
+    ttl: "5m"           # 查询结果缓存时间，生产环境建议设置为 5 分钟，平衡数据新鲜度和性能
+    compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
+    singleflight: false # 查询结果通常不需要单飞，允许一定程度的穿透以保持数据相对新鲜；如果某些统计查询非常重，可以考虑启用单飞
+    negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
+
+  meta:                 # 元数据缓存（如问卷版本、计划版本等），适合中期缓存，平衡新鲜度和性能
+    compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
+    singleflight: false # 元数据更新频率较低，通常不需要单飞，允许一定程度的穿透以保持数据相对新鲜；如果某些元数据查询非常重，可以考虑启用单飞
+    negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
+
+  sdk:                  # SDK 相关缓存（如 token 等），适合短期缓存，性能优先
+    compress: false     # 生产环境可以适度启用压缩，节省内存和网络带宽
+    singleflight: false # SDK 请求通常不需要单飞，允许一定程度的穿透以保持数据相对新鲜
+    negative: false     # 生产环境建议禁用负缓存，避免数据更新后长时间读取旧数据；依赖单飞机制保护数据库安全
+    
+  lock:                 # 分布式锁缓存，适合短期缓存，性能优先
+    compress: false     # 锁信息通常较小且访问频繁，启用压缩可能反而增加 CPU 开销，生产环境建议禁用压缩
+    singleflight: false # 锁请求不需要单飞，允许穿透以保持系统可用性；依赖下游数据库的性能和锁机制保护数据安全
+    negative: false     # 生产环境建议禁用负缓存，避免锁状态变化后长时间读取旧状态；依赖下游数据库的性能和锁机制保护数据安全
+  
+  ttl:                       # 缓存时间，可配置
+    scale: "2h"              # 量表缓存时间，生产环境建议设置为 2 小时，平衡数据新鲜度和性能
+    scale_list: "10m"        # 量表列表缓存时间，生产环境建议设置为 10 分钟，平衡数据新鲜度和性能
+    questionnaire: "2h"      # 问卷缓存时间，生产环境建议设置为 2 小时，平衡数据新鲜度和性能
+    assessment_detail: "1h"    # 测评详情缓存时间，生产环境建议设置为 1 小时，平衡数据新鲜度和性能；如果测评结果更新频率较高，可以适当缩短缓存时间
+    assessment_list: "10m"     # 我的测评列表缓存时间，生产环境建议设置为 10 分钟，平衡数据新鲜度和性能；如果用户测评列表更新频率较高，可以适当缩短缓存时间
+    testee: "30m"              # 受试者缓存时间，生产环境建议设置为 30 分钟，平衡数据新鲜度和性能；如果受试者信息更新频率较高，可以适当缩短缓存时间
+    plan: "12h"                # 计划缓存时间，生产环境建议设置为 12 小时，平衡数据新鲜度和性能；如果计划信息更新频率较高，可以适当缩短缓存时间
+    negative: "5m"             # 负缓存时间（穿透保护），生产环境建议设置为 5 分钟，避免长时间读取旧数据；依赖单飞机制保护数据库安全
+
+  ttl_jitter_ratio: 0.2       # 缓存时间抖动比例，生产环境建议设置为 0.1（10%），避免大量缓存同时过期导致的性能问题
+
   statistics_warmup:          # 统计查询结果缓存预热配置
-    enable: false             # 2C4G 临时降配阶段关闭统计预热，改为按需加载
+    enable: true              # 启用统计缓存预热，生产环境建议开启以提升关键统计查询的性能
     org_ids: [1]              # 组织ID列表（从配置读取，默认预热所有组织）
     overview_presets: ["today", "7d", "30d"] # 首页概览常用窗口
     questionnaire_codes: []    # 问卷编码列表（从配置读取，默认预热所有问卷）
     plan_ids: []              # 计划ID列表（从配置读取，默认预热所有计划）
-  warmup:
-    enable: true
-    startup:
-      static: true
-      query: false
-    hotset:
-      enable: false
-      top_n: 20
-      max_items_per_kind: 200
+
+  warmup:                     # 其他缓存预热配置
+    enable: true              # 启用缓存预热，生产环境建议开启以提升关键数据的访问性能
+    startup:                  # 启动预热，生产环境建议开启以提升服务启动后的访问性能
+      static: true            # 预热静态数据（如量表、问卷定义等），生产环境建议开启以提升访问性能
+      query: false            # 预热查询结果，生产环境可以根据实际情况选择是否开启；如果某些统计查询非常重且访问频繁，建议开启预热
+    hotset:                   # 热点数据预热配置，生产环境建议开启以提升访问性能
+      enable: true            # 启用热点数据预热  
+      top_n: 20               # 预热前 N 热数据，生产环境建议设置为 20，平衡预热覆盖率和性能；如果访问分布非常集中，可以适当增加 top_n
+      max_items_per_kind: 200 # 每种类型预热的最大数据量，生产环境建议设置为 200，避免预热过多数据导致性能问题；如果某些类型的数据访问非常频繁，可以适当增加 max_items_per_kind
 
 # ----------------------------------------------------------------------------
 # 3.6 内建调度器配置
