@@ -2,7 +2,6 @@ package assembler
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
@@ -48,7 +47,6 @@ type StatisticsModuleDeps struct {
 	VersionStore      cachequery.VersionTokenStore
 	Observer          *observability.ComponentObserver
 	MySQLLimiter      backpressure.Acquirer
-	TesteeAccess      actorAccessApp.TesteeAccessService
 	WarmupCoordinator cachegov.Coordinator
 	StatusService     cachegov.StatusService
 }

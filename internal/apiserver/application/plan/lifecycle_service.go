@@ -6,7 +6,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -17,22 +16,11 @@ import (
 // lifecycleService 计划生命周期服务实现
 // 行为者：计划管理员
 type lifecycleService struct {
-	planRepo       plan.AssessmentPlanRepository
-	taskRepo       plan.AssessmentTaskRepository
-	scaleCatalog   ScaleCatalog
-	validator      *plan.PlanValidator
-	lifecycle      *plan.PlanLifecycle
-	eventPublisher event.EventPublisher
-}
-
-type planTransitionSpec struct {
-	action          string
-	startLog        string
-	transitionLog   string
-	transitionError string
-	planSaveError   string
-	taskSaveError   string
-	successLog      string
+	planRepo           plan.AssessmentPlanRepository
+	taskRepo           plan.AssessmentTaskRepository
+	lifecycle          *plan.PlanLifecycle
+	createWorkflow     *planCreateWorkflow
+	transitionWorkflow *planTransitionWorkflow
 }
 
 // NewLifecycleService 创建计划生命周期服务
@@ -57,267 +45,26 @@ func NewLifecycleServiceWithScaleCatalog(
 	lifecycle := plan.NewPlanLifecycle(taskRepo, taskGenerator, taskLifecycle)
 
 	return &lifecycleService{
-		planRepo:       planRepo,
-		taskRepo:       taskRepo,
-		scaleCatalog:   scaleCatalog,
-		validator:      plan.NewPlanValidator(),
-		lifecycle:      lifecycle,
-		eventPublisher: eventPublisher,
+		planRepo:           planRepo,
+		taskRepo:           taskRepo,
+		lifecycle:          lifecycle,
+		createWorkflow:     newPlanCreateWorkflow(planRepo, scaleCatalog, plan.NewPlanValidator()),
+		transitionWorkflow: newPlanTransitionWorkflow(planRepo, taskRepo, eventPublisher),
 	}
 }
 
 // CreatePlan 创建测评计划模板
 func (s *lifecycleService) CreatePlan(ctx context.Context, dto CreatePlanDTO) (*PlanResult, error) {
-	logger.L(ctx).Infow("CreatePlan service started",
-		"action", "create_plan",
-		"org_id", dto.OrgID,
-		"scale_code", dto.ScaleCode,
-		"schedule_type", dto.ScheduleType,
-		"trigger_time", dto.TriggerTime,
-		"interval", dto.Interval,
-		"total_times", dto.TotalTimes,
-		"fixed_dates", dto.FixedDates,
-		"relative_weeks", dto.RelativeWeeks,
-	)
-
-	// 1. 验证 scale code 是否存在
-	logger.L(ctx).Infow("CreatePlan validating scale_code",
-		"action", "create_plan",
-		"scale_code", dto.ScaleCode,
-	)
-	if s.scaleCatalog != nil {
-		exists, err := s.scaleCatalog.ExistsByCode(ctx, dto.ScaleCode)
-		if err != nil {
-			logger.L(ctx).Errorw("CreatePlan scale validation error",
-				"action", "create_plan",
-				"scale_code", dto.ScaleCode,
-				"error", err.Error(),
-			)
-			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "验证量表编码失败: %s", dto.ScaleCode)
-		}
-		if !exists {
-			logger.L(ctx).Errorw("CreatePlan scale not found",
-				"action", "create_plan",
-				"scale_code", dto.ScaleCode,
-			)
-			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的量表编码: %s", dto.ScaleCode)
-		}
-		logger.L(ctx).Infow("CreatePlan scale_code validated",
-			"action", "create_plan",
-			"scale_code", dto.ScaleCode,
-		)
-	}
-
-	logger.L(ctx).Infow("CreatePlan converting schedule_type",
-		"action", "create_plan",
-		"schedule_type", dto.ScheduleType,
-	)
-	scheduleType := toPlanScheduleType(dto.ScheduleType)
-	logger.L(ctx).Infow("CreatePlan schedule_type converted",
-		"action", "create_plan",
-		"schedule_type_parsed", string(scheduleType),
-	)
-
-	triggerTime, err := plan.NormalizePlanTriggerTime(dto.TriggerTime)
+	planAggregate, err := s.createWorkflow.create(ctx, dto)
 	if err != nil {
-		logger.L(ctx).Errorw("CreatePlan invalid trigger_time",
-			"action", "create_plan",
-			"trigger_time", dto.TriggerTime,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的触发时间: %s", dto.TriggerTime)
+		return nil, err
 	}
-
-	// 转换固定日期列表
-	var fixedDates []time.Time
-	if len(dto.FixedDates) > 0 {
-		logger.L(ctx).Infow("CreatePlan parsing fixed_dates",
-			"action", "create_plan",
-			"fixed_dates_count", len(dto.FixedDates),
-			"fixed_dates", dto.FixedDates,
-		)
-		fixedDates = make([]time.Time, 0, len(dto.FixedDates))
-		for i, dateStr := range dto.FixedDates {
-			logger.L(ctx).Infow("CreatePlan parsing fixed_date",
-				"action", "create_plan",
-				"index", i,
-				"date_str", dateStr,
-			)
-			date, err := parseDate(dateStr)
-			if err != nil {
-				logger.L(ctx).Errorw("CreatePlan invalid date format",
-					"action", "create_plan",
-					"index", i,
-					"date_str", dateStr,
-					"error", err.Error(),
-				)
-				return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的日期格式: %s", dateStr)
-			}
-			fixedDates = append(fixedDates, date)
-			logger.L(ctx).Infow("CreatePlan fixed_date parsed",
-				"action", "create_plan",
-				"index", i,
-				"date", date.Format("2006-01-02"),
-			)
-		}
-		logger.L(ctx).Infow("CreatePlan all fixed_dates parsed",
-			"action", "create_plan",
-			"fixed_dates_count", len(fixedDates),
-		)
-	}
-
-	// 2. 根据 schedule_type 确定 totalTimes
-	// 对于 custom 和 fixed_date 类型，totalTimes 应该从对应的数组长度推导
-	totalTimes := dto.TotalTimes
-	logger.L(ctx).Infow("CreatePlan calculating total_times",
-		"action", "create_plan",
-		"initial_total_times", totalTimes,
-		"schedule_type", scheduleType,
-	)
-	switch scheduleType {
-	case plan.PlanScheduleCustom:
-		if len(dto.RelativeWeeks) > 0 {
-			totalTimes = len(dto.RelativeWeeks)
-			logger.L(ctx).Infow("CreatePlan total_times from relative_weeks",
-				"action", "create_plan",
-				"total_times", totalTimes,
-				"relative_weeks_count", len(dto.RelativeWeeks),
-			)
-		}
-	case plan.PlanScheduleFixedDate:
-		if len(fixedDates) > 0 {
-			totalTimes = len(fixedDates)
-			logger.L(ctx).Infow("CreatePlan total_times from fixed_dates",
-				"action", "create_plan",
-				"total_times", totalTimes,
-				"fixed_dates_count", len(fixedDates),
-			)
-		}
-	}
-	logger.L(ctx).Infow("CreatePlan total_times calculated",
-		"action", "create_plan",
-		"final_total_times", totalTimes,
-	)
-
-	// 3. 验证参数（使用计算后的 totalTimes）
-	logger.L(ctx).Infow("CreatePlan validating parameters",
-		"action", "create_plan",
-		"org_id", dto.OrgID,
-		"scale_code", dto.ScaleCode,
-		"schedule_type", string(scheduleType),
-		"trigger_time", triggerTime,
-		"interval", dto.Interval,
-		"total_times", totalTimes,
-		"fixed_dates_count", len(fixedDates),
-		"relative_weeks_count", len(dto.RelativeWeeks),
-	)
-	if errs := s.validator.ValidateForCreation(dto.OrgID, dto.ScaleCode, scheduleType, triggerTime, dto.Interval, totalTimes, fixedDates, dto.RelativeWeeks); len(errs) > 0 {
-		logger.L(ctx).Errorw("CreatePlan validation failed",
-			"action", "create_plan",
-			"org_id", dto.OrgID,
-			"validation_errors", errs,
-			"errors_count", len(errs),
-		)
-		for i, err := range errs {
-			logger.L(ctx).Errorw("CreatePlan validation error detail",
-				"action", "create_plan",
-				"error_index", i,
-				"field", err.Field,
-				"message", err.Message,
-			)
-		}
-		return nil, plan.ToError(errs)
-	}
-	logger.L(ctx).Infow("CreatePlan validation passed",
-		"action", "create_plan",
-	)
-
-	// 4. 创建计划选项
-	logger.L(ctx).Infow("CreatePlan building plan options",
-		"action", "create_plan",
-		"trigger_time", triggerTime,
-		"has_fixed_dates", len(fixedDates) > 0,
-		"has_relative_weeks", len(dto.RelativeWeeks) > 0,
-	)
-	opts := []plan.PlanOption{plan.WithTriggerTime(triggerTime)}
-	if len(fixedDates) > 0 {
-		opts = append(opts, plan.WithFixedDates(fixedDates))
-		logger.L(ctx).Infow("CreatePlan added fixed_dates option",
-			"action", "create_plan",
-			"fixed_dates_count", len(fixedDates),
-		)
-	}
-	if len(dto.RelativeWeeks) > 0 {
-		opts = append(opts, plan.WithRelativeWeeks(dto.RelativeWeeks))
-		logger.L(ctx).Infow("CreatePlan added relative_weeks option",
-			"action", "create_plan",
-			"relative_weeks_count", len(dto.RelativeWeeks),
-		)
-	}
-	logger.L(ctx).Infow("CreatePlan plan options built",
-		"action", "create_plan",
-		"options_count", len(opts),
-	)
-
-	// 5. 创建计划领域对象
-	logger.L(ctx).Infow("CreatePlan creating domain object",
-		"action", "create_plan",
-		"org_id", dto.OrgID,
-		"scale_code", dto.ScaleCode,
-		"schedule_type", string(scheduleType),
-		"trigger_time", triggerTime,
-		"interval", dto.Interval,
-		"total_times", totalTimes,
-	)
-	p, err := plan.NewAssessmentPlan(dto.OrgID, dto.ScaleCode, scheduleType, dto.Interval, totalTimes, opts...)
-	if err != nil {
-		logger.L(ctx).Errorw("CreatePlan failed to create domain object",
-			"action", "create_plan",
-			"org_id", dto.OrgID,
-			"scale_code", dto.ScaleCode,
-			"schedule_type", string(scheduleType),
-			"trigger_time", triggerTime,
-			"interval", dto.Interval,
-			"total_times", totalTimes,
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建计划失败")
-	}
-	logger.L(ctx).Infow("CreatePlan domain object created",
-		"action", "create_plan",
-		"plan_id", p.GetID().String(),
-	)
-
-	// 6. 持久化
-	logger.L(ctx).Infow("CreatePlan saving to repository",
-		"action", "create_plan",
-		"plan_id", p.GetID().String(),
-	)
-	if err := s.planRepo.Save(ctx, p); err != nil {
-		logger.L(ctx).Errorw("CreatePlan failed to save plan",
-			"action", "create_plan",
-			"plan_id", p.GetID().String(),
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
-	}
-	logger.L(ctx).Infow("CreatePlan plan saved",
-		"action", "create_plan",
-		"plan_id", p.GetID().String(),
-	)
-
-	logger.L(ctx).Infow("CreatePlan completed successfully",
-		"action", "create_plan",
-		"plan_id", p.GetID().String(),
-		"org_id", dto.OrgID,
-	)
-
-	return toPlanResult(p), nil
+	return toPlanResult(planAggregate), nil
 }
 
 // PausePlan 暂停计划
 func (s *lifecycleService) PausePlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
-	return s.transitionPlanWithTaskCancellation(
+	return s.transitionWorkflow.transitionPlanWithTaskCancellation(
 		ctx,
 		orgID,
 		planID,
@@ -417,7 +164,7 @@ func (s *lifecycleService) ResumePlan(ctx context.Context, orgID int64, planID s
 
 // FinishPlan 手动结束计划
 func (s *lifecycleService) FinishPlan(ctx context.Context, orgID int64, planID string) (*PlanResult, error) {
-	return s.transitionPlanWithTaskCancellation(
+	return s.transitionWorkflow.transitionPlanWithTaskCancellation(
 		ctx,
 		orgID,
 		planID,
@@ -436,7 +183,7 @@ func (s *lifecycleService) FinishPlan(ctx context.Context, orgID int64, planID s
 
 // CancelPlan 取消计划
 func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID string) error {
-	_, err := s.transitionPlanWithTaskCancellation(
+	_, err := s.transitionWorkflow.transitionPlanWithTaskCancellation(
 		ctx,
 		orgID,
 		planID,
@@ -452,91 +199,4 @@ func (s *lifecycleService) CancelPlan(ctx context.Context, orgID int64, planID s
 		s.lifecycle.Cancel,
 	)
 	return err
-}
-
-func (s *lifecycleService) transitionPlanWithTaskCancellation(
-	ctx context.Context,
-	orgID int64,
-	planID string,
-	spec planTransitionSpec,
-	transition func(context.Context, *plan.AssessmentPlan) ([]*plan.AssessmentTask, error),
-) (*PlanResult, error) {
-	logger.L(ctx).Infow(spec.startLog,
-		"action", spec.action,
-		"org_id", orgID,
-		"plan_id", planID,
-	)
-
-	planAggregate, err := loadPlanInOrg(ctx, s.planRepo, orgID, planID, spec.action)
-	if err != nil {
-		return nil, err
-	}
-
-	canceledTasks, err := transition(ctx, planAggregate)
-	if err != nil {
-		logger.L(ctx).Errorw(spec.transitionError,
-			"action", spec.action,
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, err
-	}
-
-	logger.L(ctx).Infow(spec.transitionLog,
-		"action", spec.action,
-		"plan_id", planID,
-		"canceled_tasks_count", len(canceledTasks),
-	)
-
-	if err := s.planRepo.Save(ctx, planAggregate); err != nil {
-		logger.L(ctx).Errorw(spec.planSaveError,
-			"action", spec.action,
-			"plan_id", planID,
-			"error", err.Error(),
-		)
-		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存计划失败")
-	}
-
-	savedTaskCount := s.saveCanceledTasks(ctx, spec.action, planID, spec.taskSaveError, canceledTasks)
-
-	logger.L(ctx).Infow(spec.successLog,
-		"action", spec.action,
-		"plan_id", planID,
-		"canceled_tasks_count", len(canceledTasks),
-		"saved_tasks_count", savedTaskCount,
-	)
-
-	return toPlanResult(planAggregate), nil
-}
-
-func (s *lifecycleService) saveCanceledTasks(
-	ctx context.Context,
-	action string,
-	planID string,
-	taskSaveError string,
-	tasks []*plan.AssessmentTask,
-) int {
-	savedTaskCount := 0
-	for _, task := range tasks {
-		if err := s.taskRepo.Save(ctx, task); err != nil {
-			logger.L(ctx).Errorw(taskSaveError,
-				"action", action,
-				"plan_id", planID,
-				"task_id", task.GetID().String(),
-				"error", err.Error(),
-			)
-			continue
-		}
-		savedTaskCount++
-
-		eventing.PublishCollectedEvents(ctx, s.eventPublisher, task, nil, func(evt event.DomainEvent, err error) {
-			logger.L(ctx).Errorw("Failed to publish task event",
-				"action", action,
-				"task_id", task.GetID().String(),
-				"event_type", evt.EventType(),
-				"error", err.Error(),
-			)
-		})
-	}
-	return savedTaskCount
 }

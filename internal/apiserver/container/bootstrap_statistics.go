@@ -54,7 +54,6 @@ func (c *Container) buildStatisticsModuleDeps() assembler.StatisticsModuleDeps {
 		VersionStore:      versionStore,
 		Observer:          c.cacheObserver(),
 		MySQLLimiter:      c.backpressure.MySQL,
-		TesteeAccess:      c.actorTesteeAccessService(),
 		WarmupCoordinator: c.WarmupCoordinator(),
 		StatusService:     c.CacheGovernanceStatusService(),
 	}

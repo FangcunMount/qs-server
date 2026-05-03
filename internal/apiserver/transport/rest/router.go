@@ -119,7 +119,7 @@ type StatisticsDeps struct {
 	ReadService                    statisticsApp.ReadService
 	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
-	TesteeAccessService            actorAccessApp.TesteeAccessService
+	TesteeAccessService            statisticsApp.TesteeAccessValidator
 	WarmupCoordinator              cachegov.Coordinator
 	CacheGovernanceStatusService   cachegov.StatusService
 }

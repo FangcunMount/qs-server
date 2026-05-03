@@ -12,19 +12,6 @@ type AssessmentPlanRepository interface {
 	// FindByID 根据 ID 查询计划
 	FindByID(ctx context.Context, id AssessmentPlanID) (*AssessmentPlan, error)
 
-	// FindByScaleCode 查询某个量表的所有计划
-	FindByScaleCode(ctx context.Context, scaleCode string) ([]*AssessmentPlan, error)
-
-	// FindActivePlans 查询所有活跃的计划
-	FindActivePlans(ctx context.Context) ([]*AssessmentPlan, error)
-
-	// FindByTesteeID 查询某个受试者参与的所有计划
-	// 实现方式：通过 Task 反查 Plan，返回去重后的 Plan 列表
-	FindByTesteeID(ctx context.Context, testeeID testee.ID) ([]*AssessmentPlan, error)
-
-	// FindList 分页查询计划列表（支持条件筛选）
-	FindList(ctx context.Context, orgID int64, scaleCode string, status string, page, pageSize int) ([]*AssessmentPlan, int64, error)
-
 	// Save 保存计划
 	Save(ctx context.Context, plan *AssessmentPlan) error
 }
@@ -51,15 +38,6 @@ type AssessmentTaskRepository interface {
 
 	// FindExpiredTasks 查询已过期的任务（状态为 opened，截止时间 <= now）
 	FindExpiredTasks(ctx context.Context) ([]*AssessmentTask, error)
-
-	// FindList 分页查询任务列表（支持条件筛选）
-	FindList(ctx context.Context, orgID int64, planID *AssessmentPlanID, testeeID *testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
-
-	// FindListByTesteeIDs 分页查询受试者集合范围内的任务。
-	FindListByTesteeIDs(ctx context.Context, orgID int64, planID *AssessmentPlanID, testeeIDs []testee.ID, status *TaskStatus, page, pageSize int) ([]*AssessmentTask, int64, error)
-
-	// FindWindow 查询任务窗口，不返回 total，仅返回是否还有下一页。
-	FindWindow(ctx context.Context, orgID int64, planID AssessmentPlanID, testeeIDs []testee.ID, status *TaskStatus, plannedBefore *time.Time, page, pageSize int) ([]*AssessmentTask, bool, error)
 
 	// Save 保存任务
 	Save(ctx context.Context, task *AssessmentTask) error

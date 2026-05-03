@@ -94,7 +94,7 @@ func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
 		planRepo,
 		taskRepo,
 	)
-	module.QueryService = planApp.NewQueryServiceWithReadModel(planReadModel, planReadModel, scaleCatalog)
+	module.QueryService = planApp.NewQueryService(planReadModel, planReadModel, scaleCatalog)
 	module.TaskAssessmentResolver = planApp.NewTaskAssessmentResolver(taskRepo)
 	module.TaskNotificationContextReader = planApp.NewTaskNotificationContextReader(taskRepo, planRepo)
 

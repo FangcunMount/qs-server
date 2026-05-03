@@ -5,145 +5,104 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 )
 
-type taskWindowRepoStub struct {
-	windowTasks         []*domainPlan.AssessmentTask
-	windowHasMore       bool
-	lastWindowOrgID     int64
-	lastWindowPlanID    domainPlan.AssessmentPlanID
-	lastWindowTesteeIDs []testee.ID
-	lastWindowStatus    *domainPlan.TaskStatus
-	lastWindowBefore    *time.Time
-	lastWindowPage      int
-	lastWindowPageSize  int
+type planReadModelStub struct {
+	planRows       []planreadmodel.PlanRow
+	planTotal      int64
+	planByID       map[uint64]planreadmodel.PlanRow
+	testeePlanRows []planreadmodel.PlanRow
+	lastListFilter planreadmodel.PlanFilter
+	lastListPage   planreadmodel.PageRequest
+	lastGetOrgID   int64
+	lastGetPlanID  uint64
+	lastTesteeID   uint64
 }
 
-type scaleRepoStub struct {
-	byCode map[string]*domainScale.MedicalScale
+type taskReadModelStub struct {
+	windowRows       []planreadmodel.TaskRow
+	windowHasMore    bool
+	lastWindowFilter planreadmodel.TaskWindowFilter
+	lastWindowPage   planreadmodel.PageRequest
 }
 
-type planListRepoStub struct {
-	plans []*domainPlan.AssessmentPlan
-	total int64
+type scaleCatalogStub struct {
+	titles map[string]string
 }
 
-func (r *planListRepoStub) FindByID(context.Context, domainPlan.AssessmentPlanID) (*domainPlan.AssessmentPlan, error) {
-	return nil, nil
-}
-
-func (r *planListRepoStub) FindByScaleCode(context.Context, string) ([]*domainPlan.AssessmentPlan, error) {
-	return nil, nil
-}
-
-func (r *planListRepoStub) FindActivePlans(context.Context) ([]*domainPlan.AssessmentPlan, error) {
-	return nil, nil
-}
-
-func (r *planListRepoStub) FindByTesteeID(context.Context, testee.ID) ([]*domainPlan.AssessmentPlan, error) {
-	return nil, nil
-}
-
-func (r *planListRepoStub) FindList(context.Context, int64, string, string, int, int) ([]*domainPlan.AssessmentPlan, int64, error) {
-	if r == nil {
-		return nil, 0, nil
+func (r *planReadModelStub) GetPlan(_ context.Context, orgID int64, planID uint64) (*planreadmodel.PlanRow, error) {
+	r.lastGetOrgID = orgID
+	r.lastGetPlanID = planID
+	if r.planByID != nil {
+		row := r.planByID[planID]
+		return &row, nil
 	}
-	return r.plans, r.total, nil
+	return &planreadmodel.PlanRow{ID: planID, OrgID: orgID, ScaleCode: "scale-code", Status: "active"}, nil
 }
 
-func (r *planListRepoStub) Save(context.Context, *domainPlan.AssessmentPlan) error {
-	return nil
+func (r *planReadModelStub) ListPlans(_ context.Context, filter planreadmodel.PlanFilter, page planreadmodel.PageRequest) (planreadmodel.PlanPage, error) {
+	r.lastListFilter = filter
+	r.lastListPage = page
+	return planreadmodel.PlanPage{Items: r.planRows, Total: r.planTotal, Page: page.Page, PageSize: page.PageSize}, nil
 }
 
-func (r *scaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error {
-	return nil
+func (r *planReadModelStub) ListPlansByTesteeID(_ context.Context, testeeID uint64) ([]planreadmodel.PlanRow, error) {
+	r.lastTesteeID = testeeID
+	return r.testeePlanRows, nil
 }
 
-func (r *scaleRepoStub) FindByCode(_ context.Context, code string) (*domainScale.MedicalScale, error) {
-	if r == nil {
-		return nil, nil
-	}
-	return r.byCode[code], nil
-}
-
-func (r *scaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
+func (r *taskReadModelStub) GetTask(context.Context, int64, uint64) (*planreadmodel.TaskRow, error) {
 	return nil, nil
 }
 
-func (r *scaleRepoStub) Update(context.Context, *domainScale.MedicalScale) error {
-	return nil
+func (r *taskReadModelStub) ListTasks(context.Context, planreadmodel.TaskFilter, planreadmodel.PageRequest) (planreadmodel.TaskPage, error) {
+	return planreadmodel.TaskPage{}, nil
 }
 
-func (r *scaleRepoStub) Remove(context.Context, string) error {
-	return nil
-}
-
-func (r *scaleRepoStub) ExistsByCode(context.Context, string) (bool, error) {
-	return false, nil
-}
-
-func (r *taskWindowRepoStub) FindByID(context.Context, domainPlan.AssessmentTaskID) (*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindByPlanID(context.Context, domainPlan.AssessmentPlanID) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindByPlanIDAndTesteeIDs(context.Context, domainPlan.AssessmentPlanID, []testee.ID) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindByTesteeID(context.Context, testee.ID) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindByTesteeIDAndPlanID(context.Context, testee.ID, domainPlan.AssessmentPlanID) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindPendingTasks(context.Context, int64, time.Time) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindExpiredTasks(context.Context) ([]*domainPlan.AssessmentTask, error) {
-	return nil, nil
-}
-
-func (r *taskWindowRepoStub) FindList(context.Context, int64, *domainPlan.AssessmentPlanID, *testee.ID, *domainPlan.TaskStatus, int, int) ([]*domainPlan.AssessmentTask, int64, error) {
-	return nil, 0, nil
-}
-
-func (r *taskWindowRepoStub) FindListByTesteeIDs(context.Context, int64, *domainPlan.AssessmentPlanID, []testee.ID, *domainPlan.TaskStatus, int, int) ([]*domainPlan.AssessmentTask, int64, error) {
-	return nil, 0, nil
-}
-
-func (r *taskWindowRepoStub) FindWindow(_ context.Context, orgID int64, planID domainPlan.AssessmentPlanID, testeeIDs []testee.ID, status *domainPlan.TaskStatus, plannedBefore *time.Time, page, pageSize int) ([]*domainPlan.AssessmentTask, bool, error) {
-	r.lastWindowOrgID = orgID
-	r.lastWindowPlanID = planID
-	r.lastWindowTesteeIDs = append([]testee.ID(nil), testeeIDs...)
-	r.lastWindowStatus = status
-	if plannedBefore != nil {
-		clone := *plannedBefore
-		r.lastWindowBefore = &clone
-	} else {
-		r.lastWindowBefore = nil
-	}
+func (r *taskReadModelStub) ListTaskWindow(_ context.Context, filter planreadmodel.TaskWindowFilter, page planreadmodel.PageRequest) (planreadmodel.TaskWindow, error) {
+	r.lastWindowFilter = filter
 	r.lastWindowPage = page
-	r.lastWindowPageSize = pageSize
-	return r.windowTasks, r.windowHasMore, nil
+	return planreadmodel.TaskWindow{Items: r.windowRows, Page: page.Page, PageSize: page.PageSize, HasMore: r.windowHasMore}, nil
 }
 
-func (r *taskWindowRepoStub) Save(context.Context, *domainPlan.AssessmentTask) error {
-	return nil
+func (r *taskReadModelStub) ListTasksByPlanID(context.Context, uint64) ([]planreadmodel.TaskRow, error) {
+	return nil, nil
 }
 
-func (r *taskWindowRepoStub) SaveBatch(context.Context, []*domainPlan.AssessmentTask) error {
-	return nil
+func (r *taskReadModelStub) ListTasksByPlanIDAndTesteeIDs(context.Context, uint64, []uint64) ([]planreadmodel.TaskRow, error) {
+	return nil, nil
+}
+
+func (r *taskReadModelStub) ListTasksByTesteeID(context.Context, uint64) ([]planreadmodel.TaskRow, error) {
+	return nil, nil
+}
+
+func (r *taskReadModelStub) ListTasksByTesteeIDAndPlanID(context.Context, uint64, uint64) ([]planreadmodel.TaskRow, error) {
+	return nil, nil
+}
+
+func (r *scaleCatalogStub) ExistsByCode(context.Context, string) (bool, error) {
+	return true, nil
+}
+
+func (r *scaleCatalogStub) ResolveTitle(_ context.Context, code string) string {
+	if r == nil {
+		return ""
+	}
+	return r.titles[code]
+}
+
+func (r *scaleCatalogStub) ResolveTitles(_ context.Context, codes []string) map[string]string {
+	results := make(map[string]string, len(codes))
+	if r == nil {
+		return results
+	}
+	for _, code := range codes {
+		results[code] = r.titles[code]
+	}
+	return results
 }
 
 func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
@@ -151,20 +110,20 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessmentPlan returned error: %v", err)
 	}
-	task := domainPlan.NewAssessmentTask(
-		planAggregate.GetID(),
-		1,
-		1,
-		testee.NewID(3001),
-		"scale-code",
-		time.Date(2026, 4, 11, 10, 0, 0, 0, time.Local),
-	)
-
-	repo := &taskWindowRepoStub{
-		windowTasks:   []*domainPlan.AssessmentTask{task},
+	reader := &taskReadModelStub{
+		windowRows: []planreadmodel.TaskRow{{
+			ID:        1001,
+			PlanID:    planAggregate.GetID().Uint64(),
+			Seq:       1,
+			OrgID:     1,
+			TesteeID:  3001,
+			ScaleCode: "scale-code",
+			PlannedAt: time.Date(2026, 4, 11, 10, 0, 0, 0, time.Local),
+			Status:    "pending",
+		}},
 		windowHasMore: true,
 	}
-	service := NewQueryService(&schedulerPlanRepoByIDStub{plan: planAggregate}, repo, nil)
+	service := NewQueryService(&planReadModelStub{}, reader, nil)
 
 	result, err := service.ListTaskWindow(context.Background(), ListTaskWindowDTO{
 		OrgID:         1,
@@ -179,23 +138,23 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 		t.Fatalf("ListTaskWindow returned error: %v", err)
 	}
 
-	if repo.lastWindowOrgID != 1 {
-		t.Fatalf("expected org_id=1, got %d", repo.lastWindowOrgID)
+	if reader.lastWindowFilter.OrgID != 1 {
+		t.Fatalf("expected org_id=1, got %d", reader.lastWindowFilter.OrgID)
 	}
-	if repo.lastWindowPlanID != planAggregate.GetID() {
-		t.Fatalf("expected plan id %s, got %s", planAggregate.GetID().String(), repo.lastWindowPlanID.String())
+	if reader.lastWindowFilter.PlanID != planAggregate.GetID().Uint64() {
+		t.Fatalf("expected plan id %s, got %d", planAggregate.GetID().String(), reader.lastWindowFilter.PlanID)
 	}
-	if len(repo.lastWindowTesteeIDs) != 2 || repo.lastWindowTesteeIDs[0] != testee.NewID(3001) || repo.lastWindowTesteeIDs[1] != testee.NewID(3002) {
-		t.Fatalf("unexpected window testee ids: %+v", repo.lastWindowTesteeIDs)
+	if len(reader.lastWindowFilter.TesteeIDs) != 2 || reader.lastWindowFilter.TesteeIDs[0] != 3001 || reader.lastWindowFilter.TesteeIDs[1] != 3002 {
+		t.Fatalf("unexpected window testee ids: %+v", reader.lastWindowFilter.TesteeIDs)
 	}
-	if repo.lastWindowStatus == nil || *repo.lastWindowStatus != domainPlan.TaskStatusPending {
-		t.Fatalf("unexpected window status: %+v", repo.lastWindowStatus)
+	if reader.lastWindowFilter.Status == nil || *reader.lastWindowFilter.Status != "pending" {
+		t.Fatalf("unexpected window status: %+v", reader.lastWindowFilter.Status)
 	}
-	if repo.lastWindowBefore == nil || repo.lastWindowBefore.Format("2006-01-02 15:04:05") != "2026-04-11 12:00:00" {
-		t.Fatalf("unexpected planned_before: %+v", repo.lastWindowBefore)
+	if reader.lastWindowFilter.PlannedBefore == nil || reader.lastWindowFilter.PlannedBefore.Format("2006-01-02 15:04:05") != "2026-04-11 12:00:00" {
+		t.Fatalf("unexpected planned_before: %+v", reader.lastWindowFilter.PlannedBefore)
 	}
-	if repo.lastWindowPage != 2 || repo.lastWindowPageSize != 50 {
-		t.Fatalf("unexpected page args: page=%d page_size=%d", repo.lastWindowPage, repo.lastWindowPageSize)
+	if reader.lastWindowPage.Page != 2 || reader.lastWindowPage.PageSize != 50 {
+		t.Fatalf("unexpected page args: page=%d page_size=%d", reader.lastWindowPage.Page, reader.lastWindowPage.PageSize)
 	}
 	if result == nil || !result.HasMore || len(result.Items) != 1 {
 		t.Fatalf("unexpected window result: %#v", result)
@@ -203,7 +162,7 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 }
 
 func TestQueryServiceListTaskWindowRejectsInvalidStatus(t *testing.T) {
-	service := NewQueryService(&schedulerPlanRepoByIDStub{}, &taskWindowRepoStub{}, nil)
+	service := NewQueryService(&planReadModelStub{}, &taskReadModelStub{}, nil)
 
 	_, err := service.ListTaskWindow(context.Background(), ListTaskWindowDTO{
 		OrgID:  1,
@@ -216,25 +175,20 @@ func TestQueryServiceListTaskWindowRejectsInvalidStatus(t *testing.T) {
 }
 
 func TestQueryServiceListPlansResolvesScaleTitle(t *testing.T) {
-	planAggregate, err := domainPlan.NewAssessmentPlan(1, "scale-code", domainPlan.PlanScheduleByWeek, 1, 1)
-	if err != nil {
-		t.Fatalf("NewAssessmentPlan returned error: %v", err)
+	planReader := &planReadModelStub{
+		planRows: []planreadmodel.PlanRow{{
+			ID:           1001,
+			OrgID:        1,
+			ScaleCode:    "scale-code",
+			ScheduleType: "by_week",
+			Interval:     1,
+			TotalTimes:   1,
+			Status:       "active",
+		}},
+		planTotal: 1,
 	}
-
-	scaleItem, err := domainScale.NewMedicalScale(meta.Code("scale-code"), "抑郁自评量表")
-	if err != nil {
-		t.Fatalf("NewMedicalScale returned error: %v", err)
-	}
-
-	planRepo := &planListRepoStub{
-		plans: []*domainPlan.AssessmentPlan{planAggregate},
-		total: 1,
-	}
-
-	service := NewQueryService(planRepo, &taskWindowRepoStub{}, &scaleRepoStub{
-		byCode: map[string]*domainScale.MedicalScale{
-			"scale-code": scaleItem,
-		},
+	service := NewQueryService(planReader, &taskReadModelStub{}, &scaleCatalogStub{
+		titles: map[string]string{"scale-code": "抑郁自评量表"},
 	})
 
 	result, err := service.ListPlans(context.Background(), ListPlansDTO{

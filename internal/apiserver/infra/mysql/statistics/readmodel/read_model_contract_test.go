@@ -1,6 +1,8 @@
 package readmodel
 
 import (
+	"database/sql"
+	"strings"
 	"testing"
 	"time"
 
@@ -8,6 +10,8 @@ import (
 	statisticsreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticsreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	mysqlDriver "gorm.io/driver/mysql"
+	"gorm.io/gorm"
 )
 
 func TestStatisticsTrendMetricMappingsDocumentColumnContract(t *testing.T) {
@@ -112,6 +116,138 @@ func TestAssessmentEntryMetaFromPODocumentsMapperContract(t *testing.T) {
 	}
 }
 
+func TestBuildClinicianSubjectQueryDocumentsFilterPageOrderContract(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var rows []actorInfra.ClinicianPO
+
+	stmt := buildClinicianSubjectQuery(db.Session(&gorm.Session{DryRun: true}), 9).
+		Order("id DESC").
+		Offset(20).
+		Limit(10).
+		Find(&rows).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"org_id = ?",
+		"deleted_at IS NULL",
+		"ORDER BY id DESC",
+		"LIMIT ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	if !containsStatisticsReadModelVar(stmt.Vars, int64(9)) || !containsStatisticsReadModelVar(stmt.Vars, 10) {
+		t.Fatalf("query vars = %#v, want org/page limit", stmt.Vars)
+	}
+}
+
+func TestBuildAssessmentEntryMetaQueryDocumentsClinicianAndActiveFilters(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var rows []actorInfra.AssessmentEntryPO
+	clinicianID := uint64(101)
+	activeOnly := true
+
+	stmt := buildAssessmentEntryMetaQuery(db.Session(&gorm.Session{DryRun: true}), 9, &clinicianID, &activeOnly).
+		Order("id DESC").
+		Offset(0).
+		Limit(20).
+		Find(&rows).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"org_id = ?",
+		"deleted_at IS NULL",
+		"clinician_id = ?",
+		"is_active = ?",
+		"ORDER BY id DESC",
+		"LIMIT ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{int64(9), clinicianID, activeOnly, 20} {
+		if !containsStatisticsReadModelVar(stmt.Vars, want) {
+			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+}
+
+func TestBuildQuestionnaireBatchTotalsQueryDocumentsDedupedTotalsContract(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var rows []statisticsreadmodel.QuestionnaireBatchTotal
+
+	stmt := buildQuestionnaireBatchTotalsQuery(db.Session(&gorm.Session{DryRun: true}), 9, []string{"Q-A", "Q-B"}).
+		Find(&rows).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"content_code AS code",
+		"SUM(submission_count)",
+		"SUM(completion_count)",
+		"org_id = ?",
+		"content_type = ?",
+		"deleted_at IS NULL",
+		"content_code IN",
+		"GROUP BY",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{int64(9), "questionnaire", "Q-A", "Q-B"} {
+		if !containsStatisticsReadModelVar(stmt.Vars, want) {
+			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+}
+
+func TestBuildPlanTaskTrendQueryDocumentsDatePlanAndOrderContract(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var rows []struct {
+		StatDate time.Time
+		Count    int64
+	}
+	planID := uint64(501)
+	from := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	stmt := buildPlanTaskTrendQuery(db.Session(&gorm.Session{DryRun: true}), 9, &planID, from, to).
+		Find(&rows).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"stat_date",
+		"SUM(task_created_count)",
+		"SUM(task_opened_count)",
+		"SUM(task_completed_count)",
+		"SUM(task_expired_count)",
+		"org_id = ?",
+		"stat_date >= ?",
+		"stat_date < ?",
+		"deleted_at IS NULL",
+		"GROUP BY",
+		"ORDER BY stat_date ASC",
+		"plan_id = ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	if !containsStatisticsReadModelVar(stmt.Vars, int64(9)) || !containsStatisticsReadModelVar(stmt.Vars, planID) {
+		t.Fatalf("query vars = %#v, want org/plan", stmt.Vars)
+	}
+}
+
 func mustOverviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) string {
 	field, _ := overviewTrendField(metric)
 	return field
@@ -130,4 +266,37 @@ func mustAssessmentServiceTrendField(metric statisticsreadmodel.AssessmentServic
 func mustPlanTaskTrendField(metric statisticsreadmodel.PlanTaskMetric) string {
 	field, _ := planTaskTrendField(metric)
 	return field
+}
+
+func newDryRunStatisticsReadModelDB(t *testing.T) *gorm.DB {
+	t.Helper()
+	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_dry_run?charset=utf8mb4&parseTime=True&loc=Local")
+	if err != nil {
+		t.Fatalf("open dry-run sql db: %v", err)
+	}
+	t.Cleanup(func() { _ = conn.Close() })
+	db, err := gorm.Open(mysqlDriver.New(mysqlDriver.Config{
+		Conn:                      conn,
+		SkipInitializeWithVersion: true,
+	}), &gorm.Config{DryRun: true, DisableAutomaticPing: true})
+	if err != nil {
+		t.Fatalf("open dry-run gorm db: %v", err)
+	}
+	return db
+}
+
+func containsStatisticsReadModelVar(values []interface{}, want interface{}) bool {
+	for _, value := range values {
+		if value == want {
+			return true
+		}
+		if nested, ok := value.([]string); ok {
+			for _, item := range nested {
+				if item == want {
+					return true
+				}
+			}
+		}
+	}
+	return false
 }

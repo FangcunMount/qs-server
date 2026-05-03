@@ -158,6 +158,66 @@ func TestPlanStatisticsTransportsDoNotDependOnPlanRepositories(t *testing.T) {
 	}
 }
 
+func TestPlanQueryServiceUsesReadModelOnly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "plan", "query_service.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, token := range []string{
+		"planRepo",
+		"taskRepo",
+		"NewQueryServiceWithReadModel",
+		".FindList(",
+		".FindWindow(",
+		".FindListByTesteeIDs(",
+	} {
+		if strings.Contains(content, token) {
+			t.Fatalf("plan query_service.go contains %s; PlanQueryService must query through planreadmodel only", token)
+		}
+	}
+}
+
+func TestPlanDomainRepositoriesStayCommandSide(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "domain", "plan", "repository.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, decl := range parsed.Decls {
+		gen, ok := decl.(*ast.GenDecl)
+		if !ok {
+			continue
+		}
+		for _, spec := range gen.Specs {
+			typeSpec, ok := spec.(*ast.TypeSpec)
+			if !ok || (typeSpec.Name.Name != "AssessmentPlanRepository" && typeSpec.Name.Name != "AssessmentTaskRepository") {
+				continue
+			}
+			iface, ok := typeSpec.Type.(*ast.InterfaceType)
+			if !ok {
+				continue
+			}
+			for _, method := range iface.Methods.List {
+				for _, name := range method.Names {
+					for _, disallowed := range []string{"FindList", "FindListByTesteeIDs", "FindWindow", "Count"} {
+						if name.Name == disallowed {
+							t.Fatalf("%s exposes %s; plan domain repositories must not expose read-model list/count/window queries", typeSpec.Name.Name, name.Name)
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
 func TestTransportDepsDoesNotComposeSurveyScaleRESTHandlers(t *testing.T) {
 	t.Parallel()
 
@@ -284,6 +344,23 @@ func TestEvaluationAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 		importPath := strings.Trim(imported.Path.Value, `"`)
 		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
 			t.Fatalf("evaluation assembler imports %s; actor access adaptation must stay in container/bootstrap composition", importPath)
+		}
+	}
+}
+
+func TestStatisticsAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "statistics.go")
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imported := range parsed.Imports {
+		importPath := strings.Trim(imported.Path.Value, `"`)
+		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
+			t.Fatalf("statistics assembler imports %s; actor access adaptation belongs in container/bootstrap or REST deps composition", importPath)
 		}
 	}
 }

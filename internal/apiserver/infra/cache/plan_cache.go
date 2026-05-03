@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
@@ -99,21 +98,4 @@ func (r *CachedPlanRepository) Save(ctx context.Context, domain *plan.Assessment
 // deleteCache 删除缓存
 func (r *CachedPlanRepository) deleteCache(ctx context.Context, id plan.AssessmentPlanID) error {
 	return r.store.Delete(ctx, r.buildCacheKey(id))
-}
-
-// 实现其他 Repository 方法（透传，不缓存）
-func (r *CachedPlanRepository) FindByScaleCode(ctx context.Context, scaleCode string) ([]*plan.AssessmentPlan, error) {
-	return r.repo.FindByScaleCode(ctx, scaleCode)
-}
-
-func (r *CachedPlanRepository) FindActivePlans(ctx context.Context) ([]*plan.AssessmentPlan, error) {
-	return r.repo.FindActivePlans(ctx)
-}
-
-func (r *CachedPlanRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID) ([]*plan.AssessmentPlan, error) {
-	return r.repo.FindByTesteeID(ctx, testeeID)
-}
-
-func (r *CachedPlanRepository) FindList(ctx context.Context, orgID int64, scaleCode string, status string, page, pageSize int) ([]*plan.AssessmentPlan, int64, error) {
-	return r.repo.FindList(ctx, orgID, scaleCode, status, page, pageSize)
 }

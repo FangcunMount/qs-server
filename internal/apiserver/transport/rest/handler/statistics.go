@@ -7,7 +7,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
@@ -25,7 +24,7 @@ type StatisticsHandler struct {
 	readService                    statisticsApp.ReadService
 	periodicStatsService           statisticsApp.PeriodicStatsService
 	syncService                    statisticsApp.StatisticsSyncService
-	testeeAccessService            actorAccessApp.TesteeAccessService
+	testeeAccessService            statisticsApp.TesteeAccessValidator
 	warmupCoordinator              cachegov.Coordinator
 	cacheGovernanceStatusService   cachegov.StatusService
 	governanceFacade               statisticsApp.GovernanceFacade
@@ -53,7 +52,7 @@ func NewStatisticsHandler(
 }
 
 // SetTesteeAccessService 设置 testee 访问控制服务。
-func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService actorAccessApp.TesteeAccessService) {
+func (h *StatisticsHandler) SetTesteeAccessService(testeeAccessService statisticsApp.TesteeAccessValidator) {
 	h.testeeAccessService = testeeAccessService
 }
 

@@ -447,21 +447,7 @@ func (m *readModel) GetPlanTaskTrend(ctx context.Context, orgID int64, planID *u
 		TaskCompletedCount int64
 		TaskExpiredCount   int64
 	}
-	query := m.db.WithContext(ctx).
-		Model(&statisticsInfra.StatisticsPlanDailyPO{}).
-		Select(`
-			stat_date,
-			COALESCE(SUM(task_created_count), 0) AS task_created_count,
-			COALESCE(SUM(task_opened_count), 0) AS task_opened_count,
-			COALESCE(SUM(task_completed_count), 0) AS task_completed_count,
-			COALESCE(SUM(task_expired_count), 0) AS task_expired_count
-		`).
-		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
-		Group("stat_date").
-		Order("stat_date ASC")
-	if planID != nil {
-		query = query.Where("plan_id = ?", *planID)
-	}
+	query := buildPlanTaskTrendQuery(m.db.WithContext(ctx), orgID, planID, from, to)
 	var rows []row
 	if err := query.Scan(&rows).Error; err != nil {
 		return domainStatistics.PlanTaskTrend{}, err
@@ -478,9 +464,7 @@ func (m *readModel) GetPlanTaskTrend(ctx context.Context, orgID int64, planID *u
 
 func (m *readModel) CountClinicianSubjects(ctx context.Context, orgID int64) (int64, error) {
 	var total int64
-	if err := m.db.WithContext(ctx).Model(&actorInfra.ClinicianPO{}).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
-		Count(&total).Error; err != nil {
+	if err := buildClinicianSubjectQuery(m.db.WithContext(ctx), orgID).Count(&total).Error; err != nil {
 		return 0, err
 	}
 	return total, nil
@@ -488,8 +472,7 @@ func (m *readModel) CountClinicianSubjects(ctx context.Context, orgID int64) (in
 
 func (m *readModel) ListClinicianSubjects(ctx context.Context, orgID int64, page, pageSize int) ([]domainStatistics.ClinicianStatisticsSubject, error) {
 	var clinicians []actorInfra.ClinicianPO
-	if err := m.db.WithContext(ctx).
-		Where("org_id = ? AND deleted_at IS NULL", orgID).
+	if err := buildClinicianSubjectQuery(m.db.WithContext(ctx), orgID).
 		Order("id DESC").
 		Offset((page - 1) * pageSize).
 		Limit(pageSize).
@@ -667,7 +650,7 @@ func (m *readModel) GetClinicianTesteeSummaryCounts(ctx context.Context, orgID i
 }
 
 func (m *readModel) CountAssessmentEntries(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool) (int64, error) {
-	query := m.assessmentEntryQuery(ctx, orgID, clinicianID, activeOnly)
+	query := buildAssessmentEntryMetaQuery(m.db.WithContext(ctx), orgID, clinicianID, activeOnly)
 
 	var total int64
 	if err := query.Count(&total).Error; err != nil {
@@ -677,7 +660,7 @@ func (m *readModel) CountAssessmentEntries(ctx context.Context, orgID int64, cli
 }
 
 func (m *readModel) ListAssessmentEntryMetas(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool, page, pageSize int) ([]domainStatistics.AssessmentEntryStatisticsMeta, error) {
-	query := m.assessmentEntryQuery(ctx, orgID, clinicianID, activeOnly)
+	query := buildAssessmentEntryMetaQuery(m.db.WithContext(ctx), orgID, clinicianID, activeOnly)
 
 	var entries []actorInfra.AssessmentEntryPO
 	if err := query.Order("id DESC").
@@ -775,13 +758,7 @@ func (m *readModel) GetQuestionnaireBatchTotals(ctx context.Context, orgID int64
 	}
 
 	var rows []row
-	if err := m.db.WithContext(ctx).
-		Model(&statisticsInfra.StatisticsContentDailyPO{}).
-		Select("content_code AS code, COALESCE(SUM(submission_count), 0) AS total_submissions, COALESCE(SUM(completion_count), 0) AS total_completions").
-		Where("org_id = ? AND content_type = ? AND deleted_at IS NULL", orgID, statisticsInfra.StatisticsContentTypeQuestionnaire).
-		Where("content_code IN ?", codes).
-		Group("content_code").
-		Scan(&rows).Error; err != nil {
+	if err := buildQuestionnaireBatchTotalsQuery(m.db.WithContext(ctx), orgID, codes).Scan(&rows).Error; err != nil {
 		return nil, err
 	}
 
@@ -796,8 +773,13 @@ func (m *readModel) GetQuestionnaireBatchTotals(ctx context.Context, orgID int64
 	return items, nil
 }
 
-func (m *readModel) assessmentEntryQuery(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool) *gorm.DB {
-	query := m.db.WithContext(ctx).
+func buildClinicianSubjectQuery(db *gorm.DB, orgID int64) *gorm.DB {
+	return db.Model(&actorInfra.ClinicianPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
+}
+
+func buildAssessmentEntryMetaQuery(db *gorm.DB, orgID int64, clinicianID *uint64, activeOnly *bool) *gorm.DB {
+	query := db.
 		Model(&actorInfra.AssessmentEntryPO{}).
 		Where("org_id = ? AND deleted_at IS NULL", orgID)
 	if clinicianID != nil {
@@ -805,6 +787,34 @@ func (m *readModel) assessmentEntryQuery(ctx context.Context, orgID int64, clini
 	}
 	if activeOnly != nil {
 		query = query.Where("is_active = ?", *activeOnly)
+	}
+	return query
+}
+
+func buildQuestionnaireBatchTotalsQuery(db *gorm.DB, orgID int64, codes []string) *gorm.DB {
+	return db.
+		Model(&statisticsInfra.StatisticsContentDailyPO{}).
+		Select("content_code AS code, COALESCE(SUM(submission_count), 0) AS total_submissions, COALESCE(SUM(completion_count), 0) AS total_completions").
+		Where("org_id = ? AND content_type = ? AND deleted_at IS NULL", orgID, statisticsInfra.StatisticsContentTypeQuestionnaire).
+		Where("content_code IN ?", codes).
+		Group("content_code")
+}
+
+func buildPlanTaskTrendQuery(db *gorm.DB, orgID int64, planID *uint64, from, to time.Time) *gorm.DB {
+	query := db.
+		Model(&statisticsInfra.StatisticsPlanDailyPO{}).
+		Select(`
+			stat_date,
+			COALESCE(SUM(task_created_count), 0) AS task_created_count,
+			COALESCE(SUM(task_opened_count), 0) AS task_opened_count,
+			COALESCE(SUM(task_completed_count), 0) AS task_completed_count,
+			COALESCE(SUM(task_expired_count), 0) AS task_expired_count
+		`).
+		Where("org_id = ? AND stat_date >= ? AND stat_date < ? AND deleted_at IS NULL", orgID, beginningOfDay(from), beginningOfDay(to)).
+		Group("stat_date").
+		Order("stat_date ASC")
+	if planID != nil {
+		query = query.Where("plan_id = ?", *planID)
 	}
 	return query
 }

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
@@ -39,96 +38,6 @@ func (r *planRepository) FindByID(ctx context.Context, id domainPlan.AssessmentP
 	}
 
 	return r.mapper.ToDomain(po), nil
-}
-
-// FindByScaleCode 查询某个量表的所有计划
-func (r *planRepository) FindByScaleCode(ctx context.Context, scaleCode string) ([]*domainPlan.AssessmentPlan, error) {
-	var pos []*AssessmentPlanPO
-	err := r.WithContext(ctx).
-		Where("scale_code = ? AND deleted_at IS NULL", scaleCode).
-		Find(&pos).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomainList(pos), nil
-}
-
-// FindActivePlans 查询所有活跃的计划
-func (r *planRepository) FindActivePlans(ctx context.Context) ([]*domainPlan.AssessmentPlan, error) {
-	var pos []*AssessmentPlanPO
-	err := r.WithContext(ctx).
-		Where("status = ? AND deleted_at IS NULL", domainPlan.PlanStatusActive.String()).
-		Find(&pos).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomainList(pos), nil
-}
-
-// FindByTesteeID 查询某个受试者参与的所有计划
-// 实现方式：通过 JOIN Task 表查询，返回去重后的 Plan 列表
-func (r *planRepository) FindByTesteeID(ctx context.Context, testeeID testee.ID) ([]*domainPlan.AssessmentPlan, error) {
-	var pos []*AssessmentPlanPO
-
-	// 使用 JOIN 查询，通过 Task 表关联 Plan 表
-	// 明确选择 assessment_plan 的所有字段，并使用 DISTINCT 去重
-	err := r.WithContext(ctx).
-		Table("assessment_plan").
-		Select("DISTINCT assessment_plan.*").
-		Joins("INNER JOIN assessment_task ON assessment_plan.id = assessment_task.plan_id").
-		Where("assessment_task.testee_id = ? AND assessment_plan.deleted_at IS NULL AND assessment_task.deleted_at IS NULL", testeeID.Uint64()).
-		Find(&pos).Error
-
-	if err != nil {
-		return nil, err
-	}
-
-	return r.mapper.ToDomainList(pos), nil
-}
-
-// FindList 分页查询计划列表（支持条件筛选）
-func (r *planRepository) FindList(ctx context.Context, orgID int64, scaleCode string, status string, page, pageSize int) ([]*domainPlan.AssessmentPlan, int64, error) {
-	var pos []*AssessmentPlanPO
-	var total int64
-
-	// 构建查询条件
-	db := r.WithContext(ctx).Where("deleted_at IS NULL")
-
-	// 添加筛选条件
-	if orgID > 0 {
-		db = db.Where("org_id = ?", orgID)
-	}
-	if scaleCode != "" {
-		db = db.Where("scale_code = ?", scaleCode)
-	}
-	if status != "" {
-		db = db.Where("status = ?", status)
-	}
-
-	// 获取总数
-	if err := db.Model(&AssessmentPlanPO{}).Count(&total).Error; err != nil {
-		return nil, 0, err
-	}
-
-	// 分页查询
-	if page > 0 && pageSize > 0 {
-		offset := (page - 1) * pageSize
-		db = db.Offset(offset).Limit(pageSize)
-	}
-
-	// 按创建时间倒序
-	db = db.Order("id DESC")
-
-	// 执行查询
-	if err := db.Find(&pos).Error; err != nil {
-		return nil, 0, err
-	}
-
-	return r.mapper.ToDomainList(pos), total, nil
 }
 
 // Save 保存计划（新增或更新）

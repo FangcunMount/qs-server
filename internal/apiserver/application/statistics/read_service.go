@@ -19,6 +19,12 @@ type readService struct {
 	answerSheetRead surveyreadmodel.AnswerSheetReader
 	cache           statisticscache.Cache
 	hotset          cachetarget.HotsetRecorder
+
+	overview           *overviewQuery
+	clinicianStats     *clinicianStatsQuery
+	entryStats         *entryStatsQuery
+	questionnaireBatch *questionnaireBatchQuery
+	cacheHelper        *statisticsCacheHelper
 }
 
 type ReadServiceOption func(*readService)
@@ -43,357 +49,48 @@ func NewReadService(readModel StatisticsReadModel, answerSheetRead surveyreadmod
 			opt(service)
 		}
 	}
+	service.cacheHelper = newStatisticsCacheHelper(service.cache, service.hotset)
+	service.overview = &overviewQuery{readModel: readModel, cache: service.cacheHelper}
+	service.clinicianStats = &clinicianStatsQuery{readModel: readModel}
+	service.entryStats = &entryStatsQuery{readModel: readModel}
+	service.questionnaireBatch = &questionnaireBatchQuery{readModel: readModel, answerSheetRead: answerSheetRead}
 	return service
 }
 
 func (s *readService) GetOverview(ctx context.Context, orgID int64, filter QueryFilter) (*domainStatistics.StatisticsOverview, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	if stats, ok := s.loadCachedOverview(ctx, orgID, timeRange); ok {
-		s.recordOverviewHotset(ctx, orgID, timeRange)
-		return stats, nil
-	}
-
-	stats, err := s.buildOverview(ctx, orgID, timeRange)
-	if err != nil {
-		return nil, err
-	}
-	s.cacheOverview(ctx, orgID, timeRange, stats)
-	s.recordOverviewHotset(ctx, orgID, timeRange)
-	return stats, nil
-}
-
-func (s *readService) buildOverview(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.StatisticsOverview, error) {
-	organizationOverview, err := s.readModel.GetOrganizationOverview(ctx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	accessWindow, err := s.readModel.GetAccessFunnel(ctx, orgID, timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	assessmentWindow, err := s.readModel.GetAssessmentService(ctx, orgID, timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	dimensionAnalysis, err := s.readModel.GetDimensionAnalysisSummary(ctx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	planWindow, err := s.readModel.GetPlanTaskOverview(ctx, orgID, timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	accessTrend, err := s.readModel.GetAccessFunnelTrend(ctx, orgID, timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	assessmentTrend, err := s.readModel.GetAssessmentServiceTrend(ctx, orgID, timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	planTrend, err := s.readModel.GetPlanTaskTrend(ctx, orgID, nil, timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-
-	return &domainStatistics.StatisticsOverview{
-		OrgID:                orgID,
-		TimeRange:            timeRange,
-		OrganizationOverview: organizationOverview,
-		AccessFunnel: domainStatistics.AccessFunnelStatistics{
-			Window: accessWindow,
-			Trend: domainStatistics.AccessFunnelTrend{
-				EntryOpened:                 fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.EntryOpened),
-				IntakeConfirmed:             fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.IntakeConfirmed),
-				TesteeCreated:               fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.TesteeCreated),
-				CareRelationshipEstablished: fillMissingDailyCounts(timeRange.From, timeRange.To, accessTrend.CareRelationshipEstablished),
-			},
-		},
-		AssessmentService: domainStatistics.AssessmentServiceStatistics{
-			Window: assessmentWindow,
-			Trend: domainStatistics.AssessmentServiceTrend{
-				AnswerSheetSubmitted: fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.AnswerSheetSubmitted),
-				AssessmentCreated:    fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.AssessmentCreated),
-				ReportGenerated:      fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.ReportGenerated),
-				AssessmentFailed:     fillMissingDailyCounts(timeRange.From, timeRange.To, assessmentTrend.AssessmentFailed),
-			},
-		},
-		DimensionAnalysis: dimensionAnalysis,
-		Plan: domainStatistics.PlanDomainStatistics{
-			Window: planWindow,
-			Trend: domainStatistics.PlanTaskTrend{
-				TaskCreated:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCreated),
-				TaskOpened:    fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskOpened),
-				TaskCompleted: fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCompleted),
-				TaskExpired:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskExpired),
-			},
-		},
-	}, nil
+	return s.overview.GetOverview(ctx, orgID, filter)
 }
 
 func (s *readService) ListClinicianStatistics(ctx context.Context, orgID int64, filter QueryFilter, page, pageSize int) (*domainStatistics.ClinicianStatisticsList, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-	page, pageSize = normalizePage(page, pageSize)
-
-	total, err := s.readModel.CountClinicianSubjects(ctx, orgID)
-	if err != nil {
-		return nil, err
-	}
-	subjects, err := s.readModel.ListClinicianSubjects(ctx, orgID, page, pageSize)
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]*domainStatistics.ClinicianStatistics, 0, len(subjects))
-	for i := range subjects {
-		item, err := s.buildClinicianStatistics(ctx, orgID, subjects[i], timeRange)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-
-	return &domainStatistics.ClinicianStatisticsList{
-		Items:      items,
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: calcTotalPages(total, pageSize),
-	}, nil
+	return s.clinicianStats.ListClinicianStatistics(ctx, orgID, filter, page, pageSize)
 }
 
 func (s *readService) GetClinicianStatistics(ctx context.Context, orgID int64, clinicianID uint64, filter QueryFilter) (*domainStatistics.ClinicianStatistics, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	subject, err := s.readModel.GetClinicianSubject(ctx, orgID, clinicianID)
-	if err != nil {
-		return nil, err
-	}
-	return s.buildClinicianStatistics(ctx, orgID, *subject, timeRange)
+	return s.clinicianStats.GetClinicianStatistics(ctx, orgID, clinicianID, filter)
 }
 
 func (s *readService) ListAssessmentEntryStatistics(ctx context.Context, orgID int64, clinicianID *uint64, activeOnly *bool, filter QueryFilter, page, pageSize int) (*domainStatistics.AssessmentEntryStatisticsList, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-	page, pageSize = normalizePage(page, pageSize)
-
-	total, err := s.readModel.CountAssessmentEntries(ctx, orgID, clinicianID, activeOnly)
-	if err != nil {
-		return nil, err
-	}
-	metas, err := s.readModel.ListAssessmentEntryMetas(ctx, orgID, clinicianID, activeOnly, page, pageSize)
-	if err != nil {
-		return nil, err
-	}
-
-	items := make([]*domainStatistics.AssessmentEntryStatistics, 0, len(metas))
-	for i := range metas {
-		item, err := s.buildEntryStatistics(ctx, orgID, metas[i], timeRange)
-		if err != nil {
-			return nil, err
-		}
-		items = append(items, item)
-	}
-
-	return &domainStatistics.AssessmentEntryStatisticsList{
-		Items:      items,
-		Total:      total,
-		Page:       page,
-		PageSize:   pageSize,
-		TotalPages: calcTotalPages(total, pageSize),
-	}, nil
+	return s.entryStats.ListAssessmentEntryStatistics(ctx, orgID, clinicianID, activeOnly, filter, page, pageSize)
 }
 
 func (s *readService) GetAssessmentEntryStatistics(ctx context.Context, orgID int64, entryID uint64, filter QueryFilter) (*domainStatistics.AssessmentEntryStatistics, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	metaItem, err := s.readModel.GetAssessmentEntryMeta(ctx, orgID, entryID)
-	if err != nil {
-		return nil, err
-	}
-	return s.buildEntryStatistics(ctx, orgID, *metaItem, timeRange)
+	return s.entryStats.GetAssessmentEntryStatistics(ctx, orgID, entryID, filter)
 }
 
 func (s *readService) GetCurrentClinicianStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*domainStatistics.ClinicianStatistics, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	subject, err := s.readModel.GetCurrentClinicianSubject(ctx, orgID, operatorUserID)
-	if err != nil {
-		return nil, err
-	}
-	return s.buildClinicianStatistics(ctx, orgID, *subject, timeRange)
+	return s.clinicianStats.GetCurrentClinicianStatistics(ctx, orgID, operatorUserID, filter)
 }
 
 func (s *readService) ListCurrentClinicianEntryStatistics(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter, page, pageSize int) (*domainStatistics.AssessmentEntryStatisticsList, error) {
-	subject, err := s.readModel.GetCurrentClinicianSubject(ctx, orgID, operatorUserID)
-	if err != nil {
-		return nil, err
-	}
-	clinicianID := subject.ID.Uint64()
-	return s.ListAssessmentEntryStatistics(ctx, orgID, &clinicianID, nil, filter, page, pageSize)
+	return s.entryStats.ListCurrentClinicianEntryStatistics(ctx, orgID, operatorUserID, filter, page, pageSize)
 }
 
 func (s *readService) GetCurrentClinicianTesteeSummary(ctx context.Context, orgID int64, operatorUserID int64, filter QueryFilter) (*domainStatistics.ClinicianTesteeSummaryStatistics, error) {
-	timeRange, err := normalizeQueryFilter(filter)
-	if err != nil {
-		return nil, err
-	}
-
-	subject, err := s.readModel.GetCurrentClinicianSubject(ctx, orgID, operatorUserID)
-	if err != nil {
-		return nil, err
-	}
-
-	snapshot, err := s.readModel.GetClinicianSnapshot(ctx, orgID, subject.ID.Uint64())
-	if err != nil {
-		return nil, err
-	}
-	keyFocusCount, assessedInWindowCount, err := s.readModel.GetClinicianTesteeSummaryCounts(ctx, orgID, subject.ID.Uint64(), timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-
-	return &domainStatistics.ClinicianTesteeSummaryStatistics{
-		TimeRange:               timeRange,
-		TotalAccessibleTestees:  snapshot.TotalAccessibleTestees,
-		PrimaryTesteeCount:      snapshot.PrimaryTesteeCount,
-		AttendingTesteeCount:    snapshot.AttendingTesteeCount,
-		CollaboratorTesteeCount: snapshot.CollaboratorTesteeCount,
-		KeyFocusTesteeCount:     keyFocusCount,
-		AssessedInWindowCount:   assessedInWindowCount,
-	}, nil
+	return s.clinicianStats.GetCurrentClinicianTesteeSummary(ctx, orgID, operatorUserID, filter)
 }
 
 func (s *readService) GetQuestionnaireBatchStatistics(ctx context.Context, orgID int64, codes []string) (*domainStatistics.QuestionnaireBatchStatisticsResponse, error) {
-	cleanCodes := make([]string, 0, len(codes))
-	seen := make(map[string]struct{}, len(codes))
-	for _, codeValue := range codes {
-		codeValue = strings.TrimSpace(codeValue)
-		if codeValue == "" {
-			continue
-		}
-		if _, exists := seen[codeValue]; exists {
-			continue
-		}
-		seen[codeValue] = struct{}{}
-		cleanCodes = append(cleanCodes, codeValue)
-	}
-
-	items := make([]*domainStatistics.QuestionnaireBatchStatisticsItem, 0, len(cleanCodes))
-	if len(cleanCodes) == 0 {
-		return &domainStatistics.QuestionnaireBatchStatisticsResponse{Items: items}, nil
-	}
-
-	totals, err := s.readModel.GetQuestionnaireBatchTotals(ctx, orgID, cleanCodes)
-	if err != nil {
-		return nil, err
-	}
-
-	resultByCode := make(map[string]*domainStatistics.QuestionnaireBatchStatisticsItem, len(cleanCodes))
-	for _, codeValue := range cleanCodes {
-		resultByCode[codeValue] = &domainStatistics.QuestionnaireBatchStatisticsItem{Code: codeValue}
-	}
-	for _, total := range totals {
-		item := resultByCode[total.Code]
-		if item == nil {
-			item = &domainStatistics.QuestionnaireBatchStatisticsItem{Code: total.Code}
-			resultByCode[total.Code] = item
-		}
-		item.TotalSubmissions = total.TotalSubmissions
-		item.TotalCompletions = total.TotalCompletions
-		if item.TotalSubmissions > 0 {
-			item.CompletionRate = float64(item.TotalCompletions) / float64(item.TotalSubmissions) * 100
-		}
-	}
-
-	for _, codeValue := range cleanCodes {
-		items = append(items, resultByCode[codeValue])
-	}
-
-	if s.answerSheetRead != nil {
-		for _, item := range items {
-			if item.TotalSubmissions > 0 {
-				continue
-			}
-			count, err := s.answerSheetRead.CountAnswerSheets(ctx, surveyreadmodel.AnswerSheetFilter{QuestionnaireCode: item.Code})
-			if err != nil {
-				return nil, err
-			}
-			if count <= 0 {
-				continue
-			}
-			item.TotalSubmissions = count
-			item.TotalCompletions = count
-			item.CompletionRate = 100
-		}
-	}
-
-	return &domainStatistics.QuestionnaireBatchStatisticsResponse{Items: items}, nil
-}
-
-func (s *readService) buildClinicianStatistics(ctx context.Context, orgID int64, subject domainStatistics.ClinicianStatisticsSubject, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.ClinicianStatistics, error) {
-	snapshot, err := s.readModel.GetClinicianSnapshot(ctx, orgID, subject.ID.Uint64())
-	if err != nil {
-		return nil, err
-	}
-	window, funnel, err := s.readModel.GetClinicianJourneyStats(ctx, orgID, subject.ID.Uint64(), timeRange.From, timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-
-	return &domainStatistics.ClinicianStatistics{
-		TimeRange: timeRange,
-		Clinician: subject,
-		Snapshot:  snapshot,
-		Window:    window,
-		Funnel:    funnel,
-	}, nil
-}
-
-func (s *readService) buildEntryStatistics(ctx context.Context, orgID int64, entry domainStatistics.AssessmentEntryStatisticsMeta, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.AssessmentEntryStatistics, error) {
-	snapshot, err := s.readModel.GetAssessmentEntryCounts(ctx, orgID, entry.ID.Uint64(), nil, nil)
-	if err != nil {
-		return nil, err
-	}
-	window, err := s.readModel.GetAssessmentEntryCounts(ctx, orgID, entry.ID.Uint64(), &timeRange.From, &timeRange.To)
-	if err != nil {
-		return nil, err
-	}
-	lastResolvedAt, err := s.readModel.GetAssessmentEntryLastEventTime(ctx, orgID, entry.ID.Uint64(), domainStatistics.BehaviorEventEntryOpened)
-	if err != nil {
-		return nil, err
-	}
-	lastIntakeAt, err := s.readModel.GetAssessmentEntryLastEventTime(ctx, orgID, entry.ID.Uint64(), domainStatistics.BehaviorEventIntakeConfirmed)
-	if err != nil {
-		return nil, err
-	}
-
-	return &domainStatistics.AssessmentEntryStatistics{
-		TimeRange:      timeRange,
-		Entry:          entry,
-		Snapshot:       snapshot,
-		Window:         window,
-		LastResolvedAt: lastResolvedAt,
-		LastIntakeAt:   lastIntakeAt,
-	}, nil
+	return s.questionnaireBatch.GetQuestionnaireBatchStatistics(ctx, orgID, codes)
 }
 
 func normalizeQueryFilter(filter QueryFilter) (domainStatistics.StatisticsTimeRange, error) {
@@ -506,47 +203,6 @@ func fillMissingDailyCounts(from, to time.Time, counts []domainStatistics.DailyC
 	}
 
 	return filled
-}
-
-func (s *readService) loadCachedOverview(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) (*domainStatistics.StatisticsOverview, bool) {
-	if s == nil || s.cache == nil {
-		return nil, false
-	}
-	return s.cache.LoadOverview(ctx, orgID, timeRange)
-}
-
-func (s *readService) cacheOverview(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange, stats *domainStatistics.StatisticsOverview) {
-	if s == nil || s.cache == nil || stats == nil {
-		return
-	}
-	s.cache.StoreOverview(ctx, orgID, timeRange, stats)
-}
-
-func (s *readService) recordOverviewHotset(ctx context.Context, orgID int64, timeRange domainStatistics.StatisticsTimeRange) {
-	if s == nil || s.hotset == nil {
-		return
-	}
-	preset, ok := overviewWarmupPreset(timeRange)
-	if !ok {
-		return
-	}
-	_ = s.hotset.Record(ctx, cachetarget.NewQueryStatsOverviewWarmupTarget(orgID, preset))
-}
-
-func overviewWarmupPreset(timeRange domainStatistics.StatisticsTimeRange) (string, bool) {
-	preset := strings.TrimSpace(string(timeRange.Preset))
-	toDay := normalizeLocalDay(timeRange.To)
-	fromDay := normalizeLocalDay(timeRange.From)
-	switch domainStatistics.TimeRangePreset(preset) {
-	case domainStatistics.TimeRangePresetToday:
-		return preset, fromDay.Equal(toDay)
-	case domainStatistics.TimeRangePreset7D:
-		return preset, fromDay.Equal(toDay.AddDate(0, 0, -6))
-	case domainStatistics.TimeRangePreset30D:
-		return preset, fromDay.Equal(toDay.AddDate(0, 0, -29))
-	default:
-		return "", false
-	}
 }
 
 func normalizePage(page, pageSize int) (int, int) {

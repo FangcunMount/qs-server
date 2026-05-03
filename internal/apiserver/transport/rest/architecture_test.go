@@ -108,6 +108,21 @@ func TestEvaluationRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) 
 	}
 }
 
+func TestStatisticsRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) {
+	t.Parallel()
+
+	parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join("handler", "statistics.go"), nil, parser.ImportsOnly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, imported := range parsed.Imports {
+		importPath := strings.Trim(imported.Path.Value, `"`)
+		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
+			t.Fatalf("handler/statistics.go imports %s; statistics REST handler must use statistics application access ports", importPath)
+		}
+	}
+}
+
 func TestEvaluationRESTTransportUsesProtectedQueryFacade(t *testing.T) {
 	t.Parallel()
 
