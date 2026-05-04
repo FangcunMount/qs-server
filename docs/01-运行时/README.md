@@ -1,184 +1,269 @@
-# 运行时
+# 运行时（01）
 
-**本文回答**：本组文档解释 `qs-server` 在运行时到底有哪些进程、它们怎么互相调用、同步链路和异步链路分别怎么走，以及这些关系该去哪里继续下钻。
+**本文回答**：`01-运行时` 这一组文档如何阅读；它解释 qs-server 三个进程如何启动、如何协作、如何通过 REST/gRPC/MQ 交互、如何接入 IAM、如何执行后台任务，以及如何优雅关闭。业务对象和领域规则不在本组展开，需回到 [02-业务模块](../02-业务模块/)；事件、存储、安全、Redis 等机制细节需回到 [03-基础设施](../03-基础设施/)。
+
+---
 
 ## 30 秒结论
 
-如果只看一屏，先看下面这张表：
-
 | 维度 | 结论 |
 | ---- | ---- |
-| 进程角色 | `qs-apiserver` 负责主业务状态和对外后台能力；`collection-server` 是前台 BFF；`qs-worker` 负责异步消费与回调 |
-| 同步主路径 | 前台通常走 `Client -> collection-server -> gRPC -> qs-apiserver`；后台通常直接 REST 到 `qs-apiserver` |
-| 异步主路径 | `qs-apiserver` 发布领域事件到 MQ，`qs-worker` 消费后再通过 gRPC 回调 `qs-apiserver` 执行内部动作 |
-| 真值边界 | 运行时图讲“谁调谁、怎么调”；领域规则和聚合边界看 [02-业务模块](../02-业务模块/)；事件/存储/配置机制看 [03-基础设施](../03-基础设施/) |
-| 最重要的认识 | worker 是异步执行器，不是第二个主业务服务；主状态仍收口在 `qs-apiserver` |
-| 阅读方式 | 先看本文整体图和主链路，再按进程分册下钻内部组件 |
+| 本组作用 | 解释运行时拓扑、启动阶段、进程间调用、身份链路、后台任务和 shutdown |
+| 核心前提 | `qs-server` 是三进程系统：`qs-apiserver`、`collection-server`、`qs-worker` |
+| 主状态位置 | 主业务状态收口在 `qs-apiserver`；collection 是 BFF；worker 是异步执行器 |
+| 同步链路 | 前台通常 `Client -> collection-server REST -> apiserver gRPC`；后台可直连 apiserver REST |
+| 异步链路 | `apiserver outbox -> MQ -> worker -> internal gRPC -> apiserver` |
+| 本组不负责 | 不展开 Survey / Scale / Evaluation / Actor / Plan / Statistics 的领域模型，不维护 REST/OpenAPI 详细契约 |
+| 推荐读法 | 先读三进程协作，再按进程读启动文档，最后读 gRPC/IAM/调度/shutdown |
 
-## 重点速查（继续往下读前先记这几条）
+---
 
-1. **三进程分工**：`collection-server` 面向前台入口，`qs-apiserver` 持有主业务写模型，`qs-worker` 负责消费事件并驱动回调。  
-2. **两类后台机制**：`Crontab/运维 -> internal REST -> apiserver` 与 `apiserver -> MQ -> worker -> gRPC -> apiserver` 是两条不同链路，不要混读。  
-3. **文档边界**：本组优先讲拓扑、时序和组件关系，不替代业务模块的领域说明，也不替代基础设施对事件、存储和配置的机制细节。  
-4. **阅读建议**：第一次读先看整体运行图和主链路时序；排障或改造某进程时，再进入本组分册。  
+## 文档地图
 
-## 为什么这一组要单独存在
+| 顺序 | 文档 | 回答的问题 |
+| ---- | ---- | ---------- |
+| 1 | [00-三进程协作总览](./00-三进程协作总览.md) | 三个进程分别负责什么、谁调谁、主链路怎么穿过进程边界 |
+| 2 | [01-qs-apiserver启动与组合根](./01-qs-apiserver启动与组合根.md) | apiserver 如何初始化资源、container、REST/gRPC、后台 runtime |
+| 3 | [02-collection-server运行时](./02-collection-server运行时.md) | collection 如何作为 BFF 接收 REST、做身份/限流/排队、gRPC 调 apiserver |
+| 4 | [03-qs-worker运行时](./03-qs-worker运行时.md) | worker 如何加载事件目录、订阅 MQ、派发 handler、internal gRPC 回调 apiserver |
+| 5 | [04-进程间调用与gRPC](./04-进程间调用与gRPC.md) | collection/worker 到 apiserver 的 gRPC 调用和 InternalService 边界 |
+| 6 | [05-IAM认证与身份链路](./05-IAM认证与身份链路.md) | JWT、TenantScope、AuthzSnapshot、ServiceAuth、mTLS/ACL 在三进程中的位置 |
+| 7 | [06-后台任务与调度](./06-后台任务与调度.md) | scheduler、outbox relay、worker MQ 消费、SubmitQueue 如何区分 |
+| 8 | [07-优雅关闭与资源释放](./07-优雅关闭与资源释放.md) | 三进程收到退出信号后资源释放顺序是什么 |
 
-运行时文档和业务模块文档解决的不是同一个问题：
+---
 
-- 业务模块先回答“这个模块负责什么、对象怎么组织”
-- 运行时先回答“这些模块在哪个进程里跑、谁调谁、消息和 RPC 怎么穿过进程边界”
+## 本组与其它目录的边界
 
-所以本组优先讲**三进程组件图、调用方向、时序与边界**，不替代 [02-业务模块](../02-业务模块/)（领域与用例）、[03-基础设施](../03-基础设施/)（事件/存储/IAM/配置机制）、[04-接口与运维](../04-接口与运维/)（契约、端口、Crontab）。
+| 你想知道 | 先看这里 | 再看哪里 |
+| -------- | -------- | -------- |
+| 系统整体是什么 | [00-总览/01-系统地图](../00-总览/01-系统地图.md) | 本组 `00-三进程协作总览` |
+| 一次答卷如何变报告 | [00-总览/03-核心业务链路](../00-总览/03-核心业务链路.md) | 本组 `04-进程间调用与gRPC`、`06-后台任务与调度` |
+| apiserver 怎么装配业务模块 | 本组 `01-qs-apiserver启动与组合根` | [02-业务模块](../02-业务模块/) |
+| collection 为什么不是主服务 | 本组 `02-collection-server运行时` | [03-基础设施/resilience](../03-基础设施/resilience/) |
+| worker 怎么消费事件 | 本组 `03-qs-worker运行时` | [03-基础设施/event](../03-基础设施/event/) |
+| IAM 怎么接入 | 本组 `05-IAM认证与身份链路` | [03-基础设施/security](../03-基础设施/security/) |
+| REST / gRPC 具体接口 | 本组只讲调用方向 | [04-接口与运维](../04-接口与运维/) |
+| 为什么这样拆 | 本组只讲现状 | [05-专题分析](../05-专题分析/) |
 
-## 本组图表怎么读
+---
 
-1. **整体**：先建立「有哪些服务组件、谁依赖谁」——见下文 **「服务组件与整体视图」**。  
-2. **示意图 / 时序图**：每篇保留 **结构图**；关键路径补 **sequenceDiagram**（启动、典型请求或异步回调）。  
-3. **核心功能与关键点**：用短表回答「这个组件负责什么、排障/扩展时最先看哪几处代码」。  
-4. **组件间引用**：明确 **协议**（REST / gRPC / MQ）、**调用方向**、与 [04-进程间通信](./04-进程间通信.md) 对照。  
-5. **边界与注意事项**：易混概念（如 BFF vs 主服务、同步 vs 事件）、勿写死的环境差异。
+## 推荐阅读路径
 
-## 服务组件与整体视图
+### 第一次理解运行时
 
-### 运行时服务组件一览
+```text
+00-三进程协作总览
+  -> 01-qs-apiserver启动与组合根
+  -> 02-collection-server运行时
+  -> 03-qs-worker运行时
+```
 
-| 组件（进程） | 在系统中的角色 | 对外提供的能力面 | 强依赖的兄弟/外部组件 |
-| ------------ | -------------- | ---------------- | ---------------------- |
-| **qs-apiserver** | 主业务与状态收口 | 后台 **REST**、**gRPC Server**（含 Internal）、**发 MQ 事件** | MySQL、MongoDB、Redis、IAM SDK、MQ、（被 collection/worker 调用） |
-| **collection-server** | 前台 BFF | **REST**（小程序/收集端） | Redis、IAM SDK、**apiserver gRPC** |
-| **qs-worker** | 异步执行器 | **无业务 REST**；**消费 MQ** | Redis、MQ、**apiserver gRPC** |
-| **（外部）IAM** | 非本仓进程 | 被 apiserver / collection **SDK 调用** | — |
-| **（外部）MQ** | 消息中间件 | apiserver **发布**，worker **订阅** | NSQ / RabbitMQ 等（见配置） |
+读完后应该能回答：
 
-### 整体运行示意图
+1. 三个进程分别启动哪些资源；
+2. 主业务状态为什么在 apiserver；
+3. collection 为什么是 BFF；
+4. worker 为什么不是第二套业务服务；
+5. 事件和 gRPC 如何穿过进程边界。
+
+### 排查答卷提交到报告链路
+
+```text
+00-总览/03-核心业务链路
+  -> 02-collection-server运行时
+  -> 04-进程间调用与gRPC
+  -> 03-qs-worker运行时
+  -> 06-后台任务与调度
+```
+
+重点检查：
+
+- collection SubmitQueue 是否受理；
+- apiserver durable submit 是否写入 outbox；
+- worker 是否订阅对应 topic；
+- internal gRPC 是否可达；
+- evaluation pipeline 是否执行；
+- report / statistics / tag 事件是否继续推进。
+
+### 排查认证或授权问题
+
+```text
+05-IAM认证与身份链路
+  -> 04-进程间调用与gRPC
+  -> 03-基础设施/security
+```
+
+重点检查：
+
+- JWT 是否验证成功；
+- tenant_id / org_id 是否存在且合法；
+- AuthzSnapshot 是否加载；
+- collection service auth 是否注入到 gRPC metadata；
+- apiserver gRPC mTLS / ACL 是否拦截。
+
+### 排查后台任务
+
+```text
+06-后台任务与调度
+  -> 01-qs-apiserver启动与组合根
+  -> 03-qs-worker运行时
+  -> 07-优雅关闭与资源释放
+```
+
+重点检查：
+
+- scheduler 是否启用；
+- Redis leader lock 是否可用；
+- worker subscriber 是否启动；
+- outbox relay 是否补发；
+- shutdown 是否提前停止了后台 runtime。
+
+---
+
+## 运行时全局图
 
 ```mermaid
 flowchart TB
     subgraph clients[外部调用方]
         MP[小程序 / 前台]
-        ADM[管理后台 / 运维]
+        Admin[管理后台 / 运维]
     end
 
-    subgraph processes[qs-server 三进程]
-        COL[collection-server]
-        API[qs-apiserver]
-        WK[qs-worker]
+    subgraph qs[qs-server 三进程]
+        COL[collection-server<br/>REST BFF]
+        API[qs-apiserver<br/>主业务与组合根]
+        WK[qs-worker<br/>MQ consumer + internal gRPC driver]
     end
 
-    subgraph external[外部依赖]
+    subgraph deps[外部依赖]
         IAM[(IAM)]
         MQ[(MQ)]
-        MY[(MySQL)]
-        MG[(MongoDB)]
-        RD[(Redis)]
+        MySQL[(MySQL)]
+        Mongo[(MongoDB)]
+        Redis[(Redis)]
     end
 
     MP -->|REST| COL
-    ADM -->|REST| API
+    Admin -->|REST| API
 
-    COL -->|gRPC mTLS| API
-    WK -->|gRPC mTLS| API
+    COL -->|gRPC| API
+    WK -->|internal gRPC| API
 
-    COL --> RD
-    API --> MY
-    API --> MG
-    API --> RD
-    WK --> RD
+    API -->|publish / outbox relay| MQ
+    MQ -->|subscribe| WK
 
     COL --> IAM
     API --> IAM
 
-    API -->|publish| MQ
-    MQ -->|subscribe| WK
+    API --> MySQL
+    API --> Mongo
+    API --> Redis
+    COL --> Redis
+    WK --> Redis
 ```
 
-**要点**：**同步查询/命令**可走 `Client → collection → gRPC → apiserver`；**跨请求异步**走 `apiserver → MQ → worker → gRPC → apiserver`，主状态仍在 **apiserver** 落库。
+这张图的关键是：
 
-### 主链路时序
-
-#### 1）前台经 BFF 的同步路径（示意）
-
-```mermaid
-sequenceDiagram
-    participant U as 客户端
-    participant C as collection-server
-    participant A as qs-apiserver
-
-    U->>C: REST /api/v1/...
-    Note over C: JWT / 限流 / 排队等入口层
-    C->>A: gRPC（AnswerSheet / Actor / Evaluation 等）
-    A-->>C: gRPC 响应
-    C-->>U: REST 响应
-```
-
-#### 2）领域事件驱动的异步路径（示意）
-
-```mermaid
-sequenceDiagram
-    participant A as qs-apiserver
-    participant MQ as MQ
-    participant W as qs-worker
-
-    Note over A: 业务提交后发布事件
-    A->>MQ: publish（event_type + payload）
-    MQ->>W: deliver
-    Note over W: 按 event_type 选 handler
-    W->>A: gRPC（Internal / AnswerSheet / Evaluation 等）
-    A-->>W: 响应
-    Note over W: Ack / Nack
-```
-
-**Verify**：Topic 与 handler 绑定以 [`configs/events.yaml`](../../configs/events.yaml) 为准。
-
-### 组件间引用与方式
-
-| 引用方向 | 方式 | 典型用途 |
-| -------- | ---- | -------- |
-| collection → apiserver | **gRPC**（客户端证书 + TLS/mTLS） | 前台查询、提交转主服务 |
-| worker → apiserver | **gRPC** | 计分、评估、打标签等回调 |
-| apiserver → worker | **无直接 RPC** | 仅通过 **MQ** 投递 |
-| Client → collection / apiserver | **REST** | 前台 / 后台入口 |
-| apiserver / collection → IAM | **SDK（HTTP/gRPC 等，由 iam 配置）** | 验签、身份、监护、服务间 token |
-| apiserver → MQ | **Publisher** | 发领域事件 |
-
-更细的矩阵见 [04-进程间通信](./04-进程间通信.md)。
-
-### 本组整体视图的边界与注意事项
-
-- 上图中的 **IAM、MQ、DB** 为逻辑依赖；**具体地址与证书**以 `configs/*.yaml` 与 [04-部署与端口](../04-接口与运维/03-部署与端口.md) 为准。  
-- **Crontab 调 apiserver REST** 与 **worker 事件链** 是两类后台，勿混；见 [04-调度与后台任务](../04-接口与运维/04-调度与后台任务.md)。
+- `apiserver -> MQ -> worker -> apiserver` 是异步闭环；
+- worker 回调 apiserver，不直接复制业务写模型；
+- collection 作为前台 BFF，不承担主业务持久化；
+- IAM 是外部系统，以 SDK/客户端能力嵌入 collection 和 apiserver，不是 qs-server 第四进程。
 
 ---
 
-## 与其它文档的分工
+## 运行时事实来源
 
-| 文档组 | 侧重 |
-| ------ | ---- |
-| [00-总览](../00-总览/) | 系统地图、主业务叙事、本地 `make` |
-| [02-业务模块](../02-业务模块/) | 各 BC 模型、接口与模块内锚点 |
-| [03-基础设施](../03-基础设施/) | 事件 YAML、存储、限流、IAM 机制、Options |
-| [04-接口与运维](../04-接口与运维/) | 契约文件、端口表、调度脚本 |
-| **01-运行时** | **三进程组件视图、交互与时序** |
-
----
-
-## 分册阅读（各进程内部组件）
-
-| 文档 | 内容侧重 |
-| ---- | -------- |
-| [01-apiserver](./01-apiserver.md) | 主进程内部：容器模块、双栈、预热、ticker |
-| [02-collection-server](./02-collection-server.md) | BFF：中间件、排队、gRPC 下游 |
-| [03-worker](./03-worker.md) | 消费：订阅、分发、handler、gRPC 客户端 |
-| [05-IAM认证与身份链路](./05-IAM认证与身份链路.md) | 鉴权在**三进程**中的落点（细节配置见 [03-基础设施/04](../03-基础设施/04-IAM与认证.md)） |
+| 类型 | 路径 |
+| ---- | ---- |
+| 三进程入口 | [`cmd/qs-apiserver`](../../cmd/qs-apiserver/)、[`cmd/collection-server`](../../cmd/collection-server/)、[`cmd/qs-worker`](../../cmd/qs-worker/) |
+| apiserver process | [`internal/apiserver/process`](../../internal/apiserver/process/) |
+| collection process | [`internal/collection-server/process`](../../internal/collection-server/process/) |
+| worker process | [`internal/worker/process`](../../internal/worker/process/) |
+| apiserver container | [`internal/apiserver/container`](../../internal/apiserver/container/) |
+| collection container | [`internal/collection-server/container`](../../internal/collection-server/container/) |
+| worker container | [`internal/worker/container`](../../internal/worker/container/) |
+| gRPC server runtime | [`internal/pkg/grpc`](../../internal/pkg/grpc/) |
+| event catalog | [`configs/events.yaml`](../../configs/events.yaml) |
+| REST 契约 | [`api/rest`](../../api/rest/) |
+| gRPC proto | [`internal/apiserver/interface/grpc/proto`](../../internal/apiserver/interface/grpc/proto/) |
+| 配置文件 | [`configs`](../../configs/) |
 
 ---
 
-## 建议阅读顺序
+## 维护原则
 
-1. **本 README**（含上文 **服务组件与整体视图**）  
-2. [04-进程间通信.md](./04-进程间通信.md) — 通信矩阵与跨组件时序  
-3. [01-apiserver.md](./01-apiserver.md) → [02-collection-server.md](./02-collection-server.md) → [03-worker.md](./03-worker.md)  
-4. [05-IAM认证与身份链路.md](./05-IAM认证与身份链路.md) — 横切鉴权在各组件中的位置  
+### 1. 启动事实以 process 为准
 
-**事实来源**：[`configs/events.yaml`](../../configs/events.yaml)；REST/proto 见 [api/rest/](../../api/rest/)、[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/)。
+只要涉及“启动阶段”“资源初始化”“shutdown”，优先看：
+
+```text
+internal/*/process/
+```
+
+不要只看 `cmd/*/main.go`，因为 main 只是入口。
+
+### 2. 依赖装配以 container 为准
+
+只要涉及“某个 handler / service / client 是谁 new 的”，优先看：
+
+```text
+internal/*/container/
+```
+
+apiserver 的业务模块装配尤其要看 `internal/apiserver/container`。
+
+### 3. 进程间契约以 proto / events.yaml 为准
+
+- gRPC 方法以 proto 和 gRPC registry 为准；
+- event type / topic / handler 以 `configs/events.yaml` 为准；
+- REST 路径以 `api/rest/*.yaml` 和 transport router 为准。
+
+### 4. 不把 worker 写成第二业务服务
+
+worker 是事件消费者和 internal gRPC driver。它可以拥有 handler、lock、notifier、client，但不能被文档写成“另一个 Evaluation 服务”或“另一个 Survey 服务”。
+
+### 5. 不把 collection 写成主写模型
+
+collection 可以做身份、监护、限流、SubmitQueue、状态查询和 gRPC 转调；主业务状态仍然落在 apiserver。
+
+---
+
+## Verify
+
+```bash
+# 三进程 process 与 container
+go test ./internal/apiserver/process/... ./internal/apiserver/container/...
+go test ./internal/collection-server/process/... ./internal/collection-server/container/...
+go test ./internal/worker/process/... ./internal/worker/container/...
+
+# gRPC 与事件
+go test ./internal/pkg/grpc/... ./internal/worker/integration/...
+
+# 全量
+go test ./...
+```
+
+文档检查：
+
+```bash
+make docs-hygiene
+```
+
+---
+
+## 下一跳
+
+第一次读完本 README 后，建议继续：
+
+1. [00-三进程协作总览](./00-三进程协作总览.md)
+2. [01-qs-apiserver启动与组合根](./01-qs-apiserver启动与组合根.md)
+3. [02-collection-server运行时](./02-collection-server运行时.md)
+4. [03-qs-worker运行时](./03-qs-worker运行时.md)
+
+如果你已经在排障，可以直接进入对应专题：
+
+- gRPC / internal 调用：[04-进程间调用与gRPC](./04-进程间调用与gRPC.md)
+- IAM / 身份 / 授权：[05-IAM认证与身份链路](./05-IAM认证与身份链路.md)
+- scheduler / outbox / worker 消费：[06-后台任务与调度](./06-后台任务与调度.md)
+- shutdown / 资源释放：[07-优雅关闭与资源释放](./07-优雅关闭与资源释放.md)
