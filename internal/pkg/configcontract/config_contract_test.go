@@ -1,6 +1,7 @@
 package configcontract
 
 import (
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -53,6 +54,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("apiserver IAM service auth config must be traceable")
 			}
+			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
 			assertEventCatalogLoads(t)
 		})
 	}
@@ -87,6 +89,7 @@ func TestCollectionDevProdConfigContracts(t *testing.T) {
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("collection IAM service auth config must be traceable")
 			}
+			assertIAMJWKSURLContract(t, "collection", name, opts.IAMOptions)
 		})
 	}
 }
@@ -133,6 +136,29 @@ func loadConfig(t *testing.T, path string, target any) {
 	}
 	if err := v.Unmarshal(target); err != nil {
 		t.Fatalf("Unmarshal(%s) error = %v", path, err)
+	}
+}
+
+func assertIAMJWKSURLContract(t *testing.T, service, configName string, opts *genericoptions.IAMOptions) {
+	t.Helper()
+	if opts == nil || opts.JWKS == nil {
+		t.Fatalf("%s %s IAM JWKS config must be traceable", service, configName)
+	}
+	rawURL := strings.TrimSpace(opts.JWKS.URL)
+	if rawURL == "" {
+		t.Fatalf("%s %s iam.jwks.url must not be empty", service, configName)
+	}
+	if strings.Contains(rawURL, "/api/v1/.well-known") {
+		t.Fatalf("%s %s iam.jwks.url must not use retired IAM v1 JWKS path: %s", service, configName, rawURL)
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("%s %s iam.jwks.url must be parseable: %v", service, configName, err)
+	}
+	switch parsed.Path {
+	case "/.well-known/jwks.json", "/api/v2/.well-known/jwks.json":
+	default:
+		t.Fatalf("%s %s iam.jwks.url path = %q, want /.well-known/jwks.json or /api/v2/.well-known/jwks.json", service, configName, parsed.Path)
 	}
 }
 
