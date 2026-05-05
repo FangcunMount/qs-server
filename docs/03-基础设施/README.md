@@ -452,11 +452,16 @@ configs/events.yaml
 | 文档 | 负责 |
 | ---- | ---- |
 | README | 阅读地图 |
-| 00-整体架构 | process、stage、container、options 总图 |
-| 01-ProcessStage | 进程启动阶段模型 |
-| 02-ContainerGraph | apiserver/collection/worker container graph |
-| 03-ConfigOptions | configs -> options -> runtime deps |
-| 04-ClientBundle | gRPC/SDK/infra clients 组合 |
+| README.md | 阅读地图，说明 runtime 子目录边界、阅读顺序、与 01-运行时/ 的区别 |
+| 00-整体架构.md | Runtime Composition Plane 总图：Options → Process Stage → Resource Bootstrap → Container → ModuleGraph → Transport |
+| 01-ProcessStage与启动流水线.md | 进程启动阶段模型：配置加载、资源准备、container 构建、transport 启动、后台任务启动 |
+| 02-ResourceBootstrap资源装配.md | 资源装配：MySQL、Mongo、Redis runtime、CacheSubsystem、MQ publisher、EventCatalog、Backpressure |
+| 03-ContainerCompositionRoot.md | Container 作为组合根：模块构造、repository/client/cache/event/security/resilience 依赖注入 |
+| 04-ConfigOptions配置链路.md | 配置链路：configs/*.yaml → Options → Config → Runtime deps → ContainerOptions |
+| 05-ClientBundle与外部客户端注入.md | 跨进程/外部客户端装配：gRPC client、IAM client、WeChat/OSS/service auth 等 runtime client bundle |
+| 06-ModuleGraph与PostWire边界.md | PostWire / ModuleGraph：为什么保留 late-bound hook，哪些依赖应构造期注入，哪些可以 post-wire |
+| 07-Lifecycle与关闭语义.md | 资源生命周期：启动失败、降级启动、publisher fallback、Redis unavailable、关闭/释放/Stop 语义 |
+| 08-新增Runtime依赖SOP.md | 新增 runtime 依赖流程：配置、resource bootstrap、container options、module constructor、tests、docs |
 
 ---
 
@@ -466,14 +471,12 @@ configs/events.yaml
 
 | 文档 | 负责 |
 | ---- | ---- |
-| README | 阅读地图 |
-| 00-整体架构 | metrics、healthz、pprof、log、audit、governance 总图 |
-| metrics.md | Prometheus metrics 命名、标签、低基数原则 |
-| Healthz.md | liveness/readyz/health dependency |
-| Pprof.md | pprof 启用和排障边界 |
-| Logging.md | 结构化日志、字段约定、错误上下文 |
-| Audit.md | 审计事件和安全/业务操作追踪 |
-| GovernanceEndpoint.md | cache/resilience/event/status 等只读治理入口 |
+| README.md | 阅读地图：说明 observability 的边界、阅读顺序、与其它基础设施模块的关系 |
+| 00-整体架构.md | 可观测性总图：metrics、healthz、pprof、logging、audit、governance endpoint 如何覆盖三进程 |
+| 01-Metrics指标体系.md | Prometheus 指标体系、命名规范、label 低基数原则、各模块指标入口 |
+| 02-Healthz与Pprof.md | 健康检查和性能剖析：liveness、readiness、dependency health、CPU/heap/goroutine 排查 |
+| 03-Logging与Audit.md | 结构化日志和审计日志：字段规范、敏感信息、业务日志 vs 审计日志边界 |
+| 04-GovernanceEndpoint与排障SOP.md | 治理状态端点和排障入口：cache/resilience/security/event/status 的只读治理边界，以及新增观测能力 SOP |
 
 ---
 
