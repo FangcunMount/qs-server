@@ -5,6 +5,7 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
@@ -76,6 +77,23 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		if c.ActorModule != nil {
 			deps.Plan.TesteeAccessService = c.ActorModule.TesteeAccessService
 		}
+	}
+	if c.ActorModule != nil && c.EvaluationModule != nil && c.PlanModule != nil &&
+		c.ActorModule.OperatorQueryService != nil &&
+		c.ActorModule.ClinicianQueryService != nil &&
+		c.ActorModule.ClinicianRelationshipService != nil &&
+		c.ActorModule.ReadModel != nil &&
+		c.EvaluationModule.LatestRiskReader != nil &&
+		c.PlanModule.FollowUpQueueReader != nil {
+		deps.Workbench.WorkbenchService = workbenchApp.NewService(
+			c.ActorModule.OperatorQueryService,
+			c.ActorModule.ClinicianQueryService,
+			c.ActorModule.ClinicianRelationshipService,
+			c.ActorModule.ReadModel,
+			c.ActorModule.ReadModel,
+			c.EvaluationModule.LatestRiskReader,
+			c.PlanModule.FollowUpQueueReader,
+		)
 	}
 	if c.StatisticsModule != nil {
 		deps.Statistics.Enabled = true
@@ -174,7 +192,7 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		deps.Actor.TesteeManagementService = c.ActorModule.TesteeManagementService
 		deps.Actor.TesteeQueryService = c.ActorModule.TesteeQueryService
 		deps.Actor.ClinicianRelationshipService = c.ActorModule.ClinicianRelationshipService
-		deps.Actor.TesteeTaggingService = c.ActorModule.TesteeTaggingService
+		deps.Actor.TesteeAssessmentAttentionService = c.ActorModule.TesteeAssessmentAttentionService
 		deps.Actor.OperatorLifecycleService = c.ActorModule.OperatorLifecycleService
 		deps.Actor.OperatorAuthorizationService = c.ActorModule.OperatorAuthorizationService
 		deps.Actor.OperatorQueryService = c.ActorModule.OperatorQueryService

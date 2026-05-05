@@ -62,10 +62,42 @@ type AssessmentRow struct {
 	FailureReason        *string
 }
 
+type LatestRiskFilter struct {
+	OrgID     int64
+	TesteeIDs []uint64
+}
+
+type LatestRiskQueueFilter struct {
+	OrgID               int64
+	TesteeIDs           []uint64
+	RestrictToTesteeIDs bool
+	RiskLevels          []string
+}
+
+type LatestRiskRow struct {
+	AssessmentID uint64
+	OrgID        int64
+	TesteeID     uint64
+	RiskLevel    string
+	OccurredAt   time.Time
+}
+
+type LatestRiskPage struct {
+	Items    []LatestRiskRow
+	Total    int64
+	Page     int
+	PageSize int
+}
+
 type AssessmentReader interface {
 	GetAssessment(ctx context.Context, id uint64) (*AssessmentRow, error)
 	GetAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentRow, error)
 	ListAssessments(ctx context.Context, filter AssessmentFilter, page PageRequest) ([]AssessmentRow, int64, error)
+}
+
+type LatestRiskReader interface {
+	ListLatestRisksByTesteeIDs(ctx context.Context, filter LatestRiskFilter) ([]LatestRiskRow, error)
+	ListLatestRiskQueue(ctx context.Context, filter LatestRiskQueueFilter, page PageRequest) (LatestRiskPage, error)
 }
 
 type ScoreFactorRow struct {

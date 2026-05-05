@@ -178,6 +178,32 @@ func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) 
 	}
 }
 
+func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
+	restrictedSQL := latestRiskQueueRowsQuery(true)
+	for _, token := range []string{
+		"ROW_NUMBER() OVER",
+		"PARTITION BY assessment.testee_id",
+		"assessment.org_id = ?",
+		"assessment.testee_id IN ?",
+		"assessment.status = ?",
+		"LOWER(ranked.risk_level) IN ?",
+		"ORDER BY occurred_at DESC, assessment_id DESC",
+		"LIMIT ? OFFSET ?",
+	} {
+		if !strings.Contains(restrictedSQL, token) {
+			t.Fatalf("restricted latest risk query does not contain %q:\n%s", token, restrictedSQL)
+		}
+	}
+
+	allOrgSQL := latestRiskQueueRowsQuery(false)
+	if strings.Contains(allOrgSQL, "assessment.testee_id IN ?") {
+		t.Fatalf("all-org latest risk query should not restrict testee ids:\n%s", allOrgSQL)
+	}
+	if !strings.Contains(allOrgSQL, "assessment.org_id = ?") || !strings.Contains(allOrgSQL, "LOWER(ranked.risk_level) IN ?") {
+		t.Fatalf("all-org latest risk query lost org/risk filters:\n%s", allOrgSQL)
+	}
+}
+
 func TestBuildFactorTrendQueryDocumentsFilterOrderAndLimit(t *testing.T) {
 	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_dry_run?charset=utf8mb4&parseTime=True&loc=Local")
 	if err != nil {
@@ -212,6 +238,25 @@ func TestBuildFactorTrendQueryDocumentsFilterOrderAndLimit(t *testing.T) {
 	for _, want := range []interface{}{uint64(2001), "sleep", 5} {
 		if !containsVar(stmt.Vars, want) {
 			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+}
+
+func TestLatestRiskRowsQueryDocumentsCurrentRiskPerTesteeContract(t *testing.T) {
+	for _, token := range []string{
+		"ROW_NUMBER() OVER",
+		"PARTITION BY assessment.testee_id",
+		"ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC",
+		"assessment.org_id = ?",
+		"assessment.testee_id IN ?",
+		"assessment.status = ?",
+		"assessment.risk_level IS NOT NULL",
+		"assessment.risk_level <> ''",
+		"assessment.deleted_at IS NULL",
+		"ranked.row_num = 1",
+	} {
+		if !strings.Contains(latestRiskRowsQuery, token) {
+			t.Fatalf("latest risk query does not contain %q:\n%s", token, latestRiskRowsQuery)
 		}
 	}
 }

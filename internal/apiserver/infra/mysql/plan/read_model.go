@@ -2,6 +2,7 @@ package plan
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	"gorm.io/gorm"
@@ -12,10 +13,41 @@ type readModel struct {
 	db *gorm.DB
 }
 
+const followUpQueueTasksQuery = `
+SELECT ranked.*
+FROM (
+	SELECT
+		assessment_task.*,
+		ROW_NUMBER() OVER (
+			PARTITION BY assessment_task.testee_id
+			ORDER BY
+				CASE WHEN assessment_task.status = 'expired' THEN 0 ELSE 1 END ASC,
+				CASE WHEN assessment_task.expire_at IS NULL THEN 1 ELSE 0 END ASC,
+				assessment_task.expire_at ASC,
+				assessment_task.planned_at ASC,
+				assessment_task.id ASC
+		) AS row_num
+	FROM assessment_task
+	WHERE assessment_task.org_id = ?
+		%s
+		AND assessment_task.status IN ?
+		AND assessment_task.deleted_at IS NULL
+) ranked
+WHERE ranked.row_num = 1
+ORDER BY
+	CASE WHEN ranked.status = 'expired' THEN 0 ELSE 1 END ASC,
+	CASE WHEN ranked.expire_at IS NULL THEN 1 ELSE 0 END ASC,
+	ranked.expire_at ASC,
+	ranked.planned_at ASC,
+	ranked.id ASC
+LIMIT ? OFFSET ?
+`
+
 // NewReadModel creates the MySQL-backed plan read model adapter.
 func NewReadModel(db *gorm.DB) interface {
 	planreadmodel.PlanReader
 	planreadmodel.TaskReader
+	planreadmodel.FollowUpQueueReader
 } {
 	return &readModel{db: db}
 }
@@ -138,6 +170,63 @@ func (m *readModel) ListTaskWindow(ctx context.Context, filter planreadmodel.Tas
 	}, nil
 }
 
+func (m *readModel) ListFollowUpQueueTasks(ctx context.Context, filter planreadmodel.FollowUpQueueFilter, page planreadmodel.PageRequest) (planreadmodel.TaskPage, error) {
+	if filter.RestrictToTesteeIDs && len(filter.TesteeIDs) == 0 {
+		return planreadmodel.TaskPage{
+			Items:    []planreadmodel.TaskRow{},
+			Page:     normalizedPage(page.Page),
+			PageSize: page.Limit(),
+		}, nil
+	}
+
+	testeeIDs := uniqueUint64(filter.TesteeIDs)
+	statuses := []string{"opened", "expired"}
+
+	var total int64
+	countQuery := m.db.WithContext(ctx).
+		Model(&AssessmentTaskPO{}).
+		Where("org_id = ? AND status IN ? AND deleted_at IS NULL", filter.OrgID, statuses)
+	if filter.RestrictToTesteeIDs {
+		countQuery = countQuery.Where("testee_id IN ?", testeeIDs)
+	}
+	if err := countQuery.Distinct("testee_id").Count(&total).Error; err != nil {
+		return planreadmodel.TaskPage{}, err
+	}
+
+	args := followUpQueueArgs(filter, statuses)
+	args = append(args, page.Limit(), page.Offset())
+	var pos []AssessmentTaskPO
+	err := m.db.WithContext(ctx).
+		Raw(followUpQueueTasksSQL(filter.RestrictToTesteeIDs), args...).
+		Scan(&pos).Error
+	if err != nil {
+		return planreadmodel.TaskPage{}, err
+	}
+
+	return planreadmodel.TaskPage{
+		Items:    taskRowsFromPOValues(pos),
+		Total:    total,
+		Page:     normalizedPage(page.Page),
+		PageSize: page.Limit(),
+	}, nil
+}
+
+func followUpQueueTasksSQL(restrictToTesteeIDs bool) string {
+	testeePredicate := ""
+	if restrictToTesteeIDs {
+		testeePredicate = "AND assessment_task.testee_id IN ?"
+	}
+	return fmt.Sprintf(followUpQueueTasksQuery, testeePredicate)
+}
+
+func followUpQueueArgs(filter planreadmodel.FollowUpQueueFilter, statuses []string) []interface{} {
+	args := []interface{}{filter.OrgID}
+	if filter.RestrictToTesteeIDs {
+		args = append(args, uniqueUint64(filter.TesteeIDs))
+	}
+	return append(args, statuses)
+}
+
 func buildPlanListQuery(db *gorm.DB, filter planreadmodel.PlanFilter) *gorm.DB {
 	query := db.Where("deleted_at IS NULL")
 	if filter.OrgID > 0 {
@@ -180,6 +269,29 @@ func buildTaskWindowQuery(db *gorm.DB, filter planreadmodel.TaskWindowFilter) *g
 		query = query.Where("planned_at <= ?", *filter.PlannedBefore)
 	}
 	return query
+}
+
+func normalizedPage(page int) int {
+	if page < 1 {
+		return 1
+	}
+	return page
+}
+
+func uniqueUint64(items []uint64) []uint64 {
+	if len(items) == 0 {
+		return []uint64{}
+	}
+	seen := make(map[uint64]struct{}, len(items))
+	result := make([]uint64, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+	return result
 }
 
 func (m *readModel) ListTasksByPlanID(ctx context.Context, planID uint64) ([]planreadmodel.TaskRow, error) {
@@ -287,6 +399,17 @@ func taskRowsFromPOs(pos []*AssessmentTaskPO) []planreadmodel.TaskRow {
 	rows := make([]planreadmodel.TaskRow, 0, len(pos))
 	for _, po := range pos {
 		rows = append(rows, taskRowFromPO(po))
+	}
+	return rows
+}
+
+func taskRowsFromPOValues(pos []AssessmentTaskPO) []planreadmodel.TaskRow {
+	if len(pos) == 0 {
+		return []planreadmodel.TaskRow{}
+	}
+	rows := make([]planreadmodel.TaskRow, 0, len(pos))
+	for i := range pos {
+		rows = append(rows, taskRowFromPO(&pos[i]))
 	}
 	return rows
 }

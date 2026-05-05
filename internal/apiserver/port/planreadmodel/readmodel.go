@@ -11,6 +11,25 @@ type PageRequest struct {
 	PageSize int
 }
 
+func (p PageRequest) Offset() int {
+	page := p.Page
+	if page < 1 {
+		page = 1
+	}
+	return (page - 1) * p.Limit()
+}
+
+func (p PageRequest) Limit() int {
+	pageSize := p.PageSize
+	if pageSize < 1 {
+		pageSize = 20
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	return pageSize
+}
+
 // PlanFilter describes plan list filters.
 type PlanFilter struct {
 	OrgID     int64
@@ -35,6 +54,12 @@ type TaskWindowFilter struct {
 	TesteeIDs     []uint64
 	Status        *string
 	PlannedBefore *time.Time
+}
+
+type FollowUpQueueFilter struct {
+	OrgID               int64
+	TesteeIDs           []uint64
+	RestrictToTesteeIDs bool
 }
 
 // PlanRow is the read-side projection of an assessment plan.
@@ -109,4 +134,8 @@ type TaskReader interface {
 	ListTasksByPlanIDAndTesteeIDs(ctx context.Context, planID uint64, testeeIDs []uint64) ([]TaskRow, error)
 	ListTasksByTesteeID(ctx context.Context, testeeID uint64) ([]TaskRow, error)
 	ListTasksByTesteeIDAndPlanID(ctx context.Context, testeeID uint64, planID uint64) ([]TaskRow, error)
+}
+
+type FollowUpQueueReader interface {
+	ListFollowUpQueueTasks(ctx context.Context, filter FollowUpQueueFilter, page PageRequest) (TaskPage, error)
 }

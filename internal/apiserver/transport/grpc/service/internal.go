@@ -29,20 +29,20 @@ import (
 // 用于事件处理后的业务逻辑调用。
 type InternalService struct {
 	pb.UnimplementedInternalServiceServer
-	answerSheetScoringService answerSheetApp.AnswerSheetScoringService
-	submissionService         assessmentApp.AssessmentSubmissionService
-	managementService         assessmentApp.AssessmentManagementService
-	engineService             engine.Service
-	scaleContextResolver      scaleApp.AssessmentScaleContextResolver
-	testeeTaggingService      testeeApp.TesteeTaggingService
-	taskAssessmentResolver    planApp.TaskAssessmentResolver
-	planCommandService        planApp.PlanCommandService
-	operatorLifecycleService  operatorApp.OperatorLifecycleService
-	operatorAuthService       operatorApp.OperatorAuthorizationService
-	operatorQueryService      operatorApp.OperatorQueryService
-	operatorRoleSyncer        operatorBootstrapRoleSyncer
-	behaviorProjectorService  statisticsApp.BehaviorProjectorService
-	warmupCoordinator         cachegov.Coordinator
+	answerSheetScoringService  answerSheetApp.AnswerSheetScoringService
+	submissionService          assessmentApp.AssessmentSubmissionService
+	managementService          assessmentApp.AssessmentManagementService
+	engineService              engine.Service
+	scaleContextResolver       scaleApp.AssessmentScaleContextResolver
+	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
+	taskAssessmentResolver     planApp.TaskAssessmentResolver
+	planCommandService         planApp.PlanCommandService
+	operatorLifecycleService   operatorApp.OperatorLifecycleService
+	operatorAuthService        operatorApp.OperatorAuthorizationService
+	operatorQueryService       operatorApp.OperatorQueryService
+	operatorRoleSyncer         operatorBootstrapRoleSyncer
+	behaviorProjectorService   statisticsApp.BehaviorProjectorService
+	warmupCoordinator          cachegov.Coordinator
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -71,7 +71,7 @@ func NewInternalService(
 	managementService assessmentApp.AssessmentManagementService,
 	engineService engine.Service,
 	scaleContextResolver scaleApp.AssessmentScaleContextResolver,
-	testeeTaggingService testeeApp.TesteeTaggingService,
+	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
 	taskAssessmentResolver planApp.TaskAssessmentResolver,
 	planCommandService planApp.PlanCommandService,
 	operatorLifecycleService operatorApp.OperatorLifecycleService,
@@ -89,7 +89,7 @@ func NewInternalService(
 		managementService:                  managementService,
 		engineService:                      engineService,
 		scaleContextResolver:               scaleContextResolver,
-		testeeTaggingService:               testeeTaggingService,
+		assessmentAttentionService:         assessmentAttentionService,
 		taskAssessmentResolver:             taskAssessmentResolver,
 		planCommandService:                 planCommandService,
 		operatorLifecycleService:           operatorLifecycleService,
@@ -398,10 +398,22 @@ func (s *InternalService) EvaluateAssessment(
 	return newAssessmentFlow(s).EvaluateAssessment(ctx, req)
 }
 
-// TagTestee 给受试者打标签
+// SyncAssessmentAttention 同步测评后置关注状态
 // 场景：worker 处理 report.generated 事件后调用
 // 职责：协议转换，将 gRPC 请求转换为应用服务调用
-// 业务逻辑：由 TesteeTaggingService 处理
+func (s *InternalService) SyncAssessmentAttention(
+	ctx context.Context,
+	req *pb.SyncAssessmentAttentionRequest,
+) (*pb.SyncAssessmentAttentionResponse, error) {
+	return newAssessmentFlow(s).SyncAssessmentAttention(ctx, req)
+}
+
+// TagTestee 兼容旧打标签 RPC
+//
+// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步，不再写 risk_* 标签。
+// 场景：worker 处理 report.generated 事件后调用
+// 职责：协议转换，将 gRPC 请求转换为应用服务调用
+// 业务逻辑：由 TesteeAssessmentAttentionService 处理
 func (s *InternalService) TagTestee(
 	ctx context.Context,
 	req *pb.TagTesteeRequest,

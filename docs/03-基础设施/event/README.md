@@ -261,7 +261,7 @@ flowchart LR
 4. durable outbox 发布 `assessment.submitted`。
 5. Worker 触发 Evaluation pipeline。
 6. Report 成功后发布 `assessment.interpreted`、`report.generated`、`footprint.report_generated`。
-7. Worker 继续做标签回写、行为投影、统计等副作用。
+7. Worker 继续做重点关注同步、行为投影、统计等副作用。
 
 ---
 

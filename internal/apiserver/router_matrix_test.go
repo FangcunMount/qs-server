@@ -18,6 +18,7 @@ import (
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
@@ -99,7 +100,7 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
+	router := resttransport.NewRouter(newRouterTestDeps())
 	router.RegisterRoutes(engine)
 
 	routes := engine.Routes()
@@ -112,7 +113,13 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id/clinicians")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/workbench/queues/summary")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/workbench/queues/:queue_type")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians/me/workbench/queues/summary")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians/me/workbench/queues/:queue_type")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners/me/workbench/queues/summary")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/practitioners/me/workbench/queues/:queue_type")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/staff")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/assessment-entries/:id")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/statistics/overview")
@@ -143,7 +150,7 @@ func TestRouterPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
+	router := resttransport.NewRouter(newRouterTestDeps())
 	router.RegisterRoutes(engine)
 
 	spec := loadRouterMatrixOpenAPI(t, "../../api/rest/apiserver.yaml")
@@ -174,10 +181,26 @@ func TestRouterProtectedClinicianRouteRequiresCapabilitySnapshot(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	engine := gin.New()
-	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
+	router := resttransport.NewRouter(newRouterTestDeps())
 	router.RegisterRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clinicians", nil)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusForbidden)
+	}
+}
+
+func TestRouterAdminWorkbenchRouteRequiresOrgAdminCapability(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	engine := gin.New()
+	router := resttransport.NewRouter(newRouterTestDeps())
+	router.RegisterRoutes(engine)
+
+	req := httptest.NewRequest(http.MethodGet, "/api/v1/workbench/queues/summary", nil)
 	rec := httptest.NewRecorder()
 	engine.ServeHTTP(rec, req)
 
@@ -251,7 +274,7 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 		})
 		c.Next()
 	})
-	router := resttransport.NewRouter(newRouterTestContainer().BuildRESTDeps(nil))
+	router := resttransport.NewRouter(newRouterTestDeps())
 	router.RegisterRoutes(engine)
 
 	req := httptest.NewRequest(http.MethodGet, "/api/v1/clinicians", nil)
@@ -260,6 +283,14 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
+	}
+
+	req = httptest.NewRequest(http.MethodGet, "/api/v1/workbench/queues/summary", nil)
+	rec = httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("workbench status = %d, want %d", rec.Code, http.StatusOK)
 	}
 }
 
@@ -310,6 +341,22 @@ func newRouterTestContainer() *container.Container {
 		},
 		StatisticsModule: &assembler.StatisticsModule{},
 	}
+}
+
+func newRouterTestDeps() resttransport.Deps {
+	deps := newRouterTestContainer().BuildRESTDeps(nil)
+	deps.Workbench.WorkbenchService = &routerWorkbenchServiceStub{}
+	return deps
+}
+
+type routerWorkbenchServiceStub struct{}
+
+func (*routerWorkbenchServiceStub) GetSummary(context.Context, workbenchApp.Scope) (*workbenchApp.SummaryResult, error) {
+	return &workbenchApp.SummaryResult{}, nil
+}
+
+func (*routerWorkbenchServiceStub) ListQueue(context.Context, workbenchApp.ListQueueDTO) (*workbenchApp.QueuePage, error) {
+	return &workbenchApp.QueuePage{Items: []workbenchApp.QueueItem{}}, nil
 }
 
 func assertRoutePresent(t *testing.T, routes gin.RoutesInfo, method, path string) {

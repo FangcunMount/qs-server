@@ -112,12 +112,12 @@ application service
 
 | 内容 | 所属 |
 | ---- | ---- |
-| `RiskLevel` | EvaluationResult / Report |
+| `RiskLevel` | EvaluationResult / Report，是高风险队列事实来源 |
 | 高风险因子 | Evaluation factor score |
-| high_risk tag | Testee 长期业务标签 |
-| 重点关注 | Testee 长期关注属性 |
+| tags | Testee 普通辅助标签，可展示和筛选 |
+| 重点关注 | Testee 长期关注属性，是重点关注队列事实来源 |
 
-报告结果可以触发标签回写，但标签不是报告本身。
+报告结果不再回写 `risk_*` 标签；标签不是报告、风险或工作台队列事实。
 
 ---
 
@@ -157,22 +157,22 @@ application service
 
 ---
 
-## 6. 报告回写标签链路
+## 6. 报告后置关注同步链路
 
 ```mermaid
 sequenceDiagram
     participant MQ as MQ
     participant Worker as report handler
     participant GRPC as internal gRPC
-    participant App as Testee application service
-    participant Domain as Testee / Tagger
+    participant App as Assessment attention service
+    participant Domain as Testee / Editor
     participant Repo as TesteeRepo
 
     MQ->>Worker: report.generated / assessment.interpreted
-    Worker->>GRPC: TagTestee / MarkKeyFocus
-    GRPC->>App: update tags/focus
-    App->>Domain: add tag / set focus
-    App->>Repo: save Testee
+    Worker->>GRPC: SyncAssessmentAttention
+    GRPC->>App: sync key focus
+    App->>Domain: mark key focus when high/severe
+    App->>Repo: save Testee when changed
 ```
 
 关键边界：
@@ -181,8 +181,8 @@ sequenceDiagram
 | ---- | ---- |
 | worker 不直接写 Testee repository | 保证写模型回到 apiserver |
 | internal gRPC 是跨进程防腐边界 | worker 不依赖 domain/testee |
-| 标签更新由应用服务执行 | 保留权限、校验、事务和日志 |
-| Report 不成为 Testee 字段 | 只回写长期标签或关注状态 |
+| 关注同步由应用服务执行 | 保留校验、事务和日志 |
+| Report 不成为 Testee 字段 | 只允许按规则标记重点关注，不维护风险标签 |
 
 ---
 

@@ -522,6 +522,168 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /workbench/queues/summary:
+    get:
+      tags:
+      - Workbench
+      summary: 获取管理员全院工作台队列统计
+      description: 返回当前机构高风险、复诊、重点关注队列数量；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      operationId: 获取管理员全院工作台队列统计
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: integer
+        description: 从业者 ID，可选
+        name: clinician_id
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianWorkbenchQueueSummaryResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /workbench/queues/{queue_type}:
+    get:
+      tags:
+      - Workbench
+      summary: 获取管理员全院工作台队列
+      description: queue_type 取值：high_risk、follow_up、key_focus；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      operationId: 获取管理员全院工作台队列
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 队列类型：high_risk/follow_up/key_focus
+        name: queue_type
+        in: path
+        required: true
+      - type: integer
+        description: 从业者 ID，可选
+        name: clinician_id
+        in: query
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量，最大 100
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianWorkbenchQueueResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/me/workbench/queues/summary:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 获取当前医生工作台队列统计
+      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放/逾期任务、重点关注字段动态生成，不以用户标签为事实来源。
+      operationId: 获取当前医生工作台队列统计
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianWorkbenchQueueSummaryResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /clinicians/me/workbench/queues/{queue_type}:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 获取当前医生工作台队列
+      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的开放或逾期任务，key_focus 使用重点关注字段。
+      operationId: 获取当前医生工作台队列
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 队列类型：high_risk/follow_up/key_focus
+        name: queue_type
+        in: path
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量，最大 100
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianWorkbenchQueueResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /clinicians/{id}:
     put:
       tags:
@@ -3935,6 +4097,83 @@ paths:
           description: OK
         '429':
           description: Too Many Requests
+  /practitioners/me/workbench/queues/summary:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 获取当前医生工作台队列统计
+      description: /clinicians/me/workbench/queues/summary 的从业者路由别名。
+      operationId: 获取当前医生工作台队列统计-从业者别名
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianWorkbenchQueueSummaryResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /practitioners/me/workbench/queues/{queue_type}:
+    get:
+      tags:
+      - Actor-Clinician
+      summary: 获取当前医生工作台队列
+      description: /clinicians/me/workbench/queues/{queue_type} 的从业者路由别名。
+      operationId: 获取当前医生工作台队列-从业者别名
+      parameters:
+      - type: string
+        description: Bearer 用户令牌
+        name: Authorization
+        in: header
+        required: true
+      - type: string
+        description: 队列类型：high_risk/follow_up/key_focus
+        name: queue_type
+        in: path
+        required: true
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量，最大 100
+        name: page_size
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.ClinicianWorkbenchQueueResponse'
+        '429':
+          description: Too Many Requests
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /practitioners/{id}:
     get:
       tags:
@@ -5213,6 +5452,102 @@ components:
         org_id:
           type: string
         title:
+          type: string
+    response.ClinicianWorkbenchQueueCountsResponse:
+      type: object
+      properties:
+        high_risk:
+          type: integer
+        follow_up:
+          type: integer
+        key_focus:
+          type: integer
+    response.ClinicianAssignmentResponse:
+      type: object
+      properties:
+        id:
+          type: string
+        org_id:
+          type: string
+        operator_id:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+        title:
+          type: string
+        clinician_type:
+          type: string
+        relation_type:
+          type: string
+        bound_at:
+          type: string
+    response.ClinicianWorkbenchQueueItemResponse:
+      type: object
+      properties:
+        testee:
+          $ref: '#/components/schemas/response.TesteeResponse'
+        reason_code:
+          type: string
+        reason:
+          type: string
+        reason_at:
+          type: string
+        risk_level:
+          type: string
+        task:
+          $ref: '#/components/schemas/response.ClinicianWorkbenchTaskSummaryResponse'
+        primary_clinician:
+          $ref: '#/components/schemas/response.ClinicianAssignmentResponse'
+        assigned_clinicians:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ClinicianAssignmentResponse'
+        is_unassigned:
+          type: boolean
+    response.ClinicianWorkbenchQueueResponse:
+      type: object
+      properties:
+        queue_type:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.ClinicianWorkbenchQueueItemResponse'
+        total:
+          type: integer
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total_pages:
+          type: integer
+    response.ClinicianWorkbenchQueueSummaryResponse:
+      type: object
+      properties:
+        counts:
+          $ref: '#/components/schemas/response.ClinicianWorkbenchQueueCountsResponse'
+    response.ClinicianWorkbenchTaskSummaryResponse:
+      type: object
+      properties:
+        task_id:
+          type: string
+        plan_id:
+          type: string
+        status:
+          type: string
+        status_label:
+          type: string
+        planned_at:
+          type: string
+        open_at:
+          type: string
+        expire_at:
+          type: string
+        scale_code:
+          type: string
+        entry_url:
           type: string
     response.ClinicianSummaryResponse:
       type: object

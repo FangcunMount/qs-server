@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
-	"strconv"
+	"strings"
 
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
@@ -24,10 +24,9 @@ func handleReportGenerated(deps *Dependencies) HandlerFunc {
 		// 处理高风险预警
 		handleHighRiskAlert(deps, data)
 
-		// 提取高风险因子并给受试者打标签
+		// 同步测评后置关注状态；高风险队列不再依赖受试者 tag。
 		if deps.InternalClient != nil {
-			highRiskFactors := extractHighRiskFactors(ctx, deps, data)
-			tagTesteeWithReportData(ctx, deps, data, highRiskFactors)
+			syncAssessmentAttentionWithReportData(ctx, deps, data)
 		}
 
 		return nil
@@ -60,79 +59,29 @@ func handleHighRiskAlert(deps *Dependencies, data domainReport.ReportGeneratedDa
 	)
 }
 
-// extractHighRiskFactors 从报告中提取高风险因子
-func extractHighRiskFactors(ctx context.Context, deps *Dependencies, data domainReport.ReportGeneratedData) []string {
-	if deps.EvaluationClient == nil {
-		return nil
-	}
-
-	assessmentID, err := strconv.ParseUint(data.AssessmentID, 10, 64)
-	if err != nil {
-		deps.Logger.Warn("failed to parse assessment_id",
-			slog.String("report_id", data.ReportID),
-			slog.String("assessment_id", data.AssessmentID),
-			slog.String("error", err.Error()),
-		)
-		return nil
-	}
-
-	reportResp, err := deps.EvaluationClient.GetAssessmentReport(ctx, assessmentID)
-	if err != nil {
-		deps.Logger.Warn("failed to get report for factor extraction",
-			slog.String("report_id", data.ReportID),
-			slog.String("assessment_id", data.AssessmentID),
-			slog.String("error", err.Error()),
-		)
-		return nil
-	}
-
-	if reportResp == nil || reportResp.Report == nil {
-		return nil
-	}
-
-	var highRiskFactors []string
-	for _, dim := range reportResp.Report.Dimensions {
-		if isHighRiskDimension(dim.RiskLevel) && dim.FactorCode != "" {
-			highRiskFactors = append(highRiskFactors, dim.FactorCode)
-		}
-	}
-
-	if len(highRiskFactors) > 0 {
-		deps.Logger.Info("extracted high risk factors from report",
-			slog.String("report_id", data.ReportID),
-			slog.Int("factor_count", len(highRiskFactors)),
-			slog.Any("factors", highRiskFactors),
-		)
-	}
-
-	return highRiskFactors
-}
-
-// isHighRiskDimension 判断维度风险等级是否为高风险
-func isHighRiskDimension(riskLevel string) bool {
-	return riskLevel == "high" || riskLevel == "severe"
-}
-
 func isHighRiskRiskLevel(riskLevel string) bool {
-	return riskLevel == "high" || riskLevel == "critical"
+	switch strings.ToLower(strings.TrimSpace(riskLevel)) {
+	case "high", "severe":
+		return true
+	default:
+		return false
+	}
 }
 
-// tagTesteeWithReportData 根据报告数据给受试者打标签
-func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data domainReport.ReportGeneratedData, highRiskFactors []string) {
+// syncAssessmentAttentionWithReportData 根据报告数据同步测评后置关注状态。
+func syncAssessmentAttentionWithReportData(ctx context.Context, deps *Dependencies, data domainReport.ReportGeneratedData) {
 	markKeyFocus := isHighRiskRiskLevel(data.RiskLevel)
 
-	resp, err := deps.InternalClient.TagTestee(
+	resp, err := deps.InternalClient.SyncAssessmentAttention(
 		ctx,
-		&pb.TagTesteeRequest{
-			TesteeId:        data.TesteeID,
-			RiskLevel:       data.RiskLevel,
-			ScaleCode:       data.ScaleCode,
-			MarkKeyFocus:    markKeyFocus,
-			HighRiskFactors: highRiskFactors,
+		&pb.SyncAssessmentAttentionRequest{
+			TesteeId:     data.TesteeID,
+			RiskLevel:    data.RiskLevel,
+			MarkKeyFocus: markKeyFocus,
 		},
 	)
 	if err != nil {
-		deps.Logger.Warn("failed to tag testee",
+		deps.Logger.Warn("failed to sync assessment attention",
 			slog.String("report_id", data.ReportID),
 			slog.Uint64("testee_id", data.TesteeID),
 			slog.String("error", err.Error()),
@@ -140,10 +89,9 @@ func tagTesteeWithReportData(ctx context.Context, deps *Dependencies, data domai
 		return
 	}
 
-	deps.Logger.Info("testee tagged successfully",
+	deps.Logger.Info("assessment attention synced successfully",
 		slog.String("report_id", data.ReportID),
 		slog.Uint64("testee_id", data.TesteeID),
-		slog.Any("tags_added", resp.TagsAdded),
 		slog.Bool("key_focus_marked", resp.KeyFocusMarked),
 	)
 }

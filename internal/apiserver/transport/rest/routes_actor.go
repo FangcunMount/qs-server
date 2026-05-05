@@ -10,6 +10,7 @@ type actorHandlers struct {
 	testee            *handler.TesteeHandler
 	operatorClinician *handler.OperatorClinicianHandler
 	assessmentEntry   *handler.AssessmentEntryHandler
+	workbench         *handler.ClinicianWorkbenchHandler
 }
 
 func (r *Router) actorHandlers() actorHandlers {
@@ -46,6 +47,9 @@ func (r *Router) actorHandlers() actorHandlers {
 			deps.QRCodeService,
 		)
 	}
+	if r.deps.Workbench.WorkbenchService != nil {
+		handlers.workbench = handler.NewClinicianWorkbenchHandler(r.deps.Workbench.WorkbenchService)
+	}
 	return handlers
 }
 
@@ -65,7 +69,8 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 	testeeHandler := handlers.testee
 	operatorClinicianHandler := handlers.operatorClinician
 	assessmentEntryHandler := handlers.assessmentEntry
-	if testeeHandler == nil && operatorClinicianHandler == nil && assessmentEntryHandler == nil {
+	workbenchHandler := handlers.workbench
+	if testeeHandler == nil && operatorClinicianHandler == nil && assessmentEntryHandler == nil && workbenchHandler == nil {
 		return
 	}
 
@@ -180,6 +185,26 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 		}
 	}
 
+	if workbenchHandler != nil {
+		adminWorkbench := apiV1.Group("/workbench", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityOrgAdmin))
+		adminWorkbench.GET("/queues/summary", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			workbenchHandler.GetOrgWorkbenchQueueSummary,
+		)...)
+		adminWorkbench.GET("/queues/:queue_type", r.rateLimitedHandlers(
+			r.rateCfg,
+			r.rateCfg.QueryGlobalQPS,
+			r.rateCfg.QueryGlobalBurst,
+			r.rateCfg.QueryUserQPS,
+			r.rateCfg.QueryUserBurst,
+			workbenchHandler.ListOrgWorkbenchQueue,
+		)...)
+	}
+
 	registerClinicianRoutes := func(group *gin.RouterGroup) {
 		if operatorClinicianHandler == nil {
 			return
@@ -266,6 +291,24 @@ func (r *Router) registerActorProtectedRoutes(apiV1 *gin.RouterGroup) {
 			r.rateCfg.QueryUserBurst,
 			operatorClinicianHandler.ListMyClinicianRelations,
 		)...)
+		if workbenchHandler != nil {
+			me.GET("/workbench/queues/summary", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				workbenchHandler.GetMyClinicianWorkbenchQueueSummary,
+			)...)
+			me.GET("/workbench/queues/:queue_type", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				workbenchHandler.ListMyClinicianWorkbenchQueue,
+			)...)
+		}
 		adminClinicians.GET("/:id", r.rateLimitedHandlers(
 			r.rateCfg,
 			r.rateCfg.QueryGlobalQPS,

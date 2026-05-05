@@ -2,7 +2,9 @@ package evaluation
 
 import (
 	"context"
+	"fmt"
 	"strings"
+	"time"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -15,7 +17,62 @@ type assessmentReadModel struct {
 	mysql.BaseRepository[*AssessmentPO]
 }
 
-func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) evaluationreadmodel.AssessmentReader {
+const latestRiskRowsQuery = `
+SELECT
+	ranked.id AS assessment_id,
+	ranked.org_id,
+	ranked.testee_id,
+	ranked.risk_level,
+	COALESCE(ranked.interpreted_at, ranked.updated_at, ranked.created_at) AS occurred_at
+FROM (
+	SELECT
+		assessment.*,
+		ROW_NUMBER() OVER (
+			PARTITION BY assessment.testee_id
+			ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
+		) AS row_num
+	FROM assessment
+	WHERE assessment.org_id = ?
+		AND assessment.testee_id IN ?
+		AND assessment.status = ?
+		AND assessment.risk_level IS NOT NULL
+		AND assessment.risk_level <> ''
+		AND assessment.deleted_at IS NULL
+) ranked
+WHERE ranked.row_num = 1
+ORDER BY occurred_at DESC, assessment_id DESC
+`
+
+const latestRiskQueueSelectSQL = `
+SELECT
+	ranked.id AS assessment_id,
+	ranked.org_id,
+	ranked.testee_id,
+	ranked.risk_level,
+	COALESCE(ranked.interpreted_at, ranked.updated_at, ranked.created_at) AS occurred_at
+FROM (
+	SELECT
+		assessment.*,
+		ROW_NUMBER() OVER (
+			PARTITION BY assessment.testee_id
+			ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
+		) AS row_num
+	FROM assessment
+	WHERE assessment.org_id = ?
+		%s
+		AND assessment.status = ?
+		AND assessment.risk_level IS NOT NULL
+		AND assessment.risk_level <> ''
+		AND assessment.deleted_at IS NULL
+) ranked
+WHERE ranked.row_num = 1
+	AND LOWER(ranked.risk_level) IN ?
+`
+
+func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) interface {
+	evaluationreadmodel.AssessmentReader
+	evaluationreadmodel.LatestRiskReader
+} {
 	return &assessmentReadModel{
 		BaseRepository: mysql.NewBaseRepository[*AssessmentPO](db, opts...),
 	}
@@ -88,6 +145,62 @@ func (r *assessmentReadModel) ListAssessments(
 	return rows, total, nil
 }
 
+func (r *assessmentReadModel) ListLatestRisksByTesteeIDs(
+	ctx context.Context,
+	filter evaluationreadmodel.LatestRiskFilter,
+) ([]evaluationreadmodel.LatestRiskRow, error) {
+	if len(filter.TesteeIDs) == 0 {
+		return []evaluationreadmodel.LatestRiskRow{}, nil
+	}
+
+	var rows []latestRiskPO
+	err := r.WithContext(ctx).
+		Raw(latestRiskRowsQuery, filter.OrgID, uniqueUint64(filter.TesteeIDs), "interpreted").
+		Scan(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return latestRiskRowsFromPOs(rows), nil
+}
+
+func (r *assessmentReadModel) ListLatestRiskQueue(
+	ctx context.Context,
+	filter evaluationreadmodel.LatestRiskQueueFilter,
+	page evaluationreadmodel.PageRequest,
+) (evaluationreadmodel.LatestRiskPage, error) {
+	if filter.RestrictToTesteeIDs && len(filter.TesteeIDs) == 0 {
+		return evaluationreadmodel.LatestRiskPage{
+			Items:    []evaluationreadmodel.LatestRiskRow{},
+			Page:     normalizedLatestRiskPage(page.Page),
+			PageSize: page.Limit(),
+		}, nil
+	}
+
+	args := latestRiskQueueArgs(filter)
+	var total int64
+	if err := r.WithContext(ctx).
+		Raw(latestRiskQueueCountQuery(filter.RestrictToTesteeIDs), args...).
+		Scan(&total).Error; err != nil {
+		return evaluationreadmodel.LatestRiskPage{}, err
+	}
+
+	rowArgs := append(args, page.Limit(), page.Offset())
+	var rows []latestRiskPO
+	if err := r.WithContext(ctx).
+		Raw(latestRiskQueueRowsQuery(filter.RestrictToTesteeIDs), rowArgs...).
+		Scan(&rows).Error; err != nil {
+		return evaluationreadmodel.LatestRiskPage{}, err
+	}
+
+	return evaluationreadmodel.LatestRiskPage{
+		Items:    latestRiskRowsFromPOs(rows),
+		Total:    total,
+		Page:     normalizedLatestRiskPage(page.Page),
+		PageSize: page.Limit(),
+	}, nil
+}
+
 func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.AssessmentFilter) *gorm.DB {
 	if filter.OrgID != 0 {
 		query = query.Where("org_id = ?", filter.OrgID)
@@ -114,6 +227,87 @@ func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.A
 		query = query.Where("created_at < ?", *filter.DateTo)
 	}
 	return query
+}
+
+type latestRiskPO struct {
+	AssessmentID uint64    `gorm:"column:assessment_id"`
+	OrgID        int64     `gorm:"column:org_id"`
+	TesteeID     uint64    `gorm:"column:testee_id"`
+	RiskLevel    string    `gorm:"column:risk_level"`
+	OccurredAt   time.Time `gorm:"column:occurred_at"`
+}
+
+func latestRiskQueueRowsQuery(restrictToTesteeIDs bool) string {
+	return latestRiskQueueSelect(restrictToTesteeIDs) + `
+ORDER BY occurred_at DESC, assessment_id DESC
+LIMIT ? OFFSET ?
+`
+}
+
+func latestRiskQueueCountQuery(restrictToTesteeIDs bool) string {
+	return `SELECT COUNT(*) FROM (` + latestRiskQueueSelect(restrictToTesteeIDs) + `) latest_risk_queue`
+}
+
+func latestRiskQueueSelect(restrictToTesteeIDs bool) string {
+	testeePredicate := ""
+	if restrictToTesteeIDs {
+		testeePredicate = "AND assessment.testee_id IN ?"
+	}
+	return fmt.Sprintf(latestRiskQueueSelectSQL, testeePredicate)
+}
+
+func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []interface{} {
+	riskLevels := normalizeRiskLevels(filter.RiskLevels)
+	args := []interface{}{filter.OrgID}
+	if filter.RestrictToTesteeIDs {
+		args = append(args, uniqueUint64(filter.TesteeIDs))
+	}
+	args = append(args, "interpreted", riskLevels)
+	return args
+}
+
+func normalizeRiskLevels(values []string) []string {
+	if len(values) == 0 {
+		return []string{"high", "severe"}
+	}
+	seen := make(map[string]struct{}, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		normalized := strings.ToLower(strings.TrimSpace(value))
+		if normalized == "" {
+			continue
+		}
+		if _, ok := seen[normalized]; ok {
+			continue
+		}
+		seen[normalized] = struct{}{}
+		result = append(result, normalized)
+	}
+	if len(result) == 0 {
+		return []string{"high", "severe"}
+	}
+	return result
+}
+
+func latestRiskRowsFromPOs(rows []latestRiskPO) []evaluationreadmodel.LatestRiskRow {
+	result := make([]evaluationreadmodel.LatestRiskRow, 0, len(rows))
+	for _, row := range rows {
+		result = append(result, evaluationreadmodel.LatestRiskRow{
+			AssessmentID: row.AssessmentID,
+			OrgID:        row.OrgID,
+			TesteeID:     row.TesteeID,
+			RiskLevel:    strings.ToLower(row.RiskLevel),
+			OccurredAt:   row.OccurredAt,
+		})
+	}
+	return result
+}
+
+func normalizedLatestRiskPage(page int) int {
+	if page < 1 {
+		return 1
+	}
+	return page
 }
 
 func assessmentPOToReadRow(po *AssessmentPO) evaluationreadmodel.AssessmentRow {
@@ -191,6 +385,22 @@ func buildFactorTrendQuery(db *gorm.DB, filter evaluationreadmodel.FactorTrendFi
 		query = query.Limit(filter.Limit)
 	}
 	return query
+}
+
+func uniqueUint64(items []uint64) []uint64 {
+	if len(items) == 0 {
+		return []uint64{}
+	}
+	seen := make(map[uint64]struct{}, len(items))
+	result := make([]uint64, 0, len(items))
+	for _, item := range items {
+		if _, ok := seen[item]; ok {
+			continue
+		}
+		seen[item] = struct{}{}
+		result = append(result, item)
+	}
+	return result
 }
 
 func scorePOsToReadRow(pos []*AssessmentScorePO) evaluationreadmodel.ScoreRow {

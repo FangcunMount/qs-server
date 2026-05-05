@@ -24,7 +24,7 @@ type UpdateTesteeRequest struct {
 	Name       *string    `json:"name"`         // 姓名
 	Gender     *string    `json:"gender"`       // 性别
 	Birthday   *time.Time `json:"birthday"`     // 出生日期
-	Tags       []string   `json:"tags"`         // 标签
+	Tags       []string   `json:"tags"`         // Deprecated: 当前更新接口不消费；标签仅作为辅助标签，不是风险/队列事实
 	IsKeyFocus *bool      `json:"is_key_focus"` // 是否重点关注
 }
 

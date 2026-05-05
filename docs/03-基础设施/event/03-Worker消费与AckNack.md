@@ -183,7 +183,7 @@ handler 依赖由 `handlers.Dependencies` 注入。
 - CreateAssessmentFromAnswerSheet。
 - CalculateAnswerSheetScore。
 - EvaluateAssessment。
-- TagTestee。
+- SyncAssessmentAttention。
 - GenerateQuestionnaireQRCode。
 - GenerateScaleQRCode。
 - HandleQuestionnairePublishedPostActions。

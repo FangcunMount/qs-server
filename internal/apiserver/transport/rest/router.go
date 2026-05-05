@@ -22,6 +22,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
@@ -52,6 +53,7 @@ type Deps struct {
 	Evaluation EvaluationDeps
 	Plan       PlanDeps
 	Statistics StatisticsDeps
+	Workbench  WorkbenchDeps
 
 	CodesService            codesapp.CodesService
 	QRCodeObjectStore       objectstorageport.PublicObjectStore
@@ -107,6 +109,10 @@ type PlanDeps struct {
 	CommandService      planApp.PlanCommandService
 	QueryService        planApp.PlanQueryService
 	TesteeAccessService actorAccessApp.TesteeAccessService
+}
+
+type WorkbenchDeps struct {
+	WorkbenchService workbenchApp.Service
 }
 
 type StatisticsDeps struct {

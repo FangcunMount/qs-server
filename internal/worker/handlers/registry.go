@@ -32,7 +32,10 @@ type InternalClient interface {
 		req *pb.CalculateAnswerSheetScoreRequest,
 	) (*pb.CalculateAnswerSheetScoreResponse, error)
 	EvaluateAssessment(ctx context.Context, assessmentID uint64) (*pb.EvaluateAssessmentResponse, error)
-	TagTestee(ctx context.Context, req *pb.TagTesteeRequest) (*pb.TagTesteeResponse, error)
+	SyncAssessmentAttention(
+		ctx context.Context,
+		req *pb.SyncAssessmentAttentionRequest,
+	) (*pb.SyncAssessmentAttentionResponse, error)
 	GenerateQuestionnaireQRCode(
 		ctx context.Context,
 		code, version string,

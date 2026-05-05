@@ -56,15 +56,15 @@ type SurveyDeps struct {
 }
 
 type ActorDeps struct {
-	TesteeRegistrationService     testeeApp.TesteeRegistrationService
-	TesteeManagementService       testeeApp.TesteeManagementService
-	TesteeQueryService            testeeApp.TesteeQueryService
-	ClinicianRelationshipService  clinicianApp.ClinicianRelationshipService
-	TesteeTaggingService          testeeApp.TesteeTaggingService
-	OperatorLifecycleService      operatorApp.OperatorLifecycleService
-	OperatorAuthorizationService  operatorApp.OperatorAuthorizationService
-	OperatorQueryService          operatorApp.OperatorQueryService
-	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater
+	TesteeRegistrationService        testeeApp.TesteeRegistrationService
+	TesteeManagementService          testeeApp.TesteeManagementService
+	TesteeQueryService               testeeApp.TesteeQueryService
+	ClinicianRelationshipService     clinicianApp.ClinicianRelationshipService
+	TesteeAssessmentAttentionService testeeApp.TesteeAssessmentAttentionService
+	OperatorLifecycleService         operatorApp.OperatorLifecycleService
+	OperatorAuthorizationService     operatorApp.OperatorAuthorizationService
+	OperatorQueryService             operatorApp.OperatorQueryService
+	OperatorRoleProjectionUpdater    operatorApp.OperatorRoleProjectionUpdater
 }
 
 type EvaluationDeps struct {
@@ -230,7 +230,7 @@ func (r *Registry) registerInternalService() error {
 		log.Warn("SurveyModule is not initialized, skipping internal service registration")
 		return nil
 	}
-	if r.deps.Actor.TesteeTaggingService == nil ||
+	if r.deps.Actor.TesteeAssessmentAttentionService == nil ||
 		r.deps.Actor.OperatorLifecycleService == nil ||
 		r.deps.Actor.OperatorAuthorizationService == nil ||
 		r.deps.Actor.OperatorQueryService == nil {
@@ -252,7 +252,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
 		r.deps.Scale.QueryService,
-		r.deps.Actor.TesteeTaggingService,
+		r.deps.Actor.TesteeAssessmentAttentionService,
 		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,
 		r.deps.Actor.OperatorLifecycleService,

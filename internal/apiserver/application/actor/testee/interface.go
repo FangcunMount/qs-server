@@ -47,7 +47,7 @@ type TesteeManagementService interface {
 	BindProfile(ctx context.Context, testeeID uint64, profileID uint64) error
 
 	// AddTag 添加业务标签
-	// 场景：后台员工为受试者添加业务标签（如"高危人群"、"重点关注"）
+	// 场景：后台员工为受试者添加普通辅助标签；风险/工作台队列不以 tag 为事实来源
 	AddTag(ctx context.Context, testeeID uint64, tag string) error
 
 	// RemoveTag 移除业务标签
@@ -61,27 +61,24 @@ type TesteeManagementService interface {
 	UnmarkKeyFocus(ctx context.Context, testeeID uint64) error
 }
 
-// TesteeTaggingService 受试者标签服务
+// TesteeAssessmentAttentionService 测评后置关注同步服务
 // 行为者：系统自动（事件驱动）
-// 职责：根据测评结果自动给受试者打标签
-// 变更来源：标签规则变化、测评结果格式变化
-type TesteeTaggingService interface {
-	// TagByAssessmentResult 根据测评结果给受试者打标签
-	TagByAssessmentResult(
+// 职责：根据测评结果同步自动关注状态，不写入受试者标签
+// 变更来源：测评结果后置同步规则变化
+type TesteeAssessmentAttentionService interface {
+	// SyncAssessmentAttention 根据测评结果同步自动关注状态。
+	// 高风险队列由 Evaluation read model 产生，本服务不维护 risk_* 标签。
+	SyncAssessmentAttention(
 		ctx context.Context,
 		testeeID uint64,
 		riskLevel string,
-		scaleCode string,
-		highRiskFactors []string,
 		markKeyFocus bool,
-	) (*TaggingResult, error)
+	) (*AssessmentAttentionResult, error)
 }
 
-// TaggingResult 标签更新结果
-type TaggingResult struct {
-	TagsAdded      []string // 已添加的标签列表
-	TagsRemoved    []string // 已移除的标签列表
-	KeyFocusMarked bool     // 是否标记为重点关注
+// AssessmentAttentionResult 测评后置关注同步结果。
+type AssessmentAttentionResult struct {
+	KeyFocusMarked bool // 本次测评结果是否满足自动重点关注规则
 }
 
 // TesteeQueryService 受试者查询服务（只读）

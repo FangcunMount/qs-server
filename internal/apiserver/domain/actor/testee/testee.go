@@ -25,7 +25,7 @@ type Testee struct {
 	updatedAt time.Time  // 更新时间
 
 	// === 业务标签与关注 ===
-	tags       []Tag  // 业务标签：["high_risk", "adhd_suspect", "vip"]
+	tags       []Tag  // 辅助标签：["adhd_suspect", "vip"]
 	source     Source // 数据来源
 	isKeyFocus bool   // 是否重点关注对象
 

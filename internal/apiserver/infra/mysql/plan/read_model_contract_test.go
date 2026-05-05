@@ -168,6 +168,34 @@ func TestBuildTaskWindowQueryDocumentsCursorOrderAndLimitContract(t *testing.T) 
 	}
 }
 
+func TestFollowUpQueueTasksQueryDocumentsOneUrgentTaskPerTesteeContract(t *testing.T) {
+	restrictedSQL := followUpQueueTasksSQL(true)
+	for _, token := range []string{
+		"ROW_NUMBER() OVER",
+		"PARTITION BY assessment_task.testee_id",
+		"CASE WHEN assessment_task.status = 'expired' THEN 0 ELSE 1 END ASC",
+		"assessment_task.expire_at ASC",
+		"assessment_task.planned_at ASC",
+		"assessment_task.org_id = ?",
+		"assessment_task.testee_id IN ?",
+		"assessment_task.status IN ?",
+		"assessment_task.deleted_at IS NULL",
+		"ranked.row_num = 1",
+		"LIMIT ? OFFSET ?",
+	} {
+		if !strings.Contains(restrictedSQL, token) {
+			t.Fatalf("restricted follow-up queue query does not contain %q:\n%s", token, restrictedSQL)
+		}
+	}
+	allOrgSQL := followUpQueueTasksSQL(false)
+	if strings.Contains(allOrgSQL, "assessment_task.testee_id IN ?") {
+		t.Fatalf("all-org follow-up queue query should not restrict testee ids:\n%s", allOrgSQL)
+	}
+	if !strings.Contains(allOrgSQL, "assessment_task.org_id = ?") || !strings.Contains(allOrgSQL, "assessment_task.status IN ?") {
+		t.Fatalf("all-org follow-up queue query lost org/status filters:\n%s", allOrgSQL)
+	}
+}
+
 func newDryRunPlanDB(t *testing.T) *gorm.DB {
 	t.Helper()
 	conn, err := sql.Open("mysql", "user:pass@tcp(127.0.0.1:3306)/qs_server_dry_run?charset=utf8mb4&parseTime=True&loc=Local")

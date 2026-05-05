@@ -157,6 +157,9 @@ func (s *stubRelationReader) ListActiveTesteeIDsByClinician(_ context.Context, _
 	s.lastRelationTypes = append([]string(nil), relationTypes...)
 	return []uint64{401}, nil
 }
+func (s *stubRelationReader) ListActiveTesteeRelationsByTesteeIDs(context.Context, int64, []uint64, []string) ([]actorreadmodel.TesteeRelationRow, error) {
+	panic("unexpected call")
+}
 func (s *stubRelationReader) ListTesteeRelations(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRelationRow, error) {
 	panic("unexpected call")
 }

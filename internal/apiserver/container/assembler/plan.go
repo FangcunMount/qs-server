@@ -16,6 +16,7 @@ import (
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
 	planEntryInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/plan"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -32,6 +33,7 @@ type PlanModule struct {
 	QueryService                  planApp.PlanQueryService
 	TaskAssessmentResolver        planApp.TaskAssessmentResolver
 	TaskNotificationContextReader planApp.TaskNotificationContextReader
+	FollowUpQueueReader           planreadmodel.FollowUpQueueReader
 
 	// 事件发布器（由容器统一注入）
 	eventPublisher      event.EventPublisher
@@ -80,6 +82,7 @@ func NewPlanModule(deps PlanModuleDeps) (*PlanModule, error) {
 	entryGenerator := planEntryInfra.NewEntryGenerator(normalized.EntryBaseURL)
 	scaleCatalog := planApp.NewRepositoryScaleCatalog(normalized.ScaleRepo)
 	planReadModel := planInfra.NewReadModel(normalized.MySQLDB)
+	module.FollowUpQueueReader = planReadModel
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
 	lifecycleService := planApp.NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, scaleCatalog, module.eventPublisher)

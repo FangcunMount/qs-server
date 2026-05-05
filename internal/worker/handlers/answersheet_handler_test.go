@@ -20,10 +20,12 @@ import (
 )
 
 type fakeWorkerInternalClient struct {
-	calculateCalls           int
-	createCalls              int
-	questionnaireQRCodeCalls int
-	scaleQRCodeCalls         int
+	calculateCalls                 int
+	createCalls                    int
+	syncAssessmentAttentionCalls   int
+	syncAssessmentAttentionRequest *pb.SyncAssessmentAttentionRequest
+	questionnaireQRCodeCalls       int
+	scaleQRCodeCalls               int
 }
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
@@ -60,11 +62,13 @@ func (f *fakeWorkerInternalClient) EvaluateAssessment(
 	return &pb.EvaluateAssessmentResponse{}, nil
 }
 
-func (f *fakeWorkerInternalClient) TagTestee(
+func (f *fakeWorkerInternalClient) SyncAssessmentAttention(
 	_ context.Context,
-	_ *pb.TagTesteeRequest,
-) (*pb.TagTesteeResponse, error) {
-	return &pb.TagTesteeResponse{}, nil
+	req *pb.SyncAssessmentAttentionRequest,
+) (*pb.SyncAssessmentAttentionResponse, error) {
+	f.syncAssessmentAttentionCalls++
+	f.syncAssessmentAttentionRequest = req
+	return &pb.SyncAssessmentAttentionResponse{}, nil
 }
 
 func (f *fakeWorkerInternalClient) GenerateQuestionnaireQRCode(

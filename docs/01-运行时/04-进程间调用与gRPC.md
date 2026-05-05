@@ -213,7 +213,7 @@ worker 的 `ClientBundle` 包括：
 | `CalculateAnswerSheetScore` | worker 处理 `answersheet.submitted` 后 | 计算答卷分数 |
 | `CreateAssessmentFromAnswerSheet` | worker 处理 `answersheet.submitted` 后 | 从答卷创建 Assessment，关联量表时可自动提交 |
 | `EvaluateAssessment` | worker 处理 `assessment.submitted` 后 | 执行评估流水线 |
-| `TagTestee` | worker 处理 `report.generated` 后 | 根据风险等级等给受试者打标签 |
+| `SyncAssessmentAttention` | worker 处理 `report.generated` 后 | 根据风险等级同步自动重点关注，不写 risk_* 标签 |
 | `ProjectBehaviorEvent` | worker 处理行为足迹事件后 | 投影行为统计和日维度读模型 |
 | `SendTaskOpenedMiniProgramNotification` | worker 处理 `task.opened` 后 | 发送任务开放通知 |
 | `HandleQuestionnairePublishedPostActions` / `HandleScalePublishedPostActions` | 问卷 / 量表发布后 | 生成二维码等发布后动作 |

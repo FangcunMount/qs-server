@@ -44,6 +44,10 @@ type TesteeReader interface {
 	CountTesteesByProfileIDs(ctx context.Context, profileIDs []uint64) (int64, error)
 }
 
+type TesteeHydrator interface {
+	ListTesteesByIDs(ctx context.Context, orgID int64, ids []uint64) ([]TesteeRow, error)
+}
+
 type OperatorFilter struct {
 	OrgID  int64
 	Role   string
@@ -98,6 +102,7 @@ type RelationFilter struct {
 	OrgID         int64
 	ClinicianID   uint64
 	TesteeID      uint64
+	TesteeIDs     []uint64
 	RelationTypes []string
 	ActiveOnly    bool
 	Offset        int
@@ -130,6 +135,7 @@ type ClinicianRelationRow struct {
 type RelationReader interface {
 	ListAssignedTestees(ctx context.Context, filter RelationFilter) ([]TesteeRow, int64, error)
 	ListActiveTesteeIDsByClinician(ctx context.Context, orgID int64, clinicianID uint64, relationTypes []string) ([]uint64, error)
+	ListActiveTesteeRelationsByTesteeIDs(ctx context.Context, orgID int64, testeeIDs []uint64, relationTypes []string) ([]TesteeRelationRow, error)
 	ListTesteeRelations(ctx context.Context, filter RelationFilter) ([]TesteeRelationRow, error)
 	ListClinicianRelations(ctx context.Context, filter RelationFilter) ([]ClinicianRelationRow, int64, error)
 	HasActiveRelationForTestee(ctx context.Context, orgID int64, clinicianID, testeeID uint64, relationTypes []string) (bool, error)
@@ -162,6 +168,7 @@ type AssessmentEntryReader interface {
 
 type ReadModel interface {
 	TesteeReader
+	TesteeHydrator
 	OperatorReader
 	ClinicianReader
 	RelationReader

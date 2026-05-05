@@ -2,7 +2,6 @@ package service
 
 import (
 	"context"
-	"fmt"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -221,19 +220,17 @@ func (flow assessmentFlow) EvaluateAssessment(
 	}, nil
 }
 
-func (flow assessmentFlow) TagTestee(
+func (flow assessmentFlow) SyncAssessmentAttention(
 	ctx context.Context,
-	req *pb.TagTesteeRequest,
-) (*pb.TagTesteeResponse, error) {
+	req *pb.SyncAssessmentAttentionRequest,
+) (*pb.SyncAssessmentAttentionResponse, error) {
 	s := flow.service
 	l := logger.L(ctx)
 
-	l.Infow("gRPC: 收到给受试者打标签请求",
-		"action", "tag_testee",
+	l.Infow("gRPC: 收到同步测评后置关注请求",
+		"action", "sync_assessment_attention",
 		"testee_id", req.TesteeId,
 		"risk_level", req.RiskLevel,
-		"scale_code", req.ScaleCode,
-		"high_risk_factors_count", len(req.HighRiskFactors),
 		"mark_key_focus", req.MarkKeyFocus,
 	)
 
@@ -241,36 +238,72 @@ func (flow assessmentFlow) TagTestee(
 		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
 	}
 
-	result, err := s.testeeTaggingService.TagByAssessmentResult(
+	result, err := s.assessmentAttentionService.SyncAssessmentAttention(
 		ctx,
 		req.TesteeId,
 		req.RiskLevel,
-		req.ScaleCode,
-		req.HighRiskFactors,
 		req.MarkKeyFocus,
 	)
 	if err != nil {
-		l.Errorw("给受试者打标签失败",
+		l.Errorw("同步测评后置关注失败",
+			"testee_id", req.TesteeId,
+			"risk_level", req.RiskLevel,
+			"error", err.Error(),
+		)
+		return nil, status.Errorf(codes.Internal, "同步测评后置关注失败: %v", err)
+	}
+
+	l.Infow("同步测评后置关注成功",
+		"action", "sync_assessment_attention",
+		"testee_id", req.TesteeId,
+		"key_focus_marked", result.KeyFocusMarked,
+	)
+
+	return &pb.SyncAssessmentAttentionResponse{
+		Success:        true,
+		KeyFocusMarked: result.KeyFocusMarked,
+		Message:        "测评后置关注同步完成",
+	}, nil
+}
+
+func (flow assessmentFlow) TagTestee(
+	ctx context.Context,
+	req *pb.TagTesteeRequest,
+) (*pb.TagTesteeResponse, error) {
+	s := flow.service
+	l := logger.L(ctx)
+
+	l.Warnw("gRPC: TagTestee 已废弃，桥接为测评后置关注同步",
+		"action", "tag_testee_deprecated",
+		"testee_id", req.TesteeId,
+		"risk_level", req.RiskLevel,
+		"scale_code", req.ScaleCode,
+		"mark_key_focus", req.MarkKeyFocus,
+	)
+
+	if req.TesteeId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
+	}
+
+	result, err := s.assessmentAttentionService.SyncAssessmentAttention(
+		ctx,
+		req.TesteeId,
+		req.RiskLevel,
+		req.MarkKeyFocus,
+	)
+	if err != nil {
+		l.Errorw("TagTestee deprecated 桥接失败",
 			"testee_id", req.TesteeId,
 			"risk_level", req.RiskLevel,
 			"scale_code", req.ScaleCode,
 			"error", err.Error(),
 		)
-		return nil, status.Errorf(codes.Internal, "给受试者打标签失败: %v", err)
+		return nil, status.Errorf(codes.Internal, "同步测评后置关注失败: %v", err)
 	}
-
-	l.Infow("给受试者打标签成功",
-		"action", "tag_testee",
-		"testee_id", req.TesteeId,
-		"tags_added_count", len(result.TagsAdded),
-		"tags_removed_count", len(result.TagsRemoved),
-		"key_focus_marked", result.KeyFocusMarked,
-	)
 
 	return &pb.TagTesteeResponse{
 		Success:        true,
-		TagsAdded:      result.TagsAdded,
 		KeyFocusMarked: result.KeyFocusMarked,
-		Message:        fmt.Sprintf("标签更新成功：添加 %d 个，移除 %d 个", len(result.TagsAdded), len(result.TagsRemoved)),
+		Message:        "TagTestee 已废弃，已桥接为测评后置关注同步",
 	}, nil
 }

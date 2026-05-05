@@ -72,6 +72,9 @@ type EvaluationModule struct {
 	// 受保护查询服务 - 服务于 REST 查询访问与查询编排收口
 	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
 
+	// 最新风险读模型 - 服务于医生工作台等跨模块读侧编排
+	LatestRiskReader evaluationreadmodel.LatestRiskReader
+
 	// ==================== 评估引擎 ====================
 
 	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
@@ -124,6 +127,7 @@ type evaluationInfra struct {
 	assessmentRepo               assessment.Repository
 	scoreRepo                    assessment.ScoreRepository
 	assessmentReader             evaluationreadmodel.AssessmentReader
+	latestRiskReader             evaluationreadmodel.LatestRiskReader
 	scoreReader                  evaluationreadmodel.ScoreReader
 	reportReader                 evaluationreadmodel.ReportReader
 	assessmentOutboxStore        *mysqlEventOutbox.Store
@@ -145,7 +149,9 @@ func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, erro
 		infra.assessmentRepo = baseAssessmentRepo
 	}
 
-	infra.assessmentReader = mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
+	assessmentReadModel := mysqlEval.NewAssessmentReadModel(normalized.MySQLDB, mysqlOptions)
+	infra.assessmentReader = assessmentReadModel
+	infra.latestRiskReader = assessmentReadModel
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
 	reportRepo, err := mongoEval.NewReportRepositoryWithTopicResolver(normalized.MongoDB, normalized.TopicResolver, mongoOptions)
@@ -255,6 +261,7 @@ func (m *EvaluationModule) wireAssessmentApplications(
 		m.WaitService,
 		m.AccessQueryService,
 	)
+	m.LatestRiskReader = infra.latestRiskReader
 }
 
 type evaluationPipelineDeps struct {

@@ -312,6 +312,10 @@ func (s *relationshipServiceRelationReader) ListActiveTesteeIDsByClinician(conte
 	return s.activeTesteeIDs, nil
 }
 
+func (s *relationshipServiceRelationReader) ListActiveTesteeRelationsByTesteeIDs(context.Context, int64, []uint64, []string) ([]actorreadmodel.TesteeRelationRow, error) {
+	return nil, nil
+}
+
 func (s *relationshipServiceRelationReader) ListTesteeRelations(context.Context, actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRelationRow, error) {
 	s.listTesteeRelationsCalls++
 	return s.testeeRelations, nil

@@ -22,6 +22,7 @@ import (
 	actorInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/actor"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
 	statisticsInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/statistics"
+	actorreadmodel "github.com/FangcunMount/qs-server/internal/apiserver/port/actorreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -33,11 +34,11 @@ import (
 // ActorModule Actor 模块（测评对象和工作人员）
 type ActorModule struct {
 	// testee service 层（按行为者组织）
-	TesteeRegistrationService testeeApp.TesteeRegistrationService // 注册服务 - C端用户
-	TesteeManagementService   testeeApp.TesteeManagementService   // 管理服务 - B端员工
-	TesteeQueryService        testeeApp.TesteeQueryService        // 查询服务 - 通用（小程序、C端）
-	TesteeBackendQueryService testeeApp.TesteeBackendQueryService // 后台查询服务 - B端员工（包含家长信息）
-	TesteeTaggingService      testeeApp.TesteeTaggingService      // 标签服务 - 系统自动（事件驱动）
+	TesteeRegistrationService        testeeApp.TesteeRegistrationService        // 注册服务 - C端用户
+	TesteeManagementService          testeeApp.TesteeManagementService          // 管理服务 - B端员工
+	TesteeQueryService               testeeApp.TesteeQueryService               // 查询服务 - 通用（小程序、C端）
+	TesteeBackendQueryService        testeeApp.TesteeBackendQueryService        // 后台查询服务 - B端员工（包含家长信息）
+	TesteeAssessmentAttentionService testeeApp.TesteeAssessmentAttentionService // 测评后置关注同步服务 - 系统自动（事件驱动）
 
 	// operator service 层（按行为者组织）
 	OperatorLifecycleService      operatorApp.OperatorLifecycleService      // 生命周期服务 - 人事/行政
@@ -50,6 +51,7 @@ type ActorModule struct {
 	TesteeAccessService           actorAccessApp.TesteeAccessService        // 解析后台访问范围：admin bypass / ClinicianTesteeRelation
 	ActiveOperatorChecker         operatorApp.ActiveOperatorChecker         // REST/gRPC 认证期 active operator 检查
 	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater // 将 IAM 角色快照投影回本地 operator
+	ReadModel                     actorreadmodel.ReadModel                  // 只读投影，供跨模块工作台等读侧编排使用
 }
 
 // ActorModuleDeps 定义 Actor 模块的显式构造依赖。
@@ -108,6 +110,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	relationRepo := actorInfra.NewRelationRepository(mysqlDB, mysqlOptions)
 	assessmentEntryRepo := actorInfra.NewAssessmentEntryRepository(mysqlDB, mysqlOptions)
 	actorReadModel := actorInfra.NewReadModel(mysqlDB, mysqlOptions)
+	module.ReadModel = actorReadModel
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB, mysqlOptions)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
@@ -119,7 +122,6 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	testeeEditor := testee.NewEditor(testeeValidator)
 	testeeBinder := testee.NewBinder(testeeRepo)
 	testeeTagger := testee.NewTagger(testeeValidator)
-	testeeRiskTagPolicy := testee.NewRiskTagPolicy()
 
 	// 初始化 operator domain services
 	operatorValidator := operator.NewValidator()
@@ -146,9 +148,9 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		txRunner,
 	)
 	module.TesteeQueryService = testeeApp.NewQueryService(actorReadModel)
-	module.TesteeTaggingService = testeeApp.NewTaggingService(
+	module.TesteeAssessmentAttentionService = testeeApp.NewAssessmentAttentionService(
 		testeeRepo,
-		testeeRiskTagPolicy,
+		testeeEditor,
 		txRunner,
 	)
 

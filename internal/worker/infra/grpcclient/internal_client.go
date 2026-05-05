@@ -74,7 +74,25 @@ func (c *InternalClient) CalculateAnswerSheetScore(
 	return resp, nil
 }
 
-// TagTestee 给受试者打标签
+// SyncAssessmentAttention 同步测评后置关注状态。
+func (c *InternalClient) SyncAssessmentAttention(
+	ctx context.Context,
+	req *pb.SyncAssessmentAttentionRequest,
+) (*pb.SyncAssessmentAttentionResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.SyncAssessmentAttention(ctx, req)
+	if err != nil {
+		return nil, fmt.Errorf("failed to sync assessment attention: %w", err)
+	}
+
+	return resp, nil
+}
+
+// TagTestee 兼容旧打标签 RPC。
+//
+// Deprecated: use SyncAssessmentAttention. 当前仅用于兼容旧调用方。
 func (c *InternalClient) TagTestee(
 	ctx context.Context,
 	req *pb.TagTesteeRequest,

@@ -103,6 +103,28 @@ func (r *readModel) CountTesteesByProfileIDs(ctx context.Context, profileIDs []u
 	return count, err
 }
 
+func (r *readModel) ListTesteesByIDs(ctx context.Context, orgID int64, ids []uint64) ([]actorreadmodel.TesteeRow, error) {
+	if len(ids) == 0 {
+		return []actorreadmodel.TesteeRow{}, nil
+	}
+	testeesByID, err := r.loadTesteeRowsByIDInOrg(ctx, orgID, ids)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]actorreadmodel.TesteeRow, 0, len(ids))
+	seen := make(map[uint64]struct{}, len(ids))
+	for _, id := range ids {
+		if _, ok := seen[id]; ok {
+			continue
+		}
+		seen[id] = struct{}{}
+		if row, ok := testeesByID[id]; ok {
+			rows = append(rows, row)
+		}
+	}
+	return rows, nil
+}
+
 func (r *readModel) applyTesteeFilter(query *gorm.DB, filter actorreadmodel.TesteeFilter) *gorm.DB {
 	query = query.Where("org_id = ? AND deleted_at IS NULL", filter.OrgID)
 	if filter.RestrictToAccessScope {
@@ -262,6 +284,49 @@ func (r *readModel) ListActiveTesteeIDsByClinician(ctx context.Context, orgID in
 	return rawIDs, err
 }
 
+func (r *readModel) ListActiveTesteeRelationsByTesteeIDs(ctx context.Context, orgID int64, testeeIDs []uint64, relationTypes []string) ([]actorreadmodel.TesteeRelationRow, error) {
+	if len(testeeIDs) == 0 {
+		return []actorreadmodel.TesteeRelationRow{}, nil
+	}
+	var relationRows []*ClinicianRelationPO
+	if err := buildActiveTesteeRelationsQuery(r.WithContext(ctx), orgID, testeeIDs, relationTypes).
+		Find(&relationRows).Error; err != nil {
+		return nil, err
+	}
+	clinicianIDs := make([]uint64, 0, len(relationRows))
+	for _, relation := range relationRows {
+		clinicianIDs = append(clinicianIDs, uint64(relation.ClinicianID))
+	}
+	cliniciansByID, err := r.loadClinicianRowsByID(ctx, clinicianIDs)
+	if err != nil {
+		return nil, err
+	}
+	rows := make([]actorreadmodel.TesteeRelationRow, 0, len(relationRows))
+	for _, relation := range relationRows {
+		clinicianRow, ok := cliniciansByID[uint64(relation.ClinicianID)]
+		if !ok {
+			continue
+		}
+		rows = append(rows, actorreadmodel.TesteeRelationRow{
+			Relation:  relationRowFromPO(relation),
+			Clinician: clinicianRow,
+		})
+	}
+	return rows, nil
+}
+
+func buildActiveTesteeRelationsQuery(db *gorm.DB, orgID int64, testeeIDs []uint64, relationTypes []string) *gorm.DB {
+	query := db.
+		Where("org_id = ? AND testee_id IN ? AND is_active = ? AND deleted_at IS NULL", orgID, uniqueUint64(testeeIDs), true)
+	if len(relationTypes) > 0 {
+		query = query.Where("relation_type IN ?", relationTypes)
+	}
+	return query.
+		Order("testee_id ASC").
+		Order("CASE relation_type WHEN 'primary' THEN 0 WHEN 'attending' THEN 1 WHEN 'collaborator' THEN 2 WHEN 'assigned' THEN 3 ELSE 4 END ASC").
+		Order("bound_at DESC, id DESC")
+}
+
 func (r *readModel) ListTesteeRelations(ctx context.Context, filter actorreadmodel.RelationFilter) ([]actorreadmodel.TesteeRelationRow, error) {
 	relationRows, _, err := r.listRelationPOs(ctx, filter, false)
 	if err != nil {
@@ -344,6 +409,9 @@ func (r *readModel) listRelationPOs(ctx context.Context, filter actorreadmodel.R
 	if filter.TesteeID > 0 {
 		query = query.Where("testee_id = ?", filter.TesteeID)
 	}
+	if len(filter.TesteeIDs) > 0 {
+		query = query.Where("testee_id IN ?", filter.TesteeIDs)
+	}
 	if filter.ActiveOnly {
 		query = query.Where("is_active = ?", true)
 	}
@@ -414,6 +482,26 @@ func (r *readModel) loadTesteeRowsByID(ctx context.Context, ids []uint64) (map[u
 	var pos []*TesteePO
 	err := r.WithContext(ctx).Where("id IN ? AND deleted_at IS NULL", uniqueUint64(ids)).Find(&pos).Error
 	if err != nil {
+		return nil, err
+	}
+	result := make(map[uint64]actorreadmodel.TesteeRow, len(pos))
+	for _, po := range pos {
+		row := testeeRowFromPO(po)
+		result[row.ID] = row
+	}
+	return result, nil
+}
+
+func (r *readModel) loadTesteeRowsByIDInOrg(ctx context.Context, orgID int64, ids []uint64) (map[uint64]actorreadmodel.TesteeRow, error) {
+	if len(ids) == 0 {
+		return map[uint64]actorreadmodel.TesteeRow{}, nil
+	}
+	query := r.WithContext(ctx).Where("id IN ? AND deleted_at IS NULL", uniqueUint64(ids))
+	if orgID > 0 {
+		query = query.Where("org_id = ?", orgID)
+	}
+	var pos []*TesteePO
+	if err := query.Find(&pos).Error; err != nil {
 		return nil, err
 	}
 	result := make(map[uint64]actorreadmodel.TesteeRow, len(pos))
