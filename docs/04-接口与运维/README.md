@@ -1,58 +1,121 @@
-# 接口与运维
+# 04-接口与运维 阅读地图
 
-**本文回答**：本组文档解释 `qs-server` 的机器契约和运维入口分别落在哪里，包括 REST / gRPC 契约、端口与部署映射、周期任务与事件型后台任务的分工；本文先给结论和阅读导航，再说明它与业务模块、基础设施、运行时之间的边界。
+**本文回答**：`04-接口与运维/` 这一组文档如何阅读；REST、gRPC、配置、部署、调度、健康检查、排障、容量规划分别去哪里看；它与 `01-运行时/`、`02-业务模块/`、`03-基础设施/` 的边界是什么。
+
+---
 
 ## 30 秒结论
 
-如果只看一屏，先看下面这张表：
-
 | 维度 | 结论 |
 | ---- | ---- |
-| 本组主题 | REST 契约、gRPC 契约、端口部署映射、调度与后台任务，以及典型生产事故复盘 |
-| 真值边界 | 这里讲机器契约入口和运维事实；业务语义仍回到 [02-业务模块](../02-业务模块/) |
-| 契约真值 | REST 以 [api/rest](../../api/rest/) 为准，gRPC 以 [proto](../../internal/apiserver/interface/grpc/proto/) 为准 |
-| 运维真值 | 端口、TLS / mTLS、Crontab、ticker、部署映射和事故处置证据都从本组文档与 `configs/` / 日志 / 代码对照核实 |
-| 最重要的认识 | “事件型后台任务”和“定时 / 运维触发任务”是两套不同机制，不能混成一条链理解 |
-| 阅读方式 | 先读 REST 与 gRPC，再读部署与端口，最后读调度与后台任务 |
+| 本组定位 | 负责 qs-server 的**机器契约与运维入口**：REST/gRPC 契约、配置、端口部署、调度、健康检查、排障、容量档位 |
+| 契约真值 | REST 以 `api/rest/*.yaml` 与 `transport/rest` 注册为准；gRPC 以 proto 与 `transport/grpc/registry.go` 为准 |
+| 运维真值 | 配置以 `configs/*.yaml` 为准；端口映射以 `build/docker/*.yml` 为准；运行行为以 process/runtime/container 代码为准 |
+| 不负责 | 不重复业务领域模型，不替代基础设施深讲，不写历史专题复盘 |
+| 重点边界 | collection-server 是前台 BFF；qs-apiserver 是后台/内部主服务；worker 不暴露业务 HTTP/gRPC |
+| 当前变化 | 旧文档中事故复盘、代码质量报告、operating 接入等专题不纳入新版主目录，可移入专题或 archive |
+| 推荐读法 | 先看契约总览，再读 apiserver REST / collection REST / gRPC，最后看配置部署、调度、观测、排障、容量 |
 
-## 重点速查（继续往下读前先记这几条）
+一句话概括：
 
-1. **契约以机器文件为准**：正文只解释入口和 Verify 方式，真正的 REST / gRPC 契约还是以导出 yaml 和 proto 为准。  
-2. **不要混文档层**：业务 Handler 的语义、领域动作和模块边界不在本组重复展开。  
-3. **后台分两类**：`Crontab / ticker / 运维触发` 与 `MQ 事件驱动` 是两类不同后台机制，本组只负责把它们的运维入口和部署事实讲清楚。  
-4. **排障时从这里入手**：遇到“这个接口实际暴露在哪个进程、哪个端口、谁来调、怎么生成契约”这类问题，优先看本组。  
+> **04-接口与运维回答“系统对外/对内暴露什么机器入口，以及生产中怎么配置、部署、观察、排障”。**
 
-## 为什么这一组要单独存在
+---
 
-契约和运维事实如果散落在模块文、运行时文和基础设施文里，会出现两个问题：一是读者不知道“接口真值文件到底在哪”，二是部署、端口、调度与事件后台任务容易混成一条链。因此本组单独承担：
+## 1. 新版目录
 
-- REST / gRPC 机器契约入口在哪里、如何和代码注册点互相验证
-- HTTP / gRPC 监听地址、TLS / mTLS、Compose 映射与对外暴露面如何核对
-- `Crontab / ticker / 运维触发` 与 `MQ 事件驱动` 这两类后台机制在运维视角下如何区分
+```text
+04-接口与运维/
+├── README.md
+├── 00-接口契约总览.md
+├── 01-apiserver-REST.md
+├── 02-collection-REST.md
+├── 03-gRPC契约.md
+├── 04-internal-gRPC.md
+├── 05-配置与环境变量.md
+├── 06-部署与端口.md
+├── 07-调度任务.md
+├── 08-健康检查与观测.md
+├── 09-常见排障.md
+└── 10-QPS容量档位与资源配置建议.md
+```
 
-本组优先讲**契约入口、运维触发方式、部署事实**，不重复模块文里的业务语义。
+---
 
-## 与其它文档的分工
+## 2. 阅读顺序
 
-| 文档组 | 侧重 |
+| 顺序 | 文档 | 先回答什么 |
+| ---- | ---- | ---------- |
+| 1 | [00-接口契约总览.md](./00-接口契约总览.md) | REST/gRPC 契约真值、双 REST 面、内部入口边界 |
+| 2 | [01-apiserver-REST.md](./01-apiserver-REST.md) | apiserver 的公开/protected/internal REST 分组和中间件 |
+| 3 | [02-collection-REST.md](./02-collection-REST.md) | collection-server 的前台 BFF REST、限流、提交队列、公开读接口 |
+| 4 | [03-gRPC契约.md](./03-gRPC契约.md) | proto、服务注册、collection/worker client 矩阵 |
+| 5 | [04-internal-gRPC.md](./04-internal-gRPC.md) | InternalService 的 worker 回调定位与边界 |
+| 6 | [05-配置与环境变量.md](./05-配置与环境变量.md) | 配置文件、环境变量、配置链路、敏感项 |
+| 7 | [06-部署与端口.md](./06-部署与端口.md) | dev/prod 端口、Docker Compose 映射、TLS/mTLS |
+| 8 | [07-调度任务.md](./07-调度任务.md) | apiserver 内建 scheduler、worker 事件后台、internal REST 手工触发 |
+| 9 | [08-健康检查与观测.md](./08-健康检查与观测.md) | healthz/readyz/metrics/pprof/governance/status |
+| 10 | [09-常见排障.md](./09-常见排障.md) | 接口、gRPC、部署、调度、观测常见问题 |
+| 11 | [10-QPS容量档位与资源配置建议.md](./10-QPS容量档位与资源配置建议.md) | 100-1000 QPS 容量档位、容器资源、压测验收 |
+
+---
+
+## 3. 与其它文档组的分工
+
+| 文档组 | 负责 |
 | ------ | ---- |
-| [02-业务模块](../02-业务模块/) | 各模块 REST/gRPC **业务语义**、用例与锚点 |
-| [03-基础设施](../03-基础设施/) | JWT、**gRPC 拦截器链**、限流键、[`configs/events.yaml`](../../configs/events.yaml) |
-| [01-运行时](../01-运行时/) | 各进程职责与启动顺序 |
-| **04-接口与运维（本文）** | **OpenAPI 导出**、**proto 与注册**、端口表、Crontab 与进程内 ticker |
+| `01-运行时/` | 三进程业务运行时、请求链路、进程间协作 |
+| `02-业务模块/` | Survey / Scale / Evaluation / Actor / Plan / Statistics 的业务语义 |
+| `03-基础设施/` | Event、DataAccess、Redis、Resilience、Security、Integrations、Runtime、Observability 的机制深讲 |
+| `04-接口与运维/` | REST/gRPC 契约、配置部署、端口、调度、健康检查、排障、容量 |
+| `05-专题分析/` | 事故复盘、质量报告、专项分析、历史专题 |
 
-## 建议阅读顺序
+---
 
-1. [01-REST契约.md](./01-REST契约.md) — 双 REST 面、契约生成与 Verify  
-2. [02-gRPC契约.md](./02-gRPC契约.md) — 服务矩阵、`GRPCRegistry`、Internal 与 worker  
-3. [03-部署与端口.md](./03-部署与端口.md) — 监听地址、Compose 映射、TLS / mTLS  
-4. [04-调度与后台任务.md](./04-调度与后台任务.md) — Crontab、统计同步 ticker、与 [01-事件系统](../03-基础设施/01-事件系统.md) 的异步链  
-5. [05-事故复盘：2026-04-16 qs.evaluation.lifecycle 积压与 30 秒尾延迟.md](./05-事故复盘：2026-04-16%20qs.evaluation.lifecycle%20积压与%2030%20秒尾延迟.md) — 一次真实生产排障如何从“数据库疑似瓶颈”收敛到“应用层同步缓存失效”
-6. [06-operating 缓存治理页接入.md](./06-operating%20缓存治理页接入.md) — 自研 operating 后台如何复用 internal 缓存治理接口与 Grafana 深链接
-7. [07-代码质量基线报告：2026-04-22.md](./07-代码质量基线报告：2026-04-22.md) — 当前质量门禁、覆盖率、安全扫描和下一阶段治理优先级
-8. [08-架构边界审计与Tier1测试策略：2026-04-22.md](./08-架构边界审计与Tier1测试策略：2026-04-22.md) — 分层边界现状、允许例外、Tier 1 测试策略与第一阶段深度治理落点
-9. [09-govulncheck剩余advisory分组处置：2026-04-22.md](./09-govulncheck剩余advisory分组处置：2026-04-22.md) — Go 1.25.9 升级后的 govulncheck 分组结果、历史已吸收 advisory 与 watchlist 处置方式
-10. [10-operating 事件只读状态接入.md](./10-operating%20事件只读状态接入.md) — operating 如何读取事件 catalog 摘要与 outbox backlog/lag，只读不治理
-11. [11-QPS容量档位与资源配置建议.md](./11-QPS容量档位与资源配置建议.md) — QPS 100-1000 的配置档位、容器资源、主机硬件和压测验收建议
+## 4. 关键真值索引
 
-**机器可读契约**：[api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[api/rest/collection.yaml](../../api/rest/collection.yaml)、[internal/apiserver/interface/grpc/proto](../../internal/apiserver/interface/grpc/proto/)；各进程配置见 [configs/](../../configs/)。
+| 类型 | 真值 |
+| ---- | ---- |
+| apiserver REST | `internal/apiserver/transport/rest` |
+| collection REST | `internal/collection-server/transport/rest/router.go` |
+| REST 导出 | `api/rest/apiserver.yaml`、`api/rest/collection.yaml` |
+| gRPC proto | `internal/apiserver/interface/grpc/proto` |
+| gRPC 注册 | `internal/apiserver/transport/grpc/registry.go` |
+| 配置 | `configs/*.yaml` |
+| 端口部署 | `build/docker/*.yml` |
+| HTTP 通用能力 | `internal/pkg/server/genericapiserver.go` |
+| gRPC 通用能力 | `internal/pkg/grpc/server.go` |
+| scheduler | `internal/apiserver/runtime/scheduler` |
+
+---
+
+## 5. 维护原则
+
+1. 契约文档不能脱离机器文件。
+2. 业务语义不要重复到接口运维文档里。
+3. internal REST 和 public REST 必须分清。
+4. gRPC service 注册条件必须写清 nil-skip 行为。
+5. 配置文档必须说明配置链路和敏感项。
+6. 端口文档必须区分配置监听、容器端口、宿主机映射。
+7. 调度文档必须区分 scheduler 和 MQ worker。
+8. 排障文档必须能从现象指向模块深讲。
+
+---
+
+## 6. Verify
+
+```bash
+make docs-rest
+make docs-verify
+go test ./internal/apiserver/transport/rest
+go test ./internal/collection-server/transport/rest
+go test ./internal/apiserver/transport/grpc
+go test ./internal/pkg/server
+```
+
+文档检查：
+
+```bash
+make docs-hygiene
+git diff --check
+```
