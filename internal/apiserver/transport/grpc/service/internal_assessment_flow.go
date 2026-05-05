@@ -277,7 +277,6 @@ func (flow assessmentFlow) TagTestee(
 		"action", "tag_testee_deprecated",
 		"testee_id", req.TesteeId,
 		"risk_level", req.RiskLevel,
-		"scale_code", req.ScaleCode,
 		"mark_key_focus", req.MarkKeyFocus,
 	)
 
@@ -295,7 +294,6 @@ func (flow assessmentFlow) TagTestee(
 		l.Errorw("TagTestee deprecated 桥接失败",
 			"testee_id", req.TesteeId,
 			"risk_level", req.RiskLevel,
-			"scale_code", req.ScaleCode,
 			"error", err.Error(),
 		)
 		return nil, status.Errorf(codes.Internal, "同步测评后置关注失败: %v", err)

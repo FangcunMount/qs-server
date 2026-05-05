@@ -62,8 +62,12 @@ func TestInternalServiceDeprecatedTagTesteeBridgesWithoutRiskTags(t *testing.T) 
 	if !resp.Success || !resp.KeyFocusMarked {
 		t.Fatalf("unexpected response: %#v", resp)
 	}
-	if len(resp.TagsAdded) != 0 {
-		t.Fatalf("tags_added = %v, want empty", resp.TagsAdded)
+	tagsAddedField := resp.ProtoReflect().Descriptor().Fields().ByName("tags_added")
+	if tagsAddedField == nil {
+		t.Fatal("tags_added field descriptor not found")
+	}
+	if got := resp.ProtoReflect().Get(tagsAddedField).List().Len(); got != 0 {
+		t.Fatalf("tags_added length = %d, want 0", got)
 	}
 	if fake.calls != 1 || fake.testeeID != 20 || fake.riskLevel != "high" || !fake.markKeyFocus {
 		t.Fatalf("unexpected service call: %#v", fake)
