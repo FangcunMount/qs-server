@@ -167,10 +167,13 @@ ScaleSnapshot
 它被用于两件事：
 
 1. 应用到 `Assessment`：
+
    ```text
    Assessment.ApplyEvaluation(EvaluationResult)
    ```
+
 2. 构建 `InterpretReport`：
+
    ```text
    reportInputFromContext(evalCtx)
    ```
