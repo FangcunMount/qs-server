@@ -47,7 +47,7 @@ func WriteResponse(c *gin.Context, err error, data interface{}) {
 		coder := errors.ParseCoder(err)
 		c.JSON(coder.HTTPStatus(), ErrResponse{
 			Code:      coder.Code(),
-			Message:   coder.String(),
+			Message:   errorResponseMessage(err, coder),
 			Reference: coder.Reference(),
 		})
 

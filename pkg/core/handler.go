@@ -1,9 +1,11 @@
 package core
 
 import (
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -67,7 +69,7 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 	if coder := errors.ParseCoder(err); coder != nil {
 		httpStatus = coder.HTTPStatus()
 		businessCode = coder.Code()
-		message = coder.String()
+		message = errorResponseMessage(err, coder)
 		reference = coder.Reference()
 	} else {
 		// 处理未知错误
@@ -82,6 +84,36 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 		Message:   message,
 		Reference: reference,
 	})
+}
+
+func errorResponseMessage(err error, coder errors.Coder) string {
+	message := coder.String()
+	if coder.HTTPStatus() < http.StatusBadRequest || coder.HTTPStatus() >= http.StatusInternalServerError {
+		return message
+	}
+
+	cause := errors.Cause(err)
+	if cause != nil && cause != err {
+		if detail := strings.TrimSpace(cause.Error()); detail != "" {
+			return detail
+		}
+	}
+
+	if detail := componentBaseErrorDetail(err); detail != "" {
+		return detail
+	}
+	return message
+}
+
+func componentBaseErrorDetail(err error) string {
+	formatted := fmt.Sprintf("%#-v", err)
+	var items []struct {
+		Error string `json:"error"`
+	}
+	if json.Unmarshal([]byte(formatted), &items) != nil || len(items) == 0 {
+		return ""
+	}
+	return strings.TrimSpace(items[0].Error)
 }
 
 // ErrorResponseWithCode 直接使用错误码的错误响应
