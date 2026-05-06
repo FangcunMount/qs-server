@@ -287,6 +287,8 @@ func (m *readModel) GetAccessFunnelTrend(ctx context.Context, orgID int64, from,
 	return trend, nil
 }
 
+const assessmentServiceAnswerSheetSubmittedScanAlias = "answer_sheet_submitted_count"
+
 func (m *readModel) GetAssessmentService(ctx context.Context, orgID int64, from, to time.Time) (domainStatistics.AssessmentServiceWindow, error) {
 	var row struct {
 		AnswerSheetSubmittedCount sql.NullInt64
@@ -297,7 +299,7 @@ func (m *readModel) GetAssessmentService(ctx context.Context, orgID int64, from,
 	if err := m.db.WithContext(ctx).
 		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
-			COALESCE(SUM(service_answersheet_submitted_count), 0) AS answersheet_submitted_count,
+			COALESCE(SUM(service_answersheet_submitted_count), 0) AS `+assessmentServiceAnswerSheetSubmittedScanAlias+`,
 			COALESCE(SUM(service_assessment_created_count), 0) AS assessment_created_count,
 			COALESCE(SUM(service_report_generated_count), 0) AS report_generated_count,
 			COALESCE(SUM(service_assessment_failed_count), 0) AS assessment_failed_count
@@ -336,7 +338,7 @@ func (m *readModel) GetAssessmentServiceTrend(ctx context.Context, orgID int64, 
 		Model(&statisticsInfra.StatisticsJourneyDailyPO{}).
 		Select(`
 			stat_date,
-			COALESCE(service_answersheet_submitted_count, 0) AS answersheet_submitted_count,
+			COALESCE(service_answersheet_submitted_count, 0) AS `+assessmentServiceAnswerSheetSubmittedScanAlias+`,
 			COALESCE(service_assessment_created_count, 0) AS assessment_created_count,
 			COALESCE(service_report_generated_count, 0) AS report_generated_count,
 			COALESCE(service_assessment_failed_count, 0) AS assessment_failed_count

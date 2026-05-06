@@ -12,7 +12,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
+	"gorm.io/gorm/schema"
 )
+
+func TestAssessmentServiceAnswerSheetScanAliasMatchesGORMNaming(t *testing.T) {
+	t.Parallel()
+
+	want := schema.NamingStrategy{}.ColumnName("", "AnswerSheetSubmittedCount")
+	if assessmentServiceAnswerSheetSubmittedScanAlias != want {
+		t.Fatalf("answersheet submitted scan alias = %q, want %q", assessmentServiceAnswerSheetSubmittedScanAlias, want)
+	}
+}
 
 func TestStatisticsTrendMetricMappingsDocumentColumnContract(t *testing.T) {
 	t.Parallel()
