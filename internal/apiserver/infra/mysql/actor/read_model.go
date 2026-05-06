@@ -228,7 +228,7 @@ func (r *readModel) ListClinicians(ctx context.Context, filter actorreadmodel.Cl
 	var pos []*ClinicianPO
 	err := r.WithContext(ctx).
 		Where("org_id = ? AND deleted_at IS NULL", filter.OrgID).
-		Order("id DESC").
+		Order("id ASC").
 		Offset(filter.Offset).
 		Limit(filter.Limit).
 		Find(&pos).Error
