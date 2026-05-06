@@ -10,7 +10,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
-// assessmentAttentionService 同步测评结果后置关注状态，不维护风险标签。
+// assessmentAttentionService 同步测评结果后置关注状态。
 type assessmentAttentionService struct {
 	repo   domain.Repository
 	editor domain.Editor

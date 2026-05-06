@@ -54,11 +54,11 @@ type InternalServiceClient interface {
 	EvaluateAssessment(ctx context.Context, in *EvaluateAssessmentRequest, opts ...grpc.CallOption) (*EvaluateAssessmentResponse, error)
 	// 同步测评后置关注状态
 	// 场景：worker 处理 report.generated 事件后调用
-	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注；不写 risk_* 标签
+	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
 	SyncAssessmentAttention(ctx context.Context, in *SyncAssessmentAttentionRequest, opts ...grpc.CallOption) (*SyncAssessmentAttentionResponse, error)
 	// Deprecated: Do not use.
-	// 给受试者打标签
-	// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步，不再写 risk_* 标签。
+	// 旧版后置同步入口
+	// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
 	TagTestee(ctx context.Context, in *TagTesteeRequest, opts ...grpc.CallOption) (*TagTesteeResponse, error)
 	// 生成问卷小程序码
 	// 场景：worker 处理 questionnaire.changed(published) 事件后调用
@@ -234,11 +234,11 @@ type InternalServiceServer interface {
 	EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error)
 	// 同步测评后置关注状态
 	// 场景：worker 处理 report.generated 事件后调用
-	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注；不写 risk_* 标签
+	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
 	SyncAssessmentAttention(context.Context, *SyncAssessmentAttentionRequest) (*SyncAssessmentAttentionResponse, error)
 	// Deprecated: Do not use.
-	// 给受试者打标签
-	// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步，不再写 risk_* 标签。
+	// 旧版后置同步入口
+	// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
 	TagTestee(context.Context, *TagTesteeRequest) (*TagTesteeResponse, error)
 	// 生成问卷小程序码
 	// 场景：worker 处理 questionnaire.changed(published) 事件后调用

@@ -90,7 +90,6 @@ func buildTesteeSummaryResponse(
 	name string,
 	genderValue int8,
 	birthday *time.Time,
-	tags []string,
 	source string,
 	isKeyFocus bool,
 ) *response.TesteeResponse {
@@ -106,8 +105,6 @@ func buildTesteeSummaryResponse(
 		Gender:          gender,
 		GenderLabel:     response.LabelForGender(gender),
 		Birthday:        response.FormatDatePtr(birthday),
-		Tags:            tags,
-		TagsLabel:       response.LabelTags(tags),
 		Source:          source,
 		SourceLabel:     response.LabelForTesteeSource(source),
 		IsKeyFocus:      isKeyFocus,

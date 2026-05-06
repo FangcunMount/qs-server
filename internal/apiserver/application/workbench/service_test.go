@@ -51,13 +51,9 @@ func TestServiceListHighRiskQueueUsesLatestRiskRowsAndExcludesNonHighRisk(t *tes
 	}
 }
 
-func TestServiceListHighRiskQueueIgnoresManualRiskTags(t *testing.T) {
+func TestServiceListHighRiskQueueRequiresLatestRiskRows(t *testing.T) {
 	testees := &testeeReaderStub{rowsByID: map[uint64]actorreadmodel.TesteeRow{
-		1: func() actorreadmodel.TesteeRow {
-			row := testeeRow(1, "A")
-			row.Tags = []string{"risk_high"}
-			return row
-		}(),
+		1: testeeRow(1, "A"),
 	}}
 	latestRisks := &latestRiskReaderStub{}
 	svc := newTestService(testees, latestRisks, &followUpReaderStub{}, &assignmentHydratorStub{})
@@ -73,14 +69,14 @@ func TestServiceListHighRiskQueueIgnoresManualRiskTags(t *testing.T) {
 	}
 
 	if page.Total != 0 || len(page.Items) != 0 {
-		t.Fatalf("high risk queue should ignore manual risk tags, got %#v", page)
+		t.Fatalf("high risk queue should require latest risk rows, got %#v", page)
 	}
 	if !latestRisks.lastFilter.RestrictToTesteeIDs {
 		t.Fatalf("latest risk filter should still be the queue fact source: %#v", latestRisks.lastFilter)
 	}
 }
 
-func TestServiceListFollowUpQueueReturnsUrgentTaskPerTestee(t *testing.T) {
+func TestServiceListFollowUpQueueReturnsOpenedTaskPerTestee(t *testing.T) {
 	plannedAt := time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC)
 	expireAt := plannedAt.Add(24 * time.Hour)
 	testees := &testeeReaderStub{rowsByID: map[uint64]actorreadmodel.TesteeRow{
@@ -89,7 +85,7 @@ func TestServiceListFollowUpQueueReturnsUrgentTaskPerTestee(t *testing.T) {
 	}}
 	followUps := &followUpReaderStub{page: planreadmodel.TaskPage{
 		Items: []planreadmodel.TaskRow{
-			{ID: 202, PlanID: 302, OrgID: 9, TesteeID: 2, ScaleCode: "SDS", PlannedAt: plannedAt, ExpireAt: &expireAt, Status: "expired", EntryURL: "https://entry/2"},
+			{ID: 202, PlanID: 302, OrgID: 9, TesteeID: 2, ScaleCode: "SDS", PlannedAt: plannedAt, ExpireAt: &expireAt, Status: "opened", EntryURL: "https://entry/2"},
 			{ID: 201, PlanID: 301, OrgID: 9, TesteeID: 1, ScaleCode: "SAS", PlannedAt: plannedAt, Status: "opened", EntryURL: "https://entry/1"},
 		},
 		Total: 2,
@@ -109,14 +105,14 @@ func TestServiceListFollowUpQueueReturnsUrgentTaskPerTestee(t *testing.T) {
 	if page.Total != 2 || len(page.Items) != 2 {
 		t.Fatalf("total/items = %d/%d, want 2/2", page.Total, len(page.Items))
 	}
-	if page.Items[0].Testee.ID != 2 || page.Items[0].ReasonCode != "follow_up_expired" {
-		t.Fatalf("unexpected expired item: %#v", page.Items[0])
+	if page.Items[0].Testee.ID != 2 || page.Items[0].ReasonCode != "follow_up_opened" {
+		t.Fatalf("unexpected first item: %#v", page.Items[0])
 	}
 	if page.Items[0].Task == nil || page.Items[0].Task.TaskID != 202 || page.Items[0].Task.EntryURL != "https://entry/2" {
 		t.Fatalf("unexpected task summary: %#v", page.Items[0].Task)
 	}
 	if page.Items[1].Testee.ID != 1 || page.Items[1].ReasonCode != "follow_up_opened" {
-		t.Fatalf("unexpected opened item: %#v", page.Items[1])
+		t.Fatalf("unexpected second item: %#v", page.Items[1])
 	}
 	if !followUps.lastFilter.RestrictToTesteeIDs || len(followUps.lastFilter.TesteeIDs) != 3 {
 		t.Fatalf("follow-up filter did not keep assigned scope: %#v", followUps.lastFilter)

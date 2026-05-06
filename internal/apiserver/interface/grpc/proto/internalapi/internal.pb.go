@@ -2278,8 +2278,8 @@ func (x *SyncAssessmentAttentionResponse) GetMessage() string {
 	return ""
 }
 
-// 给受试者打标签请求
-// Deprecated: use SyncAssessmentAttention. 不再写 risk_* 标签。
+// 旧版后置同步请求
+// Deprecated: use SyncAssessmentAttention.
 type TagTesteeRequest struct {
 	state     protoimpl.MessageState `protogen:"open.v1"`
 	TesteeId  uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`   // 受试者ID
@@ -2360,13 +2360,13 @@ func (x *TagTesteeRequest) GetHighRiskFactors() []string {
 	return nil
 }
 
-// 给受试者打标签响应
-// Deprecated: use SyncAssessmentAttentionResponse. tags_added 始终为空。
+// 旧版后置同步响应
+// Deprecated: use SyncAssessmentAttentionResponse.
 type TagTesteeResponse struct {
 	state   protoimpl.MessageState `protogen:"open.v1"`
 	Success bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"` // 是否成功
 	// Deprecated: Marked as deprecated in internalapi/internal.proto.
-	TagsAdded      []string `protobuf:"bytes,2,rep,name=tags_added,json=tagsAdded,proto3" json:"tags_added,omitempty"`                   // 已添加的标签列表
+	TagsAdded      []string `protobuf:"bytes,2,rep,name=tags_added,json=tagsAdded,proto3" json:"tags_added,omitempty"`                   // 旧字段，始终为空
 	KeyFocusMarked bool     `protobuf:"varint,3,opt,name=key_focus_marked,json=keyFocusMarked,proto3" json:"key_focus_marked,omitempty"` // 是否标记为重点关注
 	Message        string   `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`                                        // 描述信息
 	unknownFields  protoimpl.UnknownFields

@@ -79,7 +79,6 @@ type Testee struct {
 	Birthday         *time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-	Tags             []string
 	Source           string
 	IsKeyFocus       bool
 	LastAssessmentAt *time.Time

@@ -10,8 +10,6 @@ type TesteeResponse struct {
 	Gender          string                   `json:"gender,omitempty"`             // 性别
 	GenderLabel     string                   `json:"gender_label,omitempty"`       // 性别中文
 	Birthday        *string                  `json:"birthday,omitempty"`           // 出生日期
-	Tags            []string                 `json:"tags"`                         // 标签
-	TagsLabel       []string                 `json:"tags_label,omitempty"`         // 标签中文
 	Source          string                   `json:"source,omitempty"`             // 来源
 	SourceLabel     string                   `json:"source_label,omitempty"`       // 来源中文
 	IsKeyFocus      bool                     `json:"is_key_focus"`                 // 是否重点关注

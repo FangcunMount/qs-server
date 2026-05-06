@@ -44,7 +44,7 @@ message CreateTesteeRequest {
   string name = 4;                      // 姓名
   int32 gender = 5;                     // 性别：1-男，2-女，3-其他
   google.protobuf.Timestamp birthday = 6; // 出生日期
-  repeated string tags = 7;             // 标签列表
+  repeated string tags = 7 [deprecated=true]; // Deprecated: 受试者 tags 暂不作为产品能力使用
   string source = 8;                    // 来源：online_form/plan/imported
   bool is_key_focus = 9;                // 是否重点关注
 }
@@ -60,7 +60,7 @@ message UpdateTesteeRequest {
   string name = 2;                      // 姓名（可选）
   int32 gender = 3;                     // 性别（可选）
   google.protobuf.Timestamp birthday = 4; // 出生日期（可选）
-  repeated string tags = 5;             // 标签列表（可选）
+  repeated string tags = 5 [deprecated=true]; // Deprecated: 受试者 tags 暂不作为产品能力使用
   bool is_key_focus = 6;                // 是否重点关注（可选）
 }
 
@@ -100,7 +100,7 @@ message TesteeResponse {
   string name = 5;                      // 姓名
   int32 gender = 6;                     // 性别
   google.protobuf.Timestamp birthday = 7; // 出生日期
-  repeated string tags = 8;             // 标签列表
+  repeated string tags = 8 [deprecated=true]; // Deprecated: 受试者 tags 暂不作为产品能力使用
   string source = 9;                    // 来源
   bool is_key_focus = 10;               // 是否重点关注
   

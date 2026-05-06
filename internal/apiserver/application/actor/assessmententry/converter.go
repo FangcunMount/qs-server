@@ -71,7 +71,6 @@ func toTesteeSummaryResult(item *domainTestee.Testee) *TesteeSummaryResult {
 		Gender:     int8(item.Gender()),
 		Birthday:   item.Birthday(),
 		Age:        item.GetAge(),
-		Tags:       item.TagsAsStrings(),
 		Source:     item.Source(),
 		IsKeyFocus: item.IsKeyFocus(),
 	}

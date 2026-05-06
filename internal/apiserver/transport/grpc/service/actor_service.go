@@ -120,21 +120,6 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 		}
 	}
 
-	// 如果有标签需要添加
-	for _, tag := range req.Tags {
-		if tag != "" {
-			if err := s.managementService.AddTag(ctx, result.ID, tag); err != nil {
-				logger.L(ctx).Warnw("Failed to add tag",
-					"action", "add_tag",
-					"testee_id", result.ID,
-					"tag", tag,
-					"error", err.Error(),
-				)
-				// 不影响主流程
-			}
-		}
-	}
-
 	resp, err := s.toProtoTesteeResponse(result)
 	if err != nil {
 		return nil, err
@@ -201,29 +186,6 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 			"error", err.Error(),
 		)
 		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	// 更新标签
-	if len(req.Tags) > 0 {
-		// 获取当前受试者信息
-		current, err := s.queryService.GetByID(ctx, req.Id)
-		if err != nil {
-			logger.L(ctx).Warnw("Failed to get current testee info",
-				"action", "update_tags",
-				"testee_id", req.Id,
-				"error", err.Error(),
-			)
-		} else {
-			// 简单处理：先删除所有旧标签，再添加新标签
-			for _, oldTag := range current.Tags {
-				_ = s.managementService.RemoveTag(ctx, req.Id, oldTag)
-			}
-			for _, newTag := range req.Tags {
-				if newTag != "" {
-					_ = s.managementService.AddTag(ctx, req.Id, newTag)
-				}
-			}
-		}
 	}
 
 	// 更新重点关注状态
@@ -409,7 +371,6 @@ func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) (*p
 		OrgId:      orgID,
 		Name:       result.Name,
 		Gender:     int32(result.Gender),
-		Tags:       result.Tags,
 		Source:     result.Source,
 		IsKeyFocus: result.IsKeyFocus,
 	}

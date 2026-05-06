@@ -35,12 +35,12 @@ service InternalService {
   
   // 同步测评后置关注状态
   // 场景：worker 处理 report.generated 事件后调用
-  // 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注；不写 risk_* 标签
+  // 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
   rpc SyncAssessmentAttention(SyncAssessmentAttentionRequest)
       returns (SyncAssessmentAttentionResponse);
 
-  // 给受试者打标签
-  // Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步，不再写 risk_* 标签。
+  // 旧版后置同步入口
+  // Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
   rpc TagTestee(TagTesteeRequest) 
       returns (TagTesteeResponse) {
     option deprecated = true;
@@ -348,8 +348,8 @@ message SyncAssessmentAttentionResponse {
 
 // ==================== Deprecated TagTestee ====================
 
-// 给受试者打标签请求
-// Deprecated: use SyncAssessmentAttention. 不再写 risk_* 标签。
+// 旧版后置同步请求
+// Deprecated: use SyncAssessmentAttention.
 message TagTesteeRequest {
   uint64 testee_id = 1;              // 受试者ID
   string risk_level = 2;             // 风险等级：none/low/medium/high/severe
@@ -358,11 +358,11 @@ message TagTesteeRequest {
   repeated string high_risk_factors = 5 [deprecated=true]; // 高风险因子编码列表（可选）
 }
 
-// 给受试者打标签响应
-// Deprecated: use SyncAssessmentAttentionResponse. tags_added 始终为空。
+// 旧版后置同步响应
+// Deprecated: use SyncAssessmentAttentionResponse.
 message TagTesteeResponse {
   bool success = 1;                  // 是否成功
-  repeated string tags_added = 2 [deprecated=true]; // 已添加的标签列表
+  repeated string tags_added = 2 [deprecated=true]; // 旧字段，始终为空
   bool key_focus_marked = 3;         // 是否标记为重点关注
   string message = 4;                // 描述信息
 }

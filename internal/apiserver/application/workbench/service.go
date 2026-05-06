@@ -192,8 +192,8 @@ func (s *service) listFollowUpQueue(ctx context.Context, resolved resolvedScope,
 		reasonAt := followUpReasonAt(task)
 		items = append(items, QueueItem{
 			Testee:     testee,
-			ReasonCode: followUpReasonCode(task.Status),
-			Reason:     followUpReason(task.Status),
+			ReasonCode: followUpReasonCode(),
+			Reason:     followUpReason(),
 			ReasonAt:   reasonAt,
 			Task:       taskSummary(task),
 		})
@@ -481,24 +481,15 @@ func latestRiskReason(riskLevel string) string {
 	return "最近测评高风险"
 }
 
-func followUpReasonCode(status string) string {
-	if status == "expired" {
-		return "follow_up_expired"
-	}
+func followUpReasonCode() string {
 	return "follow_up_opened"
 }
 
-func followUpReason(status string) string {
-	if status == "expired" {
-		return "复诊任务已逾期"
-	}
+func followUpReason() string {
 	return "复诊任务待完成"
 }
 
 func followUpReasonAt(task planreadmodel.TaskRow) *time.Time {
-	if task.Status == "expired" && task.ExpireAt != nil {
-		return task.ExpireAt
-	}
 	if task.OpenAt != nil {
 		return task.OpenAt
 	}
@@ -528,7 +519,6 @@ func testeeFromRow(row actorreadmodel.TesteeRow) Testee {
 		Birthday:         row.Birthday,
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
-		Tags:             append([]string(nil), row.Tags...),
 		Source:           row.Source,
 		IsKeyFocus:       row.IsKeyFocus,
 		LastAssessmentAt: row.LastAssessmentAt,

@@ -90,7 +90,7 @@ func (c *InternalClient) SyncAssessmentAttention(
 	return resp, nil
 }
 
-// TagTestee 兼容旧打标签 RPC。
+// TagTestee 兼容旧版后置同步 RPC。
 //
 // Deprecated: use SyncAssessmentAttention. 当前仅用于兼容旧调用方。
 func (c *InternalClient) TagTestee(

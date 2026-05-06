@@ -167,7 +167,6 @@ type AssignedTesteeResult struct {
 	Gender     int8
 	Birthday   *time.Time
 	Age        int
-	Tags       []string
 	Source     string
 	IsKeyFocus bool
 }

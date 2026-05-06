@@ -508,7 +508,6 @@ func toTesteeSummaryResponse(item *assessmentEntryApp.TesteeSummaryResult) *resp
 		item.Name,
 		item.Gender,
 		item.Birthday,
-		item.Tags,
 		item.Source,
 		item.IsKeyFocus,
 	)

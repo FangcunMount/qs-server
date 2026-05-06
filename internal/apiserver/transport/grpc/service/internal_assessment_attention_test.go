@@ -42,7 +42,7 @@ func TestInternalServiceSyncAssessmentAttentionRejectsMissingTesteeID(t *testing
 	}
 }
 
-func TestInternalServiceDeprecatedTagTesteeBridgesWithoutRiskTags(t *testing.T) {
+func TestInternalServiceDeprecatedTagTesteeBridgesToAssessmentAttention(t *testing.T) {
 	fake := &fakeAssessmentAttentionService{
 		result: &testeeApp.AssessmentAttentionResult{KeyFocusMarked: true},
 	}

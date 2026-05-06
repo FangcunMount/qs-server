@@ -203,17 +203,6 @@ func LabelForKeyFocus(isKeyFocus bool) string {
 	return "普通关注"
 }
 
-func LabelTags(tags []string) []string {
-	if len(tags) == 0 {
-		return nil
-	}
-	result := make([]string, 0, len(tags))
-	for _, tag := range tags {
-		result = append(result, domainTestee.Tag(tag).DisplayName())
-	}
-	return result
-}
-
 func mapGenderCode(value string) domainTestee.Gender {
 	switch value {
 	case "male":

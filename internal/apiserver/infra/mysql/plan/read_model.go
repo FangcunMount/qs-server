@@ -21,7 +21,6 @@ FROM (
 		ROW_NUMBER() OVER (
 			PARTITION BY assessment_task.testee_id
 			ORDER BY
-				CASE WHEN assessment_task.status = 'expired' THEN 0 ELSE 1 END ASC,
 				CASE WHEN assessment_task.expire_at IS NULL THEN 1 ELSE 0 END ASC,
 				assessment_task.expire_at ASC,
 				assessment_task.planned_at ASC,
@@ -30,12 +29,11 @@ FROM (
 	FROM assessment_task
 	WHERE assessment_task.org_id = ?
 		%s
-		AND assessment_task.status IN ?
+		AND assessment_task.status = ?
 		AND assessment_task.deleted_at IS NULL
 ) ranked
 WHERE ranked.row_num = 1
 ORDER BY
-	CASE WHEN ranked.status = 'expired' THEN 0 ELSE 1 END ASC,
 	CASE WHEN ranked.expire_at IS NULL THEN 1 ELSE 0 END ASC,
 	ranked.expire_at ASC,
 	ranked.planned_at ASC,
@@ -180,12 +178,12 @@ func (m *readModel) ListFollowUpQueueTasks(ctx context.Context, filter planreadm
 	}
 
 	testeeIDs := uniqueUint64(filter.TesteeIDs)
-	statuses := []string{"opened", "expired"}
+	const status = "opened"
 
 	var total int64
 	countQuery := m.db.WithContext(ctx).
 		Model(&AssessmentTaskPO{}).
-		Where("org_id = ? AND status IN ? AND deleted_at IS NULL", filter.OrgID, statuses)
+		Where("org_id = ? AND status = ? AND deleted_at IS NULL", filter.OrgID, status)
 	if filter.RestrictToTesteeIDs {
 		countQuery = countQuery.Where("testee_id IN ?", testeeIDs)
 	}
@@ -193,7 +191,7 @@ func (m *readModel) ListFollowUpQueueTasks(ctx context.Context, filter planreadm
 		return planreadmodel.TaskPage{}, err
 	}
 
-	args := followUpQueueArgs(filter, statuses)
+	args := followUpQueueArgs(filter, status)
 	args = append(args, page.Limit(), page.Offset())
 	var pos []AssessmentTaskPO
 	err := m.db.WithContext(ctx).
@@ -219,12 +217,12 @@ func followUpQueueTasksSQL(restrictToTesteeIDs bool) string {
 	return fmt.Sprintf(followUpQueueTasksQuery, testeePredicate)
 }
 
-func followUpQueueArgs(filter planreadmodel.FollowUpQueueFilter, statuses []string) []interface{} {
+func followUpQueueArgs(filter planreadmodel.FollowUpQueueFilter, status string) []interface{} {
 	args := []interface{}{filter.OrgID}
 	if filter.RestrictToTesteeIDs {
 		args = append(args, uniqueUint64(filter.TesteeIDs))
 	}
-	return append(args, statuses)
+	return append(args, status)
 }
 
 func buildPlanListQuery(db *gorm.DB, filter planreadmodel.PlanFilter) *gorm.DB {

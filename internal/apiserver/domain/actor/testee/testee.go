@@ -24,8 +24,8 @@ type Testee struct {
 	createdAt time.Time  // 创建时间
 	updatedAt time.Time  // 更新时间
 
-	// === 业务标签与关注 ===
-	tags       []Tag  // 辅助标签：["adhd_suspect", "vip"]
+	// === 历史标签与关注 ===
+	tags       []Tag  // 历史兼容字段；当前产品不展示、不筛选
 	source     Source // 数据来源
 	isKeyFocus bool   // 是否重点关注对象
 
@@ -129,59 +129,15 @@ func (t *Testee) GetAge() int {
 	return age
 }
 
-// === 标签管理方法 ===
+// === 历史标签持久化 ===
 
-// Tags 获取标签列表（返回副本，防止外部修改）
-func (t *Testee) Tags() []Tag {
-	tags := make([]Tag, len(t.tags))
-	copy(tags, t.tags)
-	return tags
-}
-
-// TagsAsStrings 获取标签的字符串列表（用于序列化和外部展示）
+// TagsAsStrings 获取历史标签的字符串列表（仅用于持久化保留）
 func (t *Testee) TagsAsStrings() []string {
 	tags := make([]string, len(t.tags))
 	for i, tag := range t.tags {
 		tags[i] = string(tag)
 	}
 	return tags
-}
-
-// HasTag 检查是否有某个标签
-func (t *Testee) HasTag(tag Tag) bool {
-	for _, existing := range t.tags {
-		if existing == tag {
-			return true
-		}
-	}
-	return false
-}
-
-// HasTagString 检查是否有某个标签（字符串版本）
-func (t *Testee) HasTagString(tag string) bool {
-	return t.HasTag(Tag(tag))
-}
-
-// addTag 添加标签（包内方法，应通过 Tagger 调用）
-func (t *Testee) addTag(tag Tag) {
-	if tag == "" {
-		return
-	}
-	// 防重复
-	if t.HasTag(tag) {
-		return
-	}
-	t.tags = append(t.tags, tag)
-}
-
-// removeTag 移除标签（包内方法，应通过 Tagger 调用）
-func (t *Testee) removeTag(tag Tag) {
-	for i, existing := range t.tags {
-		if existing == tag {
-			t.tags = append(t.tags[:i], t.tags[i+1:]...)
-			return
-		}
-	}
 }
 
 // === 关注度管理 ===
@@ -237,16 +193,7 @@ func (t *Testee) SetKeyFocus(isKeyFocus bool) {
 	t.isKeyFocus = isKeyFocus
 }
 
-// SetTags 设置标签列表（仅用于从数据库加载）
-func (t *Testee) SetTags(tags []Tag) {
-	if tags == nil {
-		t.tags = make([]Tag, 0)
-	} else {
-		t.tags = tags
-	}
-}
-
-// SetTagsFromStrings 从字符串列表设置标签（仅用于从数据库加载）
+// SetTagsFromStrings 从字符串列表设置历史标签（仅用于从数据库加载）
 func (t *Testee) SetTagsFromStrings(tags []string) {
 	if tags == nil {
 		t.tags = make([]Tag, 0)

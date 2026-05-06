@@ -76,7 +76,6 @@ func toAssignedTesteeResultFromRow(row *actorreadmodel.TesteeRow) *AssignedTeste
 		Gender:     row.Gender,
 		Birthday:   row.Birthday,
 		Age:        ageFromBirthday(row.Birthday),
-		Tags:       append([]string(nil), row.Tags...),
 		Source:     row.Source,
 		IsKeyFocus: row.IsKeyFocus,
 	}

@@ -14,7 +14,6 @@ type managementService struct {
 	repo   domain.Repository
 	editor domain.Editor
 	binder domain.Binder
-	tagger domain.Tagger
 	uow    apptransaction.Runner
 }
 
@@ -23,14 +22,12 @@ func NewManagementService(
 	repo domain.Repository,
 	editor domain.Editor,
 	binder domain.Binder,
-	tagger domain.Tagger,
 	uow apptransaction.Runner,
 ) TesteeManagementService {
 	return &managementService{
 		repo:   repo,
 		editor: editor,
 		binder: binder,
-		tagger: tagger,
 		uow:    uow,
 	}
 }
@@ -78,56 +75,6 @@ func (s *managementService) BindProfile(ctx context.Context, testeeID uint64, pr
 
 		// 2. 使用领域服务绑定
 		if err := s.binder.Bind(txCtx, testee, profileID); err != nil {
-			return err
-		} // 3. 持久化
-		if err := s.repo.Update(txCtx, testee); err != nil {
-			return errors.Wrap(err, "failed to update testee")
-		}
-
-		return nil
-	})
-}
-
-// AddTag 添加业务标签
-func (s *managementService) AddTag(ctx context.Context, testeeID uint64, tag string) error {
-	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
-	if err != nil {
-		return err
-	}
-	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
-		if err != nil {
-			return errors.Wrap(err, "failed to find testee")
-		}
-
-		// 2. 使用领域服务添加标签
-		if err := s.tagger.Tag(txCtx, testee, domain.Tag(tag)); err != nil {
-			return err
-		} // 3. 持久化
-		if err := s.repo.Update(txCtx, testee); err != nil {
-			return errors.Wrap(err, "failed to update testee")
-		}
-
-		return nil
-	})
-}
-
-// RemoveTag 移除业务标签
-func (s *managementService) RemoveTag(ctx context.Context, testeeID uint64, tag string) error {
-	targetTesteeID, err := testeeIDFromUint64("testee_id", testeeID)
-	if err != nil {
-		return err
-	}
-	return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-		// 1. 查找受试者
-		testee, err := s.repo.FindByID(txCtx, targetTesteeID)
-		if err != nil {
-			return errors.Wrap(err, "failed to find testee")
-		}
-
-		// 2. 使用领域服务移除标签
-		if err := s.tagger.UnTag(txCtx, testee, domain.Tag(tag)); err != nil {
 			return err
 		} // 3. 持久化
 		if err := s.repo.Update(txCtx, testee); err != nil {

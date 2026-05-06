@@ -17,7 +17,6 @@ func toTesteeResult(testee *domain.Testee) *TesteeResult {
 		CreatedAt:  testee.CreatedAt(),
 		UpdatedAt:  testee.UpdatedAt(),
 		Age:        testee.GetAge(),
-		Tags:       testee.TagsAsStrings(),
 		Source:     testee.Source(),
 		IsKeyFocus: testee.IsKeyFocus(),
 	}
@@ -57,7 +56,6 @@ func toTesteeResultFromRow(row *actorreadmodel.TesteeRow) *TesteeResult {
 		CreatedAt:        row.CreatedAt,
 		UpdatedAt:        row.UpdatedAt,
 		Age:              ageFromBirthday(row.Birthday),
-		Tags:             append([]string(nil), row.Tags...),
 		Source:           row.Source,
 		IsKeyFocus:       row.IsKeyFocus,
 		LastAssessmentAt: row.LastAssessmentAt,

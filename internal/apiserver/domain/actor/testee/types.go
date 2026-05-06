@@ -1,7 +1,6 @@
 package testee
 
 import (
-	"regexp"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -51,39 +50,8 @@ func (g Gender) DisplayName() string {
 // Tag 标签类型
 type Tag string
 
-const (
-	TagKeyFocus Tag = "key_focus"
-)
-
 func (t Tag) String() string {
 	return string(t)
-}
-
-// DisplayName 返回标签的中文展示名称。
-func (t Tag) DisplayName() string {
-	switch t {
-	case "risk_high":
-		return "高风险"
-	case "risk_medium":
-		return "中风险"
-	case "risk_low":
-		return "低风险"
-	case "risk_severe":
-		return "严重风险"
-	case TagKeyFocus:
-		return "重点关注"
-	case "daily_simulation":
-		return "日常模拟"
-	case "seeddata":
-		return "种子数据"
-	default:
-		return string(t)
-	}
-}
-
-func (t Tag) IsValid() bool {
-	// 规则：只允许字母、数字、下划线、中文
-	return regexp.MustCompile(`^[\w\p{Han}]+$`).MatchString(string(t))
 }
 
 // Source 数据来源类型。

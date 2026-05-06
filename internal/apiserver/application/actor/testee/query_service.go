@@ -62,7 +62,6 @@ func (s *queryService) ListTestees(ctx context.Context, dto ListTesteeDTO) (*Tes
 	filter := actorreadmodel.TesteeFilter{
 		OrgID:                 dto.OrgID,
 		Name:                  dto.Name,
-		Tags:                  dto.Tags,
 		KeyFocus:              dto.KeyFocus,
 		CreatedAtStart:        dto.CreatedAtStart,
 		CreatedAtEnd:          dto.CreatedAtEnd,

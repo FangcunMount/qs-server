@@ -45,28 +45,40 @@ ORDER BY occurred_at DESC, assessment_id DESC
 
 const latestRiskQueueSelectSQL = `
 SELECT
-	ranked.id AS assessment_id,
-	ranked.org_id,
-	ranked.testee_id,
-	ranked.risk_level,
-	COALESCE(ranked.interpreted_at, ranked.updated_at, ranked.created_at) AS occurred_at
-FROM (
-	SELECT
-		assessment.*,
-		ROW_NUMBER() OVER (
-			PARTITION BY assessment.testee_id
-			ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
-		) AS row_num
-	FROM assessment
-	WHERE assessment.org_id = ?
+	candidate.id AS assessment_id,
+	candidate.org_id,
+	candidate.testee_id,
+	candidate.risk_level,
+	COALESCE(candidate.interpreted_at, candidate.updated_at, candidate.created_at) AS occurred_at
+%s
+`
+
+const latestRiskQueueFromWhereSQL = `
+FROM assessment candidate
+WHERE candidate.org_id = ?
 		%s
-		AND assessment.status = ?
-		AND assessment.risk_level IS NOT NULL
-		AND assessment.risk_level <> ''
-		AND assessment.deleted_at IS NULL
-) ranked
-WHERE ranked.row_num = 1
-	AND LOWER(ranked.risk_level) IN ?
+	AND candidate.status = ?
+	AND candidate.risk_level IS NOT NULL
+	AND candidate.risk_level <> ''
+	AND candidate.risk_level IN ?
+	AND candidate.deleted_at IS NULL
+	AND NOT EXISTS (
+		SELECT 1
+		FROM assessment newer
+		WHERE newer.org_id = candidate.org_id
+			AND newer.testee_id = candidate.testee_id
+			AND newer.status = candidate.status
+			AND newer.risk_level IS NOT NULL
+			AND newer.risk_level <> ''
+			AND newer.deleted_at IS NULL
+			AND (
+				COALESCE(newer.interpreted_at, newer.updated_at, newer.created_at) > COALESCE(candidate.interpreted_at, candidate.updated_at, candidate.created_at)
+				OR (
+					COALESCE(newer.interpreted_at, newer.updated_at, newer.created_at) = COALESCE(candidate.interpreted_at, candidate.updated_at, candidate.created_at)
+					AND newer.id > candidate.id
+				)
+			)
+	)
 `
 
 func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) interface {
@@ -245,15 +257,19 @@ LIMIT ? OFFSET ?
 }
 
 func latestRiskQueueCountQuery(restrictToTesteeIDs bool) string {
-	return `SELECT COUNT(*) FROM (` + latestRiskQueueSelect(restrictToTesteeIDs) + `) latest_risk_queue`
+	return `SELECT COUNT(*)` + latestRiskQueueFromWhere(restrictToTesteeIDs)
 }
 
 func latestRiskQueueSelect(restrictToTesteeIDs bool) string {
+	return fmt.Sprintf(latestRiskQueueSelectSQL, latestRiskQueueFromWhere(restrictToTesteeIDs))
+}
+
+func latestRiskQueueFromWhere(restrictToTesteeIDs bool) string {
 	testeePredicate := ""
 	if restrictToTesteeIDs {
-		testeePredicate = "AND assessment.testee_id IN ?"
+		testeePredicate = "AND candidate.testee_id IN ?"
 	}
-	return fmt.Sprintf(latestRiskQueueSelectSQL, testeePredicate)
+	return fmt.Sprintf(latestRiskQueueFromWhereSQL, testeePredicate)
 }
 
 func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []interface{} {

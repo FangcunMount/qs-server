@@ -125,8 +125,6 @@ func newClinicianWorkbenchTesteeResponse(result workbenchApp.Testee) *TesteeResp
 		Gender:          gender,
 		GenderLabel:     LabelForGender(gender),
 		Birthday:        FormatDatePtr(result.Birthday),
-		Tags:            append([]string(nil), result.Tags...),
-		TagsLabel:       LabelTags(result.Tags),
 		Source:          result.Source,
 		SourceLabel:     LabelForTesteeSource(result.Source),
 		IsKeyFocus:      result.IsKeyFocus,

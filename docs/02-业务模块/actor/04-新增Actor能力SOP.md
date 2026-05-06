@@ -11,12 +11,12 @@
 | 需求类型 | 示例 | 主要落点 |
 | -------- | ---- | -------- |
 | 认证账号能力 | 登录、密码、token、账号状态 | IAM，不属于 Actor |
-| 受试者长期属性 | 姓名、生日、标签、重点关注 | Testee |
+| 受试者长期属性 | 姓名、生日、重点关注 | Testee |
 | 从业者业务属性 | 科室、职称、工号、是否激活 | Clinician |
 | 后台操作者权限 | roles、是否可管理量表/计划 | Operator / IAM authz |
 | 医生-受试者关系 | 可见范围、服务关系、分配关系 | Relation |
 | 测评入口 | token、target、有效期、intake | AssessmentEntry |
-| 测评结果反馈 | 高风险标签、报告后回写 | Evaluation -> Actor 应用服务 |
+| 测评结果反馈 | 报告后同步重点关注、生成随访任务 | Evaluation -> Actor/Plan 应用服务 |
 | 统计投影 | entry opened、intake confirmed | Statistics/Behavior |
 
 一句话原则：
@@ -53,7 +53,6 @@ flowchart TD
 ### 2.1 适用场景
 
 - 新增长期档案字段。
-- 新增标签。
 - 新增重点关注规则。
 - 新增 profile 绑定逻辑。
 - 新增测评统计快照字段。
@@ -61,7 +60,7 @@ flowchart TD
 ### 2.2 修改顺序
 
 1. 修改 `domain/actor/testee`。
-2. 增加或调整领域服务，例如 Tagger/Binder/Validator。
+2. 增加或调整领域服务，例如 Binder/Validator。
 3. 修改 application service。
 4. 修改 repository/mapper。
 5. 修改 REST/gRPC DTO。
@@ -70,7 +69,7 @@ flowchart TD
 
 ### 2.3 注意
 
-不要把单次 Assessment 结果直接复制成 Testee 主字段。长期标签可以回写，但原始测评结果仍属于 Evaluation。
+不要把单次 Assessment 结果直接复制成 Testee 主字段。重点关注可以由评估后置同步更新，但原始测评结果仍属于 Evaluation。
 
 ---
 
@@ -181,7 +180,6 @@ Entry token 不是 IAM token。新增入口能力不要把认证态塞进 Entry 
 
 ### 7.1 适用场景
 
-- 报告后自动打高风险标签。
 - 报告后标记重点关注。
 - 根据风险更新服务关系。
 - 生成随访任务。
@@ -293,7 +291,7 @@ go test ./internal/worker/integration/eventing
 
 | 变更类型 | 至少同步 |
 | -------- | -------- |
-| Testee 字段/标签 | [01-Testee与标签.md](./01-Testee与标签.md) |
+| Testee 字段/重点关注 | [01-Testee与标签.md](./01-Testee与标签.md) |
 | Clinician/Operator | [02-Clinician与Operator.md](./02-Clinician与Operator.md) |
 | Entry/IAM | [03-AssessmentEntry与IAM边界.md](./03-AssessmentEntry与IAM边界.md) |
 | Actor 总体边界 | [00-整体模型.md](./00-整体模型.md) |

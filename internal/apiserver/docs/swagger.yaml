@@ -1,21 +1,5 @@
 basePath: /api/v1
 definitions:
-  cachetarget.WarmupKind:
-    enum:
-    - static.scale
-    - static.questionnaire
-    - static.scale_list
-    - query.stats_system
-    - query.stats_questionnaire
-    - query.stats_plan
-    type: string
-    x-enum-varnames:
-    - WarmupKindStaticScale
-    - WarmupKindStaticQuestionnaire
-    - WarmupKindStaticScaleList
-    - WarmupKindQueryStatsSystem
-    - WarmupKindQueryStatsQuestionnaire
-    - WarmupKindQueryStatsPlan
   cachegovernance.ManualWarmupItemResult:
     properties:
       family:
@@ -81,6 +65,24 @@ definitions:
       scope:
         type: string
     type: object
+  cachetarget.WarmupKind:
+    enum:
+    - static.scale
+    - static.questionnaire
+    - static.scale_list
+    - query.stats_overview
+    - query.stats_system
+    - query.stats_questionnaire
+    - query.stats_plan
+    type: string
+    x-enum-varnames:
+    - WarmupKindStaticScale
+    - WarmupKindStaticQuestionnaire
+    - WarmupKindStaticScaleList
+    - WarmupKindQueryStatsOverview
+    - WarmupKindQueryStatsSystem
+    - WarmupKindQueryStatsQuestionnaire
+    - WarmupKindQueryStatsPlan
   core.ErrResponse:
     properties:
       code:
@@ -108,6 +110,13 @@ definitions:
       reference:
         description: Reference 返回参考文档（错误时使用）
         type: string
+    type: object
+  handler.questionnaireBatchRequest:
+    properties:
+      codes:
+        items:
+          type: string
+        type: array
     type: object
   meta.ID:
     enum:
@@ -204,42 +213,6 @@ definitions:
           $ref: '#/definitions/viewmodel.QuestionDTO'
         type: array
     type: object
-  request.CreateAssessmentEntryRequest:
-    properties:
-      expires_at:
-        $ref: '#/definitions/request.FlexibleTime'
-      target_code:
-        type: string
-      target_type:
-        type: string
-      target_version:
-        type: string
-    required:
-    - target_code
-    - target_type
-    type: object
-  request.CreateClinicianRequest:
-    properties:
-      clinician_type:
-        type: string
-      department:
-        type: string
-      employee_code:
-        type: string
-      is_active:
-        type: boolean
-      name:
-        type: string
-      operator_id:
-        $ref: '#/definitions/meta.ID'
-      org_id:
-        type: integer
-      title:
-        type: string
-    required:
-    - clinician_type
-    - name
-    type: object
   request.CreatePlanRequest:
     properties:
       fixed_dates:
@@ -306,38 +279,6 @@ definitions:
       title:
         type: string
     type: object
-  request.CreateStaffRequest:
-    properties:
-      email:
-        description: 邮箱
-        type: string
-      is_active:
-        description: 是否激活
-        type: boolean
-      name:
-        description: 姓名
-        type: string
-      org_id:
-        description: 兼容字段：机构ID
-        type: integer
-      password:
-        description: 新建 IAM 运营账号时的初始密码
-        type: string
-      phone:
-        description: 电话
-        type: string
-      roles:
-        description: 期望授予的角色列表（IAM 启用时转成 assignment）
-        items:
-          type: string
-        type: array
-      user_id:
-        allOf:
-        - $ref: '#/definitions/meta.ID'
-        description: IAM用户ID（优先使用）
-    required:
-    - name
-    type: object
   request.EnrollTesteeRequest:
     properties:
       plan_id:
@@ -388,24 +329,6 @@ definitions:
         type: string
       title:
         type: string
-    type: object
-  request.FlexibleTime:
-    properties:
-      time.Time:
-        type: string
-    type: object
-  request.IntakeByAssessmentEntryRequest:
-    properties:
-      birthday:
-        type: string
-      gender:
-        type: string
-      name:
-        type: string
-      profile_id:
-        type: integer
-    required:
-    - name
     type: object
   request.InterpretRuleModel:
     properties:
@@ -537,46 +460,6 @@ definitions:
       questionnaire_version:
         type: string
     type: object
-  request.UpdateStaffRequest:
-    properties:
-      email:
-        description: 邮箱
-        type: string
-      is_active:
-        description: 是否激活
-        type: boolean
-      name:
-        description: 姓名
-        type: string
-      phone:
-        description: 电话
-        type: string
-      roles:
-        description: 角色列表
-        items:
-          type: string
-        type: array
-    type: object
-  request.UpdateTesteeRequest:
-    properties:
-      birthday:
-        description: 出生日期
-        type: string
-      gender:
-        description: 性别
-        type: string
-      is_key_focus:
-        description: 是否重点关注
-        type: boolean
-      name:
-        description: 姓名
-        type: string
-      tags:
-        description: 标签
-        items:
-          type: string
-        type: array
-    type: object
   response.AnswerSheetListResponse:
     properties:
       items:
@@ -641,68 +524,6 @@ definitions:
         type: array
       count:
         type: integer
-    type: object
-  response.AssessmentEntryIntakeResponse:
-    properties:
-      assignment:
-        $ref: '#/definitions/response.RelationResponse'
-      clinician:
-        $ref: '#/definitions/response.ClinicianSummaryResponse'
-      entry:
-        $ref: '#/definitions/response.AssessmentEntryResponse'
-      relation:
-        $ref: '#/definitions/response.RelationResponse'
-      testee:
-        $ref: '#/definitions/response.TesteeResponse'
-    type: object
-  response.AssessmentEntryListResponse:
-    properties:
-      items:
-        items:
-          $ref: '#/definitions/response.AssessmentEntryResponse'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  response.AssessmentEntryResolvedResponse:
-    properties:
-      clinician:
-        $ref: '#/definitions/response.ClinicianSummaryResponse'
-      entry:
-        $ref: '#/definitions/response.AssessmentEntryResponse'
-    type: object
-  response.AssessmentEntryResponse:
-    properties:
-      clinician_id:
-        type: string
-      expires_at:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      is_active_label:
-        type: string
-      org_id:
-        type: string
-      qrcode_url:
-        type: string
-      target_code:
-        type: string
-      target_type:
-        type: string
-      target_type_label:
-        type: string
-      target_version:
-        type: string
-      token:
-        type: string
     type: object
   response.AssessmentListResponse:
     properties:
@@ -826,40 +647,15 @@ definitions:
       value:
         type: string
     type: object
-  response.ClinicianListResponse:
+  response.ClinicianAssignmentResponse:
     properties:
-      items:
-        items:
-          $ref: '#/definitions/response.ClinicianResponse'
-        type: array
-      page:
-        type: integer
-      page_size:
-        type: integer
-      total:
-        type: integer
-      total_pages:
-        type: integer
-    type: object
-  response.ClinicianResponse:
-    properties:
-      assessment_entry_count:
-        type: integer
-      assigned_testee_count:
-        type: integer
-      clinician_type:
+      bound_at:
         type: string
-      clinician_type_label:
+      clinician_type:
         type: string
       department:
         type: string
-      employee_code:
-        type: string
       id:
-        type: string
-      is_active:
-        type: boolean
-      is_active_label:
         type: string
       name:
         type: string
@@ -867,24 +663,84 @@ definitions:
         type: string
       org_id:
         type: string
+      relation_type:
+        type: string
       title:
         type: string
     type: object
-  response.ClinicianSummaryResponse:
+  response.ClinicianWorkbenchQueueCountsResponse:
     properties:
-      clinician_type:
+      follow_up:
+        type: integer
+      high_risk:
+        type: integer
+      key_focus:
+        type: integer
+    type: object
+  response.ClinicianWorkbenchQueueItemResponse:
+    properties:
+      assigned_clinicians:
+        items:
+          $ref: '#/definitions/response.ClinicianAssignmentResponse'
+        type: array
+      is_unassigned:
+        type: boolean
+      primary_clinician:
+        $ref: '#/definitions/response.ClinicianAssignmentResponse'
+      reason:
         type: string
-      clinician_type_label:
+      reason_at:
         type: string
-      department:
+      reason_code:
         type: string
-      id:
+      risk_level:
         type: string
-      name:
+      task:
+        $ref: '#/definitions/response.ClinicianWorkbenchTaskSummaryResponse'
+      testee:
+        $ref: '#/definitions/response.TesteeResponse'
+    type: object
+  response.ClinicianWorkbenchQueueResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.ClinicianWorkbenchQueueItemResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      queue_type:
         type: string
-      operator_id:
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  response.ClinicianWorkbenchQueueSummaryResponse:
+    properties:
+      counts:
+        $ref: '#/definitions/response.ClinicianWorkbenchQueueCountsResponse'
+    type: object
+  response.ClinicianWorkbenchTaskSummaryResponse:
+    properties:
+      entry_url:
         type: string
-      title:
+      expire_at:
+        type: string
+      open_at:
+        type: string
+      plan_id:
+        type: string
+      planned_at:
+        type: string
+      scale_code:
+        type: string
+      status:
+        type: string
+      status_label:
+        type: string
+      task_id:
         type: string
     type: object
   response.DimensionItem:
@@ -1049,6 +905,79 @@ definitions:
       suggestion:
         type: string
     type: object
+  response.PeriodicProjectResponse:
+    properties:
+      completed_weeks:
+        description: 已完成周数
+        type: integer
+      completion_rate:
+        description: 完成率（0-100）
+        type: number
+      current_week:
+        description: 当前应该完成的周次
+        type: integer
+      end_date:
+        description: 项目结束日期
+        type: string
+      project_id:
+        description: 项目ID
+        type: string
+      project_name:
+        description: 项目名称
+        type: string
+      scale_name:
+        description: 关联的量表名称
+        type: string
+      start_date:
+        description: 项目开始日期
+        type: string
+      tasks:
+        description: 各周任务状态（按周次升序排列）
+        items:
+          $ref: '#/definitions/response.PeriodicTaskResponse'
+        type: array
+      total_weeks:
+        description: 总周数
+        type: integer
+    type: object
+  response.PeriodicStatsResponse:
+    properties:
+      active_projects:
+        description: 进行中的项目数
+        type: integer
+      projects:
+        description: 周期性项目列表
+        items:
+          $ref: '#/definitions/response.PeriodicProjectResponse'
+        type: array
+      total_projects:
+        description: 项目总数
+        type: integer
+    type: object
+  response.PeriodicTaskResponse:
+    properties:
+      assessment_id:
+        description: 关联的测评ID（如已完成）
+        type: string
+      completed_at:
+        description: 完成时间
+        type: string
+      due_date:
+        description: 截止时间
+        type: string
+      planned_at:
+        description: 计划时间
+        type: string
+      status:
+        description: 状态：completed/pending/overdue
+        type: string
+      status_label:
+        description: 状态中文
+        type: string
+      week:
+        description: 第几周（从1开始）
+        type: integer
+    type: object
   response.PlanListResponse:
     properties:
       page:
@@ -1148,35 +1077,6 @@ definitions:
       version:
         type: string
     type: object
-  response.RelationResponse:
-    properties:
-      bound_at:
-        type: string
-      clinician_id:
-        type: string
-      id:
-        type: string
-      is_active:
-        type: boolean
-      is_active_label:
-        type: string
-      org_id:
-        type: string
-      relation_type:
-        type: string
-      relation_type_label:
-        type: string
-      source_id:
-        type: string
-      source_type:
-        type: string
-      source_type_label:
-        type: string
-      testee_id:
-        type: string
-      unbound_at:
-        type: string
-    type: object
   response.ReportListResponse:
     properties:
       items:
@@ -1241,14 +1141,6 @@ definitions:
       value:
         type: string
     type: object
-  response.ScaleAnalysisResponse:
-    properties:
-      scales:
-        description: 量表趋势列表
-        items:
-          $ref: '#/definitions/response.ScaleTrendResponse'
-        type: array
-    type: object
   response.ScaleCategoriesResponse:
     properties:
       applicable_ages:
@@ -1271,30 +1163,6 @@ definitions:
         items:
           $ref: '#/definitions/response.TagResponse'
         type: array
-    type: object
-  response.ScaleFactorResponse:
-    properties:
-      factor_code:
-        description: 因子编码
-        type: string
-      factor_name:
-        description: 因子名称
-        type: string
-      percentile:
-        description: 百分位
-        type: number
-      raw_score:
-        description: 原始分
-        type: number
-      risk_level:
-        description: 风险等级：normal/medium/high
-        type: string
-      risk_level_label:
-        description: 风险等级中文
-        type: string
-      t_score:
-        description: T分
-        type: number
     type: object
   response.ScaleListResponse:
     properties:
@@ -1358,49 +1226,6 @@ definitions:
         description: 更新人
         type: string
     type: object
-  response.ScaleTestResponse:
-    properties:
-      assessment_id:
-        description: 测评ID
-        type: string
-      factors:
-        description: 各因子得分
-        items:
-          $ref: '#/definitions/response.ScaleFactorResponse'
-        type: array
-      result:
-        description: 结果描述，如："轻度焦虑"
-        type: string
-      risk_level:
-        description: 风险等级：normal/medium/high
-        type: string
-      risk_level_label:
-        description: 风险等级中文
-        type: string
-      test_date:
-        description: 测评日期
-        type: string
-      total_score:
-        description: 总分
-        type: number
-    type: object
-  response.ScaleTrendResponse:
-    properties:
-      scale_code:
-        description: 量表编码
-        type: string
-      scale_id:
-        description: 量表ID
-        type: string
-      scale_name:
-        description: 量表名称
-        type: string
-      tests:
-        description: 测评历史记录（按时间升序排列）
-        items:
-          $ref: '#/definitions/response.ScaleTestResponse'
-        type: array
-    type: object
   response.ScoreResponse:
     properties:
       assessment_id:
@@ -1420,61 +1245,6 @@ definitions:
       total_score:
         description: 总分
         type: number
-    type: object
-  response.StaffListResponse:
-    properties:
-      items:
-        description: 列表数据
-        items:
-          $ref: '#/definitions/response.StaffResponse'
-        type: array
-      page:
-        description: 当前页码
-        type: integer
-      page_size:
-        description: 每页数量
-        type: integer
-      total:
-        description: 总数
-        type: integer
-      total_pages:
-        description: 总页数
-        type: integer
-    type: object
-  response.StaffResponse:
-    properties:
-      created_at:
-        description: 创建时间
-        type: string
-      email:
-        description: 邮箱
-        type: string
-      id:
-        description: ID
-        type: string
-      is_active:
-        description: 是否激活
-        type: boolean
-      name:
-        description: 姓名
-        type: string
-      org_id:
-        description: 机构ID
-        type: string
-      phone:
-        description: 电话
-        type: string
-      roles:
-        description: 角色列表
-        items:
-          type: string
-        type: array
-      updated_at:
-        description: 更新时间
-        type: string
-      user_id:
-        description: 用户ID
-        type: string
     type: object
   response.StageResponse:
     properties:
@@ -1596,26 +1366,6 @@ definitions:
           $ref: '#/definitions/response.TaskResponse'
         type: array
     type: object
-  response.TesteeListResponse:
-    properties:
-      items:
-        description: 列表数据
-        items:
-          $ref: '#/definitions/response.TesteeResponse'
-        type: array
-      page:
-        description: 当前页码
-        type: integer
-      page_size:
-        description: 每页数量
-        type: integer
-      total:
-        description: 总数
-        type: integer
-      total_pages:
-        description: 总页数
-        type: integer
-    type: object
   response.TesteeResponse:
     properties:
       assessment_stats:
@@ -1666,16 +1416,6 @@ definitions:
       source_label:
         description: 来源中文
         type: string
-      tags:
-        description: 标签
-        items:
-          type: string
-        type: array
-      tags_label:
-        description: 标签中文
-        items:
-          type: string
-        type: array
       updated_at:
         description: 更新时间
         type: string
@@ -1717,12 +1457,278 @@ definitions:
         description: 风险等级中文
         type: string
     type: object
+  statistics.AccessFunnelStatistics:
+    properties:
+      trend:
+        $ref: '#/definitions/statistics.AccessFunnelTrend'
+      window:
+        $ref: '#/definitions/statistics.AccessFunnelWindow'
+    type: object
+  statistics.AccessFunnelTrend:
+    properties:
+      care_relationship_established:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      entry_opened:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      intake_confirmed:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      testee_created:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+    type: object
+  statistics.AccessFunnelWindow:
+    properties:
+      care_relationship_established_count:
+        type: integer
+      entry_opened_count:
+        type: integer
+      intake_confirmed_count:
+        type: integer
+      testee_created_count:
+        type: integer
+    type: object
+  statistics.AssessmentEntryStatistics:
+    properties:
+      entry:
+        $ref: '#/definitions/statistics.AssessmentEntryStatisticsMeta'
+      last_intake_at:
+        type: string
+      last_resolved_at:
+        type: string
+      snapshot:
+        $ref: '#/definitions/statistics.AssessmentEntryStatisticsCounts'
+      time_range:
+        $ref: '#/definitions/statistics.StatisticsTimeRange'
+      window:
+        $ref: '#/definitions/statistics.AssessmentEntryStatisticsCounts'
+    type: object
+  statistics.AssessmentEntryStatisticsCounts:
+    properties:
+      assessment_count:
+        type: integer
+      assigned_count:
+        type: integer
+      intake_count:
+        type: integer
+      resolve_count:
+        type: integer
+    type: object
+  statistics.AssessmentEntryStatisticsList:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statistics.AssessmentEntryStatistics'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  statistics.AssessmentEntryStatisticsMeta:
+    properties:
+      clinician_id:
+        $ref: '#/definitions/meta.ID'
+      clinician_name:
+        type: string
+      created_at:
+        type: string
+      expires_at:
+        type: string
+      id:
+        $ref: '#/definitions/meta.ID'
+      is_active:
+        type: boolean
+      org_id:
+        type: integer
+      target_code:
+        type: string
+      target_type:
+        type: string
+      target_version:
+        type: string
+      token:
+        type: string
+    type: object
+  statistics.AssessmentServiceStatistics:
+    properties:
+      trend:
+        $ref: '#/definitions/statistics.AssessmentServiceTrend'
+      window:
+        $ref: '#/definitions/statistics.AssessmentServiceWindow'
+    type: object
+  statistics.AssessmentServiceTrend:
+    properties:
+      answersheet_submitted:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      assessment_created:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      assessment_failed:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      report_generated:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+    type: object
+  statistics.AssessmentServiceWindow:
+    properties:
+      answersheet_submitted_count:
+        type: integer
+      assessment_created_count:
+        type: integer
+      assessment_failed_count:
+        type: integer
+      report_generated_count:
+        type: integer
+    type: object
+  statistics.ClinicianStatistics:
+    properties:
+      clinician:
+        $ref: '#/definitions/statistics.ClinicianStatisticsSubject'
+      funnel:
+        $ref: '#/definitions/statistics.ClinicianStatisticsFunnel'
+      snapshot:
+        $ref: '#/definitions/statistics.ClinicianStatisticsSnapshot'
+      time_range:
+        $ref: '#/definitions/statistics.StatisticsTimeRange'
+      window:
+        $ref: '#/definitions/statistics.ClinicianStatisticsWindow'
+    type: object
+  statistics.ClinicianStatisticsFunnel:
+    properties:
+      assessment_count:
+        type: integer
+      assigned_count:
+        type: integer
+      created_count:
+        type: integer
+      intake_count:
+        type: integer
+      resolved_count:
+        type: integer
+    type: object
+  statistics.ClinicianStatisticsList:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statistics.ClinicianStatistics'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  statistics.ClinicianStatisticsSnapshot:
+    properties:
+      active_entry_count:
+        type: integer
+      attending_testee_count:
+        type: integer
+      collaborator_testee_count:
+        type: integer
+      primary_testee_count:
+        type: integer
+      total_accessible_testees:
+        type: integer
+    type: object
+  statistics.ClinicianStatisticsSubject:
+    properties:
+      clinician_type:
+        type: string
+      department:
+        type: string
+      id:
+        $ref: '#/definitions/meta.ID'
+      is_active:
+        type: boolean
+      name:
+        type: string
+      operator_id:
+        $ref: '#/definitions/meta.ID'
+      title:
+        type: string
+    type: object
+  statistics.ClinicianStatisticsWindow:
+    properties:
+      assigned_count:
+        type: integer
+      completed_assessment_count:
+        type: integer
+      intake_count:
+        type: integer
+    type: object
+  statistics.ClinicianTesteeSummaryStatistics:
+    properties:
+      assessed_in_window_count:
+        type: integer
+      attending_testee_count:
+        type: integer
+      collaborator_testee_count:
+        type: integer
+      key_focus_testee_count:
+        type: integer
+      primary_testee_count:
+        type: integer
+      time_range:
+        $ref: '#/definitions/statistics.StatisticsTimeRange'
+      total_accessible_testees:
+        type: integer
+    type: object
   statistics.DailyCount:
     properties:
       count:
         type: integer
       date:
         type: string
+    type: object
+  statistics.DimensionAnalysisSummary:
+    properties:
+      clinician_count:
+        type: integer
+      content_count:
+        type: integer
+      entry_count:
+        type: integer
+    type: object
+  statistics.OrganizationOverview:
+    properties:
+      active_entry_count:
+        type: integer
+      assessment_count:
+        type: integer
+      clinician_count:
+        type: integer
+      report_count:
+        type: integer
+      testee_count:
+        type: integer
+    type: object
+  statistics.PlanDomainStatistics:
+    properties:
+      trend:
+        $ref: '#/definitions/statistics.PlanTaskTrend'
+      window:
+        $ref: '#/definitions/statistics.PlanTaskWindow'
     type: object
   statistics.PlanStatistics:
     properties:
@@ -1751,6 +1757,64 @@ definitions:
       total_tasks:
         description: 任务统计
         type: integer
+      trend:
+        $ref: '#/definitions/statistics.PlanTaskTrend'
+      window:
+        allOf:
+        - $ref: '#/definitions/statistics.PlanTaskWindow'
+        description: 近窗口任务趋势，默认由计划日投影提供
+    type: object
+  statistics.PlanTaskTrend:
+    properties:
+      task_completed:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      task_created:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      task_expired:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      task_opened:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+    type: object
+  statistics.PlanTaskWindow:
+    properties:
+      active_testees:
+        type: integer
+      enrolled_testees:
+        type: integer
+      task_completed_count:
+        type: integer
+      task_created_count:
+        type: integer
+      task_expired_count:
+        type: integer
+      task_opened_count:
+        type: integer
+    type: object
+  statistics.QuestionnaireBatchStatisticsItem:
+    properties:
+      code:
+        type: string
+      completion_rate:
+        type: number
+      total_completions:
+        type: integer
+      total_submissions:
+        type: integer
+    type: object
+  statistics.QuestionnaireBatchStatisticsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/statistics.QuestionnaireBatchStatisticsItem'
+        type: array
     type: object
   statistics.QuestionnaireStatistics:
     properties:
@@ -1787,6 +1851,32 @@ definitions:
       total_submissions:
         description: 基础统计
         type: integer
+    type: object
+  statistics.StatisticsOverview:
+    properties:
+      access_funnel:
+        $ref: '#/definitions/statistics.AccessFunnelStatistics'
+      assessment_service:
+        $ref: '#/definitions/statistics.AssessmentServiceStatistics'
+      dimension_analysis:
+        $ref: '#/definitions/statistics.DimensionAnalysisSummary'
+      org_id:
+        type: integer
+      organization_overview:
+        $ref: '#/definitions/statistics.OrganizationOverview'
+      plan:
+        $ref: '#/definitions/statistics.PlanDomainStatistics'
+      time_range:
+        $ref: '#/definitions/statistics.StatisticsTimeRange'
+    type: object
+  statistics.StatisticsTimeRange:
+    properties:
+      from:
+        type: string
+      preset:
+        $ref: '#/definitions/statistics.TimeRangePreset'
+      to:
+        type: string
     type: object
   statistics.SystemStatistics:
     properties:
@@ -1825,6 +1915,16 @@ definitions:
         description: 今日新增受试者
         type: integer
     type: object
+  statistics.TimeRangePreset:
+    enum:
+    - today
+    - 7d
+    - 30d
+    type: string
+    x-enum-varnames:
+    - TimeRangePresetToday
+    - TimeRangePreset7D
+    - TimeRangePreset30D
   viewmodel.AnswerDTO:
     properties:
       question_code:
@@ -1919,19 +2019,6 @@ definitions:
       target_value:
         description: 目标值
         type: string
-    type: object
-  waiter.StatusSummary:
-    properties:
-      risk_level:
-        type: string
-      status:
-        description: pending/submitted/interpreted/failed
-        type: string
-      total_score:
-        type: number
-      updated_at:
-        description: Unix timestamp
-        type: integer
     type: object
 info:
   contact: {}
@@ -2104,12 +2191,7 @@ paths:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/waiter.StatusSummary'
-              type: object
+            $ref: '#/definitions/core.Response'
         "429":
           description: Too Many Requests
           schema:
@@ -2117,288 +2199,6 @@ paths:
       summary: 长轮询等待报告生成
       tags:
       - Evaluation-Assessment
-  /api/v1/clinicians:
-    get:
-      description: 查询机构内从业者列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验，实际以 JWT org_id 为准
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
-        in: query
-        name: org_id
-        type: integer
-      - default: 1
-        description: 页码
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ClinicianListResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询从业者列表
-      tags:
-      - Actor-Clinician
-    post:
-      consumes:
-      - application/json
-      description: 创建机构内从业者档案，仅 qs:admin 可访问；请求体中的 org_id 仅作兼容校验，实际以 JWT org_id 为准
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 创建从业者请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateClinicianRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ClinicianResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 创建从业者
-      tags:
-      - Actor-Clinician
-  /api/v1/clinicians/{id}:
-    get:
-      description: 查询指定从业者详情，仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 从业者ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ClinicianResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取从业者详情
-      tags:
-      - Actor-Clinician
-  /api/v1/clinicians/me:
-    get:
-      description: 获取当前后台操作者绑定的从业者档案；当前也兼容旧的 /practitioners 路由别名
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ClinicianResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取我的从业者身份
-      tags:
-      - Actor-Clinician
-  /api/v1/clinicians/me/assessment-entries:
-    get:
-      description: 查询当前从业者创建的测评入口列表；当前也兼容旧的 /practitioners 路由别名
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - default: 1
-        description: 页码
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentEntryListResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询我的测评入口列表
-      tags:
-      - Actor-AssessmentEntry
-    post:
-      consumes:
-      - application/json
-      description: 为当前从业者创建测评入口二维码；当前也兼容旧的 /practitioners 路由别名
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 创建测评入口请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateAssessmentEntryRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentEntryResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 创建我的测评入口
-      tags:
-      - Actor-AssessmentEntry
-  /api/v1/clinicians/me/assessment-entries/{id}:
-    get:
-      description: 查询当前从业者持有的单个测评入口详情
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - description: 入口ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentEntryResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询我的测评入口详情
-      tags:
-      - Actor-AssessmentEntry
-  /api/v1/clinicians/me/testees:
-    get:
-      description: 查询当前从业者可访问的受试者列表，底层复用与 /api/v1/testees 相同的访问范围收口逻辑
-      parameters:
-      - description: Bearer 用户令牌
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      - default: 1
-        description: 页码
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TesteeListResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询我的受试者
-      tags:
-      - Actor-Clinician
   /api/v1/codes/apply:
     post:
       consumes:
@@ -3241,70 +3041,6 @@ paths:
       summary: 开放任务
       tags:
       - Task-Management
-  /api/v1/public/assessment-entries/{token}:
-    get:
-      description: 公开解析测评入口 token，返回入口配置和所属从业者摘要
-      parameters:
-      - description: 测评入口Token
-        in: path
-        name: token
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentEntryResolvedResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 公开解析测评入口
-      tags:
-      - Actor-AssessmentEntry
-  /api/v1/public/assessment-entries/{token}/intake:
-    post:
-      consumes:
-      - application/json
-      description: 通过测评入口 token 建立受试者并自动绑定从业者关系
-      parameters:
-      - description: 测评入口Token
-        in: path
-        name: token
-        required: true
-        type: string
-      - description: 扫码 intake 请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.IntakeByAssessmentEntryRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.AssessmentEntryIntakeResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 公开扫码建档
-      tags:
-      - Actor-AssessmentEntry
   /api/v1/public/questionnaires:
     get:
       consumes:
@@ -4522,25 +4258,34 @@ paths:
       summary: 获取已发布的量表
       tags:
       - Scale-Query
-  /api/v1/staff:
+  /api/v1/statistics/clinicians:
     get:
-      description: 机构级后台账号列表，仅 qs:admin 可访问；org_id 查询参数仅作兼容校验
+      consumes:
+      - application/json
+      description: 按机构和时间窗口查询从业者统计列表；仅 qs:admin 可访问
       parameters:
-      - description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
-        in: query
-        name: org_id
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
         type: string
-      - description: 角色筛选
+      - description: 时间窗口预设：today/7d/30d
         in: query
-        name: role
+        name: preset
         type: string
-      - default: 1
-        description: 页码
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      - description: 页码
         in: query
         name: page
         type: integer
-      - default: 20
-        description: 每页数量
+      - description: 每页数量
         in: query
         name: page_size
         type: integer
@@ -4554,107 +4299,44 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.StaffListResponse'
+                  $ref: '#/definitions/statistics.ClinicianStatisticsList'
               type: object
         "429":
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
-      summary: 查询员工列表
+      summary: 查询从业者统计列表
       tags:
-      - Actor
-    post:
-      consumes:
-      - application/json
-      parameters:
-      - description: 创建员工请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/request.CreateStaffRequest'
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.StaffResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 创建员工
-      tags:
-      - Actor
-  /api/v1/staff/{id}:
-    delete:
-      parameters:
-      - description: 员工ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 删除员工
-      tags:
-      - Actor
+      - Statistics
+  /api/v1/statistics/clinicians/{id}:
     get:
-      parameters:
-      - description: 员工ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.StaffResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取员工详情
-      tags:
-      - Actor
-    put:
       consumes:
       - application/json
+      description: 按从业者 ID 查询统计概览、窗口指标和漏斗指标；仅 qs:admin 可访问
       parameters:
-      - description: 员工ID
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        format: int64
         in: path
         name: id
         required: true
+        type: integer
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
         type: string
-      - description: 更新员工请求
-        in: body
-        name: body
-        required: true
-        schema:
-          $ref: '#/definitions/request.UpdateStaffRequest'
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
       produces:
       - application/json
       responses:
@@ -4665,15 +4347,298 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.StaffResponse'
+                  $ref: '#/definitions/statistics.ClinicianStatistics'
               type: object
         "429":
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
-      summary: 更新员工
+      summary: 查询单个从业者统计
       tags:
-      - Actor
+      - Statistics
+  /api/v1/statistics/clinicians/me/entries:
+    get:
+      consumes:
+      - application/json
+      description: 查询当前后台操作者绑定从业者的测评入口统计列表
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
+        type: string
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.AssessmentEntryStatisticsList'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询当前从业者入口统计列表
+      tags:
+      - Statistics
+  /api/v1/statistics/clinicians/me/overview:
+    get:
+      consumes:
+      - application/json
+      description: 查询当前后台操作者绑定从业者的统计概览
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
+        type: string
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.ClinicianStatistics'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询当前从业者统计概览
+      tags:
+      - Statistics
+  /api/v1/statistics/clinicians/me/testees-summary:
+    get:
+      consumes:
+      - application/json
+      description: 查询当前后台操作者绑定从业者可访问受试者摘要统计
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
+        type: string
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.ClinicianTesteeSummaryStatistics'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询当前从业者受试者摘要
+      tags:
+      - Statistics
+  /api/v1/statistics/entries:
+    get:
+      consumes:
+      - application/json
+      description: 查询机构内测评入口统计列表，支持 clinician_id、status 和时间窗口过滤；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        format: int64
+        in: query
+        name: clinician_id
+        type: integer
+      - description: 入口状态：active/inactive
+        in: query
+        name: status
+        type: string
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
+        type: string
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.AssessmentEntryStatisticsList'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询测评入口统计列表
+      tags:
+      - Statistics
+  /api/v1/statistics/entries/{id}:
+    get:
+      consumes:
+      - application/json
+      description: 按入口 ID 查询入口快照、窗口计数和最近事件时间；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 入口ID
+        format: int64
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
+        type: string
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.AssessmentEntryStatistics'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询单个测评入口统计
+      tags:
+      - Statistics
+  /api/v1/statistics/overview:
+    get:
+      consumes:
+      - application/json
+      description: 查询机构总览、接入漏斗、测评服务、维度分析和计划任务统计；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 时间窗口预设：today/7d/30d
+        in: query
+        name: preset
+        type: string
+      - description: 自定义开始日期，格式 YYYY-MM-DD
+        in: query
+        name: from
+        type: string
+      - description: 自定义结束日期，格式 YYYY-MM-DD
+        in: query
+        name: to
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.StatisticsOverview'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询机构统计总览
+      tags:
+      - Statistics
   /api/v1/statistics/plans/{plan_id}:
     get:
       consumes:
@@ -4745,6 +4710,46 @@ paths:
       summary: 获取问卷/量表统计
       tags:
       - Statistics
+  /api/v1/statistics/questionnaires/batch:
+    post:
+      consumes:
+      - application/json
+      description: 按问卷 code 批量查询提交数、完成数和完成率；需要问卷或量表管理权限
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 问卷编码列表
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/handler.questionnaireBatchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/statistics.QuestionnaireBatchStatisticsResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 批量查询问卷统计
+      tags:
+      - Statistics
   /api/v1/statistics/system:
     get:
       consumes:
@@ -4811,110 +4816,23 @@ paths:
       summary: 获取受试者统计
       tags:
       - Statistics
-  /api/v1/testees:
+  /api/v1/statistics/testees/{testee_id}/periodic:
     get:
-      description: 以 JWT org_id 为准查询后台可见受试者。qs:admin 可查看机构全量，其他后台用户按 ClinicianTesteeRelation
-        自动收口；org_id 查询参数仅作兼容校验
-      parameters:
-      - description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
-        in: query
-        name: org_id
-        type: string
-      - description: 姓名（模糊匹配）
-        in: query
-        name: name
-        type: string
-      - description: 是否重点关注
-        in: query
-        name: is_key_focus
-        type: boolean
-      - description: 档案ID（等同于IAM儿童ID）
-        in: query
-        name: profile_id
-        type: string
-      - description: 按 Clinician 过滤受试者
-        in: query
-        name: clinician_id
-        type: string
-      - description: 报到开始日期（格式：YYYY-MM-DD，按 created_at 过滤）
-        in: query
-        name: created_start_date
-        type: string
-      - description: 报到结束日期（格式：YYYY-MM-DD，按 created_at 过滤）
-        in: query
-        name: created_end_date
-        type: string
-      - default: 1
-        description: 页码
-        in: query
-        name: page
-        type: integer
-      - default: 20
-        description: 每页数量
-        in: query
-        name: page_size
-        type: integer
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TesteeListResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 查询受试者列表
-      tags:
-      - Actor
-  /api/v1/testees/{id}:
-    get:
-      parameters:
-      - description: 受试者ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TesteeResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取受试者详情
-      tags:
-      - Actor
-    put:
       consumes:
       - application/json
+      description: 查询受试者周期计划项目、周次任务和完成情况；后台访问范围按 ClinicianTesteeRelation 收口
       parameters:
-      - description: 受试者ID
-        in: path
-        name: id
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
         required: true
         type: string
-      - description: 更新受试者请求
-        in: body
-        name: body
+      - description: 受试者ID
+        format: int64
+        in: path
+        name: testee_id
         required: true
-        schema:
-          $ref: '#/definitions/request.UpdateTesteeRequest'
+        type: integer
       produces:
       - application/json
       responses:
@@ -4925,15 +4843,15 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/response.TesteeResponse'
+                  $ref: '#/definitions/response.PeriodicStatsResponse'
               type: object
         "429":
           description: Too Many Requests
           schema:
             $ref: '#/definitions/core.ErrResponse'
-      summary: 更新受试者
+      summary: 查询受试者周期项目统计
       tags:
-      - Actor
+      - Statistics
   /api/v1/testees/{id}/plans:
     get:
       description: 查看某个受试者参与的所有计划
@@ -5005,41 +4923,6 @@ paths:
       summary: 查询受试者在某个计划下的所有任务
       tags:
       - Plan-Query
-  /api/v1/testees/{id}/scale-analysis:
-    get:
-      parameters:
-      - description: Testee ID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.ScaleAnalysisResponse'
-              type: object
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/core.Response'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 获取受试者量表分析结果
-      tags:
-      - Testee
   /api/v1/testees/{id}/tasks:
     get:
       description: 查看某个受试者的所有任务
@@ -5073,57 +4956,51 @@ paths:
       summary: 查询受试者的所有任务
       tags:
       - Plan-Query
-  /api/v1/testees/by-profile-id:
+  /clinicians/me/workbench/queues/{queue_type}:
     get:
-      description: 以 JWT org_id 为准，根据档案ID查询受试者；org_id 查询参数仅作兼容校验，若传入则必须与 JWT org_id
-        一致
+      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
+        返回每名受试者最紧急的开放任务，key_focus 使用重点关注字段。
       parameters:
-      - description: 兼容字段：机构ID，若传入必须与 JWT org_id 一致
-        in: query
-        name: org_id
-        type: string
-      - description: 用户档案ID（IAM Child ID/ProfileID）
-        in: query
-        name: profile_id
+      - description: 队列类型：high_risk/follow_up/key_focus
+        in: path
+        name: queue_type
         required: true
         type: string
-      - description: 兼容字段：IAM儿童ID
+      - description: 页码，默认 1
         in: query
-        name: iam_child_id
-        type: string
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            allOf:
-            - $ref: '#/definitions/core.Response'
-            - properties:
-                data:
-                  $ref: '#/definitions/response.TesteeResponse'
-              type: object
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 根据 profile_id 获取受试者详情
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列
       tags:
-      - Actor
-  /health:
+      - clinicians
+  /clinicians/me/workbench/queues/summary:
     get:
-      description: 检查 API Server 健康状态
+      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-      summary: 健康检查
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列统计
       tags:
-      - 系统
+      - clinicians
   /internal/v1/cache/governance/warmup-targets:
     post:
       consumes:
@@ -5305,31 +5182,6 @@ paths:
       summary: 查询任务窗口
       tags:
       - Task-Query
-  /internal/v1/statistics/sync/org-snapshot:
-    post:
-      consumes:
-      - application/json
-      description: 从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问
-      parameters:
-      - description: Bearer 用户令牌（或内部调用token）
-        in: header
-        name: Authorization
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/core.Response'
-        "429":
-          description: Too Many Requests
-          schema:
-            $ref: '#/definitions/core.ErrResponse'
-      summary: 同步机构总览快照
-      tags:
-      - Statistics-Sync
   /internal/v1/statistics/sync/daily:
     post:
       consumes:
@@ -5363,6 +5215,31 @@ paths:
       summary: 同步每日统计
       tags:
       - Statistics-Sync
+  /internal/v1/statistics/sync/org-snapshot:
+    post:
+      consumes:
+      - application/json
+      description: 从 MySQL 原始表重建 statistics_org_snapshot；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 同步机构总览快照
+      tags:
+      - Statistics-Sync
   /internal/v1/statistics/sync/plan:
     post:
       consumes:
@@ -5388,20 +5265,105 @@ paths:
       summary: 同步计划统计
       tags:
       - Statistics-Sync
-  /ping:
+  /practitioners/me/workbench/queues/{queue_type}:
     get:
-      description: 测试 API Server 连通性
+      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
+        返回每名受试者最紧急的开放任务，key_focus 使用重点关注字段。
+      parameters:
+      - description: 队列类型：high_risk/follow_up/key_focus
+        in: path
+        name: queue_type
+        required: true
+        type: string
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            additionalProperties: true
-            type: object
-      summary: Ping
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列
       tags:
-      - 系统
+      - clinicians
+  /practitioners/me/workbench/queues/summary:
+    get:
+      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取当前医生工作台队列统计
+      tags:
+      - clinicians
+  /workbench/queues/{queue_type}:
+    get:
+      description: queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含开放任务；仅
+        qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      parameters:
+      - description: 队列类型：high_risk/follow_up/key_focus
+        in: path
+        name: queue_type
+        required: true
+        type: string
+      - description: 从业者 ID，可选
+        in: query
+        name: clinician_id
+        type: integer
+      - description: 页码，默认 1
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量，默认 20，最大 100
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取管理员全院工作台队列
+      tags:
+      - Workbench
+  /workbench/queues/summary:
+    get:
+      description: 返回当前机构高风险、复诊、重点关注队列数量；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      parameters:
+      - description: 从业者 ID，可选
+        in: query
+        name: clinician_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/response.ClinicianWorkbenchQueueSummaryResponse'
+      security:
+      - BearerAuth: []
+      summary: 获取管理员全院工作台队列统计
+      tags:
+      - Workbench
 schemes:
 - http
 - https

@@ -29,7 +29,7 @@ func TestBuildTesteeSummaryResponse(t *testing.T) {
 	profileID := uint64(88)
 	birthday := time.Date(2012, 1, 2, 0, 0, 0, 0, time.Local)
 
-	result := buildTesteeSummaryResponse(7, 8, &profileID, "Alice", 2, &birthday, []string{"vip"}, "manual", true)
+	result := buildTesteeSummaryResponse(7, 8, &profileID, "Alice", 2, &birthday, "manual", true)
 
 	if result.ID != "7" || result.OrgID != "8" {
 		t.Fatalf("unexpected ids in testee response: %+v", result)
@@ -45,8 +45,5 @@ func TestBuildTesteeSummaryResponse(t *testing.T) {
 	}
 	if !result.IsKeyFocus || result.IsKeyFocusLabel == "" {
 		t.Fatalf("unexpected key focus fields: %+v", result)
-	}
-	if len(result.Tags) != 1 || result.Tags[0] != "vip" {
-		t.Fatalf("tags = %v, want [vip]", result.Tags)
 	}
 }

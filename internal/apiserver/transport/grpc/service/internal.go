@@ -408,9 +408,9 @@ func (s *InternalService) SyncAssessmentAttention(
 	return newAssessmentFlow(s).SyncAssessmentAttention(ctx, req)
 }
 
-// TagTestee 兼容旧打标签 RPC
+// TagTestee 兼容旧 RPC
 //
-// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步，不再写 risk_* 标签。
+// Deprecated: use SyncAssessmentAttention. 当前仅桥接重点关注同步。
 // 场景：worker 处理 report.generated 事件后调用
 // 职责：协议转换，将 gRPC 请求转换为应用服务调用
 // 业务逻辑：由 TesteeAssessmentAttentionService 处理

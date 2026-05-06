@@ -121,7 +121,6 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	testeeFactory := testee.NewFactory(testeeRepo, testeeValidator)
 	testeeEditor := testee.NewEditor(testeeValidator)
 	testeeBinder := testee.NewBinder(testeeRepo)
-	testeeTagger := testee.NewTagger(testeeValidator)
 
 	// 初始化 operator domain services
 	operatorValidator := operator.NewValidator()
@@ -144,7 +143,6 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		testeeRepo,
 		testeeEditor,
 		testeeBinder,
-		testeeTagger,
 		txRunner,
 	)
 	module.TesteeQueryService = testeeApp.NewQueryService(actorReadModel)

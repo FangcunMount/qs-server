@@ -8,7 +8,6 @@ import (
 type TesteeFilter struct {
 	OrgID                 int64
 	Name                  string
-	Tags                  []string
 	KeyFocus              *bool
 	CreatedAtStart        *time.Time
 	CreatedAtEnd          *time.Time
@@ -27,7 +26,6 @@ type TesteeRow struct {
 	Birthday         *time.Time
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-	Tags             []string
 	Source           string
 	IsKeyFocus       bool
 	LastAssessmentAt *time.Time

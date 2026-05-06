@@ -8,10 +8,9 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
-func TestSyncAssessmentAttentionMarksHighRiskWithoutChangingTags(t *testing.T) {
+func TestSyncAssessmentAttentionMarksHighRiskAsKeyFocus(t *testing.T) {
 	item := domain.NewTestee(1, "testee", domain.GenderUnknown, nil)
 	item.SetID(domain.ID(10))
-	item.SetTags([]domain.Tag{domain.Tag("risk_high"), domain.Tag("manual")})
 	repo := &assessmentAttentionRepoStub{item: item}
 	var txCalls int
 	service := NewAssessmentAttentionService(
@@ -37,13 +36,11 @@ func TestSyncAssessmentAttentionMarksHighRiskWithoutChangingTags(t *testing.T) {
 	if !result.KeyFocusMarked || !item.IsKeyFocus() {
 		t.Fatalf("expected high risk result to mark key focus")
 	}
-	assertStrings(t, item.TagsAsStrings(), []string{"risk_high", "manual"})
 }
 
-func TestSyncAssessmentAttentionDoesNotUnmarkOrRewriteTagsForLowerRisk(t *testing.T) {
+func TestSyncAssessmentAttentionDoesNotUnmarkKeyFocusForLowerRisk(t *testing.T) {
 	item := domain.NewTestee(1, "testee", domain.GenderUnknown, nil)
 	item.SetID(domain.ID(11))
-	item.SetTags([]domain.Tag{domain.Tag("risk_high"), domain.Tag("risk_severe"), domain.Tag("manual")})
 	item.SetKeyFocus(true)
 	repo := &assessmentAttentionRepoStub{item: item}
 	var txCalls int
@@ -67,7 +64,6 @@ func TestSyncAssessmentAttentionDoesNotUnmarkOrRewriteTagsForLowerRisk(t *testin
 	if !item.IsKeyFocus() {
 		t.Fatalf("expected existing key focus marker to be preserved")
 	}
-	assertStrings(t, item.TagsAsStrings(), []string{"risk_high", "risk_severe", "manual"})
 	if txCalls != 0 || repo.findByIDCalls != 0 || repo.updateCalls != 0 {
 		t.Fatalf("expected lower risk sync to be a no-op, got tx=%d find=%d update=%d", txCalls, repo.findByIDCalls, repo.updateCalls)
 	}
@@ -122,15 +118,3 @@ func (s *assessmentAttentionRepoStub) FindByProfile(context.Context, int64, uint
 }
 
 func (s *assessmentAttentionRepoStub) Delete(context.Context, domain.ID) error { return nil }
-
-func assertStrings(t *testing.T, actual, expected []string) {
-	t.Helper()
-	if len(actual) != len(expected) {
-		t.Fatalf("expected %v, got %v", expected, actual)
-	}
-	for i := range expected {
-		if actual[i] != expected[i] {
-			t.Fatalf("expected %v, got %v", expected, actual)
-		}
-	}
-}

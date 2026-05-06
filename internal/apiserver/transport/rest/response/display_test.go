@@ -93,16 +93,3 @@ func TestNewPeriodicStatsResponseFormatsDatesAndLabels(t *testing.T) {
 		t.Fatalf("due_date = %#v, want %q", task.DueDate, "2026-04-20")
 	}
 }
-
-func TestLabelTagsUsesDisplayNames(t *testing.T) {
-	got := LabelTags([]string{"risk_high", "custom_tag"})
-	if len(got) != 2 {
-		t.Fatalf("len = %d, want 2", len(got))
-	}
-	if got[0] != "高风险" {
-		t.Fatalf("got[0] = %q, want %q", got[0], "高风险")
-	}
-	if got[1] != "custom_tag" {
-		t.Fatalf("got[1] = %q, want %q", got[1], "custom_tag")
-	}
-}

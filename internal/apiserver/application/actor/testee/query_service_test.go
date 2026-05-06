@@ -21,7 +21,6 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 	result, err := service.ListTestees(context.Background(), ListTesteeDTO{
 		OrgID:          1,
 		Name:           "张",
-		Tags:           []string{"重点"},
 		KeyFocus:       &keyFocus,
 		CreatedAtStart: &start,
 		CreatedAtEnd:   &end,
@@ -37,7 +36,7 @@ func TestListTesteesUsesUnifiedFilterForUnrestrictedQueries(t *testing.T) {
 	if repo.lastFilter.RestrictToAccessScope {
 		t.Fatalf("expected unrestricted filter, got %+v", repo.lastFilter)
 	}
-	if repo.lastFilter.Name != "张" || len(repo.lastFilter.Tags) != 1 || repo.lastFilter.Tags[0] != "重点" {
+	if repo.lastFilter.Name != "张" {
 		t.Fatalf("unexpected filter passed to repo: %+v", repo.lastFilter)
 	}
 	if repo.lastFilter.KeyFocus == nil || *repo.lastFilter.KeyFocus != false {

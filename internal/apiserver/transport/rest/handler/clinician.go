@@ -480,8 +480,8 @@ func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 		h.BadRequestResponse(c, "page must be greater than 0", nil)
 		return
 	}
-	if req.PageSize <= 0 || req.PageSize > 100 {
-		h.BadRequestResponse(c, "page_size must be between 1 and 100", nil)
+	if req.PageSize <= 0 || req.PageSize > 200 {
+		h.BadRequestResponse(c, "page_size must be between 1 and 200", nil)
 		return
 	}
 	orgID, err := h.RequireProtectedOrgIDWithLegacy(c, req.OrgID)
@@ -1125,7 +1125,6 @@ func toAssignedTesteeResponse(item *clinicianApp.AssignedTesteeResult) *response
 		item.Name,
 		item.Gender,
 		item.Birthday,
-		item.Tags,
 		item.Source,
 		item.IsKeyFocus,
 	)

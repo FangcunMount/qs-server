@@ -2,7 +2,6 @@ package testee
 
 import (
 	"context"
-	"regexp"
 	"strings"
 	"time"
 
@@ -30,12 +29,6 @@ type Validator interface {
 
 	// ValidateBirthday 验证生日
 	ValidateBirthday(birthday *time.Time) error
-
-	// ValidateTag 验证单个标签
-	ValidateTag(tag string) error
-
-	// ValidateTags 验证标签列表
-	ValidateTags(tags []string) error
 }
 
 // validator 验证器实现
@@ -177,41 +170,6 @@ func (v *validator) ValidateBirthday(birthday *time.Time) error {
 	// 不能是负年龄
 	if age < 0 {
 		return errors.WithCode(code.ErrValidation, "invalid birthday")
-	}
-
-	return nil
-}
-
-// ValidateTag 验证单个标签
-func (v *validator) ValidateTag(tag string) error {
-	if tag == "" {
-		return errors.WithCode(code.ErrValidation, "tag cannot be empty")
-	}
-
-	if len(tag) > 50 {
-		return errors.WithCode(code.ErrValidation, "tag too long (max 50 characters)")
-	}
-
-	// 可以添加更多标签格式验证，如不能包含特殊字符等
-	// 规则：只允许字母、数字、下划线、中文
-	if !regexp.MustCompile(`^[\w\p{Han}]+$`).MatchString(tag) {
-		return errors.WithCode(code.ErrValidation, "tag contains invalid characters")
-	}
-
-	return nil
-}
-
-// ValidateTags 验证标签列表
-func (v *validator) ValidateTags(tags []string) error {
-	if len(tags) > 50 {
-		return errors.WithCode(code.ErrValidation, "too many tags (max 50)")
-	}
-
-	// 验证每个标签
-	for _, tag := range tags {
-		if err := v.ValidateTag(tag); err != nil {
-			return errors.Wrapf(err, "invalid tag: %s", tag)
-		}
 	}
 
 	return nil

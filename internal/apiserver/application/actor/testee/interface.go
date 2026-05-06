@@ -12,7 +12,7 @@ import (
 //
 // 行为者识别：
 // 1. C端用户(患者/家长) - 自助注册、查看自己的档案
-// 2. B端操作者(Operator) - 管理受试者档案、标签、重点关注、批量操作
+// 2. B端操作者(Operator) - 管理受试者档案、重点关注、批量操作
 // 3. 通用查询服务 (Query Service) - 为所有行为者提供只读查询
 
 // TesteeRegistrationService 受试者注册服务
@@ -35,7 +35,7 @@ type TesteeRegistrationService interface {
 
 // TesteeManagementService 受试者档案管理服务
 // 行为者：B端操作者(Operator)
-// 职责：管理受试者档案、业务标签、重点关注
+// 职责：管理受试者档案、重点关注
 // 变更来源：B端管理后台的业务需求变化
 type TesteeManagementService interface {
 	// UpdateBasicInfo 更新基本信息
@@ -45,13 +45,6 @@ type TesteeManagementService interface {
 	// BindProfile 绑定用户档案
 	// 场景：将临时创建的受试者绑定到正式的用户档案
 	BindProfile(ctx context.Context, testeeID uint64, profileID uint64) error
-
-	// AddTag 添加业务标签
-	// 场景：后台员工为受试者添加普通辅助标签；风险/工作台队列不以 tag 为事实来源
-	AddTag(ctx context.Context, testeeID uint64, tag string) error
-
-	// RemoveTag 移除业务标签
-	RemoveTag(ctx context.Context, testeeID uint64, tag string) error
 
 	// MarkAsKeyFocus 标记为重点关注
 	// 场景：将需要特别关注的受试者标记出来
@@ -63,11 +56,11 @@ type TesteeManagementService interface {
 
 // TesteeAssessmentAttentionService 测评后置关注同步服务
 // 行为者：系统自动（事件驱动）
-// 职责：根据测评结果同步自动关注状态，不写入受试者标签
+// 职责：根据测评结果同步自动关注状态
 // 变更来源：测评结果后置同步规则变化
 type TesteeAssessmentAttentionService interface {
 	// SyncAssessmentAttention 根据测评结果同步自动关注状态。
-	// 高风险队列由 Evaluation read model 产生，本服务不维护 risk_* 标签。
+	// 高风险队列由 Evaluation read model 产生。
 	SyncAssessmentAttention(
 		ctx context.Context,
 		testeeID uint64,
@@ -148,10 +141,9 @@ type UpdateTesteeProfileDTO struct {
 
 // ListTesteeDTO 列出受试者 DTO
 type ListTesteeDTO struct {
-	OrgID                 int64    // 机构ID
-	Name                  string   // 姓名（模糊搜索）
-	Tags                  []string // 标签过滤
-	KeyFocus              *bool    // 是否重点关注
+	OrgID                 int64  // 机构ID
+	Name                  string // 姓名（模糊搜索）
+	KeyFocus              *bool  // 是否重点关注
 	CreatedAtStart        *time.Time
 	CreatedAtEnd          *time.Time
 	AccessibleTesteeIDs   []uint64 // 可访问的受试者范围（可选）
@@ -171,7 +163,6 @@ type TesteeResult struct {
 	CreatedAt  time.Time  // 创建时间
 	UpdatedAt  time.Time  // 更新时间
 	Age        int        // 年龄
-	Tags       []string   // 业务标签
 	Source     string     // 数据来源
 	IsKeyFocus bool       // 是否重点关注
 

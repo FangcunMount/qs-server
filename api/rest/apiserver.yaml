@@ -280,7 +280,7 @@ paths:
         in: query
       - type: integer
         default: 20
-        description: 每页数量
+        description: 每页数量，最大 200
         name: page_size
         in: query
       responses:
@@ -562,7 +562,7 @@ paths:
       tags:
       - Workbench
       summary: 获取管理员全院工作台队列
-      description: queue_type 取值：high_risk、follow_up、key_focus；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+      description: queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
       operationId: 获取管理员全院工作台队列
       parameters:
       - type: string
@@ -612,7 +612,7 @@ paths:
       tags:
       - Actor-Clinician
       summary: 获取当前医生工作台队列统计
-      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放/逾期任务、重点关注字段动态生成，不以用户标签为事实来源。
+      description: 返回当前医生名下高风险、复诊、重点关注队列数量。队列由最新测评风险、开放任务、重点关注字段动态生成，不以用户标签为事实来源。
       operationId: 获取当前医生工作台队列统计
       parameters:
       - type: string
@@ -643,7 +643,7 @@ paths:
       tags:
       - Actor-Clinician
       summary: 获取当前医生工作台队列
-      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的开放或逾期任务，key_focus 使用重点关注字段。
+      description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的开放任务，key_focus 使用重点关注字段。
       operationId: 获取当前医生工作台队列
       parameters:
       - type: string
@@ -5155,11 +5155,6 @@ components:
         name:
           description: 姓名
           type: string
-        tags:
-          description: 标签
-          type: array
-          items:
-            type: string
     response.AnswerSheetListResponse:
       type: object
       properties:
@@ -6346,16 +6341,6 @@ components:
         source_label:
           description: 来源中文
           type: string
-        tags:
-          description: 标签
-          type: array
-          items:
-            type: string
-        tags_label:
-          description: 标签中文
-          type: array
-          items:
-            type: string
         updated_at:
           description: 更新时间
           type: string

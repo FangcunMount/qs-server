@@ -428,6 +428,52 @@ func TestOperatorClinicianHandlerListCliniciansDefaultsPaginationAndUsesProtecte
 	}
 }
 
+func TestOperatorClinicianHandlerListCliniciansAllowsPageSize200(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	query := &stubActorClinicianQueryService{
+		listResult: &clinicianApp.ClinicianListResult{
+			Items: []*clinicianApp.ClinicianResult{},
+		},
+	}
+	handler := newOperatorClinicianHandlerForTest()
+	handler.clinicianQueryService = query
+
+	c, rec := newActorTestContext(http.MethodGet, "/api/v1/clinicians?org_id=91&page=1&page_size=200", nil)
+	c.Set(restmiddleware.OrgIDKey, uint64(91))
+
+	handler.ListClinicians(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if query.lastListDTO.Limit != 200 {
+		t.Fatalf("limit = %d, want 200", query.lastListDTO.Limit)
+	}
+}
+
+func TestOperatorClinicianHandlerListCliniciansRejectsPageSizeAbove200(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	query := &stubActorClinicianQueryService{
+		listResult: &clinicianApp.ClinicianListResult{},
+	}
+	handler := newOperatorClinicianHandlerForTest()
+	handler.clinicianQueryService = query
+
+	c, rec := newActorTestContext(http.MethodGet, "/api/v1/clinicians?org_id=91&page=1&page_size=201", nil)
+	c.Set(restmiddleware.OrgIDKey, uint64(91))
+
+	handler.ListClinicians(c)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusBadRequest, rec.Body.String())
+	}
+	if query.lastListDTO.Limit != 0 {
+		t.Fatalf("query service should not be called, got dto: %+v", query.lastListDTO)
+	}
+}
+
 func TestOperatorClinicianHandlerListTesteeClinicianRelationsUsesProtectedScope(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 

@@ -65,7 +65,7 @@ Scale 的边界必须守住。
 | 本次 Assessment 状态、失败、重试 | `evaluation` |
 | 本次 factor score、total score、risk result | `evaluation` 产出 |
 | InterpretReport 的生成和保存 | `evaluation/report` |
-| 受试者标签、操作者、治疗师、监护关系 | `actor` |
+| 受试者、操作者、治疗师、监护关系 | `actor` |
 | 任务开放、过期、完成、通知 | `plan` |
 | 风险分布统计、行为投影 | `statistics` |
 
@@ -232,7 +232,7 @@ flowchart TB
 | Survey -> Evaluation | AnswerSheet 提供作答事实和答案级分数 | Scale 不保存答卷 |
 | Scale -> Evaluation | Evaluation 加载 ScaleSnapshot 计算因子分和解释 | Scale 不推进 Assessment 状态 |
 | Evaluation -> Report | 使用 Scale 规则输出组织报告 | Report 不重定义风险规则 |
-| Evaluation -> Actor | 高风险标签、关注对象 | Scale 不直接打标签 |
+| Evaluation -> Actor | 关注对象 | Scale 不直接维护 Actor 主数据 |
 | Evaluation -> Statistics | 风险结果进入统计 | Scale 不维护统计读模型 |
 
 ---

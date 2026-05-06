@@ -1,6 +1,6 @@
-# Testee 与标签
+# Testee 与重点关注
 
-**本文回答**：`Testee` 在 Actor 模块中代表什么，为什么它不是 IAM User；标签、重点关注、Profile 绑定和测评统计快照如何协作；Evaluation 报告下游如何安全回写受试者标签。
+**本文回答**：`Testee` 在 Actor 模块中代表什么，为什么它不是 IAM User；重点关注、Profile 绑定和测评统计快照如何协作；Evaluation 报告下游如何安全同步受试者关注状态。
 
 ---
 
@@ -10,15 +10,15 @@
 | ---- | ---- |
 | 模块定位 | `Testee` 是“被测评的人”在 qs-server 中的业务聚合根 |
 | 不等于 IAM User | Testee 可以没有登录账号，也可以绑定 IAM Child/Profile |
-| 核心字段 | orgID、profileID、name、gender、birthday、tags、source、isKeyFocus、assessmentStats |
-| 标签定位 | tags 是受试者长期业务标签，不是某次 Assessment 状态 |
+| 核心字段 | orgID、profileID、name、gender、birthday、source、isKeyFocus、assessmentStats |
+| tags 定位 | `testee.tags` 仅作为数据库历史兼容字段保留，当前产品不展示、不筛选、不作为队列事实 |
 | 重点关注 | `isKeyFocus` 是长期关注属性，可由人工或报告回写触发 |
 | 统计快照 | `assessmentStats` 是读模型优化快照，不应直接作为主事实修改 |
 | 回写原则 | worker/report 下游不直接写库，应回到 apiserver application service |
 
 一句话概括：
 
-> **Testee 保存“这个被测评对象是谁、有什么长期业务标记”，而不是保存“这一次测评结果是什么”。**
+> **Testee 保存“这个被测评对象是谁、是否需要长期关注”，而不是保存“这一次测评结果是什么”。**
 
 ---
 
@@ -34,7 +34,7 @@
 | IAM Child/Profile | Profile 是身份/档案来源；Testee 是 QS 业务视图 |
 | AnswerSheet | AnswerSheet 是一次作答事实；Testee 是长期主体 |
 | Assessment | Assessment 是一次测评行为；Testee 可关联多次测评 |
-| Report | Report 是一次测评报告；Testee 可被报告结果影响标签 |
+| Report | Report 是一次测评报告；Testee 可被报告结果影响重点关注状态 |
 
 ---
 
@@ -49,7 +49,7 @@ classDiagram
         name
         gender
         birthday
-        tags
+        tags_legacy
         source
         isKeyFocus
         assessmentStats
@@ -64,7 +64,7 @@ classDiagram
 | `name` | 姓名，可脱敏显示 |
 | `gender` | 性别 |
 | `birthday` | 出生日期 |
-| `tags` | 业务标签，例如 high_risk、adhd_suspect、vip |
+| `tags` | 历史兼容字段，当前不作为产品展示、筛选或队列事实 |
 | `source` | 数据来源 |
 | `isKeyFocus` | 是否重点关注 |
 | `assessmentStats` | 测评统计快照，只读优化 |
@@ -83,41 +83,26 @@ classDiagram
 
 ---
 
-## 3. 标签模型
+## 3. 历史 tags 字段
 
-`Testee` 内部持有 `[]Tag`，并通过方法保护封装：
+`Testee` 数据表仍保留 `tags` JSON 字段，领域对象只保留持久化恢复与回写能力，目的是兼容历史数据和旧部署。当前产品入口不再使用该字段：
 
-| 方法 | 说明 |
-| ---- | ---- |
-| `Tags()` | 返回标签副本，避免外部修改内部 slice |
-| `TagsAsStrings()` | 转成字符串列表 |
-| `HasTag(tag)` | 判断是否已有标签 |
-| `addTag(tag)` | 包内方法，防重复添加 |
-| `removeTag(tag)` | 包内方法，移除标签 |
+| 产品面 | 当前行为 |
+| ------ | -------- |
+| 受试者详情 / 列表 | 不返回 `tags` / `tags_label` |
+| 受试者列表筛选 | 不支持 tag 筛选 |
+| 工作台队列 | 不读取 tag |
+| 测评后置同步 | 只同步重点关注状态 |
 
-### 3.1 为什么 add/remove 是包内方法
-
-`addTag` 和 `removeTag` 是包内方法，意味着外部不应直接绕过领域服务修改标签。正确路径应通过 Tagger 或应用服务统一处理：
-
-```text
-application service
-  -> domain tagger
-  -> Testee.addTag/removeTag
-  -> repository.Update
-```
-
-这可以保证标签来源、幂等和校验统一。
-
-### 3.2 标签不等于风险结果
+### 3.1 tags 不等于风险结果
 
 | 内容 | 所属 |
 | ---- | ---- |
 | `RiskLevel` | EvaluationResult / Report，是高风险队列事实来源 |
 | 高风险因子 | Evaluation factor score |
-| tags | Testee 普通辅助标签，可展示和筛选 |
 | 重点关注 | Testee 长期关注属性，是重点关注队列事实来源 |
 
-报告结果不再回写 `risk_*` 标签；标签不是报告、风险或工作台队列事实。
+报告结果不回写 Testee tags；tags 不是报告、风险或工作台队列事实。
 
 ---
 
@@ -182,7 +167,7 @@ sequenceDiagram
 | worker 不直接写 Testee repository | 保证写模型回到 apiserver |
 | internal gRPC 是跨进程防腐边界 | worker 不依赖 domain/testee |
 | 关注同步由应用服务执行 | 保留校验、事务和日志 |
-| Report 不成为 Testee 字段 | 只允许按规则标记重点关注，不维护风险标签 |
+| Report 不成为 Testee 字段 | 只允许按规则标记重点关注 |
 
 ---
 
@@ -207,8 +192,8 @@ sequenceDiagram
 | 模式 | 当前落点 | 意图 |
 | ---- | -------- | ---- |
 | Aggregate Root | `Testee` | 收口受试者长期属性 |
-| Encapsulation | `Tags()` 返回副本，add/remove 包内 | 避免外部直接修改内部状态 |
-| Domain Service | Tagger/Binder/Validator | 标签、绑定、校验不塞满实体 |
+| Encapsulation | 聚合方法保护内部状态 | 避免外部直接修改内部状态 |
+| Domain Service | Binder/Validator | 绑定、校验不塞满实体 |
 | Application Service | testee services | 编排 repository、IAM profile、internal gRPC |
 | Projection / Snapshot | `assessmentStats` | 列表/趋势读取优化 |
 | Anti-corruption | internal gRPC / iambridge | 隔离 worker/IAM 与 Testee domain |
@@ -220,10 +205,9 @@ sequenceDiagram
 | 设计 | 收益 | 代价 |
 | ---- | ---- | ---- |
 | Testee 不等于 IAM User | 支持儿童、代填、临时对象 | 需要 profile 绑定和身份映射 |
-| tags 放在 Testee | 长期业务标签可查询 | 标签语义必须治理 |
+| 保留 `testee.tags` 字段 | 兼容历史数据 | 当前产品不展示、不筛选，后续可择机迁移清理 |
 | stats 作为快照 | 列表性能好 | 异步一致性，需要投影修复 |
 | worker 通过 gRPC 回写 | 写模型统一 | 多一次调用 |
-| addTag 防重复 | 标签幂等 | 标签规范需要额外文档 |
 
 ---
 
@@ -235,7 +219,7 @@ sequenceDiagram
 
 ### 10.2 “高风险就是 Assessment 状态”
 
-错误。高风险是 Evaluation 产出，标签是 Actor 长期属性，二者可以关联但不能混同。
+错误。高风险是 Evaluation 产出，重点关注是 Testee 长期关注属性，二者不能混同。
 
 ### 10.3 “assessmentStats 可以直接手动改”
 

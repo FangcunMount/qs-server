@@ -442,7 +442,6 @@ func (h *TesteeHandler) buildTesteeListDTO(c *gin.Context, operatorUserID int64,
 	dto := testeeApp.ListTesteeDTO{
 		OrgID:          query.OrgID,
 		Name:           query.Request.Name,
-		Tags:           query.Request.Tags,
 		KeyFocus:       query.Request.IsKeyFocus,
 		CreatedAtStart: query.CreatedAtStart,
 		CreatedAtEnd:   query.CreatedAtEnd,
@@ -545,17 +544,6 @@ func testeeMatchesListFilter(
 	if req.IsKeyFocus != nil && result.IsKeyFocus != *req.IsKeyFocus {
 		return false
 	}
-	if len(req.Tags) > 0 {
-		tagSet := make(map[string]struct{}, len(result.Tags))
-		for _, tag := range result.Tags {
-			tagSet[tag] = struct{}{}
-		}
-		for _, want := range req.Tags {
-			if _, ok := tagSet[want]; !ok {
-				return false
-			}
-		}
-	}
 	return createdAtInRange(result.CreatedAt, createdAtStart, createdAtEnd)
 }
 
@@ -622,8 +610,6 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 		Gender:          gender,
 		GenderLabel:     response.LabelForGender(gender),
 		Birthday:        response.FormatDatePtr(result.Birthday),
-		Tags:            result.Tags,
-		TagsLabel:       response.LabelTags(result.Tags),
 		Source:          result.Source,
 		SourceLabel:     response.LabelForTesteeSource(result.Source),
 		IsKeyFocus:      result.IsKeyFocus,

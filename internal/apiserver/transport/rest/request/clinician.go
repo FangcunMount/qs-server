@@ -77,7 +77,7 @@ type BindClinicianOperatorRequest struct {
 type ListClinicianRequest struct {
 	OrgID    int64 `form:"org_id"`
 	Page     int   `form:"page" binding:"omitempty,min=1"`
-	PageSize int   `form:"page_size" binding:"omitempty,min=1,max=100"`
+	PageSize int   `form:"page_size" binding:"omitempty,min=1,max=200"`
 }
 
 // CreateAssessmentEntryRequest 创建测评入口请求。

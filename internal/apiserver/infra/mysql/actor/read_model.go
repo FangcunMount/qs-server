@@ -136,9 +136,6 @@ func (r *readModel) applyTesteeFilter(query *gorm.DB, filter actorreadmodel.Test
 	if filter.KeyFocus != nil {
 		query = query.Where("is_key_focus = ?", *filter.KeyFocus)
 	}
-	for _, tag := range filter.Tags {
-		query = query.Where("JSON_CONTAINS(tags, ?)", `"`+tag+`"`)
-	}
 	if filter.CreatedAtStart != nil {
 		query = query.Where("created_at >= ?", *filter.CreatedAtStart)
 	}
@@ -539,7 +536,6 @@ func testeeRowFromPO(po *TesteePO) actorreadmodel.TesteeRow {
 		Birthday:         po.Birthday,
 		CreatedAt:        po.CreatedAt,
 		UpdatedAt:        po.UpdatedAt,
-		Tags:             append([]string(nil), po.Tags...),
 		Source:           po.Source,
 		IsKeyFocus:       po.IsKeyFocus,
 		LastAssessmentAt: po.LastAssessmentAt,

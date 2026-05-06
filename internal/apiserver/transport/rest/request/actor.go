@@ -14,7 +14,6 @@ type CreateTesteeRequest struct {
 	Name       string     `json:"name" binding:"required"`   // 姓名
 	Gender     string     `json:"gender"`                    // 性别
 	Birthday   *time.Time `json:"birthday"`                  // 出生日期
-	Tags       []string   `json:"tags"`                      // 标签
 	Source     string     `json:"source"`                    // 来源
 	IsKeyFocus bool       `json:"is_key_focus"`              // 是否重点关注
 }
@@ -24,22 +23,20 @@ type UpdateTesteeRequest struct {
 	Name       *string    `json:"name"`         // 姓名
 	Gender     *string    `json:"gender"`       // 性别
 	Birthday   *time.Time `json:"birthday"`     // 出生日期
-	Tags       []string   `json:"tags"`         // Deprecated: 当前更新接口不消费；标签仅作为辅助标签，不是风险/队列事实
 	IsKeyFocus *bool      `json:"is_key_focus"` // 是否重点关注
 }
 
 // ListTesteeRequest 查询受试者列表请求
 type ListTesteeRequest struct {
-	OrgID            int64    `form:"org_id"`                                      // 兼容字段：机构ID
-	Name             string   `form:"name"`                                        // 姓名（模糊匹配）
-	Tags             []string `form:"tags"`                                        // 标签筛选
-	IsKeyFocus       *bool    `form:"is_key_focus"`                                // 是否重点关注
-	ProfileID        string   `form:"profile_id"`                                  // 档案ID（ProfileID）
-	ClinicianID      *uint64  `form:"clinician_id"`                                // Clinician 过滤
-	CreatedStartDate string   `form:"created_start_date"`                          // 报到开始日期（YYYY-MM-DD）
-	CreatedEndDate   string   `form:"created_end_date"`                            // 报到结束日期（YYYY-MM-DD）
-	Page             int      `form:"page" binding:"omitempty,min=1"`              // 页码
-	PageSize         int      `form:"page_size" binding:"omitempty,min=1,max=100"` // 每页数量
+	OrgID            int64   `form:"org_id"`                                      // 兼容字段：机构ID
+	Name             string  `form:"name"`                                        // 姓名（模糊匹配）
+	IsKeyFocus       *bool   `form:"is_key_focus"`                                // 是否重点关注
+	ProfileID        string  `form:"profile_id"`                                  // 档案ID（ProfileID）
+	ClinicianID      *uint64 `form:"clinician_id"`                                // Clinician 过滤
+	CreatedStartDate string  `form:"created_start_date"`                          // 报到开始日期（YYYY-MM-DD）
+	CreatedEndDate   string  `form:"created_end_date"`                            // 报到结束日期（YYYY-MM-DD）
+	Page             int     `form:"page" binding:"omitempty,min=1"`              // 页码
+	PageSize         int     `form:"page_size" binding:"omitempty,min=1,max=100"` // 每页数量
 }
 
 // GetTesteeByProfileIDRequest 根据 profile_id 查询受试者请求
