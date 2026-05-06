@@ -32,6 +32,9 @@ func (u *intakeUseCase) Execute(ctx context.Context, token string, dto IntakeByA
 		if err := u.ensureAccessAssignment(txCtx, state); err != nil {
 			return err
 		}
+		if err := u.service.logIntakeSuccess(txCtx, state); err != nil {
+			return err
+		}
 		return u.service.stageIntakeBehaviorEvents(txCtx, state)
 	})
 	if err != nil {

@@ -797,7 +797,10 @@ func buildQuestionnaireBatchTotalsQuery(db *gorm.DB, orgID int64, codes []string
 	return db.
 		Model(&statisticsInfra.StatisticsContentDailyPO{}).
 		Select("content_code AS code, COALESCE(SUM(submission_count), 0) AS total_submissions, COALESCE(SUM(completion_count), 0) AS total_completions").
-		Where("org_id = ? AND content_type = ? AND deleted_at IS NULL", orgID, statisticsInfra.StatisticsContentTypeQuestionnaire).
+		Where("org_id = ? AND content_type IN ? AND deleted_at IS NULL", orgID, []string{
+			statisticsInfra.StatisticsContentTypeQuestionnaire,
+			statisticsInfra.StatisticsContentTypeScale,
+		}).
 		Where("content_code IN ?", codes).
 		Group("content_code")
 }

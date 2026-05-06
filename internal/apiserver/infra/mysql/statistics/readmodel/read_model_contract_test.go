@@ -203,7 +203,7 @@ func TestBuildQuestionnaireBatchTotalsQueryDocumentsDedupedTotalsContract(t *tes
 		"SUM(submission_count)",
 		"SUM(completion_count)",
 		"org_id = ?",
-		"content_type = ?",
+		"content_type IN",
 		"deleted_at IS NULL",
 		"content_code IN",
 		"GROUP BY",
@@ -212,7 +212,7 @@ func TestBuildQuestionnaireBatchTotalsQueryDocumentsDedupedTotalsContract(t *tes
 			t.Fatalf("query sql %q does not contain %q", sql, token)
 		}
 	}
-	for _, want := range []interface{}{int64(9), "questionnaire", "Q-A", "Q-B"} {
+	for _, want := range []interface{}{int64(9), "questionnaire", "scale", "Q-A", "Q-B"} {
 		if !containsStatisticsReadModelVar(stmt.Vars, want) {
 			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
 		}

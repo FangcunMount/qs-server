@@ -21,3 +21,23 @@ func TestContentDailyInsertSQLGroupsByExpressions(t *testing.T) {
 		t.Fatal("content daily SQL must not group inner assessment branches by select aliases")
 	}
 }
+
+func TestAccessFunnelInsertSQLUsesIntakeLogFacts(t *testing.T) {
+	for _, token := range []string{
+		"FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND intake_at >= ? AND intake_at < ?",
+		"FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND testee_created = 1",
+		"FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND assignment_created = 1",
+	} {
+		if !strings.Contains(accessFunnelOrgInsertSQL, token) {
+			t.Fatalf("access funnel SQL does not contain %q", token)
+		}
+	}
+	for _, token := range []string{
+		"FROM testee WHERE",
+		"FROM clinician_relation WHERE",
+	} {
+		if strings.Contains(accessFunnelOrgInsertSQL, token) {
+			t.Fatalf("access funnel SQL must use intake-log facts, found %q", token)
+		}
+	}
+}

@@ -282,10 +282,10 @@ FROM (
   FROM assessment_entry_resolve_log WHERE org_id = ? AND deleted_at IS NULL AND resolved_at >= ? AND resolved_at < ? GROUP BY DATE(resolved_at)
   UNION ALL SELECT DATE(intake_at), 0, COUNT(*), 0, 0
   FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND intake_at >= ? AND intake_at < ? GROUP BY DATE(intake_at)
-  UNION ALL SELECT DATE(created_at), 0, 0, COUNT(*), 0
-  FROM testee WHERE org_id = ? AND deleted_at IS NULL AND created_at >= ? AND created_at < ? GROUP BY DATE(created_at)
-  UNION ALL SELECT DATE(bound_at), 0, 0, 0, COUNT(DISTINCT testee_id)
-  FROM clinician_relation WHERE org_id = ? AND deleted_at IS NULL AND bound_at >= ? AND bound_at < ? GROUP BY DATE(bound_at)
+  UNION ALL SELECT DATE(intake_at), 0, 0, COUNT(*), 0
+  FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND testee_created = 1 AND intake_at >= ? AND intake_at < ? GROUP BY DATE(intake_at)
+  UNION ALL SELECT DATE(intake_at), 0, 0, 0, COUNT(*)
+  FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND assignment_created = 1 AND intake_at >= ? AND intake_at < ? GROUP BY DATE(intake_at)
 ) raw
 GROUP BY raw.stat_date
 ON DUPLICATE KEY UPDATE

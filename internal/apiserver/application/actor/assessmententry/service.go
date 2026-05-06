@@ -353,6 +353,20 @@ func newAssessmentEntryRelation(
 	)
 }
 
+func (s *service) logIntakeSuccess(ctx context.Context, state *intakeState) error {
+	if s.intakeLog == nil {
+		return nil
+	}
+	orgID := state.entry.OrgID()
+	clinicianID := state.entry.ClinicianID().Uint64()
+	entryID := state.entry.ID().Uint64()
+	testeeID := state.testee.ID().Uint64()
+	if err := s.intakeLog.LogIntake(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt, state.testeeCreated, state.assignmentCreated); err != nil {
+		return errors.Wrap(err, "failed to log assessment entry intake")
+	}
+	return nil
+}
+
 func (s *service) stageIntakeBehaviorEvents(ctx context.Context, state *intakeState) error {
 	if s.behaviorEvents == nil {
 		return nil
