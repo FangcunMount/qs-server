@@ -266,7 +266,7 @@ func convertTesteeResponse(resp *pb.TesteeResponse) *TesteeResponse {
 		IAMChildID: strconv.FormatUint(resp.IamChildId, 10),
 		Name:       resp.Name,
 		Gender:     resp.Gender,
-		Tags:       resp.Tags,
+		Tags:       []string{},
 		Source:     resp.Source,
 		IsKeyFocus: resp.IsKeyFocus,
 	}
