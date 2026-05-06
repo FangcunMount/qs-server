@@ -29,7 +29,7 @@ FROM (
 	FROM assessment_task
 	WHERE assessment_task.org_id = ?
 		%s
-		AND assessment_task.status = ?
+		AND assessment_task.status IN ?
 		AND assessment_task.deleted_at IS NULL
 ) ranked
 WHERE ranked.row_num = 1
@@ -178,12 +178,12 @@ func (m *readModel) ListFollowUpQueueTasks(ctx context.Context, filter planreadm
 	}
 
 	testeeIDs := uniqueUint64(filter.TesteeIDs)
-	const status = "opened"
+	statuses := followUpQueueStatuses()
 
 	var total int64
 	countQuery := m.db.WithContext(ctx).
 		Model(&AssessmentTaskPO{}).
-		Where("org_id = ? AND status = ? AND deleted_at IS NULL", filter.OrgID, status)
+		Where("org_id = ? AND status IN ? AND deleted_at IS NULL", filter.OrgID, statuses)
 	if filter.RestrictToTesteeIDs {
 		countQuery = countQuery.Where("testee_id IN ?", testeeIDs)
 	}
@@ -191,7 +191,7 @@ func (m *readModel) ListFollowUpQueueTasks(ctx context.Context, filter planreadm
 		return planreadmodel.TaskPage{}, err
 	}
 
-	args := followUpQueueArgs(filter, status)
+	args := followUpQueueArgs(filter, statuses)
 	args = append(args, page.Limit(), page.Offset())
 	var pos []AssessmentTaskPO
 	err := m.db.WithContext(ctx).
@@ -217,12 +217,16 @@ func followUpQueueTasksSQL(restrictToTesteeIDs bool) string {
 	return fmt.Sprintf(followUpQueueTasksQuery, testeePredicate)
 }
 
-func followUpQueueArgs(filter planreadmodel.FollowUpQueueFilter, status string) []interface{} {
+func followUpQueueArgs(filter planreadmodel.FollowUpQueueFilter, statuses []string) []interface{} {
 	args := []interface{}{filter.OrgID}
 	if filter.RestrictToTesteeIDs {
 		args = append(args, uniqueUint64(filter.TesteeIDs))
 	}
-	return append(args, status)
+	return append(args, statuses)
+}
+
+func followUpQueueStatuses() []string {
+	return []string{"pending", "opened"}
 }
 
 func buildPlanListQuery(db *gorm.DB, filter planreadmodel.PlanFilter) *gorm.DB {

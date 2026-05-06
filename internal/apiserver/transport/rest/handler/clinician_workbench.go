@@ -51,7 +51,7 @@ func (h *ClinicianWorkbenchHandler) GetMyClinicianWorkbenchQueueSummary(c *gin.C
 
 // ListMyClinicianWorkbenchQueue godoc
 // @Summary 获取当前医生工作台队列
-// @Description queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的开放任务，key_focus 使用重点关注字段。
+// @Description queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。
 // @Tags clinicians
 // @Security BearerAuth
 // @Produce json
@@ -119,7 +119,7 @@ func (h *ClinicianWorkbenchHandler) GetOrgWorkbenchQueueSummary(c *gin.Context) 
 
 // ListOrgWorkbenchQueue godoc
 // @Summary 获取管理员全院工作台队列
-// @Description queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
+// @Description queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含待开放或已开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。
 // @Tags Workbench
 // @Security BearerAuth
 // @Produce json

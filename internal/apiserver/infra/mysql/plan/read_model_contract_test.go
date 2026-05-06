@@ -168,7 +168,7 @@ func TestBuildTaskWindowQueryDocumentsCursorOrderAndLimitContract(t *testing.T) 
 	}
 }
 
-func TestFollowUpQueueTasksQueryDocumentsOpenedTaskPerTesteeContract(t *testing.T) {
+func TestFollowUpQueueTasksQueryDocumentsOutstandingTaskPerTesteeContract(t *testing.T) {
 	restrictedSQL := followUpQueueTasksSQL(true)
 	for _, token := range []string{
 		"ROW_NUMBER() OVER",
@@ -177,7 +177,7 @@ func TestFollowUpQueueTasksQueryDocumentsOpenedTaskPerTesteeContract(t *testing.
 		"assessment_task.planned_at ASC",
 		"assessment_task.org_id = ?",
 		"assessment_task.testee_id IN ?",
-		"assessment_task.status = ?",
+		"assessment_task.status IN ?",
 		"assessment_task.deleted_at IS NULL",
 		"ranked.row_num = 1",
 		"LIMIT ? OFFSET ?",
@@ -190,11 +190,15 @@ func TestFollowUpQueueTasksQueryDocumentsOpenedTaskPerTesteeContract(t *testing.
 	if strings.Contains(allOrgSQL, "assessment_task.testee_id IN ?") {
 		t.Fatalf("all-org follow-up queue query should not restrict testee ids:\n%s", allOrgSQL)
 	}
-	if !strings.Contains(allOrgSQL, "assessment_task.org_id = ?") || !strings.Contains(allOrgSQL, "assessment_task.status = ?") {
+	if !strings.Contains(allOrgSQL, "assessment_task.org_id = ?") || !strings.Contains(allOrgSQL, "assessment_task.status IN ?") {
 		t.Fatalf("all-org follow-up queue query lost org/status filters:\n%s", allOrgSQL)
 	}
-	if strings.Contains(allOrgSQL, "expired") || strings.Contains(restrictedSQL, "expired") {
-		t.Fatalf("follow-up queue must only include opened tasks:\n%s", allOrgSQL)
+	if strings.Contains(allOrgSQL, "expired") || strings.Contains(restrictedSQL, "expired") || strings.Contains(allOrgSQL, "completed") || strings.Contains(restrictedSQL, "completed") {
+		t.Fatalf("follow-up queue must not include terminal task statuses:\n%s", allOrgSQL)
+	}
+	statuses := followUpQueueStatuses()
+	if len(statuses) != 2 || statuses[0] != "pending" || statuses[1] != "opened" {
+		t.Fatalf("follow-up queue statuses = %#v, want pending/opened", statuses)
 	}
 }
 

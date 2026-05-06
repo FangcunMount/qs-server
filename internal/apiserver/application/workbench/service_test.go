@@ -76,7 +76,7 @@ func TestServiceListHighRiskQueueRequiresLatestRiskRows(t *testing.T) {
 	}
 }
 
-func TestServiceListFollowUpQueueReturnsOpenedTaskPerTestee(t *testing.T) {
+func TestServiceListFollowUpQueueReturnsOutstandingTaskPerTestee(t *testing.T) {
 	plannedAt := time.Date(2026, 5, 5, 9, 0, 0, 0, time.UTC)
 	expireAt := plannedAt.Add(24 * time.Hour)
 	testees := &testeeReaderStub{rowsByID: map[uint64]actorreadmodel.TesteeRow{
@@ -86,7 +86,7 @@ func TestServiceListFollowUpQueueReturnsOpenedTaskPerTestee(t *testing.T) {
 	followUps := &followUpReaderStub{page: planreadmodel.TaskPage{
 		Items: []planreadmodel.TaskRow{
 			{ID: 202, PlanID: 302, OrgID: 9, TesteeID: 2, ScaleCode: "SDS", PlannedAt: plannedAt, ExpireAt: &expireAt, Status: "opened", EntryURL: "https://entry/2"},
-			{ID: 201, PlanID: 301, OrgID: 9, TesteeID: 1, ScaleCode: "SAS", PlannedAt: plannedAt, Status: "opened", EntryURL: "https://entry/1"},
+			{ID: 201, PlanID: 301, OrgID: 9, TesteeID: 1, ScaleCode: "SAS", PlannedAt: plannedAt, Status: "pending"},
 		},
 		Total: 2,
 	}}
@@ -113,6 +113,9 @@ func TestServiceListFollowUpQueueReturnsOpenedTaskPerTestee(t *testing.T) {
 	}
 	if page.Items[1].Testee.ID != 1 || page.Items[1].ReasonCode != "follow_up_opened" {
 		t.Fatalf("unexpected second item: %#v", page.Items[1])
+	}
+	if page.Items[1].Task == nil || page.Items[1].Task.Status != "pending" {
+		t.Fatalf("unexpected pending task summary: %#v", page.Items[1].Task)
 	}
 	if !followUps.lastFilter.RestrictToTesteeIDs || len(followUps.lastFilter.TesteeIDs) != 3 {
 		t.Fatalf("follow-up filter did not keep assigned scope: %#v", followUps.lastFilter)
