@@ -714,11 +714,34 @@ func (h *OperatorClinicianHandler) UnbindClinicianTesteeRelation(c *gin.Context)
 }
 
 func (h *OperatorClinicianHandler) GetTesteeClinicians(c *gin.Context) {
-	h.listTesteeClinicianRelations(c, true)
+	result, err := h.loadTesteeClinicianRelations(c, true)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	items := make([]*response.ClinicianResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		if item == nil || item.Clinician == nil {
+			continue
+		}
+		items = append(items, toClinicianResponse(item.Clinician))
+	}
+	h.Success(c, &response.ClinicianListResponse{Items: items})
 }
 
 func (h *OperatorClinicianHandler) ListTesteeClinicianRelations(c *gin.Context) {
-	h.listTesteeClinicianRelations(c, false)
+	result, err := h.loadTesteeClinicianRelations(c, false)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+
+	items := make([]*response.TesteeClinicianRelationResponse, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, toTesteeClinicianRelationResponse(item))
+	}
+	h.Success(c, &response.TesteeClinicianRelationListResponse{Items: items})
 }
 
 func (h *OperatorClinicianHandler) loadProtectedStaff(c *gin.Context, orgID int64, staffID uint64) (*operatorApp.OperatorResult, error) {
@@ -863,20 +886,17 @@ func (h *OperatorClinicianHandler) changeClinicianState(
 	return result, nil
 }
 
-func (h *OperatorClinicianHandler) listTesteeClinicianRelations(c *gin.Context, activeOnly bool) {
+func (h *OperatorClinicianHandler) loadTesteeClinicianRelations(c *gin.Context, activeOnly bool) (*clinicianApp.TesteeRelationListResult, error) {
 	testeeID, err := strconv.ParseUint(c.Param("id"), 10, 64)
 	if err != nil {
-		h.Error(c, err)
-		return
+		return nil, err
 	}
 	orgID, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
-		h.Error(c, err)
-		return
+		return nil, err
 	}
 	if err := h.testeeAccessService.ValidateTesteeAccess(c.Request.Context(), orgID, operatorUserID, testeeID); err != nil {
-		h.Error(c, err)
-		return
+		return nil, err
 	}
 	result, err := h.clinicianRelationshipService.ListTesteeRelations(c.Request.Context(), clinicianApp.ListTesteeRelationDTO{
 		OrgID:      orgID,
@@ -884,15 +904,12 @@ func (h *OperatorClinicianHandler) listTesteeClinicianRelations(c *gin.Context, 
 		ActiveOnly: activeOnly,
 	})
 	if err != nil {
-		h.Error(c, err)
-		return
+		return nil, err
 	}
-
-	items := make([]*response.TesteeClinicianRelationResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, toTesteeClinicianRelationResponse(item))
+	if result == nil {
+		result = &clinicianApp.TesteeRelationListResult{}
 	}
-	h.Success(c, &response.TesteeClinicianRelationListResponse{Items: items})
+	return result, nil
 }
 
 func (h *OperatorClinicianHandler) listClinicianRelationsFor(c *gin.Context, orgID int64, clinicianID uint64) {

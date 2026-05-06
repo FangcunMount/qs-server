@@ -508,6 +508,55 @@ func TestOperatorClinicianHandlerListTesteeClinicianRelationsUsesProtectedScope(
 	}
 }
 
+func TestOperatorClinicianHandlerGetTesteeCliniciansReturnsFlatClinicianRefs(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	relations := &stubActorClinicianRelationshipService{
+		testeeRelationsResult: &clinicianApp.TesteeRelationListResult{
+			Items: []*clinicianApp.TesteeRelationResult{{
+				Relation:  &clinicianApp.RelationResult{ID: 8, OrgID: 91, ClinicianID: 12, TesteeID: 11, RelationType: "primary", IsActive: true},
+				Clinician: &clinicianApp.ClinicianResult{ID: 12, OrgID: 91, Name: "Dr. Ren", Title: "主任医师", ClinicianType: "doctor", IsActive: true},
+			}},
+		},
+	}
+	access := &stubActorTesteeAccessService{}
+	handler := newOperatorClinicianHandlerForTest()
+	handler.clinicianRelationshipService = relations
+	handler.testeeAccessService = access
+
+	c, rec := newActorTestContext(http.MethodGet, "/api/v1/testees/11/clinicians", nil)
+	c.Params = gin.Params{{Key: "id", Value: "11"}}
+	c.Set(restmiddleware.OrgIDKey, uint64(91))
+	c.Set(restmiddleware.UserIDKey, uint64(703))
+
+	handler.GetTesteeClinicians(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want %d; body=%s", rec.Code, http.StatusOK, rec.Body.String())
+	}
+	if relations.lastTesteeRelationDTO.OrgID != 91 || relations.lastTesteeRelationDTO.TesteeID != 11 || !relations.lastTesteeRelationDTO.ActiveOnly {
+		t.Fatalf("unexpected relation dto: %+v", relations.lastTesteeRelationDTO)
+	}
+
+	var body struct {
+		Data struct {
+			Items []map[string]interface{} `json:"items"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if len(body.Data.Items) != 1 {
+		t.Fatalf("items length = %d, want 1; body=%s", len(body.Data.Items), rec.Body.String())
+	}
+	if body.Data.Items[0]["id"] != "12" || body.Data.Items[0]["name"] != "Dr. Ren" {
+		t.Fatalf("unexpected flat clinician item: %#v", body.Data.Items[0])
+	}
+	if _, ok := body.Data.Items[0]["clinician"]; ok {
+		t.Fatalf("/testees/:id/clinicians should not return relation wrapper: %#v", body.Data.Items[0])
+	}
+}
+
 func TestAssessmentEntryHandlerResolveAssessmentEntryReturnsResolvedPayload(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
