@@ -24,6 +24,7 @@ func TestContentDailyInsertSQLGroupsByExpressions(t *testing.T) {
 
 func TestAccessFunnelInsertSQLUsesIntakeLogFacts(t *testing.T) {
 	for _, token := range []string{
+		"GREATEST(SUM(raw.entry_opened_count), SUM(raw.intake_confirmed_count)), SUM(raw.intake_confirmed_count)",
 		"FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND intake_at >= ? AND intake_at < ?",
 		"FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND testee_created = 1",
 		"FROM assessment_entry_intake_log WHERE org_id = ? AND deleted_at IS NULL AND assignment_created = 1",

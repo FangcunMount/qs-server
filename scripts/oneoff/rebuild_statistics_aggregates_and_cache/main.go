@@ -135,19 +135,22 @@ func main() {
 		return
 	}
 
-	warmScopes, err := resolveWarmScopes(ctx, sqlDB, cfg, orgIDs, startDate, *endDate)
-	if err != nil {
-		log.Fatalf("resolve cache warm scopes: %v", err)
-	}
-	for _, scope := range warmScopes {
-		log.Printf("warm scope org_id=%d questionnaires=%d plans=%d", scope.OrgID, len(scope.QuestionnaireCodes), len(scope.PlanIDs))
+	var warmScopes []warmScope
+	if shouldRebuildCache(cfg) {
+		warmScopes, err = resolveWarmScopes(ctx, sqlDB, cfg, orgIDs, startDate, *endDate)
+		if err != nil {
+			log.Fatalf("resolve cache warm scopes: %v", err)
+		}
+		for _, scope := range warmScopes {
+			log.Printf("warm scope org_id=%d questionnaires=%d plans=%d", scope.OrgID, len(scope.QuestionnaireCodes), len(scope.PlanIDs))
+		}
 	}
 	if !cfg.apply {
 		if cfg.redisEnabled() && !cfg.skipCache {
 			queryPattern, versionPattern := cachePatterns(cfg.redisQueryNS)
 			log.Printf("dry-run cache patterns: query=%q version=%q", queryPattern, versionPattern)
 		}
-		log.Print("dry-run only; re-run with --apply to rebuild statistics aggregates and Redis query cache")
+		log.Printf("dry-run only; re-run with --apply to rebuild %s", rebuildTargetDescription(cfg))
 		return
 	}
 
@@ -165,6 +168,28 @@ func main() {
 		}
 	}
 	log.Print("statistics aggregate/cache rebuild completed")
+}
+
+func shouldRebuildCache(cfg config) bool {
+	return !cfg.skipCache && cfg.redisEnabled()
+}
+
+func rebuildTargetDescription(cfg config) string {
+	targets := make([]string, 0, 2)
+	if !cfg.skipAggregate {
+		targets = append(targets, "statistics aggregates")
+	}
+	if !cfg.skipCache {
+		if cfg.redisEnabled() {
+			targets = append(targets, "Redis query cache")
+		} else {
+			targets = append(targets, "Redis query cache (requires Redis flags)")
+		}
+	}
+	if len(targets) == 0 {
+		return "nothing"
+	}
+	return strings.Join(targets, " and ")
 }
 
 func parseFlags() config {

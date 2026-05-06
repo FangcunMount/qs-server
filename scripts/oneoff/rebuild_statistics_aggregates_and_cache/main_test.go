@@ -22,3 +22,25 @@ func TestNewRedisClientUsesACLUsername(t *testing.T) {
 		t.Fatalf("expected redis db to be propagated, got %d", opts.DB)
 	}
 }
+
+func TestRebuildTargetDescriptionHonorsSkipCache(t *testing.T) {
+	cfg := config{skipCache: true}
+
+	if shouldRebuildCache(cfg) {
+		t.Fatal("should not rebuild cache when --skip-cache is set")
+	}
+	if got := rebuildTargetDescription(cfg); got != "statistics aggregates" {
+		t.Fatalf("target description = %q, want statistics aggregates", got)
+	}
+}
+
+func TestRebuildTargetDescriptionIncludesRedisWhenConfigured(t *testing.T) {
+	cfg := config{redisQueryAddr: "127.0.0.1:6379", redisMetaAddr: "127.0.0.1:6379"}
+
+	if !shouldRebuildCache(cfg) {
+		t.Fatal("should rebuild cache when Redis is configured and cache is not skipped")
+	}
+	if got := rebuildTargetDescription(cfg); got != "statistics aggregates and Redis query cache" {
+		t.Fatalf("target description = %q, want aggregate and Redis targets", got)
+	}
+}

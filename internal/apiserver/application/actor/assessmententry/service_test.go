@@ -97,3 +97,48 @@ func TestServiceLogIntakeSuccessPersistsFunnelFacts(t *testing.T) {
 		t.Fatalf("logged funnel flags/time = time:%v testee:%v assignment:%v", writer.intakeAt, writer.testeeCreated, writer.assignmentCreated)
 	}
 }
+
+type recordingResolveLogWriter struct {
+	orgID       int64
+	clinicianID uint64
+	entryID     uint64
+	resolvedAt  time.Time
+}
+
+func (w *recordingResolveLogWriter) LogResolve(_ context.Context, orgID int64, clinicianID, entryID uint64, resolvedAt time.Time) error {
+	w.orgID = orgID
+	w.clinicianID = clinicianID
+	w.entryID = entryID
+	w.resolvedAt = resolvedAt
+	return nil
+}
+
+func TestServiceLogResolveSuccessPersistsEntryOpenFact(t *testing.T) {
+	t.Parallel()
+
+	resolvedAt := time.Date(2026, 5, 6, 12, 0, 0, 0, time.UTC)
+	entry := domainAssessmentEntry.NewAssessmentEntry(
+		9,
+		domainClinician.NewID(101),
+		"entry-token",
+		domainAssessmentEntry.TargetTypeScale,
+		"scale-code",
+		"v1",
+		true,
+		nil,
+	)
+	entry.SetID(domainAssessmentEntry.NewID(201))
+	writer := &recordingResolveLogWriter{}
+	svc := &service{resolveLog: writer}
+
+	err := svc.logResolveSuccess(context.Background(), entry, resolvedAt)
+	if err != nil {
+		t.Fatalf("logResolveSuccess() error = %v", err)
+	}
+	if writer.orgID != 9 || writer.clinicianID != 101 || writer.entryID != 201 {
+		t.Fatalf("logged identity = org:%d clinician:%d entry:%d", writer.orgID, writer.clinicianID, writer.entryID)
+	}
+	if !writer.resolvedAt.Equal(resolvedAt) {
+		t.Fatalf("resolvedAt = %v, want %v", writer.resolvedAt, resolvedAt)
+	}
+}

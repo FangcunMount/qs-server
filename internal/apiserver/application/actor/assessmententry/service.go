@@ -201,6 +201,9 @@ func (s *service) Resolve(ctx context.Context, token string) (*ResolvedAssessmen
 		if err != nil {
 			return err
 		}
+		if err := s.logResolveSuccess(txCtx, entry, resolvedAt); err != nil {
+			return err
+		}
 		if s.behaviorEvents != nil {
 			if err := s.behaviorEvents.StageEntryOpened(txCtx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt); err != nil {
 				return errors.Wrap(err, "failed to stage assessment entry opened behavior event")
@@ -363,6 +366,16 @@ func (s *service) logIntakeSuccess(ctx context.Context, state *intakeState) erro
 	testeeID := state.testee.ID().Uint64()
 	if err := s.intakeLog.LogIntake(ctx, orgID, clinicianID, entryID, testeeID, state.intakeAt, state.testeeCreated, state.assignmentCreated); err != nil {
 		return errors.Wrap(err, "failed to log assessment entry intake")
+	}
+	return nil
+}
+
+func (s *service) logResolveSuccess(ctx context.Context, entry *domainAssessmentEntry.AssessmentEntry, resolvedAt time.Time) error {
+	if s.resolveLog == nil {
+		return nil
+	}
+	if err := s.resolveLog.LogResolve(ctx, entry.OrgID(), entry.ClinicianID().Uint64(), entry.ID().Uint64(), resolvedAt); err != nil {
+		return errors.Wrap(err, "failed to log assessment entry resolve")
 	}
 	return nil
 }

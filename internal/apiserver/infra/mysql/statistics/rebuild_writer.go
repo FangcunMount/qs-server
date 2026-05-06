@@ -275,7 +275,7 @@ INSERT INTO statistics_journey_daily (
 )
 SELECT
   ? AS org_id, 'org', 0, raw.stat_date,
-  SUM(raw.entry_opened_count), SUM(raw.intake_confirmed_count),
+  GREATEST(SUM(raw.entry_opened_count), SUM(raw.intake_confirmed_count)), SUM(raw.intake_confirmed_count),
   SUM(raw.testee_created_count), SUM(raw.care_relationship_established_count)
 FROM (
   SELECT DATE(resolved_at) AS stat_date, COUNT(*) AS entry_opened_count, 0 AS intake_confirmed_count, 0 AS testee_created_count, 0 AS care_relationship_established_count
