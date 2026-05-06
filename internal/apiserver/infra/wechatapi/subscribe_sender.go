@@ -22,31 +22,33 @@ func NewSubscribeSender(sdkCache cache.Cache) *SubscribeSender {
 	return &SubscribeSender{cache: sdkCache}
 }
 
+// SendSubscribeMessage 发送小程序订阅消息
 func (s *SubscribeSender) SendSubscribeMessage(_ context.Context, appID, appSecret string, msg wechatmini.SubscribeMessage) error {
-	// subscribeClient, err := s.newSubscribeClient(appID, appSecret)
-	// if err != nil {
-	// 	return err
-	// }
+	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
+	if err != nil {
+		return err
+	}
 
-	// data := make(map[string]*miniSubscribe.DataItem, len(msg.Data))
-	// for key, value := range msg.Data {
-	// 	data[key] = &miniSubscribe.DataItem{Value: value}
-	// }
+	data := make(map[string]*miniSubscribe.DataItem, len(msg.Data))
+	for key, value := range msg.Data {
+		data[key] = &miniSubscribe.DataItem{Value: value}
+	}
 
-	// req := &miniSubscribe.Message{
-	// 	ToUser:           msg.ToUser,
-	// 	TemplateID:       msg.TemplateID,
-	// 	Page:             msg.Page,
-	// 	Data:             data,
-	// 	MiniprogramState: msg.MiniProgramState,
-	// 	Lang:             msg.Lang,
-	// }
-	// if err := subscribeClient.Send(req); err != nil {
-	// 	return fmt.Errorf("send subscribe message: %w", err)
-	// }
+	req := &miniSubscribe.Message{
+		ToUser:           msg.ToUser,
+		TemplateID:       msg.TemplateID,
+		Page:             msg.Page,
+		Data:             data,
+		MiniprogramState: msg.MiniProgramState,
+		Lang:             msg.Lang,
+	}
+	if err := subscribeClient.Send(req); err != nil {
+		return fmt.Errorf("send subscribe message: %w", err)
+	}
 	return nil
 }
 
+// ListTemplates 列出小程序订阅消息模板
 func (s *SubscribeSender) ListTemplates(_ context.Context, appID, appSecret string) ([]wechatmini.SubscribeTemplate, error) {
 	subscribeClient, err := s.newSubscribeClient(appID, appSecret)
 	if err != nil {

@@ -82,6 +82,7 @@ func NewMiniProgramTaskNotificationService(
 	}
 }
 
+// SendTaskOpened 发送 task.opened 小程序通知
 func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDTO) (*TaskOpenedResult, error) {
 	l := logger.L(ctx)
 	result := &TaskOpenedResult{
