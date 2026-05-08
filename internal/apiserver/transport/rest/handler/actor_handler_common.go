@@ -100,7 +100,6 @@ func buildTesteeSummaryResponse(
 		ID:              strconv.FormatUint(id, 10),
 		OrgID:           strconv.FormatInt(orgID, 10),
 		ProfileID:       profileIDStr,
-		IAMChildID:      response.LegacyIAMChildIDAlias(profileIDStr),
 		Name:            name,
 		Gender:          gender,
 		GenderLabel:     response.LabelForGender(gender),

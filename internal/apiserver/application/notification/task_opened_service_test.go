@@ -39,13 +39,13 @@ type recipientResolverStub struct {
 	recipients *iambridge.MiniProgramRecipients
 	err        error
 	callCount  int
-	childID    string
+	profileID  string
 }
 
 func (s *recipientResolverStub) IsEnabled() bool { return s.enabled }
-func (s *recipientResolverStub) ResolveMiniProgramRecipients(_ context.Context, childID string) (*iambridge.MiniProgramRecipients, error) {
+func (s *recipientResolverStub) ResolveMiniProgramRecipients(_ context.Context, profileID string) (*iambridge.MiniProgramRecipients, error) {
 	s.callCount++
-	s.childID = childID
+	s.profileID = profileID
 	return s.recipients, s.err
 }
 
@@ -132,7 +132,7 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 		enabled: true,
 		recipients: &iambridge.MiniProgramRecipients{
 			OpenIDs: []string{"openid-guardian"},
-			Source:  "guardian",
+			Source:  "profile_link",
 		},
 	}
 	sender := &senderStub{
@@ -172,11 +172,11 @@ func TestSendTaskOpenedFallsBackToGuardians(t *testing.T) {
 	if err != nil {
 		t.Fatalf("SendTaskOpened returned error: %v", err)
 	}
-	if result.SentCount != 1 || result.RecipientSource != "guardian" {
+	if result.SentCount != 1 || result.RecipientSource != "profile_link" {
 		t.Fatalf("unexpected result: %#v", result)
 	}
-	if resolver.callCount != 1 || resolver.childID != "1001" {
-		t.Fatalf("expected recipient resolver call, got callCount=%d childID=%q", resolver.callCount, resolver.childID)
+	if resolver.callCount != 1 || resolver.profileID != "1001" {
+		t.Fatalf("expected recipient resolver call, got callCount=%d profileID=%q", resolver.callCount, resolver.profileID)
 	}
 	if len(sender.sent) != 1 {
 		t.Fatalf("expected one sent message, got %d", len(sender.sent))
@@ -243,8 +243,8 @@ func TestSendTaskOpenedPrefersDirectTesteeUser(t *testing.T) {
 	if result.RecipientSource != "testee" || result.SentCount != 1 {
 		t.Fatalf("unexpected result: %#v", result)
 	}
-	if resolver.callCount != 1 || resolver.childID != "2002" {
-		t.Fatalf("expected recipient resolver call, got callCount=%d childID=%q", resolver.callCount, resolver.childID)
+	if resolver.callCount != 1 || resolver.profileID != "2002" {
+		t.Fatalf("expected recipient resolver call, got callCount=%d profileID=%q", resolver.callCount, resolver.profileID)
 	}
 	if len(sender.sent) != 1 || sender.sent[0].ToUser != "openid-testee" {
 		t.Fatalf("unexpected sent payload: %#v", sender.sent)

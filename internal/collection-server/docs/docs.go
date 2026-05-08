@@ -1224,6 +1224,66 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/scales/hot": {
+            "get": {
+                "description": "获取当前热门量表排行榜，用于小程序首页展示 3~5 个可填写量表。默认按近 30 天答卷提交量排序。",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "量表"
+                ],
+                "summary": "获取热门量表列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 5,
+                        "description": "返回数量，服务端限制为 3~5",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 30,
+                        "description": "热度统计窗口天数",
+                        "name": "window_days",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/scales/{code}": {
             "get": {
                 "description": "根据量表编码获取量表详情。注意：返回的因子列表只包含 is_show = true 的因子。\n响应字段说明：\n- category: 主类（adhd/tic/sensory/executive/mental/neurodev/chronic/qol）\n- stages: 阶段列表（数组，deep_assessment/follow_up/outcome）\n- applicable_ages: 使用年龄列表（数组，infant/preschool/school_child/adolescent/adult）\n- reporters: 填报人列表（数组，可包含 parent/teacher/self/clinical）\n- tags: 标签列表（数组，动态输入）\n- question_count: 题目数量（不包含 Section 题型）\n- factors: 因子列表（只包含 is_show = true 的因子），每个因子包含 max_score（最大分，可选）和 is_show（是否显示）字段",
@@ -1428,7 +1488,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "根据IAM儿童ID检查受试者是否存在",
+                "description": "根据 IAM ProfileID 检查受试者是否存在",
                 "produces": [
                     "application/json"
                 ],
@@ -1439,8 +1499,8 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "string",
-                        "description": "IAM儿童ID",
-                        "name": "iam_child_id",
+                        "description": "IAM档案ID",
+                        "name": "iam_profile_id",
                         "in": "query",
                         "required": true
                     }
@@ -1773,6 +1833,17 @@ const docTemplate = `{
                 }
             }
         },
+        "answersheet.SubmitAcceptedResponse": {
+            "type": "object",
+            "properties": {
+                "request_id": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
         "answersheet.SubmitAnswerSheetRequest": {
             "type": "object",
             "required": [
@@ -1804,28 +1875,6 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "answersheet.SubmitAnswerSheetResponse": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
-        "answersheet.SubmitAcceptedResponse": {
-            "type": "object",
-            "properties": {
-                "request_id": {
-                    "type": "string"
-                },
-                "status": {
                     "type": "string"
                 }
             }
@@ -2342,6 +2391,26 @@ const docTemplate = `{
                 }
             }
         },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse": {
+            "type": "object",
+            "properties": {
+                "limit": {
+                    "type": "integer"
+                },
+                "scales": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/scale.HotScaleSummaryResponse"
+                    }
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "window_days": {
+                    "type": "integer"
+                }
+            }
+        },
         "github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse": {
             "type": "object",
             "properties": {
@@ -2575,6 +2644,68 @@ const docTemplate = `{
                 }
             }
         },
+        "scale.HotScaleSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "applicable_ages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "heat_score": {
+                    "type": "integer"
+                },
+                "question_count": {
+                    "type": "integer"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "rank": {
+                    "type": "integer"
+                },
+                "reporters": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "stages": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submission_count": {
+                    "type": "integer"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
         "scale.InterpretRuleResponse": {
             "type": "object",
             "properties": {
@@ -2799,7 +2930,6 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "gender",
-                "iam_child_id",
                 "name"
             ],
             "properties": {
@@ -2815,12 +2945,8 @@ const docTemplate = `{
                     "description": "性别：1-男，2-女，3-其他",
                     "type": "integer"
                 },
-                "iam_child_id": {
-                    "description": "IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字",
-                    "type": "string"
-                },
-                "iam_user_id": {
-                    "description": "IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字",
+                "id_card_number": {
+                    "description": "身份证号（可选）",
                     "type": "string"
                 },
                 "is_key_focus": {
@@ -2829,6 +2955,10 @@ const docTemplate = `{
                 },
                 "name": {
                     "description": "姓名",
+                    "type": "string"
+                },
+                "relation": {
+                    "description": "与当前用户关系：self/parent/grandparent/other，默认 parent",
                     "type": "string"
                 },
                 "source": {
@@ -2925,8 +3055,8 @@ const docTemplate = `{
                     "description": "性别",
                     "type": "integer"
                 },
-                "iam_child_id": {
-                    "description": "IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字",
+                "iam_profile_id": {
+                    "description": "IAM档案ID - 使用字符串以兼容 IAM 系统和前端大数字",
                     "type": "string"
                 },
                 "iam_user_id": {

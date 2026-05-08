@@ -27,29 +27,29 @@ func NewActorClient(base *Client) *ActorClient {
 
 // CreateTesteeRequest 创建受试者请求参数
 type CreateTesteeRequest struct {
-	OrgID      uint64     // 机构ID
-	IAMUserID  string     // IAM用户ID（成人）- 字符串格式
-	IAMChildID string     // IAM儿童ID - 字符串格式
-	Name       string     // 姓名
-	Gender     int32      // 性别：1-男，2-女，3-其他
-	Birthday   *time.Time // 出生日期
-	Tags       []string   // 标签列表
-	Source     string     // 来源：online_form/plan/imported
-	IsKeyFocus bool       // 是否重点关注
+	OrgID        uint64     // 机构ID
+	IAMUserID    string     // IAM用户ID - 字符串格式
+	IAMProfileID string     // IAM档案ID - 字符串格式
+	Name         string     // 姓名
+	Gender       int32      // 性别：1-男，2-女，3-其他
+	Birthday     *time.Time // 出生日期
+	Tags         []string   // 标签列表
+	Source       string     // 来源：online_form/plan/imported
+	IsKeyFocus   bool       // 是否重点关注
 }
 
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
-	ID         uint64    // 受试者ID
-	OrgID      uint64    // 机构ID
-	IAMUserID  string    // IAM用户ID - 字符串格式
-	IAMChildID string    // IAM儿童ID - 字符串格式
-	Name       string    // 姓名
-	Gender     int32     // 性别
-	Birthday   time.Time // 出生日期
-	Tags       []string  // 标签列表
-	Source     string    // 来源
-	IsKeyFocus bool      // 是否重点关注
+	ID           uint64    // 受试者ID
+	OrgID        uint64    // 机构ID
+	IAMUserID    string    // IAM用户ID - 字符串格式
+	IAMProfileID string    // IAM档案ID - 字符串格式
+	Name         string    // 姓名
+	Gender       int32     // 性别
+	Birthday     time.Time // 出生日期
+	Tags         []string  // 标签列表
+	Source       string    // 来源
+	IsKeyFocus   bool      // 是否重点关注
 
 	// 测评统计信息
 	AssessmentStats *AssessmentStats
@@ -81,7 +81,7 @@ func (c *ActorClient) CreateTestee(ctx context.Context, req *CreateTesteeRequest
 
 	// 转换字符串 ID 为 uint64
 	var iamUserID uint64
-	var iamChildID uint64
+	var iamProfileID uint64
 	var err error
 
 	if req.IAMUserID != "" {
@@ -91,22 +91,22 @@ func (c *ActorClient) CreateTestee(ctx context.Context, req *CreateTesteeRequest
 		}
 	}
 
-	if req.IAMChildID != "" {
-		iamChildID, err = strconv.ParseUint(req.IAMChildID, 10, 64)
+	if req.IAMProfileID != "" {
+		iamProfileID, err = strconv.ParseUint(req.IAMProfileID, 10, 64)
 		if err != nil {
-			return nil, fmt.Errorf("invalid iam_child_id format: %w", err)
+			return nil, fmt.Errorf("invalid iam_profile_id format: %w", err)
 		}
 	}
 
 	pbReq := &pb.CreateTesteeRequest{
-		OrgId:      req.OrgID,
-		IamUserId:  iamUserID,
-		IamChildId: iamChildID,
-		Name:       req.Name,
-		Gender:     req.Gender,
-		Tags:       req.Tags,
-		Source:     req.Source,
-		IsKeyFocus: req.IsKeyFocus,
+		OrgId:        req.OrgID,
+		IamUserId:    iamUserID,
+		IamProfileId: iamProfileID,
+		Name:         req.Name,
+		Gender:       req.Gender,
+		Tags:         req.Tags,
+		Source:       req.Source,
+		IsKeyFocus:   req.IsKeyFocus,
 	}
 
 	if req.Birthday != nil {
@@ -193,13 +193,13 @@ func (c *ActorClient) UpdateTestee(ctx context.Context, req *UpdateTesteeRequest
 }
 
 // TesteeExists 检查受试者是否存在
-func (c *ActorClient) TesteeExists(ctx context.Context, orgID, iamChildID uint64) (exists bool, testeeID uint64, err error) {
+func (c *ActorClient) TesteeExists(ctx context.Context, orgID, iamProfileID uint64) (exists bool, testeeID uint64, err error) {
 	ctx, cancel := c.base.ContextWithTimeout(ctx)
 	defer cancel()
 
 	resp, err := c.client.TesteeExists(ctx, &pb.TesteeExistsRequest{
-		OrgId:      orgID,
-		IamChildId: iamChildID,
+		OrgId:        orgID,
+		IamProfileId: iamProfileID,
 	})
 	if err != nil {
 		return false, 0, err
@@ -230,16 +230,16 @@ func (c *ActorClient) ListTesteesByOrg(ctx context.Context, orgID uint64, offset
 	return testees, resp.Total, nil
 }
 
-// ListTesteesByUser 根据用户（监护人）的孩子ID列表查询受试者列表
+// ListTesteesByUser 根据用户关联的 ProfileID 列表查询受试者列表
 // 用于 collection-server 查询当前用户的所有受试者
-func (c *ActorClient) ListTesteesByUser(ctx context.Context, childIDs []uint64, offset, limit int32) ([]*TesteeResponse, int64, error) {
+func (c *ActorClient) ListTesteesByUser(ctx context.Context, profileIDs []uint64, offset, limit int32) ([]*TesteeResponse, int64, error) {
 	ctx, cancel := c.base.ContextWithTimeout(ctx)
 	defer cancel()
 
 	resp, err := c.client.ListTesteesByUser(ctx, &pb.ListTesteesByUserRequest{
-		IamChildIds: childIDs,
-		Offset:      offset,
-		Limit:       limit,
+		IamProfileIds: profileIDs,
+		Offset:        offset,
+		Limit:         limit,
 	})
 	if err != nil {
 		return nil, 0, err
@@ -260,15 +260,15 @@ func convertTesteeResponse(resp *pb.TesteeResponse) *TesteeResponse {
 	}
 
 	result := &TesteeResponse{
-		ID:         resp.Id,
-		OrgID:      resp.OrgId,
-		IAMUserID:  strconv.FormatUint(resp.IamUserId, 10),
-		IAMChildID: strconv.FormatUint(resp.IamChildId, 10),
-		Name:       resp.Name,
-		Gender:     resp.Gender,
-		Tags:       []string{},
-		Source:     resp.Source,
-		IsKeyFocus: resp.IsKeyFocus,
+		ID:           resp.Id,
+		OrgID:        resp.OrgId,
+		IAMUserID:    formatOptionalUint64(resp.IamUserId),
+		IAMProfileID: formatOptionalUint64(resp.IamProfileId),
+		Name:         resp.Name,
+		Gender:       resp.Gender,
+		Tags:         []string{},
+		Source:       resp.Source,
+		IsKeyFocus:   resp.IsKeyFocus,
 	}
 
 	if resp.Birthday != nil {
@@ -295,4 +295,11 @@ func convertTesteeResponse(resp *pb.TesteeResponse) *TesteeResponse {
 	}
 
 	return result
+}
+
+func formatOptionalUint64(id uint64) string {
+	if id == 0 {
+		return ""
+	}
+	return strconv.FormatUint(id, 10)
 }

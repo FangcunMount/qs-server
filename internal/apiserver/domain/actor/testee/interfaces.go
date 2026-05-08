@@ -23,10 +23,9 @@ type Repository interface {
 	Delete(ctx context.Context, id ID) error
 }
 
-// Factory 受试者工厂领域服务
+	// Factory 受试者工厂领域服务
 type Factory interface {
 	// GetOrCreateByProfile 根据用户档案ID获取或创建受试者
-	// 注意：当前 profileID 对应 IAM.Child.ID，未来可重构为更通用的档案系统
 	GetOrCreateByProfile(
 		ctx context.Context,
 		orgID int64,

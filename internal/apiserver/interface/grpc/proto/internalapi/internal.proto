@@ -432,7 +432,7 @@ message SendTaskOpenedMiniProgramNotificationResponse {
   bool success = 1;                  // 是否成功
   int32 sent_count = 2;              // 成功发送条数
   repeated string recipient_open_ids = 3; // 实际命中的 openid 列表
-  string recipient_source = 4;       // 收件人来源：testee / guardian
+  string recipient_source = 4;       // 收件人来源：testee / profile_link
   bool skipped = 5;                  // 是否跳过发送
   string message = 6;                // 描述信息
 }

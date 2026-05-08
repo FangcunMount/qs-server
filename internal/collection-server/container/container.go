@@ -101,24 +101,26 @@ func (c *Container) Initialize() error {
 func (c *Container) initApplicationServices() {
 	log.Info("🎯 Initializing application services...")
 
-	// 获取 GuardianshipService（如果 IAM 启用）
-	var guardianshipService *iam.GuardianshipService
+	// 获取 ProfileLinkService（如果 IAM 启用）
+	var profileLinkService *iam.ProfileLinkService
+	var profileService *iam.ProfileService
 	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
-		guardianshipService = c.IAMModule.GuardianshipService()
+		profileLinkService = c.IAMModule.ProfileLinkService()
+		profileService = c.IAMModule.ProfileService()
 	}
 	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
 
 	c.submissionService = answersheet.NewSubmissionService(
 		c.answerSheetClient,
 		c.actorClient,
-		guardianshipService,
+		profileLinkService,
 		c.opts.SubmitQueue,
 		submitGuard,
 	)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
 	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
-	c.testeeService = testee.NewService(c.actorClient, guardianshipService)
+	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
 
 	log.Info("✅ Application services initialized")
 }
@@ -127,17 +129,17 @@ func (c *Container) initApplicationServices() {
 func (c *Container) initHandlers() {
 	log.Info("🌐 Initializing REST handlers...")
 
-	// 获取 GuardianshipService（如果 IAM 启用）
-	var guardianshipService *iam.GuardianshipService
+	// 获取 ProfileLinkService（如果 IAM 启用）
+	var profileLinkService *iam.ProfileLinkService
 	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
-		guardianshipService = c.IAMModule.GuardianshipService()
+		profileLinkService = c.IAMModule.ProfileLinkService()
 	}
 
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
-	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, guardianshipService)
+	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
 
 	log.Info("✅ REST handlers initialized")

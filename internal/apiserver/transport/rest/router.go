@@ -228,6 +228,12 @@ func (r *Router) unsupportedFeature(c *gin.Context) {
 }
 
 // healthCheck 健康检查处理函数。
+// @Summary 健康检查
+// @Description 返回 apiserver 健康状态
+// @Tags health
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /health [get]
 func (r *Router) healthCheck(c *gin.Context) {
 	response := gin.H{
 		"status":       "healthy",

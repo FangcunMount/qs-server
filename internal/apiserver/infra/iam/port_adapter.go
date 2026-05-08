@@ -180,40 +180,40 @@ func (g *operatorAuthzGateway) LoadOperatorRoleNames(ctx context.Context, orgID,
 	return snap.RoleNames(), nil
 }
 
-type guardianDirectory struct {
-	guardianship *GuardianshipService
-	identity     *IdentityService
+type profileLinkDirectory struct {
+	profileLink *ProfileLinkService
+	identity    *IdentityService
 }
 
-func NewGuardianDirectory(guardianship *GuardianshipService, identity *IdentityService) iambridge.GuardianDirectory {
-	if guardianship == nil {
+func NewProfileLinkDirectory(profileLink *ProfileLinkService, identity *IdentityService) iambridge.ProfileLinkDirectory {
+	if profileLink == nil {
 		return nil
 	}
-	return &guardianDirectory{guardianship: guardianship, identity: identity}
+	return &profileLinkDirectory{profileLink: profileLink, identity: identity}
 }
 
-func (d *guardianDirectory) IsEnabled() bool {
-	return d != nil && d.guardianship != nil && d.guardianship.IsEnabled()
+func (d *profileLinkDirectory) IsEnabled() bool {
+	return d != nil && d.profileLink != nil && d.profileLink.IsEnabled()
 }
 
-func (d *guardianDirectory) ListGuardians(ctx context.Context, childID string) ([]iambridge.Guardian, error) {
+func (d *profileLinkDirectory) ListProfileLinkedUsers(ctx context.Context, profileID string) ([]iambridge.ProfileLinkedUser, error) {
 	if !d.IsEnabled() {
-		return nil, fmt.Errorf("guardianship service not enabled")
+		return nil, fmt.Errorf("profile link service not enabled")
 	}
-	resp, err := d.guardianship.ListGuardians(ctx, childID)
+	resp, err := d.profileLink.ListProfileLinks(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
 	if resp == nil || len(resp.Items) == 0 {
-		return []iambridge.Guardian{}, nil
+		return []iambridge.ProfileLinkedUser{}, nil
 	}
 
-	guardians := make([]iambridge.Guardian, 0, len(resp.Items))
+	linkedUsers := make([]iambridge.ProfileLinkedUser, 0, len(resp.Items))
 	for _, edge := range resp.Items {
 		if edge == nil || edge.ProfileLink == nil {
 			continue
 		}
-		guardian := iambridge.Guardian{Relation: edge.ProfileLink.GetRelation().String()}
+		linkedUser := iambridge.ProfileLinkedUser{Relation: edge.ProfileLink.GetRelation().String()}
 		user := edge.User
 		if user == nil && d.identity != nil && d.identity.IsEnabled() && edge.ProfileLink.UserId != "" {
 			userResp, err := d.identity.GetUser(ctx, edge.ProfileLink.UserId)
@@ -222,43 +222,43 @@ func (d *guardianDirectory) ListGuardians(ctx context.Context, childID string) (
 			}
 		}
 		if user != nil {
-			guardian.Name = user.GetNickname()
-			guardian.Phone = primaryPhone(user)
+			linkedUser.Name = user.GetNickname()
+			linkedUser.Phone = primaryPhone(user)
 		}
-		guardians = append(guardians, guardian)
+		linkedUsers = append(linkedUsers, linkedUser)
 	}
-	return guardians, nil
+	return linkedUsers, nil
 }
 
 type miniProgramRecipientResolver struct {
-	guardianship *GuardianshipService
-	identity     *IdentityService
+	profileLink *ProfileLinkService
+	identity    *IdentityService
 }
 
-func NewMiniProgramRecipientResolver(guardianship *GuardianshipService, identity *IdentityService) iambridge.MiniProgramRecipientResolver {
-	if guardianship == nil && identity == nil {
+func NewMiniProgramRecipientResolver(profileLink *ProfileLinkService, identity *IdentityService) iambridge.MiniProgramRecipientResolver {
+	if profileLink == nil && identity == nil {
 		return nil
 	}
-	return &miniProgramRecipientResolver{guardianship: guardianship, identity: identity}
+	return &miniProgramRecipientResolver{profileLink: profileLink, identity: identity}
 }
 
 func (r *miniProgramRecipientResolver) IsEnabled() bool {
-	return r != nil && ((r.identity != nil && r.identity.IsEnabled()) || (r.guardianship != nil && r.guardianship.IsEnabled()))
+	return r != nil && ((r.identity != nil && r.identity.IsEnabled()) || (r.profileLink != nil && r.profileLink.IsEnabled()))
 }
 
-func (r *miniProgramRecipientResolver) ResolveMiniProgramRecipients(ctx context.Context, childID string) (*iambridge.MiniProgramRecipients, error) {
-	childID = strings.TrimSpace(childID)
-	if !r.IsEnabled() || childID == "" {
+func (r *miniProgramRecipientResolver) ResolveMiniProgramRecipients(ctx context.Context, profileID string) (*iambridge.MiniProgramRecipients, error) {
+	profileID = strings.TrimSpace(profileID)
+	if !r.IsEnabled() || profileID == "" {
 		return &iambridge.MiniProgramRecipients{}, nil
 	}
 
-	if direct := r.resolveUserOpenIDs(ctx, childID); len(direct) > 0 {
+	if direct := r.resolveUserOpenIDs(ctx, profileID); len(direct) > 0 {
 		return &iambridge.MiniProgramRecipients{OpenIDs: direct, Source: "testee"}, nil
 	}
-	if r.guardianship == nil || !r.guardianship.IsEnabled() {
+	if r.profileLink == nil || !r.profileLink.IsEnabled() {
 		return &iambridge.MiniProgramRecipients{}, nil
 	}
-	resp, err := r.guardianship.ListGuardians(ctx, childID)
+	resp, err := r.profileLink.ListProfileLinks(ctx, profileID)
 	if err != nil {
 		return nil, err
 	}
@@ -277,7 +277,7 @@ func (r *miniProgramRecipientResolver) ResolveMiniProgramRecipients(ctx context.
 			}
 		}
 	}
-	return &iambridge.MiniProgramRecipients{OpenIDs: uniqueStrings(openIDs), Source: "guardian"}, nil
+	return &iambridge.MiniProgramRecipients{OpenIDs: uniqueStrings(openIDs), Source: "profile_link"}, nil
 }
 
 func (r *miniProgramRecipientResolver) resolveUserOpenIDs(ctx context.Context, userID string) []string {

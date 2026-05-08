@@ -32,8 +32,8 @@ type IAMOptions struct {
 	// 用户信息缓存配置
 	UserCache *IAMCacheOptions `json:"user-cache" mapstructure:"user-cache"`
 
-	// 监护关系缓存配置
-	GuardianshipCache *IAMCacheOptions `json:"guardianship-cache" mapstructure:"guardianship-cache"`
+	// ProfileLink 缓存配置
+	ProfileLinkCache *IAMCacheOptions `json:"profile-link-cache" mapstructure:"profile-link-cache"`
 
 	// Authz 快照（与 IAM Casbin domain / app_name 对齐）
 	AuthzAppName              string        `json:"authz-app-name" mapstructure:"authz-app-name"`
@@ -145,7 +145,7 @@ func NewIAMOptions() *IAMOptions {
 			MaxSize: 10000,
 		},
 
-		GuardianshipCache: &IAMCacheOptions{
+		ProfileLinkCache: &IAMCacheOptions{
 			Enabled: true,
 			TTL:     10 * time.Minute,
 			MaxSize: 50000,

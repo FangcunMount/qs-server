@@ -183,8 +183,8 @@ iam:
     ttl: 5m
     max-size: 10000
   
-  # 监护关系缓存
-  guardianship-cache:
+  # ProfileLink 缓存
+  profile-link-cache:
     enabled: true
     ttl: 10m
     max-size: 50000

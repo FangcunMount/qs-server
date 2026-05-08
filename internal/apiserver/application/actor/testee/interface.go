@@ -115,7 +115,7 @@ type TesteeBackendQueryService interface {
 // RegisterTesteeDTO 注册受试者 DTO
 type RegisterTesteeDTO struct {
 	OrgID     int64      // 机构ID
-	ProfileID *uint64    // 用户档案ID（可选，当前对应 IAM.Child.ID）
+	ProfileID *uint64    // IAM Profile ID（可选）
 	Name      string     // 姓名
 	Gender    int8       // 性别（0-未知,1-男,2-女）
 	Birthday  *time.Time // 出生日期

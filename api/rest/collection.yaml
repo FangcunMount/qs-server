@@ -854,6 +854,45 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /scales/categories:
+    get:
+      tags:
+      - 量表
+      summary: 获取量表分类列表
+      description: '获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
+
+        返回说明：
+
+        - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev,
+        chronic, qol）
+
+        - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
+
+        - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent,
+        adult）
+
+        - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
+
+        - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）'
+      operationId: 获取量表分类列表
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/scale.ScaleCategoriesResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /scales/hot:
     get:
       tags:
@@ -890,45 +929,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-        '500':
-          description: Internal Server Error
-          content:
-            application/json:
-              schema:
-                $ref: '#/components/schemas/core.ErrResponse'
-  /scales/categories:
-    get:
-      tags:
-      - 量表
-      summary: 获取量表分类列表
-      description: '获取量表的主类、阶段、使用年龄、填报人等分类选项列表，用于前端渲染和配置量表字段。
-
-        返回说明：
-
-        - categories: 主类列表，包含8个选项（adhd, tic, sensory, executive, mental, neurodev,
-        chronic, qol）
-
-        - stages: 阶段列表，包含3个选项（deep_assessment, follow_up, outcome）
-
-        - applicable_ages: 使用年龄列表，包含5个选项（infant, preschool, school_child, adolescent,
-        adult）
-
-        - reporters: 填报人列表，包含4个选项（parent, teacher, self, clinical）
-
-        - tags: 标签列表，返回空数组（标签已改为动态输入，通过后台输入设置）'
-      operationId: 获取量表分类列表
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                allOf:
-                - $ref: '#/components/schemas/core.Response'
-                - type: object
-                  properties:
-                    data:
-                      $ref: '#/components/schemas/scale.ScaleCategoriesResponse'
         '500':
           description: Internal Server Error
           content:
@@ -1089,12 +1089,12 @@ paths:
       tags:
       - 受试者
       summary: 检查受试者是否存在
-      description: 根据IAM儿童ID检查受试者是否存在
+      description: 根据 IAM ProfileID 检查受试者是否存在
       operationId: 检查受试者是否存在
       parameters:
       - type: string
-        description: IAM儿童ID
-        name: iam_child_id
+        description: IAM档案ID
+        name: iam_profile_id
         in: query
         required: true
       responses:
@@ -1289,16 +1289,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
-  /assessments/high-risk:
-    get:
-      tags:
-      - Transport-Contract
-      summary: GET /assessments/high-risk
-      responses:
-        '200':
-          description: OK
-        '429':
-          description: Too Many Requests
 components:
   schemas:
     answersheet.AnswerSheetResponse:
@@ -1330,6 +1320,13 @@ components:
           type: string
         writer_name:
           type: string
+    answersheet.SubmitAcceptedResponse:
+      type: object
+      properties:
+        request_id:
+          type: string
+        status:
+          type: string
     answersheet.SubmitAnswerSheetRequest:
       type: object
       required:
@@ -1353,20 +1350,6 @@ components:
         testee_id:
           type: integer
         title:
-          type: string
-    answersheet.SubmitAnswerSheetResponse:
-      type: object
-      properties:
-        id:
-          type: string
-        message:
-          type: string
-    answersheet.SubmitAcceptedResponse:
-      type: object
-      properties:
-        request_id:
-          type: string
-        status:
           type: string
     answersheet.SubmitStatusResponse:
       type: object
@@ -1708,19 +1691,6 @@ components:
             $ref: '#/components/schemas/questionnaire.QuestionnaireSummaryResponse'
         total:
           type: integer
-    github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse:
-      type: object
-      properties:
-        page:
-          type: integer
-        page_size:
-          type: integer
-        scales:
-          type: array
-          items:
-            $ref: '#/components/schemas/scale.ScaleSummaryResponse'
-        total:
-          type: integer
     github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse:
       type: object
       properties:
@@ -1733,6 +1703,19 @@ components:
         total:
           type: integer
         window_days:
+          type: integer
+    github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse:
+      type: object
+      properties:
+        page:
+          type: integer
+        page_size:
+          type: integer
+        scales:
+          type: array
+          items:
+            $ref: '#/components/schemas/scale.ScaleSummaryResponse'
+        total:
           type: integer
     meta.Birthday:
       type: object
@@ -1874,6 +1857,47 @@ components:
           type: string
         title:
           type: string
+    scale.HotScaleSummaryResponse:
+      type: object
+      properties:
+        applicable_ages:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        heat_score:
+          type: integer
+        question_count:
+          type: integer
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        rank:
+          type: integer
+        reporters:
+          type: array
+          items:
+            type: string
+        stages:
+          type: array
+          items:
+            type: string
+        status:
+          type: string
+        submission_count:
+          type: integer
+        tags:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
     scale.InterpretRuleResponse:
       type: object
       properties:
@@ -1991,17 +2015,6 @@ components:
             type: string
         title:
           type: string
-    scale.HotScaleSummaryResponse:
-      allOf:
-      - $ref: '#/components/schemas/scale.ScaleSummaryResponse'
-      - type: object
-        properties:
-          heat_score:
-            type: integer
-          rank:
-            type: integer
-          submission_count:
-            type: integer
     scale.StageResponse:
       type: object
       properties:
@@ -2034,7 +2047,6 @@ components:
       type: object
       required:
       - gender
-      - iam_child_id
       - name
       properties:
         birthday:
@@ -2044,17 +2056,17 @@ components:
         gender:
           description: 性别：1-男，2-女，3-其他
           type: integer
-        iam_child_id:
-          description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
-          type: string
-        iam_user_id:
-          description: IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字
+        id_card_number:
+          description: 身份证号（可选）
           type: string
         is_key_focus:
           description: 是否重点关注
           type: boolean
         name:
           description: 姓名
+          type: string
+        relation:
+          description: 与当前用户关系：self/parent/grandparent/other，默认 parent
           type: string
         source:
           description: 来源：online_form/plan/imported
@@ -2119,8 +2131,8 @@ components:
         gender:
           description: 性别
           type: integer
-        iam_child_id:
-          description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
+        iam_profile_id:
+          description: IAM档案ID - 使用字符串以兼容 IAM 系统和前端大数字
           type: string
         iam_user_id:
           description: IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字

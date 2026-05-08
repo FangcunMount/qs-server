@@ -20,7 +20,7 @@ type IAMModule struct {
 	serviceAuthHelper   *iam.ServiceAuthHelper
 	identityService     *iam.IdentityService
 	operationAccountSvc *iam.OperationAccountService
-	guardianshipSvc     *iam.GuardianshipService
+	profileLinkSvc     *iam.ProfileLinkService
 	wechatAppService    *iam.WeChatAppService
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
 }
@@ -59,7 +59,7 @@ func NewIAMModuleWithRuntimeOptions(ctx context.Context, opts *options.IAMOption
 		serviceAuthHelper:   newIAMServiceAuthHelper(ctx, client, opts),
 		identityService:     newIAMIdentityService(client),
 		operationAccountSvc: newIAMOperationAccountService(client),
-		guardianshipSvc:     newIAMGuardianshipService(client),
+		profileLinkSvc:     newIAMProfileLinkService(client),
 		wechatAppService:    newIAMWeChatAppService(client),
 		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
 	}
@@ -150,13 +150,13 @@ func newIAMOperationAccountService(client *iam.Client) *iam.OperationAccountServ
 	return service
 }
 
-func newIAMGuardianshipService(client *iam.Client) *iam.GuardianshipService {
+func newIAMProfileLinkService(client *iam.Client) *iam.ProfileLinkService {
 	if client == nil || !client.IsEnabled() {
 		return nil
 	}
-	service, err := iam.NewGuardianshipService(client)
+	service, err := iam.NewProfileLinkService(client)
 	if err != nil {
-		logger.L(context.Background()).Warnw("Failed to create guardianship service",
+		logger.L(context.Background()).Warnw("Failed to create profile link service",
 			"component", "iam_module",
 			"error", err.Error(),
 		)
@@ -227,10 +227,10 @@ func (m *IAMModule) OperationAccountService() *iam.OperationAccountService {
 	return m.operationAccountSvc
 }
 
-// GuardianshipService 返回监护关系服务
-// 用于监护关系验证和查询
-func (m *IAMModule) GuardianshipService() *iam.GuardianshipService {
-	return m.guardianshipSvc
+// ProfileLinkService 返回 ProfileLink 服务。
+// 用于 Profile 访问校验和关系查询。
+func (m *IAMModule) ProfileLinkService() *iam.ProfileLinkService {
+	return m.profileLinkSvc
 }
 
 // WeChatAppService 返回微信应用服务
@@ -345,16 +345,16 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 		}
 	}
 
-	// 监护关系缓存配置
-	if opts.GuardianshipCache != nil {
-		iamOpts.GuardianshipCache = &iam.CacheOptions{
-			Enabled: opts.GuardianshipCache.Enabled,
-			TTL:     opts.GuardianshipCache.TTL,
-			MaxSize: opts.GuardianshipCache.MaxSize,
+	// ProfileLink 缓存配置
+	if opts.ProfileLinkCache != nil {
+		iamOpts.ProfileLinkCache = &iam.CacheOptions{
+			Enabled: opts.ProfileLinkCache.Enabled,
+			TTL:     opts.ProfileLinkCache.TTL,
+			MaxSize: opts.ProfileLinkCache.MaxSize,
 		}
 	} else {
-		// 默认启用监护关系缓存
-		iamOpts.GuardianshipCache = &iam.CacheOptions{
+		// 默认启用 ProfileLink 缓存
+		iamOpts.ProfileLinkCache = &iam.CacheOptions{
 			Enabled: true,
 			TTL:     10 * time.Minute,
 			MaxSize: 50000,

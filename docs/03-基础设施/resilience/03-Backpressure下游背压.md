@@ -416,8 +416,8 @@ defer release()
 
 - IsGuardian。
 - IsGuardianWithDetails。
-- ValidateChildExists。
-- ListChildren。
+- ValidateProfileExists。
+- ListProfiles。
 - ListGuardians。
 - EstablishProfileLink。
 - RevokeProfileLink。

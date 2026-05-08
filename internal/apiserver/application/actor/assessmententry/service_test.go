@@ -10,32 +10,32 @@ import (
 	domainTestee "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 )
 
-type guardianshipReaderStub struct {
-	enabled     bool
-	lastChildID string
-	err         error
+type profileReaderStub struct {
+	enabled       bool
+	lastProfileID string
+	err           error
 }
 
-func (s *guardianshipReaderStub) IsEnabled() bool {
+func (s *profileReaderStub) IsEnabled() bool {
 	return s.enabled
 }
 
-func (s *guardianshipReaderStub) ValidateChildExists(_ context.Context, childID string) error {
-	s.lastChildID = childID
+func (s *profileReaderStub) ValidateProfileExists(_ context.Context, profileID string) error {
+	s.lastProfileID = profileID
 	return s.err
 }
 
-func TestServiceValidateIntakeProfileUsesGuardianshipReader(t *testing.T) {
+func TestServiceValidateIntakeProfileUsesProfileReader(t *testing.T) {
 	profileID := uint64(88)
-	reader := &guardianshipReaderStub{enabled: true}
-	svc := &service{guardianshipSvc: reader}
+	reader := &profileReaderStub{enabled: true}
+	svc := &service{profileReader: reader}
 
 	err := svc.validateIntakeProfile(context.Background(), IntakeByAssessmentEntryDTO{ProfileID: &profileID})
 	if err != nil {
 		t.Fatalf("validateIntakeProfile() error = %v", err)
 	}
-	if reader.lastChildID != "88" {
-		t.Fatalf("childID = %q, want 88", reader.lastChildID)
+	if reader.lastProfileID != "88" {
+		t.Fatalf("profileID = %q, want 88", reader.lastProfileID)
 	}
 }
 

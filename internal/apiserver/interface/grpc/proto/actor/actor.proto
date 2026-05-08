@@ -39,8 +39,8 @@ service ActorService {
 // CreateTesteeRequest 创建受试者请求
 message CreateTesteeRequest {
   uint64 org_id = 1;                    // 机构ID
-  uint64 iam_user_id = 2;               // IAM用户ID（成人）
-  uint64 iam_child_id = 3;              // IAM儿童ID
+  uint64 iam_user_id = 2;               // IAM用户ID
+  uint64 iam_profile_id = 3;            // IAM档案ID
   string name = 4;                      // 姓名
   int32 gender = 5;                     // 性别：1-男，2-女，3-其他
   google.protobuf.Timestamp birthday = 6; // 出生日期
@@ -67,7 +67,7 @@ message UpdateTesteeRequest {
 // TesteeExistsRequest 检查受试者是否存在请求
 message TesteeExistsRequest {
   uint64 org_id = 1;                    // 机构ID
-  uint64 iam_child_id = 2;              // IAM儿童ID
+  uint64 iam_profile_id = 2;            // IAM档案ID
 }
 
 // TesteeExistsResponse 检查受试者是否存在响应
@@ -84,9 +84,9 @@ message ListTesteesByOrgRequest {
 }
 
 // ListTesteesByUserRequest 根据用户（监护人）查询受试者列表请求
-// 通过传入监护人的所有孩子ID列表来查询
+// 通过传入用户关联的 ProfileID 列表来查询
 message ListTesteesByUserRequest {
-  repeated uint64 iam_child_ids = 1;    // IAM儿童ID列表（监护人的所有孩子）
+  repeated uint64 iam_profile_ids = 1;  // IAM档案ID列表
   int32 offset = 2;                     // 偏移量
   int32 limit = 3;                      // 限制数量
 }
@@ -96,7 +96,7 @@ message TesteeResponse {
   uint64 id = 1;                        // 受试者ID
   uint64 org_id = 2;                    // 机构ID
   uint64 iam_user_id = 3;               // IAM用户ID
-  uint64 iam_child_id = 4;              // IAM儿童ID
+  uint64 iam_profile_id = 4;            // IAM档案ID
   string name = 5;                      // 姓名
   int32 gender = 6;                     // 性别
   google.protobuf.Timestamp birthday = 7; // 出生日期

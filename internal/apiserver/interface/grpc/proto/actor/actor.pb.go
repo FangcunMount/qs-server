@@ -24,13 +24,13 @@ const (
 
 // CreateTesteeRequest 创建受试者请求
 type CreateTesteeRequest struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	OrgId      uint64                 `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                  // 机构ID
-	IamUserId  uint64                 `protobuf:"varint,2,opt,name=iam_user_id,json=iamUserId,proto3" json:"iam_user_id,omitempty"`    // IAM用户ID（成人）
-	IamChildId uint64                 `protobuf:"varint,3,opt,name=iam_child_id,json=iamChildId,proto3" json:"iam_child_id,omitempty"` // IAM儿童ID
-	Name       string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`                                  // 姓名
-	Gender     int32                  `protobuf:"varint,5,opt,name=gender,proto3" json:"gender,omitempty"`                             // 性别：1-男，2-女，3-其他
-	Birthday   *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=birthday,proto3" json:"birthday,omitempty"`                          // 出生日期
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	OrgId        uint64                 `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                        // 机构ID
+	IamUserId    uint64                 `protobuf:"varint,2,opt,name=iam_user_id,json=iamUserId,proto3" json:"iam_user_id,omitempty"`          // IAM用户ID
+	IamProfileId uint64                 `protobuf:"varint,3,opt,name=iam_profile_id,json=iamProfileId,proto3" json:"iam_profile_id,omitempty"` // IAM档案ID
+	Name         string                 `protobuf:"bytes,4,opt,name=name,proto3" json:"name,omitempty"`                                        // 姓名
+	Gender       int32                  `protobuf:"varint,5,opt,name=gender,proto3" json:"gender,omitempty"`                                   // 性别：1-男，2-女，3-其他
+	Birthday     *timestamppb.Timestamp `protobuf:"bytes,6,opt,name=birthday,proto3" json:"birthday,omitempty"`                                // 出生日期
 	// Deprecated: Marked as deprecated in actor/actor.proto.
 	Tags          []string `protobuf:"bytes,7,rep,name=tags,proto3" json:"tags,omitempty"`                                  // Deprecated: 受试者 tags 暂不作为产品能力使用
 	Source        string   `protobuf:"bytes,8,opt,name=source,proto3" json:"source,omitempty"`                              // 来源：online_form/plan/imported
@@ -83,9 +83,9 @@ func (x *CreateTesteeRequest) GetIamUserId() uint64 {
 	return 0
 }
 
-func (x *CreateTesteeRequest) GetIamChildId() uint64 {
+func (x *CreateTesteeRequest) GetIamProfileId() uint64 {
 	if x != nil {
-		return x.IamChildId
+		return x.IamProfileId
 	}
 	return 0
 }
@@ -268,8 +268,8 @@ func (x *UpdateTesteeRequest) GetIsKeyFocus() bool {
 // TesteeExistsRequest 检查受试者是否存在请求
 type TesteeExistsRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	OrgId         uint64                 `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                  // 机构ID
-	IamChildId    uint64                 `protobuf:"varint,2,opt,name=iam_child_id,json=iamChildId,proto3" json:"iam_child_id,omitempty"` // IAM儿童ID
+	OrgId         uint64                 `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                        // 机构ID
+	IamProfileId  uint64                 `protobuf:"varint,2,opt,name=iam_profile_id,json=iamProfileId,proto3" json:"iam_profile_id,omitempty"` // IAM档案ID
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -311,9 +311,9 @@ func (x *TesteeExistsRequest) GetOrgId() uint64 {
 	return 0
 }
 
-func (x *TesteeExistsRequest) GetIamChildId() uint64 {
+func (x *TesteeExistsRequest) GetIamProfileId() uint64 {
 	if x != nil {
-		return x.IamChildId
+		return x.IamProfileId
 	}
 	return 0
 }
@@ -433,12 +433,12 @@ func (x *ListTesteesByOrgRequest) GetLimit() int32 {
 }
 
 // ListTesteesByUserRequest 根据用户（监护人）查询受试者列表请求
-// 通过传入监护人的所有孩子ID列表来查询
+// 通过传入用户关联的 ProfileID 列表来查询
 type ListTesteesByUserRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	IamChildIds   []uint64               `protobuf:"varint,1,rep,packed,name=iam_child_ids,json=iamChildIds,proto3" json:"iam_child_ids,omitempty"` // IAM儿童ID列表（监护人的所有孩子）
-	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`                                       // 偏移量
-	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                                         // 限制数量
+	IamProfileIds []uint64               `protobuf:"varint,1,rep,packed,name=iam_profile_ids,json=iamProfileIds,proto3" json:"iam_profile_ids,omitempty"` // IAM档案ID列表
+	Offset        int32                  `protobuf:"varint,2,opt,name=offset,proto3" json:"offset,omitempty"`                                             // 偏移量
+	Limit         int32                  `protobuf:"varint,3,opt,name=limit,proto3" json:"limit,omitempty"`                                               // 限制数量
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -473,9 +473,9 @@ func (*ListTesteesByUserRequest) Descriptor() ([]byte, []int) {
 	return file_actor_actor_proto_rawDescGZIP(), []int{6}
 }
 
-func (x *ListTesteesByUserRequest) GetIamChildIds() []uint64 {
+func (x *ListTesteesByUserRequest) GetIamProfileIds() []uint64 {
 	if x != nil {
-		return x.IamChildIds
+		return x.IamProfileIds
 	}
 	return nil
 }
@@ -496,14 +496,14 @@ func (x *ListTesteesByUserRequest) GetLimit() int32 {
 
 // TesteeResponse 受试者响应
 type TesteeResponse struct {
-	state      protoimpl.MessageState `protogen:"open.v1"`
-	Id         uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`                                     // 受试者ID
-	OrgId      uint64                 `protobuf:"varint,2,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                  // 机构ID
-	IamUserId  uint64                 `protobuf:"varint,3,opt,name=iam_user_id,json=iamUserId,proto3" json:"iam_user_id,omitempty"`    // IAM用户ID
-	IamChildId uint64                 `protobuf:"varint,4,opt,name=iam_child_id,json=iamChildId,proto3" json:"iam_child_id,omitempty"` // IAM儿童ID
-	Name       string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`                                  // 姓名
-	Gender     int32                  `protobuf:"varint,6,opt,name=gender,proto3" json:"gender,omitempty"`                             // 性别
-	Birthday   *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=birthday,proto3" json:"birthday,omitempty"`                          // 出生日期
+	state        protoimpl.MessageState `protogen:"open.v1"`
+	Id           uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`                                           // 受试者ID
+	OrgId        uint64                 `protobuf:"varint,2,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`                        // 机构ID
+	IamUserId    uint64                 `protobuf:"varint,3,opt,name=iam_user_id,json=iamUserId,proto3" json:"iam_user_id,omitempty"`          // IAM用户ID
+	IamProfileId uint64                 `protobuf:"varint,4,opt,name=iam_profile_id,json=iamProfileId,proto3" json:"iam_profile_id,omitempty"` // IAM档案ID
+	Name         string                 `protobuf:"bytes,5,opt,name=name,proto3" json:"name,omitempty"`                                        // 姓名
+	Gender       int32                  `protobuf:"varint,6,opt,name=gender,proto3" json:"gender,omitempty"`                                   // 性别
+	Birthday     *timestamppb.Timestamp `protobuf:"bytes,7,opt,name=birthday,proto3" json:"birthday,omitempty"`                                // 出生日期
 	// Deprecated: Marked as deprecated in actor/actor.proto.
 	Tags       []string `protobuf:"bytes,8,rep,name=tags,proto3" json:"tags,omitempty"`                                   // Deprecated: 受试者 tags 暂不作为产品能力使用
 	Source     string   `protobuf:"bytes,9,opt,name=source,proto3" json:"source,omitempty"`                               // 来源
@@ -567,9 +567,9 @@ func (x *TesteeResponse) GetIamUserId() uint64 {
 	return 0
 }
 
-func (x *TesteeResponse) GetIamChildId() uint64 {
+func (x *TesteeResponse) GetIamProfileId() uint64 {
 	if x != nil {
-		return x.IamChildId
+		return x.IamProfileId
 	}
 	return 0
 }
@@ -876,12 +876,11 @@ var File_actor_actor_proto protoreflect.FileDescriptor
 
 const file_actor_actor_proto_rawDesc = "" +
 	"\n" +
-	"\x11actor/actor.proto\x12\x05actor\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa4\x02\n" +
+	"\x11actor/actor.proto\x12\x05actor\x1a\x1fgoogle/protobuf/timestamp.proto\"\xa8\x02\n" +
 	"\x13CreateTesteeRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12\x1e\n" +
-	"\viam_user_id\x18\x02 \x01(\x04R\tiamUserId\x12 \n" +
-	"\fiam_child_id\x18\x03 \x01(\x04R\n" +
-	"iamChildId\x12\x12\n" +
+	"\viam_user_id\x18\x02 \x01(\x04R\tiamUserId\x12$\n" +
+	"\x0eiam_profile_id\x18\x03 \x01(\x04R\fiamProfileId\x12\x12\n" +
 	"\x04name\x18\x04 \x01(\tR\x04name\x12\x16\n" +
 	"\x06gender\x18\x05 \x01(\x05R\x06gender\x126\n" +
 	"\bbirthday\x18\x06 \x01(\v2\x1a.google.protobuf.TimestampR\bbirthday\x12\x16\n" +
@@ -898,28 +897,26 @@ const file_actor_actor_proto_rawDesc = "" +
 	"\bbirthday\x18\x04 \x01(\v2\x1a.google.protobuf.TimestampR\bbirthday\x12\x16\n" +
 	"\x04tags\x18\x05 \x03(\tB\x02\x18\x01R\x04tags\x12 \n" +
 	"\fis_key_focus\x18\x06 \x01(\bR\n" +
-	"isKeyFocus\"N\n" +
+	"isKeyFocus\"R\n" +
 	"\x13TesteeExistsRequest\x12\x15\n" +
-	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12 \n" +
-	"\fiam_child_id\x18\x02 \x01(\x04R\n" +
-	"iamChildId\"K\n" +
+	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12$\n" +
+	"\x0eiam_profile_id\x18\x02 \x01(\x04R\fiamProfileId\"K\n" +
 	"\x14TesteeExistsResponse\x12\x16\n" +
 	"\x06exists\x18\x01 \x01(\bR\x06exists\x12\x1b\n" +
 	"\ttestee_id\x18\x02 \x01(\x04R\btesteeId\"^\n" +
 	"\x17ListTesteesByOrgRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x04R\x05orgId\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x14\n" +
-	"\x05limit\x18\x03 \x01(\x05R\x05limit\"l\n" +
-	"\x18ListTesteesByUserRequest\x12\"\n" +
-	"\riam_child_ids\x18\x01 \x03(\x04R\viamChildIds\x12\x16\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"p\n" +
+	"\x18ListTesteesByUserRequest\x12&\n" +
+	"\x0fiam_profile_ids\x18\x01 \x03(\x04R\riamProfileIds\x12\x16\n" +
 	"\x06offset\x18\x02 \x01(\x05R\x06offset\x12\x14\n" +
-	"\x05limit\x18\x03 \x01(\x05R\x05limit\"\xe8\x03\n" +
+	"\x05limit\x18\x03 \x01(\x05R\x05limit\"\xec\x03\n" +
 	"\x0eTesteeResponse\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x15\n" +
 	"\x06org_id\x18\x02 \x01(\x04R\x05orgId\x12\x1e\n" +
-	"\viam_user_id\x18\x03 \x01(\x04R\tiamUserId\x12 \n" +
-	"\fiam_child_id\x18\x04 \x01(\x04R\n" +
-	"iamChildId\x12\x12\n" +
+	"\viam_user_id\x18\x03 \x01(\x04R\tiamUserId\x12$\n" +
+	"\x0eiam_profile_id\x18\x04 \x01(\x04R\fiamProfileId\x12\x12\n" +
 	"\x04name\x18\x05 \x01(\tR\x04name\x12\x16\n" +
 	"\x06gender\x18\x06 \x01(\x05R\x06gender\x126\n" +
 	"\bbirthday\x18\a \x01(\v2\x1a.google.protobuf.TimestampR\bbirthday\x12\x16\n" +

@@ -14,8 +14,7 @@ type Testee struct {
 	orgID int64 // 所属机构（医院、训练中心、学校等）
 
 	// === 用户档案关联 ===
-	// 注意：当前实现绑定的是 IAM.Child，未来可重构为更通用的 Profile
-	profileID *uint64 // 可选：关联的用户档案ID（当前对应 IAM.Child.ID）
+	profileID *uint64 // 可选：关联的 IAM Profile ID
 
 	// === 基本属性 ===
 	name      string     // 姓名（可脱敏）

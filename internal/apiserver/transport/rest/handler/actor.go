@@ -60,6 +60,18 @@ func NewTesteeHandler(
 }
 
 // GetTestee 获取受试者详情（后台管理接口，包含家长信息）。
+// @Summary 获取受试者详情
+// @Description 根据受试者 ID 获取受试者详情
+// @Tags 受试者
+// @Produce json
+// @Param id path int true "受试者ID"
+// @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 403 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/testees/{id} [get]
 func (h *TesteeHandler) GetTestee(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -120,7 +132,7 @@ func (h *TesteeHandler) GetTesteeByProfileID(c *gin.Context) {
 		return
 	}
 
-	profileIDStr := req.CanonicalProfileID()
+	profileIDStr := req.ProfileID
 	if profileIDStr == "" {
 		h.BadRequestResponse(c, "profile_id is required", nil)
 		return
@@ -333,7 +345,7 @@ func (h *TesteeHandler) ListTestees(c *gin.Context) {
 }
 
 func (h *TesteeHandler) fetchTesteeByProfile(c *gin.Context, orgID int64, profileIDStr string) (*testeeApp.TesteeResult, error) {
-	childID, err := strconv.ParseUint(profileIDStr, 10, 64)
+	profileID, err := strconv.ParseUint(profileIDStr, 10, 64)
 	if err != nil {
 		logger.L(c.Request.Context()).Warnw("Invalid profile_id format",
 			"action", "fetch_testee_by_profile",
@@ -344,12 +356,12 @@ func (h *TesteeHandler) fetchTesteeByProfile(c *gin.Context, orgID int64, profil
 		return nil, err
 	}
 
-	result, err := h.testeeQueryService.FindByProfile(c.Request.Context(), orgID, childID)
+	result, err := h.testeeQueryService.FindByProfile(c.Request.Context(), orgID, profileID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to find testee by profile_id",
 			"action", "fetch_testee_by_profile",
 			"org_id", orgID,
-			"profile_id", childID,
+			"profile_id", profileID,
 			"error", err.Error(),
 		)
 		return nil, err
@@ -605,7 +617,6 @@ func toTesteeResponse(result *testeeApp.TesteeResult) *response.TesteeResponse {
 		ID:              idStr,
 		OrgID:           orgIDStr,
 		ProfileID:       profileIDStr,
-		IAMChildID:      response.LegacyIAMChildIDAlias(profileIDStr),
 		Name:            result.Name,
 		Gender:          gender,
 		GenderLabel:     response.LabelForGender(gender),

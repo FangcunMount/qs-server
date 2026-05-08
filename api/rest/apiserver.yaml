@@ -3344,14 +3344,10 @@ paths:
         name: org_id
         in: query
       - type: string
-        description: 用户档案ID（IAM Child ID/ProfileID）
+        description: 用户档案ID（ProfileID）
         name: profile_id
         in: query
         required: true
-      - type: string
-        description: 兼容字段：IAM儿童ID
-        name: iam_child_id
-        in: query
       responses:
         '200':
           description: OK
@@ -6314,9 +6310,6 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/response.GuardianResponse'
-        iam_child_id:
-          description: IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
-          type: string
         id:
           description: ID
           type: string

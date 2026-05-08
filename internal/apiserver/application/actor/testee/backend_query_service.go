@@ -14,17 +14,17 @@ import (
 // 职责：提供受试者详细信息查询能力（包含家长信息等后台管理所需数据）
 type backendQueryService struct {
 	queryService      TesteeQueryService
-	guardianDirectory iambridge.GuardianDirectory
+	profileLinkDirectory iambridge.ProfileLinkDirectory
 }
 
 // NewBackendQueryService 创建受试者后台查询服务
 func NewBackendQueryService(
 	queryService TesteeQueryService,
-	guardianDirectory iambridge.GuardianDirectory,
+	profileLinkDirectory iambridge.ProfileLinkDirectory,
 ) TesteeBackendQueryService {
 	return &backendQueryService{
-		queryService:      queryService,
-		guardianDirectory: guardianDirectory,
+		queryService:          queryService,
+		profileLinkDirectory: profileLinkDirectory,
 	}
 }
 
@@ -42,20 +42,20 @@ func (s *backendQueryService) GetByIDWithGuardians(ctx context.Context, testeeID
 		Guardians:    []GuardianInfo{},
 	}
 
-	// 3. 如果受试者有 profileID 且监护关系服务可用，则获取家长信息
+	// 3. 如果受试者有 profileID 且 ProfileLink 服务可用，则获取关联用户信息
 	if testeeResult.ProfileID == nil {
 		logger.L(ctx).Debugw("Testee has no profileID, skipping guardian fetch",
 			"action", "get_testee_with_guardians",
 			"testee_id", testeeID,
 		)
-	} else if s.guardianDirectory == nil {
-		logger.L(ctx).Debugw("Guardianship service is nil, skipping guardian fetch",
+	} else if s.profileLinkDirectory == nil {
+		logger.L(ctx).Debugw("ProfileLink service is nil, skipping linked user fetch",
 			"action", "get_testee_with_guardians",
 			"testee_id", testeeID,
 			"profile_id", *testeeResult.ProfileID,
 		)
-	} else if !s.guardianDirectory.IsEnabled() {
-		logger.L(ctx).Debugw("Guardianship service is not enabled, skipping guardian fetch",
+	} else if !s.profileLinkDirectory.IsEnabled() {
+		logger.L(ctx).Debugw("ProfileLink service is not enabled, skipping linked user fetch",
 			"action", "get_testee_with_guardians",
 			"testee_id", testeeID,
 			"profile_id", *testeeResult.ProfileID,
@@ -107,7 +107,7 @@ func (s *backendQueryService) ListTesteesWithGuardians(ctx context.Context, dto 
 		}
 
 		// 3. 为每个受试者获取家长信息（如果可用）
-		if testeeResult.ProfileID != nil && s.guardianDirectory != nil && s.guardianDirectory.IsEnabled() {
+		if testeeResult.ProfileID != nil && s.profileLinkDirectory != nil && s.profileLinkDirectory.IsEnabled() {
 			guardians, err := s.fetchGuardians(ctx, *testeeResult.ProfileID)
 			if err != nil {
 				// 家长信息获取失败不影响主流程，记录日志即可
@@ -135,25 +135,23 @@ func (s *backendQueryService) ListTesteesWithGuardians(ctx context.Context, dto 
 
 // fetchGuardians 从 IAM 服务获取监护人信息
 func (s *backendQueryService) fetchGuardians(ctx context.Context, profileID uint64) ([]GuardianInfo, error) {
-	childID := fmt.Sprintf("%d", profileID)
+	profileIDStr := fmt.Sprintf("%d", profileID)
 
-	items, err := s.guardianDirectory.ListGuardians(ctx, childID)
+	items, err := s.profileLinkDirectory.ListProfileLinkedUsers(ctx, profileIDStr)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list guardians from IAM")
+		return nil, errors.Wrap(err, "failed to list profile linked users from IAM")
 	}
 	if len(items) == 0 {
-		logger.L(ctx).Debugw("IAM ListGuardians returned empty items",
+		logger.L(ctx).Debugw("IAM ListProfileLinkedUsers returned empty items",
 			"action", "fetch_guardians",
 			"profile_id", profileID,
-			"child_id", childID,
 		)
 		return []GuardianInfo{}, nil
 	}
 
-	logger.L(ctx).Debugw("IAM ListGuardians response received",
+	logger.L(ctx).Debugw("IAM ListProfileLinkedUsers response received",
 		"action", "fetch_guardians",
 		"profile_id", profileID,
-		"child_id", childID,
 		"items_count", len(items),
 	)
 

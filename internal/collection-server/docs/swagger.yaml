@@ -29,6 +29,13 @@ definitions:
       writer_name:
         type: string
     type: object
+  answersheet.SubmitAcceptedResponse:
+    properties:
+      request_id:
+        type: string
+      status:
+        type: string
+    type: object
   answersheet.SubmitAnswerSheetRequest:
     properties:
       answers:
@@ -52,20 +59,6 @@ definitions:
     - questionnaire_code
     - questionnaire_version
     - testee_id
-    type: object
-  answersheet.SubmitAnswerSheetResponse:
-    properties:
-      id:
-        type: string
-      message:
-        type: string
-    type: object
-  answersheet.SubmitAcceptedResponse:
-    properties:
-      request_id:
-        type: string
-      status:
-        type: string
     type: object
   answersheet.SubmitStatusResponse:
     properties:
@@ -407,6 +400,19 @@ definitions:
       total:
         type: integer
     type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse:
+    properties:
+      limit:
+        type: integer
+      scales:
+        items:
+          $ref: '#/definitions/scale.HotScaleSummaryResponse'
+        type: array
+      total:
+        type: integer
+      window_days:
+        type: integer
+    type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListScalesResponse:
     properties:
       page:
@@ -557,6 +563,47 @@ definitions:
         type: object
       scoring_strategy:
         type: string
+      title:
+        type: string
+    type: object
+  scale.HotScaleSummaryResponse:
+    properties:
+      applicable_ages:
+        items:
+          type: string
+        type: array
+      category:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      heat_score:
+        type: integer
+      question_count:
+        type: integer
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      rank:
+        type: integer
+      reporters:
+        items:
+          type: string
+        type: array
+      stages:
+        items:
+          type: string
+        type: array
+      status:
+        type: string
+      submission_count:
+        type: integer
+      tags:
+        items:
+          type: string
+        type: array
       title:
         type: string
     type: object
@@ -714,17 +761,17 @@ definitions:
       gender:
         description: 性别：1-男，2-女，3-其他
         type: integer
-      iam_child_id:
-        description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
-        type: string
-      iam_user_id:
-        description: IAM用户ID（成人）- 使用字符串以兼容 IAM 系统和前端大数字
+      id_card_number:
+        description: 身份证号（可选）
         type: string
       is_key_focus:
         description: 是否重点关注
         type: boolean
       name:
         description: 姓名
+        type: string
+      relation:
+        description: 与当前用户关系：self/parent/grandparent/other，默认 parent
         type: string
       source:
         description: 来源：online_form/plan/imported
@@ -736,7 +783,6 @@ definitions:
         type: array
     required:
     - gender
-    - iam_child_id
     - name
     type: object
   testee.ListTesteesResponse:
@@ -793,8 +839,8 @@ definitions:
       gender:
         description: 性别
         type: integer
-      iam_child_id:
-        description: IAM儿童ID - 使用字符串以兼容 IAM 系统和前端大数字
+      iam_profile_id:
+        description: IAM档案ID - 使用字符串以兼容 IAM 系统和前端大数字
         type: string
       iam_user_id:
         description: IAM用户ID - 使用字符串以兼容 IAM 系统和前端大数字
@@ -1655,6 +1701,43 @@ paths:
       summary: 获取量表分类列表
       tags:
       - 量表
+  /api/v1/scales/hot:
+    get:
+      description: 获取当前热门量表排行榜，用于小程序首页展示 3~5 个可填写量表。默认按近 30 天答卷提交量排序。
+      parameters:
+      - default: 5
+        description: 返回数量，服务端限制为 3~5
+        in: query
+        name: limit
+        type: integer
+      - default: 30
+        description: 热度统计窗口天数
+        in: query
+        name: window_days
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_scale.ListHotScalesResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取热门量表列表
+      tags:
+      - 量表
   /api/v1/testees:
     get:
       description: 查询当前用户（监护人）的所有受试者列表（支持分页）
@@ -1861,11 +1944,11 @@ paths:
       - 受试者
   /api/v1/testees/exists:
     get:
-      description: 根据IAM儿童ID检查受试者是否存在
+      description: 根据 IAM ProfileID 检查受试者是否存在
       parameters:
-      - description: IAM儿童ID
+      - description: IAM档案ID
         in: query
-        name: iam_child_id
+        name: iam_profile_id
         required: true
         type: string
       produces:

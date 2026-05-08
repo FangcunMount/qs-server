@@ -61,11 +61,11 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 	}
 }
 
-func TestGetChildIDReturnsVerifiedChildID(t *testing.T) {
+func TestGetProfileIDReturnsVerifiedProfileID(t *testing.T) {
 	c, _ := gin.CreateTestContext(httptest.NewRecorder())
-	c.Set(ChildIDKey, uint64(7))
+	c.Set(ProfileIDKey, uint64(7))
 
-	if got := GetChildID(c); got != 7 {
-		t.Fatalf("child id = %d, want 7", got)
+	if got := GetProfileID(c); got != 7 {
+		t.Fatalf("profile id = %d, want 7", got)
 	}
 }

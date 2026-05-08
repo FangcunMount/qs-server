@@ -68,7 +68,6 @@ func (r *testeeRepository) FindByID(ctx context.Context, id testee.ID) (*testee.
 }
 
 // FindByProfile 根据用户档案ID查找受试者
-// 注意：当前 ProfileID 对应 IAM.Child.ID
 func (r *testeeRepository) FindByProfile(ctx context.Context, orgID int64, profileID uint64) (*testee.Testee, error) {
 	var po TesteePO
 	err := r.WithContext(ctx).

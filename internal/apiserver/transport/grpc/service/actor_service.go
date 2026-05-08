@@ -64,8 +64,8 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 	}
 
 	var profileID *uint64
-	if req.IamChildId > 0 {
-		profileID = &req.IamChildId
+	if req.IamProfileId > 0 {
+		profileID = &req.IamProfileId
 	}
 	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
 	if err != nil {
@@ -215,7 +215,7 @@ func (s *ActorService) TesteeExists(ctx context.Context, req *pb.TesteeExistsReq
 	if req.OrgId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "机构ID不能为空")
 	}
-	if req.IamChildId == 0 {
+	if req.IamProfileId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "用户档案ID不能为空")
 	}
 
@@ -224,7 +224,7 @@ func (s *ActorService) TesteeExists(ctx context.Context, req *pb.TesteeExistsReq
 		return nil, err
 	}
 
-	result, err := s.queryService.FindByProfile(ctx, orgID, req.IamChildId)
+	result, err := s.queryService.FindByProfile(ctx, orgID, req.IamProfileId)
 	if err != nil || result == nil {
 		return &pb.TesteeExistsResponse{
 			Exists:   false,
@@ -282,7 +282,7 @@ func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTestees
 // ListTesteesByUser 根据用户（监护人）查询受试者列表
 // @Description 查询指定用户（监护人）的所有受试者
 func (s *ActorService) ListTesteesByUser(ctx context.Context, req *pb.ListTesteesByUserRequest) (*pb.TesteeListResponse, error) {
-	if len(req.IamChildIds) == 0 {
+	if len(req.IamProfileIds) == 0 {
 		return &pb.TesteeListResponse{
 			Items: []*pb.TesteeResponse{},
 			Total: 0,
@@ -297,11 +297,11 @@ func (s *ActorService) ListTesteesByUser(ctx context.Context, req *pb.ListTestee
 		limit = 20
 	}
 
-	result, err := s.queryService.ListByProfileIDs(ctx, req.IamChildIds, offset, limit)
+	result, err := s.queryService.ListByProfileIDs(ctx, req.IamProfileIds, offset, limit)
 	if err != nil {
 		logger.L(ctx).Errorw("Failed to list testees by user",
 			"action", "list_testees_by_user",
-			"profile_count", len(req.IamChildIds),
+			"profile_count", len(req.IamProfileIds),
 			"error", err.Error(),
 		)
 		return nil, status.Error(codes.Internal, err.Error())
@@ -377,7 +377,7 @@ func (s *ActorService) toProtoTesteeResponse(result *testeeApp.TesteeResult) (*p
 
 	// 设置用户档案ID
 	if result.ProfileID != nil {
-		resp.IamChildId = *result.ProfileID
+		resp.IamProfileId = *result.ProfileID
 	}
 
 	// 设置生日

@@ -24,7 +24,7 @@ type IAMOptions struct {
 	JWT               *JWTOptions
 	JWKS              *JWKSOptions
 	UserCache         *CacheOptions
-	GuardianshipCache *CacheOptions
+	ProfileLinkCache *CacheOptions
 
 	// Authz 授权快照（GetAuthorizationSnapshot）
 	AuthzAppName              string

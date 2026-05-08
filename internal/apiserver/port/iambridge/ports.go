@@ -66,20 +66,20 @@ type OperatorAuthzGateway interface {
 	LoadOperatorRoleNames(ctx context.Context, orgID, userID int64) ([]string, error)
 }
 
-type GuardianshipReader interface {
+type ProfileReader interface {
 	IsEnabled() bool
-	ValidateChildExists(ctx context.Context, childID string) error
+	ValidateProfileExists(ctx context.Context, profileID string) error
 }
 
-type Guardian struct {
+type ProfileLinkedUser struct {
 	Name     string
 	Phone    string
 	Relation string
 }
 
-type GuardianDirectory interface {
+type ProfileLinkDirectory interface {
 	IsEnabled() bool
-	ListGuardians(ctx context.Context, childID string) ([]Guardian, error)
+	ListProfileLinkedUsers(ctx context.Context, profileID string) ([]ProfileLinkedUser, error)
 }
 
 type MiniProgramRecipients struct {
@@ -89,5 +89,5 @@ type MiniProgramRecipients struct {
 
 type MiniProgramRecipientResolver interface {
 	IsEnabled() bool
-	ResolveMiniProgramRecipients(ctx context.Context, childID string) (*MiniProgramRecipients, error)
+	ResolveMiniProgramRecipients(ctx context.Context, profileID string) (*MiniProgramRecipients, error)
 }

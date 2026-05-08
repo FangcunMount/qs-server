@@ -18,7 +18,7 @@ import (
 
 type actorLookupClient interface {
 	GetTestee(ctx context.Context, testeeID uint64) (*grpcclient.TesteeResponse, error)
-	TesteeExists(ctx context.Context, orgID, iamChildID uint64) (exists bool, testeeID uint64, err error)
+	TesteeExists(ctx context.Context, orgID, iamProfileID uint64) (exists bool, testeeID uint64, err error)
 }
 
 // IdempotencyGuard protects cross-instance submit idempotency for the same request key.
@@ -33,10 +33,10 @@ type answerSheetGateway interface {
 	GetAnswerSheet(ctx context.Context, id uint64) (*grpcclient.AnswerSheetOutput, error)
 }
 
-type guardianshipChecker interface {
+type profileLinkChecker interface {
 	IsEnabled() bool
 	GetDefaultOrgID() uint64
-	IsGuardian(ctx context.Context, userID, iamChildID string) (bool, error)
+	HasActiveProfileLink(ctx context.Context, userID, iamProfileID string) (bool, error)
 }
 
 // SubmissionService 答卷提交服务
@@ -47,7 +47,7 @@ type guardianshipChecker interface {
 type SubmissionService struct {
 	answerSheetClient   answerSheetGateway
 	actorClient         actorLookupClient
-	guardianshipService guardianshipChecker
+	profileLinkService  profileLinkChecker
 	queue               *SubmitQueue
 	submitGuard         IdempotencyGuard
 }
@@ -56,14 +56,14 @@ type SubmissionService struct {
 func NewSubmissionService(
 	answerSheetClient answerSheetGateway,
 	actorClient actorLookupClient,
-	guardianshipService guardianshipChecker,
+	profileLinkService profileLinkChecker,
 	queueOptions *options.SubmitQueueOptions,
 	submitGuard IdempotencyGuard,
 ) *SubmissionService {
 	service := &SubmissionService{
 		answerSheetClient:   answerSheetClient,
 		actorClient:         actorClient,
-		guardianshipService: guardianshipService,
+		profileLinkService:  profileLinkService,
 		submitGuard:         submitGuard,
 	}
 
@@ -180,8 +180,8 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 		return nil, err
 	}
 
-	// 2. 校验监护关系权限，并获取 testee 信息（用于获取 OrgID）
-	testee, resolvedTesteeID, err := s.validateGuardianship(ctx, writerID, req.TesteeID)
+	// 2. 校验 active ProfileLink 权限，并获取 testee 信息（用于获取 OrgID）
+	testee, resolvedTesteeID, err := s.validateProfileAccess(ctx, writerID, req.TesteeID)
 	if err != nil {
 		return nil, err
 	}
@@ -222,11 +222,11 @@ func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64)
 	return nil
 }
 
-// validateGuardianship 校验监护关系权限，返回 canonical testee 信息与 canonical testee ID。
-func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, testeeID uint64) (*grpcclient.TesteeResponse, uint64, error) {
+// validateProfileAccess verifies active ProfileLink access and returns canonical testee data.
+func (s *SubmissionService) validateProfileAccess(ctx context.Context, writerID, testeeID uint64) (*grpcclient.TesteeResponse, uint64, error) {
 	l := logger.L(ctx)
 
-	// 查询受试者信息（需要获取 OrgID 和 IAMChildID）。
+	// 查询受试者信息（需要获取 OrgID 和 IAMProfileID）。
 	// 兼容某些上游把 profile_id 误传成 testee_id 的情况。
 	testee, resolvedTesteeID, err := s.resolveCanonicalTestee(ctx, testeeID)
 	if err != nil {
@@ -239,21 +239,21 @@ func (s *SubmissionService) validateGuardianship(ctx context.Context, writerID, 
 	}
 
 	// 如果 IAM 服务未启用，直接返回 testee
-	if s.guardianshipService == nil || !s.guardianshipService.IsEnabled() {
+	if s.profileLinkService == nil || !s.profileLinkService.IsEnabled() {
 		return testee, resolvedTesteeID, nil
 	}
 
-	// 如果受试者未绑定 IAM 用户，跳过权限校验
-	if testee.IAMChildID == "" {
-		l.Warnw("受试者未绑定IAM用户，跳过权限校验",
+	// 如果受试者未绑定 IAM Profile，跳过权限校验
+	if testee.IAMProfileID == "" {
+		l.Warnw("受试者未绑定 IAM Profile，跳过权限校验",
 			"testee_id", resolvedTesteeID,
 			"testee_name", testee.Name,
 		)
 		return testee, resolvedTesteeID, nil
 	}
 
-	// 验证监护关系
-	if err := s.checkGuardianRelation(ctx, writerID, resolvedTesteeID, testee.IAMChildID, testee.Name); err != nil {
+	// 验证 active ProfileLink
+	if err := s.checkProfileLinkAccess(ctx, writerID, resolvedTesteeID, testee.IAMProfileID, testee.Name); err != nil {
 		return nil, 0, err
 	}
 
@@ -265,11 +265,11 @@ func (s *SubmissionService) resolveCanonicalTestee(ctx context.Context, rawTeste
 	if err == nil {
 		return testee, rawTesteeID, nil
 	}
-	if status.Code(err) != codes.NotFound || s.guardianshipService == nil {
+	if status.Code(err) != codes.NotFound || s.profileLinkService == nil {
 		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
 	}
 
-	orgID := s.guardianshipService.GetDefaultOrgID()
+	orgID := s.profileLinkService.GetDefaultOrgID()
 	exists, canonicalTesteeID, existsErr := s.actorClient.TesteeExists(ctx, orgID, rawTesteeID)
 	if existsErr != nil {
 		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
@@ -292,40 +292,40 @@ func (s *SubmissionService) resolveCanonicalTestee(ctx context.Context, rawTeste
 	return canonicalTestee, canonicalTesteeID, nil
 }
 
-// checkGuardianRelation 检查监护关系
-func (s *SubmissionService) checkGuardianRelation(ctx context.Context, writerID, testeeID uint64, iamChildID, testeeName string) error {
+// checkProfileLinkAccess checks whether writerID has an active ProfileLink to iamProfileID.
+func (s *SubmissionService) checkProfileLinkAccess(ctx context.Context, writerID, testeeID uint64, iamProfileID, testeeName string) error {
 	l := logger.L(ctx)
 
 	userIDStr := strconv.FormatUint(writerID, 10)
-	isGuardian, err := s.guardianshipService.IsGuardian(ctx, userIDStr, iamChildID)
+	hasActiveProfileLink, err := s.profileLinkService.HasActiveProfileLink(ctx, userIDStr, iamProfileID)
 	if err != nil {
-		l.Errorw("校验监护关系失败",
+		l.Errorw("校验 ProfileLink 权限失败",
 			"action", "submit_answersheet",
 			"writer_id", writerID,
 			"testee_id", testeeID,
-			"iam_child_id", iamChildID,
+			"iam_profile_id", iamProfileID,
 			"error", err.Error(),
 		)
-		return fmt.Errorf("校验监护关系失败: %w", err)
+		return fmt.Errorf("校验 ProfileLink 权限失败: %w", err)
 	}
 
-	if !isGuardian {
-		l.Warnw("无权为该受试者提交答卷：不是监护人",
+	if !hasActiveProfileLink {
+		l.Warnw("无权为该受试者提交答卷：缺少 active ProfileLink",
 			"action", "submit_answersheet",
 			"writer_id", writerID,
 			"testee_id", testeeID,
-			"iam_child_id", iamChildID,
+			"iam_profile_id", iamProfileID,
 			"testee_name", testeeName,
 			"result", "forbidden",
 		)
 		return fmt.Errorf("无权为该受试者提交答卷")
 	}
 
-	l.Infow("监护关系验证通过",
+	l.Infow("ProfileLink 权限验证通过",
 		"action", "submit_answersheet",
 		"writer_id", writerID,
 		"testee_id", testeeID,
-		"iam_child_id", iamChildID,
+		"iam_profile_id", iamProfileID,
 	)
 	return nil
 }

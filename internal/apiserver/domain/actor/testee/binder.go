@@ -9,7 +9,6 @@ import (
 
 // Binder 档案绑定器领域服务
 // 负责 Testee 与用户档案（Profile）的绑定关系管理
-// 注意：当前 Profile 对应 IAM.Child，未来可重构为更通用的档案系统
 type Binder interface {
 	// Bind 绑定到用户档案
 	// 验证绑定的合法性，防止重复绑定或绑定冲突

@@ -16,8 +16,8 @@ import (
 const (
 	// UserIDKey is the legacy collection context key for numeric user ID.
 	UserIDKey = httpauth.UserIDKey
-	// ChildIDKey is the collection context key for verified child ID.
-	ChildIDKey = "child_id"
+	// ProfileIDKey is the collection context key for verified IAM ProfileID.
+	ProfileIDKey = "profile_id"
 	// TesteeIDKey is reserved for business lookup results.
 	TesteeIDKey = "testee_id"
 	// PrincipalKey stores the Security Control Plane principal projection.
@@ -32,18 +32,13 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 	return httpauth.UserIdentityMiddleware()
 }
 
-// GuardianshipVerifier verifies guardian-child relationships.
-type GuardianshipVerifier interface {
-	IsGuardian(ctx gin.Context, userID, childID string) (bool, error)
-}
-
-// GuardianshipMiddleware verifies that the authenticated user is the guardian
-// of the child referenced by the given query or path parameter.
-func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDParam string) gin.HandlerFunc {
+// ProfileLinkMiddleware verifies that the authenticated user has an active
+// link to the profile referenced by the given query or path parameter.
+func ProfileLinkMiddleware(profileLinkSvc *iam.ProfileLinkService, profileIDParam string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		if guardianshipSvc == nil || !guardianshipSvc.IsEnabled() {
+		if profileLinkSvc == nil || !profileLinkSvc.IsEnabled() {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
-				"error": "guardianship service not available",
+				"error": "profile link service not available",
 			})
 			c.Abort()
 			return
@@ -58,62 +53,62 @@ func GuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDPar
 			return
 		}
 
-		childIDStr := c.Query(childIDParam)
-		if childIDStr == "" {
-			childIDStr = c.Param(childIDParam)
+		profileIDStr := c.Query(profileIDParam)
+		if profileIDStr == "" {
+			profileIDStr = c.Param(profileIDParam)
 		}
-		if childIDStr == "" {
+		if profileIDStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": fmt.Sprintf("missing required parameter: %s", childIDParam),
+				"error": fmt.Sprintf("missing required parameter: %s", profileIDParam),
 			})
 			c.Abort()
 			return
 		}
 
-		isGuardian, err := guardianshipSvc.IsGuardian(c.Request.Context(), claims.UserID, childIDStr)
+		hasActiveProfileLink, err := profileLinkSvc.HasActiveProfileLink(c.Request.Context(), claims.UserID, profileIDStr)
 		if err != nil {
 			c.JSON(http.StatusInternalServerError, gin.H{
-				"error": fmt.Sprintf("failed to verify guardianship: %v", err),
+				"error": fmt.Sprintf("failed to verify profile link: %v", err),
 			})
 			c.Abort()
 			return
 		}
-		if !isGuardian {
+		if !hasActiveProfileLink {
 			c.JSON(http.StatusForbidden, gin.H{
-				"error": "you are not the guardian of this child",
+				"error": "you do not have access to this profile",
 			})
 			c.Abort()
 			return
 		}
 
-		childID, err := strconv.ParseUint(childIDStr, 10, 64)
+		profileID, err := strconv.ParseUint(profileIDStr, 10, 64)
 		if err != nil {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": fmt.Sprintf("invalid child id format: %s", childIDStr),
+				"error": fmt.Sprintf("invalid profile id format: %s", profileIDStr),
 			})
 			c.Abort()
 			return
 		}
-		c.Set(ChildIDKey, childID)
+		c.Set(ProfileIDKey, profileID)
 
 		c.Next()
 	}
 }
 
-// OptionalGuardianshipMiddleware verifies guardianship only when the child ID
+// OptionalProfileLinkMiddleware verifies profile access only when the ProfileID
 // parameter is present; unavailable IAM dependencies degrade open as before.
-func OptionalGuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, childIDParam string) gin.HandlerFunc {
+func OptionalProfileLinkMiddleware(profileLinkSvc *iam.ProfileLinkService, profileIDParam string) gin.HandlerFunc {
 	return func(c *gin.Context) {
-		childIDStr := c.Query(childIDParam)
-		if childIDStr == "" {
-			childIDStr = c.Param(childIDParam)
+		profileIDStr := c.Query(profileIDParam)
+		if profileIDStr == "" {
+			profileIDStr = c.Param(profileIDParam)
 		}
-		if childIDStr == "" {
+		if profileIDStr == "" {
 			c.Next()
 			return
 		}
 
-		if guardianshipSvc == nil || !guardianshipSvc.IsEnabled() {
+		if profileLinkSvc == nil || !profileLinkSvc.IsEnabled() {
 			c.Next()
 			return
 		}
@@ -124,14 +119,14 @@ func OptionalGuardianshipMiddleware(guardianshipSvc *iam.GuardianshipService, ch
 			return
 		}
 
-		isGuardian, err := guardianshipSvc.IsGuardian(c.Request.Context(), claims.UserID, childIDStr)
+		hasActiveProfileLink, err := profileLinkSvc.HasActiveProfileLink(c.Request.Context(), claims.UserID, profileIDStr)
 		if err != nil {
 			c.Next()
 			return
 		}
-		if isGuardian {
-			childID, _ := strconv.ParseUint(childIDStr, 10, 64)
-			c.Set(ChildIDKey, childID)
+		if hasActiveProfileLink {
+			profileID, _ := strconv.ParseUint(profileIDStr, 10, 64)
+			c.Set(ProfileIDKey, profileID)
 		}
 
 		c.Next()
@@ -143,9 +138,9 @@ func GetUserID(c *gin.Context) uint64 {
 	return httpauth.GetUserID(c)
 }
 
-// GetChildID returns the verified child ID from gin.Context.
-func GetChildID(c *gin.Context) uint64 {
-	val, exists := c.Get(ChildIDKey)
+// GetProfileID returns the verified IAM ProfileID from gin.Context.
+func GetProfileID(c *gin.Context) uint64 {
+	val, exists := c.Get(ProfileIDKey)
 	if !exists {
 		return 0
 	}

@@ -4,8 +4,7 @@ package response
 type TesteeResponse struct {
 	ID              string                   `json:"id"`                           // ID
 	OrgID           string                   `json:"org_id"`                       // 机构ID
-	ProfileID       *string                  `json:"profile_id,omitempty"`         // 用户档案ID（新字段）
-	IAMChildID      *string                  `json:"iam_child_id,omitempty"`       // IAM儿童ID（已废弃，向后兼容，等同于ProfileID）
+	ProfileID       *string                  `json:"profile_id,omitempty"`         // 用户档案ID
 	Name            string                   `json:"name"`                         // 姓名
 	Gender          string                   `json:"gender,omitempty"`             // 性别
 	GenderLabel     string                   `json:"gender_label,omitempty"`       // 性别中文

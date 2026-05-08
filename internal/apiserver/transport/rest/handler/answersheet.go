@@ -99,7 +99,7 @@ func (h *AnswerSheetHandler) List(c *gin.Context) {
 
 // AdminSubmit 管理员提交答卷
 // @Summary 管理员提交答卷
-// @Description 管理员绕过监护关系校验提交答卷
+// @Description 管理员绕过ProfileLink 权限校验提交答卷
 // @Tags AnswerSheet-Management
 // @Accept json
 // @Produce json

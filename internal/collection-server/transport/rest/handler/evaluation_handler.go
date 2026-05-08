@@ -61,7 +61,7 @@ func NewEvaluationHandler(queryService evaluationQueryService, answerSheetServic
 // @Security Bearer
 // @Router /api/v1/assessments/{id} [get]
 func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
-	// 从 query 参数获取 testee_id（监护关系验证已在中间件完成，或由业务逻辑验证）
+	// 从 query 参数获取 testee_id（ProfileLink 权限验证已在中间件完成，或由业务逻辑验证）
 	testeeIDStr := h.GetQueryParam(c, "testee_id")
 	if testeeIDStr == "" {
 		h.BadRequestResponse(c, "testee_id is required", nil)

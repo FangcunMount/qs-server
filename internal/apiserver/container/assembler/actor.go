@@ -57,7 +57,7 @@ type ActorModule struct {
 // ActorModuleDeps 定义 Actor 模块的显式构造依赖。
 type ActorModuleDeps struct {
 	MySQLDB             *gorm.DB
-	GuardianshipService *iam.GuardianshipService
+	ProfileLinkService *iam.ProfileLinkService
 	IdentityService     *iam.IdentityService
 	RedisClient         redis.UniversalClient
 	CacheBuilder        *keyspace.Builder
@@ -77,7 +77,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 
 	module := &ActorModule{}
 	mysqlDB := deps.MySQLDB
-	guardianshipSvc := deps.GuardianshipService
+	profileLinkSvc := deps.ProfileLinkService
 	identitySvc := deps.IdentityService
 	operationAccountSvc := deps.OperationAccountSvc
 	var authzAssign *iam.AuthzAssignmentClient
@@ -90,7 +90,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	operatorAuthzGateway := iam.NewOperatorAuthzGateway(authzAssign, authzSnap)
 	userDirectory := iam.NewUserDirectory(identitySvc)
 	accountRegistrar := iam.NewOperationAccountRegistrar(operationAccountSvc)
-	guardianDirectory := iam.NewGuardianDirectory(guardianshipSvc, identitySvc)
+	profileLinkDirectory := iam.NewProfileLinkDirectory(profileLinkSvc, identitySvc)
 
 	txRunner := newMySQLTransactionRunner(mysqlDB)
 	mysqlOptions := mysql.BaseRepositoryOptions{Limiter: deps.MySQLLimiter}
@@ -137,7 +137,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		testeeValidator,
 		testeeBinder,
 		txRunner,
-		guardianshipSvc,
+		profileLinkSvc,
 	)
 	module.TesteeManagementService = testeeApp.NewManagementService(
 		testeeRepo,
@@ -154,7 +154,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 
 	module.TesteeBackendQueryService = testeeApp.NewBackendQueryService(
 		module.TesteeQueryService,
-		guardianDirectory,
+		profileLinkDirectory,
 	)
 	module.OperatorLifecycleService = operatorApp.NewLifecycleService(
 		operatorRepo,
@@ -208,7 +208,7 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 		testeeRepo,
 		testeeFactory,
 		assessmentEntryValidator,
-		guardianshipSvc,
+		profileLinkSvc,
 		resolveLogWriter,
 		intakeLogWriter,
 		behaviorEvents,

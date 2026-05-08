@@ -13,15 +13,15 @@ import (
 type TesteeHandler struct {
 	*BaseHandler
 	testeeService       *testee.Service
-	guardianshipService *iam.GuardianshipService
+	profileLinkService *iam.ProfileLinkService
 }
 
 // NewTesteeHandler 创建受试者处理器
-func NewTesteeHandler(testeeService *testee.Service, guardianshipService *iam.GuardianshipService) *TesteeHandler {
+func NewTesteeHandler(testeeService *testee.Service, profileLinkService *iam.ProfileLinkService) *TesteeHandler {
 	return &TesteeHandler{
 		BaseHandler:         NewBaseHandler(),
 		testeeService:       testeeService,
-		guardianshipService: guardianshipService,
+		profileLinkService: profileLinkService,
 	}
 }
 
@@ -51,7 +51,7 @@ func (h *TesteeHandler) Create(c *gin.Context) {
 		return
 	}
 
-	result, err := h.testeeService.CreateTestee(c.Request.Context(), &req)
+	result, err := h.testeeService.CreateTestee(c.Request.Context(), userID, &req)
 	if err != nil {
 		h.InternalErrorResponse(c, "create testee failed", err)
 		return
@@ -187,26 +187,26 @@ func (h *TesteeHandler) List(c *gin.Context) {
 		return
 	}
 
-	// 从 IAM SDK 获取当前用户的所有孩子ID列表
-	childIDs := []uint64{}
-	if h.guardianshipService != nil && h.guardianshipService.IsEnabled() {
+	// 从 IAM SDK 获取当前用户的所有 ProfileID 列表
+	profileIDs := []uint64{}
+	if h.profileLinkService != nil && h.profileLinkService.IsEnabled() {
 		userIDStr := strconv.FormatUint(userID, 10)
-		childrenResp, err := h.guardianshipService.GetUserChildren(c.Request.Context(), userIDStr)
+		profilesResp, err := h.profileLinkService.GetUserProfiles(c.Request.Context(), userIDStr)
 		if err != nil {
-			log.Warnf("Failed to get user children from IAM: %v, will return empty list", err)
+			log.Warnf("Failed to get user profiles from IAM: %v, will return empty list", err)
 			// 不返回错误，允许继续查询（返回空列表）
-		} else if childrenResp != nil && len(childrenResp.Items) > 0 {
-			for _, edge := range childrenResp.Items {
+		} else if profilesResp != nil && len(profilesResp.Items) > 0 {
+			for _, edge := range profilesResp.Items {
 				if edge.Profile != nil && edge.Profile.Id != "" {
-					if childID, err := strconv.ParseUint(edge.Profile.Id, 10, 64); err == nil {
-						childIDs = append(childIDs, childID)
+					if profileID, err := strconv.ParseUint(edge.Profile.Id, 10, 64); err == nil {
+						profileIDs = append(profileIDs, profileID)
 					}
 				}
 			}
 		}
 	}
 
-	result, err := h.testeeService.ListMyTestees(c.Request.Context(), childIDs, &req)
+	result, err := h.testeeService.ListMyTestees(c.Request.Context(), profileIDs, &req)
 	if err != nil {
 		h.InternalErrorResponse(c, "list my testees failed", err)
 		return
@@ -217,10 +217,10 @@ func (h *TesteeHandler) List(c *gin.Context) {
 
 // Exists 检查受试者是否存在
 // @Summary 检查受试者是否存在
-// @Description 根据IAM儿童ID检查受试者是否存在
+// @Description 根据 IAM ProfileID 检查受试者是否存在
 // @Tags 受试者
 // @Produce json
-// @Param iam_child_id query string true "IAM儿童ID"
+// @Param iam_profile_id query string true "IAM档案ID"
 // @Success 200 {object} core.Response{data=testee.TesteeExistsResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 401 {object} core.ErrResponse
@@ -228,9 +228,9 @@ func (h *TesteeHandler) List(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/testees/exists [get]
 func (h *TesteeHandler) Exists(c *gin.Context) {
-	iamChildID := h.GetQueryParam(c, "iam_child_id")
-	if iamChildID == "" {
-		h.BadRequestResponse(c, "iam_child_id is required", nil)
+	iamProfileID := h.GetQueryParam(c, "iam_profile_id")
+	if iamProfileID == "" {
+		h.BadRequestResponse(c, "iam_profile_id is required", nil)
 		return
 	}
 
@@ -241,7 +241,7 @@ func (h *TesteeHandler) Exists(c *gin.Context) {
 		return
 	}
 
-	result, err := h.testeeService.TesteeExists(c.Request.Context(), iamChildID)
+	result, err := h.testeeService.TesteeExists(c.Request.Context(), iamProfileID)
 	if err != nil {
 		h.InternalErrorResponse(c, "check testee existence failed", err)
 		return

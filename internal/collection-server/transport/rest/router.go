@@ -380,7 +380,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetFactorTrend,
 		)...)
 		// 高风险因子
-		assessments.GET("/high-risk", rateLimitedHandlers(
+		assessments.GET("/:id/factors/high-risk", rateLimitedHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,

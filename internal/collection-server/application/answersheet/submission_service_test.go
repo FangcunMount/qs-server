@@ -27,8 +27,8 @@ func (s *actorLookupClientStub) GetTestee(_ context.Context, testeeID uint64) (*
 	return nil, status.Error(codes.NotFound, "受试者不存在")
 }
 
-func (s *actorLookupClientStub) TesteeExists(_ context.Context, _ uint64, iamChildID uint64) (bool, uint64, error) {
-	if id, ok := s.existsIDs[iamChildID]; ok {
+func (s *actorLookupClientStub) TesteeExists(_ context.Context, _ uint64, iamProfileID uint64) (bool, uint64, error) {
+	if id, ok := s.existsIDs[iamProfileID]; ok {
 		return true, id, nil
 	}
 	return false, 0, nil
@@ -65,10 +65,10 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 	stub := &actorLookupClientStub{
 		getResults: map[uint64]*grpcclient.TesteeResponse{
 			canonicalTesteeID: {
-				ID:         canonicalTesteeID,
-				OrgID:      1,
-				IAMChildID: "615966157324694062",
-				Name:       "宋博文",
+				ID:           canonicalTesteeID,
+				OrgID:        1,
+				IAMProfileID: "615966157324694062",
+				Name:         "宋博文",
 			},
 		},
 		getErrors: map[uint64]error{
@@ -80,7 +80,7 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 	}
 	service := &SubmissionService{
 		actorClient:         stub,
-		guardianshipService: new(iam.GuardianshipService),
+		profileLinkService: new(iam.ProfileLinkService),
 	}
 
 	testee, resolvedID, err := service.resolveCanonicalTestee(context.Background(), profileID)

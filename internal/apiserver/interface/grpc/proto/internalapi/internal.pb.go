@@ -2917,7 +2917,7 @@ type SendTaskOpenedMiniProgramNotificationResponse struct {
 	Success          bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                                            // 是否成功
 	SentCount        int32                  `protobuf:"varint,2,opt,name=sent_count,json=sentCount,proto3" json:"sent_count,omitempty"`                       // 成功发送条数
 	RecipientOpenIds []string               `protobuf:"bytes,3,rep,name=recipient_open_ids,json=recipientOpenIds,proto3" json:"recipient_open_ids,omitempty"` // 实际命中的 openid 列表
-	RecipientSource  string                 `protobuf:"bytes,4,opt,name=recipient_source,json=recipientSource,proto3" json:"recipient_source,omitempty"`      // 收件人来源：testee / guardian
+	RecipientSource  string                 `protobuf:"bytes,4,opt,name=recipient_source,json=recipientSource,proto3" json:"recipient_source,omitempty"`      // 收件人来源：testee / profile_link
 	Skipped          bool                   `protobuf:"varint,5,opt,name=skipped,proto3" json:"skipped,omitempty"`                                            // 是否跳过发送
 	Message          string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"`                                             // 描述信息
 	unknownFields    protoimpl.UnknownFields

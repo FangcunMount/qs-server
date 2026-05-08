@@ -21,7 +21,7 @@ type registrationService struct {
 	validator       domain.Validator
 	binder          domain.Binder
 	uow             apptransaction.Runner
-	guardianshipSvc iambridge.GuardianshipReader
+	profileReader iambridge.ProfileReader
 }
 
 // NewRegistrationService 创建受试者注册服务
@@ -31,7 +31,7 @@ func NewRegistrationService(
 	validator domain.Validator,
 	binder domain.Binder,
 	uow apptransaction.Runner,
-	guardianshipSvc iambridge.GuardianshipReader,
+	profileReader iambridge.ProfileReader,
 ) TesteeRegistrationService {
 	return &registrationService{
 		repo:            repo,
@@ -39,7 +39,7 @@ func NewRegistrationService(
 		validator:       validator,
 		binder:          binder,
 		uow:             uow,
-		guardianshipSvc: guardianshipSvc,
+		profileReader: profileReader,
 	}
 }
 
@@ -88,26 +88,24 @@ func (s *registrationService) Register(ctx context.Context, dto RegisterTesteeDT
 			"result", "success",
 		)
 
-		// 2. 如果提供了 ProfileID，先验证该 child 在 IAM 中是否存在
+		// 2. 如果提供了 ProfileID，先验证该 Profile 在 IAM 中是否存在
 		if dto.ProfileID != nil && *dto.ProfileID > 0 {
 			l.Debugw("验证ProfileID在IAM中是否存在",
 				"profile_id", *dto.ProfileID,
 			)
 
-			if s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
-				childID := strconv.FormatUint(*dto.ProfileID, 10)
-				if err := s.guardianshipSvc.ValidateChildExists(txCtx, childID); err != nil {
+			if s.profileReader != nil && s.profileReader.IsEnabled() {
+				profileID := strconv.FormatUint(*dto.ProfileID, 10)
+				if err := s.profileReader.ValidateProfileExists(txCtx, profileID); err != nil {
 					l.Warnw("ProfileID在IAM中不存在",
 						"profile_id", *dto.ProfileID,
-						"child_id", childID,
 						"result", "failed",
 						"error", err.Error(),
 					)
-					return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
+					return errors.WithCode(code.ErrInvalidArgument, "profile does not exist in IAM system")
 				}
 				l.Debugw("ProfileID验证通过",
 					"profile_id", *dto.ProfileID,
-					"child_id", childID,
 				)
 			}
 		}
@@ -245,24 +243,21 @@ func (s *registrationService) EnsureByProfile(ctx context.Context, dto EnsureTes
 		}
 
 		// 验证 ProfileID 在 IAM 中是否存在
-		if s.guardianshipSvc != nil && s.guardianshipSvc.IsEnabled() {
-			childID := strconv.FormatUint(*dto.ProfileID, 10)
+		if s.profileReader != nil && s.profileReader.IsEnabled() {
+			profileID := strconv.FormatUint(*dto.ProfileID, 10)
 			l.Debugw("验证ProfileID在IAM中是否存在",
 				"profile_id", *dto.ProfileID,
-				"child_id", childID,
 			)
-			if err := s.guardianshipSvc.ValidateChildExists(txCtx, childID); err != nil {
+			if err := s.profileReader.ValidateProfileExists(txCtx, profileID); err != nil {
 				l.Warnw("ProfileID在IAM中不存在",
 					"profile_id", *dto.ProfileID,
-					"child_id", childID,
 					"result", "failed",
 					"error", err.Error(),
 				)
-				return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
+				return errors.WithCode(code.ErrInvalidArgument, "profile does not exist in IAM system")
 			}
 			l.Debugw("ProfileID验证通过",
 				"profile_id", *dto.ProfileID,
-				"child_id", childID,
 			)
 		}
 

@@ -332,7 +332,7 @@ GuardianshipService 用于前台场景：
 collection-server 在提交前会：
 
 1. 查询受试者。
-2. 获取 IAMChildID。
+2. 获取 IAMProfileID。
 3. 调 GuardianshipService 判断是否监护人。
 4. 通过后才继续提交。
 
@@ -743,8 +743,8 @@ IAMOptions 统一管理：
 检查：
 
 1. IAM GuardianshipService 是否可用。
-2. testee 是否绑定 IAMChildID。
-3. userID / childID。
+2. testee 是否绑定 IAMProfileID。
+3. userID / profileID。
 4. guardianship cache。
 5. IAM relationship data。
 

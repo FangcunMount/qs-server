@@ -21,7 +21,7 @@ type IAMOptions struct {
 	JWT               *JWTOptions
 	JWKS              *JWKSOptions
 	UserCache         *CacheOptions
-	GuardianshipCache *CacheOptions
+	ProfileLinkCache *CacheOptions
 
 	AuthzAppName              string
 	AuthzCacheTTL             time.Duration

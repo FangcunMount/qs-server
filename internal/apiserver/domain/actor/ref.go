@@ -16,7 +16,7 @@ import (
 // 避免跨聚合根直接依赖实体，保持松耦合
 type TesteeRef struct {
 	testeeID  testee.ID // 受试者ID
-	profileID *uint64   // 可选：用户档案ID（当前对应 IAM.Child.ID）
+	profileID *uint64   // 可选：IAM Profile ID
 }
 
 // NewTesteeRef 创建受试者引用

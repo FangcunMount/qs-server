@@ -37,9 +37,6 @@ func TestBuildTesteeSummaryResponse(t *testing.T) {
 	if result.ProfileID == nil || *result.ProfileID != "88" {
 		t.Fatalf("profile_id = %v, want 88", result.ProfileID)
 	}
-	if result.IAMChildID == nil || *result.IAMChildID != "88" {
-		t.Fatalf("iam_child_id = %v, want 88", result.IAMChildID)
-	}
 	if result.Gender != "female" {
 		t.Fatalf("gender = %q, want female", result.Gender)
 	}

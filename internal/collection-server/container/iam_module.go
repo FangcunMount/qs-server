@@ -19,7 +19,8 @@ type IAMModule struct {
 	tokenVerifier       *iam.TokenVerifier
 	serviceAuthHelper   *iam.ServiceAuthHelper
 	identityService     *iam.IdentityService
-	guardianshipSvc     *iam.GuardianshipService
+	profileService      *iam.ProfileService
+	profileLinkSvc     *iam.ProfileLinkService
 	authzSnapshotLoader *iamauth.SnapshotLoader
 }
 
@@ -79,12 +80,20 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		}
 	}
 
-	// 创建 Guardianship 服务
-	var guardianshipSvc *iam.GuardianshipService
+	var profileService *iam.ProfileService
 	if client.IsEnabled() {
-		guardianshipSvc, err = iam.NewGuardianshipService(client)
+		profileService, err = iam.NewProfileService(client)
 		if err != nil {
-			log.Warnf("Failed to create guardianship service: %v", err)
+			log.Warnf("Failed to create profile service: %v", err)
+		}
+	}
+
+	// 创建 ProfileLink 服务
+	var profileLinkSvc *iam.ProfileLinkService
+	if client.IsEnabled() {
+		profileLinkSvc, err = iam.NewProfileLinkService(client)
+		if err != nil {
+			log.Warnf("Failed to create profile link service: %v", err)
 		}
 	}
 
@@ -105,7 +114,8 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		tokenVerifier:       tokenVerifier,
 		serviceAuthHelper:   serviceAuthHelper,
 		identityService:     identityService,
-		guardianshipSvc:     guardianshipSvc,
+		profileService:      profileService,
+		profileLinkSvc:     profileLinkSvc,
 		authzSnapshotLoader: authzSnapshotLoader,
 	}, nil
 }
@@ -140,10 +150,16 @@ func (m *IAMModule) IdentityService() *iam.IdentityService {
 	return m.identityService
 }
 
-// GuardianshipService 返回监护关系服务
-// 用于监护关系验证和查询
-func (m *IAMModule) GuardianshipService() *iam.GuardianshipService {
-	return m.guardianshipSvc
+// ProfileService 返回档案命令服务
+// 用于 collection-server 注册 testee 时创建 IAM Profile + ProfileLink。
+func (m *IAMModule) ProfileService() *iam.ProfileService {
+	return m.profileService
+}
+
+// ProfileLinkService 返回 ProfileLink 服务。
+// 用于 Profile 访问校验和关系查询。
+func (m *IAMModule) ProfileLinkService() *iam.ProfileLinkService {
+	return m.profileLinkSvc
 }
 
 // AuthzSnapshotLoader 返回 IAM 授权快照加载器（与 apiserver 共用 pkg/iamauth）。
@@ -252,16 +268,16 @@ func convertIAMOptions(opts *options.IAMOptions) *iam.IAMOptions {
 		}
 	}
 
-	// 监护关系缓存配置
-	if opts.GuardianshipCache != nil {
-		iamOpts.GuardianshipCache = &iam.CacheOptions{
-			Enabled: opts.GuardianshipCache.Enabled,
-			TTL:     opts.GuardianshipCache.TTL,
-			MaxSize: opts.GuardianshipCache.MaxSize,
+	// ProfileLink 缓存配置
+	if opts.ProfileLinkCache != nil {
+		iamOpts.ProfileLinkCache = &iam.CacheOptions{
+			Enabled: opts.ProfileLinkCache.Enabled,
+			TTL:     opts.ProfileLinkCache.TTL,
+			MaxSize: opts.ProfileLinkCache.MaxSize,
 		}
 	} else {
-		// 默认启用监护关系缓存
-		iamOpts.GuardianshipCache = &iam.CacheOptions{
+		// 默认启用 ProfileLink 缓存
+		iamOpts.ProfileLinkCache = &iam.CacheOptions{
 			Enabled: true,
 			TTL:     10 * time.Minute,
 			MaxSize: 50000,

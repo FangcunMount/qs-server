@@ -130,7 +130,7 @@ sequenceDiagram
 
     Client->>App: Intake(token, profile/testee info)
     App->>App: resolveEntry(token)
-    App->>IAM: ValidateChildExists(profileID)
+    App->>IAM: ValidateProfileExists(profileID)
     App->>TesteeFactory: GetOrCreateByProfile / CreateTemporary
     App->>RelationRepo: ensure creator relation
     App->>RelationRepo: ensure attending/access relation
@@ -141,7 +141,7 @@ Intake 会做：
 
 | 步骤 | 说明 |
 | ---- | ---- |
-| validateIntakeProfile | 如果有 profileID 且 IAM guardianship 启用，校验 child profile 存在 |
+| validateIntakeProfile | 如果有 profileID 且 IAM guardianship 启用，校验 profile 存在 |
 | resolveIntakeTestee | 有 profile 则 get-or-create，无 profile 则创建 temporary Testee |
 | ensureCreatorRelation | 确保 creator 关系 |
 | ensureAssignmentRelation | 确保 attending/access 类关系 |
@@ -157,7 +157,7 @@ AssessmentEntry 与 IAM 的关系很容易误解。
 | -------- | ----------------------- |
 | 当前登录用户 | REST/Auth middleware 和 actorctx 归一化 |
 | 组织信息 | orgID 校验 |
-| IAM Child/Profile | Intake 时通过 guardianshipSvc.ValidateChildExists 校验 |
+| IAM Profile | Intake 时通过 guardianshipSvc.ValidateProfileExists 校验 |
 | 授权快照 | access guard / operator authz 使用 |
 | token/JWT | 只在边界层解析，不写入 AssessmentEntry |
 

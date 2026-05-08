@@ -9,8 +9,7 @@ import (
 // CreateTesteeRequest 创建受试者请求
 type CreateTesteeRequest struct {
 	OrgID      int64      `json:"org_id" binding:"required"` // 机构ID
-	ProfileID  *uint64    `json:"profile_id"`                // 用户档案ID（新字段）
-	IAMChildID *int64     `json:"iam_child_id"`              // IAM儿童ID（已废弃，向后兼容）
+	ProfileID  *uint64    `json:"profile_id"`                // 用户档案ID
 	Name       string     `json:"name" binding:"required"`   // 姓名
 	Gender     string     `json:"gender"`                    // 性别
 	Birthday   *time.Time `json:"birthday"`                  // 出生日期
@@ -41,9 +40,8 @@ type ListTesteeRequest struct {
 
 // GetTesteeByProfileIDRequest 根据 profile_id 查询受试者请求
 type GetTesteeByProfileIDRequest struct {
-	OrgID      int64  `form:"org_id"`       // 兼容字段：机构ID
-	ProfileID  string `form:"profile_id"`   // 用户档案ID（ProfileID）
-	IAMChildID string `form:"iam_child_id"` // 兼容字段：IAM儿童ID
+	OrgID     int64  `form:"org_id"`     // 兼容字段：机构ID
+	ProfileID string `form:"profile_id"` // 用户档案ID（ProfileID）
 }
 
 // CreateStaffRequest 创建员工请求

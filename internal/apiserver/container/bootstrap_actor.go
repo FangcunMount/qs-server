@@ -10,7 +10,7 @@ import (
 )
 
 type actorModuleInitDeps struct {
-	guardianshipSvc     *iam.GuardianshipService
+	profileLinkSvc     *iam.ProfileLinkService
 	identitySvc         *iam.IdentityService
 	operationAccountSvc *iam.OperationAccountService
 	opAuthz             *iam.OperatorAuthzBundle
@@ -22,7 +22,7 @@ func (c *Container) resolveActorModuleInitDeps() actorModuleInitDeps {
 		return deps
 	}
 
-	deps.guardianshipSvc = c.IAMModule.GuardianshipService()
+	deps.profileLinkSvc = c.IAMModule.ProfileLinkService()
 	deps.identitySvc = c.IAMModule.IdentityService()
 	deps.operationAccountSvc = c.IAMModule.OperationAccountService()
 	deps.opAuthz = &iam.OperatorAuthzBundle{
@@ -36,7 +36,7 @@ func (c *Container) buildActorModuleDeps() assembler.ActorModuleDeps {
 	deps := c.resolveActorModuleInitDeps()
 	return assembler.ActorModuleDeps{
 		MySQLDB:             c.mysqlDB,
-		GuardianshipService: deps.guardianshipSvc,
+		ProfileLinkService: deps.profileLinkSvc,
 		IdentityService:     deps.identitySvc,
 		RedisClient:         c.CacheClient(cacheplane.FamilyObject),
 		CacheBuilder:        c.CacheBuilder(cacheplane.FamilyObject),

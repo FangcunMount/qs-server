@@ -120,7 +120,6 @@ func newClinicianWorkbenchTesteeResponse(result workbenchApp.Testee) *TesteeResp
 		ID:              idStr,
 		OrgID:           orgIDStr,
 		ProfileID:       profileIDStr,
-		IAMChildID:      LegacyIAMChildIDAlias(profileIDStr),
 		Name:            result.Name,
 		Gender:          gender,
 		GenderLabel:     LabelForGender(gender),

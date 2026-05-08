@@ -20,49 +20,77 @@ import (
 // 3. 转换 gRPC 响应到 REST DTO
 type Service struct {
 	actorClient         *grpcclient.ActorClient
-	guardianshipService *iam.GuardianshipService
+	profileLinkService *iam.ProfileLinkService
+	profileService      *iam.ProfileService
 }
 
 // NewService 创建受试者服务
-func NewService(actorClient *grpcclient.ActorClient, guardianshipService *iam.GuardianshipService) *Service {
+func NewService(actorClient *grpcclient.ActorClient, profileLinkService *iam.ProfileLinkService, profileService *iam.ProfileService) *Service {
 	return &Service{
 		actorClient:         actorClient,
-		guardianshipService: guardianshipService,
+		profileLinkService: profileLinkService,
+		profileService:      profileService,
 	}
 }
 
 // CreateTestee 创建受试者
-func (s *Service) CreateTestee(ctx context.Context, req *CreateTesteeRequest) (*TesteeResponse, error) {
+func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTesteeRequest) (*TesteeResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
-	log.Infof("Creating testee: name=%s, iamChildID=%s", req.Name, req.IAMChildID)
+	log.Infof("Creating testee: name=%s, userID=%d", req.Name, userID)
 
 	l.Infow("开始创建受试者",
 		"action", "create_testee",
 		"name", req.Name,
-		"iam_child_id", req.IAMChildID,
+		"iam_user_id", userID,
 	)
+	if userID == 0 {
+		return nil, fmt.Errorf("user id is required")
+	}
+	if s.profileService == nil || !s.profileService.IsEnabled() {
+		return nil, fmt.Errorf("iam profile service not enabled")
+	}
 
 	// 从 IAM 获取默认机构ID（单租户场景）
-	orgID := s.guardianshipService.GetDefaultOrgID()
+	orgID := s.defaultOrgID()
+	iamUserID := strconv.FormatUint(userID, 10)
+	profile, err := s.profileService.CreateProfile(ctx, iam.CreateProfileInput{
+		UserID:       iamUserID,
+		LegalName:    req.Name,
+		Gender:       req.Gender,
+		DOB:          birthdayString(req.Birthday),
+		IDCardNumber: req.IDCardNumber,
+		Relation:     req.Relation,
+	})
+	if err != nil {
+		l.Errorw("创建 IAM Profile 失败",
+			"action", "create_testee",
+			"name", req.Name,
+			"iam_user_id", iamUserID,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, err
+	}
 
 	// 调用 gRPC 服务
 	l.Debugw("调用 gRPC 服务创建受试者",
 		"org_id", orgID,
-		"iam_user_id", req.IAMUserID,
+		"iam_user_id", iamUserID,
+		"iam_profile_id", profile.ProfileID,
 	)
 
 	result, err := s.actorClient.CreateTestee(ctx, &grpcclient.CreateTesteeRequest{
-		OrgID:      orgID,
-		IAMUserID:  req.IAMUserID,
-		IAMChildID: req.IAMChildID,
-		Name:       req.Name,
-		Gender:     req.Gender,
-		Birthday:   req.Birthday.ToTimePtr(), // 转换 Date 为 *time.Time
-		Tags:       req.Tags,
-		Source:     req.Source,
-		IsKeyFocus: req.IsKeyFocus,
+		OrgID:        orgID,
+		IAMUserID:    iamUserID,
+		IAMProfileID: profile.ProfileID,
+		Name:         req.Name,
+		Gender:       req.Gender,
+		Birthday:     req.Birthday.ToTimePtr(), // 转换 Date 为 *time.Time
+		Tags:         req.Tags,
+		Source:       req.Source,
+		IsKeyFocus:   req.IsKeyFocus,
 	})
 	if err != nil {
 		log.Errorf("Failed to create testee via gRPC: %v", err)
@@ -74,12 +102,15 @@ func (s *Service) CreateTestee(ctx context.Context, req *CreateTesteeRequest) (*
 		)
 		return nil, err
 	}
+	result.IAMUserID = iamUserID
+	result.IAMProfileID = profile.ProfileID
 
 	duration := time.Since(startTime)
 	l.Infow("创建受试者成功",
 		"action", "create_testee",
 		"result", "success",
 		"testee_id", result.ID,
+		"iam_profile_id", profile.ProfileID,
 		"duration_ms", duration.Milliseconds(),
 	)
 
@@ -203,16 +234,16 @@ func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *Update
 }
 
 // ListMyTestees 查询当前用户的受试者列表
-// childIDs 是当前用户（监护人）在 IAM 系统中的所有孩子ID列表
-func (s *Service) ListMyTestees(ctx context.Context, childIDs []uint64, req *ListTesteesRequest) (*ListTesteesResponse, error) {
+// profileIDs 是当前用户在 IAM 系统中拥有 active ProfileLink 的 ProfileID 列表
+func (s *Service) ListMyTestees(ctx context.Context, profileIDs []uint64, req *ListTesteesRequest) (*ListTesteesResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
-	log.Infof("Listing my testees: childIDs=%v, offset=%d, limit=%d", childIDs, req.Offset, req.Limit)
+	log.Infof("Listing my testees: profileIDs=%v, offset=%d, limit=%d", profileIDs, req.Offset, req.Limit)
 
 	l.Debugw("查询受试者列表",
 		"action", "list_my_testees",
-		"child_ids_count", len(childIDs),
+		"profile_ids_count", len(profileIDs),
 		"offset", req.Offset,
 		"limit", req.Limit,
 	)
@@ -229,7 +260,7 @@ func (s *Service) ListMyTestees(ctx context.Context, childIDs []uint64, req *Lis
 		"limit", limit,
 	)
 
-	testees, total, err := s.actorClient.ListTesteesByUser(ctx, childIDs, offset, limit)
+	testees, total, err := s.actorClient.ListTesteesByUser(ctx, profileIDs, offset, limit)
 	if err != nil {
 		log.Errorf("Failed to list my testees via gRPC: %v", err)
 		l.Errorw("查询受试者列表失败",
@@ -261,32 +292,32 @@ func (s *Service) ListMyTestees(ctx context.Context, childIDs []uint64, req *Lis
 }
 
 // TesteeExists 检查受试者是否存在
-func (s *Service) TesteeExists(ctx context.Context, iamChildID string) (*TesteeExistsResponse, error) {
+func (s *Service) TesteeExists(ctx context.Context, iamProfileID string) (*TesteeExistsResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
 
 	// 转换 string ID 为 uint64
-	childIDUint, err := strconv.ParseUint(iamChildID, 10, 64)
+	profileIDUint, err := strconv.ParseUint(iamProfileID, 10, 64)
 	if err != nil {
-		return nil, fmt.Errorf("invalid iam_child_id format: %w", err)
+		return nil, fmt.Errorf("invalid iam_profile_id format: %w", err)
 	}
 
 	// 从 IAM 获取默认机构ID（单租户场景）
-	orgID := s.guardianshipService.GetDefaultOrgID()
-	log.Infof("Checking testee existence: orgID=%d, iamChildID=%s", orgID, iamChildID)
+	orgID := s.defaultOrgID()
+	log.Infof("Checking testee existence: orgID=%d, iamProfileID=%s", orgID, iamProfileID)
 
 	l.Debugw("检查受试者存在性",
 		"action", "testee_exists",
 		"org_id", orgID,
-		"iam_child_id", iamChildID,
+		"iam_profile_id", iamProfileID,
 	)
 
-	exists, testeeID, err := s.actorClient.TesteeExists(ctx, orgID, childIDUint)
+	exists, testeeID, err := s.actorClient.TesteeExists(ctx, orgID, profileIDUint)
 	if err != nil {
 		log.Errorf("Failed to check testee existence via gRPC: %v", err)
 		l.Errorw("检查受试者存在性失败",
 			"action", "testee_exists",
-			"iam_child_id", iamChildID,
+			"iam_profile_id", iamProfileID,
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -296,7 +327,7 @@ func (s *Service) TesteeExists(ctx context.Context, iamChildID string) (*TesteeE
 	duration := time.Since(startTime)
 	l.Debugw("检查受试者存在性完成",
 		"action", "testee_exists",
-		"iam_child_id", iamChildID,
+		"iam_profile_id", iamProfileID,
 		"exists", exists,
 		"testee_id", testeeID,
 		"duration_ms", duration.Milliseconds(),
@@ -321,18 +352,18 @@ func convertToTesteeResponse(from *grpcclient.TesteeResponse) *TesteeResponse {
 	}
 
 	resp := &TesteeResponse{
-		ID:         strconv.FormatUint(from.ID, 10),
-		OrgID:      strconv.FormatUint(from.OrgID, 10),
-		IAMUserID:  from.IAMUserID,
-		IAMChildID: from.IAMChildID,
-		Name:       from.Name,
-		Gender:     from.Gender,
-		Birthday:   meta.NewBirthday(from.Birthday.Format("2006-01-02")),
-		Tags:       from.Tags,
-		Source:     from.Source,
-		IsKeyFocus: from.IsKeyFocus,
-		CreatedAt:  from.CreatedAt,
-		UpdatedAt:  from.UpdatedAt,
+		ID:           strconv.FormatUint(from.ID, 10),
+		OrgID:        strconv.FormatUint(from.OrgID, 10),
+		IAMUserID:    from.IAMUserID,
+		IAMProfileID: from.IAMProfileID,
+		Name:         from.Name,
+		Gender:       from.Gender,
+		Birthday:     meta.NewBirthday(from.Birthday.Format("2006-01-02")),
+		Tags:         from.Tags,
+		Source:       from.Source,
+		IsKeyFocus:   from.IsKeyFocus,
+		CreatedAt:    from.CreatedAt,
+		UpdatedAt:    from.UpdatedAt,
 	}
 
 	// 转换测评统计信息
@@ -345,4 +376,18 @@ func convertToTesteeResponse(from *grpcclient.TesteeResponse) *TesteeResponse {
 	}
 
 	return resp
+}
+
+func birthdayString(birthday *meta.Birthday) string {
+	if birthday == nil {
+		return ""
+	}
+	return birthday.String()
+}
+
+func (s *Service) defaultOrgID() uint64 {
+	if s.profileLinkService == nil {
+		return 1
+	}
+	return s.profileLinkService.GetDefaultOrgID()
 }

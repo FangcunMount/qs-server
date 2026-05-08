@@ -24,7 +24,7 @@ func (c *Container) resolveMiniProgramTaskNotificationDeps() miniProgramTaskNoti
 	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
 		deps.wechatAppService = c.IAMModule.WeChatAppService()
 		deps.recipientResolver = iam.NewMiniProgramRecipientResolver(
-			c.IAMModule.GuardianshipService(),
+			c.IAMModule.ProfileLinkService(),
 			c.IAMModule.IdentityService(),
 		)
 	}

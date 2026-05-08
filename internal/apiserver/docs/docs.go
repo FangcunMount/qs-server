@@ -105,7 +105,7 @@ const docTemplate = `{
         },
         "/api/v1/answersheets/admin-submit": {
             "post": {
-                "description": "管理员绕过监护关系校验提交答卷",
+                "description": "管理员绕过 ProfileLink 权限校验提交答卷",
                 "consumes": [
                     "application/json"
                 ],
@@ -7295,10 +7295,6 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/response.GuardianResponse"
                     }
-                },
-                "iam_child_id": {
-                    "description": "IAM儿童ID（已废弃，向后兼容，等同于ProfileID）",
-                    "type": "string"
                 },
                 "id": {
                     "description": "ID",

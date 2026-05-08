@@ -33,7 +33,7 @@ func TestContainerBuildActorModuleDepsUsesObjectCacheBuilderAndPolicy(t *testing
 	if deps.TesteePolicy != c.CachePolicy(cachepolicy.PolicyTestee) {
 		t.Fatalf("policy = %#v, want %#v", deps.TesteePolicy, c.CachePolicy(cachepolicy.PolicyTestee))
 	}
-	if deps.GuardianshipService != nil || deps.IdentityService != nil || deps.OperatorAuthz != nil || deps.OperationAccountSvc != nil {
+	if deps.ProfileLinkService != nil || deps.IdentityService != nil || deps.OperatorAuthz != nil || deps.OperationAccountSvc != nil {
 		t.Fatalf("unexpected IAM deps in actor deps: %#v", deps)
 	}
 	if deps.Observer != c.cacheObserver() {

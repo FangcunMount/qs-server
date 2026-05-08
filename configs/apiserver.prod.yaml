@@ -446,7 +446,7 @@ iam:
     fetch-strategies: ["http", "grpc", "cache"]        # 降级策略：HTTP → gRPC → 缓存
 
   # 用户信息缓存配置
-    ttl: 10m                                           # 缓存时长（监护关系变化较少）
+    ttl: 10m                                           # 缓存时长（ProfileLink 变化较少）
     max-size: 50000                                    # 最大缓存条目数
 
   # 用户信息缓存配置
@@ -455,10 +455,10 @@ iam:
     ttl: 5m                                            # 缓存时长
     max-size: 10000                                    # 最大缓存条目数
   
-  # 监护关系缓存配置
-  guardianship-cache:
-    enabled: true                                      # 启用监护关系缓存
-    ttl: 10m                                           # 缓存时长（监护关系变化较少）
+  # ProfileLink 缓存配置
+  profile-link-cache:
+    enabled: true                                      # 启用ProfileLink 缓存
+    ttl: 10m                                           # 缓存时长（ProfileLink 变化较少）
     max-size: 50000                                    # 最大缓存条目数
 
 # ----------------------------------------------------------------------------

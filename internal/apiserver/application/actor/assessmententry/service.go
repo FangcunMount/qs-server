@@ -25,7 +25,7 @@ type service struct {
 	entryReader     actorreadmodel.AssessmentEntryReader
 	testeeFactory   domainTestee.Factory
 	validator       domainAssessmentEntry.Validator
-	guardianshipSvc iambridge.GuardianshipReader
+	profileReader iambridge.ProfileReader
 	resolveLog      ResolveLogWriter
 	intakeLog       IntakeLogWriter
 	behaviorEvents  BehaviorEventStager
@@ -51,7 +51,7 @@ func NewService(
 	testeeRepo domainTestee.Repository,
 	testeeFactory domainTestee.Factory,
 	validator domainAssessmentEntry.Validator,
-	guardianshipSvc iambridge.GuardianshipReader,
+	profileReader iambridge.ProfileReader,
 	resolveLog ResolveLogWriter,
 	intakeLog IntakeLogWriter,
 	behaviorEvents BehaviorEventStager,
@@ -70,7 +70,7 @@ func NewService(
 		entryReader:     entryReader,
 		testeeFactory:   testeeFactory,
 		validator:       validator,
-		guardianshipSvc: guardianshipSvc,
+		profileReader: profileReader,
 		resolveLog:      resolveLog,
 		intakeLog:       intakeLog,
 		behaviorEvents:  behaviorEvents,
@@ -226,11 +226,11 @@ func (s *service) Intake(ctx context.Context, token string, dto IntakeByAssessme
 }
 
 func (s *service) validateIntakeProfile(ctx context.Context, dto IntakeByAssessmentEntryDTO) error {
-	if dto.ProfileID == nil || *dto.ProfileID == 0 || s.guardianshipSvc == nil || !s.guardianshipSvc.IsEnabled() {
+	if dto.ProfileID == nil || *dto.ProfileID == 0 || s.profileReader == nil || !s.profileReader.IsEnabled() {
 		return nil
 	}
-	if err := s.guardianshipSvc.ValidateChildExists(ctx, strconv.FormatUint(*dto.ProfileID, 10)); err != nil {
-		return errors.WithCode(code.ErrInvalidArgument, "child profile does not exist in IAM system")
+	if err := s.profileReader.ValidateProfileExists(ctx, strconv.FormatUint(*dto.ProfileID, 10)); err != nil {
+		return errors.WithCode(code.ErrInvalidArgument, "profile does not exist in IAM system")
 	}
 	return nil
 }
