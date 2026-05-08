@@ -12,15 +12,15 @@ import (
 // TesteeHandler 受试者处理器
 type TesteeHandler struct {
 	*BaseHandler
-	testeeService       *testee.Service
+	testeeService      *testee.Service
 	profileLinkService *iam.ProfileLinkService
 }
 
 // NewTesteeHandler 创建受试者处理器
 func NewTesteeHandler(testeeService *testee.Service, profileLinkService *iam.ProfileLinkService) *TesteeHandler {
 	return &TesteeHandler{
-		BaseHandler:         NewBaseHandler(),
-		testeeService:       testeeService,
+		BaseHandler:        NewBaseHandler(),
+		testeeService:      testeeService,
 		profileLinkService: profileLinkService,
 	}
 }

@@ -19,17 +19,17 @@ import (
 // 2. 调用 apiserver 的 Actor gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type Service struct {
-	actorClient         *grpcclient.ActorClient
+	actorClient        *grpcclient.ActorClient
 	profileLinkService *iam.ProfileLinkService
-	profileService      *iam.ProfileService
+	profileService     *iam.ProfileService
 }
 
 // NewService 创建受试者服务
 func NewService(actorClient *grpcclient.ActorClient, profileLinkService *iam.ProfileLinkService, profileService *iam.ProfileService) *Service {
 	return &Service{
-		actorClient:         actorClient,
+		actorClient:        actorClient,
 		profileLinkService: profileLinkService,
-		profileService:      profileService,
+		profileService:     profileService,
 	}
 }
 

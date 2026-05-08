@@ -57,7 +57,7 @@ JWT 证明“你是谁”，TenantScope 证明“你在哪个组织”，AuthzSn
 
 > **qs-server 没有自己重新实现一套用户体系和权限系统，而是把 IAM 作为身份与授权的外部真值系统接入进来。但我没有让 IAM SDK 类型直接进入业务领域模型，而是通过 IAMModule 和 Security Control Plane 做边界隔离。**
 >
-> **在进程启动时，apiserver 和 collection-server 都会根据 IAMOptions 创建 IAMModule。apiserver 的 IAMModule 能力更完整，包括 TokenVerifier、ServiceAuthHelper、IdentityService、OperationAccountService、GuardianshipService、WeChatAppService 和 AuthzSnapshotLoader；collection-server 作为前台 BFF，能力更窄，主要是 TokenVerifier、ServiceAuthHelper、IdentityService、GuardianshipService 和 AuthzSnapshotLoader。这样每个进程只嵌入自己需要的 IAM 能力。**
+> **在进程启动时，apiserver 和 collection-server 都会根据 IAMOptions 创建 IAMModule。apiserver 的 IAMModule 能力更完整，包括 TokenVerifier、ServiceAuthHelper、IdentityService、OperationAccountService、ProfileLinkService、WeChatAppService 和 AuthzSnapshotLoader；collection-server 作为前台 BFF，能力更窄，主要是 TokenVerifier、ServiceAuthHelper、IdentityService、ProfileLinkService 和 AuthzSnapshotLoader。这样每个进程只嵌入自己需要的 IAM 能力。**
 >
 > **请求进来以后，HTTP 侧先经过 JWT middleware，再通过 UserIdentityMiddleware 投影出 Principal 和 TenantScope。Principal 回答“谁在调用”，TenantScope 回答“在哪个 tenant/org 范围内调用”。gRPC 侧则通过 IAMAuthInterceptor 从 metadata 里提取 bearer token，使用 SDK TokenVerifier 验证，再把 user/account/tenant/session/token/roles 等写入 context。**
 >
@@ -149,7 +149,7 @@ flowchart TB
 - 创建 TokenVerifier。
 - 创建 ServiceAuthHelper。
 - 创建 IdentityService。
-- 创建 GuardianshipService。
+- 创建 ProfileLinkService。
 - 创建 AuthzSnapshotLoader。
 - apiserver 侧还创建 OperationAccountService、WeChatAppService。
 - 统一 Close，停止 token refresh / JWKS refresh / client。
@@ -161,7 +161,7 @@ flowchart TB
 | TokenVerifier | 有 | 有 | REST/gRPC token 验证 |
 | ServiceAuthHelper | 有 | 有 | 服务间认证 |
 | IdentityService | 有 | 有 | 用户资料查询 |
-| GuardianshipService | 有 | 有 | 监护关系校验 |
+| ProfileLinkService | 有 | 有 | 监护关系校验 |
 | AuthzSnapshotLoader | 有 | 有 | 授权快照 |
 | OperationAccountService | 有 | 无 | 后台运营账号能力 |
 | WeChatAppService | 有 | 无 | 微信应用配置 |

@@ -210,7 +210,7 @@ survey → scale → evaluation → actor → plan → statistics
 典型问题：
 
 - 当前受试者是谁？
-- 是否绑定 IAM Child / Profile？
+- 是否绑定 IAM Profile？
 - 谁可以访问这个受试者？
 - 是否需要为受试者打标签或标记重点关注？
 

@@ -13,7 +13,7 @@ import (
 // 行为者：B端员工(Staff) - 后台管理系统
 // 职责：提供受试者详细信息查询能力（包含家长信息等后台管理所需数据）
 type backendQueryService struct {
-	queryService      TesteeQueryService
+	queryService         TesteeQueryService
 	profileLinkDirectory iambridge.ProfileLinkDirectory
 }
 
@@ -23,7 +23,7 @@ func NewBackendQueryService(
 	profileLinkDirectory iambridge.ProfileLinkDirectory,
 ) TesteeBackendQueryService {
 	return &backendQueryService{
-		queryService:          queryService,
+		queryService:         queryService,
 		profileLinkDirectory: profileLinkDirectory,
 	}
 }

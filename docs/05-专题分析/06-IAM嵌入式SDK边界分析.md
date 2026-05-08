@@ -76,7 +76,7 @@ flowchart TB
         verifier["TokenVerifier"]
         svcAuth["ServiceAuthHelper"]
         identity["IdentityService"]
-        guardianship["GuardianshipService"]
+        guardianship["ProfileLinkService"]
         authz["AuthzSnapshotLoader"]
         wechat["WeChatAppService"]
         operation["OperationAccountService"]
@@ -128,7 +128,7 @@ IAMModule 负责：
 3. 创建 ServiceAuthHelper。
 4. 创建 IdentityService。
 5. 创建 OperationAccountService。
-6. 创建 GuardianshipService。
+6. 创建 ProfileLinkService。
 7. 创建 WeChatAppService。
 8. 创建 AuthzSnapshotLoader。
 9. 注入 runtime limiter，如 apiserver 的 IAM backpressure。
@@ -159,7 +159,7 @@ apiserver 是主业务服务，需要更完整的 IAM 能力：
 | ServiceAuthHelper | 服务间认证 |
 | IdentityService | 用户身份查询 |
 | OperationAccountService | 后台运营账号注册/管理 |
-| GuardianshipService | 监护关系查询 |
+| ProfileLinkService | 监护关系查询 |
 | WeChatAppService | 微信应用配置查询 |
 | AuthzSnapshotLoader | IAM 授权快照加载 |
 
@@ -175,7 +175,7 @@ collection 是前台 BFF，IAM 能力更窄：
 | TokenVerifier | 前台 JWT 验证 |
 | ServiceAuthHelper | collection 以服务身份调 IAM 或 apiserver |
 | IdentityService | 用户信息查询 |
-| GuardianshipService | 前台监护关系校验 |
+| ProfileLinkService | 前台监护关系校验 |
 | AuthzSnapshotLoader | 前台授权快照加载 |
 
 collection 不需要：
@@ -321,19 +321,19 @@ AuthzSnapshot（如果需要用户业务权限）
 
 ---
 
-## 8. GuardianshipService 边界
+## 8. ProfileLinkService 边界
 
-GuardianshipService 用于前台场景：
+ProfileLinkService 用于前台场景：
 
 ```text
-当前用户能否为某个 IAM child / testee 提交答卷？
+当前用户能否为某个 IAM profile / testee 提交答卷？
 ```
 
 collection-server 在提交前会：
 
 1. 查询受试者。
 2. 获取 IAMProfileID。
-3. 调 GuardianshipService 判断是否监护人。
+3. 调 ProfileLinkService 判断是否监护人。
 4. 通过后才继续提交。
 
 这属于前台 BFF 保护逻辑。
@@ -474,7 +474,7 @@ Application 层可以通过窄接口使用 IAM 能力，但要避免直接依赖
 
 ```text
 IdentityService wrapper
-GuardianshipService wrapper
+ProfileLinkService wrapper
 AuthzSnapshotLoader
 WeChatAppConfigProvider
 RecipientResolver
@@ -581,7 +581,7 @@ IAMOptions 统一管理：
 
 - TokenVerifier。
 - SnapshotLoader。
-- GuardianshipService。
+- ProfileLinkService。
 - IdentityService。
 - WeChatAppService。
 
@@ -742,7 +742,7 @@ IAMOptions 统一管理：
 
 检查：
 
-1. IAM GuardianshipService 是否可用。
+1. IAM ProfileLinkService 是否可用。
 2. testee 是否绑定 IAMProfileID。
 3. userID / profileID。
 4. guardianship cache。

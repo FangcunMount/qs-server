@@ -123,7 +123,7 @@ Intake 是入口真正接入业务对象的步骤。
 sequenceDiagram
     participant Client
     participant App as EntryService
-    participant IAM as GuardianshipReader
+    participant IAM as ProfileReader
     participant TesteeFactory
     participant RelationRepo
     participant Events as BehaviorEventStager
@@ -157,7 +157,7 @@ AssessmentEntry 与 IAM 的关系很容易误解。
 | -------- | ----------------------- |
 | 当前登录用户 | REST/Auth middleware 和 actorctx 归一化 |
 | 组织信息 | orgID 校验 |
-| IAM Profile | Intake 时通过 guardianshipSvc.ValidateProfileExists 校验 |
+| IAM Profile | Intake 时通过 profileReader.ValidateProfileExists 校验 |
 | 授权快照 | access guard / operator authz 使用 |
 | token/JWT | 只在边界层解析，不写入 AssessmentEntry |
 
@@ -201,7 +201,7 @@ AssessmentEntry 会 stage 行为事件：
 | Aggregate Root | `AssessmentEntry` | 入口状态和 token 生命周期聚合 |
 | Validator | `assessmententry.Validator` | 创建参数集中校验 |
 | Application Service | `assessmententry.Service` | 编排 clinician、testee、relation、IAM、事件 |
-| Anti-corruption | `guardianshipSvc` / iambridge | 隔离 IAM Child/Profile |
+| Anti-corruption | `profileReader` / iambridge | 隔离 IAM Profile |
 | Unit of Work | `uow.WithinTransaction` | 创建/解析/接入时保持写入边界 |
 | Event Staging | `BehaviorEventStager` | 入口行为进入统计投影 |
 
@@ -215,7 +215,7 @@ AssessmentEntry 会 stage 行为事件：
 | Entry 独立于 Assessment | 入口和测评结果解耦 | 链路更长，需要跨模块引用 |
 | Intake 创建 relation | 医生和受试者关系自动建立 | 需要关系幂等 |
 | 行为事件 staged | 统计可追踪入口漏斗 | 需要 outbox/behavior 投影 |
-| IAM child 校验通过 guardianshipSvc | 不复制 IAM profile | IAM 不可用时要有降级语义 |
+| IAM profile 校验通过 profileReader | 不复制 IAM profile | IAM 不可用时要有降级语义 |
 
 ---
 

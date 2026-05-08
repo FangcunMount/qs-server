@@ -57,7 +57,7 @@ type ActorModule struct {
 // ActorModuleDeps 定义 Actor 模块的显式构造依赖。
 type ActorModuleDeps struct {
 	MySQLDB             *gorm.DB
-	ProfileLinkService *iam.ProfileLinkService
+	ProfileLinkService  *iam.ProfileLinkService
 	IdentityService     *iam.IdentityService
 	RedisClient         redis.UniversalClient
 	CacheBuilder        *keyspace.Builder

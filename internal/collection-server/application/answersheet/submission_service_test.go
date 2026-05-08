@@ -79,7 +79,7 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 		},
 	}
 	service := &SubmissionService{
-		actorClient:         stub,
+		actorClient:        stub,
 		profileLinkService: new(iam.ProfileLinkService),
 	}
 

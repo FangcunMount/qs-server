@@ -14,7 +14,7 @@
 | 注入方式 | `process.resource_bootstrap` 构建 `container.BackpressureOptions`，container/assembler 显式传入 repository/client |
 | MySQL 接入 | `internal/pkg/database/mysql.BaseRepository` 的 CRUD helper 执行前 acquire |
 | Mongo 接入 | `internal/apiserver/infra/mongo.BaseRepository` 的 collection 操作执行前 acquire |
-| IAM 接入 | `GuardianshipService` 等 IAM SDK 调用前 acquire |
+| IAM 接入 | `ProfileLinkService` 等 IAM SDK 调用前 acquire |
 | timeout 语义 | timeout 只限制“等待槽位”的时间，不限制拿到槽位后的业务执行时间 |
 | nil limiter | no-op，直接放行 |
 | 观测 outcome | `backpressure_acquired`、`backpressure_timeout`、`backpressure_released` |
@@ -72,7 +72,7 @@ flowchart TB
     subgraph Infra["Infra Adapter"]
         mysqlRepo["MySQL Repository"]
         mongoRepo["Mongo Repository"]
-        iamClient["IAM Client / GuardianshipService"]
+        iamClient["IAM Client / ProfileLinkService"]
     end
 
     subgraph BP["Backpressure"]
@@ -397,9 +397,9 @@ ClientRuntimeOptions{
 
 `NewClientWithRuntimeOptions` 会保存 limiter 到 Client 实例。
 
-### 10.2 GuardianshipService
+### 10.2 ProfileLinkService
 
-`NewGuardianshipService(client)` 会从 IAM client 取 limiter：
+`NewProfileLinkService(client)` 会从 IAM client 取 limiter：
 
 ```text
 limiter = client.Limiter()
@@ -414,11 +414,11 @@ defer release()
 
 覆盖：
 
-- IsGuardian。
-- IsGuardianWithDetails。
+- HasActiveProfileLink。
+- HasActiveProfileLinkWithDetails。
 - ValidateProfileExists。
 - ListProfiles。
-- ListGuardians。
+- ListProfileLinks。
 - EstablishProfileLink。
 - RevokeProfileLink。
 - BatchRevokeProfileLinks。
@@ -750,7 +750,7 @@ Reason=backpressure limiter disabled
 - MySQL BaseRepository：[../../../internal/pkg/database/mysql/base.go](../../../internal/pkg/database/mysql/base.go)
 - Mongo BaseRepository：[../../../internal/apiserver/infra/mongo/base.go](../../../internal/apiserver/infra/mongo/base.go)
 - IAM Client：[../../../internal/apiserver/infra/iam/client.go](../../../internal/apiserver/infra/iam/client.go)
-- IAM GuardianshipService：[../../../internal/apiserver/infra/iam/guardianship.go](../../../internal/apiserver/infra/iam/guardianship.go)
+- IAM ProfileLinkService：[../../../internal/apiserver/infra/iam/profile_link.go](../../../internal/apiserver/infra/iam/profile_link.go)
 - Container BackpressureOptions：[../../../internal/apiserver/container/options.go](../../../internal/apiserver/container/options.go)
 - Resource bootstrap：[../../../internal/apiserver/process/resource_bootstrap.go](../../../internal/apiserver/process/resource_bootstrap.go)
 - Resilience metrics：[../../../internal/pkg/resilienceplane/prometheus.go](../../../internal/pkg/resilienceplane/prometheus.go)

@@ -9,7 +9,7 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 模块定位 | `Testee` 是“被测评的人”在 qs-server 中的业务聚合根 |
-| 不等于 IAM User | Testee 可以没有登录账号，也可以绑定 IAM Child/Profile |
+| 不等于 IAM User | Testee 可以没有登录账号，也可以绑定 IAM Profile |
 | 核心字段 | orgID、profileID、name、gender、birthday、source、isKeyFocus、assessmentStats |
 | tags 定位 | `testee.tags` 仅作为数据库历史兼容字段保留，当前产品不展示、不筛选、不作为队列事实 |
 | 重点关注 | `isKeyFocus` 是长期关注属性，可由人工或报告回写触发 |
@@ -31,7 +31,7 @@
 | 概念 | 差异 |
 | ---- | ---- |
 | IAM User | IAM User 是登录账号；Testee 是受试者业务档案 |
-| IAM Child/Profile | Profile 是身份/档案来源；Testee 是 QS 业务视图 |
+| IAM Profile | Profile 是身份/档案来源；Testee 是 QS 业务视图 |
 | AnswerSheet | AnswerSheet 是一次作答事实；Testee 是长期主体 |
 | Assessment | Assessment 是一次测评行为；Testee 可关联多次测评 |
 | Report | Report 是一次测评报告；Testee 可被报告结果影响重点关注状态 |
@@ -60,7 +60,7 @@ classDiagram
 | ---- | ---- |
 | `id` | 受试者 ID |
 | `orgID` | 所属机构 |
-| `profileID` | 可选，当前对应 IAM.Child.ID，未来可抽象为 Profile |
+| `profileID` | 可选，当前对应 IAM Profile ID，未来可抽象为 Profile |
 | `name` | 姓名，可脱敏显示 |
 | `gender` | 性别 |
 | `birthday` | 出生日期 |
@@ -75,9 +75,9 @@ classDiagram
 
 | 情况 | 说明 |
 | ---- | ---- |
-| 绑定 IAM Child/Profile | 来自家长或 IAM 档案 |
+| 绑定 IAM Profile | 来自家长或 IAM 档案 |
 | 未绑定 profile | 临时受试者或线下录入 |
-| 未来通用 Profile | 可能从 IAM.Child 演进为更通用 profile-system |
+| 未来通用 Profile | 可能从 IAM Profile 演进为更通用 profile-system |
 
 领域模型不应该假设每个 Testee 都能登录。
 
@@ -178,7 +178,7 @@ sequenceDiagram
 | 来源 | 说明 |
 | ---- | ---- |
 | 手动录入 | 后台或业务人员创建 |
-| IAM profile 绑定 | 基于 IAM Child/Profile 创建或关联 |
+| IAM profile 绑定 | 基于 IAM Profile 创建或关联 |
 | AssessmentEntry intake | 通过测评入口提交信息时临时或绑定创建 |
 | 计划任务 | Plan 需要关联受试者 |
 | 外部导入 | 批量导入受试者档案 |

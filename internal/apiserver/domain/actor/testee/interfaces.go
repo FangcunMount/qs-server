@@ -23,7 +23,7 @@ type Repository interface {
 	Delete(ctx context.Context, id ID) error
 }
 
-	// Factory 受试者工厂领域服务
+// Factory 受试者工厂领域服务
 type Factory interface {
 	// GetOrCreateByProfile 根据用户档案ID获取或创建受试者
 	GetOrCreateByProfile(

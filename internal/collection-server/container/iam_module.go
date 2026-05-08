@@ -20,7 +20,7 @@ type IAMModule struct {
 	serviceAuthHelper   *iam.ServiceAuthHelper
 	identityService     *iam.IdentityService
 	profileService      *iam.ProfileService
-	profileLinkSvc     *iam.ProfileLinkService
+	profileLinkSvc      *iam.ProfileLinkService
 	authzSnapshotLoader *iamauth.SnapshotLoader
 }
 
@@ -115,7 +115,7 @@ func NewIAMModule(ctx context.Context, opts *options.IAMOptions) (*IAMModule, er
 		serviceAuthHelper:   serviceAuthHelper,
 		identityService:     identityService,
 		profileService:      profileService,
-		profileLinkSvc:     profileLinkSvc,
+		profileLinkSvc:      profileLinkSvc,
 		authzSnapshotLoader: authzSnapshotLoader,
 	}, nil
 }

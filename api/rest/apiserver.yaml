@@ -126,7 +126,7 @@ paths:
       tags:
       - AnswerSheet-Management
       summary: 管理员提交答卷
-      description: 管理员绕过监护关系校验提交答卷
+      description: 管理员绕过 ProfileLink 权限校验提交答卷
       operationId: 管理员提交答卷
       parameters:
       - type: string

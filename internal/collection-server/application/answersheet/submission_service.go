@@ -45,11 +45,11 @@ type profileLinkChecker interface {
 // 2. 调用 apiserver 的 gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
-	answerSheetClient   answerSheetGateway
-	actorClient         actorLookupClient
-	profileLinkService  profileLinkChecker
-	queue               *SubmitQueue
-	submitGuard         IdempotencyGuard
+	answerSheetClient  answerSheetGateway
+	actorClient        actorLookupClient
+	profileLinkService profileLinkChecker
+	queue              *SubmitQueue
+	submitGuard        IdempotencyGuard
 }
 
 // NewSubmissionService 创建答卷提交服务
@@ -61,10 +61,10 @@ func NewSubmissionService(
 	submitGuard IdempotencyGuard,
 ) *SubmissionService {
 	service := &SubmissionService{
-		answerSheetClient:   answerSheetClient,
-		actorClient:         actorClient,
-		profileLinkService:  profileLinkService,
-		submitGuard:         submitGuard,
+		answerSheetClient:  answerSheetClient,
+		actorClient:        actorClient,
+		profileLinkService: profileLinkService,
+		submitGuard:        submitGuard,
 	}
 
 	if queueOptions == nil {

@@ -12,15 +12,15 @@ import (
 
 // IAMOptions 简化的 IAM 配置（避免导入循环）
 type IAMOptions struct {
-	Enabled           bool
-	GRPCEnabled       bool
-	JWKSEnabled       bool
-	EnableTracing     bool // 启用链路追踪
-	EnableMetrics     bool // 启用 Prometheus 指标
-	GRPC              *GRPCOptions
-	JWT               *JWTOptions
-	JWKS              *JWKSOptions
-	UserCache         *CacheOptions
+	Enabled          bool
+	GRPCEnabled      bool
+	JWKSEnabled      bool
+	EnableTracing    bool // 启用链路追踪
+	EnableMetrics    bool // 启用 Prometheus 指标
+	GRPC             *GRPCOptions
+	JWT              *JWTOptions
+	JWKS             *JWKSOptions
+	UserCache        *CacheOptions
 	ProfileLinkCache *CacheOptions
 
 	AuthzAppName              string

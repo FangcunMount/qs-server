@@ -16,11 +16,11 @@ import (
 // registrationService 受试者注册服务实现
 // 行为者：C端用户(患者/家长)
 type registrationService struct {
-	repo            domain.Repository
-	factory         domain.Factory
-	validator       domain.Validator
-	binder          domain.Binder
-	uow             apptransaction.Runner
+	repo          domain.Repository
+	factory       domain.Factory
+	validator     domain.Validator
+	binder        domain.Binder
+	uow           apptransaction.Runner
 	profileReader iambridge.ProfileReader
 }
 
@@ -34,11 +34,11 @@ func NewRegistrationService(
 	profileReader iambridge.ProfileReader,
 ) TesteeRegistrationService {
 	return &registrationService{
-		repo:            repo,
-		factory:         factory,
-		validator:       validator,
-		binder:          binder,
-		uow:             uow,
+		repo:          repo,
+		factory:       factory,
+		validator:     validator,
+		binder:        binder,
+		uow:           uow,
 		profileReader: profileReader,
 	}
 }

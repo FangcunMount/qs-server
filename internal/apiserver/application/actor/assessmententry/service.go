@@ -18,18 +18,18 @@ import (
 )
 
 type service struct {
-	repo            domainAssessmentEntry.Repository
-	clinicianRepo   domainClinician.Repository
-	relationRepo    domainRelation.Repository
-	testeeRepo      domainTestee.Repository
-	entryReader     actorreadmodel.AssessmentEntryReader
-	testeeFactory   domainTestee.Factory
-	validator       domainAssessmentEntry.Validator
-	profileReader iambridge.ProfileReader
-	resolveLog      ResolveLogWriter
-	intakeLog       IntakeLogWriter
-	behaviorEvents  BehaviorEventStager
-	uow             apptransaction.Runner
+	repo           domainAssessmentEntry.Repository
+	clinicianRepo  domainClinician.Repository
+	relationRepo   domainRelation.Repository
+	testeeRepo     domainTestee.Repository
+	entryReader    actorreadmodel.AssessmentEntryReader
+	testeeFactory  domainTestee.Factory
+	validator      domainAssessmentEntry.Validator
+	profileReader  iambridge.ProfileReader
+	resolveLog     ResolveLogWriter
+	intakeLog      IntakeLogWriter
+	behaviorEvents BehaviorEventStager
+	uow            apptransaction.Runner
 }
 
 type intakeState struct {
@@ -63,18 +63,18 @@ func NewService(
 		entryReader = entryReaders[0]
 	}
 	return &service{
-		repo:            repo,
-		clinicianRepo:   clinicianRepo,
-		relationRepo:    relationRepo,
-		testeeRepo:      testeeRepo,
-		entryReader:     entryReader,
-		testeeFactory:   testeeFactory,
-		validator:       validator,
-		profileReader: profileReader,
-		resolveLog:      resolveLog,
-		intakeLog:       intakeLog,
-		behaviorEvents:  behaviorEvents,
-		uow:             uow,
+		repo:           repo,
+		clinicianRepo:  clinicianRepo,
+		relationRepo:   relationRepo,
+		testeeRepo:     testeeRepo,
+		entryReader:    entryReader,
+		testeeFactory:  testeeFactory,
+		validator:      validator,
+		profileReader:  profileReader,
+		resolveLog:     resolveLog,
+		intakeLog:      intakeLog,
+		behaviorEvents: behaviorEvents,
+		uow:            uow,
 	}
 }
 

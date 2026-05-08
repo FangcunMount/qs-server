@@ -20,7 +20,7 @@ type IAMModule struct {
 	serviceAuthHelper   *iam.ServiceAuthHelper
 	identityService     *iam.IdentityService
 	operationAccountSvc *iam.OperationAccountService
-	profileLinkSvc     *iam.ProfileLinkService
+	profileLinkSvc      *iam.ProfileLinkService
 	wechatAppService    *iam.WeChatAppService
 	authzSnapshotLoader *iam.AuthzSnapshotLoader
 }
@@ -59,7 +59,7 @@ func NewIAMModuleWithRuntimeOptions(ctx context.Context, opts *options.IAMOption
 		serviceAuthHelper:   newIAMServiceAuthHelper(ctx, client, opts),
 		identityService:     newIAMIdentityService(client),
 		operationAccountSvc: newIAMOperationAccountService(client),
-		profileLinkSvc:     newIAMProfileLinkService(client),
+		profileLinkSvc:      newIAMProfileLinkService(client),
 		wechatAppService:    newIAMWeChatAppService(client),
 		authzSnapshotLoader: newIAMAuthzSnapshotLoader(client, opts),
 	}

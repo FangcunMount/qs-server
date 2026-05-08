@@ -201,7 +201,7 @@ collection 的应用服务很薄，主要是 gRPC 转调和前置校验。
 ```mermaid
 flowchart TB
     Clients[gRPC ClientBundle]
-    IAM[GuardianshipService]
+    IAM[ProfileLinkService]
     Redis[SubmitGuard / Redis ops + lock]
     SQ[SubmitQueue Options]
 
@@ -536,7 +536,7 @@ flowchart TB
 | HTTP 表现 | 可能位置 | 排查 |
 | -------- | -------- | ---- |
 | 401 | JWT / IAM verifier | token 是否有效、JWKS 是否可用 |
-| 403 | 监护关系 / org scope | writer、testee、IAM child 绑定、guardianship |
+| 403 | 监护关系 / org scope | writer、testee、IAM profile 绑定、guardianship |
 | 429 | RateLimit / SubmitQueue / SubmitGuard / gRPC max-inflight | 队列容量、限流配置、request_id 是否重复、max_inflight |
 | 404 | canonical testee 解析失败 | testee_id 是否误传 profile_id，Actor gRPC 是否可用 |
 | 500 | gRPC / apiserver / durable submit | apiserver gRPC 日志、Mongo durable submit、events outbox |
