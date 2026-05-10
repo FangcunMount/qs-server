@@ -195,7 +195,7 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 
 	// 注入用户信息到 context，供后续业务逻辑使用
 	ctx = context.WithValue(ctx, authContextKeyUserID, claims.UserID)
-	ctx = context.WithValue(ctx, authContextKeyAccountID, claims.AccountID)
+	ctx = context.WithValue(ctx, authContextKeyAccountID, resolveAccountID(claims))
 	ctx = context.WithValue(ctx, authContextKeyTenantID, claims.TenantID)
 	ctx = context.WithValue(ctx, authContextKeySessionID, claims.SessionID)
 	ctx = context.WithValue(ctx, authContextKeyTokenID, claims.TokenID)
@@ -224,6 +224,35 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 	}
 
 	return ctx
+}
+
+func resolveAccountID(claims *auth.TokenClaims) string {
+	if claims == nil {
+		return ""
+	}
+	if len(claims.Extra) > 0 {
+		for _, key := range []string{"account_id", "accountId", "aid"} {
+			if v, ok := claims.Extra[key]; ok {
+				if s := claimValueToString(v); s != "" {
+					return s
+				}
+			}
+		}
+	}
+	return strings.TrimSpace(claims.LoginIdentityID)
+}
+
+func claimValueToString(v interface{}) string {
+	switch x := v.(type) {
+	case string:
+		return strings.TrimSpace(x)
+	case fmt.Stringer:
+		return strings.TrimSpace(x.String())
+	case int, int8, int16, int32, int64, uint, uint8, uint16, uint32, uint64, float32, float64:
+		return strings.TrimSpace(fmt.Sprint(x))
+	default:
+		return ""
+	}
 }
 
 // AddSkipMethod 添加跳过认证的方法

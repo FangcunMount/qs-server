@@ -2,13 +2,10 @@ package iam
 
 import (
 	"context"
+	"errors"
 	"fmt"
-	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	authnv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authn/v2"
-	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/client"
-	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 )
 
 type RegisterOperationAccountInput struct {
@@ -30,11 +27,11 @@ type RegisterOperationAccountResult struct {
 	IsNewAccount bool
 }
 
+var ErrOperationAccountNotSupported = errors.New("iam operation account onboarding is not supported by IAM v2.0.6 SDK")
+
 // OperationAccountService 封装 IAM 运营账号注册能力。
 type OperationAccountService struct {
-	client  *auth.Client
 	enabled bool
-	limiter backpressure.Acquirer
 }
 
 func NewOperationAccountService(client *Client) (*OperationAccountService, error) {
@@ -47,19 +44,12 @@ func NewOperationAccountService(client *Client) (*OperationAccountService, error
 		return nil, fmt.Errorf("SDK client is nil")
 	}
 
-	authClient := sdkClient.Auth()
-	if authClient == nil {
-		return nil, fmt.Errorf("auth client is nil")
-	}
-
-	logger.L(context.Background()).Infow("OperationAccountService initialized",
+	logger.L(context.Background()).Infow("OperationAccountService disabled because IAM v2.0.6 no longer exposes AccountOnboardingService",
 		"component", "iam.operation_account",
-		"result", "success",
+		"result", "unsupported",
 	)
 	return &OperationAccountService{
-		client:  authClient,
-		enabled: true,
-		limiter: client.Limiter(),
+		enabled: false,
 	}, nil
 }
 
@@ -68,49 +58,5 @@ func (s *OperationAccountService) IsEnabled() bool {
 }
 
 func (s *OperationAccountService) RegisterOperationAccount(ctx context.Context, input RegisterOperationAccountInput) (*RegisterOperationAccountResult, error) {
-	if !s.enabled {
-		return nil, fmt.Errorf("operation account service not enabled")
-	}
-	ctx, release, err := s.acquire(ctx)
-	if err != nil {
-		return nil, err
-	}
-	defer release()
-
-	resp, err := s.client.CreateOperationAccount(ctx, &authnv2.CreateOperationAccountRequest{
-		ExistingUserId: input.ExistingUserID,
-		Name:           input.Name,
-		Phone:          input.Phone,
-		Email:          input.Email,
-		ScopedTenantId: input.ScopedTenantID,
-		OperaLoginId:   input.OperaLoginID,
-		Password:       input.Password,
-	})
-	if err != nil {
-		return nil, err
-	}
-	if resp == nil {
-		return nil, fmt.Errorf("empty response from IAM RegisterOperationAccount")
-	}
-
-	userID, err := strconv.ParseInt(resp.GetUserId(), 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse user id from IAM: %w", err)
-	}
-
-	return &RegisterOperationAccountResult{
-		UserID:       userID,
-		AccountID:    resp.GetAccountId(),
-		CredentialID: resp.GetCredentialId(),
-		ExternalID:   resp.GetExternalId(),
-		IsNewUser:    resp.GetIsNewUser(),
-		IsNewAccount: resp.GetIsNewAccount(),
-	}, nil
-}
-
-func (s *OperationAccountService) acquire(ctx context.Context) (context.Context, func(), error) {
-	if s == nil || s.limiter == nil {
-		return ctx, func() {}, nil
-	}
-	return s.limiter.Acquire(ctx)
+	return nil, ErrOperationAccountNotSupported
 }

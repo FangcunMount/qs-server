@@ -13,13 +13,13 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	now := time.Now().UTC()
 	result := &auth.VerifyResult{
 		Claims: &auth.TokenClaims{
-			UserID:    "1001",
-			AccountID: "2001",
-			TenantID:  "3001",
-			SessionID: "session-1",
-			TokenID:   "token-1",
-			Roles:     []string{"admin"},
-			AMR:       []string{"pwd"},
+			UserID:          "1001",
+			LoginIdentityID: "2001",
+			TenantID:        "3001",
+			SessionID:       "session-1",
+			TokenID:         "token-1",
+			Roles:           []string{"admin"},
+			AMR:             []string{"pwd"},
 		},
 		Metadata: &auth.VerifyMetadata{
 			TokenType: authnv2.TokenType_TOKEN_TYPE_ACCESS,
@@ -62,8 +62,9 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 			SessionID: "session-2",
 			TokenID:   "token-2",
 			Extra: map[string]interface{}{
-				"user_id": "4001",
-				"org_id":  "5001",
+				"user_id":    "4001",
+				"org_id":     "5001",
+				"account_id": "6001",
 			},
 		},
 	}
@@ -78,18 +79,21 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 	if claims.TenantID != "5001" {
 		t.Fatalf("unexpected fallback tenant id: %s", claims.TenantID)
 	}
+	if claims.AccountID != "6001" {
+		t.Fatalf("unexpected fallback account id: %s", claims.AccountID)
+	}
 }
 
 func TestUserClaimsMapToSecurityPlanePrincipalAndTenantScope(t *testing.T) {
 	result := &auth.VerifyResult{
 		Claims: &auth.TokenClaims{
-			UserID:    "1001",
-			AccountID: "2001",
-			TenantID:  "3001",
-			SessionID: "session-1",
-			TokenID:   "token-1",
-			Roles:     []string{"qs:operator"},
-			AMR:       []string{"pwd"},
+			UserID:          "1001",
+			LoginIdentityID: "2001",
+			TenantID:        "3001",
+			SessionID:       "session-1",
+			TokenID:         "token-1",
+			Roles:           []string{"qs:operator"},
+			AMR:             []string{"pwd"},
 		},
 	}
 

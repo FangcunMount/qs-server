@@ -418,7 +418,7 @@ func buildUserClaims(result *auth.VerifyResult) *UserClaims {
 	tokenClaims := result.Claims
 	return &UserClaims{
 		UserID:    resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-		AccountID: tokenClaims.AccountID,
+		AccountID: resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra),
 		TenantID:  resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
 		SessionID: tokenClaims.SessionID,
 		TokenID:   tokenClaims.TokenID,
@@ -426,6 +426,20 @@ func buildUserClaims(result *auth.VerifyResult) *UserClaims {
 		AMR:       tokenClaims.AMR,
 		Metadata:  result.Metadata,
 	}
+}
+
+// resolveAccountID keeps qs-server's historical AccountID context key compatible with IAM v2 LoginIdentityID.
+func resolveAccountID(loginIdentityID string, extra map[string]interface{}) string {
+	if len(extra) > 0 {
+		for _, key := range []string{"account_id", "accountId", "aid"} {
+			if v, ok := extra[key]; ok {
+				if s := claimValueToString(v); s != "" {
+					return s
+				}
+			}
+		}
+	}
+	return strings.TrimSpace(loginIdentityID)
 }
 
 // resolveUserID 优先使用标准 UserID 字段，缺失时从 Extra 兼容提取。

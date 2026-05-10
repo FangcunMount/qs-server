@@ -6,8 +6,8 @@ github.com/DATA-DOG/go-sqlmock v1.5.2 h1:OcvFkGmslmlZibjAjaHm3L//6LiuBgolP7Oputl
 github.com/DATA-DOG/go-sqlmock v1.5.2/go.mod h1:88MAG/4G7SMwSE3CeA0ZKzrT5CiOU3OJ+JlNzwDqpNU=
 github.com/FangcunMount/component-base v0.6.1 h1:LRuZ7f4Ft2ElShEmDQDYlK6n94b/O5+z3IuTJRceJG0=
 github.com/FangcunMount/component-base v0.6.1/go.mod h1:YDJbNH8P+pNBE8MWgQCI1DptDXD2gCzBhHdd9kgSVFk=
-github.com/FangcunMount/iam/v2 v2.0.4 h1:rFvllDkyLrlh+dGN9lHKTLQwHNgmDnA18LBGWelL95k=
-github.com/FangcunMount/iam/v2 v2.0.4/go.mod h1:caaIzQ3v5Cn8LtRXzobhjiWGYUUQbWNXuHfkJE+CJOw=
+github.com/FangcunMount/iam/v2 v2.0.6 h1:65widSoaFo8gNYb2+KZvkgPIyEBovQZ0T6hl/yUCD1E=
+github.com/FangcunMount/iam/v2 v2.0.6/go.mod h1:caaIzQ3v5Cn8LtRXzobhjiWGYUUQbWNXuHfkJE+CJOw=
 github.com/KyleBanks/depth v1.2.1 h1:5h8fQADFrWtarTdtDudMmGsC7GPbOAu6RVB3ffsVFHc=
 github.com/KyleBanks/depth v1.2.1/go.mod h1:jzSb9d0L43HxTQfT+oSA1EEp2q+ne2uh6XgeJcm8brE=
 github.com/Microsoft/go-winio v0.6.2 h1:F2VQgta7ecxGYO8k3ZZz3RS8fVIXVxONVUPlNERoyfY=

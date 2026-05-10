@@ -16,13 +16,13 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	now := time.Now().UTC()
 	result := &auth.VerifyResult{
 		Claims: &auth.TokenClaims{
-			UserID:    "1001",
-			AccountID: "2001",
-			TenantID:  "3001",
-			SessionID: "session-1",
-			TokenID:   "token-1",
-			Roles:     []string{"admin"},
-			AMR:       []string{"pwd"},
+			UserID:          "1001",
+			LoginIdentityID: "2001",
+			TenantID:        "3001",
+			SessionID:       "session-1",
+			TokenID:         "token-1",
+			Roles:           []string{"admin"},
+			AMR:             []string{"pwd"},
 			Extra: map[string]interface{}{
 				"username": "alice",
 			},
@@ -64,13 +64,13 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testin
 	interceptor := &IAMAuthInterceptor{}
 	result := &auth.VerifyResult{
 		Claims: &auth.TokenClaims{
-			UserID:    "1001",
-			AccountID: "2001",
-			TenantID:  "3001",
-			SessionID: "session-1",
-			TokenID:   "token-1",
-			Roles:     []string{"qs:operator"},
-			AMR:       []string{"pwd"},
+			UserID:          "1001",
+			LoginIdentityID: "2001",
+			TenantID:        "3001",
+			SessionID:       "session-1",
+			TokenID:         "token-1",
+			Roles:           []string{"qs:operator"},
+			AMR:             []string{"pwd"},
 			Extra: map[string]interface{}{
 				"username": "alice",
 			},
