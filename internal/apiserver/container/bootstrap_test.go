@@ -206,6 +206,7 @@ func TestContainerBuildQRCodeServiceConfigUsesOSSOverrides(t *testing.T) {
 
 	if config == nil {
 		t.Fatal("config = nil, want non-nil")
+		return
 	}
 	if config.WeChatAppID != "wechat-app" || config.PagePath != "pages/task/index" {
 		t.Fatalf("unexpected base config: %#v", config)

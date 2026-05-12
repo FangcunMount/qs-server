@@ -29,6 +29,7 @@ func TestToReportResultIncludesCreatedAt(t *testing.T) {
 	got := toReportResult(rpt)
 	if got == nil {
 		t.Fatal("expected report result")
+		return
 	}
 	if !got.CreatedAt.Equal(createdAt) {
 		t.Fatalf("expected createdAt %v, got %v", createdAt, got.CreatedAt)

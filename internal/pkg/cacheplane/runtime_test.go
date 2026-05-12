@@ -68,6 +68,7 @@ func TestRuntimeHandleUsesNamedProfileAndNamespace(t *testing.T) {
 	handle := runtime.Handle(context.Background(), FamilyStatic)
 	if handle == nil {
 		t.Fatal("expected handle")
+		return
 	}
 	if handle.Client != profileClient {
 		t.Fatal("expected named-profile redis client")
@@ -118,6 +119,7 @@ func TestRuntimeHandleFallsBackToDefaultProfileWhenNamedProfileMissing(t *testin
 	handle := runtime.Handle(context.Background(), FamilyLock)
 	if handle == nil {
 		t.Fatal("expected handle")
+		return
 	}
 	if handle.Client != defaultClient {
 		t.Fatal("expected default redis client fallback")
@@ -155,6 +157,7 @@ func TestRuntimeHandleMarksUnavailableNamedProfileAsDegraded(t *testing.T) {
 	handle := runtime.Handle(context.Background(), FamilyOps)
 	if handle == nil {
 		t.Fatal("expected handle")
+		return
 	}
 	if !handle.Degraded {
 		t.Fatal("expected degraded handle")

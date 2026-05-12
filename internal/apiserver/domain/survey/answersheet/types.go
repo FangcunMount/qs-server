@@ -78,8 +78,8 @@ type SubmissionContext struct {
 // NewSubmissionContext 创建提交上下文。
 func NewSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string) (SubmissionContext, error) {
 	ctx := SubmissionContext{
-		filler: filler,
-		testee: testee,
+		filler: cloneFillerRef(filler),
+		testee: cloneTesteeRef(testee),
 		orgID:  orgID,
 		taskID: strings.TrimSpace(taskID),
 	}
@@ -92,8 +92,8 @@ func NewSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgI
 // ReconstructSubmissionContext 从持久化数据重建提交上下文，允许历史数据缺字段。
 func ReconstructSubmissionContext(filler *actor.FillerRef, testee *actor.TesteeRef, orgID meta.ID, taskID string) SubmissionContext {
 	return SubmissionContext{
-		filler: filler,
-		testee: testee,
+		filler: cloneFillerRef(filler),
+		testee: cloneTesteeRef(testee),
 		orgID:  orgID,
 		taskID: taskID,
 	}
@@ -119,11 +119,11 @@ func (c SubmissionContext) Validate() error {
 }
 
 func (c SubmissionContext) Filler() *actor.FillerRef {
-	return c.filler
+	return cloneFillerRef(c.filler)
 }
 
 func (c SubmissionContext) Testee() *actor.TesteeRef {
-	return c.testee
+	return cloneTesteeRef(c.testee)
 }
 
 func (c SubmissionContext) TesteeID() meta.ID {
@@ -139,4 +139,31 @@ func (c SubmissionContext) OrgID() meta.ID {
 
 func (c SubmissionContext) TaskID() string {
 	return c.taskID
+}
+
+func (c SubmissionContext) clone() SubmissionContext {
+	return SubmissionContext{
+		filler: cloneFillerRef(c.filler),
+		testee: cloneTesteeRef(c.testee),
+		orgID:  c.orgID,
+		taskID: c.taskID,
+	}
+}
+
+func cloneFillerRef(filler *actor.FillerRef) *actor.FillerRef {
+	if filler == nil {
+		return nil
+	}
+	return actor.NewFillerRef(filler.UserID(), filler.FillerType())
+}
+
+func cloneTesteeRef(testee *actor.TesteeRef) *actor.TesteeRef {
+	if testee == nil {
+		return nil
+	}
+	profileID := testee.ProfileID()
+	if profileID != nil {
+		return actor.NewTesteeRefWithProfile(testee.TesteeID(), *profileID)
+	}
+	return actor.NewTesteeRef(testee.TesteeID())
 }

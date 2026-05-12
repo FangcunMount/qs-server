@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
@@ -85,7 +86,7 @@ func Submit(
 	sheet := &AnswerSheet{
 		id:                id,
 		questionnaireRef:  questionnaireRef,
-		submissionContext: submissionContext,
+		submissionContext: submissionContext.clone(),
 		answers:           answers,
 		filledAt:          filledAt,
 		score:             0,
@@ -144,7 +145,7 @@ func ReconstructWithSubmissionContext(
 	return &AnswerSheet{
 		id:                id,
 		questionnaireRef:  questionnaireRef,
-		submissionContext: submissionContext,
+		submissionContext: submissionContext.clone(),
 		answers:           answers,
 		filledAt:          filledAt,
 		score:             score,
@@ -194,7 +195,7 @@ func (a *AnswerSheet) Filler() *actor.FillerRef {
 
 // SubmissionContext 获取提交上下文。
 func (a *AnswerSheet) SubmissionContext() SubmissionContext {
-	return a.submissionContext
+	return a.submissionContext.clone()
 }
 
 // QuestionnaireInfo 获取问卷信息（用于展示）
@@ -249,7 +250,7 @@ func (a *AnswerSheet) UpdateScores(scoredSheet *ScoredAnswerSheet) error {
 
 // Events 获取待发布的领域事件
 func (a *AnswerSheet) Events() []event.DomainEvent {
-	return a.events
+	return slices.Clone(a.events)
 }
 
 // ClearEvents 清空事件列表（通常在事件发布后调用）

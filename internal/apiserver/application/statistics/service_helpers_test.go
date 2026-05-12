@@ -27,6 +27,7 @@ func TestDaysAgoReturnsApproximateOffset(t *testing.T) {
 	got := daysAgo(7)
 	if got == nil {
 		t.Fatal("daysAgo returned nil")
+		return
 	}
 	diff := time.Since(*got)
 	if diff < 7*24*time.Hour || diff > 8*24*time.Hour {

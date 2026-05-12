@@ -27,6 +27,7 @@ func TestHandleReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) 
 	req := client.syncAssessmentAttentionRequest
 	if req == nil {
 		t.Fatalf("expected attention sync request")
+		return
 	}
 	if req.TesteeId != 99 || req.RiskLevel != "severe" || !req.MarkKeyFocus {
 		t.Fatalf("unexpected attention sync request: %#v", req)

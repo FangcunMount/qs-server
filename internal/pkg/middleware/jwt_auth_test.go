@@ -32,6 +32,7 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	claims := buildUserClaims(result)
 	if claims == nil {
 		t.Fatal("expected claims")
+		return
 	}
 	if claims.UserID != "1001" {
 		t.Fatalf("unexpected user id: %s", claims.UserID)
@@ -72,6 +73,7 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 	claims := buildUserClaims(result)
 	if claims == nil {
 		t.Fatal("expected claims")
+		return
 	}
 	if claims.UserID != "4001" {
 		t.Fatalf("unexpected fallback user id: %s", claims.UserID)

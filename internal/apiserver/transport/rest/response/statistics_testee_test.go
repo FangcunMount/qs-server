@@ -26,6 +26,7 @@ func TestNewTesteeStatisticsResponseFormatsAssessmentDates(t *testing.T) {
 
 	if resp == nil {
 		t.Fatal("expected non-nil response")
+		return
 	}
 	if resp.FirstAssessmentDate == nil || *resp.FirstAssessmentDate != "2026-04-01 09:30:00" {
 		t.Fatalf("unexpected first_assessment_date: %+v", resp.FirstAssessmentDate)

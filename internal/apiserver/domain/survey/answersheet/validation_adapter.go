@@ -2,6 +2,7 @@ package answersheet
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 )
 
@@ -119,7 +120,7 @@ func (a *AnswerValueAdapter) AsArray() []string {
 	// 根据不同类型转换为数组
 	switch v := raw.(type) {
 	case []string:
-		return v
+		return slices.Clone(v)
 	case string:
 		// 单个字符串包装为数组
 		if v == "" {

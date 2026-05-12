@@ -1,6 +1,7 @@
 package questionnaire
 
 import (
+	"slices"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -171,7 +172,7 @@ func (q *Questionnaire) CanBePublished() bool {
 
 // GetQuestions 获取问卷中的所有问题
 func (q *Questionnaire) GetQuestions() []Question {
-	return q.questions
+	return slices.Clone(q.questions)
 }
 
 // SetQuestions 设置问题列表（仓储层重建使用）

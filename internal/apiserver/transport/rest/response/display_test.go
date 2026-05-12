@@ -27,6 +27,7 @@ func TestNewAssessmentResponseAddsLabelsAndFormatsTimes(t *testing.T) {
 	resp := NewAssessmentResponse(result)
 	if resp == nil {
 		t.Fatal("expected response")
+		return
 	}
 	if resp.OriginTypeLabel != "计划测评" {
 		t.Fatalf("origin_type_label = %q, want %q", resp.OriginTypeLabel, "计划测评")

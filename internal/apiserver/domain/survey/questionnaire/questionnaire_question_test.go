@@ -75,6 +75,26 @@ func TestQuestionnaireReorderQuestions(t *testing.T) {
 	}
 }
 
+func TestQuestionnaireGetQuestionsReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	q := newTestQuestionnaire(t)
+	if err := q.ReplaceQuestions([]Question{
+		newTestQuestion(t, "Q1", "Question 1"),
+		newTestQuestion(t, "Q2", "Question 2"),
+	}); err != nil {
+		t.Fatalf("ReplaceQuestions() error = %v", err)
+	}
+
+	questions := q.GetQuestions()
+	questions[0] = newTestQuestion(t, "Q3", "Question 3")
+
+	got := q.GetQuestions()
+	if got[0].GetCode().Value() != "Q1" {
+		t.Fatalf("first question code = %q, want Q1", got[0].GetCode().Value())
+	}
+}
+
 func newTestQuestionnaire(t *testing.T) *Questionnaire {
 	t.Helper()
 

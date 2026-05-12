@@ -73,6 +73,24 @@ func (s *durableStoreStagerStub) Stage(ctx context.Context, events ...event.Doma
 	return s.err
 }
 
+func TestTransactionalSubmissionDurableStoreRequiresAnswerSheet(t *testing.T) {
+	runner := &durableStoreRunnerStub{}
+	writer := &durableStoreWriterStub{}
+	stager := &durableStoreStagerStub{}
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager)
+
+	_, existed, err := store.CreateDurably(t.Context(), nil, DurableSubmitMeta{})
+	if err == nil {
+		t.Fatal("CreateDurably() error = nil, want answer sheet required error")
+	}
+	if existed {
+		t.Fatalf("CreateDurably() existed = true, want false")
+	}
+	if runner.called || writer.findCalled || writer.saveCalled || stager.called {
+		t.Fatalf("nil sheet should not touch collaborators: runner=%v find=%v save=%v stage=%v", runner.called, writer.findCalled, writer.saveCalled, stager.called)
+	}
+}
+
 func TestTransactionalSubmissionDurableStoreIdempotencyHitDoesNotOpenTransaction(t *testing.T) {
 	existing := newDurableStoreTestSheet(t)
 	runner := &durableStoreRunnerStub{}

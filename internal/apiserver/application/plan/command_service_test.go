@@ -195,6 +195,7 @@ func TestCommandServiceSchedulePendingTasksCollectsStats(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected schedule result")
+		return
 	}
 	if len(result.Tasks) != 1 || result.Tasks[0].ID != "task-1" {
 		t.Fatalf("unexpected tasks: %#v", result.Tasks)
@@ -258,6 +259,7 @@ func TestCommandServiceCancelPlanCountsAffectedTasks(t *testing.T) {
 	}
 	if result == nil {
 		t.Fatalf("expected cancel result")
+		return
 	}
 	if result.AffectedTaskCount != 2 {
 		t.Fatalf("unexpected affected task count: %d", result.AffectedTaskCount)

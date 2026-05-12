@@ -46,6 +46,7 @@ func TestScaleToSnapshotMapsFactorScoringAndInterpretRules(t *testing.T) {
 	snapshot := scaleToSnapshot(medicalScale)
 	if snapshot == nil {
 		t.Fatal("snapshot is nil")
+		return
 	}
 	if snapshot.Code != "SDS" || snapshot.QuestionnaireCode != "Q-SDS" || snapshot.QuestionnaireVersion != "1.0.0" {
 		t.Fatalf("unexpected scale snapshot: %#v", snapshot)

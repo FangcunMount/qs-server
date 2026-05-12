@@ -17,7 +17,7 @@ type transactionalSubmissionDurableStore struct {
 
 func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
 	if sheet == nil {
-		return nil, false, nil
+		return nil, false, fmt.Errorf("answer sheet is required")
 	}
 
 	if s.runner == nil || s.writer == nil || s.stager == nil {

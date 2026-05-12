@@ -138,16 +138,25 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewQuestionnaireRef() error = %v", err)
 	}
-	sheet, err := domainanswersheet.NewAnswerSheet(
-		questionnaireRef,
+	subCtx, err := domainanswersheet.NewSubmissionContext(
 		actor.NewFillerRef(7, actor.FillerTypeGuardian),
+		actor.NewTesteeRefWithProfile(meta.FromUint64(401), 901),
+		meta.FromUint64(1),
+		"task-mgmt-test",
+	)
+	if err != nil {
+		t.Fatalf("NewSubmissionContext() error = %v", err)
+	}
+	sheet, err := domainanswersheet.Submit(
+		meta.FromUint64(12),
+		questionnaireRef,
+		subCtx,
 		[]domainanswersheet.Answer{answer1, answer2},
 		time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC),
 	)
 	if err != nil {
-		t.Fatalf("NewAnswerSheet() error = %v", err)
+		t.Fatalf("Submit() error = %v", err)
 	}
-	sheet.AssignID(meta.FromUint64(12))
 
 	service := &managementService{
 		repo: &managementRepoStub{

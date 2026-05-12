@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	submitport "github.com/FangcunMount/qs-server/internal/apiserver/port/answersheetsubmit"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -40,6 +41,19 @@ func TestAnswerSheetPOBeforeInsertPreservesPreassignedDomainID(t *testing.T) {
 	po.BeforeInsert()
 	if po.DomainID != meta.FromUint64(1001) {
 		t.Fatalf("DomainID = %s, want preassigned 1001", po.DomainID)
+	}
+}
+
+func TestRepositoryCreateDurablyRequiresAnswerSheet(t *testing.T) {
+	t.Parallel()
+
+	repo := &Repository{}
+	_, existed, err := repo.CreateDurably(t.Context(), nil, submitport.DurableSubmitMeta{})
+	if err == nil {
+		t.Fatal("CreateDurably() error = nil, want answer sheet required error")
+	}
+	if existed {
+		t.Fatalf("CreateDurably() existed = true, want false")
 	}
 }
 

@@ -10,8 +10,13 @@ func TestParseInclusiveLocalDateRange(t *testing.T) {
 	if err != nil {
 		t.Fatalf("parseInclusiveLocalDateRange returned error: %v", err)
 	}
-	if start == nil || end == nil {
-		t.Fatalf("expected both start and end to be set")
+	if start == nil {
+		t.Fatalf("expected start to be set")
+		return
+	}
+	if end == nil {
+		t.Fatalf("expected end to be set")
+		return
 	}
 	if got, want := start.Format("2006-01-02 15:04:05"), "2026-04-15 00:00:00"; got != want {
 		t.Fatalf("start = %s, want %s", got, want)

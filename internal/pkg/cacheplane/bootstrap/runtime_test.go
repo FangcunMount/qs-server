@@ -74,6 +74,7 @@ func TestBuildRuntimeCreatesFamilyHandlesAndLockManager(t *testing.T) {
 
 	if bundle == nil {
 		t.Fatal("bundle = nil, want runtime bundle")
+		return
 	}
 	if bundle.StatusRegistry == nil || bundle.Runtime == nil || bundle.LockManager == nil {
 		t.Fatalf("runtime outputs missing: %#v", bundle)
@@ -111,6 +112,7 @@ func TestBuildRuntimeKeepsFallbackDefaultSemantics(t *testing.T) {
 	handle := bundle.Handle(cacheplane.FamilyOps)
 	if handle == nil {
 		t.Fatal("ops handle = nil, want fallback handle")
+		return
 	}
 	if handle.Client != defaultClient {
 		t.Fatal("ops handle client = non-default, want default fallback client")
@@ -144,6 +146,7 @@ func TestBuildRuntimeKeepsDegradedSemantics(t *testing.T) {
 	handle := bundle.Handle(cacheplane.FamilyQuery)
 	if handle == nil {
 		t.Fatal("query handle = nil, want degraded handle")
+		return
 	}
 	if !handle.Degraded || handle.Available {
 		t.Fatalf("query handle = %#v, want degraded unavailable handle", handle)

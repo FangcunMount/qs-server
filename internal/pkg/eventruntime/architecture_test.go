@@ -177,6 +177,7 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 	cfg := catalog.Config()
 	if cfg == nil {
 		t.Fatalf("catalog config is nil")
+		return nil
 	}
 	for eventType := range cfg.Events {
 		if !catalog.IsDurableOutbox(eventType) {

@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 func TestNewQuestionnaireRefRejectsMissingVersion(t *testing.T) {
@@ -66,6 +67,73 @@ func TestSubmitRaisesSubmittedEventWithSubmissionContext(t *testing.T) {
 	}
 }
 
+func TestAnswerSheetEventsReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	sheet, err := Submit(
+		meta.FromUint64(1001),
+		mustQuestionnaireRef(t),
+		mustSubmissionContext(t),
+		[]Answer{mustAnswer(t)},
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+
+	events := sheet.Events()
+	events[0] = event.New("mutated", "AnswerSheet", "1001", map[string]string{})
+
+	if got := sheet.Events()[0].EventType(); got != EventTypeSubmitted {
+		t.Fatalf("stored event type = %q, want %s", got, EventTypeSubmitted)
+	}
+}
+
+func TestSubmissionContextCopiesActorRefsAtBoundaries(t *testing.T) {
+	t.Parallel()
+
+	filler := actor.NewFillerRef(301, actor.FillerTypeSelf)
+	testee := actor.NewTesteeRefWithProfile(meta.FromUint64(401), 901)
+	ctx, err := NewSubmissionContext(filler, testee, meta.FromUint64(501), "task-1")
+	if err != nil {
+		t.Fatalf("NewSubmissionContext() error = %v", err)
+	}
+	if ctx.filler == filler || ctx.testee == testee {
+		t.Fatalf("SubmissionContext reused input refs")
+	}
+	if ctx.Filler() == ctx.filler || ctx.Testee() == ctx.testee {
+		t.Fatalf("SubmissionContext getter exposed internal refs")
+	}
+	fillerA, fillerB := ctx.Filler(), ctx.Filler()
+	testeeA, testeeB := ctx.Testee(), ctx.Testee()
+	if fillerA == fillerB || testeeA == testeeB {
+		t.Fatalf("SubmissionContext getter returned reusable refs")
+	}
+
+	reconstructed := ReconstructSubmissionContext(filler, testee, meta.FromUint64(501), "task-1")
+	if reconstructed.filler == filler || reconstructed.testee == testee {
+		t.Fatalf("ReconstructSubmissionContext reused input refs")
+	}
+
+	sheet, err := Submit(
+		meta.FromUint64(1001),
+		mustQuestionnaireRef(t),
+		ctx,
+		[]Answer{mustAnswer(t)},
+		time.Now(),
+	)
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
+	if sheet.submissionContext.filler == ctx.filler || sheet.submissionContext.testee == ctx.testee {
+		t.Fatalf("Submit reused submission context refs")
+	}
+	gotCtx := sheet.SubmissionContext()
+	if gotCtx.filler == sheet.submissionContext.filler || gotCtx.testee == sheet.submissionContext.testee {
+		t.Fatalf("AnswerSheet.SubmissionContext exposed internal refs")
+	}
+}
+
 func TestOptionsValueClonesInputAndRawOutput(t *testing.T) {
 	t.Parallel()
 
@@ -81,6 +149,28 @@ func TestOptionsValueClonesInputAndRawOutput(t *testing.T) {
 	if rawAgain[0] != "A" {
 		t.Fatalf("raw value after output mutation = %q, want A", rawAgain[0])
 	}
+}
+
+func TestAnswerValueAdapterAsArrayReturnsCopy(t *testing.T) {
+	t.Parallel()
+
+	source := []string{"A"}
+	adapter := NewAnswerValueAdapter(mutableArrayAnswerValue{values: source})
+
+	got := adapter.AsArray()
+	got[0] = "B"
+
+	if again := adapter.AsArray(); again[0] != "A" {
+		t.Fatalf("AsArray() after caller mutation = %q, want A", again[0])
+	}
+}
+
+type mutableArrayAnswerValue struct {
+	values []string
+}
+
+func (v mutableArrayAnswerValue) Raw() any {
+	return v.values
 }
 
 func mustQuestionnaireRef(t *testing.T) QuestionnaireRef {

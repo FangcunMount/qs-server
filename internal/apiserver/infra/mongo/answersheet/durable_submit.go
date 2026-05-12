@@ -47,7 +47,7 @@ func (r *Repository) ensureIndexes(ctx context.Context) error {
 
 func (r *Repository) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, metaInfo submitport.DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
 	if sheet == nil {
-		return nil, false, nil
+		return nil, false, fmt.Errorf("answer sheet is required")
 	}
 
 	if metaInfo.IdempotencyKey != "" {
