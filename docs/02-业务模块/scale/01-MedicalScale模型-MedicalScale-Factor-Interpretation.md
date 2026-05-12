@@ -134,10 +134,6 @@ Evaluation 使用这些规则产出某次测评结果。
 
 ---
 
-# 第一部分：MedicalScale 聚合根
-
----
-
 ## 4. 为什么 MedicalScale 是聚合根
 
 Scale 模块中有多个规则对象：
@@ -525,10 +521,6 @@ Evaluation 可以安全加载并执行这份规则。
 
 ---
 
-# 第二部分：Factor 与 ScoringSpec
-
----
-
 ## 11. Factor 的模型定位
 
 `Factor` 是 `MedicalScale` 聚合内部的规则实体。
@@ -813,10 +805,6 @@ Evaluation 保存 FactorScore。
 
 ---
 
-# 第三部分：InterpretationRules 与 RiskLevel
-
----
-
 ## 21. InterpretationRule 的模型定位
 
 `InterpretationRule` 是单条解读规则值对象。
@@ -1006,10 +994,6 @@ Scale 定义可命中的文案模板；
 Evaluation 产生命中结果；
 ReportBuilder 组织最终报告。
 ```
-
----
-
-# 第四部分：规则封装、事件与应用层协作
 
 ---
 
