@@ -27,7 +27,6 @@ import (
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
-	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -186,7 +185,15 @@ func (m *EvaluationModule) wireEvaluationEngine(
 
 	if normalized.InputResolver != nil {
 		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
-		evaluatorRegistry, _ := engine.NewEvaluatorRegistry(scaleEvaluation.NewExecutor(ruleengineInfra.NewScaleFactorScorer()))
+		scaleEvaluator := scaleEvaluation.NewExecutorWithService(
+			scaleEvaluation.NewService(
+				scaleEvaluation.DefaultInputValidator{},
+				scaleEvaluation.DefaultInputAssembler{},
+				nil,
+				scaleEvaluation.DefaultResultMapper{},
+			),
+		)
+		evaluatorRegistry, _ := engine.NewEvaluatorRegistry(scaleEvaluator)
 		scoreProjectors, _ := evaluationResult.NewScoreProjectorRegistry(
 			evaluationResult.NewScaleScoreProjector(infra.scoreRepo),
 		)

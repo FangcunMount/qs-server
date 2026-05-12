@@ -19,14 +19,17 @@ type Evaluator interface {
 	Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error)
 }
 
+// EvaluatorRegistry 解释模型评估器注册表。
 type EvaluatorRegistry interface {
 	Resolve(kind assessment.EvaluationModelKind) (Evaluator, error)
 }
 
+// mutableEvaluatorRegistry 可变解释模型评估器注册表。
 type mutableEvaluatorRegistry struct {
 	items map[assessment.EvaluationModelKind]Evaluator
 }
 
+// NewEvaluatorRegistry 创建解释模型评估器注册表。
 func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, error) {
 	registry := &mutableEvaluatorRegistry{items: make(map[assessment.EvaluationModelKind]Evaluator)}
 	for _, evaluator := range evaluators {
@@ -37,6 +40,7 @@ func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, e
 	return registry, nil
 }
 
+// Register 注册解释模型评估器。
 func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	if evaluator == nil {
 		return fmt.Errorf("evaluation evaluator is nil")
@@ -52,6 +56,7 @@ func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	return nil
 }
 
+// Resolve 解析解释模型评估器。
 func (r *mutableEvaluatorRegistry) Resolve(kind assessment.EvaluationModelKind) (Evaluator, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation evaluator registry is not configured")

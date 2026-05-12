@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"slices"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -78,22 +80,38 @@ type ScoringStrategyRegistry interface {
 	ScoreFactor(ctx context.Context, factor FactorSnapshot, values []float64) (float64, error)
 }
 
+// Evaluator 执行量表解释模型评估。
 type Evaluator struct {
 	scoringRegistry ScoringStrategyRegistry
+	calculator      *calculation.Engine
 }
 
+// NewEvaluator 创建量表解释模型评估器。
 func NewEvaluator(scoringRegistry ScoringStrategyRegistry) *Evaluator {
-	return &Evaluator{scoringRegistry: scoringRegistry}
+	if scoringRegistry == nil {
+		scoringRegistry = DefaultScoringStrategyRegistry{}
+	}
+	return &Evaluator{
+		scoringRegistry: scoringRegistry,
+		calculator:      calculation.NewEngine(scaleCalculationRegistry{registry: scoringRegistry}),
+	}
 }
 
+// NewDefaultEvaluator 创建默认量表解释模型评估器。
 func NewDefaultEvaluator() *Evaluator {
 	return NewEvaluator(DefaultScoringStrategyRegistry{})
 }
 
+// Evaluate 执行量表解释模型评估。
 func (e *Evaluator) Evaluate(ctx context.Context, input ScaleEvaluationInput) (*ScaleEvaluationResult, error) {
-	factorScores, totalScore := e.CalculateScores(ctx, input)
-	factorScores, riskLevel := e.ClassifyRisk(input.Scale, factorScores)
-	factorScores, conclusion, suggestion := e.Interpret(input.Scale, factorScores, totalScore, riskLevel)
+	// 计算量表因子得分。
+	factorScores, totalScore := e.calculateScores(ctx, input)
+	// 分类量表因子风险等级。
+	factorScores, riskLevel := e.classifyRisk(input.Scale, factorScores)
+	// 解读量表因子。
+	factorScores, conclusion, suggestion := e.interpret(input.Scale, factorScores, totalScore, riskLevel)
+
+	// 返回量表解释模型评估结果。
 	return &ScaleEvaluationResult{
 		TotalScore:   totalScore,
 		RiskLevel:    riskLevel,
@@ -103,10 +121,15 @@ func (e *Evaluator) Evaluate(ctx context.Context, input ScaleEvaluationInput) (*
 	}, nil
 }
 
-func (e *Evaluator) CalculateScores(ctx context.Context, input ScaleEvaluationInput) ([]ScaleFactorScore, float64) {
+// calculateScores 计算量表因子得分。
+func (e *Evaluator) calculateScores(ctx context.Context, input ScaleEvaluationInput) ([]ScaleFactorScore, float64) {
+	// 创建量表因子得分列表。
 	factorScores := make([]ScaleFactorScore, 0, len(input.Scale.Factors))
+	// 计算量表因子得分。
 	for _, factor := range input.Scale.Factors {
+		// 计算因子得分。
 		rawScore := e.calculateFactorRawScore(ctx, factor, input.AnswerSheet, input.Questionnaire)
+		// 创建量表因子得分。
 		factorScores = append(factorScores, ScaleFactorScore{
 			FactorCode:   factor.Code,
 			FactorName:   factor.Title,
@@ -116,25 +139,38 @@ func (e *Evaluator) CalculateScores(ctx context.Context, input ScaleEvaluationIn
 			IsTotalScore: factor.IsTotalScore,
 		})
 	}
-	return factorScores, CalculateTotalScore(factorScores)
+
+	// 计算总分。
+	return factorScores, calculateTotalScore(factorScores)
 }
 
-func (e *Evaluator) ClassifyRisk(model ScaleEvaluationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, RiskLevel) {
+// classifyRisk 分类量表因子风险等级。
+func (e *Evaluator) classifyRisk(model ScaleEvaluationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, RiskLevel) {
+	// 创建量表因子得分列表。
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
+		// 计算因子风险等级。
 		fs.RiskLevel = calculateFactorRiskLevel(model, fs.FactorCode, fs.RawScore)
+		// 添加到量表因子得分列表。
 		updatedScores = append(updatedScores, fs)
 	}
+	// 计算总体风险等级。
 	return updatedScores, calculateOverallRiskLevel(model, updatedScores)
 }
 
-func (e *Evaluator) Interpret(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel RiskLevel) ([]ScaleFactorScore, string, string) {
+// interpret 解读量表因子。
+func (e *Evaluator) interpret(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel RiskLevel) ([]ScaleFactorScore, string, string) {
+	// 创建量表因子得分列表。
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
+		// 解读因子。
 		fs.Conclusion, fs.Suggestion = interpretFactor(model, fs)
+		// 添加到量表因子得分列表。
 		updatedScores = append(updatedScores, fs)
 	}
+	// 解读总体。
 	conclusion, suggestion := interpretOverall(model, updatedScores, totalScore, riskLevel)
+	// 返回量表因子得分列表、总结论和建议。
 	return updatedScores, conclusion, suggestion
 }
 
@@ -149,14 +185,21 @@ func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor FactorSn
 	if err != nil {
 		return 0
 	}
-	score, err := e.scoringRegistry.ScoreFactor(ctx, factor, values)
+	score, err := e.calculator.ScoreDimension(ctx, calculation.Dimension{
+		Code:            factor.Code.String(),
+		ScoringStrategy: string(factor.ScoringStrategy),
+	}, values)
+	if e.calculator == nil {
+		score, err = e.scoringRegistry.ScoreFactor(ctx, factor, values)
+	}
 	if err != nil {
 		return 0
 	}
 	return score
 }
 
-func CalculateTotalScore(factorScores []ScaleFactorScore) float64 {
+// calculateTotalScore 计算量表总分。
+func calculateTotalScore(factorScores []ScaleFactorScore) float64 {
 	var totalScore float64
 	for _, fs := range factorScores {
 		if fs.IsTotalScore {
@@ -167,6 +210,7 @@ func CalculateTotalScore(factorScores []ScaleFactorScore) float64 {
 	return totalScore
 }
 
+// collectFactorValues 收集因子得分。
 func collectFactorValues(factor FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) ([]float64, error) {
 	switch factor.ScoringStrategy {
 	case ScoringStrategySum, ScoringStrategyAvg:
@@ -181,6 +225,7 @@ func collectFactorValues(factor FactorSnapshot, sheet *ScaleAnswerSheetSnapshot,
 	}
 }
 
+// collectQuestionScores 收集题目得分。
 func collectQuestionScores(factor FactorSnapshot, sheet *ScaleAnswerSheetSnapshot) []float64 {
 	answerMap := factorScoreAnswerMap(sheet)
 	scores := make([]float64, 0, len(factor.QuestionCodes))
@@ -192,6 +237,7 @@ func collectQuestionScores(factor FactorSnapshot, sheet *ScaleAnswerSheetSnapsho
 	return scores
 }
 
+// collectCntMatches 收集匹配的题目得分。
 func collectCntMatches(factor FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) []float64 {
 	targetContents := factor.ScoringParams.GetCntOptionContents()
 	if len(targetContents) == 0 {
@@ -220,6 +266,7 @@ func collectCntMatches(factor FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, q
 	return matchValues
 }
 
+// simulateFactorScore 模拟因子得分。
 func simulateFactorScore(factor FactorSnapshot) float64 {
 	questionCount := len(factor.QuestionCodes)
 	if questionCount == 0 {
@@ -228,6 +275,7 @@ func simulateFactorScore(factor FactorSnapshot) float64 {
 	return float64(questionCount) * 2.5
 }
 
+// factorScoreOptionContentMap 收集选项内容。
 func factorScoreOptionContentMap(qnr *ScaleQuestionnaireSnapshot) map[string]string {
 	contentMap := make(map[string]string)
 	if qnr == nil {
@@ -241,6 +289,7 @@ func factorScoreOptionContentMap(qnr *ScaleQuestionnaireSnapshot) map[string]str
 	return contentMap
 }
 
+// factorScoreAnswerMap 收集答案。
 func factorScoreAnswerMap(sheet *ScaleAnswerSheetSnapshot) map[string]ScaleAnswerSnapshot {
 	answerMap := make(map[string]ScaleAnswerSnapshot)
 	if sheet == nil {
@@ -252,6 +301,7 @@ func factorScoreAnswerMap(sheet *ScaleAnswerSheetSnapshot) map[string]ScaleAnswe
 	return answerMap
 }
 
+// factorScoreOptionID 收集选项ID。
 func factorScoreOptionID(answer ScaleAnswerSnapshot) string {
 	raw := answer.Value
 	if raw == nil {
@@ -266,6 +316,7 @@ func factorScoreOptionID(answer ScaleAnswerSnapshot) string {
 	return ""
 }
 
+// calculateFactorRiskLevel 计算因子风险等级。
 func calculateFactorRiskLevel(model ScaleEvaluationModel, factorCode FactorCode, score float64) RiskLevel {
 	if factor, found := findFactor(model, factorCode); found {
 		if rule := findInterpretRule(factor, score); rule != nil {
@@ -275,6 +326,7 @@ func calculateFactorRiskLevel(model ScaleEvaluationModel, factorCode FactorCode,
 	return defaultRiskLevelByScore(score)
 }
 
+// calculateOverallRiskLevel 计算总体风险等级。
 func calculateOverallRiskLevel(model ScaleEvaluationModel, factorScores []ScaleFactorScore) RiskLevel {
 	for _, fs := range factorScores {
 		if fs.IsTotalScore {
@@ -295,6 +347,7 @@ func calculateOverallRiskLevel(model ScaleEvaluationModel, factorScores []ScaleF
 	return maxRisk
 }
 
+// interpretFactor 解读因子。
 func interpretFactor(model ScaleEvaluationModel, fs ScaleFactorScore) (string, string) {
 	if factor, found := findFactor(model, fs.FactorCode); found {
 		if rule := findInterpretRuleWithRangeFallback(factor, fs.RawScore); rule != nil && rule.GetConclusion() != "" {
@@ -304,6 +357,7 @@ func interpretFactor(model ScaleEvaluationModel, fs ScaleFactorScore) (string, s
 	return defaultFactorInterpretation(fs.FactorName, fs.RiskLevel, fs.RawScore)
 }
 
+// interpretOverall 解读总体。
 func interpretOverall(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel RiskLevel) (string, string) {
 	for _, fs := range factorScores {
 		if !fs.IsTotalScore {
@@ -318,6 +372,7 @@ func interpretOverall(model ScaleEvaluationModel, factorScores []ScaleFactorScor
 	return defaultOverallInterpretation(totalScore, riskLevel)
 }
 
+// findFactor 查找因子。
 func findFactor(model ScaleEvaluationModel, factorCode FactorCode) (FactorSnapshot, bool) {
 	for _, factor := range model.Factors {
 		if factor.Code == factorCode {
@@ -327,25 +382,29 @@ func findFactor(model ScaleEvaluationModel, factorCode FactorCode) (FactorSnapsh
 	return FactorSnapshot{}, false
 }
 
+// findInterpretRule 查找解读规则。
 func findInterpretRule(factor FactorSnapshot, score float64) *InterpretationRule {
-	for i := range factor.InterpretRules {
-		if factor.InterpretRules[i].Matches(score) {
-			return &factor.InterpretRules[i]
-		}
-	}
-	return nil
-}
-
-func findInterpretRuleWithRangeFallback(factor FactorSnapshot, score float64) *InterpretationRule {
-	if rule := findInterpretRule(factor, score); rule != nil {
-		return rule
-	}
-	if len(factor.InterpretRules) == 0 {
+	rules := toScoreRangeRules(factor.InterpretRules)
+	matched := interpretation.MatchRule(score, rules)
+	if matched == nil {
 		return nil
 	}
-	return &factor.InterpretRules[len(factor.InterpretRules)-1]
+	rule := NewInterpretationRule(NewScoreRange(matched.Min, matched.Max), RiskLevel(matched.Level), matched.Conclusion, matched.Suggestion)
+	return &rule
 }
 
+// findInterpretRuleWithRangeFallback 查找解读规则（范围降级）。
+func findInterpretRuleWithRangeFallback(factor FactorSnapshot, score float64) *InterpretationRule {
+	rules := toScoreRangeRules(factor.InterpretRules)
+	matched := interpretation.MatchRuleWithRangeFallback(score, rules)
+	if matched == nil {
+		return nil
+	}
+	rule := NewInterpretationRule(NewScoreRange(matched.Min, matched.Max), RiskLevel(matched.Level), matched.Conclusion, matched.Suggestion)
+	return &rule
+}
+
+// defaultRiskLevelByScore 默认风险等级。
 func defaultRiskLevelByScore(score float64) RiskLevel {
 	switch {
 	case score >= 80:
@@ -361,6 +420,7 @@ func defaultRiskLevelByScore(score float64) RiskLevel {
 	}
 }
 
+// riskLevelOrder 风险等级排序。
 func riskLevelOrder(level RiskLevel) int {
 	switch level {
 	case RiskLevelNone:
@@ -378,6 +438,7 @@ func riskLevelOrder(level RiskLevel) int {
 	}
 }
 
+// defaultFactorInterpretation 默认因子解读。
 func defaultFactorInterpretation(factorName string, riskLevel RiskLevel, score float64) (string, string) {
 	switch riskLevel {
 	case RiskLevelSevere:
@@ -393,6 +454,7 @@ func defaultFactorInterpretation(factorName string, riskLevel RiskLevel, score f
 	}
 }
 
+// defaultOverallInterpretation 默认总体解读。
 func defaultOverallInterpretation(totalScore float64, riskLevel RiskLevel) (string, string) {
 	switch riskLevel {
 	case RiskLevelSevere:
@@ -408,6 +470,7 @@ func defaultOverallInterpretation(totalScore float64, riskLevel RiskLevel) (stri
 	}
 }
 
+// cloneEvaluationFloat64Ptr 克隆浮点数指针。
 func cloneEvaluationFloat64Ptr(value *float64) *float64 {
 	if value == nil {
 		return nil
@@ -416,28 +479,50 @@ func cloneEvaluationFloat64Ptr(value *float64) *float64 {
 	return &cloned
 }
 
+// DefaultScoringStrategyRegistry 默认量表因子聚合策略注册表。
 type DefaultScoringStrategyRegistry struct{}
 
+// ScoreFactor 执行量表因子聚合策略。
 func (DefaultScoringStrategyRegistry) ScoreFactor(_ context.Context, factor FactorSnapshot, values []float64) (float64, error) {
-	switch factor.ScoringStrategy {
-	case ScoringStrategySum:
-		return sumValues(values), nil
-	case ScoringStrategyAvg:
-		if len(values) == 0 {
-			return 0, nil
-		}
-		return sumValues(values) / float64(len(values)), nil
-	case ScoringStrategyCnt:
-		return float64(len(values)), nil
-	default:
+	score, err := calculation.DefaultStrategyRegistry{}.Score(context.Background(), calculation.Dimension{
+		Code:            factor.Code.String(),
+		ScoringStrategy: string(factor.ScoringStrategy),
+	}, values)
+	if err != nil {
+		return 0, err
+	}
+	if factor.ScoringStrategy != ScoringStrategySum &&
+		factor.ScoringStrategy != ScoringStrategyAvg &&
+		factor.ScoringStrategy != ScoringStrategyCnt {
 		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
+	return score, nil
 }
 
-func sumValues(values []float64) float64 {
-	var total float64
-	for _, value := range values {
-		total += value
+type scaleCalculationRegistry struct {
+	registry ScoringStrategyRegistry
+}
+
+func (r scaleCalculationRegistry) Score(ctx context.Context, dimension calculation.Dimension, values []float64) (float64, error) {
+	if r.registry == nil {
+		return 0, nil
 	}
-	return total
+	return r.registry.ScoreFactor(ctx, FactorSnapshot{
+		Code:            NewFactorCode(dimension.Code),
+		ScoringStrategy: ScoringStrategyCode(dimension.ScoringStrategy),
+	}, values)
+}
+
+func toScoreRangeRules(rules []InterpretationRule) []interpretation.ScoreRangeRule {
+	converted := make([]interpretation.ScoreRangeRule, 0, len(rules))
+	for _, rule := range rules {
+		converted = append(converted, interpretation.ScoreRangeRule{
+			Min:        rule.GetScoreRange().Min(),
+			Max:        rule.GetScoreRange().Max(),
+			Level:      string(rule.GetRiskLevel()),
+			Conclusion: rule.GetConclusion(),
+			Suggestion: rule.GetSuggestion(),
+		})
+	}
+	return converted
 }

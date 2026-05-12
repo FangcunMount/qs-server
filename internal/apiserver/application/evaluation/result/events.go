@@ -10,16 +10,19 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
+// EventAssembler 事件装配器。
 type EventAssembler interface {
 	BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent
 }
 
 type defaultEventAssembler struct{}
 
+// NewEventAssembler 创建事件装配器。
 func NewEventAssembler() EventAssembler {
 	return defaultEventAssembler{}
 }
 
+// BuildSuccessEvents 构建成功事件。
 func (defaultEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
 	if outcome.Assessment == nil || outcome.Result == nil || rpt == nil {
 		return nil

@@ -2,10 +2,13 @@ package evaluation
 
 import (
 	"context"
+	"errors"
 	"testing"
 
+	evaluationengine "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -60,7 +63,10 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{},
 	}
 
-	result, err := executor.EvaluateScale(context.Background(), a, snapshot)
+	result, err := executor.Execute(context.Background(), evaluationengine.ExecutionInput{
+		Assessment: a,
+		Input:      snapshot,
+	})
 	if err != nil {
 		t.Fatalf("EvaluateScale returned error: %v", err)
 	}
@@ -76,4 +82,89 @@ func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 	var _ interface {
 		Kind() assessment.EvaluationModelKind
 	} = (*Executor)(nil)
+}
+
+func TestScaleEvaluationServiceOrchestratesDependencies(t *testing.T) {
+	validator := &stubValidator{}
+	assembler := &stubAssembler{
+		output: domainScale.ScaleEvaluationInput{
+			Scale: domainScale.ScaleEvaluationModel{
+				Factors: []domainScale.FactorSnapshot{{Code: domainScale.NewFactorCode("f1"), IsTotalScore: true}},
+			},
+		},
+	}
+	evaluator := domainScale.NewEvaluator(stubScoringRegistry{})
+	mapper := &stubMapper{
+		output: assessment.NewEvaluationResult(1, assessment.RiskLevelLow, "c", "s", nil),
+	}
+	service := NewService(validator, assembler, evaluator, mapper)
+
+	a, _ := assessment.NewAssessment(
+		1,
+		testee.NewID(1),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(1)),
+		assessment.NewAdhocOrigin(),
+	)
+	_ = a.Submit()
+	snapshot := &evaluationinput.InputSnapshot{
+		MedicalScale: &evaluationinput.ScaleSnapshot{
+			QuestionnaireCode: "Q-001",
+			Status:            "published",
+			Factors: []evaluationinput.FactorSnapshot{
+				{Code: "f1", IsTotalScore: true, ScoringStrategy: "sum"},
+			},
+		},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{},
+	}
+	result, err := service.Evaluate(context.Background(), a, snapshot)
+	if err != nil {
+		t.Fatalf("Evaluate returned error: %v", err)
+	}
+	if result == nil {
+		t.Fatal("expected result, got nil")
+	}
+	if !validator.called || !assembler.called || !mapper.called {
+		t.Fatalf("expected validator/assembler/mapper to be called, got %v/%v/%v", validator.called, assembler.called, mapper.called)
+	}
+}
+
+type stubValidator struct {
+	called bool
+	err    error
+}
+
+func (s *stubValidator) Validate(input ScaleExecutionInput) error {
+	s.called = true
+	return s.err
+}
+
+type stubAssembler struct {
+	called bool
+	output domainScale.ScaleEvaluationInput
+}
+
+func (s *stubAssembler) FromSnapshot(_ *evaluationinput.InputSnapshot) domainScale.ScaleEvaluationInput {
+	s.called = true
+	return s.output
+}
+
+type stubMapper struct {
+	called bool
+	output *assessment.EvaluationResult
+}
+
+func (s *stubMapper) ToEvaluationResult(
+	_ *domainScale.ScaleEvaluationResult,
+	_ *assessment.Assessment,
+	_ *evaluationinput.InputSnapshot,
+) *assessment.EvaluationResult {
+	s.called = true
+	return s.output
+}
+
+type stubScoringRegistry struct{}
+
+func (stubScoringRegistry) ScoreFactor(context.Context, domainScale.FactorSnapshot, []float64) (float64, error) {
+	return 1, errors.New("ignore")
 }
