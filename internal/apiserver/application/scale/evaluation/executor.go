@@ -7,6 +7,7 @@ import (
 	evaluationengine "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -29,7 +30,7 @@ func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 		NewService(
 			DefaultInputValidator{},
 			DefaultInputAssembler{},
-			domainScale.NewEvaluator(scaleScoringRegistry{scorer: scorer}),
+			scaleevaluation.NewEvaluator(scaleScoringRegistry{scorer: scorer}),
 			DefaultResultMapper{},
 		),
 	)
@@ -41,7 +42,7 @@ func NewExecutorWithService(service Service) *Executor {
 		service = NewService(
 			DefaultInputValidator{},
 			DefaultInputAssembler{},
-			domainScale.NewDefaultEvaluator(),
+			scaleevaluation.NewDefaultEvaluator(),
 			DefaultResultMapper{},
 		)
 	}
@@ -80,7 +81,7 @@ type scaleScoringRegistry struct {
 //  3. 返回评分结果
 func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor domainScale.FactorSnapshot, values []float64) (float64, error) {
 	if r.scorer == nil {
-		return domainScale.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
+		return scaleevaluation.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
 	return r.scorer.ScoreFactor(ctx, string(factor.Code), values, string(factor.ScoringStrategy), nil)
 }

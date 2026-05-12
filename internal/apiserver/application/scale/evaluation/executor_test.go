@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -87,13 +88,13 @@ func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 func TestScaleEvaluationServiceOrchestratesDependencies(t *testing.T) {
 	validator := &stubValidator{}
 	assembler := &stubAssembler{
-		output: domainScale.ScaleEvaluationInput{
-			Scale: domainScale.ScaleEvaluationModel{
+		output: scaleevaluation.ScaleEvaluationInput{
+			Scale: scaleevaluation.ScaleEvaluationModel{
 				Factors: []domainScale.FactorSnapshot{{Code: domainScale.NewFactorCode("f1"), IsTotalScore: true}},
 			},
 		},
 	}
-	evaluator := domainScale.NewEvaluator(stubScoringRegistry{})
+	evaluator := scaleevaluation.NewEvaluator(stubScoringRegistry{})
 	mapper := &stubMapper{
 		output: assessment.NewEvaluationResult(1, assessment.RiskLevelLow, "c", "s", nil),
 	}
@@ -141,10 +142,10 @@ func (s *stubValidator) Validate(input ScaleExecutionInput) error {
 
 type stubAssembler struct {
 	called bool
-	output domainScale.ScaleEvaluationInput
+	output scaleevaluation.ScaleEvaluationInput
 }
 
-func (s *stubAssembler) FromSnapshot(_ *evaluationinput.InputSnapshot) domainScale.ScaleEvaluationInput {
+func (s *stubAssembler) FromSnapshot(_ *evaluationinput.InputSnapshot) scaleevaluation.ScaleEvaluationInput {
 	s.called = true
 	return s.output
 }
@@ -155,7 +156,7 @@ type stubMapper struct {
 }
 
 func (s *stubMapper) ToEvaluationResult(
-	_ *domainScale.ScaleEvaluationResult,
+	_ *scaleevaluation.ScaleEvaluationResult,
 	_ *assessment.Assessment,
 	_ *evaluationinput.InputSnapshot,
 ) *assessment.EvaluationResult {

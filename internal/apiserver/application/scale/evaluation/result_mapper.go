@@ -2,14 +2,14 @@ package evaluation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type ResultMapper interface {
 	ToEvaluationResult(
-		result *domainScale.ScaleEvaluationResult,
+		result *scaleevaluation.ScaleEvaluationResult,
 		a *assessment.Assessment,
 		snapshot *evaluationinput.InputSnapshot,
 	) *assessment.EvaluationResult
@@ -18,7 +18,7 @@ type ResultMapper interface {
 type DefaultResultMapper struct{}
 
 func (DefaultResultMapper) ToEvaluationResult(
-	result *domainScale.ScaleEvaluationResult,
+	result *scaleevaluation.ScaleEvaluationResult,
 	a *assessment.Assessment,
 	snapshot *evaluationinput.InputSnapshot,
 ) *assessment.EvaluationResult {

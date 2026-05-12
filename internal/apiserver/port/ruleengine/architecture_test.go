@@ -32,8 +32,11 @@ func TestEvaluationPipelineDoesNotCallCalculationExecutionDirectly(t *testing.T)
 	t.Parallel()
 
 	root := repoRoot(t)
-	pipelineRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "engine", "pipeline")
-	err := filepath.WalkDir(pipelineRoot, func(path string, entry os.DirEntry, err error) error {
+	engineRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "engine")
+	if _, statErr := os.Stat(engineRoot); statErr != nil {
+		t.Fatalf("evaluation engine root missing: %v", statErr)
+	}
+	err := filepath.WalkDir(engineRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -51,7 +54,7 @@ func TestEvaluationPipelineDoesNotCallCalculationExecutionDirectly(t *testing.T)
 			"calculation.BatchScore",
 		} {
 			if strings.Contains(text, token) {
-				t.Fatalf("%s contains %q; evaluation pipeline must use ruleengine ports for scoring execution", filepath.ToSlash(mustRel(t, root, path)), token)
+				t.Fatalf("%s contains %q; evaluation engine must use ruleengine ports for scoring execution", filepath.ToSlash(mustRel(t, root, path)), token)
 			}
 		}
 		return nil

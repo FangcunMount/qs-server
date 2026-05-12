@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -19,14 +19,14 @@ type Service interface {
 type scaleEvaluationService struct {
 	validator InputValidator
 	assembler InputAssembler
-	evaluator *domainScale.Evaluator
+	evaluator *scaleevaluation.Evaluator
 	mapper    ResultMapper
 }
 
 func NewService(
 	validator InputValidator,
 	assembler InputAssembler,
-	evaluator *domainScale.Evaluator,
+	evaluator *scaleevaluation.Evaluator,
 	mapper ResultMapper,
 ) Service {
 	if validator == nil {
@@ -36,7 +36,7 @@ func NewService(
 		assembler = DefaultInputAssembler{}
 	}
 	if evaluator == nil {
-		evaluator = domainScale.NewDefaultEvaluator()
+		evaluator = scaleevaluation.NewDefaultEvaluator()
 	}
 	if mapper == nil {
 		mapper = DefaultResultMapper{}
