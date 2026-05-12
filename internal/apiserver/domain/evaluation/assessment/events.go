@@ -58,8 +58,8 @@ type AssessmentInterpretedData struct {
 	ModelKind     string    `json:"model_kind,omitempty"`
 	ModelCode     string    `json:"model_code,omitempty"`
 	ModelVersion  string    `json:"model_version,omitempty"`
-	ScaleCode     string    `json:"scale_code"`
-	ScaleVersion  string    `json:"scale_version"`
+	ScaleCode     string    `json:"scale_code,omitempty"`
+	ScaleVersion  string    `json:"scale_version,omitempty"`
 	TotalScore    float64   `json:"total_score"`
 	RiskLevel     string    `json:"risk_level"`
 	InterpretedAt time.Time `json:"interpreted_at"`
@@ -119,7 +119,7 @@ func NewAssessmentSubmittedEvent(
 	}
 	if medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
 		data.ScaleCode = string(medicalScaleRef.Code())
-		data.ScaleVersion = medicalScaleRef.Name()
+		data.ScaleVersion = medicalScaleRef.Version()
 		if data.ModelKind == "" {
 			data.ModelKind = EvaluationModelKindScale.String()
 			data.ModelCode = data.ScaleCode
@@ -150,7 +150,32 @@ func NewAssessmentInterpretedEvent(
 			ModelCode:     modelRef.Code().String(),
 			ModelVersion:  modelRef.Version(),
 			ScaleCode:     string(medicalScaleRef.Code()),
-			ScaleVersion:  medicalScaleRef.Name(),
+			ScaleVersion:  medicalScaleRef.Version(),
+			TotalScore:    totalScore,
+			RiskLevel:     string(riskLevel),
+			InterpretedAt: interpretedAt,
+		},
+	)
+}
+
+// NewAssessmentModelInterpretedEvent 创建通用解释模型已解读事件。
+func NewAssessmentModelInterpretedEvent(
+	orgID int64,
+	assessmentID ID,
+	testeeID testee.ID,
+	modelRef EvaluationModelRef,
+	totalScore float64,
+	riskLevel RiskLevel,
+	interpretedAt time.Time,
+) AssessmentInterpretedEvent {
+	return event.New(EventTypeInterpreted, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
+		AssessmentInterpretedData{
+			OrgID:         orgID,
+			AssessmentID:  int64(assessmentID),
+			TesteeID:      testeeID.Uint64(),
+			ModelKind:     modelRef.Kind().String(),
+			ModelCode:     modelRef.Code().String(),
+			ModelVersion:  modelRef.Version(),
 			TotalScore:    totalScore,
 			RiskLevel:     string(riskLevel),
 			InterpretedAt: interpretedAt,

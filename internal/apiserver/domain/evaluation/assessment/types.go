@@ -317,9 +317,10 @@ func (r AnswerSheetRef) IsEmpty() bool {
 
 // MedicalScaleRef 量表引用值对象
 type MedicalScaleRef struct {
-	id   meta.ID
-	code meta.Code
-	name string
+	id      meta.ID
+	code    meta.Code
+	name    string
+	version string
 }
 
 // NewMedicalScaleRef 创建量表引用
@@ -328,6 +329,16 @@ func NewMedicalScaleRef(id meta.ID, code meta.Code, name string) MedicalScaleRef
 		id:   id,
 		code: code,
 		name: name,
+	}
+}
+
+// NewMedicalScaleRefWithVersion 创建带解释模型版本的量表引用。
+func NewMedicalScaleRefWithVersion(id meta.ID, code meta.Code, name, version string) MedicalScaleRef {
+	return MedicalScaleRef{
+		id:      id,
+		code:    code,
+		name:    name,
+		version: version,
 	}
 }
 
@@ -346,6 +357,11 @@ func (r MedicalScaleRef) Name() string {
 	return r.name
 }
 
+// Version 获取量表解释模型版本。
+func (r MedicalScaleRef) Version() string {
+	return r.version
+}
+
 // IsEmpty 是否为空引用
 func (r MedicalScaleRef) IsEmpty() bool {
 	return r.id.IsZero() && r.code.IsEmpty()
@@ -353,7 +369,7 @@ func (r MedicalScaleRef) IsEmpty() bool {
 
 // ToEvaluationModelRef 将旧的 MedicalScaleRef 转换为通用解释模型引用。
 func (r MedicalScaleRef) ToEvaluationModelRef() EvaluationModelRef {
-	return NewScaleEvaluationModelRef(r.id, r.code, "", r.name)
+	return NewScaleEvaluationModelRef(r.id, r.code, r.version, r.name)
 }
 
 // ==================== 业务来源值对象 ====================

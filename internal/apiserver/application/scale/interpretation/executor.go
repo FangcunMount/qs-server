@@ -1,13 +1,13 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
 	"fmt"
 
-	evaluationengine "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -16,12 +16,12 @@ type Executor struct {
 	service Service
 }
 
-// Executor 实现 evaluationengine.Evaluator 接口
+// Executor 实现 evaluationexecute.Evaluator 接口
 // 场景：评估引擎执行 Scale 解释模型评估
 // 流程：
-//  1. 实现 evaluationengine.Evaluator 接口
+//  1. 实现 evaluationexecute.Evaluator 接口
 //  2. 返回评估器
-var _ evaluationengine.Evaluator = (*Executor)(nil)
+var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
 // NewExecutor 创建 Scale 解释模型评估执行器
 // 使用默认评分策略注册表
@@ -30,7 +30,7 @@ func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 		NewService(
 			DefaultInputValidator{},
 			DefaultInputAssembler{},
-			scaleevaluation.NewEvaluator(scaleScoringRegistry{scorer: scorer}),
+			scaleinterpretation.NewEvaluator(scaleScoringRegistry{scorer: scorer}),
 			DefaultResultMapper{},
 		),
 	)
@@ -42,7 +42,7 @@ func NewExecutorWithService(service Service) *Executor {
 		service = NewService(
 			DefaultInputValidator{},
 			DefaultInputAssembler{},
-			scaleevaluation.NewDefaultEvaluator(),
+			scaleinterpretation.NewDefaultEvaluator(),
 			DefaultResultMapper{},
 		)
 	}
@@ -60,7 +60,7 @@ func (e *Executor) Kind() assessment.EvaluationModelKind {
 //  1. 验证输入是否合法
 //  2. 执行 Scale 解释模型评估
 //  3. 返回评估结果
-func (e *Executor) Execute(ctx context.Context, input evaluationengine.ExecutionInput) (*assessment.EvaluationResult, error) {
+func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.EvaluationResult, error) {
 	if e == nil || e.service == nil {
 		return nil, fmt.Errorf("scale evaluation service is not configured")
 	}
@@ -81,7 +81,7 @@ type scaleScoringRegistry struct {
 //  3. 返回评分结果
 func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor domainScale.FactorSnapshot, values []float64) (float64, error) {
 	if r.scorer == nil {
-		return scaleevaluation.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
+		return scaleinterpretation.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
 	return r.scorer.ScoreFactor(ctx, string(factor.Code), values, string(factor.ScoringStrategy), nil)
 }

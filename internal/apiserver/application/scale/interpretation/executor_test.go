@@ -1,15 +1,14 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
-	"errors"
 	"testing"
 
-	evaluationengine "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -64,7 +63,7 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{},
 	}
 
-	result, err := executor.Execute(context.Background(), evaluationengine.ExecutionInput{
+	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: a,
 		Input:      snapshot,
 	})
@@ -85,16 +84,16 @@ func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 	} = (*Executor)(nil)
 }
 
-func TestScaleEvaluationServiceOrchestratesDependencies(t *testing.T) {
+func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	validator := &stubValidator{}
 	assembler := &stubAssembler{
-		output: scaleevaluation.ScaleEvaluationInput{
-			Scale: scaleevaluation.ScaleEvaluationModel{
+		output: scaleinterpretation.ScaleInterpretationInput{
+			Scale: scaleinterpretation.ScaleInterpretationModel{
 				Factors: []domainScale.FactorSnapshot{{Code: domainScale.NewFactorCode("f1"), IsTotalScore: true}},
 			},
 		},
 	}
-	evaluator := scaleevaluation.NewEvaluator(stubScoringRegistry{})
+	evaluator := scaleinterpretation.NewEvaluator(stubScoringRegistry{})
 	mapper := &stubMapper{
 		output: assessment.NewEvaluationResult(1, assessment.RiskLevelLow, "c", "s", nil),
 	}
@@ -142,10 +141,10 @@ func (s *stubValidator) Validate(input ScaleExecutionInput) error {
 
 type stubAssembler struct {
 	called bool
-	output scaleevaluation.ScaleEvaluationInput
+	output scaleinterpretation.ScaleInterpretationInput
 }
 
-func (s *stubAssembler) FromSnapshot(_ *evaluationinput.InputSnapshot) scaleevaluation.ScaleEvaluationInput {
+func (s *stubAssembler) FromSnapshot(_ *evaluationinput.InputSnapshot) scaleinterpretation.ScaleInterpretationInput {
 	s.called = true
 	return s.output
 }
@@ -156,7 +155,7 @@ type stubMapper struct {
 }
 
 func (s *stubMapper) ToEvaluationResult(
-	_ *scaleevaluation.ScaleEvaluationResult,
+	_ *scaleinterpretation.ScaleInterpretationResult,
 	_ *assessment.Assessment,
 	_ *evaluationinput.InputSnapshot,
 ) *assessment.EvaluationResult {
@@ -167,5 +166,5 @@ func (s *stubMapper) ToEvaluationResult(
 type stubScoringRegistry struct{}
 
 func (stubScoringRegistry) ScoreFactor(context.Context, domainScale.FactorSnapshot, []float64) (float64, error) {
-	return 1, errors.New("ignore")
+	return 1, nil
 }

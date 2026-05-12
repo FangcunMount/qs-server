@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -119,6 +120,36 @@ func TestScaleMapperNormalizeRiskLevelSupportsLegacyValues(t *testing.T) {
 				t.Fatalf("normalizeRiskLevel(%q) = %q, want %q", tc.raw, got, tc.want)
 			}
 		})
+	}
+}
+
+func TestScaleMapperPersistsAndBackfillsScaleVersion(t *testing.T) {
+	t.Parallel()
+
+	mapper := NewScaleMapper()
+	domain, err := domainscale.NewMedicalScale(
+		meta.NewCode("SCALE_V"),
+		"Scale V",
+		domainscale.WithScaleVersion("2.3.0"),
+		domainscale.WithQuestionnaire(meta.NewCode("Q-V"), "9.9.0"),
+	)
+	if err != nil {
+		t.Fatalf("NewMedicalScale returned error: %v", err)
+	}
+
+	po := mapper.ToPO(domain)
+	if po.ScaleVersion != "2.3.0" {
+		t.Fatalf("po scale version = %q, want 2.3.0", po.ScaleVersion)
+	}
+
+	backfilled := mapper.ToDomain(context.Background(), &ScalePO{
+		Code:                 "SCALE_OLD",
+		Title:                "Scale Old",
+		QuestionnaireVersion: "1.8.0",
+		Status:               domainscale.StatusDraft.String(),
+	})
+	if backfilled.GetScaleVersion() != "1.8.0" {
+		t.Fatalf("backfilled scale version = %q, want questionnaire version", backfilled.GetScaleVersion())
 	}
 }
 

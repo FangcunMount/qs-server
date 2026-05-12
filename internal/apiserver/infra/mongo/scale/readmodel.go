@@ -48,6 +48,7 @@ func scaleReadModelFindOptions(page scalereadmodel.PageRequest) *options.FindOpt
 func scaleSummaryProjection() bson.M {
 	return bson.M{
 		"code":               1,
+		"scale_version":      1,
 		"title":              1,
 		"description":        1,
 		"category":           1,
@@ -105,6 +106,7 @@ func scaleRowsFromPO(items []ScalePO) []scalereadmodel.ScaleSummaryRow {
 	for _, item := range items {
 		rows = append(rows, scalereadmodel.ScaleSummaryRow{
 			Code:              item.Code,
+			ScaleVersion:      scaleVersionFromPO(&item),
 			Title:             item.Title,
 			Description:       item.Description,
 			Category:          item.Category,

@@ -1,11 +1,11 @@
-package evaluation
+package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
-func (*Evaluator) classifyRisk(model ScaleEvaluationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, scale.RiskLevel) {
+func (*Evaluator) classifyRisk(model ScaleInterpretationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, scale.RiskLevel) {
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
 		fs.RiskLevel = calculateFactorRiskLevel(model, fs.FactorCode, fs.RawScore)
@@ -14,7 +14,7 @@ func (*Evaluator) classifyRisk(model ScaleEvaluationModel, factorScores []ScaleF
 	return updatedScores, calculateOverallRiskLevel(model, updatedScores)
 }
 
-func calculateFactorRiskLevel(model ScaleEvaluationModel, factorCode scale.FactorCode, score float64) scale.RiskLevel {
+func calculateFactorRiskLevel(model ScaleInterpretationModel, factorCode scale.FactorCode, score float64) scale.RiskLevel {
 	if factor, found := findFactor(model, factorCode); found {
 		if rule := findInterpretRule(factor, score); rule != nil {
 			return rule.GetRiskLevel()
@@ -23,7 +23,7 @@ func calculateFactorRiskLevel(model ScaleEvaluationModel, factorCode scale.Facto
 	return defaultRiskLevelByScore(score)
 }
 
-func calculateOverallRiskLevel(model ScaleEvaluationModel, factorScores []ScaleFactorScore) scale.RiskLevel {
+func calculateOverallRiskLevel(model ScaleInterpretationModel, factorScores []ScaleFactorScore) scale.RiskLevel {
 	for _, fs := range factorScores {
 		if fs.IsTotalScore {
 			if factor, found := findFactor(model, fs.FactorCode); found {
@@ -75,7 +75,7 @@ func riskLevelOrder(level scale.RiskLevel) int {
 	}
 }
 
-func findFactor(model ScaleEvaluationModel, factorCode scale.FactorCode) (scale.FactorSnapshot, bool) {
+func findFactor(model ScaleInterpretationModel, factorCode scale.FactorCode) (scale.FactorSnapshot, bool) {
 	for _, factor := range model.Factors {
 		if factor.Code == factorCode {
 			return factor, true

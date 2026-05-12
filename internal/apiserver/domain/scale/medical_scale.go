@@ -13,6 +13,7 @@ type MedicalScale struct {
 	// 标识
 	id        meta.ID
 	scaleCode meta.Code
+	version   string
 
 	// 基本信息
 	title       string
@@ -61,6 +62,7 @@ func NewMedicalScale(scaleCode meta.Code, title string, opts ...MedicalScaleOpti
 
 	m := &MedicalScale{
 		scaleCode: scaleCode,
+		version:   DefaultScaleVersion,
 		title:     title,
 		status:    StatusDraft,
 	}
@@ -85,6 +87,13 @@ func WithID(id meta.ID) MedicalScaleOption {
 func WithDescription(desc string) MedicalScaleOption {
 	return func(m *MedicalScale) {
 		m.description = desc
+	}
+}
+
+// WithScaleVersion 设置量表解释模型版本。
+func WithScaleVersion(version string) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.version = normalizeScaleVersion(version)
 	}
 }
 
@@ -201,6 +210,11 @@ func (m *MedicalScale) GetCode() meta.Code {
 	return m.scaleCode
 }
 
+// GetScaleVersion 获取量表解释模型版本。
+func (m *MedicalScale) GetScaleVersion() string {
+	return normalizeScaleVersion(m.version)
+}
+
 // GetTitle 获取标题
 func (m *MedicalScale) GetTitle() string {
 	return m.title
@@ -226,7 +240,9 @@ func (m *MedicalScale) GetStatus() Status {
 	return m.status
 }
 
-// GetFactors 获取因子列表
+// GetFactors 获取因子列表。
+//
+// Deprecated: 外部调用方应使用 FactorSnapshots，避免拿到可变 Factor 指针。
 func (m *MedicalScale) GetFactors() []*Factor {
 	return slices.Clone(m.factors)
 }
@@ -705,9 +721,18 @@ func (m *MedicalScale) addChangedEvent(action ChangeAction) {
 	m.addEvent(NewScaleChangedEvent(
 		m.id.Uint64(),
 		string(m.scaleCode),
-		"",
+		m.GetScaleVersion(),
 		m.title,
 		action,
 		time.Now(),
 	))
+}
+
+const DefaultScaleVersion = "1.0.0"
+
+func normalizeScaleVersion(version string) string {
+	if version == "" {
+		return DefaultScaleVersion
+	}
+	return version
 }

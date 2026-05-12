@@ -1,7 +1,8 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestEvaluatorCalculatesSumAvgCntAndUsesTotalScoreFactor(t *testing.T) {
-	input := scaleEvaluationInputForTest()
+	input := scaleInterpretationInputForTest()
 
 	result, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
 	if err != nil {
@@ -25,7 +26,7 @@ func TestEvaluatorCalculatesSumAvgCntAndUsesTotalScoreFactor(t *testing.T) {
 }
 
 func TestEvaluatorSumsFactorsWhenNoTotalScoreFactor(t *testing.T) {
-	input := scaleEvaluationInputForTest()
+	input := scaleInterpretationInputForTest()
 	for i := range input.Scale.Factors {
 		input.Scale.Factors[i].IsTotalScore = false
 	}
@@ -40,7 +41,7 @@ func TestEvaluatorSumsFactorsWhenNoTotalScoreFactor(t *testing.T) {
 }
 
 func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
-	input := scaleEvaluationInputForTest()
+	input := scaleInterpretationInputForTest()
 	input.AnswerSheet.Answers[0].Score = 40
 	input.AnswerSheet.Answers[1].Score = 50
 
@@ -64,7 +65,7 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 }
 
 func TestEvaluatorInterpretationUsesRulesAndDefaults(t *testing.T) {
-	input := scaleEvaluationInputForTest()
+	input := scaleInterpretationInputForTest()
 
 	result, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
 	if err != nil {
@@ -82,9 +83,31 @@ func TestEvaluatorInterpretationUsesRulesAndDefaults(t *testing.T) {
 	}
 }
 
-func scaleEvaluationInputForTest() ScaleEvaluationInput {
-	return ScaleEvaluationInput{
-		Scale: ScaleEvaluationModel{
+func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
+	t.Run("cnt requires questionnaire", func(t *testing.T) {
+		input := scaleInterpretationInputForTest()
+		input.Questionnaire = nil
+
+		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+		if err == nil || !strings.Contains(err.Error(), "questionnaire is required") {
+			t.Fatalf("Evaluate error = %v, want questionnaire required", err)
+		}
+	})
+
+	t.Run("unsupported strategy", func(t *testing.T) {
+		input := scaleInterpretationInputForTest()
+		input.Scale.Factors[0].ScoringStrategy = scale.ScoringStrategyCode("unknown")
+
+		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+		if err == nil || !strings.Contains(err.Error(), "unsupported factor scoring strategy") {
+			t.Fatalf("Evaluate error = %v, want unsupported strategy", err)
+		}
+	})
+}
+
+func scaleInterpretationInputForTest() ScaleInterpretationInput {
+	return ScaleInterpretationInput{
+		Scale: ScaleInterpretationModel{
 			Code: "S-001",
 			Factors: []scale.FactorSnapshot{
 				{

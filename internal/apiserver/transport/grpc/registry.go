@@ -10,7 +10,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
@@ -72,7 +72,7 @@ type EvaluationDeps struct {
 	ManagementService  assessmentApp.AssessmentManagementService
 	ReportQueryService assessmentApp.ReportQueryService
 	ScoreQueryService  assessmentApp.ScoreQueryService
-	EvaluationService  engine.Service
+	EvaluationService  execute.Service
 }
 
 type ScaleDeps struct {

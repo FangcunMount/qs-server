@@ -19,6 +19,7 @@ func scaleToSnapshot(m *scale.MedicalScale) *port.ScaleSnapshot {
 	return &port.ScaleSnapshot{
 		ID:                   m.GetID().Uint64(),
 		Code:                 m.GetCode().String(),
+		ScaleVersion:         m.GetScaleVersion(),
 		Title:                m.GetTitle(),
 		QuestionnaireCode:    m.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: m.GetQuestionnaireVersion(),

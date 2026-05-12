@@ -1,4 +1,4 @@
-package evaluation
+package interpretation
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
-func (*Evaluator) interpret(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel scale.RiskLevel) ([]ScaleFactorScore, string, string) {
+func (*Evaluator) interpret(model ScaleInterpretationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel scale.RiskLevel) ([]ScaleFactorScore, string, string) {
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
 		fs.Conclusion, fs.Suggestion = interpretFactor(model, fs)
@@ -16,7 +16,7 @@ func (*Evaluator) interpret(model ScaleEvaluationModel, factorScores []ScaleFact
 	return updatedScores, conclusion, suggestion
 }
 
-func interpretFactor(model ScaleEvaluationModel, fs ScaleFactorScore) (string, string) {
+func interpretFactor(model ScaleInterpretationModel, fs ScaleFactorScore) (string, string) {
 	if factor, found := findFactor(model, fs.FactorCode); found {
 		if rule := findInterpretRuleWithRangeFallback(factor, fs.RawScore); rule != nil && rule.GetConclusion() != "" {
 			return rule.GetConclusion(), rule.GetSuggestion()
@@ -25,7 +25,7 @@ func interpretFactor(model ScaleEvaluationModel, fs ScaleFactorScore) (string, s
 	return defaultFactorInterpretation(fs.FactorName, fs.RiskLevel, fs.RawScore)
 }
 
-func interpretOverall(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel scale.RiskLevel) (string, string) {
+func interpretOverall(model ScaleInterpretationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel scale.RiskLevel) (string, string) {
 	for _, fs := range factorScores {
 		if !fs.IsTotalScore {
 			continue

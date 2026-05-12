@@ -14,7 +14,7 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
@@ -101,7 +101,7 @@ type ActorDeps struct {
 
 type EvaluationDeps struct {
 	ManagementService     assessmentApp.AssessmentManagementService
-	EvaluationService     engine.Service
+	EvaluationService     execute.Service
 	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
 }
 

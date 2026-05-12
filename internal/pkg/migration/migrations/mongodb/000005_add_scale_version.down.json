@@ -1,0 +1,13 @@
+[
+  { "dropIndexes": "scales", "index": "idx_scales_code_version_deleted" },
+  {
+    "update": "scales",
+    "updates": [
+      {
+        "q": {},
+        "u": { "$unset": { "scale_version": "" } },
+        "multi": true
+      }
+    ]
+  }
+]

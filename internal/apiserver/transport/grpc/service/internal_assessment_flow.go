@@ -166,7 +166,7 @@ func (flow assessmentFlow) EvaluateAssessment(
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	err := s.engineService.Evaluate(ctx, req.AssessmentId)
+	err := s.executeService.Evaluate(ctx, req.AssessmentId)
 	if err != nil {
 		l.Errorw("执行评估失败",
 			"action", "evaluate_assessment",

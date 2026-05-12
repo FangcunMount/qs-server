@@ -54,6 +54,7 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 
 	po := &ScalePO{
 		Code:                 domain.GetCode().String(),
+		ScaleVersion:         domain.GetScaleVersion(),
 		Title:                domain.GetTitle(),
 		Description:          domain.GetDescription(),
 		Category:             domain.GetCategory().String(),
@@ -64,7 +65,7 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 		QuestionnaireCode:    domain.GetQuestionnaireCode().String(),
 		QuestionnaireVersion: domain.GetQuestionnaireVersion(),
 		Status:               domain.GetStatus().String(),
-		Factors:              m.mapFactorsToPO(domain.GetFactors()),
+		Factors:              m.mapFactorSnapshotsToPO(domain.FactorSnapshots()),
 	}
 	po.CreatedAt = domain.GetCreatedAt()
 	po.CreatedBy = domain.GetCreatedBy().Uint64()
@@ -74,38 +75,38 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 	return po
 }
 
-// mapFactorsToPO 将因子列表转换为持久化对象
-func (m *ScaleMapper) mapFactorsToPO(factors []*scale.Factor) []FactorPO {
+// mapFactorSnapshotsToPO 将只读因子快照列表转换为持久化对象。
+func (m *ScaleMapper) mapFactorSnapshotsToPO(factors []scale.FactorSnapshot) []FactorPO {
 	if factors == nil {
 		return []FactorPO{}
 	}
 
 	result := make([]FactorPO, 0, len(factors))
 	for _, f := range factors {
-		result = append(result, m.mapFactorToPO(f))
+		result = append(result, m.mapFactorSnapshotToPO(f))
 	}
 	return result
 }
 
-// mapFactorToPO 将单个因子转换为持久化对象
-func (m *ScaleMapper) mapFactorToPO(f *scale.Factor) FactorPO {
+// mapFactorSnapshotToPO 将单个因子只读快照转换为持久化对象。
+func (m *ScaleMapper) mapFactorSnapshotToPO(f scale.FactorSnapshot) FactorPO {
 	// 转换题目编码
-	questionCodes := make([]string, 0, len(f.GetQuestionCodes()))
-	for _, qc := range f.GetQuestionCodes() {
+	questionCodes := make([]string, 0, len(f.QuestionCodes))
+	for _, qc := range f.QuestionCodes {
 		questionCodes = append(questionCodes, qc.String())
 	}
 
 	return FactorPO{
-		Code:            f.GetCode().String(),
-		Title:           f.GetTitle(),
-		FactorType:      f.GetFactorType().String(),
-		IsTotalScore:    f.IsTotalScore(),
-		IsShow:          f.IsShow(),
+		Code:            f.Code.String(),
+		Title:           f.Title,
+		FactorType:      f.FactorType.String(),
+		IsTotalScore:    f.IsTotalScore,
+		IsShow:          f.IsShow,
 		QuestionCodes:   questionCodes,
-		ScoringStrategy: f.GetScoringStrategy().String(),
-		ScoringParams:   scoringParamsToStoredMap(f.GetScoringParams(), f.GetScoringStrategy()),
-		MaxScore:        f.GetMaxScore(),
-		InterpretRules:  m.mapInterpretRulesToPO(f.GetInterpretRules()),
+		ScoringStrategy: f.ScoringStrategy.String(),
+		ScoringParams:   scoringParamsToStoredMap(f.ScoringParams, f.ScoringStrategy),
+		MaxScore:        cloneFloat64Ptr(f.MaxScore),
+		InterpretRules:  m.mapInterpretRulesToPO(f.InterpretRules),
 	}
 }
 
@@ -189,6 +190,7 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 		meta.NewCode(po.Code),
 		po.Title,
 		scale.WithDescription(po.Description),
+		scale.WithScaleVersion(scaleVersionFromPO(po)),
 		scale.WithCategory(scale.NewCategory(po.Category)),
 		scale.WithStages(stages),
 		scale.WithApplicableAges(applicableAges),
@@ -208,6 +210,27 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 	}
 
 	return domain
+}
+
+func scaleVersionFromPO(po *ScalePO) string {
+	if po == nil {
+		return scale.DefaultScaleVersion
+	}
+	if po.ScaleVersion != "" {
+		return po.ScaleVersion
+	}
+	if po.QuestionnaireVersion != "" {
+		return po.QuestionnaireVersion
+	}
+	return scale.DefaultScaleVersion
+}
+
+func cloneFloat64Ptr(value *float64) *float64 {
+	if value == nil {
+		return nil
+	}
+	cloned := *value
+	return &cloned
 }
 
 // mapFactorsToDomain 将因子持久化对象列表转换为领域模型

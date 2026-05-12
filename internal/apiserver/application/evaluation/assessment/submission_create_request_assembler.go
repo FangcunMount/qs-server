@@ -46,10 +46,15 @@ func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domai
 		if dto.MedicalScaleName != nil {
 			scaleName = *dto.MedicalScaleName
 		}
-		scaleRef := domainAssessment.NewMedicalScaleRef(
+		scaleVersion := ""
+		if dto.ScaleVersion != nil {
+			scaleVersion = *dto.ScaleVersion
+		}
+		scaleRef := domainAssessment.NewMedicalScaleRefWithVersion(
 			meta.FromUint64(*dto.MedicalScaleID),
 			meta.NewCode(scaleCode),
 			scaleName,
+			scaleVersion,
 		)
 		req.MedicalScaleRef = &scaleRef
 	}

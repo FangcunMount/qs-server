@@ -9,6 +9,7 @@ import (
 // ScaleResponse 量表响应
 type ScaleResponse struct {
 	Code                 string           `json:"code"`
+	ScaleVersion         string           `json:"scale_version"`
 	Title                string           `json:"title"`
 	Description          string           `json:"description"`
 	Category             string           `json:"category,omitempty"`
@@ -61,6 +62,7 @@ type ScaleListResponse struct {
 // ScaleSummaryResponse 量表摘要响应（不包含因子详情）
 type ScaleSummaryResponse struct {
 	Code              string   `json:"code"`
+	ScaleVersion      string   `json:"scale_version"`
 	Title             string   `json:"title"`
 	Description       string   `json:"description"`
 	Category          string   `json:"category,omitempty"`
@@ -99,6 +101,7 @@ func NewScaleResponse(result *scale.ScaleResult) *ScaleResponse {
 
 	return &ScaleResponse{
 		Code:                 result.Code,
+		ScaleVersion:         result.ScaleVersion,
 		Title:                result.Title,
 		Description:          result.Description,
 		Category:             result.Category,
@@ -192,6 +195,7 @@ func NewScaleSummaryListResponse(result *scale.ScaleSummaryListResult, page, pag
 	for _, item := range result.Items {
 		scales = append(scales, ScaleSummaryResponse{
 			Code:              item.Code,
+			ScaleVersion:      item.ScaleVersion,
 			Title:             item.Title,
 			Description:       item.Description,
 			Category:          item.Category,

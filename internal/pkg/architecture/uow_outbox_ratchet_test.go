@@ -84,7 +84,7 @@ func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 	}
 	text := string(data)
 	required := []string{
-		"engine.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore)",
+		"execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore)",
 		"assessmentApp.NewSubmissionService(",
 		"assessmentApp.NewManagementService(",
 	}

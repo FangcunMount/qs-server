@@ -14,9 +14,8 @@ import (
 )
 
 type RepositoryResolver struct {
-	scaleCatalog        port.ScaleCatalog
-	answerSheetReader   port.AnswerSheetReader
-	questionnaireReader port.QuestionnaireReader
+	scaleCatalog port.ScaleCatalog
+	providers    *ModelInputProviderRegistry
 }
 
 // NewRepositoryResolver builds the current compatibility adapter from Survey/Scale
@@ -40,39 +39,24 @@ func NewResolver(
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 ) *RepositoryResolver {
+	providers, _ := NewModelInputProviderRegistry(
+		NewScaleModelInputProvider(scaleCatalog, answerSheetReader, questionnaireReader),
+	)
 	return &RepositoryResolver{
-		scaleCatalog:        scaleCatalog,
-		answerSheetReader:   answerSheetReader,
-		questionnaireReader: questionnaireReader,
+		scaleCatalog: scaleCatalog,
+		providers:    providers,
 	}
 }
 
 func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	modelRef := normalizeModelRef(ref)
-	if modelRef.Kind != port.EvaluationModelKindScale {
+	provider, err := r.providers.Resolve(modelRef.Kind)
+	if err != nil {
 		err := fmt.Errorf("unsupported evaluation model kind: %s", modelRef.Kind)
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}
-
-	medicalScale, err := r.scaleCatalog.GetScale(ctx, modelRef.Code)
-	if err != nil {
-		return nil, err
-	}
-	answerSheet, err := r.answerSheetReader.GetAnswerSheet(ctx, ref.AnswerSheetID)
-	if err != nil {
-		return nil, err
-	}
-	qnr, err := r.questionnaireReader.GetQuestionnaire(ctx, answerSheet.QuestionnaireCode, answerSheet.QuestionnaireVersion)
-	if err != nil {
-		return nil, err
-	}
-
-	return &port.InputSnapshot{
-		Model:         port.NewScaleModelSnapshot(medicalScale),
-		MedicalScale:  medicalScale,
-		AnswerSheet:   answerSheet,
-		Questionnaire: qnr,
-	}, nil
+	ref.ModelRef = modelRef
+	return provider.ResolveInput(ctx, ref)
 }
 
 func normalizeModelRef(ref port.InputRef) port.ModelRef {
@@ -87,6 +71,95 @@ func normalizeModelRef(ref port.InputRef) port.ModelRef {
 
 func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
 	return r.scaleCatalog.GetScale(ctx, code)
+}
+
+type ModelInputProvider interface {
+	Kind() port.EvaluationModelKind
+	ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error)
+}
+
+type ModelInputProviderRegistry struct {
+	items map[port.EvaluationModelKind]ModelInputProvider
+}
+
+func NewModelInputProviderRegistry(providers ...ModelInputProvider) (*ModelInputProviderRegistry, error) {
+	registry := &ModelInputProviderRegistry{items: make(map[port.EvaluationModelKind]ModelInputProvider)}
+	for _, provider := range providers {
+		if err := registry.Register(provider); err != nil {
+			return nil, err
+		}
+	}
+	return registry, nil
+}
+
+func (r *ModelInputProviderRegistry) Register(provider ModelInputProvider) error {
+	if provider == nil {
+		return fmt.Errorf("evaluation input provider is nil")
+	}
+	kind := provider.Kind()
+	if kind == "" {
+		return fmt.Errorf("evaluation input provider kind is empty")
+	}
+	if _, exists := r.items[kind]; exists {
+		return fmt.Errorf("evaluation input provider already registered for kind %s", kind)
+	}
+	r.items[kind] = provider
+	return nil
+}
+
+func (r *ModelInputProviderRegistry) Resolve(kind port.EvaluationModelKind) (ModelInputProvider, error) {
+	if r == nil {
+		return nil, fmt.Errorf("evaluation input provider registry is not configured")
+	}
+	provider, ok := r.items[kind]
+	if !ok {
+		return nil, fmt.Errorf("unsupported evaluation model kind: %s", kind)
+	}
+	return provider, nil
+}
+
+type ScaleModelInputProvider struct {
+	scaleCatalog        port.ScaleCatalog
+	answerSheetReader   port.AnswerSheetReader
+	questionnaireReader port.QuestionnaireReader
+}
+
+func NewScaleModelInputProvider(
+	scaleCatalog port.ScaleCatalog,
+	answerSheetReader port.AnswerSheetReader,
+	questionnaireReader port.QuestionnaireReader,
+) ScaleModelInputProvider {
+	return ScaleModelInputProvider{
+		scaleCatalog:        scaleCatalog,
+		answerSheetReader:   answerSheetReader,
+		questionnaireReader: questionnaireReader,
+	}
+}
+
+func (ScaleModelInputProvider) Kind() port.EvaluationModelKind {
+	return port.EvaluationModelKindScale
+}
+
+func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
+	medicalScale, err := p.scaleCatalog.GetScale(ctx, ref.ModelRef.Code)
+	if err != nil {
+		return nil, err
+	}
+	answerSheet, err := p.answerSheetReader.GetAnswerSheet(ctx, ref.AnswerSheetID)
+	if err != nil {
+		return nil, err
+	}
+	qnr, err := p.questionnaireReader.GetQuestionnaire(ctx, answerSheet.QuestionnaireCode, answerSheet.QuestionnaireVersion)
+	if err != nil {
+		return nil, err
+	}
+
+	return &port.InputSnapshot{
+		Model:         port.NewScaleModelSnapshot(medicalScale),
+		MedicalScale:  medicalScale,
+		AnswerSheet:   answerSheet,
+		Questionnaire: qnr,
+	}, nil
 }
 
 type RepositoryScaleSnapshotCatalog struct {

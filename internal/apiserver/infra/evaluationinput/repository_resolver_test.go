@@ -207,6 +207,48 @@ func TestQuestionnaireSnapshotReaderExactVersionMissCarriesFailureReason(t *test
 	}
 }
 
+func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) {
+	if _, err := NewModelInputProviderRegistry(fakeInputProvider{kind: port.EvaluationModelKindScale}, fakeInputProvider{kind: port.EvaluationModelKindScale}); err == nil {
+		t.Fatal("expected duplicate provider kind error")
+	}
+	registry, err := NewModelInputProviderRegistry(fakeInputProvider{kind: port.EvaluationModelKindScale})
+	if err != nil {
+		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
+	}
+	if _, err := registry.Resolve(port.EvaluationModelKindMBTI); err == nil {
+		t.Fatal("expected unknown provider kind error")
+	}
+}
+
+func TestRepositoryResolverUnsupportedModelKindCarriesFailureKind(t *testing.T) {
+	resolver := NewResolver(scaleCatalogStub{}, answerSheetReaderStub{}, &questionnaireReaderStub{})
+	_, err := resolver.Resolve(context.Background(), port.InputRef{
+		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindMBTI, Code: "MBTI-16P"},
+	})
+	if err == nil {
+		t.Fatal("expected unsupported model kind error")
+	}
+	var kindCarrier port.FailureKindCarrier
+	if !stderrors.As(err, &kindCarrier) {
+		t.Fatalf("expected failure kind carrier, got %T", err)
+	}
+	if got := kindCarrier.FailureKind(); got != port.FailureKindUnsupportedModel {
+		t.Fatalf("failure kind = %s, want %s", got, port.FailureKindUnsupportedModel)
+	}
+}
+
+type fakeInputProvider struct {
+	kind port.EvaluationModelKind
+}
+
+func (p fakeInputProvider) Kind() port.EvaluationModelKind {
+	return p.kind
+}
+
+func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.InputSnapshot, error) {
+	return &port.InputSnapshot{}, nil
+}
+
 type scaleCatalogStub struct {
 	snapshot *port.ScaleSnapshot
 	err      error

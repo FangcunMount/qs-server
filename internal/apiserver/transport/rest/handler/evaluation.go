@@ -9,7 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -20,14 +20,14 @@ import (
 type EvaluationHandler struct {
 	*BaseHandler
 	managementService     assessmentApp.AssessmentManagementService
-	evaluationService     engine.Service
+	evaluationService     execute.Service
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService
 }
 
 // NewEvaluationHandler 创建评估模块 Handler
 func NewEvaluationHandler(
 	managementService assessmentApp.AssessmentManagementService,
-	evaluationService engine.Service,
+	evaluationService execute.Service,
 	protectedQueryService assessmentApp.AssessmentProtectedQueryService,
 ) *EvaluationHandler {
 	return &EvaluationHandler{

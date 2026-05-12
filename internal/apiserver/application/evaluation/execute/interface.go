@@ -4,7 +4,7 @@
 // 设计说明：
 // engine 只承担通用编排：加载 Assessment、解析输入快照、选择模型执行器、
 // 写入结果并统一收口失败；具体模型解释由 Scale/MBTI 等 executor 实现。
-package engine
+package execute
 
 import "context"
 

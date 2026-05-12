@@ -119,8 +119,8 @@ type AssessmentProtectedQueryService interface {
 
 // ==================== 评估引擎服务 ====================
 //
-// 注意：EvaluationService 已独立到 engine 包中
-// 请使用: github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine
+// 注意：EvaluationService 已独立到 execute 包中
+// 请使用: github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute
 //
 // 行为者：评估引擎 (Evaluation Engine / qs-worker)
 // 职责：执行计分、解读、生成报告

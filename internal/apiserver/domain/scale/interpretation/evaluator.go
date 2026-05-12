@@ -1,4 +1,4 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
@@ -31,7 +31,7 @@ func NewDefaultEvaluator() *Evaluator {
 }
 
 // Evaluate 执行量表解释模型评估。
-func (e *Evaluator) Evaluate(ctx context.Context, input ScaleEvaluationInput) (*ScaleEvaluationResult, error) {
+func (e *Evaluator) Evaluate(ctx context.Context, input ScaleInterpretationInput) (*ScaleInterpretationResult, error) {
 	return e.runEvaluation(ctx, input)
 }
 

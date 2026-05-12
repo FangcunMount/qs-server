@@ -129,6 +129,7 @@ type AssessmentScaleContextResult struct {
 	MedicalScaleID   *uint64
 	MedicalScaleCode *string
 	MedicalScaleName *string
+	ScaleVersion     *string
 }
 
 // ScaleCategoriesResult 量表分类结果

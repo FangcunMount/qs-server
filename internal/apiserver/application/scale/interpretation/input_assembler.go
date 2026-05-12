@@ -1,39 +1,40 @@
-package evaluation
+package interpretation
 
 import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type InputAssembler interface {
-	FromSnapshot(snapshot *evaluationinput.InputSnapshot) scaleevaluation.ScaleEvaluationInput
+	FromSnapshot(snapshot *evaluationinput.InputSnapshot) scaleinterpretation.ScaleInterpretationInput
 }
 
 type DefaultInputAssembler struct{}
 
-func (DefaultInputAssembler) FromSnapshot(snapshot *evaluationinput.InputSnapshot) scaleevaluation.ScaleEvaluationInput {
+func (DefaultInputAssembler) FromSnapshot(snapshot *evaluationinput.InputSnapshot) scaleinterpretation.ScaleInterpretationInput {
 	if snapshot == nil {
-		return scaleevaluation.ScaleEvaluationInput{}
+		return scaleinterpretation.ScaleInterpretationInput{}
 	}
-	return scaleevaluation.ScaleEvaluationInput{
+	return scaleinterpretation.ScaleInterpretationInput{
 		Scale:         modelFromSnapshot(snapshot.MedicalScale),
 		AnswerSheet:   answerSheetFromSnapshot(snapshot.AnswerSheet),
 		Questionnaire: questionnaireFromSnapshot(snapshot.Questionnaire),
 	}
 }
 
-func modelFromSnapshot(snapshot *evaluationinput.ScaleSnapshot) scaleevaluation.ScaleEvaluationModel {
+func modelFromSnapshot(snapshot *evaluationinput.ScaleSnapshot) scaleinterpretation.ScaleInterpretationModel {
 	if snapshot == nil {
-		return scaleevaluation.ScaleEvaluationModel{}
+		return scaleinterpretation.ScaleInterpretationModel{}
 	}
 	factors := make([]domainScale.FactorSnapshot, 0, len(snapshot.Factors))
 	for _, factor := range snapshot.Factors {
 		factors = append(factors, factorFromSnapshot(factor))
 	}
-	return scaleevaluation.ScaleEvaluationModel{
+	return scaleinterpretation.ScaleInterpretationModel{
 		Code:                 snapshot.Code,
+		ScaleVersion:         snapshot.ScaleVersion,
 		Title:                snapshot.Title,
 		QuestionnaireCode:    snapshot.QuestionnaireCode,
 		QuestionnaireVersion: snapshot.QuestionnaireVersion,
@@ -68,19 +69,19 @@ func factorFromSnapshot(snapshot evaluationinput.FactorSnapshot) domainScale.Fac
 	}
 }
 
-func answerSheetFromSnapshot(snapshot *evaluationinput.AnswerSheetSnapshot) *scaleevaluation.ScaleAnswerSheetSnapshot {
+func answerSheetFromSnapshot(snapshot *evaluationinput.AnswerSheetSnapshot) *scaleinterpretation.ScaleAnswerSheetSnapshot {
 	if snapshot == nil {
 		return nil
 	}
-	answers := make([]scaleevaluation.ScaleAnswerSnapshot, 0, len(snapshot.Answers))
+	answers := make([]scaleinterpretation.ScaleAnswerSnapshot, 0, len(snapshot.Answers))
 	for _, answer := range snapshot.Answers {
-		answers = append(answers, scaleevaluation.ScaleAnswerSnapshot{
+		answers = append(answers, scaleinterpretation.ScaleAnswerSnapshot{
 			QuestionCode: meta.NewCode(answer.QuestionCode),
 			Score:        answer.Score,
 			Value:        answer.Value,
 		})
 	}
-	return &scaleevaluation.ScaleAnswerSheetSnapshot{
+	return &scaleinterpretation.ScaleAnswerSheetSnapshot{
 		ID:                   snapshot.ID,
 		QuestionnaireCode:    snapshot.QuestionnaireCode,
 		QuestionnaireVersion: snapshot.QuestionnaireVersion,
@@ -88,26 +89,26 @@ func answerSheetFromSnapshot(snapshot *evaluationinput.AnswerSheetSnapshot) *sca
 	}
 }
 
-func questionnaireFromSnapshot(snapshot *evaluationinput.QuestionnaireSnapshot) *scaleevaluation.ScaleQuestionnaireSnapshot {
+func questionnaireFromSnapshot(snapshot *evaluationinput.QuestionnaireSnapshot) *scaleinterpretation.ScaleQuestionnaireSnapshot {
 	if snapshot == nil {
 		return nil
 	}
-	questions := make([]scaleevaluation.ScaleQuestionSnapshot, 0, len(snapshot.Questions))
+	questions := make([]scaleinterpretation.ScaleQuestionSnapshot, 0, len(snapshot.Questions))
 	for _, question := range snapshot.Questions {
-		options := make([]scaleevaluation.ScaleOptionSnapshot, 0, len(question.Options))
+		options := make([]scaleinterpretation.ScaleOptionSnapshot, 0, len(question.Options))
 		for _, option := range question.Options {
-			options = append(options, scaleevaluation.ScaleOptionSnapshot{
+			options = append(options, scaleinterpretation.ScaleOptionSnapshot{
 				Code:    option.Code,
 				Content: option.Content,
 				Score:   option.Score,
 			})
 		}
-		questions = append(questions, scaleevaluation.ScaleQuestionSnapshot{
+		questions = append(questions, scaleinterpretation.ScaleQuestionSnapshot{
 			Code:    meta.NewCode(question.Code),
 			Options: options,
 		})
 	}
-	return &scaleevaluation.ScaleQuestionnaireSnapshot{
+	return &scaleinterpretation.ScaleQuestionnaireSnapshot{
 		Code:      snapshot.Code,
 		Version:   snapshot.Version,
 		Questions: questions,

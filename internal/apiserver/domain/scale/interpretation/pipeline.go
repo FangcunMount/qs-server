@@ -1,4 +1,4 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
@@ -7,12 +7,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
-func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleEvaluationInput) (*ScaleEvaluationResult, error) {
-	factorScores, totalScore := e.calculateScores(ctx, input)
+func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleInterpretationInput) (*ScaleInterpretationResult, error) {
+	factorScores, totalScore, err := e.calculateScores(ctx, input)
+	if err != nil {
+		return nil, err
+	}
 	factorScores, riskLevel := e.classifyRisk(input.Scale, factorScores)
 	factorScores, conclusion, suggestion := e.interpret(input.Scale, factorScores, totalScore, riskLevel)
 
-	return &ScaleEvaluationResult{
+	return &ScaleInterpretationResult{
 		TotalScore:   totalScore,
 		RiskLevel:    riskLevel,
 		Conclusion:   conclusion,
@@ -21,10 +24,13 @@ func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleEvaluationInpu
 	}, nil
 }
 
-func (e *Evaluator) calculateScores(ctx context.Context, input ScaleEvaluationInput) ([]ScaleFactorScore, float64) {
+func (e *Evaluator) calculateScores(ctx context.Context, input ScaleInterpretationInput) ([]ScaleFactorScore, float64, error) {
 	factorScores := make([]ScaleFactorScore, 0, len(input.Scale.Factors))
 	for _, factor := range input.Scale.Factors {
-		rawScore := e.calculateFactorRawScore(ctx, factor, input.AnswerSheet, input.Questionnaire)
+		rawScore, err := e.calculateFactorRawScore(ctx, factor, input.AnswerSheet, input.Questionnaire)
+		if err != nil {
+			return nil, 0, err
+		}
 		factorScores = append(factorScores, ScaleFactorScore{
 			FactorCode:   factor.Code,
 			FactorName:   factor.Title,
@@ -34,19 +40,19 @@ func (e *Evaluator) calculateScores(ctx context.Context, input ScaleEvaluationIn
 			IsTotalScore: factor.IsTotalScore,
 		})
 	}
-	return factorScores, calculateTotalScore(factorScores)
+	return factorScores, calculateTotalScore(factorScores), nil
 }
 
-func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) float64 {
+func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) (float64, error) {
 	if sheet == nil {
-		return simulateFactorScore(factor)
+		return simulateFactorScore(factor), nil
 	}
 	if e == nil || e.scoringRegistry == nil {
-		return 0
+		return 0, nil
 	}
 	values, err := collectFactorValues(factor, sheet, qnr)
 	if err != nil {
-		return 0
+		return 0, err
 	}
 	score, err := e.calculator.ScoreDimension(ctx, calculation.Dimension{
 		Code:         factor.Code.String(),
@@ -56,9 +62,9 @@ func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.Fa
 		score, err = e.scoringRegistry.ScoreFactor(ctx, factor, values)
 	}
 	if err != nil {
-		return 0
+		return 0, err
 	}
-	return score
+	return score, nil
 }
 
 func calculateTotalScore(factorScores []ScaleFactorScore) float64 {

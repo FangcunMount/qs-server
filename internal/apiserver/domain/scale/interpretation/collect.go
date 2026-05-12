@@ -1,4 +1,4 @@
-package evaluation
+package interpretation
 
 import (
 	"fmt"
@@ -17,7 +17,7 @@ func collectFactorValues(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSna
 		}
 		return collectCntMatches(factor, sheet, qnr), nil
 	default:
-		return nil, nil
+		return nil, fmt.Errorf("unsupported factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
 }
 

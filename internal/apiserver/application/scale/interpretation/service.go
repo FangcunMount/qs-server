@@ -1,10 +1,10 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	scaleevaluation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/evaluation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -16,17 +16,17 @@ type Service interface {
 	) (*assessment.EvaluationResult, error)
 }
 
-type scaleEvaluationService struct {
+type scaleInterpretationService struct {
 	validator InputValidator
 	assembler InputAssembler
-	evaluator *scaleevaluation.Evaluator
+	evaluator *scaleinterpretation.Evaluator
 	mapper    ResultMapper
 }
 
 func NewService(
 	validator InputValidator,
 	assembler InputAssembler,
-	evaluator *scaleevaluation.Evaluator,
+	evaluator *scaleinterpretation.Evaluator,
 	mapper ResultMapper,
 ) Service {
 	if validator == nil {
@@ -36,12 +36,12 @@ func NewService(
 		assembler = DefaultInputAssembler{}
 	}
 	if evaluator == nil {
-		evaluator = scaleevaluation.NewDefaultEvaluator()
+		evaluator = scaleinterpretation.NewDefaultEvaluator()
 	}
 	if mapper == nil {
 		mapper = DefaultResultMapper{}
 	}
-	return &scaleEvaluationService{
+	return &scaleInterpretationService{
 		validator: validator,
 		assembler: assembler,
 		evaluator: evaluator,
@@ -49,7 +49,7 @@ func NewService(
 	}
 }
 
-func (s *scaleEvaluationService) Evaluate(
+func (s *scaleInterpretationService) Evaluate(
 	ctx context.Context,
 	a *assessment.Assessment,
 	snapshot *evaluationinput.InputSnapshot,

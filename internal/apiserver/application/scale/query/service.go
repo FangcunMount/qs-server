@@ -168,10 +168,12 @@ func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questi
 	scaleID := medicalScale.GetID().Uint64()
 	scaleCode := medicalScale.GetCode().Value()
 	scaleName := medicalScale.GetTitle()
+	scaleVersion := medicalScale.GetScaleVersion()
 	return &shared.AssessmentScaleContextResult{
 		MedicalScaleID:   &scaleID,
 		MedicalScaleCode: &scaleCode,
 		MedicalScaleName: &scaleName,
+		ScaleVersion:     &scaleVersion,
 	}, nil
 }
 

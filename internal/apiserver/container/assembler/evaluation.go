@@ -11,10 +11,10 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/evaluation"
+	scaleInterpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/interpretation"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -75,7 +75,7 @@ type EvaluationModule struct {
 	// ==================== 评估引擎 ====================
 
 	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
-	EvaluationService engine.Service
+	EvaluationService execute.Service
 }
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
@@ -185,15 +185,15 @@ func (m *EvaluationModule) wireEvaluationEngine(
 
 	if normalized.InputResolver != nil {
 		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
-		scaleEvaluator := scaleEvaluation.NewExecutorWithService(
-			scaleEvaluation.NewService(
-				scaleEvaluation.DefaultInputValidator{},
-				scaleEvaluation.DefaultInputAssembler{},
+		scaleEvaluator := scaleInterpretation.NewExecutorWithService(
+			scaleInterpretation.NewService(
+				scaleInterpretation.DefaultInputValidator{},
+				scaleInterpretation.DefaultInputAssembler{},
 				nil,
-				scaleEvaluation.DefaultResultMapper{},
+				scaleInterpretation.DefaultResultMapper{},
 			),
 		)
-		evaluatorRegistry, _ := engine.NewEvaluatorRegistry(scaleEvaluator)
+		evaluatorRegistry, _ := execute.NewEvaluatorRegistry(scaleEvaluator)
 		scoreProjectors, _ := evaluationResult.NewScoreProjectorRegistry(
 			evaluationResult.NewScaleScoreProjector(infra.scoreRepo),
 		)
@@ -208,12 +208,12 @@ func (m *EvaluationModule) wireEvaluationEngine(
 			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
 		)
 
-		m.EvaluationService = engine.NewService(
+		m.EvaluationService = execute.NewService(
 			infra.assessmentRepo,
 			normalized.InputResolver,
 			resultWriter,
-			engine.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
-			engine.WithEvaluatorRegistry(evaluatorRegistry),
+			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
+			execute.WithEvaluatorRegistry(evaluatorRegistry),
 		)
 	}
 }

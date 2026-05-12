@@ -16,6 +16,7 @@ import (
 // ScaleResult 量表结果
 type ScaleResult struct {
 	Code                 string         // 量表编码
+	ScaleVersion         string         // 量表解释模型版本
 	Title                string         // 量表标题
 	Description          string         // 量表描述
 	Category             string         // 主类
@@ -68,6 +69,7 @@ type ScaleListResult struct {
 // ScaleSummaryResult 量表摘要结果（不包含因子列表，用于列表展示）
 type ScaleSummaryResult struct {
 	Code              string    // 量表编码
+	ScaleVersion      string    // 量表解释模型版本
 	Title             string    // 量表标题
 	Description       string    // 量表描述
 	Category          string    // 主类
@@ -140,6 +142,7 @@ func ToScaleResult(m *domainScale.MedicalScale) *ScaleResult {
 
 	result := &ScaleResult{
 		Code:                 m.GetCode().String(),
+		ScaleVersion:         m.GetScaleVersion(),
 		Title:                m.GetTitle(),
 		Description:          m.GetDescription(),
 		Category:             m.GetCategory().String(),
@@ -272,6 +275,7 @@ func ToSummaryListResult(ctx context.Context, items []*domainScale.MedicalScale,
 
 		result.Items = append(result.Items, &ScaleSummaryResult{
 			Code:              item.GetCode().String(),
+			ScaleVersion:      item.GetScaleVersion(),
 			Title:             item.GetTitle(),
 			Description:       item.GetDescription(),
 			Category:          item.GetCategory().String(),
@@ -301,6 +305,7 @@ func ToSummaryRowsResult(ctx context.Context, items []scalereadmodel.ScaleSummar
 	for _, item := range items {
 		result.Items = append(result.Items, &ScaleSummaryResult{
 			Code:              item.Code,
+			ScaleVersion:      item.ScaleVersion,
 			Title:             item.Title,
 			Description:       item.Description,
 			Category:          item.Category,

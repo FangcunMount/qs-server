@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 )
 
 // ============= Assessment 相关响应 =============
@@ -221,7 +221,7 @@ func NewAssessmentListResponse(result *assessment.AssessmentListResult) *Assessm
 }
 
 // NewBatchEvaluationResponse 从应用层 Result 创建批量评估响应
-func NewBatchEvaluationResponse(result *engine.BatchResult) *BatchEvaluationResponse {
+func NewBatchEvaluationResponse(result *execute.BatchResult) *BatchEvaluationResponse {
 	if result == nil {
 		return nil
 	}

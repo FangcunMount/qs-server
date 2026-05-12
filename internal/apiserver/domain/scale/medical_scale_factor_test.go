@@ -163,6 +163,22 @@ func TestMedicalScaleEncapsulatesSlicesAndEvents(t *testing.T) {
 	}
 }
 
+func TestMedicalScaleUsesExplicitScaleVersionInChangedEvent(t *testing.T) {
+	t.Parallel()
+
+	m := newTestMedicalScale(t, WithScaleVersion("2.0.0"))
+	if err := m.AddFactor(newTestFactor(t, "F1")); err != nil {
+		t.Fatalf("AddFactor() error = %v", err)
+	}
+	evt, ok := m.Events()[0].(ScaleChangedEvent)
+	if !ok {
+		t.Fatalf("event type = %T, want ScaleChangedEvent", m.Events()[0])
+	}
+	if evt.Payload().Version != "2.0.0" {
+		t.Fatalf("event scale version = %q, want 2.0.0", evt.Payload().Version)
+	}
+}
+
 func TestFactorEncapsulatesScoringAndRules(t *testing.T) {
 	t.Parallel()
 
@@ -330,10 +346,10 @@ func newPublishedTestMedicalScale(t *testing.T) *MedicalScale {
 	return m
 }
 
-func newTestMedicalScale(t *testing.T) *MedicalScale {
+func newTestMedicalScale(t *testing.T, opts ...MedicalScaleOption) *MedicalScale {
 	t.Helper()
 
-	m, err := NewMedicalScale(meta.NewCode("SCALE_A"), "Scale A")
+	m, err := NewMedicalScale(meta.NewCode("SCALE_A"), "Scale A", opts...)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
 	}

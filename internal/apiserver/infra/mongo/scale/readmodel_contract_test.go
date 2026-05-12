@@ -65,7 +65,7 @@ func TestScaleReadModelFindOptionsAppliesPaginationSortAndProjection(t *testing.
 	if !ok {
 		t.Fatalf("projection = %#v, want bson.M", opts.Projection)
 	}
-	for _, field := range []string{"code", "title", "description", "category", "stages", "applicable_ages", "reporters", "tags", "questionnaire_code", "status", "created_by", "created_at", "updated_by", "updated_at"} {
+	for _, field := range []string{"code", "scale_version", "title", "description", "category", "stages", "applicable_ages", "reporters", "tags", "questionnaire_code", "status", "created_by", "created_at", "updated_by", "updated_at"} {
 		if projection[field] != 1 {
 			t.Fatalf("projection[%s] = %#v, want 1", field, projection[field])
 		}
@@ -79,6 +79,7 @@ func TestScaleRowsFromPOCopiesSlicesAndAuditFields(t *testing.T) {
 	items := []ScalePO{
 		{
 			Code:              "SCALE_A",
+			ScaleVersion:      "2.0.0",
 			Title:             "Scale A",
 			Description:       "desc",
 			Category:          "mental",
@@ -100,7 +101,7 @@ func TestScaleRowsFromPOCopiesSlicesAndAuditFields(t *testing.T) {
 		t.Fatalf("row count = %d, want 1", len(rows))
 	}
 	row := rows[0]
-	if row.Code != "SCALE_A" || row.Title != "Scale A" || row.QuestionnaireCode != "Q_A" {
+	if row.Code != "SCALE_A" || row.ScaleVersion != "2.0.0" || row.Title != "Scale A" || row.QuestionnaireCode != "Q_A" {
 		t.Fatalf("unexpected row identity fields: %#v", row)
 	}
 	if row.CreatedBy.Uint64() != 1001 || row.UpdatedBy.Uint64() != 1002 {

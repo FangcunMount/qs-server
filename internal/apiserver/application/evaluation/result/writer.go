@@ -13,7 +13,7 @@ type writer struct {
 	scoreProjectors ScoreProjectorRegistry
 	reportBuilders  ReportBuilderRegistry
 	reportSaver     ReportDurableSaver
-	eventAssembler  EventAssembler
+	eventAssemblers EventAssemblerRegistry
 	notifier        CompletionNotifier
 }
 
@@ -24,16 +24,22 @@ func NewWriter(
 	reportSaver ReportDurableSaver,
 	notifier CompletionNotifier,
 ) Writer {
+	eventAssemblers, _ := NewEventAssemblerRegistry(ScaleEventAssembler{})
 	return &writer{
 		assessmentRepo:  assessmentRepo,
 		scoreProjectors: scoreProjectors,
 		reportBuilders:  reportBuilders,
 		reportSaver:     reportSaver,
-		eventAssembler:  NewEventAssembler(),
+		eventAssemblers: eventAssemblers,
 		notifier:        notifier,
 	}
 }
 
+// Write persists an evaluation outcome in the compatibility order:
+// score projection -> Assessment interpreted save -> report durable save/outbox
+// staging -> waiter notification. This order intentionally preserves the
+// historical failure semantics where a later report-save failure may happen
+// after the Assessment has already been saved as interpreted.
 func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 	l := logger.L(ctx)
 	if outcome.Assessment == nil {
@@ -82,7 +88,8 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 	if err != nil {
 		return evalerrors.AssessmentInterpretFailed(err, "生成报告失败")
 	}
-	if err := w.reportSaver.SaveReportDurably(ctx, rpt, outcome.Assessment.TesteeID(), w.eventAssembler.BuildSuccessEvents(outcome, rpt)); err != nil {
+	assembler := w.eventAssemblers.Resolve(kind)
+	if err := w.reportSaver.SaveReportDurably(ctx, rpt, outcome.Assessment.TesteeID(), assembler.BuildSuccessEvents(outcome, rpt)); err != nil {
 		return evalerrors.Database(err, "保存报告失败")
 	}
 

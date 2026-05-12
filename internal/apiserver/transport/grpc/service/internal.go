@@ -13,7 +13,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
@@ -32,7 +32,7 @@ type InternalService struct {
 	answerSheetScoringService  answerSheetApp.AnswerSheetScoringService
 	submissionService          assessmentApp.AssessmentSubmissionService
 	managementService          assessmentApp.AssessmentManagementService
-	engineService              engine.Service
+	executeService             execute.Service
 	scaleContextResolver       scaleApp.AssessmentScaleContextResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
 	taskAssessmentResolver     planApp.TaskAssessmentResolver
@@ -58,6 +58,7 @@ type assessmentScaleContext struct {
 	medicalScaleID   *uint64
 	medicalScaleCode *string
 	medicalScaleName *string
+	scaleVersion     *string
 }
 
 type operatorBootstrapRoleSyncer interface {
@@ -69,7 +70,7 @@ func NewInternalService(
 	answerSheetScoringService answerSheetApp.AnswerSheetScoringService,
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
-	engineService engine.Service,
+	executeService execute.Service,
 	scaleContextResolver scaleApp.AssessmentScaleContextResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
 	taskAssessmentResolver planApp.TaskAssessmentResolver,
@@ -87,7 +88,7 @@ func NewInternalService(
 		answerSheetScoringService:          answerSheetScoringService,
 		submissionService:                  submissionService,
 		managementService:                  managementService,
-		engineService:                      engineService,
+		executeService:                     executeService,
 		scaleContextResolver:               scaleContextResolver,
 		assessmentAttentionService:         assessmentAttentionService,
 		taskAssessmentResolver:             taskAssessmentResolver,
@@ -170,12 +171,14 @@ func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, que
 		"scale_id", result.MedicalScaleID,
 		"scale_code", result.MedicalScaleCode,
 		"scale_name", result.MedicalScaleName,
+		"scale_version", result.ScaleVersion,
 	)
 
 	return assessmentScaleContext{
 		medicalScaleID:   result.MedicalScaleID,
 		medicalScaleCode: result.MedicalScaleCode,
 		medicalScaleName: result.MedicalScaleName,
+		scaleVersion:     result.ScaleVersion,
 	}
 }
 
@@ -192,6 +195,7 @@ func buildCreateAssessmentDTO(
 		MedicalScaleID:       scaleCtx.medicalScaleID,
 		MedicalScaleCode:     scaleCtx.medicalScaleCode,
 		MedicalScaleName:     scaleCtx.medicalScaleName,
+		ScaleVersion:         scaleCtx.scaleVersion,
 		OriginType:           req.OriginType,
 	}
 	if dto.OriginType == "" {

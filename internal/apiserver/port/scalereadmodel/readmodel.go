@@ -28,6 +28,7 @@ func (f ScaleFilter) IsEmpty() bool {
 // ScaleSummaryRow is a transport-neutral scale list row.
 type ScaleSummaryRow struct {
 	Code              string
+	ScaleVersion      string
 	Title             string
 	Description       string
 	Category          string

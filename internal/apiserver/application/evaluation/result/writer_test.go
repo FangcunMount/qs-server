@@ -48,9 +48,13 @@ func (r *resultScoreRepoStub) DeleteByAssessmentID(context.Context, assessment.I
 type resultReportBuilderStub struct {
 	order *[]string
 	rpt   *domainReport.InterpretReport
+	kind  assessment.EvaluationModelKind
 }
 
 func (b *resultReportBuilderStub) Kind() assessment.EvaluationModelKind {
+	if b.kind != "" {
+		return b.kind
+	}
 	return assessment.EvaluationModelKindScale
 }
 
@@ -167,6 +171,59 @@ func TestWriterReportSaveFailureKeepsInterpretedSaveBeforeReturningError(t *test
 	}
 	if got := order[len(order)-1]; got != "report_save" {
 		t.Fatalf("last operation = %s, want report_save before returning error; order=%#v", got, order)
+	}
+}
+
+func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *testing.T) {
+	order := make([]string, 0)
+	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8002),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-MBTI"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6002)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7002)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	a.ClearEvents()
+
+	reportBuilders, err := NewReportBuilderRegistry(&resultReportBuilderStub{
+		order: &order,
+		kind:  assessment.EvaluationModelKindMBTI,
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil),
+	})
+	if err != nil {
+		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
+	}
+	reportSaver := &resultReportSaverStub{order: &order}
+	writer := NewWriter(
+		&resultAssessmentRepoStub{order: &order},
+		nil,
+		reportBuilders,
+		reportSaver,
+		nil,
+	)
+	result := assessment.NewEvaluationResult(0, assessment.RiskLevelNone, "INTJ", "", nil).WithModelRef(modelRef)
+
+	if err := writer.Write(context.Background(), Outcome{Assessment: a, Result: result}); err != nil {
+		t.Fatalf("Write returned error: %v", err)
+	}
+
+	wantOrder := []string{"assessment", "report_build", "report_save"}
+	for i := range wantOrder {
+		if order[i] != wantOrder[i] {
+			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
+		}
+	}
+	if len(reportSaver.eventTypes) != 1 || reportSaver.eventTypes[0] != assessment.EventTypeInterpreted {
+		t.Fatalf("event types = %#v, want generic assessment interpreted only", reportSaver.eventTypes)
 	}
 }
 

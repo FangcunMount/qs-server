@@ -112,7 +112,7 @@ func WithEvaluationModel(modelRef EvaluationModelRef) AssessmentOption {
 		}
 		a.modelRef = &modelRef
 		if modelRef.IsScale() && a.medicalScaleRef == nil {
-			scaleRef := NewMedicalScaleRef(modelRef.ID(), modelRef.Code(), modelRef.Title())
+			scaleRef := NewMedicalScaleRefWithVersion(modelRef.ID(), modelRef.Code(), modelRef.Title(), modelRef.Version())
 			a.medicalScaleRef = &scaleRef
 		}
 	}
@@ -198,6 +198,9 @@ func Reconstruct(
 	if modelRef == nil && medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
 		ref := medicalScaleRef.ToEvaluationModelRef()
 		modelRef = &ref
+	}
+	if modelRef != nil && modelRef.IsScale() && medicalScaleRef != nil && medicalScaleRef.version == "" {
+		medicalScaleRef.version = modelRef.Version()
 	}
 	var summary *ResultSummary
 	if totalScore != nil || riskLevel != nil {

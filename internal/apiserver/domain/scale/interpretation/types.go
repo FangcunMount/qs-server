@@ -1,4 +1,4 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
@@ -7,15 +7,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// ScaleEvaluationInput 是量表解释执行的纯领域输入。
-type ScaleEvaluationInput struct {
-	Scale         ScaleEvaluationModel
+// ScaleInterpretationInput 是量表解释执行的纯领域输入。
+type ScaleInterpretationInput struct {
+	Scale         ScaleInterpretationModel
 	AnswerSheet   *ScaleAnswerSheetSnapshot
 	Questionnaire *ScaleQuestionnaireSnapshot
 }
 
-type ScaleEvaluationModel struct {
+type ScaleInterpretationModel struct {
 	Code                 string
+	ScaleVersion         string
 	Title                string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
@@ -53,7 +54,7 @@ type ScaleOptionSnapshot struct {
 	Score   float64
 }
 
-type ScaleEvaluationResult struct {
+type ScaleInterpretationResult struct {
 	TotalScore   float64
 	RiskLevel    scale.RiskLevel
 	Conclusion   string

@@ -14,9 +14,10 @@ type ScalePO struct {
 	base.BaseDocument `bson:",inline"`
 
 	// 基本信息
-	Code        string `bson:"code" json:"code"`
-	Title       string `bson:"title" json:"title"`
-	Description string `bson:"description,omitempty" json:"description,omitempty"`
+	Code         string `bson:"code" json:"code"`
+	ScaleVersion string `bson:"scale_version,omitempty" json:"scale_version,omitempty"`
+	Title        string `bson:"title" json:"title"`
+	Description  string `bson:"description,omitempty" json:"description,omitempty"`
 
 	// 分类信息
 	Category       string   `bson:"category,omitempty" json:"category,omitempty"`               // 主类

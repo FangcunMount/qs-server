@@ -55,10 +55,14 @@ func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
 	if scale == nil {
 		return nil
 	}
+	version := scale.ScaleVersion
+	if version == "" {
+		version = scale.QuestionnaireVersion
+	}
 	return &ModelSnapshot{
 		Kind:    EvaluationModelKindScale,
 		Code:    scale.Code,
-		Version: scale.QuestionnaireVersion,
+		Version: version,
 		Title:   scale.Title,
 		Payload: ScaleModelPayload{Scale: scale},
 	}
@@ -71,6 +75,7 @@ type ScaleModelPayload struct {
 type ScaleSnapshot struct {
 	ID                   uint64
 	Code                 string
+	ScaleVersion         string
 	Title                string
 	QuestionnaireCode    string
 	QuestionnaireVersion string

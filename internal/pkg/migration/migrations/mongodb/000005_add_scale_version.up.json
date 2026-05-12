@@ -1,0 +1,33 @@
+[
+  {
+    "update": "scales",
+    "updates": [
+      {
+        "q": { "$or": [ { "scale_version": { "$exists": false } }, { "scale_version": "" } ] },
+        "u": [
+          {
+            "$set": {
+              "scale_version": {
+                "$cond": [
+                  { "$ne": [ "$questionnaire_version", "" ] },
+                  "$questionnaire_version",
+                  "1.0.0"
+                ]
+              }
+            }
+          }
+        ],
+        "multi": true
+      }
+    ]
+  },
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "code": 1, "scale_version": 1, "deleted_at": 1 },
+        "name": "idx_scales_code_version_deleted"
+      }
+    ]
+  }
+]

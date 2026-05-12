@@ -109,16 +109,16 @@ func TestSurveyScaleApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
 	}
 }
 
-func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
+func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	engineRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "engine")
+	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":  "evaluationinput snapshots",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey": "evaluationinput snapshots",
 	}
-	err := filepath.WalkDir(engineRoot, func(path string, entry os.DirEntry, err error) error {
+	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
 		}
@@ -134,7 +134,7 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			for forbidden, replacement := range forbiddenImports {
 				if strings.HasPrefix(importPath, forbidden) {
-					t.Fatalf("%s imports %s; generic evaluation engine should consume %s instead of survey/scale aggregates", rel, importPath, replacement)
+					t.Fatalf("%s imports %s; generic evaluation execute should consume %s instead of survey/scale aggregates", rel, importPath, replacement)
 				}
 			}
 		}
@@ -145,15 +145,15 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 	}
 }
 
-func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
+func TestScaleInterpretationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "scale", "evaluation"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "scale", "interpretation"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
-		if strings.Contains(importPath, "/application/evaluation/engine/pipeline") {
+		if strings.Contains(importPath, "/application/evaluation/engine") {
 			t.Fatalf("%s imports %s; scale executor must not wrap legacy evaluation pipeline", filepath.ToSlash(mustRel(t, root, path)), importPath)
 		}
 	})
