@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
+	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/evaluation"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -22,7 +22,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
-	interpretengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretengine"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
@@ -32,8 +31,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
-	interpretenginePort "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretengine"
-	ruleenginePort "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -132,7 +129,7 @@ type evaluationInfra struct {
 	scoreReader                  evaluationreadmodel.ScoreReader
 	reportReader                 evaluationreadmodel.ReportReader
 	assessmentOutboxStore        *mysqlEventOutbox.Store
-	reportDurableSaver           pipeline.ReportDurableSaver
+	reportDurableSaver           evaluationResult.ReportDurableSaver
 	txRunner                     apptransaction.Runner
 	waiterRegistry               *waiter.WaiterRegistry
 	assessmentOutboxRelay        appEventing.OutboxRelay
@@ -167,7 +164,7 @@ func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, erro
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
 	}
-	infra.reportDurableSaver = pipeline.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
+	infra.reportDurableSaver = evaluationResult.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
 	infra.assessmentOutboxStore = assessmentOutboxStore
 	infra.assessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, normalized.EventPublisher)
 	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
@@ -189,23 +186,25 @@ func (m *EvaluationModule) wireEvaluationEngine(
 
 	if normalized.InputResolver != nil {
 		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
-
-		pipelineRunner := newEvaluationPipelineRunner(evaluationPipelineDeps{
-			AssessmentRepo:  infra.assessmentRepo,
-			ScoreRepo:       infra.scoreRepo,
-			ReportBuilder:   reportBuilder,
-			ReportSaver:     infra.reportDurableSaver,
-			WaiterRegistry:  infra.waiterRegistry,
-			FactorScorer:    ruleengineInfra.NewScaleFactorScorer(),
-			Interpreter:     interpretengineInfra.NewInterpreter(),
-			DefaultProvider: interpretengineInfra.NewDefaultProvider(),
-		})
-		evaluatorRegistry, _ := engine.NewEvaluatorRegistry(scaleEvaluation.NewExecutor(pipelineRunner, nil))
+		evaluatorRegistry, _ := engine.NewEvaluatorRegistry(scaleEvaluation.NewExecutor(ruleengineInfra.NewScaleFactorScorer()))
+		scoreProjectors, _ := evaluationResult.NewScoreProjectorRegistry(
+			evaluationResult.NewScaleScoreProjector(infra.scoreRepo),
+		)
+		reportBuilders, _ := evaluationResult.NewReportBuilderRegistry(
+			evaluationResult.NewScaleReportBuilder(reportBuilder),
+		)
+		resultWriter := evaluationResult.NewWriter(
+			infra.assessmentRepo,
+			scoreProjectors,
+			reportBuilders,
+			infra.reportDurableSaver,
+			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
+		)
 
 		m.EvaluationService = engine.NewService(
 			infra.assessmentRepo,
 			normalized.InputResolver,
-			pipelineRunner,
+			resultWriter,
 			engine.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			engine.WithEvaluatorRegistry(evaluatorRegistry),
 		)
@@ -265,40 +264,6 @@ func (m *EvaluationModule) wireAssessmentApplications(
 		m.AccessQueryService,
 	)
 	m.LatestRiskReader = infra.latestRiskReader
-}
-
-type evaluationPipelineDeps struct {
-	AssessmentRepo  assessment.Repository
-	ScoreRepo       assessment.ScoreRepository
-	ReportBuilder   report.ReportBuilder
-	ReportSaver     pipeline.ReportDurableSaver
-	WaiterRegistry  *waiter.WaiterRegistry
-	FactorScorer    ruleenginePort.ScaleFactorScorer
-	Interpreter     interpretenginePort.Interpreter
-	DefaultProvider interpretenginePort.DefaultProvider
-}
-
-func newEvaluationPipelineRunner(deps evaluationPipelineDeps) *pipeline.Chain {
-	chain := pipeline.NewChain()
-	chain.AddHandler(pipeline.NewValidationHandler())
-	chain.AddHandler(pipeline.NewFactorScoreHandler(deps.FactorScorer))
-	chain.AddHandler(pipeline.NewRiskLevelHandler(
-		pipeline.NewRiskClassifier(),
-		pipeline.NewAssessmentScoreWriter(deps.ScoreRepo),
-	))
-	chain.AddHandler(pipeline.NewInterpretationHandler(
-		pipeline.NewInterpretationGenerator(deps.Interpreter, deps.DefaultProvider),
-		pipeline.NewInterpretationFinalizer(
-			pipeline.NewAssessmentResultWriter(deps.AssessmentRepo),
-			pipeline.NewInterpretReportWriter(deps.ReportBuilder, deps.ReportSaver),
-		),
-	))
-	if deps.WaiterRegistry != nil {
-		chain.AddHandler(pipeline.NewWaiterNotifyHandler(
-			pipeline.NewWaiterCompletionNotifier(deps.WaiterRegistry),
-		))
-	}
-	return chain
 }
 
 func normalizeEvaluationModuleDeps(deps EvaluationModuleDeps) (EvaluationModuleDeps, error) {

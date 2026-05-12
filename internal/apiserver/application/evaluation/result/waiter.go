@@ -1,4 +1,4 @@
-package pipeline
+package result
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 )
 
 type CompletionNotifier interface {
-	NotifyCompletion(ctx context.Context, evalCtx *Context)
+	NotifyCompletion(ctx context.Context, outcome Outcome)
 }
 
 type waiterCompletionNotifier struct {
@@ -20,12 +20,12 @@ func NewWaiterCompletionNotifier(waiterRegistry evaluationwaiter.Notifier) Compl
 	return waiterCompletionNotifier{waiterRegistry: waiterRegistry}
 }
 
-func (n waiterCompletionNotifier) NotifyCompletion(ctx context.Context, evalCtx *Context) {
-	if n.waiterRegistry == nil || evalCtx == nil || evalCtx.EvaluationResult == nil || evalCtx.Assessment == nil {
+func (n waiterCompletionNotifier) NotifyCompletion(ctx context.Context, outcome Outcome) {
+	if n.waiterRegistry == nil || outcome.Result == nil || outcome.Assessment == nil {
 		return
 	}
-	result := evalCtx.EvaluationResult
-	assessmentID := evalCtx.Assessment.ID().Uint64()
+	result := outcome.Result
+	assessmentID := outcome.Assessment.ID().Uint64()
 	riskLevelStr := string(result.RiskLevel)
 	summary := evaluationwaiter.StatusSummary{
 		Status:     "interpreted",

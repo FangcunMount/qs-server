@@ -5,42 +5,41 @@ import (
 	"fmt"
 
 	evaluationengine "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-type PipelineRunner interface {
-	Execute(ctx context.Context, evalCtx *pipeline.Context) error
-}
-
 // Executor adapts the Scale interpretation model to the generic Evaluation executor contract.
 type Executor struct {
-	runner    PipelineRunner
 	evaluator *domainScale.Evaluator
 }
 
-func NewExecutor(runner PipelineRunner, evaluator *domainScale.Evaluator) *Executor {
+func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
+	return NewExecutorWithEvaluator(domainScale.NewEvaluator(scaleScoringRegistry{scorer: scorer}))
+}
+
+func NewExecutorWithEvaluator(evaluator *domainScale.Evaluator) *Executor {
 	if evaluator == nil {
 		evaluator = domainScale.NewDefaultEvaluator()
 	}
-	return &Executor{runner: runner, evaluator: evaluator}
+	return &Executor{evaluator: evaluator}
 }
 
 func (e *Executor) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindScale
 }
 
-func (e *Executor) Evaluate(ctx context.Context, input evaluationengine.ExecutionInput) error {
-	if e == nil || e.runner == nil {
-		return fmt.Errorf("scale evaluation pipeline runner is not configured")
+func (e *Executor) Execute(ctx context.Context, input evaluationengine.ExecutionInput) (*assessment.EvaluationResult, error) {
+	if err := validateScaleExecutionInput(input); err != nil {
+		return nil, err
 	}
-	return e.runner.Execute(ctx, pipeline.NewContext(input.Assessment, input.Input))
+	return e.EvaluateScale(ctx, input.Assessment, input.Input)
 }
 
-func (e *Executor) EvaluateScale(ctx context.Context, snapshot *evaluationinput.InputSnapshot) (*assessment.EvaluationResult, error) {
+func (e *Executor) EvaluateScale(ctx context.Context, a *assessment.Assessment, snapshot *evaluationinput.InputSnapshot) (*assessment.EvaluationResult, error) {
 	evaluator := e.evaluator
 	if evaluator == nil {
 		evaluator = domainScale.NewDefaultEvaluator()
@@ -49,7 +48,7 @@ func (e *Executor) EvaluateScale(ctx context.Context, snapshot *evaluationinput.
 	if err != nil {
 		return nil, err
 	}
-	return ConvertScaleResult(result, snapshot), nil
+	return ConvertScaleResult(result, a, snapshot), nil
 }
 
 func InputFromSnapshot(snapshot *evaluationinput.InputSnapshot) domainScale.ScaleEvaluationInput {
@@ -63,7 +62,7 @@ func InputFromSnapshot(snapshot *evaluationinput.InputSnapshot) domainScale.Scal
 	}
 }
 
-func ConvertScaleResult(result *domainScale.ScaleEvaluationResult, snapshot *evaluationinput.InputSnapshot) *assessment.EvaluationResult {
+func ConvertScaleResult(result *domainScale.ScaleEvaluationResult, a *assessment.Assessment, snapshot *evaluationinput.InputSnapshot) *assessment.EvaluationResult {
 	if result == nil {
 		return nil
 	}
@@ -86,7 +85,9 @@ func ConvertScaleResult(result *domainScale.ScaleEvaluationResult, snapshot *eva
 		result.Suggestion,
 		factorScores,
 	)
-	if snapshot != nil && snapshot.Model != nil {
+	if a != nil && a.EvaluationModelRef() != nil {
+		evalResult.WithModelRef(*a.EvaluationModelRef())
+	} else if snapshot != nil && snapshot.Model != nil {
 		evalResult.WithModelRef(assessment.NewEvaluationModelRefByCode(
 			assessment.EvaluationModelKind(snapshot.Model.Kind),
 			meta.NewCode(snapshot.Model.Code),
@@ -95,6 +96,46 @@ func ConvertScaleResult(result *domainScale.ScaleEvaluationResult, snapshot *eva
 		))
 	}
 	return evalResult
+}
+
+func validateScaleExecutionInput(input evaluationengine.ExecutionInput) error {
+	if input.Assessment == nil {
+		return fmt.Errorf("assessment is required")
+	}
+	if !input.Assessment.Status().IsSubmitted() {
+		return fmt.Errorf("assessment is not submitted")
+	}
+	if input.Input == nil {
+		return fmt.Errorf("evaluation input snapshot is required")
+	}
+	scale := input.Input.MedicalScale
+	if scale == nil {
+		return fmt.Errorf("medical scale is required")
+	}
+	if len(scale.Factors) == 0 {
+		return fmt.Errorf("medical scale has no factors")
+	}
+	if !scale.IsPublished() {
+		return fmt.Errorf("medical scale is not published")
+	}
+	if scale.QuestionnaireCode != input.Assessment.QuestionnaireRef().Code().String() {
+		return fmt.Errorf("medical scale does not match the questionnaire")
+	}
+	if input.Input.AnswerSheet == nil {
+		return fmt.Errorf("answer sheet not found")
+	}
+	return nil
+}
+
+type scaleScoringRegistry struct {
+	scorer ruleengine.ScaleFactorScorer
+}
+
+func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor domainScale.FactorSnapshot, values []float64) (float64, error) {
+	if r.scorer == nil {
+		return domainScale.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
+	}
+	return r.scorer.ScoreFactor(ctx, string(factor.Code), values, string(factor.ScoringStrategy), nil)
 }
 
 func modelFromSnapshot(snapshot *evaluationinput.ScaleSnapshot) domainScale.ScaleEvaluationModel {

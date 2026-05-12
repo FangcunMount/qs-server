@@ -12,19 +12,19 @@ import (
 )
 
 type evaluatorStub struct {
-	kind     assessment.EvaluationModelKind
-	evaluate func(context.Context, ExecutionInput) error
+	kind    assessment.EvaluationModelKind
+	execute func(context.Context, ExecutionInput) (*assessment.EvaluationResult, error)
 }
 
 func (e evaluatorStub) Kind() assessment.EvaluationModelKind {
 	return e.kind
 }
 
-func (e evaluatorStub) Evaluate(ctx context.Context, input ExecutionInput) error {
-	if e.evaluate != nil {
-		return e.evaluate(ctx, input)
+func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error) {
+	if e.execute != nil {
+		return e.execute(ctx, input)
 	}
-	return nil
+	return assessment.NewEvaluationResult(0, assessment.RiskLevelNone, "", "", nil), nil
 }
 
 func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {

@@ -4,12 +4,29 @@ import (
 	"context"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
-	executor := NewExecutor(nil, nil)
+	executor := NewExecutor(nil)
+	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindScale, meta.NewCode("S-001"), "1.0.0", "Scale")
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(1),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(1)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
 	snapshot := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:    evaluationinput.EvaluationModelKindScale,
@@ -18,7 +35,9 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 			Title:   "Scale",
 		},
 		MedicalScale: &evaluationinput.ScaleSnapshot{
-			Code: "S-001",
+			Code:              "S-001",
+			QuestionnaireCode: "Q-001",
+			Status:            "published",
 			Factors: []evaluationinput.FactorSnapshot{
 				{
 					Code:            "total",
@@ -41,7 +60,7 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{},
 	}
 
-	result, err := executor.EvaluateScale(context.Background(), snapshot)
+	result, err := executor.EvaluateScale(context.Background(), a, snapshot)
 	if err != nil {
 		t.Fatalf("EvaluateScale returned error: %v", err)
 	}

@@ -139,8 +139,9 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 	}
 	text := string(data)
 	required := []string{
-		"pipeline.NewTransactionalReportDurableSaver(",
-		"ReportSaver:     infra.reportDurableSaver",
+		"evaluationResult.NewTransactionalReportDurableSaver(",
+		"reportBuilders",
+		"infra.reportDurableSaver",
 	}
 	for _, token := range required {
 		if !strings.Contains(text, token) {

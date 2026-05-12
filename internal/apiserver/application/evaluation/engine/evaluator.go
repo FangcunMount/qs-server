@@ -16,7 +16,7 @@ type ExecutionInput struct {
 // Evaluator 执行某一类解释模型的评估。
 type Evaluator interface {
 	Kind() assessment.EvaluationModelKind
-	Evaluate(ctx context.Context, input ExecutionInput) error
+	Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error)
 }
 
 type EvaluatorRegistry interface {

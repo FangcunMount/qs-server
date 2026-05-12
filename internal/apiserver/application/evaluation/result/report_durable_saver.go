@@ -1,4 +1,4 @@
-package pipeline
+package result
 
 import (
 	"context"
@@ -26,13 +26,6 @@ type transactionalReportDurableSaver struct {
 	runner apptransaction.Runner
 	writer ReportDurableWriter
 	stager ReportEventStager
-}
-
-func NewReportDurableSaver(candidate any) ReportDurableSaver {
-	if saver, ok := candidate.(ReportDurableSaver); ok {
-		return saver
-	}
-	return nil
 }
 
 func NewTransactionalReportDurableSaver(

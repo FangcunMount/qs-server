@@ -126,9 +126,6 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 			return nil
 		}
 		rel := filepath.ToSlash(mustRel(t, root, path))
-		if strings.HasPrefix(rel, "internal/apiserver/application/evaluation/engine/pipeline/") {
-			return nil
-		}
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
 			return err
@@ -146,6 +143,40 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+}
+
+func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "scale", "evaluation"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		if strings.Contains(importPath, "/application/evaluation/engine/pipeline") {
+			t.Fatalf("%s imports %s; scale executor must not wrap legacy evaluation pipeline", filepath.ToSlash(mustRel(t, root, path)), importPath)
+		}
+	})
+}
+
+func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result"), func(path, importPath string) {
+		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		for _, forbidden := range forbiddenImports {
+			if strings.HasPrefix(importPath, forbidden) {
+				t.Fatalf("%s imports %s; result writer must orchestrate outputs without owning scale rules", filepath.ToSlash(mustRel(t, root, path)), importPath)
+			}
+		}
+	})
 }
 
 func TestEvaluationDoesNotUseDeprecatedRepositoryFallbacks(t *testing.T) {

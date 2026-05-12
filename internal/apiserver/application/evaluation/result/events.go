@@ -1,4 +1,4 @@
-package pipeline
+package result
 
 import (
 	"strconv"
@@ -10,33 +10,36 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-type InterpretationEventAssembler interface {
-	BuildSuccessEvents(evalCtx *Context, rpt *domainReport.InterpretReport) []event.DomainEvent
+type EventAssembler interface {
+	BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent
 }
 
-type defaultInterpretationEventAssembler struct{}
+type defaultEventAssembler struct{}
 
-func NewInterpretationEventAssembler() InterpretationEventAssembler {
-	return defaultInterpretationEventAssembler{}
+func NewEventAssembler() EventAssembler {
+	return defaultEventAssembler{}
 }
 
-func (defaultInterpretationEventAssembler) BuildSuccessEvents(evalCtx *Context, rpt *domainReport.InterpretReport) []event.DomainEvent {
+func (defaultEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
+	if outcome.Assessment == nil || outcome.Result == nil || rpt == nil {
+		return nil
+	}
 	now := time.Now()
-	assessmentRef := evalCtx.Assessment.MedicalScaleRef()
+	assessmentRef := outcome.Assessment.MedicalScaleRef()
 	if assessmentRef == nil {
 		return nil
 	}
-	modelRef := evalCtx.Assessment.EvaluationModelRef()
+	modelRef := outcome.Assessment.EvaluationModelRef()
 	if modelRef == nil {
 		ref := assessmentRef.ToEvaluationModelRef()
 		modelRef = &ref
 	}
 
 	scaleVersion := ""
-	if evalCtx.MedicalScale != nil {
-		scaleVersion = evalCtx.MedicalScale.QuestionnaireVersion
-	} else if !evalCtx.Assessment.QuestionnaireRef().IsEmpty() {
-		scaleVersion = evalCtx.Assessment.QuestionnaireRef().Version()
+	if outcome.Input != nil && outcome.Input.MedicalScale != nil {
+		scaleVersion = outcome.Input.MedicalScale.QuestionnaireVersion
+	} else if !outcome.Assessment.QuestionnaireRef().IsEmpty() {
+		scaleVersion = outcome.Assessment.QuestionnaireRef().Version()
 	}
 
 	scaleRef := assessment.NewMedicalScaleRef(
@@ -45,19 +48,19 @@ func (defaultInterpretationEventAssembler) BuildSuccessEvents(evalCtx *Context, 
 		scaleVersion,
 	)
 
-	assessmentID := evalCtx.Assessment.ID().Uint64()
+	assessmentID := outcome.Assessment.ID().Uint64()
 	reportID := rpt.ID().Uint64()
-	testeeID := evalCtx.Assessment.TesteeID().Uint64()
+	testeeID := outcome.Assessment.TesteeID().Uint64()
 
 	return []event.DomainEvent{
 		assessment.NewAssessmentInterpretedEvent(
-			evalCtx.Assessment.OrgID(),
-			evalCtx.Assessment.ID(),
-			evalCtx.Assessment.TesteeID(),
+			outcome.Assessment.OrgID(),
+			outcome.Assessment.ID(),
+			outcome.Assessment.TesteeID(),
 			*modelRef,
 			scaleRef,
-			evalCtx.EvaluationResult.TotalScore,
-			evalCtx.EvaluationResult.RiskLevel,
+			outcome.Result.TotalScore,
+			outcome.Result.RiskLevel,
 			now,
 		),
 		domainReport.NewReportGeneratedEvent(
@@ -71,7 +74,7 @@ func (defaultInterpretationEventAssembler) BuildSuccessEvents(evalCtx *Context, 
 			now,
 		),
 		domainStatistics.NewFootprintReportGeneratedEvent(
-			evalCtx.Assessment.OrgID(),
+			outcome.Assessment.OrgID(),
 			testeeID,
 			assessmentID,
 			reportID,

@@ -6,16 +6,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
+	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
-
-type EvaluationPipelineRunner interface {
-	Execute(ctx context.Context, evalCtx *pipeline.Context) error
-}
 
 // service 评估引擎服务实现
 type service struct {
@@ -26,9 +22,8 @@ type service struct {
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 
-	// 处理器链
-	pipelineRunner EvaluationPipelineRunner
-	evaluators     EvaluatorRegistry
+	evaluators   EvaluatorRegistry
+	resultWriter evaluationresult.Writer
 }
 
 type EventStager interface {
@@ -55,15 +50,15 @@ func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 func NewService(
 	assessmentRepo assessment.Repository,
 	inputResolver evaluationinput.Resolver,
-	pipelineRunner EvaluationPipelineRunner,
+	resultWriter evaluationresult.Writer,
 	opts ...ServiceOption,
 ) Service {
 	registry, _ := NewEvaluatorRegistry()
 	svc := &service{
 		assessmentRepo: assessmentRepo,
 		inputResolver:  inputResolver,
-		pipelineRunner: pipelineRunner,
 		evaluators:     registry,
+		resultWriter:   resultWriter,
 	}
 
 	// 应用选项
@@ -130,8 +125,25 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
-	if err := evaluator.Evaluate(ctx, ExecutionInput{Assessment: a, Input: input}); err != nil {
+	evaluationResult, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
+	if err != nil {
 		l.Errorw("评估解释器执行失败",
+			"assessment_id", assessmentID,
+			"model_kind", modelKind.String(),
+			"model_code", evaluationModelCode(a, input),
+			"result", "failed",
+			"error", err.Error(),
+		)
+		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		return err
+	}
+	if s.resultWriter == nil {
+		err := evalerrors.ModuleNotConfigured("evaluation result writer is not configured")
+		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		return err
+	}
+	if err := s.resultWriter.Write(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Result: evaluationResult}); err != nil {
+		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
 			"model_kind", modelKind.String(),
 			"model_code", evaluationModelCode(a, input),

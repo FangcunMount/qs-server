@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
+	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -203,20 +203,14 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 	)
 }
 
-type pipelineRunnerStub struct{}
-
-func (r *pipelineRunnerStub) Execute(context.Context, *pipeline.Context) error {
-	return nil
-}
-
-type recordingPipelineRunner struct {
+type recordingResultWriter struct {
 	calls   int
-	evalCtx *pipeline.Context
+	outcome evaluationresult.Outcome
 }
 
-func (r *recordingPipelineRunner) Execute(_ context.Context, evalCtx *pipeline.Context) error {
-	r.calls++
-	r.evalCtx = evalCtx
+func (w *recordingResultWriter) Write(_ context.Context, outcome evaluationresult.Outcome) error {
+	w.calls++
+	w.outcome = outcome
 	return nil
 }
 
@@ -256,20 +250,20 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func TestNewServiceAcceptsPipelineRunner(t *testing.T) {
-	runner := &pipelineRunnerStub{}
+func TestNewServiceAcceptsResultWriter(t *testing.T) {
+	writer := &recordingResultWriter{}
 	svc := NewService(
 		&fakeAssessmentRepo{},
 		failingInputResolver{},
-		runner,
+		writer,
 	)
 
 	impl, ok := svc.(*service)
 	if !ok {
 		t.Fatalf("expected *service, got %T", svc)
 	}
-	if impl.pipelineRunner != runner {
-		t.Fatal("expected pipeline runner to be stored on service")
+	if impl.resultWriter != writer {
+		t.Fatal("expected result writer to be stored on service")
 	}
 }
 
@@ -303,26 +297,29 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 303, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
 	}}
-	runner := &recordingPipelineRunner{}
+	writer := &recordingResultWriter{}
+	var executionInput ExecutionInput
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		kind: domainAssessment.EvaluationModelKindScale,
-		evaluate: func(ctx context.Context, input ExecutionInput) error {
-			return runner.Execute(ctx, pipeline.NewContext(input.Assessment, input.Input))
+		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.EvaluationResult, error) {
+			executionInput = input
+			return domainAssessment.NewEvaluationResult(7, domainAssessment.RiskLevelLow, "ok", "keep", nil).
+				WithModelRef(*input.Assessment.EvaluationModelRef()), nil
 		},
 	})
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	svc := NewService(aRepo, input, runner, WithEvaluatorRegistry(registry))
+	svc := NewService(aRepo, input, writer, WithEvaluatorRegistry(registry))
 
 	if err := svc.Evaluate(context.Background(), 101); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if runner.calls != 1 {
-		t.Fatalf("pipeline runner calls = %d, want 1", runner.calls)
+	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
+		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if runner.evalCtx == nil || runner.evalCtx.Model == nil || runner.evalCtx.Model.Kind != evaluationinput.EvaluationModelKindScale {
-		t.Fatalf("unexpected eval context model: %#v", runner.evalCtx)
+	if writer.calls != 1 || writer.outcome.Result == nil || writer.outcome.Result.TotalScore != 7 {
+		t.Fatalf("unexpected result writer outcome: %#v", writer.outcome)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)
@@ -369,7 +366,7 @@ func TestEvaluateUnknownModelKindMarksAssessmentFailed(t *testing.T) {
 	svc := NewService(
 		aRepo,
 		input,
-		&recordingPipelineRunner{},
+		&recordingResultWriter{},
 		WithTransactionalOutbox(txRunner, stager),
 		WithEvaluatorRegistry(registry),
 	)
