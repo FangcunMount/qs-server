@@ -99,13 +99,22 @@ func newScoringAnswerSheet(t *testing.T, answers ...domainAnswerSheet.Answer) *d
 
 	sheet := domainAnswerSheet.Reconstruct(
 		meta.FromUint64(1001),
-		domainAnswerSheet.NewQuestionnaireRef("qnr", "1.0", "Questionnaire"),
+		mustQuestionnaireRefForScoringTest(t),
 		domainActor.NewFillerRef(2001, domainActor.FillerTypeSelf),
 		answers,
 		time.Now(),
 		0,
 	)
 	return sheet
+}
+
+func mustQuestionnaireRefForScoringTest(t *testing.T) domainAnswerSheet.QuestionnaireRef {
+	t.Helper()
+	ref, err := domainAnswerSheet.NewQuestionnaireRef("qnr", "1.0", "Questionnaire")
+	if err != nil {
+		t.Fatalf("NewQuestionnaireRef() error = %v", err)
+	}
+	return ref
 }
 
 func newScoringAnswer(t *testing.T, questionCode, optionCode string) domainAnswerSheet.Answer {

@@ -134,8 +134,12 @@ func TestManagementServiceGetByIDReturnsConvertedAnswerSheet(t *testing.T) {
 
 	answer1, _ := domainanswersheet.NewAnswer(meta.NewCode("q1"), questionnairedomain.TypeRadio, domainanswersheet.NewOptionValue("A"), 1.5)
 	answer2, _ := domainanswersheet.NewAnswer(meta.NewCode("q2"), questionnairedomain.TypeNumber, domainanswersheet.NewNumberValue(7), 2.5)
+	questionnaireRef, err := domainanswersheet.NewQuestionnaireRef("QNR-001", "v1", "PHQ-9")
+	if err != nil {
+		t.Fatalf("NewQuestionnaireRef() error = %v", err)
+	}
 	sheet, err := domainanswersheet.NewAnswerSheet(
-		domainanswersheet.NewQuestionnaireRef("QNR-001", "v1", "PHQ-9"),
+		questionnaireRef,
 		actor.NewFillerRef(7, actor.FillerTypeGuardian),
 		[]domainanswersheet.Answer{answer1, answer2},
 		time.Date(2026, 4, 22, 10, 0, 0, 0, time.UTC),

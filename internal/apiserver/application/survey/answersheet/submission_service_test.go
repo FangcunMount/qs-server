@@ -13,12 +13,14 @@ import (
 
 type durableStoreCaptureStub struct {
 	lastMeta      DurableSubmitMeta
+	lastSheet     *domainAnswerSheet.AnswerSheet
 	existing      bool
 	returnedSheet *domainAnswerSheet.AnswerSheet
 }
 
 func (s *durableStoreCaptureStub) CreateDurably(_ context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
 	s.lastMeta = meta
+	s.lastSheet = sheet
 	if s.returnedSheet != nil {
 		return s.returnedSheet, s.existing, nil
 	}
@@ -59,15 +61,22 @@ func TestSubmissionServiceCreateAndSaveAnswerSheetPassesDurableSubmitMeta(t *tes
 	if result == nil {
 		t.Fatal("createAndSaveAnswerSheet() returned nil sheet")
 	}
-	if store.lastMeta.IdempotencyKey != "idem-1" || store.lastMeta.WriterID != 301 || store.lastMeta.TesteeID != 401 || store.lastMeta.OrgID != 501 || store.lastMeta.TaskID != "task-1" {
+	if store.lastMeta.IdempotencyKey != "idem-1" {
 		t.Fatalf("unexpected durable meta: %+v", store.lastMeta)
+	}
+	if store.lastSheet == nil {
+		t.Fatal("durable store did not receive sheet")
+	}
+	submissionContext := store.lastSheet.SubmissionContext()
+	if submissionContext.Filler().UserID() != 301 || submissionContext.TesteeID().Uint64() != 401 || submissionContext.OrgID().Uint64() != 501 || submissionContext.TaskID() != "task-1" {
+		t.Fatalf("unexpected submission context: %+v", submissionContext)
 	}
 }
 
 func TestSubmissionServiceCreateAndSaveAnswerSheetReturnsExistingSheet(t *testing.T) {
 	existing := domainAnswerSheet.Reconstruct(
 		meta.FromUint64(999),
-		domainAnswerSheet.NewQuestionnaireRef("QNR-1", "1.0.0", "Questionnaire"),
+		mustQuestionnaireRefForSubmissionTest(t),
 		nil,
 		mustAnswersForSubmissionTest(t),
 		nowForSubmissionTest(),

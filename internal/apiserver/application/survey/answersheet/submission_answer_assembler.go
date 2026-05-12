@@ -22,48 +22,59 @@ type answerBuildResult struct {
 // buildAnswerValuesAndTasks 构建答案值对象和校验任务。
 func buildAnswerValuesAndTasks(
 	l *logger.RequestLogger,
-	answerDTOs []AnswerDTO,
-	questionMap map[string]questionnaire.Question,
+	spec questionnaire.SubmissionSpec,
+	rawAnswers []questionnaire.RawSubmissionAnswer,
 ) ([]answerBuildResult, []ruleengine.AnswerValidationTask, error) {
-	l.Infow("开始验证答案", "answer_count", len(answerDTOs), "action", "validate", "resource", "answer")
+	l.Infow("开始验证答案", "answer_count", len(rawAnswers), "action", "validate", "resource", "answer")
 
-	results := make([]answerBuildResult, 0, len(answerDTOs))
-	tasks := make([]ruleengine.AnswerValidationTask, 0, len(answerDTOs))
+	preparedAnswers, err := spec.PrepareAnswers(rawAnswers)
+	if err != nil {
+		l.Warnw("提交答案不符合问卷规格", "error", err.Error(), "result", "failed")
+		return nil, nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "提交答案不符合问卷规格")
+	}
 
-	for i, answerDTO := range answerDTOs {
-		question, exists := questionMap[answerDTO.QuestionCode]
-		if !exists {
-			l.Warnw("问题不存在于问卷中", "question_code", answerDTO.QuestionCode, "answer_index", i, "result", "failed")
-			return nil, nil, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("问题 %s 不存在于问卷中", answerDTO.QuestionCode))
-		}
+	results := make([]answerBuildResult, 0, len(preparedAnswers))
+	tasks := make([]ruleengine.AnswerValidationTask, 0, len(preparedAnswers))
 
-		answerValue, err := answersheet.CreateAnswerValueFromRaw(
-			questionnaire.QuestionType(answerDTO.QuestionType),
-			answerDTO.Value,
-		)
+	for _, prepared := range preparedAnswers {
+		questionType := prepared.QuestionType()
+		questionCode := prepared.QuestionCode().Value()
+		answerValue, err := answersheet.CreateAnswerValueFromRaw(questionType, prepared.Value())
 		if err != nil {
-			l.Warnw("创建答案值失败", "question_code", answerDTO.QuestionCode, "question_type", answerDTO.QuestionType, "error", err.Error(), "result", "failed")
-			return nil, nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("创建答案值失败 [%s]", answerDTO.QuestionCode))
+			l.Warnw("创建答案值失败", "question_code", questionCode, "question_type", questionType.Value(), "error", err.Error(), "result", "failed")
+			return nil, nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "%s", fmt.Sprintf("创建答案值失败 [%s]", questionCode))
 		}
 
 		results = append(results, answerBuildResult{
-			questionCode: answerDTO.QuestionCode,
+			questionCode: questionCode,
 			answerValue:  answerValue,
-			questionType: questionnaire.QuestionType(answerDTO.QuestionType),
+			questionType: questionType,
 		})
 
 		tasks = append(tasks, ruleengine.AnswerValidationTask{
-			ID:    answerDTO.QuestionCode,
+			ID:    questionCode,
 			Value: answersheet.NewAnswerValueAdapter(answerValue),
-			Rules: validationRuleSpecsFromQuestion(question),
+			Rules: validationRuleSpecsFromPreparedAnswer(prepared),
 		})
 	}
 
 	return results, tasks, nil
 }
 
-func validationRuleSpecsFromQuestion(question questionnaire.Question) []ruleengine.ValidationRuleSpec {
-	rules := question.GetValidationRules()
+func rawSubmissionAnswersFromDTO(answerDTOs []AnswerDTO) []questionnaire.RawSubmissionAnswer {
+	rawAnswers := make([]questionnaire.RawSubmissionAnswer, 0, len(answerDTOs))
+	for _, answerDTO := range answerDTOs {
+		rawAnswers = append(rawAnswers, questionnaire.RawSubmissionAnswer{
+			QuestionCode: answerDTO.QuestionCode,
+			QuestionType: answerDTO.QuestionType,
+			Value:        answerDTO.Value,
+		})
+	}
+	return rawAnswers
+}
+
+func validationRuleSpecsFromPreparedAnswer(answer questionnaire.PreparedSubmissionAnswer) []ruleengine.ValidationRuleSpec {
+	rules := answer.ValidationRules()
 	if len(rules) == 0 {
 		return nil
 	}

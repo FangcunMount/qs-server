@@ -40,6 +40,15 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		fillerID = filler.UserID()
 		fillerType = string(filler.FillerType())
 	}
+	submissionContext := bo.SubmissionContext()
+	var testeeID uint64
+	if !submissionContext.TesteeID().IsZero() {
+		testeeID = submissionContext.TesteeID().Uint64()
+	}
+	var orgID uint64
+	if !submissionContext.OrgID().IsZero() {
+		orgID = submissionContext.OrgID().Uint64()
+	}
 
 	// 创建PO对象
 	po := &AnswerSheetPO{
@@ -48,6 +57,9 @@ func (m *AnswerSheetMapper) ToPO(bo *answersheet.AnswerSheet) *AnswerSheetPO {
 		QuestionnaireTitle:   title,
 		FillerID:             fillerID,
 		FillerType:           fillerType,
+		TesteeID:             testeeID,
+		OrgID:                orgID,
+		TaskID:               submissionContext.TaskID(),
 		TotalScore:           bo.Score(),
 		FilledAt:             bo.FilledAt(),
 		Answers:              answers,
@@ -79,20 +91,32 @@ func (m *AnswerSheetMapper) ToBO(po *AnswerSheetPO) *answersheet.AnswerSheet {
 	}
 
 	// 构建问卷引用
-	questionnaireRef := answersheet.NewQuestionnaireRef(
+	questionnaireRef, err := answersheet.NewQuestionnaireRef(
 		po.QuestionnaireCode,
 		po.QuestionnaireVersion,
 		po.QuestionnaireTitle,
 	)
+	if err != nil {
+		return nil
+	}
 
 	// 构建填写者引用
 	filler := actor.NewFillerRef(po.FillerID, actor.FillerType(po.FillerType))
+	submissionContext := answersheet.ReconstructSubmissionContext(filler, nil, 0, po.TaskID)
+	if po.TesteeID != 0 && po.OrgID != 0 {
+		submissionContext = answersheet.ReconstructSubmissionContext(
+			filler,
+			actor.NewTesteeRef(meta.FromUint64(po.TesteeID)),
+			meta.FromUint64(po.OrgID),
+			po.TaskID,
+		)
+	}
 
 	// 使用 Reconstruct 重建答卷对象
-	return answersheet.Reconstruct(
+	return answersheet.ReconstructWithSubmissionContext(
 		po.DomainID,
 		questionnaireRef,
-		filler,
+		submissionContext,
 		answers,
 		po.FilledAt,
 		po.TotalScore,

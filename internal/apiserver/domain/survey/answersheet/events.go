@@ -42,13 +42,22 @@ type AnswerSheetSubmittedEvent = event.Event[AnswerSheetSubmittedData]
 
 // ==================== 事件构造函数 ====================
 
-// NewAnswerSheetSubmittedEvent 构造答卷提交事件
-func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, taskID string) AnswerSheetSubmittedEvent {
+// NewAnswerSheetSubmittedEvent 构造答卷提交事件。
+func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet) AnswerSheetSubmittedEvent {
 	code, ver, _ := sheet.QuestionnaireInfo()
 	filler := sheet.Filler()
 	fillerID, err := safeconv.Int64ToUint64(filler.UserID())
 	if err != nil {
 		panic(fmt.Errorf("answersheet filler id: %w", err))
+	}
+	submissionContext := sheet.SubmissionContext()
+	testeeID, err := safeconv.MetaIDToUint64(submissionContext.TesteeID())
+	if err != nil {
+		panic(fmt.Errorf("answersheet testee id: %w", err))
+	}
+	orgID, err := safeconv.MetaIDToUint64(submissionContext.OrgID())
+	if err != nil {
+		panic(fmt.Errorf("answersheet org id: %w", err))
 	}
 
 	return event.New(EventTypeSubmitted, AggregateType, sheet.ID().String(),
@@ -60,7 +69,7 @@ func NewAnswerSheetSubmittedEvent(sheet *AnswerSheet, testeeID, orgID uint64, ta
 			OrgID:                orgID,
 			FillerID:             fillerID,
 			FillerType:           filler.FillerType().String(),
-			TaskID:               taskID,
+			TaskID:               submissionContext.TaskID(),
 			SubmittedAt:          sheet.FilledAt(),
 		},
 	)

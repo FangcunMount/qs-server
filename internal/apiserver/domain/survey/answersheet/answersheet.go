@@ -16,8 +16,8 @@ type AnswerSheet struct {
 	id meta.ID
 
 	// 填写者信息
-	filler   *actor.FillerRef
-	filledAt time.Time
+	submissionContext SubmissionContext
+	filledAt          time.Time
 
 	// 问卷&答卷信息
 	questionnaireRef QuestionnaireRef
@@ -30,45 +30,87 @@ type AnswerSheet struct {
 	events []event.DomainEvent
 }
 
-// NewAnswerSheet 创建答卷（提交时创建，不存在草稿状态）
-// 创建即提交，自动触发 AnswerSheetSubmittedEvent
+// NewAnswerSheet 创建答卷（兼容旧调用方，不产生提交事件）。
+//
+// Deprecated: 新提交必须使用 Submit，让提交上下文和 SubmittedEvent 同时入模。
 func NewAnswerSheet(
 	questionnaireRef QuestionnaireRef,
 	filler *actor.FillerRef,
 	answers []Answer,
 	filledAt time.Time,
 ) (*AnswerSheet, error) {
-	// 验证必填字段
-	if questionnaireRef.IsEmpty() {
-		return nil, fmt.Errorf("questionnaire reference is required")
+	if err := questionnaireRef.Validate(); err != nil {
+		return nil, err
 	}
 	if filler == nil {
 		return nil, fmt.Errorf("filler is required")
 	}
-	if len(answers) == 0 {
-		return nil, fmt.Errorf("at least one answer is required")
-	}
-
-	// 验证答案唯一性
-	codeSet := make(map[string]bool)
-	for _, ans := range answers {
-		code := ans.QuestionCode()
-		if codeSet[code] {
-			return nil, fmt.Errorf("duplicate answer for question: %s", code)
-		}
-		codeSet[code] = true
+	if err := validateAnswers(answers); err != nil {
+		return nil, err
 	}
 
 	sheet := &AnswerSheet{
-		questionnaireRef: questionnaireRef,
-		filler:           filler,
-		answers:          answers,
-		filledAt:         filledAt,
-		score:            0, // 初始分数为0，需要通过 CalculateScore 计算
-		events:           make([]event.DomainEvent, 0),
+		questionnaireRef:  questionnaireRef,
+		submissionContext: ReconstructSubmissionContext(filler, nil, meta.ZeroID, ""),
+		answers:           answers,
+		filledAt:          filledAt,
+		score:             0, // 初始分数为0，需要通过 CalculateScore 计算
+		events:            make([]event.DomainEvent, 0),
 	}
 
 	return sheet, nil
+}
+
+// Submit 创建完整的答卷提交事实，并立即产生 AnswerSheetSubmittedEvent。
+func Submit(
+	id meta.ID,
+	questionnaireRef QuestionnaireRef,
+	submissionContext SubmissionContext,
+	answers []Answer,
+	filledAt time.Time,
+) (*AnswerSheet, error) {
+	if id.IsZero() {
+		return nil, fmt.Errorf("answer sheet id is required")
+	}
+	if err := questionnaireRef.Validate(); err != nil {
+		return nil, err
+	}
+	if err := submissionContext.Validate(); err != nil {
+		return nil, err
+	}
+	if err := validateAnswers(answers); err != nil {
+		return nil, err
+	}
+
+	sheet := &AnswerSheet{
+		id:                id,
+		questionnaireRef:  questionnaireRef,
+		submissionContext: submissionContext,
+		answers:           answers,
+		filledAt:          filledAt,
+		score:             0,
+		events:            make([]event.DomainEvent, 0, 1),
+	}
+	sheet.addEvent(NewAnswerSheetSubmittedEvent(sheet))
+	return sheet, nil
+}
+
+func validateAnswers(answers []Answer) error {
+	if len(answers) == 0 {
+		return fmt.Errorf("at least one answer is required")
+	}
+	codeSet := make(map[string]bool)
+	for _, ans := range answers {
+		if err := ans.Validate(); err != nil {
+			return err
+		}
+		code := ans.QuestionCode()
+		if codeSet[code] {
+			return fmt.Errorf("duplicate answer for question: %s", code)
+		}
+		codeSet[code] = true
+	}
+	return nil
 }
 
 // Reconstruct 从持久化数据重建答卷对象（用于仓储层）
@@ -80,13 +122,32 @@ func Reconstruct(
 	filledAt time.Time,
 	score float64,
 ) *AnswerSheet {
+	return ReconstructWithSubmissionContext(
+		id,
+		questionnaireRef,
+		ReconstructSubmissionContext(filler, nil, meta.ZeroID, ""),
+		answers,
+		filledAt,
+		score,
+	)
+}
+
+// ReconstructWithSubmissionContext 从持久化数据重建带提交上下文的答卷对象。
+func ReconstructWithSubmissionContext(
+	id meta.ID,
+	questionnaireRef QuestionnaireRef,
+	submissionContext SubmissionContext,
+	answers []Answer,
+	filledAt time.Time,
+	score float64,
+) *AnswerSheet {
 	return &AnswerSheet{
-		id:               id,
-		questionnaireRef: questionnaireRef,
-		filler:           filler,
-		answers:          answers,
-		filledAt:         filledAt,
-		score:            score,
+		id:                id,
+		questionnaireRef:  questionnaireRef,
+		submissionContext: submissionContext,
+		answers:           answers,
+		filledAt:          filledAt,
+		score:             score,
 	}
 }
 
@@ -109,10 +170,11 @@ func (a *AnswerSheet) AssignID(id meta.ID) {
 
 // IsFilledBy 判断是否由指定填写者填写
 func (a *AnswerSheet) IsFilledBy(filler *actor.FillerRef) bool {
-	if a.filler == nil || filler == nil {
+	current := a.Filler()
+	if current == nil || filler == nil {
 		return false
 	}
-	return a.filler.UserID() == filler.UserID()
+	return current.UserID() == filler.UserID()
 }
 
 // Score 获取总分
@@ -127,7 +189,12 @@ func (a *AnswerSheet) FilledAt() time.Time {
 
 // Filler 获取填写者
 func (a *AnswerSheet) Filler() *actor.FillerRef {
-	return a.filler
+	return a.submissionContext.Filler()
+}
+
+// SubmissionContext 获取提交上下文。
+func (a *AnswerSheet) SubmissionContext() SubmissionContext {
+	return a.submissionContext
 }
 
 // QuestionnaireInfo 获取问卷信息（用于展示）
@@ -196,10 +263,4 @@ func (a *AnswerSheet) addEvent(evt event.DomainEvent) {
 		a.events = make([]event.DomainEvent, 0)
 	}
 	a.events = append(a.events, evt)
-}
-
-// RaiseSubmittedEvent 在持久化后触发提交事件（确保带上持久化后的 ID）。
-// testeeID、orgID 和 taskID 由应用层传入，用于传递给测评/计划层。
-func (a *AnswerSheet) RaiseSubmittedEvent(testeeID, orgID uint64, taskID string) {
-	a.addEvent(NewAnswerSheetSubmittedEvent(a, testeeID, orgID, taskID))
 }

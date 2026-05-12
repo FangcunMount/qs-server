@@ -3,6 +3,7 @@ package answersheet
 import (
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -162,11 +163,11 @@ func NewOptionsValue(values []string) AnswerValue {
 	if values == nil {
 		values = []string{}
 	}
-	return OptionsValue{values: values}
+	return OptionsValue{values: slices.Clone(values)}
 }
 
 func (o OptionsValue) Raw() any {
-	return o.values
+	return slices.Clone(o.values)
 }
 
 // =========== 工厂方法 ============

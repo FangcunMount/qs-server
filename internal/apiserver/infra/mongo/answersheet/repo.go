@@ -66,8 +66,10 @@ func (r *Repository) Create(ctx context.Context, sheet *answersheet.AnswerSheet)
 		return err
 	}
 
-	// 将生成的 ID 设置回领域对象
-	sheet.AssignID(meta.ID(po.DomainID))
+	if sheet.ID().IsZero() {
+		// 将生成的 ID 设置回旧构造路径创建的领域对象。
+		sheet.AssignID(meta.ID(po.DomainID))
+	}
 
 	return nil
 }

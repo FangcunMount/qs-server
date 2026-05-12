@@ -33,20 +33,40 @@ func createAnswerSheet(
 	qnr *questionnaire.Questionnaire,
 	answers []answersheet.Answer,
 ) (*answersheet.AnswerSheet, error) {
-	questionnaireRef := answersheet.NewQuestionnaireRef(
+	questionnaireRef, err := answersheet.NewQuestionnaireRef(
 		dto.QuestionnaireCode,
 		dto.QuestionnaireVer,
 		qnr.GetTitle(),
 	)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建问卷引用失败")
+	}
 
 	fillerUserID, err := fillerUserIDFromUint64("filler_id", dto.FillerID)
 	if err != nil {
 		return nil, err
 	}
 	fillerRef := actor.NewFillerRef(fillerUserID, actor.FillerTypeSelf)
+	testeeID, err := metaIDFromUint64("testee_id", dto.TesteeID)
+	if err != nil {
+		return nil, err
+	}
+	orgID, err := metaIDFromUint64("org_id", dto.OrgID)
+	if err != nil {
+		return nil, err
+	}
+	submissionContext, err := answersheet.NewSubmissionContext(
+		fillerRef,
+		actor.NewTesteeRef(testeeID),
+		orgID,
+		dto.TaskID,
+	)
+	if err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷提交上下文失败")
+	}
 
 	l.Debugw("开始创建答卷领域对象", "questionnaire_code", dto.QuestionnaireCode, "filler_id", dto.FillerID, "answer_count", len(answers))
-	sheet, err := answersheet.NewAnswerSheet(questionnaireRef, fillerRef, answers, time.Now())
+	sheet, err := answersheet.Submit(answersheet.NewID(), questionnaireRef, submissionContext, answers, time.Now())
 	if err != nil {
 		l.Errorw("创建答卷领域对象失败", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")
 		return nil, errors.WrapC(err, errorCode.ErrAnswerSheetInvalid, "创建答卷失败")
@@ -63,10 +83,6 @@ func (s *submissionService) persistSubmittedAnswerSheet(
 	l.Infow("开始保存答卷", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode)
 	storedSheet, existing, err := s.durableStore.CreateDurably(ctx, sheet, DurableSubmitMeta{
 		IdempotencyKey: dto.IdempotencyKey,
-		WriterID:       dto.FillerID,
-		TesteeID:       dto.TesteeID,
-		OrgID:          dto.OrgID,
-		TaskID:         dto.TaskID,
 	})
 	if err != nil {
 		l.Errorw("保存答卷失败", "action", "create", "resource", "answersheet", "questionnaire_code", dto.QuestionnaireCode, "error", err.Error(), "result", "failed")

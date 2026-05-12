@@ -78,9 +78,13 @@ func TestAnswerSheetToSnapshotPreservesRawValuesAndScores(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAnswer returned error: %v", err)
 	}
+	questionnaireRef, err := answersheet.NewQuestionnaireRef("Q-SDS", "1.0.0", "SDS Questionnaire")
+	if err != nil {
+		t.Fatalf("NewQuestionnaireRef returned error: %v", err)
+	}
 	sheet := answersheet.Reconstruct(
 		meta.FromUint64(9001),
-		answersheet.NewQuestionnaireRef("Q-SDS", "1.0.0", "SDS Questionnaire"),
+		questionnaireRef,
 		actor.NewFillerRef(101, actor.FillerTypeSelf),
 		[]answersheet.Answer{answer},
 		time.Date(2026, 5, 2, 12, 0, 0, 0, time.UTC),

@@ -59,13 +59,13 @@ func (s *submissionService) Submit(ctx context.Context, dto SubmitAnswerSheetDTO
 	}
 
 	// 2. 获取并验证问卷
-	qnr, questionMap, err := s.fetchAndValidateQuestionnaire(ctx, l, &dto)
+	qnr, spec, err := s.fetchAndValidateQuestionnaire(ctx, l, &dto)
 	if err != nil {
 		return nil, err
 	}
 
 	// 3. 构建答案值对象和校验任务
-	answerResults, validationTasks, err := buildAnswerValuesAndTasks(l, dto.Answers, questionMap)
+	answerResults, validationTasks, err := buildAnswerValuesAndTasks(l, spec, rawSubmissionAnswersFromDTO(dto.Answers))
 	if err != nil {
 		return nil, err
 	}
@@ -119,6 +119,10 @@ func (s *submissionService) validateSubmitDTO(l *logger.RequestLogger, dto Submi
 	if dto.TesteeID == 0 {
 		l.Warnw("答卷提交失败：受试者ID为空", "action", "submit", "resource", "answersheet", "result", "failed")
 		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "受试者ID不能为空")
+	}
+	if dto.OrgID == 0 {
+		l.Warnw("答卷提交失败：组织ID为空", "action", "submit", "resource", "answersheet", "result", "failed")
+		return errors.WithCode(errorCode.ErrAnswerSheetInvalid, "组织ID不能为空")
 	}
 	if len(dto.Answers) == 0 {
 		l.Warnw("答卷提交失败：答案列表为空", "action", "submit", "resource", "answersheet", "result", "failed", "questionnaire_code", dto.QuestionnaireCode)

@@ -94,7 +94,6 @@ func TestTransactionalSubmissionDurableStoreIdempotencyHitDoesNotOpenTransaction
 
 func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testing.T) {
 	sheet := newDurableStoreTestSheet(t)
-	sheet.RaiseSubmittedEvent(1, 2, "task-1")
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{
 		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{"id": "1"})},
@@ -119,7 +118,6 @@ func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testin
 
 func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *testing.T) {
 	sheet := newDurableStoreTestSheet(t)
-	sheet.RaiseSubmittedEvent(1, 2, "task-1")
 	stageErr := errors.New("stage failed")
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{
@@ -142,7 +140,6 @@ func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *te
 
 func TestTransactionalSubmissionDurableStoreFailureCanReturnCompletedIdempotentResult(t *testing.T) {
 	sheet := newDurableStoreTestSheet(t)
-	sheet.RaiseSubmittedEvent(1, 2, "task-1")
 	existing := newDurableStoreTestSheet(t)
 	stageErr := errors.New("stage failed")
 	runner := &durableStoreRunnerStub{}
@@ -170,13 +167,38 @@ func TestTransactionalSubmissionDurableStoreFailureCanReturnCompletedIdempotentR
 
 func newDurableStoreTestSheet(t *testing.T) *domainAnswerSheet.AnswerSheet {
 	t.Helper()
-	sheet := domainAnswerSheet.Reconstruct(
+	sheet, err := domainAnswerSheet.Submit(
 		meta.FromUint64(1),
-		domainAnswerSheet.NewQuestionnaireRef("QNR-1", "1.0.0", "Questionnaire"),
-		actor.NewFillerRef(301, actor.FillerTypeSelf),
+		mustQuestionnaireRefForSubmissionTest(t),
+		mustSubmissionContextForSubmissionTest(t),
 		mustAnswersForSubmissionTest(t),
 		time.Unix(1, 0),
-		0,
 	)
+	if err != nil {
+		t.Fatalf("Submit() error = %v", err)
+	}
 	return sheet
+}
+
+func mustQuestionnaireRefForSubmissionTest(t *testing.T) domainAnswerSheet.QuestionnaireRef {
+	t.Helper()
+	ref, err := domainAnswerSheet.NewQuestionnaireRef("QNR-1", "1.0.0", "Questionnaire")
+	if err != nil {
+		t.Fatalf("NewQuestionnaireRef() error = %v", err)
+	}
+	return ref
+}
+
+func mustSubmissionContextForSubmissionTest(t *testing.T) domainAnswerSheet.SubmissionContext {
+	t.Helper()
+	ctx, err := domainAnswerSheet.NewSubmissionContext(
+		actor.NewFillerRef(301, actor.FillerTypeSelf),
+		actor.NewTesteeRef(meta.FromUint64(401)),
+		meta.FromUint64(501),
+		"task-1",
+	)
+	if err != nil {
+		t.Fatalf("NewSubmissionContext() error = %v", err)
+	}
+	return ctx
 }

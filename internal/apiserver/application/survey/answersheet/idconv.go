@@ -10,6 +10,10 @@ import (
 )
 
 func answerSheetIDFromUint64(field string, value uint64) (meta.ID, error) {
+	return metaIDFromUint64(field, value)
+}
+
+func metaIDFromUint64(field string, value uint64) (meta.ID, error) {
 	id, err := safeconv.Uint64ToMetaID(value)
 	if err != nil {
 		return 0, errors.WithCode(errorCode.ErrAnswerSheetInvalid, "%s exceeds int64", field)

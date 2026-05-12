@@ -10,11 +10,11 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-// DurableSubmitMeta carries submission metadata that must survive durable writes.
+// DurableSubmitMeta carries application-level durable write metadata.
 type DurableSubmitMeta = submitport.DurableSubmitMeta
 
 // SubmissionDurableStore persists answersheets together with inbound idempotency
-// metadata and the answersheet.submitted outbox entry.
+// metadata and staged domain events.
 type SubmissionDurableStore interface {
 	CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error)
 }

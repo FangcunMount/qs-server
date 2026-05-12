@@ -18,6 +18,9 @@ type AnswerSheetPO struct {
 	QuestionnaireTitle   string     `bson:"questionnaire_title" json:"questionnaire_title"`
 	FillerID             int64      `bson:"filler_id" json:"filler_id"`
 	FillerType           string     `bson:"filler_type" json:"filler_type"`
+	TesteeID             uint64     `bson:"testee_id,omitempty" json:"testee_id,omitempty"`
+	OrgID                uint64     `bson:"org_id,omitempty" json:"org_id,omitempty"`
+	TaskID               string     `bson:"task_id,omitempty" json:"task_id,omitempty"`
 	TotalScore           float64    `bson:"total_score" json:"total_score"`
 	FilledAt             time.Time  `bson:"filled_at" json:"filled_at"`
 	Answers              []AnswerPO `bson:"answers" json:"answers"`
@@ -34,9 +37,9 @@ func (p *AnswerSheetPO) BeforeInsert() {
 		p.ID = primitive.NewObjectID()
 	}
 
-	// 生成DomainID
-	domainID := meta.New()
-	p.DomainID = domainID
+	if p.DomainID.IsZero() {
+		p.DomainID = meta.New()
+	}
 
 	p.CreatedAt = time.Now()
 	p.UpdatedAt = time.Now()

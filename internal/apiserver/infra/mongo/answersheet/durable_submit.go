@@ -97,6 +97,13 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	if sheet == nil {
 		return nil, nil
 	}
+	if sheet.ID().IsZero() {
+		return nil, fmt.Errorf("answersheet durable save requires preassigned answer sheet id")
+	}
+	submissionContext := sheet.SubmissionContext()
+	if err := submissionContext.Validate(); err != nil {
+		return nil, fmt.Errorf("answersheet durable save requires complete submission context: %w", err)
+	}
 
 	po := r.mapper.ToPO(sheet)
 	if po == nil {
@@ -105,10 +112,20 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 
 	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
-	sheet.AssignID(meta.ID(po.DomainID))
-	sheet.RaiseSubmittedEvent(metaInfo.TesteeID, metaInfo.OrgID, metaInfo.TaskID)
 
 	answerSheetDoc, err := po.ToBsonM()
+	if err != nil {
+		return nil, err
+	}
+	writerID, err := safeconv.Int64ToUint64(submissionContext.Filler().UserID())
+	if err != nil {
+		return nil, err
+	}
+	testeeID, err := safeconv.MetaIDToUint64(submissionContext.TesteeID())
+	if err != nil {
+		return nil, err
+	}
+	orgID, err := safeconv.MetaIDToUint64(submissionContext.OrgID())
 	if err != nil {
 		return nil, err
 	}
@@ -119,8 +136,8 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 		now := time.Now()
 		idempotencyDoc = &AnswerSheetSubmitIdempotencyPO{
 			IdempotencyKey:       metaInfo.IdempotencyKey,
-			WriterID:             metaInfo.WriterID,
-			TesteeID:             metaInfo.TesteeID,
+			WriterID:             writerID,
+			TesteeID:             testeeID,
 			QuestionnaireCode:    code,
 			QuestionnaireVersion: version,
 			AnswerSheetID:        sheet.ID().Uint64(),
@@ -141,13 +158,13 @@ func (r *Repository) SaveSubmittedAnswerSheet(ctx context.Context, sheet *domain
 	}
 
 	events := append([]event.DomainEvent{}, sheet.Events()...)
-	orgID, err := safeconv.Uint64ToInt64(metaInfo.OrgID)
+	orgIDInt64, err := safeconv.Uint64ToInt64(orgID)
 	if err != nil {
 		return nil, err
 	}
 	events = append(events, domainStatistics.NewFootprintAnswerSheetSubmittedEvent(
-		orgID,
-		metaInfo.TesteeID,
+		orgIDInt64,
+		testeeID,
 		sheet.ID().Uint64(),
 		sheet.FilledAt(),
 	))
