@@ -6,8 +6,8 @@ import (
 )
 
 type Dimension struct {
-	Code            string
-	ScoringStrategy string
+	Code         string
+	StrategyCode string
 }
 
 type StrategyRegistry interface {

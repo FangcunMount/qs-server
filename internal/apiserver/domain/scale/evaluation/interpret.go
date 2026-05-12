@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
-func (_ *Evaluator) interpret(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel scale.RiskLevel) ([]ScaleFactorScore, string, string) {
+func (*Evaluator) interpret(model ScaleEvaluationModel, factorScores []ScaleFactorScore, totalScore float64, riskLevel scale.RiskLevel) ([]ScaleFactorScore, string, string) {
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
 		fs.Conclusion, fs.Suggestion = interpretFactor(model, fs)

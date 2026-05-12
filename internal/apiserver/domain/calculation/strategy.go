@@ -5,7 +5,7 @@ import "context"
 type DefaultStrategyRegistry struct{}
 
 func (DefaultStrategyRegistry) Score(_ context.Context, dimension Dimension, values []float64) (float64, error) {
-	switch dimension.ScoringStrategy {
+	switch dimension.StrategyCode {
 	case "sum":
 		return sumValues(values), nil
 	case "avg":

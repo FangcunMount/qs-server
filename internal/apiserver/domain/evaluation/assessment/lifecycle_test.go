@@ -158,8 +158,7 @@ func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 	modelRef := a.EvaluationModelRef()
 	if modelRef == nil {
 		t.Fatal("expected evaluation model ref")
-	}
-	if modelRef.Kind() != EvaluationModelKindScale || modelRef.Code() != scaleRef.Code() || modelRef.Title() != scaleRef.Name() {
+	} else if modelRef.Kind() != EvaluationModelKindScale || modelRef.Code() != scaleRef.Code() || modelRef.Title() != scaleRef.Name() {
 		t.Fatalf("unexpected model ref: %#v", modelRef)
 	}
 

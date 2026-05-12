@@ -49,8 +49,8 @@ func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.Fa
 		return 0
 	}
 	score, err := e.calculator.ScoreDimension(ctx, calculation.Dimension{
-		Code:            factor.Code.String(),
-		ScoringStrategy: string(factor.ScoringStrategy),
+		Code:         factor.Code.String(),
+		StrategyCode: string(factor.ScoringStrategy),
 	}, values)
 	if e.calculator == nil {
 		score, err = e.scoringRegistry.ScoreFactor(ctx, factor, values)

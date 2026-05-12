@@ -41,8 +41,8 @@ type DefaultScoringStrategyRegistry struct{}
 // ScoreFactor 执行量表因子聚合策略。
 func (DefaultScoringStrategyRegistry) ScoreFactor(_ context.Context, factor scale.FactorSnapshot, values []float64) (float64, error) {
 	score, err := calculation.DefaultStrategyRegistry{}.Score(context.Background(), calculation.Dimension{
-		Code:            factor.Code.String(),
-		ScoringStrategy: string(factor.ScoringStrategy),
+		Code:         factor.Code.String(),
+		StrategyCode: string(factor.ScoringStrategy),
 	}, values)
 	if err != nil {
 		return 0, err
@@ -65,6 +65,6 @@ func (r scaleCalculationRegistry) Score(ctx context.Context, dimension calculati
 	}
 	return r.registry.ScoreFactor(ctx, scale.FactorSnapshot{
 		Code:            scale.NewFactorCode(dimension.Code),
-		ScoringStrategy: scale.ScoringStrategyCode(dimension.ScoringStrategy),
+		ScoringStrategy: scale.ScoringStrategyCode(dimension.StrategyCode),
 	}, values)
 }

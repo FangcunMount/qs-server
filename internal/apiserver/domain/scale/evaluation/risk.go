@@ -5,7 +5,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 )
 
-func (_ *Evaluator) classifyRisk(model ScaleEvaluationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, scale.RiskLevel) {
+func (*Evaluator) classifyRisk(model ScaleEvaluationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, scale.RiskLevel) {
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
 	for _, fs := range factorScores {
 		fs.RiskLevel = calculateFactorRiskLevel(model, fs.FactorCode, fs.RawScore)

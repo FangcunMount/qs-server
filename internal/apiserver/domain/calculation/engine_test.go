@@ -20,8 +20,8 @@ func TestDefaultStrategyRegistryScores(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			got, err := engine.ScoreDimension(context.Background(), Dimension{
-				Code:            "f1",
-				ScoringStrategy: tc.strategy,
+				Code:         "f1",
+				StrategyCode: tc.strategy,
 			}, tc.values)
 			if err != nil {
 				t.Fatalf("ScoreDimension returned error: %v", err)
