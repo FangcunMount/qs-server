@@ -319,10 +319,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 }
 
 func normalizeFactorType(raw string) scale.FactorType {
-	if raw == "" {
-		return scale.FactorTypePrimary
-	}
-	return scale.FactorType(raw)
+	return scale.ParseFactorType(raw)
 }
 
 func normalizeFactorScoringStrategy(raw string) scale.ScoringStrategyCode {

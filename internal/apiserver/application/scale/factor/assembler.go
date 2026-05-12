@@ -22,10 +22,7 @@ func toFactorDomain(
 		strategy = domscale.ScoringStrategyCode(scoringStrategy)
 	}
 
-	fType := domscale.FactorTypePrimary
-	if factorType != "" {
-		fType = domscale.FactorType(factorType)
-	}
+	fType := domscale.ParseFactorType(factorType)
 
 	scoringParamsDomain := scoringParamsFromDTO(scoringParams)
 	factor, err := domscale.NewFactor(

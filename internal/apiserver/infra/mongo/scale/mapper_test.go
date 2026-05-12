@@ -168,7 +168,7 @@ func TestScaleMapperToDomainBackfillsLegacyFactorDefaults(t *testing.T) {
 				IsShow:          true,
 				QuestionCodes:   []string{"Q1", "Q2"},
 				InterpretRules:  nil,
-				FactorType:      "",
+				FactorType:      "first_grade",
 				ScoringStrategy: "",
 			},
 		},

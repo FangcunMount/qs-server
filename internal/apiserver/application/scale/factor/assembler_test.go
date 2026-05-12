@@ -60,3 +60,24 @@ func TestToFactorDomainRejectsCntStrategyWithoutCntOptionContents(t *testing.T) 
 		t.Fatal("toFactorDomain() error = nil, want cnt parameter validation error")
 	}
 }
+
+func TestToFactorDomainAcceptsLegacyFactorType(t *testing.T) {
+	factor, err := toFactorDomain(
+		"F1",
+		"Factor 1",
+		"first_grade",
+		false,
+		true,
+		[]string{"Q1"},
+		domainScale.ScoringStrategySum.String(),
+		nil,
+		nil,
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("toFactorDomain() error = %v", err)
+	}
+	if factor.GetFactorType() != domainScale.FactorTypePrimary {
+		t.Fatalf("factor type = %q, want %q", factor.GetFactorType(), domainScale.FactorTypePrimary)
+	}
+}

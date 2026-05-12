@@ -3,6 +3,7 @@ package scale
 import (
 	"regexp"
 	"slices"
+	"strings"
 )
 
 // ===================== 量表状态 =================
@@ -101,6 +102,18 @@ func (ft FactorType) String() string {
 // IsValid 检查因子类型是否有效
 func (ft FactorType) IsValid() bool {
 	return ft == FactorTypePrimary || ft == FactorTypeMultilevel
+}
+
+// ParseFactorType maps persisted/API factor type aliases to the current domain vocabulary.
+func ParseFactorType(raw string) FactorType {
+	switch strings.TrimSpace(raw) {
+	case "", FactorTypePrimary.String(), "first_grade":
+		return FactorTypePrimary
+	case FactorTypeMultilevel.String(), "second_grade", "multi_level":
+		return FactorTypeMultilevel
+	default:
+		return FactorType(raw)
+	}
 }
 
 // ===================== 计分策略 =================

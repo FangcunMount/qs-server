@@ -71,18 +71,78 @@ func TestCachedScaleRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
 	}
 }
 
-func newScaleCacheTestScale(t *testing.T, code string) *scale.MedicalScale {
+func TestCachedScaleRepositoryReloadsPublishedScaleCacheWithoutFactors(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	source := newScaleCacheTestScaleWithFactor(t, "S-001")
+	baseRepo := &scaleMutationRepo{findByCodeResult: source}
+	cached := NewCachedScaleRepositoryWithBuilderAndPolicy(
+		baseRepo,
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		cachepolicy.CachePolicy{},
+	).(*CachedScaleRepository)
+	stale := newScaleCacheTestScale(t, "S-001", scale.WithStatus(scale.StatusPublished))
+	if err := cached.setCache(context.Background(), "S-001", stale); err != nil {
+		t.Fatalf("set stale cache error = %v", err)
+	}
+
+	got, err := cached.FindByCode(context.Background(), "S-001")
+	if err != nil {
+		t.Fatalf("FindByCode() error = %v", err)
+	}
+	if got.FactorCount() != 1 {
+		t.Fatalf("factor count = %d, want 1", got.FactorCount())
+	}
+	if baseRepo.findByCodeCalls != 1 {
+		t.Fatalf("source loads = %d, want 1", baseRepo.findByCodeCalls)
+	}
+
+	got, err = cached.FindByCode(context.Background(), "S-001")
+	if err != nil {
+		t.Fatalf("FindByCode() second error = %v", err)
+	}
+	if got.FactorCount() != 1 {
+		t.Fatalf("second factor count = %d, want 1", got.FactorCount())
+	}
+	if baseRepo.findByCodeCalls != 1 {
+		t.Fatalf("source loads after refreshed cache = %d, want 1", baseRepo.findByCodeCalls)
+	}
+}
+
+func newScaleCacheTestScale(t *testing.T, code string, opts ...scale.MedicalScaleOption) *scale.MedicalScale {
 	t.Helper()
 
-	domain, err := scale.NewMedicalScale(meta.NewCode(code), "Test Scale")
+	domain, err := scale.NewMedicalScale(meta.NewCode(code), "Test Scale", opts...)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
 	}
 	return domain
 }
 
+func newScaleCacheTestScaleWithFactor(t *testing.T, code string) *scale.MedicalScale {
+	t.Helper()
+
+	factor, err := scale.NewFactor(
+		scale.NewFactorCode("F1"),
+		"Factor 1",
+		scale.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
+	)
+	if err != nil {
+		t.Fatalf("NewFactor() error = %v", err)
+	}
+	return newScaleCacheTestScale(t, code, scale.WithStatus(scale.StatusPublished), scale.WithFactors([]*scale.Factor{factor}))
+}
+
 type scaleMutationRepo struct {
 	scale.Repository
+	findByCodeResult *scale.MedicalScale
+	findByCodeCalls  int
 }
 
 func (r *scaleMutationRepo) Create(context.Context, *scale.MedicalScale) error {
@@ -95,4 +155,9 @@ func (r *scaleMutationRepo) Update(context.Context, *scale.MedicalScale) error {
 
 func (r *scaleMutationRepo) Remove(context.Context, string) error {
 	return nil
+}
+
+func (r *scaleMutationRepo) FindByCode(context.Context, string) (*scale.MedicalScale, error) {
+	r.findByCodeCalls++
+	return r.findByCodeResult, nil
 }

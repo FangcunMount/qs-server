@@ -102,7 +102,7 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 
 // FindByCode 根据编码查询量表（优先从缓存读取）
 func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	return ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
 		PolicyKey:      cachepolicy.PolicyScale,
 		CacheKey:       r.buildCacheKey(code),
 		Policy:         r.policy,
@@ -111,6 +111,10 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 		Load:           func(ctx context.Context) (*scale.MedicalScale, error) { return r.repo.FindByCode(ctx, code) },
 		AsyncSetCached: true,
 	})
+	if err != nil || !isStalePublishedScaleCache(domain) {
+		return domain, err
+	}
+	return r.reloadScaleCacheFromSource(ctx, code)
 }
 
 // FindByQuestionnaireCode 根据问卷编码查询量表
@@ -174,6 +178,38 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 // deleteCache 删除缓存
 func (r *CachedScaleRepository) deleteCache(ctx context.Context, code string) error {
 	return r.store.Delete(ctx, r.buildCacheKey(code))
+}
+
+func isStalePublishedScaleCache(domain *scale.MedicalScale) bool {
+	return domain != nil && domain.IsPublished() && domain.FactorCount() == 0
+}
+
+func (r *CachedScaleRepository) reloadScaleCacheFromSource(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	logger.L(ctx).Warnw("published scale cache has no factors, reloading from source",
+		"code", code,
+	)
+	if r.store.available() {
+		if err := r.deleteCache(ctx, code); err != nil {
+			logger.L(ctx).Warnw("failed to delete stale scale cache",
+				"code", code,
+				"error", err,
+			)
+		}
+	}
+
+	domain, err := r.repo.FindByCode(ctx, code)
+	if err != nil {
+		return nil, err
+	}
+	if r.store.available() && domain != nil {
+		if err := r.setCache(ctx, code, domain); err != nil {
+			logger.L(ctx).Warnw("failed to refresh scale cache from source",
+				"code", code,
+				"error", err,
+			)
+		}
+	}
+	return domain, nil
 }
 
 // WarmupCache 预热缓存（批量加载量表）
