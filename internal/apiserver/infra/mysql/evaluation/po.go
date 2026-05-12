@@ -31,6 +31,12 @@ type AssessmentPO struct {
 	MedicalScaleCode *string `gorm:"column:medical_scale_code;size:100"`
 	MedicalScaleName *string `gorm:"column:medical_scale_name;size:255"`
 
+	// 通用解释模型引用（可选）
+	EvaluationModelKind    *string `gorm:"column:evaluation_model_kind;size:50;index:idx_evaluation_model"`
+	EvaluationModelCode    *string `gorm:"column:evaluation_model_code;size:100;index:idx_evaluation_model"`
+	EvaluationModelVersion *string `gorm:"column:evaluation_model_version;size:50"`
+	EvaluationModelTitle   *string `gorm:"column:evaluation_model_title;size:255"`
+
 	// 答卷引用
 	AnswerSheetID uint64 `gorm:"column:answer_sheet_id;not null;uniqueIndex:uk_answer_sheet_id"`
 

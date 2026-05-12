@@ -20,6 +20,12 @@ var (
 	// ErrNoScale 无量表错误
 	ErrNoScale = errors.New("assessment has no medical scale bound")
 
+	// ErrNoEvaluationModel 无解释模型错误
+	ErrNoEvaluationModel = errors.New("assessment has no evaluation model bound")
+
+	// ErrEvaluationModelMismatch 评估结果与测评解释模型不匹配
+	ErrEvaluationModelMismatch = errors.New("evaluation result model does not match assessment model")
+
 	// ErrNotFound 未找到错误
 	ErrNotFound = errors.New("assessment not found")
 

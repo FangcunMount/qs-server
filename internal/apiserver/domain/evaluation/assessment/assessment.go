@@ -10,9 +10,9 @@ import (
 // Assessment 测评聚合根
 // 代表"一次具体的测评行为"，是 assessment 子域的核心聚合根
 // 核心职责：
-// 1. 记录测评元数据（谁做的、用什么问卷/量表、来源于哪个业务场景）
+// 1. 记录测评元数据（谁做的、用什么问卷/解释模型、来源于哪个业务场景）
 // 2. 管理测评生命周期（创建 → 提交 → 评估 → 完成/失败）
-// 3. 记录评估结果（总分、风险等级）
+// 3. 记录评估结果摘要（总分、风险等级等兼容字段）
 // 4. 发布领域事件（AssessmentSubmittedEvent、AssessmentInterpretedEvent）
 type Assessment struct {
 	// === 核心标识 ===
@@ -23,7 +23,8 @@ type Assessment struct {
 	testeeRef        testee.ID        // 受试者引用
 	questionnaireRef QuestionnaireRef // 问卷引用
 	answerSheetRef   AnswerSheetRef   // 答卷引用
-	medicalScaleRef  *MedicalScaleRef // 量表引用（可选：纯问卷模式为 nil）
+	modelRef         *EvaluationModelRef
+	medicalScaleRef  *MedicalScaleRef // 兼容旧 Scale 查询与事件字段（可选：纯问卷模式为 nil）
 
 	// === 业务来源 ===
 	origin Origin
@@ -32,6 +33,7 @@ type Assessment struct {
 	status     Status
 	totalScore *float64
 	riskLevel  *RiskLevel
+	summary    *ResultSummary
 
 	// === 时间戳 ===
 	submittedAt   *time.Time
@@ -95,7 +97,25 @@ func NewAssessment(
 
 // WithMedicalScale 设置关联的量表
 func WithMedicalScale(scaleRef MedicalScaleRef) AssessmentOption {
-	return func(a *Assessment) { a.medicalScaleRef = &scaleRef }
+	return func(a *Assessment) {
+		a.medicalScaleRef = &scaleRef
+		modelRef := scaleRef.ToEvaluationModelRef()
+		a.modelRef = &modelRef
+	}
+}
+
+// WithEvaluationModel 设置本次测评要使用的解释模型。
+func WithEvaluationModel(modelRef EvaluationModelRef) AssessmentOption {
+	return func(a *Assessment) {
+		if modelRef.IsEmpty() {
+			return
+		}
+		a.modelRef = &modelRef
+		if modelRef.IsScale() && a.medicalScaleRef == nil {
+			scaleRef := NewMedicalScaleRef(modelRef.ID(), modelRef.Code(), modelRef.Title())
+			a.medicalScaleRef = &scaleRef
+		}
+	}
 }
 
 // WithID 设置ID（用于重建）
@@ -169,18 +189,33 @@ func Reconstruct(
 	interpretedAt *time.Time,
 	failedAt *time.Time,
 	failureReason *string,
+	modelRefs ...*EvaluationModelRef,
 ) *Assessment {
+	var modelRef *EvaluationModelRef
+	if len(modelRefs) > 0 {
+		modelRef = modelRefs[0]
+	}
+	if modelRef == nil && medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
+		ref := medicalScaleRef.ToEvaluationModelRef()
+		modelRef = &ref
+	}
+	var summary *ResultSummary
+	if totalScore != nil || riskLevel != nil {
+		summary = summaryFromLegacyResult(totalScore, riskLevel)
+	}
 	return &Assessment{
 		id:               id,
 		orgID:            orgID,
 		testeeRef:        testeeID,
 		questionnaireRef: questionnaireRef,
 		answerSheetRef:   answerSheetRef,
+		modelRef:         modelRef,
 		medicalScaleRef:  medicalScaleRef,
 		origin:           origin,
 		status:           status,
 		totalScore:       totalScore,
 		riskLevel:        riskLevel,
+		summary:          summary,
 		submittedAt:      submittedAt,
 		interpretedAt:    interpretedAt,
 		failedAt:         failedAt,
@@ -210,6 +245,7 @@ func (a *Assessment) Submit() error {
 		a.testeeRef,
 		a.questionnaireRef,
 		a.answerSheetRef,
+		a.modelRef,
 		a.medicalScaleRef,
 		now,
 	))
@@ -218,7 +254,7 @@ func (a *Assessment) Submit() error {
 }
 
 // ApplyEvaluation 应用评估结果
-// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了量表
+// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型
 // 后置条件：状态变为 interpreted，记录评估结果
 //
 // 注意：assessment.interpreted 的可靠出站绑定在报告成功落库的 Mongo 边界，
@@ -227,16 +263,22 @@ func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
 	if !a.status.IsSubmitted() {
 		return NewInvalidStatusError("apply evaluation", a.status)
 	}
-	if !a.HasMedicalScale() {
-		return ErrNoScale
+	if !a.HasEvaluationModel() {
+		return ErrNoEvaluationModel
 	}
 	if result == nil {
 		return ErrInvalidArgument
+	}
+	if result.ModelRef.IsEmpty() {
+		result.WithModelRef(*a.modelRef)
+	} else if !a.modelRef.SameIdentity(result.ModelRef) {
+		return ErrEvaluationModelMismatch
 	}
 
 	now := time.Now()
 	a.totalScore = &result.TotalScore
 	a.riskLevel = &result.RiskLevel
+	a.summary = &result.Summary
 	a.status = StatusInterpreted
 	a.interpretedAt = &now
 
@@ -261,6 +303,7 @@ func (a *Assessment) MarkAsFailed(reason string) error {
 	a.interpretedAt = nil
 	a.totalScore = nil
 	a.riskLevel = nil
+	a.summary = nil
 
 	// 发布领域事件
 	a.addEvent(NewAssessmentFailedEvent(
@@ -295,6 +338,7 @@ func (a *Assessment) RetryFromFailed() error {
 		a.testeeRef,
 		a.questionnaireRef,
 		a.answerSheetRef,
+		a.modelRef,
 		a.medicalScaleRef,
 		now,
 	))
@@ -344,9 +388,19 @@ func (a *Assessment) MedicalScaleRef() *MedicalScaleRef {
 	return a.medicalScaleRef
 }
 
+// EvaluationModelRef 获取解释模型引用。
+func (a *Assessment) EvaluationModelRef() *EvaluationModelRef {
+	return a.modelRef
+}
+
 // HasMedicalScale 是否绑定了量表
 func (a *Assessment) HasMedicalScale() bool {
 	return a.medicalScaleRef != nil && !a.medicalScaleRef.IsEmpty()
+}
+
+// HasEvaluationModel 是否绑定了解释模型。
+func (a *Assessment) HasEvaluationModel() bool {
+	return a.modelRef != nil && !a.modelRef.IsEmpty()
 }
 
 // ==================== 业务来源查询方法 ====================
@@ -381,6 +435,11 @@ func (a *Assessment) TotalScore() *float64 {
 // RiskLevel 获取风险等级
 func (a *Assessment) RiskLevel() *RiskLevel {
 	return a.riskLevel
+}
+
+// ResultSummary 获取通用结果摘要。
+func (a *Assessment) ResultSummary() *ResultSummary {
+	return a.summary
 }
 
 // ==================== 时间戳查询方法 ====================
@@ -434,9 +493,9 @@ func (a *Assessment) IsCompleted() bool {
 	return a.status.IsTerminal()
 }
 
-// NeedsEvaluation 是否需要评估（已提交且绑定了量表）
+// NeedsEvaluation 是否需要评估（已提交且绑定了解释模型）
 func (a *Assessment) NeedsEvaluation() bool {
-	return a.IsSubmitted() && a.HasMedicalScale()
+	return a.IsSubmitted() && a.HasEvaluationModel()
 }
 
 // ==================== 领域事件管理 ====================
@@ -464,4 +523,27 @@ func (a *Assessment) setID(id ID) {
 // SyncIDFromRepository 从仓储层同步ID（供仓储层使用）
 func SyncIDFromRepository(a *Assessment, id uint64) {
 	a.setID(NewID(id))
+}
+
+func summaryFromLegacyResult(totalScore *float64, riskLevel *RiskLevel) *ResultSummary {
+	if totalScore == nil && riskLevel == nil {
+		return nil
+	}
+	var score *float64
+	if totalScore != nil {
+		value := *totalScore
+		score = &value
+	}
+	var level *string
+	primary := ""
+	if riskLevel != nil {
+		value := string(*riskLevel)
+		level = &value
+		primary = value
+	}
+	return &ResultSummary{
+		PrimaryLabel: primary,
+		Score:        score,
+		Level:        level,
+	}
 }

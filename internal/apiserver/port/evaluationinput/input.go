@@ -5,8 +5,31 @@ import (
 	"fmt"
 )
 
+type EvaluationModelKind string
+
+const (
+	EvaluationModelKindScale EvaluationModelKind = "scale"
+	EvaluationModelKindMBTI  EvaluationModelKind = "mbti"
+)
+
+func (k EvaluationModelKind) String() string {
+	return string(k)
+}
+
+type ModelRef struct {
+	Kind    EvaluationModelKind
+	Code    string
+	Version string
+	Title   string
+}
+
+func (r ModelRef) IsEmpty() bool {
+	return r.Kind == "" && r.Code == ""
+}
+
 type InputRef struct {
 	AssessmentID         uint64
+	ModelRef             ModelRef
 	MedicalScaleCode     string
 	AnswerSheetID        uint64
 	QuestionnaireCode    string
@@ -14,9 +37,35 @@ type InputRef struct {
 }
 
 type InputSnapshot struct {
+	Model         *ModelSnapshot
 	MedicalScale  *ScaleSnapshot
 	AnswerSheet   *AnswerSheetSnapshot
 	Questionnaire *QuestionnaireSnapshot
+}
+
+type ModelSnapshot struct {
+	Kind    EvaluationModelKind
+	Code    string
+	Version string
+	Title   string
+	Payload any
+}
+
+func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
+	if scale == nil {
+		return nil
+	}
+	return &ModelSnapshot{
+		Kind:    EvaluationModelKindScale,
+		Code:    scale.Code,
+		Version: scale.QuestionnaireVersion,
+		Title:   scale.Title,
+		Payload: ScaleModelPayload{Scale: scale},
+	}
+}
+
+type ScaleModelPayload struct {
+	Scale *ScaleSnapshot
 }
 
 type ScaleSnapshot struct {
@@ -142,6 +191,8 @@ type FailureKind string
 
 const (
 	FailureKindUnknown                      FailureKind = "unknown"
+	FailureKindModelNotFound                FailureKind = "model_not_found"
+	FailureKindUnsupportedModel             FailureKind = "unsupported_model"
 	FailureKindScaleNotFound                FailureKind = "scale_not_found"
 	FailureKindAnswerSheetNotFound          FailureKind = "answersheet_not_found"
 	FailureKindQuestionnaireNotFound        FailureKind = "questionnaire_not_found"

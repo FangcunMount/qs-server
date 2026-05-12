@@ -209,12 +209,35 @@ func (r *pipelineRunnerStub) Execute(context.Context, *pipeline.Context) error {
 	return nil
 }
 
+type recordingPipelineRunner struct {
+	calls   int
+	evalCtx *pipeline.Context
+}
+
+func (r *recordingPipelineRunner) Execute(_ context.Context, evalCtx *pipeline.Context) error {
+	r.calls++
+	r.evalCtx = evalCtx
+	return nil
+}
+
 type failingInputResolver struct {
 	err error
 }
 
 func (r failingInputResolver) Resolve(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
 	return nil, r.err
+}
+
+type successfulInputResolver struct {
+	snapshot *evaluationinput.InputSnapshot
+	lastRef  evaluationinput.InputRef
+	calls    int
+}
+
+func (r *successfulInputResolver) Resolve(_ context.Context, ref evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
+	r.calls++
+	r.lastRef = ref
+	return r.snapshot, nil
 }
 
 type inputFailure struct {
@@ -247,5 +270,121 @@ func TestNewServiceAcceptsPipelineRunner(t *testing.T) {
 	}
 	if impl.pipelineRunner != runner {
 		t.Fatal("expected pipeline runner to be stored on service")
+	}
+}
+
+func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
+	scaleRef := domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")
+	aRepo := &fakeAssessmentRepo{
+		assessment: domainAssessment.Reconstruct(
+			meta.FromUint64(101),
+			1,
+			testee.NewID(202),
+			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+			domainAssessment.NewAnswerSheetRef(meta.FromUint64(303)),
+			&scaleRef,
+			domainAssessment.NewAdhocOrigin(),
+			domainAssessment.StatusSubmitted,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+		),
+	}
+	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:  evaluationinput.EvaluationModelKindScale,
+			Code:  "S-001",
+			Title: "Scale",
+		},
+		MedicalScale:  &evaluationinput.ScaleSnapshot{Code: "S-001", Title: "Scale"},
+		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 303, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
+	}}
+	runner := &recordingPipelineRunner{}
+	registry, err := NewEvaluatorRegistry(evaluatorStub{
+		kind: domainAssessment.EvaluationModelKindScale,
+		evaluate: func(ctx context.Context, input ExecutionInput) error {
+			return runner.Execute(ctx, pipeline.NewContext(input.Assessment, input.Input))
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
+	}
+	svc := NewService(aRepo, input, runner, WithEvaluatorRegistry(registry))
+
+	if err := svc.Evaluate(context.Background(), 101); err != nil {
+		t.Fatalf("Evaluate returned error: %v", err)
+	}
+	if runner.calls != 1 {
+		t.Fatalf("pipeline runner calls = %d, want 1", runner.calls)
+	}
+	if runner.evalCtx == nil || runner.evalCtx.Model == nil || runner.evalCtx.Model.Kind != evaluationinput.EvaluationModelKindScale {
+		t.Fatalf("unexpected eval context model: %#v", runner.evalCtx)
+	}
+	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
+		t.Fatalf("unexpected input ref: %#v", input.lastRef)
+	}
+}
+
+func TestEvaluateUnknownModelKindMarksAssessmentFailed(t *testing.T) {
+	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	aRepo := &fakeAssessmentRepo{
+		assessment: domainAssessment.Reconstruct(
+			meta.FromUint64(102),
+			1,
+			testee.NewID(202),
+			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-MBTI"), "1.0.0"),
+			domainAssessment.NewAnswerSheetRef(meta.FromUint64(304)),
+			nil,
+			domainAssessment.NewAdhocOrigin(),
+			domainAssessment.StatusSubmitted,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			&modelRef,
+		),
+	}
+	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:    evaluationinput.EvaluationModelKindMBTI,
+			Code:    "MBTI-16P",
+			Version: "1.0.0",
+			Title:   "MBTI",
+		},
+		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 304, QuestionnaireCode: "Q-MBTI", QuestionnaireVersion: "1.0.0"},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-MBTI", Version: "1.0.0"},
+	}}
+	txRunner := &engineRecordingTxRunner{}
+	stager := &engineRecordingEventStager{}
+	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{kind: domainAssessment.EvaluationModelKindScale})
+	if registryErr != nil {
+		t.Fatalf("NewEvaluatorRegistry returned error: %v", registryErr)
+	}
+	svc := NewService(
+		aRepo,
+		input,
+		&recordingPipelineRunner{},
+		WithTransactionalOutbox(txRunner, stager),
+		WithEvaluatorRegistry(registry),
+	)
+
+	err := svc.Evaluate(context.Background(), 102)
+	if err == nil {
+		t.Fatal("Evaluate error = nil, want unsupported model kind")
+	}
+	if !aRepo.assessment.Status().IsFailed() {
+		t.Fatalf("assessment status = %s, want failed", aRepo.assessment.Status())
+	}
+	if aRepo.saveCalls != 1 || !txRunner.called {
+		t.Fatalf("failure finalizer did not persist through transaction: saveCalls=%d tx=%v", aRepo.saveCalls, txRunner.called)
+	}
+	if len(stager.eventTypes) != 1 || stager.eventTypes[0] != domainAssessment.EventTypeFailed {
+		t.Fatalf("staged event types = %#v, want assessment failed", stager.eventTypes)
 	}
 }

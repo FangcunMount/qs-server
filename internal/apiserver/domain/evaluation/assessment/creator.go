@@ -41,6 +41,7 @@ type CreateAssessmentRequest struct {
 	Origin Origin
 
 	// 可选字段
+	ModelRef        *EvaluationModelRef
 	MedicalScaleRef *MedicalScaleRef
 }
 
@@ -64,6 +65,14 @@ func NewCreateAssessmentRequest(
 // WithMedicalScale 设置关联量表
 func (r CreateAssessmentRequest) WithMedicalScale(ref MedicalScaleRef) CreateAssessmentRequest {
 	r.MedicalScaleRef = &ref
+	modelRef := ref.ToEvaluationModelRef()
+	r.ModelRef = &modelRef
+	return r
+}
+
+// WithEvaluationModel 设置解释模型引用。
+func (r CreateAssessmentRequest) WithEvaluationModel(ref EvaluationModelRef) CreateAssessmentRequest {
+	r.ModelRef = &ref
 	return r
 }
 
@@ -174,6 +183,9 @@ func (c *DefaultAssessmentCreator) Create(
 
 	// 3. 创建 pending 测评
 	opts := make([]AssessmentOption, 0)
+	if req.ModelRef != nil {
+		opts = append(opts, WithEvaluationModel(*req.ModelRef))
+	}
 	if req.MedicalScaleRef != nil {
 		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))
 	}
@@ -303,6 +315,9 @@ func (c *SimpleAssessmentCreator) Create(
 ) (*Assessment, error) {
 	// 1. 构造选项
 	opts := make([]AssessmentOption, 0)
+	if req.ModelRef != nil {
+		opts = append(opts, WithEvaluationModel(*req.ModelRef))
+	}
 	if req.MedicalScaleRef != nil {
 		opts = append(opts, WithMedicalScale(*req.MedicalScaleRef))
 	}

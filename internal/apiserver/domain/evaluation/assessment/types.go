@@ -159,6 +159,96 @@ func IsHighRisk(r RiskLevel) bool {
 	return r == RiskLevelHigh || r == RiskLevelSevere
 }
 
+// ==================== 解释模型引用 ====================
+
+// EvaluationModelKind 测评解释模型类型。
+type EvaluationModelKind string
+
+const (
+	// EvaluationModelKindScale 医学/心理量表模型。
+	EvaluationModelKindScale EvaluationModelKind = "scale"
+
+	// EvaluationModelKindMBTI MBTI 人格模型，当前仅预留扩展点。
+	EvaluationModelKindMBTI EvaluationModelKind = "mbti"
+)
+
+func (k EvaluationModelKind) String() string {
+	return string(k)
+}
+
+func (k EvaluationModelKind) IsValid() bool {
+	switch k {
+	case EvaluationModelKindScale, EvaluationModelKindMBTI:
+		return true
+	default:
+		return false
+	}
+}
+
+// EvaluationModelRef 表示本次 Assessment 要使用的解释模型。
+type EvaluationModelRef struct {
+	id      meta.ID
+	kind    EvaluationModelKind
+	code    meta.Code
+	version string
+	title   string
+}
+
+// NewEvaluationModelRef 创建通用解释模型引用。
+func NewEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
+	return EvaluationModelRef{
+		id:      id,
+		kind:    kind,
+		code:    code,
+		version: version,
+		title:   title,
+	}
+}
+
+// NewEvaluationModelRefByCode 创建不带底层模型 ID 的解释模型引用。
+func NewEvaluationModelRefByCode(kind EvaluationModelKind, code meta.Code, version, title string) EvaluationModelRef {
+	return NewEvaluationModelRef(kind, meta.ID(0), code, version, title)
+}
+
+// NewScaleEvaluationModelRef 创建 Scale 解释模型引用。
+func NewScaleEvaluationModelRef(id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
+	return NewEvaluationModelRef(EvaluationModelKindScale, id, code, version, title)
+}
+
+func (r EvaluationModelRef) ID() meta.ID {
+	return r.id
+}
+
+func (r EvaluationModelRef) Kind() EvaluationModelKind {
+	return r.kind
+}
+
+func (r EvaluationModelRef) Code() meta.Code {
+	return r.code
+}
+
+func (r EvaluationModelRef) Version() string {
+	return r.version
+}
+
+func (r EvaluationModelRef) Title() string {
+	return r.title
+}
+
+func (r EvaluationModelRef) IsEmpty() bool {
+	return r.kind == "" && r.code.IsEmpty()
+}
+
+func (r EvaluationModelRef) IsScale() bool {
+	return r.kind == EvaluationModelKindScale
+}
+
+func (r EvaluationModelRef) SameIdentity(other EvaluationModelRef) bool {
+	return r.kind == other.kind &&
+		r.code == other.code &&
+		r.version == other.version
+}
+
 // ==================== 引用值对象 ====================
 
 // QuestionnaireRef 问卷引用值对象
@@ -261,6 +351,11 @@ func (r MedicalScaleRef) IsEmpty() bool {
 	return r.id.IsZero() && r.code.IsEmpty()
 }
 
+// ToEvaluationModelRef 将旧的 MedicalScaleRef 转换为通用解释模型引用。
+func (r MedicalScaleRef) ToEvaluationModelRef() EvaluationModelRef {
+	return NewScaleEvaluationModelRef(r.id, r.code, "", r.name)
+}
+
 // ==================== 业务来源值对象 ====================
 
 // Origin 业务来源值对象
@@ -341,10 +436,33 @@ func (c FactorCode) Equals(other FactorCode) bool {
 
 // ==================== 评估结果值对象 ====================
 
+// ResultSummary 是跨模型通用的结果摘要。
+type ResultSummary struct {
+	PrimaryLabel string
+	Score        *float64
+	Level        *string
+	Tags         []string
+}
+
+// EvaluationDetail 承载具体模型的结构化结果。
+type EvaluationDetail struct {
+	Kind    EvaluationModelKind
+	Payload any
+}
+
 // EvaluationResult 评估结果值对象
-// 包含完整的量表评估结果
+// 包含通用结果摘要和当前兼容保留的量表评估结果字段。
 // 由应用服务层使用 calculation 和 interpretation 功能域组装
 type EvaluationResult struct {
+	// 解释模型引用
+	ModelRef EvaluationModelRef
+
+	// 通用结果摘要
+	Summary ResultSummary
+
+	// 具体模型结果明细
+	Detail EvaluationDetail
+
 	// 总分
 	TotalScore float64
 
@@ -373,13 +491,36 @@ func NewEvaluationResult(
 	if factorScores == nil {
 		factorScores = make([]FactorScoreResult, 0)
 	}
+	level := string(riskLevel)
+	summaryScore := totalScore
 	return &EvaluationResult{
 		TotalScore:   totalScore,
 		RiskLevel:    riskLevel,
 		Conclusion:   conclusion,
 		Suggestion:   suggestion,
 		FactorScores: factorScores,
+		Summary: ResultSummary{
+			PrimaryLabel: level,
+			Score:        &summaryScore,
+			Level:        &level,
+		},
+		Detail: EvaluationDetail{
+			Kind:    EvaluationModelKindScale,
+			Payload: factorScores,
+		},
 	}
+}
+
+// WithModelRef 绑定解释模型引用。
+func (r *EvaluationResult) WithModelRef(modelRef EvaluationModelRef) *EvaluationResult {
+	if r == nil {
+		return nil
+	}
+	r.ModelRef = modelRef
+	if r.Detail.Kind == "" {
+		r.Detail.Kind = modelRef.Kind()
+	}
+	return r
 }
 
 // GetFactorScore 获取指定因子的得分

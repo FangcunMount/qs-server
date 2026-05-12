@@ -125,6 +125,10 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 			return nil
 		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if strings.HasPrefix(rel, "internal/apiserver/application/evaluation/engine/pipeline/") {
+			return nil
+		}
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
 			return err
@@ -133,7 +137,7 @@ func TestEvaluationEngineUsesInputSnapshotPort(t *testing.T) {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			for forbidden, replacement := range forbiddenImports {
 				if strings.HasPrefix(importPath, forbidden) {
-					t.Fatalf("%s imports %s; evaluation engine should consume %s instead of survey/scale aggregates", filepath.ToSlash(mustRel(t, root, path)), importPath, replacement)
+					t.Fatalf("%s imports %s; generic evaluation engine should consume %s instead of survey/scale aggregates", rel, importPath, replacement)
 				}
 			}
 		}

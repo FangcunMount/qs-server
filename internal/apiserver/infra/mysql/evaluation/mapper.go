@@ -43,6 +43,25 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 		po.MedicalScaleCode = &scaleCode
 		po.MedicalScaleName = &scaleName
 	}
+	if modelRef := domain.EvaluationModelRef(); modelRef != nil && !modelRef.IsEmpty() {
+		modelKind := modelRef.Kind().String()
+		modelCode := modelRef.Code().String()
+		modelVersion := modelRef.Version()
+		modelTitle := modelRef.Title()
+		po.EvaluationModelKind = &modelKind
+		po.EvaluationModelCode = &modelCode
+		po.EvaluationModelVersion = &modelVersion
+		po.EvaluationModelTitle = &modelTitle
+
+		if modelRef.IsScale() && po.MedicalScaleCode == nil {
+			scaleID := modelRef.ID().Uint64()
+			scaleCode := modelCode
+			scaleName := modelTitle
+			po.MedicalScaleID = &scaleID
+			po.MedicalScaleCode = &scaleCode
+			po.MedicalScaleName = &scaleName
+		}
+	}
 
 	// 来源ID（可选）
 	if originID := domain.Origin().ID(); originID != nil {
@@ -99,6 +118,29 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		)
 		scaleRef = &ref
 	}
+	var modelRef *assessment.EvaluationModelRef
+	if po.EvaluationModelKind != nil && po.EvaluationModelCode != nil {
+		version := ""
+		if po.EvaluationModelVersion != nil {
+			version = *po.EvaluationModelVersion
+		}
+		title := ""
+		if po.EvaluationModelTitle != nil {
+			title = *po.EvaluationModelTitle
+		}
+		var id meta.ID
+		if po.MedicalScaleID != nil && assessment.EvaluationModelKind(*po.EvaluationModelKind) == assessment.EvaluationModelKindScale {
+			id = mustMetaIDFromUint64("assessment.medical_scale_id", *po.MedicalScaleID)
+		}
+		ref := assessment.NewEvaluationModelRef(
+			assessment.EvaluationModelKind(*po.EvaluationModelKind),
+			id,
+			meta.NewCode(*po.EvaluationModelCode),
+			version,
+			title,
+		)
+		modelRef = &ref
+	}
 
 	// 构建风险等级（可选）
 	var riskLevel *assessment.RiskLevel
@@ -123,6 +165,7 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		po.InterpretedAt,
 		po.FailedAt,
 		po.FailureReason,
+		modelRef,
 	)
 }
 

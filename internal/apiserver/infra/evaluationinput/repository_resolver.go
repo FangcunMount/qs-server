@@ -48,7 +48,13 @@ func NewResolver(
 }
 
 func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	medicalScale, err := r.scaleCatalog.GetScale(ctx, ref.MedicalScaleCode)
+	modelRef := normalizeModelRef(ref)
+	if modelRef.Kind != port.EvaluationModelKindScale {
+		err := fmt.Errorf("unsupported evaluation model kind: %s", modelRef.Kind)
+		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
+	}
+
+	medicalScale, err := r.scaleCatalog.GetScale(ctx, modelRef.Code)
 	if err != nil {
 		return nil, err
 	}
@@ -62,10 +68,21 @@ func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*p
 	}
 
 	return &port.InputSnapshot{
+		Model:         port.NewScaleModelSnapshot(medicalScale),
 		MedicalScale:  medicalScale,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
 	}, nil
+}
+
+func normalizeModelRef(ref port.InputRef) port.ModelRef {
+	if !ref.ModelRef.IsEmpty() {
+		return ref.ModelRef
+	}
+	if ref.MedicalScaleCode != "" {
+		return port.ModelRef{Kind: port.EvaluationModelKindScale, Code: ref.MedicalScaleCode}
+	}
+	return port.ModelRef{}
 }
 
 func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {

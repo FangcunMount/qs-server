@@ -139,7 +139,12 @@ func TestQuestionnaireToSnapshotPreservesOptionScores(t *testing.T) {
 }
 
 func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.T) {
-	scaleSnapshot := &port.ScaleSnapshot{Code: "SDS"}
+	scaleSnapshot := &port.ScaleSnapshot{
+		Code:                 "SDS",
+		Title:                "SDS",
+		QuestionnaireCode:    "Q-SDS",
+		QuestionnaireVersion: "2.0.0",
+	}
 	answerSnapshot := &port.AnswerSheetSnapshot{
 		ID:                   2001,
 		QuestionnaireCode:    "Q-SDS",
@@ -154,7 +159,7 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	)
 
 	snapshot, err := resolver.Resolve(context.Background(), port.InputRef{
-		MedicalScaleCode:     "SDS",
+		ModelRef:             port.ModelRef{Kind: port.EvaluationModelKindScale, Code: "SDS", Version: "2.0.0", Title: "SDS"},
 		AnswerSheetID:        2001,
 		QuestionnaireCode:    "ignored",
 		QuestionnaireVersion: "ignored",
@@ -164,6 +169,19 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	}
 	if snapshot.MedicalScale != scaleSnapshot || snapshot.AnswerSheet != answerSnapshot || snapshot.Questionnaire != questionnaireSnapshot {
 		t.Fatalf("unexpected composed snapshot: %#v", snapshot)
+	}
+	if snapshot.Model == nil {
+		t.Fatal("expected model snapshot")
+	}
+	if snapshot.Model.Kind != port.EvaluationModelKindScale ||
+		snapshot.Model.Code != "SDS" ||
+		snapshot.Model.Version != "2.0.0" ||
+		snapshot.Model.Title != "SDS" {
+		t.Fatalf("unexpected model snapshot: %#v", snapshot.Model)
+	}
+	payload, ok := snapshot.Model.Payload.(port.ScaleModelPayload)
+	if !ok || payload.Scale != scaleSnapshot {
+		t.Fatalf("unexpected scale model payload: %#v", snapshot.Model.Payload)
 	}
 	if qReader.code != "Q-SDS" || qReader.version != "2.0.0" {
 		t.Fatalf("questionnaire reader called with %s/%s, want answer sheet exact version", qReader.code, qReader.version)

@@ -12,6 +12,7 @@ type Context struct {
 	// 输入数据
 	Assessment    *assessment.Assessment
 	Input         *evaluationinput.InputSnapshot
+	Model         *evaluationinput.ModelSnapshot
 	MedicalScale  *evaluationinput.ScaleSnapshot
 	AnswerSheet   *evaluationinput.AnswerSheetSnapshot   // 答卷数据
 	Questionnaire *evaluationinput.QuestionnaireSnapshot // 问卷数据（用于获取选项内容等）
@@ -40,6 +41,7 @@ func NewContext(
 		FactorScores: make([]assessment.FactorScoreResult, 0),
 	}
 	if input != nil {
+		ctx.Model = input.Model
 		ctx.MedicalScale = input.MedicalScale
 		ctx.AnswerSheet = input.AnswerSheet
 		ctx.Questionnaire = input.Questionnaire

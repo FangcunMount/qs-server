@@ -139,3 +139,91 @@ func TestApplyEvaluationDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.
 		t.Fatalf("expected failed event after failover, got %s", a.Events()[0].EventType())
 	}
 }
+
+func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
+	scaleRef := NewMedicalScaleRef(meta.FromUint64(3001), meta.NewCode("s-code"), "scale title")
+	a, err := NewAssessment(
+		1,
+		testee.NewID(1004),
+		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v4"),
+		NewAnswerSheetRef(meta.FromUint64(2004)),
+		NewAdhocOrigin(),
+		WithID(NewID(5003)),
+		WithMedicalScale(scaleRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+
+	modelRef := a.EvaluationModelRef()
+	if modelRef == nil {
+		t.Fatal("expected evaluation model ref")
+	}
+	if modelRef.Kind() != EvaluationModelKindScale || modelRef.Code() != scaleRef.Code() || modelRef.Title() != scaleRef.Name() {
+		t.Fatalf("unexpected model ref: %#v", modelRef)
+	}
+
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	event, ok := a.Events()[0].(AssessmentSubmittedEvent)
+	if !ok {
+		t.Fatalf("event type = %T, want AssessmentSubmittedEvent", a.Events()[0])
+	}
+	data := event.Payload()
+	if data.ModelKind != "scale" || data.ModelCode != "s-code" || data.ScaleCode != "s-code" {
+		t.Fatalf("unexpected submitted event data: %#v", data)
+	}
+}
+
+func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
+	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	a, err := NewAssessment(
+		1,
+		testee.NewID(1005),
+		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v5"),
+		NewAnswerSheetRef(meta.FromUint64(2005)),
+		NewAdhocOrigin(),
+		WithID(NewID(5004)),
+		WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+
+	result := NewEvaluationResult(0, RiskLevelNone, "INTJ", "", nil).
+		WithModelRef(NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI"))
+	if err := a.ApplyEvaluation(result); err != nil {
+		t.Fatalf("ApplyEvaluation returned error: %v", err)
+	}
+	if !a.Status().IsInterpreted() {
+		t.Fatalf("expected interpreted status, got %s", a.Status())
+	}
+}
+
+func TestApplyEvaluationRejectsMismatchedEvaluationModelRef(t *testing.T) {
+	a, err := NewAssessment(
+		1,
+		testee.NewID(1006),
+		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v6"),
+		NewAnswerSheetRef(meta.FromUint64(2006)),
+		NewAdhocOrigin(),
+		WithID(NewID(5005)),
+		WithEvaluationModel(NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+
+	result := NewEvaluationResult(0, RiskLevelNone, "", "", nil).
+		WithModelRef(NewEvaluationModelRefByCode(EvaluationModelKindScale, meta.NewCode("SDS"), "1.0.0", "SDS"))
+	if err := a.ApplyEvaluation(result); err != ErrEvaluationModelMismatch {
+		t.Fatalf("ApplyEvaluation error = %v, want ErrEvaluationModelMismatch", err)
+	}
+}

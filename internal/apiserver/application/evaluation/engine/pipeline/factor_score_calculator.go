@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -34,20 +35,20 @@ func (c ruleEngineFactorScoreCalculator) Calculate(
 	if medicalScale == nil {
 		return nil, 0
 	}
-	factorScores := make([]assessment.FactorScoreResult, 0, len(medicalScale.Factors))
-	for _, factor := range medicalScale.Factors {
-		rawScore := c.calculateFactorRawScore(ctx, factor, sheet, qnr)
-		factorScores = append(factorScores, assessment.NewFactorScoreResult(
-			assessment.NewFactorCode(factor.Code),
-			factor.Title,
-			rawScore,
-			assessment.RiskLevelNone,
-			"",
-			"",
-			factor.IsTotalScore,
-		))
+	evaluator := domainScale.NewEvaluator(scaleFactorScoringRegistry{scorer: c.scorer})
+	factorScores, totalScore := evaluator.CalculateScores(ctx, scaleDomainInputFromSnapshots(medicalScale, sheet, qnr))
+	return assessmentScoresFromScaleDomain(factorScores), totalScore
+}
+
+type scaleFactorScoringRegistry struct {
+	scorer ruleengine.ScaleFactorScorer
+}
+
+func (r scaleFactorScoringRegistry) ScoreFactor(ctx context.Context, factor domainScale.FactorSnapshot, values []float64) (float64, error) {
+	if r.scorer == nil {
+		return 0, nil
 	}
-	return factorScores, calculateTotalScore(factorScores)
+	return r.scorer.ScoreFactor(ctx, string(factor.Code), values, string(factor.ScoringStrategy), nil)
 }
 
 func (c ruleEngineFactorScoreCalculator) calculateFactorRawScore(

@@ -2,6 +2,7 @@ package pipeline
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -22,20 +23,12 @@ func (c scaleRuleRiskClassifier) Classify(
 	medicalScale *evaluationinput.ScaleSnapshot,
 	factorScores []assessment.FactorScoreResult,
 ) ([]assessment.FactorScoreResult, assessment.RiskLevel) {
-	updatedScores := make([]assessment.FactorScoreResult, 0, len(factorScores))
-	for _, fs := range factorScores {
-		riskLevel := c.calculateFactorRiskLevel(medicalScale, fs.FactorCode, fs.RawScore)
-		updatedScores = append(updatedScores, assessment.NewFactorScoreResult(
-			fs.FactorCode,
-			fs.FactorName,
-			fs.RawScore,
-			riskLevel,
-			fs.Conclusion,
-			fs.Suggestion,
-			fs.IsTotalScore,
-		))
-	}
-	return updatedScores, c.calculateOverallRiskLevel(medicalScale, updatedScores)
+	evaluator := domainScale.NewEvaluator(nil)
+	updatedScores, riskLevel := evaluator.ClassifyRisk(
+		scaleDomainModelFromSnapshot(medicalScale),
+		scaleDomainScoresFromAssessment(factorScores),
+	)
+	return assessmentScoresFromScaleDomain(updatedScores), assessment.RiskLevel(riskLevel)
 }
 
 func (c scaleRuleRiskClassifier) calculateFactorRiskLevel(

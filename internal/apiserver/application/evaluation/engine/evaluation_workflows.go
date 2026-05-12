@@ -56,7 +56,7 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 		return nil, evalerrors.AssessmentInvalidStatus("测评状态不正确，无法评估")
 	}
 
-	if a.MedicalScaleRef() == nil {
+	if !a.NeedsEvaluation() {
 		log.Infow("纯问卷模式，跳过评估",
 			"assessment_id", assessmentID,
 			"mode", "questionnaire_only",
@@ -91,7 +91,8 @@ func (w evaluationInputWorkflow) Resolve(ctx context.Context, a *assessment.Asse
 	}
 	snapshot, err := w.resolver.Resolve(ctx, evaluationinput.InputRef{
 		AssessmentID:         assessmentID,
-		MedicalScaleCode:     a.MedicalScaleRef().Code().String(),
+		ModelRef:             modelRefFromAssessment(a),
+		MedicalScaleCode:     legacyScaleCodeFromAssessment(a),
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),
@@ -102,6 +103,26 @@ func (w evaluationInputWorkflow) Resolve(ctx context.Context, a *assessment.Asse
 	return snapshot, nil
 }
 
+func modelRefFromAssessment(a *assessment.Assessment) evaluationinput.ModelRef {
+	if a == nil || a.EvaluationModelRef() == nil {
+		return evaluationinput.ModelRef{}
+	}
+	ref := a.EvaluationModelRef()
+	return evaluationinput.ModelRef{
+		Kind:    evaluationinput.EvaluationModelKind(ref.Kind().String()),
+		Code:    ref.Code().String(),
+		Version: ref.Version(),
+		Title:   ref.Title(),
+	}
+}
+
+func legacyScaleCodeFromAssessment(a *assessment.Assessment) string {
+	if a == nil || a.MedicalScaleRef() == nil {
+		return ""
+	}
+	return a.MedicalScaleRef().Code().String()
+}
+
 func mapInputResolveError(err error) error {
 	var carrier evaluationinput.FailureKindCarrier
 	if !stderrors.As(err, &carrier) {
@@ -109,6 +130,8 @@ func mapInputResolveError(err error) error {
 	}
 
 	switch carrier.FailureKind() {
+	case evaluationinput.FailureKindModelNotFound, evaluationinput.FailureKindUnsupportedModel:
+		return evalerrors.InvalidArgument("解释模型不可用")
 	case evaluationinput.FailureKindScaleNotFound:
 		return evalerrors.MedicalScaleNotFound(err, "量表不存在")
 	case evaluationinput.FailureKindAnswerSheetNotFound:

@@ -28,6 +28,7 @@ type service struct {
 
 	// 处理器链
 	pipelineRunner EvaluationPipelineRunner
+	evaluators     EvaluatorRegistry
 }
 
 type EventStager interface {
@@ -44,6 +45,12 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 	}
 }
 
+func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
+	return func(s *service) {
+		s.evaluators = registry
+	}
+}
+
 // NewService 创建评估引擎服务
 func NewService(
 	assessmentRepo assessment.Repository,
@@ -51,10 +58,12 @@ func NewService(
 	pipelineRunner EvaluationPipelineRunner,
 	opts ...ServiceOption,
 ) Service {
+	registry, _ := NewEvaluatorRegistry()
 	svc := &service{
 		assessmentRepo: assessmentRepo,
 		inputResolver:  inputResolver,
 		pipelineRunner: pipelineRunner,
+		evaluators:     registry,
 	}
 
 	// 应用选项
@@ -97,24 +106,35 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	// 2. 创建评估上下文
-	evalCtx := pipeline.NewContext(a, input)
+	modelKind := resolveEvaluationModelKind(a, input)
 
-	// 3. 执行处理器链
-	l.Infow("开始执行评估处理器链",
+	l.Infow("开始执行评估解释器",
 		"assessment_id", assessmentID,
-		"scale_code", a.MedicalScaleRef().Code().String(),
+		"model_kind", modelKind.String(),
+		"model_code", evaluationModelCode(a, input),
 	)
 
-	if s.pipelineRunner == nil {
-		err := evalerrors.ModuleNotConfigured("evaluation pipeline runner is not configured")
+	if s.evaluators == nil {
+		err := evalerrors.ModuleNotConfigured("evaluation evaluator registry is not configured")
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
-	if err := s.pipelineRunner.Execute(ctx, evalCtx); err != nil {
-		l.Errorw("评估处理器链执行失败",
+	evaluator, err := s.evaluators.Resolve(modelKind)
+	if err != nil {
+		l.Errorw("评估解释器解析失败",
 			"assessment_id", assessmentID,
-			"scale_code", a.MedicalScaleRef().Code().String(),
+			"model_kind", modelKind.String(),
+			"result", "failed",
+			"error", err.Error(),
+		)
+		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
+		return err
+	}
+	if err := evaluator.Evaluate(ctx, ExecutionInput{Assessment: a, Input: input}); err != nil {
+		l.Errorw("评估解释器执行失败",
+			"assessment_id", assessmentID,
+			"model_kind", modelKind.String(),
+			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -128,11 +148,32 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"resource", "assessment",
 		"result", "success",
 		"assessment_id", assessmentID,
-		"scale_code", a.MedicalScaleRef().Code().String(),
+		"model_kind", modelKind.String(),
+		"model_code", evaluationModelCode(a, input),
 		"duration_ms", duration.Milliseconds(),
 	)
 
 	return nil
+}
+
+func resolveEvaluationModelKind(a *assessment.Assessment, input *evaluationinput.InputSnapshot) assessment.EvaluationModelKind {
+	if input != nil && input.Model != nil && input.Model.Kind != "" {
+		return assessment.EvaluationModelKind(input.Model.Kind)
+	}
+	if a != nil && a.EvaluationModelRef() != nil {
+		return a.EvaluationModelRef().Kind()
+	}
+	return ""
+}
+
+func evaluationModelCode(a *assessment.Assessment, input *evaluationinput.InputSnapshot) string {
+	if input != nil && input.Model != nil && input.Model.Code != "" {
+		return input.Model.Code
+	}
+	if a != nil && a.EvaluationModelRef() != nil {
+		return a.EvaluationModelRef().Code().String()
+	}
+	return ""
 }
 
 // EvaluateBatch 批量评估

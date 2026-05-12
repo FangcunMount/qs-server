@@ -30,6 +30,11 @@ func NewDefaultReportBuilder(suggestionGenerator SuggestionGenerator) *DefaultRe
 	}
 }
 
+// NewScaleReportBuilder 构建当前 Scale 模型报告生成器。
+func NewScaleReportBuilder(suggestionGenerator SuggestionGenerator) *DefaultReportBuilder {
+	return NewDefaultReportBuilder(suggestionGenerator)
+}
+
 // Build 构建解读报告
 func (b *DefaultReportBuilder) Build(input GenerateReportInput) (*InterpretReport, error) {
 	if input.AssessmentID.IsZero() {

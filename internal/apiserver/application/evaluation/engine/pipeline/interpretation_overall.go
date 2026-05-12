@@ -112,11 +112,15 @@ func (g *InterpretationGenerator) generateOverallInterpretationDefault(evalCtx *
 
 // buildEvaluationResult 构建评估结果
 func (g *InterpretationGenerator) buildEvaluationResult(evalCtx *Context) *assessment.EvaluationResult {
-	return assessment.NewEvaluationResult(
+	result := assessment.NewEvaluationResult(
 		evalCtx.TotalScore,
 		evalCtx.RiskLevel,
 		evalCtx.Conclusion,
 		evalCtx.Suggestion,
 		evalCtx.FactorScores,
 	)
+	if evalCtx.Assessment != nil && evalCtx.Assessment.EvaluationModelRef() != nil {
+		result.WithModelRef(*evalCtx.Assessment.EvaluationModelRef())
+	}
+	return result
 }

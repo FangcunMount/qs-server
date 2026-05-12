@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/engine/pipeline"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/evaluation"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -187,7 +188,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 	var suggestionGenerator report.SuggestionGenerator
 
 	if normalized.InputResolver != nil {
-		reportBuilder := report.NewDefaultReportBuilder(suggestionGenerator)
+		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
 
 		pipelineRunner := newEvaluationPipelineRunner(evaluationPipelineDeps{
 			AssessmentRepo:  infra.assessmentRepo,
@@ -199,12 +200,14 @@ func (m *EvaluationModule) wireEvaluationEngine(
 			Interpreter:     interpretengineInfra.NewInterpreter(),
 			DefaultProvider: interpretengineInfra.NewDefaultProvider(),
 		})
+		evaluatorRegistry, _ := engine.NewEvaluatorRegistry(scaleEvaluation.NewExecutor(pipelineRunner, nil))
 
 		m.EvaluationService = engine.NewService(
 			infra.assessmentRepo,
 			normalized.InputResolver,
 			pipelineRunner,
 			engine.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
+			engine.WithEvaluatorRegistry(evaluatorRegistry),
 		)
 	}
 }

@@ -42,24 +42,28 @@ type AssessmentFilter struct {
 }
 
 type AssessmentRow struct {
-	ID                   uint64
-	OrgID                int64
-	TesteeID             uint64
-	QuestionnaireCode    string
-	QuestionnaireVersion string
-	AnswerSheetID        uint64
-	MedicalScaleID       *uint64
-	MedicalScaleCode     *string
-	MedicalScaleName     *string
-	OriginType           string
-	OriginID             *string
-	Status               string
-	TotalScore           *float64
-	RiskLevel            *string
-	SubmittedAt          *time.Time
-	InterpretedAt        *time.Time
-	FailedAt             *time.Time
-	FailureReason        *string
+	ID                     uint64
+	OrgID                  int64
+	TesteeID               uint64
+	QuestionnaireCode      string
+	QuestionnaireVersion   string
+	AnswerSheetID          uint64
+	MedicalScaleID         *uint64
+	MedicalScaleCode       *string
+	MedicalScaleName       *string
+	EvaluationModelKind    *string
+	EvaluationModelCode    *string
+	EvaluationModelVersion *string
+	EvaluationModelTitle   *string
+	OriginType             string
+	OriginID               *string
+	Status                 string
+	TotalScore             *float64
+	RiskLevel              *string
+	SubmittedAt            *time.Time
+	InterpretedAt          *time.Time
+	FailedAt               *time.Time
+	FailureReason          *string
 }
 
 type LatestRiskFilter struct {

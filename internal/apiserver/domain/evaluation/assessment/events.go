@@ -37,14 +37,17 @@ type AssessmentSubmittedData struct {
 	QuestionnaireCode string    `json:"questionnaire_code"`
 	QuestionnaireVer  string    `json:"questionnaire_version"`
 	AnswerSheetID     string    `json:"answersheet_id"`
+	ModelKind         string    `json:"model_kind,omitempty"`
+	ModelCode         string    `json:"model_code,omitempty"`
+	ModelVersion      string    `json:"model_version,omitempty"`
 	ScaleCode         string    `json:"scale_code,omitempty"`
 	ScaleVersion      string    `json:"scale_version,omitempty"`
 	SubmittedAt       time.Time `json:"submitted_at"`
 }
 
-// NeedsEvaluation 是否需要评估（有量表才需要）
+// NeedsEvaluation 是否需要评估（有解释模型才需要，兼容旧 scale_code 事件）
 func (d AssessmentSubmittedData) NeedsEvaluation() bool {
-	return d.ScaleCode != ""
+	return d.ModelCode != "" || d.ScaleCode != ""
 }
 
 // AssessmentInterpretedData 测评已解读事件数据
@@ -52,6 +55,9 @@ type AssessmentInterpretedData struct {
 	OrgID         int64     `json:"org_id"`
 	AssessmentID  int64     `json:"assessment_id"`
 	TesteeID      uint64    `json:"testee_id"`
+	ModelKind     string    `json:"model_kind,omitempty"`
+	ModelCode     string    `json:"model_code,omitempty"`
+	ModelVersion  string    `json:"model_version,omitempty"`
 	ScaleCode     string    `json:"scale_code"`
 	ScaleVersion  string    `json:"scale_version"`
 	TotalScore    float64   `json:"total_score"`
@@ -93,6 +99,7 @@ func NewAssessmentSubmittedEvent(
 	testeeID testee.ID,
 	questionnaireRef QuestionnaireRef,
 	answerSheetRef AnswerSheetRef,
+	modelRef *EvaluationModelRef,
 	medicalScaleRef *MedicalScaleRef,
 	submittedAt time.Time,
 ) AssessmentSubmittedEvent {
@@ -105,9 +112,19 @@ func NewAssessmentSubmittedEvent(
 		AnswerSheetID:     strconv.FormatInt(int64(answerSheetRef.ID()), 10),
 		SubmittedAt:       submittedAt,
 	}
+	if modelRef != nil && !modelRef.IsEmpty() {
+		data.ModelKind = modelRef.Kind().String()
+		data.ModelCode = modelRef.Code().String()
+		data.ModelVersion = modelRef.Version()
+	}
 	if medicalScaleRef != nil && !medicalScaleRef.IsEmpty() {
 		data.ScaleCode = string(medicalScaleRef.Code())
 		data.ScaleVersion = medicalScaleRef.Name()
+		if data.ModelKind == "" {
+			data.ModelKind = EvaluationModelKindScale.String()
+			data.ModelCode = data.ScaleCode
+			data.ModelVersion = data.ScaleVersion
+		}
 	}
 
 	return event.New(EventTypeSubmitted, AggregateType, strconv.FormatInt(int64(assessmentID), 10), data)
@@ -118,6 +135,7 @@ func NewAssessmentInterpretedEvent(
 	orgID int64,
 	assessmentID ID,
 	testeeID testee.ID,
+	modelRef EvaluationModelRef,
 	medicalScaleRef MedicalScaleRef,
 	totalScore float64,
 	riskLevel RiskLevel,
@@ -128,6 +146,9 @@ func NewAssessmentInterpretedEvent(
 			OrgID:         orgID,
 			AssessmentID:  int64(assessmentID),
 			TesteeID:      testeeID.Uint64(),
+			ModelKind:     modelRef.Kind().String(),
+			ModelCode:     modelRef.Code().String(),
+			ModelVersion:  modelRef.Version(),
 			ScaleCode:     string(medicalScaleRef.Code()),
 			ScaleVersion:  medicalScaleRef.Name(),
 			TotalScore:    totalScore,

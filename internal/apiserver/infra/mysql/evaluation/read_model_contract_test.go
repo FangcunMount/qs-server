@@ -17,6 +17,8 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 	scaleID := uint64(3001)
 	scaleCode := "SDS"
 	scaleName := "抑郁自评"
+	modelKind := "scale"
+	modelVersion := "1.0.0"
 	originID := "plan-1"
 	total := 88.5
 	risk := "high"
@@ -24,24 +26,28 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 	failure := "engine failed"
 
 	row := assessmentPOToReadRow(&AssessmentPO{
-		AuditFields:          mysql.AuditFields{ID: meta.FromUint64(101)},
-		OrgID:                1,
-		TesteeID:             2001,
-		QuestionnaireCode:    "Q-SDS",
-		QuestionnaireVersion: "1.0.0",
-		MedicalScaleID:       &scaleID,
-		MedicalScaleCode:     &scaleCode,
-		MedicalScaleName:     &scaleName,
-		AnswerSheetID:        5001,
-		OriginType:           "plan",
-		OriginID:             &originID,
-		Status:               "interpreted",
-		TotalScore:           &total,
-		RiskLevel:            &risk,
-		SubmittedAt:          &now,
-		InterpretedAt:        &now,
-		FailedAt:             &now,
-		FailureReason:        &failure,
+		AuditFields:            mysql.AuditFields{ID: meta.FromUint64(101)},
+		OrgID:                  1,
+		TesteeID:               2001,
+		QuestionnaireCode:      "Q-SDS",
+		QuestionnaireVersion:   "1.0.0",
+		MedicalScaleID:         &scaleID,
+		MedicalScaleCode:       &scaleCode,
+		MedicalScaleName:       &scaleName,
+		EvaluationModelKind:    &modelKind,
+		EvaluationModelCode:    &scaleCode,
+		EvaluationModelVersion: &modelVersion,
+		EvaluationModelTitle:   &scaleName,
+		AnswerSheetID:          5001,
+		OriginType:             "plan",
+		OriginID:               &originID,
+		Status:                 "interpreted",
+		TotalScore:             &total,
+		RiskLevel:              &risk,
+		SubmittedAt:            &now,
+		InterpretedAt:          &now,
+		FailedAt:               &now,
+		FailureReason:          &failure,
 	})
 
 	if row.ID != 101 || row.OrgID != 1 || row.TesteeID != 2001 || row.AnswerSheetID != 5001 {
@@ -52,6 +58,12 @@ func TestAssessmentPOToReadRowMapsAllReadModelFields(t *testing.T) {
 	}
 	if row.MedicalScaleID == nil || *row.MedicalScaleID != scaleID || row.MedicalScaleCode == nil || *row.MedicalScaleCode != scaleCode {
 		t.Fatalf("unexpected scale fields: %#v", row)
+	}
+	if row.EvaluationModelKind == nil || *row.EvaluationModelKind != modelKind ||
+		row.EvaluationModelCode == nil || *row.EvaluationModelCode != scaleCode ||
+		row.EvaluationModelVersion == nil || *row.EvaluationModelVersion != modelVersion ||
+		row.EvaluationModelTitle == nil || *row.EvaluationModelTitle != scaleName {
+		t.Fatalf("unexpected evaluation model fields: %#v", row)
 	}
 	if row.OriginID == nil || *row.OriginID != originID || row.TotalScore == nil || *row.TotalScore != total || row.RiskLevel == nil || *row.RiskLevel != risk {
 		t.Fatalf("unexpected optional fields: %#v", row)

@@ -26,6 +26,11 @@ func (defaultInterpretationEventAssembler) BuildSuccessEvents(evalCtx *Context, 
 	if assessmentRef == nil {
 		return nil
 	}
+	modelRef := evalCtx.Assessment.EvaluationModelRef()
+	if modelRef == nil {
+		ref := assessmentRef.ToEvaluationModelRef()
+		modelRef = &ref
+	}
 
 	scaleVersion := ""
 	if evalCtx.MedicalScale != nil {
@@ -49,6 +54,7 @@ func (defaultInterpretationEventAssembler) BuildSuccessEvents(evalCtx *Context, 
 			evalCtx.Assessment.OrgID(),
 			evalCtx.Assessment.ID(),
 			evalCtx.Assessment.TesteeID(),
+			*modelRef,
 			scaleRef,
 			evalCtx.EvaluationResult.TotalScore,
 			evalCtx.EvaluationResult.RiskLevel,
