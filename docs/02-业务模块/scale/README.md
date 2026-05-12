@@ -12,6 +12,7 @@
 | 核心聚合 | `MedicalScale` 是聚合根，`Factor` 是量表内计分维度，`InterpretationRule` 是分数区间到风险/结论/建议的规则值对象 |
 | 主链关系 | Survey 产生答卷事实，Scale 提供规则，Evaluation 在 pipeline 中组合二者产出测评结果 |
 | 规则边界 | Scale 定义“怎么算、怎么解释”，但不保存某次测评结果，不推进 Assessment 状态，不生成 Report |
+| 发布冻结 | `published` 后规则字段冻结；展示字段可改；规则修改需要先下架回到 `draft` |
 | 事件边界 | `scale.changed` 是规则变更通知，不是历史测评自动重算命令 |
 | 缓存边界 | Scale 列表缓存只优化读，不是规则权威源 |
 | 推荐读法 | 先读整体模型，再读因子计分、风险文案、Evaluation 衔接，最后读新增规则 SOP |
@@ -213,6 +214,8 @@ flowchart LR
 4. InterpretationRule 定义因子分如何解释。
 5. Evaluation 消费这些规则并保存本次结果。
 
+发布后的 Scale 是 Evaluation 可消费的规则事实。此时 `factors`、`interpretRules`、`questionnaireCode/questionnaireVersion` 不再允许直接修改；标题、描述、分类、阶段、适用年龄、填报人、标签这类展示字段仍可维护。若要修改规则，应先下架回到 `draft`，或后续通过版本化能力生成新规则版本。
+
 ---
 
 ## 6. 与其它模块的协作
@@ -368,6 +371,10 @@ Statistics projector
 ### 10.5 “ScaleListCache 可以作为 Evaluation 的规则输入”
 
 不建议。列表缓存是读优化，不是规则权威输入。Evaluation 应使用 repository / snapshot 解析出的规则。
+
+### 10.6 “MBTI / Personality 分类意味着规则也属于 Scale”
+
+不准确。当前分类可以作为运营展示标签存在，但不代表 MBTI、Big Five、DISC 等规则模型要进入 `domain/scale`。新增非医学量表模型前，应先设计 EvaluationModelRef 或同级规则域，避免把 Scale 扩成所有测评规则的大集合。
 
 ---
 

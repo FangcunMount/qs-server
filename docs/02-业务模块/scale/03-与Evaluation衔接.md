@@ -324,6 +324,12 @@ ScaleSnapshot.questionnaireCode/version
 
 如果 Scale 绑定的是 A 版本问卷，而 AnswerSheet 来自 B 版本问卷，后续因子计分可能缺题、错题或错选项。
 
+因此 Scale 的发布状态要保持规则稳定：
+
+- `draft` Scale 可以在问卷发布后同步最新 questionnaireVersion。
+- `published` Scale 不自动同步 questionnaireVersion，避免已经对外可用的规则事实漂移。
+- 如果需要让 published Scale 使用新问卷版本，应先下架回到 `draft`，完成规则校验后重新发布；中长期再通过 ScaleVersion / RuleSnapshot 解决多版本并存。
+
 ---
 
 ## 9. Scale 与 Report 的衔接

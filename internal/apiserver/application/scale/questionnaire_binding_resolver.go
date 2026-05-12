@@ -63,9 +63,6 @@ func (r questionnaireBindingResolver) ensureQuestionnaireVersion(ctx context.Con
 	if err := r.baseInfo.UpdateQuestionnaire(m, m.GetQuestionnaireCode(), latestVersion); err != nil {
 		return errors.WrapC(err, errorCode.ErrInvalidArgument, "更新问卷版本失败")
 	}
-	if err := r.repo.Update(ctx, m); err != nil {
-		return errors.WrapC(err, errorCode.ErrDatabase, "保存问卷版本失败")
-	}
 	return nil
 }
 

@@ -94,6 +94,30 @@ func ValidateFactor(f *Factor) []ValidationError {
 			Message: "因子标题不能为空",
 		})
 	}
+	if !f.GetFactorType().IsValid() {
+		errs = append(errs, ValidationError{
+			Field:   fmt.Sprintf("factor[%s].factorType", factorCode),
+			Message: "因子类型无效",
+		})
+	}
+	if !f.GetScoringStrategy().IsValid() {
+		errs = append(errs, ValidationError{
+			Field:   fmt.Sprintf("factor[%s].scoringStrategy", factorCode),
+			Message: "计分策略无效",
+		})
+	}
+	if err := f.GetScoringSpec().Validate(); err != nil {
+		errs = append(errs, ValidationError{
+			Field:   fmt.Sprintf("factor[%s].scoringSpec", factorCode),
+			Message: err.Error(),
+		})
+	}
+	if err := validateFactorQuestionCodes(f.IsTotalScore(), f.GetQuestionCodes()); err != nil {
+		errs = append(errs, ValidationError{
+			Field:   fmt.Sprintf("factor[%s].questionCodes", factorCode),
+			Message: err.Error(),
+		})
+	}
 
 	// 因子必须包含题目（除非是总分因子，总分因子可以不直接包含题目）
 	if !f.IsTotalScore() && f.QuestionCount() == 0 {
@@ -112,7 +136,8 @@ func ValidateFactor(f *Factor) []ValidationError {
 	}
 
 	// 验证解读规则的有效性
-	for i, rule := range f.GetInterpretRules() {
+	rules := f.GetInterpretRules()
+	for i, rule := range rules {
 		if !rule.IsValid() {
 			// 获取更详细的错误信息
 			scoreRange := rule.GetScoreRange()
@@ -133,6 +158,12 @@ func ValidateFactor(f *Factor) []ValidationError {
 				Message: message,
 			})
 		}
+	}
+	if _, err := NewInterpretationRules(rules); err != nil {
+		errs = append(errs, ValidationError{
+			Field:   fmt.Sprintf("factor[%s].interpretRules", factorCode),
+			Message: err.Error(),
+		})
 	}
 
 	return errs

@@ -21,7 +21,11 @@ func (BaseInfo) UpdateTitle(m *MedicalScale, newTitle string) error {
 		return newError(ErrorKindInvalidArgument, "标题长度不能超过 100 字符")
 	}
 
-	return m.updateBasicInfo(newTitle, m.description)
+	if err := m.updateBasicInfo(newTitle, m.description); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // UpdateDescription 更新量表描述
@@ -30,7 +34,11 @@ func (BaseInfo) UpdateDescription(m *MedicalScale, newDescription string) error 
 		return newError(ErrorKindInvalidArgument, "描述长度不能超过 500 字符")
 	}
 
-	return m.updateBasicInfo(m.title, newDescription)
+	if err := m.updateBasicInfo(m.title, newDescription); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // UpdateAll 批量更新基础信息
@@ -46,7 +54,11 @@ func (BaseInfo) UpdateAll(m *MedicalScale, title, description string) error {
 		return newError(ErrorKindInvalidArgument, "描述长度不能超过 500 字符")
 	}
 
-	return m.updateBasicInfo(title, description)
+	if err := m.updateBasicInfo(title, description); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // UpdateClassificationInfo 更新分类信息
@@ -87,7 +99,11 @@ func (BaseInfo) UpdateClassificationInfo(m *MedicalScale, category Category, sta
 		}
 	}
 
-	return m.updateClassificationInfo(category, stages, applicableAges, reporters, tags)
+	if err := m.updateClassificationInfo(category, stages, applicableAges, reporters, tags); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // UpdateAllWithClassification 批量更新基础信息和分类信息
@@ -143,7 +159,11 @@ func (BaseInfo) UpdateAllWithClassification(m *MedicalScale, title, description 
 		return err
 	}
 
-	return m.updateClassificationInfo(category, stages, applicableAges, reporters, tags)
+	if err := m.updateClassificationInfo(category, stages, applicableAges, reporters, tags); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // UpdateQuestionnaire 更新关联的问卷
@@ -153,5 +173,9 @@ func (BaseInfo) UpdateQuestionnaire(m *MedicalScale, questionnaireCode meta.Code
 		return newError(ErrorKindInvalidArgument, "问卷编码不能为空")
 	}
 
-	return m.updateQuestionnaire(questionnaireCode, questionnaireVersion)
+	if err := m.updateQuestionnaire(questionnaireCode, questionnaireVersion); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }

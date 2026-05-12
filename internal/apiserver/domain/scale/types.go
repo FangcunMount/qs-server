@@ -2,6 +2,7 @@ package scale
 
 import (
 	"regexp"
+	"slices"
 )
 
 // ===================== 量表状态 =================
@@ -237,7 +238,7 @@ func (p *ScoringParams) WithCntOptionContents(contents []string) *ScoringParams 
 	if contents == nil {
 		p.CntOptionContents = make([]string, 0)
 	} else {
-		p.CntOptionContents = contents
+		p.CntOptionContents = slices.Clone(contents)
 	}
 	return p
 }
@@ -247,7 +248,15 @@ func (p *ScoringParams) GetCntOptionContents() []string {
 	if p == nil {
 		return nil
 	}
-	return p.CntOptionContents
+	return slices.Clone(p.CntOptionContents)
+}
+
+// Clone 返回计分参数副本。
+func (p *ScoringParams) Clone() *ScoringParams {
+	if p == nil {
+		return nil
+	}
+	return NewScoringParams().WithCntOptionContents(p.CntOptionContents)
 }
 
 // ===================== 量表类别（主类）=================

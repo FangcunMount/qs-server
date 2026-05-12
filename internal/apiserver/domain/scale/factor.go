@@ -1,6 +1,8 @@
 package scale
 
 import (
+	"slices"
+
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -22,14 +24,26 @@ type Factor struct {
 	questionCodes []meta.Code
 
 	// 计分策略配置
-	scoringStrategy ScoringStrategyCode
-	scoringParams   *ScoringParams
-
-	// 最大分
-	maxScore *float64
+	scoringSpec ScoringSpec
 
 	// 解读规则
-	interpretRules []InterpretationRule
+	interpretRules InterpretationRules
+
+	optionErr error
+}
+
+// FactorSnapshot 是 Factor 的只读快照，供查询/跨层转换使用。
+type FactorSnapshot struct {
+	Code            FactorCode
+	Title           string
+	FactorType      FactorType
+	IsTotalScore    bool
+	IsShow          bool
+	QuestionCodes   []meta.Code
+	ScoringStrategy ScoringStrategyCode
+	ScoringParams   *ScoringParams
+	MaxScore        *float64
+	InterpretRules  []InterpretationRule
 }
 
 // ===================== Factor 构造相关 =================
@@ -47,16 +61,22 @@ func NewFactor(factorCode FactorCode, title string, opts ...FactorOption) (*Fact
 	}
 
 	f := &Factor{
-		code:            factorCode,
-		title:           title,
-		factorType:      FactorTypePrimary,
-		scoringStrategy: ScoringStrategySum,
-		scoringParams:   NewScoringParams(),
-		isShow:          true, // 默认显示
+		code:           factorCode,
+		title:          title,
+		factorType:     FactorTypePrimary,
+		scoringSpec:    defaultScoringSpec(),
+		interpretRules: MustInterpretationRules(nil),
+		isShow:         true, // 默认显示
 	}
 
 	for _, opt := range opts {
 		opt(f)
+	}
+	if f.optionErr != nil {
+		return nil, f.optionErr
+	}
+	if err := f.validate(); err != nil {
+		return nil, err
 	}
 
 	return f, nil
@@ -88,39 +108,46 @@ func WithIsShow(isShow bool) FactorOption {
 // WithQuestionCodes 设置关联的题目编码
 func WithQuestionCodes(codes []meta.Code) FactorOption {
 	return func(f *Factor) {
-		f.questionCodes = codes
+		f.questionCodes = slices.Clone(codes)
 	}
 }
 
 // WithScoringStrategy 设置计分策略
 func WithScoringStrategy(strategy ScoringStrategyCode) FactorOption {
 	return func(f *Factor) {
-		f.scoringStrategy = strategy
+		f.scoringSpec = f.scoringSpec.withStrategy(strategy)
 	}
 }
 
 // WithScoringParams 设置计分参数
 func WithScoringParams(params *ScoringParams) FactorOption {
 	return func(f *Factor) {
-		if params == nil {
-			f.scoringParams = NewScoringParams()
-		} else {
-			f.scoringParams = params
-		}
+		f.scoringSpec = f.scoringSpec.withParams(params)
 	}
 }
 
 // WithInterpretRules 设置解读规则
 func WithInterpretRules(rules []InterpretationRule) FactorOption {
 	return func(f *Factor) {
-		f.interpretRules = rules
+		interpretRules, err := NewInterpretationRules(rules)
+		if err != nil {
+			f.optionErr = err
+			return
+		}
+		f.interpretRules = interpretRules
 	}
 }
 
 // WithMaxScore 设置最大分
 func WithMaxScore(maxScore *float64) FactorOption {
 	return func(f *Factor) {
-		f.maxScore = maxScore
+		f.scoringSpec = f.scoringSpec.withMaxScore(maxScore)
+	}
+}
+
+func WithScoringSpec(spec ScoringSpec) FactorOption {
+	return func(f *Factor) {
+		f.scoringSpec = spec
 	}
 }
 
@@ -153,30 +180,46 @@ func (f *Factor) IsShow() bool {
 
 // GetQuestionCodes 获取关联的题目编码
 func (f *Factor) GetQuestionCodes() []meta.Code {
-	return f.questionCodes
+	return slices.Clone(f.questionCodes)
 }
 
 // GetScoringStrategy 获取计分策略
 func (f *Factor) GetScoringStrategy() ScoringStrategyCode {
-	return f.scoringStrategy
+	return f.scoringSpec.Strategy()
 }
 
 // GetScoringParams 获取计分参数
 func (f *Factor) GetScoringParams() *ScoringParams {
-	if f.scoringParams == nil {
-		return NewScoringParams()
-	}
-	return f.scoringParams
+	return f.scoringSpec.Params()
 }
 
 // GetInterpretRules 获取解读规则
 func (f *Factor) GetInterpretRules() []InterpretationRule {
-	return f.interpretRules
+	return f.interpretRules.Items()
 }
 
 // GetMaxScore 获取最大分
 func (f *Factor) GetMaxScore() *float64 {
-	return f.maxScore
+	return f.scoringSpec.MaxScore()
+}
+
+func (f *Factor) GetScoringSpec() ScoringSpec {
+	return f.scoringSpec
+}
+
+func (f *Factor) Snapshot() FactorSnapshot {
+	return FactorSnapshot{
+		Code:            f.code,
+		Title:           f.title,
+		FactorType:      f.factorType,
+		IsTotalScore:    f.isTotalScore,
+		IsShow:          f.isShow,
+		QuestionCodes:   f.GetQuestionCodes(),
+		ScoringStrategy: f.GetScoringStrategy(),
+		ScoringParams:   f.GetScoringParams(),
+		MaxScore:        f.GetMaxScore(),
+		InterpretRules:  f.GetInterpretRules(),
+	}
 }
 
 // ===================== 业务方法 =================
@@ -198,22 +241,62 @@ func (f *Factor) ContainsQuestion(questionCode meta.Code) bool {
 
 // FindInterpretRule 根据分数查找匹配的解读规则
 func (f *Factor) FindInterpretRule(score float64) *InterpretationRule {
-	for _, rule := range f.interpretRules {
-		if rule.Matches(score) {
-			return &rule
-		}
+	rule, ok := f.interpretRules.Match(score)
+	if !ok {
+		return nil
 	}
-	return nil
+	return &rule
 }
 
 // ===================== 包内私有方法（供领域服务调用）=================
 
 // updateInterpretRules 更新解读规则
-func (f *Factor) updateInterpretRules(rules []InterpretationRule) {
-	f.interpretRules = rules
+func (f *Factor) updateInterpretRules(rules []InterpretationRule) error {
+	interpretRules, err := NewInterpretationRules(rules)
+	if err != nil {
+		return err
+	}
+	f.interpretRules = interpretRules
+	return nil
 }
 
 // addInterpretRule 添加解读规则
-func (f *Factor) addInterpretRule(rule InterpretationRule) {
-	f.interpretRules = append(f.interpretRules, rule)
+func (f *Factor) addInterpretRule(rule InterpretationRule) error {
+	interpretRules, err := f.interpretRules.WithAppended(rule)
+	if err != nil {
+		return err
+	}
+	f.interpretRules = interpretRules
+	return nil
+}
+
+func (f *Factor) validate() error {
+	if !f.factorType.IsValid() {
+		return newError(ErrorKindInvalidArgument, "invalid factor type: %s", f.factorType)
+	}
+	if err := f.scoringSpec.Validate(); err != nil {
+		return err
+	}
+	if err := validateFactorQuestionCodes(f.isTotalScore, f.questionCodes); err != nil {
+		return err
+	}
+	return nil
+}
+
+func validateFactorQuestionCodes(isTotalScore bool, codes []meta.Code) error {
+	if !isTotalScore && len(codes) == 0 {
+		return newError(ErrorKindInvalidArgument, "non-total-score factor requires question codes")
+	}
+	seen := make(map[string]struct{}, len(codes))
+	for _, code := range codes {
+		if code.IsEmpty() {
+			return newError(ErrorKindInvalidArgument, "question code cannot be empty")
+		}
+		value := code.Value()
+		if _, ok := seen[value]; ok {
+			return newError(ErrorKindInvalidArgument, "duplicate question code: %s", value)
+		}
+		seen[value] = struct{}{}
+	}
+	return nil
 }

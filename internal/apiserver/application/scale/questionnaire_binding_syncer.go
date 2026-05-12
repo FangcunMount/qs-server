@@ -41,6 +41,9 @@ func syncQuestionnaireVersion(ctx context.Context, repo domainScale.Repository, 
 	if item == nil || item.GetQuestionnaireVersion() == version {
 		return nil
 	}
+	if !item.IsDraft() {
+		return nil
+	}
 
 	baseInfo := domainScale.BaseInfo{}
 	if err := baseInfo.UpdateQuestionnaire(item, item.GetQuestionnaireCode(), version); err != nil {

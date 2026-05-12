@@ -2,7 +2,6 @@ package scale
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -235,6 +234,9 @@ func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string)
 	if m.IsArchived() {
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
 	}
+	if m.IsPublished() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "已发布量表的规则已冻结，不能编辑")
+	}
 	return m, nil
 }
 
@@ -243,7 +245,7 @@ func (s *factorService) persistFactorMutation(ctx context.Context, m *scale.Medi
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}
 
-	s.publishScaleUpdated(ctx, m)
+	eventing.PublishCollectedEvents(ctx, s.eventPublisher, m, nil, nil)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -254,20 +256,4 @@ func (s *factorService) refreshListCache(ctx context.Context) {
 		return
 	}
 	logScaleListCacheError(ctx, s.listCache.Rebuild(ctx))
-}
-
-func (s *factorService) publishScaleUpdated(ctx context.Context, m *scale.MedicalScale) {
-	if s.eventPublisher == nil || m == nil {
-		return
-	}
-	eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(
-		scale.NewScaleChangedEvent(
-			m.GetID().Uint64(),
-			m.GetCode().String(),
-			"",
-			m.GetTitle(),
-			scale.ChangeActionUpdated,
-			time.Now(),
-		),
-	), nil, nil)
 }

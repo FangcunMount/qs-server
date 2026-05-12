@@ -1,6 +1,7 @@
 package scale
 
 import (
+	"slices"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -105,7 +106,7 @@ func WithStatus(s Status) MedicalScaleOption {
 // WithFactors 设置因子列表
 func WithFactors(factors []*Factor) MedicalScaleOption {
 	return func(m *MedicalScale) {
-		m.factors = factors
+		m.factors = slices.Clone(factors)
 	}
 }
 
@@ -150,7 +151,7 @@ func WithStages(stages []Stage) MedicalScaleOption {
 		if stages == nil {
 			m.stages = []Stage{}
 		} else {
-			m.stages = stages
+			m.stages = slices.Clone(stages)
 		}
 	}
 }
@@ -161,7 +162,7 @@ func WithApplicableAges(ages []ApplicableAge) MedicalScaleOption {
 		if ages == nil {
 			m.applicableAges = []ApplicableAge{}
 		} else {
-			m.applicableAges = ages
+			m.applicableAges = slices.Clone(ages)
 		}
 	}
 }
@@ -172,7 +173,7 @@ func WithReporters(reporters []Reporter) MedicalScaleOption {
 		if reporters == nil {
 			m.reporters = []Reporter{}
 		} else {
-			m.reporters = reporters
+			m.reporters = slices.Clone(reporters)
 		}
 	}
 }
@@ -183,7 +184,7 @@ func WithTags(tags []Tag) MedicalScaleOption {
 		if tags == nil {
 			m.tags = []Tag{}
 		} else {
-			m.tags = tags
+			m.tags = slices.Clone(tags)
 		}
 	}
 }
@@ -227,7 +228,7 @@ func (m *MedicalScale) GetStatus() Status {
 
 // GetFactors 获取因子列表
 func (m *MedicalScale) GetFactors() []*Factor {
-	return m.factors
+	return slices.Clone(m.factors)
 }
 
 // GetCreatedBy 获取创建人
@@ -267,22 +268,22 @@ func (m *MedicalScale) GetCategory() Category {
 
 // GetStages 获取阶段列表
 func (m *MedicalScale) GetStages() []Stage {
-	return m.stages
+	return slices.Clone(m.stages)
 }
 
 // GetApplicableAges 获取使用年龄列表
 func (m *MedicalScale) GetApplicableAges() []ApplicableAge {
-	return m.applicableAges
+	return slices.Clone(m.applicableAges)
 }
 
 // GetReporters 获取填报人列表
 func (m *MedicalScale) GetReporters() []Reporter {
-	return m.reporters
+	return slices.Clone(m.reporters)
 }
 
 // GetTags 获取标签列表
 func (m *MedicalScale) GetTags() []Tag {
-	return m.tags
+	return slices.Clone(m.tags)
 }
 
 // ===================== 状态判断方法 =================
@@ -340,12 +341,27 @@ func (m *MedicalScale) GetNonTotalScoreFactors() []*Factor {
 	return result
 }
 
+func (m *MedicalScale) FactorSnapshots() []FactorSnapshot {
+	result := make([]FactorSnapshot, 0, len(m.factors))
+	for _, f := range m.factors {
+		if f == nil {
+			continue
+		}
+		result = append(result, f.Snapshot())
+	}
+	return result
+}
+
 // AddFactor 添加因子，并保持量表内因子编码唯一。
 func (m *MedicalScale) AddFactor(factor *Factor) error {
 	if factor == nil {
 		return newError(ErrorKindInvalidArgument, "因子对象不能为空")
 	}
-	return m.addFactor(factor)
+	if err := m.addFactor(factor); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // RemoveFactor 移除指定因子。
@@ -353,12 +369,17 @@ func (m *MedicalScale) RemoveFactor(factorCode FactorCode) error {
 	if factorCode.IsEmpty() {
 		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
-	return m.removeFactor(factorCode)
+	if err := m.removeFactor(factorCode); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // RemoveAllFactors 清空量表因子。
 func (m *MedicalScale) RemoveAllFactors() {
 	m.factors = []*Factor{}
+	m.addChangedEvent(ChangeActionUpdated)
 }
 
 // ReplaceFactors 替换全部因子，并校验编码唯一和总分因子唯一。
@@ -372,6 +393,9 @@ func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
 	for i, factor := range factors {
 		if factor == nil {
 			return newError(ErrorKindInvalidArgument, "第 %d 个因子对象为空", i+1)
+		}
+		if err := factor.validate(); err != nil {
+			return err
 		}
 
 		factorCode := factor.GetCode().Value()
@@ -392,6 +416,7 @@ func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
 	}
 
 	m.updateFactors(factors)
+	m.addChangedEvent(ChangeActionUpdated)
 	return nil
 }
 
@@ -405,10 +430,14 @@ func (m *MedicalScale) UpdateFactor(updatedFactor *Factor) error {
 	if factorCode.IsEmpty() {
 		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
+	if err := updatedFactor.validate(); err != nil {
+		return err
+	}
 
 	for i, f := range m.factors {
 		if f.GetCode().Equals(factorCode) {
 			m.factors[i] = updatedFactor
+			m.addChangedEvent(ChangeActionUpdated)
 			return nil
 		}
 	}
@@ -433,7 +462,10 @@ func (m *MedicalScale) UpdateFactorInterpretRules(factorCode FactorCode, rules [
 		}
 	}
 
-	factor.updateInterpretRules(rules)
+	if err := factor.updateInterpretRules(rules); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
 	return nil
 }
 
@@ -450,7 +482,10 @@ func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule Interp
 	if !found {
 		return newError(ErrorKindInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
 	}
-	factor.addInterpretRule(rule)
+	if err := factor.addInterpretRule(rule); err != nil {
+		return err
+	}
+	m.addChangedEvent(ChangeActionUpdated)
 	return nil
 }
 
@@ -472,22 +507,22 @@ func (m *MedicalScale) updateClassificationInfo(category Category, stages []Stag
 	if stages == nil {
 		m.stages = []Stage{}
 	} else {
-		m.stages = stages
+		m.stages = slices.Clone(stages)
 	}
 	if applicableAges == nil {
 		m.applicableAges = []ApplicableAge{}
 	} else {
-		m.applicableAges = applicableAges
+		m.applicableAges = slices.Clone(applicableAges)
 	}
 	if reporters == nil {
 		m.reporters = []Reporter{}
 	} else {
-		m.reporters = reporters
+		m.reporters = slices.Clone(reporters)
 	}
 	if tags == nil {
 		m.tags = []Tag{}
 	} else {
-		m.tags = tags
+		m.tags = slices.Clone(tags)
 	}
 	return nil
 }
@@ -513,6 +548,9 @@ func (m *MedicalScale) updateQuestionnaire(qCode meta.Code, qVersion string) err
 
 // addFactor 添加因子
 func (m *MedicalScale) addFactor(f *Factor) error {
+	if err := f.validate(); err != nil {
+		return err
+	}
 	// 幂等性检查
 	for _, existingFactor := range m.factors {
 		if existingFactor.GetCode().Equals(f.GetCode()) {
@@ -536,7 +574,7 @@ func (m *MedicalScale) removeFactor(factorCode FactorCode) error {
 
 // updateFactors 更新因子列表
 func (m *MedicalScale) updateFactors(factors []*Factor) {
-	m.factors = factors
+	m.factors = slices.Clone(factors)
 }
 
 // ===================== 生命周期包内方法（供 Lifecycle 服务调用）=================
@@ -548,15 +586,7 @@ func (m *MedicalScale) publish() error {
 		return err
 	}
 
-	// 触发领域事件
-	m.addEvent(NewScaleChangedEvent(
-		m.id.Uint64(),
-		string(m.scaleCode),
-		"", // version 暂无
-		m.title,
-		ChangeActionPublished,
-		time.Now(),
-	))
+	m.addChangedEvent(ChangeActionPublished)
 
 	return nil
 }
@@ -568,15 +598,7 @@ func (m *MedicalScale) unpublish() error {
 		return err
 	}
 
-	// 触发领域事件
-	m.addEvent(NewScaleChangedEvent(
-		m.id.Uint64(),
-		string(m.scaleCode),
-		"",
-		m.title,
-		ChangeActionUnpublished,
-		time.Now(),
-	))
+	m.addChangedEvent(ChangeActionUnpublished)
 
 	return nil
 }
@@ -588,15 +610,7 @@ func (m *MedicalScale) archive() error {
 		return err
 	}
 
-	// 触发领域事件
-	m.addEvent(NewScaleChangedEvent(
-		m.id.Uint64(),
-		string(m.scaleCode),
-		"",
-		m.title,
-		ChangeActionArchived,
-		time.Now(),
-	))
+	m.addChangedEvent(ChangeActionArchived)
 
 	return nil
 }
@@ -605,7 +619,7 @@ func (m *MedicalScale) archive() error {
 
 // Events 获取待发布的领域事件
 func (m *MedicalScale) Events() []event.DomainEvent {
-	return m.events
+	return slices.Clone(m.events)
 }
 
 // ClearEvents 清空事件列表（通常在事件发布后调用）
@@ -619,4 +633,15 @@ func (m *MedicalScale) addEvent(evt event.DomainEvent) {
 		m.events = make([]event.DomainEvent, 0)
 	}
 	m.events = append(m.events, evt)
+}
+
+func (m *MedicalScale) addChangedEvent(action ChangeAction) {
+	m.addEvent(NewScaleChangedEvent(
+		m.id.Uint64(),
+		string(m.scaleCode),
+		"",
+		m.title,
+		action,
+		time.Now(),
+	))
 }

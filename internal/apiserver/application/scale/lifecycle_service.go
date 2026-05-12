@@ -2,7 +2,6 @@ package scale
 
 import (
 	"context"
-	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
@@ -177,20 +176,4 @@ func (s *lifecycleService) executeLifecycleOperation(
 // publishEvents 发布聚合根收集的领域事件
 func (s *lifecycleService) publishEvents(ctx context.Context, m *scale.MedicalScale) {
 	eventing.PublishCollectedEvents(ctx, s.eventPublisher, m, nil, nil)
-}
-
-func (s *lifecycleService) publishScaleChanged(ctx context.Context, m *scale.MedicalScale, action scale.ChangeAction) {
-	if s.eventPublisher == nil || m == nil {
-		return
-	}
-	eventing.PublishCollectedEvents(ctx, s.eventPublisher, eventing.Collect(
-		scale.NewScaleChangedEvent(
-			m.GetID().Uint64(),
-			m.GetCode().String(),
-			"",
-			m.GetTitle(),
-			action,
-			time.Now(),
-		),
-	), nil, nil)
 }

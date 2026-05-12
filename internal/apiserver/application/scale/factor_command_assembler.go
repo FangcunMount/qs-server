@@ -27,10 +27,6 @@ func toFactorDomain(
 	}
 
 	scoringParamsDomain := scoringParamsFromDTO(scoringParams)
-	if strategy == domainScale.ScoringStrategyCnt && len(scoringParamsDomain.GetCntOptionContents()) == 0 {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "cnt 计分策略必须提供 cnt_option_contents 参数")
-	}
-
 	factor, err := domainScale.NewFactor(
 		domainScale.NewFactorCode(code),
 		title,

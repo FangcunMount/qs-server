@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -32,7 +31,7 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表基本信息失败")
 	}
 
-	s.publishScaleChanged(ctx, m, domainScale.ChangeActionUpdated)
+	s.publishEvents(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
@@ -54,6 +53,9 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 	if err != nil {
 		return nil, err
 	}
+	if m.IsPublished() {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "已发布量表的规则已冻结，不能更新关联问卷")
+	}
 
 	if err := s.resolveQuestionnaireBinding().validate(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, m.GetCode().String()); err != nil {
 		return nil, err
@@ -66,7 +68,7 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表关联问卷失败")
 	}
 
-	s.publishScaleChanged(ctx, m, domainScale.ChangeActionUpdated)
+	s.publishEvents(ctx, m)
 	s.refreshListCache(ctx)
 
 	return toScaleResult(m), nil
