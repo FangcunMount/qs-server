@@ -94,10 +94,6 @@ Evaluation 执行与报告生成。
 
 ---
 
-# 第一部分：Questionnaire 聚合根的模型设计与生命周期
-
----
-
 ## 3. Questionnaire 的模型定位
 
 `Questionnaire` 是问卷模板聚合根。
@@ -358,10 +354,6 @@ Questionnaire 不应该被当成普通 DTO 或普通表记录直接更新。
 ```
 
 应用层服务应通过聚合行为或领域服务完成修改，而不是绕过模型直接修改内部题目结构。
-
----
-
-# 第二部分：Question 与 AnswerValue 的题型扩展设计
 
 ---
 
@@ -757,10 +749,6 @@ Questionnaire.BuildSubmissionSpec 包含 rating 题；
 SubmissionSpec.PrepareAnswers 能处理 rating raw value；
 AnswerValidator 能校验 rating 范围。
 ```
-
----
-
-# 第三部分：SubmissionSpec 的设计与使用
 
 ---
 
