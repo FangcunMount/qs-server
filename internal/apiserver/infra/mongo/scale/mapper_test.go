@@ -153,6 +153,42 @@ func TestScaleMapperPersistsAndBackfillsScaleVersion(t *testing.T) {
 	}
 }
 
+func TestScaleMapperToDomainBackfillsLegacyFactorDefaults(t *testing.T) {
+	t.Parallel()
+
+	mapper := NewScaleMapper()
+	got := mapper.ToDomain(context.Background(), &ScalePO{
+		Code:   "SCALE_LEGACY",
+		Title:  "Scale Legacy",
+		Status: domainscale.StatusDraft.String(),
+		Factors: []FactorPO{
+			{
+				Code:            "F_LEGACY",
+				Title:           "Legacy Factor",
+				IsShow:          true,
+				QuestionCodes:   []string{"Q1", "Q2"},
+				InterpretRules:  nil,
+				FactorType:      "",
+				ScoringStrategy: "",
+			},
+		},
+	})
+	if got == nil {
+		t.Fatal("expected scale domain model")
+	}
+
+	snapshots := got.FactorSnapshots()
+	if len(snapshots) != 1 {
+		t.Fatalf("factor count = %d, want 1", len(snapshots))
+	}
+	if snapshots[0].FactorType != domainscale.FactorTypePrimary {
+		t.Fatalf("factor type = %q, want %q", snapshots[0].FactorType, domainscale.FactorTypePrimary)
+	}
+	if snapshots[0].ScoringStrategy != domainscale.ScoringStrategySum {
+		t.Fatalf("scoring strategy = %q, want %q", snapshots[0].ScoringStrategy, domainscale.ScoringStrategySum)
+	}
+}
+
 func TestScaleMapperToDomainSkipsLegacyCntFactorWithoutParams(t *testing.T) {
 	t.Parallel()
 

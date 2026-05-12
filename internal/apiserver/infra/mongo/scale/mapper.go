@@ -269,7 +269,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 		"scoring_params_type", getTypeName(po.ScoringParams),
 	)
 
-	strategy := scale.ScoringStrategyCode(po.ScoringStrategy)
+	strategy := normalizeFactorScoringStrategy(po.ScoringStrategy)
 	scoringParams := m.mapScoringParamsToDomain(ctx, po.ScoringParams, strategy)
 
 	// 添加日志：记录转换后的 ScoringParams
@@ -298,7 +298,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	factor, err := scale.NewFactor(
 		scale.NewFactorCode(po.Code),
 		po.Title,
-		scale.WithFactorType(scale.FactorType(po.FactorType)),
+		scale.WithFactorType(normalizeFactorType(po.FactorType)),
 		scale.WithIsTotalScore(po.IsTotalScore),
 		scale.WithIsShow(po.IsShow),
 		scale.WithQuestionCodes(questionCodes),
@@ -316,6 +316,20 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	}
 
 	return factor
+}
+
+func normalizeFactorType(raw string) scale.FactorType {
+	if raw == "" {
+		return scale.FactorTypePrimary
+	}
+	return scale.FactorType(raw)
+}
+
+func normalizeFactorScoringStrategy(raw string) scale.ScoringStrategyCode {
+	if raw == "" {
+		return scale.ScoringStrategySum
+	}
+	return scale.ScoringStrategyCode(raw)
 }
 
 func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[string]interface{}, strategy scale.ScoringStrategyCode) *scale.ScoringParams {
