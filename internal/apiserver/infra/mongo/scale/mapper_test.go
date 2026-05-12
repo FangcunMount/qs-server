@@ -211,7 +211,7 @@ func TestScaleMapperToDomainSkipsLegacyCntFactorWithoutParams(t *testing.T) {
 	if got == nil {
 		t.Fatal("expected scale domain model")
 	}
-	if len(got.GetFactors()) != 0 {
-		t.Fatalf("factor count = %d, want 0", len(got.GetFactors()))
+	if len(got.FactorSnapshots()) != 0 {
+		t.Fatalf("factor count = %d, want 0", len(got.FactorSnapshots()))
 	}
 }
