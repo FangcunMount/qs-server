@@ -19,7 +19,7 @@ func scaleDomainErrorCode(err error, fallbackCode int) int {
 		return fallbackCode
 	}
 	switch kind {
-	case domainScale.ErrorKindInvalidArgument:
+	case domainScale.ErrorKindInvalidArgument, domainScale.ErrorKindRuleFrozen:
 		return errorCode.ErrInvalidArgument
 	default:
 		return fallbackCode

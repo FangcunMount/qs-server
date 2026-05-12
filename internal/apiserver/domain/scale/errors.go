@@ -10,6 +10,8 @@ type ErrorKind string
 
 const (
 	ErrorKindInvalidArgument ErrorKind = "invalid_argument"
+	// ErrorKindRuleFrozen 表示规则已冻结：发布态或归档态量表不允许变更规则。
+	ErrorKindRuleFrozen ErrorKind = "rule_frozen"
 )
 
 // DomainError is a domain-native error that application services map to API codes.

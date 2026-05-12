@@ -56,7 +56,7 @@ func (s *factorService) AddFactor(ctx context.Context, dto AddFactorDTO) (*Scale
 
 	// 4. 添加因子
 	if err := m.AddFactor(factor); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "添加因子失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "添加因子失败")
 	}
 
 	return s.persistFactorMutation(ctx, m)
@@ -87,7 +87,7 @@ func (s *factorService) UpdateFactor(ctx context.Context, dto UpdateFactorDTO) (
 
 	// 4. 更新因子
 	if err := m.UpdateFactor(factor); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新因子失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新因子失败")
 	}
 
 	return s.persistFactorMutation(ctx, m)
@@ -111,7 +111,7 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 
 	// 3. 删除因子
 	if err := m.RemoveFactor(scale.NewFactorCode(factorCode)); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "删除因子失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "删除因子失败")
 	}
 
 	return s.persistFactorMutation(ctx, m)
@@ -160,7 +160,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 
 	// 4. 替换因子
 	if err := m.ReplaceFactors(factors); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "替换因子失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "替换因子失败")
 	}
 
 	return s.persistFactorMutation(ctx, m)
@@ -187,7 +187,7 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto Upda
 
 	// 4. 更新解读规则
 	if err := m.UpdateFactorInterpretRules(scale.NewFactorCode(dto.FactorCode), rules); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新解读规则失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新解读规则失败")
 	}
 
 	return s.persistFactorMutation(ctx, m)
@@ -219,23 +219,20 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 
 		// 更新解读规则
 		if err := m.UpdateFactorInterpretRules(scale.NewFactorCode(dto.FactorCode), rules); err != nil {
-			return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新因子[%s]解读规则失败", dto.FactorCode)
+			return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新因子[%s]解读规则失败", dto.FactorCode)
 		}
 	}
 
 	return s.persistFactorMutation(ctx, m)
 }
 
+// loadEditableScale 加载量表用于规则相关变更。
+// 状态门槛（archived/published 规则冻结）由聚合根 ensureRuleEditable 守护，
+// 这里只负责仓储错误的映射。
 func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string) (*scale.MedicalScale, error) {
 	m, err := s.repo.FindByCode(ctx, scaleCode)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
-	}
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-	if m.IsPublished() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "已发布量表的规则已冻结，不能编辑")
 	}
 	return m, nil
 }

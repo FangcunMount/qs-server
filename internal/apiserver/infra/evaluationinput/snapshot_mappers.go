@@ -11,9 +11,10 @@ func scaleToSnapshot(m *scale.MedicalScale) *port.ScaleSnapshot {
 	if m == nil {
 		return nil
 	}
-	factors := make([]port.FactorSnapshot, 0, len(m.GetFactors()))
-	for _, f := range m.GetFactors() {
-		factors = append(factors, factorToSnapshot(f))
+	domainSnapshots := m.FactorSnapshots()
+	factors := make([]port.FactorSnapshot, 0, len(domainSnapshots))
+	for _, snapshot := range domainSnapshots {
+		factors = append(factors, factorSnapshotToPort(snapshot))
 	}
 	return &port.ScaleSnapshot{
 		ID:                   m.GetID().Uint64(),
@@ -26,16 +27,15 @@ func scaleToSnapshot(m *scale.MedicalScale) *port.ScaleSnapshot {
 	}
 }
 
-func factorToSnapshot(f *scale.Factor) port.FactorSnapshot {
-	if f == nil {
-		return port.FactorSnapshot{}
-	}
-	questionCodes := make([]string, 0, len(f.GetQuestionCodes()))
-	for _, code := range f.GetQuestionCodes() {
+// factorSnapshotToPort 将领域因子快照映射为评估输入端口的因子快照。
+// 输入是只读的 scale.FactorSnapshot，避免直接持有领域实体指针。
+func factorSnapshotToPort(snapshot scale.FactorSnapshot) port.FactorSnapshot {
+	questionCodes := make([]string, 0, len(snapshot.QuestionCodes))
+	for _, code := range snapshot.QuestionCodes {
 		questionCodes = append(questionCodes, code.String())
 	}
-	rules := make([]port.InterpretRuleSnapshot, 0, len(f.GetInterpretRules()))
-	for _, rule := range f.GetInterpretRules() {
+	rules := make([]port.InterpretRuleSnapshot, 0, len(snapshot.InterpretRules))
+	for _, rule := range snapshot.InterpretRules {
 		rules = append(rules, port.InterpretRuleSnapshot{
 			Min:        rule.GetScoreRange().Min(),
 			Max:        rule.GetScoreRange().Max(),
@@ -44,16 +44,20 @@ func factorToSnapshot(f *scale.Factor) port.FactorSnapshot {
 			Suggestion: rule.GetSuggestion(),
 		})
 	}
+	cntContents := []string(nil)
+	if snapshot.ScoringParams != nil {
+		cntContents = append([]string(nil), snapshot.ScoringParams.GetCntOptionContents()...)
+	}
 	return port.FactorSnapshot{
-		Code:            f.GetCode().String(),
-		Title:           f.GetTitle(),
-		IsTotalScore:    f.IsTotalScore(),
+		Code:            snapshot.Code.String(),
+		Title:           snapshot.Title,
+		IsTotalScore:    snapshot.IsTotalScore,
 		QuestionCodes:   questionCodes,
-		ScoringStrategy: f.GetScoringStrategy().String(),
+		ScoringStrategy: snapshot.ScoringStrategy.String(),
 		ScoringParams: port.ScoringParamsSnapshot{
-			CntOptionContents: append([]string(nil), f.GetScoringParams().GetCntOptionContents()...),
+			CntOptionContents: cntContents,
 		},
-		MaxScore:       f.GetMaxScore(),
+		MaxScore:       snapshot.MaxScore,
 		InterpretRules: rules,
 	}
 }

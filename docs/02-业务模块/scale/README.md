@@ -90,7 +90,8 @@ scale/
 ├── 01-规则与因子计分.md
 ├── 02-解读规则与风险文案.md
 ├── 03-与Evaluation衔接.md
-└── 04-新增量表规则SOP.md
+├── 04-新增量表规则SOP.md
+└── 05-规则版本与历史追溯设计.md
 ```
 
 | 顺序 | 文档 | 先回答什么 |
@@ -100,6 +101,7 @@ scale/
 | 3 | [02-解读规则与风险文案.md](./02-解读规则与风险文案.md) | 因子分如何映射为风险等级、结论和建议 |
 | 4 | [03-与Evaluation衔接.md](./03-与Evaluation衔接.md) | Evaluation 如何通过 snapshot 和 pipeline 消费 Scale 规则 |
 | 5 | [04-新增量表规则SOP.md](./04-新增量表规则SOP.md) | 新增因子、计分策略、风险等级、解读字段时按什么流程改 |
+| 6 | [05-规则版本与历史追溯设计.md](./05-规则版本与历史追溯设计.md) | 规则版本号、历史 Evaluation 追溯、ScaleRuleSnapshot 两阶段方案（设计草案） |
 
 ---
 
@@ -443,5 +445,6 @@ make docs-hygiene
 | 理解风险文案 | [02-解读规则与风险文案.md](./02-解读规则与风险文案.md) |
 | 理解 Evaluation 消费 Scale | [03-与Evaluation衔接.md](./03-与Evaluation衔接.md) |
 | 新增量表规则 | [04-新增量表规则SOP.md](./04-新增量表规则SOP.md) |
+| 评估历史规则追溯 / 版本设计 | [05-规则版本与历史追溯设计.md](./05-规则版本与历史追溯设计.md) |
 | 回看业务模块入口 | [../README.md](../README.md) |
 | 理解 Survey 作答事实 | [../survey/README.md](../survey/README.md) |

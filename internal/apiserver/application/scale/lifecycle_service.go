@@ -129,21 +129,6 @@ func (s *lifecycleService) getScaleByCode(ctx context.Context, code string) (*sc
 	return m, nil
 }
 
-// getScaleAndValidateEditable 获取量表并验证是否可编辑
-func (s *lifecycleService) getScaleAndValidateEditable(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	m, err := s.getScaleByCode(ctx, code)
-	if err != nil {
-		return nil, err
-	}
-
-	// 判断量表状态
-	if m.IsArchived() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表已归档，不能编辑")
-	}
-
-	return m, nil
-}
-
 // lifecycleOperation 生命周期操作函数类型
 type lifecycleOperation func(ctx context.Context, scale *scale.MedicalScale) error
 

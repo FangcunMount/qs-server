@@ -158,9 +158,8 @@ func toScaleResult(m *scale.MedicalScale) *ScaleResult {
 		UpdatedAt: m.GetUpdatedAt(),
 	}
 
-	// 转换因子列表
-	for _, factor := range m.GetFactors() {
-		result.Factors = append(result.Factors, toFactorResult(factor))
+	for _, snapshot := range m.FactorSnapshots() {
+		result.Factors = append(result.Factors, toFactorResult(snapshot))
 	}
 
 	return result
@@ -178,30 +177,28 @@ func toScaleResultWithUsers(ctx context.Context, m *scale.MedicalScale, identity
 	return result
 }
 
-// toFactorResult 将因子领域模型转换为结果对象
-func toFactorResult(f *scale.Factor) FactorResult {
+// toFactorResult 将因子只读快照转换为结果对象。
+// 仅依赖 FactorSnapshot，避免外部直接持有 *scale.Factor 指针。
+func toFactorResult(snapshot scale.FactorSnapshot) FactorResult {
 	result := FactorResult{
-		Code:            f.GetCode().String(),
-		Title:           f.GetTitle(),
-		FactorType:      f.GetFactorType().String(),
-		IsTotalScore:    f.IsTotalScore(),
-		IsShow:          f.IsShow(),
-		QuestionCodes:   make([]string, 0),
-		ScoringStrategy: f.GetScoringStrategy().String(),
-		ScoringParams:   scoringParamsResultMap(f.GetScoringParams(), f.GetScoringStrategy()),
-		MaxScore:        f.GetMaxScore(),
-		RiskLevel:       "", // 默认值，将从解读规则中提取
-		InterpretRules:  make([]InterpretRuleResult, 0),
+		Code:            snapshot.Code.String(),
+		Title:           snapshot.Title,
+		FactorType:      snapshot.FactorType.String(),
+		IsTotalScore:    snapshot.IsTotalScore,
+		IsShow:          snapshot.IsShow,
+		QuestionCodes:   make([]string, 0, len(snapshot.QuestionCodes)),
+		ScoringStrategy: snapshot.ScoringStrategy.String(),
+		ScoringParams:   scoringParamsResultMap(snapshot.ScoringParams, snapshot.ScoringStrategy),
+		MaxScore:        snapshot.MaxScore,
+		RiskLevel:       "",
+		InterpretRules:  make([]InterpretRuleResult, 0, len(snapshot.InterpretRules)),
 	}
 
-	// 转换题目编码列表
-	for _, code := range f.GetQuestionCodes() {
+	for _, code := range snapshot.QuestionCodes {
 		result.QuestionCodes = append(result.QuestionCodes, code.String())
 	}
 
-	// 转换解读规则列表，并从第一个规则中提取风险等级作为因子级别的默认风险等级
-	rules := f.GetInterpretRules()
-	for i, rule := range rules {
+	for i, rule := range snapshot.InterpretRules {
 		riskLevel := rule.GetRiskLevel().String()
 		result.InterpretRules = append(result.InterpretRules, InterpretRuleResult{
 			MinScore:   rule.GetScoreRange().Min(),
@@ -210,14 +207,12 @@ func toFactorResult(f *scale.Factor) FactorResult {
 			Conclusion: rule.GetConclusion(),
 			Suggestion: rule.GetSuggestion(),
 		})
-		// 使用第一个规则的风险等级作为因子级别的默认风险等级
 		if i == 0 {
 			result.RiskLevel = riskLevel
 		}
 	}
 
-	// 如果没有解读规则，使用默认值 "none"
-	if len(rules) == 0 {
+	if len(snapshot.InterpretRules) == 0 {
 		result.RiskLevel = "none"
 	}
 

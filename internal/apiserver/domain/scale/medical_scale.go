@@ -310,14 +310,24 @@ func (m *MedicalScale) FactorCount() int {
 	return len(m.factors)
 }
 
-// FindFactorByCode 根据因子编码查找因子
-func (m *MedicalScale) FindFactorByCode(factorCode FactorCode) (*Factor, bool) {
+// findFactorByCode 根据因子编码查找因子（仅供 domain 包内部使用）。
+// 外部调用方请使用 FindFactorSnapshotByCode 以避免越权修改内部状态。
+func (m *MedicalScale) findFactorByCode(factorCode FactorCode) (*Factor, bool) {
 	for _, f := range m.factors {
 		if f.GetCode().Equals(factorCode) {
 			return f, true
 		}
 	}
 	return nil, false
+}
+
+// FindFactorSnapshotByCode 根据因子编码返回只读因子快照。
+func (m *MedicalScale) FindFactorSnapshotByCode(factorCode FactorCode) (FactorSnapshot, bool) {
+	f, ok := m.findFactorByCode(factorCode)
+	if !ok {
+		return FactorSnapshot{}, false
+	}
+	return f.Snapshot(), true
 }
 
 // GetTotalScoreFactor 获取总分因子
@@ -354,6 +364,9 @@ func (m *MedicalScale) FactorSnapshots() []FactorSnapshot {
 
 // AddFactor 添加因子，并保持量表内因子编码唯一。
 func (m *MedicalScale) AddFactor(factor *Factor) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if factor == nil {
 		return newError(ErrorKindInvalidArgument, "因子对象不能为空")
 	}
@@ -366,6 +379,9 @@ func (m *MedicalScale) AddFactor(factor *Factor) error {
 
 // RemoveFactor 移除指定因子。
 func (m *MedicalScale) RemoveFactor(factorCode FactorCode) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if factorCode.IsEmpty() {
 		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
@@ -377,13 +393,20 @@ func (m *MedicalScale) RemoveFactor(factorCode FactorCode) error {
 }
 
 // RemoveAllFactors 清空量表因子。
-func (m *MedicalScale) RemoveAllFactors() {
+func (m *MedicalScale) RemoveAllFactors() error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	m.factors = []*Factor{}
 	m.addChangedEvent(ChangeActionUpdated)
+	return nil
 }
 
 // ReplaceFactors 替换全部因子，并校验编码唯一和总分因子唯一。
 func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if len(factors) == 0 {
 		return newError(ErrorKindInvalidArgument, "因子列表不能为空")
 	}
@@ -422,6 +445,9 @@ func (m *MedicalScale) ReplaceFactors(factors []*Factor) error {
 
 // UpdateFactor 按编码替换已有因子。
 func (m *MedicalScale) UpdateFactor(updatedFactor *Factor) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if updatedFactor == nil {
 		return newError(ErrorKindInvalidArgument, "因子对象不能为空")
 	}
@@ -447,11 +473,14 @@ func (m *MedicalScale) UpdateFactor(updatedFactor *Factor) error {
 
 // UpdateFactorInterpretRules 更新指定因子的解读规则。
 func (m *MedicalScale) UpdateFactorInterpretRules(factorCode FactorCode, rules []InterpretationRule) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if factorCode.IsEmpty() {
 		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
 
-	factor, found := m.FindFactorByCode(factorCode)
+	factor, found := m.findFactorByCode(factorCode)
 	if !found {
 		return newError(ErrorKindInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
 	}
@@ -471,6 +500,9 @@ func (m *MedicalScale) UpdateFactorInterpretRules(factorCode FactorCode, rules [
 
 // AddFactorInterpretRule 为指定因子追加解读规则。
 func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule InterpretationRule) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if factorCode.IsEmpty() {
 		return newError(ErrorKindInvalidArgument, "因子编码不能为空")
 	}
@@ -478,7 +510,7 @@ func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule Interp
 		return newError(ErrorKindInvalidArgument, "解读规则无效")
 	}
 
-	factor, found := m.FindFactorByCode(factorCode)
+	factor, found := m.findFactorByCode(factorCode)
 	if !found {
 		return newError(ErrorKindInvalidArgument, "未找到编码为 %s 的因子", factorCode.Value())
 	}
@@ -491,8 +523,34 @@ func (m *MedicalScale) AddFactorInterpretRule(factorCode FactorCode, rule Interp
 
 // ===================== 包内私有方法（供领域服务调用）=================
 
+// ensureRuleEditable 确保量表的「规则相关」字段可编辑。
+// 规则相关 = 因子 / 计分 / 解读规则 / 关联问卷。
+// 已发布 / 已归档量表的规则被冻结，禁止变更。
+func (m *MedicalScale) ensureRuleEditable() error {
+	if m.status.IsArchived() {
+		return newError(ErrorKindRuleFrozen, "archived scale cannot be edited")
+	}
+	if m.status.IsPublished() {
+		return newError(ErrorKindRuleFrozen, "published scale rules are frozen")
+	}
+	return nil
+}
+
+// ensureDisplayEditable 确保量表的「展示信息」字段可编辑。
+// 展示信息 = 标题 / 描述 / 分类 / 标签 等不影响计分与解读的字段。
+// 已归档量表禁止任何编辑；已发布量表允许调整展示信息。
+func (m *MedicalScale) ensureDisplayEditable() error {
+	if m.status.IsArchived() {
+		return newError(ErrorKindRuleFrozen, "archived scale cannot be edited")
+	}
+	return nil
+}
+
 // updateBasicInfo 更新基本信息
 func (m *MedicalScale) updateBasicInfo(title, description string) error {
+	if err := m.ensureDisplayEditable(); err != nil {
+		return err
+	}
 	if title == "" {
 		return newError(ErrorKindInvalidArgument, "title cannot be empty")
 	}
@@ -503,6 +561,9 @@ func (m *MedicalScale) updateBasicInfo(title, description string) error {
 
 // updateClassificationInfo 更新分类信息
 func (m *MedicalScale) updateClassificationInfo(category Category, stages []Stage, applicableAges []ApplicableAge, reporters []Reporter, tags []Tag) error {
+	if err := m.ensureDisplayEditable(); err != nil {
+		return err
+	}
 	m.category = category
 	if stages == nil {
 		m.stages = []Stage{}
@@ -537,7 +598,12 @@ func (m *MedicalScale) updateStatus(newStatus Status) error {
 }
 
 // updateQuestionnaire 更新关联的问卷
+// 注意：问卷绑定直接决定题目集合与计分输入，属于规则范畴，
+// 因此发布态量表不允许更新（受 ensureRuleEditable 约束）。
 func (m *MedicalScale) updateQuestionnaire(qCode meta.Code, qVersion string) error {
+	if err := m.ensureRuleEditable(); err != nil {
+		return err
+	}
 	if qCode.IsEmpty() {
 		return newError(ErrorKindInvalidArgument, "questionnaire code cannot be empty")
 	}

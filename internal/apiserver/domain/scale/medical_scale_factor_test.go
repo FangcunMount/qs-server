@@ -24,12 +24,12 @@ func TestMedicalScaleAddUpdateRemoveFactor(t *testing.T) {
 	if err := m.UpdateFactor(updated); err != nil {
 		t.Fatalf("UpdateFactor() error = %v", err)
 	}
-	got, ok := m.FindFactorByCode(NewFactorCode("F1"))
+	snapshot, ok := m.FindFactorSnapshotByCode(NewFactorCode("F1"))
 	if !ok {
 		t.Fatal("expected updated factor")
 	}
-	if got.GetFactorType() != FactorTypeMultilevel {
-		t.Fatalf("factor type = %q, want %q", got.GetFactorType(), FactorTypeMultilevel)
+	if snapshot.FactorType != FactorTypeMultilevel {
+		t.Fatalf("factor type = %q, want %q", snapshot.FactorType, FactorTypeMultilevel)
 	}
 
 	if err := m.RemoveFactor(NewFactorCode("F1")); err != nil {
@@ -95,15 +95,15 @@ func TestMedicalScaleUpdateFactorInterpretRulesValidatesRules(t *testing.T) {
 	if err := m.UpdateFactorInterpretRules(NewFactorCode("F1"), []InterpretationRule{validRule}); err != nil {
 		t.Fatalf("UpdateFactorInterpretRules() error = %v", err)
 	}
-	factor, ok := m.FindFactorByCode(NewFactorCode("F1"))
+	snapshot, ok := m.FindFactorSnapshotByCode(NewFactorCode("F1"))
 	if !ok {
 		t.Fatal("expected factor")
 	}
-	if len(factor.GetInterpretRules()) != 1 {
-		t.Fatalf("interpret rule count = %d, want 1", len(factor.GetInterpretRules()))
+	if len(snapshot.InterpretRules) != 1 {
+		t.Fatalf("interpret rule count = %d, want 1", len(snapshot.InterpretRules))
 	}
-	if factor.GetInterpretRules()[0].GetRiskLevel() != RiskLevelLow {
-		t.Fatalf("risk level = %q, want %q", factor.GetInterpretRules()[0].GetRiskLevel(), RiskLevelLow)
+	if snapshot.InterpretRules[0].GetRiskLevel() != RiskLevelLow {
+		t.Fatalf("risk level = %q, want %q", snapshot.InterpretRules[0].GetRiskLevel(), RiskLevelLow)
 	}
 
 	invalidRule := NewInterpretationRule(NewScoreRange(10, 0), RiskLevelLow, "invalid", "")
@@ -220,6 +220,114 @@ func TestNewFactorValidatesScoringSpecAndQuestionCodes(t *testing.T) {
 	if _, err := NewFactor(NewFactorCode("F1"), "Factor 1"); err == nil {
 		t.Fatal("expected non-total factor question code error")
 	}
+}
+
+func TestPublishedScaleFreezesRuleMutations(t *testing.T) {
+	t.Parallel()
+
+	m := newPublishedTestMedicalScale(t)
+
+	if err := m.AddFactor(newTestFactor(t, "F_NEW")); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("AddFactor on published scale err = %v, want rule frozen", err)
+	}
+	if err := m.UpdateFactor(newTestFactor(t, "F1", WithFactorType(FactorTypeMultilevel))); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("UpdateFactor on published scale err = %v, want rule frozen", err)
+	}
+	if err := m.RemoveFactor(NewFactorCode("F1")); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("RemoveFactor on published scale err = %v, want rule frozen", err)
+	}
+	if err := m.RemoveAllFactors(); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("RemoveAllFactors on published scale err = %v, want rule frozen", err)
+	}
+	if err := m.ReplaceFactors([]*Factor{newTestFactor(t, "F1")}); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("ReplaceFactors on published scale err = %v, want rule frozen", err)
+	}
+
+	rule := NewInterpretationRule(NewScoreRange(0, 10), RiskLevelLow, "low", "watch")
+	if err := m.UpdateFactorInterpretRules(NewFactorCode("F1"), []InterpretationRule{rule}); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("UpdateFactorInterpretRules on published scale err = %v, want rule frozen", err)
+	}
+	if err := m.AddFactorInterpretRule(NewFactorCode("F1"), rule); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("AddFactorInterpretRule on published scale err = %v, want rule frozen", err)
+	}
+
+	bi := BaseInfo{}
+	if err := bi.UpdateQuestionnaire(m, meta.NewCode("Q-NEW"), "2.0"); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("BaseInfo.UpdateQuestionnaire on published scale err = %v, want rule frozen", err)
+	}
+}
+
+func TestPublishedScaleAllowsDisplayInfoEdit(t *testing.T) {
+	t.Parallel()
+
+	m := newPublishedTestMedicalScale(t)
+
+	bi := BaseInfo{}
+	if err := bi.UpdateAll(m, "New Title", "New Description"); err != nil {
+		t.Fatalf("BaseInfo.UpdateAll on published scale err = %v, want nil", err)
+	}
+	if got := m.GetTitle(); got != "New Title" {
+		t.Fatalf("title = %q, want %q", got, "New Title")
+	}
+}
+
+func TestArchivedScaleFreezesAllMutations(t *testing.T) {
+	t.Parallel()
+
+	m := newPublishedTestMedicalScale(t)
+	lc := NewLifecycle()
+	if err := lc.Archive(t.Context(), m); err != nil {
+		t.Fatalf("Archive() error = %v", err)
+	}
+
+	if err := m.AddFactor(newTestFactor(t, "F_NEW")); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("AddFactor on archived scale err = %v, want rule frozen", err)
+	}
+	bi := BaseInfo{}
+	if err := bi.UpdateAll(m, "Should Fail", ""); err == nil || !isRuleFrozen(err) {
+		t.Fatalf("BaseInfo.UpdateAll on archived scale err = %v, want rule frozen", err)
+	}
+}
+
+func isRuleFrozen(err error) bool {
+	kind, ok := ErrorKindOf(err)
+	return ok && kind == ErrorKindRuleFrozen
+}
+
+func newPublishedTestMedicalScale(t *testing.T) *MedicalScale {
+	t.Helper()
+
+	totalFactor, err := NewFactor(
+		NewFactorCode("TOTAL"),
+		"Total",
+		WithIsTotalScore(true),
+		WithInterpretRules([]InterpretationRule{
+			NewInterpretationRule(NewScoreRange(0, 10), RiskLevelLow, "low", "watch"),
+		}),
+	)
+	if err != nil {
+		t.Fatalf("NewFactor() error = %v", err)
+	}
+	dim := newTestFactor(t, "F1",
+		WithInterpretRules([]InterpretationRule{
+			NewInterpretationRule(NewScoreRange(0, 10), RiskLevelLow, "low", "watch"),
+		}),
+	)
+
+	m, err := NewMedicalScale(
+		meta.NewCode("SCALE_A"),
+		"Scale A",
+		WithQuestionnaire(meta.NewCode("Q1"), "1.0"),
+		WithFactors([]*Factor{totalFactor, dim}),
+	)
+	if err != nil {
+		t.Fatalf("NewMedicalScale() error = %v", err)
+	}
+	lc := NewLifecycle()
+	if err := lc.Publish(t.Context(), m); err != nil {
+		t.Fatalf("Publish() error = %v", err)
+	}
+	return m
 }
 
 func newTestMedicalScale(t *testing.T) *MedicalScale {

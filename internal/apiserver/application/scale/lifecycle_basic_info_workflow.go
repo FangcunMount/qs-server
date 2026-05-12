@@ -17,14 +17,14 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto UpdateScaleB
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表标题不能为空")
 	}
 
-	m, err := s.getScaleAndValidateEditable(ctx, dto.Code)
+	m, err := s.getScaleByCode(ctx, dto.Code)
 	if err != nil {
 		return nil, err
 	}
 
 	classification := scaleClassificationFromDTO(dto.Category, dto.Stages, dto.ApplicableAges, dto.Reporters, dto.Tags)
 	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, classification.category, classification.stages, classification.applicableAges, classification.reporters, classification.tags); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新基本信息失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新基本信息失败")
 	}
 
 	if err := s.repo.Update(ctx, m); err != nil {
@@ -49,19 +49,16 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto UpdateSc
 		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "问卷版本不能为空")
 	}
 
-	m, err := s.getScaleAndValidateEditable(ctx, dto.Code)
+	m, err := s.getScaleByCode(ctx, dto.Code)
 	if err != nil {
 		return nil, err
-	}
-	if m.IsPublished() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "已发布量表的规则已冻结，不能更新关联问卷")
 	}
 
 	if err := s.resolveQuestionnaireBinding().validate(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, m.GetCode().String()); err != nil {
 		return nil, err
 	}
 	if err := s.baseInfo.UpdateQuestionnaire(m, meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion); err != nil {
-		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "更新关联问卷失败")
+		return nil, wrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新关联问卷失败")
 	}
 
 	if err := s.repo.Update(ctx, m); err != nil {

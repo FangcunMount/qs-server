@@ -139,15 +139,12 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]Fact
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
 
-	// 3. 转换因子列表
-	factors := m.GetFactors()
-	logger.L(ctx).Infow("GetFactors: 获取因子列表", "factors", factors)
-	result := make([]FactorResult, 0, len(factors))
-	for _, factor := range factors {
-		result = append(result, toFactorResult(factor))
-		logger.L(ctx).Infow("GetFactors: 转换因子列表", "factor", factor, "result", result)
+	snapshots := m.FactorSnapshots()
+	logger.L(ctx).Infow("GetFactors: 获取因子快照", "count", len(snapshots))
+	result := make([]FactorResult, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		result = append(result, toFactorResult(snapshot))
 	}
-	logger.L(ctx).Infow("GetFactors: 转换因子列表", "result", result)
 	return result, nil
 }
 
