@@ -26,14 +26,14 @@ func (s *hotRankReadModelStub) Top(_ context.Context, query domainScale.ScaleHot
 }
 
 type hotScaleRepoStub struct {
-	byQuestionnaire          map[string]*domainScale.MedicalScale
-	byCode                   map[string]*domainScale.MedicalScale
-	summaries                []*domainScale.MedicalScale
-	findByQuestionnaireErr   error
+	byQuestionnaire           map[string]*domainScale.MedicalScale
+	byCode                    map[string]*domainScale.MedicalScale
+	summaries                 []*domainScale.MedicalScale
+	findByQuestionnaireErr    error
 	findByQuestionnaireRefErr error
-	findByQuestionnaireCalls []string
-	findByQuestionnaireRefs  []string
-	findSummaryCalls         int
+	findByQuestionnaireCalls  []string
+	findByQuestionnaireRefs   []string
+	findSummaryCalls          int
 }
 
 func (r *hotScaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error { return nil }
@@ -196,7 +196,7 @@ func TestResolveAssessmentScaleContextReturnsEmptyWhenScaleBindingNotFound(t *te
 func TestResolveAssessmentScaleContextReturnsRepositoryError(t *testing.T) {
 	repoErr := errors.New("mongo unavailable")
 	repo := &hotScaleRepoStub{
-		byQuestionnaire:          map[string]*domainScale.MedicalScale{},
+		byQuestionnaire:           map[string]*domainScale.MedicalScale{},
 		findByQuestionnaireRefErr: repoErr,
 	}
 	svc := NewQueryService(repo, repo, nil, nil, nil)

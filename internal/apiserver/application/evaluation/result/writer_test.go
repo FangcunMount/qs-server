@@ -128,7 +128,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 		scoreProjectors,
 		reportBuilders,
 		reportSaver,
-			&resultNotifierStub{order: &order},
+		&resultNotifierStub{order: &order},
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -173,7 +173,7 @@ func TestWriterReportBuilderFailureDoesNotPersistInterpretedAssessment(t *testin
 		scoreProjectors,
 		reportBuilders,
 		&resultReportSaverStub{order: &order},
-			&resultNotifierStub{order: &order},
+		&resultNotifierStub{order: &order},
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -206,7 +206,7 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 		scoreProjectors,
 		reportBuilders,
 		&resultReportSaverStub{order: &order, err: reportErr},
-			&resultNotifierStub{order: &order},
+		&resultNotifierStub{order: &order},
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
