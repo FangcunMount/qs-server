@@ -1,6 +1,6 @@
 # qs-server
 
-> **qs-server 是一个面向心理/医学测评场景的 Go 后端系统：前台可靠提交答卷，后台按量表规则异步评估生成报告，并支撑读侧统计、权限控制和运维治理。**
+> **qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统。它不是普通问卷 CRUD，而是一个多解释模型测评平台：Survey 负责作答事实，Interpretation Model 定义统一接入协议，Scale、MBTI、BigFive 等具体模型负责规则表达，Evaluation 作为通用测评执行引擎，按 ModelRef 加载 Provider 执行模型，并产出 EvaluationResult 和 InterpretReport。**
 
 [![Go Version](https://img.shields.io/badge/Go-1.25.9-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -9,22 +9,56 @@
 
 ## 1. 项目定位
 
-`qs-server` 不是普通问卷 CRUD 系统，而是一个围绕 **问卷收集、量表规则、异步评估、报告生成、统计运营和安全授权** 构建的后端系统。
+`qs-server` 面向心理、医学和人格测评场景。
 
-一句话拆解：
+它要解决的不是：
 
 ```text
-Survey 管“填什么”
-Scale 管“怎么算和怎么解释”
-Evaluation 管“这一次测评执行后的结果”
+创建问卷
+提交答案
+保存结果
+```
+
+而是：
+
+```text
+答卷可靠提交
+  -> 测评执行可追踪
+  -> 解释模型可扩展
+  -> 报告生成可恢复
+  -> 统计查询可治理
+  -> 权限边界可审计
+```
+
+新版业务主线是：
+
+```text
+Survey
+    管“用户填了什么”
+
+Interpretation Model
+    管“模型如何统一接入”
+
+Concrete Models
+    管“具体规则是什么”
+    例如 Scale / MBTI / BigFive
+
+Evaluation
+    管“这一次测评如何执行、失败、重试和生成报告”
 ```
 
 运行时上，系统采用三进程协作：
 
 ```text
 collection-server：前台 BFF 与提交保护层
-qs-apiserver：主业务中心与领域事实源
-qs-worker：事件消费者与异步评估驱动器
+qs-apiserver：主业务中心与领域事实源入口
+qs-worker：事件消费者与异步测评执行驱动器
+```
+
+准确说，它不是完整微服务架构，而是：
+
+```text
+以 qs-apiserver 为主业务中心的三进程协作架构
 ```
 
 ---
@@ -33,14 +67,16 @@ qs-worker：事件消费者与异步评估驱动器
 
 | 能力 | 说明 |
 | ---- | ---- |
-| 问卷与答卷 | 管理 Questionnaire，接收 AnswerSheet，完成答案校验与答卷持久化 |
-| 量表规则 | 管理 MedicalScale、Factor、计分规则、风险等级和解读规则 |
-| 异步评估 | 答卷提交后通过事件和 worker 异步创建 Assessment、计算分数、生成 Report |
+| Survey 作答事实 | 管理 Questionnaire，接收 AnswerSheet，完成答案校验与答卷持久化 |
+| Interpretation Model 接入协议 | 通过 ModelRef、Provider、Context、Registry 抽象多解释模型接入 |
+| Concrete Models 具体规则 | Scale、MBTI、BigFive 等具体解释模型各自维护规则资产 |
+| Evaluation 通用执行引擎 | 管理 Assessment、EvaluationRun、EvaluationResult、InterpretReport 和失败重试 |
+| 异步测评执行 | 答卷提交后通过 Outbox、MQ、worker、internal gRPC 推进 Assessment、Interpretation、Report |
 | 事件与 Outbox | 关键事件通过 Outbox 可靠出站，再进入 MQ 驱动 worker |
-| 前台保护层 | collection-server 提供 RateLimit、SubmitQueue、SubmitGuard、submit-status |
+| 前台保护层 | collection-server 提供 RateLimit、SubmitQueue、SubmitGuard、submit-status、wait-report |
 | 高并发治理 | RateLimit、Queue、Backpressure、LockLease、幂等、重复抑制和统一观测 |
 | 统计读侧聚合 | Statistics ReadService、BehaviorProjector、SyncService、QueryCache、Hotset |
-| IAM 安全接入 | 通过 IAMModule 接入 TokenVerifier、AuthzSnapshot、ServiceAuth、Guardianship |
+| IAM 安全接入 | 通过 IAMModule 接入 TokenVerifier、AuthzSnapshot、CapabilityDecision、ServiceAuth、Guardianship |
 | 运维观测 | healthz、metrics、pprof、governance status、docs/contract 校验入口 |
 
 ---
@@ -55,38 +91,45 @@ flowchart LR
     Admin["后台管理 / Operating"]
     MQ["NSQ / MQ"]
 
-    subgraph Collection["collection-server"]
+    subgraph Collection["collection-server<br/>前台保护层"]
         C1["REST BFF"]
-        C2["RateLimit / SubmitQueue / SubmitGuard"]
-        C3["gRPC Client"]
+        C2["JWT / TenantScope"]
+        C3["RateLimit / SubmitQueue / SubmitGuard"]
+        C4["submit-status / wait-report"]
+        C5["gRPC Client"]
     end
 
-    subgraph API["qs-apiserver"]
+    subgraph API["qs-apiserver<br/>主业务中心"]
         A1["REST / internal REST"]
         A2["gRPC Server"]
-        A3["Survey / Scale / Evaluation / Actor / Plan / Statistics"]
-        A4["MySQL / MongoDB / Redis / Outbox"]
+        A3["Survey / Interpretation Model / Concrete Models / Evaluation"]
+        A4["Actor / Plan / Statistics"]
+        A5["MySQL / MongoDB / Redis / Outbox"]
+        A6["Evaluation Engine"]
     end
 
-    subgraph Worker["qs-worker"]
+    subgraph Worker["qs-worker<br/>异步驱动器"]
         W1["MQ Consumer"]
         W2["Event Handler"]
-        W3["Internal gRPC Client"]
+        W3["Duplicate Suppression"]
+        W4["Internal gRPC Client"]
     end
 
-    Client --> C1 --> C2 --> C3 --> A2
+    Client --> C1 --> C2 --> C3 --> C5 --> A2
+    Client --> C4
     Admin --> A1
-    A3 --> A4 --> MQ
-    MQ --> W1 --> W2 --> W3 --> A2
+    A3 --> A5 --> MQ
+    MQ --> W1 --> W2 --> W3 --> W4 --> A2
+    A2 --> A6
 ```
 
 ### 3.2 进程职责
 
 | 进程 | 职责 | 不负责 |
 | ---- | ---- | ------ |
-| `collection-server` | 前台 REST BFF、身份投影、监护关系校验、限流、SubmitQueue、SubmitGuard、状态查询 | 不直接写主业务数据库，不拥有 Survey/Evaluation 聚合 |
-| `qs-apiserver` | 主业务事实、领域模型、REST/gRPC、MySQL/Mongo 持久化、Outbox、调度任务、安全控制面 | 不直接承接所有前台高峰，不消费业务 MQ |
-| `qs-worker` | 订阅 MQ、分发事件、Ack/Nack、通过 internal gRPC 推进异步评估 | 不直接写主业务表，不拥有业务状态机 |
+| `collection-server` | 前台 REST BFF、身份投影、监护关系校验、限流、SubmitQueue、SubmitGuard、状态查询、gRPC 转发 | 不直接写主业务数据库，不拥有 Survey/Evaluation 聚合，不执行 Provider |
+| `qs-apiserver` | 主业务事实、领域模型、REST/gRPC、MySQL/Mongo 持久化、Outbox、调度任务、安全控制面、Evaluation Engine | 不直接承接所有前台高峰，不消费业务 MQ |
+| `qs-worker` | 订阅 MQ、分发事件、Ack/Nack、通过 internal gRPC 推进异步测评执行 | 不直接写主业务表，不拥有业务状态机，不直接生成报告事实 |
 
 ---
 
@@ -100,35 +143,52 @@ sequenceDiagram
     participant Outbox as Outbox Relay
     participant MQ as NSQ / MQ
     participant Worker as qs-worker
-    participant Pipeline as Evaluation Pipeline
+    participant Eval as Evaluation Engine
+    participant Provider as Interpretation Provider
+    participant Report as Report Writer
 
-    Client->>Collection: POST /api/v1/answersheets
+    Client->>Collection: Submit AnswerSheet
     Collection->>Collection: RateLimit / SubmitQueue / SubmitGuard
     Collection->>API: gRPC SaveAnswerSheet
     API->>API: Save AnswerSheet + stage answersheet.submitted
-    API-->>Collection: submit result
-    Collection-->>Client: 200 / 202 / 429
+    API-->>Collection: saved / accepted
+    Collection-->>Client: 200 / 202 / 429 / request_id
 
     Outbox->>MQ: publish answersheet.submitted
-    MQ->>Worker: consume
-    Worker->>API: CalculateAnswerSheetScore
-    Worker->>API: CreateAssessmentFromAnswerSheet
-    API->>API: stage assessment.submitted
-    Outbox->>MQ: publish assessment.submitted
-    MQ->>Worker: consume
-    Worker->>API: EvaluateAssessment
-    API->>Pipeline: Validation -> FactorScore -> RiskLevel -> Interpretation
-    Pipeline-->>API: AssessmentScore / InterpretReport
+    MQ->>Worker: consume answersheet.submitted
+    Worker->>API: internal gRPC CreateAssessmentFromAnswerSheet
+    API->>Eval: create Assessment
+    Eval->>API: stage assessment.created
+
+    Outbox->>MQ: publish assessment.created
+    MQ->>Worker: consume assessment.created
+    Worker->>API: internal gRPC CompleteAssessment
+    Eval->>API: stage assessment.completed
+
+    Outbox->>MQ: publish assessment.completed
+    MQ->>Worker: consume assessment.completed
+    Worker->>API: internal gRPC CompleteInterpretation
+    API->>Eval: resolve ModelRef
+    Eval->>Provider: LoadContext + Evaluate
+    Provider-->>Eval: EvaluationResult
+    Eval->>API: stage interpretation.completed / interpretation.failed
+
+    Outbox->>MQ: publish interpretation.completed
+    MQ->>Worker: consume interpretation.completed
+    Worker->>API: internal gRPC GenerateReportFromInterpretation
+    API->>Report: Save InterpretReport
+    Report->>API: stage report.generated
 ```
 
 这条链路的设计原则：
 
 ```text
-同步保存答卷事实
-异步生成评估结果
+同步保存 AnswerSheet 作答事实
+异步推进 Assessment / Interpretation / Report
 Outbox 保证关键事件可靠出站
 Worker 只做异步驱动
 apiserver 保持主业务状态机和持久化边界
+Evaluation Engine 通过 ModelRef / Provider / Context 支撑多解释模型扩展
 ```
 
 ---
@@ -140,14 +200,16 @@ flowchart LR
     Actor["Actor<br/>Testee / Clinician / Operator"]
     Plan["Plan<br/>任务编排"]
     Survey["Survey<br/>Questionnaire / AnswerSheet"]
-    Scale["Scale<br/>MedicalScale / Factor / Rule"]
-    Evaluation["Evaluation<br/>Assessment / Score / Report"]
+    IM["Interpretation Model<br/>ModelRef / Provider / Context / Registry"]
+    Models["Concrete Models<br/>Scale / MBTI / BigFive"]
+    Evaluation["Evaluation<br/>Assessment / Run / Result / Report"]
     Statistics["Statistics<br/>ReadModel / Projection"]
 
     Actor --> Survey
     Plan --> Survey
     Survey --> Evaluation
-    Scale --> Evaluation
+    Evaluation --> IM
+    IM --> Models
     Evaluation --> Statistics
     Actor --> Statistics
     Plan --> Statistics
@@ -155,12 +217,22 @@ flowchart LR
 
 | 限界上下文 | 负责 |
 | ---------- | ---- |
-| `Survey` | 问卷模板、题目、选项、答案校验、答卷提交、答卷事件 |
-| `Scale` | 医学/心理量表、因子、计分规则、风险等级、解读规则 |
-| `Evaluation` | Assessment 状态机、评估引擎、分数、风险、报告、失败处理 |
+| `Survey` | 问卷模板、题目、选项、提交规格、答案校验、答卷提交、答卷事件 |
+| `Interpretation Model` | ModelRef、Provider、Context、Registry、Provider contract、Context loading contract |
+| `Concrete Models` | Scale、MBTI、BigFive 等具体解释模型的规则资产和发布版本 |
+| `Evaluation` | Assessment 状态机、EvaluationRun、EvaluationResult、InterpretReport、失败重试、测评事件 |
 | `Actor` | 受试者、医生、操作员、入口、IAM 关系投影 |
 | `Plan` | 测评计划、任务状态机、调度与通知事件 |
 | `Statistics` | 读侧统计聚合、行为投影、同步重建、查询缓存 |
+
+关键边界：
+
+```text
+AnswerSheet 是用户提交的作答事实；
+Assessment 是系统基于 AnswerSheet 和 ModelRef 创建的一次测评执行实例；
+EvaluationResult 是 Provider 执行后的结构化结果；
+InterpretReport 是最终可交付的报告事实。
+```
 
 ---
 
@@ -177,12 +249,24 @@ Worker 管消费处理
 业务状态机管幂等
 ```
 
+新版主事件链路：
+
+```text
+answersheet.submitted
+  -> assessment.created
+  -> assessment.completed
+  -> interpretation.completed / interpretation.failed
+  -> report.generated
+```
+
 关键边界：
 
 - MQ 负责消息传输。
 - Outbox 负责业务数据库与消息出站之间的一致性。
 - Worker 消费不承诺 exactly-once，业务侧必须幂等。
-- `configs/events.yaml` 是事件类型、topic、delivery 和 handler 的契约入口。
+- `configs/events.yaml` 是事件类型、topic、delivery class 和 handler 的契约入口。
+- `interpretation-model.changed` 是规则变化事件，不等于某次 Assessment 的解释完成事件。
+- `interpretation.completed` 表示 Provider 执行完成，不等于报告已经生成。
 
 ---
 
@@ -199,6 +283,7 @@ RateLimit
   -> LockLease
   -> Worker concurrency
   -> 状态机 / 唯一约束
+  -> Metrics / Governance
 ```
 
 | 层 | 目标 |
@@ -206,10 +291,21 @@ RateLimit
 | Entry Protection | 在入口挡住突发请求，返回明确 429 / Retry-After |
 | SubmitQueue | 把答卷提交削峰为 collection-server 本进程有界异步队列 |
 | SubmitGuard | 通过 done marker + in-flight lock 抑制重复提交 |
+| gRPC max-inflight | 控制 collection 到 apiserver 的跨进程并发 |
 | Backpressure | 限制 MySQL/Mongo/IAM 等下游 in-flight 操作 |
 | LockLease | 跨实例短期互斥、选主、重复抑制 |
 | Worker concurrency | 控制 MQ 消费并发，避免积压恢复时打穿 apiserver |
-| Observability | 用 `qs_resilience_*` 指标解释保护决策 |
+| Observability | 用 resilience metrics 和 governance status 解释保护决策 |
+
+边界说明：
+
+```text
+SubmitQueue 不是 MQ；
+LockLease 不保证 exactly-once；
+Backpressure 不是慢 SQL 优化；
+Worker concurrency 不替代业务状态机；
+没有压测报告前，不承诺固定 QPS。
+```
 
 ---
 
@@ -223,6 +319,7 @@ qs-server 不重新实现完整 IAM，而是通过 `IAMModule` 接入 IAM 项目
 JWT / Service Token
   -> Principal
   -> TenantScope
+  -> Actor Projection
   -> AuthzSnapshot
   -> CapabilityDecision
   -> Business Handler
@@ -232,6 +329,7 @@ JWT / Service Token
 | ---- | ---- |
 | `Principal` | 当前调用者是谁 |
 | `TenantScope` | 当前调用发生在哪个 tenant/org 范围 |
+| `Actor Projection` | 调用者在测评业务中扮演什么角色 |
 | `AuthzSnapshot` | IAM 在当前 domain 下的授权快照 |
 | `CapabilityDecision` | qs-server 对业务能力的判断结果 |
 | `ServiceIdentity` | 服务间调用身份，来自 service auth / mTLS |
@@ -239,7 +337,12 @@ JWT / Service Token
 
 关键原则：
 
-> JWT 负责认证，AuthzSnapshot 负责授权；不要直接用 JWT roles 作为业务权限真值。
+```text
+JWT 负责认证，AuthzSnapshot 负责授权；
+不要直接用 JWT roles 作为业务权限真值；
+能管理解释模型规则，不等于能查看用户测评报告；
+ServiceAuth 证明哪个服务在调用，不替代用户授权。
+```
 
 ---
 
@@ -398,7 +501,7 @@ gRPC 服务由 apiserver 暴露，collection-server 和 qs-worker 作为 client 
 | ---- | ---- |
 | [docs/00-总览](docs/00-总览/) | 系统全局地图、代码组织、核心链路 |
 | [docs/01-运行时](docs/01-运行时/) | 三进程运行时、进程间调用、服务生命周期 |
-| [docs/02-业务模块](docs/02-业务模块/) | Survey、Scale、Evaluation、Actor、Plan、Statistics |
+| [docs/02-业务模块](docs/02-业务模块/) | Survey、Interpretation Model、Scale、Evaluation、Actor、Plan、Statistics |
 | [docs/03-基础设施](docs/03-基础设施/) | Event、DataAccess、Redis、Resilience、Security、Integrations、Runtime、Observability |
 | [docs/04-接口与运维](docs/04-接口与运维/) | REST/gRPC、配置、部署、调度、健康检查、排障、容量 |
 | [docs/05-专题分析](docs/05-专题分析/) | 架构决策解释：为什么这样拆、为什么这样异步、为什么用 Outbox |
@@ -458,12 +561,12 @@ make docs-verify       # REST 契约与文档卫生组合校验
 可以明确说：
 
 - 系统采用三进程协作。
-- Survey / Scale / Evaluation 已拆分为核心业务边界。
-- 主链路采用同步提交 AnswerSheet、异步 Evaluation。
+- Survey、Interpretation Model、Concrete Models、Evaluation 是新版核心业务边界。
+- 主链路采用同步提交 AnswerSheet、异步推进 Assessment / Interpretation / Report。
 - 关键事件通过 Outbox 可靠出站。
 - collection-server 承担前台保护层。
 - Resilience / Redis / Security / Statistics 都有基础设施文档和实现支撑。
-- IAM 通过 IAMModule 嵌入，业务授权基于 AuthzSnapshot。
+- IAM 通过 IAMModule 嵌入，业务授权基于 AuthzSnapshot 和 CapabilityDecision。
 
 需要谨慎说：
 
@@ -474,6 +577,7 @@ make docs-verify       # REST 契约与文档卫生组合校验
 | 完整 ACL | 有 service identity / mTLS / ACL seam，完整策略仍需完善 |
 | 固定 QPS | 没有压测报告前不承诺固定数字 |
 | 微服务 | 当前更准确是三进程协作，不是完整微服务 |
+| MBTIProvider 完整落地 | 以当前源码事实为准；未完整闭环时只能讲成演进方向 |
 | AI 解读 | 未来增强方向，不是当前基础报告主链路 |
 
 ---
@@ -542,7 +646,7 @@ git diff --check
 ```text
 feat(survey): add questionnaire version transition
 fix(evaluation): handle report generation failure
-docs(presentation): update async evaluation talk track
+docs(readme): update multi-interpretation model positioning
 test(outbox): cover failed relay retry
 ```
 
