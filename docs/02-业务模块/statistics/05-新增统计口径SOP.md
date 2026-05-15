@@ -73,7 +73,7 @@ flowchart TD
 | 统计领域模型 | [internal/apiserver/domain/statistics](../../../internal/apiserver/domain/statistics/) |
 | Query cache | [internal/apiserver/infra/statistics/cache.go](../../../internal/apiserver/infra/statistics/cache.go) |
 | Scheduler sync | [internal/apiserver/runtime/scheduler/statistics_sync.go](../../../internal/apiserver/runtime/scheduler/statistics_sync.go) |
-| Behavior projection | [docs/05-专题分析/behavior-projection/README.md](../../05-专题分析/behavior-projection/README.md) |
+| Behavior projection | [docs/05-专题分析/05-为什么需要读侧统计聚合.md](../../05-专题分析/05-为什么需要读侧统计聚合.md) |
 
 ## Verify
 

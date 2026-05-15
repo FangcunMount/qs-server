@@ -12,7 +12,7 @@
 | LocalHotCache | 进程内热点查询结果 | 本地 TTL + LRU 容量 | `LocalHotCache` |
 | MyAssessmentListCache | 用户维度测评列表 | userID version token | `my_assessment_list_cache.go` |
 | Statistics QueryCache | 统计 overview / dashboard query | TTL + warmup，部分路径用 static version token | `infra/statistics/cache.go` |
-| StaticList | 全局发布列表快照 | rebuild 覆盖；空列表 delete key | `PublishedScaleListCache` |
+| StaticList | 全局发布列表快照，例如已发布 Scale / MBTI / BigFive / InterpretationModel 列表 | rebuild 覆盖；空列表 delete key；模型发布/归档事件触发重建 | `PublishedScaleListCache`、`MBTIModelListCache`、`PublishedInterpretationModelListCache` |
 | ScaleListCache Port | 应用层消费的已发布量表列表缓存端口 | `Rebuild / GetPage` | `port/scalelistcache` |
 
 | 维度 | 结论 |
@@ -23,7 +23,7 @@
 | data key | 查询参数通常 hash 后拼入 versioned key，避免 key 过长 |
 | local cache | 进程内短 TTL LRU，只加速热点，不作为跨进程事实 |
 | StaticList 核心 | Redis 保存全量列表快照，分页在进程内切片 |
-| ScaleList 特点 | 只缓存已发布量表列表，Rebuild 会从 read model 全量拉取并写入 Redis |
+| StaticList 特点 | 只缓存发布态全局列表，例如已发布量表列表、已发布 MBTI 模型列表；Rebuild 会从具体模型 repository / read model 全量拉取并写入 Redis |
 | 边界 | QueryCache/StaticList 都是读优化；事实源仍然是 repository/read model |
 
 一句话概括：
@@ -420,6 +420,19 @@ sync/rebuild 后预热
 
 StaticList 是“全局稳定列表快照”缓存。
 
+它不只适用于 `PublishedScaleListCache`。随着解释模型抽象层引入，MBTI、BigFive 等解释模型的“已发布模型列表”也可以使用 StaticList。
+
+典型示例：
+
+```text
+PublishedScaleListCache
+MBTIModelListCache
+BigFiveModelListCache
+PublishedInterpretationModelListCache
+```
+
+这类缓存缓存的是“列表视图”，不是完整规则事实。具体规则仍然由 Scale、MBTI、BigFive 等具体模型模块的 repository 保存。
+
 它不同于 QueryCache：
 
 | 维度 | QueryCache | StaticList |
@@ -518,6 +531,88 @@ DEL scaleListKey
 
 ---
 
+## 9.5 解释模型列表 StaticList 示例
+
+`PublishedScaleListCache` 是当前 StaticList 的代表，但 StaticList 的模式可以复用到解释模型列表。
+
+例如：
+
+```text
+MBTIModelListCache
+BigFiveModelListCache
+PublishedInterpretationModelListCache
+```
+
+### 9.5.1 MBTIModelListCache
+
+`MBTIModelListCache` 可以缓存已发布 MBTI 模型列表。
+
+适合缓存的内容：
+
+```text
+ModelCode
+ModelVersion
+DisplayName
+QuestionnaireRef
+Status
+PublishedAt
+Summary
+```
+
+不适合缓存的内容：
+
+```text
+完整 DimensionRule
+完整 QuestionMapping
+完整 TypeProfile 正文
+完整 ReportTemplate
+EvaluationResult
+InterpretReport
+```
+
+原因是 StaticList 的职责是加速“列表展示”和“模型选择”，不是保存规则详情。
+
+完整规则详情应该通过 MBTI model repository 或 ObjectCache 回源。
+
+### 9.5.2 PublishedInterpretationModelListCache
+
+如果前端或后台需要统一展示所有已发布解释模型，可以设计一个跨模型列表：
+
+```text
+PublishedInterpretationModelListCache
+```
+
+列表项可以包含：
+
+```text
+ModelType
+ModelCode
+ModelVersion
+DisplayName
+QuestionnaireRef
+Status
+PublishedAt
+```
+
+它的事实源不是 Redis，而是各具体模型模块的 published model repository 或统一 read model。
+
+### 9.5.3 失效来源
+
+解释模型列表的重建可以由以下事件触发：
+
+```text
+scale.changed
+interpretation-model.changed
+mbti-model.published
+mbti-model.archived
+bigfive-model.published
+bigfive-model.archived
+```
+
+其中 `interpretation-model.changed` 只表达规则或模型目录变化，用于列表缓存失效、Context cache 失效和读模型刷新。
+
+它不表达某次 Assessment 已完成，也不应默认触发历史测评重算。
+
 ## 10. StaticList 为什么不是 ObjectCache
 
 Scale list 不是单对象：
@@ -551,8 +646,12 @@ scale:ABC
 | 用户私有列表，有多个筛选条件 | QueryCache |
 | 机构 dashboard 统计 | QueryCache + Hotset/Warmup |
 | 全局 published scale list | StaticList |
+| 全局 published MBTI model list | StaticList |
+| 全局 published interpretation model list | StaticList |
 | 全局 published questionnaire list | StaticList 或类似结构 |
 | 单个 scale detail | ObjectCache |
+| 单个 MBTI model detail | ObjectCache 或具体模型 repository 回源 |
+| 完整 TypeProfile / DimensionRule / ReportTemplate | 不用 StaticList，走具体模型规则事实源 |
 | 单个 questionnaire detail | ObjectCache |
 | 高基数搜索 | 通常不要缓存，或谨慎 QueryCache |
 | 强实时列表 | 直接回源或极短 TTL |
@@ -594,6 +693,30 @@ Rebuild()
 - 更新频率低。
 - 查询频率高。
 - 可在发布后或 startup warmup 执行。
+
+### 12.2.1 解释模型列表重建
+
+解释模型列表重建与 ScaleList 类似。
+
+推荐流程：
+
+```text
+模型发布 / 归档 / 规则目录变化
+  -> publish scale.changed / interpretation-model.changed / mbti-model.published
+  -> handler 调用具体模型 list cache Rebuild
+  -> repository / read model 拉取 published model summaries
+  -> Redis SET full list payload
+  -> LocalHotCache reset
+```
+
+注意：
+
+```text
+Rebuild 只重建列表视图；
+不修复模型规则；
+不重算历史 Assessment；
+不修改 EvaluationResult / InterpretReport。
+```
 
 ### 12.3 TTL 兜底
 
@@ -764,6 +887,16 @@ LocalHotCache 是内存结构，不依赖 Redis。为空或禁用时只是少一
 
 不适合。只适合低维、全局、规模可控、更新频率低的列表。
 
+### 19.4.1 “解释模型详情可以放进 StaticList”
+
+错误。
+
+StaticList 适合发布态模型列表，不适合保存完整规则详情。
+
+例如 `MBTIModelListCache` 可以保存模型摘要列表，但不应该保存完整 `DimensionRule`、`TypeProfile`、`ReportTemplate`、`EvaluationResult` 或 `InterpretReport`。
+
+这些内容分别属于具体模型 repository、EvaluationResult、InterpretReport 或 Statistics ReadModel。
+
 ### 19.5 “Statistics query 应每次业务写入都 bump version”
 
 不一定。统计查询通常通过 sync/warmup/TTL 管理，不适合每次业务写入都失效所有 dashboard key。
@@ -808,6 +941,18 @@ LocalHotCache 是内存结构，不依赖 Redis。为空或禁用时只是少一
 5. payload JSON 是否可 unmarshal。
 6. page/pageSize 是否非法。
 
+### 20.5 MBTI / 解释模型列表数据旧
+
+检查：
+
+1. `interpretation-model.changed` 或具体模型发布/归档事件是否出站。
+2. 对应 handler 是否触发 list cache `Rebuild`。
+3. 具体模型 repository / read model 是否能查到 published model summaries。
+4. Redis `static_meta` family 是否 available。
+5. full list payload 是否成功覆盖。
+6. LocalHotCache 是否 reset。
+7. 是否把完整规则详情误放入 StaticList，导致 payload 过大或更新慢。
+
 ### 20.4 Scale list 数据旧
 
 检查：
@@ -849,6 +994,22 @@ LocalHotCache 是内存结构，不依赖 Redis。为空或禁用时只是少一
 7. 定义 warmup 触发点。
 8. 补 tests/docs。
 
+### 21.2.1 新增解释模型 StaticList
+
+以 `MBTIModelListCache` 为例：
+
+1. 判断列表是否只包含发布态模型摘要。
+2. 定义 list item，不包含完整规则正文。
+3. 定义 port，例如 `mbtimodellistcache.PublishedListCache`。
+4. 定义 full list payload。
+5. 增加 keyspace builder 方法。
+6. 实现 `Rebuild`，从 MBTI model repository 或 read model 拉取 published summaries。
+7. 实现 `GetPage`，从 full list payload 进程内分页。
+8. 定义空列表语义。
+9. 接入 `interpretation-model.changed` 或具体模型发布/归档事件。
+10. 判断是否需要 startup/warmup target。
+11. 补 tests/docs。
+
 ### 21.3 修改 VersionToken
 
 谨慎评估：
@@ -874,6 +1035,8 @@ LocalHotCache 是内存结构，不依赖 Redis。为空或禁用时只是少一
 
 - Scale list cache port：[../../../internal/apiserver/port/scalelistcache/cache.go](../../../internal/apiserver/port/scalelistcache/cache.go)
 - Published scale list cache：[../../../internal/apiserver/infra/cachequery/scale_list_cache.go](../../../internal/apiserver/infra/cachequery/scale_list_cache.go)
+- MBTI model list cache port：未来可参考 `internal/apiserver/port/mbtimodellistcache/`
+- Published interpretation model list cache：未来可参考 `internal/apiserver/infra/cachequery/interpretation_model_list_cache.go`
 
 ### Shared
 
@@ -891,6 +1054,15 @@ go test ./internal/apiserver/port/scalelistcache
 go test ./internal/apiserver/application/scale
 go test ./internal/apiserver/infra/cacheentry
 go test ./internal/pkg/cacheplane/keyspace
+```
+
+如果新增解释模型 StaticList：
+
+```bash
+go test ./internal/apiserver/infra/cachequery
+go test ./internal/pkg/cacheplane/keyspace
+go test ./internal/apiserver/application/...
+go test ./internal/apiserver/infra/mongo/...
 ```
 
 如果修改 statistics query cache：

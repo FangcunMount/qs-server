@@ -155,7 +155,7 @@ MedicalScale 是规则聚合，Assessment 是执行聚合。
 Scale 模块文档重建为五篇。
 
 ```text
-READM.md
+README.md
 01-Scale模型--MedicalScale-Factor-Interpretion 模型设计.md
 02-Scale 维护链路--生命周期-因子维护-问卷绑定.md
 03-Scale 查询链路--查询服务与读模型.md
@@ -167,7 +167,7 @@ READM.md
 
 | 文档 | 核心主题 |
 | --- | --- |
-| `READM.md` | Scale 定位、边界、文档导航 |
+| `README.md` | Scale 定位、边界、文档导航 |
 | `01` | MedicalScale / Factor / ScoringSpec / InterpretationRules 模型设计 |
 | `02` | 生命周期、因子维护、问卷绑定写侧链路 |
 | `03` | QueryService、Snapshot、DTO、ReadModel、缓存查询链路 |
@@ -183,7 +183,7 @@ READM -> 01 -> 02 -> 03 -> 04 -> 05
 如果只想快速理解 Scale 的边界：
 
 ```text
-READM.md
+README.md
 01-Scale模型--MedicalScale-Factor-Interpretion 模型设计.md
 04-Scale 测评链路--Scale与Evaluation联动详解.md
 ```

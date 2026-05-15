@@ -109,7 +109,7 @@ redis/
 | 2 | [01-运行时与Family模型.md](./01-运行时与Family模型.md) | family、profile、namespace、Runtime、Handle、fallback、degraded |
 | 3 | [02-Cache层总览.md](./02-Cache层总览.md) | ObjectCache、QueryCache、StaticList、Hotset、SDK token 的分流 |
 | 4 | [03-ObjectCache主路径.md](./03-ObjectCache主路径.md) | read-through、negative cache、compression、singleflight、writeback |
-| 5 | [04-QueryCache与StaticList.md](./04-QueryCache与StaticList.md) | versioned query cache、version token、ScaleListCache |
+| 5 | [04-QueryCache与StaticList.md](./04-QueryCache与StaticList.md) | versioned query cache、version token、ScaleListCache、MBTIModelListCache |
 | 6 | [05-Hotset与WarmupTarget模型.md](./05-Hotset与WarmupTarget模型.md) | hotset、WarmupTarget、scope、TopN、suppression |
 | 7 | [06-Redis分布式锁层.md](./06-Redis分布式锁层.md) | locklease、leader、idempotency、duplicate suppression |
 | 8 | [07-缓存治理层.md](./07-缓存治理层.md) | coordinator、manual warmup、repair complete、status |
@@ -181,6 +181,17 @@ redis/
 - LocalHotCache。
 - 是否适合 StaticList。
 - 是否需要 WarmupTarget。
+
+静态列表缓存不仅适用于 Scale，也适用于 MBTI、BigFive 等解释模型的“已发布模型列表”。例如：
+
+```text
+ScaleListCache
+MBTIModelListCache
+BigFiveModelListCache
+PublishedInterpretationModelListCache
+```
+
+这类缓存的前提是：列表规模可控、更新频率较低、可通过 version token 或显式 invalidation 失效，并且 cache miss 后必须能回源具体模型 repository 或 read model。
 
 ### 4.4 要新增预热目标或热点治理
 
@@ -356,7 +367,7 @@ lock_lease
 | 按 ID/code 读单对象 | ObjectCache | QueryCache / 手写 Redis |
 | 用户私有列表 | QueryCache | ObjectCache |
 | dashboard overview | QueryCache + WarmupTarget | 实时扫主表 |
-| 全局发布量表列表 | StaticList | ObjectCache |
+| 全局发布量表列表 / 解释模型列表 | StaticList | ObjectCache |
 | 热点预热候选 | Hotset | 业务排行榜 |
 | 微信 token | SDK Token Cache | ObjectCache |
 | 跨实例互斥 | LockLease | ObjectCache |
@@ -375,6 +386,8 @@ lock_lease
 | Plan ObjectCache | Plan repository |
 | Statistics QueryCache | Statistics ReadModel |
 | ScaleList StaticList | Scale read model / list builder |
+| MBTIModelList StaticList | MBTI model repository / list builder |
+| PublishedInterpretationModelList StaticList | concrete model repository / interpretation model list builder |
 | Hotset | 访问行为热度，只是治理信号 |
 | LockLease | 短期租约，不是业务事实 |
 | SDK Token Cache | 第三方平台 token |
@@ -490,6 +503,12 @@ raw error
 
 不对。StaticList 只适合全局、低频更新、规模可控的列表。
 
+### 12.7 “解释模型列表都要复制一份到 Redis”
+
+不对。Redis StaticList 只适合缓存可回源、规模可控、低频更新的发布态列表。
+
+例如已发布 Scale 列表、已发布 MBTI 模型列表可以考虑 StaticList；但模型规则详情、TypeProfile 全量内容、EvaluationResult 和 InterpretReport 不应作为 StaticList 事实源保存。
+
 ---
 
 ## 13. 排障入口
@@ -500,6 +519,7 @@ raw error
 | profile / namespace / fallback 错 | [01-运行时与Family模型.md](./01-运行时与Family模型.md) |
 | ObjectCache 命中率低 | [03-ObjectCache主路径.md](./03-ObjectCache主路径.md) |
 | QueryCache 失效不对 | [04-QueryCache与StaticList.md](./04-QueryCache与StaticList.md) |
+| MBTI / 解释模型列表不更新 | [04-QueryCache与StaticList.md](./04-QueryCache与StaticList.md) |
 | Hotset 无数据 | [05-Hotset与WarmupTarget模型.md](./05-Hotset与WarmupTarget模型.md) |
 | warmup 失败 | [07-缓存治理层.md](./07-缓存治理层.md) |
 | scheduler 不跑 | [06-Redis分布式锁层.md](./06-Redis分布式锁层.md) |

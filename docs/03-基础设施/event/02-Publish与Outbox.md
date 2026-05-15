@@ -37,6 +37,7 @@
 ```text
 questionnaire.changed
 scale.changed
+interpretation-model.changed
 task.opened
 ```
 
@@ -55,7 +56,10 @@ task.opened
 
 ```text
 answersheet.submitted
-assessment.submitted
+assessment.created
+assessment.completed
+interpretation.completed
+interpretation.failed
 report.generated
 footprint.report_generated
 ```
@@ -63,7 +67,9 @@ footprint.report_generated
 这类事件一旦丢失，会导致：
 
 - 答卷提交后不创建测评。
-- 测评提交后不执行评估。
+- 测评创建后不执行测评流程。
+- 测评完成后不执行解释流程。
+- 解释完成后不生成报告。
 - 报告生成后统计/标签/通知不推进。
 - 行为投影缺失。
 
@@ -181,7 +187,8 @@ sequenceDiagram
 | Event | Delivery | 语义 |
 | ----- | -------- | ---- |
 | `questionnaire.changed` | best_effort | 问卷规则变化通知 |
-| `scale.changed` | best_effort | 量表规则变化通知 |
+| `scale.changed` | best_effort | 医学量表规则变化通知 |
+| `interpretation-model.changed` | best_effort | 解释模型规则变化通知 |
 | `task.opened` | best_effort | 任务开放通知 |
 | `task.completed` | best_effort | 任务完成通知 |
 | `task.expired` | best_effort | 任务过期通知 |
@@ -260,8 +267,10 @@ outbox relay 可以发送 durable event。
 
 ```text
 answersheet.submitted
-assessment.submitted
-assessment.interpreted
+assessment.created
+assessment.completed
+interpretation.completed
+interpretation.failed
 assessment.failed
 report.generated
 footprint.*
@@ -277,6 +286,8 @@ footprint.*
 | 需要和业务状态同边界 | 避免状态成功但事件丢失 |
 
 ---
+
+其中，`assessment.created`、`assessment.completed`、`interpretation.completed`、`interpretation.failed` 是面向多解释模型链路的阶段性事件。事件系统只保证这些事实可靠出站；具体解释模型由 Interpretation Provider 承接，事件系统不关心 Provider 内部是 Scale、MBTI 还是其它模型。
 
 ## 7. Outbox Stage 边界
 
@@ -295,7 +306,7 @@ mysql.RequireTx(ctx)
 ```text
 WithinTransaction
   -> save Assessment
-  -> stage AssessmentSubmittedEvent / AssessmentFailedEvent
+  -> stage AssessmentCreatedEvent / AssessmentCompletedEvent / AssessmentFailedEvent
   -> commit
 ```
 
@@ -329,7 +340,8 @@ Mongo transaction
 | 状态保存成功，outbox 写失败 | 后续流程永远不触发 |
 | outbox 写成功，状态保存失败 | worker 消费到不存在的业务事实 |
 | report.generated 提前出站 | 下游查不到报告 |
-| assessment.submitted 丢失 | 测评卡住不评估 |
+| assessment.created 丢失 | 测评创建后的后续执行链路无法触发 |
+| interpretation.completed 丢失 | 解释完成后报告生成链路无法触发 |
 
 ---
 
@@ -564,28 +576,28 @@ Hook 失败会 mark failed，不会 publish。
 Evaluation 的 Report 保存链路是 durable outbox 的典型例子。
 
 ```text
-InterpretationHandler
-  -> ApplyEvaluation
-  -> Save Assessment
+InterpretationCompletedHandler
+  -> Load Assessment / EvaluationResult
   -> Build Report
   -> SaveReportDurably
-  -> stage assessment.interpreted / report.generated / footprint.report_generated
+  -> stage report.generated / footprint.report_generated
 ```
 
-为什么 `assessment.interpreted` 不在 `ApplyEvaluation` 里直接添加事件？
+为什么 `report.generated` 不应在解释流程完成前直接添加事件？
 
 因为完整成功语义是：
 
 ```text
-Assessment 已保存为 interpreted
+Assessment 已完成测评执行
+Interpretation 已完成解释
 Report 已成功保存
-success events 已 stage
+report.generated / footprint.report_generated 已 stage
 ```
 
-如果提前发 interpreted，可能出现：
+如果提前发 report.generated，可能出现：
 
 ```text
-下游收到 interpreted
+下游收到 report.generated
 但 report 查不到
 ```
 
@@ -613,8 +625,10 @@ success events 已 stage
 
 ```text
 answersheet.submitted
-assessment.submitted
-assessment.interpreted
+assessment.created
+assessment.completed
+interpretation.completed
+interpretation.failed
 assessment.failed
 report.generated
 footprint.entry_opened
@@ -788,6 +802,30 @@ stage 只完成第一步。
 7. 补 relay / architecture tests。
 8. 补 worker handler。
 9. 补文档和排障项。
+
+### 20.1.1 新增解释模型链路事件
+
+新增解释模型相关事件时，先判断事件属于哪一类：
+
+```text
+规则变化事件
+    例如 interpretation-model.changed，通常 best_effort，用于 Context cache 失效、读模型刷新、轻量通知。
+
+一次测评执行事件
+    例如 interpretation.completed / interpretation.failed，通常 durable_outbox，用于驱动报告生成、统计投影和失败处理。
+```
+
+不要把规则变化事件用于表达某次 Assessment 已完成，也不要让规则变化事件默认触发历史 Assessment 重算。
+
+事件命名应保持阶段事实清晰：
+
+```text
+assessment.created
+assessment.completed
+interpretation.completed
+interpretation.failed
+report.generated
+```
 
 ### 20.2 将 best_effort 升级为 durable_outbox
 

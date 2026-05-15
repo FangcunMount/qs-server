@@ -22,6 +22,7 @@
 | 新 JWT claim / 身份字段 | `securityplane.Principal` + `securityprojection` + HTTP/gRPC context | handler 直接读 raw claim |
 | 新 tenant / org scope | `TenantScope` + identity/scope middleware + snapshot loader domain 规则 | 业务服务里各自 Parse tenant_id |
 | 新 capability | `application/authz.Capability` + `DecideCapability` + route middleware | 用 JWT roles 判断业务权限 |
+| 新解释模型安全能力 | `read_interpretation_models` / `manage_interpretation_models` / `read_interpretation_reports` + IAM resource/action + route middleware | 把模型管理权限、报告访问权限和 JWT roles 混在一起 |
 | 新 AuthzSnapshot 行为 | `iamauth.SnapshotLoader` + authz snapshot middleware/interceptor | handler 直接调用 IAM SDK |
 | 新 service auth 调用 | service auth wrapper + shared bearer helper + gRPC client wiring | 手写 `authorization` metadata |
 | 新 mTLS 规则 | gRPC config + interceptor contract + identity match tests | 把 mTLS 当完整业务授权 |
@@ -51,13 +52,29 @@
 | 它是否暴露敏感信息？ | token、raw key、权限详情要谨慎 |
 | 文档和路由矩阵是否同步？ | 防止安全漂移 |
 
+如果新增的是 MBTI、BigFive、职业兴趣测评等解释模型，还要额外确认：
+
+| 问题 | 为什么重要 |
+| ---- | ---------- |
+| 它是“模型规则管理”还是“用户报告访问”？ | 二者 privacy 和风险不同，不能共用 capability |
+| 它是否需要新的资源命名？ | 例如 `qs:interpretation_models`、`qs:interpretation_reports` |
+| 它是否需要新的模型 scope？ | 例如按 model_type、model_code、org_id 做范围控制 |
+| 它是否涉及服务间调用？ | 例如 worker / collection-server 触发 Evaluation 或读取报告 |
+| 它是否需要 service auth 或 mTLS / ACL？ | 内部服务不能靠用户 JWT 伪装 |
+| 它是否需要对象级 ACL？ | capability 是粗粒度能力，不一定能表达单份报告授权 |
+
 ---
 
 ## 2. 决策树
 
 ```mermaid
 flowchart TD
-    start["新增安全能力"] --> identity{"新增身份字段/来源?"}
+    start["新增安全能力"] --> interpretation{"是否是解释模型相关?"}
+    interpretation -->|yes| interpKind{"模型规则 / 报告 / 服务调用?"}
+    interpKind -->|模型规则| interpModel["Capability: read/manage_interpretation_models\nResource: qs:interpretation_models"]
+    interpKind -->|报告访问| interpReport["Capability: read_interpretation_reports\nResource: qs:interpretation_reports"]
+    interpKind -->|服务调用| interpSvc["ServiceIdentity / ServiceAuth / mTLS / ACL"]
+    interpretation -->|no| identity{"新增身份字段/来源?"}
     identity -->|yes| principal["Principal / securityprojection"]
     identity -->|no| scope{"新增租户或组织范围?"}
     scope -->|yes| tenant["TenantScope / scope middleware"]
@@ -212,6 +229,124 @@ CapabilityX:
 - 在 handler 内手写 permission 判断。
 - capability 常量新增但不更新 isKnownCapability。
 - 修改 HTTP error envelope 但不更新接口文档。
+
+### 6.5 新增解释模型 capability
+
+引入 MBTI、BigFive 等解释模型时，建议先拆分三类能力：
+
+| Capability | 面向对象 | 典型资源 |
+| ---------- | -------- | -------- |
+| `read_interpretation_models` | 读取解释模型目录和详情 | `qs:interpretation_models` read/list |
+| `manage_interpretation_models` | 创建、更新、发布、归档解释模型规则 | `qs:interpretation_models` create/update/publish/archive |
+| `read_interpretation_reports` | 读取用户解释报告，例如 MBTI 报告 | `qs:interpretation_reports` read/list |
+
+不要把它们合并成一个 `manage_mbti`。
+
+原因：
+
+```text
+模型规则管理是配置权限；
+报告访问是用户数据权限；
+两者风险、审计、隐私边界不同。
+```
+
+### 6.6 IAM resource/action 接入流程
+
+新增解释模型 capability 时，IAM 侧也要同步资源和动作。
+
+推荐流程：
+
+```text
+1. QS 侧新增 Capability 常量。
+2. QS 侧更新 isKnownCapability。
+3. QS 侧更新 capabilityAllowed。
+4. IAM 侧新增 resource，例如 qs:interpretation_models / qs:interpretation_reports。
+5. IAM 侧新增 action，例如 read/list/create/update/publish/archive/statistics。
+6. IAM role 绑定 resource/action。
+7. IAM 发布策略并推进 authz_version。
+8. QS 请求期通过 SnapshotLoader 读取新的 AuthzSnapshot。
+9. QS route middleware 使用新 capability。
+10. 补 capability / middleware / route matrix tests。
+```
+
+资源建议：
+
+| Resource | 说明 |
+| -------- | ---- |
+| `qs:interpretation_models` | Scale / MBTI / BigFive 等解释模型规则和目录 |
+| `qs:interpretation_reports` | Scale / MBTI / BigFive 等解释报告 |
+| `qs:scales` | 兼容医学量表规则资源 |
+| `qs:reports` | 兼容历史报告访问资源 |
+
+Action 建议：
+
+```text
+read
+list
+create
+update
+delete
+publish
+unpublish
+archive
+statistics
+```
+
+### 6.7 MBTI 报告访问示例
+
+目标：允许运营人员查看 MBTI 报告，但不允许其维护 MBTI 规则。
+
+推荐授权：
+
+```text
+Capability: read_interpretation_reports
+Resource:   qs:interpretation_reports
+Action:     read / list
+```
+
+不推荐：
+
+```text
+Capability: manage_interpretation_models
+```
+
+因为 `manage_interpretation_models` 表达的是规则管理，不是报告访问。
+## 6.8 新增解释模型 Scope
+
+解释模型可能需要比 org 更细的 scope。
+
+常见 scope：
+
+| Scope | 示例 | 说明 |
+| ----- | ---- | ---- |
+| `org_id` | `org:1001` | 机构范围 |
+| `model_type` | `model_type:mbti` | 模型类型范围 |
+| `model_code` | `model_code:MBTI_STANDARD` | 模型编码范围 |
+| `model_version` | `model_version:1.0.0` | 模型版本范围 |
+| `report_owner` | `testee:xxx` | 报告归属对象范围 |
+
+注意：TenantScope 仍只负责租户 / 机构上下文。
+
+模型级 scope 不应该塞进 `TenantScope`，而应通过以下方式之一表达：
+
+```text
+IAM resource pattern；
+AuthzSnapshot permission attributes；
+application guard；
+对象级 ACL；
+报告访问服务中的 ownership check。
+```
+
+示例：
+
+```text
+qs:interpretation_reports:mbti
+qs:interpretation_models:mbti:MBTI_STANDARD
+```
+
+如果需要对象级权限，例如“只能看自己孩子的 MBTI 报告”，不要只靠 route-level capability。
+
+应在 application 层增加 ownership / relationship guard。
 
 ---
 
@@ -424,6 +559,7 @@ config file loading 是 TODO。
 | TenantScope | 数字 tenant、非数字 tenant、空 tenant、0 tenant、numeric org middleware |
 | AuthzSnapshot | loader nil、load failure、context injection、authz_version invalidation |
 | Capability | allowed、denied、missing_snapshot、unknown_capability、admin bypass |
+| Interpretation Capability | read/manage model、read report、IAM resource/action 映射、报告访问 denied、模型管理 denied |
 | ServiceAuth | provider nil、token error、metadata header、RequireTransportSecurity |
 | mTLS | identity present/missing、CN/service_id match/mismatch、legacy fallback |
 | ACL | default allow/deny、file missing/malformed、method allow/deny |
@@ -439,6 +575,7 @@ config file loading 是 TODO。
 | 新 Principal 字段/source | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
 | 新 TenantScope 规则 | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
 | 新 Capability | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
+| 新解释模型 capability/scope/service auth | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md)、[03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md)、`../../02-业务模块/interpretation-model/` |
 | SnapshotLoader 变化 | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | ServiceAuth / mTLS / ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
 | Operator projection | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) |
@@ -459,6 +596,10 @@ config file loading 是 TODO。
 | HTTP/gRPC 行为已对齐或差异已解释 | ☐ |
 | context key / metadata 变更有 tests | ☐ |
 | 新 capability 已补 allowed/denied/missing/unknown tests | ☐ |
+| 如为解释模型，已区分模型规则管理和报告访问权限 | ☐ |
+| 如为解释模型，IAM resource/action 已同步 | ☐ |
+| 如为解释模型，service auth / mTLS / ACL 已评估 | ☐ |
+| 如为报告访问，ownership / relationship guard 已评估 | ☐ |
 | 新 service auth 未暴露 token | ☐ |
 | 新 mTLS/ACL 行为有 contract tests | ☐ |
 | docs 和 Verify 已更新 | ☐ |
@@ -477,6 +618,10 @@ config file loading 是 TODO。
 | ACL 文档先行声称完整支持 | 误导运维和安全评审 |
 | Operator roles 做鉴权 | 使用了可能滞后的本地投影 |
 | snapshot load 失败默认放行 | 权限绕过 |
+| 用 `manage_interpretation_models` 放行 MBTI 报告访问 | 混淆规则管理和用户数据访问 |
+| 把 `model_type=mbti` 塞进 TenantScope | 租户范围和模型范围混淆 |
+| worker 调解释模型服务时复用用户 JWT | 服务身份和用户身份混淆 |
+| 新增 IAM resource 后不推进 authz_version | Snapshot 仍是旧权限，排障困难 |
 | context 中塞 raw JWT | 敏感信息泄露 |
 | status endpoint 暴露 token/permission 全量 | 安全风险 |
 
@@ -513,6 +658,16 @@ go test ./internal/collection-server/infra/iam
 go test ./internal/collection-server/transport/rest/middleware
 ```
 
+解释模型安全能力：
+
+```bash
+go test ./internal/apiserver/application/authz
+go test ./internal/apiserver/transport/rest/middleware
+go test ./internal/apiserver/transport/grpc
+go test ./internal/pkg/serviceauth
+go test ./internal/pkg/grpc
+```
+
 文档：
 
 ```bash
@@ -529,6 +684,8 @@ git diff --check
 - HTTP identity：[../../../internal/pkg/httpauth/identity.go](../../../internal/pkg/httpauth/identity.go)
 - gRPC context：[../../../internal/pkg/grpc/context.go](../../../internal/pkg/grpc/context.go)
 - Authz capability：[../../../internal/apiserver/application/authz/capability.go](../../../internal/apiserver/application/authz/capability.go)
+- Interpretation Model docs：[../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md)
+- Evaluation docs：[../../02-业务模块/evaluation/README.md](../../02-业务模块/evaluation/README.md)
 - Snapshot loader：[../../../internal/pkg/iamauth/snapshot_loader.go](../../../internal/pkg/iamauth/snapshot_loader.go)
 - Service auth shared：[../../../internal/pkg/serviceauth/bearer.go](../../../internal/pkg/serviceauth/bearer.go)
 - gRPC server chain：[../../../internal/pkg/grpc/server.go](../../../internal/pkg/grpc/server.go)
@@ -543,5 +700,6 @@ git diff --check
 | 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |
 | Principal 与 TenantScope | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
 | AuthzSnapshot 与 CapabilityDecision | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
+| 解释模型抽象 | [../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md) |
 | ServiceIdentity 与 mTLS-ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
 | OperatorRoleProjection | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) |

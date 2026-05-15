@@ -124,18 +124,21 @@ sequenceDiagram
 
 `handlers.NewRegistry()` 是 worker handler 的显式 catalog。
 
-当前注册了 12 个 handler factory：
+当前 handler factory 应与 `configs/events.yaml` 保持一致。面向多解释模型链路后，建议注册以下 handler factory：
 
 | Handler Name | 说明 |
 | ------------ | ---- |
-| `answersheet_submitted_handler` | 处理答卷提交，计算答卷分并创建 Assessment |
-| `assessment_submitted_handler` | 处理测评提交，触发评估等后续动作 |
-| `assessment_interpreted_handler` | 处理测评已解读 |
+| `answersheet_submitted_handler` | 处理答卷提交，创建 Assessment |
+| `assessment_created_handler` | 处理测评已创建，触发测评执行流程 |
+| `assessment_completed_handler` | 处理测评执行已完成，触发解释模型执行流程 |
+| `interpretation_completed_handler` | 处理解释模型执行已完成，触发报告生成等后续动作 |
+| `interpretation_failed_handler` | 处理解释模型执行失败，记录失败统计、告警或补偿入口 |
 | `assessment_failed_handler` | 处理测评失败 |
 | `behavior_projector_handler` | 处理全部 `footprint.*` 行为投影 |
 | `questionnaire_changed_handler` | 处理问卷变更 |
 | `report_generated_handler` | 处理报告生成，例如回写标签 |
-| `scale_changed_handler` | 处理量表变更 |
+| `scale_changed_handler` | 处理医学量表规则变化，例如二维码/缓存刷新 |
+| `interpretation_model_changed_handler` | 处理解释模型规则变化，例如 Context cache 失效和读模型刷新 |
 | `task_opened_handler` | 处理任务开放通知 |
 | `task_completed_handler` | 处理任务完成通知 |
 | `task_expired_handler` | 处理任务过期通知 |
@@ -181,17 +184,19 @@ handler 依赖由 `handlers.Dependencies` 注入。
 `InternalClient` 抽象了 worker 侧使用的 apiserver internal gRPC 能力：
 
 - CreateAssessmentFromAnswerSheet。
-- CalculateAnswerSheetScore。
-- EvaluateAssessment。
+- CompleteAssessment。
+- CompleteInterpretation。
+- GenerateReportFromInterpretation。
 - SyncAssessmentAttention。
 - GenerateQuestionnaireQRCode。
 - GenerateScaleQRCode。
 - HandleQuestionnairePublishedPostActions。
 - HandleScalePublishedPostActions。
+- HandleInterpretationModelChangedPostActions。
 - ProjectBehaviorEvent。
 - SendTaskOpenedMiniProgramNotification。
 
-这说明 worker handler 主要通过 internal gRPC 回调 apiserver，不直接写业务主表。
+这说明 worker handler 主要通过 internal gRPC 回调 apiserver，不直接写业务主表。Worker 只负责按事件阶段驱动应用服务，不关心解释模型内部是 Scale、MBTI 还是其它 Provider。
 
 ---
 
@@ -444,7 +449,8 @@ Event System 不提供全链路 exactly-once。以下情况都可能重复：
 | answersheet.submitted | Redis locklease duplicate suppression |
 | behavior projector | analytics_projector_checkpoint |
 | outbox relay | event_id unique + outbox status |
-| Assessment/Evaluation | 状态机和唯一约束 |
+| Assessment execution | Assessment 状态机、唯一约束、EvaluationRun |
+| Interpretation execution | Provider 执行幂等、Assessment 状态机、Result/Report 唯一约束 |
 | Report / Statistics | report durable boundary + projection checkpoint |
 | Task notification | best_effort，handler 尽量容忍重复 |
 
@@ -475,16 +481,18 @@ answersheet:processing:{answerSheetID}
 
 | Event | Handler | 主要动作 |
 | ----- | ------- | -------- |
-| `answersheet.submitted` | `answersheet_submitted_handler` | 解析答卷提交事件，计算答卷分，创建 Assessment |
+| `answersheet.submitted` | `answersheet_submitted_handler` | 解析答卷提交事件，创建 Assessment，并发布 `assessment.created` |
 
-### 14.2 Assessment / Report
+### 14.2 Assessment / Interpretation / Report
 
 | Event | Handler | 主要动作 |
 | ----- | ------- | -------- |
-| `assessment.submitted` | `assessment_submitted_handler` | 触发 EvaluateAssessment |
-| `assessment.interpreted` | `assessment_interpreted_handler` | 后续统计/日志/副作用 |
-| `assessment.failed` | `assessment_failed_handler` | 失败统计/告警/日志 |
-| `report.generated` | `report_generated_handler` | 报告生成后回写标签等动作 |
+| `assessment.created` | `assessment_created_handler` | 触发测评执行流程，完成后发布 `assessment.completed` |
+| `assessment.completed` | `assessment_completed_handler` | 触发解释模型执行流程，通过 Interpretation Provider 完成解释 |
+| `interpretation.completed` | `interpretation_completed_handler` | 解释完成后触发报告生成 |
+| `interpretation.failed` | `interpretation_failed_handler` | 解释失败后的失败统计、告警或补偿入口 |
+| `assessment.failed` | `assessment_failed_handler` | 测评失败后的失败统计、告警或补偿入口 |
+| `report.generated` | `report_generated_handler` | 报告生成后回写标签、统计投影、通知等动作 |
 
 ### 14.3 Behavior
 
@@ -492,12 +500,15 @@ answersheet:processing:{answerSheetID}
 | ------ | ------- | -------- |
 | `footprint.*` | `behavior_projector_handler` | 调 internal gRPC ProjectBehaviorEvent，更新 behavior projection |
 
-### 14.4 Survey / Scale lifecycle
+### 14.4 Survey / Scale / Interpretation Model lifecycle
 
 | Event | Handler | 主要动作 |
 | ----- | ------- | -------- |
-| `questionnaire.changed` | `questionnaire_changed_handler` | 问卷发布后动作，例如二维码/缓存 |
-| `scale.changed` | `scale_changed_handler` | 量表发布后动作，例如二维码/缓存 |
+| `questionnaire.changed` | `questionnaire_changed_handler` | 问卷发布后动作，例如二维码/缓存刷新 |
+| `scale.changed` | `scale_changed_handler` | 医学量表规则变化后动作，例如二维码/缓存刷新 |
+| `interpretation-model.changed` | `interpretation_model_changed_handler` | 解释模型规则变化后动作，例如 Context cache 失效、读模型刷新 |
+
+注意：`interpretation-model.changed` 表示规则变化，不表示某次 Assessment 的解释执行完成；某次测评中的解释结果应由 `interpretation.completed` / `interpretation.failed` 表达。
 
 ### 14.5 Plan task
 
@@ -654,7 +665,8 @@ Worker 消费会记录：
 4. message metadata/payload 是否包含 event_type。
 5. dispatcher.HasHandler(eventType)。
 6. handler registry 是否注册。
-7. handler 是否返回 error 被 Nack。
+7. `configs/events.yaml` 中的 handler 名称是否与 `handlers.NewRegistry()` 中的新事件 handler 保持一致。
+8. handler 是否返回 error 被 Nack。
 
 ### 19.3 消息反复重试
 
@@ -691,6 +703,20 @@ Worker 消费会记录：
 4. 在 `configs/events.yaml` 引用 handler。
 5. 补 registry/dispatcher/handler tests。
 6. 补本文档或 SOP。
+
+### 20.1.1 新增解释模型链路 handler
+
+新增解释模型相关 handler 时，先判断事件类型：
+
+```text
+interpretation-model.changed
+    规则变化事件，通常 best_effort，handler 主要做 Context cache 失效、读模型刷新、轻量通知。
+
+interpretation.completed / interpretation.failed
+    一次测评执行事件，通常 durable_outbox，handler 主要驱动报告生成、统计投影、失败处理或补偿入口。
+```
+
+Worker handler 不应直接执行具体模型算法。Scale、MBTI、BigFive 等解释模型应通过 apiserver application service 和 Interpretation Provider 执行，worker 只负责消费事件并调用 internal gRPC。
 
 ### 20.2 修改 Ack/Nack 策略
 
@@ -795,6 +821,8 @@ Worker 消费会记录：
 - Handler registry：[../../../internal/worker/handlers/registry.go](../../../internal/worker/handlers/registry.go)
 - Handler catalog：[../../../internal/worker/handlers/catalog.go](../../../internal/worker/handlers/catalog.go)
 - AnswerSheet handler：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
+- Assessment handler：[../../../internal/worker/handlers/assessment_handler.go](../../../internal/worker/handlers/assessment_handler.go)
+- Interpretation handler：[../../../internal/worker/handlers/interpretation_handler.go](../../../internal/worker/handlers/interpretation_handler.go)
 - Worker handlers：[../../../internal/worker/handlers/](../../../internal/worker/handlers/)
 
 ### Contract

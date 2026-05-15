@@ -24,6 +24,7 @@
 | -------- | -------- | -------- |
 | MySQL 主写模型 | AssessmentTask 新字段、新关系表 | domain port + MySQL repository + migration |
 | Mongo 文档聚合 | 新答卷文档结构、新报告结构 | domain port + Mongo repository + document mapper |
+| 新解释模型规则 | MBTIModel、TypeProfile、DimensionRule | 具体模型 domain port + Mongo Document + mapper + migration |
 | Statistics ReadModel | 新统计聚合字段、新趋势查询 | read model port + MySQL adapter + rebuild writer |
 | Outbox 能力 | 新 durable event 需要同事务出站 | MySQL/Mongo outbox store + application stage |
 | Migration | 新表、索引、字段、集合 | `internal/pkg/migration/migrations/*` |
@@ -44,6 +45,8 @@
 | ---- | ---- |
 | 这是主写模型还是读模型？ | 决定 repository 还是 read model |
 | 数据是结构化关系还是文档聚合？ | 决定 MySQL 还是 Mongo |
+| 是否是解释模型规则？ | 优先判断是否应作为具体模型模块的 Mongo 文档聚合 |
+| 是否是一次测评执行结果？ | 优先归 EvaluationResult / InterpretReport，而不是具体模型规则仓储 |
 | 是否需要强事务？ | 决定 UnitOfWork / session transaction |
 | 是否会产生 durable event？ | 决定是否接 outbox stage |
 | 是否是统计查询优化？ | 决定是否进入 Statistics read model |
@@ -59,7 +62,12 @@
 
 ```mermaid
 flowchart TD
-    start["新增持久化能力"] --> write{"是否保存业务主事实?"}
+    start["新增持久化能力"] --> interp{"是否是解释模型规则?"}
+    interp -- 是 --> modeldoc["具体模型 Mongo 文档聚合\n例如 MBTIModel / TypeProfile"]
+    interp -- 否 --> result{"是否是一次测评执行结果?"}
+    result -- 是 --> evalstore["Evaluation 结果/报告事实源\nEvaluationResult / InterpretReport"]
+    result -- 否 --> write{"是否保存业务主事实?"}
+
     write -- 是 --> shape{"结构化关系强吗?"}
     shape -- 是 --> mysql["MySQL 主写模型"]
     shape -- 否 --> mongo["Mongo 文档聚合"]
@@ -205,6 +213,18 @@ InterpretReport
 Mongo domain_event_outbox
 ```
 
+新增解释模型规则通常也优先考虑 Mongo 文档聚合，例如：
+
+```text
+MBTIModel
+DimensionRule
+QuestionMapping
+TypeProfile
+ReportTemplate
+```
+
+原因是解释模型规则通常存在嵌套结构、版本快照、整体加载和发布后冻结等需求。
+
 ### 5.2 实施步骤
 
 1. 定义 domain aggregate。
@@ -244,6 +264,108 @@ Mongo domain_event_outbox
 | 成功 commit 后再 ClearEvents | ☐ |
 | 幂等 key 并发处理已测试 | ☐ |
 
+## 5.5 新增解释模型规则文档
+
+新增 MBTI、BigFive、职业兴趣测评等解释模型时，先不要修改 Evaluation 主表，也不要把规则塞进 Scale。
+
+推荐先建立具体模型自己的规则文档聚合：
+
+```text
+MBTIModel
+├── ModelCode
+├── ModelVersion
+├── QuestionnaireRef
+├── Status
+├── Dimensions
+├── TypeProfiles
+├── ReportTemplate
+└── Metadata
+```
+
+### 5.5.1 建议落点
+
+| 数据 | 建议落点 | 说明 |
+| ---- | -------- | ---- |
+| `MBTIModel` | Mongo Document | 解释模型规则聚合根 |
+| `DimensionRule` | Mongo 内嵌文档 | 维度规则，属于 MBTIModel |
+| `QuestionMapping` | Mongo 内嵌文档 | 题目到维度的映射规则 |
+| `TypeProfile` | Mongo 内嵌或独立 collection | 类型画像，可随版本快照 |
+| `MBTIContext` | Redis cache，可回源 Mongo | 只读执行上下文，不是事实源 |
+| `EvaluationResult` | Evaluation 结果仓储 | 本次执行结果，不归 MBTI 规则仓储 |
+| `InterpretReport` | Evaluation 报告仓储 | 本次报告快照，不归 MBTI 规则仓储 |
+| MBTI 统计 | Statistics ReadModel | 查询优化投影 |
+
+### 5.5.2 Document 设计检查清单
+
+| 检查项 | 是否完成 |
+| ------ | -------- |
+| collection name 明确，例如 `mbti_models` | ☐ |
+| `model_code` / `model_version` 唯一索引明确 | ☐ |
+| `questionnaire_code` / `questionnaire_version` 引用明确 | ☐ |
+| `status` 枚举明确，例如 draft / published / archived | ☐ |
+| 发布后规则冻结策略明确 | ☐ |
+| Dimensions / TypeProfiles 的结构明确 | ☐ |
+| ReportTemplate 是否内嵌或独立明确 | ☐ |
+| bson tag 完整 | ☐ |
+| created_at / updated_at / published_at / archived_at 明确 | ☐ |
+| mapper 双向转换有测试 | ☐ |
+
+### 5.5.3 Migration 设计检查清单
+
+新增解释模型规则文档时，至少需要考虑：
+
+```text
+create collection
+unique index: model_code + model_version
+query index: status + model_code
+query index: questionnaire_code + questionnaire_version
+optional index: org_id / tenant_id
+optional index: updated_at / published_at
+```
+
+migration 不应做大规模历史规则生成。
+
+如果要从旧规则批量生成 MBTIModel，应单独设计 backfill。
+
+### 5.5.4 Repository / Mapper 检查清单
+
+| 检查项 | 是否完成 |
+| ------ | -------- |
+| 定义具体模型 repository port | ☐ |
+| repository port 位于具体模型 domain/application 边界 | ☐ |
+| infra/mongo 实现 repository | ☐ |
+| Document 不泄露给 domain/application | ☐ |
+| mapper 覆盖嵌套维度、题目映射、类型画像 | ☐ |
+| GetByCodeVersion / GetPublished / SaveDraft / Publish 等方法明确 | ☐ |
+| duplicate key 映射为业务错误 | ☐ |
+| published 状态下禁止直接覆盖规则 | ☐ |
+| repository tests 覆盖版本、状态、索引查询 | ☐ |
+
+### 5.5.5 与 Evaluation 的边界
+
+新增解释模型时，Evaluation 只引用模型，不保存模型规则。
+
+推荐边界：
+
+```text
+Assessment
+    保存 ModelRef / 状态 / 结果引用
+
+具体模型模块
+    保存 MBTIModel / DimensionRule / TypeProfile 等规则事实
+
+EvaluationResult
+    保存 DimensionScore / TypeCode / ProfileResult 等本次执行结果
+
+InterpretReport
+    保存报告快照和渲染数据
+
+Statistics ReadModel
+    保存 TypeCode 分布、维度倾向分布等统计投影
+```
+
+不要为每种解释模型在 Assessment 主表上新增大量专用字段。
+
 ---
 
 ## 6. 新增 Statistics ReadModel
@@ -259,6 +381,8 @@ Mongo domain_event_outbox
 - 允许最终一致。
 - 可以被 rebuild/backfill。
 - 不能反向修改业务主状态。
+- 解释模型结果分布，例如 MBTI TypeCode 分布。
+- 解释模型维度统计，例如 E/I、S/N、T/F、J/P 倾向分布。
 
 ### 6.2 实施步骤
 
@@ -288,6 +412,21 @@ Mongo domain_event_outbox
 | read model adapter 更新 | ☐ |
 | QueryCache 判断完成 | ☐ |
 | 不反向修改业务主表 | ☐ |
+
+### 6.4 新增解释模型统计检查清单
+
+| 检查项 | 是否完成 |
+| ------ | -------- |
+| 统计事实来源明确，例如 EvaluationResult / InterpretReport / Assessment.ModelRef | ☐ |
+| 是否复用现有 daily 表已判断 | ☐ |
+| 是否需要新增 `statistics_mbti_type_daily` 等专用表已判断 | ☐ |
+| model_type / model_code / model_version 维度明确 | ☐ |
+| TypeCode / DimensionCode / PreferenceCode 维度明确 | ☐ |
+| migration 完成 | ☐ |
+| projector 或 SyncService 更新 | ☐ |
+| backfill / rebuild 策略明确 | ☐ |
+| QueryCache / WarmupTarget 判断完成 | ☐ |
+| 不复制完整 TypeProfile 文案进统计表 | ☐ |
 
 ---
 
@@ -554,6 +693,7 @@ Worker 通常应通过 internal gRPC 回到 apiserver。
 | 新 Mongo collection/repository | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md) |
 | 新 migration/schema | [03-Migration与Schema演进.md](./03-Migration与Schema演进.md) |
 | 新 statistics read model | [04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md) |
+| 新解释模型规则文档 | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md)、[04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md)、`../../02-业务模块/interpretation-model/` |
 | 新 durable event outbox | `../event/02-Publish与Outbox.md` |
 | 新 Redis cache | `../redis/README.md` |
 | 业务主模型变化 | `../../02-业务模块/...` |
@@ -566,6 +706,7 @@ Worker 通常应通过 internal gRPC 回到 apiserver。
 | 检查项 | 是否完成 |
 | ------ | -------- |
 | 已判断 MySQL / Mongo / ReadModel / Outbox / Cache / Backfill 边界 | ☐ |
+| 如为解释模型，已判断规则事实、执行结果、报告快照、统计投影分别落在哪一层 | ☐ |
 | 已定义 domain model 或 read model 口径 | ☐ |
 | 已定义 port / query interface | ☐ |
 | 已写 migration up/down | ☐ |
@@ -595,6 +736,9 @@ Worker 通常应通过 internal gRPC 回到 apiserver。
 | read model 反写主表 | CQRS 边界破坏 |
 | 把复杂 backfill 塞进 migration | 部署不可控 |
 | cache 当数据库用 | 数据不可重建且语义不清 |
+| 新增 MBTI 就直接改 Assessment 表 | Evaluation 主模型被具体解释模型污染 |
+| 把 TypeProfile 全文复制进 Statistics 表 | ReadModel 变成规则事实源，后续难以维护 |
+| 把 MBTIContext 当事实源持久化 | Context 是执行快照/缓存，不是规则聚合 |
 | worker 直写主 repository | 主写模型分裂 |
 | 统计不准就改统计表 | 下次 rebuild 覆盖，源事实未修 |
 
@@ -629,6 +773,15 @@ go test ./internal/apiserver/infra/mysql/statistics
 go test ./internal/apiserver/application/statistics
 ```
 
+新增解释模型持久化：
+
+```bash
+go test ./internal/apiserver/domain/...
+go test ./internal/apiserver/application/...
+go test ./internal/apiserver/infra/mongo/...
+go test ./internal/apiserver/infra/mysql/statistics/...
+```
+
 Docs：
 
 ```bash
@@ -646,6 +799,8 @@ git diff --check
 - Migration：[../../../internal/pkg/migration/](../../../internal/pkg/migration/)
 - StatisticsReadModel port：[../../../internal/apiserver/port/statisticsreadmodel/read_model.go](../../../internal/apiserver/port/statisticsreadmodel/read_model.go)
 - MySQL read model adapter：[../../../internal/apiserver/infra/mysql/statistics/readmodel/read_model.go](../../../internal/apiserver/infra/mysql/statistics/readmodel/read_model.go)
+- Interpretation Model docs：[../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md)
+- Evaluation docs：[../../02-业务模块/evaluation/README.md](../../02-业务模块/evaluation/README.md)
 - MySQL outbox：[../../../internal/apiserver/infra/mysql/eventoutbox/](../../../internal/apiserver/infra/mysql/eventoutbox/)
 - Mongo outbox：[../../../internal/apiserver/infra/mongo/eventoutbox/](../../../internal/apiserver/infra/mongo/eventoutbox/)
 - Architecture tests：[../../../internal/pkg/architecture/data_access_architecture_test.go](../../../internal/pkg/architecture/data_access_architecture_test.go)
@@ -661,3 +816,4 @@ git diff --check
 | Mongo 文档仓储 | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md) |
 | Migration | [03-Migration与Schema演进.md](./03-Migration与Schema演进.md) |
 | ReadModel | [04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md) |
+| 解释模型抽象 | [../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md) |

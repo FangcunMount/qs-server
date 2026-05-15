@@ -89,6 +89,24 @@ Profile System 如何沉淀长期人格画像；
 
 ---
 
+### 2.1 当前实现状态
+
+当前 qs-server 尚未交付完整 MBTI 模块。
+
+本轮代码只完成接入前治理：
+
+```text
+Evaluation 支持按 EvaluationModelRef 路由；
+Scale 通过 ModelInputProvider / Evaluator 接入；
+非 Scale 假模型通过契约测试证明 Evaluation 主流程可扩展；
+MBTI 不再被建模为 Scale category；
+assessment_score 暂时仍是 Scale 专用投影。
+```
+
+因此本文是下一阶段接入清单，不表示当前已有 `MBTIModel / MBTIProvider / MBTIReportBuilder` 的生产实现。
+
+---
+
 ## 3. 为什么 MBTI 不应该放进 Scale
 
 Scale 的核心模型是医学量表规则。

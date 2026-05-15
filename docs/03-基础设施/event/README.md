@@ -174,9 +174,13 @@ answersheet.submitted outbox
   -> relay published
   -> worker answersheet_submitted_handler
   -> CreateAssessmentFromAnswerSheet
-  -> assessment.submitted outbox
-  -> assessment_submitted_handler
-  -> EvaluateAssessment
+  -> assessment.created outbox
+  -> assessment_created_handler
+  -> CompleteAssessment
+  -> assessment.completed outbox
+  -> assessment_completed_handler
+  -> interpretation.completed outbox
+  -> interpretation_completed_handler
   -> report.generated / assessment.failed
 ```
 
@@ -242,26 +246,33 @@ flowchart LR
     answer["AnswerSheet<br/>submitted"] --> outbox1["Mongo/MySQL Outbox"]
     outbox1 --> mq1["qs.evaluation.lifecycle"]
     mq1 --> worker1["answersheet_submitted_handler"]
-    worker1 --> assessment["Create / Submit Assessment"]
-    assessment --> outbox2["Assessment Outbox"]
+    worker1 --> assessment["Create Assessment"]
+    assessment --> outbox2["Assessment Created Outbox"]
     outbox2 --> mq2["qs.evaluation.lifecycle"]
-    mq2 --> worker2["assessment_submitted_handler"]
-    worker2 --> eval["EvaluateAssessment"]
-    eval --> report["Report generated"]
-    report --> outbox3["Report / Footprint Outbox"]
-    outbox3 --> mq3["assessment + analytics topics"]
-    mq3 --> worker3["report / behavior handlers"]
+    mq2 --> worker2["assessment_created_handler"]
+    worker2 --> completed["Complete Assessment"]
+    completed --> outbox3["Assessment Completed Outbox"]
+    outbox3 --> mq3["qs.evaluation.lifecycle"]
+    mq3 --> worker3["assessment_completed_handler"]
+    worker3 --> interpretation["Complete Interpretation"]
+    interpretation --> outbox4["Interpretation Completed Outbox"]
+    outbox4 --> mq4["qs.evaluation.lifecycle"]
+    mq4 --> worker4["interpretation_completed_handler"]
+    worker4 --> report["Report generated"]
+    report --> outbox5["Report / Footprint Outbox"]
+    outbox5 --> mq5["assessment + analytics topics"]
+    mq5 --> worker5["report / behavior handlers"]
 ```
-
-这条链路说明：
 
 1. Survey 保存答卷事实。
 2. durable outbox 发布 `answersheet.submitted`。
-3. Worker 创建/提交 Assessment。
-4. durable outbox 发布 `assessment.submitted`。
-5. Worker 触发 Evaluation pipeline。
-6. Report 成功后发布 `assessment.interpreted`、`report.generated`、`footprint.report_generated`。
+3. Worker 创建 Assessment，并发布 `assessment.created`。
+4. Evaluation 执行测评流程，并发布 `assessment.completed`。
+5. Interpretation Provider 完成解释流程，并发布 `interpretation.completed`。
+6. Report 生成成功后发布 `report.generated`、`footprint.report_generated`。
 7. Worker 继续做重点关注同步、行为投影、统计等副作用。
+
+这条链路只表达事件系统的异步驱动顺序，不绑定具体解释模型。Scale、MBTI、BigFive 等解释模型都应通过 Interpretation Provider 接入 Evaluation；事件系统只关心 `assessment.created`、`assessment.completed`、`interpretation.completed`、`report.generated` 这些阶段性事实，而不关心 Provider 内部如何加载规则、计算分数或生成解释。
 
 ---
 
@@ -306,8 +317,9 @@ task.canceled
 
 ```text
 answersheet.submitted
-assessment.submitted
-assessment.interpreted
+assessment.created
+assessment.completed
+interpretation.completed
 assessment.failed
 report.generated
 footprint.*

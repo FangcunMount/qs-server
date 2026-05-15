@@ -17,6 +17,7 @@
 | Operator roles | 本地 Operator roles 是 IAM roles 的投影，不作为 capability 真值 |
 | Decision 结果 | allowed / denied / missing_snapshot / unknown_capability / invalid_scope |
 | 关键边界 | capability 是粗粒度业务能力枚举；更细资源级 ACL 需要单独建模 |
+| 解释模型扩展 | 新增 MBTI / BigFive 等解释模型后，应新增或复用 `read_interpretation_reports`、`manage_interpretation_models` 等 capability，并同步 IAM resource/action 策略 |
 
 一句话概括：
 
@@ -190,16 +191,17 @@ user:{user_id}
 
 ## 6. Capability 清单
 
-当前 `authz.Capability`：
-
 | Capability | 说明 |
 | ---------- | ---- |
 | `org_admin` | 机构管理员 |
 | `read_questionnaires` | 读取问卷 |
 | `manage_questionnaires` | 管理问卷 |
-| `read_scales` | 读取量表 |
-| `manage_scales` | 管理量表 |
+| `read_scales` | 读取医学量表 |
+| `manage_scales` | 管理医学量表 |
+| `read_interpretation_models` | 读取解释模型，例如 Scale / MBTI / BigFive 的发布态模型列表和详情 |
+| `manage_interpretation_models` | 管理解释模型，例如发布、归档、更新 Scale / MBTI / BigFive 规则 |
 | `read_answersheets` | 读取答卷 |
+| `read_interpretation_reports` | 读取解释报告，例如 Scale 报告、MBTI 报告、BigFive 报告 |
 | `manage_evaluation_plans` | 管理测评计划 |
 | `evaluate_assessments` | 触发/重试测评 |
 
@@ -228,7 +230,10 @@ Capability 是为了路由/middleware 使用的粗粒度能力枚举。
 | `manage_questionnaires` | `qs:questionnaires` create/update/delete/publish/unpublish/archive/statistics，或 QS admin |
 | `read_scales` | `qs:scales` read/list，或 QS admin |
 | `manage_scales` | `qs:scales` create/update/delete/publish/unpublish/archive，或 QS admin |
+| `read_interpretation_models` | `qs:interpretation_models` read/list，或 `qs:scales` read/list，或 QS admin |
+| `manage_interpretation_models` | `qs:interpretation_models` create/update/delete/publish/unpublish/archive，或 `qs:scales` create/update/delete/publish/unpublish/archive，或 QS admin |
 | `read_answersheets` | `qs:answersheets` read/list/statistics，或 QS admin |
+| `read_interpretation_reports` | `qs:interpretation_reports` read/list/statistics，或 `qs:reports` read/list，或 QS admin |
 | `manage_evaluation_plans` | 同时具备 evaluation_plans 管理动作与 evaluation_plan_tasks 任务动作，或 QS admin |
 | `evaluate_assessments` | `qs:assessments` retry 或 batch_evaluate，或 QS admin |
 
@@ -243,6 +248,111 @@ qs:evaluation_plan_tasks
 ```
 
 因为计划管理既涉及 plan，也涉及 task 调度/打开/完成/取消等能力。
+
+### 7.2 解释模型相关 capability
+
+解释模型扩展后，建议将“模型规则管理”和“报告访问”拆成两类 capability。
+
+```text
+read_interpretation_models / manage_interpretation_models
+    面向 Scale、MBTI、BigFive 等解释模型规则和模型目录。
+
+read_interpretation_reports
+    面向用户的一次测评报告，例如 MBTI 报告、量表报告、BigFive 报告。
+```
+
+这样可以避免把“能维护 MBTI 规则”和“能查看某个用户 MBTI 报告”混成一个权限。
+
+推荐资源：
+
+```text
+qs:interpretation_models
+qs:interpretation_reports
+```
+
+兼容已有 Scale 权限时，可以保留：
+
+```text
+qs:scales
+qs:reports
+```
+
+但长期建议逐步把跨模型权限收敛到 interpretation model / interpretation report 语义。
+
+---
+
+## 7.5 IAM 授权表新增资源 / Action 指引
+
+新增解释模型 capability 时，需要同步 IAM policy / role / permission 配置。
+
+推荐流程：
+
+```text
+1. 在 QS 侧新增 Capability 常量。
+2. 在 `isKnownCapability` 注册 capability。
+3. 在 `capabilityAllowed` 增加 resource/action 映射。
+4. 在 IAM 侧新增 resource，例如 `qs:interpretation_models` 或 `qs:interpretation_reports`。
+5. 在 IAM 侧新增 actions，例如 read/list/create/update/delete/publish/archive/statistics。
+6. 将 resource/action 绑定到对应 role。
+7. 发布 IAM policy，并产生新的 authz_version。
+8. 请求期通过 GetAuthorizationSnapshot 获取新 snapshot。
+9. 补 QS capability tests、middleware tests 和文档。
+```
+
+### 7.5.1 资源建议
+
+| Resource | 说明 |
+| -------- | ---- |
+| `qs:interpretation_models` | 解释模型规则和目录，例如 Scale / MBTI / BigFive |
+| `qs:interpretation_reports` | 解释报告，例如 MBTI 报告、量表报告 |
+| `qs:scales` | 兼容医学量表规则管理 |
+| `qs:reports` | 兼容历史报告访问资源 |
+| `qs:assessments` | 测评执行、重试、批量评估 |
+
+### 7.5.2 Action 建议
+
+| Action | 说明 |
+| ------ | ---- |
+| `read` | 读取详情 |
+| `list` | 读取列表 |
+| `create` | 创建草稿 |
+| `update` | 更新草稿 |
+| `delete` | 删除草稿或未发布模型 |
+| `publish` | 发布模型 |
+| `unpublish` | 取消发布 |
+| `archive` | 归档模型 |
+| `statistics` | 查看统计数据 |
+| `retry` | 重试测评 |
+| `batch_evaluate` | 批量触发评估 |
+
+### 7.5.3 MBTI 报告访问示例
+
+如果要控制用户是否能访问 MBTI 报告，可以增加：
+
+```text
+Capability: read_interpretation_reports
+Resource:   qs:interpretation_reports
+Actions:    read / list
+```
+
+如果需要按模型类型继续细分，可以在对象级 ACL 或 resource pattern 中表达，例如：
+
+```text
+qs:interpretation_reports:mbti
+qs:interpretation_reports:scale
+```
+
+但不要把模型类型硬编码进 JWT roles，也不要在 handler 中直接解析 roles 放行。
+
+正确链路仍然是：
+
+```text
+IAM policy
+  -> GetAuthorizationSnapshot
+  -> authz.Snapshot permissions
+  -> CapabilityDecision
+  -> route middleware / application guard
+```
 
 ---
 
@@ -453,6 +563,7 @@ Principal.TenantID
 6. Operator local roles 不能作为 capability 真值。
 7. gRPC 与 HTTP 的 snapshot 注入语义要尽量对齐。
 8. 新 capability 必须补映射、middleware 测试和文档。
+9. 新解释模型 capability 必须同步 IAM resource/action、QS capability 映射、路由中间件、测试和文档。
 
 ---
 
@@ -481,6 +592,14 @@ Principal.TenantID
 ### 18.6 “Capability 足够表达所有权限”
 
 不一定。Capability 是路由级粗粒度能力，更细粒度对象 ACL 需要独立设计。
+
+### 18.7 “能管理 MBTI 模型就能查看用户 MBTI 报告”
+
+不应该默认如此。
+
+管理解释模型规则属于 `manage_interpretation_models`，查看用户测评报告属于 `read_interpretation_reports`。
+
+前者面向模型配置和规则维护，后者面向用户数据和报告隐私，应该拆开授权。
 
 ---
 
@@ -528,14 +647,18 @@ Principal.TenantID
 3. 文档和能力列表是否同步。
 4. 测试是否覆盖新增 capability。
 
-### 19.5 gRPC InvalidArgument tenant_id numeric
+### 19.4.1 MBTI 报告访问被拒绝
 
 检查：
 
-1. gRPC IAMAuthInterceptor 是否注入 tenantID。
-2. tenantID 是否数字。
-3. 当前 RPC 是否需要 QS org。
-4. IAM token 签发策略。
+1. 路由是否使用 `read_interpretation_reports` 或等价 capability。
+2. `isKnownCapability` 是否注册该 capability。
+3. `capabilityAllowed` 是否映射到 `qs:interpretation_reports` read/list。
+4. IAM policy 是否包含 `qs:interpretation_reports` 资源。
+5. IAM role 是否绑定了 read/list action。
+6. AuthzSnapshot permissions 是否带回新 resource/action。
+7. authz_version 是否已经更新。
+8. 是否误用 `manage_interpretation_models` 代替报告访问权限。
 
 ---
 
@@ -553,6 +676,21 @@ Principal.TenantID
 6. 更新 capability tests。
 7. 更新本文档和 README。
 8. 更新 IAM policy 文档或配置。
+
+### 20.1.1 新增解释模型 Capability
+
+以 MBTI 报告访问为例：
+
+1. 新增 `read_interpretation_reports` capability。
+2. 在 `isKnownCapability` 中注册。
+3. 在 `capabilityAllowed` 中映射 `qs:interpretation_reports` read/list/statistics。
+4. 在 IAM policy 中新增 `qs:interpretation_reports` resource。
+5. 在 IAM policy 中配置 read/list/statistics actions。
+6. 把 resource/action 绑定到对应 role。
+7. 确认 IAM `GetAuthorizationSnapshot` 能返回该 permission。
+8. 给报告查询路由挂载 `RequireCapabilityMiddleware(read_interpretation_reports)`。
+9. 补 allowed / denied / missing_snapshot / unknown_capability tests。
+10. 更新 security README、本文档和业务模块文档。
 
 ### 20.2 修改 resource/action 映射
 
@@ -584,6 +722,8 @@ Principal.TenantID
 
 - Snapshot：[../../../internal/apiserver/application/authz/snapshot.go](../../../internal/apiserver/application/authz/snapshot.go)
 - Capability：[../../../internal/apiserver/application/authz/capability.go](../../../internal/apiserver/application/authz/capability.go)
+- Interpretation Model docs：[../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md)
+- Evaluation docs：[../../02-业务模块/evaluation/README.md](../../02-业务模块/evaluation/README.md)
 - AuthzSnapshotMiddleware：[../../../internal/apiserver/transport/rest/middleware/authz_snapshot_middleware.go](../../../internal/apiserver/transport/rest/middleware/authz_snapshot_middleware.go)
 - Capability middleware：[../../../internal/apiserver/transport/rest/middleware/capability_middleware.go](../../../internal/apiserver/transport/rest/middleware/capability_middleware.go)
 - gRPC AuthzSnapshot interceptor：[../../../internal/apiserver/transport/grpc/authz_snapshot_interceptor.go](../../../internal/apiserver/transport/grpc/authz_snapshot_interceptor.go)
@@ -598,6 +738,14 @@ go test ./internal/apiserver/application/authz
 go test ./internal/apiserver/transport/rest/middleware
 go test ./internal/apiserver/transport/grpc
 go test ./internal/pkg/securityplane
+```
+
+如果新增解释模型 capability：
+
+```bash
+go test ./internal/apiserver/application/authz
+go test ./internal/apiserver/transport/rest/middleware
+go test ./internal/apiserver/router_matrix_test.go
 ```
 
 如果修改路由 capability：

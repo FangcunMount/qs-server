@@ -17,6 +17,7 @@
 | 事务要求 | rebuild writer 通过 `gormuow.RequireTx(ctx)` 要求在事务中执行 |
 | 行为投影 | `behavior_footprint`、`assessment_episode` 和 journey daily 构成行为统计输入 |
 | 查询缓存 | QueryCache 只缓存 read model 查询结果，不是统计事实源 |
+| 解释模型扩展 | 新增 MBTI / BigFive 等解释模型时，规则事实归具体模型模块，执行结果归 EvaluationResult / InterpretReport，统计查询归 Statistics ReadModel |
 | 关键边界 | read model 可以冗余、聚合、最终一致，但不能反向改变业务聚合 |
 
 一句话概括：
@@ -32,7 +33,8 @@ Statistics 查询通常要跨多个模块：
 ```text
 Actor: Testee / Clinician / AssessmentEntry
 Survey: Questionnaire / AnswerSheet
-Evaluation: Assessment / Report
+Scale / Interpretation Model: MedicalScale / MBTIModel / ModelRef
+Evaluation: Assessment / EvaluationResult / InterpretReport
 Plan: AssessmentTask
 Event: BehaviorFootprint / AssessmentEpisode
 ```
@@ -64,6 +66,7 @@ flowchart TB
         actor["Actor<br/>Testee / Clinician / Entry"]
         survey["Survey<br/>AnswerSheet / Questionnaire"]
         evaluation["Evaluation<br/>Assessment / Report"]
+        model["Interpretation Model<br/>Scale / MBTI / ModelRef"]
         plan["Plan<br/>AssessmentTask"]
         behavior["BehaviorFootprint / AssessmentEpisode"]
     end
@@ -90,6 +93,7 @@ flowchart TB
 
     Sources --> projector
     Sources --> sync
+    model --> sync
     projector --> journey
     sync --> writer
     writer --> journey
@@ -130,6 +134,30 @@ flowchart TB
 | 用 `report_generated_count` 判断报告是否存在 | 应查 Evaluation Report |
 | 用 entry funnel 判断 AssessmentEntry 状态 | 应查 Actor Entry |
 | 修改统计表修业务状态 | 下次 sync 会覆盖，且业务主状态未变 |
+
+### 3.2 新解释模型的边界
+
+新增 MBTI / BigFive 等解释模型时，不能把 ReadModel 当成规则模型或执行结果模型。
+
+推荐边界：
+
+| 数据 | 主事实源 | ReadModel 中的角色 |
+| ---- | -------- | ------------------ |
+| `MBTIModel` | MBTI 模块的 Mongo Document | 不保存完整规则，只用于统计维度引用 |
+| `TypeProfile` | MBTI 规则文档或版本快照 | 不作为画像事实源 |
+| `Assessment.ModelRef` | Evaluation Assessment | 用于区分模型类型和版本 |
+| `EvaluationResult` | Evaluation 结果仓储 | 统计投影输入 |
+| `InterpretReport` | Evaluation 报告仓储 | 报告生成统计输入 |
+| MBTI 类型分布 | Statistics ReadModel | 查询优化投影，可重建 |
+| MBTI 维度分布 | Statistics ReadModel | 查询优化投影，可重建 |
+
+核心原则：
+
+```text
+具体解释模型保存规则事实；
+Evaluation 保存本次执行事实；
+Statistics ReadModel 保存统计查询投影。
+```
 
 ---
 
@@ -182,7 +210,22 @@ flowchart TB
 | `Count/List/GetAssessmentEntry...` | 入口统计 |
 | `GetQuestionnaireBatchTotals` | 问卷批量统计 |
 
-### 4.6 Port 设计原则
+### 4.6 Interpretation Model / MBTI
+
+新增解释模型后，ReadModel port 可以按业务需要增加模型分布类查询。
+
+建议方法族：
+
+| 方法族 | 说明 |
+| ------ | ---- |
+| `GetInterpretationModelDistribution` | 按模型类型、模型版本统计测评执行和报告结果 |
+| `GetMBTITypeDistribution` | 按 TypeCode 统计 MBTI 类型分布 |
+| `GetMBTIDimensionDistribution` | 按 E/I、S/N、T/F、J/P 维度统计倾向分布 |
+| `ListInterpretationModelTrend` | 按日期查看不同解释模型的执行趋势 |
+
+这些查询只读取 Statistics ReadModel，不直接读取 MBTIModel 规则文档，也不直接实时扫描 EvaluationResult。
+
+### 4.7 Port 设计原则
 
 ReadModel port 的方法按业务查询面命名，不按表结构命名。
 
@@ -236,6 +279,8 @@ Adapter 不负责：
 ---
 
 ## 6. 四张核心聚合表
+
+当前统计读模型以四张聚合表为核心。新增 MBTI 等解释模型后，可以先复用现有 `statistics_content_daily` / `statistics_journey_daily` 的通用指标；如果需要按 TypeCode、维度倾向、模型版本做高频分析，再新增解释模型专用统计表。
 
 ### 6.1 statistics_journey_daily
 
@@ -300,6 +345,17 @@ origin_type
 stat_date
 ```
 
+解释模型扩展后，`content_type` 可以承接更通用的模型类型，例如：
+
+```text
+questionnaire
+scale
+mbti
+bigfive
+```
+
+其中 `content_code` 对应具体内容或模型编码，`origin_type` 可以用于区分入口来源、模型来源或业务场景。是否扩展字段需要以实际查询口径和 migration 设计为准。
+
 典型指标：
 
 ```text
@@ -359,6 +415,52 @@ dimension_entry_count
 dimension_content_count
 snapshot_at
 ```
+
+### 6.5 解释模型统计表候选
+
+如果 MBTI 或其它解释模型成为高频统计对象，可以新增专用 read model 表。
+
+候选表：
+
+```text
+statistics_interpretation_model_daily
+statistics_mbti_type_daily
+statistics_mbti_dimension_daily
+```
+
+建议维度：
+
+```text
+org_id
+model_type
+model_code
+model_version
+stat_date
+```
+
+MBTI 类型分布可以增加：
+
+```text
+type_code
+```
+
+MBTI 维度分布可以增加：
+
+```text
+dimension_code
+preference_code
+```
+
+典型指标：
+
+```text
+assessment_completed_count
+interpretation_completed_count
+interpretation_failed_count
+report_generated_count
+```
+
+注意：这些表是统计投影，不是 MBTIModel、EvaluationResult 或 InterpretReport 的事实源。
 
 ---
 
@@ -556,6 +658,42 @@ source facts
 
 不要第一步就清 cache。
 
+## 11.5 新解释模型的统计链路
+
+以 MBTI 为例，推荐统计链路如下：
+
+```text
+MBTIModel
+  -> 作为规则事实保存在具体模型模块，例如 Mongo Document
+
+Assessment
+  -> 保存 ModelRef，说明本次测评使用 mbti / code / version
+
+EvaluationResult
+  -> 保存 DimensionScore、TypeCode、ProfileResult 等执行结果快照
+
+InterpretReport
+  -> 保存报告快照和渲染数据
+
+Event
+  -> interpretation.completed / report.generated 驱动统计投影
+
+Statistics ReadModel
+  -> 保存 TypeCode 分布、维度倾向分布、模型执行趋势
+
+QueryCache
+  -> 缓存高频统计查询结果
+```
+
+这条链路中，Statistics ReadModel 只做统计查询优化。
+
+它不应该：
+
+- 保存完整 MBTI 规则。
+- 作为 TypeProfile 的事实源。
+- 作为 EvaluationResult 的事实源。
+- 被业务写流程反向依赖。
+
 ---
 
 ## 12. 与业务模块的边界
@@ -564,6 +702,10 @@ source facts
 | -------- | ---- |
 | 某个 Assessment 是否 interpreted | Evaluation Assessment |
 | 某个 Report 内容 | Evaluation Report |
+| 某次 MBTI 的 TypeCode | EvaluationResult |
+| 某个 MBTI 类型画像 | MBTIModel / TypeProfile 规则事实源 |
+| MBTI 类型分布趋势 | Statistics ReadModel |
+| MBTI 报告内容 | Evaluation InterpretReport |
 | 某个 Task 是否 completed | Plan AssessmentTask |
 | 某个 Testee 标签 | Actor Testee |
 | 某个 AnswerSheet 内容 | Survey AnswerSheet |
@@ -579,6 +721,9 @@ ReadModel 不应：
 - 给 Testee 打标签。
 - 变更 AnswerSheet。
 - 修改 Scale/Questionnaire。
+- 修改 MBTIModel / TypeProfile。
+- 修改 EvaluationResult。
+- 修改 InterpretReport。
 
 这些是业务写模型职责。
 
@@ -597,6 +742,16 @@ ReadModel 不应：
 | 需要高频缓存 | QueryCache / cachetarget / warmup |
 | 需要历史修复 | SyncService / backfill |
 | 需要业务状态变化 | 回业务模块，不在 Statistics |
+
+如果新增的是解释模型统计口径，例如 MBTI TypeCode 分布，建议先判断：
+
+| 问题 | 落点 |
+| ---- | ---- |
+| 只是按 `model_type` 过滤已有测评完成数 | 扩展现有 ReadModel 查询 |
+| 需要按 TypeCode 聚合 | 新增 `statistics_mbti_type_daily` 或等价投影 |
+| 需要按维度倾向聚合 | 新增 `statistics_mbti_dimension_daily` 或等价投影 |
+| 需要读取 MBTI 规则描述 | 回源 MBTIModel / TypeProfile，不进入 Statistics 主表 |
+| 需要缓存高频分布查询 | QueryCache / cachetarget / warmup |
 
 ---
 
@@ -651,6 +806,12 @@ ReadModel 不应：
 
 不够。可能需要 migration、PO、rebuild writer、adapter、ReadService、cache、docs、tests。
 
+### 16.6 “新增 MBTI 统计就把 MBTI 规则复制到统计表”
+
+错误。统计表只保存聚合口径和必要维度，不保存完整规则。
+
+如果需要展示 TypeProfile 文案，应通过 MBTI 规则事实源读取，而不是把画像全文复制进 Statistics ReadModel。
+
 ---
 
 ## 17. 排障路径
@@ -697,6 +858,18 @@ ReadModel 不应：
 5. pending behavior events 是否堆积。
 6. daily rebuild 是否覆盖日期。
 
+### 17.5 MBTI 类型分布不准
+
+检查：
+
+1. `interpretation.completed` 是否正常出站。
+2. `EvaluationResult` 是否保存 TypeCode / DimensionScore。
+3. `report.generated` 是否正常出站。
+4. Statistics projector 是否消费对应事件。
+5. MBTI 专用 read model 表是否有数据。
+6. QueryCache 是否缓存了旧结果。
+7. 是否误把 MBTIModel 规则变化当成历史结果重算。
+
 ---
 
 ## 18. 修改指南
@@ -739,6 +912,22 @@ ReadModel 不应：
 6. 更新 ReadModel query。
 7. 补 checkpoint/pending/reconcile tests。
 
+### 18.4 新增解释模型统计
+
+步骤：
+
+1. 明确统计口径，例如 TypeCode 分布、维度倾向分布、模型执行趋势。
+2. 确认事实来源：EvaluationResult、InterpretReport、Assessment.ModelRef。
+3. 判断是否复用现有 daily 表，还是新增专用 read model 表。
+4. 编写 migration。
+5. 更新 PO / mapper / RebuildWriter。
+6. 更新 `statisticsreadmodel.ReadModel` port。
+7. 更新 MySQL adapter。
+8. 更新 ReadService 和 QueryCache target。
+9. 更新事件 projector。
+10. 补 backfill / rebuild 策略。
+11. 补 tests 和 docs。
+
 ---
 
 ## 19. 代码锚点
@@ -758,6 +947,12 @@ ReadModel 不应：
 - Statistics domain：[../../../internal/apiserver/domain/statistics/](../../../internal/apiserver/domain/statistics/)
 - Statistics application：[../../../internal/apiserver/application/statistics/](../../../internal/apiserver/application/statistics/)
 
+### Interpretation / Evaluation
+
+- Evaluation domain：[../../../internal/apiserver/domain/evaluation/](../../../internal/apiserver/domain/evaluation/)
+- Interpretation Model docs：[../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md)
+- Evaluation docs：[../../02-业务模块/evaluation/README.md](../../02-业务模块/evaluation/README.md)
+
 ---
 
 ## 20. Verify
@@ -767,6 +962,15 @@ go test ./internal/apiserver/port/statisticsreadmodel
 go test ./internal/apiserver/infra/mysql/statistics
 go test ./internal/apiserver/application/statistics
 go test ./internal/apiserver/domain/statistics
+```
+
+如果新增解释模型统计：
+
+```bash
+go test ./internal/apiserver/domain/evaluation/...
+go test ./internal/apiserver/application/evaluation/...
+go test ./internal/apiserver/infra/mysql/statistics/...
+go test ./internal/apiserver/application/statistics/...
 ```
 
 如果修改 behavior projection：

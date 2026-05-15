@@ -85,6 +85,43 @@ Evaluation 的目标不是“懂所有模型的细节”，而是“稳定执行
 
 ---
 
+### 2.1 当前代码事实与目标态
+
+截至当前代码，Evaluation 已经具备通用引擎的核心执行缝合点，但不是所有文档中的目标名词都已经落成独立模型。
+
+当前已实现：
+
+```text
+Assessment / EvaluationModelRef；
+evaluationinput.InputSnapshot；
+evaluationinput.ModelInputProvider；
+execute.Evaluator / EvaluatorRegistry；
+result.Writer；
+ScoreProjector / ReportBuilder / EventAssembler registry。
+```
+
+当前仍是兼容结构：
+
+```text
+medical_scale_* 字段仍保留；
+assessment_score 仍是 Scale 专用投影；
+Scale 报告 builder 仍生成现有 InterpretReport；
+非 Scale 模型当前只通过契约测试证明引擎可扩展。
+```
+
+目标态但尚未作为独立代码对象落地：
+
+```text
+EvaluationRun；
+统一 InterpretationProvider；
+通用结果持久化表；
+完整 MBTI 模块与 MBTI 报告 builder。
+```
+
+因此阅读本文时，凡是提到 `Provider / EvaluationRun / 通用结果持久化` 的部分，应理解为下一阶段演进方向；当前代码事实以 `Evaluator + ModelInputProvider + ResultWriter` 为准。
+
+---
+
 ## 3. Evaluation 管什么
 
 Evaluation 管的是一次测评执行事实。
