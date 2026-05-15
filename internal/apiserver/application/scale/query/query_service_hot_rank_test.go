@@ -185,10 +185,10 @@ func TestResolveAssessmentScaleContextReturnsEmptyWhenScaleBindingNotFound(t *te
 	if err != nil {
 		t.Fatalf("ResolveAssessmentScaleContext() error = %v", err)
 	}
-	if result == nil {
-		t.Fatal("ResolveAssessmentScaleContext() = nil, want empty result")
-	}
-	if result.MedicalScaleCode != nil || result.MedicalScaleID != nil || result.ScaleVersion != nil {
+	if result == nil ||
+		result.MedicalScaleCode != nil ||
+		result.MedicalScaleID != nil ||
+		result.ScaleVersion != nil {
 		t.Fatalf("ResolveAssessmentScaleContext() = %+v, want empty scale context", result)
 	}
 }
