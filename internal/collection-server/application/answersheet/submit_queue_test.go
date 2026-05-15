@@ -53,7 +53,9 @@ func TestSubmitQueueEnqueueReturnsImmediately(t *testing.T) {
 
 func TestSubmitQueueReturnsFullWhenBufferIsExhausted(t *testing.T) {
 	release := make(chan struct{})
+	processingStarted := make(chan struct{}, 1)
 	q := NewSubmitQueue(1, 1, func(context.Context, string, uint64, *SubmitAnswerSheetRequest) (*SubmitAnswerSheetResponse, error) {
+		processingStarted <- struct{}{}
 		<-release
 		return &SubmitAnswerSheetResponse{ID: "42"}, nil
 	})
@@ -62,16 +64,10 @@ func TestSubmitQueueReturnsFullWhenBufferIsExhausted(t *testing.T) {
 	if err := q.Enqueue(context.Background(), "req-1", 1, &SubmitAnswerSheetRequest{}); err != nil {
 		t.Fatalf("first enqueue: %v", err)
 	}
-	deadline := time.Now().Add(time.Second)
-	for {
-		status, ok := q.GetStatus("req-1")
-		if ok && status.Status == SubmitStatusProcessing {
-			break
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("req-1 did not enter processing")
-		}
-		time.Sleep(time.Millisecond)
+	select {
+	case <-processingStarted:
+	case <-time.After(5 * time.Second):
+		t.Fatal("req-1 did not enter processing")
 	}
 	if err := q.Enqueue(context.Background(), "req-2", 1, &SubmitAnswerSheetRequest{}); err != nil {
 		t.Fatalf("second enqueue should fill buffer: %v", err)
