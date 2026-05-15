@@ -16,12 +16,13 @@ import (
 type resultAssessmentRepoStub struct {
 	order *[]string
 	saved *assessment.Assessment
+	err   error
 }
 
 func (r *resultAssessmentRepoStub) Save(_ context.Context, a *assessment.Assessment) error {
 	*r.order = append(*r.order, "assessment")
 	r.saved = a
-	return nil
+	return r.err
 }
 
 func (r *resultAssessmentRepoStub) FindByID(context.Context, assessment.ID) (*assessment.Assessment, error) {
@@ -35,12 +36,13 @@ func (r *resultAssessmentRepoStub) FindByAnswerSheetID(context.Context, assessme
 type resultScoreRepoStub struct {
 	order *[]string
 	score *assessment.AssessmentScore
+	err   error
 }
 
 func (r *resultScoreRepoStub) SaveScoresWithContext(_ context.Context, _ *assessment.Assessment, score *assessment.AssessmentScore) error {
 	*r.order = append(*r.order, "score")
 	r.score = score
-	return nil
+	return r.err
 }
 
 func (r *resultScoreRepoStub) DeleteByAssessmentID(context.Context, assessment.ID) error { return nil }
@@ -82,10 +84,12 @@ func (s *resultReportSaverStub) SaveReportDurably(_ context.Context, _ *domainRe
 
 type resultNotifierStub struct {
 	order *[]string
+	calls int
 }
 
-func (n resultNotifierStub) NotifyCompletion(context.Context, Outcome) {
+func (n *resultNotifierStub) NotifyCompletion(context.Context, Outcome) {
 	*n.order = append(*n.order, "waiter")
+	n.calls++
 }
 
 func TestGenericEventAssemblerIsFallbackOnly(t *testing.T) {
@@ -124,7 +128,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 		scoreProjectors,
 		reportBuilders,
 		reportSaver,
-		resultNotifierStub{order: &order},
+			&resultNotifierStub{order: &order},
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -169,7 +173,7 @@ func TestWriterReportBuilderFailureDoesNotPersistInterpretedAssessment(t *testin
 		scoreProjectors,
 		reportBuilders,
 		&resultReportSaverStub{order: &order},
-		resultNotifierStub{order: &order},
+			&resultNotifierStub{order: &order},
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -202,7 +206,7 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 		scoreProjectors,
 		reportBuilders,
 		&resultReportSaverStub{order: &order, err: reportErr},
-		resultNotifierStub{order: &order},
+			&resultNotifierStub{order: &order},
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -219,6 +223,90 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 	for i := range wantOrder {
 		if order[i] != wantOrder[i] {
 			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
+		}
+	}
+}
+
+func TestWriterScoreProjectionFailureKeepsAssessmentUninterpreted(t *testing.T) {
+	order := make([]string, 0)
+	a := submittedScaleAssessment(t)
+	scoreErr := errors.New("score save failed")
+	scoreRepo := &resultScoreRepoStub{order: &order, err: scoreErr}
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(scoreRepo))
+	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
+		order: &order,
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil),
+	})
+	assessmentRepo := &resultAssessmentRepoStub{order: &order}
+	notifier := &resultNotifierStub{order: &order}
+	writer, err := NewWriter(
+		assessmentRepo,
+		scoreProjectors,
+		reportBuilders,
+		&resultReportSaverStub{order: &order},
+		notifier,
+	)
+	if err != nil {
+		t.Fatalf("NewWriter returned error: %v", err)
+	}
+
+	err = writer.Write(context.Background(), scaleOutcomeForWriterTest(a))
+	if !errors.Is(err, scoreErr) {
+		t.Fatalf("Write error = %v, want score save failure", err)
+	}
+	if assessmentRepo.saved != nil || a.Status().IsInterpreted() {
+		t.Fatalf("assessment should not be persisted or changed when score save fails; saved=%#v status=%s", assessmentRepo.saved, a.Status())
+	}
+	if notifier.calls != 0 {
+		t.Fatalf("notifier calls = %d, want 0", notifier.calls)
+	}
+	wantOrder := []string{"report_build", "report_save", "score"}
+	for i := range wantOrder {
+		if order[i] != wantOrder[i] {
+			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
+		}
+	}
+}
+
+func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
+	order := make([]string, 0)
+	a := submittedScaleAssessment(t)
+	saveErr := errors.New("assessment save failed")
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
+	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
+		order: &order,
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil),
+	})
+	assessmentRepo := &resultAssessmentRepoStub{order: &order, err: saveErr}
+	notifier := &resultNotifierStub{order: &order}
+	writer, err := NewWriter(
+		assessmentRepo,
+		scoreProjectors,
+		reportBuilders,
+		&resultReportSaverStub{order: &order},
+		notifier,
+	)
+	if err != nil {
+		t.Fatalf("NewWriter returned error: %v", err)
+	}
+
+	err = writer.Write(context.Background(), scaleOutcomeForWriterTest(a))
+	if !errors.Is(err, saveErr) {
+		t.Fatalf("Write error = %v, want assessment save failure", err)
+	}
+	if !a.Status().IsInterpreted() {
+		t.Fatalf("assessment in memory should be interpreted after ApplyEvaluation; status=%s", a.Status())
+	}
+	if notifier.calls != 0 {
+		t.Fatalf("notifier calls = %d, want 0", notifier.calls)
+	}
+	wantOrder := []string{"report_build", "report_save", "score", "assessment"}
+	if len(order) != len(wantOrder) {
+		t.Fatalf("order = %#v, want %#v", order, wantOrder)
+	}
+	for i := range wantOrder {
+		if order[i] != wantOrder[i] {
+			t.Fatalf("order = %#v, want %#v", order, wantOrder)
 		}
 	}
 }

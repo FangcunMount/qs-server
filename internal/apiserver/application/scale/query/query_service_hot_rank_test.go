@@ -29,6 +29,8 @@ type hotScaleRepoStub struct {
 	byQuestionnaire          map[string]*domainScale.MedicalScale
 	byCode                   map[string]*domainScale.MedicalScale
 	summaries                []*domainScale.MedicalScale
+	findByQuestionnaireErr   error
+	findByQuestionnaireRefErr error
 	findByQuestionnaireCalls []string
 	findByQuestionnaireRefs  []string
 	findSummaryCalls         int
@@ -46,10 +48,16 @@ func (r *hotScaleRepoStub) FindByCodeVersion(ctx context.Context, code, _ string
 }
 func (r *hotScaleRepoStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
 	r.findByQuestionnaireCalls = append(r.findByQuestionnaireCalls, questionnaireCode)
+	if r.findByQuestionnaireErr != nil {
+		return nil, r.findByQuestionnaireErr
+	}
 	return r.byQuestionnaire[questionnaireCode], nil
 }
 func (r *hotScaleRepoStub) FindByQuestionnaireRef(_ context.Context, questionnaireCode, questionnaireVersion string) (*domainScale.MedicalScale, error) {
 	r.findByQuestionnaireRefs = append(r.findByQuestionnaireRefs, questionnaireCode+":"+questionnaireVersion)
+	if r.findByQuestionnaireRefErr != nil {
+		return nil, r.findByQuestionnaireRefErr
+	}
 	if item, ok := r.byQuestionnaire[questionnaireCode]; ok && item.GetQuestionnaireVersion() == questionnaireVersion {
 		return item, nil
 	}
@@ -164,6 +172,41 @@ func TestResolveAssessmentScaleContextUsesScaleRepositoryBehindApplicationPort(t
 	}
 	if len(repo.findByQuestionnaireRefs) != 1 || repo.findByQuestionnaireRefs[0] != "Q-A:1.0.0" {
 		t.Fatalf("FindByQuestionnaireRef calls = %#v, want Q-A:1.0.0", repo.findByQuestionnaireRefs)
+	}
+}
+
+func TestResolveAssessmentScaleContextReturnsEmptyWhenScaleBindingNotFound(t *testing.T) {
+	repo := &hotScaleRepoStub{
+		byQuestionnaire: map[string]*domainScale.MedicalScale{},
+	}
+	svc := NewQueryService(repo, repo, nil, nil, nil)
+
+	result, err := svc.ResolveAssessmentScaleContext(context.Background(), "Q-A", "1.0.0")
+	if err != nil {
+		t.Fatalf("ResolveAssessmentScaleContext() error = %v", err)
+	}
+	if result == nil {
+		t.Fatal("ResolveAssessmentScaleContext() = nil, want empty result")
+	}
+	if result.MedicalScaleCode != nil || result.MedicalScaleID != nil || result.ScaleVersion != nil {
+		t.Fatalf("ResolveAssessmentScaleContext() = %+v, want empty scale context", result)
+	}
+}
+
+func TestResolveAssessmentScaleContextReturnsRepositoryError(t *testing.T) {
+	repoErr := errors.New("mongo unavailable")
+	repo := &hotScaleRepoStub{
+		byQuestionnaire:          map[string]*domainScale.MedicalScale{},
+		findByQuestionnaireRefErr: repoErr,
+	}
+	svc := NewQueryService(repo, repo, nil, nil, nil)
+
+	result, err := svc.ResolveAssessmentScaleContext(context.Background(), "Q-A", "1.0.0")
+	if !errors.Is(err, repoErr) {
+		t.Fatalf("ResolveAssessmentScaleContext() error = %v, want %v", err, repoErr)
+	}
+	if result != nil {
+		t.Fatalf("ResolveAssessmentScaleContext() result = %+v, want nil on repository error", result)
 	}
 }
 

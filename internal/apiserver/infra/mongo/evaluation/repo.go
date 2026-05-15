@@ -12,14 +12,12 @@ import (
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // ReportRepository 报告 MongoDB 仓储
 type ReportRepository struct {
 	base.BaseRepository
-	mapper      *ReportMapper
-	outboxStore *mongoEventOutbox.Store
+	mapper *ReportMapper
 }
 
 // NewReportRepository 创建报告仓储
@@ -27,16 +25,10 @@ func NewReportRepository(db *mongo.Database, opts ...base.BaseRepositoryOptions)
 	return NewReportRepositoryWithTopicResolver(db, nil, opts...)
 }
 
-func NewReportRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver, opts ...base.BaseRepositoryOptions) (*ReportRepository, error) {
-	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(db, resolver)
-	if err != nil {
-		return nil, err
-	}
-
+func NewReportRepositoryWithTopicResolver(db *mongo.Database, _ eventcatalog.TopicResolver, opts ...base.BaseRepositoryOptions) (*ReportRepository, error) {
 	return &ReportRepository{
 		BaseRepository: base.NewBaseRepository(db, (&InterpretReportPO{}).CollectionName(), opts...),
 		mapper:         NewReportMapper(),
-		outboxStore:    outboxStore,
 	}, nil
 }
 
@@ -49,25 +41,6 @@ var _ report.ReportRepository = (*ReportRepository)(nil)
 func (r *ReportRepository) Save(ctx context.Context, rpt *report.InterpretReport) error {
 	return r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
 		return r.SaveReportRecord(txCtx, rpt, 0)
-	})
-}
-
-func (r *ReportRepository) SaveReportDurably(ctx context.Context, rpt *report.InterpretReport, testeeID testee.ID, events []event.DomainEvent) error {
-	if rpt == nil {
-		return nil
-	}
-
-	return r.withTransaction(ctx, func(txCtx mongo.SessionContext) error {
-		if err := r.SaveReportRecord(txCtx, rpt, testeeID); err != nil {
-			return err
-		}
-		if len(events) > 0 {
-			if err := r.outboxStore.StageEventsTx(txCtx, events); err != nil {
-				return fmt.Errorf("暂存报告事件失败: %w", err)
-			}
-		}
-
-		return nil
 	})
 }
 

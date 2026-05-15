@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
@@ -168,14 +167,13 @@ func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questi
 	} else {
 		medicalScale, err = s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 	}
-	if err != nil || medicalScale == nil {
-		if err != nil && !domscale.IsNotFound(err) {
-			logger.L(ctx).Infow("问卷未关联量表，将创建纯问卷模式的测评",
-				"questionnaire_code", questionnaireCode,
-				"questionnaire_version", questionnaireVersion,
-				"error", err,
-			)
+	if err != nil {
+		if domscale.IsNotFound(err) {
+			return &shared.AssessmentScaleContextResult{}, nil
 		}
+		return nil, err
+	}
+	if medicalScale == nil {
 		return &shared.AssessmentScaleContextResult{}, nil
 	}
 	scaleID := medicalScale.GetID().Uint64()

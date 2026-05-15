@@ -153,19 +153,27 @@ func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFrom
 	}
 }
 
-func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) assessmentScaleContext {
+func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) (assessmentScaleContext, error) {
 	l := logger.L(ctx)
 	if s.scaleContextResolver == nil || questionnaireCode == "" {
-		return assessmentScaleContext{}
+		return assessmentScaleContext{}, nil
 	}
 
 	result, err := s.scaleContextResolver.ResolveAssessmentScaleContext(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil || result == nil || result.MedicalScaleCode == nil {
+	if err != nil {
+		l.Errorw("解析问卷量表绑定失败",
+			"questionnaire_code", questionnaireCode,
+			"questionnaire_version", questionnaireVersion,
+			"error", err,
+		)
+		return assessmentScaleContext{}, err
+	}
+	if result == nil || result.MedicalScaleCode == nil {
 		l.Infow("问卷未关联量表，将创建纯问卷模式的测评",
 			"questionnaire_code", questionnaireCode,
 			"questionnaire_version", questionnaireVersion,
 		)
-		return assessmentScaleContext{}
+		return assessmentScaleContext{}, nil
 	}
 
 	l.Infow("找到关联量表",
@@ -180,7 +188,7 @@ func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, que
 		medicalScaleCode: result.MedicalScaleCode,
 		medicalScaleName: result.MedicalScaleName,
 		scaleVersion:     result.ScaleVersion,
-	}
+	}, nil
 }
 
 func buildCreateAssessmentDTO(
