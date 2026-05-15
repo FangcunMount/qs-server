@@ -26,6 +26,7 @@ type service struct {
 	resultWriter evaluationresult.Writer
 }
 
+// EventStager 事件暂存器
 type EventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
@@ -33,6 +34,7 @@ type EventStager interface {
 // ServiceOption 服务选项
 type ServiceOption func(*service)
 
+// WithTransactionalOutbox 配置事务和事件暂存器
 func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventStager) ServiceOption {
 	return func(s *service) {
 		s.txRunner = txRunner
@@ -40,13 +42,14 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 	}
 }
 
+// WithEvaluatorRegistry 配置评估器注册表
 func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 	return func(s *service) {
 		s.evaluators = registry
 	}
 }
 
-// NewService 创建评估引擎服务
+// NewService 创建评估引擎服务实例
 func NewService(
 	assessmentRepo assessment.Repository,
 	inputResolver evaluationinput.Resolver,
@@ -68,7 +71,7 @@ func NewService(
 	return svc
 }
 
-// Evaluate 执行评估
+// Evaluate 执行单次评估
 func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	l := logger.L(ctx)
 	startTime := time.Now()
@@ -79,12 +82,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"assessment_id", assessmentID,
 	)
 
-	// 参数校验
 	if assessmentID == 0 {
-		l.Warnw("测评ID为空", "action", "evaluate", "result", "invalid_params")
-		return evalerrors.InvalidArgument("测评ID不能为空")
+		l.Warnw("评估ID为空", "action", "evaluate", "result", "invalid_params")
+		return evalerrors.InvalidArgument("评估ID不能为空")
 	}
 
+	// 加载评估数据
 	loaded, err := s.assessmentLoader().LoadForEvaluation(ctx, assessmentID)
 	if err != nil {
 		return err
@@ -94,12 +97,14 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 	a := loaded.assessment
 
+	// 解析评估输入
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
 		s.failureFinalizer().MarkAsFailed(ctx, a, inputResolveFailureReason(err))
 		return err
 	}
 
+	// 解析评估模型类型
 	modelKind := resolveEvaluationModelKind(a, input)
 
 	l.Infow("开始执行评估解释器",
@@ -108,14 +113,17 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"model_code", evaluationModelCode(a, input),
 	)
 
+	// 解析评估模型执行器
 	if s.evaluators == nil {
 		err := evalerrors.ModuleNotConfigured("evaluation evaluator registry is not configured")
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
+
+	// 解析评估模型执行器
 	evaluator, err := s.evaluators.Resolve(modelKind)
 	if err != nil {
-		l.Errorw("评估解释器解析失败",
+		l.Errorw("评估模型执行器解析失败",
 			"assessment_id", assessmentID,
 			"model_kind", modelKind.String(),
 			"result", "failed",
@@ -124,18 +132,23 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
+
+	// 执行评估模型
 	evaluationResult, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
 	if err != nil {
-		l.Errorw("评估解释器执行失败",
+		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
 			"model_kind", modelKind.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
 		)
+		// 标记评估流程执行失败
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
+
+	// 执行评估成功，写入评估结果和报告
 	if s.resultWriter == nil {
 		err := evalerrors.ModuleNotConfigured("evaluation result writer is not configured")
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
@@ -153,7 +166,6 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	duration := time.Since(startTime)
 	l.Infow("评估执行完成",
 		"action", "evaluate",
 		"resource", "assessment",
@@ -161,12 +173,13 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"assessment_id", assessmentID,
 		"model_kind", modelKind.String(),
 		"model_code", evaluationModelCode(a, input),
-		"duration_ms", duration.Milliseconds(),
+		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return nil
 }
 
+// resolveEvaluationModelKind 解析评估模型类型
 func resolveEvaluationModelKind(a *assessment.Assessment, input *evaluationinput.InputSnapshot) assessment.EvaluationModelKind {
 	if input != nil && input.Model != nil && input.Model.Kind != "" {
 		return assessment.EvaluationModelKind(input.Model.Kind)
@@ -177,6 +190,7 @@ func resolveEvaluationModelKind(a *assessment.Assessment, input *evaluationinput
 	return ""
 }
 
+// evaluationModelCode 解析评估模型代码
 func evaluationModelCode(a *assessment.Assessment, input *evaluationinput.InputSnapshot) string {
 	if input != nil && input.Model != nil && input.Model.Code != "" {
 		return input.Model.Code
@@ -195,10 +209,12 @@ func (s *service) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs 
 	}.EvaluateBatch(ctx, orgID, assessmentIDs)
 }
 
+// assessmentLoader 评估数据加载器
 func (s *service) assessmentLoader() assessmentLoader {
 	return assessmentLoader{repo: s.assessmentRepo}
 }
 
+// failureFinalizer 评估失败标记器
 func (s *service) failureFinalizer() evaluationFailureFinalizer {
 	return evaluationFailureFinalizer{
 		repo:        s.assessmentRepo,

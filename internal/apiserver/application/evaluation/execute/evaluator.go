@@ -1,39 +1,22 @@
 package execute
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-type ExecutionInput struct {
-	Assessment *assessment.Assessment
-	Input      *evaluationinput.InputSnapshot
-}
-
-// Evaluator 执行某一类解释模型的评估。
-type Evaluator interface {
-	Kind() assessment.EvaluationModelKind
-	Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error)
-}
-
-// EvaluatorRegistry 解释模型评估器注册表。
-type EvaluatorRegistry interface {
-	Resolve(kind assessment.EvaluationModelKind) (Evaluator, error)
-}
-
-// mutableEvaluatorRegistry 可变解释模型评估器注册表。
+// mutableEvaluatorRegistry 可变评估模型评估器注册表。
 type mutableEvaluatorRegistry struct {
 	items map[assessment.EvaluationModelKind]Evaluator
 }
 
+// newEmptyEvaluatorRegistry 创建空的评估模型评估器注册表。
 func newEmptyEvaluatorRegistry() *mutableEvaluatorRegistry {
 	return &mutableEvaluatorRegistry{items: make(map[assessment.EvaluationModelKind]Evaluator)}
 }
 
-// NewEvaluatorRegistry 创建解释模型评估器注册表。
+// NewEvaluatorRegistry 创建评估模型评估器注册表。
 func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, error) {
 	registry := newEmptyEvaluatorRegistry()
 	for _, evaluator := range evaluators {
@@ -44,7 +27,7 @@ func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, e
 	return registry, nil
 }
 
-// Register 注册解释模型评估器。
+// Register 注册评估模型评估器。
 func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	if evaluator == nil {
 		return fmt.Errorf("evaluation evaluator is nil")
@@ -60,7 +43,7 @@ func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	return nil
 }
 
-// Resolve 解析解释模型评估器。
+// Resolve 解析评估模型评估器。
 func (r *mutableEvaluatorRegistry) Resolve(kind assessment.EvaluationModelKind) (Evaluator, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation evaluator registry is not configured")

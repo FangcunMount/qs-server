@@ -12,13 +12,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+// assessmentListCache 测评列表缓存
 type assessmentListCache interface {
+	// Get 获取测评列表缓存
 	Get(ctx context.Context, userID uint64, page, pageSize int, status, scaleCode, riskLevel, dateFrom, dateTo string, dest interface{}) error
+	// Set 设置测评列表缓存
 	Set(ctx context.Context, userID uint64, page, pageSize int, status, scaleCode, riskLevel, dateFrom, dateTo string, value interface{})
+	// Invalidate 失效测评列表缓存
 	Invalidate(ctx context.Context, userID uint64) error
 }
 
-// submissionService 测评提交服务实现
+// submissionService 测评提交服务
 // 行为者：答题者 (Testee)
 type submissionService struct {
 	repo        assessment.Repository
@@ -29,6 +33,7 @@ type submissionService struct {
 	listCache   assessmentListCache
 }
 
+// NewSubmissionService 创建测评提交服务实例
 func NewSubmissionService(
 	repo assessment.Repository,
 	reader evaluationreadmodel.AssessmentReader,
@@ -47,10 +52,12 @@ func NewSubmissionService(
 	}
 }
 
+// Create 创建测评
 func (s *submissionService) Create(ctx context.Context, dto CreateAssessmentDTO) (*AssessmentResult, error) {
 	return assessmentCreatorWorkflow{service: s}.Create(ctx, dto)
 }
 
+// assessmentCreatorWorkflow 测评创建工作流
 type assessmentCreatorWorkflow struct {
 	service *submissionService
 }
@@ -162,10 +169,12 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 	return result, nil
 }
 
+// Submit 提交测评
 func (s *submissionService) Submit(ctx context.Context, assessmentID uint64) (*AssessmentResult, error) {
 	return assessmentSubmitWorkflow{service: s}.Submit(ctx, assessmentID)
 }
 
+// assessmentSubmitWorkflow 测评提交工作流
 type assessmentSubmitWorkflow struct {
 	service *submissionService
 }

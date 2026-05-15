@@ -7,10 +7,12 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 )
 
+// myAssessmentListCacheHelper 我的测评列表缓存助手
 type myAssessmentListCacheHelper struct {
 	cache assessmentListCache
 }
 
+// myAssessmentListCacheKey 我的测评列表缓存键
 type myAssessmentListCacheKey struct {
 	userID    uint64
 	page      int
@@ -22,6 +24,7 @@ type myAssessmentListCacheKey struct {
 	dateTo    string
 }
 
+// newMyAssessmentListCacheKey 创建我的测评列表缓存键
 func newMyAssessmentListCacheKey(dto ListMyAssessmentsDTO, page, pageSize int) myAssessmentListCacheKey {
 	return myAssessmentListCacheKey{
 		userID:    dto.TesteeID,
@@ -35,6 +38,7 @@ func newMyAssessmentListCacheKey(dto ListMyAssessmentsDTO, page, pageSize int) m
 	}
 }
 
+// Get 获取我的测评列表缓存
 func (h myAssessmentListCacheHelper) Get(ctx context.Context, key myAssessmentListCacheKey) (*AssessmentListResult, bool) {
 	if h.cache == nil {
 		return nil, false
@@ -57,6 +61,7 @@ func (h myAssessmentListCacheHelper) Get(ctx context.Context, key myAssessmentLi
 	return nil, false
 }
 
+// Set 设置我的测评列表缓存
 func (h myAssessmentListCacheHelper) Set(ctx context.Context, key myAssessmentListCacheKey, result *AssessmentListResult) {
 	if h.cache == nil || result == nil {
 		return
@@ -75,6 +80,7 @@ func (h myAssessmentListCacheHelper) Set(ctx context.Context, key myAssessmentLi
 	)
 }
 
+// Invalidate 失效我的测评列表缓存
 func (h myAssessmentListCacheHelper) Invalidate(ctx context.Context, userID uint64) {
 	if h.cache == nil || userID == 0 {
 		return
@@ -106,6 +112,7 @@ func (h myAssessmentListCacheHelper) Invalidate(ctx context.Context, userID uint
 	}
 }
 
+// formatAssessmentListDateKey 格式化测评列表日期键
 func formatAssessmentListDateKey(value *time.Time) string {
 	if value == nil {
 		return ""

@@ -23,7 +23,7 @@ type RepositoryResolver struct {
 // ports and be wired through NewResolver instead of adding more repository/domain
 // dependencies outside repository_resolver.go and snapshot_mappers.go.
 func NewRepositoryResolver(
-	scaleRepo scale.Repository,
+	scaleRepo ScaleSnapshotRepository,
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 ) (*RepositoryResolver, error) {
@@ -167,10 +167,18 @@ func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.Inpu
 }
 
 type RepositoryScaleSnapshotCatalog struct {
-	repo scale.Repository
+	repo ScaleSnapshotRepository
 }
 
-func NewRepositoryScaleSnapshotCatalog(repo scale.Repository) *RepositoryScaleSnapshotCatalog {
+// ScaleSnapshotRepository is the narrow Scale read port needed by evaluation
+// input resolution. Command repositories may implement it, but providers should
+// not depend on Scale mutation capabilities.
+type ScaleSnapshotRepository interface {
+	FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error)
+	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error)
+}
+
+func NewRepositoryScaleSnapshotCatalog(repo ScaleSnapshotRepository) *RepositoryScaleSnapshotCatalog {
 	return &RepositoryScaleSnapshotCatalog{repo: repo}
 }
 

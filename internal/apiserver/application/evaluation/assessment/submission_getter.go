@@ -10,10 +10,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+// assessmentGetter 测评获取器
 type assessmentGetter struct {
 	service *submissionService
 }
 
+// GetMyAssessment 获取我的测评详情
 func (g assessmentGetter) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentResult, error) {
 	s := g.service
 	l := logger.L(ctx)
@@ -56,6 +58,7 @@ func (g assessmentGetter) GetMyAssessment(ctx context.Context, testeeID, assessm
 	return toAssessmentResult(a)
 }
 
+// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
 func (g assessmentGetter) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentResult, error) {
 	s := g.service
 	l := logger.L(ctx)

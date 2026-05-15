@@ -16,6 +16,10 @@ type scoreQueryService struct {
 	scaleCatalog     evaluationinput.ScaleCatalog
 }
 
+// scoreQueryService 实现了 ScoreQueryService 接口
+var _ ScoreQueryService = &scoreQueryService{}
+
+// NewScoreQueryService 创建得分查询服务实例
 func NewScoreQueryService(
 	scoreReader evaluationreadmodel.ScoreReader,
 	assessmentReader evaluationreadmodel.AssessmentReader,

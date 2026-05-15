@@ -7,11 +7,13 @@ import (
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
+// waitService 等待测评报告服务
 type waitService struct {
 	managementService AssessmentManagementService
 	registry          evaluationwaiter.Registry
 }
 
+// NewWaitService 创建等待测评报告服务实例
 func NewWaitService(managementService AssessmentManagementService, registry evaluationwaiter.Registry) AssessmentWaitService {
 	return &waitService{
 		managementService: managementService,
@@ -19,6 +21,7 @@ func NewWaitService(managementService AssessmentManagementService, registry eval
 	}
 }
 
+// WaitReport 等待测评报告
 func (s *waitService) WaitReport(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary {
 	if summary, done := s.loadTerminalAssessmentSummary(ctx, assessmentID); done {
 		return summary
@@ -29,6 +32,7 @@ func (s *waitService) WaitReport(ctx context.Context, assessmentID uint64) evalu
 	return s.waitForReportWithRegistry(ctx, assessmentID)
 }
 
+// waitForReportByPolling 等待测评报告通过轮询
 func (s *waitService) waitForReportByPolling(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary {
 	ticker := time.NewTicker(time.Second)
 	defer ticker.Stop()
@@ -45,6 +49,7 @@ func (s *waitService) waitForReportByPolling(ctx context.Context, assessmentID u
 	}
 }
 
+// waitForReportWithRegistry 等待测评报告通过注册表
 func (s *waitService) waitForReportWithRegistry(ctx context.Context, assessmentID uint64) evaluationwaiter.StatusSummary {
 	ch := make(chan evaluationwaiter.StatusSummary, 1)
 	s.registry.Add(assessmentID, ch)
@@ -67,6 +72,7 @@ func (s *waitService) waitForReportWithRegistry(ctx context.Context, assessmentI
 	}
 }
 
+// loadTerminalAssessmentSummary 加载终端测评总结
 func (s *waitService) loadTerminalAssessmentSummary(ctx context.Context, assessmentID uint64) (evaluationwaiter.StatusSummary, bool) {
 	if s.managementService == nil {
 		return evaluationwaiter.StatusSummary{}, false
@@ -78,6 +84,7 @@ func (s *waitService) loadTerminalAssessmentSummary(ctx context.Context, assessm
 	return assessmentStatusSummary(result)
 }
 
+// assessmentStatusSummary 测评总结
 func assessmentStatusSummary(result *AssessmentResult) (evaluationwaiter.StatusSummary, bool) {
 	if result == nil || !isTerminalAssessmentStatus(result.Status) {
 		return evaluationwaiter.StatusSummary{}, false
@@ -85,10 +92,12 @@ func assessmentStatusSummary(result *AssessmentResult) (evaluationwaiter.StatusS
 	return buildAssessmentStatusSummary(result), true
 }
 
+// isTerminalAssessmentStatus 是否终端测评状态
 func isTerminalAssessmentStatus(status string) bool {
 	return status == "interpreted" || status == "failed"
 }
 
+// buildAssessmentStatusSummary 构建测评总结
 func buildAssessmentStatusSummary(result *AssessmentResult) evaluationwaiter.StatusSummary {
 	var totalScore *float64
 	if result.TotalScore != nil {
@@ -110,6 +119,7 @@ func buildAssessmentStatusSummary(result *AssessmentResult) evaluationwaiter.Sta
 	}
 }
 
+// pendingAssessmentStatusSummary 待测评总结
 func pendingAssessmentStatusSummary() evaluationwaiter.StatusSummary {
 	return evaluationwaiter.StatusSummary{
 		Status:    "pending",

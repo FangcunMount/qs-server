@@ -13,15 +13,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
+// loadedAssessment 加载的评估数据
 type loadedAssessment struct {
 	assessment     *assessment.Assessment
 	skipEvaluation bool
 }
 
+// assessmentLoader 评估数据加载器
 type assessmentLoader struct {
 	repo assessment.Repository
 }
 
+// LoadForEvaluation 加载评估数据
 func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID uint64) (*loadedAssessment, error) {
 	log := logger.L(ctx)
 	log.Debugw("加载测评数据",
@@ -68,6 +71,7 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 	return &loadedAssessment{assessment: a}, nil
 }
 
+// EnsureAssessmentInOrg 确保评估数据属于当前机构
 func (l assessmentLoader) EnsureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
 	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
 	if err != nil {
@@ -81,53 +85,25 @@ func (l assessmentLoader) EnsureAssessmentInOrg(ctx context.Context, orgID int64
 	return nil
 }
 
+// evaluationInputWorkflow 评估输入解析器
 type evaluationInputWorkflow struct {
 	resolver evaluationinput.Resolver
 }
 
+// Resolve 解析评估输入
 func (w evaluationInputWorkflow) Resolve(ctx context.Context, a *assessment.Assessment, assessmentID uint64) (*evaluationinput.InputSnapshot, error) {
 	if w.resolver == nil {
 		return nil, evalerrors.ModuleNotConfigured("evaluation input resolver is not configured")
 	}
-	modelRef := modelRefFromAssessment(a)
-	legacyScaleCode := ""
-	if modelRef.IsEmpty() {
-		legacyScaleCode = legacyScaleCodeFromAssessment(a)
-	}
-	snapshot, err := w.resolver.Resolve(ctx, evaluationinput.InputRef{
-		AssessmentID:         assessmentID,
-		ModelRef:             modelRef,
-		MedicalScaleCode:     legacyScaleCode,
-		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
-		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
-		QuestionnaireVersion: a.QuestionnaireRef().Version(),
-	})
+	// 解析评估输入
+	snapshot, err := w.resolver.Resolve(ctx, inputRefFromAssessment(a, assessmentID))
 	if err != nil {
 		return nil, mapInputResolveError(err)
 	}
 	return snapshot, nil
 }
 
-func modelRefFromAssessment(a *assessment.Assessment) evaluationinput.ModelRef {
-	if a == nil || a.EvaluationModelRef() == nil {
-		return evaluationinput.ModelRef{}
-	}
-	ref := a.EvaluationModelRef()
-	return evaluationinput.ModelRef{
-		Kind:    evaluationinput.EvaluationModelKind(ref.Kind().String()),
-		Code:    ref.Code().String(),
-		Version: ref.Version(),
-		Title:   ref.Title(),
-	}
-}
-
-func legacyScaleCodeFromAssessment(a *assessment.Assessment) string {
-	if a == nil || a.MedicalScaleRef() == nil {
-		return ""
-	}
-	return a.MedicalScaleRef().Code().String()
-}
-
+// mapInputResolveError 映射评估输入解析错误
 func mapInputResolveError(err error) error {
 	var carrier evaluationinput.FailureKindCarrier
 	if !stderrors.As(err, &carrier) {
@@ -138,7 +114,7 @@ func mapInputResolveError(err error) error {
 	case evaluationinput.FailureKindModelNotFound, evaluationinput.FailureKindUnsupportedModel:
 		return evalerrors.InvalidArgument("解释模型不可用")
 	case evaluationinput.FailureKindScaleNotFound:
-		return evalerrors.MedicalScaleNotFound(err, "量表不存在")
+		return mapScaleInputResolveError(err)
 	case evaluationinput.FailureKindAnswerSheetNotFound:
 		return evalerrors.AnswerSheetNotFound(err, "答卷不存在")
 	case evaluationinput.FailureKindQuestionnaireNotFound:
@@ -150,6 +126,7 @@ func mapInputResolveError(err error) error {
 	}
 }
 
+// inputResolveFailureReason 映射评估输入解析失败原因
 func inputResolveFailureReason(err error) string {
 	var carrier evaluationinput.FailureReasonCarrier
 	if stderrors.As(err, &carrier) {
@@ -158,12 +135,14 @@ func inputResolveFailureReason(err error) string {
 	return "评估输入加载失败: " + err.Error()
 }
 
+// evaluationFailureFinalizer 评估失败标记器
 type evaluationFailureFinalizer struct {
 	repo        assessment.Repository
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 }
 
+// MarkAsFailed 标记评估失败
 func (f evaluationFailureFinalizer) MarkAsFailed(ctx context.Context, a *assessment.Assessment, reason string) {
 	log := logger.L(ctx)
 
@@ -188,6 +167,7 @@ func (f evaluationFailureFinalizer) MarkAsFailed(ctx context.Context, a *assessm
 	}
 }
 
+// SaveAssessmentWithEvents 保存评估数据和事件
 func (f evaluationFailureFinalizer) SaveAssessmentWithEvents(ctx context.Context, a *assessment.Assessment) error {
 	if f.txRunner == nil || f.eventStager == nil {
 		return evalerrors.ModuleNotConfigured("assessment engine transactional outbox requires transaction runner and event stager")
@@ -212,11 +192,13 @@ func (f evaluationFailureFinalizer) SaveAssessmentWithEvents(ctx context.Context
 	return nil
 }
 
+// batchEvaluator 批量评估器
 type batchEvaluator struct {
 	loader   assessmentLoader
 	evaluate func(ctx context.Context, assessmentID uint64) error
 }
 
+// EvaluateBatch 批量评估
 func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error) {
 	log := logger.L(ctx)
 	startTime := time.Now()
@@ -232,6 +214,7 @@ func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessme
 		return nil, evalerrors.InvalidArgument("机构ID不能为空")
 	}
 
+	// 确保评估数据属于当前机构
 	for _, id := range assessmentIDs {
 		if err := b.loader.EnsureAssessmentInOrg(ctx, orgID, id); err != nil {
 			log.Warnw("批量评估的机构范围校验失败",
@@ -243,6 +226,7 @@ func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessme
 		}
 	}
 
+	// 批量评估
 	result := &BatchResult{
 		TotalCount:   len(assessmentIDs),
 		SuccessCount: 0,
@@ -250,6 +234,7 @@ func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessme
 		FailedIDs:    make([]uint64, 0),
 	}
 
+	// 执行单次评估
 	for _, id := range assessmentIDs {
 		if err := b.evaluate(ctx, id); err != nil {
 			result.FailedCount++
@@ -263,7 +248,6 @@ func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessme
 		}
 	}
 
-	duration := time.Since(startTime)
 	log.Infow("批量评估完成",
 		"action", "evaluate_batch",
 		"resource", "assessment",
@@ -271,7 +255,7 @@ func (b batchEvaluator) EvaluateBatch(ctx context.Context, orgID int64, assessme
 		"total_count", result.TotalCount,
 		"success_count", result.SuccessCount,
 		"failed_count", result.FailedCount,
-		"duration_ms", duration.Milliseconds(),
+		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
 	return result, nil

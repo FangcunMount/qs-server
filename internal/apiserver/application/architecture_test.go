@@ -245,7 +245,9 @@ func TestEvaluationExecuteKeepsScaleCompatibilityIsolated(t *testing.T) {
 
 	root := repoRoot(t)
 	dir := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
-	allowed := filepath.ToSlash(filepath.Join("internal", "apiserver", "application", "evaluation", "execute", "evaluation_workflows.go"))
+	allowed := map[string]struct{}{
+		filepath.ToSlash(filepath.Join("internal", "apiserver", "application", "evaluation", "execute", "scale_compatibility.go")): {},
+	}
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -260,8 +262,8 @@ func TestEvaluationExecuteKeepsScaleCompatibilityIsolated(t *testing.T) {
 		}
 		text := string(data)
 		for _, token := range []string{"MedicalScale", "ScalePayload("} {
-			if rel != allowed && strings.Contains(text, token) {
-				t.Fatalf("%s contains %q; execute layer scale compatibility must stay isolated in %s", rel, token, allowed)
+			if _, ok := allowed[rel]; !ok && strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; execute layer scale compatibility must stay isolated in scale_compatibility.go", rel, token)
 			}
 		}
 		return nil

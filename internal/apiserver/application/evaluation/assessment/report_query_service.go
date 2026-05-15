@@ -13,6 +13,7 @@ type reportQueryService struct {
 	reader evaluationreadmodel.ReportReader
 }
 
+// NewReportQueryService 创建报告查询服务实例
 func NewReportQueryService(reader evaluationreadmodel.ReportReader) ReportQueryService {
 	return &reportQueryService{
 		reader: reader,
@@ -55,6 +56,7 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 	}, nil
 }
 
+// listReportRows 查询报告列表数据
 func (s *reportQueryService) listReportRows(
 	ctx context.Context,
 	dto ListReportsDTO,

@@ -11,10 +11,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
+// myAssessmentListWorkflow 我的测评列表工作流
 type myAssessmentListWorkflow struct {
 	service *submissionService
 }
 
+// List 查询我的测评列表
 func (w myAssessmentListWorkflow) List(ctx context.Context, dto ListMyAssessmentsDTO) (*AssessmentListResult, error) {
 	s := w.service
 	l := logger.L(ctx)
@@ -90,10 +92,12 @@ func (w myAssessmentListWorkflow) List(ctx context.Context, dto ListMyAssessment
 	return result, nil
 }
 
+// myAssessmentQuery 我的测评查询
 type myAssessmentQuery struct {
 	reader evaluationreadmodel.AssessmentReader
 }
 
+// List 查询我的测评列表
 func (q myAssessmentQuery) List(
 	ctx context.Context,
 	dto ListMyAssessmentsDTO,
@@ -118,6 +122,7 @@ func (q myAssessmentQuery) List(
 	return items, total, err
 }
 
+// normalizeMyAssessmentStatuses 规范化我的测评状态
 func normalizeMyAssessmentStatuses(raw string) []string {
 	switch raw {
 	case "":

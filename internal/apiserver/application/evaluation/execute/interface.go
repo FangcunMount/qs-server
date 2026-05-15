@@ -6,7 +6,12 @@
 // 写入结果并统一收口失败；具体模型解释由 Scale/MBTI 等 executor 实现。
 package execute
 
-import "context"
+import (
+	"context"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+)
 
 // Service 评估引擎服务接口
 // 行为者：评估引擎 (Evaluation Engine / qs-worker)
@@ -26,6 +31,26 @@ type Service interface {
 	// EvaluateBatch 批量评估
 	// 场景：批量处理积压的测评任务
 	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
+}
+
+// Evaluator 执行某一类评估模型的评估。
+type Evaluator interface {
+	// Kind 返回评估模型类型
+	Kind() assessment.EvaluationModelKind
+	// Execute 执行评估模型
+	Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error)
+}
+
+// EvaluatorRegistry 评估模型评估器注册表。
+type EvaluatorRegistry interface {
+	// Resolve 解析评估模型评估器
+	Resolve(kind assessment.EvaluationModelKind) (Evaluator, error)
+}
+
+// ExecutionInput 执行输入
+type ExecutionInput struct {
+	Assessment *assessment.Assessment
+	Input      *evaluationinput.InputSnapshot
 }
 
 // BatchResult 批量评估结果

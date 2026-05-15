@@ -1,7 +1,11 @@
-// Package result owns the post-execution write phase for Evaluation outcomes.
+// Package result 责评估执行后的写入阶段
 //
-// The writer persists report durably (with outbox staging) before score
-// projection and Assessment interpreted save, then waiter notification.
-// Cross-store compensation is not handled here. Callers must treat this
-// package as an application consistency boundary, not model-specific scoring logic.
+// 写入器持久化报告（使用出箱暂存），然后投影分数和评估解释保存，然后通知等待者
+//
+// 跨存储补偿不在这里处理。调用者必须将此包视为应用程序一致性边界，而不是模型特定评分逻辑。
+//
+// 行为者：评估引擎 (Evaluation Engine / qs-worker)
+// 职责：评估执行后的写入阶段
+// 变更来源：评估执行后的写入阶段
+// 说明：此包由评估引擎调用，负责评估执行后的写入阶段
 package result

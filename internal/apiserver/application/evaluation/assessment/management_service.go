@@ -22,6 +22,7 @@ type managementService struct {
 	eventStager EventStager
 }
 
+// NewManagementService 创建测评管理服务实例
 func NewManagementService(
 	repo assessment.Repository,
 	reader evaluationreadmodel.AssessmentReader,
@@ -145,14 +146,17 @@ func (s *managementService) List(ctx context.Context, dto ListAssessmentsDTO) (*
 	}, nil
 }
 
+// Retry 重试失败的测评
 func (s *managementService) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
 	return assessmentRetryWorkflow{service: s}.Retry(ctx, orgID, assessmentID)
 }
 
+// assessmentRetryWorkflow 测评重试工作流
 type assessmentRetryWorkflow struct {
 	service *managementService
 }
 
+// Retry 重试失败的测评
 func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessmentID uint64) (*AssessmentResult, error) {
 	s := w.service
 	l := logger.L(ctx)
@@ -233,6 +237,9 @@ func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessm
 	return result, nil
 }
 
+// loadAssessmentInOrg 加载测评
+// 场景：管理员重试失败的测评
+// 说明：加载测评数据，并检查是否属于当前机构
 func (s *managementService) loadAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64, action string) (*assessment.Assessment, error) {
 	l := logger.L(ctx)
 

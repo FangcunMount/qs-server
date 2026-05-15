@@ -9,10 +9,16 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
+// EventStager 事件阶段器
+// 行为者：测评提交服务
+// 职责：阶段测评事件
+// 变更来源：测评提交服务
 type EventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
+// saveAssessmentAndStageEvents 保存测评并阶段事件
+// 场景：保存测评并阶段事件
 func saveAssessmentAndStageEvents(
 	ctx context.Context,
 	repo domainAssessment.Repository,
