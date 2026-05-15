@@ -396,3 +396,31 @@ func (s *protectedAccessCheckerStub) ListAccessibleTesteeIDs(context.Context, in
 	}
 	return []uint64{}, nil
 }
+
+func TestNormalizeAssessmentListQueryDefaultsPageAndSize(t *testing.T) {
+	t.Parallel()
+
+	got := normalizeAssessmentListQuery(ListAssessmentsDTO{})
+	if got.Page != 1 || got.PageSize != 10 {
+		t.Fatalf("normalizeAssessmentListQuery() = %#v, want page=1 pageSize=10", got)
+	}
+
+	got = normalizeAssessmentListQuery(ListAssessmentsDTO{Page: 2, PageSize: 20})
+	if got.Page != 2 || got.PageSize != 20 {
+		t.Fatalf("normalizeAssessmentListQuery() = %#v, want page=2 pageSize=20", got)
+	}
+}
+
+func TestNormalizeReportListQueryDefaultsPageAndSize(t *testing.T) {
+	t.Parallel()
+
+	got := normalizeReportListQuery(ListReportsDTO{})
+	if got.Page != 1 || got.PageSize != 10 {
+		t.Fatalf("normalizeReportListQuery() = %#v, want page=1 pageSize=10", got)
+	}
+
+	got = normalizeReportListQuery(ListReportsDTO{Page: 3, PageSize: 15})
+	if got.Page != 3 || got.PageSize != 15 {
+		t.Fatalf("normalizeReportListQuery() = %#v, want page=3 pageSize=15", got)
+	}
+}
