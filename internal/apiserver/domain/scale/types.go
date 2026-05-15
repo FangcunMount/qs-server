@@ -295,8 +295,6 @@ const (
 	CategoryEmotion Category = "emt"
 	// CategorySleep 睡眠
 	CategorySleep Category = "slp"
-	// CategoryMBTI MBTI
-	CategoryMBTI Category = "mbti"
 	// CategoryPersonality 人格
 	CategoryPersonality Category = "personality"
 )
@@ -310,7 +308,7 @@ func NewCategory(value string) Category {
 var AllCategories = []Category{
 	CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
 	CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
-	CategoryMBTI, CategoryPersonality,
+	CategoryPersonality,
 }
 
 // Value 获取类别文案
@@ -324,7 +322,6 @@ func (c Category) Label() string {
 		CategoryExecutiveFunction:  "执行功能",
 		CategoryEmotion:            "情绪",
 		CategorySleep:              "睡眠",
-		CategoryMBTI:               "MBTI",
 		CategoryPersonality:        "人格",
 	}
 	return categoryMap[c]
@@ -348,7 +345,7 @@ func (c Category) IsValid() bool {
 	switch c {
 	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
 		CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
-		CategoryMBTI, CategoryPersonality:
+		CategoryPersonality:
 		return true
 	default:
 		return false

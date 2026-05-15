@@ -139,7 +139,7 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 		return nil, err
 	}
 
-	scaleCtx := s.resolveAssessmentScaleContext(ctx, req.QuestionnaireCode)
+	scaleCtx := s.resolveAssessmentScaleContext(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
 	dto := buildCreateAssessmentDTO(req, scaleCtx)
 	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, scaleCtx.medicalScaleCode, &dto)
 

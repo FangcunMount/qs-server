@@ -48,6 +48,10 @@ func (b *Builder) BuildScaleKey(code string) string {
 	return NewCacheKeyspace(b.namespace()).Scale(code)
 }
 
+func (b *Builder) BuildScaleVersionKey(code, version string) string {
+	return NewCacheKeyspace(b.namespace()).ScaleVersion(code, version)
+}
+
 func (b *Builder) BuildScaleListKey() string {
 	return NewCacheKeyspace(b.namespace()).ScaleList()
 }

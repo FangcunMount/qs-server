@@ -125,7 +125,15 @@ func (r *scaleCacheQueryRepo) FindByCode(_ context.Context, code string) (*domai
 	return nil, domainscale.ErrNotFound
 }
 
+func (r *scaleCacheQueryRepo) FindByCodeVersion(ctx context.Context, code, _ string) (*domainscale.MedicalScale, error) {
+	return r.FindByCode(ctx, code)
+}
+
 func (r *scaleCacheQueryRepo) FindByQuestionnaireCode(context.Context, string) (*domainscale.MedicalScale, error) {
+	return nil, domainscale.ErrNotFound
+}
+
+func (r *scaleCacheQueryRepo) FindByQuestionnaireRef(context.Context, string, string) (*domainscale.MedicalScale, error) {
 	return nil, domainscale.ErrNotFound
 }
 

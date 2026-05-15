@@ -38,9 +38,11 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 			Title:   "Scale",
 		},
 		MedicalScale: &evaluationinput.ScaleSnapshot{
-			Code:              "S-001",
-			QuestionnaireCode: "Q-001",
-			Status:            "published",
+			Code:                 "S-001",
+			ScaleVersion:         "1.0.0",
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
+			Status:               "published",
 			Factors: []evaluationinput.FactorSnapshot{
 				{
 					Code:            "total",
@@ -55,12 +57,14 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 			},
 		},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
 			Answers: []evaluationinput.AnswerSnapshot{
 				{QuestionCode: "q1", Score: 3},
 				{QuestionCode: "q2", Score: 4},
 			},
 		},
-		Questionnaire: &evaluationinput.QuestionnaireSnapshot{},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
 	}
 
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
@@ -84,12 +88,48 @@ func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 	} = (*Executor)(nil)
 }
 
+func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
+	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindScale, meta.NewCode("S-001"), "1.0.0", "Scale")
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(1),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(1)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	err = DefaultInputValidator{}.Validate(ScaleExecutionInput{
+		Assessment: a,
+		Input: &evaluationinput.InputSnapshot{
+			Model:        evaluationinput.NewScaleModelSnapshot(&evaluationinput.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", Title: "Scale"}),
+			ModelPayload: evaluationinput.ScaleModelPayload{Scale: &evaluationinput.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", QuestionnaireCode: "Q-001", QuestionnaireVersion: "2.0.0", Status: "published", Factors: []evaluationinput.FactorSnapshot{{Code: "total"}}}},
+			AnswerSheet:  &evaluationinput.AnswerSheetSnapshot{ID: 1, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
+			Questionnaire: &evaluationinput.QuestionnaireSnapshot{
+				Code:    "Q-001",
+				Version: "1.0.0",
+			},
+		},
+	})
+	if err == nil {
+		t.Fatal("Validate error = nil, want questionnaire version mismatch")
+	}
+}
+
 func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	validator := &stubValidator{}
 	assembler := &stubAssembler{
 		output: scaleinterpretation.ScaleInterpretationInput{
 			Scale: scaleinterpretation.ScaleInterpretationModel{
-				Factors: []domainScale.FactorSnapshot{{Code: domainScale.NewFactorCode("f1"), IsTotalScore: true}},
+				Factors: []domainScale.FactorSnapshot{{Code: domainScale.NewFactorCode("f1"), IsTotalScore: true, ScoringStrategy: domainScale.ScoringStrategySum}},
+			},
+			AnswerSheet: &scaleinterpretation.ScaleAnswerSheetSnapshot{
+				Answers: []scaleinterpretation.ScaleAnswerSnapshot{{QuestionCode: meta.NewCode("f1"), Score: 1}},
 			},
 		},
 	}

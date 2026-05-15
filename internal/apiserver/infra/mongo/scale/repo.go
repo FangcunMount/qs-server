@@ -47,7 +47,45 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.Medica
 		"code":       code,
 		"deleted_at": nil, // 排除已软删除的记录
 	}
+	return r.findOne(ctx, filter)
+}
 
+// FindByCodeVersion 根据编码和量表版本查询量表。
+func (r *Repository) FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error) {
+	if scaleVersion == "" {
+		return r.FindByCode(ctx, code)
+	}
+	filter := bson.M{
+		"code":       code,
+		"deleted_at": nil,
+		"$or":        scaleVersionCompatibilityFilter(scaleVersion),
+	}
+	return r.findOne(ctx, filter)
+}
+
+// FindByQuestionnaireCode 根据问卷编码查询量表
+func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+	filter := bson.M{
+		"questionnaire_code": questionnaireCode,
+		"deleted_at":         nil,
+	}
+	return r.findOne(ctx, filter)
+}
+
+// FindByQuestionnaireRef 根据问卷编码和版本查询量表。
+func (r *Repository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error) {
+	if questionnaireVersion == "" {
+		return r.FindByQuestionnaireCode(ctx, questionnaireCode)
+	}
+	filter := bson.M{
+		"questionnaire_code":    questionnaireCode,
+		"questionnaire_version": questionnaireVersion,
+		"deleted_at":            nil,
+	}
+	return r.findOne(ctx, filter)
+}
+
+func (r *Repository) findOne(ctx context.Context, filter bson.M) (*scale.MedicalScale, error) {
 	var po ScalePO
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
@@ -60,23 +98,18 @@ func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.Medica
 	return r.mapper.ToDomain(ctx, &po), nil
 }
 
-// FindByQuestionnaireCode 根据问卷编码查询量表
-func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
-	filter := bson.M{
-		"questionnaire_code": questionnaireCode,
-		"deleted_at":         nil,
+func scaleVersionCompatibilityFilter(scaleVersion string) []bson.M {
+	return []bson.M{
+		{"scale_version": scaleVersion},
+		{
+			"questionnaire_version": scaleVersion,
+			"$or": []bson.M{
+				{"scale_version": ""},
+				{"scale_version": nil},
+				{"scale_version": bson.M{"$exists": false}},
+			},
+		},
 	}
-
-	var po ScalePO
-	err := r.FindOne(ctx, filter, &po)
-	if err != nil {
-		if err == mongo.ErrNoDocuments {
-			return nil, scale.ErrNotFound
-		}
-		return nil, err
-	}
-
-	return r.mapper.ToDomain(ctx, &po), nil
 }
 
 // Update 更新量表

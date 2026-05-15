@@ -30,6 +30,7 @@ type hotScaleRepoStub struct {
 	byCode                   map[string]*domainScale.MedicalScale
 	summaries                []*domainScale.MedicalScale
 	findByQuestionnaireCalls []string
+	findByQuestionnaireRefs  []string
 	findSummaryCalls         int
 }
 
@@ -40,9 +41,19 @@ func (r *hotScaleRepoStub) FindByCode(_ context.Context, code string) (*domainSc
 	}
 	return nil, errors.New("not found")
 }
+func (r *hotScaleRepoStub) FindByCodeVersion(ctx context.Context, code, _ string) (*domainScale.MedicalScale, error) {
+	return r.FindByCode(ctx, code)
+}
 func (r *hotScaleRepoStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
 	r.findByQuestionnaireCalls = append(r.findByQuestionnaireCalls, questionnaireCode)
 	return r.byQuestionnaire[questionnaireCode], nil
+}
+func (r *hotScaleRepoStub) FindByQuestionnaireRef(_ context.Context, questionnaireCode, questionnaireVersion string) (*domainScale.MedicalScale, error) {
+	r.findByQuestionnaireRefs = append(r.findByQuestionnaireRefs, questionnaireCode+":"+questionnaireVersion)
+	if item, ok := r.byQuestionnaire[questionnaireCode]; ok && item.GetQuestionnaireVersion() == questionnaireVersion {
+		return item, nil
+	}
+	return nil, domainScale.ErrNotFound
 }
 func (r *hotScaleRepoStub) ListScales(context.Context, scalereadmodel.ScaleFilter, scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	r.findSummaryCalls++
@@ -141,7 +152,7 @@ func TestResolveAssessmentScaleContextUsesScaleRepositoryBehindApplicationPort(t
 	}
 	svc := NewQueryService(repo, repo, nil, nil, nil)
 
-	result, err := svc.ResolveAssessmentScaleContext(context.Background(), "Q-A")
+	result, err := svc.ResolveAssessmentScaleContext(context.Background(), "Q-A", "1.0.0")
 	if err != nil {
 		t.Fatalf("ResolveAssessmentScaleContext() error = %v", err)
 	}
@@ -150,6 +161,9 @@ func TestResolveAssessmentScaleContextUsesScaleRepositoryBehindApplicationPort(t
 	}
 	if result.MedicalScaleID == nil || *result.MedicalScaleID == 0 {
 		t.Fatalf("MedicalScaleID = %+v, want non-zero id", result.MedicalScaleID)
+	}
+	if len(repo.findByQuestionnaireRefs) != 1 || repo.findByQuestionnaireRefs[0] != "Q-A:1.0.0" {
+		t.Fatalf("FindByQuestionnaireRef calls = %#v, want Q-A:1.0.0", repo.findByQuestionnaireRefs)
 	}
 }
 

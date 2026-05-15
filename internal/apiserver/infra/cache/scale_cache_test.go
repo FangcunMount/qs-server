@@ -29,12 +29,16 @@ func TestCachedScaleRepositoryCreateUpdateRemoveWritesAndInvalidatesCache(t *tes
 	).(*CachedScaleRepository)
 	domain := newScaleCacheTestScale(t, "S-001")
 	key := cached.buildCacheKey("S-001")
+	versionKey := cached.buildVersionCacheKey("S-001", domain.GetScaleVersion())
 
 	if err := cached.Create(context.Background(), domain); err != nil {
 		t.Fatalf("Create() error = %v", err)
 	}
 	if !hasRedisKey(t, client, key) {
 		t.Fatal("cache key should exist after create")
+	}
+	if !hasRedisKey(t, client, versionKey) {
+		t.Fatal("version cache key should exist after create")
 	}
 
 	if err := cached.Update(context.Background(), domain); err != nil {
@@ -43,6 +47,9 @@ func TestCachedScaleRepositoryCreateUpdateRemoveWritesAndInvalidatesCache(t *tes
 	if hasRedisKey(t, client, key) {
 		t.Fatal("cache key should be deleted after update")
 	}
+	if hasRedisKey(t, client, versionKey) {
+		t.Fatal("version cache key should be deleted after update")
+	}
 
 	if err := cached.Create(context.Background(), domain); err != nil {
 		t.Fatalf("Create() second error = %v", err)
@@ -50,11 +57,18 @@ func TestCachedScaleRepositoryCreateUpdateRemoveWritesAndInvalidatesCache(t *tes
 	if !hasRedisKey(t, client, key) {
 		t.Fatal("cache key should exist before remove")
 	}
+	if !hasRedisKey(t, client, versionKey) {
+		t.Fatal("version cache key should exist before remove")
+	}
+	baseRepo.findByCodeResult = domain
 	if err := cached.Remove(context.Background(), "S-001"); err != nil {
 		t.Fatalf("Remove() error = %v", err)
 	}
 	if hasRedisKey(t, client, key) {
 		t.Fatal("cache key should be deleted after remove")
+	}
+	if hasRedisKey(t, client, versionKey) {
+		t.Fatal("version cache key should be deleted after remove")
 	}
 }
 

@@ -152,10 +152,10 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	}
 	questionnaireSnapshot := &port.QuestionnaireSnapshot{Code: "Q-SDS", Version: "2.0.0"}
 	qReader := &questionnaireReaderStub{snapshot: questionnaireSnapshot}
+	scaleCatalog := &scaleCatalogStub{snapshot: scaleSnapshot}
 	resolver := NewResolver(
-		scaleCatalogStub{snapshot: scaleSnapshot},
-		answerSheetReaderStub{snapshot: answerSnapshot},
-		qReader,
+		scaleCatalog,
+		NewScaleModelInputProvider(scaleCatalog, answerSheetReaderStub{snapshot: answerSnapshot}, qReader),
 	)
 
 	snapshot, err := resolver.Resolve(context.Background(), port.InputRef{
@@ -167,7 +167,8 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if snapshot.MedicalScale != scaleSnapshot || snapshot.AnswerSheet != answerSnapshot || snapshot.Questionnaire != questionnaireSnapshot {
+	scalePayload, ok := port.ScalePayload(snapshot)
+	if !ok || scalePayload != scaleSnapshot || snapshot.AnswerSheet != answerSnapshot || snapshot.Questionnaire != questionnaireSnapshot {
 		t.Fatalf("unexpected composed snapshot: %#v", snapshot)
 	}
 	if snapshot.Model == nil {
@@ -182,6 +183,13 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	payload, ok := snapshot.Model.Payload.(port.ScaleModelPayload)
 	if !ok || payload.Scale != scaleSnapshot {
 		t.Fatalf("unexpected scale model payload: %#v", snapshot.Model.Payload)
+	}
+	payload, ok = snapshot.ModelPayload.(port.ScaleModelPayload)
+	if !ok || payload.Scale != scaleSnapshot {
+		t.Fatalf("unexpected input model payload: %#v", snapshot.ModelPayload)
+	}
+	if scaleCatalog.ref.Code != "SDS" || scaleCatalog.ref.Version != "2.0.0" {
+		t.Fatalf("scale catalog ref = %#v, want SDS/2.0.0", scaleCatalog.ref)
 	}
 	if qReader.code != "Q-SDS" || qReader.version != "2.0.0" {
 		t.Fatalf("questionnaire reader called with %s/%s, want answer sheet exact version", qReader.code, qReader.version)
@@ -221,7 +229,7 @@ func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) 
 }
 
 func TestRepositoryResolverUnsupportedModelKindCarriesFailureKind(t *testing.T) {
-	resolver := NewResolver(scaleCatalogStub{}, answerSheetReaderStub{}, &questionnaireReaderStub{})
+	resolver := NewResolver(&scaleCatalogStub{})
 	_, err := resolver.Resolve(context.Background(), port.InputRef{
 		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindMBTI, Code: "MBTI-16P"},
 	})
@@ -252,9 +260,15 @@ func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.I
 type scaleCatalogStub struct {
 	snapshot *port.ScaleSnapshot
 	err      error
+	ref      port.ModelRef
 }
 
-func (s scaleCatalogStub) GetScale(context.Context, string) (*port.ScaleSnapshot, error) {
+func (s *scaleCatalogStub) GetScale(context.Context, string) (*port.ScaleSnapshot, error) {
+	return s.snapshot, s.err
+}
+
+func (s *scaleCatalogStub) GetScaleByRef(_ context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
+	s.ref = ref
 	return s.snapshot, s.err
 }
 

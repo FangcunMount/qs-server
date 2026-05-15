@@ -326,6 +326,61 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	}
 }
 
+func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
+	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindMBTI, meta.NewCode("FAKE-MODEL"), "1.0.0", "Fake Model")
+	aRepo := &fakeAssessmentRepo{
+		assessment: domainAssessment.Reconstruct(
+			meta.FromUint64(103),
+			1,
+			testee.NewID(202),
+			domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("Q-FAKE"), "1.0.0"),
+			domainAssessment.NewAnswerSheetRef(meta.FromUint64(305)),
+			nil,
+			domainAssessment.NewAdhocOrigin(),
+			domainAssessment.StatusSubmitted,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			nil,
+			&modelRef,
+		),
+	}
+	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
+		Model: &evaluationinput.ModelSnapshot{
+			Kind:    evaluationinput.EvaluationModelKindMBTI,
+			Code:    "FAKE-MODEL",
+			Version: "1.0.0",
+			Title:   "Fake Model",
+		},
+		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 305, QuestionnaireCode: "Q-FAKE", QuestionnaireVersion: "1.0.0"},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-FAKE", Version: "1.0.0"},
+	}}
+	writer := &recordingResultWriter{}
+	registry, err := NewEvaluatorRegistry(evaluatorStub{
+		kind: domainAssessment.EvaluationModelKindMBTI,
+		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.EvaluationResult, error) {
+			return domainAssessment.NewEvaluationResult(0, domainAssessment.RiskLevelNone, "INTJ", "", nil).
+				WithModelRef(*input.Assessment.EvaluationModelRef()), nil
+		},
+	})
+	if err != nil {
+		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
+	}
+	svc := NewService(aRepo, input, writer, WithEvaluatorRegistry(registry))
+
+	if err := svc.Evaluate(context.Background(), 103); err != nil {
+		t.Fatalf("Evaluate returned error: %v", err)
+	}
+	if writer.calls != 1 || writer.outcome.Result == nil || writer.outcome.Result.ModelRef.Kind() != domainAssessment.EvaluationModelKindMBTI {
+		t.Fatalf("unexpected writer outcome: %#v", writer.outcome)
+	}
+	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindMBTI || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
+		t.Fatalf("unexpected input ref: %#v", input.lastRef)
+	}
+}
+
 func TestEvaluateUnknownModelKindMarksAssessmentFailed(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	aRepo := &fakeAssessmentRepo{

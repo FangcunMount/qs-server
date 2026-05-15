@@ -521,7 +521,6 @@ func NewEvaluationResult(
 			Level:        &level,
 		},
 		Detail: EvaluationDetail{
-			Kind:    EvaluationModelKindScale,
 			Payload: factorScores,
 		},
 	}

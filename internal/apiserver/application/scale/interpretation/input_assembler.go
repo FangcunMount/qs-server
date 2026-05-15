@@ -17,8 +17,9 @@ func (DefaultInputAssembler) FromSnapshot(snapshot *evaluationinput.InputSnapsho
 	if snapshot == nil {
 		return scaleinterpretation.ScaleInterpretationInput{}
 	}
+	scaleSnapshot, _ := evaluationinput.ScalePayload(snapshot)
 	return scaleinterpretation.ScaleInterpretationInput{
-		Scale:         modelFromSnapshot(snapshot.MedicalScale),
+		Scale:         modelFromSnapshot(scaleSnapshot),
 		AnswerSheet:   answerSheetFromSnapshot(snapshot.AnswerSheet),
 		Questionnaire: questionnaireFromSnapshot(snapshot.Questionnaire),
 	}

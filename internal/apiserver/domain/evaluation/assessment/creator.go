@@ -115,6 +115,42 @@ type ScaleValidator interface {
 	IsLinkedToQuestionnaire(ctx context.Context, scaleRef MedicalScaleRef, questionnaireRef QuestionnaireRef) (bool, error)
 }
 
+// EvaluationModelValidator 解释模型验证器接口。
+type EvaluationModelValidator interface {
+	ValidateEvaluationModel(ctx context.Context, modelRef EvaluationModelRef, questionnaireRef QuestionnaireRef) error
+}
+
+type scaleEvaluationModelValidator struct {
+	scaleValidator ScaleValidator
+}
+
+// NewScaleEvaluationModelValidator 将旧 ScaleValidator 适配为通用解释模型验证器。
+func NewScaleEvaluationModelValidator(v ScaleValidator) EvaluationModelValidator {
+	return scaleEvaluationModelValidator{scaleValidator: v}
+}
+
+func (v scaleEvaluationModelValidator) ValidateEvaluationModel(ctx context.Context, modelRef EvaluationModelRef, questionnaireRef QuestionnaireRef) error {
+	if v.scaleValidator == nil || modelRef.IsEmpty() || !modelRef.IsScale() {
+		return nil
+	}
+	scaleRef := NewMedicalScaleRefWithVersion(modelRef.ID(), modelRef.Code(), modelRef.Title(), modelRef.Version())
+	exists, err := v.scaleValidator.Exists(ctx, scaleRef)
+	if err != nil {
+		return fmt.Errorf("failed to validate evaluation model: %w", err)
+	}
+	if !exists {
+		return ErrScaleNotFound
+	}
+	linked, err := v.scaleValidator.IsLinkedToQuestionnaire(ctx, scaleRef, questionnaireRef)
+	if err != nil {
+		return fmt.Errorf("failed to check evaluation model-questionnaire link: %w", err)
+	}
+	if !linked {
+		return ErrScaleNotLinked
+	}
+	return nil
+}
+
 // ==================== DefaultAssessmentCreator 默认实现 ====================
 
 // DefaultAssessmentCreator 默认测评创建服务
@@ -123,6 +159,7 @@ type DefaultAssessmentCreator struct {
 	testeeValidator        TesteeValidator
 	questionnaireValidator QuestionnaireValidator
 	answerSheetValidator   AnswerSheetValidator
+	modelValidator         EvaluationModelValidator
 	scaleValidator         ScaleValidator
 }
 
@@ -150,10 +187,20 @@ func WithAnswerSheetValidator(v AnswerSheetValidator) AssessmentCreatorOption {
 	}
 }
 
+// WithEvaluationModelValidator 设置解释模型验证器。
+func WithEvaluationModelValidator(v EvaluationModelValidator) AssessmentCreatorOption {
+	return func(c *DefaultAssessmentCreator) {
+		c.modelValidator = v
+	}
+}
+
 // WithScaleValidator 设置量表验证器
 func WithScaleValidator(v ScaleValidator) AssessmentCreatorOption {
 	return func(c *DefaultAssessmentCreator) {
 		c.scaleValidator = v
+		if c.modelValidator == nil {
+			c.modelValidator = NewScaleEvaluationModelValidator(v)
+		}
 	}
 }
 
@@ -259,8 +306,15 @@ func (c *DefaultAssessmentCreator) validate(
 		}
 	}
 
-	// 4. 验证量表（如果指定了量表）
-	if req.MedicalScaleRef != nil && c.scaleValidator != nil {
+	// 4. 验证解释模型（如果指定）
+	if req.ModelRef != nil && c.modelValidator != nil {
+		if err := c.modelValidator.ValidateEvaluationModel(ctx, *req.ModelRef, req.QuestionnaireRef); err != nil {
+			return err
+		}
+	}
+
+	// 5. 验证量表（兼容旧调用方未传 ModelRef 的情况）
+	if req.ModelRef == nil && req.MedicalScaleRef != nil && c.scaleValidator != nil {
 		exists, err := c.scaleValidator.Exists(ctx, *req.MedicalScaleRef)
 		if err != nil {
 			return fmt.Errorf("failed to validate medical scale: %w", err)

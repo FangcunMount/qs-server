@@ -80,6 +80,10 @@ func (r *CachedScaleRepository) buildCacheKey(code string) string {
 	return r.keys.BuildScaleKey(strings.ToLower(code))
 }
 
+func (r *CachedScaleRepository) buildVersionCacheKey(code, version string) string {
+	return r.keys.BuildScaleVersionKey(strings.ToLower(code), strings.ToLower(version))
+}
+
 // Create 创建量表（同时写入缓存）
 func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.MedicalScale) error {
 	if err := r.repo.Create(ctx, domain); err != nil {
@@ -94,6 +98,15 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 				"code", domain.GetCode().String(),
 				"error", err,
 			)
+		}
+		if version := domain.GetScaleVersion(); version != "" {
+			if err := r.setVersionCache(ctx, domain.GetCode().String(), version, domain); err != nil {
+				logger.L(ctx).Warnw("failed to populate scale version cache after create",
+					"code", domain.GetCode().String(),
+					"scale_version", version,
+					"error", err,
+				)
+			}
 		}
 	}
 
@@ -117,10 +130,38 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 	return r.reloadScaleCacheFromSource(ctx, code)
 }
 
+// FindByCodeVersion 根据量表编码和版本查询量表。
+func (r *CachedScaleRepository) FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error) {
+	if scaleVersion == "" {
+		return r.FindByCode(ctx, code)
+	}
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
+		PolicyKey: cachepolicy.PolicyScale,
+		CacheKey:  r.buildVersionCacheKey(code, scaleVersion),
+		Policy:    r.policy,
+		Observer:  r.observer,
+		Store:     r.store,
+		Load: func(ctx context.Context) (*scale.MedicalScale, error) {
+			return r.repo.FindByCodeVersion(ctx, code, scaleVersion)
+		},
+		AsyncSetCached: true,
+	})
+	if err != nil || !isStalePublishedScaleCache(domain) {
+		return domain, err
+	}
+	return r.reloadScaleVersionCacheFromSource(ctx, code, scaleVersion)
+}
+
 // FindByQuestionnaireCode 根据问卷编码查询量表
 func (r *CachedScaleRepository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
 	// 问卷编码查询不缓存（使用频率低，且需要维护额外索引）
 	return r.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+}
+
+// FindByQuestionnaireRef 根据问卷编码和版本查询量表
+func (r *CachedScaleRepository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error) {
+	// 问卷引用查询不缓存（使用频率低，且需要维护额外索引）
+	return r.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
 }
 
 // Update 更新量表（同时失效缓存）
@@ -139,6 +180,15 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 				"error", err,
 			)
 		}
+		if version := domain.GetScaleVersion(); version != "" {
+			if err := r.deleteVersionCache(ctx, oldCode, version); err != nil {
+				logger.L(ctx).Warnw("failed to invalidate scale version cache after update",
+					"code", oldCode,
+					"scale_version", version,
+					"error", err,
+				)
+			}
+		}
 	}
 
 	return nil
@@ -146,6 +196,10 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 
 // Remove 删除量表（同时失效缓存）
 func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
+	var removedVersion string
+	if existing, err := r.repo.FindByCode(ctx, code); err == nil && existing != nil {
+		removedVersion = existing.GetScaleVersion()
+	}
 	if err := r.repo.Remove(ctx, code); err != nil {
 		return err
 	}
@@ -157,6 +211,15 @@ func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
 				"code", code,
 				"error", err,
 			)
+		}
+		if removedVersion != "" {
+			if err := r.deleteVersionCache(ctx, code, removedVersion); err != nil {
+				logger.L(ctx).Warnw("failed to invalidate scale version cache after remove",
+					"code", code,
+					"scale_version", removedVersion,
+					"error", err,
+				)
+			}
 		}
 	}
 
@@ -175,9 +238,17 @@ func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domai
 	return r.store.Set(ctx, r.buildCacheKey(code), domain)
 }
 
+func (r *CachedScaleRepository) setVersionCache(ctx context.Context, code, version string, domain *scale.MedicalScale) error {
+	return r.store.Set(ctx, r.buildVersionCacheKey(code, version), domain)
+}
+
 // deleteCache 删除缓存
 func (r *CachedScaleRepository) deleteCache(ctx context.Context, code string) error {
 	return r.store.Delete(ctx, r.buildCacheKey(code))
+}
+
+func (r *CachedScaleRepository) deleteVersionCache(ctx context.Context, code, version string) error {
+	return r.store.Delete(ctx, r.buildVersionCacheKey(code, version))
 }
 
 func isStalePublishedScaleCache(domain *scale.MedicalScale) bool {
@@ -205,6 +276,37 @@ func (r *CachedScaleRepository) reloadScaleCacheFromSource(ctx context.Context, 
 		if err := r.setCache(ctx, code, domain); err != nil {
 			logger.L(ctx).Warnw("failed to refresh scale cache from source",
 				"code", code,
+				"error", err,
+			)
+		}
+	}
+	return domain, nil
+}
+
+func (r *CachedScaleRepository) reloadScaleVersionCacheFromSource(ctx context.Context, code, version string) (*scale.MedicalScale, error) {
+	logger.L(ctx).Warnw("published scale version cache has no factors, reloading from source",
+		"code", code,
+		"scale_version", version,
+	)
+	if r.store.available() {
+		if err := r.deleteVersionCache(ctx, code, version); err != nil {
+			logger.L(ctx).Warnw("failed to delete stale scale version cache",
+				"code", code,
+				"scale_version", version,
+				"error", err,
+			)
+		}
+	}
+
+	domain, err := r.repo.FindByCodeVersion(ctx, code, version)
+	if err != nil {
+		return nil, err
+	}
+	if r.store.available() && domain != nil {
+		if err := r.setVersionCache(ctx, code, version, domain); err != nil {
+			logger.L(ctx).Warnw("failed to refresh scale version cache from source",
+				"code", code,
+				"scale_version", version,
 				"error", err,
 			)
 		}

@@ -136,13 +136,11 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]shar
 
 	// 2. 从仓储获取量表
 	m, err := s.repo.FindByCode(ctx, scaleCode)
-	logger.L(ctx).Infow("GetFactors: 获取量表", "scaleCode", scaleCode, "err", err)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
 	}
 
 	snapshots := m.FactorSnapshots()
-	logger.L(ctx).Infow("GetFactors: 获取因子快照", "count", len(snapshots))
 	result := make([]shared.FactorResult, 0, len(snapshots))
 	for _, snapshot := range snapshots {
 		result = append(result, shared.ToFactorResult(snapshot))
@@ -150,16 +148,25 @@ func (s *queryService) GetFactors(ctx context.Context, scaleCode string) ([]shar
 	return result, nil
 }
 
-// ResolveAssessmentScaleContext 按问卷编码解析创建测评所需的量表上下文。
-func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) (*shared.AssessmentScaleContextResult, error) {
+// ResolveAssessmentScaleContext 按问卷编码和版本解析创建测评所需的量表上下文。
+func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) (*shared.AssessmentScaleContextResult, error) {
 	if s == nil || s.repo == nil || questionnaireCode == "" {
 		return &shared.AssessmentScaleContextResult{}, nil
 	}
-	medicalScale, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	var (
+		medicalScale *domscale.MedicalScale
+		err          error
+	)
+	if questionnaireVersion != "" {
+		medicalScale, err = s.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
+	} else {
+		medicalScale, err = s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+	}
 	if err != nil || medicalScale == nil {
 		if err != nil && !domscale.IsNotFound(err) {
 			logger.L(ctx).Infow("问卷未关联量表，将创建纯问卷模式的测评",
 				"questionnaire_code", questionnaireCode,
+				"questionnaire_version", questionnaireVersion,
 				"error", err,
 			)
 		}

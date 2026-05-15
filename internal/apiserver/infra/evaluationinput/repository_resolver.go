@@ -27,24 +27,23 @@ func NewRepositoryResolver(
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
 ) *RepositoryResolver {
+	scaleCatalog := NewRepositoryScaleSnapshotCatalog(scaleRepo)
+	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
+	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
 	return NewResolver(
-		NewRepositoryScaleSnapshotCatalog(scaleRepo),
-		NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo),
-		NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo),
+		scaleCatalog,
+		NewScaleModelInputProvider(scaleCatalog, answerSheetReader, questionnaireReader),
 	)
 }
 
 func NewResolver(
-	scaleCatalog port.ScaleCatalog,
-	answerSheetReader port.AnswerSheetReader,
-	questionnaireReader port.QuestionnaireReader,
+	scaleCatalog port.ScaleModelCatalog,
+	providers ...ModelInputProvider,
 ) *RepositoryResolver {
-	providers, _ := NewModelInputProviderRegistry(
-		NewScaleModelInputProvider(scaleCatalog, answerSheetReader, questionnaireReader),
-	)
+	providerRegistry, _ := NewModelInputProviderRegistry(providers...)
 	return &RepositoryResolver{
 		scaleCatalog: scaleCatalog,
-		providers:    providers,
+		providers:    providerRegistry,
 	}
 }
 
@@ -119,13 +118,13 @@ func (r *ModelInputProviderRegistry) Resolve(kind port.EvaluationModelKind) (Mod
 }
 
 type ScaleModelInputProvider struct {
-	scaleCatalog        port.ScaleCatalog
+	scaleCatalog        port.ScaleModelCatalog
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 }
 
 func NewScaleModelInputProvider(
-	scaleCatalog port.ScaleCatalog,
+	scaleCatalog port.ScaleModelCatalog,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
 ) ScaleModelInputProvider {
@@ -141,7 +140,7 @@ func (ScaleModelInputProvider) Kind() port.EvaluationModelKind {
 }
 
 func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	medicalScale, err := p.scaleCatalog.GetScale(ctx, ref.ModelRef.Code)
+	medicalScale, err := p.scaleCatalog.GetScaleByRef(ctx, ref.ModelRef)
 	if err != nil {
 		return nil, err
 	}
@@ -154,8 +153,10 @@ func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.Inpu
 		return nil, err
 	}
 
+	payload := port.ScaleModelPayload{Scale: medicalScale}
 	return &port.InputSnapshot{
 		Model:         port.NewScaleModelSnapshot(medicalScale),
+		ModelPayload:  payload,
 		MedicalScale:  medicalScale,
 		AnswerSheet:   answerSheet,
 		Questionnaire: qnr,
@@ -195,6 +196,51 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 		"result", "success",
 	)
 	return scaleToSnapshot(medicalScale), nil
+}
+
+func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
+	l := logger.L(ctx)
+	l.Debugw("加载解释模型数据",
+		"model_kind", ref.Kind,
+		"model_code", ref.Code,
+		"model_version", ref.Version,
+		"action", "read",
+		"resource", "scale",
+	)
+
+	var (
+		medicalScale *scale.MedicalScale
+		err          error
+	)
+	if ref.Version != "" {
+		medicalScale, err = r.repo.FindByCodeVersion(ctx, ref.Code, ref.Version)
+	} else {
+		medicalScale, err = r.repo.FindByCode(ctx, ref.Code)
+	}
+	if err != nil {
+		l.Errorw("加载解释模型失败",
+			"model_kind", ref.Kind,
+			"model_code", ref.Code,
+			"model_version", ref.Version,
+			"action", "read",
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型不存在", "加载解释模型失败")
+	}
+	snapshot := scaleToSnapshot(medicalScale)
+	if snapshot == nil || (ref.Version != "" && snapshot.ScaleVersion != ref.Version) {
+		err := fmt.Errorf("解释模型版本不存在或不匹配")
+		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "解释模型版本不存在或不匹配", "加载解释模型失败")
+	}
+
+	l.Debugw("解释模型数据加载成功",
+		"model_kind", ref.Kind,
+		"model_code", ref.Code,
+		"model_version", snapshot.ScaleVersion,
+		"result", "success",
+	)
+	return snapshot, nil
 }
 
 type RepositoryAnswerSheetSnapshotReader struct {

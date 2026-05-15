@@ -20,11 +20,17 @@ func (r *scaleRepoBindingStub) Create(_ context.Context, _ *domainScale.MedicalS
 func (r *scaleRepoBindingStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
 	return nil, domainScale.ErrNotFound
 }
+func (r *scaleRepoBindingStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainScale.MedicalScale, error) {
+	return nil, domainScale.ErrNotFound
+}
 func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
 	if scale, ok := r.boundByQuestionnaire[questionnaireCode]; ok {
 		return scale, nil
 	}
 	return nil, domainScale.ErrNotFound
+}
+func (r *scaleRepoBindingStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*domainScale.MedicalScale, error) {
+	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
 func (r *scaleRepoBindingStub) Update(_ context.Context, _ *domainScale.MedicalScale) error {
 	return nil

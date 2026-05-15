@@ -87,6 +87,12 @@ func (n resultNotifierStub) NotifyCompletion(context.Context, Outcome) {
 	*n.order = append(*n.order, "waiter")
 }
 
+func TestGenericEventAssemblerIsFallbackOnly(t *testing.T) {
+	if got := (GenericEventAssembler{}).Kind(); got != "" {
+		t.Fatalf("GenericEventAssembler kind = %q, want empty fallback kind", got)
+	}
+}
+
 func TestWriterPersistsScaleOutcomeInLegacyOrderAndStagesEvents(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)

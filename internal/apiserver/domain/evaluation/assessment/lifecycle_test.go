@@ -34,6 +34,30 @@ func TestDefaultAssessmentCreatorCreateKeepsPendingByDefault(t *testing.T) {
 	}
 }
 
+func TestDefaultAssessmentCreatorUsesEvaluationModelValidator(t *testing.T) {
+	validator := &creatorModelValidatorStub{}
+	creator := NewDefaultAssessmentCreator(WithEvaluationModelValidator(validator))
+	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	req := NewCreateAssessmentRequest(
+		1,
+		testee.NewID(1001),
+		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v1"),
+		NewAnswerSheetRef(meta.FromUint64(2001)),
+		NewAdhocOrigin(),
+	).WithEvaluationModel(modelRef)
+
+	got, err := creator.Create(context.Background(), req)
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if got.EvaluationModelRef() == nil || got.EvaluationModelRef().Kind() != EvaluationModelKindMBTI {
+		t.Fatalf("unexpected model ref: %#v", got.EvaluationModelRef())
+	}
+	if !validator.called || validator.modelRef.Code() != modelRef.Code() || validator.questionnaireRef.Code().String() != "q-code" {
+		t.Fatalf("validator call = %v ref=%#v questionnaire=%#v", validator.called, validator.modelRef, validator.questionnaireRef)
+	}
+}
+
 func TestAssessmentFailedAndRetryLifecycleEvents(t *testing.T) {
 	a, err := NewAssessment(
 		1,
@@ -79,6 +103,20 @@ func TestAssessmentFailedAndRetryLifecycleEvents(t *testing.T) {
 	if a.Events()[0].EventType() != EventTypeSubmitted {
 		t.Fatalf("expected submitted event after retry, got %s", a.Events()[0].EventType())
 	}
+}
+
+type creatorModelValidatorStub struct {
+	called           bool
+	modelRef         EvaluationModelRef
+	questionnaireRef QuestionnaireRef
+	err              error
+}
+
+func (s *creatorModelValidatorStub) ValidateEvaluationModel(_ context.Context, modelRef EvaluationModelRef, questionnaireRef QuestionnaireRef) error {
+	s.called = true
+	s.modelRef = modelRef
+	s.questionnaireRef = questionnaireRef
+	return s.err
 }
 
 func TestApplyEvaluationDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.T) {
@@ -200,6 +238,9 @@ func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
 	}
 	if !a.Status().IsInterpreted() {
 		t.Fatalf("expected interpreted status, got %s", a.Status())
+	}
+	if result.Detail.Kind != EvaluationModelKindMBTI {
+		t.Fatalf("result detail kind = %s, want mbti", result.Detail.Kind)
 	}
 }
 

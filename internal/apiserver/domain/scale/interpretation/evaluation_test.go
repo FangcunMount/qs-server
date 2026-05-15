@@ -84,6 +84,16 @@ func TestEvaluatorInterpretationUsesRulesAndDefaults(t *testing.T) {
 }
 
 func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
+	t.Run("answer sheet required", func(t *testing.T) {
+		input := scaleInterpretationInputForTest()
+		input.AnswerSheet = nil
+
+		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+		if err == nil || !strings.Contains(err.Error(), "answer sheet is required") {
+			t.Fatalf("Evaluate error = %v, want answer sheet required", err)
+		}
+	})
+
 	t.Run("cnt requires questionnaire", func(t *testing.T) {
 		input := scaleInterpretationInputForTest()
 		input.Questionnaire = nil

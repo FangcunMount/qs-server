@@ -2,6 +2,7 @@ package interpretation
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -45,7 +46,7 @@ func (e *Evaluator) calculateScores(ctx context.Context, input ScaleInterpretati
 
 func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) (float64, error) {
 	if sheet == nil {
-		return simulateFactorScore(factor), nil
+		return 0, fmt.Errorf("answer sheet is required for scale factor scoring")
 	}
 	if e == nil || e.scoringRegistry == nil {
 		return 0, nil

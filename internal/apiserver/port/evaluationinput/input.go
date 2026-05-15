@@ -37,7 +37,10 @@ type InputRef struct {
 }
 
 type InputSnapshot struct {
-	Model         *ModelSnapshot
+	Model        *ModelSnapshot
+	ModelPayload ModelPayload
+	// Deprecated: use ScalePayload(input) instead. Kept for one compatibility
+	// cycle while Scale-specific consumers move behind the model payload seam.
 	MedicalScale  *ScaleSnapshot
 	AnswerSheet   *AnswerSheetSnapshot
 	Questionnaire *QuestionnaireSnapshot
@@ -48,7 +51,11 @@ type ModelSnapshot struct {
 	Code    string
 	Version string
 	Title   string
-	Payload any
+	Payload ModelPayload
+}
+
+type ModelPayload interface {
+	ModelKind() EvaluationModelKind
 }
 
 func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
@@ -70,6 +77,28 @@ func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
 
 type ScaleModelPayload struct {
 	Scale *ScaleSnapshot
+}
+
+func (ScaleModelPayload) ModelKind() EvaluationModelKind {
+	return EvaluationModelKindScale
+}
+
+func ScalePayload(input *InputSnapshot) (*ScaleSnapshot, bool) {
+	if input == nil {
+		return nil, false
+	}
+	if payload, ok := input.ModelPayload.(ScaleModelPayload); ok && payload.Scale != nil {
+		return payload.Scale, true
+	}
+	if input.Model != nil {
+		if payload, ok := input.Model.Payload.(ScaleModelPayload); ok && payload.Scale != nil {
+			return payload.Scale, true
+		}
+	}
+	if input.MedicalScale != nil {
+		return input.MedicalScale, true
+	}
+	return nil, false
 }
 
 type ScaleSnapshot struct {
@@ -178,6 +207,11 @@ type Resolver interface {
 
 type ScaleCatalog interface {
 	GetScale(ctx context.Context, code string) (*ScaleSnapshot, error)
+}
+
+type ScaleModelCatalog interface {
+	ScaleCatalog
+	GetScaleByRef(ctx context.Context, ref ModelRef) (*ScaleSnapshot, error)
 }
 
 type AnswerSheetReader interface {

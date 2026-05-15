@@ -27,11 +27,19 @@ func (r *ruleFreezeScaleRepoStub) FindByCode(context.Context, string) (*domainSc
 	return r.item, nil
 }
 
+func (r *ruleFreezeScaleRepoStub) FindByCodeVersion(context.Context, string, string) (*domainScale.MedicalScale, error) {
+	return r.FindByCode(context.Background(), "")
+}
+
 func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
 	if r.item == nil {
 		return nil, domainScale.ErrNotFound
 	}
 	return r.item, nil
+}
+
+func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*domainScale.MedicalScale, error) {
+	return r.FindByQuestionnaireCode(context.Background(), "")
 }
 
 func (r *ruleFreezeScaleRepoStub) Update(_ context.Context, item *domainScale.MedicalScale) error {

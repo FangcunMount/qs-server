@@ -79,11 +79,17 @@ func (r *scaleRepoSyncStub) Create(_ context.Context, _ *domainScale.MedicalScal
 func (r *scaleRepoSyncStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
 	return nil, domainScale.ErrNotFound
 }
+func (r *scaleRepoSyncStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainScale.MedicalScale, error) {
+	return nil, domainScale.ErrNotFound
+}
 func (r *scaleRepoSyncStub) FindByQuestionnaireCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
 	if r.item == nil {
 		return nil, domainScale.ErrNotFound
 	}
 	return r.item, nil
+}
+func (r *scaleRepoSyncStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*domainScale.MedicalScale, error) {
+	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
 func (r *scaleRepoSyncStub) Update(_ context.Context, item *domainScale.MedicalScale) error {
 	r.item = item

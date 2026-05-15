@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -63,7 +64,7 @@ func (r *mutableEventAssemblerRegistry) Resolve(kind assessment.EvaluationModelK
 type GenericEventAssembler struct{}
 
 func (GenericEventAssembler) Kind() assessment.EvaluationModelKind {
-	return assessment.EvaluationModelKindMBTI
+	return ""
 }
 
 func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, _ *domainReport.InterpretReport) []event.DomainEvent {
@@ -116,8 +117,10 @@ func (ScaleEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport
 	if scaleVersion == "" && outcome.Input != nil && outcome.Input.Model != nil {
 		scaleVersion = outcome.Input.Model.Version
 	}
-	if scaleVersion == "" && outcome.Input != nil && outcome.Input.MedicalScale != nil {
-		scaleVersion = outcome.Input.MedicalScale.ScaleVersion
+	if scaleVersion == "" && outcome.Input != nil {
+		if scaleSnapshot, ok := evaluationinput.ScalePayload(outcome.Input); ok && scaleSnapshot != nil {
+			scaleVersion = scaleSnapshot.ScaleVersion
+		}
 	}
 	if scaleVersion == "" && !outcome.Assessment.QuestionnaireRef().IsEmpty() {
 		scaleVersion = outcome.Assessment.QuestionnaireRef().Version()

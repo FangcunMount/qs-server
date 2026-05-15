@@ -114,5 +114,6 @@ func scaleSnapshotFromOutcome(outcome Outcome) *evaluationinput.ScaleSnapshot {
 	if outcome.Input == nil {
 		return nil
 	}
-	return outcome.Input.MedicalScale
+	snapshot, _ := evaluationinput.ScalePayload(outcome.Input)
+	return snapshot
 }

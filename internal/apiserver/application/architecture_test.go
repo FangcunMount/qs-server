@@ -179,6 +179,23 @@ func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
 	})
 }
 
+func TestScaleDomainDoesNotModelMBTIAsCategory(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "domain", "scale", "types.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{`CategoryMBTI`, `Category = "mbti"`} {
+		if strings.Contains(text, token) {
+			t.Fatalf("%s contains %q; MBTI must be a peer interpretation model, not a scale category", filepath.ToSlash(mustRel(t, root, path)), token)
+		}
+	}
+}
+
 func TestEvaluationDoesNotUseDeprecatedRepositoryFallbacks(t *testing.T) {
 	t.Parallel()
 

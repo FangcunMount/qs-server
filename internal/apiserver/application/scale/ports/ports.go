@@ -36,12 +36,12 @@ type ScaleQueryService interface {
 	ListPublished(ctx context.Context, dto shared.ListScalesDTO) (*shared.ScaleSummaryListResult, error)
 	ListHotPublished(ctx context.Context, dto shared.ListHotScalesDTO) (*shared.HotScaleListResult, error)
 	GetFactors(ctx context.Context, scaleCode string) ([]shared.FactorResult, error)
-	ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) (*shared.AssessmentScaleContextResult, error)
+	ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) (*shared.AssessmentScaleContextResult, error)
 }
 
 // AssessmentScaleContextResolver 创建测评时消费的量表上下文端口。
 type AssessmentScaleContextResolver interface {
-	ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) (*shared.AssessmentScaleContextResult, error)
+	ResolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) (*shared.AssessmentScaleContextResult, error)
 }
 
 // ScaleCategoryService 量表分类选项服务。

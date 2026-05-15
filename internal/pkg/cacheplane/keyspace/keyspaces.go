@@ -20,6 +20,13 @@ func (k CacheKeyspace) Scale(code string) string {
 	return k.keyspace.Prefix("scale:" + code)
 }
 
+func (k CacheKeyspace) ScaleVersion(code, version string) string {
+	if version == "" {
+		return k.Scale(code)
+	}
+	return k.keyspace.Prefix("scale:" + code + ":" + version)
+}
+
 func (k CacheKeyspace) ScaleList() string {
 	return k.keyspace.Prefix("scale:list:v1")
 }

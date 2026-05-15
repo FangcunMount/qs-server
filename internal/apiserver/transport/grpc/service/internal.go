@@ -153,16 +153,17 @@ func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFrom
 	}
 }
 
-func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode string) assessmentScaleContext {
+func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) assessmentScaleContext {
 	l := logger.L(ctx)
 	if s.scaleContextResolver == nil || questionnaireCode == "" {
 		return assessmentScaleContext{}
 	}
 
-	result, err := s.scaleContextResolver.ResolveAssessmentScaleContext(ctx, questionnaireCode)
+	result, err := s.scaleContextResolver.ResolveAssessmentScaleContext(ctx, questionnaireCode, questionnaireVersion)
 	if err != nil || result == nil || result.MedicalScaleCode == nil {
 		l.Infow("问卷未关联量表，将创建纯问卷模式的测评",
 			"questionnaire_code", questionnaireCode,
+			"questionnaire_version", questionnaireVersion,
 		)
 		return assessmentScaleContext{}
 	}

@@ -19,7 +19,9 @@ type Repository interface {
 	// 基础 CRUD 操作
 	Create(ctx context.Context, scale *MedicalScale) error
 	FindByCode(ctx context.Context, code string) (*MedicalScale, error)
+	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*MedicalScale, error)
 	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*MedicalScale, error)
+	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*MedicalScale, error)
 	Update(ctx context.Context, scale *MedicalScale) error
 	Remove(ctx context.Context, code string) error
 	ExistsByCode(ctx context.Context, code string) (bool, error)

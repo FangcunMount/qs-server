@@ -24,7 +24,25 @@ func NewWriter(
 	reportSaver ReportDurableSaver,
 	notifier CompletionNotifier,
 ) Writer {
-	eventAssemblers, _ := NewEventAssemblerRegistry(ScaleEventAssembler{})
+	return NewWriterWithEventAssemblers(
+		assessmentRepo,
+		scoreProjectors,
+		reportBuilders,
+		reportSaver,
+		notifier,
+		ScaleEventAssembler{},
+	)
+}
+
+func NewWriterWithEventAssemblers(
+	assessmentRepo assessment.Repository,
+	scoreProjectors ScoreProjectorRegistry,
+	reportBuilders ReportBuilderRegistry,
+	reportSaver ReportDurableSaver,
+	notifier CompletionNotifier,
+	assemblers ...EventAssembler,
+) Writer {
+	eventAssemblers, _ := NewEventAssemblerRegistry(assemblers...)
 	return &writer{
 		assessmentRepo:  assessmentRepo,
 		scoreProjectors: scoreProjectors,

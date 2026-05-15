@@ -60,14 +60,6 @@ func collectCntMatches(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnaps
 	return matchValues
 }
 
-func simulateFactorScore(factor scale.FactorSnapshot) float64 {
-	questionCount := len(factor.QuestionCodes)
-	if questionCount == 0 {
-		return 50.0
-	}
-	return float64(questionCount) * 2.5
-}
-
 func factorScoreOptionContentMap(qnr *ScaleQuestionnaireSnapshot) map[string]string {
 	contentMap := make(map[string]string)
 	if qnr == nil {
