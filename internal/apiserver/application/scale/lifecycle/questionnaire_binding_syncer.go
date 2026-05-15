@@ -10,11 +10,16 @@ import (
 
 // QuestionnaireBindingSyncer updates scale questionnaire-version projection after questionnaire publication.
 type QuestionnaireBindingSyncer struct {
-	repo domscale.Repository
+	repo questionnaireBindingSyncRepository
+}
+
+type questionnaireBindingSyncRepository interface {
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
+	Update(ctx context.Context, scale *domscale.MedicalScale) error
 }
 
 // NewQuestionnaireBindingSyncer creates a survey-facing scale binding syncer.
-func NewQuestionnaireBindingSyncer(repo domscale.Repository) *QuestionnaireBindingSyncer {
+func NewQuestionnaireBindingSyncer(repo questionnaireBindingSyncRepository) *QuestionnaireBindingSyncer {
 	return &QuestionnaireBindingSyncer{repo: repo}
 }
 
@@ -26,7 +31,7 @@ func (s *QuestionnaireBindingSyncer) SyncQuestionnaireVersion(ctx context.Contex
 	return syncQuestionnaireVersion(ctx, s.repo, questionnaireCode, version)
 }
 
-func syncQuestionnaireVersion(ctx context.Context, repo domscale.Repository, questionnaireCode, version string) error {
+func syncQuestionnaireVersion(ctx context.Context, repo questionnaireBindingSyncRepository, questionnaireCode, version string) error {
 	if repo == nil || questionnaireCode == "" || version == "" {
 		return nil
 	}

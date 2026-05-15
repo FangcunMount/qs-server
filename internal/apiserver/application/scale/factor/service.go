@@ -16,13 +16,18 @@ import (
 // factorService 量表因子编辑服务实现
 // 行为者：量表因子编辑者
 type factorService struct {
-	repo           domscale.Repository
+	repo           factorRepository
 	listCache      scalelistcache.PublishedListCache
 	eventPublisher event.EventPublisher
 }
 
+type factorRepository interface {
+	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
+	Update(ctx context.Context, scale *domscale.MedicalScale) error
+}
+
 // NewService 创建量表因子编辑应用服务。
-func NewService(repo domscale.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ports.ScaleFactorService {
+func NewService(repo factorRepository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ports.ScaleFactorService {
 	return &factorService{
 		repo:           repo,
 		listCache:      listCache,

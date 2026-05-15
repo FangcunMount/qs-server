@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
-func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
+func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps, error) {
 	var infra *surveyScaleInfra
 	if c != nil {
 		infra = c.surveyScaleInfra
@@ -19,11 +19,14 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra != nil {
-		resolver := evaluationinputInfra.NewRepositoryResolver(
+		resolver, err := evaluationinputInfra.NewRepositoryResolver(
 			infra.scaleRepo,
 			infra.answerSheetRepo,
 			infra.questionnaireRepo,
 		)
+		if err != nil {
+			return assembler.EvaluationModuleDeps{}, fmt.Errorf("failed to initialize evaluation input resolver: %w", err)
+		}
 		inputResolver = resolver
 		scaleCatalog = resolver
 	}
@@ -62,11 +65,15 @@ func (c *Container) buildEvaluationModuleDeps() assembler.EvaluationModuleDeps {
 		MySQLLimiter:         c.backpressure.MySQL,
 		MongoLimiter:         c.backpressure.Mongo,
 		TesteeAccessChecker:  newEvaluationTesteeAccessChecker(c.actorTesteeAccessService()),
-	}
+	}, nil
 }
 
 func (c *Container) buildEvaluationModule() (*assembler.EvaluationModule, error) {
-	return assembler.NewEvaluationModule(c.buildEvaluationModuleDeps())
+	deps, err := c.buildEvaluationModuleDeps()
+	if err != nil {
+		return nil, err
+	}
+	return assembler.NewEvaluationModule(deps)
 }
 
 // initEvaluationModule 初始化 Evaluation 模块。

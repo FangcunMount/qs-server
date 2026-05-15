@@ -72,6 +72,50 @@ func TestCachedScaleRepositoryCreateUpdateRemoveWritesAndInvalidatesCache(t *tes
 	}
 }
 
+func TestCachedScaleRepositoryUpdateInvalidatesOldAndNewVersionCache(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	oldDomain := newScaleCacheTestScale(t, "S-001", scale.WithScaleVersion("1.0.0"))
+	newDomain := newScaleCacheTestScale(t, "S-001", scale.WithScaleVersion("2.0.0"))
+	baseRepo := &scaleMutationRepo{findByCodeResult: oldDomain}
+	cached := NewCachedScaleRepositoryWithBuilderAndPolicy(
+		baseRepo,
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		cachepolicy.CachePolicy{},
+	).(*CachedScaleRepository)
+	codeKey := cached.buildCacheKey("S-001")
+	oldVersionKey := cached.buildVersionCacheKey("S-001", "1.0.0")
+	newVersionKey := cached.buildVersionCacheKey("S-001", "2.0.0")
+
+	if err := cached.setCache(context.Background(), "S-001", oldDomain); err != nil {
+		t.Fatalf("set cache error = %v", err)
+	}
+	if err := cached.setVersionCache(context.Background(), "S-001", "1.0.0", oldDomain); err != nil {
+		t.Fatalf("set old version cache error = %v", err)
+	}
+	if err := cached.setVersionCache(context.Background(), "S-001", "2.0.0", newDomain); err != nil {
+		t.Fatalf("set new version cache error = %v", err)
+	}
+
+	if err := cached.Update(context.Background(), newDomain); err != nil {
+		t.Fatalf("Update() error = %v", err)
+	}
+	for _, key := range []string{codeKey, oldVersionKey, newVersionKey} {
+		if hasRedisKey(t, client, key) {
+			t.Fatalf("cache key %s should be deleted after update", key)
+		}
+	}
+	if baseRepo.findByCodeCalls != 1 {
+		t.Fatalf("FindByCode calls = %d, want 1 to discover old version", baseRepo.findByCodeCalls)
+	}
+}
+
 func TestCachedScaleRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
 	repo := NewCachedScaleRepositoryWithBuilderAndPolicy(nil, nil, keyspace.NewBuilderWithNamespace("prod:cache:static"), cachepolicy.CachePolicy{})
 	cached, ok := repo.(*CachedScaleRepository)

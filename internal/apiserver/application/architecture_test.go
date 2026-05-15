@@ -240,6 +240,37 @@ func TestEvaluationDoesNotUseDeprecatedRepositoryFallbacks(t *testing.T) {
 	}
 }
 
+func TestEvaluationExecuteKeepsScaleCompatibilityIsolated(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
+	allowed := filepath.ToSlash(filepath.Join("internal", "apiserver", "application", "evaluation", "execute", "evaluation_workflows.go"))
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range []string{"MedicalScale", "ScalePayload("} {
+			if rel != allowed && strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; execute layer scale compatibility must stay isolated in %s", rel, token, allowed)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluationApplicationUsesCentralErrorMapper(t *testing.T) {
 	t.Parallel()
 

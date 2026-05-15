@@ -29,9 +29,13 @@ type mutableEvaluatorRegistry struct {
 	items map[assessment.EvaluationModelKind]Evaluator
 }
 
+func newEmptyEvaluatorRegistry() *mutableEvaluatorRegistry {
+	return &mutableEvaluatorRegistry{items: make(map[assessment.EvaluationModelKind]Evaluator)}
+}
+
 // NewEvaluatorRegistry 创建解释模型评估器注册表。
 func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, error) {
-	registry := &mutableEvaluatorRegistry{items: make(map[assessment.EvaluationModelKind]Evaluator)}
+	registry := newEmptyEvaluatorRegistry()
 	for _, evaluator := range evaluators {
 		if err := registry.Register(evaluator); err != nil {
 			return nil, err

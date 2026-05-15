@@ -77,12 +77,7 @@ func (r *Repository) FindByQuestionnaireRef(ctx context.Context, questionnaireCo
 	if questionnaireVersion == "" {
 		return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 	}
-	filter := bson.M{
-		"questionnaire_code":    questionnaireCode,
-		"questionnaire_version": questionnaireVersion,
-		"deleted_at":            nil,
-	}
-	return r.findOne(ctx, filter)
+	return r.findOne(ctx, questionnaireRefFilter(questionnaireCode, questionnaireVersion))
 }
 
 func (r *Repository) findOne(ctx context.Context, filter bson.M) (*scale.MedicalScale, error) {
@@ -109,6 +104,14 @@ func scaleVersionCompatibilityFilter(scaleVersion string) []bson.M {
 				{"scale_version": bson.M{"$exists": false}},
 			},
 		},
+	}
+}
+
+func questionnaireRefFilter(questionnaireCode, questionnaireVersion string) bson.M {
+	return bson.M{
+		"questionnaire_code":    questionnaireCode,
+		"questionnaire_version": questionnaireVersion,
+		"deleted_at":            nil,
 	}
 }
 

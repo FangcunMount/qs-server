@@ -19,9 +19,13 @@ func (s *lifecycleService) resolveQuestionnaireBinding() questionnaireBindingRes
 }
 
 type questionnaireBindingResolver struct {
-	repo                 domscale.Repository
+	repo                 questionnaireBindingLookup
 	questionnaireCatalog questionnairecatalog.Catalog
 	baseInfo             domscale.BaseInfo
+}
+
+type questionnaireBindingLookup interface {
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
 }
 
 func (r questionnaireBindingResolver) ensureQuestionnaireVersion(ctx context.Context, scaleCode string, m *domscale.MedicalScale) error {

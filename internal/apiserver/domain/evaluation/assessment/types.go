@@ -526,6 +526,30 @@ func NewEvaluationResult(
 	}
 }
 
+// NewModelEvaluationResult 创建跨解释模型的通用结果。
+func NewModelEvaluationResult(
+	modelRef EvaluationModelRef,
+	summary ResultSummary,
+	detail EvaluationDetail,
+) *EvaluationResult {
+	totalScore := 0.0
+	if summary.Score != nil {
+		totalScore = *summary.Score
+	}
+	if detail.Kind == "" {
+		detail.Kind = modelRef.Kind()
+	}
+	return &EvaluationResult{
+		ModelRef:     modelRef,
+		Summary:      summary,
+		Detail:       detail,
+		TotalScore:   totalScore,
+		RiskLevel:    RiskLevelNone,
+		Conclusion:   summary.PrimaryLabel,
+		FactorScores: make([]FactorScoreResult, 0),
+	}
+}
+
 // WithModelRef 绑定解释模型引用。
 func (r *EvaluationResult) WithModelRef(modelRef EvaluationModelRef) *EvaluationResult {
 	if r == nil {

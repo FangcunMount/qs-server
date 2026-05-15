@@ -167,6 +167,15 @@ func (r *CachedScaleRepository) FindByQuestionnaireRef(ctx context.Context, ques
 // Update 更新量表（同时失效缓存）
 func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.MedicalScale) error {
 	oldCode := domain.GetCode().String()
+	var oldVersion string
+	if existing, err := r.repo.FindByCode(ctx, oldCode); err == nil && existing != nil {
+		oldVersion = existing.GetScaleVersion()
+	} else if err != nil && !scale.IsNotFound(err) {
+		logger.L(ctx).Warnw("failed to load old scale version before cache invalidation",
+			"code", oldCode,
+			"error", err,
+		)
+	}
 
 	if err := r.repo.Update(ctx, domain); err != nil {
 		return err
@@ -180,7 +189,14 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 				"error", err,
 			)
 		}
+		versions := make(map[string]struct{}, 2)
+		if oldVersion != "" {
+			versions[oldVersion] = struct{}{}
+		}
 		if version := domain.GetScaleVersion(); version != "" {
+			versions[version] = struct{}{}
+		}
+		for version := range versions {
 			if err := r.deleteVersionCache(ctx, oldCode, version); err != nil {
 				logger.L(ctx).Warnw("failed to invalidate scale version cache after update",
 					"code", oldCode,

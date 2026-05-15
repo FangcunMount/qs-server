@@ -361,8 +361,10 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		kind: domainAssessment.EvaluationModelKindMBTI,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.EvaluationResult, error) {
-			return domainAssessment.NewEvaluationResult(0, domainAssessment.RiskLevelNone, "INTJ", "", nil).
-				WithModelRef(*input.Assessment.EvaluationModelRef()), nil
+			return domainAssessment.NewModelEvaluationResult(*input.Assessment.EvaluationModelRef(), domainAssessment.ResultSummary{PrimaryLabel: "INTJ"}, domainAssessment.EvaluationDetail{
+				Kind:    domainAssessment.EvaluationModelKindMBTI,
+				Payload: "INTJ",
+			}), nil
 		},
 	})
 	if err != nil {

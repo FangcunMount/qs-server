@@ -18,7 +18,7 @@ import (
 // lifecycleService 量表生命周期服务实现
 // 行为者：量表设计者/管理员
 type lifecycleService struct {
-	repo                 domscale.Repository
+	repo                 lifecycleRepository
 	questionnaireCatalog questionnairecatalog.Catalog
 	lifecycle            domscale.Lifecycle
 	baseInfo             domscale.BaseInfo
@@ -26,9 +26,17 @@ type lifecycleService struct {
 	listCache            scalelistcache.PublishedListCache
 }
 
+type lifecycleRepository interface {
+	Create(ctx context.Context, scale *domscale.MedicalScale) error
+	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
+	Update(ctx context.Context, scale *domscale.MedicalScale) error
+	Remove(ctx context.Context, code string) error
+}
+
 // NewService 创建量表生命周期应用服务。
 func NewService(
-	repo domscale.Repository,
+	repo lifecycleRepository,
 	questionnaireCatalog questionnairecatalog.Catalog,
 	eventPublisher event.EventPublisher,
 	listCache scalelistcache.PublishedListCache,

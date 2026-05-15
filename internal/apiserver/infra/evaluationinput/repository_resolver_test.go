@@ -153,10 +153,13 @@ func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.
 	questionnaireSnapshot := &port.QuestionnaireSnapshot{Code: "Q-SDS", Version: "2.0.0"}
 	qReader := &questionnaireReaderStub{snapshot: questionnaireSnapshot}
 	scaleCatalog := &scaleCatalogStub{snapshot: scaleSnapshot}
-	resolver := NewResolver(
+	resolver, err := NewResolver(
 		scaleCatalog,
 		NewScaleModelInputProvider(scaleCatalog, answerSheetReaderStub{snapshot: answerSnapshot}, qReader),
 	)
+	if err != nil {
+		t.Fatalf("NewResolver returned error: %v", err)
+	}
 
 	snapshot, err := resolver.Resolve(context.Background(), port.InputRef{
 		ModelRef:             port.ModelRef{Kind: port.EvaluationModelKindScale, Code: "SDS", Version: "2.0.0", Title: "SDS"},
@@ -228,9 +231,21 @@ func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) 
 	}
 }
 
+func TestNewResolverReturnsProviderRegistryError(t *testing.T) {
+	if _, err := NewResolver(&scaleCatalogStub{}, fakeInputProvider{kind: port.EvaluationModelKindScale}, fakeInputProvider{kind: port.EvaluationModelKindScale}); err == nil {
+		t.Fatal("NewResolver error = nil, want duplicate provider kind error")
+	}
+	if _, err := NewResolver(&scaleCatalogStub{}, nil); err == nil {
+		t.Fatal("NewResolver error = nil, want nil provider error")
+	}
+}
+
 func TestRepositoryResolverUnsupportedModelKindCarriesFailureKind(t *testing.T) {
-	resolver := NewResolver(&scaleCatalogStub{})
-	_, err := resolver.Resolve(context.Background(), port.InputRef{
+	resolver, err := NewResolver(&scaleCatalogStub{})
+	if err != nil {
+		t.Fatalf("NewResolver returned error: %v", err)
+	}
+	_, err = resolver.Resolve(context.Background(), port.InputRef{
 		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindMBTI, Code: "MBTI-16P"},
 	})
 	if err == nil {

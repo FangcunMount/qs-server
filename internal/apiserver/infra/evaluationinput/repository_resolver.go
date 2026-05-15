@@ -26,7 +26,7 @@ func NewRepositoryResolver(
 	scaleRepo scale.Repository,
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
-) *RepositoryResolver {
+) (*RepositoryResolver, error) {
 	scaleCatalog := NewRepositoryScaleSnapshotCatalog(scaleRepo)
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
@@ -39,12 +39,15 @@ func NewRepositoryResolver(
 func NewResolver(
 	scaleCatalog port.ScaleModelCatalog,
 	providers ...ModelInputProvider,
-) *RepositoryResolver {
-	providerRegistry, _ := NewModelInputProviderRegistry(providers...)
+) (*RepositoryResolver, error) {
+	providerRegistry, err := NewModelInputProviderRegistry(providers...)
+	if err != nil {
+		return nil, err
+	}
 	return &RepositoryResolver{
 		scaleCatalog: scaleCatalog,
 		providers:    providerRegistry,
-	}
+	}, nil
 }
 
 func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

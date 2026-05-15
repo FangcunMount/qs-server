@@ -24,3 +24,21 @@ func TestScaleVersionCompatibilityFilterMatchesScaleVersionOrLegacyQuestionnaire
 		t.Fatalf("legacy questionnaire_version = %#v, want 2.0.0", filter[1]["questionnaire_version"])
 	}
 }
+
+func TestQuestionnaireRefFilterMatchesExactQuestionnaireVersion(t *testing.T) {
+	t.Parallel()
+
+	filter := questionnaireRefFilter("Q-SDS", "2.0.0")
+	if filter["questionnaire_code"] != "Q-SDS" {
+		t.Fatalf("questionnaire_code = %#v, want Q-SDS", filter["questionnaire_code"])
+	}
+	if filter["questionnaire_version"] != "2.0.0" {
+		t.Fatalf("questionnaire_version = %#v, want 2.0.0", filter["questionnaire_version"])
+	}
+	if filter["deleted_at"] != nil {
+		t.Fatalf("deleted_at = %#v, want nil", filter["deleted_at"])
+	}
+	if _, ok := filter["$or"]; ok {
+		t.Fatalf("questionnaire ref filter must not use compatibility $or: %#v", filter)
+	}
+}

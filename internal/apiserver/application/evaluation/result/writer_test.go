@@ -49,6 +49,7 @@ type resultReportBuilderStub struct {
 	order *[]string
 	rpt   *domainReport.InterpretReport
 	kind  assessment.EvaluationModelKind
+	err   error
 }
 
 func (b *resultReportBuilderStub) Kind() assessment.EvaluationModelKind {
@@ -60,7 +61,7 @@ func (b *resultReportBuilderStub) Kind() assessment.EvaluationModelKind {
 
 func (b *resultReportBuilderStub) Build(context.Context, Outcome) (*domainReport.InterpretReport, error) {
 	*b.order = append(*b.order, "report_build")
-	return b.rpt, nil
+	return b.rpt, b.err
 }
 
 type resultReportSaverStub struct {
@@ -93,7 +94,7 @@ func TestGenericEventAssemblerIsFallbackOnly(t *testing.T) {
 	}
 }
 
-func TestWriterPersistsScaleOutcomeInLegacyOrderAndStagesEvents(t *testing.T) {
+func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
 	outcome := scaleOutcomeForWriterTest(a)
@@ -118,19 +119,22 @@ func TestWriterPersistsScaleOutcomeInLegacyOrderAndStagesEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	writer := NewWriter(
+	writer, err := NewWriter(
 		&resultAssessmentRepoStub{order: &order},
 		scoreProjectors,
 		reportBuilders,
 		reportSaver,
 		resultNotifierStub{order: &order},
 	)
+	if err != nil {
+		t.Fatalf("NewWriter returned error: %v", err)
+	}
 
 	if err := writer.Write(context.Background(), outcome); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
-	wantOrder := []string{"score", "assessment", "report_build", "report_save", "waiter"}
+	wantOrder := []string{"report_build", "report_save", "score", "assessment", "waiter"}
 	if len(order) != len(wantOrder) {
 		t.Fatalf("order = %#v, want %#v", order, wantOrder)
 	}
@@ -150,7 +154,40 @@ func TestWriterPersistsScaleOutcomeInLegacyOrderAndStagesEvents(t *testing.T) {
 	}
 }
 
-func TestWriterReportSaveFailureKeepsInterpretedSaveBeforeReturningError(t *testing.T) {
+func TestWriterReportBuilderFailureDoesNotPersistInterpretedAssessment(t *testing.T) {
+	order := make([]string, 0)
+	a := submittedScaleAssessment(t)
+	buildErr := errors.New("report build failed")
+	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
+	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
+		order: &order,
+		err:   buildErr,
+	})
+	assessmentRepo := &resultAssessmentRepoStub{order: &order}
+	writer, err := NewWriter(
+		assessmentRepo,
+		scoreProjectors,
+		reportBuilders,
+		&resultReportSaverStub{order: &order},
+		resultNotifierStub{order: &order},
+	)
+	if err != nil {
+		t.Fatalf("NewWriter returned error: %v", err)
+	}
+
+	err = writer.Write(context.Background(), scaleOutcomeForWriterTest(a))
+	if err == nil {
+		t.Fatal("Write error = nil, want report build failure")
+	}
+	if assessmentRepo.saved != nil || a.Status().IsInterpreted() {
+		t.Fatalf("assessment should not be persisted or changed when report build fails; saved=%#v status=%s", assessmentRepo.saved, a.Status())
+	}
+	if len(order) != 1 || order[0] != "report_build" {
+		t.Fatalf("order = %#v, want only report_build", order)
+	}
+}
+
+func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
 	reportErr := errors.New("report save failed")
@@ -160,23 +197,29 @@ func TestWriterReportSaveFailureKeepsInterpretedSaveBeforeReturningError(t *test
 		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil),
 	})
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
-	writer := NewWriter(
+	writer, err := NewWriter(
 		assessmentRepo,
 		scoreProjectors,
 		reportBuilders,
 		&resultReportSaverStub{order: &order, err: reportErr},
 		resultNotifierStub{order: &order},
 	)
+	if err != nil {
+		t.Fatalf("NewWriter returned error: %v", err)
+	}
 
-	err := writer.Write(context.Background(), scaleOutcomeForWriterTest(a))
+	err = writer.Write(context.Background(), scaleOutcomeForWriterTest(a))
 	if err == nil {
 		t.Fatal("Write error = nil, want report save failure")
 	}
-	if assessmentRepo.saved == nil || !assessmentRepo.saved.Status().IsInterpreted() {
-		t.Fatalf("assessment should have been saved as interpreted before report failure")
+	if assessmentRepo.saved != nil || a.Status().IsInterpreted() {
+		t.Fatalf("assessment should not be persisted or changed when report save fails; saved=%#v status=%s", assessmentRepo.saved, a.Status())
 	}
-	if got := order[len(order)-1]; got != "report_save" {
-		t.Fatalf("last operation = %s, want report_save before returning error; order=%#v", got, order)
+	wantOrder := []string{"report_build", "report_save"}
+	for i := range wantOrder {
+		if order[i] != wantOrder[i] {
+			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
+		}
 	}
 }
 
@@ -209,20 +252,26 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
 	reportSaver := &resultReportSaverStub{order: &order}
-	writer := NewWriter(
+	writer, err := NewWriter(
 		&resultAssessmentRepoStub{order: &order},
 		nil,
 		reportBuilders,
 		reportSaver,
 		nil,
 	)
-	result := assessment.NewEvaluationResult(0, assessment.RiskLevelNone, "INTJ", "", nil).WithModelRef(modelRef)
+	if err != nil {
+		t.Fatalf("NewWriter returned error: %v", err)
+	}
+	result := assessment.NewModelEvaluationResult(modelRef, assessment.ResultSummary{PrimaryLabel: "INTJ"}, assessment.EvaluationDetail{
+		Kind:    assessment.EvaluationModelKindMBTI,
+		Payload: "INTJ",
+	})
 
 	if err := writer.Write(context.Background(), Outcome{Assessment: a, Result: result}); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
-	wantOrder := []string{"assessment", "report_build", "report_save"}
+	wantOrder := []string{"report_build", "report_save", "assessment"}
 	for i := range wantOrder {
 		if order[i] != wantOrder[i] {
 			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
@@ -230,6 +279,15 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 	}
 	if len(reportSaver.eventTypes) != 1 || reportSaver.eventTypes[0] != assessment.EventTypeInterpreted {
 		t.Fatalf("event types = %#v, want generic assessment interpreted only", reportSaver.eventTypes)
+	}
+}
+
+func TestNewWriterReturnsEventAssemblerRegistryError(t *testing.T) {
+	if _, err := NewWriterWithEventAssemblers(nil, nil, nil, nil, nil, nil); err == nil {
+		t.Fatal("NewWriterWithEventAssemblers error = nil, want nil assembler error")
+	}
+	if _, err := NewWriterWithEventAssemblers(nil, nil, nil, nil, nil, ScaleEventAssembler{}, ScaleEventAssembler{}); err == nil {
+		t.Fatal("NewWriterWithEventAssemblers error = nil, want duplicate assembler error")
 	}
 }
 

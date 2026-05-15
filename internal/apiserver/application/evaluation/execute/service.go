@@ -53,11 +53,10 @@ func NewService(
 	resultWriter evaluationresult.Writer,
 	opts ...ServiceOption,
 ) Service {
-	registry, _ := NewEvaluatorRegistry()
 	svc := &service{
 		assessmentRepo: assessmentRepo,
 		inputResolver:  inputResolver,
-		evaluators:     registry,
+		evaluators:     newEmptyEvaluatorRegistry(),
 		resultWriter:   resultWriter,
 	}
 

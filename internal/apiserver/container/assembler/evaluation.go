@@ -114,7 +114,9 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 		AssessmentOutboxRelay:        infra.assessmentOutboxRelay,
 		AssessmentOutboxStatusReader: infra.assessmentOutboxStatusReader,
 	}
-	module.wireEvaluationEngine(normalized, infra)
+	if err := module.wireEvaluationEngine(normalized, infra); err != nil {
+		return nil, err
+	}
 	module.wireAssessmentApplications(normalized, infra)
 
 	return module, nil
@@ -180,7 +182,7 @@ func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, erro
 func (m *EvaluationModule) wireEvaluationEngine(
 	normalized EvaluationModuleDeps,
 	infra *evaluationInfra,
-) {
+) error {
 	var suggestionGenerator report.SuggestionGenerator
 
 	if normalized.InputResolver != nil {
@@ -193,20 +195,32 @@ func (m *EvaluationModule) wireEvaluationEngine(
 				scaleInterpretation.DefaultResultMapper{},
 			),
 		)
-		evaluatorRegistry, _ := execute.NewEvaluatorRegistry(scaleEvaluator)
-		scoreProjectors, _ := evaluationResult.NewScoreProjectorRegistry(
+		evaluatorRegistry, err := execute.NewEvaluatorRegistry(scaleEvaluator)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
+		}
+		scoreProjectors, err := evaluationResult.NewScoreProjectorRegistry(
 			evaluationResult.NewScaleScoreProjector(infra.scoreRepo),
 		)
-		reportBuilders, _ := evaluationResult.NewReportBuilderRegistry(
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
+		}
+		reportBuilders, err := evaluationResult.NewReportBuilderRegistry(
 			evaluationResult.NewScaleReportBuilder(reportBuilder),
 		)
-		resultWriter := evaluationResult.NewWriter(
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation report builder registry: %v", err)
+		}
+		resultWriter, err := evaluationResult.NewWriter(
 			infra.assessmentRepo,
 			scoreProjectors,
 			reportBuilders,
 			infra.reportDurableSaver,
 			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
 		)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation result writer: %v", err)
+		}
 
 		m.EvaluationService = execute.NewService(
 			infra.assessmentRepo,
@@ -216,6 +230,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
 		)
 	}
+	return nil
 }
 
 func (m *EvaluationModule) wireAssessmentApplications(

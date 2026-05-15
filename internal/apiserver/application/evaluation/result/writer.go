@@ -2,10 +2,13 @@ package result
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type writer struct {
@@ -23,7 +26,7 @@ func NewWriter(
 	reportBuilders ReportBuilderRegistry,
 	reportSaver ReportDurableSaver,
 	notifier CompletionNotifier,
-) Writer {
+) (Writer, error) {
 	return NewWriterWithEventAssemblers(
 		assessmentRepo,
 		scoreProjectors,
@@ -41,8 +44,11 @@ func NewWriterWithEventAssemblers(
 	reportSaver ReportDurableSaver,
 	notifier CompletionNotifier,
 	assemblers ...EventAssembler,
-) Writer {
-	eventAssemblers, _ := NewEventAssemblerRegistry(assemblers...)
+) (Writer, error) {
+	eventAssemblers, err := NewEventAssemblerRegistry(assemblers...)
+	if err != nil {
+		return nil, err
+	}
 	return &writer{
 		assessmentRepo:  assessmentRepo,
 		scoreProjectors: scoreProjectors,
@@ -50,14 +56,19 @@ func NewWriterWithEventAssemblers(
 		reportSaver:     reportSaver,
 		eventAssemblers: eventAssemblers,
 		notifier:        notifier,
-	}
+	}, nil
 }
 
-// Write persists an evaluation outcome in the compatibility order:
-// score projection -> Assessment interpreted save -> report durable save/outbox
-// staging -> waiter notification. This order intentionally preserves the
-// historical failure semantics where a later report-save failure may happen
-// after the Assessment has already been saved as interpreted.
+type preparedOutcome struct {
+	projector ScoreProjector
+	report    *domainReport.InterpretReport
+	events    []event.DomainEvent
+}
+
+// Write persists an evaluation outcome with Assessment state atomicity: report
+// construction and durable report save must succeed before the Assessment is
+// mutated and saved as interpreted. Cross MySQL/Mongo compensation remains a
+// separate reliability concern.
 func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 	l := logger.L(ctx)
 	if outcome.Assessment == nil {
@@ -66,13 +77,22 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 	if outcome.Result == nil {
 		return evalerrors.ModuleNotConfigured("evaluation result is required for evaluation result writer")
 	}
-	kind := resolveOutcomeKind(outcome)
+	if w.reportSaver == nil {
+		return evalerrors.ModuleNotConfigured("report durable saver is not configured")
+	}
 
-	if w.scoreProjectors != nil {
-		if projector := w.scoreProjectors.Resolve(kind); projector != nil {
-			if err := projector.Project(ctx, outcome); err != nil {
-				return err
-			}
+	prepared, err := w.prepare(ctx, outcome)
+	if err != nil {
+		return err
+	}
+
+	if err := w.reportSaver.SaveReportDurably(ctx, prepared.report, outcome.Assessment.TesteeID(), prepared.events); err != nil {
+		return evalerrors.Database(err, "保存报告失败")
+	}
+
+	if prepared.projector != nil {
+		if err := prepared.projector.Project(ctx, outcome); err != nil {
+			return err
 		}
 	}
 
@@ -92,27 +112,60 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 
-	if w.reportSaver == nil {
-		return evalerrors.ModuleNotConfigured("report durable saver is not configured")
+	if w.notifier != nil {
+		w.notifier.NotifyCompletion(ctx, outcome)
+	}
+	return nil
+}
+
+func (w *writer) prepare(ctx context.Context, outcome Outcome) (preparedOutcome, error) {
+	kind := resolveOutcomeKind(outcome)
+	if err := ensureOutcomeCanApplyEvaluation(outcome); err != nil {
+		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "应用评估结果失败")
+	}
+	var projector ScoreProjector
+	if w.scoreProjectors != nil {
+		projector = w.scoreProjectors.Resolve(kind)
 	}
 	if w.reportBuilders == nil {
-		return evalerrors.ModuleNotConfigured("evaluation report builder registry is not configured")
+		return preparedOutcome{}, evalerrors.ModuleNotConfigured("evaluation report builder registry is not configured")
 	}
 	builder, err := w.reportBuilders.Resolve(kind)
 	if err != nil {
-		return err
+		return preparedOutcome{}, err
 	}
 	rpt, err := builder.Build(ctx, outcome)
 	if err != nil {
-		return evalerrors.AssessmentInterpretFailed(err, "生成报告失败")
+		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "生成报告失败")
 	}
 	assembler := w.eventAssemblers.Resolve(kind)
-	if err := w.reportSaver.SaveReportDurably(ctx, rpt, outcome.Assessment.TesteeID(), assembler.BuildSuccessEvents(outcome, rpt)); err != nil {
-		return evalerrors.Database(err, "保存报告失败")
-	}
+	return preparedOutcome{
+		projector: projector,
+		report:    rpt,
+		events:    assembler.BuildSuccessEvents(outcome, rpt),
+	}, nil
+}
 
-	if w.notifier != nil {
-		w.notifier.NotifyCompletion(ctx, outcome)
+func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
+	if outcome.Assessment == nil {
+		return fmt.Errorf("assessment is required")
+	}
+	if outcome.Result == nil {
+		return fmt.Errorf("evaluation result is required")
+	}
+	if !outcome.Assessment.Status().IsSubmitted() {
+		return assessment.NewInvalidStatusError("apply evaluation", outcome.Assessment.Status())
+	}
+	modelRef := outcome.Assessment.EvaluationModelRef()
+	if modelRef == nil || modelRef.IsEmpty() {
+		return assessment.ErrNoEvaluationModel
+	}
+	if outcome.Result.ModelRef.IsEmpty() {
+		outcome.Result.WithModelRef(*modelRef)
+		return nil
+	}
+	if !modelRef.SameIdentity(outcome.Result.ModelRef) {
+		return assessment.ErrEvaluationModelMismatch
 	}
 	return nil
 }

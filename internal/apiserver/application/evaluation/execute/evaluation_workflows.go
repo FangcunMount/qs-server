@@ -89,10 +89,15 @@ func (w evaluationInputWorkflow) Resolve(ctx context.Context, a *assessment.Asse
 	if w.resolver == nil {
 		return nil, evalerrors.ModuleNotConfigured("evaluation input resolver is not configured")
 	}
+	modelRef := modelRefFromAssessment(a)
+	legacyScaleCode := ""
+	if modelRef.IsEmpty() {
+		legacyScaleCode = legacyScaleCodeFromAssessment(a)
+	}
 	snapshot, err := w.resolver.Resolve(ctx, evaluationinput.InputRef{
 		AssessmentID:         assessmentID,
-		ModelRef:             modelRefFromAssessment(a),
-		MedicalScaleCode:     legacyScaleCodeFromAssessment(a),
+		ModelRef:             modelRef,
+		MedicalScaleCode:     legacyScaleCode,
 		AnswerSheetID:        a.AnswerSheetRef().ID().Uint64(),
 		QuestionnaireCode:    a.QuestionnaireRef().Code().String(),
 		QuestionnaireVersion: a.QuestionnaireRef().Version(),

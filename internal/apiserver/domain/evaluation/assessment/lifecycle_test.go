@@ -231,8 +231,10 @@ func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
 		t.Fatalf("Submit returned error: %v", err)
 	}
 
-	result := NewEvaluationResult(0, RiskLevelNone, "INTJ", "", nil).
-		WithModelRef(NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI"))
+	result := NewModelEvaluationResult(modelRef, ResultSummary{PrimaryLabel: "INTJ"}, EvaluationDetail{
+		Kind:    EvaluationModelKindMBTI,
+		Payload: "INTJ",
+	})
 	if err := a.ApplyEvaluation(result); err != nil {
 		t.Fatalf("ApplyEvaluation returned error: %v", err)
 	}
