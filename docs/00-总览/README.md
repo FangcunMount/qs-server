@@ -119,8 +119,8 @@ flowchart LR
 先读：
 
 1. [05-源码事实矩阵.md](./05-源码事实矩阵.md)
-2. [../CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)
-3. [../README.md](../README.md)
+2. [../README.md](../README.md)
+3. [../../README.md](../../README.md)
 
 维护原则是：**先确认源码和机器契约，再修改 prose 文档**。如果事实矩阵没有覆盖某个新事实，先补矩阵，再决定应该落在哪一组文档里。
 
@@ -225,7 +225,7 @@ Client / 小程序
 | gRPC 契约 | [../../internal/apiserver/interface/grpc/proto/](../../internal/apiserver/interface/grpc/proto/) |
 | 配置 | [../../configs/apiserver.dev.yaml](../../configs/apiserver.dev.yaml)、[../../configs/collection-server.dev.yaml](../../configs/collection-server.dev.yaml)、[../../configs/worker.dev.yaml](../../configs/worker.dev.yaml) |
 | 构建与运行 | [../../Makefile](../../Makefile) |
-| 文档维护 | [../CONTRIBUTING-DOCS.md](../CONTRIBUTING-DOCS.md)、[./05-源码事实矩阵.md](./05-源码事实矩阵.md) |
+| 文档维护 | [../README.md](../README.md)、[./05-源码事实矩阵.md](./05-源码事实矩阵.md) |
 
 ---
 
@@ -270,4 +270,3 @@ go test ./internal/collection-server/application/answersheet \
 | 看 REST、gRPC、事件契约、部署和排障 | [../04-接口与运维/README.md](../04-接口与运维/README.md) |
 | 看设计取舍和跨模块分析 | [../05-专题分析/README.md](../05-专题分析/README.md) |
 | 准备技术分享或面试讲法 | [../06-宣讲/README.md](../06-宣讲/README.md) |
-

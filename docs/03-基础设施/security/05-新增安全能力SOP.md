@@ -311,6 +311,7 @@ Capability: manage_interpretation_models
 ```
 
 因为 `manage_interpretation_models` 表达的是规则管理，不是报告访问。
+
 ## 6.8 新增解释模型 Scope
 
 解释模型可能需要比 org 更细的 scope。

@@ -1,6 +1,6 @@
-# 为什么使用 Outbox
+# 04-为什么使用 Outbox
 
-**本文回答**：为什么 qs-server 不在业务事务里直接 publish MQ，也不把事件发布交给 worker 重试，而是在 AnswerSheet、Assessment、Report 等关键写入路径中使用 Outbox；Outbox 在系统里解决了什么一致性问题、带来了什么代价、如何与 Mongo/MySQL、EventCatalog、Relay、Worker 和治理状态协作。
+**本文回答**：为什么 qs-server 不在业务事务里直接 publish MQ，也不把事件发布交给 worker 重试，而是在 AnswerSheet、Assessment、Interpretation、Report 等关键写入路径中使用 Outbox；Outbox 在系统里解决了什么一致性问题、带来了什么代价、如何与 Mongo/MySQL、EventCatalog、Relay、Worker、Evaluation Engine、Interpretation Provider 和治理状态协作。
 
 ---
 
@@ -16,8 +16,9 @@ Outbox 解决的是一个核心问题：
 
 | 场景 | 后果 |
 | ---- | ---- |
-| AnswerSheet 保存成功，但 MQ publish 失败 | 评估永远不执行 |
-| Assessment 状态更新成功，但后续事件没发出 | 统计/通知/行为投影缺失 |
+| AnswerSheet 保存成功，但 MQ publish 失败 | Assessment 永远不创建，测评执行链路断裂 |
+| Assessment 状态更新成功，但后续事件没发出 | 解释模型执行、报告生成、统计/通知/行为投影缺失 |
+| Interpretation 执行成功，但完成事件没发出 | Report 不生成，前台一直等待报告 |
 | Report 保存成功，但事件丢失 | 前端/统计/后续链路不知道报告完成 |
 | 进程在 DB commit 后、MQ publish 前崩溃 | 业务事实存在，但异步链路断掉 |
 | MQ 短暂不可用 | 同步请求失败面扩大，或事件丢失 |
@@ -63,8 +64,7 @@ MQ publish failed
 结果：
 
 - AnswerSheet 已经存在。
-- `answersheet.submitted` 没发出去。
-- worker 不会创建 Assessment。
+- worker 不会创建 Assessment，后续 `assessment.created -> assessment.completed -> interpretation.completed -> report.generated` 链路不会启动。
 - 用户看到答卷提交成功，但报告永远不生成。
 
 这就是典型的“双写不一致”。
@@ -131,9 +131,9 @@ Mongo transaction:
 
 | Outbox | 存储 | 典型事件 | 作用 |
 | ------ | ---- | -------- | ---- |
-| mongo-domain-events | Mongo | answersheet.submitted、behavior footprint 等 | 从 Survey 答卷事实出站 |
-| assessment-mysql-outbox | MySQL | assessment/evaluation lifecycle 事件 | 从 Evaluation/Assessment 状态出站 |
-| report mongo outbox | Mongo | report / interpretation 相关事件 | 从 Report durable save 出站 |
+| mongo-domain-events | Mongo | `answersheet.submitted`、`footprint.*` 等 | 从 Survey 答卷事实和行为足迹出站 |
+| assessment-mysql-outbox | MySQL | `assessment.created`、`assessment.completed`、`interpretation.completed`、`interpretation.failed`、`assessment.failed` | 从 Evaluation / Assessment / Interpretation 状态出站 |
+| report mongo outbox | Mongo | `report.generated`、`footprint.report_generated` | 从 Report durable save 出站 |
 
 它们都不是“单独的消息表”那么简单，而是和各自业务事实存储绑定。
 
@@ -178,19 +178,19 @@ AnswerSheet + idempotency + outbox events
 
 - 三者都不应该半成功。
 
-### 4.2 这对异步评估非常关键
+### 4.2 这对异步测评执行非常关键
 
-worker 评估依赖 `answersheet.submitted`。
+worker 创建 Assessment 依赖 `answersheet.submitted`。
 
-如果 AnswerSheet 保存和 event staging 不能同事务，异步评估链路就可能断。
+如果 AnswerSheet 保存和 event staging 不能同事务，异步测评执行链路就可能断。
 
 ---
 
 ## 5. Assessment 为什么使用 MySQL Outbox
 
-Evaluation 中 Assessment、Score 等结果更多落在 MySQL。
+Evaluation 中 Assessment、EvaluationRun、EvaluationResult 索引、Interpretation 执行状态等更多落在 MySQL 或需要 MySQL 事务边界协作。
 
-Assessment 状态变化和后续事件也需要可靠出站。
+Assessment 状态变化、Interpretation 执行完成/失败和后续事件也需要可靠出站。
 
 MySQL outbox store 使用表：
 
@@ -355,6 +355,52 @@ EventCatalog / TopicResolver 负责将 DomainEvent 解析成 outbox record 的 t
 
 ---
 
+## 9.5 Outbox 与新事件语义
+
+多解释模型链路下，Outbox 关注的是阶段事实，而不是具体模型算法。
+
+主链路事件应表达：
+
+```text
+answersheet.submitted
+  -> assessment.created
+  -> assessment.completed
+  -> interpretation.completed / interpretation.failed
+  -> report.generated
+```
+
+它们的语义分别是：
+
+| Event | 语义 | 典型 Outbox |
+| ----- | ---- | ----------- |
+| `answersheet.submitted` | 答卷事实已保存 | Mongo Outbox |
+| `assessment.created` | 已基于答卷创建一次 Assessment | MySQL Outbox |
+| `assessment.completed` | Evaluation 层的测评执行阶段已完成 | MySQL Outbox |
+| `interpretation.completed` | 具体 Interpretation Provider 已完成解释 | MySQL Outbox |
+| `interpretation.failed` | 具体 Interpretation Provider 执行失败 | MySQL Outbox |
+| `assessment.failed` | Assessment 执行失败 | MySQL Outbox |
+| `report.generated` | InterpretReport 已可靠保存 | Mongo / Report Outbox |
+
+这些事件不应该写成旧语义：
+
+```text
+assessment.submitted
+assessment.interpreted
+```
+
+原因：
+
+```text
+assessment.created 更准确表达“测评已创建”；
+assessment.completed 更准确表达“Evaluation 执行阶段完成”；
+interpretation.completed 更准确表达“具体模型解释完成”；
+report.generated 更准确表达“报告事实已保存”。
+```
+
+这让事件系统可以同时服务 Scale、MBTI、BigFive 等解释模型，而不把事件语义绑定到医学量表或某个具体 Provider。
+
+---
+
 ## 10. BeforePublish Hook 的作用
 
 OutboxRelay 支持 `BeforePublishHook`。
@@ -438,6 +484,8 @@ Outbox 显式记录事件，语义更清楚。
 ```text
 AnswerSheet save
   -> 直接调用 EvaluationService.CreateAssessment
+  -> 直接调用 InterpretationProvider.Evaluate
+  -> 直接生成 Report
 ```
 
 问题：
@@ -507,6 +555,21 @@ Outbox 的优势是把 publish retry 变成持久化后台任务。
 
 后续新增事件订阅者，不需要把同步调用塞进主写链路。
 
+### 16.6 支持多解释模型链路
+
+Outbox 记录的是阶段事实，不记录具体模型算法。
+
+因此，当系统新增 MBTI、BigFive 等解释模型时，事件链路仍然可以保持稳定：
+
+```text
+Assessment created
+  -> Assessment completed
+  -> Interpretation completed / failed
+  -> Report generated
+```
+
+新增模型主要改变 Provider、Context、规则事实源和结果结构，不应该改变 Outbox 的基本可靠出站机制。
+
 ---
 
 ## 17. Outbox 带来的代价
@@ -535,6 +598,9 @@ Outbox 不保证：
 - 事件顺序完全全局一致。
 - 下游处理没有副作用。
 - published 后业务一定完成。
+- `interpretation-model.changed` 会自动重算历史 Assessment。
+- `interpretation.completed` 一定已经生成 Report。
+- `report.generated` 一定已经完成所有统计投影。
 
 所以 worker 端仍需要：
 
@@ -587,11 +653,32 @@ Outbox 不保证：
 - worker Nack/retry。
 - consumer-side 幂等跳过。
 
+### 19.5 interpretation.completed 已 stage 但报告没生成
+
+可能原因：
+
+- `interpretation.completed` 事件未 publish。
+- `interpretation_completed_handler` 未注册或未消费。
+- report durable save 失败。
+- report outbox stage 失败。
+- Report repository / Mongo 不可用。
+- worker Nack 后等待重试。
+- duplicate suppression 错误 skip。
+
+排查顺序：
+
+```text
+MySQL outbox interpretation.completed
+  -> MQ publish 状态
+  -> worker handler logs
+  -> Report durable save
+  -> report.generated outbox
+  -> report.generated worker / projector
+```
+
 ---
 
 ## 20. 设计不变量
-
-后续演进应坚持：
 
 1. 关键业务事件必须和业务事实同事务 stage。
 2. 不允许业务保存成功但事件只在内存里。
@@ -602,7 +689,11 @@ Outbox 不保证：
 7. EventID 必须唯一。
 8. EventCatalog 是 topic 解析真值。
 9. Consumer 必须幂等。
-10. Governance endpoint 默认只读，不应随意 mark/skip/delete event。
+10. 事件表达阶段事实，不表达具体模型算法。
+11. `assessment.created`、`assessment.completed`、`interpretation.completed`、`report.generated` 不应退回旧的 `assessment.submitted` / `assessment.interpreted` 语义。
+12. `interpretation-model.changed` 是规则变化事件，不是某次测评完成事件。
+13. 规则变化事件不应默认触发历史 Assessment 重算。
+14. Governance endpoint 默认只读，不应随意 mark/skip/delete event。
 
 ---
 
@@ -628,6 +719,20 @@ Outbox 不保证：
 
 不代表。published 只说明事件已进入 MQ，worker 是否处理成功要看 consumer 侧。
 
+### 21.6 “assessment.completed 等于报告已生成”
+
+不对。`assessment.completed` 只表示 Evaluation 层的测评执行阶段完成。
+
+报告事实应由 `interpretation.completed -> report.generated` 链路推进。
+
+### 21.7 “interpretation-model.changed 应该触发历史重算”
+
+不应该默认如此。
+
+`interpretation-model.changed` 表示规则变化，主要用于缓存失效、Context cache 失效、读模型刷新和治理预热。
+
+历史 Assessment 是否重算，必须由显式 ReEvaluationJob 或补偿任务建模。
+
 ---
 
 ## 22. 替代方案分析
@@ -646,7 +751,7 @@ Outbox 不保证：
 - 不支持多订阅者。
 - 无持久重试。
 
-结论：不适合 AnswerSheet -> Evaluation 这种链路。
+结论：不适合 AnswerSheet -> Assessment -> Interpretation -> Report 这种多阶段链路。
 
 ### 22.2 DB commit 后直接 publish MQ
 
@@ -721,6 +826,12 @@ Outbox 不保证：
 - `internal/apiserver/container/assembler/survey.go`
 - `internal/apiserver/container/assembler/evaluation.go`
 
+### Worker Handlers
+
+- `internal/worker/handlers/answersheet_handler.go`
+- `internal/worker/handlers/assessment_handler.go`
+- `internal/worker/handlers/interpretation_handler.go`
+
 ### Runtime Relay
 
 - `internal/apiserver/process/runtime_bootstrap.go`
@@ -763,7 +874,12 @@ git diff --check
 | 目标 | 文档 |
 | ---- | ---- |
 | 为什么需要读侧统计聚合 | `05-为什么需要读侧统计聚合.md` |
-| 为什么同步提交但异步评估 | `02-为什么同步提交但异步评估.md` |
+| 为什么同步提交但异步测评执行 | `02-为什么同步提交但异步测评执行.md` |
+| 多解释模型扩展专题 | `08-多解释模型扩展专题--从Scale到MBTI.md` |
+| Evaluation 通用执行引擎专题 | `09-Evaluation通用执行引擎专题.md` |
+| 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
 | Event Publish / Outbox 深讲 | `../03-基础设施/event/02-Publish与Outbox.md` |
 | Worker Ack/Nack | `../03-基础设施/event/03-Worker消费与AckNack.md` |
-| AnswerSheet 提交 | `../02-业务模块/survey/02-AnswerSheet提交与校验.md` |
+| AnswerSheet 提交 | `../02-业务模块/survey/02-AnswerSheet提交事实模型.md` |
+| Evaluation 执行链路 | `../02-业务模块/evaluation/02-Evaluation执行链路--从AnswerSheet提交到Assessment完成.md` |
+| Evaluation 引擎链路 | `../02-业务模块/evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md` |

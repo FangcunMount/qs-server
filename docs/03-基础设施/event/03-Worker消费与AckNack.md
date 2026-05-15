@@ -822,7 +822,7 @@ Worker handler 不应直接执行具体模型算法。Scale、MBTI、BigFive 等
 - Handler catalog：[../../../internal/worker/handlers/catalog.go](../../../internal/worker/handlers/catalog.go)
 - AnswerSheet handler：[../../../internal/worker/handlers/answersheet_handler.go](../../../internal/worker/handlers/answersheet_handler.go)
 - Assessment handler：[../../../internal/worker/handlers/assessment_handler.go](../../../internal/worker/handlers/assessment_handler.go)
-- Interpretation handler：[../../../internal/worker/handlers/interpretation_handler.go](../../../internal/worker/handlers/interpretation_handler.go)
+- Report handler：[../../../internal/worker/handlers/report_handler.go](../../../internal/worker/handlers/report_handler.go)
 - Worker handlers：[../../../internal/worker/handlers/](../../../internal/worker/handlers/)
 
 ### Contract

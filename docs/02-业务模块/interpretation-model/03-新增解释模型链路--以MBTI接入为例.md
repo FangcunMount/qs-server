@@ -101,6 +101,7 @@ Scale 通过 ModelInputProvider / Evaluator 接入；
 非 Scale 假模型通过契约测试证明 Evaluation 主流程可扩展；
 MBTI 不再被建模为 Scale category；
 assessment_score 暂时仍是 Scale 专用投影。
+ResultWriter 只保证报告失败时不持久化 interpreted Assessment，不承担跨库强一致。
 ```
 
 因此本文是下一阶段接入清单，不表示当前已有 `MBTIModel / MBTIProvider / MBTIReportBuilder` 的生产实现。

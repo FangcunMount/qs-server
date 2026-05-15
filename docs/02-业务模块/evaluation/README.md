@@ -107,6 +107,7 @@ medical_scale_* 字段仍保留；
 assessment_score 仍是 Scale 专用投影；
 Scale 报告 builder 仍生成现有 InterpretReport；
 非 Scale 模型当前只通过契约测试证明引擎可扩展。
+ResultWriter 当前只保证 Assessment 状态原子，不提供 MySQL + Mongo 跨库强一致。
 ```
 
 目标态但尚未作为独立代码对象落地：
