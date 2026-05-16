@@ -1,6 +1,6 @@
 # 新增安全能力 SOP
 
-**本文回答**：在 qs-server 中新增或修改 JWT claims、Principal、TenantScope、AuthzSnapshot、CapabilityDecision、service auth、mTLS、ACL、OperatorRoleProjection 时，应该如何先确定模型边界，再补 contract tests、runtime adapter、文档和 Verify，避免安全事实散落在 handler、middleware、IAM SDK 和本地角色中。
+**本文回答**：在 qs-server 中新增或修改 JWT claims、Principal、OrgScope、AuthzSnapshot、CapabilityDecision、service auth、mTLS、ACL、OperatorRoleProjection 时，应该如何先确定模型边界，再补 contract tests、runtime adapter、文档和 Verify，避免安全事实散落在 handler、middleware、IAM SDK 和本地角色中。
 
 ---
 
@@ -20,7 +20,7 @@
 | 新增类型 | 主要落点 | 禁止做法 |
 | -------- | -------- | -------- |
 | 新 JWT claim / 身份字段 | `securityplane.Principal` + `securityprojection` + HTTP/gRPC context | handler 直接读 raw claim |
-| 新 tenant / org scope | `TenantScope` + identity/scope middleware + snapshot loader domain 规则 | 业务服务里各自 Parse tenant_id |
+| 新 IAM domain / QS org scope | `OrgScope` + identity/scope middleware + snapshot loader domain 规则 | 业务服务里各自把 `tenant_id` 当 `org_id` |
 | 新 capability | `application/authz.Capability` + `DecideCapability` + route middleware | 用 JWT roles 判断业务权限 |
 | 新解释模型安全能力 | `read_interpretation_models` / `manage_interpretation_models` / `read_interpretation_reports` + IAM resource/action + route middleware | 把模型管理权限、报告访问权限和 JWT roles 混在一起 |
 | 新 AuthzSnapshot 行为 | `iamauth.SnapshotLoader` + authz snapshot middleware/interceptor | handler 直接调用 IAM SDK |
@@ -31,7 +31,7 @@
 
 一句话原则：
 
-> **安全能力必须先落到 Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity 或 Projection 之一；否则先别写中间件。**
+> **安全能力必须先落到 Principal、OrgScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity 或 Projection 之一；否则先别写中间件。**
 
 ---
 
@@ -39,11 +39,11 @@
 
 | 问题 | 为什么重要 |
 | ---- | ---------- |
-| 这是身份、租户范围、授权快照、能力判断、服务身份、传输安全、ACL 还是本地投影？ | 决定落点 |
+| 这是身份、IAM 授权域、QS 业务组织范围、授权快照、能力判断、服务身份、传输安全、ACL 还是本地投影？ | 决定落点 |
 | 它是否改变 HTTP/gRPC 行为？ | 影响 status code、error envelope、兼容性 |
 | 它是否改变权限真值来源？ | 高风险，必须审查 |
 | 它是否依赖 JWT roles？ | roles 不能直接作为 capability 真值 |
-| 它是否需要 tenant_id -> org_id 转换？ | 必须经过 TenantScope |
+| 它是否需要 QS 业务组织范围？ | 使用 OrgScope.OrgID；禁止把 JWT `tenant_id` 当 `org_id` |
 | 它是否需要 IAM Snapshot？ | 应走 SnapshotLoader，不要 handler 直连 IAM |
 | 它是否是 service-to-service？ | 应走 ServiceIdentity / service auth / mTLS / ACL |
 | 它是否只是本地展示投影？ | 不能参与权限判断 |
@@ -63,6 +63,16 @@
 | 它是否需要 service auth 或 mTLS / ACL？ | 内部服务不能靠用户 JWT 伪装 |
 | 它是否需要对象级 ACL？ | capability 是粗粒度能力，不一定能表达单份报告授权 |
 
+新增安全能力时还必须回答：
+
+1. 是否需要认证主体？使用 Principal。
+2. 是否需要 IAM 授权域？使用 TenantDomain。
+3. 是否需要 QS 业务组织范围？使用 OrgScope.OrgID。
+4. 是否需要 capability？使用 AuthzSnapshot + CapabilityDecision。
+5. 是否误用了 JWT `tenant_id` 作为 `org_id`？禁止。
+6. 是否新增了 context key？必须同步 HTTP/gRPC projection。
+7. 是否新增了文档和测试？
+
 ---
 
 ## 2. 决策树
@@ -77,7 +87,7 @@ flowchart TD
     interpretation -->|no| identity{"新增身份字段/来源?"}
     identity -->|yes| principal["Principal / securityprojection"]
     identity -->|no| scope{"新增租户或组织范围?"}
-    scope -->|yes| tenant["TenantScope / scope middleware"]
+    scope -->|yes| tenant["OrgScope / scope middleware"]
     scope -->|no| authz{"新增业务权限?"}
     authz -->|yes| cap["CapabilityDecision / application authz"]
     authz -->|no| snapshot{"修改授权快照加载?"}
@@ -99,7 +109,7 @@ flowchart TD
 
 | 步骤 | 必做 |
 | ---- | ---- |
-| 1. 定模型 | 明确属于 Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity、Projection 哪一类 |
+| 1. 定模型 | 明确属于 Principal、OrgScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity、Projection 哪一类 |
 | 2. 锁行为 | 先补 contract tests，覆盖成功、失败、缺失、降级、skip、错误码 |
 | 3. 选位置 | projection 只做 primitive -> model；transport 只做 adapter；application/authz 做 capability；IAM SDK 留在 infra |
 | 4. 接运行时 | 修改 middleware/interceptor/helper/loader，不让 handler 散读安全事实 |
@@ -147,7 +157,7 @@ Capability
 6. 更新 gRPC `injectUserContext` / `PrincipalFromContext`。
 7. 如果是 slice/map，做 defensive copy。
 8. 补 HTTP/gRPC projection tests。
-9. 更新 [01-Principal与TenantScope.md](./01-Principal与TenantScope.md)。
+9. 更新 [01-Principal与OrgScope.md](./01-Principal与OrgScope.md)。
 
 ### 4.3 禁止
 
@@ -158,33 +168,33 @@ Capability
 
 ---
 
-## 5. 新增 TenantScope / Scope 规则
+## 5. 新增 OrgScope / Scope 规则
 
 ### 5.1 适用场景
 
-- tenant_id 与 org_id 关系变化。
-- 支持非数字 tenant。
+- TenantDomain 与 OrgID 关系变化。
+- 支持新的 IAM 授权域表达。
 - 新增 CasbinDomain override。
 - 新增 org scope 校验。
 - gRPC / HTTP scope 行为对齐。
 
 ### 5.2 实施步骤
 
-1. 明确 raw tenant 与业务 org 的关系。
-2. 更新 `TenantScope` 模型或构造函数。
-3. 更新 `TenantScopeFromTenantID`。
-4. 更新 HTTP `RequireTenantIDMiddleware` / `RequireNumericOrgScopeMiddleware`。
-5. 更新 gRPC `TenantScopeFromContext` 和 AuthzSnapshotUnaryInterceptor。
+1. 明确 IAM 授权域与 QS 业务 org 的关系。
+2. 更新 `OrgScope` 模型或构造函数。
+3. 更新 `OrgScopeFromIdentity`。
+4. 更新 HTTP `RequireTenantDomainMiddleware` / `RequireOrgScopeMiddleware`。
+5. 更新 gRPC `OrgScopeFromContext` 和 AuthzSnapshotUnaryInterceptor。
 6. 更新 SnapshotLoader domain 规则，如涉及 domain。
-7. 补空 tenant、数字 tenant、非数字 tenant、0 tenant tests。
+7. 补空 `tenant_domain`、空 `org_id`、0 `org_id`、HTTP/gRPC projection tests。
 8. 更新文档。
 
 ### 5.3 禁止
 
-- 在业务 service 里直接 `strconv.ParseUint(tenant_id)`。
+- 在业务 service 里直接 `strconv.ParseUint(tenant_id)` 当作业务 org。
 - 在某个 handler 中定义私有 scope 规则。
 - 不更新 gRPC。
-- 把 non-numeric tenant 悄悄当 org_id=0。
+- 把缺失或无效的 `org_id` 悄悄当 org_id=0。
 
 ---
 
@@ -326,9 +336,9 @@ Capability: manage_interpretation_models
 | `model_version` | `model_version:1.0.0` | 模型版本范围 |
 | `report_owner` | `testee:xxx` | 报告归属对象范围 |
 
-注意：TenantScope 仍只负责租户 / 机构上下文。
+注意：OrgScope 只负责 IAM 授权域 / QS 业务组织范围上下文。
 
-模型级 scope 不应该塞进 `TenantScope`，而应通过以下方式之一表达：
+模型级 scope 不应该塞进 `OrgScope`，而应通过以下方式之一表达：
 
 ```text
 IAM resource pattern；
@@ -557,7 +567,7 @@ config file loading 是 TODO。
 | 能力 | 必测 |
 | ---- | ---- |
 | Principal | HTTP/gRPC 字段投影、默认 unknown、slice defensive copy |
-| TenantScope | 数字 tenant、非数字 tenant、空 tenant、0 tenant、numeric org middleware |
+| OrgScope | tenant_domain 投影、org_id 投影、空 org_id、0 org_id、HTTP/gRPC scope middleware |
 | AuthzSnapshot | loader nil、load failure、context injection、authz_version invalidation |
 | Capability | allowed、denied、missing_snapshot、unknown_capability、admin bypass |
 | Interpretation Capability | read/manage model、read report、IAM resource/action 映射、报告访问 denied、模型管理 denied |
@@ -573,8 +583,8 @@ config file loading 是 TODO。
 
 | 变更 | 至少同步 |
 | ---- | -------- |
-| 新 Principal 字段/source | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
-| 新 TenantScope 规则 | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
+| 新 Principal 字段/source | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
+| 新 OrgScope 规则 | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | 新 Capability | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | 新解释模型 capability/scope/service auth | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md)、[03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md)、`../../02-业务模块/interpretation-model/` |
 | SnapshotLoader 变化 | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
@@ -613,14 +623,14 @@ config file loading 是 TODO。
 | 反模式 | 后果 |
 | ------ | ---- |
 | handler 里判断 `role == admin` | 绕过 IAM AuthzSnapshot |
-| 业务 service 里解析 tenant_id | scope 规则漂移 |
+| 业务 service 里解析 tenant_id 当 org_id | scope 规则漂移 |
 | service auth 手写 metadata | token 生命周期和格式漂移 |
 | mTLS CN 当用户身份 | 用户/服务身份混淆 |
 | ACL 文档先行声称完整支持 | 误导运维和安全评审 |
 | Operator roles 做鉴权 | 使用了可能滞后的本地投影 |
 | snapshot load 失败默认放行 | 权限绕过 |
 | 用 `manage_interpretation_models` 放行 MBTI 报告访问 | 混淆规则管理和用户数据访问 |
-| 把 `model_type=mbti` 塞进 TenantScope | 租户范围和模型范围混淆 |
+| 把 `model_type=mbti` 塞进 OrgScope | 组织范围和模型范围混淆 |
 | worker 调解释模型服务时复用用户 JWT | 服务身份和用户身份混淆 |
 | 新增 IAM resource 后不推进 authz_version | Snapshot 仍是旧权限，排障困难 |
 | context 中塞 raw JWT | 敏感信息泄露 |
@@ -699,7 +709,7 @@ git diff --check
 | 目标 | 文档 |
 | ---- | ---- |
 | 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |
-| Principal 与 TenantScope | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
+| Principal 与 OrgScope | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | AuthzSnapshot 与 CapabilityDecision | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | 解释模型抽象 | [../../02-业务模块/interpretation-model/README.md](../../02-业务模块/interpretation-model/README.md) |
 | ServiceIdentity 与 mTLS-ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |

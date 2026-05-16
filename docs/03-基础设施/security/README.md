@@ -1,6 +1,6 @@
 # Security Control Plane 阅读地图
 
-**本文回答**：`security/` 子目录这一组文档应该如何阅读；qs-server 的安全控制面负责什么、不负责什么；Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity、mTLS/ACL、OperatorRoleProjection 和新增安全能力 SOP 分别应该去哪里看。
+**本文回答**：`security/` 子目录这一组文档应该如何阅读；qs-server 的安全控制面负责什么、不负责什么；Principal、OrgScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity、mTLS/ACL、OperatorRoleProjection 和新增安全能力 SOP 分别应该去哪里看。
 
 ---
 
@@ -8,20 +8,31 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 模块定位 | `security/` 是 qs-server 的**安全控制面文档组**，统一解释身份、租户范围、授权快照、能力判断、服务身份、传输安全和本地角色投影 |
-| 核心模型 | 只读模型在 `internal/pkg/securityplane`：Principal、TenantScope、AuthzSnapshotView、CapabilityDecision、ServiceIdentity |
+| 模块定位 | `security/` 是 qs-server 的**安全控制面文档组**，统一解释身份、IAM 授权域、QS 业务组织范围、授权快照、能力判断、服务身份、传输安全和本地角色投影 |
+| 核心模型 | 只读模型在 `internal/pkg/securityplane`：Principal、OrgScope、AuthzSnapshotView、CapabilityDecision、ServiceIdentity |
 | 投影层 | `internal/pkg/securityprojection` 负责把 HTTP/gRPC/service/mTLS 输入转换为统一安全视图 |
 | 用户身份 | HTTP JWT / gRPC JWT 最终投影为 Principal |
-| 租户范围 | IAM `tenant_id` 保留为 raw tenant；QS 业务需要 numeric `org_id` 时必须经过 TenantScope |
+| 授权域 / 组织范围 | IAM JWT `tenant_id` 投影为 `TenantDomain` / `tenant_domain`；IAM JWT `org_id` 投影为 QS `OrgID` / `org_id`；二者共同组成 OrgScope |
 | 权限真值 | 业务 capability 以 IAM AuthzSnapshot 的 resource/action 为准，不信任 JWT roles |
 | 服务身份 | service auth bearer token 和 mTLS certificate identity 统一投影为 ServiceIdentity |
 | 本地角色 | Operator local roles 是 IAM snapshot roles 的本地投影，不是权限真值 |
 | 当前边界 | mTLS / ACL seam 已接入，但 ACL 文件加载仍不是完整实现 |
-| 推荐读法 | 先读整体架构，再读 Principal/TenantScope、AuthzSnapshot/Capability、ServiceIdentity/mTLS、OperatorRoleProjection，最后读 SOP |
+| 推荐读法 | 先读整体架构，再读 Principal/OrgScope、AuthzSnapshot/Capability、ServiceIdentity/mTLS、OperatorRoleProjection，最后读 SOP |
 
 一句话概括：
 
 > **Security Control Plane 不是重写一套安全框架，而是给 HTTP、gRPC、IAM、service auth、mTLS、ACL 和本地投影建立统一安全语言。**
+
+---
+
+## 0. 术语总约定
+
+在 qs-server 中：
+
+- JWT `tenant_id` = IAM authorization domain，例如 `fangcun` / `platform`，进入 `TenantDomain` / `tenant_domain` / Casbin domain 语义。
+- JWT `org_id` = QS business organization scope，例如 `1` / `2` / `3`，进入 `OrgID` / `org_id` 语义。
+- `OrgScope` 是 `TenantDomain + OrgID` 的只读投影视图。
+- 文档和代码不再用 tenant 语义表达 QS 业务组织范围；业务数据范围必须看 `org_id`。
 
 ---
 
@@ -33,7 +44,7 @@ Security Control Plane 负责统一解释以下安全事实：
 HTTP JWT claims
 gRPC bearer token
 Principal
-TenantScope
+OrgScope
 AuthzSnapshot
 CapabilityDecision
 ServiceIdentity
@@ -47,7 +58,7 @@ Operator local role projection
 ```text
 谁在调用？
 来自哪个认证来源？
-在哪个 tenant/org 范围？
+在哪个 IAM 授权域 / QS 业务组织范围？
 用户有哪些 IAM resource/action？
 某个 REST route 需要哪个 capability？
 服务调用方是谁？
@@ -86,7 +97,7 @@ Security 文档解释安全事实和控制面边界；
 security/
 ├── README.md
 ├── 00-整体架构.md
-├── 01-Principal与TenantScope.md
+├── 01-Principal与OrgScope.md
 ├── 02-AuthzSnapshot与CapabilityDecision.md
 ├── 03-ServiceIdentity与mTLS-ACL.md
 ├── 04-OperatorRoleProjection.md
@@ -96,7 +107,7 @@ security/
 | 顺序 | 文档 | 先回答什么 |
 | ---- | ---- | ---------- |
 | 1 | [00-整体架构.md](./00-整体架构.md) | 安全控制面总图、HTTP/gRPC/service/mTLS/Operator 投影边界 |
-| 2 | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) | Principal、TenantScope、HTTP/gRPC 身份投影、tenant_id 与 org_id |
+| 2 | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) | Principal、OrgScope、HTTP/gRPC 身份投影、TenantDomain 与 OrgID |
 | 3 | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) | IAM 授权快照、resource/action、capability 判断 |
 | 4 | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) | service auth、mTLS identity、identity match、ACL seam |
 | 5 | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) | Operator 本地 roles 投影与权限真值边界 |
@@ -112,7 +123,7 @@ security/
 
 ```text
 00-整体架构
-  -> 01-Principal与TenantScope
+  -> 01-Principal与OrgScope
   -> 02-AuthzSnapshot与CapabilityDecision
   -> 03-ServiceIdentity与mTLS-ACL
   -> 04-OperatorRoleProjection
@@ -121,7 +132,7 @@ security/
 读完后应能回答：
 
 1. Principal 和 ServiceIdentity 的区别是什么？
-2. tenant_id 为什么不能直接等同于 org_id？
+2. JWT `tenant_id` 和 JWT `org_id` 分别表达什么？
 3. 为什么 JWT roles 不是业务权限真值？
 4. AuthzSnapshot 如何支持 capability 判断？
 5. mTLS、service auth、ACL 分别负责什么？
@@ -145,23 +156,23 @@ security/
 - `RequireCapabilityMiddleware`。
 - route matrix tests。
 
-### 4.3 要新增 tenant / org scope 规则
+### 4.3 要新增 IAM 授权域 / QS org scope 规则
 
 读：
 
 ```text
-01-Principal与TenantScope
+01-Principal与OrgScope
   -> 05-新增安全能力SOP
 ```
 
 重点看：
 
-- raw `TenantID`。
-- numeric `OrgID`。
-- `HasNumericOrg`。
-- `RequireTenantIDMiddleware`。
-- `RequireNumericOrgScopeMiddleware`。
-- gRPC tenant scope。
+- `TenantDomain`。
+- `OrgID`。
+- `HasOrgID`。
+- `RequireTenantDomainMiddleware`。
+- `RequireOrgScopeMiddleware`。
+- gRPC org scope。
 
 ### 4.4 要新增服务间认证
 
@@ -208,7 +219,7 @@ flowchart TB
     subgraph HTTP["HTTP REST"]
         jwt["JWTAuthMiddleware"]
         identity["UserIdentityMiddleware"]
-        scope["Tenant Scope Middleware"]
+        scope["Org Scope Middleware"]
         snapshot["AuthzSnapshotMiddleware"]
         capability["Capability Middleware"]
     end
@@ -222,7 +233,7 @@ flowchart TB
 
     subgraph Model["Security Plane Models"]
         principal["Principal"]
-        tenant["TenantScope"]
+        org["OrgScope"]
         authz["AuthzSnapshotView"]
         decision["CapabilityDecision"]
         service["ServiceIdentity"]
@@ -233,8 +244,8 @@ flowchart TB
     end
 
     jwt --> identity --> principal
-    identity --> tenant
-    scope --> tenant
+    identity --> org
+    scope --> org
     snapshot --> authz --> decision
     capability --> decision
     mtls --> service
@@ -254,8 +265,8 @@ flowchart TB
 ```text
 JWTAuthMiddleware
   -> UserIdentityMiddleware
-  -> RequireTenantIDMiddleware
-  -> RequireNumericOrgScopeMiddleware
+  -> RequireTenantDomainMiddleware
+  -> RequireOrgScopeMiddleware
   -> AuthzSnapshotMiddleware
   -> RequireCapabilityMiddleware
   -> Handler
@@ -282,7 +293,7 @@ Recovery
 | 模型 | 回答 | 不是 |
 | ---- | ---- | ---- |
 | Principal | 谁在调用 | 权限判断结果 |
-| TenantScope | 在哪个 tenant/org 范围 | IAM policy |
+| OrgScope | 在哪个 IAM 授权域 / QS 业务组织范围 | IAM policy |
 | AuthzSnapshotView | IAM 授权快照视图 | 长期本地权限副本 |
 | CapabilityDecision | 某个业务能力是否允许 | 完整 ACL 引擎 |
 | ServiceIdentity | 哪个服务在调用 | 用户 Principal |
@@ -317,9 +328,9 @@ Recovery
 
 错误。必须基于 AuthzSnapshot 与 CapabilityDecision。
 
-### 9.2 “tenant_id 就是 org_id”
+### 9.2 “JWT tenant_id 就是 org_id”
 
-不严谨。TenantScope 同时保存 raw tenant 与 numeric org 解析结果。
+错误。JWT `tenant_id` 是 IAM 授权域；JWT `org_id` 才是 QS 业务组织范围。OrgScope 保存 `TenantDomain + OrgID`，不再从授权域推导业务组织。
 
 ### 9.3 “Operator local roles 可以鉴权”
 
@@ -343,8 +354,8 @@ Recovery
 
 | 现象 | 优先文档 |
 | ---- | -------- |
-| HTTP 401 / user not authenticated | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
-| tenant_id 缺失或非数字 | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
+| HTTP 401 / user not authenticated | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
+| tenant_domain 缺失或 org_id 缺失 | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | permission denied | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | authorization snapshot load failed | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | gRPC Unauthenticated | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
@@ -358,7 +369,7 @@ Recovery
 ## 11. 维护原则
 
 1. 新身份字段必须进入 Principal / Projection，而不是 handler 私读 raw claim。
-2. 新租户规则必须进入 TenantScope / middleware，而不是业务服务各自解析。
+2. 新授权域 / 组织范围规则必须进入 OrgScope / middleware，而不是业务服务各自解析。
 3. 新业务权限必须进入 CapabilityDecision，而不是 JWT roles 判断。
 4. 新 service auth 必须走共享 bearer helper，而不是手写 metadata。
 5. 新 mTLS/ACL 行为必须有 contract tests。
@@ -438,7 +449,7 @@ git diff --check
 | 目标 | 文档 |
 | ---- | ---- |
 | 整体架构 | [00-整体架构.md](./00-整体架构.md) |
-| Principal 与 TenantScope | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
+| Principal 与 OrgScope | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | AuthzSnapshot 与 CapabilityDecision | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | ServiceIdentity 与 mTLS-ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
 | OperatorRoleProjection | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) |

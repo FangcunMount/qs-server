@@ -152,7 +152,7 @@ increase(qs_cache_family_degraded_total[10m])
 看：
 
 - Principal。
-- TenantScope。
+- OrgScope。
 - AuthzSnapshot 是否加载。
 - CapabilityDecision outcome。
 - IAM resource/action。

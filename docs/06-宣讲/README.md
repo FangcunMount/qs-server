@@ -135,7 +135,7 @@ qs-server 不应该再被讲成“一个问卷&量表系统”。
 | 5 | [04-异步评估链路讲法.md](./04-异步评估链路讲法.md) | 串起答卷提交、事件、worker、Internal gRPC、Evaluation Engine、Provider、Report |
 | 6 | [05-事件与Outbox讲法.md](./05-事件与Outbox讲法.md) | 讲清 EventCatalog、Outbox、NSQ、Worker Ack/Nack 和事件可靠性 |
 | 7 | [06-高并发治理讲法.md](./06-高并发治理讲法.md) | 讲清 RateLimit、SubmitQueue、SubmitGuard、Backpressure、LockLease、worker concurrency |
-| 8 | [07-IAM与安全讲法.md](./07-IAM与安全讲法.md) | 讲清 Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceAuth |
+| 8 | [07-IAM与安全讲法.md](./07-IAM与安全讲法.md) | 讲清 Principal、OrgScope、AuthzSnapshot、CapabilityDecision、ServiceAuth |
 | 9 | [08-工程质量与测试讲法.md](./08-工程质量与测试讲法.md) | 讲清测试、契约校验、文档卫生和架构证据链 |
 | 10 | [09-30分钟技术分享脚本.md](./09-30分钟技术分享脚本.md) | 一份可以直接照着讲的 30 分钟完整分享稿 |
 | 11 | [10-架构图素材索引.md](./10-架构图素材索引.md) | 统一管理宣讲可用的架构图、时序图、证据图和讲图脚本 |
@@ -431,7 +431,7 @@ qs-server 不应该再被讲成“一个问卷&量表系统”。
 
 ### 10.9 IAM
 
-> **JWT 证明“你是谁”，TenantScope 证明“你在哪个组织”，AuthzSnapshot 判断“你能做什么”。**
+> **JWT 证明“你是谁”，OrgScope 证明“在哪个授权域和组织范围”，AuthzSnapshot 判断“你能做什么”。**
 
 ### 10.10 工程质量
 
@@ -534,7 +534,7 @@ flowchart TB
 6. 事件与 Outbox：EventCatalog / Outbox / NSQ / Worker
 7. 多解释模型扩展：Scale -> MBTI -> BigFive
 8. 高并发：RateLimit / SubmitQueue / Backpressure / LockLease
-9. IAM 安全：Principal / TenantScope / AuthzSnapshot / Capability
+9. IAM 安全：Principal / OrgScope / AuthzSnapshot / Capability
 10. 工程质量：测试 / 契约 / 文档 / 证据
 11. 总结：现状、边界、演进路线
 ```

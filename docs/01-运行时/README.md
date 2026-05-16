@@ -27,7 +27,7 @@
 | 3 | [02-collection-server运行时](./02-collection-server运行时.md) | collection 如何作为 BFF 接收 REST、做身份/限流/排队、gRPC 调 apiserver |
 | 4 | [03-qs-worker运行时](./03-qs-worker运行时.md) | worker 如何加载事件目录、订阅 MQ、派发 handler、internal gRPC 回调 apiserver |
 | 5 | [04-进程间调用与gRPC](./04-进程间调用与gRPC.md) | collection/worker 到 apiserver 的 gRPC 调用和 InternalService 边界 |
-| 6 | [05-IAM认证与身份链路](./05-IAM认证与身份链路.md) | JWT、TenantScope、AuthzSnapshot、ServiceAuth、mTLS/ACL 在三进程中的位置 |
+| 6 | [05-IAM认证与身份链路](./05-IAM认证与身份链路.md) | JWT、OrgScope、AuthzSnapshot、ServiceAuth、mTLS/ACL 在三进程中的位置 |
 | 7 | [06-后台任务与调度](./06-后台任务与调度.md) | scheduler、outbox relay、worker MQ 消费、SubmitQueue 如何区分 |
 | 8 | [07-优雅关闭与资源释放](./07-优雅关闭与资源释放.md) | 三进程收到退出信号后资源释放顺序是什么 |
 
@@ -97,7 +97,7 @@
 重点检查：
 
 - JWT 是否验证成功；
-- tenant_id / org_id 是否存在且合法；
+- tenant_domain / org_id 是否存在且合法；
 - AuthzSnapshot 是否加载；
 - collection service auth 是否注入到 gRPC metadata；
 - apiserver gRPC mTLS / ACL 是否拦截。

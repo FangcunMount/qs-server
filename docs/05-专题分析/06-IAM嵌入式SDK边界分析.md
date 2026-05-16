@@ -24,14 +24,14 @@ Process Runtime
 | collection IAMModule | 能力更窄：TokenVerifier、ServiceAuth、Identity、Guardianship、AuthzSnapshot |
 | 权限真值 | 业务 capability 必须基于 AuthzSnapshot，不直接信任 JWT roles |
 | 服务身份 | ServiceAuthHelper 只负责服务间 token/metadata，不等于用户权限 |
-| 租户边界 | IAM tenant_id 通过 TenantScope 映射到 QS org scope |
+| 授权域 / 组织边界 | IAM JWT `tenant_id` 投影为 TenantDomain；IAM JWT `org_id` 投影为 QS OrgScope |
 | 运行时保护 | apiserver IAM client 注入 Backpressure limiter，避免 IAM 慢拖垮主服务 |
 | 关闭语义 | IAMModule 统一关闭 ServiceAuthHelper、TokenVerifier、Client |
 | 禁止事项 | handler/application/domain 直接依赖 IAM SDK，或用 JWT roles / local Operator roles 做业务授权 |
 
 一句话概括：
 
-> **IAM SDK 可以嵌入 runtime，但 IAM 语义不能侵入领域模型；qs-server 只消费“身份、租户、授权快照、服务身份、监护关系、应用配置”等经过边界转换后的能力。**
+> **IAM SDK 可以嵌入 runtime，但 IAM 语义不能侵入领域模型；qs-server 只消费“身份、授权域、业务组织范围、授权快照、服务身份、监护关系、应用配置”等经过边界转换后的能力。**
 
 ---
 
@@ -84,7 +84,7 @@ flowchart TB
 
     subgraph Security["Security Plane"]
         principal["Principal"]
-        scope["TenantScope"]
+        scope["OrgScope"]
         snapshot["AuthzSnapshot"]
         decision["CapabilityDecision"]
         serviceId["ServiceIdentity"]
@@ -261,7 +261,7 @@ AuthzSnapshotLoader 负责：
 
 ### 6.1 为什么需要 snapshot
 
-业务请求需要在“当前 tenant/org + user + app”维度判断权限。
+业务请求需要在“当前 tenant_domain / org_id + user + app”维度判断权限。
 
 如果每次 capability 都实时调用 IAM，会导致：
 
@@ -312,7 +312,7 @@ ServiceAuthHelper 负责：
 ```text
 ServiceIdentity
 +
-Principal / TenantScope（如果代表用户）
+Principal / OrgScope（如果代表用户）
 +
 AuthzSnapshot（如果需要用户业务权限）
 ```
@@ -498,7 +498,7 @@ Transport 层负责：
 
 - JWT middleware。
 - UserIdentity projection。
-- TenantScope。
+- OrgScope。
 - AuthzSnapshotMiddleware。
 - gRPC IAMAuthInterceptor。
 - mTLS identity match。
@@ -570,7 +570,7 @@ IAMOptions 统一管理：
 最终进入 qs-server 的不是 IAM raw DTO，而是：
 
 - Principal。
-- TenantScope。
+- OrgScope。
 - AuthzSnapshot。
 - CapabilityDecision。
 - ServiceIdentity。
@@ -724,7 +724,7 @@ IAMOptions 统一管理：
 1. AuthzSnapshotLoader 是否为 nil。
 2. IAM GRPCEnabled。
 3. IAM Authz app name。
-4. tenantID / userID。
+4. tenantDomain / userID。
 5. IAM GetAuthorizationSnapshot。
 6. CacheTTL / authz_version。
 

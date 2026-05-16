@@ -511,7 +511,7 @@ TTL 如何设置；
 ```text
 03-基础设施/security/README.md
 03-基础设施/security/00-整体架构.md
-03-基础设施/security/01-Principal与TenantScope.md
+03-基础设施/security/01-Principal与OrgScope.md
 03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md
 03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md
 ```
@@ -520,7 +520,7 @@ TTL 如何设置；
 
 ```text
 Principal；
-TenantScope；
+OrgScope；
 AuthzSnapshot；
 CapabilityDecision；
 ServiceIdentity；

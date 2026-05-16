@@ -445,7 +445,7 @@ collection-server 调用 qs-apiserver：
 
 - ServiceIdentity：collection-server。
 - Principal：用户 JWT 中的 user。
-- TenantScope：用户 tenant/org。
+- OrgScope：用户 IAM 授权域 / QS 业务组织范围。
 - AuthzSnapshot：用户在 org 内的业务权限。
 
 ### 13.2 不要混用
@@ -669,6 +669,6 @@ git diff --check
 | ---- | ---- |
 | OperatorRoleProjection | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) |
 | 新增安全能力 SOP | [05-新增安全能力SOP.md](./05-新增安全能力SOP.md) |
-| Principal 与 TenantScope | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
+| Principal 与 OrgScope | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | AuthzSnapshot 与 CapabilityDecision | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |

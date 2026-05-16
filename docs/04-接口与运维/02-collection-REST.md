@@ -12,7 +12,7 @@
 | REST 前缀 | 业务 API 在 `/api/v1`，公开信息在 `/api/v1/public` |
 | 健康治理 | `/health`、`/readyz`、`/governance/redis`、`/governance/resilience`、`/ping` |
 | OpenAPI | `/api/rest` 静态挂载，`/swagger-ui` UI，`/swagger` 跳转 |
-| Auth | IAM enabled 时 `/api/v1` 走 JWT + TenantScope + AuthzSnapshot，但 scale read-only 白名单可跳过 |
+| Auth | IAM enabled 时 `/api/v1` 走 JWT + OrgScope + AuthzSnapshot，但 scale read-only 白名单可跳过 |
 | RateLimit | submit/query/wait-report 走 global + user/ip 双层限流，优先 Redis backend，fallback local |
 | SubmitQueue | `POST /answersheets` 入队后返回 202 + request_id，状态通过 `/answersheets/submit-status` 查 |
 | 不负责 | 后台发布、统计同步、cache governance repair、operator 管理 |
@@ -117,8 +117,8 @@ GET /api/v1/scales/categories
 ```text
 JWTAuthMiddlewareWithOptions
 UserIdentityMiddleware
-RequireTenantIDMiddleware
-RequireNumericOrgScopeMiddleware
+RequireTenantDomainMiddleware
+RequireOrgScopeMiddleware
 AuthzSnapshotMiddleware
 ```
 
@@ -219,7 +219,7 @@ collection 静态挂载：
 2. IAMModule 是否 enabled。
 3. TokenVerifier。
 4. JWT。
-5. tenant_id numeric org。
+5. tenant_domain 和 org_id。
 
 ### 11.2 submit 429
 

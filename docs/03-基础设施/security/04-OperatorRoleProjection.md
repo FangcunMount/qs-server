@@ -15,6 +15,8 @@
 | infra sync helper | `infra/iam/operator_roles_sync.go` 提供从 IAM 拉快照并替换本地 roles 的 helper |
 | 失败策略 | 投影失败只 warning，不阻断当前请求认证/鉴权 |
 | 权限判断 | 仍以请求期 AuthzSnapshot + CapabilityDecision 为准，不以本地 Operator roles 为准 |
+| 输入边界 | 不解析 JWT；消费安全链路已投影的 Principal / OrgScope / AuthzSnapshot |
+| 范围读取 | 需要业务组织时读取 OrgScope.OrgID；需要 IAM 授权域时读取 OrgScope.TenantDomain |
 | 当前重复点 | application updater 与 infra sync helper 有相近投影逻辑，本轮文档固定语义，不强行重构 |
 | 后续方向 | 可以收敛成单一 projection service，但不能改变权限真值边界 |
 
@@ -65,7 +67,7 @@ sequenceDiagram
     participant Repo as OperatorRepository
     participant Handler as Handler
 
-    Req->>Identity: user_id + tenant_id/org_id
+    Req->>Identity: user_id + tenant_domain + org_id
     Identity->>Snapshot: active operator / org user
     Snapshot->>IAM: Load AuthzSnapshot
     IAM-->>Snapshot: roles + permissions
@@ -109,10 +111,10 @@ logger.Warnw(...)
 
 gRPC 中：
 
-1. 读取 tenantID/userID。
+1. 读取 tenantDomain/userID。
 2. 加载 IAM snapshot。
 3. 如果 updater 不为空。
-4. tenantID/userID 可解析为数字。
+4. orgID/userID 可解析为数字。
 5. 调用：
 
 ```text
@@ -512,8 +514,8 @@ Operator role projection 是最终一致视图。
 
 检查：
 
-1. tenantID/userID 是否在 gRPC context 中。
-2. tenantID/userID 是否可解析为数字。
+1. tenantDomain/userID 是否在 gRPC context 中。
+2. orgID/userID 是否可解析为数字。
 3. updater 是否为 nil。
 4. loader 是否加载 snapshot。
 5. repo.FindByUser(orgID,userID) 是否找到 Operator。
@@ -611,6 +613,6 @@ git diff --check
 | ---- | ---- |
 | 新增安全能力 SOP | [05-新增安全能力SOP.md](./05-新增安全能力SOP.md) |
 | AuthzSnapshot 与 CapabilityDecision | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
-| Principal 与 TenantScope | [01-Principal与TenantScope.md](./01-Principal与TenantScope.md) |
+| Principal 与 OrgScope | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | ServiceIdentity 与 mTLS-ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
 | 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |

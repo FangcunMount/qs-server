@@ -1,6 +1,6 @@
 # apiserver REST
 
-**本文回答**：qs-apiserver 的 REST 面如何分成 public、protected、internal 三层；每层注册哪些路由；IAM/JWT/TenantScope/AuthzSnapshot 中间件如何挂载；治理类 internal endpoint 应如何理解和排障。
+**本文回答**：qs-apiserver 的 REST 面如何分成 public、protected、internal 三层；每层注册哪些路由；IAM/JWT/OrgScope/AuthzSnapshot 中间件如何挂载；治理类 internal endpoint 应如何理解和排障。
 
 ---
 
@@ -11,7 +11,7 @@
 | Public | `/health`、`/readyz`、`/ping`、`/governance/redis`、`/api/v1/public/*`、`/api/v1/qrcodes/:filename` | 基础健康、公开信息、二维码对象 |
 | Protected | `/api/v1/*` | 后台业务 API：User、Questionnaire、AnswerSheet、Scale、Evaluation、Actor、Plan、Statistics、Codes、Admin |
 | Internal | `/internal/v1/*` | Plan/Statistics/Cache/Event/Resilience 内部治理和手工操作 |
-| Auth chain | Protected/Internal group | JWT → UserIdentity → TenantID → NumericOrgScope → ActiveOperator → AuthzSnapshot |
+| Auth chain | Protected/Internal group | JWT → UserIdentity → TenantDomain → OrgScope → ActiveOperator → AuthzSnapshot |
 
 一句话概括：
 
@@ -115,8 +115,8 @@ Internal 并不等于“无认证”。当前 internal group 也会应用 protec
 ```text
 JWTAuthMiddlewareWithOptions
 UserIdentityMiddleware
-RequireTenantIDMiddleware
-RequireNumericOrgScopeMiddleware
+RequireTenantDomainMiddleware
+RequireOrgScopeMiddleware
 RequireActiveOperatorMiddleware
 AuthzSnapshotMiddleware
 ```
@@ -124,8 +124,8 @@ AuthzSnapshotMiddleware
 含义：
 
 - JWT 负责认证。
-- UserIdentity 投影 Principal/TenantScope。
-- TenantID/NumericOrgScope 保证组织范围。
+- UserIdentity 投影 Principal/OrgScope。
+- TenantDomain 保证 IAM 授权域，OrgScope 保证 QS 业务组织范围。
 - ActiveOperator 检查当前用户是本地有效 operator。
 - AuthzSnapshot 加载 IAM 授权快照。
 
@@ -178,13 +178,13 @@ internal/apiserver/transport/rest/routes_*.go
 4. ForceRemoteVerification。
 5. JWT metadata。
 
-### 8.2 tenant_id required / numeric org required
+### 8.2 tenant_domain required / org_id required
 
 检查：
 
 1. token claims。
-2. TenantID。
-3. 是否 numeric org。
+2. 是否有 TenantDomain。
+3. 是否有有效 org_id。
 4. 是否应该挂在 public route。
 
 ### 8.3 permission denied

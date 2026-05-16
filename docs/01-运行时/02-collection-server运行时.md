@@ -17,7 +17,7 @@
 | 集成层 | integration stage 创建 apiserver gRPC client manager，注入 AnswerSheet / Questionnaire / Evaluation / Actor / Scale client |
 | HTTP 层 | 只启动 HTTP REST server；全局中间件包括 recovery、request-id、logger、API logger、NoCache、Options |
 | 保护层 | 答卷提交走 SubmitQueue；rate limit 可用 Redis backend，不可用时降级为本地限流 |
-| 安全层 | `/api/v1` 默认挂 IAM JWT、UserIdentity、TenantID、OrgScope、AuthzSnapshot；部分公开 scale GET 白名单可跳过认证 |
+| 安全层 | `/api/v1` 默认挂 IAM JWT、UserIdentity、TenantDomain、OrgScope、AuthzSnapshot；部分公开 scale GET 白名单可跳过认证 |
 | 关闭顺序 | shutdown hook 关闭 gRPC manager、Redis、authz sync、IAM、container，最后关闭 HTTP server |
 
 一句话概括：**collection-server 是前台入口保护层和协议适配层，它把“用户请求”整理成“apiserver gRPC 调用”，但不重新实现业务权威模型。**
@@ -375,7 +375,7 @@ GET /api/v1/public/info
 
 ---
 
-## 8. 身份链路：JWT、Tenant、OrgScope 与 AuthzSnapshot
+## 8. 身份链路：JWT、TenantDomain、OrgScope 与 AuthzSnapshot
 
 collection 的 `/api/v1` 默认挂 IAM 认证中间件。核心链路是：
 
@@ -384,8 +384,8 @@ flowchart LR
     Req[HTTP Request]
     JWT[JWTAuthMiddleware]
     UID[UserIdentityMiddleware]
-    Tenant[RequireTenantID]
-    Org[RequireNumericOrgScope]
+    Tenant[RequireTenantDomain]
+    Org[RequireOrgScope]
     Snap[AuthzSnapshotMiddleware]
     Handler[Business Handler]
 
@@ -398,8 +398,8 @@ flowchart LR
 | ---- | ---- |
 | JWT verifier | 使用 IAM SDK 验证 token，可配置本地 JWKS 或远程权威校验 |
 | UserIdentity | 从认证结果中投影当前用户身份 |
-| TenantID | 要求请求带租户范围 |
-| OrgScope | 要求请求带数值型 org scope |
+| TenantDomain | 要求请求带 IAM 授权域，来自 JWT `tenant_id` |
+| OrgScope | 要求请求带 QS 业务组织范围，来自 JWT `org_id` |
 | AuthzSnapshot | 加载 IAM 授权快照，作为权限视图 |
 | ServiceAuthHelper | collection 调 apiserver gRPC 时附加服务 JWT metadata |
 

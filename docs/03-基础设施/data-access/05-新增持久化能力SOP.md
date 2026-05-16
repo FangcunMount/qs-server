@@ -167,7 +167,7 @@ domain_event_outbox
 | ------ | -------- |
 | 表名明确 | ☐ |
 | 主键字段明确 | ☐ |
-| org_id / tenant scope 字段 | ☐ |
+| org_id / org scope 字段 | ☐ |
 | created_at / updated_at / deleted_at | ☐ |
 | created_by / updated_by / deleted_by 如需审计 | ☐ |
 | 状态字段枚举值明确 | ☐ |
@@ -319,7 +319,7 @@ create collection
 unique index: model_code + model_version
 query index: status + model_code
 query index: questionnaire_code + questionnaire_version
-optional index: org_id / tenant_id
+optional index: org_id / tenant_domain
 optional index: updated_at / published_at
 ```
 

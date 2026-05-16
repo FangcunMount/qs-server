@@ -96,7 +96,7 @@ Redis
     RateLimit / SubmitQueue / Backpressure / Duplicate Suppression / Lock / Degraded Mode
 
 安全控制面
-    Principal / TenantScope / AuthzSnapshot / CapabilityDecision / ServiceIdentity / mTLS / ACL
+    Principal / OrgScope / AuthzSnapshot / CapabilityDecision / ServiceIdentity / mTLS / ACL
 
 外部集成
     WeChat / ObjectStorage / Notification / External Adapter
@@ -160,7 +160,7 @@ Redis
 | data-access | MySQL、Mongo、Repository、UnitOfWork、Migration、ReadModel、Outbox Store |
 | redis | 缓存、查询缓存、Hotset、Warmup、LockLease、缓存治理 |
 | resilience | 限流、提交队列、背压、幂等重复抑制、降级保护 |
-| security | Principal、TenantScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity |
+| security | Principal、OrgScope、AuthzSnapshot、CapabilityDecision、ServiceIdentity |
 | integrations | WeChat、OSS、Notification、外部适配器 |
 | runtime | 启动流水线、资源装配、Container、配置链路、ClientBundle、Lifecycle |
 | observability | Metrics、Healthz、Pprof、Logging、Audit、治理端点 |
@@ -411,7 +411,7 @@ metrics label 是否低基数。
 ```text
 security/README.md
 security/00-整体架构.md
-security/01-Principal与TenantScope.md
+security/01-Principal与OrgScope.md
 security/02-AuthzSnapshot与CapabilityDecision.md
 security/03-ServiceIdentity与mTLS-ACL.md
 ```
@@ -420,7 +420,7 @@ security/03-ServiceIdentity与mTLS-ACL.md
 
 ```text
 Principal 如何构造；
-TenantScope 如何传递；
+OrgScope 如何传递；
 AuthzSnapshot 是否来自 IAM；
 CapabilityDecision 如何落到 handler / service；
 ServiceIdentity 如何保护内部调用；
@@ -695,7 +695,7 @@ SubmitGuard 不是 Assessment 幂等的最终事实源；
 
 ```text
 Principal；
-TenantScope；
+OrgScope；
 AuthzSnapshot；
 CapabilityDecision；
 ServiceIdentity；
