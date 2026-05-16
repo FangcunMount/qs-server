@@ -13,13 +13,13 @@ import (
 )
 
 const (
-	UserIDKey      = "user_id"
-	UserIDStrKey   = "user_id_str"
-	OrgIDKey       = "org_id"
-	TenantIDKey    = "tenant_id"
-	RolesKey       = "roles"
-	PrincipalKey   = "security_principal"
-	TenantScopeKey = "security_tenant_scope"
+	UserIDKey       = "user_id"
+	UserIDStrKey    = "user_id_str"
+	OrgIDKey        = "org_id"
+	TenantDomainKey = "tenant_domain"
+	RolesKey        = "roles"
+	PrincipalKey    = "security_principal"
+	OrgScopeKey     = "security_org_scope"
 )
 
 // UserIdentityMiddleware projects IAM JWT claims into gin.Context.
@@ -43,18 +43,7 @@ func UserIdentityMiddleware() gin.HandlerFunc {
 			c.Set(UserIDKey, userID)
 		}
 
-		c.Set(TenantIDKey, claims.TenantID)
-		if claims.TenantID != "" {
-			if orgID, err := strconv.ParseUint(claims.TenantID, 10, 64); err == nil {
-				c.Set(OrgIDKey, orgID)
-			}
-		}
-
-		if len(claims.Roles) > 0 {
-			c.Set(RolesKey, claims.Roles)
-		}
-		setSecurityProjection(c, claims)
-
+		projectIdentityContext(c, claims)
 		c.Next()
 	}
 }
@@ -69,34 +58,27 @@ func OptionalUserIdentityMiddleware() gin.HandlerFunc {
 		}
 
 		c.Set(UserIDStrKey, claims.UserID)
-		c.Set(TenantIDKey, claims.TenantID)
 		if claims.UserID != "" {
 			if userID, err := strconv.ParseUint(claims.UserID, 10, 64); err == nil {
 				c.Set(UserIDKey, userID)
 			}
 		}
-		if claims.TenantID != "" {
-			if orgID, err := strconv.ParseUint(claims.TenantID, 10, 64); err == nil {
-				c.Set(OrgIDKey, orgID)
-			}
-		}
 		if len(claims.Roles) > 0 {
 			c.Set(RolesKey, claims.Roles)
 		}
-		setSecurityProjection(c, claims)
-
+		projectIdentityContext(c, claims)
 		c.Next()
 	}
 }
 
-// RequireTenantIDMiddleware requires a non-empty IAM tenant_id claim.
-func RequireTenantIDMiddleware() gin.HandlerFunc {
+// RequireTenantDomainMiddleware requires a non-empty IAM authorization domain claim.
+func RequireTenantDomainMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		claims := pkgmiddleware.GetUserClaims(c)
-		logger.L(c.Request.Context()).Debugw("RequireTenantIDMiddleware claims", "claims", claims)
-		if claims == nil || claims.TenantID == "" {
-			logger.L(c.Request.Context()).Errorw("RequireTenantIDMiddleware claims is nil or empty", "claims", claims)
-			c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant_id claim is required"})
+		logger.L(c.Request.Context()).Debugw("RequireTenantDomainMiddleware claims", "claims", claims)
+		if claims == nil || tenantDomainFromClaims(claims) == "" {
+			logger.L(c.Request.Context()).Errorw("RequireTenantDomainMiddleware missing tenant domain", "claims", claims)
+			c.JSON(http.StatusUnauthorized, gin.H{"error": "tenant domain claim is required"})
 			c.Abort()
 			return
 		}
@@ -104,11 +86,11 @@ func RequireTenantIDMiddleware() gin.HandlerFunc {
 	}
 }
 
-// RequireNumericOrgScopeMiddleware requires tenant_id to be parseable as a QS org_id.
-func RequireNumericOrgScopeMiddleware() gin.HandlerFunc {
+// RequireOrgScopeMiddleware requires a resolvable QS business org_id.
+func RequireOrgScopeMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if GetOrgID(c) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id must be a numeric organization id for QS"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "org_id claim is required for QS business scope"})
 			c.Abort()
 			return
 		}
@@ -143,8 +125,9 @@ func GetOrgID(c *gin.Context) uint64 {
 	return id
 }
 
-func GetTenantID(c *gin.Context) string {
-	val, exists := c.Get(TenantIDKey)
+// GetTenantDomain returns the IAM authorization domain from gin.Context.
+func GetTenantDomain(c *gin.Context) string {
+	val, exists := c.Get(TenantDomainKey)
 	if !exists {
 		return ""
 	}
@@ -171,31 +154,47 @@ func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
 	return principal, ok
 }
 
-// GetTenantScope returns the Security Control Plane tenant scope projection.
-func GetTenantScope(c *gin.Context) (securityplane.TenantScope, bool) {
-	val, exists := c.Get(TenantScopeKey)
+// GetOrgScope returns the Security Control Plane org scope projection.
+func GetOrgScope(c *gin.Context) (securityplane.OrgScope, bool) {
+	val, exists := c.Get(OrgScopeKey)
 	if !exists {
-		return securityplane.TenantScope{}, false
+		return securityplane.OrgScope{}, false
 	}
-	scope, ok := val.(securityplane.TenantScope)
+	scope, ok := val.(securityplane.OrgScope)
 	return scope, ok
 }
 
-func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims) {
+func projectIdentityContext(c *gin.Context, claims *pkgmiddleware.UserClaims) {
+	tenantDomain := tenantDomainFromClaims(claims)
+	c.Set(TenantDomainKey, tenantDomain)
+
+	if orgID, ok := resolveOrgIDFromClaims(claims); ok {
+		c.Set(OrgIDKey, orgID)
+	}
+	if len(claims.Roles) > 0 {
+		c.Set(RolesKey, claims.Roles)
+	}
+	setSecurityProjection(c, claims, tenantDomain)
+}
+
+func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims, tenantDomain string) {
 	if claims == nil {
 		return
 	}
+	orgID, hasOrg := resolveOrgIDFromClaims(claims)
 	principal := securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
-		Kind:      securityplane.PrincipalKindUser,
-		Source:    securityplane.PrincipalSourceHTTPJWT,
-		UserID:    claims.UserID,
-		AccountID: claims.AccountID,
-		TenantID:  claims.TenantID,
-		SessionID: claims.SessionID,
-		TokenID:   claims.TokenID,
-		Roles:     claims.Roles,
-		AMR:       claims.AMR,
+		Kind:         securityplane.PrincipalKindUser,
+		Source:       securityplane.PrincipalSourceHTTPJWT,
+		UserID:       claims.UserID,
+		AccountID:    claims.AccountID,
+		TenantDomain: tenantDomain,
+		OrgID:        orgID,
+		HasOrgID:     hasOrg,
+		SessionID:    claims.SessionID,
+		TokenID:      claims.TokenID,
+		Roles:        claims.Roles,
+		AMR:          claims.AMR,
 	})
 	c.Set(PrincipalKey, principal)
-	c.Set(TenantScopeKey, securityprojection.TenantScopeFromTenantID(claims.TenantID, ""))
+	c.Set(OrgScopeKey, securityprojection.OrgScopeFromIdentity(tenantDomain, orgID, hasOrg, ""))
 }

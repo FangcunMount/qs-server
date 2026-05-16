@@ -17,13 +17,14 @@ func TestUserIdentityMiddlewareProjectsSecurityPrincipalAndScope(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:    "42",
-			AccountID: "account-1",
-			TenantID:  "88",
-			SessionID: "session-1",
-			TokenID:   "token-1",
-			Roles:     []string{"operator"},
-			AMR:       []string{"pwd"},
+			UserID:       "42",
+			AccountID:    "account-1",
+			TenantDomain: "fangcun",
+			OrgID:        "88",
+			SessionID:    "session-1",
+			TokenID:      "token-1",
+			Roles:        []string{"operator"},
+			AMR:          []string{"pwd"},
 		})
 		c.Next()
 	})
@@ -39,12 +40,12 @@ func TestUserIdentityMiddlewareProjectsSecurityPrincipalAndScope(t *testing.T) {
 		if principal.UserID != "42" || principal.AccountID != "account-1" || principal.TokenID != "token-1" {
 			t.Fatalf("principal = %#v, want projected claims", principal)
 		}
-		scope, ok := GetTenantScope(c)
+		scope, ok := GetOrgScope(c)
 		if !ok {
-			t.Fatal("expected tenant scope projection")
+			t.Fatal("expected org scope projection")
 		}
-		if !scope.HasNumericOrg || scope.OrgID != 88 {
-			t.Fatalf("scope = %#v, want numeric org 88", scope)
+		if scope.TenantDomain != "fangcun" || !scope.HasOrgID || scope.OrgID != 88 {
+			t.Fatalf("scope = %#v, want fangcun org 88", scope)
 		}
 		if got := GetUserID(c); got != 42 {
 			t.Fatalf("legacy user id = %d, want 42", got)

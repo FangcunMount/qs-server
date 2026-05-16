@@ -12,10 +12,11 @@ import (
 type authContextKey string
 
 const (
-	authContextKeyUserID       authContextKey = "user_id"
-	authContextKeyAccountID    authContextKey = "account_id"
-	authContextKeyTenantID     authContextKey = "tenant_id"
-	authContextKeySessionID    authContextKey = "session_id"
+	authContextKeyUserID        authContextKey = "user_id"
+	authContextKeyAccountID     authContextKey = "account_id"
+	authContextKeyTenantDomain authContextKey = "tenant_domain"
+	authContextKeyOrgID        authContextKey = "org_id"
+	authContextKeySessionID     authContextKey = "session_id"
 	authContextKeyTokenID      authContextKey = "token_id"
 	authContextKeyRoles        authContextKey = "roles"
 	authContextKeyAMR          authContextKey = "amr"
@@ -43,9 +44,21 @@ func AccountIDFromContext(ctx context.Context) string {
 	return contextStringValue(ctx, authContextKeyAccountID)
 }
 
-// TenantIDFromContext returns the IAM tenant ID from a gRPC request context.
-func TenantIDFromContext(ctx context.Context) string {
-	return contextStringValue(ctx, authContextKeyTenantID)
+// TenantDomainFromContext returns the IAM authorization domain from a gRPC request context.
+func TenantDomainFromContext(ctx context.Context) string {
+	return contextStringValue(ctx, authContextKeyTenantDomain)
+}
+
+// OrgIDFromContext returns the QS business org_id from a gRPC request context.
+func OrgIDFromContext(ctx context.Context) (uint64, bool) {
+	if ctx == nil {
+		return 0, false
+	}
+	orgID, ok := ctx.Value(authContextKeyOrgID).(uint64)
+	if !ok || orgID == 0 {
+		return 0, false
+	}
+	return orgID, true
 }
 
 // SessionIDFromContext returns the IAM session ID from a gRPC request context.
@@ -100,36 +113,40 @@ func PrincipalFromContext(ctx context.Context) (securityplane.Principal, bool) {
 	}
 	userID := UserIDFromContext(ctx)
 	accountID := AccountIDFromContext(ctx)
-	tenantID := TenantIDFromContext(ctx)
+	tenantDomain := TenantDomainFromContext(ctx)
+	orgID, hasOrg := OrgIDFromContext(ctx)
 	sessionID := SessionIDFromContext(ctx)
 	tokenID := TokenIDFromContext(ctx)
 	username := UsernameFromContext(ctx)
 	roles := RolesFromContext(ctx)
 	amr := AuthenticationMethodsFromContext(ctx)
-	if userID == "" && accountID == "" && tenantID == "" && sessionID == "" && tokenID == "" && username == "" && len(roles) == 0 && len(amr) == 0 {
+	if userID == "" && accountID == "" && tenantDomain == "" && sessionID == "" && tokenID == "" && username == "" && len(roles) == 0 && len(amr) == 0 {
 		return securityplane.Principal{}, false
 	}
 	return securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
-		Kind:      securityplane.PrincipalKindUser,
-		Source:    securityplane.PrincipalSourceGRPCJWT,
-		UserID:    userID,
-		AccountID: accountID,
-		TenantID:  tenantID,
-		SessionID: sessionID,
-		TokenID:   tokenID,
-		Username:  username,
-		Roles:     roles,
-		AMR:       amr,
+		Kind:         securityplane.PrincipalKindUser,
+		Source:       securityplane.PrincipalSourceGRPCJWT,
+		UserID:       userID,
+		AccountID:    accountID,
+		TenantDomain: tenantDomain,
+		OrgID:        orgID,
+		HasOrgID:     hasOrg,
+		SessionID:    sessionID,
+		TokenID:      tokenID,
+		Username:     username,
+		Roles:        roles,
+		AMR:          amr,
 	}), true
 }
 
-// TenantScopeFromContext returns the Security Control Plane tenant scope projection.
-func TenantScopeFromContext(ctx context.Context) (securityplane.TenantScope, bool) {
-	tenantID := TenantIDFromContext(ctx)
-	if tenantID == "" {
-		return securityplane.TenantScope{}, false
+// OrgScopeFromContext returns the Security Control Plane org scope projection.
+func OrgScopeFromContext(ctx context.Context) (securityplane.OrgScope, bool) {
+	tenantDomain := TenantDomainFromContext(ctx)
+	if tenantDomain == "" {
+		return securityplane.OrgScope{}, false
 	}
-	return securityprojection.TenantScopeFromTenantID(tenantID, ""), true
+	orgID, hasOrg := OrgIDFromContext(ctx)
+	return securityprojection.OrgScopeFromIdentity(tenantDomain, orgID, hasOrg, ""), true
 }
 
 // ServiceIdentityFromMTLSContext returns the mTLS service identity projection when present.

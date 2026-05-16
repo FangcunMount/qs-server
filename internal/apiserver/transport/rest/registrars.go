@@ -107,8 +107,8 @@ func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, r
 			verifyOpts := r.iamVerifyOptions()
 			group.Use(middleware.JWTAuthMiddlewareWithOptions(tokenVerifier, verifyOpts))
 			group.Use(restmiddleware.UserIdentityMiddleware())
-			group.Use(restmiddleware.RequireTenantIDMiddleware())
-			group.Use(restmiddleware.RequireNumericOrgScopeMiddleware())
+			group.Use(restmiddleware.RequireTenantDomainMiddleware())
+			group.Use(restmiddleware.RequireOrgScopeMiddleware())
 			if r.deps.Actor.ActiveOperatorChecker != nil {
 				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.deps.Actor.ActiveOperatorChecker))
 			}

@@ -1,7 +1,5 @@
 package securityplane
 
-import "strconv"
-
 // PrincipalKind identifies what kind of authenticated subject is represented.
 type PrincipalKind string
 
@@ -24,16 +22,18 @@ const (
 
 // Principal is the read-only identity view used by the Security Control Plane.
 type Principal struct {
-	Kind      PrincipalKind
-	Source    PrincipalSource
-	UserID    string
-	AccountID string
-	TenantID  string
-	SessionID string
-	TokenID   string
-	Username  string
-	Roles     []string
-	AMR       []string
+	Kind         PrincipalKind
+	Source       PrincipalSource
+	UserID       string
+	AccountID    string
+	TenantDomain string // IAM authorization domain (e.g. fangcun, platform).
+	OrgID        uint64 // QS business organization scope when resolved.
+	HasOrgID     bool
+	SessionID    string
+	TokenID      string
+	Username     string
+	Roles        []string
+	AMR          []string
 }
 
 // RoleNames returns a defensive copy of role names.
@@ -46,31 +46,23 @@ func (p Principal) AuthenticationMethods() []string {
 	return append([]string(nil), p.AMR...)
 }
 
-// TenantScope is the read-only tenant/org scope projected from identity claims and IAM domain data.
-type TenantScope struct {
-	TenantID       string
+// OrgScope is the read-only IAM authorization domain and QS business org projection.
+type OrgScope struct {
+	TenantDomain   string
 	OrgID          uint64
-	HasNumericOrg  bool
+	HasOrgID       bool
 	CasbinDomain   string
 	RawScopeSource string
 }
 
-// NewTenantScope creates the canonical security-plane scope view from the raw IAM tenant ID.
-func NewTenantScope(tenantID, casbinDomain string) TenantScope {
-	scope := TenantScope{
-		TenantID:     tenantID,
+// NewOrgScope creates the canonical security-plane org scope view.
+func NewOrgScope(tenantDomain string, orgID uint64, hasOrg bool, casbinDomain string) OrgScope {
+	return OrgScope{
+		TenantDomain: tenantDomain,
+		OrgID:        orgID,
+		HasOrgID:     hasOrg && orgID > 0,
 		CasbinDomain: casbinDomain,
 	}
-	if tenantID == "" {
-		return scope
-	}
-	orgID, err := strconv.ParseUint(tenantID, 10, 64)
-	if err != nil || orgID == 0 {
-		return scope
-	}
-	scope.OrgID = orgID
-	scope.HasNumericOrg = true
-	return scope
 }
 
 // AuthzPermissionView is the transport-agnostic view of one IAM resource/action permission.

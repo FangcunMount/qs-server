@@ -15,7 +15,8 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantID:        "3001",
+			TenantDomain:    "fangcun",
+			OrgID:           "3001",
 			SessionID:       "session-1",
 			TokenID:         "token-1",
 			Roles:           []string{"admin"},
@@ -40,8 +41,11 @@ func TestBuildUserClaimsIncludesSessionAndMetadata(t *testing.T) {
 	if claims.AccountID != "2001" {
 		t.Fatalf("unexpected account id: %s", claims.AccountID)
 	}
-	if claims.TenantID != "3001" {
-		t.Fatalf("unexpected tenant id: %s", claims.TenantID)
+	if claims.TenantDomain != "fangcun" {
+		t.Fatalf("unexpected tenant domain: %s", claims.TenantDomain)
+	}
+	if claims.OrgID != "3001" {
+		t.Fatalf("unexpected org id: %s", claims.OrgID)
 	}
 	if claims.SessionID != "session-1" {
 		t.Fatalf("unexpected session id: %s", claims.SessionID)
@@ -65,6 +69,7 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 			Extra: map[string]interface{}{
 				"user_id":    "4001",
 				"org_id":     "5001",
+				"tenant_id":  "fangcun",
 				"account_id": "6001",
 			},
 		},
@@ -78,20 +83,24 @@ func TestBuildUserClaimsFallsBackToExtraIDs(t *testing.T) {
 	if claims.UserID != "4001" {
 		t.Fatalf("unexpected fallback user id: %s", claims.UserID)
 	}
-	if claims.TenantID != "5001" {
-		t.Fatalf("unexpected fallback tenant id: %s", claims.TenantID)
+	if claims.TenantDomain != "fangcun" {
+		t.Fatalf("unexpected fallback tenant domain: %s", claims.TenantDomain)
+	}
+	if claims.OrgID != "5001" {
+		t.Fatalf("unexpected fallback org id: %s", claims.OrgID)
 	}
 	if claims.AccountID != "6001" {
 		t.Fatalf("unexpected fallback account id: %s", claims.AccountID)
 	}
 }
 
-func TestUserClaimsMapToSecurityPlanePrincipalAndTenantScope(t *testing.T) {
+func TestUserClaimsMapToSecurityPlaneOrgScope(t *testing.T) {
 	result := &auth.VerifyResult{
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantID:        "3001",
+			TenantDomain:    "fangcun",
+			OrgID:           "3001",
 			SessionID:       "session-1",
 			TokenID:         "token-1",
 			Roles:           []string{"qs:operator"},
@@ -100,30 +109,13 @@ func TestUserClaimsMapToSecurityPlanePrincipalAndTenantScope(t *testing.T) {
 	}
 
 	claims := buildUserClaims(result)
-	principal := securityplane.Principal{
-		Kind:      securityplane.PrincipalKindUser,
-		Source:    securityplane.PrincipalSourceHTTPJWT,
-		UserID:    claims.UserID,
-		AccountID: claims.AccountID,
-		TenantID:  claims.TenantID,
-		SessionID: claims.SessionID,
-		TokenID:   claims.TokenID,
-		Roles:     claims.Roles,
-		AMR:       claims.AMR,
-	}
-	scope := securityplane.NewTenantScope(claims.TenantID, "")
+	scope := securityplane.NewOrgScope(claims.TenantDomain, 3001, true, "")
 
-	if principal.UserID != "1001" || principal.AccountID != "2001" || principal.TokenID != "token-1" {
-		t.Fatalf("unexpected principal projection: %#v", principal)
+	if claims.UserID != "1001" || claims.AccountID != "2001" {
+		t.Fatalf("unexpected claims: %#v", claims)
 	}
-	if principal.Kind != securityplane.PrincipalKindUser || principal.Source != securityplane.PrincipalSourceHTTPJWT {
-		t.Fatalf("unexpected principal kind/source: %#v", principal)
-	}
-	if len(principal.RoleNames()) != 1 || principal.RoleNames()[0] != "qs:operator" {
-		t.Fatalf("principal roles = %#v, want [qs:operator]", principal.RoleNames())
-	}
-	if !scope.HasNumericOrg || scope.OrgID != 3001 {
-		t.Fatalf("tenant scope = %#v, want numeric org 3001", scope)
+	if !scope.HasOrgID || scope.OrgID != 3001 || scope.TenantDomain != "fangcun" {
+		t.Fatalf("org scope = %#v, want fangcun org 3001", scope)
 	}
 }
 

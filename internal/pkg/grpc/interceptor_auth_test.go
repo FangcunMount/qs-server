@@ -18,7 +18,8 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantID:        "3001",
+			TenantDomain:    "fangcun",
+			OrgID:           "3001",
 			SessionID:       "session-1",
 			TokenID:         "token-1",
 			Roles:           []string{"admin"},
@@ -43,8 +44,11 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	if got := AccountIDFromContext(ctx); got != "2001" {
 		t.Fatalf("unexpected account_id: %v", got)
 	}
-	if got := TenantIDFromContext(ctx); got != "3001" {
-		t.Fatalf("unexpected tenant_id: %v", got)
+	if got := TenantDomainFromContext(ctx); got != "fangcun" {
+		t.Fatalf("unexpected tenant_domain: %v", got)
+	}
+	if orgID, ok := OrgIDFromContext(ctx); !ok || orgID != 3001 {
+		t.Fatalf("unexpected org_id: (%d, %v)", orgID, ok)
 	}
 	if got := SessionIDFromContext(ctx); got != "session-1" {
 		t.Fatalf("unexpected session_id: %v", got)
@@ -60,13 +64,14 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	}
 }
 
-func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testing.T) {
+func TestInjectedUserContextMapsToSecurityPlanePrincipalAndOrgScope(t *testing.T) {
 	interceptor := &IAMAuthInterceptor{}
 	result := &auth.VerifyResult{
 		Claims: &auth.TokenClaims{
 			UserID:          "1001",
 			LoginIdentityID: "2001",
-			TenantID:        "3001",
+			TenantDomain:    "fangcun",
+			OrgID:           "3001",
 			SessionID:       "session-1",
 			TokenID:         "token-1",
 			Roles:           []string{"qs:operator"},
@@ -82,9 +87,9 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testin
 	if !ok {
 		t.Fatal("expected principal projection")
 	}
-	scope, ok := TenantScopeFromContext(ctx)
+	scope, ok := OrgScopeFromContext(ctx)
 	if !ok {
-		t.Fatal("expected tenant scope projection")
+		t.Fatal("expected org scope projection")
 	}
 
 	if principal.UserID != "1001" || principal.Username != "alice" {
@@ -93,8 +98,8 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndTenantScope(t *testin
 	if principal.Source != securityplane.PrincipalSourceGRPCJWT {
 		t.Fatalf("principal source = %q, want grpc_jwt", principal.Source)
 	}
-	if !scope.HasNumericOrg || scope.OrgID != 3001 {
-		t.Fatalf("tenant scope = %#v, want numeric org 3001", scope)
+	if !scope.HasOrgID || scope.OrgID != 3001 || scope.TenantDomain != "fangcun" {
+		t.Fatalf("org scope = %#v, want fangcun org 3001", scope)
 	}
 	if got := principal.AuthenticationMethods(); len(got) != 1 || got[0] != "pwd" {
 		t.Fatalf("principal amr = %#v, want [pwd]", got)

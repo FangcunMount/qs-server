@@ -98,7 +98,7 @@ func (r *operationAccountRegistrar) RegisterOperationAccount(ctx context.Context
 		Name:           input.Name,
 		Phone:          input.Phone,
 		Email:          input.Email,
-		ScopedTenantID: formatOptionalInt64(input.ScopedTenantID),
+		ScopedOrgID: formatOptionalInt64(input.ScopedOrgID),
 		OperaLoginID:   input.OperaLoginID,
 		Password:       input.Password,
 	})
@@ -133,7 +133,7 @@ func (r *authzSnapshotReader) LoadAuthzSnapshot(ctx context.Context, orgID, user
 	if r == nil || r.loader == nil {
 		return nil, fmt.Errorf("iam authorization snapshot loader is not available")
 	}
-	return r.loader.Load(ctx, strconv.FormatInt(orgID, 10), strconv.FormatInt(userID, 10))
+	return r.loader.Load(ctx, r.loader.AuthorizationDomain(), strconv.FormatInt(userID, 10))
 }
 
 type operatorAuthzGateway struct {

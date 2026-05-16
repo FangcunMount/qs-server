@@ -47,16 +47,16 @@ func newAuthzSnapshotMiddleware(
 			c.Abort()
 			return
 		}
-		tenantID := GetTenantID(c)
+		tenantDomain := GetTenantDomain(c)
 		userIDStr := GetUserIDStr(c)
-		if tenantID == "" || userIDStr == "" {
+		if tenantDomain == "" || userIDStr == "" {
 			c.JSON(http.StatusBadRequest, gin.H{
-				"error": "tenant_id and user identity are required for authorization",
+				"error": "tenant domain and user identity are required for authorization",
 			})
 			c.Abort()
 			return
 		}
-		snap, err := load(c.Request.Context(), tenantID, userIDStr)
+		snap, err := load(c.Request.Context(), tenantDomain, userIDStr)
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{
 				"error": fmt.Sprintf("failed to load authorization snapshot: %v", err),

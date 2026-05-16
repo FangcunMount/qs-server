@@ -3,12 +3,12 @@ package iamauth
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 	"time"
 
 	authzv2 "github.com/FangcunMount/iam/v2/api/grpc/iam/authz/v2"
+	"github.com/FangcunMount/iam/v2/pkg/tenant"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/authz"
 	"golang.org/x/sync/singleflight"
 )
@@ -106,12 +106,18 @@ func (l *SnapshotLoader) ObserveTenantAuthzVersion(tenantID string, version int6
 	}
 }
 
-// DomainForOrg 与 Load / Grant / Revoke 共用的 Casbin domain。
-func (l *SnapshotLoader) DomainForOrg(orgID int64) string {
+// AuthorizationDomain 返回 IAM Casbin 授权域（与 JWT tenant domain 对齐）。
+func (l *SnapshotLoader) AuthorizationDomain() string {
 	if l != nil && l.opts.CasbinDomainOverride != "" {
 		return l.opts.CasbinDomainOverride
 	}
-	return strconv.FormatInt(orgID, 10)
+	return tenant.DefaultID
+}
+
+// DomainForOrg 返回 IAM Casbin domain；orgID 为 QS 业务组织，不作为 Casbin domain。
+func (l *SnapshotLoader) DomainForOrg(orgID int64) string {
+	_ = orgID
+	return l.AuthorizationDomain()
 }
 
 // Load 拉取授权快照。

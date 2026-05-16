@@ -13,7 +13,7 @@ type RegisterOperationAccountInput struct {
 	Name           string
 	Phone          string
 	Email          string
-	ScopedTenantID string
+	ScopedOrgID string
 	OperaLoginID   string
 	Password       string
 }

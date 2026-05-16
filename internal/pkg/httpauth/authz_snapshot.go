@@ -22,14 +22,14 @@ func AuthzSnapshotMiddleware(loader *iamauth.SnapshotLoader) gin.HandlerFunc {
 			c.Abort()
 			return
 		}
-		tenantID := GetTenantID(c)
+		tenantDomain := GetTenantDomain(c)
 		userIDStr := GetUserIDStr(c)
-		if tenantID == "" || userIDStr == "" {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "tenant_id and user identity are required for authorization"})
+		if tenantDomain == "" || userIDStr == "" {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "tenant domain and user identity are required for authorization"})
 			c.Abort()
 			return
 		}
-		snap, err := loader.Load(c.Request.Context(), tenantID, userIDStr)
+		snap, err := loader.Load(c.Request.Context(), tenantDomain, userIDStr)
 		if err != nil {
 			c.JSON(http.StatusServiceUnavailable, gin.H{"error": fmt.Sprintf("failed to load authorization snapshot: %v", err)})
 			c.Abort()

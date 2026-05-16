@@ -40,18 +40,19 @@ func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.
 	gin.SetMode(gin.TestMode)
 
 	snap := &authzapp.Snapshot{Roles: []string{"qs:admin"}}
-	var gotTenantID string
+	var gotTenantDomain string
 	var gotUserID string
 
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {
-		c.Set(TenantIDKey, "88")
+		c.Set(TenantDomainKey, "fangcun")
+		c.Set(OrgIDKey, uint64(88))
 		c.Set(UserIDStrKey, "701")
 		c.Set(UserIDKey, uint64(701))
 		c.Next()
 	})
-	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantID, userID string) (*authzapp.Snapshot, error) {
-		gotTenantID = tenantID
+	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantDomain, userID string) (*authzapp.Snapshot, error) {
+		gotTenantDomain = tenantDomain
 		gotUserID = userID
 		return snap, nil
 	}, nil))
@@ -75,8 +76,8 @@ func TestAuthzSnapshotMiddlewareStoresSnapshotInGinAndRequestContext(t *testing.
 	if rec.Code != http.StatusNoContent {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusNoContent)
 	}
-	if gotTenantID != "88" || gotUserID != "701" {
-		t.Fatalf("load called with tenant=%q user=%q, want tenant=88 user=701", gotTenantID, gotUserID)
+	if gotTenantDomain != "fangcun" || gotUserID != "701" {
+		t.Fatalf("load called with tenant=%q user=%q, want tenant=fangcun user=701", gotTenantDomain, gotUserID)
 	}
 }
 
@@ -89,13 +90,14 @@ func TestAuthzSnapshotMiddlewarePersistsProjectionWhenCurrentOperatorExists(t *t
 
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {
-		c.Set(TenantIDKey, "88")
+		c.Set(TenantDomainKey, "fangcun")
+		c.Set(OrgIDKey, uint64(88))
 		c.Set(UserIDStrKey, "701")
 		c.Set(UserIDKey, uint64(701))
 		c.Set(CurrentOperatorKey, operator)
 		c.Next()
 	})
-	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantID, userID string) (*authzapp.Snapshot, error) {
+	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantDomain, userID string) (*authzapp.Snapshot, error) {
 		return snap, nil
 	}, updater))
 	engine.GET("/check", func(c *gin.Context) {
@@ -127,13 +129,14 @@ func TestAuthzSnapshotMiddlewareUpdaterFailureDoesNotAbortRequest(t *testing.T) 
 
 	engine := gin.New()
 	engine.Use(func(c *gin.Context) {
-		c.Set(TenantIDKey, "88")
+		c.Set(TenantDomainKey, "fangcun")
+		c.Set(OrgIDKey, uint64(88))
 		c.Set(UserIDStrKey, "701")
 		c.Set(UserIDKey, uint64(701))
 		c.Set(CurrentOperatorKey, operator)
 		c.Next()
 	})
-	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantID, userID string) (*authzapp.Snapshot, error) {
+	engine.Use(newAuthzSnapshotMiddleware(func(ctx context.Context, tenantDomain, userID string) (*authzapp.Snapshot, error) {
 		return &authzapp.Snapshot{Roles: []string{"qs:admin"}}, nil
 	}, updater))
 	engine.GET("/check", func(c *gin.Context) {

@@ -32,7 +32,7 @@ type OperationAccountRegistration struct {
 	Name           string
 	Phone          string
 	Email          string
-	ScopedTenantID int64
+	ScopedOrgID int64
 	OperaLoginID   string
 	Password       string
 }

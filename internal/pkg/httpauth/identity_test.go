@@ -16,9 +16,10 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:   "42",
-			TenantID: "88",
-			Roles:    []string{"operator"},
+			UserID:       "42",
+			TenantDomain: "fangcun",
+			OrgID:        "88",
+			Roles:        []string{"operator"},
 		})
 		c.Next()
 	})
@@ -27,11 +28,8 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if got := GetUserID(c); got != 42 {
 			t.Fatalf("user_id = %d, want 42", got)
 		}
-		if got := GetUserIDStr(c); got != "42" {
-			t.Fatalf("user_id_str = %q, want 42", got)
-		}
-		if got := GetTenantID(c); got != "88" {
-			t.Fatalf("tenant_id = %q, want 88", got)
+		if got := GetTenantDomain(c); got != "fangcun" {
+			t.Fatalf("tenant_domain = %q, want fangcun", got)
 		}
 		if got := GetOrgID(c); got != 88 {
 			t.Fatalf("org_id = %d, want 88", got)
@@ -43,15 +41,15 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if !ok {
 			t.Fatal("expected security principal projection")
 		}
-		if principal.UserID != "42" || principal.TenantID != "88" {
-			t.Fatalf("principal = %#v, want user 42 tenant 88", principal)
+		if principal.UserID != "42" || principal.TenantDomain != "fangcun" || !principal.HasOrgID || principal.OrgID != 88 {
+			t.Fatalf("principal = %#v, want user 42 domain fangcun org 88", principal)
 		}
-		scope, ok := GetTenantScope(c)
+		scope, ok := GetOrgScope(c)
 		if !ok {
-			t.Fatal("expected tenant scope projection")
+			t.Fatal("expected org scope projection")
 		}
-		if !scope.HasNumericOrg || scope.OrgID != 88 {
-			t.Fatalf("scope = %#v, want numeric org 88", scope)
+		if !scope.HasOrgID || scope.OrgID != 88 || scope.TenantDomain != "fangcun" {
+			t.Fatalf("scope = %#v, want fangcun org 88", scope)
 		}
 		c.Status(http.StatusNoContent)
 	})
@@ -63,17 +61,17 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 	}
 }
 
-func TestRequireNumericOrgScopeMiddlewareRejectsNonNumericTenant(t *testing.T) {
+func TestRequireOrgScopeMiddlewareRejectsMissingOrg(t *testing.T) {
 	t.Parallel()
 	gin.SetMode(gin.TestMode)
 
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
-		c.Set("user_claims", &pkgmiddleware.UserClaims{UserID: "42", TenantID: "tenant-alpha"})
+		c.Set("user_claims", &pkgmiddleware.UserClaims{UserID: "42", TenantDomain: "fangcun"})
 		c.Next()
 	})
 	router.Use(UserIdentityMiddleware())
-	router.Use(RequireNumericOrgScopeMiddleware())
+	router.Use(RequireOrgScopeMiddleware())
 	router.GET("/", func(c *gin.Context) {
 		c.Status(http.StatusNoContent)
 	})

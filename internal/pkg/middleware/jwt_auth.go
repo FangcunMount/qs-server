@@ -20,10 +20,11 @@ type UserClaimsContextKey struct{}
 
 // UserClaims 简化的用户声明
 type UserClaims struct {
-	UserID    string
-	AccountID string
-	TenantID  string
-	SessionID string
+	UserID       string
+	AccountID    string
+	TenantDomain string // IAM 授权域（JWT tenant_id，如 fangcun / platform）
+	OrgID        string // IAM 业务组织 ID（JWT org_id 透传）
+	SessionID    string
 	TokenID   string
 	Roles     []string
 	AMR       []string
@@ -295,13 +296,13 @@ func GetUserID(c *gin.Context) string {
 	return ""
 }
 
-// GetTenantID 从上下文获取租户 ID
-func GetTenantID(c *gin.Context) string {
+// GetTenantDomain 从上下文获取 IAM 授权域。
+func GetTenantDomain(c *gin.Context) string {
 	claims := GetUserClaims(c)
-	if claims != nil {
-		return claims.TenantID
+	if claims == nil {
+		return ""
 	}
-	return ""
+	return strings.TrimSpace(claims.TenantDomain)
 }
 
 // GetAccountID 从上下文获取账户 ID
@@ -359,16 +360,40 @@ func hasRole(roles []string, role string) bool {
 	return false
 }
 
-// resolveTenantID 优先使用 SDK 的 TenantID，缺失时从 Extra 兼容（IAM 常把自定义声明放在 Extra）。
-func resolveTenantID(tenantID string, extra map[string]interface{}) string {
-	if s := strings.TrimSpace(tenantID); s != "" {
-		return s
-	}
-	if len(extra) == 0 {
+// resolveTenantDomain 优先使用 SDK 授权域，缺失时从 Extra 的 tenant_id 兼容。
+func resolveTenantDomain(tokenClaims *auth.TokenClaims) string {
+	if tokenClaims == nil {
 		return ""
 	}
-	for _, key := range []string{"tenant_id", "org_id", "organization_id", "tid"} {
-		if v, ok := extra[key]; ok {
+	if domain := strings.TrimSpace(tokenClaims.AuthorizationDomain()); domain != "" {
+		return domain
+	}
+	if len(tokenClaims.Extra) == 0 {
+		return ""
+	}
+	for _, key := range []string{"tenant_id", "tenant_domain", "tid"} {
+		if v, ok := tokenClaims.Extra[key]; ok {
+			if s := claimValueToString(v); s != "" {
+				return s
+			}
+		}
+	}
+	return ""
+}
+
+// resolveOrgIDClaim 读取 JWT org_id；不从 tenant_id / org_id 混用 Extra 中的 tenant 键。
+func resolveOrgIDClaim(tokenClaims *auth.TokenClaims) string {
+	if tokenClaims == nil {
+		return ""
+	}
+	if raw := strings.TrimSpace(tokenClaims.OrgID); raw != "" {
+		return raw
+	}
+	if len(tokenClaims.Extra) == 0 {
+		return ""
+	}
+	for _, key := range []string{"org_id", "organization_id"} {
+		if v, ok := tokenClaims.Extra[key]; ok {
 			if s := claimValueToString(v); s != "" {
 				return s
 			}
@@ -383,17 +408,17 @@ func logJWTClaimMapping(c *gin.Context, raw *auth.TokenClaims, mapped *UserClaim
 		logger.L(c.Request.Context()).Debugw("jwt claims mapped is nil", "path", c.Request.URL.Path, "method", c.Request.Method)
 		return
 	}
-	if mapped.TenantID != "" && mapped.UserID != "" {
-		logger.L(c.Request.Context()).Debugw("jwt claims mapped with tenant_id and user_id", "path", c.Request.URL.Path, "method", c.Request.Method, "mapped_tenant_id", mapped.TenantID, "mapped_user_id", mapped.UserID)
+	if mapped.TenantDomain != "" && mapped.UserID != "" {
+		logger.L(c.Request.Context()).Debugw("jwt claims mapped with tenant_domain and user_id", "path", c.Request.URL.Path, "method", c.Request.Method, "mapped_tenant_domain", mapped.TenantDomain, "mapped_user_id", mapped.UserID)
 		return
 	}
 	keys := sortedExtraKeys(raw)
-	logger.L(c.Request.Context()).Debugw("jwt claims mapped with missing tenant_id or user_id",
+	logger.L(c.Request.Context()).Debugw("jwt claims mapped with missing tenant_domain or user_id",
 		"path", c.Request.URL.Path,
 		"method", c.Request.Method,
-		"mapped_tenant_empty", mapped.TenantID == "",
+		"mapped_tenant_empty", mapped.TenantDomain == "",
 		"mapped_user_empty", mapped.UserID == "",
-		"raw_tenant_empty", strings.TrimSpace(raw.TenantID) == "",
+		"raw_tenant_empty", strings.TrimSpace(raw.AuthorizationDomain()) == "",
 		"raw_user_empty", strings.TrimSpace(raw.UserID) == "",
 		"extra_keys", keys,
 	)
@@ -416,15 +441,17 @@ func buildUserClaims(result *auth.VerifyResult) *UserClaims {
 		return nil
 	}
 	tokenClaims := result.Claims
+	tenantDomain := resolveTenantDomain(tokenClaims)
 	return &UserClaims{
-		UserID:    resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
-		AccountID: resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra),
-		TenantID:  resolveTenantID(tokenClaims.TenantID, tokenClaims.Extra),
-		SessionID: tokenClaims.SessionID,
-		TokenID:   tokenClaims.TokenID,
-		Roles:     tokenClaims.Roles,
-		AMR:       tokenClaims.AMR,
-		Metadata:  result.Metadata,
+		UserID:       resolveUserID(tokenClaims.UserID, tokenClaims.Extra),
+		AccountID:    resolveAccountID(tokenClaims.LoginIdentityID, tokenClaims.Extra),
+		TenantDomain: tenantDomain,
+		OrgID:        resolveOrgIDClaim(tokenClaims),
+		SessionID:    tokenClaims.SessionID,
+		TokenID:      tokenClaims.TokenID,
+		Roles:        tokenClaims.Roles,
+		AMR:          tokenClaims.AMR,
+		Metadata:     result.Metadata,
 	}
 }
 

@@ -8,11 +8,11 @@ import (
 
 func TestPrincipalFromInputCopiesSlicesAndDefaults(t *testing.T) {
 	in := PrincipalInput{
-		Source:   securityplane.PrincipalSourceHTTPJWT,
-		UserID:   "1001",
-		TenantID: "2001",
-		Roles:    []string{"operator"},
-		AMR:      []string{"pwd"},
+		Source:       securityplane.PrincipalSourceHTTPJWT,
+		UserID:       "1001",
+		TenantDomain: "fangcun",
+		Roles:        []string{"operator"},
+		AMR:          []string{"pwd"},
 	}
 
 	principal := PrincipalFromInput(in)
@@ -33,18 +33,15 @@ func TestPrincipalFromInputCopiesSlicesAndDefaults(t *testing.T) {
 	}
 }
 
-func TestTenantScopeFromTenantIDKeepsNumericAndRawTenant(t *testing.T) {
-	scope := TenantScopeFromTenantID("42", "tenant:42")
-	if !scope.HasNumericOrg || scope.OrgID != 42 {
-		t.Fatalf("scope = %#v, want numeric org 42", scope)
-	}
-	if scope.TenantID != "42" || scope.CasbinDomain != "tenant:42" {
-		t.Fatalf("scope = %#v, want raw tenant and domain", scope)
+func TestOrgScopeFromIdentity(t *testing.T) {
+	scope := OrgScopeFromIdentity("fangcun", 42, true, "tenant:fangcun")
+	if !scope.HasOrgID || scope.OrgID != 42 || scope.TenantDomain != "fangcun" {
+		t.Fatalf("scope = %#v, want fangcun org 42", scope)
 	}
 
-	nonNumeric := TenantScopeFromTenantID("tenant-alpha", "")
-	if nonNumeric.HasNumericOrg || nonNumeric.OrgID != 0 {
-		t.Fatalf("nonNumeric scope = %#v, want no numeric org", nonNumeric)
+	emptyOrg := OrgScopeFromIdentity("fangcun", 0, false, "")
+	if emptyOrg.HasOrgID || emptyOrg.OrgID != 0 {
+		t.Fatalf("scope = %#v, want no org", emptyOrg)
 	}
 }
 

@@ -193,10 +193,16 @@ func (i *IAMAuthInterceptor) injectUserContext(ctx context.Context, result *auth
 	}
 	claims := result.Claims
 
+	tenantDomain := claims.AuthorizationDomain()
+	orgID, hasOrg := claims.BusinessOrgID()
+
 	// 注入用户信息到 context，供后续业务逻辑使用
 	ctx = context.WithValue(ctx, authContextKeyUserID, claims.UserID)
 	ctx = context.WithValue(ctx, authContextKeyAccountID, resolveAccountID(claims))
-	ctx = context.WithValue(ctx, authContextKeyTenantID, claims.TenantID)
+	ctx = context.WithValue(ctx, authContextKeyTenantDomain, tenantDomain)
+	if hasOrg {
+		ctx = context.WithValue(ctx, authContextKeyOrgID, orgID)
+	}
 	ctx = context.WithValue(ctx, authContextKeySessionID, claims.SessionID)
 	ctx = context.WithValue(ctx, authContextKeyTokenID, claims.TokenID)
 

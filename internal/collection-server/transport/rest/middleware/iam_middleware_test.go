@@ -17,13 +17,14 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 	router := gin.New()
 	router.Use(func(c *gin.Context) {
 		c.Set("user_claims", &pkgmiddleware.UserClaims{
-			UserID:    "42",
-			AccountID: "acct-1",
-			TenantID:  "88",
-			SessionID: "sess-1",
-			TokenID:   "tok-1",
-			Roles:     []string{"guardian"},
-			AMR:       []string{"pwd"},
+			UserID:       "42",
+			AccountID:    "acct-1",
+			TenantDomain: "fangcun",
+			OrgID:        "88",
+			SessionID:    "sess-1",
+			TokenID:      "tok-1",
+			Roles:        []string{"guardian"},
+			AMR:          []string{"pwd"},
 		})
 		c.Next()
 	})
@@ -39,15 +40,15 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 		if principal.Kind != securityplane.PrincipalKindUser || principal.Source != securityplane.PrincipalSourceHTTPJWT {
 			t.Fatalf("unexpected principal kind/source: %#v", principal)
 		}
-		if principal.UserID != "42" || principal.AccountID != "acct-1" || principal.TenantID != "88" {
+		if principal.UserID != "42" || principal.AccountID != "acct-1" || !principal.HasOrgID || principal.OrgID != 88 {
 			t.Fatalf("unexpected principal: %#v", principal)
 		}
-		scope, ok := GetTenantScope(c)
+		scope, ok := GetOrgScope(c)
 		if !ok {
-			t.Fatal("tenant scope projection missing")
+			t.Fatal("org scope projection missing")
 		}
-		if !scope.HasNumericOrg || scope.OrgID != 88 {
-			t.Fatalf("unexpected tenant scope: %#v", scope)
+		if scope.TenantDomain != "fangcun" || !scope.HasOrgID || scope.OrgID != 88 {
+			t.Fatalf("unexpected org scope: %#v", scope)
 		}
 		c.Status(http.StatusNoContent)
 	})
