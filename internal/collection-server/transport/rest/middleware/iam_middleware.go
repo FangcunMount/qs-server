@@ -14,11 +14,11 @@ import (
 )
 
 const (
-	UserIDKey     = httpauth.UserIDKey
-	ProfileIDKey  = "profile_id"
-	TesteeIDKey   = "testee_id"
-	PrincipalKey  = httpauth.PrincipalKey
-	OrgScopeKey   = httpauth.OrgScopeKey
+	UserIDKey    = httpauth.UserIDKey
+	ProfileIDKey = "profile_id"
+	TesteeIDKey  = "testee_id"
+	PrincipalKey = httpauth.PrincipalKey
+	OrgScopeKey  = httpauth.OrgScopeKey
 )
 
 func UserIdentityMiddleware() gin.HandlerFunc {

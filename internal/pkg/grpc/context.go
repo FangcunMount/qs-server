@@ -12,11 +12,11 @@ import (
 type authContextKey string
 
 const (
-	authContextKeyUserID        authContextKey = "user_id"
-	authContextKeyAccountID     authContextKey = "account_id"
+	authContextKeyUserID       authContextKey = "user_id"
+	authContextKeyAccountID    authContextKey = "account_id"
 	authContextKeyTenantDomain authContextKey = "tenant_domain"
 	authContextKeyOrgID        authContextKey = "org_id"
-	authContextKeySessionID     authContextKey = "session_id"
+	authContextKeySessionID    authContextKey = "session_id"
 	authContextKeyTokenID      authContextKey = "token_id"
 	authContextKeyRoles        authContextKey = "roles"
 	authContextKeyAMR          authContextKey = "amr"

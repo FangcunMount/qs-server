@@ -98,7 +98,7 @@ func (r *operationAccountRegistrar) RegisterOperationAccount(ctx context.Context
 		Name:           input.Name,
 		Phone:          input.Phone,
 		Email:          input.Email,
-		ScopedOrgID: formatOptionalInt64(input.ScopedOrgID),
+		ScopedOrgID:    formatOptionalInt64(input.ScopedOrgID),
 		OperaLoginID:   input.OperaLoginID,
 		Password:       input.Password,
 	})

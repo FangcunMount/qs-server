@@ -25,10 +25,10 @@ type UserClaims struct {
 	TenantDomain string // IAM 授权域（JWT tenant_id，如 fangcun / platform）
 	OrgID        string // IAM 业务组织 ID（JWT org_id 透传）
 	SessionID    string
-	TokenID   string
-	Roles     []string
-	AMR       []string
-	Metadata  *auth.VerifyMetadata
+	TokenID      string
+	Roles        []string
+	AMR          []string
+	Metadata     *auth.VerifyMetadata
 }
 
 func normalizeVerifyOptions(opts *auth.VerifyOptions) *auth.VerifyOptions {

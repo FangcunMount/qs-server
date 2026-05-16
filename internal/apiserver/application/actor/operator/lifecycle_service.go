@@ -266,7 +266,7 @@ func (s *lifecycleService) resolveOrCreateUser(ctx context.Context, dto Register
 			Name:           dto.Name,
 			Phone:          dto.Phone,
 			Email:          dto.Email,
-			ScopedOrgID: dto.OrgID,
+			ScopedOrgID:    dto.OrgID,
 			Password:       dto.Password,
 		})
 		if err != nil {

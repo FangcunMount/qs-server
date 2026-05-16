@@ -126,10 +126,10 @@ func RequireAnyRoleMiddleware(requiredRoles ...string) gin.HandlerFunc {
 	}
 }
 
-func GetUserID(c *gin.Context) uint64           { return httpauth.GetUserID(c) }
-func GetUserIDStr(c *gin.Context) string      { return httpauth.GetUserIDStr(c) }
-func GetOrgID(c *gin.Context) uint64          { return httpauth.GetOrgID(c) }
-func GetTenantDomain(c *gin.Context) string   { return httpauth.GetTenantDomain(c) }
+func GetUserID(c *gin.Context) uint64       { return httpauth.GetUserID(c) }
+func GetUserIDStr(c *gin.Context) string    { return httpauth.GetUserIDStr(c) }
+func GetOrgID(c *gin.Context) uint64        { return httpauth.GetOrgID(c) }
+func GetTenantDomain(c *gin.Context) string { return httpauth.GetTenantDomain(c) }
 func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
 	return httpauth.GetPrincipal(c)
 }
