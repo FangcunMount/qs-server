@@ -79,4 +79,3 @@ type errMismatch struct{}
 func (errMismatch) Error() string {
 	return "requested org_id does not match resolved organization scope"
 }
-
