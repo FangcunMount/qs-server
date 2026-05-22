@@ -83,12 +83,12 @@ func (errMismatch) Error() string {
 
 // HTTPStatusForResolveError maps resolver errors to HTTP status codes.
 func HTTPStatusForResolveError(err error) int {
-	switch {
-	case err == nil:
-		return http.StatusOK
-	case err == ErrMismatch:
-		return http.StatusBadRequest
+	switch err {
+	case ErrMismatch: // 请求的org_id与解析的org_id不匹配
+		return http.StatusForbidden
+	case ErrUnresolved: // 无法解析org_id
+		return http.StatusUnauthorized
 	default:
-		return http.StatusBadRequest
+		return http.StatusInternalServerError
 	}
 }
