@@ -77,7 +77,9 @@ var ErrMismatch = errMismatch{}
 
 type errMismatch struct{}
 
-func (errMismatch) Error() string { return "requested org_id does not match resolved organization scope" }
+func (errMismatch) Error() string {
+	return "requested org_id does not match resolved organization scope"
+}
 
 // HTTPStatusForResolveError maps resolver errors to HTTP status codes.
 func HTTPStatusForResolveError(err error) int {
