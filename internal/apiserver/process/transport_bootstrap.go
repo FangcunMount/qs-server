@@ -6,7 +6,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
+	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/orgscope"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
 )
 
@@ -118,6 +120,15 @@ func buildGRPCServer(cfg *config.Config, deps container.ServerGRPCBootstrapDeps)
 		return nil, err
 	}
 
+	if deps.ActiveOperatorChecker != nil {
+		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
+			grpcpkg.NewOrgScopeUnaryInterceptor(
+				restmiddleware.APIServerOrgScopeResolver(deps.ActiveOperatorChecker, orgscope.DefaultOrgID),
+			))
+	} else {
+		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
+			grpcpkg.NewOrgScopeUnaryInterceptor(orgscope.FixedResolver(orgscope.DefaultOrgID)))
+	}
 	if loader := deps.AuthzSnapshotLoader; loader != nil {
 		// 授权快照拦截器只负责权限视图，不替代前面的 JWT 权威在线校验。
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,

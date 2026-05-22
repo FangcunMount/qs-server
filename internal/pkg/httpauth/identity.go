@@ -86,11 +86,11 @@ func RequireTenantDomainMiddleware() gin.HandlerFunc {
 	}
 }
 
-// RequireOrgScopeMiddleware requires a resolvable QS business org_id.
+// RequireOrgScopeMiddleware requires a resolvable QS business org_id in request context.
 func RequireOrgScopeMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		if GetOrgID(c) == 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "org_id claim is required for QS business scope"})
+			c.JSON(http.StatusBadRequest, gin.H{"error": "organization scope is required for QS business routes"})
 			c.Abort()
 			return
 		}
@@ -168,20 +168,16 @@ func projectIdentityContext(c *gin.Context, claims *pkgmiddleware.UserClaims) {
 	tenantDomain := tenantDomainFromClaims(claims)
 	c.Set(TenantDomainKey, tenantDomain)
 
-	if orgID, ok := resolveOrgIDFromClaims(claims); ok {
-		c.Set(OrgIDKey, orgID)
-	}
 	if len(claims.Roles) > 0 {
 		c.Set(RolesKey, claims.Roles)
 	}
-	setSecurityProjection(c, claims, tenantDomain)
+	setSecurityProjection(c, claims, tenantDomain, 0, false)
 }
 
-func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims, tenantDomain string) {
+func setSecurityProjection(c *gin.Context, claims *pkgmiddleware.UserClaims, tenantDomain string, orgID uint64, hasOrg bool) {
 	if claims == nil {
 		return
 	}
-	orgID, hasOrg := resolveOrgIDFromClaims(claims)
 	principal := securityprojection.PrincipalFromInput(securityprojection.PrincipalInput{
 		Kind:         securityplane.PrincipalKindUser,
 		Source:       securityplane.PrincipalSourceHTTPJWT,

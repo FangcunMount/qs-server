@@ -120,10 +120,9 @@ func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool
 	}
 
 	api.Use(withAuthSkip(skip, pkgmiddleware.JWTAuthMiddlewareWithOptions(tokenVerifier, r.iamVerifyOptions())))
-	// 与 apiserver 对齐：tenant domain、org_id、IAM 授权快照（collection 无 Operator，不做 ActiveOperator 校验）
+	// collection 的 org 由 testee/业务层决定，不在 HTTP 入口解析 OrgScope；仅校验 IAM 身份与授权域。
 	api.Use(withAuthSkip(skip, collectionmiddleware.UserIdentityMiddleware()))
 	api.Use(withAuthSkip(skip, httpauth.RequireTenantDomainMiddleware()))
-	api.Use(withAuthSkip(skip, httpauth.RequireOrgScopeMiddleware()))
 	if loader := r.container.IAMModule.AuthzSnapshotLoader(); loader != nil {
 		// 授权快照只负责权限视图，不替代 JWT 的权威在线校验。
 		api.Use(withAuthSkip(skip, httpauth.AuthzSnapshotMiddleware(loader)))

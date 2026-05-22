@@ -18,7 +18,6 @@ const (
 	ProfileIDKey = "profile_id"
 	TesteeIDKey  = "testee_id"
 	PrincipalKey = httpauth.PrincipalKey
-	OrgScopeKey  = httpauth.OrgScopeKey
 )
 
 func UserIdentityMiddleware() gin.HandlerFunc {
@@ -137,8 +136,4 @@ func GetProfileID(c *gin.Context) uint64 {
 
 func GetPrincipal(c *gin.Context) (securityplane.Principal, bool) {
 	return httpauth.GetPrincipal(c)
-}
-
-func GetOrgScope(c *gin.Context) (securityplane.OrgScope, bool) {
-	return httpauth.GetOrgScope(c)
 }

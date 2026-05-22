@@ -44,8 +44,8 @@ func TestUserIdentityMiddlewareProjectsSecurityPrincipalAndScope(t *testing.T) {
 		if !ok {
 			t.Fatal("expected org scope projection")
 		}
-		if scope.TenantDomain != "fangcun" || !scope.HasOrgID || scope.OrgID != 88 {
-			t.Fatalf("scope = %#v, want fangcun org 88", scope)
+		if scope.TenantDomain != "fangcun" || scope.HasOrgID || scope.OrgID != 0 {
+			t.Fatalf("scope = %#v, want tenant without JWT org before QS resolver", scope)
 		}
 		if got := GetUserID(c); got != 42 {
 			t.Fatalf("legacy user id = %d, want 42", got)

@@ -47,8 +47,8 @@ func TestInjectUserContextIncludesSessionAndMetadata(t *testing.T) {
 	if got := TenantDomainFromContext(ctx); got != "fangcun" {
 		t.Fatalf("unexpected tenant_domain: %v", got)
 	}
-	if orgID, ok := OrgIDFromContext(ctx); !ok || orgID != 3001 {
-		t.Fatalf("unexpected org_id: (%d, %v)", orgID, ok)
+	if orgID, ok := OrgIDFromContext(ctx); ok {
+		t.Fatalf("org_id should not come from JWT claims, got %d", orgID)
 	}
 	if got := SessionIDFromContext(ctx); got != "session-1" {
 		t.Fatalf("unexpected session_id: %v", got)
@@ -98,8 +98,8 @@ func TestInjectedUserContextMapsToSecurityPlanePrincipalAndOrgScope(t *testing.T
 	if principal.Source != securityplane.PrincipalSourceGRPCJWT {
 		t.Fatalf("principal source = %q, want grpc_jwt", principal.Source)
 	}
-	if !scope.HasOrgID || scope.OrgID != 3001 || scope.TenantDomain != "fangcun" {
-		t.Fatalf("org scope = %#v, want fangcun org 3001", scope)
+	if scope.HasOrgID || scope.OrgID != 0 || scope.TenantDomain != "fangcun" {
+		t.Fatalf("org scope = %#v, want tenant without JWT org", scope)
 	}
 	if got := principal.AuthenticationMethods(); len(got) != 1 || got[0] != "pwd" {
 		t.Fatalf("principal amr = %#v, want [pwd]", got)

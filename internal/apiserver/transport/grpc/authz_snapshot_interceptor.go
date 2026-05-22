@@ -40,7 +40,7 @@ func NewAuthzSnapshotUnaryInterceptor(
 		}
 		orgID, hasOrg := grpcctx.OrgIDFromContext(ctx)
 		if !hasOrg {
-			return nil, status.Errorf(codes.InvalidArgument, "org_id claim is required for QS business scope")
+			return nil, status.Errorf(codes.InvalidArgument, "organization scope is required for QS business routes")
 		}
 		snap, err := loader.Load(ctx, tenantDomain, userIDStr)
 		if err != nil {

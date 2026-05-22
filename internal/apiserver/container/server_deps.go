@@ -19,6 +19,7 @@ import (
 type ServerGRPCBootstrapDeps struct {
 	AuthzSnapshotLoader           *iaminfra.AuthzSnapshotLoader
 	OperatorRoleProjectionUpdater operatorApp.OperatorRoleProjectionUpdater
+	ActiveOperatorChecker         operatorApp.ActiveOperatorChecker
 	TokenVerifier                 *auth.TokenVerifier
 }
 
@@ -46,6 +47,7 @@ func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
 	}
 	if c.ActorModule != nil {
 		deps.OperatorRoleProjectionUpdater = c.ActorModule.OperatorRoleProjectionUpdater
+		deps.ActiveOperatorChecker = c.ActorModule.ActiveOperatorChecker
 	}
 	return deps
 }

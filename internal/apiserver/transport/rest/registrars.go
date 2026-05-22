@@ -8,6 +8,7 @@ import (
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
 	"github.com/FangcunMount/qs-server/internal/pkg/middleware"
+	"github.com/FangcunMount/qs-server/internal/pkg/orgscope"
 	"github.com/gin-gonic/gin"
 )
 
@@ -108,6 +109,13 @@ func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, r
 			group.Use(middleware.JWTAuthMiddlewareWithOptions(tokenVerifier, verifyOpts))
 			group.Use(restmiddleware.UserIdentityMiddleware())
 			group.Use(restmiddleware.RequireTenantDomainMiddleware())
+			if r.deps.Actor.ActiveOperatorChecker != nil {
+				group.Use(restmiddleware.ResolveOrgScopeMiddleware(
+					restmiddleware.APIServerOrgScopeResolver(r.deps.Actor.ActiveOperatorChecker, orgscope.DefaultOrgID),
+				))
+			} else {
+				group.Use(restmiddleware.ResolveOrgScopeMiddleware(orgscope.FixedResolver(orgscope.DefaultOrgID)))
+			}
 			group.Use(restmiddleware.RequireOrgScopeMiddleware())
 			if r.deps.Actor.ActiveOperatorChecker != nil {
 				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.deps.Actor.ActiveOperatorChecker))

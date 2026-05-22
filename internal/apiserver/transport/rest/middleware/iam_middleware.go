@@ -8,6 +8,7 @@ import (
 	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/httpauth"
+	"github.com/FangcunMount/qs-server/internal/pkg/orgscope"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/internal/pkg/securityplane"
 	"github.com/gin-gonic/gin"
@@ -34,6 +35,10 @@ func OptionalUserIdentityMiddleware() gin.HandlerFunc {
 
 func RequireTenantDomainMiddleware() gin.HandlerFunc {
 	return httpauth.RequireTenantDomainMiddleware()
+}
+
+func ResolveOrgScopeMiddleware(resolve orgscope.ResolveFunc) gin.HandlerFunc {
+	return httpauth.ResolveOrgScopeMiddleware(resolve)
 }
 
 func RequireOrgScopeMiddleware() gin.HandlerFunc {

@@ -31,8 +31,8 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if got := GetTenantDomain(c); got != "fangcun" {
 			t.Fatalf("tenant_domain = %q, want fangcun", got)
 		}
-		if got := GetOrgID(c); got != 88 {
-			t.Fatalf("org_id = %d, want 88", got)
+		if got := GetOrgID(c); got != 0 {
+			t.Fatalf("org_id = %d, want 0 before QS org resolver", got)
 		}
 		if got := GetRoles(c); len(got) != 1 || got[0] != "operator" {
 			t.Fatalf("roles = %#v, want [operator]", got)
@@ -41,15 +41,8 @@ func TestUserIdentityMiddlewareProjectsClaimsToGinContext(t *testing.T) {
 		if !ok {
 			t.Fatal("expected security principal projection")
 		}
-		if principal.UserID != "42" || principal.TenantDomain != "fangcun" || !principal.HasOrgID || principal.OrgID != 88 {
-			t.Fatalf("principal = %#v, want user 42 domain fangcun org 88", principal)
-		}
-		scope, ok := GetOrgScope(c)
-		if !ok {
-			t.Fatal("expected org scope projection")
-		}
-		if !scope.HasOrgID || scope.OrgID != 88 || scope.TenantDomain != "fangcun" {
-			t.Fatalf("scope = %#v, want fangcun org 88", scope)
+		if principal.UserID != "42" || principal.TenantDomain != "fangcun" || principal.HasOrgID {
+			t.Fatalf("principal = %#v, want user 42 domain fangcun without org", principal)
 		}
 		c.Status(http.StatusNoContent)
 	})

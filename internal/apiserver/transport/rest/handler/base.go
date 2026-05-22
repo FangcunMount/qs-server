@@ -41,7 +41,7 @@ func (h *BaseHandler) GetUserIDUint64(c *gin.Context) (uint64, bool) {
 	return userID, true
 }
 
-// GetOrgID 从上下文获取业务组织 ID（来自 JWT org_id claim）。
+// GetOrgID 从上下文获取 QS 业务组织 ID（由 ResolveOrgScopeMiddleware 写入）。
 func (h *BaseHandler) GetOrgID(c *gin.Context) uint64 {
 	return middleware.GetOrgID(c)
 }

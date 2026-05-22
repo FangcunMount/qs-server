@@ -40,15 +40,11 @@ func TestUserIdentityMiddlewareKeepsLegacyKeysAndSecurityProjection(t *testing.T
 		if principal.Kind != securityplane.PrincipalKindUser || principal.Source != securityplane.PrincipalSourceHTTPJWT {
 			t.Fatalf("unexpected principal kind/source: %#v", principal)
 		}
-		if principal.UserID != "42" || principal.AccountID != "acct-1" || !principal.HasOrgID || principal.OrgID != 88 {
+		if principal.UserID != "42" || principal.AccountID != "acct-1" || principal.HasOrgID {
 			t.Fatalf("unexpected principal: %#v", principal)
 		}
-		scope, ok := GetOrgScope(c)
-		if !ok {
-			t.Fatal("org scope projection missing")
-		}
-		if scope.TenantDomain != "fangcun" || !scope.HasOrgID || scope.OrgID != 88 {
-			t.Fatalf("unexpected org scope: %#v", scope)
+		if principal.TenantDomain != "fangcun" {
+			t.Fatalf("unexpected tenant domain: %#v", principal)
 		}
 		c.Status(http.StatusNoContent)
 	})
