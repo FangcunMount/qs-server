@@ -35,14 +35,19 @@ func (flow behaviorProjectionFlow) ProjectBehaviorEvent(
 	if s.behaviorProjectorService == nil {
 		return nil, status.Error(codes.FailedPrecondition, "behavior projector service is not available")
 	}
-	if req == nil || req.EventId == "" || req.EventType == "" || req.OrgId == 0 || req.OccurredAt == nil {
+	if req == nil || req.EventId == "" || req.EventType == "" || req.OccurredAt == nil {
 		return nil, status.Error(codes.InvalidArgument, "event_id, event_type, org_id and occurred_at are required")
+	}
+
+	orgID, err := requestPlanOrgID(ctx, req.OrgId)
+	if err != nil {
+		return nil, err
 	}
 
 	result, err := s.behaviorProjectorService.ProjectBehaviorEvent(ctx, statisticsApp.BehaviorProjectEventInput{
 		EventID:           req.EventId,
 		EventType:         req.EventType,
-		OrgID:             req.OrgId,
+		OrgID:             orgID,
 		ClinicianID:       req.ClinicianId,
 		SourceClinicianID: req.SourceClinicianId,
 		EntryID:           req.EntryId,
@@ -138,6 +143,12 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 	if err := validateCreateAssessmentFromAnswerSheetRequest(req); err != nil {
 		return nil, err
 	}
+
+	orgID, err := requestOrgIDUint64(ctx, req.OrgId)
+	if err != nil {
+		return nil, err
+	}
+	req.OrgId = orgID
 
 	scaleCtx, err := s.resolveAssessmentScaleContext(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
 	if err != nil {

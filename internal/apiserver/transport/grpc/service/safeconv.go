@@ -1,10 +1,29 @@
 package service
 
 import (
+	"context"
+
+	grpcctx "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
+
+func requestOrgIDUint64(ctx context.Context, reqOrgID uint64) (uint64, error) {
+	return grpcctx.ResolveRequestOrgID(ctx, reqOrgID)
+}
+
+func requestOrgIDInt64(ctx context.Context, reqOrgID uint64) (int64, error) {
+	resolved, err := grpcctx.ResolveRequestOrgID(ctx, reqOrgID)
+	if err != nil {
+		return 0, err
+	}
+	return requestInt64FromUint64("org_id", resolved)
+}
+
+func requestPlanOrgID(ctx context.Context, reqOrgID int64) (int64, error) {
+	return grpcctx.ResolveRequestOrgIDInt64(ctx, reqOrgID)
+}
 
 func requestInt64FromUint64(field string, value uint64) (int64, error) {
 	converted, err := safeconv.Uint64ToInt64(value)

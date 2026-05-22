@@ -50,7 +50,7 @@ func (h *BaseHandler) GetOrgID(c *gin.Context) uint64 {
 func (h *BaseHandler) RequireProtectedOrgID(c *gin.Context) (int64, error) {
 	orgID := h.GetOrgID(c)
 	if orgID == 0 {
-		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route requires org scope from JWT")
+		return 0, errors.WithCode(code.ErrPermissionDenied, "protected route requires resolved organization scope")
 	}
 	resolvedID, err := safeconv.Uint64ToInt64(orgID)
 	if err != nil {
@@ -85,14 +85,14 @@ func (h *BaseHandler) RequireProtectedScope(c *gin.Context) (int64, int64, error
 	return orgID, userID, nil
 }
 
-// RequireProtectedOrgIDWithLegacy 在 JWT org 语义下兼容旧请求体/query 的 org_id。
+// RequireProtectedOrgIDWithLegacy 在已解析的 QS org scope 下兼容旧请求体/query 的 org_id。
 func (h *BaseHandler) RequireProtectedOrgIDWithLegacy(c *gin.Context, legacyOrgID int64) (int64, error) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
 		return 0, err
 	}
 	if legacyOrgID != 0 && legacyOrgID != orgID {
-		return 0, errors.WithCode(code.ErrInvalidArgument, "org_id does not match JWT org scope")
+		return 0, errors.WithCode(code.ErrInvalidArgument, "org_id does not match resolved organization scope")
 	}
 	return orgID, nil
 }

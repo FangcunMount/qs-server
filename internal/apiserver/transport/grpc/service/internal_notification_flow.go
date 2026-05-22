@@ -107,8 +107,13 @@ func (flow notificationFlow) SendTaskOpenedMiniProgramNotification(
 		openAt = req.GetOpenAt().AsTime()
 	}
 
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
+	}
+
 	result, err := s.miniProgramTaskNotificationService.SendTaskOpened(ctx, notificationApp.TaskOpenedDTO{
-		OrgID:    req.GetOrgId(),
+		OrgID:    orgID,
 		TaskID:   req.GetTaskId(),
 		TesteeID: req.GetTesteeId(),
 		EntryURL: req.GetEntryUrl(),

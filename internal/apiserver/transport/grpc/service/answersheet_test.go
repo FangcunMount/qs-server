@@ -56,6 +56,7 @@ func TestAnswerSheetServiceSaveAnswerSheetDecodesStructuredValues(t *testing.T) 
 	_, err := svc.SaveAnswerSheet(context.Background(), &pb.SaveAnswerSheetRequest{
 		QuestionnaireCode:    "QNR-001",
 		QuestionnaireVersion: "1.0.0",
+		OrgId:                1,
 		WriterId:             101,
 		TesteeId:             202,
 		Answers: []*pb.Answer{

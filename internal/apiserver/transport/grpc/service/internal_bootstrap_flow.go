@@ -42,6 +42,12 @@ func (flow operatorBootstrapFlow) BootstrapOperator(
 		return nil, err
 	}
 
+	orgID, err := requestPlanOrgID(ctx, req.OrgId)
+	if err != nil {
+		return nil, err
+	}
+	req.OrgId = orgID
+
 	created, finalResult, err := s.runBootstrapOperator(ctx, req)
 	if err != nil {
 		return nil, err
@@ -65,8 +71,6 @@ func validateBootstrapOperatorRequest(s *InternalService, req *pb.BootstrapOpera
 		return status.Error(codes.FailedPrecondition, "operator services not configured")
 	case req == nil:
 		return status.Error(codes.InvalidArgument, "request 不能为空")
-	case req.OrgId <= 0:
-		return status.Error(codes.InvalidArgument, "org_id 不能为空")
 	case req.UserId <= 0:
 		return status.Error(codes.InvalidArgument, "user_id 不能为空")
 	case req.Name == "":

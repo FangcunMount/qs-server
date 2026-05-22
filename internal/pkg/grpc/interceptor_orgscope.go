@@ -31,7 +31,7 @@ func NewOrgScopeUnaryInterceptor(resolve orgscope.ResolveFunc) grpc.UnaryServerI
 		requested := orgscope.RequestedOrgIDFromMetadata(incomingMetadataMap(ctx))
 		orgID, err := resolve(ctx, userID, requested)
 		if err != nil || orgID == 0 {
-			return nil, status.Errorf(codes.InvalidArgument, "organization scope could not be resolved")
+			return nil, orgscope.GRPCStatusForResolveError(err)
 		}
 		ctx = context.WithValue(ctx, authContextKeyOrgID, orgID)
 		return handler(ctx, req)

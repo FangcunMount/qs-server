@@ -39,7 +39,7 @@ func NewTesteeAccessService(
 
 func (s *service) ResolveAccessScope(ctx context.Context, orgID int64, operatorUserID int64) (*TesteeAccessScope, error) {
 	if orgID <= 0 {
-		return nil, errors.WithCode(code.ErrPermissionDenied, "protected route requires org scope from JWT")
+		return nil, errors.WithCode(code.ErrPermissionDenied, "protected route requires resolved organization scope")
 	}
 	if operatorUserID <= 0 {
 		return nil, errors.WithCode(code.ErrPermissionDenied, "protected route requires user identity from JWT")

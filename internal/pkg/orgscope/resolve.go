@@ -2,7 +2,6 @@ package orgscope
 
 import (
 	"context"
-	"net/http"
 	"strconv"
 	"strings"
 
@@ -81,14 +80,3 @@ func (errMismatch) Error() string {
 	return "requested org_id does not match resolved organization scope"
 }
 
-// HTTPStatusForResolveError maps resolver errors to HTTP status codes.
-func HTTPStatusForResolveError(err error) int {
-	switch err {
-	case ErrMismatch: // 请求的org_id与解析的org_id不匹配
-		return http.StatusForbidden
-	case ErrUnresolved: // 无法解析org_id
-		return http.StatusUnauthorized
-	default:
-		return http.StatusInternalServerError
-	}
-}

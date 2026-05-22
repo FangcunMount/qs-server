@@ -48,10 +48,6 @@ func (s *ActorService) RegisterService(server *grpc.Server) {
 // CreateTestee 创建受试者
 // @Description C端用户注册或外部系统创建受试者
 func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeRequest) (*pb.TesteeResponse, error) {
-	// 参数验证
-	if req.OrgId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "机构ID不能为空")
-	}
 	if req.Name == "" {
 		return nil, status.Error(codes.InvalidArgument, "姓名不能为空")
 	}
@@ -67,7 +63,7 @@ func (s *ActorService) CreateTestee(ctx context.Context, req *pb.CreateTesteeReq
 	if req.IamProfileId > 0 {
 		profileID = &req.IamProfileId
 	}
-	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
+	orgID, err := requestOrgIDInt64(ctx, req.OrgId)
 	if err != nil {
 		return nil, err
 	}
@@ -212,14 +208,11 @@ func (s *ActorService) UpdateTestee(ctx context.Context, req *pb.UpdateTesteeReq
 // TesteeExists 检查受试者是否存在
 // @Description 检查指定机构下的用户档案是否已创建受试者
 func (s *ActorService) TesteeExists(ctx context.Context, req *pb.TesteeExistsRequest) (*pb.TesteeExistsResponse, error) {
-	if req.OrgId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "机构ID不能为空")
-	}
 	if req.IamProfileId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "用户档案ID不能为空")
 	}
 
-	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
+	orgID, err := requestOrgIDInt64(ctx, req.OrgId)
 	if err != nil {
 		return nil, err
 	}
@@ -241,11 +234,7 @@ func (s *ActorService) TesteeExists(ctx context.Context, req *pb.TesteeExistsReq
 // ListTesteesByOrg 根据机构查询受试者列表
 // @Description 查询指定机构下的受试者列表
 func (s *ActorService) ListTesteesByOrg(ctx context.Context, req *pb.ListTesteesByOrgRequest) (*pb.TesteeListResponse, error) {
-	if req.OrgId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "机构ID不能为空")
-	}
-
-	orgID, err := requestInt64FromUint64("org_id", req.OrgId)
+	orgID, err := requestOrgIDInt64(ctx, req.OrgId)
 	if err != nil {
 		return nil, err
 	}

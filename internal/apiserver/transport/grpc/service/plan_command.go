@@ -26,8 +26,9 @@ func (s *PlanCommandService) RegisterService(server *grpc.Server) {
 }
 
 func (s *PlanCommandService) CreatePlan(ctx context.Context, req *pb.CreatePlanRequest) (*pb.CreatePlanResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetScaleCode() == "" {
 		return nil, status.Error(codes.InvalidArgument, "scale_code 不能为空")
@@ -37,7 +38,7 @@ func (s *PlanCommandService) CreatePlan(ctx context.Context, req *pb.CreatePlanR
 	}
 
 	result, err := s.commandService.CreatePlan(ctx, planApp.CreatePlanDTO{
-		OrgID:         req.GetOrgId(),
+		OrgID:         orgID,
 		ScaleCode:     req.GetScaleCode(),
 		ScheduleType:  req.GetScheduleType(),
 		TriggerTime:   req.GetTriggerTime(),
@@ -58,14 +59,15 @@ func (s *PlanCommandService) CreatePlan(ctx context.Context, req *pb.CreatePlanR
 }
 
 func (s *PlanCommandService) PausePlan(ctx context.Context, req *pb.PausePlanRequest) (*pb.PausePlanResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetPlanId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
 	}
 
-	result, err := s.commandService.PausePlan(ctx, req.GetOrgId(), req.GetPlanId())
+	result, err := s.commandService.PausePlan(ctx, orgID, req.GetPlanId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -77,14 +79,15 @@ func (s *PlanCommandService) PausePlan(ctx context.Context, req *pb.PausePlanReq
 }
 
 func (s *PlanCommandService) ResumePlan(ctx context.Context, req *pb.ResumePlanRequest) (*pb.ResumePlanResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetPlanId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
 	}
 
-	result, err := s.commandService.ResumePlan(ctx, req.GetOrgId(), req.GetPlanId(), req.GetTesteeStartDates())
+	result, err := s.commandService.ResumePlan(ctx, orgID, req.GetPlanId(), req.GetTesteeStartDates())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -96,14 +99,15 @@ func (s *PlanCommandService) ResumePlan(ctx context.Context, req *pb.ResumePlanR
 }
 
 func (s *PlanCommandService) FinishPlan(ctx context.Context, req *pb.FinishPlanRequest) (*pb.FinishPlanResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetPlanId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
 	}
 
-	result, err := s.commandService.FinishPlan(ctx, req.GetOrgId(), req.GetPlanId())
+	result, err := s.commandService.FinishPlan(ctx, orgID, req.GetPlanId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -115,14 +119,15 @@ func (s *PlanCommandService) FinishPlan(ctx context.Context, req *pb.FinishPlanR
 }
 
 func (s *PlanCommandService) CancelPlan(ctx context.Context, req *pb.CancelPlanRequest) (*pb.CancelPlanResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetPlanId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
 	}
 
-	result, err := s.commandService.CancelPlan(ctx, req.GetOrgId(), req.GetPlanId())
+	result, err := s.commandService.CancelPlan(ctx, orgID, req.GetPlanId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -137,8 +142,9 @@ func (s *PlanCommandService) CancelPlan(ctx context.Context, req *pb.CancelPlanR
 }
 
 func (s *PlanCommandService) EnrollTestee(ctx context.Context, req *pb.EnrollTesteeRequest) (*pb.EnrollTesteeResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetPlanId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
@@ -151,7 +157,7 @@ func (s *PlanCommandService) EnrollTestee(ctx context.Context, req *pb.EnrollTes
 	}
 
 	result, err := s.commandService.EnrollTestee(ctx, planApp.EnrollTesteeDTO{
-		OrgID:     req.GetOrgId(),
+		OrgID:     orgID,
 		PlanID:    req.GetPlanId(),
 		TesteeID:  req.GetTesteeId(),
 		StartDate: req.GetStartDate(),
@@ -167,8 +173,9 @@ func (s *PlanCommandService) EnrollTestee(ctx context.Context, req *pb.EnrollTes
 }
 
 func (s *PlanCommandService) TerminateEnrollment(ctx context.Context, req *pb.TerminateEnrollmentRequest) (*pb.TerminateEnrollmentResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetPlanId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "plan_id 不能为空")
@@ -177,7 +184,7 @@ func (s *PlanCommandService) TerminateEnrollment(ctx context.Context, req *pb.Te
 		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
 	}
 
-	result, err := s.commandService.TerminateEnrollment(ctx, req.GetOrgId(), req.GetPlanId(), req.GetTesteeId())
+	result, err := s.commandService.TerminateEnrollment(ctx, orgID, req.GetPlanId(), req.GetTesteeId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -193,11 +200,12 @@ func (s *PlanCommandService) TerminateEnrollment(ctx context.Context, req *pb.Te
 }
 
 func (s *PlanCommandService) SchedulePendingTasks(ctx context.Context, req *pb.SchedulePendingTasksRequest) (*pb.SchedulePendingTasksResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 
-	result, err := s.commandService.SchedulePendingTasks(ctx, req.GetOrgId(), req.GetBefore())
+	result, err := s.commandService.SchedulePendingTasks(ctx, orgID, req.GetBefore())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -216,14 +224,15 @@ func (s *PlanCommandService) SchedulePendingTasks(ctx context.Context, req *pb.S
 }
 
 func (s *PlanCommandService) OpenTask(ctx context.Context, req *pb.OpenTaskRequest) (*pb.OpenTaskResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetTaskId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "task_id 不能为空")
 	}
 
-	result, err := s.commandService.OpenTask(ctx, req.GetOrgId(), req.GetTaskId(), planApp.OpenTaskDTO{
+	result, err := s.commandService.OpenTask(ctx, orgID, req.GetTaskId(), planApp.OpenTaskDTO{
 		EntryToken: req.GetEntryToken(),
 		EntryURL:   req.GetEntryUrl(),
 		ExpireAt:   req.GetExpireAt(),
@@ -239,8 +248,9 @@ func (s *PlanCommandService) OpenTask(ctx context.Context, req *pb.OpenTaskReque
 }
 
 func (s *PlanCommandService) CompleteTask(ctx context.Context, req *pb.CompleteTaskRequest) (*pb.CompleteTaskResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetTaskId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "task_id 不能为空")
@@ -249,7 +259,7 @@ func (s *PlanCommandService) CompleteTask(ctx context.Context, req *pb.CompleteT
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
 	}
 
-	result, err := s.commandService.CompleteTask(ctx, req.GetOrgId(), req.GetTaskId(), req.GetAssessmentId())
+	result, err := s.commandService.CompleteTask(ctx, orgID, req.GetTaskId(), req.GetAssessmentId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -261,14 +271,15 @@ func (s *PlanCommandService) CompleteTask(ctx context.Context, req *pb.CompleteT
 }
 
 func (s *PlanCommandService) ExpireTask(ctx context.Context, req *pb.ExpireTaskRequest) (*pb.ExpireTaskResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetTaskId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "task_id 不能为空")
 	}
 
-	result, err := s.commandService.ExpireTask(ctx, req.GetOrgId(), req.GetTaskId())
+	result, err := s.commandService.ExpireTask(ctx, orgID, req.GetTaskId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
@@ -280,14 +291,15 @@ func (s *PlanCommandService) ExpireTask(ctx context.Context, req *pb.ExpireTaskR
 }
 
 func (s *PlanCommandService) CancelTask(ctx context.Context, req *pb.CancelTaskRequest) (*pb.CancelTaskResponse, error) {
-	if req.GetOrgId() <= 0 {
-		return nil, status.Error(codes.InvalidArgument, "org_id 不能为空")
+	orgID, err := requestPlanOrgID(ctx, req.GetOrgId())
+	if err != nil {
+		return nil, err
 	}
 	if req.GetTaskId() == "" {
 		return nil, status.Error(codes.InvalidArgument, "task_id 不能为空")
 	}
 
-	result, err := s.commandService.CancelTask(ctx, req.GetOrgId(), req.GetTaskId())
+	result, err := s.commandService.CancelTask(ctx, orgID, req.GetTaskId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}
