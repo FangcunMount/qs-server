@@ -83,17 +83,17 @@ func (r *scaleBindingSyncerRecorder) SyncQuestionnaireVersion(_ context.Context,
 
 func TestSyncScaleQuestionnaireVersion(t *testing.T) {
 	tests := []struct {
-		name             string
-		code             string
-		questionnaireTyp domainQuestionnaire.QuestionnaireType
-		wantSyncCalls   int
+		name              string
+		code              string
+		questionnaireTyp  domainQuestionnaire.QuestionnaireType
+		wantSyncCalls     int
 		wantSyncedVersion string
 	}{
 		{
-			name:             "syncs medical scale questionnaire version",
-			code:             "Q-MS",
-			questionnaireTyp: domainQuestionnaire.TypeMedicalScale,
-			wantSyncCalls:    1,
+			name:              "syncs medical scale questionnaire version",
+			code:              "Q-MS",
+			questionnaireTyp:  domainQuestionnaire.TypeMedicalScale,
+			wantSyncCalls:     1,
 			wantSyncedVersion: "2.0",
 		},
 		{
