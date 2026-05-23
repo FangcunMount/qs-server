@@ -19,6 +19,7 @@ type ClinicianLifecycleService interface {
 // ClinicianQueryService 从业者查询服务。
 type ClinicianQueryService interface {
 	GetByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
+	GetBasicByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error)
 	GetByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianResult, error)
 	ListClinicians(ctx context.Context, dto ListClinicianDTO) (*ClinicianListResult, error)
 }

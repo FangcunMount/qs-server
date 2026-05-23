@@ -34,6 +34,10 @@ func (*routerClinicianQueryStub) GetByID(context.Context, uint64) (*clinicianApp
 	return nil, nil
 }
 
+func (*routerClinicianQueryStub) GetBasicByID(context.Context, uint64) (*clinicianApp.ClinicianResult, error) {
+	return nil, nil
+}
+
 func (*routerClinicianQueryStub) GetByOperator(context.Context, int64, uint64) (*clinicianApp.ClinicianResult, error) {
 	return nil, nil
 }

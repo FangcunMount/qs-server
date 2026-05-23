@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 )
 
 // QueryService 问卷查询服务
@@ -31,7 +32,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*QuestionnaireResp
 
 	result, err := s.questionnaireClient.GetQuestionnaire(ctx, code)
 	if err != nil {
-		log.Errorf("Failed to get questionnaire via gRPC: %v", err)
+		logQuestionnaireGRPCError("Failed to get questionnaire via gRPC", err)
 		return nil, err
 	}
 
@@ -60,7 +61,7 @@ func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest)
 
 	result, err := s.questionnaireClient.ListQuestionnaires(ctx, req.Page, req.PageSize, req.Status, req.Title)
 	if err != nil {
-		log.Errorf("Failed to list questionnaires via gRPC: %v", err)
+		logQuestionnaireGRPCError("Failed to list questionnaires via gRPC", err)
 		return nil, err
 	}
 
@@ -87,6 +88,14 @@ func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest)
 		Page:           result.Page,
 		PageSize:       result.PageSize,
 	}, nil
+}
+
+func logQuestionnaireGRPCError(message string, err error) {
+	if cancelerr.Is(err) {
+		log.Debugf("%s: %v", message, err)
+		return
+	}
+	log.Errorf("%s: %v", message, err)
 }
 
 // convertQuestionnaire 转换问卷

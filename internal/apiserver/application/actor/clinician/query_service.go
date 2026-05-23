@@ -28,6 +28,14 @@ func NewQueryService(
 }
 
 func (s *queryService) GetByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
+	item, err := s.GetBasicByID(ctx, clinicianID)
+	if err != nil {
+		return nil, err
+	}
+	return s.enrichCounts(ctx, item)
+}
+
+func (s *queryService) GetBasicByID(ctx context.Context, clinicianID uint64) (*ClinicianResult, error) {
 	targetClinicianID, err := clinicianIDFromUint64("clinician_id", clinicianID)
 	if err != nil {
 		return nil, err
@@ -36,7 +44,7 @@ func (s *queryService) GetByID(ctx context.Context, clinicianID uint64) (*Clinic
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to find clinician")
 	}
-	return s.enrichCounts(ctx, toClinicianResultFromRow(item))
+	return toClinicianResultFromRow(item), nil
 }
 
 func (s *queryService) GetByOperator(ctx context.Context, orgID int64, operatorID uint64) (*ClinicianResult, error) {

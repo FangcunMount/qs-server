@@ -845,7 +845,7 @@ func requireClinicianInOrg(ctx context.Context, queryService clinicianApp.Clinic
 	if queryService == nil {
 		return nil, errors.WithCode(code.ErrInternalServerError, "clinician query service not configured")
 	}
-	result, err := queryService.GetByID(ctx, clinicianID)
+	result, err := queryService.GetBasicByID(ctx, clinicianID)
 	if err != nil {
 		return nil, err
 	}

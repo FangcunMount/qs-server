@@ -99,16 +99,19 @@ func (s *stubActorTesteeAccessService) ListAccessibleTesteeIDs(context.Context, 
 }
 
 type stubActorClinicianQueryService struct {
-	getByIDResult    *clinicianApp.ClinicianResult
-	getByIDErr       error
-	listResult       *clinicianApp.ClinicianListResult
-	listErr          error
-	lastListDTO      clinicianApp.ListClinicianDTO
-	lastGetByID      uint64
-	lastGetByOpOrg   int64
-	lastGetByOpID    uint64
-	getByOperator    *clinicianApp.ClinicianResult
-	getByOperatorErr error
+	getByIDResult      *clinicianApp.ClinicianResult
+	getByIDErr         error
+	getBasicByIDResult *clinicianApp.ClinicianResult
+	getBasicByIDErr    error
+	listResult         *clinicianApp.ClinicianListResult
+	listErr            error
+	lastListDTO        clinicianApp.ListClinicianDTO
+	lastGetByID        uint64
+	lastGetBasicByID   uint64
+	lastGetByOpOrg     int64
+	lastGetByOpID      uint64
+	getByOperator      *clinicianApp.ClinicianResult
+	getByOperatorErr   error
 }
 
 func (s *stubActorClinicianQueryService) GetByID(_ context.Context, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
@@ -117,6 +120,14 @@ func (s *stubActorClinicianQueryService) GetByID(_ context.Context, clinicianID 
 		return s.getByIDResult, s.getByIDErr
 	}
 	return nil, nil
+}
+
+func (s *stubActorClinicianQueryService) GetBasicByID(_ context.Context, clinicianID uint64) (*clinicianApp.ClinicianResult, error) {
+	s.lastGetBasicByID = clinicianID
+	if s.getBasicByIDResult != nil || s.getBasicByIDErr != nil {
+		return s.getBasicByIDResult, s.getBasicByIDErr
+	}
+	return s.getByIDResult, s.getByIDErr
 }
 
 func (s *stubActorClinicianQueryService) GetByOperator(_ context.Context, orgID int64, operatorID uint64) (*clinicianApp.ClinicianResult, error) {
@@ -622,8 +633,11 @@ func TestAssessmentEntryHandlerListClinicianAssessmentEntriesDefaultsPaginationA
 	if rec.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusOK)
 	}
-	if query.lastGetByID != 12 {
-		t.Fatalf("clinician id = %d, want 12", query.lastGetByID)
+	if query.lastGetBasicByID != 12 {
+		t.Fatalf("basic clinician id = %d, want 12", query.lastGetBasicByID)
+	}
+	if query.lastGetByID != 0 {
+		t.Fatalf("enriched clinician lookup should not be used for org check, got id %d", query.lastGetByID)
 	}
 	if entryService.lastListDTO.OrgID != 91 || entryService.lastListDTO.ClinicianID != 12 || entryService.lastListDTO.Offset != 0 || entryService.lastListDTO.Limit != 20 {
 		t.Fatalf("unexpected assessment-entry dto: %+v", entryService.lastListDTO)

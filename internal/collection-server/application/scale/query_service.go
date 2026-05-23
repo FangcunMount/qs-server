@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 )
 
 // QueryService 量表查询服务
@@ -32,7 +33,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, er
 
 	result, err := s.scaleClient.GetScale(ctx, code)
 	if err != nil {
-		log.Errorf("Failed to get scale via gRPC: %v", err)
+		logScaleGRPCError("Failed to get scale via gRPC", err)
 		return nil, err
 	}
 
@@ -61,7 +62,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 
 	result, err := s.scaleClient.ListScales(ctx, req.Page, req.PageSize, req.Status, req.Title, req.Category, req.Stages, req.ApplicableAges, req.Reporters, req.Tags)
 	if err != nil {
-		log.Errorf("Failed to list scales via gRPC: %v", err)
+		logScaleGRPCError("Failed to list scales via gRPC", err)
 		return nil, err
 	}
 
@@ -148,7 +149,7 @@ func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesRespo
 
 	result, err := s.scaleClient.GetScaleCategories(ctx)
 	if err != nil {
-		log.Errorf("Failed to get scale categories via gRPC: %v", err)
+		logScaleGRPCError("Failed to get scale categories via gRPC", err)
 		return nil, err
 	}
 
@@ -201,6 +202,14 @@ func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesRespo
 		Reporters:      reporters,
 		Tags:           tags,
 	}, nil
+}
+
+func logScaleGRPCError(message string, err error) {
+	if cancelerr.Is(err) {
+		log.Debugf("%s: %v", message, err)
+		return
+	}
+	log.Errorf("%s: %v", message, err)
 }
 
 // convertScale 转换量表

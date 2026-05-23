@@ -9,6 +9,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
@@ -44,6 +45,14 @@ func (h *BaseHandler) SuccessResponseWithMessage(c *gin.Context, message string,
 func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 	if err == nil {
 		h.Success(c, nil)
+		return
+	}
+	if cancelerr.Is(err) {
+		logger.L(c.Request.Context()).Debugw("HTTP request canceled",
+			"action", "http_request_canceled",
+			"error", err.Error(),
+		)
+		c.AbortWithStatus(httpStatusClientClosedRequest)
 		return
 	}
 
@@ -85,6 +94,8 @@ func (h *BaseHandler) ErrorResponse(c *gin.Context, err error) {
 		Reference: reference,
 	})
 }
+
+const httpStatusClientClosedRequest = 499
 
 func errorResponseMessage(err error, coder errors.Coder) string {
 	message := coder.String()

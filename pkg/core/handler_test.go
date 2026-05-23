@@ -1,6 +1,7 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -10,6 +11,8 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 func TestBaseHandlerErrorResponseUsesBusinessMessageForClientErrors(t *testing.T) {
@@ -67,5 +70,37 @@ func TestBaseHandlerErrorResponseKeepsGenericMessageForServerErrors(t *testing.T
 	}
 	if body.Message == "database password leaked" {
 		t.Fatalf("server error leaked detail message")
+	}
+}
+
+func TestBaseHandlerErrorResponseTreatsContextCanceledAsClientClosedRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+
+	NewBaseHandler().Error(ctx, cberrors.Wrap(context.Canceled, "failed to count accessible testees"))
+
+	if recorder.Code != httpStatusClientClosedRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, httpStatusClientClosedRequest)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty response for canceled request", recorder.Body.String())
+	}
+}
+
+func TestBaseHandlerErrorResponseTreatsGRPCCanceledAsClientClosedRequest(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	recorder := httptest.NewRecorder()
+	ctx, _ := gin.CreateTestContext(recorder)
+	ctx.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+
+	NewBaseHandler().Error(ctx, cberrors.Wrap(status.Error(codes.Canceled, "context canceled"), "get scale failed"))
+
+	if recorder.Code != httpStatusClientClosedRequest {
+		t.Fatalf("status = %d, want %d", recorder.Code, httpStatusClientClosedRequest)
+	}
+	if recorder.Body.Len() != 0 {
+		t.Fatalf("body = %q, want empty response for canceled gRPC request", recorder.Body.String())
 	}
 }
