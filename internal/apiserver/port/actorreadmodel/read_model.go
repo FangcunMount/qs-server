@@ -47,10 +47,12 @@ type TesteeHydrator interface {
 }
 
 type OperatorFilter struct {
-	OrgID  int64
-	Role   string
-	Offset int
-	Limit  int
+	OrgID      int64
+	UserID     int64
+	Role       string
+	ActiveOnly bool
+	Offset     int
+	Limit      int
 }
 
 type OperatorRow struct {

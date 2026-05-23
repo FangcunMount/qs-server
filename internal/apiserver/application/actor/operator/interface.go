@@ -76,6 +76,7 @@ type OperatorQueryService interface {
 
 type ActiveOperatorChecker interface {
 	RequireActive(ctx context.Context, orgID int64, userID int64) (*OperatorResult, error)
+	ResolveActive(ctx context.Context, userID int64, requestedOrgID int64) (*OperatorResult, error)
 }
 
 // OperatorRoleProjectionUpdater 将授权快照中的角色投影回本地 Operator 聚合。

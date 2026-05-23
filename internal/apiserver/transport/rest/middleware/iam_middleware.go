@@ -47,6 +47,10 @@ func RequireOrgScopeMiddleware() gin.HandlerFunc {
 
 func RequireActiveOperatorMiddleware(checker operatorapp.ActiveOperatorChecker) gin.HandlerFunc {
 	return func(c *gin.Context) {
+		if GetCurrentOperator(c) != nil {
+			c.Next()
+			return
+		}
 		if checker == nil {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "operator repository not configured"})
 			c.Abort()

@@ -123,7 +123,7 @@ func buildGRPCServer(cfg *config.Config, deps container.ServerGRPCBootstrapDeps)
 	if deps.ActiveOperatorChecker != nil {
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,
 			grpcpkg.NewOrgScopeUnaryInterceptor(
-				restmiddleware.APIServerOrgScopeResolver(deps.ActiveOperatorChecker, orgscope.DefaultOrgID),
+				restmiddleware.APIServerOrgScopeResolver(deps.ActiveOperatorChecker),
 			))
 	} else {
 		grpcConfig.ExtraUnaryAfterAuth = append(grpcConfig.ExtraUnaryAfterAuth,

@@ -24,6 +24,11 @@ func TestHTTPStatusForResolveError(t *testing.T) {
 			err:  pkgerrors.WithCode(code.ErrPermissionDenied, "operator not found"),
 			want: http.StatusForbidden,
 		},
+		{
+			name: "invalid argument from resolver",
+			err:  pkgerrors.WithCode(code.ErrInvalidArgument, "multiple active organizations"),
+			want: http.StatusBadRequest,
+		},
 		{name: "wrapped mismatch", err: errors.Join(ErrMismatch, errors.New("detail")), want: http.StatusForbidden},
 		{name: "unknown", err: errors.New("boom"), want: http.StatusInternalServerError},
 	}

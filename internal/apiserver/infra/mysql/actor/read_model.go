@@ -175,7 +175,16 @@ func (r *readModel) FindOperatorByUser(ctx context.Context, orgID int64, userID 
 
 func (r *readModel) ListOperators(ctx context.Context, filter actorreadmodel.OperatorFilter) ([]actorreadmodel.OperatorRow, error) {
 	var pos []*OperatorPO
-	query := r.WithContext(ctx).Where("org_id = ? AND deleted_at IS NULL", filter.OrgID)
+	query := r.WithContext(ctx).Where("deleted_at IS NULL")
+	if filter.OrgID > 0 {
+		query = query.Where("org_id = ?", filter.OrgID)
+	}
+	if filter.UserID > 0 {
+		query = query.Where("user_id = ?", filter.UserID)
+	}
+	if filter.ActiveOnly {
+		query = query.Where("is_active = ?", true)
+	}
 	if filter.Role != "" {
 		query = query.Where("JSON_CONTAINS(roles, ?)", `"`+filter.Role+`"`)
 	}

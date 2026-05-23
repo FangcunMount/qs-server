@@ -110,16 +110,11 @@ func (composer protectedGroupMiddlewareComposer) apply(group *gin.RouterGroup, r
 			group.Use(restmiddleware.UserIdentityMiddleware())
 			group.Use(restmiddleware.RequireTenantDomainMiddleware())
 			if r.deps.Actor.ActiveOperatorChecker != nil {
-				group.Use(restmiddleware.ResolveOrgScopeMiddleware(
-					restmiddleware.APIServerOrgScopeResolver(r.deps.Actor.ActiveOperatorChecker, orgscope.DefaultOrgID),
-				))
+				group.Use(restmiddleware.ResolveOperatorOrgScopeMiddleware(r.deps.Actor.ActiveOperatorChecker))
 			} else {
 				group.Use(restmiddleware.ResolveOrgScopeMiddleware(orgscope.FixedResolver(orgscope.DefaultOrgID)))
 			}
 			group.Use(restmiddleware.RequireOrgScopeMiddleware())
-			if r.deps.Actor.ActiveOperatorChecker != nil {
-				group.Use(restmiddleware.RequireActiveOperatorMiddleware(r.deps.Actor.ActiveOperatorChecker))
-			}
 			if loader := r.deps.IAM.SnapshotLoader; loader != nil {
 				group.Use(restmiddleware.AuthzSnapshotMiddleware(loader, r.deps.Actor.OperatorRoleProjectionUpdater))
 			} else {

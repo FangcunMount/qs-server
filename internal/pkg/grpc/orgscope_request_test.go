@@ -57,3 +57,11 @@ func TestGRPCStatusForResolveErrorMapsPermissionDenied(t *testing.T) {
 		t.Fatalf("status = %v, want PermissionDenied", err)
 	}
 }
+
+func TestGRPCStatusForResolveErrorMapsInvalidArgument(t *testing.T) {
+	t.Parallel()
+	err := orgscope.GRPCStatusForResolveError(pkgerrors.WithCode(code.ErrInvalidArgument, "multiple active organizations"))
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("status = %v, want InvalidArgument", err)
+	}
+}

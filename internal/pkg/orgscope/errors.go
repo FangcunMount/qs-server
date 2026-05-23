@@ -18,6 +18,9 @@ func HTTPStatusForResolveError(err error) int {
 	if errors.Is(err, ErrMismatch) || pkgerrors.IsCode(err, code.ErrPermissionDenied) {
 		return http.StatusForbidden
 	}
+	if pkgerrors.IsCode(err, code.ErrInvalidArgument) {
+		return http.StatusBadRequest
+	}
 	if errors.Is(err, ErrUnresolved) {
 		return http.StatusUnauthorized
 	}
@@ -31,6 +34,9 @@ func GRPCStatusForResolveError(err error) error {
 	}
 	if errors.Is(err, ErrMismatch) || pkgerrors.IsCode(err, code.ErrPermissionDenied) {
 		return status.Error(codes.PermissionDenied, err.Error())
+	}
+	if pkgerrors.IsCode(err, code.ErrInvalidArgument) {
+		return status.Error(codes.InvalidArgument, err.Error())
 	}
 	if errors.Is(err, ErrUnresolved) {
 		return status.Error(codes.Unauthenticated, err.Error())
