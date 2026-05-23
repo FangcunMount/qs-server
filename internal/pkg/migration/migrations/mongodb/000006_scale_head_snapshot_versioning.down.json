@@ -1,0 +1,29 @@
+[
+  {
+    "delete": "scales",
+    "deletes": [
+      {
+        "q": { "record_role": "published_snapshot" },
+        "limit": 0
+      }
+    ]
+  },
+  {
+    "update": "scales",
+    "updates": [
+      {
+        "q": { "record_role": "head" },
+        "u": {
+          "$unset": {
+            "record_role": "",
+            "is_active_published": ""
+          }
+        },
+        "multi": true
+      }
+    ]
+  },
+  { "dropIndexes": "scales", "index": "idx_scales_questionnaire_version_role" },
+  { "dropIndexes": "scales", "index": "idx_scales_active_published_code" },
+  { "dropIndexes": "scales", "index": "idx_scales_code_version_role_unique" }
+]

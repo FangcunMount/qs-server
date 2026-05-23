@@ -58,5 +58,6 @@ func questionnaireCatalogItem(q *domainQuestionnaire.Questionnaire) *questionnai
 		Code:    q.GetCode().String(),
 		Version: q.GetVersion().String(),
 		Type:    q.GetType().String(),
+		Status:  q.GetStatus().String(),
 	}
 }

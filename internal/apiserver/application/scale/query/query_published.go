@@ -22,6 +22,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListScalesD
 		return nil, err
 	}
 	filter.Status = domainScale.StatusPublished.Value()
+	filter.PublishedOnly = true
 
 	if s.canUsePublishedListCache(filter) {
 		if cached, ok := s.listCache.GetPage(ctx, dto.Page, dto.PageSize); ok {
@@ -58,7 +59,7 @@ func validateScaleListPage(page, pageSize int) error {
 }
 
 func (s *queryService) canUsePublishedListCache(filter scalereadmodel.ScaleFilter) bool {
-	return filter.Title == "" && filter.Category == "" && s.listCache != nil
+	return filter.Title == "" && filter.Category == "" && filter.PublishedOnly && s.listCache != nil
 }
 
 func (s *queryService) listScaleSummaryRows(ctx context.Context, filter scalereadmodel.ScaleFilter, page, pageSize int) (*shared.ScaleSummaryListResult, error) {

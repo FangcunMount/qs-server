@@ -5,6 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/editable"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -22,6 +23,7 @@ type factorService struct {
 }
 
 type factorRepository interface {
+	CreatePublishedSnapshot(ctx context.Context, scale *domscale.MedicalScale, active bool) error
 	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
 	Update(ctx context.Context, scale *domscale.MedicalScale) error
 }
@@ -212,6 +214,9 @@ func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string)
 	m, err := s.repo.FindByCode(ctx, scaleCode)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
+	}
+	if err := editable.EnsureHeadEditable(ctx, s.repo, m); err != nil {
+		return nil, err
 	}
 	return m, nil
 }

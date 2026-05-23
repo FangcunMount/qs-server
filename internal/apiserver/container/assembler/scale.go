@@ -1,10 +1,13 @@
 package assembler
 
 import (
+	"context"
+
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -32,15 +35,16 @@ type ScaleModule struct {
 
 // ScaleModuleDeps 定义 Scale 模块的显式构造依赖。
 type ScaleModuleDeps struct {
-	EventPublisher       event.EventPublisher
-	Repo                 scale.Repository
-	Reader               scalereadmodel.ScaleReader
-	ListCache            scalelistcache.PublishedListCache
-	QuestionnaireCatalog questionnairecatalog.Catalog
-	RankRedisClient      redis.UniversalClient
-	RankCacheBuilder     *keyspace.Builder
-	IdentityService      *iam.IdentityService
-	HotsetRecorder       cachetarget.HotsetRecorder
+	EventPublisher         event.EventPublisher
+	Repo                   scale.Repository
+	Reader                 scalereadmodel.ScaleReader
+	ListCache              scalelistcache.PublishedListCache
+	QuestionnaireCatalog   questionnairecatalog.Catalog
+	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
+	RankRedisClient        redis.UniversalClient
+	RankCacheBuilder       *keyspace.Builder
+	IdentityService        *iam.IdentityService
+	HotsetRecorder         cachetarget.HotsetRecorder
 }
 
 // NewScaleModule 创建 Scale 模块。
@@ -54,13 +58,35 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	module.eventPublisher = normalized.EventPublisher
 
 	// 初始化 service 层（依赖 repository，使用模块统一的事件发布器）
-	module.LifecycleService = scaleApp.NewLifecycleService(normalized.Repo, normalized.QuestionnaireCatalog, module.eventPublisher, normalized.ListCache)
+	module.LifecycleService = scaleApp.NewLifecycleService(
+		normalized.Repo,
+		normalized.QuestionnaireCatalog,
+		module.eventPublisher,
+		normalized.ListCache,
+		newScaleQuestionnairePublisher(normalized.QuestionnairePublisher),
+	)
 	module.FactorService = scaleApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
 	module.QueryService = scaleApp.NewQueryService(normalized.Repo, normalized.Reader, normalized.IdentityService, normalized.ListCache, normalized.HotsetRecorder, hotRankReader)
 	module.CategoryService = scaleApp.NewCategoryService()
 
 	return module, nil
+}
+
+func newScaleQuestionnairePublisher(service quesApp.QuestionnaireLifecycleService) scaleApp.QuestionnairePublisherFunc {
+	if service == nil {
+		return nil
+	}
+	return func(ctx context.Context, code string) (string, error) {
+		result, err := service.Publish(ctx, code)
+		if err != nil {
+			return "", err
+		}
+		if result == nil {
+			return "", nil
+		}
+		return result.Version, nil
+	}
 }
 
 func normalizeScaleModuleDeps(deps ScaleModuleDeps) (ScaleModuleDeps, error) {

@@ -59,7 +59,7 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 		if questionnaireCode == "" {
 			continue
 		}
-		item, err := s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+		item, err := s.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 		if err != nil {
 			logger.L(ctx).Warnw("failed to resolve hot scale by questionnaire code",
 				"questionnaire_code", questionnaireCode,
@@ -96,14 +96,14 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 		seen[item.Scale.GetCode().String()] = struct{}{}
 	}
 
-	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: domainScale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
+	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: domainScale.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取热门量表兜底列表失败")
 	}
 
 	result := make([]domainScale.HotScaleSummary, 0, limit-len(existing))
 	for _, row := range rows {
-		item, err := s.repo.FindByCode(ctx, row.Code)
+		item, err := s.repo.FindPublishedByCode(ctx, row.Code)
 		if err != nil {
 			logger.L(ctx).Warnw("failed to resolve fallback hot scale",
 				"scale_code", row.Code,

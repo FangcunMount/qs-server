@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -36,6 +37,28 @@ func TestScaleFilterToBSONMapsTypedFilter(t *testing.T) {
 	}
 	if got := titleQuery["$options"]; got != "i" {
 		t.Fatalf("title options = %#v, want i", got)
+	}
+	if _, ok := query["$or"]; !ok {
+		t.Fatalf("head list query missing head role filter: %#v", query)
+	}
+}
+
+func TestScaleFilterToBSONPublishedOnlyUsesActiveSnapshot(t *testing.T) {
+	t.Parallel()
+
+	query := scaleFilterToBSON(scalereadmodel.ScaleFilter{
+		Status:        "published",
+		PublishedOnly: true,
+	})
+
+	if got := query["record_role"]; got != domainScale.RecordRolePublishedSnapshot.String() {
+		t.Fatalf("record_role = %#v, want published_snapshot", got)
+	}
+	if got := query["is_active_published"]; got != true {
+		t.Fatalf("is_active_published = %#v, want true", got)
+	}
+	if _, ok := query["$or"]; ok {
+		t.Fatalf("published-only query must not include head role fallback: %#v", query)
 	}
 }
 

@@ -178,6 +178,10 @@ type ScaleSnapshotRepository interface {
 	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error)
 }
 
+type publishedScaleSnapshotRepository interface {
+	FindPublishedByCode(ctx context.Context, code string) (*scale.MedicalScale, error)
+}
+
 func NewRepositoryScaleSnapshotCatalog(repo ScaleSnapshotRepository) *RepositoryScaleSnapshotCatalog {
 	return &RepositoryScaleSnapshotCatalog{repo: repo}
 }
@@ -190,7 +194,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 		"resource", "scale",
 	)
 
-	medicalScale, err := r.repo.FindByCode(ctx, code)
+	medicalScale, err := r.findCurrentPublishedScale(ctx, code)
 	if err != nil {
 		l.Errorw("加载量表失败",
 			"scale_code", code,
@@ -226,7 +230,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	if ref.Version != "" {
 		medicalScale, err = r.repo.FindByCodeVersion(ctx, ref.Code, ref.Version)
 	} else {
-		medicalScale, err = r.repo.FindByCode(ctx, ref.Code)
+		medicalScale, err = r.findCurrentPublishedScale(ctx, ref.Code)
 	}
 	if err != nil {
 		l.Errorw("加载解释模型失败",
@@ -252,6 +256,13 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 		"result", "success",
 	)
 	return snapshot, nil
+}
+
+func (r *RepositoryScaleSnapshotCatalog) findCurrentPublishedScale(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	if repo, ok := r.repo.(publishedScaleSnapshotRepository); ok {
+		return repo.FindPublishedByCode(ctx, code)
+	}
+	return r.repo.FindByCode(ctx, code)
 }
 
 type RepositoryAnswerSheetSnapshotReader struct {

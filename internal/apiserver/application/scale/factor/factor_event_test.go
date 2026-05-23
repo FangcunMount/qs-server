@@ -19,6 +19,10 @@ func (r *ruleFreezeScaleRepoStub) Create(context.Context, *domainScale.MedicalSc
 	return nil
 }
 
+func (r *ruleFreezeScaleRepoStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+	return nil
+}
+
 func (r *ruleFreezeScaleRepoStub) FindByCode(context.Context, string) (*domainScale.MedicalScale, error) {
 	if r.item == nil {
 		return nil, domainScale.ErrNotFound

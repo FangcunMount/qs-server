@@ -66,7 +66,7 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := infra.scaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value()}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
+		items, err := infra.scaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}

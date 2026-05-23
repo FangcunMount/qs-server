@@ -17,10 +17,16 @@ type scaleRepoBindingStub struct {
 func (r *scaleRepoBindingStub) Create(_ context.Context, _ *domainScale.MedicalScale) error {
 	return nil
 }
+func (r *scaleRepoBindingStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+	return nil
+}
 func (r *scaleRepoBindingStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
 	return nil, domainScale.ErrNotFound
 }
 func (r *scaleRepoBindingStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainScale.MedicalScale, error) {
+	return nil, domainScale.ErrNotFound
+}
+func (r *scaleRepoBindingStub) FindPublishedByCode(context.Context, string) (*domainScale.MedicalScale, error) {
 	return nil, domainScale.ErrNotFound
 }
 func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
@@ -28,6 +34,9 @@ func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questi
 		return scale, nil
 	}
 	return nil, domainScale.ErrNotFound
+}
+func (r *scaleRepoBindingStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
+	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
 func (r *scaleRepoBindingStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*domainScale.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
@@ -38,6 +47,12 @@ func (r *scaleRepoBindingStub) Update(_ context.Context, _ *domainScale.MedicalS
 func (r *scaleRepoBindingStub) Remove(_ context.Context, _ string) error { return nil }
 func (r *scaleRepoBindingStub) ExistsByCode(_ context.Context, _ string) (bool, error) {
 	return false, nil
+}
+func (r *scaleRepoBindingStub) SetActivePublishedVersion(context.Context, string, string) error {
+	return nil
+}
+func (r *scaleRepoBindingStub) ClearActivePublishedVersion(context.Context, string) error {
+	return nil
 }
 
 type questionnaireCatalogBindingStub struct {
@@ -68,6 +83,7 @@ func questionnaireCatalogItem(q *domainQuestionnaire.Questionnaire) *questionnai
 		Code:    q.GetCode().String(),
 		Version: q.GetVersion().String(),
 		Type:    q.GetType().String(),
+		Status:  q.GetStatus().String(),
 	}
 }
 

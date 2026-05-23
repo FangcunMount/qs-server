@@ -27,6 +27,9 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 		deps.ListCache = infra.scaleListCache
 		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.questionnaireRepo)
 	}
+	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
+		deps.QuestionnairePublisher = c.SurveyModule.Questionnaire.LifecycleService
+	}
 	return deps
 }
 

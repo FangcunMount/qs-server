@@ -18,11 +18,16 @@ func IsNotFound(err error) bool {
 type Repository interface {
 	// 基础 CRUD 操作
 	Create(ctx context.Context, scale *MedicalScale) error
+	CreatePublishedSnapshot(ctx context.Context, scale *MedicalScale, active bool) error
 	FindByCode(ctx context.Context, code string) (*MedicalScale, error)
 	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*MedicalScale, error)
+	FindPublishedByCode(ctx context.Context, code string) (*MedicalScale, error)
 	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*MedicalScale, error)
+	FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*MedicalScale, error)
 	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*MedicalScale, error)
 	Update(ctx context.Context, scale *MedicalScale) error
+	SetActivePublishedVersion(ctx context.Context, code, scaleVersion string) error
+	ClearActivePublishedVersion(ctx context.Context, code string) error
 	Remove(ctx context.Context, code string) error
 	ExistsByCode(ctx context.Context, code string) (bool, error)
 }

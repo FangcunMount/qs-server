@@ -12,11 +12,18 @@ import (
 )
 
 type ruleFreezeScaleRepoStub struct {
-	item        *domainScale.MedicalScale
-	updateCount int
+	item          *domainScale.MedicalScale
+	updateCount   int
+	snapshotCount int
+	clearedActive bool
 }
 
 func (r *ruleFreezeScaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error {
+	return nil
+}
+
+func (r *ruleFreezeScaleRepoStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+	r.snapshotCount++
 	return nil
 }
 
@@ -31,11 +38,19 @@ func (r *ruleFreezeScaleRepoStub) FindByCodeVersion(context.Context, string, str
 	return r.FindByCode(context.Background(), "")
 }
 
+func (r *ruleFreezeScaleRepoStub) FindPublishedByCode(context.Context, string) (*domainScale.MedicalScale, error) {
+	return r.FindByCode(context.Background(), "")
+}
+
 func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
 	if r.item == nil {
 		return nil, domainScale.ErrNotFound
 	}
 	return r.item, nil
+}
+
+func (r *ruleFreezeScaleRepoStub) FindPublishedByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
+	return r.FindByQuestionnaireCode(context.Background(), "")
 }
 
 func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*domainScale.MedicalScale, error) {
@@ -52,6 +67,15 @@ func (r *ruleFreezeScaleRepoStub) Remove(context.Context, string) error { return
 
 func (r *ruleFreezeScaleRepoStub) ExistsByCode(context.Context, string) (bool, error) {
 	return false, nil
+}
+
+func (r *ruleFreezeScaleRepoStub) SetActivePublishedVersion(context.Context, string, string) error {
+	return nil
+}
+
+func (r *ruleFreezeScaleRepoStub) ClearActivePublishedVersion(context.Context, string) error {
+	r.clearedActive = true
+	return nil
 }
 
 type scaleEventPublisherStub struct {
@@ -84,13 +108,15 @@ func TestPublishedScaleFreezesRuleMutationsButAllowsDisplayUpdate(t *testing.T) 
 		Code:          "F2",
 		Title:         "Factor 2",
 		QuestionCodes: []string{"Q2"},
-	}); err == nil {
-		t.Fatal("AddFactor() error = nil, want published rule freeze error")
+	}); err != nil {
+		t.Fatalf("AddFactor() error = %v, want nil after draft fork", err)
 	}
-	if repo.updateCount != 0 {
-		t.Fatalf("rule mutation updated repo %d times, want 0", repo.updateCount)
+	if repo.snapshotCount != 1 || repo.updateCount != 1 || !repo.item.IsDraft() || repo.item.GetScaleVersion() != "1.0.1" {
+		t.Fatalf("published edit fork = snapshots:%d updates:%d status:%s version:%s, want snapshot/update draft 1.0.1",
+			repo.snapshotCount, repo.updateCount, repo.item.GetStatus(), repo.item.GetScaleVersion())
 	}
 
+	repo.updateCount = 0
 	lifecycleSvc := &lifecycleService{repo: repo, baseInfo: domainScale.BaseInfo{}, eventPublisher: &scaleEventPublisherStub{}}
 	if _, err := lifecycleSvc.UpdateQuestionnaire(context.Background(), shared.UpdateScaleQuestionnaireDTO{
 		Code:                 published.GetCode().String(),

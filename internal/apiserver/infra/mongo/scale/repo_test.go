@@ -3,6 +3,7 @@ package scale
 import (
 	"testing"
 
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -13,27 +14,35 @@ func TestScaleVersionCompatibilityFilterMatchesScaleVersionOrLegacyQuestionnaire
 	if len(filter) != 2 {
 		t.Fatalf("filter len = %d, want 2", len(filter))
 	}
-	if filter[0]["scale_version"] != "2.0.0" {
+	exact, ok := filter[0].(bson.M)
+	if !ok || exact["scale_version"] != "2.0.0" {
 		t.Fatalf("first branch = %#v, want exact scale_version", filter[0])
 	}
-	legacy, ok := filter[1]["$or"].([]bson.M)
+	legacyBranch, ok := filter[1].(bson.M)
+	if !ok {
+		t.Fatalf("legacy branch = %#v, want bson.M", filter[1])
+	}
+	legacy, ok := legacyBranch["$or"].(bson.A)
 	if !ok || len(legacy) != 3 {
 		t.Fatalf("legacy branch = %#v, want three scale_version missing/empty variants", filter[1])
 	}
-	if filter[1]["questionnaire_version"] != "2.0.0" {
-		t.Fatalf("legacy questionnaire_version = %#v, want 2.0.0", filter[1]["questionnaire_version"])
+	if legacyBranch["questionnaire_version"] != "2.0.0" {
+		t.Fatalf("legacy questionnaire_version = %#v, want 2.0.0", legacyBranch["questionnaire_version"])
 	}
 }
 
-func TestQuestionnaireRefFilterMatchesExactQuestionnaireVersion(t *testing.T) {
+func TestPublishedQuestionnaireRefFilterMatchesPublishedSnapshotVersion(t *testing.T) {
 	t.Parallel()
 
-	filter := questionnaireRefFilter("Q-SDS", "2.0.0")
+	filter := publishedQuestionnaireRefFilter("Q-SDS", "2.0.0")
 	if filter["questionnaire_code"] != "Q-SDS" {
 		t.Fatalf("questionnaire_code = %#v, want Q-SDS", filter["questionnaire_code"])
 	}
 	if filter["questionnaire_version"] != "2.0.0" {
 		t.Fatalf("questionnaire_version = %#v, want 2.0.0", filter["questionnaire_version"])
+	}
+	if filter["record_role"] != domainScale.RecordRolePublishedSnapshot.String() {
+		t.Fatalf("record_role = %#v, want published_snapshot", filter["record_role"])
 	}
 	if filter["deleted_at"] != nil {
 		t.Fatalf("deleted_at = %#v, want nil", filter["deleted_at"])

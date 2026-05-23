@@ -37,11 +37,17 @@ type hotScaleRepoStub struct {
 }
 
 func (r *hotScaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error { return nil }
+func (r *hotScaleRepoStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+	return nil
+}
 func (r *hotScaleRepoStub) FindByCode(_ context.Context, code string) (*domainScale.MedicalScale, error) {
 	if item, ok := r.findByCode(code); ok {
 		return item, nil
 	}
 	return nil, errors.New("not found")
+}
+func (r *hotScaleRepoStub) FindPublishedByCode(ctx context.Context, code string) (*domainScale.MedicalScale, error) {
+	return r.FindByCode(ctx, code)
 }
 func (r *hotScaleRepoStub) FindByCodeVersion(ctx context.Context, code, _ string) (*domainScale.MedicalScale, error) {
 	return r.FindByCode(ctx, code)
@@ -52,6 +58,9 @@ func (r *hotScaleRepoStub) FindByQuestionnaireCode(_ context.Context, questionna
 		return nil, r.findByQuestionnaireErr
 	}
 	return r.byQuestionnaire[questionnaireCode], nil
+}
+func (r *hotScaleRepoStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
+	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
 func (r *hotScaleRepoStub) FindByQuestionnaireRef(_ context.Context, questionnaireCode, questionnaireVersion string) (*domainScale.MedicalScale, error) {
 	r.findByQuestionnaireRefs = append(r.findByQuestionnaireRefs, questionnaireCode+":"+questionnaireVersion)
@@ -73,6 +82,12 @@ func (r *hotScaleRepoStub) CountScales(context.Context, scalereadmodel.ScaleFilt
 func (r *hotScaleRepoStub) Update(context.Context, *domainScale.MedicalScale) error { return nil }
 func (r *hotScaleRepoStub) Remove(context.Context, string) error                    { return nil }
 func (r *hotScaleRepoStub) ExistsByCode(context.Context, string) (bool, error)      { return false, nil }
+func (r *hotScaleRepoStub) SetActivePublishedVersion(context.Context, string, string) error {
+	return nil
+}
+func (r *hotScaleRepoStub) ClearActivePublishedVersion(context.Context, string) error {
+	return nil
+}
 
 func TestListHotPublishedUsesHotRankReadModelOrdering(t *testing.T) {
 	scaleA := mustHotScale(t, "S-A", "Q-A")

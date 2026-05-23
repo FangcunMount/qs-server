@@ -1,6 +1,8 @@
 package scale
 
 import (
+	"context"
+
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
@@ -20,8 +22,22 @@ func NewLifecycleService(
 	questionnaireCatalog questionnairecatalog.Catalog,
 	eventPublisher event.EventPublisher,
 	listCache scalelistcache.PublishedListCache,
+	questionnairePublishers ...lifecycle.QuestionnairePublisher,
 ) ScaleLifecycleService {
-	return lifecycle.NewService(repo, questionnaireCatalog, eventPublisher, listCache)
+	var questionnairePublisher lifecycle.QuestionnairePublisher
+	if len(questionnairePublishers) > 0 {
+		questionnairePublisher = questionnairePublishers[0]
+	}
+	return lifecycle.NewService(repo, questionnaireCatalog, eventPublisher, listCache, lifecycle.WithQuestionnairePublisher(questionnairePublisher))
+}
+
+// QuestionnairePublisherFunc adapts a function to the scale lifecycle's
+// questionnaire publication port.
+type QuestionnairePublisherFunc func(ctx context.Context, code string) (string, error)
+
+// PublishQuestionnaire implements lifecycle.QuestionnairePublisher.
+func (f QuestionnairePublisherFunc) PublishQuestionnaire(ctx context.Context, code string) (string, error) {
+	return f(ctx, code)
 }
 
 // NewFactorService 创建量表因子编辑应用服务。

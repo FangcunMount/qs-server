@@ -15,14 +15,15 @@ type PageRequest struct {
 
 // ScaleFilter contains typed filters for scale list queries.
 type ScaleFilter struct {
-	Status   string
-	Title    string
-	Category string
+	Status        string
+	Title         string
+	Category      string
+	PublishedOnly bool
 }
 
 // IsEmpty reports whether no optional scale filters were supplied.
 func (f ScaleFilter) IsEmpty() bool {
-	return f.Status == "" && f.Title == "" && f.Category == ""
+	return f.Status == "" && f.Title == "" && f.Category == "" && !f.PublishedOnly
 }
 
 // ScaleSummaryRow is a transport-neutral scale list row.

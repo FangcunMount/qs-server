@@ -1,0 +1,90 @@
+[
+  {
+    "update": "scales",
+    "updates": [
+      {
+        "q": {
+          "$or": [
+            { "record_role": { "$exists": false } },
+            { "record_role": "" },
+            { "record_role": "head" }
+          ]
+        },
+        "u": [
+          {
+            "$set": {
+              "scale_version": {
+                "$cond": [
+                  { "$and": [ { "$ne": [ "$scale_version", null ] }, { "$ne": [ "$scale_version", "" ] } ] },
+                  "$scale_version",
+                  {
+                    "$cond": [
+                      { "$and": [ { "$ne": [ "$questionnaire_version", null ] }, { "$ne": [ "$questionnaire_version", "" ] } ] },
+                      "$questionnaire_version",
+                      "1.0.0"
+                    ]
+                  }
+                ]
+              },
+              "record_role": "head",
+              "is_active_published": false
+            }
+          }
+        ],
+        "multi": true
+      }
+    ]
+  },
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": { "code": 1, "scale_version": 1, "record_role": 1 },
+        "name": "idx_scales_code_version_role_unique",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "code": 1, "record_role": 1, "is_active_published": 1, "deleted_at": 1 },
+        "name": "idx_scales_active_published_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "record_role": 1, "deleted_at": 1 },
+        "name": "idx_scales_questionnaire_version_role"
+      }
+    ]
+  },
+  {
+    "aggregate": "scales",
+    "pipeline": [
+      {
+        "$match": {
+          "deleted_at": null,
+          "status": "published",
+          "$or": [
+            { "record_role": "head" },
+            { "record_role": { "$exists": false } },
+            { "record_role": "" }
+          ]
+        }
+      },
+      {
+        "$set": {
+          "record_role": "published_snapshot",
+          "is_active_published": true,
+          "updated_at": "$$NOW"
+        }
+      },
+      { "$unset": "_id" },
+      {
+        "$merge": {
+          "into": "scales",
+          "on": [ "code", "scale_version", "record_role" ],
+          "whenMatched": "merge",
+          "whenNotMatched": "insert"
+        }
+      }
+    ],
+    "cursor": {}
+  }
+]

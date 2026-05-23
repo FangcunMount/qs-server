@@ -67,7 +67,8 @@ func (c *PublishedScaleListCache) Rebuild(ctx context.Context) error {
 	}
 
 	filter := scalereadmodel.ScaleFilter{
-		Status: domainScale.StatusPublished.Value(),
+		Status:        domainScale.StatusPublished.Value(),
+		PublishedOnly: true,
 	}
 
 	total, err := c.reader.CountScales(ctx, filter)

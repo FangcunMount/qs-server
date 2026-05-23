@@ -7,6 +7,7 @@ type Item struct {
 	Code    string
 	Version string
 	Type    string
+	Status  string
 }
 
 // Catalog exposes questionnaire facts without leaking questionnaire repositories.

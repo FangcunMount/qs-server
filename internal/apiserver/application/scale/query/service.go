@@ -35,7 +35,9 @@ type queryService struct {
 
 type scaleQueryRepository interface {
 	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
+	FindPublishedByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
 	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
+	FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
 	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domscale.MedicalScale, error)
 }
 
@@ -118,14 +120,9 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*sh
 	}
 
 	// 2. 获取量表
-	m, err := s.repo.FindByCode(ctx, code)
+	m, err := s.repo.FindPublishedByCode(ctx, code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
-	}
-
-	// 3. 检查量表状态
-	if !m.IsPublished() {
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "量表未发布")
 	}
 	s.recordHotset(ctx, cachetarget.NewStaticScaleWarmupTarget(code))
 
@@ -165,7 +162,7 @@ func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questi
 	if questionnaireVersion != "" {
 		medicalScale, err = s.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
 	} else {
-		medicalScale, err = s.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+		medicalScale, err = s.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 	}
 	if err != nil {
 		if domscale.IsNotFound(err) {

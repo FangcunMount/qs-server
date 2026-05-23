@@ -22,6 +22,9 @@ func (s *lifecycleService) UpdateBasicInfo(ctx context.Context, dto shared.Updat
 	if err != nil {
 		return nil, err
 	}
+	if err := s.ensureHeadEditable(ctx, m); err != nil {
+		return nil, err
+	}
 
 	classification := shared.ClassificationFromDTO(dto.Category, dto.Stages, dto.ApplicableAges, dto.Reporters, dto.Tags)
 	if err := s.baseInfo.UpdateAllWithClassification(m, dto.Title, dto.Description, classification.Category, classification.Stages, classification.ApplicableAges, classification.Reporters, classification.Tags); err != nil {
@@ -56,6 +59,9 @@ func (s *lifecycleService) UpdateQuestionnaire(ctx context.Context, dto shared.U
 	}
 
 	if err := s.resolveQuestionnaireBinding().validate(ctx, dto.QuestionnaireCode, dto.QuestionnaireVersion, m.GetCode().String()); err != nil {
+		return nil, err
+	}
+	if err := s.ensureHeadEditable(ctx, m); err != nil {
 		return nil, err
 	}
 	if err := s.baseInfo.UpdateQuestionnaire(m, meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion); err != nil {

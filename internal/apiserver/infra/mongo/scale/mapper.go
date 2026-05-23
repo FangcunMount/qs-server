@@ -55,6 +55,8 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 	po := &ScalePO{
 		Code:                 domain.GetCode().String(),
 		ScaleVersion:         domain.GetScaleVersion(),
+		RecordRole:           domain.GetRecordRole().String(),
+		IsActivePublished:    domain.IsActivePublished(),
 		Title:                domain.GetTitle(),
 		Description:          domain.GetDescription(),
 		Category:             domain.GetCategory().String(),
@@ -191,6 +193,8 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 		po.Title,
 		scale.WithDescription(po.Description),
 		scale.WithScaleVersion(scaleVersionFromPO(po)),
+		scale.WithRecordRole(scale.NormalizeRecordRole(po.RecordRole)),
+		scale.WithActivePublished(po.IsActivePublished),
 		scale.WithCategory(scale.NewCategory(po.Category)),
 		scale.WithStages(stages),
 		scale.WithApplicableAges(applicableAges),

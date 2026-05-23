@@ -47,21 +47,23 @@ func scaleReadModelFindOptions(page scalereadmodel.PageRequest) *options.FindOpt
 
 func scaleSummaryProjection() bson.M {
 	return bson.M{
-		"code":               1,
-		"scale_version":      1,
-		"title":              1,
-		"description":        1,
-		"category":           1,
-		"stages":             1,
-		"applicable_ages":    1,
-		"reporters":          1,
-		"tags":               1,
-		"questionnaire_code": 1,
-		"status":             1,
-		"created_by":         1,
-		"created_at":         1,
-		"updated_by":         1,
-		"updated_at":         1,
+		"code":                1,
+		"scale_version":       1,
+		"title":               1,
+		"description":         1,
+		"category":            1,
+		"stages":              1,
+		"applicable_ages":     1,
+		"reporters":           1,
+		"tags":                1,
+		"questionnaire_code":  1,
+		"status":              1,
+		"record_role":         1,
+		"is_active_published": 1,
+		"created_by":          1,
+		"created_at":          1,
+		"updated_by":          1,
+		"updated_at":          1,
 	}
 }
 
@@ -72,6 +74,16 @@ func (r scaleReadModel) CountScales(ctx context.Context, filter scalereadmodel.S
 func scaleFilterToBSON(filter scalereadmodel.ScaleFilter) bson.M {
 	query := bson.M{
 		"deleted_at": nil,
+	}
+	if filter.PublishedOnly {
+		query["record_role"] = domainScale.RecordRolePublishedSnapshot.String()
+		query["is_active_published"] = true
+	} else {
+		query["$or"] = bson.A{
+			bson.M{"record_role": domainScale.RecordRoleHead.String()},
+			bson.M{"record_role": bson.M{"$exists": false}},
+			bson.M{"record_role": ""},
+		}
 	}
 	if filter.Status != "" {
 		if parsed, ok := domainScale.ParseStatus(filter.Status); ok {

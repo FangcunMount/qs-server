@@ -31,7 +31,9 @@ type MedicalScale struct {
 	questionnaireVersion string
 
 	// 状态
-	status Status
+	status            Status
+	recordRole        RecordRole
+	isActivePublished bool
 
 	// 因子列表（包含解读规则）
 	factors []*Factor
@@ -61,10 +63,11 @@ func NewMedicalScale(scaleCode meta.Code, title string, opts ...MedicalScaleOpti
 	}
 
 	m := &MedicalScale{
-		scaleCode: scaleCode,
-		version:   DefaultScaleVersion,
-		title:     title,
-		status:    StatusDraft,
+		scaleCode:  scaleCode,
+		version:    DefaultScaleVersion,
+		title:      title,
+		status:     StatusDraft,
+		recordRole: RecordRoleHead,
 	}
 
 	for _, opt := range opts {
@@ -109,6 +112,20 @@ func WithQuestionnaire(qCode meta.Code, qVersion string) MedicalScaleOption {
 func WithStatus(s Status) MedicalScaleOption {
 	return func(m *MedicalScale) {
 		m.status = s
+	}
+}
+
+// WithRecordRole 设置记录角色。
+func WithRecordRole(role RecordRole) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.recordRole = NormalizeRecordRole(role.String())
+	}
+}
+
+// WithActivePublished 设置是否为当前激活的已发布快照。
+func WithActivePublished(active bool) MedicalScaleOption {
+	return func(m *MedicalScale) {
+		m.isActivePublished = active
 	}
 }
 
@@ -240,6 +257,29 @@ func (m *MedicalScale) GetStatus() Status {
 	return m.status
 }
 
+// GetRecordRole 获取记录角色。
+func (m *MedicalScale) GetRecordRole() RecordRole {
+	if m.recordRole == "" {
+		return RecordRoleHead
+	}
+	return m.recordRole
+}
+
+// IsHead 是否为工作版本。
+func (m *MedicalScale) IsHead() bool {
+	return m.GetRecordRole() == RecordRoleHead
+}
+
+// IsPublishedSnapshot 是否为已发布快照。
+func (m *MedicalScale) IsPublishedSnapshot() bool {
+	return m.GetRecordRole() == RecordRolePublishedSnapshot
+}
+
+// IsActivePublished 是否为当前激活的已发布快照。
+func (m *MedicalScale) IsActivePublished() bool {
+	return m.isActivePublished
+}
+
 // GetFactors 获取因子列表。
 //
 // Deprecated: 外部调用方应使用 FactorSnapshots，避免拿到可变 Factor 指针。
@@ -275,6 +315,16 @@ func (m *MedicalScale) SetCreatedBy(id meta.ID) {
 // SetUpdatedBy 设置更新人（仓储层重建使用）
 func (m *MedicalScale) SetUpdatedBy(id meta.ID) {
 	m.updatedBy = id
+}
+
+// SetRecordRole 设置记录角色（仓储层重建使用）。
+func (m *MedicalScale) SetRecordRole(role RecordRole) {
+	m.recordRole = NormalizeRecordRole(role.String())
+}
+
+// SetActivePublished 设置当前激活的已发布快照标记。
+func (m *MedicalScale) SetActivePublished(active bool) {
+	m.isActivePublished = active
 }
 
 // GetCategory 获取类别
@@ -610,6 +660,11 @@ func (m *MedicalScale) updateStatus(newStatus Status) error {
 		return newError(ErrorKindInvalidArgument, "archived scale cannot change status")
 	}
 	m.status = newStatus
+	return nil
+}
+
+func (m *MedicalScale) updateScaleVersion(newVersion ScaleVersion) error {
+	m.version = normalizeScaleVersion(newVersion.String())
 	return nil
 }
 

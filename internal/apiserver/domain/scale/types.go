@@ -3,6 +3,7 @@ package scale
 import (
 	"regexp"
 	"slices"
+	"strconv"
 	"strings"
 )
 
@@ -50,6 +51,79 @@ func ParseStatus(value string) (Status, bool) {
 	default:
 		return "", false
 	}
+}
+
+// RecordRole 表示量表记录在版本族中的角色。
+type RecordRole string
+
+const (
+	RecordRoleHead              RecordRole = "head"
+	RecordRolePublishedSnapshot RecordRole = "published_snapshot"
+)
+
+// String 获取角色字符串。
+func (r RecordRole) String() string {
+	return string(r)
+}
+
+// NormalizeRecordRole 将空值归一化为 head，兼容历史数据。
+func NormalizeRecordRole(value string) RecordRole {
+	switch RecordRole(value) {
+	case RecordRolePublishedSnapshot:
+		return RecordRolePublishedSnapshot
+	case RecordRoleHead:
+		fallthrough
+	default:
+		return RecordRoleHead
+	}
+}
+
+type ScaleVersion string
+
+func NewScaleVersion(value string) ScaleVersion {
+	return ScaleVersion(normalizeScaleVersion(value))
+}
+
+func (v ScaleVersion) String() string {
+	return string(v)
+}
+
+// IncrementPatch 递增 patch 版本号，例如 1.0.0 -> 1.0.1。
+func (v ScaleVersion) IncrementPatch() ScaleVersion {
+	raw := normalizeScaleVersion(string(v))
+	prefix := ""
+	if strings.HasPrefix(raw, "v") {
+		prefix = "v"
+		raw = strings.TrimPrefix(raw, "v")
+	}
+	parts := splitByDot(raw)
+	switch len(parts) {
+	case 0:
+		return ScaleVersion(prefix + "1.0.1")
+	case 1:
+		return ScaleVersion(prefix + parts[0] + ".0.1")
+	case 2:
+		return ScaleVersion(prefix + parts[0] + "." + parts[1] + ".1")
+	default:
+		patch := parseScaleVersionPart(parts[2])
+		patch++
+		return ScaleVersion(prefix + parts[0] + "." + parts[1] + "." + strconv.Itoa(patch))
+	}
+}
+
+func parseScaleVersionPart(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+func splitByDot(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ".")
 }
 
 // ===================== 因子编码 =================

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/component-base/pkg/logger"
 	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -14,60 +13,16 @@ func (s *lifecycleService) resolveQuestionnaireBinding() questionnaireBindingRes
 	return questionnaireBindingResolver{
 		repo:                 s.repo,
 		questionnaireCatalog: s.questionnaireCatalog,
-		baseInfo:             s.baseInfo,
 	}
 }
 
 type questionnaireBindingResolver struct {
 	repo                 questionnaireBindingLookup
 	questionnaireCatalog questionnairecatalog.Catalog
-	baseInfo             domscale.BaseInfo
 }
 
 type questionnaireBindingLookup interface {
 	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
-}
-
-func (r questionnaireBindingResolver) ensureQuestionnaireVersion(ctx context.Context, scaleCode string, m *domscale.MedicalScale) error {
-	if m.GetQuestionnaireCode().IsEmpty() {
-		return nil
-	}
-
-	if err := r.validate(ctx, m.GetQuestionnaireCode().Value(), m.GetQuestionnaireVersion(), scaleCode); err != nil {
-		return err
-	}
-
-	if m.GetQuestionnaireVersion() != "" {
-		return nil
-	}
-
-	questionnaireCode := m.GetQuestionnaireCode().Value()
-	logger.L(ctx).Infow("问卷版本为空，自动获取最新版本",
-		"scale_code", scaleCode,
-		"questionnaire_code", questionnaireCode,
-	)
-
-	if r.questionnaireCatalog == nil {
-		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-	}
-	q, err := r.questionnaireCatalog.FindPublishedQuestionnaire(ctx, questionnaireCode)
-	if err != nil {
-		return errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取关联问卷失败")
-	}
-	if q == nil {
-		return errors.WithCode(errorCode.ErrQuestionnaireNotFound, "关联的问卷不存在")
-	}
-
-	latestVersion := q.Version
-	logger.L(ctx).Infow("自动设置问卷版本",
-		"scale_code", scaleCode,
-		"questionnaire_code", questionnaireCode,
-		"version", latestVersion,
-	)
-	if err := r.baseInfo.UpdateQuestionnaire(m, m.GetQuestionnaireCode(), latestVersion); err != nil {
-		return errors.WrapC(err, errorCode.ErrInvalidArgument, "更新问卷版本失败")
-	}
-	return nil
 }
 
 func (r questionnaireBindingResolver) validate(ctx context.Context, questionnaireCode string, questionnaireVersion string, currentScaleCode string) error {

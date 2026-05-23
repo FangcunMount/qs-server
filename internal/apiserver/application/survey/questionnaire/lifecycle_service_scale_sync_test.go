@@ -4,8 +4,6 @@ import (
 	"context"
 	"testing"
 
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -70,35 +68,17 @@ func (r *questionnaireRepoSyncStub) HasPublishedSnapshots(_ context.Context, _ s
 	return false, nil
 }
 
-type scaleRepoSyncStub struct {
-	item        *domainScale.MedicalScale
-	updateCalls int
+type scaleBindingSyncerRecorder struct {
+	syncCalls   int
+	lastCode    string
+	lastVersion string
 }
 
-func (r *scaleRepoSyncStub) Create(_ context.Context, _ *domainScale.MedicalScale) error { return nil }
-func (r *scaleRepoSyncStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
-}
-func (r *scaleRepoSyncStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
-}
-func (r *scaleRepoSyncStub) FindByQuestionnaireCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	if r.item == nil {
-		return nil, domainScale.ErrNotFound
-	}
-	return r.item, nil
-}
-func (r *scaleRepoSyncStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*domainScale.MedicalScale, error) {
-	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
-}
-func (r *scaleRepoSyncStub) Update(_ context.Context, item *domainScale.MedicalScale) error {
-	r.item = item
-	r.updateCalls++
+func (r *scaleBindingSyncerRecorder) SyncQuestionnaireVersion(_ context.Context, questionnaireCode, version string) error {
+	r.syncCalls++
+	r.lastCode = questionnaireCode
+	r.lastVersion = version
 	return nil
-}
-func (r *scaleRepoSyncStub) Remove(_ context.Context, _ string) error { return nil }
-func (r *scaleRepoSyncStub) ExistsByCode(_ context.Context, _ string) (bool, error) {
-	return false, nil
 }
 
 func TestSyncScaleQuestionnaireVersion(t *testing.T) {
@@ -106,22 +86,21 @@ func TestSyncScaleQuestionnaireVersion(t *testing.T) {
 		name             string
 		code             string
 		questionnaireTyp domainQuestionnaire.QuestionnaireType
-		wantUpdateCalls  int
-		wantVersion      string
+		wantSyncCalls   int
+		wantSyncedVersion string
 	}{
 		{
-			name:             "updates single medical scale binding",
+			name:             "syncs medical scale questionnaire version",
 			code:             "Q-MS",
 			questionnaireTyp: domainQuestionnaire.TypeMedicalScale,
-			wantUpdateCalls:  1,
-			wantVersion:      "2.0",
+			wantSyncCalls:    1,
+			wantSyncedVersion: "2.0",
 		},
 		{
 			name:             "skips survey questionnaire",
 			code:             "Q-SURVEY",
 			questionnaireTyp: domainQuestionnaire.TypeSurvey,
-			wantUpdateCalls:  0,
-			wantVersion:      "1.0",
+			wantSyncCalls:    0,
 		},
 	}
 
@@ -136,33 +115,24 @@ func TestSyncScaleQuestionnaireVersion(t *testing.T) {
 			if err != nil {
 				t.Fatalf("NewQuestionnaire() error = %v", err)
 			}
-			scaleItem, err := domainScale.NewMedicalScale(
-				meta.NewCode("S-001"),
-				"Scale",
-				domainScale.WithQuestionnaire(meta.NewCode(tt.code), "1.0"),
-			)
-			if err != nil {
-				t.Fatalf("NewMedicalScale() error = %v", err)
-			}
-
-			scaleRepo := &scaleRepoSyncStub{item: scaleItem}
+			syncer := &scaleBindingSyncerRecorder{}
 			svc := &lifecycleService{
 				repo: &questionnaireRepoSyncStub{
 					byCode: map[string]*domainQuestionnaire.Questionnaire{
 						tt.code: q,
 					},
 				},
-				scaleSyncer: scaleApp.NewQuestionnaireBindingSyncer(scaleRepo),
+				scaleSyncer: syncer,
 			}
 
 			if err := svc.syncScaleQuestionnaireVersion(ctx, tt.code, "2.0"); err != nil {
 				t.Fatalf("syncScaleQuestionnaireVersion() error = %v", err)
 			}
-			if scaleRepo.updateCalls != tt.wantUpdateCalls {
-				t.Fatalf("syncScaleQuestionnaireVersion() updateCalls = %d, want %d", scaleRepo.updateCalls, tt.wantUpdateCalls)
+			if syncer.syncCalls != tt.wantSyncCalls {
+				t.Fatalf("syncScaleQuestionnaireVersion() syncCalls = %d, want %d", syncer.syncCalls, tt.wantSyncCalls)
 			}
-			if got := scaleRepo.item.GetQuestionnaireVersion(); got != tt.wantVersion {
-				t.Fatalf("syncScaleQuestionnaireVersion() questionnaire version = %q, want %q", got, tt.wantVersion)
+			if tt.wantSyncCalls > 0 && syncer.lastVersion != tt.wantSyncedVersion {
+				t.Fatalf("syncScaleQuestionnaireVersion() synced version = %q, want %q", syncer.lastVersion, tt.wantSyncedVersion)
 			}
 		})
 	}

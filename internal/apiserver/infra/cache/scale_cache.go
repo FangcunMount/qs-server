@@ -113,6 +113,15 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 	return nil
 }
 
+// CreatePublishedSnapshot 创建或更新已发布快照并失效相关缓存。
+func (r *CachedScaleRepository) CreatePublishedSnapshot(ctx context.Context, domain *scale.MedicalScale, active bool) error {
+	if err := r.repo.CreatePublishedSnapshot(ctx, domain, active); err != nil {
+		return err
+	}
+	r.invalidateScaleFamilyCache(ctx, domain.GetCode().String(), domain.GetScaleVersion())
+	return nil
+}
+
 // FindByCode 根据编码查询量表（优先从缓存读取）
 func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
 	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
@@ -152,10 +161,20 @@ func (r *CachedScaleRepository) FindByCodeVersion(ctx context.Context, code, sca
 	return r.reloadScaleVersionCacheFromSource(ctx, code, scaleVersion)
 }
 
+// FindPublishedByCode 根据编码查询当前激活的已发布量表快照。
+func (r *CachedScaleRepository) FindPublishedByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	return r.repo.FindPublishedByCode(ctx, code)
+}
+
 // FindByQuestionnaireCode 根据问卷编码查询量表
 func (r *CachedScaleRepository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
 	// 问卷编码查询不缓存（使用频率低，且需要维护额外索引）
 	return r.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
+}
+
+// FindPublishedByQuestionnaireCode 根据问卷编码查询当前激活的已发布量表快照。
+func (r *CachedScaleRepository) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+	return r.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 }
 
 // FindByQuestionnaireRef 根据问卷编码和版本查询量表
@@ -210,6 +229,24 @@ func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.Medica
 	return nil
 }
 
+// SetActivePublishedVersion 切换当前激活的已发布快照并失效缓存。
+func (r *CachedScaleRepository) SetActivePublishedVersion(ctx context.Context, code, scaleVersion string) error {
+	if err := r.repo.SetActivePublishedVersion(ctx, code, scaleVersion); err != nil {
+		return err
+	}
+	r.invalidateScaleFamilyCache(ctx, code, scaleVersion)
+	return nil
+}
+
+// ClearActivePublishedVersion 清空当前激活快照并失效缓存。
+func (r *CachedScaleRepository) ClearActivePublishedVersion(ctx context.Context, code string) error {
+	if err := r.repo.ClearActivePublishedVersion(ctx, code); err != nil {
+		return err
+	}
+	r.invalidateScaleFamilyCache(ctx, code, "")
+	return nil
+}
+
 // Remove 删除量表（同时失效缓存）
 func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
 	var removedVersion string
@@ -245,6 +282,28 @@ func (r *CachedScaleRepository) Remove(ctx context.Context, code string) error {
 // ExistsByCode 检查编码是否存在
 func (r *CachedScaleRepository) ExistsByCode(ctx context.Context, code string) (bool, error) {
 	return r.repo.ExistsByCode(ctx, code)
+}
+
+func (r *CachedScaleRepository) invalidateScaleFamilyCache(ctx context.Context, code, version string) {
+	if !r.store.available() {
+		return
+	}
+	if err := r.deleteCache(ctx, code); err != nil {
+		logger.L(ctx).Warnw("failed to invalidate scale cache",
+			"code", code,
+			"error", err,
+		)
+	}
+	if version == "" {
+		return
+	}
+	if err := r.deleteVersionCache(ctx, code, version); err != nil {
+		logger.L(ctx).Warnw("failed to invalidate scale version cache",
+			"code", code,
+			"scale_version", version,
+			"error", err,
+		)
+	}
 }
 
 // ==================== 缓存操作 ====================

@@ -16,8 +16,13 @@ type ScalePO struct {
 	// 基本信息
 	Code         string `bson:"code" json:"code"`
 	ScaleVersion string `bson:"scale_version,omitempty" json:"scale_version,omitempty"`
-	Title        string `bson:"title" json:"title"`
-	Description  string `bson:"description,omitempty" json:"description,omitempty"`
+	RecordRole   string `bson:"record_role,omitempty" json:"record_role,omitempty"`
+
+	// 是否为当前对外生效的已发布快照
+	IsActivePublished bool `bson:"is_active_published,omitempty" json:"is_active_published,omitempty"`
+
+	Title       string `bson:"title" json:"title"`
+	Description string `bson:"description,omitempty" json:"description,omitempty"`
 
 	// 分类信息
 	Category       string   `bson:"category,omitempty" json:"category,omitempty"`               // 主类

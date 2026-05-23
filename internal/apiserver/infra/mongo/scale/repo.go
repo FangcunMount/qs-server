@@ -6,6 +6,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -28,9 +29,14 @@ func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) 
 
 // Create 创建量表
 func (r *Repository) Create(ctx context.Context, domain *scale.MedicalScale) error {
+	domain.SetRecordRole(scale.RecordRoleHead)
+	domain.SetActivePublished(false)
+
 	po := r.mapper.ToPO(domain)
 	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
+	po.RecordRole = scale.RecordRoleHead.String()
+	po.IsActivePublished = false
 
 	insertData, err := po.ToBsonM()
 	if err != nil {
@@ -41,13 +47,32 @@ func (r *Repository) Create(ctx context.Context, domain *scale.MedicalScale) err
 	return err
 }
 
+// CreatePublishedSnapshot 创建或更新已发布量表快照。
+func (r *Repository) CreatePublishedSnapshot(ctx context.Context, domain *scale.MedicalScale, active bool) error {
+	po := r.mapper.ToPO(domain)
+	mongoBase.ApplyAuditUpdate(ctx, po)
+	po.BeforeUpdate()
+	po.RecordRole = scale.RecordRolePublishedSnapshot.String()
+	po.IsActivePublished = active
+
+	updateData, err := po.ToBsonM()
+	if err != nil {
+		return err
+	}
+
+	filter := bson.M{
+		"code":          domain.GetCode().String(),
+		"scale_version": domain.GetScaleVersion(),
+		"record_role":   scale.RecordRolePublishedSnapshot.String(),
+		"deleted_at":    nil,
+	}
+	_, err = r.Collection().UpdateOne(ctx, filter, bson.M{"$set": updateData}, options.Update().SetUpsert(true))
+	return err
+}
+
 // FindByCode 根据编码查询量表
 func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	filter := bson.M{
-		"code":       code,
-		"deleted_at": nil, // 排除已软删除的记录
-	}
-	return r.findOne(ctx, filter)
+	return r.findOne(ctx, headFilter(code))
 }
 
 // FindByCodeVersion 根据编码和量表版本查询量表。
@@ -55,29 +80,37 @@ func (r *Repository) FindByCodeVersion(ctx context.Context, code, scaleVersion s
 	if scaleVersion == "" {
 		return r.FindByCode(ctx, code)
 	}
-	filter := bson.M{
-		"code":       code,
-		"deleted_at": nil,
-		"$or":        scaleVersionCompatibilityFilter(scaleVersion),
+	domain, err := r.findOne(ctx, publishedVersionFilter(code, scaleVersion))
+	if err == nil {
+		return domain, nil
 	}
-	return r.findOne(ctx, filter)
+	if err != scale.ErrNotFound {
+		return nil, err
+	}
+	return r.findOne(ctx, headVersionFilter(code, scaleVersion))
+}
+
+// FindPublishedByCode 根据编码查询当前激活的已发布快照。
+func (r *Repository) FindPublishedByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
+	return r.findOne(ctx, publishedCodeFilter(code))
 }
 
 // FindByQuestionnaireCode 根据问卷编码查询量表
 func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
-	filter := bson.M{
-		"questionnaire_code": questionnaireCode,
-		"deleted_at":         nil,
-	}
-	return r.findOne(ctx, filter)
+	return r.findOne(ctx, headQuestionnaireFilter(questionnaireCode))
+}
+
+// FindPublishedByQuestionnaireCode 根据问卷编码查询当前激活的已发布量表快照。
+func (r *Repository) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+	return r.findOne(ctx, publishedQuestionnaireCodeFilter(questionnaireCode))
 }
 
 // FindByQuestionnaireRef 根据问卷编码和版本查询量表。
 func (r *Repository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error) {
 	if questionnaireVersion == "" {
-		return r.FindByQuestionnaireCode(ctx, questionnaireCode)
+		return r.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 	}
-	return r.findOne(ctx, questionnaireRefFilter(questionnaireCode, questionnaireVersion))
+	return r.findOne(ctx, publishedQuestionnaireRefFilter(questionnaireCode, questionnaireVersion))
 }
 
 func (r *Repository) findOne(ctx context.Context, filter bson.M) (*scale.MedicalScale, error) {
@@ -93,38 +126,114 @@ func (r *Repository) findOne(ctx context.Context, filter bson.M) (*scale.Medical
 	return r.mapper.ToDomain(ctx, &po), nil
 }
 
-func scaleVersionCompatibilityFilter(scaleVersion string) []bson.M {
-	return []bson.M{
-		{"scale_version": scaleVersion},
-		{
+func scaleVersionCompatibilityFilter(scaleVersion string) bson.A {
+	return bson.A{
+		bson.M{"scale_version": scaleVersion},
+		bson.M{
 			"questionnaire_version": scaleVersion,
-			"$or": []bson.M{
-				{"scale_version": ""},
-				{"scale_version": nil},
-				{"scale_version": bson.M{"$exists": false}},
+			"$or": bson.A{
+				bson.M{"scale_version": ""},
+				bson.M{"scale_version": nil},
+				bson.M{"scale_version": bson.M{"$exists": false}},
 			},
 		},
 	}
 }
 
-func questionnaireRefFilter(questionnaireCode, questionnaireVersion string) bson.M {
+func headRoleCandidates() bson.A {
+	return bson.A{
+		bson.M{"record_role": scale.RecordRoleHead.String()},
+		bson.M{"record_role": bson.M{"$exists": false}},
+		bson.M{"record_role": ""},
+	}
+}
+
+func headFilter(code string) bson.M {
+	return bson.M{
+		"code":       code,
+		"deleted_at": nil,
+		"$or":        headRoleCandidates(),
+	}
+}
+
+func headVersionFilter(code, scaleVersion string) bson.M {
+	filter := headFilter(code)
+	filter["$or"] = bson.A{
+		bson.M{
+			"record_role": scale.RecordRoleHead.String(),
+			"$or":         scaleVersionCompatibilityFilter(scaleVersion),
+		},
+		bson.M{
+			"record_role": bson.M{"$exists": false},
+			"$or":         scaleVersionCompatibilityFilter(scaleVersion),
+		},
+		bson.M{
+			"record_role": "",
+			"$or":         scaleVersionCompatibilityFilter(scaleVersion),
+		},
+	}
+	return filter
+}
+
+func publishedVersionFilter(code, scaleVersion string) bson.M {
+	return bson.M{
+		"code":        code,
+		"record_role": scale.RecordRolePublishedSnapshot.String(),
+		"deleted_at":  nil,
+		"$or":         scaleVersionCompatibilityFilter(scaleVersion),
+	}
+}
+
+func publishedCodeFilter(code string) bson.M {
+	return bson.M{
+		"code":                code,
+		"record_role":         scale.RecordRolePublishedSnapshot.String(),
+		"is_active_published": true,
+		"status":              scale.StatusPublished.String(),
+		"deleted_at":          nil,
+	}
+}
+
+func headQuestionnaireFilter(questionnaireCode string) bson.M {
+	return bson.M{
+		"questionnaire_code": questionnaireCode,
+		"deleted_at":         nil,
+		"$or":                headRoleCandidates(),
+	}
+}
+
+func publishedQuestionnaireCodeFilter(questionnaireCode string) bson.M {
+	return bson.M{
+		"questionnaire_code":  questionnaireCode,
+		"record_role":         scale.RecordRolePublishedSnapshot.String(),
+		"is_active_published": true,
+		"status":              scale.StatusPublished.String(),
+		"deleted_at":          nil,
+	}
+}
+
+func publishedQuestionnaireRefFilter(questionnaireCode, questionnaireVersion string) bson.M {
 	return bson.M{
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": questionnaireVersion,
+		"record_role":           scale.RecordRolePublishedSnapshot.String(),
+		"status":                scale.StatusPublished.String(),
 		"deleted_at":            nil,
 	}
 }
 
 // Update 更新量表
 func (r *Repository) Update(ctx context.Context, domain *scale.MedicalScale) error {
+	domain.SetRecordRole(scale.RecordRoleHead)
+	domain.SetActivePublished(false)
+
 	po := r.mapper.ToPO(domain)
 	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
+	po.RecordRole = scale.RecordRoleHead.String()
+	po.IsActivePublished = false
 
-	filter := bson.M{
-		"code":       domain.GetCode().String(),
-		"deleted_at": nil,
-	}
+	filter := headFilter(domain.GetCode().String())
 
 	updateData, err := po.ToBsonM()
 	if err != nil {
@@ -133,16 +242,61 @@ func (r *Repository) Update(ctx context.Context, domain *scale.MedicalScale) err
 
 	update := bson.M{"$set": updateData}
 
-	result, err := r.UpdateOne(ctx, filter, update)
+	_, err = r.Collection().UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	return err
+}
+
+// SetActivePublishedVersion 切换当前对外生效的已发布量表快照。
+func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, scaleVersion string) error {
+	now := time.Now()
+	userID := mongoBase.AuditUserID(ctx)
+
+	_, err := r.Collection().UpdateMany(ctx, bson.M{
+		"code":        code,
+		"record_role": scale.RecordRolePublishedSnapshot.String(),
+		"deleted_at":  nil,
+	}, bson.M{"$set": bson.M{
+		"is_active_published": false,
+		"updated_at":          now,
+		"updated_by":          userID,
+	}})
 	if err != nil {
 		return err
 	}
 
+	result, err := r.Collection().UpdateOne(ctx, bson.M{
+		"code":          code,
+		"scale_version": scaleVersion,
+		"record_role":   scale.RecordRolePublishedSnapshot.String(),
+		"deleted_at":    nil,
+	}, bson.M{"$set": bson.M{
+		"is_active_published": true,
+		"updated_at":          now,
+		"updated_by":          userID,
+	}})
+	if err != nil {
+		return err
+	}
 	if result.MatchedCount == 0 {
 		return scale.ErrNotFound
 	}
-
 	return nil
+}
+
+// ClearActivePublishedVersion 清空当前激活的已发布量表快照。
+func (r *Repository) ClearActivePublishedVersion(ctx context.Context, code string) error {
+	now := time.Now()
+	userID := mongoBase.AuditUserID(ctx)
+	_, err := r.Collection().UpdateMany(ctx, bson.M{
+		"code":        code,
+		"record_role": scale.RecordRolePublishedSnapshot.String(),
+		"deleted_at":  nil,
+	}, bson.M{"$set": bson.M{
+		"is_active_published": false,
+		"updated_at":          now,
+		"updated_by":          userID,
+	}})
+	return err
 }
 
 // Remove 删除量表（软删除）
@@ -163,7 +317,7 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 		},
 	}
 
-	result, err := r.UpdateOne(ctx, filter, update)
+	result, err := r.Collection().UpdateMany(ctx, filter, update)
 	if err != nil {
 		return err
 	}
@@ -177,12 +331,7 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 
 // ExistsByCode 检查编码是否存在
 func (r *Repository) ExistsByCode(ctx context.Context, code string) (bool, error) {
-	filter := bson.M{
-		"code":       code,
-		"deleted_at": nil,
-	}
-
-	count, err := r.Collection().CountDocuments(ctx, filter)
+	count, err := r.Collection().CountDocuments(ctx, headFilter(code))
 	if err != nil {
 		return false, err
 	}
