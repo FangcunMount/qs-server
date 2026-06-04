@@ -15,6 +15,15 @@ import (
 	"github.com/go-sql-driver/mysql"
 )
 
+const mysqlMaxIdentifierLength = 64
+
+var backupTablePrefixes = map[string]string{
+	"assessment":       "seed_bak_assessment_",
+	"assessment_task":  "seed_bak_task_",
+	"assessment_score": "seed_bak_score_",
+	"testee":           "seed_bak_testee_",
+}
+
 type config struct {
 	mysqlDSN            string
 	orgID               int64
@@ -579,34 +588,34 @@ func printPreviewRows(rows []previewRow) {
 
 func backupSourceRows(ctx context.Context, conn *sql.Conn, cfg config) error {
 	statements := []string{
-		fmt.Sprintf("CREATE TABLE seeddata_rewrite_bak_assessment_%s LIKE assessment", cfg.backupSuffix),
-		fmt.Sprintf(`INSERT IGNORE INTO seeddata_rewrite_bak_assessment_%s
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s LIKE assessment", backupTableName("assessment", cfg.backupSuffix)),
+		fmt.Sprintf(`INSERT IGNORE INTO %s
 SELECT a.* FROM assessment a
-INNER JOIN seeddata_assessment_time_rewrite_scope s ON s.assessment_id = a.id`, cfg.backupSuffix),
-		fmt.Sprintf("CREATE TABLE seeddata_rewrite_bak_assessment_task_%s LIKE assessment_task", cfg.backupSuffix),
-		fmt.Sprintf(`INSERT IGNORE INTO seeddata_rewrite_bak_assessment_task_%s
+INNER JOIN seeddata_assessment_time_rewrite_scope s ON s.assessment_id = a.id`, backupTableName("assessment", cfg.backupSuffix)),
+		fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s LIKE assessment_task", backupTableName("assessment_task", cfg.backupSuffix)),
+		fmt.Sprintf(`INSERT IGNORE INTO %s
 SELECT t.* FROM assessment_task t
-INNER JOIN seeddata_assessment_time_rewrite_scope s ON s.task_id = t.id`, cfg.backupSuffix),
+INNER JOIN seeddata_assessment_time_rewrite_scope s ON s.task_id = t.id`, backupTableName("assessment_task", cfg.backupSuffix)),
 	}
 	if cfg.rewriteScoreTimes {
 		statements = append(statements,
-			fmt.Sprintf("CREATE TABLE seeddata_rewrite_bak_assessment_score_%s LIKE assessment_score", cfg.backupSuffix),
-			fmt.Sprintf(`INSERT IGNORE INTO seeddata_rewrite_bak_assessment_score_%s
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s LIKE assessment_score", backupTableName("assessment_score", cfg.backupSuffix)),
+			fmt.Sprintf(`INSERT IGNORE INTO %s
 SELECT sc.* FROM assessment_score sc
 INNER JOIN seeddata_assessment_time_rewrite_scope s ON s.assessment_id = sc.assessment_id
-WHERE sc.deleted_at IS NULL`, cfg.backupSuffix),
+WHERE sc.deleted_at IS NULL`, backupTableName("assessment_score", cfg.backupSuffix)),
 		)
 	}
 	if cfg.refreshTesteeStats {
 		statements = append(statements,
-			fmt.Sprintf("CREATE TABLE seeddata_rewrite_bak_testee_%s LIKE testee", cfg.backupSuffix),
-			fmt.Sprintf(`INSERT IGNORE INTO seeddata_rewrite_bak_testee_%s
+			fmt.Sprintf("CREATE TABLE IF NOT EXISTS %s LIKE testee", backupTableName("testee", cfg.backupSuffix)),
+			fmt.Sprintf(`INSERT IGNORE INTO %s
 SELECT te.* FROM testee te
 INNER JOIN (
   SELECT DISTINCT org_id, testee_id
   FROM seeddata_assessment_time_rewrite_scope
 ) s ON s.org_id = te.org_id AND s.testee_id = te.id
-WHERE te.deleted_at IS NULL`, cfg.backupSuffix),
+WHERE te.deleted_at IS NULL`, backupTableName("testee", cfg.backupSuffix)),
 		)
 	}
 
@@ -785,7 +794,17 @@ func validateBackupSuffix(s string) error {
 	if !regexp.MustCompile(`^[A-Za-z0-9_]+$`).MatchString(s) {
 		return fmt.Errorf("must match ^[A-Za-z0-9_]+$")
 	}
+	for source, prefix := range backupTablePrefixes {
+		name := prefix + s
+		if len(name) > mysqlMaxIdentifierLength {
+			return fmt.Errorf("%s backup table name %q is %d characters; MySQL limit is %d", source, name, len(name), mysqlMaxIdentifierLength)
+		}
+	}
 	return nil
+}
+
+func backupTableName(source, suffix string) string {
+	return backupTablePrefixes[source] + suffix
 }
 
 func nullString(v sql.NullString) string {

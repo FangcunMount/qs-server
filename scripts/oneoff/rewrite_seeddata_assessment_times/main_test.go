@@ -1,6 +1,9 @@
 package main
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestUint64CSVFlagSetAcceptsRepeatedAndCommaSeparatedValues(t *testing.T) {
 	var ids uint64CSVFlag
@@ -41,6 +44,20 @@ func TestValidateBackupSuffix(t *testing.T) {
 	for _, suffix := range []string{"bad-suffix", "bad.suffix", ""} {
 		if err := validateBackupSuffix(suffix); err == nil {
 			t.Fatalf("validateBackupSuffix(%q) expected error", suffix)
+		}
+	}
+
+	if err := validateBackupSuffix(strings.Repeat("a", mysqlMaxIdentifierLength)); err == nil {
+		t.Fatal("validateBackupSuffix() expected error for too long generated table name")
+	}
+}
+
+func TestBackupTableNameUsesShortMySQLSafePrefixes(t *testing.T) {
+	suffix := "20260603_seeddata_time_rewrite"
+	for source := range backupTablePrefixes {
+		name := backupTableName(source, suffix)
+		if len(name) > mysqlMaxIdentifierLength {
+			t.Fatalf("backup table name %q length = %d, want <= %d", name, len(name), mysqlMaxIdentifierLength)
 		}
 	}
 }
