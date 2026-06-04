@@ -430,17 +430,22 @@ SELECT
   COUNT(*) AS assessments,
   COUNT(DISTINCT plan_id) AS plans,
   COUNT(DISTINCT testee_id) AS testees,
-  COALESCE((SELECT COUNT(*) FROM assessment_score s INNER JOIN seeddata_assessment_time_rewrite_scope r ON r.assessment_id = s.assessment_id WHERE s.deleted_at IS NULL), 0) AS assessment_scores,
   CAST(MIN(target_date) AS CHAR) AS min_target_date,
   CAST(MAX(target_date) AS CHAR) AS max_target_date
 FROM seeddata_assessment_time_rewrite_scope`).Scan(
 		&summary.Assessments,
 		&summary.Plans,
 		&summary.Testees,
-		&summary.AssessmentScore,
 		&summary.MinTargetDate,
 		&summary.MaxTargetDate,
 	); err != nil {
+		return scopeSummary{}, err
+	}
+	if err := conn.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM assessment_score s
+INNER JOIN seeddata_assessment_time_rewrite_scope r ON r.assessment_id = s.assessment_id
+WHERE s.deleted_at IS NULL`).Scan(&summary.AssessmentScore); err != nil {
 		return scopeSummary{}, err
 	}
 	return summary, nil
