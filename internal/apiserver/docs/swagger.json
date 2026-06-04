@@ -102,7 +102,7 @@
         },
         "/api/v1/answersheets/admin-submit": {
             "post": {
-                "description": "管理员绕过 ProfileLink 权限校验提交答卷",
+                "description": "管理员绕过ProfileLink 权限校验提交答卷",
                 "consumes": [
                     "application/json"
                 ],
@@ -4447,6 +4447,76 @@
                 }
             }
         },
+        "/api/v1/testees/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "根据受试者 ID 获取受试者详情",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "受试者"
+                ],
+                "summary": "获取受试者详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.TesteeResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/testees/{id}/plans": {
             "get": {
                 "description": "查看某个受试者参与的所有计划",
@@ -4648,7 +4718,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的开放任务，key_focus 使用重点关注字段。",
+                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
                 "produces": [
                     "application/json"
                 ],
@@ -4682,6 +4752,27 @@
                         "description": "OK",
                         "schema": {
                             "$ref": "#/definitions/response.ClinicianWorkbenchQueueResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/health": {
+            "get": {
+                "description": "返回 apiserver 健康状态",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "health"
+                ],
+                "summary": "健康检查",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "object",
+                            "additionalProperties": true
                         }
                     }
                 }
@@ -5137,7 +5228,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的开放任务，key_focus 使用重点关注字段。",
+                "description": "queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up 返回每名受试者最紧急的待开放或已开放任务，key_focus 使用重点关注字段。",
                 "produces": [
                     "application/json"
                 ],
@@ -5216,7 +5307,7 @@
                         "BearerAuth": []
                     }
                 ],
-                "description": "queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。",
+                "description": "queue_type 取值：high_risk、follow_up、key_focus；follow_up 只包含待开放或已开放任务；仅 qs:admin 可访问。clinician_id 可选，存在时限制到该医生已分配受试者。",
                 "produces": [
                     "application/json"
                 ],
@@ -5776,6 +5867,9 @@
                     "type": "integer"
                 },
                 "plan_id": {
+                    "type": "string"
+                },
+                "planned_after": {
                     "type": "string"
                 },
                 "planned_before": {
@@ -7029,6 +7123,9 @@
                         "type": "string"
                     }
                 },
+                "scale_version": {
+                    "type": "string"
+                },
                 "stages": {
                     "type": "array",
                     "items": {
@@ -7314,7 +7411,7 @@
                     "type": "string"
                 },
                 "profile_id": {
-                    "description": "用户档案ID（新字段）",
+                    "description": "用户档案ID",
                     "type": "string"
                 },
                 "source": {

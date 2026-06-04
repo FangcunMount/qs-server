@@ -46,6 +46,7 @@ type ListTaskWindowRequest struct {
 	PlanID        string   `json:"plan_id"`
 	Status        string   `json:"status,omitempty"`
 	TesteeIDs     []string `json:"testee_ids,omitempty"`
+	PlannedAfter  string   `json:"planned_after,omitempty"`
 	PlannedBefore string   `json:"planned_before,omitempty"`
 	Page          int      `json:"page,omitempty"`
 	PageSize      int      `json:"page_size,omitempty"`

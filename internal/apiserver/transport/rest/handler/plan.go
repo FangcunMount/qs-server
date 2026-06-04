@@ -513,6 +513,7 @@ func (h *PlanHandler) ListTaskWindow(c *gin.Context) {
 		PlanID:        req.PlanID,
 		TesteeIDs:     req.TesteeIDs,
 		Status:        req.Status,
+		PlannedAfter:  req.PlannedAfter,
 		PlannedBefore: req.PlannedBefore,
 		Page:          req.Page,
 		PageSize:      req.PageSize,

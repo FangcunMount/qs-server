@@ -135,6 +135,7 @@ func TestBuildTaskWindowQueryDocumentsCursorOrderAndLimitContract(t *testing.T) 
 	db := newDryRunPlanDB(t)
 	var rows []AssessmentTaskPO
 	status := "opened"
+	plannedAfter := time.Date(2026, 5, 3, 0, 0, 0, 0, time.UTC)
 	plannedBefore := time.Date(2026, 5, 3, 10, 0, 0, 0, time.UTC)
 
 	stmt := buildTaskWindowQuery(
@@ -144,6 +145,7 @@ func TestBuildTaskWindowQueryDocumentsCursorOrderAndLimitContract(t *testing.T) 
 			PlanID:        101,
 			TesteeIDs:     []uint64{3001, 3002},
 			Status:        &status,
+			PlannedAfter:  &plannedAfter,
 			PlannedBefore: &plannedBefore,
 		},
 	).Order("planned_at ASC").Order("id ASC").Limit(11).Find(&rows).Statement
@@ -155,6 +157,7 @@ func TestBuildTaskWindowQueryDocumentsCursorOrderAndLimitContract(t *testing.T) 
 		"deleted_at IS NULL",
 		"testee_id IN",
 		"status = ?",
+		"planned_at >= ?",
 		"planned_at <= ?",
 		"ORDER BY planned_at ASC,id ASC",
 		"LIMIT ?",

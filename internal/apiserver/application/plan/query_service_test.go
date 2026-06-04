@@ -5,8 +5,10 @@ import (
 	"testing"
 	"time"
 
+	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/planreadmodel"
+	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 type planReadModelStub struct {
@@ -130,6 +132,7 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 		PlanID:        planAggregate.GetID().String(),
 		TesteeIDs:     []string{"3001", "3002"},
 		Status:        "pending",
+		PlannedAfter:  "2026-04-11 08:00:00",
 		PlannedBefore: "2026-04-11 12:00:00",
 		Page:          2,
 		PageSize:      50,
@@ -149,6 +152,9 @@ func TestQueryServiceListTaskWindowForwardsWindowFilters(t *testing.T) {
 	}
 	if reader.lastWindowFilter.Status == nil || *reader.lastWindowFilter.Status != "pending" {
 		t.Fatalf("unexpected window status: %+v", reader.lastWindowFilter.Status)
+	}
+	if reader.lastWindowFilter.PlannedAfter == nil || reader.lastWindowFilter.PlannedAfter.Format("2006-01-02 15:04:05") != "2026-04-11 08:00:00" {
+		t.Fatalf("unexpected planned_after: %+v", reader.lastWindowFilter.PlannedAfter)
 	}
 	if reader.lastWindowFilter.PlannedBefore == nil || reader.lastWindowFilter.PlannedBefore.Format("2006-01-02 15:04:05") != "2026-04-11 12:00:00" {
 		t.Fatalf("unexpected planned_before: %+v", reader.lastWindowFilter.PlannedBefore)
@@ -171,6 +177,20 @@ func TestQueryServiceListTaskWindowRejectsInvalidStatus(t *testing.T) {
 	})
 	if err == nil {
 		t.Fatal("expected invalid status error")
+	}
+}
+
+func TestQueryServiceListTaskWindowRejectsPlannedAfterAfterBefore(t *testing.T) {
+	service := NewQueryService(&planReadModelStub{}, &taskReadModelStub{}, nil)
+
+	_, err := service.ListTaskWindow(context.Background(), ListTaskWindowDTO{
+		OrgID:         1,
+		PlanID:        "614333603412718126",
+		PlannedAfter:  "2026-04-11 12:00:00",
+		PlannedBefore: "2026-04-11 08:00:00",
+	})
+	if err == nil || !cberrors.IsCode(err, errorCode.ErrInvalidArgument) {
+		t.Fatalf("expected ErrInvalidArgument, got: %v", err)
 	}
 }
 

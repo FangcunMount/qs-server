@@ -53,6 +53,7 @@ type TaskWindowFilter struct {
 	PlanID        uint64
 	TesteeIDs     []uint64
 	Status        *string
+	PlannedAfter  *time.Time
 	PlannedBefore *time.Time
 }
 

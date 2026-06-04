@@ -218,6 +218,15 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 		status = &statusVal
 	}
 
+	var plannedAfter *time.Time
+	if rawAfter := strings.TrimSpace(dto.PlannedAfter); rawAfter != "" {
+		parsed, err := parseTime(rawAfter)
+		if err != nil {
+			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的 planned_after: %v", err)
+		}
+		plannedAfter = &parsed
+	}
+
 	var plannedBefore *time.Time
 	if rawBefore := strings.TrimSpace(dto.PlannedBefore); rawBefore != "" {
 		parsed, err := parseTime(rawBefore)
@@ -225,6 +234,9 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 			return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的 planned_before: %v", err)
 		}
 		plannedBefore = &parsed
+	}
+	if plannedAfter != nil && plannedBefore != nil && plannedAfter.After(*plannedBefore) {
+		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "planned_after 不能晚于 planned_before")
 	}
 
 	testeeIDs := make([]testee.ID, 0, len(dto.TesteeIDs))
@@ -242,6 +254,7 @@ func (s *queryService) ListTaskWindow(ctx context.Context, dto ListTaskWindowDTO
 	filter := planreadmodel.TaskWindowFilter{
 		OrgID:         dto.OrgID,
 		PlanID:        planID.Uint64(),
+		PlannedAfter:  plannedAfter,
 		PlannedBefore: plannedBefore,
 	}
 	if status != nil {

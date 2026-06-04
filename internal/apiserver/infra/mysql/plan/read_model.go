@@ -267,6 +267,9 @@ func buildTaskWindowQuery(db *gorm.DB, filter planreadmodel.TaskWindowFilter) *g
 	if filter.Status != nil {
 		query = query.Where("status = ?", *filter.Status)
 	}
+	if filter.PlannedAfter != nil {
+		query = query.Where("planned_at >= ?", *filter.PlannedAfter)
+	}
 	if filter.PlannedBefore != nil {
 		query = query.Where("planned_at <= ?", *filter.PlannedBefore)
 	}

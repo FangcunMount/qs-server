@@ -58,6 +58,7 @@ type ListTaskWindowDTO struct {
 	PlanID        string   // 计划ID（必填）
 	TesteeIDs     []string // 受试者ID集合（可选）
 	Status        string   // 状态（可选）
+	PlannedAfter  string   // planned_at >= after（可选）
 	PlannedBefore string   // planned_at <= before（可选）
 	Page          int      // 页码（从1开始）
 	PageSize      int      // 每页数量
