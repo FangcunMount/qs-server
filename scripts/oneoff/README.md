@@ -28,6 +28,7 @@ export REDIS_PASSWORD='***'
 | `rebuild_access_funnel_from_sources/main.go` | 从接入业务源重建接入漏斗统计源和聚合 | MySQL `assessment_entry_intake_log` / `statistics_journey_daily.access_*` |
 | `rebuild_statistics_facts_from_sources/main.go` | 从业务源表重建统计事实层 | MySQL `behavior_footprint` / `assessment_episode` |
 | `rebuild_statistics_aggregates_and_cache/main.go` | 重建统计聚合表并刷新统计查询缓存 | MySQL 统计聚合表，Redis 统计查询缓存 |
+| `rebuild_seeddata_access_statistics/main.go` | 一站式修复 seeddata 接入统计历史数据 | MySQL intake/resolve log、`behavior_footprint`、`statistics_journey_daily` |
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
@@ -274,6 +275,82 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 - `--inferred-testee-created`：推导出来的 intake log 是否记为新建档案，默认开启。
 - `--backup-suffix`：备份表后缀，只允许字母、数字和下划线。
 - `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
+
+## rebuild_seeddata_access_statistics/main.go
+
+### 做什么
+
+一站式修复 `seeddata-runner` 历史数据导致的接入统计偏低，串联以下阶段：
+
+1. 从 `clinician_relation` 推导缺失的 `assessment_entry_intake_log`（默认仅 `testee.source = daily_simulation`）。
+2. 从 intake log 推导缺失的 `assessment_entry_resolve_log`（供 `entry_opened`）。
+3. 将 resolve/intake log 投影到 `behavior_footprint`（`entry_opened` / `intake_confirmed` / `testee_profile_created` / `care_relationship_established`）。
+4. 重建 `statistics_journey_daily`（含临床人员维度 `intake_count` 等）与组织快照。
+5. 可选刷新 Redis 统计查询缓存。
+
+### 解决什么问题
+
+旧 seeddata 绕过 public intake、直接 assign-attending，导致漏斗事件缺失，临床人员维度 `window.intake_count` 远低于 `snapshot.primary_testee_count`。本脚本一次执行完成源日志补录、事实投影和聚合重算。
+
+### 如何调用
+
+先 dry-run：
+
+```bash
+go run scripts/oneoff/rebuild_seeddata_access_statistics/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --preview-limit 50
+```
+
+确认后执行（默认跳过 Redis，只写 MySQL）：
+
+```bash
+go run scripts/oneoff/rebuild_seeddata_access_statistics/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --backup-suffix 20260605_seeddata_access \
+  --apply
+```
+
+需要同时刷新缓存时，追加 Redis 参数并关闭 `--skip-cache`：
+
+```bash
+go run scripts/oneoff/rebuild_seeddata_access_statistics/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --backup-suffix 20260605_seeddata_access \
+  --redis-addr "$REDIS_ADDR" \
+  --redis-query-namespace 'qs:cache:query' \
+  --redis-password "$REDIS_PASSWORD" \
+  --skip-cache=false \
+  --apply
+```
+
+验收 SQL（临床人员 30 天窗口 intake 应明显上升）：
+
+```sql
+SELECT clinician_id, SUM(intake_confirmed_count) AS intake_count
+FROM statistics_journey_daily
+WHERE org_id = 1 AND subject_type = 'clinician' AND deleted_at IS NULL
+  AND stat_date >= DATE_SUB(CURDATE(), INTERVAL 30 DAY)
+GROUP BY clinician_id
+ORDER BY intake_count DESC
+LIMIT 20;
+```
+
+关键参数：
+
+- `--org-id` / `--all-orgs`：二选一。
+- `--testee-source`：推导 intake 的受试者来源，默认 `daily_simulation`。
+- `--skip-intake` / `--skip-resolve` / `--skip-footprint` / `--skip-aggregate` / `--skip-cache`：分阶段跳过；默认 `--skip-cache=true`。
+- `--backup-suffix`：备份 intake/resolve/footprint/journey 窗口数据。
 
 ## rebuild_statistics_facts_from_sources/main.go
 
