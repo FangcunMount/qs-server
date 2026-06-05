@@ -14,32 +14,47 @@ type readModel struct {
 }
 
 const followUpQueueTasksQuery = `
-SELECT ranked.*
+SELECT picked_task.*
 FROM (
 	SELECT
-		assessment_task.*,
-		ROW_NUMBER() OVER (
-			PARTITION BY assessment_task.testee_id
-			ORDER BY
-				CASE WHEN assessment_task.expire_at IS NULL THEN 1 ELSE 0 END ASC,
-				assessment_task.expire_at ASC,
-				assessment_task.planned_at ASC,
-				assessment_task.id ASC
-		) AS row_num
-	FROM assessment_task
-	WHERE assessment_task.org_id = ?
-		%s
-		AND assessment_task.status IN ?
-		AND assessment_task.deleted_at IS NULL
-) ranked
-WHERE ranked.row_num = 1
-ORDER BY
-	CASE WHEN ranked.expire_at IS NULL THEN 1 ELSE 0 END ASC,
-	ranked.expire_at ASC,
-	ranked.planned_at ASC,
-	ranked.id ASC
-LIMIT ? OFFSET ?
-`
+		ranked.id,
+		ranked.expire_at,
+		ranked.planned_at
+	FROM (
+		SELECT
+			assessment_task.id,
+			assessment_task.testee_id,
+			assessment_task.expire_at,
+			assessment_task.planned_at,
+			ROW_NUMBER() OVER (
+				PARTITION BY assessment_task.testee_id
+				ORDER BY
+					CASE WHEN assessment_task.expire_at IS NULL THEN 1 ELSE 0 END ASC,
+					assessment_task.expire_at ASC,
+					assessment_task.planned_at ASC,
+					assessment_task.id ASC
+			) AS row_num
+		FROM assessment_task FORCE INDEX (idx_task_workbench_followup_opened)
+		WHERE assessment_task.org_id = ?
+			%s
+			AND assessment_task.status IN ?
+			AND assessment_task.deleted_at IS NULL
+	) ranked
+	WHERE ranked.row_num = 1
+	ORDER BY
+		CASE WHEN ranked.expire_at IS NULL THEN 1 ELSE 0 END ASC,
+		ranked.expire_at ASC,
+		ranked.planned_at ASC,
+		ranked.id ASC
+	LIMIT ? OFFSET ?
+	) picked
+	JOIN assessment_task picked_task ON picked_task.id = picked.id
+	ORDER BY
+		CASE WHEN picked.expire_at IS NULL THEN 1 ELSE 0 END ASC,
+		picked.expire_at ASC,
+		picked.planned_at ASC,
+		picked.id ASC
+		`
 
 // NewReadModel creates the MySQL-backed plan read model adapter.
 func NewReadModel(db *gorm.DB) interface {

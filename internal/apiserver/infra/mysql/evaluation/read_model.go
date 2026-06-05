@@ -45,20 +45,23 @@ ORDER BY occurred_at DESC, assessment_id DESC
 
 const latestRiskQueueCoreSQL = `
 FROM assessment a
-INNER JOIN (
-	SELECT testee_id, MAX(id) AS latest_id
-	FROM assessment
-	WHERE org_id = ?
-		%s
-		AND status = ?
-		AND risk_level IS NOT NULL
-		AND risk_level <> ''
-		AND deleted_at IS NULL
-	GROUP BY testee_id
-) latest ON a.id = latest.latest_id
-WHERE a.deleted_at IS NULL
+WHERE a.org_id = ?
+	%s
+	AND a.status = ?
+	AND a.deleted_at IS NULL
 	AND a.risk_level IN ?
-`
+	AND NOT EXISTS (
+		SELECT 1
+		FROM assessment newer
+		WHERE newer.org_id = a.org_id
+			AND newer.testee_id = a.testee_id
+			AND newer.status = ?
+			AND newer.risk_level IS NOT NULL
+			AND newer.risk_level <> ''
+			AND newer.deleted_at IS NULL
+			AND newer.id > a.id
+	)
+	`
 
 const latestRiskQueueSelectSQL = `
 SELECT
@@ -258,7 +261,7 @@ func latestRiskQueueSelect(restrictToTesteeIDs bool) string {
 
 func latestRiskQueueTesteePredicate(restrictToTesteeIDs bool) string {
 	if restrictToTesteeIDs {
-		return "AND testee_id IN ?"
+		return "AND a.testee_id IN ?"
 	}
 	return ""
 }
@@ -269,7 +272,7 @@ func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []int
 	if filter.RestrictToTesteeIDs {
 		args = append(args, uniqueUint64(filter.TesteeIDs))
 	}
-	args = append(args, "interpreted", riskLevels)
+	args = append(args, "interpreted", riskLevels, "interpreted")
 	return args
 }
 

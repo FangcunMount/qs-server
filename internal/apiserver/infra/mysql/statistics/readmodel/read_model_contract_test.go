@@ -271,12 +271,15 @@ func TestBuildPlanTaskFulfillmentWindowQueryDocumentsCohortContract(t *testing.T
 	now := to.AddDate(0, 0, 1)
 
 	stmt := buildPlanTaskFulfillmentWindowQuery(db.Session(&gorm.Session{DryRun: true}), 9, &planID, from, to, now).
-		Find(&row).Statement
+		Scan(&row).Statement
 
 	sql := stmt.SQL.String()
 	for _, token := range []string{
 		"assessment_task t",
 		"JOIN assessment_plan p",
+		"FORCE INDEX (idx_task_org_deleted_planned_status)",
+		"FORCE INDEX (idx_task_org_deleted_expire_status)",
+		"CROSS JOIN",
 		"t.planned_at >= ?",
 		"t.expire_at IS NOT NULL",
 		"t.completed_at <= t.expire_at",
@@ -314,6 +317,8 @@ func TestBuildPlanTaskFulfillmentTrendQueryDocumentsCohortDateContract(t *testin
 	for _, token := range []string{
 		"DATE(t.planned_at)",
 		"DATE(t.expire_at)",
+		"FORCE INDEX (idx_task_org_deleted_planned_status)",
+		"FORCE INDEX (idx_task_org_deleted_expire_status)",
 		"planned_task_count",
 		"due_task_count",
 		"completed_task_count",
@@ -330,6 +335,60 @@ func TestBuildPlanTaskFulfillmentTrendQueryDocumentsCohortDateContract(t *testin
 		if !containsStatisticsReadModelVar(stmt.Vars, want) {
 			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
 		}
+	}
+}
+
+func TestBuildPlanTaskDistinctTesteeCountQueryDocumentsRangeAndPreGroupContract(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var row struct {
+		Count int64
+	}
+	planID := uint64(501)
+	from := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	query, err := buildPlanTaskDistinctTesteeCountQuery(db.Session(&gorm.Session{DryRun: true}), 9, &planID, "created_at", "", from, to)
+	if err != nil {
+		t.Fatalf("build created_at distinct query: %v", err)
+	}
+	stmt := query.Scan(&row).Statement
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"COUNT(DISTINCT scoped.testee_id)",
+		"FORCE INDEX (idx_task_org_deleted_created)",
+		"t.created_at >= ?",
+		"t.created_at < ?",
+		"GROUP BY t.plan_id, t.testee_id",
+		"JOIN assessment_plan p",
+		"t.plan_id = ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("created_at distinct query sql %q does not contain %q", sql, token)
+		}
+	}
+	if !containsStatisticsReadModelVar(stmt.Vars, int64(9)) || !containsStatisticsReadModelVar(stmt.Vars, planID) {
+		t.Fatalf("query vars = %#v, want org/plan", stmt.Vars)
+	}
+
+	query, err = buildPlanTaskDistinctTesteeCountQuery(db.Session(&gorm.Session{DryRun: true}), 9, nil, "completed_at", "completed", from, to)
+	if err != nil {
+		t.Fatalf("build completed_at distinct query: %v", err)
+	}
+	stmt = query.Scan(&row).Statement
+	sql = stmt.SQL.String()
+	for _, token := range []string{
+		"FORCE INDEX (idx_task_org_deleted_completed_status)",
+		"t.completed_at >= ?",
+		"t.status = ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("completed_at distinct query sql %q does not contain %q", sql, token)
+		}
+	}
+	if !containsStatisticsReadModelVar(stmt.Vars, "completed") {
+		t.Fatalf("query vars = %#v, want completed status", stmt.Vars)
 	}
 }
 

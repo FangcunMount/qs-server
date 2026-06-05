@@ -875,21 +875,48 @@ func buildPlanTaskTrendQuery(db *gorm.DB, orgID int64, planID *uint64, from, to 
 }
 
 func buildPlanTaskFulfillmentWindowQuery(db *gorm.DB, orgID int64, planID *uint64, from, to, now time.Time) *gorm.DB {
-	query := buildPlanTaskFulfillmentBaseQuery(db, orgID, planID).
-		Select(`
-			COALESCE(SUM(CASE WHEN t.planned_at >= ? AND t.planned_at < ? THEN 1 ELSE 0 END), 0) AS planned_task_count,
-			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? THEN 1 ELSE 0 END), 0) AS due_task_count,
-			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? THEN 1 ELSE 0 END), 0) AS completed_task_count,
-			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? AND t.completed_at IS NOT NULL AND t.completed_at <= t.expire_at THEN 1 ELSE 0 END), 0) AS on_time_completed_count,
-			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND (t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?)) THEN 1 ELSE 0 END), 0) AS overdue_task_count
-		`,
-			from, to,
-			from, to,
-			from, to, planTaskStatusCompleted,
-			from, to, planTaskStatusCompleted,
-			from, to, planTaskStatusExpired, planTaskStatusCompleted, now,
-		)
-	return query
+	planClause := ""
+	plannedArgs := []interface{}{orgID, planTaskStatusCanceled, from, to}
+	dueArgs := []interface{}{
+		planTaskStatusCompleted,
+		planTaskStatusCompleted,
+		planTaskStatusExpired, planTaskStatusCompleted, now,
+		orgID, planTaskStatusCanceled, from, to,
+	}
+	if planID != nil {
+		planClause = " AND t.plan_id = ?"
+		plannedArgs = append(plannedArgs, *planID)
+		dueArgs = append(dueArgs, *planID)
+	}
+
+	sql := fmt.Sprintf(`
+		SELECT
+			planned.planned_task_count,
+			due.due_task_count,
+			due.completed_task_count,
+			due.on_time_completed_count,
+			due.overdue_task_count
+		FROM (
+			SELECT COUNT(*) AS planned_task_count
+			FROM assessment_task t FORCE INDEX (idx_task_org_deleted_planned_status)
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.planned_at >= ? AND t.planned_at < ?%s
+		) planned
+		CROSS JOIN (
+			SELECT
+				COUNT(*) AS due_task_count,
+				COALESCE(SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END), 0) AS completed_task_count,
+				COALESCE(SUM(CASE WHEN t.status = ? AND t.completed_at IS NOT NULL AND t.completed_at <= t.expire_at THEN 1 ELSE 0 END), 0) AS on_time_completed_count,
+				COALESCE(SUM(CASE WHEN t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?) THEN 1 ELSE 0 END), 0) AS overdue_task_count
+			FROM assessment_task t FORCE INDEX (idx_task_org_deleted_expire_status)
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ?%s
+		) due`, planClause, planClause)
+
+	args := make([]interface{}, 0, len(plannedArgs)+len(dueArgs))
+	args = append(args, plannedArgs...)
+	args = append(args, dueArgs...)
+	return db.Raw(sql, args...)
 }
 
 func buildPlanTaskFulfillmentTrendQuery(db *gorm.DB, orgID int64, planID *uint64, from, to, now time.Time) *gorm.DB {
@@ -916,7 +943,7 @@ func buildPlanTaskFulfillmentTrendQuery(db *gorm.DB, orgID int64, planID *uint64
 				0 AS due_task_count,
 				0 AS completed_task_count,
 				0 AS overdue_task_count
-			FROM assessment_task t
+			FROM assessment_task t FORCE INDEX (idx_task_org_deleted_planned_status)
 			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
 			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.planned_at >= ? AND t.planned_at < ?%s
 			GROUP BY DATE(t.planned_at)
@@ -927,7 +954,7 @@ func buildPlanTaskFulfillmentTrendQuery(db *gorm.DB, orgID int64, planID *uint64
 				COUNT(*) AS due_task_count,
 				SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS completed_task_count,
 				SUM(CASE WHEN t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?) THEN 1 ELSE 0 END) AS overdue_task_count
-			FROM assessment_task t
+			FROM assessment_task t FORCE INDEX (idx_task_org_deleted_expire_status)
 			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
 			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ?%s
 			GROUP BY DATE(t.expire_at)
@@ -939,17 +966,6 @@ func buildPlanTaskFulfillmentTrendQuery(db *gorm.DB, orgID int64, planID *uint64
 	args = append(args, plannedArgs...)
 	args = append(args, dueArgs...)
 	return db.Raw(sql, args...)
-}
-
-func buildPlanTaskFulfillmentBaseQuery(db *gorm.DB, orgID int64, planID *uint64) *gorm.DB {
-	query := db.
-		Table("assessment_task t").
-		Joins("JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL").
-		Where("t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ?", orgID, planTaskStatusCanceled)
-	if planID != nil {
-		query = query.Where("t.plan_id = ?", *planID)
-	}
-	return query
 }
 
 func planTaskFulfillmentWindowFromRow(planned, due, completed, onTimeCompleted, overdue int64) domainStatistics.PlanTaskFulfillmentWindow {
@@ -1046,22 +1062,57 @@ func (m *readModel) getPlanTaskOverview(ctx context.Context, orgID int64, planID
 
 func (m *readModel) countPlanTaskDistinctTestees(ctx context.Context, orgID int64, planID *uint64, timeField, status string, from, to time.Time) (int64, error) {
 	var count int64
-	query := m.db.WithContext(ctx).
-		Table("assessment_task t").
-		Joins("JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL").
-		Select("COUNT(DISTINCT t.testee_id) AS count").
-		Where("t.org_id = ? AND t.deleted_at IS NULL", orgID).
-		Where(fmt.Sprintf("t.%s >= ? AND t.%s < ?", timeField, timeField), from, to)
-	if planID != nil {
-		query = query.Where("t.plan_id = ?", *planID)
-	}
-	if status != "" {
-		query = query.Where("t.status = ?", status)
+	query, err := buildPlanTaskDistinctTesteeCountQuery(m.db.WithContext(ctx), orgID, planID, timeField, status, from, to)
+	if err != nil {
+		return 0, err
 	}
 	if err := scanCountQuery(query, &count); err != nil {
 		return 0, err
 	}
 	return count, nil
+}
+
+func buildPlanTaskDistinctTesteeCountQuery(db *gorm.DB, orgID int64, planID *uint64, timeField, status string, from, to time.Time) (*gorm.DB, error) {
+	indexName, ok := planTaskDistinctTesteeIndex(timeField)
+	if !ok {
+		return nil, fmt.Errorf("unsupported plan task distinct time field: %s", timeField)
+	}
+
+	planClause := ""
+	statusClause := ""
+	args := []interface{}{orgID, from, to}
+	if planID != nil {
+		planClause = " AND t.plan_id = ?"
+		args = append(args, *planID)
+	}
+	if status != "" {
+		statusClause = " AND t.status = ?"
+		args = append(args, status)
+	}
+	args = append(args, orgID)
+
+	sql := fmt.Sprintf(`
+		SELECT COUNT(DISTINCT scoped.testee_id) AS count
+		FROM (
+			SELECT t.plan_id, t.testee_id
+			FROM assessment_task t FORCE INDEX (%s)
+			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.%s >= ? AND t.%s < ?%s%s
+			GROUP BY t.plan_id, t.testee_id
+		) scoped
+		JOIN assessment_plan p ON p.org_id = ? AND p.id = scoped.plan_id AND p.deleted_at IS NULL`,
+		indexName, timeField, timeField, planClause, statusClause)
+	return db.Raw(sql, args...), nil
+}
+
+func planTaskDistinctTesteeIndex(timeField string) (string, bool) {
+	switch timeField {
+	case "created_at":
+		return "idx_task_org_deleted_created", true
+	case "completed_at":
+		return "idx_task_org_deleted_completed_status", true
+	default:
+		return "", false
+	}
 }
 
 func overviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) (string, bool) {

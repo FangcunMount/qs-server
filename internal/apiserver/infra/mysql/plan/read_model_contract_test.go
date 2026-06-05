@@ -174,15 +174,18 @@ func TestBuildTaskWindowQueryDocumentsCursorOrderAndLimitContract(t *testing.T) 
 func TestFollowUpQueueTasksQueryDocumentsOutstandingTaskPerTesteeContract(t *testing.T) {
 	restrictedSQL := followUpQueueTasksSQL(true)
 	for _, token := range []string{
+		"SELECT picked_task.*",
 		"ROW_NUMBER() OVER",
 		"PARTITION BY assessment_task.testee_id",
 		"assessment_task.expire_at ASC",
 		"assessment_task.planned_at ASC",
+		"FORCE INDEX (idx_task_workbench_followup_opened)",
 		"assessment_task.org_id = ?",
 		"assessment_task.testee_id IN ?",
 		"assessment_task.status IN ?",
 		"assessment_task.deleted_at IS NULL",
 		"ranked.row_num = 1",
+		"JOIN assessment_task picked_task ON picked_task.id = picked.id",
 		"LIMIT ? OFFSET ?",
 	} {
 		if !strings.Contains(restrictedSQL, token) {
