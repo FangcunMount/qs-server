@@ -257,9 +257,7 @@ func (r *StatisticsRepository) UpsertAnalyticsPendingEvent(ctx context.Context, 
 
 func (r *StatisticsRepository) ListDueAnalyticsPendingEvents(ctx context.Context, limit int, now time.Time) ([]*domainStatistics.AnalyticsPendingEvent, error) {
 	var rows []*AnalyticsPendingEventPO
-	query := r.WithContext(ctx).
-		Where("next_attempt_at <= ? AND deleted_at IS NULL", now).
-		Order("next_attempt_at ASC")
+	query := buildDueAnalyticsPendingEventsQuery(r.WithContext(ctx), now)
 	if limit > 0 {
 		query = query.Limit(limit)
 	}
@@ -279,6 +277,12 @@ func (r *StatisticsRepository) ListDueAnalyticsPendingEvents(ctx context.Context
 		})
 	}
 	return items, nil
+}
+
+func buildDueAnalyticsPendingEventsQuery(db *gorm.DB, now time.Time) *gorm.DB {
+	return db.Model(&AnalyticsPendingEventPO{}).
+		Where("next_attempt_at <= ? AND deleted_at IS NULL", now).
+		Order("next_attempt_at ASC")
 }
 
 func (r *StatisticsRepository) RescheduleAnalyticsPendingEvent(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {

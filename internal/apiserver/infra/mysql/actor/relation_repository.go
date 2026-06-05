@@ -162,14 +162,18 @@ func (r *relationRepository) ListHistoryByClinician(
 	clinicianID clinician.ID,
 ) ([]*domain.ClinicianTesteeRelation, error) {
 	var pos []*ClinicianRelationPO
-	err := r.WithContext(ctx).
-		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinicianID).
-		Order("bound_at DESC, id DESC").
+	err := buildRelationHistoryByClinicianQuery(r.WithContext(ctx), orgID, clinicianID).
 		Find(&pos).Error
 	if err != nil {
 		return nil, err
 	}
 	return r.mapper.ToDomains(pos), nil
+}
+
+func buildRelationHistoryByClinicianQuery(db *gorm.DB, orgID int64, clinicianID clinician.ID) *gorm.DB {
+	return db.Model(&ClinicianRelationPO{}).
+		Where("org_id = ? AND clinician_id = ? AND deleted_at IS NULL", orgID, clinicianID).
+		Order("bound_at DESC, id DESC")
 }
 
 func (r *relationRepository) CountActiveByClinician(

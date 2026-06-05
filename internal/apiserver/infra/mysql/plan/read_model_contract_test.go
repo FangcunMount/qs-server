@@ -76,7 +76,7 @@ func TestBuildPlanListQueryDocumentsFilterContract(t *testing.T) {
 	stmt := buildPlanListQuery(
 		db.Session(&gorm.Session{DryRun: true}).Model(&AssessmentPlanPO{}),
 		planreadmodel.PlanFilter{OrgID: 9, ScaleCode: "SDS", Status: "active"},
-	).Find(&rows).Statement
+	).Order("id DESC").Find(&rows).Statement
 
 	sql := stmt.SQL.String()
 	for _, token := range []string{
@@ -84,6 +84,7 @@ func TestBuildPlanListQueryDocumentsFilterContract(t *testing.T) {
 		"org_id = ?",
 		"scale_code = ?",
 		"status = ?",
+		"ORDER BY id DESC",
 	} {
 		if !strings.Contains(sql, token) {
 			t.Fatalf("query sql %q does not contain %q", sql, token)

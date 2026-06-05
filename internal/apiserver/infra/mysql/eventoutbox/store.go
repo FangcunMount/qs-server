@@ -124,14 +124,7 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 
 	var rows []*OutboxPO
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		staleBefore := now.Add(-s.publishingStaleFor)
-		if err := tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
-			Where(
-				"(status = ? AND next_attempt_at <= ?) OR (status = ? AND next_attempt_at <= ?) OR (status = ? AND updated_at <= ?)",
-				outboxcore.StatusPending, now,
-				outboxcore.StatusFailed, now,
-				outboxcore.StatusPublishing, staleBefore,
-			).
+		if err := s.dueEventsSelectionQuery(tx, now).
 			Order("created_at ASC").
 			Limit(limit).
 			Find(&rows).Error; err != nil {
@@ -168,6 +161,17 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 	}
 
 	return claimed, nil
+}
+
+func (s *Store) dueEventsSelectionQuery(tx *gorm.DB, now time.Time) *gorm.DB {
+	staleBefore := now.Add(-s.publishingStaleFor)
+	return tx.Clauses(clause.Locking{Strength: "UPDATE", Options: "SKIP LOCKED"}).
+		Where(
+			"(status = ? AND next_attempt_at <= ?) OR (status = ? AND next_attempt_at <= ?) OR (status = ? AND updated_at <= ?)",
+			outboxcore.StatusPending, now,
+			outboxcore.StatusFailed, now,
+			outboxcore.StatusPublishing, staleBefore,
+		)
 }
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
@@ -217,17 +221,13 @@ func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outbox
 	observations := make([]outboxcore.StatusObservation, 0, len(statuses))
 	for _, status := range statuses {
 		var count int64
-		if err := s.db.WithContext(ctx).Model(&OutboxPO{}).Where("status = ?", status).Count(&count).Error; err != nil {
+		if err := outboxStatusCountQuery(s.db.WithContext(ctx), status).Count(&count).Error; err != nil {
 			return outboxport.StatusSnapshot{}, err
 		}
 		var oldest OutboxPO
 		var oldestCreatedAt *time.Time
 		if count > 0 {
-			if err := s.db.WithContext(ctx).
-				Where("status = ?", status).
-				Order("created_at ASC").
-				Limit(1).
-				Find(&oldest).Error; err != nil {
+			if err := outboxOldestStatusQuery(s.db.WithContext(ctx), status).Find(&oldest).Error; err != nil {
 				return outboxport.StatusSnapshot{}, err
 			}
 			oldestCreatedAt = &oldest.CreatedAt
@@ -239,4 +239,14 @@ func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outbox
 		})
 	}
 	return outboxcore.BuildStatusSnapshot("assessment-mysql-outbox", now, observations), nil
+}
+
+func outboxStatusCountQuery(db *gorm.DB, status string) *gorm.DB {
+	return db.Model(&OutboxPO{}).Where("status = ?", status)
+}
+
+func outboxOldestStatusQuery(db *gorm.DB, status string) *gorm.DB {
+	return db.Where("status = ?", status).
+		Order("created_at ASC").
+		Limit(1)
 }

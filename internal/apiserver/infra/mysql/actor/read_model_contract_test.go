@@ -5,6 +5,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/clinician"
 	mysqlDriver "gorm.io/driver/mysql"
 	"gorm.io/gorm"
 )
@@ -37,6 +38,34 @@ func TestBuildActiveTesteeRelationsQueryDocumentsWorkbenchAssignmentContract(t *
 		}
 	}
 	for _, want := range []interface{}{int64(9), true} {
+		if !containsActorVar(stmt.Vars, want) {
+			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+}
+
+func TestBuildRelationHistoryByClinicianQueryDocumentsHistoryIndexContract(t *testing.T) {
+	db := newDryRunActorDB(t)
+	var rows []ClinicianRelationPO
+
+	stmt := buildRelationHistoryByClinicianQuery(
+		db.Session(&gorm.Session{DryRun: true}).Model(&ClinicianRelationPO{}),
+		9,
+		clinician.ID(101),
+	).Find(&rows).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"org_id = ?",
+		"clinician_id = ?",
+		"deleted_at IS NULL",
+		"ORDER BY bound_at DESC, id DESC",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{int64(9), clinician.ID(101)} {
 		if !containsActorVar(stmt.Vars, want) {
 			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
 		}
