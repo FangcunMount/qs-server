@@ -433,7 +433,11 @@ func (r *readModel) listRelationPOs(ctx context.Context, filter actorreadmodel.R
 		}
 	}
 
-	err := query.Order("bound_at DESC, id DESC").Offset(filter.Offset).Limit(filter.Limit).Find(&pos).Error
+	limit := filter.Limit
+	if limit <= 0 {
+		limit = -1 // -1 means no limit in GORM; 0 would generate LIMIT 0 and return nothing
+	}
+	err := query.Order("bound_at DESC, id DESC").Offset(filter.Offset).Limit(limit).Find(&pos).Error
 	if err != nil {
 		return nil, 0, err
 	}
