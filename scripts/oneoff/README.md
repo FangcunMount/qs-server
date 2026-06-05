@@ -282,7 +282,7 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 
 一站式修复 `seeddata-runner` 历史数据导致的接入统计偏低，串联以下阶段：
 
-1. 从 `clinician_relation` 推导缺失的 `assessment_entry_intake_log`（默认仅 `testee.source = daily_simulation`）。
+1. 从 `clinician_relation` 推导缺失的 `assessment_entry_intake_log`：`source_type = assessment_entry` 走入口关联；`manual/import` 后台直挂主责/主治走该医生活跃入口（默认仅 `testee.source = daily_simulation`）。
 2. 从 intake log 推导缺失的 `assessment_entry_resolve_log`（供 `entry_opened`）。
 3. 将 resolve/intake log 投影到 `behavior_footprint`（`entry_opened` / `intake_confirmed` / `testee_profile_created` / `care_relationship_established`）。
 4. 重建 `statistics_journey_daily`（含临床人员维度 `intake_count` 等）与组织快照。
@@ -298,7 +298,7 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 
 ```bash
 go run scripts/oneoff/rebuild_seeddata_access_statistics/main.go \
-  --mysql-dsn "$MYSQL_DSN" \
+  --mysql-dsn 'fcm_admin:RfDtf6SGkGFeB9qZQtX@tcp(rm-2zet3fx250176qq8jko.mysql.rds.aliyuncs.com:3306)/qs?parseTime=true' \
   --org-id 1 \
   --start-date 2025-01-01 \
   --end-date 2026-06-06 \
@@ -309,7 +309,7 @@ go run scripts/oneoff/rebuild_seeddata_access_statistics/main.go \
 
 ```bash
 go run scripts/oneoff/rebuild_seeddata_access_statistics/main.go \
-  --mysql-dsn "$MYSQL_DSN" \
+  --mysql-dsn 'fcm_admin:RfDtf6SGkGFeB9qZQtX@tcp(rm-2zet3fx250176qq8jko.mysql.rds.aliyuncs.com:3306)/qs?parseTime=true' \
   --org-id 1 \
   --start-date 2025-01-01 \
   --end-date 2026-06-06 \

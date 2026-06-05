@@ -477,7 +477,10 @@ CREATE TEMPORARY TABLE `+scopeTableName+` (
 		return fmt.Errorf("load existing intake logs: %w", err)
 	}
 	if _, err := conn.ExecContext(ctx, buildInferredIntakeScopeInsert(cfg), buildInferredIntakeScopeArgs(cfg, startDate, endDate)...); err != nil {
-		return fmt.Errorf("load inferred intake logs: %w", err)
+		return fmt.Errorf("load inferred assessment_entry intake logs: %w", err)
+	}
+	if _, err := conn.ExecContext(ctx, buildInferredManualRelationScopeInsert(cfg), buildInferredManualRelationScopeArgs(cfg, startDate, endDate)...); err != nil {
+		return fmt.Errorf("load inferred manual relation intake logs: %w", err)
 	}
 	return nil
 }
@@ -886,6 +889,73 @@ func buildInferredIntakeScopeArgs(cfg config, startDate, endDate time.Time) []an
 	return args
 }
 
+func buildInferredManualRelationScopeInsert(cfg config) string {
+	testeeSources := parseCSV(cfg.testeeSourceRaw)
+	sourcePredicate := ""
+	if len(testeeSources) > 0 {
+		sourcePredicate = " AND t.source IN (" + placeholders(len(testeeSources)) + ")"
+	}
+	testeeCreatedValue := "CASE WHEN ABS(TIMESTAMPDIFF(SECOND, t.created_at, cr.bound_at)) <= 5 THEN 1 ELSE 0 END"
+	if cfg.inferredTesteeCreated {
+		testeeCreatedValue = "1"
+	}
+
+	query := `
+INSERT INTO ` + scopeTableName + ` (
+  source_kind, existing_id, org_id, clinician_id, entry_id, testee_id,
+  testee_created, assignment_created, intake_at, created_at, updated_at
+)
+SELECT
+  'inferred_manual',
+  NULL,
+  cr.org_id,
+  cr.clinician_id,
+  ae.entry_id,
+  cr.testee_id,
+  ` + testeeCreatedValue + ` AS testee_created,
+  1 AS assignment_created,
+  cr.bound_at AS intake_at,
+  cr.created_at,
+  cr.updated_at
+FROM clinician_relation cr
+INNER JOIN testee t
+  ON t.id = cr.testee_id
+ AND t.org_id = cr.org_id
+ AND t.deleted_at IS NULL
+INNER JOIN (
+  SELECT org_id, clinician_id, MIN(id) AS entry_id
+  FROM assessment_entry
+  WHERE deleted_at IS NULL
+    AND is_active = 1
+    AND (expires_at IS NULL OR expires_at > NOW(3))
+  GROUP BY org_id, clinician_id
+) ae
+  ON ae.org_id = cr.org_id
+ AND ae.clinician_id = cr.clinician_id
+LEFT JOIN assessment_entry_intake_log l
+  ON l.org_id = cr.org_id
+ AND l.clinician_id = cr.clinician_id
+ AND l.testee_id = cr.testee_id
+ AND l.deleted_at IS NULL
+WHERE cr.deleted_at IS NULL
+  AND cr.source_type IN ('manual', 'import')
+  AND cr.relation_type IN ('primary', 'attending', 'collaborator', 'assigned')
+  AND cr.bound_at >= ?
+  AND cr.bound_at < ?
+  AND l.id IS NULL` + sourcePredicate
+	query, _ = appendOrgPredicate(query, nil, cfg, "cr")
+	return query
+}
+
+func buildInferredManualRelationScopeArgs(cfg config, startDate, endDate time.Time) []any {
+	args := []any{startDate, endDate}
+	for _, item := range parseCSV(cfg.testeeSourceRaw) {
+		args = append(args, item)
+	}
+	_, args = appendOrgPredicate("", args, cfg, "cr")
+	return args
+}
+
 func buildDeleteIntakeLogs(cfg config, startDate, endDate time.Time) statementSpec {
 	query := `DELETE FROM assessment_entry_intake_log WHERE deleted_at IS NULL AND intake_at >= ? AND intake_at < ?`
 	args := []any{startDate, endDate}
@@ -914,7 +984,7 @@ SELECT
   org_id, clinician_id, entry_id, testee_id,
   testee_created, assignment_created, intake_at, created_at, updated_at
 FROM ` + scopeTableName + `
-WHERE source_kind = 'inferred'
+WHERE source_kind IN ('inferred', 'inferred_manual')
 ORDER BY intake_at, org_id, clinician_id, entry_id, testee_id`
 
 func loadScopeSummaries(ctx context.Context, conn *sql.Conn) ([]rebuildScopeSummary, error) {

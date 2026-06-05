@@ -38,6 +38,20 @@ func TestFootprintCountSQLStripsUpsertClause(t *testing.T) {
 	}
 }
 
+func TestBuildInferredManualRelationScopeTargetsManualSource(t *testing.T) {
+	cfg := config{orgID: 1, inferredTesteeCreated: true}
+	query := buildInferredManualRelationScopeInsert(cfg)
+	for _, fragment := range []string{
+		"'inferred_manual'",
+		"cr.source_type IN ('manual', 'import')",
+		"FROM assessment_entry",
+	} {
+		if !strings.Contains(query, fragment) {
+			t.Fatalf("expected %q in manual relation scope query: %s", fragment, query)
+		}
+	}
+}
+
 func TestAppendOrgPredicateAllOrgs(t *testing.T) {
 	cfg := config{allOrgs: true}
 	query, args := appendOrgPredicate("WHERE 1=1", nil, cfg, "l")
