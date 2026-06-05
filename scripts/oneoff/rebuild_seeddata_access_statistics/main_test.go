@@ -39,7 +39,7 @@ func TestFootprintCountSQLStripsUpsertClause(t *testing.T) {
 }
 
 func TestBuildInferredManualRelationScopeTargetsManualSource(t *testing.T) {
-	cfg := config{orgID: 1, inferredTesteeCreated: true}
+	cfg := config{orgID: 1, inferredTesteeCreated: true, testeeSourceRaw: "daily_simulation"}
 	query := buildInferredManualRelationScopeInsert(cfg)
 	for _, fragment := range []string{
 		"'inferred_manual'",
@@ -49,6 +49,9 @@ func TestBuildInferredManualRelationScopeTargetsManualSource(t *testing.T) {
 		if !strings.Contains(query, fragment) {
 			t.Fatalf("expected %q in manual relation scope query: %s", fragment, query)
 		}
+	}
+	if strings.Contains(query, "t.source IN") {
+		t.Fatalf("manual relation scope must not filter testee.source: %s", query)
 	}
 }
 

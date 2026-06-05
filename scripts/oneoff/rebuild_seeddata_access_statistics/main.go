@@ -890,11 +890,7 @@ func buildInferredIntakeScopeArgs(cfg config, startDate, endDate time.Time) []an
 }
 
 func buildInferredManualRelationScopeInsert(cfg config) string {
-	testeeSources := parseCSV(cfg.testeeSourceRaw)
-	sourcePredicate := ""
-	if len(testeeSources) > 0 {
-		sourcePredicate = " AND t.source IN (" + placeholders(len(testeeSources)) + ")"
-	}
+	// manual/import 后台直挂是明确修复目标，不按 testee.source 过滤。
 	testeeCreatedValue := "CASE WHEN ABS(TIMESTAMPDIFF(SECOND, t.created_at, cr.bound_at)) <= 5 THEN 1 ELSE 0 END"
 	if cfg.inferredTesteeCreated {
 		testeeCreatedValue = "1"
@@ -942,16 +938,13 @@ WHERE cr.deleted_at IS NULL
   AND cr.relation_type IN ('primary', 'attending', 'collaborator', 'assigned')
   AND cr.bound_at >= ?
   AND cr.bound_at < ?
-  AND l.id IS NULL` + sourcePredicate
+  AND l.id IS NULL`
 	query, _ = appendOrgPredicate(query, nil, cfg, "cr")
 	return query
 }
 
 func buildInferredManualRelationScopeArgs(cfg config, startDate, endDate time.Time) []any {
 	args := []any{startDate, endDate}
-	for _, item := range parseCSV(cfg.testeeSourceRaw) {
-		args = append(args, item)
-	}
 	_, args = appendOrgPredicate("", args, cfg, "cr")
 	return args
 }
