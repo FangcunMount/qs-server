@@ -25,6 +25,7 @@ export REDIS_PASSWORD='***'
 | ---- | ---- | ------------ |
 | `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` / `interpret_reports` |
 | `rewrite_seeddata_assessment_times/main.go` | 将 seeddata plan task 测评从错误集中日期改回任务计划日期 | MySQL `assessment` / `assessment_task` / `assessment_score` / `testee` |
+| `rebuild_access_funnel_from_sources/main.go` | 从接入业务源重建接入漏斗统计源和聚合 | MySQL `assessment_entry_intake_log` / `statistics_journey_daily.access_*` |
 | `rebuild_statistics_facts_from_sources/main.go` | 从业务源表重建统计事实层 | MySQL `behavior_footprint` / `assessment_episode` |
 | `rebuild_statistics_aggregates_and_cache/main.go` | 重建统计聚合表并刷新统计查询缓存 | MySQL 统计聚合表，Redis 统计查询缓存 |
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
@@ -114,6 +115,7 @@ go run scripts/oneoff/cleanup_deleted_assessment_orphans.go \
 - 默认刷新受影响 `testee` 的 `total_assessments` / `last_assessment_at` / `last_risk_level`。
 
 脚本默认 dry-run。执行写入时会先创建备份表，除非显式传入 `--skip-backup`。
+备份表名前缀为 `seed_bak_assessment_`、`seed_bak_task_`、`seed_bak_score_`、`seed_bak_testee_`。
 
 ### 解决什么问题
 
@@ -128,8 +130,8 @@ go run scripts/oneoff/rewrite_seeddata_assessment_times/main.go \
   --mysql-dsn "$MYSQL_DSN" \
   --org-id 1 \
   --collapsed-date 2026-06-03 \
-  --target-start-date 2026-05-30 \
-  --target-end-date 2026-06-04 \
+  --target-start-date 2026-05-28 \
+  --target-end-date 2026-06-03 \
   --preview-limit 50
 ```
 
@@ -140,10 +142,10 @@ go run scripts/oneoff/rewrite_seeddata_assessment_times/main.go \
   --mysql-dsn "$MYSQL_DSN" \
   --org-id 1 \
   --collapsed-date 2026-06-03 \
-  --target-start-date 2026-05-30 \
-  --target-end-date 2026-06-04 \
-  --plan-id 1001 \
-  --plan-id 1002
+  --target-start-date 2026-05-28 \
+  --target-end-date 2026-06-03 \
+  --plan-id 614333603412718126 \
+  --plan-id 614187067651404334
 ```
 
 确认后执行：
@@ -153,9 +155,9 @@ go run scripts/oneoff/rewrite_seeddata_assessment_times/main.go \
   --mysql-dsn "$MYSQL_DSN" \
   --org-id 1 \
   --collapsed-date 2026-06-03 \
-  --target-start-date 2026-05-30 \
-  --target-end-date 2026-06-04 \
-  --backup-suffix 20260604_seeddata_time_rewrite \
+  --target-start-date 2026-05-28 \
+  --target-end-date 2026-06-03 \
+  --backup-suffix 20260603_seeddata_time_rewrite \
   --apply
 ```
 
@@ -165,7 +167,7 @@ go run scripts/oneoff/rewrite_seeddata_assessment_times/main.go \
 go run scripts/oneoff/rebuild_statistics_facts_from_sources/main.go \
   --mysql-dsn "$MYSQL_DSN" \
   --org-id 1 \
-  --start-date 2026-05-30 \
+  --start-date 2026-05-28 \
   --end-date 2026-06-04 \
   --reset-window \
   --apply
@@ -173,8 +175,12 @@ go run scripts/oneoff/rebuild_statistics_facts_from_sources/main.go \
 go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
   --mysql-dsn "$MYSQL_DSN" \
   --org-id 1 \
-  --start-date 2026-05-30 \
+  --start-date 2026-05-28 \
   --end-date 2026-06-04 \
+  --redis-addr "$REDIS_ADDR" \
+  --redis-query-namespace 'qs:cache:query' \
+  --redis-username "$REDIS_USERNAME" \
+  --redis-password "$REDIS_PASSWORD" \
   --apply
 ```
 
@@ -188,6 +194,88 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 - `--rewrite-task-expire-at`：是否同步改写任务过期时间，默认关闭。
 - `--rewrite-score-times`：是否同步改写测评分行时间，默认开启。
 - `--refresh-testee-stats`：是否刷新受试者冗余测评统计字段，默认开启。
+- `--backup-suffix`：备份表后缀，只允许字母、数字和下划线。
+- `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
+
+## rebuild_access_funnel_from_sources/main.go
+
+### 做什么
+
+从接入相关业务源重建统计中心概览里的“接入漏斗”数据：
+
+- 保留并重放窗口内已有的 `assessment_entry_intake_log`。
+- 从 `clinician_relation.source_type = 'assessment_entry'` 的照护关系推导缺失的 intake log，默认只处理 `testee.source = 'daily_simulation'`，避免误把真实人工分配算进 seeddata 接入。
+- 重新计算 `statistics_journey_daily` 机构维度的 `access_entry_opened_count` / `access_intake_confirmed_count` / `access_testee_created_count` / `access_care_relationship_established_count`。
+
+脚本不会删除 `assessment_entry_resolve_log`。入口打开只能从该日志读取，删除后无法从业务源完整还原。
+
+### 解决什么问题
+
+用于修复 `seeddata-runner` 曾经绕过 public `/assessment-entries/:token/intake`，直接创建 testee 并调用后台关系分配接口，导致接入漏斗“完成接入 / 新建档案 / 建立照护”缺失的问题。
+
+脚本默认 dry-run。执行 `--apply` 时会先备份窗口内 active 的 `assessment_entry_intake_log` 和机构维度 `statistics_journey_daily` 行，除非显式传入 `--skip-backup`。
+
+### 如何调用
+
+先 dry-run 预览：
+
+```bash
+go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --preview-limit 50
+```
+
+确认后执行：
+
+```bash
+go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --backup-suffix 20260605_access_funnel_rebuild \
+  --apply
+```
+
+如果确认 `imported` 也是 seeddata-runner 造出来并且应该纳入接入漏斗，可显式扩大来源范围：
+
+```bash
+go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --testee-source daily_simulation,imported \
+  --backup-suffix 20260605_access_funnel_rebuild \
+  --apply
+```
+
+执行后如果页面仍读到旧值，只刷新统计查询缓存：
+
+```bash
+go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2025-01-01 \
+  --end-date 2026-06-06 \
+  --skip-aggregate \
+  --redis-addr "$REDIS_ADDR" \
+  --redis-query-namespace 'qs:cache:query' \
+  --redis-username "$REDIS_USERNAME" \
+  --redis-password "$REDIS_PASSWORD" \
+  --apply
+```
+
+关键参数：
+
+- `--org-id` / `--all-orgs`：二选一，限定组织范围。
+- `--start-date`：包含边界，默认 `2025-01-01`。
+- `--end-date`：排除边界，不传默认到明天零点。
+- `--testee-source`：推导缺失 intake log 的受试者来源，默认 `daily_simulation`；传空字符串可关闭来源过滤，但生产环境不建议关闭。
+- `--inferred-testee-created`：推导出来的 intake log 是否记为新建档案，默认开启。
 - `--backup-suffix`：备份表后缀，只允许字母、数字和下划线。
 - `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
 
