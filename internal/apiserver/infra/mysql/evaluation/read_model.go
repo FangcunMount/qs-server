@@ -44,32 +44,29 @@ ORDER BY occurred_at DESC, assessment_id DESC
 `
 
 const latestRiskQueueCoreSQL = `
-FROM (
-	SELECT
-		assessment.*,
-		ROW_NUMBER() OVER (
-			PARTITION BY assessment.testee_id
-			ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
-		) AS row_num
+FROM assessment a
+INNER JOIN (
+	SELECT testee_id, MAX(id) AS latest_id
 	FROM assessment
-	WHERE assessment.org_id = ?
+	WHERE org_id = ?
 		%s
-		AND assessment.status = ?
-		AND assessment.risk_level IS NOT NULL
-		AND assessment.risk_level <> ''
-		AND assessment.deleted_at IS NULL
-) ranked
-WHERE ranked.row_num = 1
-	AND ranked.risk_level IN ?
+		AND status = ?
+		AND risk_level IS NOT NULL
+		AND risk_level <> ''
+		AND deleted_at IS NULL
+	GROUP BY testee_id
+) latest ON a.id = latest.latest_id
+WHERE a.deleted_at IS NULL
+	AND a.risk_level IN ?
 `
 
 const latestRiskQueueSelectSQL = `
 SELECT
-	ranked.id AS assessment_id,
-	ranked.org_id,
-	ranked.testee_id,
-	ranked.risk_level,
-	COALESCE(ranked.interpreted_at, ranked.updated_at, ranked.created_at) AS occurred_at
+	a.id AS assessment_id,
+	a.org_id,
+	a.testee_id,
+	a.risk_level,
+	COALESCE(a.interpreted_at, a.updated_at, a.created_at) AS occurred_at
 ` + latestRiskQueueCoreSQL
 
 const latestRiskQueueCountSQL = `
@@ -261,7 +258,7 @@ func latestRiskQueueSelect(restrictToTesteeIDs bool) string {
 
 func latestRiskQueueTesteePredicate(restrictToTesteeIDs bool) string {
 	if restrictToTesteeIDs {
-		return "AND assessment.testee_id IN ?"
+		return "AND testee_id IN ?"
 	}
 	return ""
 }

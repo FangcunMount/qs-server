@@ -193,13 +193,13 @@ func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) 
 func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
 	restrictedSQL := latestRiskQueueRowsQuery(true)
 	for _, token := range []string{
-		"ROW_NUMBER() OVER",
-		"PARTITION BY assessment.testee_id",
-		"assessment.org_id = ?",
-		"assessment.testee_id IN ?",
-		"assessment.status = ?",
-		"ranked.row_num = 1",
-		"ranked.risk_level IN ?",
+		"FROM assessment a",
+		"MAX(id) AS latest_id",
+		"GROUP BY testee_id",
+		"org_id = ?",
+		"testee_id IN ?",
+		"status = ?",
+		"a.risk_level IN ?",
 		"ORDER BY occurred_at DESC, assessment_id DESC",
 		"LIMIT ? OFFSET ?",
 	} {
@@ -209,17 +209,17 @@ func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
 	}
 
 	allOrgSQL := latestRiskQueueRowsQuery(false)
-	if strings.Contains(allOrgSQL, "assessment.testee_id IN ?") {
+	if strings.Contains(allOrgSQL, "testee_id IN ?") {
 		t.Fatalf("all-org latest risk query should not restrict testee ids:\n%s", allOrgSQL)
 	}
-	if !strings.Contains(allOrgSQL, "assessment.org_id = ?") || !strings.Contains(allOrgSQL, "ranked.risk_level IN ?") {
+	if !strings.Contains(allOrgSQL, "org_id = ?") || !strings.Contains(allOrgSQL, "a.risk_level IN ?") {
 		t.Fatalf("all-org latest risk query lost org/risk filters:\n%s", allOrgSQL)
 	}
 	countSQL := latestRiskQueueCountQuery(false)
 	if !strings.HasPrefix(strings.TrimSpace(countSQL), "SELECT COUNT(*)") {
-		t.Fatalf("latest risk count query should count from ranked latest rows:\n%s", countSQL)
+		t.Fatalf("latest risk count query should count latest rows per testee:\n%s", countSQL)
 	}
-	if !strings.Contains(countSQL, "ranked.row_num = 1") {
+	if !strings.Contains(countSQL, "GROUP BY testee_id") {
 		t.Fatalf("latest risk count query should dedupe by testee before counting:\n%s", countSQL)
 	}
 }
