@@ -43,43 +43,38 @@ WHERE ranked.row_num = 1
 ORDER BY occurred_at DESC, assessment_id DESC
 `
 
-const latestRiskQueueSelectSQL = `
-SELECT
-	candidate.id AS assessment_id,
-	candidate.org_id,
-	candidate.testee_id,
-	candidate.risk_level,
-	COALESCE(candidate.interpreted_at, candidate.updated_at, candidate.created_at) AS occurred_at
-%s
+const latestRiskQueueCoreSQL = `
+FROM (
+	SELECT
+		assessment.*,
+		ROW_NUMBER() OVER (
+			PARTITION BY assessment.testee_id
+			ORDER BY COALESCE(assessment.interpreted_at, assessment.updated_at, assessment.created_at) DESC, assessment.id DESC
+		) AS row_num
+	FROM assessment
+	WHERE assessment.org_id = ?
+		%s
+		AND assessment.status = ?
+		AND assessment.risk_level IS NOT NULL
+		AND assessment.risk_level <> ''
+		AND assessment.deleted_at IS NULL
+) ranked
+WHERE ranked.row_num = 1
+	AND ranked.risk_level IN ?
 `
 
-const latestRiskQueueFromWhereSQL = `
-FROM assessment candidate
-WHERE candidate.org_id = ?
-		%s
-	AND candidate.status = ?
-	AND candidate.risk_level IS NOT NULL
-	AND candidate.risk_level <> ''
-	AND candidate.risk_level IN ?
-	AND candidate.deleted_at IS NULL
-	AND NOT EXISTS (
-		SELECT 1
-		FROM assessment newer
-		WHERE newer.org_id = candidate.org_id
-			AND newer.testee_id = candidate.testee_id
-			AND newer.status = candidate.status
-			AND newer.risk_level IS NOT NULL
-			AND newer.risk_level <> ''
-			AND newer.deleted_at IS NULL
-			AND (
-				COALESCE(newer.interpreted_at, newer.updated_at, newer.created_at) > COALESCE(candidate.interpreted_at, candidate.updated_at, candidate.created_at)
-				OR (
-					COALESCE(newer.interpreted_at, newer.updated_at, newer.created_at) = COALESCE(candidate.interpreted_at, candidate.updated_at, candidate.created_at)
-					AND newer.id > candidate.id
-				)
-			)
-	)
-`
+const latestRiskQueueSelectSQL = `
+SELECT
+	ranked.id AS assessment_id,
+	ranked.org_id,
+	ranked.testee_id,
+	ranked.risk_level,
+	COALESCE(ranked.interpreted_at, ranked.updated_at, ranked.created_at) AS occurred_at
+` + latestRiskQueueCoreSQL
+
+const latestRiskQueueCountSQL = `
+SELECT COUNT(*)
+` + latestRiskQueueCoreSQL
 
 func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) interface {
 	evaluationreadmodel.AssessmentReader
@@ -257,19 +252,18 @@ LIMIT ? OFFSET ?
 }
 
 func latestRiskQueueCountQuery(restrictToTesteeIDs bool) string {
-	return `SELECT COUNT(*)` + latestRiskQueueFromWhere(restrictToTesteeIDs)
+	return fmt.Sprintf(latestRiskQueueCountSQL, latestRiskQueueTesteePredicate(restrictToTesteeIDs))
 }
 
 func latestRiskQueueSelect(restrictToTesteeIDs bool) string {
-	return fmt.Sprintf(latestRiskQueueSelectSQL, latestRiskQueueFromWhere(restrictToTesteeIDs))
+	return fmt.Sprintf(latestRiskQueueSelectSQL, latestRiskQueueTesteePredicate(restrictToTesteeIDs))
 }
 
-func latestRiskQueueFromWhere(restrictToTesteeIDs bool) string {
-	testeePredicate := ""
+func latestRiskQueueTesteePredicate(restrictToTesteeIDs bool) string {
 	if restrictToTesteeIDs {
-		testeePredicate = "AND candidate.testee_id IN ?"
+		return "AND assessment.testee_id IN ?"
 	}
-	return fmt.Sprintf(latestRiskQueueFromWhereSQL, testeePredicate)
+	return ""
 }
 
 func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []interface{} {
