@@ -266,7 +266,7 @@ ORDER BY source_kind`)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []rebuildScopeSummary
 	for rows.Next() {
@@ -289,7 +289,7 @@ LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var result []dailyPreviewRow
 	for rows.Next() {
