@@ -7897,11 +7897,27 @@ const docTemplate = `{
         "statistics.PlanDomainStatistics": {
             "type": "object",
             "properties": {
+                "activity": {
+                    "$ref": "#/definitions/statistics.PlanTaskActivityStatistics"
+                },
+                "fulfillment": {
+                    "$ref": "#/definitions/statistics.PlanTaskFulfillmentStatistics"
+                },
                 "trend": {
-                    "$ref": "#/definitions/statistics.PlanTaskTrend"
+                    "description": "Deprecated: use activity.trend.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/statistics.PlanTaskTrend"
+                        }
+                    ]
                 },
                 "window": {
-                    "$ref": "#/definitions/statistics.PlanTaskWindow"
+                    "description": "Deprecated: use activity.window.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/statistics.PlanTaskWindow"
+                        }
+                    ]
                 }
             }
         },
@@ -7911,6 +7927,14 @@ const docTemplate = `{
                 "active_testees": {
                     "description": "活跃受试者数（有完成任务的）",
                     "type": "integer"
+                },
+                "activity": {
+                    "description": "近窗口任务趋势，默认由计划日投影提供",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/statistics.PlanTaskActivityStatistics"
+                        }
+                    ]
                 },
                 "completed_tasks": {
                     "description": "已完成任务数",
@@ -7928,6 +7952,9 @@ const docTemplate = `{
                     "description": "已过期任务数",
                     "type": "integer"
                 },
+                "fulfillment": {
+                    "$ref": "#/definitions/statistics.PlanTaskFulfillmentStatistics"
+                },
                 "org_id": {
                     "type": "integer"
                 },
@@ -7943,15 +7970,149 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "trend": {
-                    "$ref": "#/definitions/statistics.PlanTaskTrend"
+                    "description": "Deprecated: use activity.trend.",
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/statistics.PlanTaskTrend"
+                        }
+                    ]
                 },
                 "window": {
-                    "description": "近窗口任务趋势，默认由计划日投影提供",
+                    "description": "Deprecated: use activity.window.",
                     "allOf": [
                         {
                             "$ref": "#/definitions/statistics.PlanTaskWindow"
                         }
                     ]
+                }
+            }
+        },
+        "statistics.PlanTaskActivityStatistics": {
+            "type": "object",
+            "properties": {
+                "trend": {
+                    "$ref": "#/definitions/statistics.PlanTaskActivityTrend"
+                },
+                "window": {
+                    "$ref": "#/definitions/statistics.PlanTaskActivityWindow"
+                }
+            }
+        },
+        "statistics.PlanTaskActivityTrend": {
+            "type": "object",
+            "properties": {
+                "task_completed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "task_created": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "task_expired": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "task_opened": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                }
+            }
+        },
+        "statistics.PlanTaskActivityWindow": {
+            "type": "object",
+            "properties": {
+                "active_testees": {
+                    "type": "integer"
+                },
+                "enrolled_testees": {
+                    "type": "integer"
+                },
+                "task_completed_count": {
+                    "type": "integer"
+                },
+                "task_created_count": {
+                    "type": "integer"
+                },
+                "task_expired_count": {
+                    "type": "integer"
+                },
+                "task_opened_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "statistics.PlanTaskFulfillmentStatistics": {
+            "type": "object",
+            "properties": {
+                "trend": {
+                    "$ref": "#/definitions/statistics.PlanTaskFulfillmentTrend"
+                },
+                "window": {
+                    "$ref": "#/definitions/statistics.PlanTaskFulfillmentWindow"
+                }
+            }
+        },
+        "statistics.PlanTaskFulfillmentTrend": {
+            "type": "object",
+            "properties": {
+                "completed": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "due": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "overdue": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                },
+                "planned": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/statistics.DailyCount"
+                    }
+                }
+            }
+        },
+        "statistics.PlanTaskFulfillmentWindow": {
+            "type": "object",
+            "properties": {
+                "completed_task_count": {
+                    "type": "integer"
+                },
+                "completion_rate": {
+                    "type": "number"
+                },
+                "due_task_count": {
+                    "type": "integer"
+                },
+                "on_time_completed_count": {
+                    "type": "integer"
+                },
+                "on_time_completion_rate": {
+                    "type": "number"
+                },
+                "overdue_task_count": {
+                    "type": "integer"
+                },
+                "planned_task_count": {
+                    "type": "integer"
                 }
             }
         },

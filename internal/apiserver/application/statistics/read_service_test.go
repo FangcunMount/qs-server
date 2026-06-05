@@ -37,6 +37,8 @@ type statisticsReadModelStub struct {
 	dimensionAnalysisSummary domainStatistics.DimensionAnalysisSummary
 	planTaskWindow           domainStatistics.PlanTaskWindow
 	planTrendByMetric        map[PlanTaskMetric][]domainStatistics.DailyCount
+	planFulfillmentWindow    domainStatistics.PlanTaskFulfillmentWindow
+	planFulfillmentTrend     domainStatistics.PlanTaskFulfillmentTrend
 
 	countAssessmentEntriesResult int64
 	listAssessmentEntryMetas     []domainStatistics.AssessmentEntryStatisticsMeta
@@ -141,6 +143,16 @@ func (s *statisticsReadModelStub) GetPlanTaskTrend(_ context.Context, _ int64, _
 	}, nil
 }
 
+func (s *statisticsReadModelStub) GetPlanTaskFulfillment(context.Context, int64, *uint64, time.Time, time.Time) (domainStatistics.PlanTaskFulfillmentWindow, error) {
+	return s.planFulfillmentWindow, nil
+}
+
+func (s *statisticsReadModelStub) GetPlanTaskFulfillmentTrend(_ context.Context, _ int64, _ *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentTrend, error) {
+	s.lastTrendFrom = append(s.lastTrendFrom, from)
+	s.lastTrendTo = append(s.lastTrendTo, to)
+	return s.planFulfillmentTrend, nil
+}
+
 func (*statisticsReadModelStub) CountClinicianSubjects(context.Context, int64) (int64, error) {
 	return 0, nil
 }
@@ -237,8 +249,8 @@ func TestReadServiceGetOverviewNormalizesQueryFilterBeforeReadModelCalls(t *test
 	if !stub.lastOverviewFrom.Equal(wantFrom) || !stub.lastOverviewTo.Equal(wantTo) {
 		t.Fatalf("overview range = [%v,%v), want [%v,%v)", stub.lastOverviewFrom, stub.lastOverviewTo, wantFrom, wantTo)
 	}
-	if len(stub.lastTrendFrom) != 3 {
-		t.Fatalf("trend calls = %d, want 3", len(stub.lastTrendFrom))
+	if len(stub.lastTrendFrom) != 4 {
+		t.Fatalf("trend calls = %d, want 4", len(stub.lastTrendFrom))
 	}
 	if got.OrganizationOverview.TesteeCount != 7 || got.AccessFunnel.Window.EntryOpenedCount != 3 {
 		t.Fatalf("unexpected overview payload: %+v", got)
@@ -269,6 +281,11 @@ func TestReadServiceGetOverviewUsesCacheAside(t *testing.T) {
 			ContentCount:   4,
 		},
 		planTaskWindow: domainStatistics.PlanTaskWindow{TaskCompletedCount: 6},
+		planFulfillmentWindow: domainStatistics.PlanTaskFulfillmentWindow{
+			DueTaskCount:       10,
+			CompletedTaskCount: 7,
+			CompletionRate:     70,
+		},
 	}
 	service := NewReadService(stub, nil, WithReadServiceCache(cache))
 	filter := QueryFilter{
@@ -297,6 +314,12 @@ func TestReadServiceGetOverviewUsesCacheAside(t *testing.T) {
 	}
 	if second.AccessFunnel.Window.EntryOpenedCount != first.AccessFunnel.Window.EntryOpenedCount {
 		t.Fatalf("cached access funnel changed: got %d want %d", second.AccessFunnel.Window.EntryOpenedCount, first.AccessFunnel.Window.EntryOpenedCount)
+	}
+	if second.Plan.Activity.Window.TaskCompletedCount != 6 || second.Plan.Window.TaskCompletedCount != 6 {
+		t.Fatalf("plan activity window not populated: %+v", second.Plan)
+	}
+	if second.Plan.Fulfillment.Window.DueTaskCount != 10 || second.Plan.Fulfillment.Window.CompletionRate != 70 {
+		t.Fatalf("plan fulfillment window not populated: %+v", second.Plan.Fulfillment.Window)
 	}
 }
 

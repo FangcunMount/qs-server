@@ -1726,16 +1726,28 @@ definitions:
     type: object
   statistics.PlanDomainStatistics:
     properties:
+      activity:
+        $ref: '#/definitions/statistics.PlanTaskActivityStatistics'
+      fulfillment:
+        $ref: '#/definitions/statistics.PlanTaskFulfillmentStatistics'
       trend:
-        $ref: '#/definitions/statistics.PlanTaskTrend'
+        allOf:
+        - $ref: '#/definitions/statistics.PlanTaskTrend'
+        description: 'Deprecated: use activity.trend.'
       window:
-        $ref: '#/definitions/statistics.PlanTaskWindow'
+        allOf:
+        - $ref: '#/definitions/statistics.PlanTaskWindow'
+        description: 'Deprecated: use activity.window.'
     type: object
   statistics.PlanStatistics:
     properties:
       active_testees:
         description: 活跃受试者数（有完成任务的）
         type: integer
+      activity:
+        allOf:
+        - $ref: '#/definitions/statistics.PlanTaskActivityStatistics'
+        description: 近窗口任务趋势，默认由计划日投影提供
       completed_tasks:
         description: 已完成任务数
         type: integer
@@ -1748,6 +1760,8 @@ definitions:
       expired_tasks:
         description: 已过期任务数
         type: integer
+      fulfillment:
+        $ref: '#/definitions/statistics.PlanTaskFulfillmentStatistics'
       org_id:
         type: integer
       pending_tasks:
@@ -1759,11 +1773,97 @@ definitions:
         description: 任务统计
         type: integer
       trend:
-        $ref: '#/definitions/statistics.PlanTaskTrend'
+        allOf:
+        - $ref: '#/definitions/statistics.PlanTaskTrend'
+        description: 'Deprecated: use activity.trend.'
       window:
         allOf:
         - $ref: '#/definitions/statistics.PlanTaskWindow'
-        description: 近窗口任务趋势，默认由计划日投影提供
+        description: 'Deprecated: use activity.window.'
+    type: object
+  statistics.PlanTaskActivityStatistics:
+    properties:
+      trend:
+        $ref: '#/definitions/statistics.PlanTaskActivityTrend'
+      window:
+        $ref: '#/definitions/statistics.PlanTaskActivityWindow'
+    type: object
+  statistics.PlanTaskActivityTrend:
+    properties:
+      task_completed:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      task_created:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      task_expired:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      task_opened:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+    type: object
+  statistics.PlanTaskActivityWindow:
+    properties:
+      active_testees:
+        type: integer
+      enrolled_testees:
+        type: integer
+      task_completed_count:
+        type: integer
+      task_created_count:
+        type: integer
+      task_expired_count:
+        type: integer
+      task_opened_count:
+        type: integer
+    type: object
+  statistics.PlanTaskFulfillmentStatistics:
+    properties:
+      trend:
+        $ref: '#/definitions/statistics.PlanTaskFulfillmentTrend'
+      window:
+        $ref: '#/definitions/statistics.PlanTaskFulfillmentWindow'
+    type: object
+  statistics.PlanTaskFulfillmentTrend:
+    properties:
+      completed:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      due:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      overdue:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+      planned:
+        items:
+          $ref: '#/definitions/statistics.DailyCount'
+        type: array
+    type: object
+  statistics.PlanTaskFulfillmentWindow:
+    properties:
+      completed_task_count:
+        type: integer
+      completion_rate:
+        type: number
+      due_task_count:
+        type: integer
+      on_time_completed_count:
+        type: integer
+      on_time_completion_rate:
+        type: number
+      overdue_task_count:
+        type: integer
+      planned_task_count:
+        type: integer
     type: object
   statistics.PlanTaskTrend:
     properties:

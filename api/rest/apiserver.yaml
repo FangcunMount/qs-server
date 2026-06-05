@@ -6389,6 +6389,10 @@ components:
         active_testees:
           description: 活跃受试者数（有完成任务的）
           type: integer
+        activity:
+          description: 近窗口任务事件活动，按 created_at/open_at/completed_at/expire_at 归属
+          allOf:
+          - $ref: '#/components/schemas/statistics.PlanTaskActivityStatistics'
         completed_tasks:
           description: 已完成任务数
           type: integer
@@ -6401,6 +6405,8 @@ components:
         expired_tasks:
           description: 已过期任务数
           type: integer
+        fulfillment:
+          $ref: '#/components/schemas/statistics.PlanTaskFulfillmentStatistics'
         org_id:
           type: integer
         pending_tasks:
@@ -6410,6 +6416,132 @@ components:
           type: integer
         total_tasks:
           description: 任务统计
+          type: integer
+        trend:
+          description: Deprecated; use activity.trend.
+          allOf:
+          - $ref: '#/components/schemas/statistics.PlanTaskTrend'
+        window:
+          description: Deprecated; use activity.window.
+          allOf:
+          - $ref: '#/components/schemas/statistics.PlanTaskWindow'
+    statistics.PlanTaskActivityStatistics:
+      type: object
+      properties:
+        trend:
+          $ref: '#/components/schemas/statistics.PlanTaskActivityTrend'
+        window:
+          $ref: '#/components/schemas/statistics.PlanTaskActivityWindow'
+    statistics.PlanTaskActivityTrend:
+      type: object
+      properties:
+        task_completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        task_created:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        task_expired:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        task_opened:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+    statistics.PlanTaskActivityWindow:
+      type: object
+      properties:
+        active_testees:
+          type: integer
+        enrolled_testees:
+          type: integer
+        task_completed_count:
+          type: integer
+        task_created_count:
+          type: integer
+        task_expired_count:
+          type: integer
+        task_opened_count:
+          type: integer
+    statistics.PlanTaskFulfillmentStatistics:
+      type: object
+      properties:
+        trend:
+          $ref: '#/components/schemas/statistics.PlanTaskFulfillmentTrend'
+        window:
+          $ref: '#/components/schemas/statistics.PlanTaskFulfillmentWindow'
+    statistics.PlanTaskFulfillmentTrend:
+      type: object
+      properties:
+        completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        due:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        overdue:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        planned:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+    statistics.PlanTaskFulfillmentWindow:
+      type: object
+      properties:
+        completed_task_count:
+          type: integer
+        completion_rate:
+          type: number
+        due_task_count:
+          type: integer
+        on_time_completed_count:
+          type: integer
+        on_time_completion_rate:
+          type: number
+        overdue_task_count:
+          type: integer
+        planned_task_count:
+          type: integer
+    statistics.PlanTaskTrend:
+      type: object
+      properties:
+        task_completed:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        task_created:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        task_expired:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+        task_opened:
+          type: array
+          items:
+            $ref: '#/components/schemas/statistics.DailyCount'
+    statistics.PlanTaskWindow:
+      type: object
+      properties:
+        active_testees:
+          type: integer
+        enrolled_testees:
+          type: integer
+        task_completed_count:
+          type: integer
+        task_created_count:
+          type: integer
+        task_expired_count:
+          type: integer
+        task_opened_count:
           type: integer
     statistics.QuestionnaireStatistics:
       type: object

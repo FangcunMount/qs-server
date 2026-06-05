@@ -99,6 +99,8 @@ type PlanStatistics struct {
 	ActiveTestees   int64 `json:"active_testees"`   // 活跃受试者数（有完成任务的）
 
 	// 近窗口任务趋势，默认由计划日投影提供
-	Window PlanTaskWindow `json:"window"`
-	Trend  PlanTaskTrend  `json:"trend"`
+	Activity    PlanTaskActivityStatistics    `json:"activity"`
+	Fulfillment PlanTaskFulfillmentStatistics `json:"fulfillment"`
+	Window      PlanTaskWindow                `json:"window"` // Deprecated: use activity.window.
+	Trend       PlanTaskTrend                 `json:"trend"`  // Deprecated: use activity.trend.
 }

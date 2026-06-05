@@ -196,6 +196,18 @@ func (r *StatisticsRepository) BuildRealtimePlanStatistics(ctx context.Context, 
 	}
 	result.EnrolledTestees = testeeStats.EnrolledTestees
 	result.ActiveTestees = testeeStats.ActiveTestees
+	activityWindow := r.planTaskActivityWindowFromTasks(ctx, orgID, planID)
+	activityTrend := r.planTaskActivityTrendFromTasks(ctx, orgID, planID)
+	result.Activity = domainStatistics.PlanTaskActivityStatistics{
+		Window: activityWindow,
+		Trend:  activityTrend,
+	}
+	result.Fulfillment = domainStatistics.PlanTaskFulfillmentStatistics{
+		Window: r.planTaskFulfillmentWindow(ctx, orgID, planID),
+		Trend:  r.planTaskFulfillmentTrend(ctx, orgID, planID),
+	}
+	result.Window = activityWindow
+	result.Trend = activityTrend
 	return result, nil
 }
 

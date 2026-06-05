@@ -221,7 +221,7 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 
 ```bash
 go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
-  --mysql-dsn "$MYSQL_DSN" \
+  --mysql-dsn 'fcm_admin:RfDtf6SGkGFeB9qZQtX@tcp(rm-2zet3fx250176qq8jko.mysql.rds.aliyuncs.com:3306)/qs?parseTime=true' \
   --org-id 1 \
   --start-date 2025-01-01 \
   --end-date 2026-06-06 \
@@ -232,7 +232,7 @@ go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
 
 ```bash
 go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
-  --mysql-dsn "$MYSQL_DSN" \
+  --mysql-dsn 'fcm_admin:RfDtf6SGkGFeB9qZQtX@tcp(rm-2zet3fx250176qq8jko.mysql.rds.aliyuncs.com:3306)/qs?parseTime=true' \
   --org-id 1 \
   --start-date 2025-01-01 \
   --end-date 2026-06-06 \
@@ -244,7 +244,7 @@ go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
 
 ```bash
 go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
-  --mysql-dsn "$MYSQL_DSN" \
+  --mysql-dsn 'fcm_admin:RfDtf6SGkGFeB9qZQtX@tcp(rm-2zet3fx250176qq8jko.mysql.rds.aliyuncs.com:3306)/qs?parseTime=true' \
   --org-id 1 \
   --start-date 2025-01-01 \
   --end-date 2026-06-06 \
@@ -257,15 +257,11 @@ go run scripts/oneoff/rebuild_access_funnel_from_sources/main.go \
 
 ```bash
 go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
-  --mysql-dsn "$MYSQL_DSN" \
+  --mysql-dsn 'fcm_admin:RfDtf6SGkGFeB9qZQtX@tcp(rm-2zet3fx250176qq8jko.mysql.rds.aliyuncs.com:3306)/qs?parseTime=true' \
   --org-id 1 \
   --start-date 2025-01-01 \
   --end-date 2026-06-06 \
   --skip-aggregate \
-  --redis-addr "$REDIS_ADDR" \
-  --redis-query-namespace 'qs:cache:query' \
-  --redis-username "$REDIS_USERNAME" \
-  --redis-password "$REDIS_PASSWORD" \
   --apply
 ```
 

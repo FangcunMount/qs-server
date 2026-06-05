@@ -70,6 +70,8 @@ type ReadModel interface {
 	GetPlanTaskOverviewByPlan(ctx context.Context, orgID int64, planID uint64, from, to time.Time) (domainStatistics.PlanTaskWindow, error)
 	GetPlanTaskTrend(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskTrend, error)
 	ListPlanTaskTrend(ctx context.Context, orgID int64, planID *uint64, metric PlanTaskMetric, from, to time.Time) []domainStatistics.DailyCount
+	GetPlanTaskFulfillment(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentWindow, error)
+	GetPlanTaskFulfillmentTrend(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentTrend, error)
 
 	CountClinicianSubjects(ctx context.Context, orgID int64) (int64, error)
 	ListClinicianSubjects(ctx context.Context, orgID int64, page, pageSize int) ([]domainStatistics.ClinicianStatisticsSubject, error)

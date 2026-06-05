@@ -112,8 +112,9 @@ type DimensionAnalysisSummary struct {
 	ContentCount   int64 `json:"content_count"`
 }
 
-// PlanTaskWindow 计划任务窗口指标。
-type PlanTaskWindow struct {
+// PlanTaskActivityWindow 计划任务事件活动窗口指标。
+// 这些字段按事件发生时间归属，例如 task_completed_count 归到 completed_at 所在日期。
+type PlanTaskActivityWindow struct {
 	TaskCreatedCount   int64 `json:"task_created_count"`
 	TaskOpenedCount    int64 `json:"task_opened_count"`
 	TaskCompletedCount int64 `json:"task_completed_count"`
@@ -122,18 +123,58 @@ type PlanTaskWindow struct {
 	ActiveTestees      int64 `json:"active_testees"`
 }
 
-// PlanTaskTrend 计划任务趋势。
-type PlanTaskTrend struct {
+// PlanTaskActivityTrend 计划任务事件活动趋势。
+type PlanTaskActivityTrend struct {
 	TaskCreated   []DailyCount `json:"task_created"`
 	TaskOpened    []DailyCount `json:"task_opened"`
 	TaskCompleted []DailyCount `json:"task_completed"`
 	TaskExpired   []DailyCount `json:"task_expired"`
 }
 
+// PlanTaskWindow 保留旧字段类型名称，语义等同 PlanTaskActivityWindow。
+type PlanTaskWindow = PlanTaskActivityWindow
+
+// PlanTaskTrend 保留旧字段类型名称，语义等同 PlanTaskActivityTrend。
+type PlanTaskTrend = PlanTaskActivityTrend
+
+// PlanTaskActivityStatistics 计划任务事件活动统计域。
+type PlanTaskActivityStatistics struct {
+	Window PlanTaskActivityWindow `json:"window"`
+	Trend  PlanTaskActivityTrend  `json:"trend"`
+}
+
+// PlanTaskFulfillmentWindow 计划任务履约 cohort 窗口指标。
+// 这些字段按计划/截止时间归属，用于回答窗口内应履约任务的完成情况。
+type PlanTaskFulfillmentWindow struct {
+	PlannedTaskCount     int64   `json:"planned_task_count"`
+	DueTaskCount         int64   `json:"due_task_count"`
+	CompletedTaskCount   int64   `json:"completed_task_count"`
+	OnTimeCompletedCount int64   `json:"on_time_completed_count"`
+	OverdueTaskCount     int64   `json:"overdue_task_count"`
+	CompletionRate       float64 `json:"completion_rate"`
+	OnTimeCompletionRate float64 `json:"on_time_completion_rate"`
+}
+
+// PlanTaskFulfillmentTrend 计划任务履约 cohort 趋势。
+type PlanTaskFulfillmentTrend struct {
+	Planned   []DailyCount `json:"planned"`
+	Due       []DailyCount `json:"due"`
+	Completed []DailyCount `json:"completed"`
+	Overdue   []DailyCount `json:"overdue"`
+}
+
+// PlanTaskFulfillmentStatistics 计划任务履约 cohort 统计域。
+type PlanTaskFulfillmentStatistics struct {
+	Window PlanTaskFulfillmentWindow `json:"window"`
+	Trend  PlanTaskFulfillmentTrend  `json:"trend"`
+}
+
 // PlanDomainStatistics 计划统计域。
 type PlanDomainStatistics struct {
-	Window PlanTaskWindow `json:"window"`
-	Trend  PlanTaskTrend  `json:"trend"`
+	Activity    PlanTaskActivityStatistics    `json:"activity"`
+	Fulfillment PlanTaskFulfillmentStatistics `json:"fulfillment"`
+	Window      PlanTaskWindow                `json:"window"` // Deprecated: use activity.window.
+	Trend       PlanTaskTrend                 `json:"trend"`  // Deprecated: use activity.trend.
 }
 
 // StatisticsOverview 机构统计概览。

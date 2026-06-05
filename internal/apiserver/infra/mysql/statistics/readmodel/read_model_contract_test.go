@@ -258,6 +258,93 @@ func TestBuildPlanTaskTrendQueryDocumentsDatePlanAndOrderContract(t *testing.T) 
 	}
 }
 
+func TestBuildPlanTaskFulfillmentWindowQueryDocumentsCohortContract(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var row struct {
+		PlannedTaskCount int64
+	}
+	planID := uint64(501)
+	from := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+	now := to.AddDate(0, 0, 1)
+
+	stmt := buildPlanTaskFulfillmentWindowQuery(db.Session(&gorm.Session{DryRun: true}), 9, &planID, from, to, now).
+		Find(&row).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"assessment_task t",
+		"JOIN assessment_plan p",
+		"t.planned_at >= ?",
+		"t.expire_at IS NOT NULL",
+		"t.completed_at <= t.expire_at",
+		"t.completed_at > t.expire_at",
+		"t.expire_at < ?",
+		"t.status <> ?",
+		"t.plan_id = ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{int64(9), planID, "completed", "expired", "canceled"} {
+		if !containsStatisticsReadModelVar(stmt.Vars, want) {
+			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+}
+
+func TestBuildPlanTaskFulfillmentTrendQueryDocumentsCohortDateContract(t *testing.T) {
+	t.Parallel()
+
+	db := newDryRunStatisticsReadModelDB(t)
+	var rows []struct {
+		StatDate time.Time
+	}
+	planID := uint64(501)
+	from := time.Date(2026, 5, 1, 10, 0, 0, 0, time.UTC)
+	to := from.AddDate(0, 0, 7)
+
+	stmt := buildPlanTaskFulfillmentTrendQuery(db.Session(&gorm.Session{DryRun: true}), 9, &planID, from, to, to).
+		Find(&rows).Statement
+
+	sql := stmt.SQL.String()
+	for _, token := range []string{
+		"DATE(t.planned_at)",
+		"DATE(t.expire_at)",
+		"planned_task_count",
+		"due_task_count",
+		"completed_task_count",
+		"overdue_task_count",
+		"UNION ALL",
+		"ORDER BY raw.stat_date ASC",
+		"t.plan_id = ?",
+	} {
+		if !strings.Contains(sql, token) {
+			t.Fatalf("query sql %q does not contain %q", sql, token)
+		}
+	}
+	for _, want := range []interface{}{int64(9), planID, "completed", "expired", "canceled"} {
+		if !containsStatisticsReadModelVar(stmt.Vars, want) {
+			t.Fatalf("query vars = %#v, want %v", stmt.Vars, want)
+		}
+	}
+}
+
+func TestPlanTaskFulfillmentWindowFromRowCalculatesRatesOnDueCohort(t *testing.T) {
+	t.Parallel()
+
+	got := planTaskFulfillmentWindowFromRow(12, 10, 7, 6, 2)
+	if got.PlannedTaskCount != 12 || got.DueTaskCount != 10 || got.CompletedTaskCount != 7 || got.OnTimeCompletedCount != 6 || got.OverdueTaskCount != 2 {
+		t.Fatalf("unexpected fulfillment window: %+v", got)
+	}
+	if got.CompletionRate != 70 || got.OnTimeCompletionRate != 60 {
+		t.Fatalf("rates = %.2f/%.2f, want 70/60", got.CompletionRate, got.OnTimeCompletionRate)
+	}
+}
+
 func mustOverviewTrendField(metric statisticsreadmodel.OrgOverviewMetric) string {
 	field, _ := overviewTrendField(metric)
 	return field

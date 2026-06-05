@@ -64,6 +64,27 @@ func (q *overviewQuery) buildOverview(ctx context.Context, orgID int64, timeRang
 	if err != nil {
 		return nil, err
 	}
+	planFulfillmentWindow, err := q.readModel.GetPlanTaskFulfillment(ctx, orgID, nil, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+	planFulfillmentTrend, err := q.readModel.GetPlanTaskFulfillmentTrend(ctx, orgID, nil, timeRange.From, timeRange.To)
+	if err != nil {
+		return nil, err
+	}
+
+	planActivityTrend := domainStatistics.PlanTaskActivityTrend{
+		TaskCreated:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCreated),
+		TaskOpened:    fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskOpened),
+		TaskCompleted: fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCompleted),
+		TaskExpired:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskExpired),
+	}
+	planFulfillmentFilledTrend := domainStatistics.PlanTaskFulfillmentTrend{
+		Planned:   fillMissingDailyCounts(timeRange.From, timeRange.To, planFulfillmentTrend.Planned),
+		Due:       fillMissingDailyCounts(timeRange.From, timeRange.To, planFulfillmentTrend.Due),
+		Completed: fillMissingDailyCounts(timeRange.From, timeRange.To, planFulfillmentTrend.Completed),
+		Overdue:   fillMissingDailyCounts(timeRange.From, timeRange.To, planFulfillmentTrend.Overdue),
+	}
 
 	return &domainStatistics.StatisticsOverview{
 		OrgID:                orgID,
@@ -89,13 +110,16 @@ func (q *overviewQuery) buildOverview(ctx context.Context, orgID int64, timeRang
 		},
 		DimensionAnalysis: dimensionAnalysis,
 		Plan: domainStatistics.PlanDomainStatistics{
-			Window: planWindow,
-			Trend: domainStatistics.PlanTaskTrend{
-				TaskCreated:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCreated),
-				TaskOpened:    fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskOpened),
-				TaskCompleted: fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskCompleted),
-				TaskExpired:   fillMissingDailyCounts(timeRange.From, timeRange.To, planTrend.TaskExpired),
+			Activity: domainStatistics.PlanTaskActivityStatistics{
+				Window: planWindow,
+				Trend:  planActivityTrend,
 			},
+			Fulfillment: domainStatistics.PlanTaskFulfillmentStatistics{
+				Window: planFulfillmentWindow,
+				Trend:  planFulfillmentFilledTrend,
+			},
+			Window: planWindow,
+			Trend:  planActivityTrend,
 		},
 	}, nil
 }

@@ -8,6 +8,12 @@ import (
 	"gorm.io/gorm"
 )
 
+const (
+	planTaskCompletedStatus = "completed"
+	planTaskExpiredStatus   = "expired"
+	planTaskCanceledStatus  = "canceled"
+)
+
 func (r *StatisticsRepository) LoadSystemStatistics(ctx context.Context, orgID int64) (*domainStatistics.SystemStatistics, bool, error) {
 	var snapshot StatisticsOrgSnapshotPO
 	if err := r.WithContext(ctx).
@@ -60,13 +66,23 @@ func (r *StatisticsRepository) LoadPlanStatistics(ctx context.Context, orgID int
 	if err != nil {
 		return nil, false, err
 	}
-	stats.Window = r.planTaskWindow(ctx, orgID, planID)
-	stats.Trend = domainStatistics.PlanTaskTrend{
+	activityWindow := r.planTaskWindow(ctx, orgID, planID)
+	activityTrend := domainStatistics.PlanTaskTrend{
 		TaskCreated:   r.planTaskTrend(ctx, orgID, planID, "task_created_count"),
 		TaskOpened:    r.planTaskTrend(ctx, orgID, planID, "task_opened_count"),
 		TaskCompleted: r.planTaskTrend(ctx, orgID, planID, "task_completed_count"),
 		TaskExpired:   r.planTaskTrend(ctx, orgID, planID, "task_expired_count"),
 	}
+	stats.Activity = domainStatistics.PlanTaskActivityStatistics{
+		Window: activityWindow,
+		Trend:  activityTrend,
+	}
+	stats.Fulfillment = domainStatistics.PlanTaskFulfillmentStatistics{
+		Window: r.planTaskFulfillmentWindow(ctx, orgID, planID),
+		Trend:  r.planTaskFulfillmentTrend(ctx, orgID, planID),
+	}
+	stats.Window = activityWindow
+	stats.Trend = activityTrend
 	return stats, true, nil
 }
 
@@ -331,6 +347,210 @@ func (r *StatisticsRepository) planTaskTrend(ctx context.Context, orgID int64, p
 		return []domainStatistics.DailyCount{}
 	}
 	return buildDailyCounts(rows)
+}
+
+func (r *StatisticsRepository) planTaskActivityWindowFromTasks(ctx context.Context, orgID int64, planID uint64) domainStatistics.PlanTaskWindow {
+	from, to := defaultPlanTaskTrendRange()
+	var row struct {
+		TaskCreatedCount   int64
+		TaskOpenedCount    int64
+		TaskCompletedCount int64
+		TaskExpiredCount   int64
+		EnrolledTestees    int64
+		ActiveTestees      int64
+	}
+	if err := r.WithContext(ctx).
+		Table("assessment_task t").
+		Joins("JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL").
+		Select(`
+			COALESCE(SUM(CASE WHEN t.created_at >= ? AND t.created_at < ? THEN 1 ELSE 0 END), 0) AS task_created_count,
+			COALESCE(SUM(CASE WHEN t.open_at IS NOT NULL AND t.open_at >= ? AND t.open_at < ? THEN 1 ELSE 0 END), 0) AS task_opened_count,
+			COALESCE(SUM(CASE WHEN t.completed_at IS NOT NULL AND t.completed_at >= ? AND t.completed_at < ? AND t.status = ? THEN 1 ELSE 0 END), 0) AS task_completed_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? THEN 1 ELSE 0 END), 0) AS task_expired_count,
+			COUNT(DISTINCT CASE WHEN t.created_at >= ? AND t.created_at < ? THEN t.testee_id END) AS enrolled_testees,
+			COUNT(DISTINCT CASE WHEN t.completed_at IS NOT NULL AND t.completed_at >= ? AND t.completed_at < ? AND t.status = ? THEN t.testee_id END) AS active_testees
+		`,
+			from, to,
+			from, to,
+			from, to, planTaskCompletedStatus,
+			from, to, planTaskExpiredStatus,
+			from, to,
+			from, to, planTaskCompletedStatus,
+		).
+		Where("t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL", orgID, planID).
+		Scan(&row).Error; err != nil {
+		return domainStatistics.PlanTaskWindow{}
+	}
+	return domainStatistics.PlanTaskWindow{
+		TaskCreatedCount:   row.TaskCreatedCount,
+		TaskOpenedCount:    row.TaskOpenedCount,
+		TaskCompletedCount: row.TaskCompletedCount,
+		TaskExpiredCount:   row.TaskExpiredCount,
+		EnrolledTestees:    row.EnrolledTestees,
+		ActiveTestees:      row.ActiveTestees,
+	}
+}
+
+func (r *StatisticsRepository) planTaskActivityTrendFromTasks(ctx context.Context, orgID int64, planID uint64) domainStatistics.PlanTaskTrend {
+	from, to := defaultPlanTaskTrendRange()
+	type row struct {
+		StatDate           time.Time
+		TaskCreatedCount   int64
+		TaskOpenedCount    int64
+		TaskCompletedCount int64
+		TaskExpiredCount   int64
+	}
+	var rows []row
+	if err := r.WithContext(ctx).Raw(`
+		SELECT
+			raw.stat_date,
+			COALESCE(SUM(raw.task_created_count), 0) AS task_created_count,
+			COALESCE(SUM(raw.task_opened_count), 0) AS task_opened_count,
+			COALESCE(SUM(raw.task_completed_count), 0) AS task_completed_count,
+			COALESCE(SUM(raw.task_expired_count), 0) AS task_expired_count
+		FROM (
+			SELECT DATE(t.created_at) AS stat_date, COUNT(*) AS task_created_count, 0 AS task_opened_count, 0 AS task_completed_count, 0 AS task_expired_count
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.created_at >= ? AND t.created_at < ?
+			GROUP BY DATE(t.created_at)
+			UNION ALL
+			SELECT DATE(t.open_at) AS stat_date, 0, COUNT(*), 0, 0
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.open_at IS NOT NULL AND t.open_at >= ? AND t.open_at < ?
+			GROUP BY DATE(t.open_at)
+			UNION ALL
+			SELECT DATE(t.completed_at) AS stat_date, 0, 0, COUNT(*), 0
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.status = ? AND t.completed_at IS NOT NULL AND t.completed_at >= ? AND t.completed_at < ?
+			GROUP BY DATE(t.completed_at)
+			UNION ALL
+			SELECT DATE(t.expire_at) AS stat_date, 0, 0, 0, COUNT(*)
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.status = ? AND t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ?
+			GROUP BY DATE(t.expire_at)
+		) raw
+		GROUP BY raw.stat_date
+		ORDER BY raw.stat_date ASC`,
+		orgID, planID, from, to,
+		orgID, planID, from, to,
+		orgID, planID, planTaskCompletedStatus, from, to,
+		orgID, planID, planTaskExpiredStatus, from, to,
+	).Scan(&rows).Error; err != nil {
+		return domainStatistics.PlanTaskTrend{}
+	}
+	trend := domainStatistics.PlanTaskTrend{}
+	for _, item := range rows {
+		trend.TaskCreated = append(trend.TaskCreated, domainStatistics.DailyCount{Date: item.StatDate, Count: item.TaskCreatedCount})
+		trend.TaskOpened = append(trend.TaskOpened, domainStatistics.DailyCount{Date: item.StatDate, Count: item.TaskOpenedCount})
+		trend.TaskCompleted = append(trend.TaskCompleted, domainStatistics.DailyCount{Date: item.StatDate, Count: item.TaskCompletedCount})
+		trend.TaskExpired = append(trend.TaskExpired, domainStatistics.DailyCount{Date: item.StatDate, Count: item.TaskExpiredCount})
+	}
+	return trend
+}
+
+func (r *StatisticsRepository) planTaskFulfillmentWindow(ctx context.Context, orgID int64, planID uint64) domainStatistics.PlanTaskFulfillmentWindow {
+	from, to := defaultPlanTaskTrendRange()
+	var row struct {
+		PlannedTaskCount     int64
+		DueTaskCount         int64
+		CompletedTaskCount   int64
+		OnTimeCompletedCount int64
+		OverdueTaskCount     int64
+	}
+	if err := r.WithContext(ctx).
+		Table("assessment_task t").
+		Joins("JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL").
+		Select(`
+			COALESCE(SUM(CASE WHEN t.planned_at >= ? AND t.planned_at < ? THEN 1 ELSE 0 END), 0) AS planned_task_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? THEN 1 ELSE 0 END), 0) AS due_task_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? THEN 1 ELSE 0 END), 0) AS completed_task_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? AND t.completed_at IS NOT NULL AND t.completed_at <= t.expire_at THEN 1 ELSE 0 END), 0) AS on_time_completed_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND (t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?)) THEN 1 ELSE 0 END), 0) AS overdue_task_count
+		`,
+			from, to,
+			from, to,
+			from, to, planTaskCompletedStatus,
+			from, to, planTaskCompletedStatus,
+			from, to, planTaskExpiredStatus, planTaskCompletedStatus, time.Now(),
+		).
+		Where("t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.status <> ?", orgID, planID, planTaskCanceledStatus).
+		Scan(&row).Error; err != nil {
+		return domainStatistics.PlanTaskFulfillmentWindow{}
+	}
+	return planTaskFulfillmentWindowFromCounts(
+		row.PlannedTaskCount,
+		row.DueTaskCount,
+		row.CompletedTaskCount,
+		row.OnTimeCompletedCount,
+		row.OverdueTaskCount,
+	)
+}
+
+func (r *StatisticsRepository) planTaskFulfillmentTrend(ctx context.Context, orgID int64, planID uint64) domainStatistics.PlanTaskFulfillmentTrend {
+	from, to := defaultPlanTaskTrendRange()
+	type row struct {
+		StatDate           time.Time
+		PlannedTaskCount   int64
+		DueTaskCount       int64
+		CompletedTaskCount int64
+		OverdueTaskCount   int64
+	}
+	var rows []row
+	if err := r.WithContext(ctx).Raw(`
+		SELECT
+			raw.stat_date,
+			COALESCE(SUM(raw.planned_task_count), 0) AS planned_task_count,
+			COALESCE(SUM(raw.due_task_count), 0) AS due_task_count,
+			COALESCE(SUM(raw.completed_task_count), 0) AS completed_task_count,
+			COALESCE(SUM(raw.overdue_task_count), 0) AS overdue_task_count
+		FROM (
+			SELECT DATE(t.planned_at) AS stat_date, COUNT(*) AS planned_task_count, 0 AS due_task_count, 0 AS completed_task_count, 0 AS overdue_task_count
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.planned_at >= ? AND t.planned_at < ?
+			GROUP BY DATE(t.planned_at)
+			UNION ALL
+			SELECT DATE(t.expire_at) AS stat_date, 0 AS planned_task_count, COUNT(*) AS due_task_count,
+				SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS completed_task_count,
+				SUM(CASE WHEN t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?) THEN 1 ELSE 0 END) AS overdue_task_count
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.plan_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ?
+			GROUP BY DATE(t.expire_at)
+		) raw
+		GROUP BY raw.stat_date
+		ORDER BY raw.stat_date ASC`,
+		orgID, planID, planTaskCanceledStatus, from, to,
+		planTaskCompletedStatus, planTaskExpiredStatus, planTaskCompletedStatus, time.Now(),
+		orgID, planID, planTaskCanceledStatus, from, to,
+	).Scan(&rows).Error; err != nil {
+		return domainStatistics.PlanTaskFulfillmentTrend{}
+	}
+	trend := domainStatistics.PlanTaskFulfillmentTrend{}
+	for _, item := range rows {
+		trend.Planned = append(trend.Planned, domainStatistics.DailyCount{Date: item.StatDate, Count: item.PlannedTaskCount})
+		trend.Due = append(trend.Due, domainStatistics.DailyCount{Date: item.StatDate, Count: item.DueTaskCount})
+		trend.Completed = append(trend.Completed, domainStatistics.DailyCount{Date: item.StatDate, Count: item.CompletedTaskCount})
+		trend.Overdue = append(trend.Overdue, domainStatistics.DailyCount{Date: item.StatDate, Count: item.OverdueTaskCount})
+	}
+	return trend
+}
+
+func planTaskFulfillmentWindowFromCounts(planned, due, completed, onTimeCompleted, overdue int64) domainStatistics.PlanTaskFulfillmentWindow {
+	aggregator := domainStatistics.NewAggregator()
+	return domainStatistics.PlanTaskFulfillmentWindow{
+		PlannedTaskCount:     planned,
+		DueTaskCount:         due,
+		CompletedTaskCount:   completed,
+		OnTimeCompletedCount: onTimeCompleted,
+		OverdueTaskCount:     overdue,
+		CompletionRate:       aggregator.CalculateCompletionRate(due, completed),
+		OnTimeCompletionRate: aggregator.CalculateCompletionRate(due, onTimeCompleted),
+	}
 }
 
 func defaultPlanTaskTrendRange() (time.Time, time.Time) {

@@ -25,6 +25,12 @@ var accessGrantRelationTypes = []string{
 	string(actorDomainRelation.RelationTypeCollaborator),
 }
 
+const (
+	planTaskStatusCompleted = "completed"
+	planTaskStatusExpired   = "expired"
+	planTaskStatusCanceled  = "canceled"
+)
+
 type readModel struct {
 	db *gorm.DB
 }
@@ -464,6 +470,50 @@ func (m *readModel) GetPlanTaskTrend(ctx context.Context, orgID int64, planID *u
 	return trend, nil
 }
 
+func (m *readModel) GetPlanTaskFulfillment(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentWindow, error) {
+	var row struct {
+		PlannedTaskCount     sql.NullInt64
+		DueTaskCount         sql.NullInt64
+		CompletedTaskCount   sql.NullInt64
+		OnTimeCompletedCount sql.NullInt64
+		OverdueTaskCount     sql.NullInt64
+	}
+	if err := buildPlanTaskFulfillmentWindowQuery(m.db.WithContext(ctx), orgID, planID, from, to, time.Now()).
+		Scan(&row).Error; err != nil {
+		return domainStatistics.PlanTaskFulfillmentWindow{}, err
+	}
+	return planTaskFulfillmentWindowFromRow(
+		row.PlannedTaskCount.Int64,
+		row.DueTaskCount.Int64,
+		row.CompletedTaskCount.Int64,
+		row.OnTimeCompletedCount.Int64,
+		row.OverdueTaskCount.Int64,
+	), nil
+}
+
+func (m *readModel) GetPlanTaskFulfillmentTrend(ctx context.Context, orgID int64, planID *uint64, from, to time.Time) (domainStatistics.PlanTaskFulfillmentTrend, error) {
+	type row struct {
+		StatDate           time.Time
+		PlannedTaskCount   int64
+		DueTaskCount       int64
+		CompletedTaskCount int64
+		OverdueTaskCount   int64
+	}
+	var rows []row
+	if err := buildPlanTaskFulfillmentTrendQuery(m.db.WithContext(ctx), orgID, planID, from, to, time.Now()).
+		Scan(&rows).Error; err != nil {
+		return domainStatistics.PlanTaskFulfillmentTrend{}, err
+	}
+	trend := domainStatistics.PlanTaskFulfillmentTrend{}
+	for _, item := range rows {
+		trend.Planned = append(trend.Planned, domainStatistics.DailyCount{Date: item.StatDate, Count: item.PlannedTaskCount})
+		trend.Due = append(trend.Due, domainStatistics.DailyCount{Date: item.StatDate, Count: item.DueTaskCount})
+		trend.Completed = append(trend.Completed, domainStatistics.DailyCount{Date: item.StatDate, Count: item.CompletedTaskCount})
+		trend.Overdue = append(trend.Overdue, domainStatistics.DailyCount{Date: item.StatDate, Count: item.OverdueTaskCount})
+	}
+	return trend, nil
+}
+
 func (m *readModel) CountClinicianSubjects(ctx context.Context, orgID int64) (int64, error) {
 	var total int64
 	if err := buildClinicianSubjectQuery(m.db.WithContext(ctx), orgID).Count(&total).Error; err != nil {
@@ -822,6 +872,97 @@ func buildPlanTaskTrendQuery(db *gorm.DB, orgID int64, planID *uint64, from, to 
 		query = query.Where("plan_id = ?", *planID)
 	}
 	return query
+}
+
+func buildPlanTaskFulfillmentWindowQuery(db *gorm.DB, orgID int64, planID *uint64, from, to, now time.Time) *gorm.DB {
+	query := buildPlanTaskFulfillmentBaseQuery(db, orgID, planID).
+		Select(`
+			COALESCE(SUM(CASE WHEN t.planned_at >= ? AND t.planned_at < ? THEN 1 ELSE 0 END), 0) AS planned_task_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? THEN 1 ELSE 0 END), 0) AS due_task_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? THEN 1 ELSE 0 END), 0) AS completed_task_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND t.status = ? AND t.completed_at IS NOT NULL AND t.completed_at <= t.expire_at THEN 1 ELSE 0 END), 0) AS on_time_completed_count,
+			COALESCE(SUM(CASE WHEN t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ? AND (t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?)) THEN 1 ELSE 0 END), 0) AS overdue_task_count
+		`,
+			from, to,
+			from, to,
+			from, to, planTaskStatusCompleted,
+			from, to, planTaskStatusCompleted,
+			from, to, planTaskStatusExpired, planTaskStatusCompleted, now,
+		)
+	return query
+}
+
+func buildPlanTaskFulfillmentTrendQuery(db *gorm.DB, orgID int64, planID *uint64, from, to, now time.Time) *gorm.DB {
+	planClause := ""
+	plannedArgs := []interface{}{orgID, planTaskStatusCanceled, from, to}
+	dueArgs := []interface{}{planTaskStatusCompleted, planTaskStatusExpired, planTaskStatusCompleted, now, orgID, planTaskStatusCanceled, from, to}
+	if planID != nil {
+		planClause = " AND t.plan_id = ?"
+		plannedArgs = append(plannedArgs, *planID)
+		dueArgs = append(dueArgs, *planID)
+	}
+
+	sql := fmt.Sprintf(`
+		SELECT
+			raw.stat_date,
+			COALESCE(SUM(raw.planned_task_count), 0) AS planned_task_count,
+			COALESCE(SUM(raw.due_task_count), 0) AS due_task_count,
+			COALESCE(SUM(raw.completed_task_count), 0) AS completed_task_count,
+			COALESCE(SUM(raw.overdue_task_count), 0) AS overdue_task_count
+		FROM (
+			SELECT
+				DATE(t.planned_at) AS stat_date,
+				COUNT(*) AS planned_task_count,
+				0 AS due_task_count,
+				0 AS completed_task_count,
+				0 AS overdue_task_count
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.planned_at >= ? AND t.planned_at < ?%s
+			GROUP BY DATE(t.planned_at)
+			UNION ALL
+			SELECT
+				DATE(t.expire_at) AS stat_date,
+				0 AS planned_task_count,
+				COUNT(*) AS due_task_count,
+				SUM(CASE WHEN t.status = ? THEN 1 ELSE 0 END) AS completed_task_count,
+				SUM(CASE WHEN t.status = ? OR (t.completed_at IS NOT NULL AND t.completed_at > t.expire_at) OR (t.status <> ? AND t.expire_at < ?) THEN 1 ELSE 0 END) AS overdue_task_count
+			FROM assessment_task t
+			JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL
+			WHERE t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ? AND t.expire_at IS NOT NULL AND t.expire_at >= ? AND t.expire_at < ?%s
+			GROUP BY DATE(t.expire_at)
+		) raw
+		GROUP BY raw.stat_date
+		ORDER BY raw.stat_date ASC`, planClause, planClause)
+
+	args := make([]interface{}, 0, len(plannedArgs)+len(dueArgs))
+	args = append(args, plannedArgs...)
+	args = append(args, dueArgs...)
+	return db.Raw(sql, args...)
+}
+
+func buildPlanTaskFulfillmentBaseQuery(db *gorm.DB, orgID int64, planID *uint64) *gorm.DB {
+	query := db.
+		Table("assessment_task t").
+		Joins("JOIN assessment_plan p ON p.org_id = t.org_id AND p.id = t.plan_id AND p.deleted_at IS NULL").
+		Where("t.org_id = ? AND t.deleted_at IS NULL AND t.status <> ?", orgID, planTaskStatusCanceled)
+	if planID != nil {
+		query = query.Where("t.plan_id = ?", *planID)
+	}
+	return query
+}
+
+func planTaskFulfillmentWindowFromRow(planned, due, completed, onTimeCompleted, overdue int64) domainStatistics.PlanTaskFulfillmentWindow {
+	aggregator := domainStatistics.NewAggregator()
+	return domainStatistics.PlanTaskFulfillmentWindow{
+		PlannedTaskCount:     planned,
+		DueTaskCount:         due,
+		CompletedTaskCount:   completed,
+		OnTimeCompletedCount: onTimeCompleted,
+		OverdueTaskCount:     overdue,
+		CompletionRate:       aggregator.CalculateCompletionRate(due, completed),
+		OnTimeCompletionRate: aggregator.CalculateCompletionRate(due, onTimeCompleted),
+	}
 }
 
 func (m *readModel) enrichAssessmentEntryMeta(ctx context.Context, orgID int64, entry actorInfra.AssessmentEntryPO) (domainStatistics.AssessmentEntryStatisticsMeta, error) {
