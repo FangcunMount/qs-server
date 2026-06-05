@@ -55,6 +55,24 @@ func TestBuildInferredManualRelationScopeTargetsManualSource(t *testing.T) {
 	}
 }
 
+func TestBuildManualRelationIntakeFootprintUsesRelationBoundAt(t *testing.T) {
+	cfg := config{orgID: 1}
+	start := time.Date(2026, 5, 7, 0, 0, 0, 0, time.Local)
+	end := start.AddDate(0, 0, 30)
+
+	stmt := buildManualRelationIntakeConfirmedFootprintInsert(cfg, start, end)
+	for _, fragment := range []string{
+		"manual_intake_confirmed",
+		"cr.source_type IN ('manual', 'import')",
+		"cr.bound_at",
+		"NOT EXISTS",
+	} {
+		if !strings.Contains(stmt.Query, fragment) {
+			t.Fatalf("expected %q in query: %s", fragment, stmt.Query)
+		}
+	}
+}
+
 func TestAppendOrgPredicateAllOrgs(t *testing.T) {
 	cfg := config{allOrgs: true}
 	query, args := appendOrgPredicate("WHERE 1=1", nil, cfg, "l")

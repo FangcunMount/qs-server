@@ -528,10 +528,12 @@ func applyFootprintBackfill(ctx context.Context, conn *sql.Conn, cfg config, sta
 	}
 	defer func() { _ = tx.Rollback() }()
 
-	results := make([]statementResult, 0, 4)
+	results := make([]statementResult, 0, 6)
 	for _, stmt := range []statementSpec{
 		buildEntryOpenedFootprintInsert(cfg, startDate, endDate),
 		buildIntakeConfirmedFootprintInsert(cfg, startDate, endDate),
+		buildManualRelationEntryOpenedFootprintInsert(cfg, startDate, endDate),
+		buildManualRelationIntakeConfirmedFootprintInsert(cfg, startDate, endDate),
 		buildTesteeProfileCreatedFootprintInsert(cfg, startDate, endDate),
 		buildCareRelationshipEstablishedFootprintInsert(cfg, startDate, endDate),
 	} {
@@ -675,6 +677,75 @@ func buildCareRelationshipEstablishedFootprintInsert(cfg config, startDate, endD
 	return buildIntakeFootprintInsert(cfg, startDate, endDate, "care_relationship_established", "care_relationship_established", "l.assignment_created = 1")
 }
 
+func buildManualRelationIntakeConfirmedFootprintInsert(cfg config, startDate, endDate time.Time) statementSpec {
+	return buildManualRelationFootprintInsert(cfg, startDate, endDate, "manual_intake_confirmed", "intake_confirmed")
+}
+
+func buildManualRelationEntryOpenedFootprintInsert(cfg config, startDate, endDate time.Time) statementSpec {
+	return buildManualRelationFootprintInsert(cfg, startDate, endDate, "manual_entry_opened", "entry_opened")
+}
+
+func buildManualRelationFootprintInsert(cfg config, startDate, endDate time.Time, idPart, eventName string) statementSpec {
+	query := `
+INSERT INTO behavior_footprint (
+  id, org_id, subject_type, subject_id, actor_type, actor_id,
+  entry_id, clinician_id, source_clinician_id, testee_id,
+  answersheet_id, assessment_id, report_id, event_name, occurred_at, properties_json
+)
+SELECT
+  CONCAT('` + eventIDPrefix + idPart + `:', cr.id),
+  cr.org_id,
+  CASE WHEN '` + eventName + `' = 'entry_opened' THEN 'assessment_entry' ELSE 'testee' END,
+  CASE WHEN '` + eventName + `' = 'entry_opened' THEN ae.entry_id ELSE cr.testee_id END,
+  CASE WHEN '` + eventName + `' = 'entry_opened' THEN 'assessment_entry' ELSE 'clinician' END,
+  CASE WHEN '` + eventName + `' = 'entry_opened' THEN ae.entry_id ELSE cr.clinician_id END,
+  ae.entry_id,
+  cr.clinician_id,
+  0,
+  CASE WHEN '` + eventName + `' = 'entry_opened' THEN 0 ELSE cr.testee_id END,
+  0, 0, 0,
+  '` + eventName + `',
+  cr.bound_at,
+  JSON_OBJECT(
+    'source_table', 'clinician_relation',
+    'source_id', cr.id,
+    'relation_type', cr.relation_type,
+    'source_type', cr.source_type,
+    'rebuilt_by', 'rebuild_seeddata_access_statistics'
+  )
+FROM clinician_relation cr
+INNER JOIN (
+  SELECT org_id, clinician_id, MIN(id) AS entry_id
+  FROM assessment_entry
+  WHERE deleted_at IS NULL
+    AND is_active = 1
+    AND (expires_at IS NULL OR expires_at > NOW(3))
+  GROUP BY org_id, clinician_id
+) ae
+  ON ae.org_id = cr.org_id
+ AND ae.clinician_id = cr.clinician_id
+WHERE cr.deleted_at IS NULL
+  AND cr.source_type IN ('manual', 'import')
+  AND cr.relation_type IN ('primary', 'attending', 'collaborator', 'assigned')
+  AND cr.bound_at >= ?
+  AND cr.bound_at < ?
+  AND NOT EXISTS (
+    SELECT 1
+    FROM behavior_footprint f
+    WHERE f.org_id = cr.org_id
+      AND f.clinician_id = cr.clinician_id
+      AND f.testee_id = cr.testee_id
+      AND f.event_name = '` + eventName + `'
+      AND f.deleted_at IS NULL
+      AND f.occurred_at >= DATE_SUB(cr.bound_at, INTERVAL 1 DAY)
+      AND f.occurred_at <= DATE_ADD(cr.bound_at, INTERVAL 1 DAY)
+  )`
+	args := []any{startDate, endDate}
+	query, args = appendOrgPredicate(query, args, cfg, "cr")
+	query += behaviorFootprintUpsertSQL()
+	return statementSpec{Name: "insert_" + idPart + "_footprint", Query: query, Args: args}
+}
+
 func buildIntakeFootprintInsert(cfg config, startDate, endDate time.Time, idPart, eventName, extraWhere string) statementSpec {
 	query := `
 INSERT INTO behavior_footprint (
@@ -749,6 +820,8 @@ func previewFootprintCounts(ctx context.Context, conn *sql.Conn, cfg config, sta
 	queries := []statementSpec{
 		buildEntryOpenedFootprintInsert(cfg, startDate, endDate),
 		buildIntakeConfirmedFootprintInsert(cfg, startDate, endDate),
+		buildManualRelationEntryOpenedFootprintInsert(cfg, startDate, endDate),
+		buildManualRelationIntakeConfirmedFootprintInsert(cfg, startDate, endDate),
 		buildTesteeProfileCreatedFootprintInsert(cfg, startDate, endDate),
 		buildCareRelationshipEstablishedFootprintInsert(cfg, startDate, endDate),
 	}
@@ -933,6 +1006,7 @@ LEFT JOIN assessment_entry_intake_log l
  AND l.clinician_id = cr.clinician_id
  AND l.testee_id = cr.testee_id
  AND l.deleted_at IS NULL
+ AND ABS(TIMESTAMPDIFF(SECOND, l.intake_at, cr.bound_at)) <= 5
 WHERE cr.deleted_at IS NULL
   AND cr.source_type IN ('manual', 'import')
   AND cr.relation_type IN ('primary', 'attending', 'collaborator', 'assigned')
