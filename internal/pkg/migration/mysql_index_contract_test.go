@@ -82,6 +82,16 @@ func TestPruneConfirmedRedundantMySQLIndexesMigrationContract(t *testing.T) {
 	}
 }
 
+func TestOptimizeHighRiskLatestQueueIndexMigrationContract(t *testing.T) {
+	up := readMySQLMigration(t, "000035_optimize_high_risk_latest_queue_index.up.sql")
+	down := readMySQLMigration(t, "000035_optimize_high_risk_latest_queue_index.down.sql")
+
+	requireSQLContains(t, up, "ALTER TABLE `assessment` ADD INDEX `idx_assessment_workbench_latest_id_risk_by_testee` (`org_id`, `status`, `deleted_at`, `testee_id`, `id`, `risk_level`)")
+	requireSQLContains(t, up, "AND index_name = 'idx_assessment_workbench_latest_id_risk_by_testee'")
+	requireSQLContains(t, down, "ALTER TABLE `assessment` DROP INDEX `idx_assessment_workbench_latest_id_risk_by_testee`")
+	requireSQLContains(t, down, "AND index_name = 'idx_assessment_workbench_latest_id_risk_by_testee'")
+}
+
 func readMySQLMigration(t *testing.T, name string) string {
 	t.Helper()
 	data, err := os.ReadFile(filepath.Join("migrations", "mysql", name))

@@ -44,23 +44,24 @@ ORDER BY occurred_at DESC, assessment_id DESC
 `
 
 const latestRiskQueueCoreSQL = `
-FROM assessment a
+FROM (
+	SELECT
+		assessment.testee_id,
+		MAX(assessment.id) AS latest_id
+	FROM assessment FORCE INDEX (idx_assessment_workbench_latest_id_risk_by_testee)
+	WHERE assessment.org_id = ?
+		%s
+		AND assessment.status = ?
+		AND assessment.deleted_at IS NULL
+		AND assessment.risk_level IS NOT NULL
+		AND assessment.risk_level <> ''
+	GROUP BY assessment.testee_id
+) latest
+JOIN assessment a ON a.id = latest.latest_id
 WHERE a.org_id = ?
-	%s
 	AND a.status = ?
 	AND a.deleted_at IS NULL
 	AND a.risk_level IN ?
-	AND NOT EXISTS (
-		SELECT 1
-		FROM assessment newer
-		WHERE newer.org_id = a.org_id
-			AND newer.testee_id = a.testee_id
-			AND newer.status = ?
-			AND newer.risk_level IS NOT NULL
-			AND newer.risk_level <> ''
-			AND newer.deleted_at IS NULL
-			AND newer.id > a.id
-	)
 	`
 
 const latestRiskQueueSelectSQL = `
@@ -75,6 +76,11 @@ SELECT
 const latestRiskQueueCountSQL = `
 SELECT COUNT(*)
 ` + latestRiskQueueCoreSQL
+
+const latestRiskQueueRestrictedTesteePredicate = `
+		AND assessment.testee_id IN ?`
+
+const latestRiskQueueUnrestrictedTesteePredicate = ``
 
 func NewAssessmentReadModel(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) interface {
 	evaluationreadmodel.AssessmentReader
@@ -261,9 +267,9 @@ func latestRiskQueueSelect(restrictToTesteeIDs bool) string {
 
 func latestRiskQueueTesteePredicate(restrictToTesteeIDs bool) string {
 	if restrictToTesteeIDs {
-		return "AND a.testee_id IN ?"
+		return latestRiskQueueRestrictedTesteePredicate
 	}
-	return ""
+	return latestRiskQueueUnrestrictedTesteePredicate
 }
 
 func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []interface{} {
@@ -272,7 +278,7 @@ func latestRiskQueueArgs(filter evaluationreadmodel.LatestRiskQueueFilter) []int
 	if filter.RestrictToTesteeIDs {
 		args = append(args, uniqueUint64(filter.TesteeIDs))
 	}
-	args = append(args, "interpreted", riskLevels, "interpreted")
+	args = append(args, "interpreted", filter.OrgID, "interpreted", riskLevels)
 	return args
 }
 

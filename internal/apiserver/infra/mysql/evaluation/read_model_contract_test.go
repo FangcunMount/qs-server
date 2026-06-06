@@ -193,14 +193,19 @@ func TestApplyAssessmentReadModelFilterBuildsExpectedWhereClauses(t *testing.T) 
 func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
 	restrictedSQL := latestRiskQueueRowsQuery(true)
 	for _, token := range []string{
-		"FROM assessment a",
+		"MAX(assessment.id) AS latest_id",
+		"FORCE INDEX (idx_assessment_workbench_latest_id_risk_by_testee)",
+		"assessment.org_id = ?",
+		"assessment.testee_id IN ?",
+		"assessment.status = ?",
+		"assessment.deleted_at IS NULL",
+		"assessment.risk_level IS NOT NULL",
+		"assessment.risk_level <> ''",
+		"GROUP BY assessment.testee_id",
+		"JOIN assessment a ON a.id = latest.latest_id",
 		"a.org_id = ?",
-		"a.testee_id IN ?",
 		"a.status = ?",
 		"a.risk_level IN ?",
-		"NOT EXISTS",
-		"newer.testee_id = a.testee_id",
-		"newer.id > a.id",
 		"ORDER BY occurred_at DESC, assessment_id DESC",
 		"LIMIT ? OFFSET ?",
 	} {
@@ -210,7 +215,7 @@ func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
 	}
 
 	allOrgSQL := latestRiskQueueRowsQuery(false)
-	if strings.Contains(allOrgSQL, "a.testee_id IN ?") {
+	if strings.Contains(allOrgSQL, "assessment.testee_id IN ?") {
 		t.Fatalf("all-org latest risk query should not restrict testee ids:\n%s", allOrgSQL)
 	}
 	if !strings.Contains(allOrgSQL, "a.org_id = ?") || !strings.Contains(allOrgSQL, "a.risk_level IN ?") {
@@ -220,8 +225,40 @@ func TestLatestRiskQueueQuerySupportsRestrictedAndAllOrgScopes(t *testing.T) {
 	if !strings.HasPrefix(strings.TrimSpace(countSQL), "SELECT COUNT(*)") {
 		t.Fatalf("latest risk count query should count latest rows per testee:\n%s", countSQL)
 	}
-	if !strings.Contains(countSQL, "NOT EXISTS") || !strings.Contains(countSQL, "newer.id > a.id") {
-		t.Fatalf("latest risk count query should exclude stale per-testee risk rows:\n%s", countSQL)
+	if !strings.Contains(countSQL, "MAX(assessment.id) AS latest_id") || !strings.Contains(countSQL, "GROUP BY assessment.testee_id") {
+		t.Fatalf("latest risk count query should derive latest per-testee risk rows:\n%s", countSQL)
+	}
+	if strings.Contains(countSQL, "NOT EXISTS") || strings.Contains(countSQL, "newer.id > a.id") {
+		t.Fatalf("latest risk count query should not use anti-join shape:\n%s", countSQL)
+	}
+}
+
+func TestLatestRiskQueueArgsMatchDerivedLatestSQLPlaceholders(t *testing.T) {
+	restricted := latestRiskQueueArgs(evaluationreadmodel.LatestRiskQueueFilter{
+		OrgID:               9,
+		TesteeIDs:           []uint64{3002, 3001, 3001},
+		RestrictToTesteeIDs: true,
+		RiskLevels:          []string{"HIGH", "severe"},
+	})
+	if len(restricted) != 6 {
+		t.Fatalf("restricted args = %#v, want 6 args", restricted)
+	}
+	if restricted[0] != int64(9) || restricted[2] != "interpreted" || restricted[3] != int64(9) || restricted[4] != "interpreted" {
+		t.Fatalf("restricted args = %#v, want inner org/status then outer org/status", restricted)
+	}
+	if ids, ok := restricted[1].([]uint64); !ok || len(ids) != 2 || ids[0] != 3002 || ids[1] != 3001 {
+		t.Fatalf("restricted testee ids = %#v, want unique ids in input order", restricted[1])
+	}
+	if risks, ok := restricted[5].([]string); !ok || len(risks) != 2 || risks[0] != "high" || risks[1] != "severe" {
+		t.Fatalf("restricted risk args = %#v, want normalized risks", restricted[5])
+	}
+
+	allOrg := latestRiskQueueArgs(evaluationreadmodel.LatestRiskQueueFilter{OrgID: 9})
+	if len(allOrg) != 5 || allOrg[0] != int64(9) || allOrg[1] != "interpreted" || allOrg[2] != int64(9) || allOrg[3] != "interpreted" {
+		t.Fatalf("all-org args = %#v, want inner org/status then outer org/status", allOrg)
+	}
+	if risks, ok := allOrg[4].([]string); !ok || len(risks) != 2 || risks[0] != "high" || risks[1] != "severe" {
+		t.Fatalf("all-org risk args = %#v, want default high/severe", allOrg[4])
 	}
 }
 
