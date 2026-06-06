@@ -65,7 +65,7 @@ func (f *fakeTaskSchedulerService) SchedulePendingTasks(ctx context.Context, org
 
 type fakeTaskManagementService struct{}
 
-func (f *fakeTaskManagementService) OpenTask(context.Context, int64, string, OpenTaskDTO) (*TaskResult, error) {
+func (f *fakeTaskManagementService) OpenTask(context.Context, int64, string) (*TaskResult, error) {
 	return nil, errors.New("not implemented")
 }
 

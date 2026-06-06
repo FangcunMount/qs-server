@@ -362,16 +362,6 @@ definitions:
           type: string
         type: array
     type: object
-  request.OpenTaskRequest:
-    properties:
-      entry_token:
-        type: string
-      entry_url:
-        type: string
-      expire_at:
-        description: 格式：YYYY-MM-DD HH:mm:ss
-        type: string
-    type: object
   request.ReorderQuestionsRequest:
     properties:
       question_codes:
@@ -3103,9 +3093,8 @@ paths:
       - Task-Management
   /api/v1/plans/tasks/{id}/open:
     post:
-      consumes:
-      - application/json
-      description: 手动开放任务，生成入口；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
+      description: 手动开放任务，自动生成入口并发布 task.opened 事件；仅 qs:evaluation_plan_manager 或
+        qs:admin 可访问
       parameters:
       - description: Bearer 用户令牌
         in: header
@@ -3117,12 +3106,6 @@ paths:
         name: id
         required: true
         type: string
-      - description: 开放任务请求
-        in: body
-        name: request
-        required: true
-        schema:
-          $ref: '#/definitions/request.OpenTaskRequest'
       produces:
       - application/json
       responses:

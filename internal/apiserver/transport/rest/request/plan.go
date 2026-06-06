@@ -52,13 +52,6 @@ type ListTaskWindowRequest struct {
 	PageSize      int      `json:"page_size,omitempty"`
 }
 
-// OpenTaskRequest 开放任务请求
-type OpenTaskRequest struct {
-	EntryToken string `json:"entry_token" valid:"required~入口令牌不能为空"`
-	EntryURL   string `json:"entry_url" valid:"required~入口URL不能为空"`
-	ExpireAt   string `json:"expire_at" valid:"required~过期时间不能为空"` // 格式：YYYY-MM-DD HH:mm:ss
-}
-
 // ============= Query Requests =============
 
 // ListPlansRequest 查询计划列表请求

@@ -232,11 +232,7 @@ func (s *PlanCommandService) OpenTask(ctx context.Context, req *pb.OpenTaskReque
 		return nil, status.Error(codes.InvalidArgument, "task_id 不能为空")
 	}
 
-	result, err := s.commandService.OpenTask(ctx, orgID, req.GetTaskId(), planApp.OpenTaskDTO{
-		EntryToken: req.GetEntryToken(),
-		EntryURL:   req.GetEntryUrl(),
-		ExpireAt:   req.GetExpireAt(),
-	})
+	result, err := s.commandService.OpenTask(ctx, orgID, req.GetTaskId())
 	if err != nil {
 		return nil, toPlanCommandGRPCError(err)
 	}

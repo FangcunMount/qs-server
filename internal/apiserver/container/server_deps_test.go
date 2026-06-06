@@ -143,7 +143,7 @@ func (*planCommandServiceStub) TerminateEnrollment(context.Context, int64, strin
 func (*planCommandServiceStub) SchedulePendingTasks(context.Context, int64, string) (*planApp.TaskScheduleResult, error) {
 	return nil, nil
 }
-func (*planCommandServiceStub) OpenTask(context.Context, int64, string, planApp.OpenTaskDTO) (*planApp.TaskResult, error) {
+func (*planCommandServiceStub) OpenTask(context.Context, int64, string) (*planApp.TaskResult, error) {
 	return nil, nil
 }
 func (*planCommandServiceStub) CompleteTask(context.Context, int64, string, string) (*planApp.TaskResult, error) {

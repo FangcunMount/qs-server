@@ -97,8 +97,8 @@ func (s *commandService) SchedulePendingTasks(ctx context.Context, orgID int64, 
 	}, nil
 }
 
-func (s *commandService) OpenTask(ctx context.Context, orgID int64, taskID string, dto OpenTaskDTO) (*TaskResult, error) {
-	return s.taskManagement.OpenTask(ctx, orgID, taskID, dto)
+func (s *commandService) OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
+	return s.taskManagement.OpenTask(ctx, orgID, taskID)
 }
 
 func (s *commandService) CompleteTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error) {

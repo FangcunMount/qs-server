@@ -15,6 +15,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 )
@@ -102,6 +103,18 @@ func (s *taskOpenedService) SendTaskOpened(ctx context.Context, dto TaskOpenedDT
 	testeeResult, err := s.testeeQueryService.GetByID(ctx, dto.TesteeID)
 	if err != nil {
 		return nil, fmt.Errorf("get testee: %w", err)
+	}
+	if testeeDomain.IsSeeddataMockSource(testeeDomain.Source(testeeResult.Source)) {
+		l.Infow("task.opened mini program notification skipped for seeddata mock testee",
+			"action", "send_task_opened_miniprogram_notification",
+			"task_id", dto.TaskID,
+			"testee_id", dto.TesteeID,
+			"testee_source", testeeResult.Source,
+			"template_id", result.TemplateID,
+		)
+		result.Skipped = true
+		result.Message = "seeddata mock testee"
+		return result, nil
 	}
 
 	appID, appSecret, err := s.getWechatAppConfig(ctx)

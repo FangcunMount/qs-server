@@ -237,9 +237,6 @@ message SchedulePendingTasksResponse {
 message OpenTaskRequest {
   int64 org_id = 1;
   string task_id = 2;
-  string entry_token = 3;
-  string entry_url = 4;
-  string expire_at = 5;
 }
 
 message OpenTaskResponse {

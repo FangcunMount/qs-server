@@ -73,8 +73,8 @@ type TaskSchedulerService interface {
 // 变更来源：任务管理的业务需求变化
 type TaskManagementService interface {
 	// OpenTask 开放任务
-	// 场景：手动开放任务，生成入口
-	OpenTask(ctx context.Context, orgID int64, taskID string, dto OpenTaskDTO) (*TaskResult, error)
+	// 场景：手动开放任务，自动生成入口
+	OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error)
 
 	// CompleteTask 完成任务
 	// 场景：用户完成测评后，更新任务状态
@@ -100,7 +100,7 @@ type PlanCommandService interface {
 	EnrollTestee(ctx context.Context, dto EnrollTesteeDTO) (*EnrollmentResult, error)
 	TerminateEnrollment(ctx context.Context, orgID int64, planID string, testeeID string) (*EnrollmentTerminationResult, error)
 	SchedulePendingTasks(ctx context.Context, orgID int64, before string) (*TaskScheduleResult, error)
-	OpenTask(ctx context.Context, orgID int64, taskID string, dto OpenTaskDTO) (*TaskResult, error)
+	OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error)
 	CompleteTask(ctx context.Context, orgID int64, taskID string, assessmentID string) (*TaskResult, error)
 	ExpireTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error)
 	CancelTask(ctx context.Context, orgID int64, taskID string) (*TaskMutationResult, error)

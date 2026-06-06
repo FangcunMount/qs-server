@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	planentryport "github.com/FangcunMount/qs-server/internal/apiserver/port/planentry"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -17,51 +18,52 @@ import (
 type taskManagementService struct {
 	taskRepo       plan.AssessmentTaskRepository
 	taskLifecycle  *plan.TaskLifecycle
+	entryGenerator planentryport.Generator
 	eventPublisher event.EventPublisher
 }
 
 // NewTaskManagementService 创建任务管理服务
 func NewTaskManagementService(
 	taskRepo plan.AssessmentTaskRepository,
+	entryGenerator planentryport.Generator,
 	eventPublisher event.EventPublisher,
 ) TaskManagementService {
 	taskLifecycle := plan.NewTaskLifecycle()
 	return &taskManagementService{
 		taskRepo:       taskRepo,
 		taskLifecycle:  taskLifecycle,
+		entryGenerator: entryGenerator,
 		eventPublisher: eventPublisher,
 	}
 }
 
 // OpenTask 开放任务
-func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskID string, dto OpenTaskDTO) (*TaskResult, error) {
+func (s *taskManagementService) OpenTask(ctx context.Context, orgID int64, taskID string) (*TaskResult, error) {
 	logger.L(ctx).Infow("Opening task",
 		"action", "open_task",
 		"org_id", orgID,
 		"task_id", taskID,
-		"expire_at", dto.ExpireAt,
 	)
 
-	// 1. 解析过期时间
-	expireAt, err := parseTime(dto.ExpireAt)
-	if err != nil {
-		logger.L(ctx).Errorw("Invalid expire time",
-			"action", "open_task",
-			"task_id", taskID,
-			"expire_at", dto.ExpireAt,
-			"error", err.Error(),
-		)
-		return nil, errors.WithCode(errorCode.ErrInvalidArgument, "无效的过期时间: %v", err)
-	}
-
-	// 2. 查询并校验任务
+	// 1. 查询并校验任务
 	task, err := loadTaskInOrg(ctx, s.taskRepo, orgID, taskID, "open_task")
 	if err != nil {
 		return nil, err
 	}
 
+	// 2. 生成入口
+	token, url, expireAt, err := s.entryGenerator.GenerateEntry(ctx, task)
+	if err != nil {
+		logger.L(ctx).Errorw("Failed to generate entry",
+			"action", "open_task",
+			"task_id", taskID,
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrInternalServerError, "生成任务入口失败")
+	}
+
 	// 3. 调用领域服务开放任务
-	if err := s.taskLifecycle.Open(ctx, task, dto.EntryToken, dto.EntryURL, expireAt); err != nil {
+	if err := s.taskLifecycle.Open(ctx, task, token, url, expireAt); err != nil {
 		logger.L(ctx).Errorw("Failed to open task",
 			"action", "open_task",
 			"task_id", taskID,

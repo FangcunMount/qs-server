@@ -78,6 +78,16 @@ func (s Source) String() string {
 	return string(s)
 }
 
+// IsSeeddataMockSource 判断是否为 seeddata / 日常模拟等 mock 受试者。
+func IsSeeddataMockSource(source Source) bool {
+	switch source {
+	case SourceSeeddata, SourceDailySimulation:
+		return true
+	default:
+		return false
+	}
+}
+
 // DisplayName 返回数据来源的中文展示名称。
 func (s Source) DisplayName() string {
 	switch s {

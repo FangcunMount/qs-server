@@ -1314,9 +1314,6 @@ type OpenTaskRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	OrgId         int64                  `protobuf:"varint,1,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
 	TaskId        string                 `protobuf:"bytes,2,opt,name=task_id,json=taskId,proto3" json:"task_id,omitempty"`
-	EntryToken    string                 `protobuf:"bytes,3,opt,name=entry_token,json=entryToken,proto3" json:"entry_token,omitempty"`
-	EntryUrl      string                 `protobuf:"bytes,4,opt,name=entry_url,json=entryUrl,proto3" json:"entry_url,omitempty"`
-	ExpireAt      string                 `protobuf:"bytes,5,opt,name=expire_at,json=expireAt,proto3" json:"expire_at,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1361,27 +1358,6 @@ func (x *OpenTaskRequest) GetOrgId() int64 {
 func (x *OpenTaskRequest) GetTaskId() string {
 	if x != nil {
 		return x.TaskId
-	}
-	return ""
-}
-
-func (x *OpenTaskRequest) GetEntryToken() string {
-	if x != nil {
-		return x.EntryToken
-	}
-	return ""
-}
-
-func (x *OpenTaskRequest) GetEntryUrl() string {
-	if x != nil {
-		return x.EntryUrl
-	}
-	return ""
-}
-
-func (x *OpenTaskRequest) GetExpireAt() string {
-	if x != nil {
-		return x.ExpireAt
 	}
 	return ""
 }
@@ -3268,14 +3244,10 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x06before\x18\x02 \x01(\tR\x06before\"\x91\x01\n" +
 	"\x1cSchedulePendingTasksResponse\x124\n" +
 	"\x05tasks\x18\x01 \x03(\v2\x1e.internalapi.TaskResultMessageR\x05tasks\x12;\n" +
-	"\x05stats\x18\x02 \x01(\v2%.internalapi.TaskScheduleStatsMessageR\x05stats\"\x9c\x01\n" +
+	"\x05stats\x18\x02 \x01(\v2%.internalapi.TaskScheduleStatsMessageR\x05stats\"A\n" +
 	"\x0fOpenTaskRequest\x12\x15\n" +
 	"\x06org_id\x18\x01 \x01(\x03R\x05orgId\x12\x17\n" +
-	"\atask_id\x18\x02 \x01(\tR\x06taskId\x12\x1f\n" +
-	"\ventry_token\x18\x03 \x01(\tR\n" +
-	"entryToken\x12\x1b\n" +
-	"\tentry_url\x18\x04 \x01(\tR\bentryUrl\x12\x1b\n" +
-	"\texpire_at\x18\x05 \x01(\tR\bexpireAt\"F\n" +
+	"\atask_id\x18\x02 \x01(\tR\x06taskId\"F\n" +
 	"\x10OpenTaskResponse\x122\n" +
 	"\x04task\x18\x01 \x01(\v2\x1e.internalapi.TaskResultMessageR\x04task\"j\n" +
 	"\x13CompleteTaskRequest\x12\x15\n" +

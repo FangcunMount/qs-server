@@ -1199,10 +1199,7 @@ const docTemplate = `{
         },
         "/api/v1/plans/tasks/{id}/open": {
             "post": {
-                "description": "手动开放任务，生成入口；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
-                "consumes": [
-                    "application/json"
-                ],
+                "description": "手动开放任务，自动生成入口并发布 task.opened 事件；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
                 "produces": [
                     "application/json"
                 ],
@@ -1224,15 +1221,6 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
-                    },
-                    {
-                        "description": "开放任务请求",
-                        "name": "request",
-                        "in": "body",
-                        "required": true,
-                        "schema": {
-                            "$ref": "#/definitions/request.OpenTaskRequest"
-                        }
                     }
                 ],
                 "responses": {
@@ -5886,21 +5874,6 @@ const docTemplate = `{
                     "items": {
                         "type": "string"
                     }
-                }
-            }
-        },
-        "request.OpenTaskRequest": {
-            "type": "object",
-            "properties": {
-                "entry_token": {
-                    "type": "string"
-                },
-                "entry_url": {
-                    "type": "string"
-                },
-                "expire_at": {
-                    "description": "格式：YYYY-MM-DD HH:mm:ss",
-                    "type": "string"
                 }
             }
         },

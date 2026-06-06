@@ -530,13 +530,11 @@ func (h *PlanHandler) ListTaskWindow(c *gin.Context) {
 
 // OpenTask 开放任务
 // @Summary 开放任务
-// @Description 手动开放任务，生成入口；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
+// @Description 手动开放任务，自动生成入口并发布 task.opened 事件；仅 qs:evaluation_plan_manager 或 qs:admin 可访问
 // @Tags Task-Management
-// @Accept json
 // @Produce json
 // @Param Authorization header string true "Bearer 用户令牌"
 // @Param id path string true "任务ID"
-// @Param request body request.OpenTaskRequest true "开放任务请求"
 // @Success 200 {object} core.Response{data=response.TaskResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Router /api/v1/plans/tasks/{id}/open [post]
@@ -552,23 +550,7 @@ func (h *PlanHandler) OpenTask(c *gin.Context) {
 		return
 	}
 
-	var req request.OpenTaskRequest
-	if err := h.BindJSON(c, &req); err != nil {
-		h.Error(c, err)
-		return
-	}
-	if ok, err := govalidator.ValidateStruct(req); !ok {
-		h.Error(c, err)
-		return
-	}
-
-	dto := planApp.OpenTaskDTO{
-		EntryToken: req.EntryToken,
-		EntryURL:   req.EntryURL,
-		ExpireAt:   req.ExpireAt,
-	}
-
-	result, err := h.commandService.OpenTask(c.Request.Context(), orgID, taskID, dto)
+	result, err := h.commandService.OpenTask(c.Request.Context(), orgID, taskID)
 	if err != nil {
 		logger.L(c.Request.Context()).Errorw("Failed to open task",
 			"action", "open_task",

@@ -306,3 +306,71 @@ func TestSendTaskOpenedFailsWhenTemplateKeysMismatch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
+
+func TestSendTaskOpenedSkipsSeeddataMockTestee(t *testing.T) {
+	profileID := uint64(4004)
+	planAggregate, task, tasks := buildTaskOpenedFixture(t, 44, 1, 2)
+	sender := &senderStub{
+		templates: []wechatmini.SubscribeTemplate{
+			{
+				ID:      "tmpl-1",
+				Content: "计划名称\n{{thing5.DATA}}\n计划时间\n{{date1.DATA}}\n计划进展\n{{character_string2.DATA}}\n温馨提示\n{{thing3.DATA}}",
+			},
+		},
+	}
+	resolver := &recipientResolverStub{
+		enabled: true,
+		recipients: &iambridge.MiniProgramRecipients{
+			OpenIDs: []string{"openid-testee"},
+			Source:  "testee",
+		},
+	}
+
+	for _, source := range []string{
+		string(testeeDomain.SourceSeeddata),
+		string(testeeDomain.SourceDailySimulation),
+	} {
+		t.Run(source, func(t *testing.T) {
+			resolver.callCount = 0
+			sender.sent = nil
+
+			service := NewMiniProgramTaskNotificationService(
+				&testeeLookupStub{result: &testeeApp.TesteeResult{
+					ID:        44,
+					ProfileID: &profileID,
+					Name:      "模拟受试者",
+					Source:    source,
+				}},
+				&taskNotificationContextReaderStub{result: notificationContextFromFixture(planAggregate, task, tasks)},
+				&scaleLookupStub{},
+				resolver,
+				&wechatAppLookupStub{},
+				sender,
+				&Config{
+					PagePath:             "pages/questionnaire/index",
+					AppID:                "wx-app",
+					AppSecret:            "wx-secret",
+					TaskOpenedTemplateID: "tmpl-1",
+				},
+			)
+
+			result, err := service.SendTaskOpened(context.Background(), TaskOpenedDTO{
+				TaskID:   task.GetID().String(),
+				TesteeID: 44,
+				OpenAt:   time.Date(2026, 4, 3, 10, 30, 0, 0, time.Local),
+			})
+			if err != nil {
+				t.Fatalf("SendTaskOpened returned error: %v", err)
+			}
+			if !result.Skipped || result.SentCount != 0 || result.Message != "seeddata mock testee" {
+				t.Fatalf("unexpected result: %#v", result)
+			}
+			if resolver.callCount != 0 {
+				t.Fatalf("expected recipient resolver to be skipped, got %d calls", resolver.callCount)
+			}
+			if len(sender.sent) != 0 {
+				t.Fatalf("expected no subscribe message sent, got %d", len(sender.sent))
+			}
+		})
+	}
+}

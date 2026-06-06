@@ -51,7 +51,7 @@ func (f *fakePlanCommandService) SchedulePendingTasks(ctx context.Context, orgID
 	return f.schedulePendingTasksFn(ctx, orgID, before)
 }
 
-func (f *fakePlanCommandService) OpenTask(context.Context, int64, string, planApp.OpenTaskDTO) (*planApp.TaskResult, error) {
+func (f *fakePlanCommandService) OpenTask(context.Context, int64, string) (*planApp.TaskResult, error) {
 	panic("unexpected call")
 }
 

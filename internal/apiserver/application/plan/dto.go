@@ -23,13 +23,6 @@ type EnrollTesteeDTO struct {
 	StartDate string // 开始日期（格式：YYYY-MM-DD）
 }
 
-// OpenTaskDTO 开放任务 DTO
-type OpenTaskDTO struct {
-	EntryToken string // 入口令牌
-	EntryURL   string // 入口URL
-	ExpireAt   string // 过期时间（格式：YYYY-MM-DD HH:mm:ss）
-}
-
 // ListPlansDTO 查询计划列表 DTO
 type ListPlansDTO struct {
 	OrgID     int64  // 机构ID（可选）
