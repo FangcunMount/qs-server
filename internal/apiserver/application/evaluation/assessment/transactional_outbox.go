@@ -17,6 +17,9 @@ type EventStager interface {
 	Stage(ctx context.Context, events ...event.DomainEvent) error
 }
 
+// AdditionalEventBuilder builds outbox events after persistence assigns aggregate IDs.
+type AdditionalEventBuilder func(a *domainAssessment.Assessment) []event.DomainEvent
+
 // saveAssessmentAndStageEvents 保存测评并阶段事件
 // 场景：保存测评并阶段事件
 func saveAssessmentAndStageEvents(
@@ -25,7 +28,7 @@ func saveAssessmentAndStageEvents(
 	txRunner apptransaction.Runner,
 	stager EventStager,
 	a *domainAssessment.Assessment,
-	additional []event.DomainEvent,
+	additional AdditionalEventBuilder,
 ) error {
 	if txRunner == nil || stager == nil {
 		return evalerrors.ModuleNotConfigured("assessment transactional outbox requires transaction runner and event stager")
@@ -38,9 +41,13 @@ func saveAssessmentAndStageEvents(
 		if err := repo.Save(txCtx, a); err != nil {
 			return err
 		}
-		eventsToStage := make([]event.DomainEvent, 0, len(a.Events())+len(additional))
+		var extra []event.DomainEvent
+		if additional != nil {
+			extra = additional(a)
+		}
+		eventsToStage := make([]event.DomainEvent, 0, len(a.Events())+len(extra))
 		eventsToStage = append(eventsToStage, a.Events()...)
-		eventsToStage = append(eventsToStage, additional...)
+		eventsToStage = append(eventsToStage, extra...)
 		if len(eventsToStage) == 0 {
 			return nil
 		}

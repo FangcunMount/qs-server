@@ -27,10 +27,17 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	dto CreateAssessmentDTO,
 ) error {
 	occurredAt := time.Now()
-	additionalEvents := []event.DomainEvent{
-		domainStatistics.NewFootprintAssessmentCreatedEvent(req.OrgID, dto.TesteeID, dto.AnswerSheetID, a.ID().Uint64(), occurredAt),
-	}
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, additionalEvents); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, func(saved *domainAssessment.Assessment) []event.DomainEvent {
+		return []event.DomainEvent{
+			domainStatistics.NewFootprintAssessmentCreatedEvent(
+				req.OrgID,
+				dto.TesteeID,
+				dto.AnswerSheetID,
+				saved.ID().Uint64(),
+				occurredAt,
+			),
+		}
+	}); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
