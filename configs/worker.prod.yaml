@@ -153,10 +153,10 @@ cache:
 log:
   disable-caller: true          # 生产环境禁用调用者信息（性能优化）
   disable-stacktrace: true      # 仅在 panic 时记录堆栈
-  level: info                   # 日志级别: debug, info, warn, error, fatal, panic
-  format: json                  # 日志格式: console(开发), json(生产)
-  enable-color: false           # 生产环境禁用颜色
-  development: false            # 生产模式
+  level: debug                   # 日志级别: debug, info, warn, error, fatal, panic
+  format: console               # 日志格式: console(开发), json(生产)
+  enable-color: true            # 生产环境禁用颜色
+  development: true            # 生产模式
   name: "qs-worker"             # 日志名称
   max-size: 100                 # 单个日志文件最大 100MB
   max-age: 30                   # 保留 30 天
