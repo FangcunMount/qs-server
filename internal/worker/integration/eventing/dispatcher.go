@@ -120,7 +120,7 @@ func (d *Dispatcher) createHandlerFactory(deps *handlers.Dependencies) eventrunt
 		if !ok {
 			return nil, fmt.Errorf("handler %q not registered", handlerName)
 		}
-		runtimeHandler := eventruntime.HandlerFunc(handler)
+		runtimeHandler := eventruntime.HandlerFunc(decorateHandlerWithLogging(d.logger, handlerName, handler))
 		createdHandlers[handlerName] = runtimeHandler
 		return runtimeHandler, nil
 	}

@@ -1,15 +1,19 @@
 package eventing
 
 import (
+	"bytes"
 	"context"
 	"errors"
 	"io"
 	"log/slog"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type fakeHandlerRegistry struct {
@@ -163,6 +167,72 @@ func TestDispatcherCreatesOnlyCatalogReferencedHandlers(t *testing.T) {
 	}
 }
 
+func TestDecoratedHandlerLogsEnvelopeMetadataAndPreservesSuccess(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	called := false
+	handler := decorateHandlerWithLogging(logger, "sample_handler", func(ctx context.Context, eventType string, payload []byte) error {
+		called = true
+		if eventType != "sample.created" {
+			t.Fatalf("eventType = %q, want sample.created", eventType)
+		}
+		if len(payload) == 0 {
+			t.Fatalf("payload should not be empty")
+		}
+		return nil
+	})
+
+	if err := handler(context.Background(), "sample.created", sampleEventPayload(t)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if !called {
+		t.Fatalf("decorated handler did not call wrapped handler")
+	}
+
+	output := logs.String()
+	for _, want := range []string{
+		"worker handler started",
+		"worker handler completed",
+		"handler=sample_handler",
+		"event_type=sample.created",
+		"event_id=evt-1",
+		"aggregate_type=Sample",
+		"aggregate_id=sample-1",
+		"elapsed_ms=",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("decorated handler logs missing %q in:\n%s", want, output)
+		}
+	}
+}
+
+func TestDecoratedHandlerLogsFailureAndPreservesError(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	wantErr := errors.New("handler failed")
+	handler := decorateHandlerWithLogging(logger, "sample_handler", func(context.Context, string, []byte) error {
+		return wantErr
+	})
+
+	if err := handler(context.Background(), "sample.created", []byte("not-json")); !errors.Is(err, wantErr) {
+		t.Fatalf("handler error = %v, want %v", err, wantErr)
+	}
+
+	output := logs.String()
+	for _, want := range []string{
+		"worker handler started",
+		"worker handler failed",
+		"handler=sample_handler",
+		"event_type=sample.created",
+		"envelope_parse_error=",
+		"error=\"handler failed\"",
+	} {
+		if !strings.Contains(output, want) {
+			t.Fatalf("decorated handler logs missing %q in:\n%s", want, output)
+		}
+	}
+}
+
 func sampleCatalog(handlerName string) *eventcatalog.Catalog {
 	return eventcatalog.NewCatalog(&eventcatalog.Config{
 		Topics: map[string]eventcatalog.TopicConfig{
@@ -175,6 +245,24 @@ func sampleCatalog(handlerName string) *eventcatalog.Catalog {
 			},
 		},
 	})
+}
+
+func sampleEventPayload(t *testing.T) []byte {
+	t.Helper()
+	payload, err := eventcodec.EncodeDomainEvent(event.Event[map[string]string]{
+		BaseEvent: event.BaseEvent{
+			ID:                 "evt-1",
+			EventTypeValue:     "sample.created",
+			OccurredAtValue:    time.Date(2026, 6, 6, 10, 4, 0, 0, time.UTC),
+			AggregateTypeValue: "Sample",
+			AggregateIDValue:   "sample-1",
+		},
+		Data: map[string]string{"value": "ok"},
+	})
+	if err != nil {
+		t.Fatalf("EncodeDomainEvent: %v", err)
+	}
+	return payload
 }
 
 func testLogger() *slog.Logger {
