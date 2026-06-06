@@ -26,6 +26,10 @@ type fakeWorkerInternalClient struct {
 	syncAssessmentAttentionRequest *pb.SyncAssessmentAttentionRequest
 	questionnaireQRCodeCalls       int
 	scaleQRCodeCalls               int
+	projectBehaviorCalls           int
+	projectBehaviorRequest         *pb.ProjectBehaviorEventRequest
+	projectBehaviorErr             error
+	projectBehaviorResp            *pb.ProjectBehaviorEventResponse
 }
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
@@ -105,8 +109,16 @@ func (f *fakeWorkerInternalClient) HandleScalePublishedPostActions(
 
 func (f *fakeWorkerInternalClient) ProjectBehaviorEvent(
 	_ context.Context,
-	_ *pb.ProjectBehaviorEventRequest,
+	req *pb.ProjectBehaviorEventRequest,
 ) (*pb.ProjectBehaviorEventResponse, error) {
+	f.projectBehaviorCalls++
+	f.projectBehaviorRequest = req
+	if f.projectBehaviorErr != nil {
+		return nil, f.projectBehaviorErr
+	}
+	if f.projectBehaviorResp != nil {
+		return f.projectBehaviorResp, nil
+	}
 	return &pb.ProjectBehaviorEventResponse{Status: "completed"}, nil
 }
 
