@@ -104,7 +104,7 @@ COLOR_RED := \033[31m
 .PHONY: up down re st log
 .PHONY: quick-start
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
-.PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan
+.PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 
 # ============================================================================
 # 帮助信息
@@ -163,6 +163,7 @@ docs-verify: docs-rest docs-hygiene ## 对比 api/rest 与 swagger，并检查�
 cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|collection|worker)
 	@SERVICE="$(SERVICE)" IMAGE_METADATA_PRINT=1 "$(CD_SCRIPT_DIR)/image-metadata.sh" >/dev/null
 	@test -x "$(CD_SCRIPT_DIR)/build-image.sh"
+	@test -x "$(CD_SCRIPT_DIR)/export-image.sh"
 	@test -x "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
 	@test -x "$(CD_SCRIPT_DIR)/prepare-package.sh"
 	@test -x "$(CD_SCRIPT_DIR)/remote-deploy.sh"
@@ -171,6 +172,9 @@ cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|coll
 
 cd-plan: ## 规划本次 CD 需要发布的服务
 	@"$(CD_SCRIPT_DIR)/plan-services.sh"
+
+cd-export-image: cd-validate ## 在 CI runner 拉取并导出服务镜像 tarball（供 SCP 到生产机 docker load）
+	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/export-image.sh"
 
 cd-image: cd-validate ## 构建并发布服务镜像到 GHCR 和 Docker Hub
 	@SERVICE="$(SERVICE)" DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_SHA="$(DEPLOY_SHA)" BUILD_TIME="$(BUILD_TIME)" BUILD_CACHE_REF="$(BUILD_CACHE_REF)" "$(CD_SCRIPT_DIR)/build-image.sh"

@@ -200,36 +200,114 @@ setup_apiserver_web_tls() {
   $SUDO chmod 0640 "$key_host_path"
 }
 
-select_image() {
-  local image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
-  local ghcr_login_ok=0
+image_tarball_path() {
+  printf '%s' "${IMAGE_TARBALL:-/tmp/deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
+}
 
-  echo "Checking registry login for ${DOCKER_REPOSITORY}/${IMAGE_NAME}"
-  if [ -n "${GITHUB_TOKEN:-}" ]; then
-    docker_login_with_token "$GHCR_USERNAME" "$GITHUB_TOKEN" "$DOCKER_REGISTRY" && ghcr_login_ok=1 || ghcr_login_ok=0
-  fi
-
-  if [ "$ghcr_login_ok" -ne 1 ]; then
-    if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
-      echo "GHCR login failed; falling back to Docker Hub..."
-      local dockerhub_login_ok=0
-      docker_login_with_token "$DOCKERHUB_USERNAME" "$DOCKERHUB_TOKEN" && dockerhub_login_ok=1 || dockerhub_login_ok=0
-      if [ "$dockerhub_login_ok" -ne 1 ]; then
-        echo "Docker Hub login failed; verify DOCKERHUB_USERNAME/DOCKERHUB_TOKEN." >&2
-        exit 1
-      fi
-      image="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
-    else
-      echo "GHCR login failed and Docker Hub credentials missing."
-    fi
-  fi
-
+write_compose_image_env() {
+  local image="$1"
   printf -v "$IMAGE_ENV_VAR" '%s' "$image"
   export "$IMAGE_ENV_VAR"
   COMPOSE_ENV_FILE="$DEPLOY_TMP/compose-image.env"
   printf '%s=%s\n' "$IMAGE_ENV_VAR" "$image" >"$COMPOSE_ENV_FILE"
   chmod 0600 "$COMPOSE_ENV_FILE"
   export COMPOSE_ENV_FILE
+}
+
+load_image_from_tarball() {
+  local tarball image_ref
+  tarball="$(image_tarball_path)"
+  if [ ! -f "$tarball" ]; then
+    return 1
+  fi
+
+  image_ref="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
+  echo "Loading ${IMAGE_NAME} from tarball ${tarball}..."
+  local load_started load_elapsed
+  load_started=$(date +%s)
+  gzip -dc "$tarball" | $SUDO docker load
+  load_elapsed=$(($(date +%s) - load_started))
+  echo "Loaded ${IMAGE_NAME} from tarball in ${load_elapsed}s"
+  rm -f "$tarball"
+  IMAGE_LOADED_FROM_TARBALL=1
+  export IMAGE_LOADED_FROM_TARBALL
+  write_compose_image_env "$image_ref"
+  return 0
+}
+
+select_image_from_registry() {
+  local image="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
+  local pull_registry="${DEPLOY_PULL_REGISTRY:-dockerhub}"
+
+  case "$pull_registry" in
+    dockerhub|ghcr|auto) ;;
+    *)
+      echo "DEPLOY_PULL_REGISTRY must be dockerhub, ghcr, or auto; got: ${pull_registry}" >&2
+      exit 1
+      ;;
+  esac
+
+  if [ "$pull_registry" = "dockerhub" ] || [ "$pull_registry" = "auto" ]; then
+    if [ -n "${DOCKERHUB_USERNAME:-}" ] && [ -n "${DOCKERHUB_TOKEN:-}" ]; then
+      echo "Checking Docker Hub login for ${DOCKERHUB_USERNAME}/${IMAGE_NAME}"
+      if docker_login_with_token "$DOCKERHUB_USERNAME" "$DOCKERHUB_TOKEN"; then
+        image="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${IMAGE_TAG}"
+        write_compose_image_env "$image"
+        return 0
+      fi
+      echo "Docker Hub login failed." >&2
+      if [ "$pull_registry" = "dockerhub" ]; then
+        exit 1
+      fi
+    elif [ "$pull_registry" = "dockerhub" ]; then
+      echo "Docker Hub credentials missing for DEPLOY_PULL_REGISTRY=dockerhub." >&2
+      exit 1
+    fi
+  fi
+
+  echo "Checking GHCR login for ${DOCKER_REPOSITORY}/${IMAGE_NAME}"
+  if [ -z "${GITHUB_TOKEN:-}" ]; then
+    echo "GHCR token missing; cannot pull ${image}." >&2
+    exit 1
+  fi
+  if ! docker_login_with_token "$GHCR_USERNAME" "$GITHUB_TOKEN" "$DOCKER_REGISTRY"; then
+    echo "GHCR login failed; verify GHCR credentials." >&2
+    exit 1
+  fi
+
+  write_compose_image_env "$image"
+}
+
+select_image() {
+  local source="${DEPLOY_IMAGE_SOURCE:-auto}"
+  local tarball
+  tarball="$(image_tarball_path)"
+
+  case "$source" in
+    tarball)
+      if [ ! -f "$tarball" ]; then
+        echo "DEPLOY_IMAGE_SOURCE=tarball but tarball not found: ${tarball}" >&2
+        exit 1
+      fi
+      load_image_from_tarball
+      return 0
+      ;;
+    registry)
+      select_image_from_registry
+      return 0
+      ;;
+    auto)
+      if load_image_from_tarball; then
+        return 0
+      fi
+      select_image_from_registry
+      return 0
+      ;;
+    *)
+      echo "DEPLOY_IMAGE_SOURCE must be auto, tarball, or registry; got: ${source}" >&2
+      exit 1
+      ;;
+  esac
 }
 
 cleanup_old_backups() {
@@ -265,15 +343,37 @@ docker_compose() {
   $SUDO docker compose --env-file "$COMPOSE_ENV_FILE" "$@"
 }
 
+resolve_compose_image_ref() {
+  if [ -z "${COMPOSE_ENV_FILE:-}" ] || [ ! -f "$COMPOSE_ENV_FILE" ]; then
+    echo "COMPOSE_ENV_FILE is not ready before resolving compose image" >&2
+    exit 1
+  fi
+
+  # shellcheck disable=SC1090
+  . "$COMPOSE_ENV_FILE"
+  printf '%s\n' "${!IMAGE_ENV_VAR}"
+}
+
 docker_compose_pull() {
   local -a compose_args=("$@")
-  local pull_started pull_elapsed
+  local image_ref pull_started pull_elapsed
   if [ -z "${COMPOSE_ENV_FILE:-}" ] || [ ! -f "$COMPOSE_ENV_FILE" ]; then
     echo "COMPOSE_ENV_FILE is not ready before docker compose pull" >&2
     exit 1
   fi
 
-  echo "Pulling ${COMPOSE_SERVICE} image tag ${IMAGE_TAG}..."
+  image_ref="$(resolve_compose_image_ref)"
+  if [ "${IMAGE_LOADED_FROM_TARBALL:-0}" = "1" ]; then
+    echo "Image already loaded from tarball; skipping registry pull for ${image_ref}"
+    return 0
+  fi
+
+  if $SUDO docker image inspect "$image_ref" >/dev/null 2>&1; then
+    echo "Image ${image_ref} already present locally; skipping registry pull"
+    return 0
+  fi
+
+  echo "Pulling ${COMPOSE_SERVICE} image tag ${IMAGE_TAG} from registry..."
   pull_started=$(date +%s)
   if docker_compose_pull_supports_quiet; then
     docker_compose "${compose_args[@]}" pull --quiet "$COMPOSE_SERVICE"

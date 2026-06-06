@@ -196,6 +196,19 @@ jobs:
         run: |
           make cd-package SERVICE=apiserver
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export deployment image tarball
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          make cd-export-image SERVICE=apiserver
+
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -203,7 +216,7 @@ jobs:
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package-apiserver.tar.gz"
+          source: "deploy-package-apiserver.tar.gz,deploy-image-apiserver.tar.gz"
           target: "/tmp"
 
       - name: Deploy to Production Server
@@ -220,13 +233,15 @@ jobs:
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
+          DEPLOY_IMAGE_SOURCE: tarball
+          IMAGE_TARBALL: /tmp/deploy-image-apiserver.tar.gz
         with:
           host: ${{ secrets.SVRA_HOST }}
           username: ${{ secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           command_timeout: 30m
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG,DEPLOY_IMAGE_SOURCE,IMAGE_TARBALL
           script: |
             set -Eeuo pipefail
             BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
@@ -270,6 +285,19 @@ jobs:
         run: |
           make cd-package SERVICE=collection
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export deployment image tarball
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          make cd-export-image SERVICE=collection
+
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -277,7 +305,7 @@ jobs:
           username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package-collection.tar.gz"
+          source: "deploy-package-collection.tar.gz,deploy-image-collection.tar.gz"
           target: "/tmp"
 
       - name: Deploy to Production Server
@@ -294,13 +322,15 @@ jobs:
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
+          DEPLOY_IMAGE_SOURCE: tarball
+          IMAGE_TARBALL: /tmp/deploy-image-collection.tar.gz
         with:
           host: ${{ secrets.SVRB_HOST }}
           username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
           command_timeout: 30m
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG,DEPLOY_IMAGE_SOURCE,IMAGE_TARBALL
           script: |
             set -Eeuo pipefail
             BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
@@ -359,6 +389,19 @@ jobs:
         run: |
           make cd-package SERVICE=worker
 
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.DOCKER_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Export deployment image tarball
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          make cd-export-image SERVICE=worker
+
       - name: Upload deployment package
         uses: appleboy/scp-action@v0.1.7
         with:
@@ -366,7 +409,7 @@ jobs:
           username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package-worker.tar.gz"
+          source: "deploy-package-worker.tar.gz,deploy-image-worker.tar.gz"
           target: "/tmp"
 
       - name: Deploy to Production Server
@@ -384,13 +427,15 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
+          DEPLOY_IMAGE_SOURCE: tarball
+          IMAGE_TARBALL: /tmp/deploy-image-worker.tar.gz
         with:
           host: ${{ secrets.SVRD_HOST }}
           username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
           key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
           port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
           command_timeout: 30m
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS,IMAGE_TAG
+          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS,IMAGE_TAG,DEPLOY_IMAGE_SOURCE,IMAGE_TARBALL
           script: |
             set -Eeuo pipefail
             BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"

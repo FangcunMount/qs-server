@@ -23,15 +23,17 @@ CD 本地入口：
 - `make cd-plan`
 - `make cd-image SERVICE=apiserver DEPLOY_REF=main DEPLOY_SHA=<sha>`
 - `make cd-package SERVICE=apiserver`
+- `make cd-export-image SERVICE=apiserver DEPLOY_SHA=<sha>`
 - `make cd-remote-deploy SERVICE=apiserver IMAGE_TAG=<sha>`
 - `make cd-validate SERVICE=apiserver`
 
 镜像构建与拉取：
 
 - `cd-image` 默认使用 GHCR registry cache：`ghcr.io/fangcunmount/<image>:buildcache`。
-- 生产部署默认传递 `IMAGE_TAG=${DEPLOY_SHA}`，远端优先拉取 GHCR 的 SHA tag；GHCR 登录失败时用同一 SHA tag fallback 到 Docker Hub。
+- 生产部署默认走 **tarball 直传**：CI runner 从 GHCR 快速 `docker pull`，`docker save | gzip` 后随 deploy-package 一并 SCP 到目标机，`remote-deploy.sh` 执行 `docker load`，避免目标机直连 GHCR 长时间 pull。
+- 手动部署或未上传 tarball 时，`DEPLOY_IMAGE_SOURCE=auto|registry` 会 fallback 到 registry pull；此时默认优先 Docker Hub（`DEPLOY_PULL_REGISTRY=dockerhub`），再回退 GHCR。
 - 自动触发时，CD 脚本、workflow、文档、测试等非运行时变更不会触发生产服务发布；手动触发仍按输入选择 `all/apiserver/collection/worker`。
-- 远端 `docker compose pull` 优先使用 `--quiet`，避免 Docker 进度条在 GitHub Actions 日志中重复刷屏，并在停止旧容器之前完成镜像拉取。
+- 远端若本地已有同 tag 镜像，或已从 tarball load，则跳过 registry pull。
 
 Secrets 传递规则：
 
