@@ -30,7 +30,7 @@ CD 本地入口：
 镜像构建与拉取：
 
 - `cd-image` 默认使用 GHCR registry cache：`ghcr.io/fangcunmount/<image>:buildcache`。
-- 生产部署默认走 **tarball 直传**：CI runner 从 GHCR 快速 `docker pull`，`docker save | gzip` 后随 deploy-package 一并 SCP 到目标机，`remote-deploy.sh` 执行 `docker load`，避免目标机直连 GHCR 长时间 pull。
+- 生产部署默认走 **tarball 直传**：ServerD runner 从 **GHCR** `docker pull`，`docker save | gzip` 后随 deploy-package 一并 SCP 到目标机，`remote-deploy.sh` 执行 `docker load`，避免目标机直连 registry 长时间 pull。
 - 手动部署或未上传 tarball 时，`DEPLOY_IMAGE_SOURCE=auto|registry` 会 fallback 到 registry pull；此时默认优先 Docker Hub（`DEPLOY_PULL_REGISTRY=dockerhub`），再回退 GHCR。
 - 自动触发时，CD 脚本、workflow、文档、测试等非运行时变更不会触发生产服务发布；手动触发仍按输入选择 `all/apiserver/collection/worker`。
 - 远端若本地已有同 tag 镜像，或已从 tarball load，则跳过 registry pull。
@@ -50,16 +50,36 @@ Secrets 传递规则：
 
 ### 1. ServerD 前置依赖
 
-- Docker（daemon 可用；`docker pull` 建议配置 daemon 走代理，见 `runner-dotenv.example`）
+- Docker（daemon + **containerd** 均需配置 HTTP 代理，见下方「Docker daemon 代理」）
 - `git`、`make`、`gzip`、`openssh-clients`（`ssh`/`scp`/`nc`）
 - Mihomo 代理（默认 `127.0.0.1:7890` HTTP / `7891` SOCKS5）
 - 到 ServerA/ServerB/ServerD 的 SSH（内网直连，不走 GitHub 代理）
 
 ```bash
-# /opt/actions-runner/.env — runner 进程级代理
-sudo cp scripts/cd/runner-dotenv.example /opt/actions-runner/.env
-sudo chown deploy:deploy /opt/actions-runner/.env
-cd /opt/actions-runner && sudo ./svc.sh install deploy && sudo ./svc.sh start
+# 每个 runner 实例各一份 .env（进程级代理，供拉 action / git 等）
+for d in runner1 runner2 runner3; do
+  cp scripts/cd/runner-dotenv.example /opt/actions-runner/$d/.env
+  chown deploy:deploy /opt/actions-runner/$d/.env
+done
+```
+
+**Docker daemon 代理**（`docker pull` / `docker login` 走 daemon，不是 shell 代理）：
+
+```bash
+sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf <<'EOF'
+[Service]
+Environment="HTTP_PROXY=http://127.0.0.1:7890"
+Environment="HTTPS_PROXY=http://127.0.0.1:7890"
+Environment="NO_PROXY=127.0.0.1,localhost,100.64.0.0/10"
+EOF
+sudo mkdir -p /etc/systemd/system/containerd.service.d
+sudo cp /etc/systemd/system/docker.service.d/http-proxy.conf \
+  /etc/systemd/system/containerd.service.d/http-proxy.conf
+sudo systemctl daemon-reload && sudo systemctl restart containerd docker
+
+# 验证（须强制走网络，401/200 均可；docker.io 若 EOF 说明 Mihomo 规则未放行）
+curl -sS -o /dev/null -w "ghcr:%{http_code}\n" -x http://127.0.0.1:7890 https://ghcr.io/v2/
+docker rmi hello-world 2>/dev/null; docker pull hello-world
 ```
 
 **GitHub Deploy Key（只读）**：仓库 Settings → Deploy keys → Add → 勾选只读；私钥存 Secrets `QS_SERVER_DEPLOY_KEY`。自托管 job 用 **SSH checkout**（`git@github.com` → `ssh.github.com:443` → Mihomo CONNECT）。
@@ -76,21 +96,35 @@ cd /opt/actions-runner && sudo ./svc.sh install deploy && sudo ./svc.sh start
 
 注册完成后 runner 长期在线，**日常 CD 不需要**再保存或使用这个 token。
 
-### 3. 在 ServerD 安装 Runner（组织级，一套目录）
+### 3. 在 ServerD 安装 Runner（组织级，多实例并行）
+
+目录建议 `/opt/actions-runner/runner{1,2,3}/`，标签均为 `serverd`（deploy job 并行）：
 
 ```bash
-sudo mkdir -p /opt/actions-runner && sudo chown "$USER" /opt/actions-runner
-cd /opt/actions-runner
-curl -fsSL -o actions-runner.tar.gz -L \
-  "https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz"
-tar xzf actions-runner.tar.gz
-./config.sh --url https://github.com/fangcunmount --token <RUNNER_TOKEN> --labels serverd
-sudo ./svc.sh install && sudo ./svc.sh start
+RUNNER_VER=2.334.0
+TARBALL=/tmp/actions-runner-linux-x64-${RUNNER_VER}.tar.gz
+curl -fsSL -o "$TARBALL" -L \
+  "https://github.com/actions/runner/releases/download/v${RUNNER_VER}/actions-runner-linux-x64-${RUNNER_VER}.tar.gz"
+
+install_runner() {
+  local name=$1 dir=$2 token=$3
+  mkdir -p "/opt/actions-runner/$dir"
+  tar xzf "$TARBALL" -C "/opt/actions-runner/$dir"
+  cd "/opt/actions-runner/$dir"
+  ./config.sh --url https://github.com/fangcunmount --token "$token" \
+    --name "$name" --labels serverd --unattended
+  cp /opt/actions-runner/runner1/.env .env 2>/dev/null || cp scripts/cd/runner-dotenv.example .env
+  sudo ./svc.sh install deploy && sudo ./svc.sh start
+}
+
+install_runner serverD-runner1 runner1 <TOKEN1>
+install_runner serverD-runner2 runner2 <TOKEN2>
+install_runner serverD-runner3 runner3 <TOKEN3>
 ```
 
-注意 `--url` 是 **组织地址** `https://github.com/fangcunmount`，不是单个仓库。
+注意 `--url` 是 **组织地址** `https://github.com/fangcunmount`；`svc.sh` 须在各自目录内执行：`cd /opt/actions-runner/runner1 && sudo ./svc.sh status`。
 
-成功后，组织 **Settings → Actions → Runners** 应出现带 `serverd` 标签的 runner（Idle）。
+成功后，组织 **Settings → Actions → Runners** 应出现 3 个带 `serverd` 标签的 runner（Idle）。
 
 **组织 Runner 可见范围**（组织 Settings → Actions → Runners → 该 runner → Repository access）：
 
@@ -104,7 +138,7 @@ sudo ./svc.sh install && sudo ./svc.sh start
 | Variable | 值 | 说明 |
 | -------- | -- | ---- |
 | `QS_DEPLOY_RUNNER` | `serverd` | deploy job 的 `runs-on` |
-| `QS_DEPLOY_EXPORT_REGISTRY` | `dockerhub` | 自托管 export 镜像源 |
+| `QS_DEPLOY_EXPORT_REGISTRY` | `ghcr` | 自托管 export 镜像源（ServerD 经 Mihomo 可达 GHCR；Docker Hub 需额外规则） |
 | `QS_DEPLOY_HTTP_PROXY` | `http://127.0.0.1:7890` | HTTP(S) 工具走 Mihomo |
 | `QS_DEPLOY_ALL_PROXY` | `socks5://127.0.0.1:7891` | 可选 SOCKS 代理 |
 | `QS_DEPLOY_NO_PROXY` | `127.0.0.1,localhost,内网` | 生产 SSH/SCP 不走代理 |
@@ -126,7 +160,7 @@ sudo ./svc.sh install && sudo ./svc.sh start
 | 问题 | 答案 |
 | ---- | ---- |
 | 多个项目要多个目录吗？ | **不需要**；组织级一个 `/opt/actions-runner` 即可 |
-| 多个项目同时 CD？ | 单 runner **同时只跑一个 job**，会排队；要并行可同机再注册第二个 runner（新 `--name` + 新标签） |
+| 多个项目同时 CD？ | 单 runner **同时只跑一个 job**；同机多实例（`runner1/2/3`，同标签 `serverd`）可并行 deploy |
 | secrets 怎么隔离？ | 仍按**仓库 / Environment** 注入；runner 只是执行机，不共享业务 secrets |
 
 ### 6. 流量路径（ServerD 模式）
@@ -134,10 +168,12 @@ sudo ./svc.sh install && sudo ./svc.sh start
 ```
 GitHub 触发 CD
   → docker job（GitHub-hosted）构建推 GHCR + Docker Hub
-  → deploy job（ServerD runner）
-       → docker pull（Docker Hub）→ save tarball
-       → SCP → ServerA / ServerB / ServerD
+  → deploy job（ServerD runner ×3 并行）
+       → docker login ghcr.io → pull（GHCR）→ save tarball
+       → SCP → ServerA / ServerB / ServerD（Tailscale 内网）
        → remote-deploy.sh（docker load + compose up）
 ```
+
+deploy job 用 shell `docker login`，不用 `docker/login-action`（避免自托管 runner 下载 action 超时）。
 
 如需本地开发，请使用 `build/docker/docker-compose.dev.yml`。

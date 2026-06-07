@@ -28,7 +28,7 @@ name: Production Deploy
 #
 # 可选 Repository / Organization Variables（自托管部署机 ServerD）:
 #   QS_DEPLOY_RUNNER=serverd          deploy-* job 的 runs-on；组织级 runner 标签，多仓库共用
-#   QS_DEPLOY_EXPORT_REGISTRY=dockerhub  自托管机 export 镜像源；留空默认 ghcr
+#   QS_DEPLOY_EXPORT_REGISTRY=ghcr       自托管机 export 镜像源（ServerD 推荐 ghcr；留空默认 ghcr）
 #   QS_DEPLOY_HTTP_PROXY=http://127.0.0.1:7890  Mihomo HTTP 代理
 #   QS_DEPLOY_HTTPS_PROXY=（默认同 HTTP）
 #   QS_DEPLOY_ALL_PROXY=socks5://127.0.0.1:7891
