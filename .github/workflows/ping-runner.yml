@@ -98,11 +98,20 @@ jobs:
   ping-serverd:
     name: ServerD Deploy Runner Check
     runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
-    timeout-minutes: 5
+    timeout-minutes: 10
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - name: Configure runner network (proxy + GitHub SSH)
+        env:
+          HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
+          HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY || vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
+          ALL_PROXY: ${{ vars.QS_DEPLOY_ALL_PROXY || 'socks5://127.0.0.1:7891' }}
+          NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY || '127.0.0.1,localhost' }}
+          NETWORK_SCRIPT_REF: ${{ github.sha }}
+        run: |
+          curl -fsSL --proxy "${HTTP_PROXY}" \
+            "https://raw.githubusercontent.com/FangcunMount/qs-server/${NETWORK_SCRIPT_REF}/scripts/cd/setup-runner-network.sh" \
+            | bash
 
       - name: Runner and host info
         run: |
@@ -128,15 +137,11 @@ jobs:
           echo "=========================================="
           echo "Actions Runner Service"
           echo "=========================================="
-          svc="$(systemctl list-units --type=service --all 'actions.runner.*' --no-legend 2>/dev/null | awk '{print $1}' | sed -n '1p')"
-          if [ -z "$svc" ]; then
-            echo "⚠️  No actions.runner systemd unit found (may run in foreground)"
-          elif systemctl is-active --quiet "$svc"; then
-            echo "✅ $svc is active"
-            systemctl status "$svc" --no-pager -l | head -5
+          if pgrep -f 'Runner.Listener' >/dev/null 2>&1; then
+            echo "✅ Runner.Listener process is running"
+            pgrep -af 'Runner.Listener' | head -3
           else
-            echo "❌ $svc is not active"
-            systemctl status "$svc" --no-pager -l || true
+            echo "❌ Runner.Listener process not found"
             exit 1
           fi
           echo "=========================================="
@@ -172,9 +177,22 @@ jobs:
           RUNNER_SSH_HOST: ${{ secrets.SVRA_HOST }}
           RUNNER_SSH_USER: ${{ secrets.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          RUNNER_SSH_ALIAS: servera
         run: |
-          bash scripts/cd/setup-runner-ssh.sh
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          key_file=~/.ssh/runner_servera_key
+          printf '%s\n' "$RUNNER_SSH_KEY" >"$key_file" && chmod 600 "$key_file"
+          touch ~/.ssh/config && chmod 600 ~/.ssh/config
+          if ! grep -q '^Host servera$' ~/.ssh/config; then
+            {
+              echo ""
+              echo "Host servera"
+              echo "  HostName ${RUNNER_SSH_HOST}"
+              echo "  User ${RUNNER_SSH_USER}"
+              echo "  Port ${RUNNER_SSH_PORT}"
+              echo "  IdentityFile ${key_file}"
+              echo "  StrictHostKeyChecking accept-new"
+            } >> ~/.ssh/config
+          fi
           ssh servera 'echo "✅ SSH to ServerA ($(hostname)) OK"'
 
       - name: SSH reachability to ServerB
@@ -183,9 +201,22 @@ jobs:
           RUNNER_SSH_HOST: ${{ secrets.SVRB_HOST }}
           RUNNER_SSH_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          RUNNER_SSH_ALIAS: serverb
         run: |
-          bash scripts/cd/setup-runner-ssh.sh
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          key_file=~/.ssh/runner_serverb_key
+          printf '%s\n' "$RUNNER_SSH_KEY" >"$key_file" && chmod 600 "$key_file"
+          touch ~/.ssh/config && chmod 600 ~/.ssh/config
+          if ! grep -q '^Host serverb$' ~/.ssh/config; then
+            {
+              echo ""
+              echo "Host serverb"
+              echo "  HostName ${RUNNER_SSH_HOST}"
+              echo "  User ${RUNNER_SSH_USER}"
+              echo "  Port ${RUNNER_SSH_PORT}"
+              echo "  IdentityFile ${key_file}"
+              echo "  StrictHostKeyChecking accept-new"
+            } >> ~/.ssh/config
+          fi
           ssh serverb 'echo "✅ SSH to ServerB ($(hostname)) OK"'
 
       - name: Worker containers on ServerD

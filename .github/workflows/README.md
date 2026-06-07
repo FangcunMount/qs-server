@@ -50,9 +50,19 @@ Secrets 传递规则：
 
 ### 1. ServerD 前置依赖
 
-- Docker（daemon 可用，runner 用户可 `docker pull/save/load`）
-- `git`、`make`、`gzip`
-- 到 ServerA/ServerB/ServerD 的 SSH（各仓库 CD 复用现有 `SVRA_*` / `SVRB_*` / `SVRD_*` secrets）
+- Docker（daemon 可用；`docker pull` 建议配置 daemon 走代理，见 `runner-dotenv.example`）
+- `git`、`make`、`gzip`、`openssh-clients`（`ssh`/`scp`/`nc`）
+- Mihomo 代理（默认 `127.0.0.1:7890` HTTP / `7891` SOCKS5）
+- 到 ServerA/ServerB/ServerD 的 SSH（内网直连，不走 GitHub 代理）
+
+```bash
+# /opt/actions-runner/.env — runner 进程级代理
+sudo cp scripts/cd/runner-dotenv.example /opt/actions-runner/.env
+sudo chown deploy:deploy /opt/actions-runner/.env
+cd /opt/actions-runner && sudo ./svc.sh install deploy && sudo ./svc.sh start
+```
+
+**GitHub Deploy Key（只读）**：仓库 Settings → Deploy keys → Add → 勾选只读；私钥存 Secrets `QS_SERVER_DEPLOY_KEY`。自托管 job 用 **SSH checkout**（`git@github.com` → `ssh.github.com:443` → Mihomo CONNECT）。
 
 ### 2. 获取 Registration Token（一次性）
 
@@ -93,8 +103,15 @@ sudo ./svc.sh install && sudo ./svc.sh start
 
 | Variable | 值 | 说明 |
 | -------- | -- | ---- |
-| `QS_DEPLOY_RUNNER` | `serverd` | deploy job 的 `runs-on`；留空则回退 `ubuntu-latest` |
-| `QS_DEPLOY_EXPORT_REGISTRY` | `dockerhub` | ServerD 从 Docker Hub 拉镜像再 export（避免 GHCR 慢） |
+| `QS_DEPLOY_RUNNER` | `serverd` | deploy job 的 `runs-on` |
+| `QS_DEPLOY_EXPORT_REGISTRY` | `dockerhub` | 自托管 export 镜像源 |
+| `QS_DEPLOY_HTTP_PROXY` | `http://127.0.0.1:7890` | HTTP(S) 工具走 Mihomo |
+| `QS_DEPLOY_ALL_PROXY` | `socks5://127.0.0.1:7891` | 可选 SOCKS 代理 |
+| `QS_DEPLOY_NO_PROXY` | `127.0.0.1,localhost,内网` | 生产 SSH/SCP 不走代理 |
+
+| Secret | 说明 |
+| ------ | ---- |
+| `QS_SERVER_DEPLOY_KEY` | GitHub Deploy Key 私钥（SSH checkout） |
 
 组织级 Variable 可设一次、全仓库生效；仓库级 Variable 可覆盖组织默认值。
 
@@ -102,7 +119,7 @@ sudo ./svc.sh install && sudo ./svc.sh start
 
 `ping-runner.yml` 的 `ping-serverd` job 同样使用 `QS_DEPLOY_RUNNER`（默认 `serverd`），每 6 小时自检 runner 服务、Docker/部署工具、到 A/B 的 SSH 连通性。
 
-自托管 runner 上 **不用** `appleboy/ssh-action`（会构建 Docker 镜像失败）；deploy 与 ping 均走原生 `ssh`/`scp`（`scripts/cd/setup-runner-ssh.sh`）。
+自托管 runner 上 **不用** `appleboy/ssh-action`；生产 SSH/SCP 走原生 `setup-runner-ssh.sh`，GitHub 拉代码走 **SSH + Mihomo 代理**（`setup-runner-network.sh`）。
 
 ### 5. 多项目共用说明
 

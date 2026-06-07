@@ -28,7 +28,14 @@ name: Production Deploy
 #
 # 可选 Repository / Organization Variables（自托管部署机 ServerD）:
 #   QS_DEPLOY_RUNNER=serverd          deploy-* job 的 runs-on；组织级 runner 标签，多仓库共用
-#   QS_DEPLOY_EXPORT_REGISTRY=dockerhub  自托管机 export 镜像源；留空默认 ghcr（适合 GitHub-hosted）
+#   QS_DEPLOY_EXPORT_REGISTRY=dockerhub  自托管机 export 镜像源；留空默认 ghcr
+#   QS_DEPLOY_HTTP_PROXY=http://127.0.0.1:7890  Mihomo HTTP 代理
+#   QS_DEPLOY_HTTPS_PROXY=（默认同 HTTP）
+#   QS_DEPLOY_ALL_PROXY=socks5://127.0.0.1:7891
+#   QS_DEPLOY_NO_PROXY=127.0.0.1,localhost,内网域名/IP
+#
+# Repository Secrets（自托管 checkout）:
+#   QS_SERVER_DEPLOY_KEY  GitHub Deploy Key 私钥（只读），用于 actions/checkout ssh-key
 # 组织级 runner 注册见 .github/workflows/README.md §自托管 Runner
 # ============================================================================
 
@@ -67,10 +74,12 @@ env:
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
-env:
-  # runs-on 不能用 env 上下文，deploy job 直接写 vars.QS_DEPLOY_RUNNER
-  # ServerD 拉 GHCR 慢，建议设 QS_DEPLOY_EXPORT_REGISTRY=dockerhub
   DEPLOY_EXPORT_REGISTRY: ${{ vars.QS_DEPLOY_EXPORT_REGISTRY || 'ghcr' }}
+  # 自托管 runner（ServerD）网络：走 Mihomo 代理 + GitHub SSH
+  SELF_HOSTED_HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
+  SELF_HOSTED_HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY || vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
+  SELF_HOSTED_ALL_PROXY: ${{ vars.QS_DEPLOY_ALL_PROXY || 'socks5://127.0.0.1:7891' }}
+  SELF_HOSTED_NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY || '127.0.0.1,localhost' }}
 
 jobs:
   plan:
@@ -172,10 +181,34 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
-      - name: Checkout
+      - name: Configure runner network (proxy + GitHub SSH)
+        if: vars.QS_DEPLOY_RUNNER != ''
+        env:
+          HTTP_PROXY: ${{ env.SELF_HOSTED_HTTP_PROXY }}
+          HTTPS_PROXY: ${{ env.SELF_HOSTED_HTTPS_PROXY }}
+          ALL_PROXY: ${{ env.SELF_HOSTED_ALL_PROXY }}
+          NO_PROXY: ${{ env.SELF_HOSTED_NO_PROXY }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          script_ref="${NETWORK_SCRIPT_REF:-${DEPLOY_SHA:-main}}"
+          curl -fsSL --proxy "${HTTP_PROXY}" \
+            "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
+            | bash
+
+      - name: Checkout (self-hosted SSH)
+        if: vars.QS_DEPLOY_RUNNER != ''
         uses: actions/checkout@v4
         with:
           ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
+          ssh-key: ${{ secrets.QS_SERVER_DEPLOY_KEY }}
+
+      - name: Checkout (GitHub-hosted HTTPS)
+        if: vars.QS_DEPLOY_RUNNER == ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
 
       - name: Prepare deployment package
         env:
@@ -271,10 +304,34 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
-      - name: Checkout
+      - name: Configure runner network (proxy + GitHub SSH)
+        if: vars.QS_DEPLOY_RUNNER != ''
+        env:
+          HTTP_PROXY: ${{ env.SELF_HOSTED_HTTP_PROXY }}
+          HTTPS_PROXY: ${{ env.SELF_HOSTED_HTTPS_PROXY }}
+          ALL_PROXY: ${{ env.SELF_HOSTED_ALL_PROXY }}
+          NO_PROXY: ${{ env.SELF_HOSTED_NO_PROXY }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          script_ref="${NETWORK_SCRIPT_REF:-${DEPLOY_SHA:-main}}"
+          curl -fsSL --proxy "${HTTP_PROXY}" \
+            "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
+            | bash
+
+      - name: Checkout (self-hosted SSH)
+        if: vars.QS_DEPLOY_RUNNER != ''
         uses: actions/checkout@v4
         with:
           ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
+          ssh-key: ${{ secrets.QS_SERVER_DEPLOY_KEY }}
+
+      - name: Checkout (GitHub-hosted HTTPS)
+        if: vars.QS_DEPLOY_RUNNER == ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
 
       - name: Prepare deployment package
         env:
@@ -356,10 +413,34 @@ jobs:
       WWW_GID: ${{ secrets.WWW_GID }}
       WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
     steps:
-      - name: Checkout
+      - name: Configure runner network (proxy + GitHub SSH)
+        if: vars.QS_DEPLOY_RUNNER != ''
+        env:
+          HTTP_PROXY: ${{ env.SELF_HOSTED_HTTP_PROXY }}
+          HTTPS_PROXY: ${{ env.SELF_HOSTED_HTTPS_PROXY }}
+          ALL_PROXY: ${{ env.SELF_HOSTED_ALL_PROXY }}
+          NO_PROXY: ${{ env.SELF_HOSTED_NO_PROXY }}
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+        run: |
+          script_ref="${NETWORK_SCRIPT_REF:-${DEPLOY_SHA:-main}}"
+          curl -fsSL --proxy "${HTTP_PROXY}" \
+            "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
+            | bash
+
+      - name: Checkout (self-hosted SSH)
+        if: vars.QS_DEPLOY_RUNNER != ''
         uses: actions/checkout@v4
         with:
           ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
+          ssh-key: ${{ secrets.QS_SERVER_DEPLOY_KEY }}
+
+      - name: Checkout (GitHub-hosted HTTPS)
+        if: vars.QS_DEPLOY_RUNNER == ''
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.DEPLOY_SHA }}
+          fetch-depth: 1
 
       - name: Prepare deployment package
         env:
