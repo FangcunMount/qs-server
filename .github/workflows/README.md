@@ -30,7 +30,7 @@ CD 本地入口：
 镜像构建与拉取：
 
 - `cd-image` 默认使用 GHCR registry cache：`ghcr.io/fangcunmount/<image>:buildcache`。
-- 生产部署默认走 **tarball 直传**：ServerD runner 从 **GHCR** `docker pull`，`docker save | gzip` 后随 deploy-package 一并 SCP 到目标机，`remote-deploy.sh` 执行 `docker load`，避免目标机直连 registry 长时间 pull。
+- 生产部署默认走 **tarball 直传（Artifact 模式）**：`docker` job（GitHub-hosted）构建推 GHCR 后 `docker pull` + `save | gzip`，上传 **Actions Artifact**；ServerD deploy job **下载 artifact**（不经海外 registry pull），再 SCP 到目标机 `docker load`。
 - 手动部署或未上传 tarball 时，`DEPLOY_IMAGE_SOURCE=auto|registry` 会 fallback 到 registry pull；此时默认优先 Docker Hub（`DEPLOY_PULL_REGISTRY=dockerhub`），再回退 GHCR。
 - 自动触发时，CD 脚本、workflow、文档、测试等非运行时变更不会触发生产服务发布；手动触发仍按输入选择 `all/apiserver/collection/worker`。
 - 远端若本地已有同 tag 镜像，或已从 tarball load，则跳过 registry pull。
@@ -138,7 +138,7 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 | Variable | 值 | 说明 |
 | -------- | -- | ---- |
 | `QS_DEPLOY_RUNNER` | `serverd` | deploy job 的 `runs-on` |
-| `QS_DEPLOY_EXPORT_REGISTRY` | `ghcr` | 自托管 export 镜像源（ServerD 经 Mihomo 可达 GHCR；Docker Hub 需额外规则） |
+| `QS_DEPLOY_EXPORT_REGISTRY` | （可删） | 已弃用；镜像 tarball 由 `docker` job 上传 Artifact，deploy 直接下载 |
 | `QS_DEPLOY_HTTP_PROXY` | `http://127.0.0.1:7890` | HTTP(S) 工具走 Mihomo |
 | `QS_DEPLOY_ALL_PROXY` | `socks5://127.0.0.1:7891` | 可选 SOCKS 代理 |
 | `QS_DEPLOY_NO_PROXY` | `127.0.0.1,localhost,内网` | 生产 SSH/SCP 不走代理 |
@@ -168,12 +168,13 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 ```
 GitHub 触发 CD
   → docker job（GitHub-hosted）构建推 GHCR + Docker Hub
+       → pull + save tarball → upload-artifact（deploy-image-<service>）
   → deploy job（ServerD runner ×3 并行）
-       → docker login ghcr.io → pull（GHCR）→ save tarball
+       → download-artifact（不经 ServerD docker pull 海外 registry）
        → SCP → ServerA / ServerB / ServerD（Tailscale 内网）
        → remote-deploy.sh（docker load + compose up）
 ```
 
-deploy job 用 shell `docker login`，不用 `docker/login-action`（避免自托管 runner 下载 action 超时）。
+Artifact 保留 1 天；Re-run 同一 workflow run 可复用已上传的 tarball。
 
 如需本地开发，请使用 `build/docker/docker-compose.dev.yml`。

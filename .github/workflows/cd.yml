@@ -28,7 +28,7 @@ name: Production Deploy
 #
 # 可选 Repository / Organization Variables（自托管部署机 ServerD）:
 #   QS_DEPLOY_RUNNER=serverd          deploy-* job 的 runs-on；组织级 runner 标签，多仓库共用
-#   QS_DEPLOY_EXPORT_REGISTRY=ghcr       自托管机 export 镜像源（ServerD 推荐 ghcr；留空默认 ghcr）
+#   QS_DEPLOY_EXPORT_REGISTRY=ghcr       仅 registry 回退模式；默认走 artifact（见 docker job upload-artifact）
 #   QS_DEPLOY_HTTP_PROXY=http://127.0.0.1:7890  Mihomo HTTP 代理
 #   QS_DEPLOY_HTTPS_PROXY=（默认同 HTTP）
 #   QS_DEPLOY_ALL_PROXY=socks5://127.0.0.1:7891
@@ -74,7 +74,6 @@ env:
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
-  DEPLOY_EXPORT_REGISTRY: ${{ vars.QS_DEPLOY_EXPORT_REGISTRY || 'ghcr' }}
   # 自托管 runner（ServerD）网络：走 Mihomo 代理 + GitHub SSH
   SELF_HOSTED_HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
   SELF_HOSTED_HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY || vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
@@ -130,6 +129,7 @@ jobs:
     permissions:
       contents: read
       packages: write
+      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -164,6 +164,20 @@ jobs:
             DEPLOY_SHA="${DEPLOY_SHA}" \
             BUILD_TIME="${BUILD_TIME}"
 
+      - name: Export deployment image tarball
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: ghcr
+        run: make cd-export-image SERVICE=${{ matrix.service }}
+
+      - name: Upload deployment image artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: deploy-image-${{ matrix.service }}
+          path: deploy-image-${{ matrix.service }}.tar.gz
+          retention-days: 1
+          if-no-files-found: error
+
   deploy-apiserver:
     name: Deploy API Server
     needs: [plan, docker]
@@ -172,7 +186,7 @@ jobs:
       name: production
     permissions:
       contents: read
-      packages: read
+      actions: read
     if: |
       always() &&
       needs.docker.result == 'success' &&
@@ -181,6 +195,12 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
+      - name: Download deployment image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-image-apiserver
+          path: .
+
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
@@ -238,28 +258,6 @@ jobs:
         run: |
           make cd-package SERVICE=apiserver
 
-      - name: Login to Docker Hub
-        if: env.DEPLOY_EXPORT_REGISTRY == 'dockerhub'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-
-      - name: Login to GitHub Container Registry
-        if: env.DEPLOY_EXPORT_REGISTRY == 'ghcr'
-        env:
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
-        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-      - name: Export deployment image tarball
-        env:
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-          EXPORT_IMAGE_REGISTRY: ${{ env.DEPLOY_EXPORT_REGISTRY }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: |
-          make cd-export-image SERVICE=apiserver
-
       - name: Setup deploy SSH
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
@@ -294,7 +292,7 @@ jobs:
       name: production
     permissions:
       contents: read
-      packages: read
+      actions: read
     if: |
       always() &&
       needs.docker.result == 'success' &&
@@ -303,6 +301,12 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
+      - name: Download deployment image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-image-collection
+          path: .
+
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
@@ -345,28 +349,6 @@ jobs:
         run: |
           make cd-package SERVICE=collection
 
-      - name: Login to Docker Hub
-        if: env.DEPLOY_EXPORT_REGISTRY == 'dockerhub'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-
-      - name: Login to GitHub Container Registry
-        if: env.DEPLOY_EXPORT_REGISTRY == 'ghcr'
-        env:
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
-        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-      - name: Export deployment image tarball
-        env:
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-          EXPORT_IMAGE_REGISTRY: ${{ env.DEPLOY_EXPORT_REGISTRY }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: |
-          make cd-export-image SERVICE=collection
-
       - name: Setup deploy SSH
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
@@ -401,7 +383,7 @@ jobs:
       name: production
     permissions:
       contents: read
-      packages: read
+      actions: read
     if: |
       always() &&
       needs.docker.result == 'success' &&
@@ -411,6 +393,12 @@ jobs:
       WWW_GID: ${{ secrets.WWW_GID }}
       WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
     steps:
+      - name: Download deployment image artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: deploy-image-worker
+          path: .
+
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
@@ -466,28 +454,6 @@ jobs:
           REDIS_SSL_INSECURE_SKIP_VERIFY: ${{ secrets.REDIS_SSL_INSECURE_SKIP_VERIFY }}
         run: |
           make cd-package SERVICE=worker
-
-      - name: Login to Docker Hub
-        if: env.DEPLOY_EXPORT_REGISTRY == 'dockerhub'
-        env:
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-        run: echo "$DOCKERHUB_TOKEN" | docker login -u "$DOCKERHUB_USERNAME" --password-stdin
-
-      - name: Login to GitHub Container Registry
-        if: env.DEPLOY_EXPORT_REGISTRY == 'ghcr'
-        env:
-          GHCR_USERNAME: ${{ github.actor }}
-          GHCR_TOKEN: ${{ github.token }}
-        run: echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USERNAME" --password-stdin
-
-      - name: Export deployment image tarball
-        env:
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-          EXPORT_IMAGE_REGISTRY: ${{ env.DEPLOY_EXPORT_REGISTRY }}
-          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-        run: |
-          make cd-export-image SERVICE=worker
 
       - name: Setup deploy SSH
         env:
