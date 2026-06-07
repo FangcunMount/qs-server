@@ -25,6 +25,11 @@ name: Production Deploy
 #   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_SESSION_TOKEN（可选，apiserver 二维码 OSS）
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
+#
+# 可选 Repository / Organization Variables（自托管部署机 ServerD）:
+#   QS_DEPLOY_RUNNER=serverd          deploy-* job 的 runs-on；组织级 runner 标签，多仓库共用
+#   QS_DEPLOY_EXPORT_REGISTRY=dockerhub  自托管机 export 镜像源；留空默认 ghcr（适合 GitHub-hosted）
+# 组织级 runner 注册见 .github/workflows/README.md §自托管 Runner
 # ============================================================================
 
 on:
@@ -62,6 +67,10 @@ env:
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
+  # deploy-* 默认跑 GitHub-hosted；在 ServerD 注册 runner 标签 serverd 后设 QS_DEPLOY_RUNNER=serverd
+  DEPLOY_RUNNER: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
+  # ServerD 拉 GHCR 慢，建议设 QS_DEPLOY_EXPORT_REGISTRY=dockerhub
+  DEPLOY_EXPORT_REGISTRY: ${{ vars.QS_DEPLOY_EXPORT_REGISTRY || 'ghcr' }}
 
 jobs:
   plan:
@@ -149,7 +158,7 @@ jobs:
   deploy-apiserver:
     name: Deploy API Server
     needs: [plan, docker]
-    runs-on: ubuntu-latest
+    runs-on: ${{ env.DEPLOY_RUNNER }}
     environment:
       name: production
     permissions:
@@ -196,7 +205,15 @@ jobs:
         run: |
           make cd-package SERVICE=apiserver
 
+      - name: Login to Docker Hub
+        if: env.DEPLOY_EXPORT_REGISTRY == 'dockerhub'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub Container Registry
+        if: env.DEPLOY_EXPORT_REGISTRY == 'ghcr'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
@@ -206,6 +223,8 @@ jobs:
       - name: Export deployment image tarball
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: ${{ env.DEPLOY_EXPORT_REGISTRY }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           make cd-export-image SERVICE=apiserver
 
@@ -253,7 +272,7 @@ jobs:
   deploy-collection:
     name: Deploy Collection Server
     needs: [plan, docker]
-    runs-on: ubuntu-latest
+    runs-on: ${{ env.DEPLOY_RUNNER }}
     environment:
       name: production
     permissions:
@@ -285,7 +304,15 @@ jobs:
         run: |
           make cd-package SERVICE=collection
 
+      - name: Login to Docker Hub
+        if: env.DEPLOY_EXPORT_REGISTRY == 'dockerhub'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub Container Registry
+        if: env.DEPLOY_EXPORT_REGISTRY == 'ghcr'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
@@ -295,6 +322,8 @@ jobs:
       - name: Export deployment image tarball
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: ${{ env.DEPLOY_EXPORT_REGISTRY }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           make cd-export-image SERVICE=collection
 
@@ -342,7 +371,7 @@ jobs:
   deploy-worker:
     name: Deploy Worker
     needs: [plan, docker]
-    runs-on: ubuntu-latest
+    runs-on: ${{ env.DEPLOY_RUNNER }}
     environment:
       name: production
     permissions:
@@ -389,7 +418,15 @@ jobs:
         run: |
           make cd-package SERVICE=worker
 
+      - name: Login to Docker Hub
+        if: env.DEPLOY_EXPORT_REGISTRY == 'dockerhub'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Login to GitHub Container Registry
+        if: env.DEPLOY_EXPORT_REGISTRY == 'ghcr'
         uses: docker/login-action@v3
         with:
           registry: ${{ env.DOCKER_REGISTRY }}
@@ -399,6 +436,8 @@ jobs:
       - name: Export deployment image tarball
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: ${{ env.DEPLOY_EXPORT_REGISTRY }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
         run: |
           make cd-export-image SERVICE=worker
 

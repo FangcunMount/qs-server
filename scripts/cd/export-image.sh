@@ -9,10 +9,24 @@ SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 : "${DOCKER_REPOSITORY:?DOCKER_REPOSITORY is required}"
 : "${DEPLOY_SHA:?DEPLOY_SHA is required}"
 
-IMAGE="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${DEPLOY_SHA}"
+EXPORT_IMAGE_REGISTRY="${EXPORT_IMAGE_REGISTRY:-ghcr}"
+case "$EXPORT_IMAGE_REGISTRY" in
+  ghcr)
+    IMAGE="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${DEPLOY_SHA}"
+    ;;
+  dockerhub)
+    : "${DOCKERHUB_USERNAME:?DOCKERHUB_USERNAME is required for EXPORT_IMAGE_REGISTRY=dockerhub}"
+    IMAGE="${DOCKERHUB_USERNAME}/${IMAGE_NAME}:${DEPLOY_SHA}"
+    ;;
+  *)
+    echo "EXPORT_IMAGE_REGISTRY must be ghcr or dockerhub; got: ${EXPORT_IMAGE_REGISTRY}" >&2
+    exit 1
+    ;;
+esac
+
 OUTPUT="${DEPLOY_IMAGE_PACKAGE:-deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
 
-echo "Pulling ${IMAGE} for tarball export..."
+echo "Pulling ${IMAGE} (${EXPORT_IMAGE_REGISTRY}) for tarball export..."
 pull_started=$(date +%s)
 docker pull "$IMAGE"
 pull_elapsed=$(($(date +%s) - pull_started))

@@ -5,16 +5,20 @@ on:
   schedule:
     - cron: '0 */6 * * *'  # 每6小时执行一次
 
+env:
+  # 与 cd.yml 一致；未设 Variable 时默认匹配标签 serverd
+  DEPLOY_RUNNER: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+
 jobs:
   ping-production:
     name: Production Server Quick Check
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        
+
       - name: System Health Check
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -24,29 +28,25 @@ jobs:
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
-            echo "QS-Server - Quick Check"
+            echo "QS-Server - Quick Check (ServerA)"
             echo "=========================================="
             echo "Hostname: $(hostname)"
             echo "Uptime: $(uptime)"
             echo "Date: $(date)"
             echo ""
-            
             echo "Memory:"
             free -h | grep -E "Mem|Swap"
             echo ""
-            
             echo "Disk:"
             df -h | grep -E "^/dev/" | head -3
             echo ""
-            
             echo "CPU:"
             top -bn1 | grep "Cpu(s)"
             echo ""
-            
             echo "Load Average:"
             uptime | awk -F'load average:' '{print $2}'
             echo "=========================================="
-            
+
       - name: Docker Service Check
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -56,36 +56,26 @@ jobs:
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
-            echo "Docker Service Status"
+            echo "Docker Service Status (ServerA)"
             echo "=========================================="
-            
+
             if ! sudo docker info >/dev/null 2>&1; then
               echo "❌ Docker is not running"
               exit 1
             fi
             echo "✅ Docker daemon is running"
             echo ""
-            
             echo "QS-Server containers:"
             sudo docker ps --filter "name=qs-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo ""
-            
-            # API Server
+
             if sudo docker ps --filter "name=qs-apiserver" --format "{{.Names}}" | grep -q "qs-apiserver"; then
               echo "✅ API Server is running"
             else
               echo "❌ API Server is NOT running"
             fi
-            
-            # Collection Server
-            if sudo docker ps --filter "name=qs-collection-server" --format "{{.Names}}" | grep -q "qs-collection-server"; then
-              echo "✅ Collection Server is running"
-            else
-              echo "❌ Collection Server is NOT running"
-            fi
-            
             echo "=========================================="
-            
+
       - name: API Health Check
         uses: appleboy/ssh-action@v1.0.0
         with:
@@ -95,45 +85,129 @@ jobs:
           port: ${{ secrets.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
-            echo "API Health Check"
+            echo "API Health Check (ServerA)"
             echo "=========================================="
-            
-            # API Server
+
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/healthz 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
               echo "✅ API Server HTTP (8081): OK"
             else
               echo "❌ API Server HTTP (8081): Failed ($HTTP_CODE)"
+              exit 1
             fi
-            
-            # Collection Server
-            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/health 2>/dev/null || echo "000")
-            if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ Collection Server HTTP (8082): OK"
-            else
-              echo "❌ Collection Server HTTP (8082): Failed ($HTTP_CODE)"
-            fi
-            
             echo "=========================================="
 
-  ping-github:
-    name: GitHub Runner Check
-    runs-on: ubuntu-latest
+  ping-serverd:
+    name: ServerD Deploy Runner Check
+    runs-on: ${{ env.DEPLOY_RUNNER }}
+    timeout-minutes: 5
+
     steps:
-      - name: Runner Info
+      - name: Runner and host info
         run: |
           echo "=========================================="
-          echo "GitHub Runner Info"
+          echo "ServerD Self-Hosted Runner"
           echo "=========================================="
-          echo "OS: ${{ runner.os }}"
-          echo "Name: ${{ runner.name }}"
-          echo "Arch: ${{ runner.arch }}"
-          echo "✅ GitHub Runner OK"
+          echo "Runner name: ${{ runner.name }}"
+          echo "Runner OS:   ${{ runner.os }}"
+          echo "Runner arch: ${{ runner.arch }}"
+          echo "Hostname:    $(hostname)"
+          echo "Uptime:      $(uptime -p 2>/dev/null || uptime)"
+          echo "Date:        $(date)"
+          echo ""
+          echo "Memory:"
+          free -h | grep -E "Mem|Swap" || true
+          echo ""
+          echo "Disk (/ and /tmp):"
+          df -h / /tmp 2>/dev/null | grep -E "^/dev/|^Filesystem"
+          echo "=========================================="
+
+      - name: Actions Runner service
+        run: |
+          echo "=========================================="
+          echo "Actions Runner Service"
+          echo "=========================================="
+          svc="$(systemctl list-units --type=service --all 'actions.runner.*' --no-legend 2>/dev/null | awk '{print $1}' | sed -n '1p')"
+          if [ -z "$svc" ]; then
+            echo "⚠️  No actions.runner systemd unit found (may run in foreground)"
+          elif systemctl is-active --quiet "$svc"; then
+            echo "✅ $svc is active"
+            systemctl status "$svc" --no-pager -l | head -5
+          else
+            echo "❌ $svc is not active"
+            systemctl status "$svc" --no-pager -l || true
+            exit 1
+          fi
+          echo "=========================================="
+
+      - name: Deploy tooling
+        run: |
+          echo "=========================================="
+          echo "Deploy Tooling"
+          echo "=========================================="
+          missing=0
+          for cmd in docker git make gzip; do
+            if command -v "$cmd" >/dev/null 2>&1; then
+              echo "✅ $cmd: $(command -v "$cmd")"
+            else
+              echo "❌ $cmd: not found"
+              missing=1
+            fi
+          done
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+          if ! docker info >/dev/null 2>&1; then
+            echo "❌ Docker daemon not accessible for runner user"
+            exit 1
+          fi
+          echo "✅ Docker daemon reachable"
+          echo "   Version: $(docker version --format '{{.Server.Version}}' 2>/dev/null || echo unknown)"
+          echo "=========================================="
+
+      - name: SSH reachability to ServerA
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRA_HOST }}
+          username: ${{ secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          command_timeout: 1m
+          script: |
+            echo "✅ SSH to ServerA ($(hostname)) OK"
+
+      - name: SSH reachability to ServerB
+        uses: appleboy/ssh-action@v1.0.0
+        with:
+          host: ${{ secrets.SVRB_HOST }}
+          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          command_timeout: 1m
+          script: |
+            echo "✅ SSH to ServerB ($(hostname)) OK"
+
+      - name: Worker containers on ServerD
+        run: |
+          echo "=========================================="
+          echo "Worker Containers (local)"
+          echo "=========================================="
+          if ! docker info >/dev/null 2>&1; then
+            echo "❌ Docker not accessible"
+            exit 1
+          fi
+          docker ps --filter "name=qs-worker" --format "table {{.Names}}\t{{.Status}}" || true
+          running="$(docker ps --filter "name=qs-worker" --filter "status=running" -q | wc -l | tr -d ' ')"
+          if [ "${running:-0}" -gt 0 ]; then
+            echo "✅ ${running} worker container(s) running"
+          else
+            echo "⚠️  No running qs-worker containers (may be expected if not deployed)"
+          fi
           echo "=========================================="
 
   report:
     name: Status Report
-    needs: [ping-production, ping-github]
+    needs: [ping-production, ping-serverd]
     runs-on: ubuntu-latest
     if: always()
     steps:
@@ -142,20 +216,20 @@ jobs:
           echo "=========================================="
           echo "Ping Runner - Status Report"
           echo "=========================================="
-          echo "Production Server: ${{ needs.ping-production.result }}"
-          echo "GitHub Runner: ${{ needs.ping-github.result }}"
+          echo "Production (ServerA via GitHub-hosted): ${{ needs.ping-production.result }}"
+          echo "ServerD deploy runner:                  ${{ needs.ping-serverd.result }}"
           echo "Time: $(date)"
           echo ""
-          
+
           if [ "${{ needs.ping-production.result }}" != "success" ]; then
             echo "❌ Production check failed!"
             exit 1
           fi
-          
-          if [ "${{ needs.ping-github.result }}" != "success" ]; then
-            echo "❌ GitHub runner check failed!"
+
+          if [ "${{ needs.ping-serverd.result }}" != "success" ]; then
+            echo "❌ ServerD runner check failed!"
             exit 1
           fi
-          
+
           echo "✅ All checks passed"
           echo "=========================================="

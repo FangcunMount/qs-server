@@ -42,4 +42,83 @@ Secrets 传递规则：
 - 不把 token/password 作为 Make 参数或脚本 CLI 参数传递。
 - 生产 `config.prod.env` 只在部署包中生成，日志输出必须脱敏。
 
+## 自托管 Runner（ServerD，组织级）
+
+在 **GitHub 组织 `fangcunmount`** 注册 **一台** ServerD runner，组织内多个仓库可共用（无需每个项目一个 `/opt/actions-runner` 目录）。
+
+`plan` / `docker` / `notify` 仍跑 GitHub-hosted；各仓库的 `deploy-*` 通过变量 `QS_DEPLOY_RUNNER=serverd` 切到该 runner。
+
+### 1. ServerD 前置依赖
+
+- Docker（daemon 可用，runner 用户可 `docker pull/save/load`）
+- `git`、`make`、`gzip`
+- 到 ServerA/ServerB/ServerD 的 SSH（各仓库 CD 复用现有 `SVRA_*` / `SVRB_*` / `SVRD_*` secrets）
+
+### 2. 获取 Registration Token（一次性）
+
+这是 **Runner 注册专用 token**，不是 Personal Access Token（PAT），也**不用**单独去 Developer settings 申请。
+
+1. 打开组织：`https://github.com/organizations/fangcunmount/settings/actions/runners`
+   - 或：**fangcunmount** → **Settings** → **Actions** → **Runners**
+2. 点 **New runner** → **New self-hosted runner**
+3. 选 **Linux** / **x64**，页面会显示 `./config.sh --url https://github.com/fangcunmount --token XXXXX`
+4. 复制其中的 `XXXXX` 作为 `<RUNNER_TOKEN>`（约 **1 小时**内有效，过期重新点 **New self-hosted runner** 再取）
+
+注册完成后 runner 长期在线，**日常 CD 不需要**再保存或使用这个 token。
+
+### 3. 在 ServerD 安装 Runner（组织级，一套目录）
+
+```bash
+sudo mkdir -p /opt/actions-runner && sudo chown "$USER" /opt/actions-runner
+cd /opt/actions-runner
+curl -fsSL -o actions-runner.tar.gz -L \
+  "https://github.com/actions/runner/releases/download/v2.321.0/actions-runner-linux-x64-2.321.0.tar.gz"
+tar xzf actions-runner.tar.gz
+./config.sh --url https://github.com/fangcunmount --token <RUNNER_TOKEN> --labels serverd
+sudo ./svc.sh install && sudo ./svc.sh start
+```
+
+注意 `--url` 是 **组织地址** `https://github.com/fangcunmount`，不是单个仓库。
+
+成功后，组织 **Settings → Actions → Runners** 应出现带 `serverd` 标签的 runner（Idle）。
+
+**组织 Runner 可见范围**（组织 Settings → Actions → Runners → 该 runner → Repository access）：
+
+- 推荐 **All repositories**，或
+- **Selected repositories** 仅勾选需要走 ServerD 部署的仓库
+
+### 4. 各仓库配置
+
+每个要用 ServerD 部署的仓库单独配置（仓库或组织 Variables 均可）：
+
+| Variable | 值 | 说明 |
+| -------- | -- | ---- |
+| `QS_DEPLOY_RUNNER` | `serverd` | deploy job 的 `runs-on`；留空则回退 `ubuntu-latest` |
+| `QS_DEPLOY_EXPORT_REGISTRY` | `dockerhub` | ServerD 从 Docker Hub 拉镜像再 export（避免 GHCR 慢） |
+
+组织级 Variable 可设一次、全仓库生效；仓库级 Variable 可覆盖组织默认值。
+
+**Environment 放行**：各仓库 **Settings → Environments → `production`** → 允许 self-hosted runner（否则 deploy job 会 Pending）。
+
+`ping-runner.yml` 的 `ping-serverd` job 同样使用 `QS_DEPLOY_RUNNER`（默认 `serverd`），每 6 小时自检 runner 服务、Docker/部署工具、到 A/B 的 SSH 连通性。
+
+### 5. 多项目共用说明
+
+| 问题 | 答案 |
+| ---- | ---- |
+| 多个项目要多个目录吗？ | **不需要**；组织级一个 `/opt/actions-runner` 即可 |
+| 多个项目同时 CD？ | 单 runner **同时只跑一个 job**，会排队；要并行可同机再注册第二个 runner（新 `--name` + 新标签） |
+| secrets 怎么隔离？ | 仍按**仓库 / Environment** 注入；runner 只是执行机，不共享业务 secrets |
+
+### 6. 流量路径（ServerD 模式）
+
+```
+GitHub 触发 CD
+  → docker job（GitHub-hosted）构建推 GHCR + Docker Hub
+  → deploy job（ServerD runner）
+       → docker pull（Docker Hub）→ save tarball
+       → SCP → ServerA / ServerB / ServerD
+       → remote-deploy.sh（docker load + compose up）
+```
+
 如需本地开发，请使用 `build/docker/docker-compose.dev.yml`。
