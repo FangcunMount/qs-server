@@ -16,6 +16,9 @@ name: Production Deploy
 #   REDIS_HOST, REDIS_PORT, REDIS_USE_SSL, REDIS_SSL_INSECURE_SKIP_VERIFY
 #   NSQ_NSQD_HOST, NSQ_NSQD_PORT, NSQ_LOOKUPD_HOST, NSQ_LOOKUPD_PORT
 #   DOCKERHUB_USERNAME, DOCKERHUB_TOKEN
+#   ALIYUN_ACR_REGISTRY (如 registry.cn-hangzhou.aliyuncs.com)
+#   ALIYUN_ACR_NAMESPACE (ACR 命名空间)
+#   ALIYUN_ACR_USERNAME, ALIYUN_ACR_PASSWORD (ACR 登录密码)
 #
 # Repository Secrets (仓库级别，敏感信息):
 #   MONGODB_USERNAME, MONGODB_PASSWORD, MONGODB_DBNAME
@@ -28,7 +31,7 @@ name: Production Deploy
 #
 # 可选 Repository / Organization Variables（自托管部署机 ServerD）:
 #   QS_DEPLOY_RUNNER=serverd          deploy-* job 的 runs-on；组织级 runner 标签，多仓库共用
-#   QS_DEPLOY_EXPORT_REGISTRY=ghcr       仅 registry 回退模式；默认走 artifact（见 docker job upload-artifact）
+#   QS_DEPLOY_EXPORT_REGISTRY=acr      ServerD export 镜像源；留空默认 acr（国内 ACR pull）
 #   QS_DEPLOY_HTTP_PROXY=http://127.0.0.1:7890  Mihomo HTTP 代理
 #   QS_DEPLOY_HTTPS_PROXY=（默认同 HTTP）
 #   QS_DEPLOY_ALL_PROXY=socks5://127.0.0.1:7891
@@ -74,11 +77,12 @@ env:
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
-  # 自托管 runner（ServerD）网络：走 Mihomo 代理 + GitHub SSH
+  DEPLOY_EXPORT_REGISTRY: ${{ vars.QS_DEPLOY_EXPORT_REGISTRY || 'acr' }}
+  # 自托管 runner（ServerD）网络：走 Mihomo 代理 + GitHub SSH；ACR 走 NO_PROXY 直连国内
   SELF_HOSTED_HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
   SELF_HOSTED_HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY || vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
   SELF_HOSTED_ALL_PROXY: ${{ vars.QS_DEPLOY_ALL_PROXY || 'socks5://127.0.0.1:7891' }}
-  SELF_HOSTED_NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY || '127.0.0.1,localhost' }}
+  SELF_HOSTED_NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY || '127.0.0.1,localhost,100.64.0.0/10,.aliyuncs.com,.personal.cr.aliyuncs.com' }}
 
 jobs:
   plan:
@@ -126,10 +130,11 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
       DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+      ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+      ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
     permissions:
       contents: read
       packages: write
-      actions: write
     strategy:
       fail-fast: false
       matrix:
@@ -156,6 +161,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Login to Aliyun ACR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          username: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          password: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+
       - name: Build and publish ${{ matrix.service }}
         run: |
           make cd-image \
@@ -163,20 +175,6 @@ jobs:
             DEPLOY_REF="${DEPLOY_REF}" \
             DEPLOY_SHA="${DEPLOY_SHA}" \
             BUILD_TIME="${BUILD_TIME}"
-
-      - name: Export deployment image tarball
-        env:
-          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
-          EXPORT_IMAGE_REGISTRY: ghcr
-        run: make cd-export-image SERVICE=${{ matrix.service }}
-
-      - name: Upload deployment image artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: deploy-image-${{ matrix.service }}
-          path: deploy-image-${{ matrix.service }}.tar.gz
-          retention-days: 1
-          if-no-files-found: error
 
   deploy-apiserver:
     name: Deploy API Server
@@ -186,7 +184,6 @@ jobs:
       name: production
     permissions:
       contents: read
-      actions: read
     if: |
       always() &&
       needs.docker.result == 'success' &&
@@ -195,12 +192,6 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
-      - name: Download deployment image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: deploy-image-apiserver
-          path: .
-
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
@@ -229,6 +220,23 @@ jobs:
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
+
+      - name: Login to Aliyun ACR
+        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        env:
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+        run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
+
+      - name: Export deployment image tarball
+        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: acr
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+        run: make cd-export-image SERVICE=apiserver
 
       - name: Prepare deployment package
         env:
@@ -292,7 +300,6 @@ jobs:
       name: production
     permissions:
       contents: read
-      actions: read
     if: |
       always() &&
       needs.docker.result == 'success' &&
@@ -301,12 +308,6 @@ jobs:
       WWW_UID: ${{ secrets.WWW_UID }}
       WWW_GID: ${{ secrets.WWW_GID }}
     steps:
-      - name: Download deployment image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: deploy-image-collection
-          path: .
-
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
@@ -335,6 +336,23 @@ jobs:
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
+
+      - name: Login to Aliyun ACR
+        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        env:
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+        run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
+
+      - name: Export deployment image tarball
+        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: acr
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+        run: make cd-export-image SERVICE=collection
 
       - name: Prepare deployment package
         env:
@@ -383,7 +401,6 @@ jobs:
       name: production
     permissions:
       contents: read
-      actions: read
     if: |
       always() &&
       needs.docker.result == 'success' &&
@@ -393,12 +410,6 @@ jobs:
       WWW_GID: ${{ secrets.WWW_GID }}
       WORKER_REPLICAS: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.worker_replicas || vars.QS_WORKER_REPLICAS || '3' }}
     steps:
-      - name: Download deployment image artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: deploy-image-worker
-          path: .
-
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
@@ -427,6 +438,23 @@ jobs:
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
+
+      - name: Login to Aliyun ACR
+        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        env:
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
+          ALIYUN_ACR_PASSWORD: ${{ secrets.ALIYUN_ACR_PASSWORD }}
+        run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
+
+      - name: Export deployment image tarball
+        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        env:
+          DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
+          EXPORT_IMAGE_REGISTRY: acr
+          ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
+          ALIYUN_ACR_NAMESPACE: ${{ secrets.ALIYUN_ACR_NAMESPACE }}
+        run: make cd-export-image SERVICE=worker
 
       - name: Prepare deployment package
         env:

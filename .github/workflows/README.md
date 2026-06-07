@@ -30,7 +30,7 @@ CD 本地入口：
 镜像构建与拉取：
 
 - `cd-image` 默认使用 GHCR registry cache：`ghcr.io/fangcunmount/<image>:buildcache`。
-- 生产部署默认走 **tarball 直传（Artifact 模式）**：`docker` job（GitHub-hosted）构建推 GHCR 后 `docker pull` + `save | gzip`，上传 **Actions Artifact**；ServerD deploy job **下载 artifact**（不经海外 registry pull），再 SCP 到目标机 `docker load`。
+- 生产部署默认走 **tarball 直传（阿里云 ACR 模式）**：`docker` job 构建推 GHCR/Docker Hub 后 **同步 push ACR**；ServerD 从 **国内 ACR** `docker pull`（秒级～分钟级）→ `save | gzip` → SCP → 目标机 `docker load`。GHCR/Docker Hub 仍作备份。
 - 手动部署或未上传 tarball 时，`DEPLOY_IMAGE_SOURCE=auto|registry` 会 fallback 到 registry pull；此时默认优先 Docker Hub（`DEPLOY_PULL_REGISTRY=dockerhub`），再回退 GHCR。
 - 自动触发时，CD 脚本、workflow、文档、测试等非运行时变更不会触发生产服务发布；手动触发仍按输入选择 `all/apiserver/collection/worker`。
 - 远端若本地已有同 tag 镜像，或已从 tarball load，则跳过 registry pull。
@@ -70,16 +70,37 @@ sudo tee /etc/systemd/system/docker.service.d/http-proxy.conf <<'EOF'
 [Service]
 Environment="HTTP_PROXY=http://127.0.0.1:7890"
 Environment="HTTPS_PROXY=http://127.0.0.1:7890"
-Environment="NO_PROXY=127.0.0.1,localhost,100.64.0.0/10"
+Environment="NO_PROXY=127.0.0.1,localhost,100.64.0.0/10,.aliyuncs.com"
 EOF
 sudo mkdir -p /etc/systemd/system/containerd.service.d
 sudo cp /etc/systemd/system/docker.service.d/http-proxy.conf \
   /etc/systemd/system/containerd.service.d/http-proxy.conf
 sudo systemctl daemon-reload && sudo systemctl restart containerd docker
 
-# 验证（须强制走网络，401/200 均可；docker.io 若 EOF 说明 Mihomo 规则未放行）
-curl -sS -o /dev/null -w "ghcr:%{http_code}\n" -x http://127.0.0.1:7890 https://ghcr.io/v2/
-docker rmi hello-world 2>/dev/null; docker pull hello-world
+# 验证 ACR 直连（不走代理，期望 401 或 200）
+curl -sS -o /dev/null -w "acr:%{http_code}\n" https://<ALIYUN_ACR_REGISTRY>/v2/
+```
+
+### 1.1 阿里云 ACR（组织 Secrets）
+
+1. 开通 [容器镜像服务 ACR 个人版](https://cr.console.aliyun.com/)，创建**命名空间**（如 `fangcunmount`）
+2. 访问凭证 → 设置 **固定密码**
+3. 组织 **Settings → Secrets** 添加：
+
+| Secret | 示例 |
+| ------ | ---- |
+| `ALIYUN_ACR_REGISTRY` | 个人版用**公网**地址，如 `crpi-xxx.cn-beijing.personal.cr.aliyuncs.com`（概览页复制；不是 `registry.cn-*.aliyuncs.com`） |
+| `ALIYUN_ACR_NAMESPACE` | `fangcunmount` |
+| `ALIYUN_ACR_USERNAME` | 访问凭证页用户名（如 `clack`） |
+| `ALIYUN_ACR_PASSWORD` | 访问凭证 → **设置固定密码** |
+
+4. 组织 Variable：`QS_DEPLOY_EXPORT_REGISTRY=acr`（或删除该变量，默认已是 `acr`）
+
+ServerD 验证：
+
+```bash
+echo "<ACR_PASSWORD>" | docker login crpi-xxx.cn-beijing.personal.cr.aliyuncs.com -u clack --password-stdin
+docker pull crpi-xxx.cn-beijing.personal.cr.aliyuncs.com/fangcunmount/qs-apiserver:<sha>
 ```
 
 **GitHub Deploy Key（只读）**：仓库 Settings → Deploy keys → Add → 勾选只读；私钥存 Secrets `QS_SERVER_DEPLOY_KEY`。自托管 job 用 **SSH checkout**（`git@github.com` → `ssh.github.com:443` → Mihomo CONNECT）。
@@ -138,7 +159,7 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 | Variable | 值 | 说明 |
 | -------- | -- | ---- |
 | `QS_DEPLOY_RUNNER` | `serverd` | deploy job 的 `runs-on` |
-| `QS_DEPLOY_EXPORT_REGISTRY` | （可删） | 已弃用；镜像 tarball 由 `docker` job 上传 Artifact，deploy 直接下载 |
+| `QS_DEPLOY_EXPORT_REGISTRY` | `acr` | ServerD 从阿里云 ACR pull；`ghcr`/`dockerhub` 为回退 |
 | `QS_DEPLOY_HTTP_PROXY` | `http://127.0.0.1:7890` | HTTP(S) 工具走 Mihomo |
 | `QS_DEPLOY_ALL_PROXY` | `socks5://127.0.0.1:7891` | 可选 SOCKS 代理 |
 | `QS_DEPLOY_NO_PROXY` | `127.0.0.1,localhost,内网` | 生产 SSH/SCP 不走代理 |
@@ -167,14 +188,13 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 
 ```
 GitHub 触发 CD
-  → docker job（GitHub-hosted）构建推 GHCR + Docker Hub
-       → pull + save tarball → upload-artifact（deploy-image-<service>）
+  → docker job（GitHub-hosted）构建推 GHCR + Docker Hub + 同步 push ACR
   → deploy job（ServerD runner ×3 并行）
-       → download-artifact（不经 ServerD docker pull 海外 registry）
+       → docker pull ACR（国内直连，NO_PROXY .aliyuncs.com）→ save tarball
        → SCP → ServerA / ServerB / ServerD（Tailscale 内网）
        → remote-deploy.sh（docker load + compose up）
 ```
 
-Artifact 保留 1 天；Re-run 同一 workflow run 可复用已上传的 tarball。
+ACR 镜像 tag：`registry.cn-<region>.aliyuncs.com/<namespace>/qs-<service>:<DEPLOY_SHA>`。
 
 如需本地开发，请使用 `build/docker/docker-compose.dev.yml`。
