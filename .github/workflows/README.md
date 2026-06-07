@@ -102,6 +102,8 @@ sudo ./svc.sh install && sudo ./svc.sh start
 
 `ping-runner.yml` 的 `ping-serverd` job 同样使用 `QS_DEPLOY_RUNNER`（默认 `serverd`），每 6 小时自检 runner 服务、Docker/部署工具、到 A/B 的 SSH 连通性。
 
+自托管 runner 上 **不用** `appleboy/ssh-action`（会构建 Docker 镜像失败）；deploy 与 ping 均走原生 `ssh`/`scp`（`scripts/cd/setup-runner-ssh.sh`）。
+
 ### 5. 多项目共用说明
 
 | 问题 | 答案 |

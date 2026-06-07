@@ -101,6 +101,9 @@ jobs:
     timeout-minutes: 5
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Runner and host info
         run: |
           echo "=========================================="
@@ -164,26 +167,26 @@ jobs:
           echo "=========================================="
 
       - name: SSH reachability to ServerA
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          command_timeout: 1m
-          script: |
-            echo "✅ SSH to ServerA ($(hostname)) OK"
+        env:
+          RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ secrets.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ secrets.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: servera
+        run: |
+          bash scripts/cd/setup-runner-ssh.sh
+          ssh servera 'echo "✅ SSH to ServerA ($(hostname)) OK"'
 
       - name: SSH reachability to ServerB
-        uses: appleboy/ssh-action@v1.0.0
-        with:
-          host: ${{ secrets.SVRB_HOST }}
-          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          command_timeout: 1m
-          script: |
-            echo "✅ SSH to ServerB ($(hostname)) OK"
+        env:
+          RUNNER_SSH_KEY: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ secrets.SVRB_HOST }}
+          RUNNER_SSH_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: serverb
+        run: |
+          bash scripts/cd/setup-runner-ssh.sh
+          ssh serverb 'echo "✅ SSH to ServerB ($(hostname)) OK"'
 
       - name: Worker containers on ServerD
         run: |

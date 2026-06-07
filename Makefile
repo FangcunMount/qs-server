@@ -164,6 +164,8 @@ cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|coll
 	@SERVICE="$(SERVICE)" IMAGE_METADATA_PRINT=1 "$(CD_SCRIPT_DIR)/image-metadata.sh" >/dev/null
 	@test -x "$(CD_SCRIPT_DIR)/build-image.sh"
 	@test -x "$(CD_SCRIPT_DIR)/export-image.sh"
+	@test -x "$(CD_SCRIPT_DIR)/setup-runner-ssh.sh"
+	@test -x "$(CD_SCRIPT_DIR)/runner-upload-and-deploy.sh"
 	@test -x "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
 	@test -x "$(CD_SCRIPT_DIR)/prepare-package.sh"
 	@test -x "$(CD_SCRIPT_DIR)/remote-deploy.sh"

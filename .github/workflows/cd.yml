@@ -228,19 +228,18 @@ jobs:
         run: |
           make cd-export-image SERVICE=apiserver
 
-      - name: Upload deployment package
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package-apiserver.tar.gz,deploy-image-apiserver.tar.gz"
-          target: "/tmp"
-
-      - name: Deploy to Production Server
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Setup deploy SSH
         env:
+          RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ secrets.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ secrets.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: deploy-target
+        run: bash scripts/cd/setup-runner-ssh.sh
+
+      - name: Upload and deploy apiserver
+        env:
+          RUNNER_SSH_ALIAS: deploy-target
           SERVICE: apiserver
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -253,21 +252,7 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
           DEPLOY_IMAGE_SOURCE: tarball
-          IMAGE_TARBALL: /tmp/deploy-image-apiserver.tar.gz
-        with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
-          command_timeout: 30m
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG,DEPLOY_IMAGE_SOURCE,IMAGE_TARBALL
-          script: |
-            set -Eeuo pipefail
-            BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
-            mkdir -p "$BOOTSTRAP_TMP"
-            trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
-            tar -xzf "/tmp/deploy-package-${SERVICE}.tar.gz" -C "$BOOTSTRAP_TMP"
-            bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+        run: bash scripts/cd/runner-upload-and-deploy.sh
 
   deploy-collection:
     name: Deploy Collection Server
@@ -327,19 +312,18 @@ jobs:
         run: |
           make cd-export-image SERVICE=collection
 
-      - name: Upload deployment package
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SVRB_HOST }}
-          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package-collection.tar.gz,deploy-image-collection.tar.gz"
-          target: "/tmp"
-
-      - name: Deploy to Production Server
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Setup deploy SSH
         env:
+          RUNNER_SSH_KEY: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ secrets.SVRB_HOST }}
+          RUNNER_SSH_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: deploy-target
+        run: bash scripts/cd/setup-runner-ssh.sh
+
+      - name: Upload and deploy collection
+        env:
+          RUNNER_SSH_ALIAS: deploy-target
           SERVICE: collection
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -352,21 +336,7 @@ jobs:
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
           DEPLOY_IMAGE_SOURCE: tarball
-          IMAGE_TARBALL: /tmp/deploy-image-collection.tar.gz
-        with:
-          host: ${{ secrets.SVRB_HOST }}
-          username: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          command_timeout: 30m
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,IMAGE_TAG,DEPLOY_IMAGE_SOURCE,IMAGE_TARBALL
-          script: |
-            set -Eeuo pipefail
-            BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
-            mkdir -p "$BOOTSTRAP_TMP"
-            trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
-            tar -xzf "/tmp/deploy-package-${SERVICE}.tar.gz" -C "$BOOTSTRAP_TMP"
-            bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+        run: bash scripts/cd/runner-upload-and-deploy.sh
 
   deploy-worker:
     name: Deploy Worker
@@ -441,19 +411,18 @@ jobs:
         run: |
           make cd-export-image SERVICE=worker
 
-      - name: Upload deployment package
-        uses: appleboy/scp-action@v0.1.7
-        with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          source: "deploy-package-worker.tar.gz,deploy-image-worker.tar.gz"
-          target: "/tmp"
-
-      - name: Deploy to Production Server
-        uses: appleboy/ssh-action@v1.0.0
+      - name: Setup deploy SSH
         env:
+          RUNNER_SSH_KEY: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ secrets.SVRD_HOST }}
+          RUNNER_SSH_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_ALIAS: deploy-target
+        run: bash scripts/cd/setup-runner-ssh.sh
+
+      - name: Upload and deploy worker
+        env:
+          RUNNER_SSH_ALIAS: deploy-target
           SERVICE: worker
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -467,21 +436,7 @@ jobs:
           WORKER_REPLICAS: ${{ env.WORKER_REPLICAS }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}
           DEPLOY_IMAGE_SOURCE: tarball
-          IMAGE_TARBALL: /tmp/deploy-image-worker.tar.gz
-        with:
-          host: ${{ secrets.SVRD_HOST }}
-          username: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
-          key: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
-          command_timeout: 30m
-          envs: SERVICE,DOCKER_REGISTRY,DOCKER_REPOSITORY,GHCR_USERNAME,GITHUB_TOKEN,DOCKERHUB_USERNAME,DOCKERHUB_TOKEN,SUDO_PASSWORD,WWW_UID,WWW_GID,WORKER_REPLICAS,IMAGE_TAG,DEPLOY_IMAGE_SOURCE,IMAGE_TARBALL
-          script: |
-            set -Eeuo pipefail
-            BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
-            mkdir -p "$BOOTSTRAP_TMP"
-            trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
-            tar -xzf "/tmp/deploy-package-${SERVICE}.tar.gz" -C "$BOOTSTRAP_TMP"
-            bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+        run: bash scripts/cd/runner-upload-and-deploy.sh
 
   notify:
     name: Send Notification
