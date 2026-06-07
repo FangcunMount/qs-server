@@ -67,8 +67,8 @@ env:
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
-  # deploy-* 默认跑 GitHub-hosted；在 ServerD 注册 runner 标签 serverd 后设 QS_DEPLOY_RUNNER=serverd
-  DEPLOY_RUNNER: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
+env:
+  # runs-on 不能用 env 上下文，deploy job 直接写 vars.QS_DEPLOY_RUNNER
   # ServerD 拉 GHCR 慢，建议设 QS_DEPLOY_EXPORT_REGISTRY=dockerhub
   DEPLOY_EXPORT_REGISTRY: ${{ vars.QS_DEPLOY_EXPORT_REGISTRY || 'ghcr' }}
 
@@ -158,7 +158,7 @@ jobs:
   deploy-apiserver:
     name: Deploy API Server
     needs: [plan, docker]
-    runs-on: ${{ env.DEPLOY_RUNNER }}
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
     environment:
       name: production
     permissions:
@@ -272,7 +272,7 @@ jobs:
   deploy-collection:
     name: Deploy Collection Server
     needs: [plan, docker]
-    runs-on: ${{ env.DEPLOY_RUNNER }}
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
     environment:
       name: production
     permissions:
@@ -371,7 +371,7 @@ jobs:
   deploy-worker:
     name: Deploy Worker
     needs: [plan, docker]
-    runs-on: ${{ env.DEPLOY_RUNNER }}
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
     environment:
       name: production
     permissions:

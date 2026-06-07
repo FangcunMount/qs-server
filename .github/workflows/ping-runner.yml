@@ -5,9 +5,7 @@ on:
   schedule:
     - cron: '0 */6 * * *'  # 每6小时执行一次
 
-env:
-  # 与 cd.yml 一致；未设 Variable 时默认匹配标签 serverd
-  DEPLOY_RUNNER: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
+# runs-on 不能用 workflow env，直接读 vars.QS_DEPLOY_RUNNER
 
 jobs:
   ping-production:
@@ -99,7 +97,7 @@ jobs:
 
   ping-serverd:
     name: ServerD Deploy Runner Check
-    runs-on: ${{ env.DEPLOY_RUNNER }}
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'serverd' }}
     timeout-minutes: 5
 
     steps:
