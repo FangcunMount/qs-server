@@ -168,6 +168,7 @@ cd-validate: ## 校验 CD 服务元数据和脚本入口 (SERVICE=apiserver|coll
 	@test -x "$(CD_SCRIPT_DIR)/setup-runner-ssh.sh"
 	@test -x "$(CD_SCRIPT_DIR)/runner-upload-and-deploy.sh"
 	@test -x "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
+	@test -x "$(CD_SCRIPT_DIR)/push-acr.sh"
 	@test -x "$(CD_SCRIPT_DIR)/prepare-package.sh"
 	@test -x "$(CD_SCRIPT_DIR)/remote-deploy.sh"
 	@test -x "$(CD_SCRIPT_DIR)/plan-services.sh"
@@ -179,9 +180,13 @@ cd-plan: ## 规划本次 CD 需要发布的服务
 cd-export-image: cd-validate ## 在 CI runner 拉取并导出服务镜像 tarball（供 SCP 到生产机 docker load）
 	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/export-image.sh"
 
-cd-image: cd-validate ## 构建并发布服务镜像到 GHCR 和 Docker Hub
+cd-push-acr: cd-validate ## 将已发布到 GHCR 的镜像同步到阿里云 ACR
+	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/push-acr.sh"
+
+cd-image: cd-validate ## 构建并发布服务镜像到 GHCR、Docker Hub 和阿里云 ACR
 	@SERVICE="$(SERVICE)" DEPLOY_REF="$(DEPLOY_REF)" DEPLOY_SHA="$(DEPLOY_SHA)" BUILD_TIME="$(BUILD_TIME)" BUILD_CACHE_REF="$(BUILD_CACHE_REF)" "$(CD_SCRIPT_DIR)/build-image.sh"
 	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/push-dockerhub.sh"
+	@SERVICE="$(SERVICE)" DEPLOY_SHA="$(DEPLOY_SHA)" "$(CD_SCRIPT_DIR)/push-acr.sh"
 
 cd-package: cd-validate ## 生成服务生产部署包
 	@SERVICE="$(SERVICE)" "$(CD_SCRIPT_DIR)/prepare-package.sh"
