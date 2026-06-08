@@ -1,0 +1,6 @@
+[
+  {
+    "dropIndexes": "scales",
+    "index": "idx_scales_published_questionnaire_active"
+  }
+]

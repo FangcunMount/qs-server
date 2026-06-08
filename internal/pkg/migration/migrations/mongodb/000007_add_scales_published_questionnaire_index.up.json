@@ -1,0 +1,19 @@
+[
+  {
+    "createIndexes": "scales",
+    "indexes": [
+      {
+        "key": {
+          "questionnaire_code": 1,
+          "record_role": 1,
+          "is_active_published": 1,
+          "status": 1
+        },
+        "name": "idx_scales_published_questionnaire_active",
+        "partialFilterExpression": {
+          "deleted_at": null
+        }
+      }
+    ]
+  }
+]

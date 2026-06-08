@@ -154,6 +154,17 @@ func (s *ScalesIndexes) EnsureIndexes(ctx context.Context) error {
 			},
 			Options: options.Index().SetName("idx_category_status_deleted"),
 		},
+		{
+			Keys: bson.D{
+				{Key: "questionnaire_code", Value: 1},
+				{Key: "record_role", Value: 1},
+				{Key: "is_active_published", Value: 1},
+				{Key: "status", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_scales_published_questionnaire_active").
+				SetPartialFilterExpression(bson.M{"deleted_at": nil}),
+		},
 	}
 
 	if _, err := s.collection.Indexes().CreateMany(ctx, indexModels); err != nil {
@@ -291,6 +302,14 @@ db.scales.createIndex(
 db.scales.createIndex(
     { category: 1, status: 1, deleted_at: 1 },
     { name: "idx_category_status_deleted" }
+);
+
+db.scales.createIndex(
+    { questionnaire_code: 1, record_role: 1, is_active_published: 1, status: 1 },
+    {
+        name: "idx_scales_published_questionnaire_active",
+        partialFilterExpression: { deleted_at: null }
+    }
 );
 
 // ========== InterpretReports 集合 ==========
