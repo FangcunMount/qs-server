@@ -1,0 +1,212 @@
+{
+  "collectionBaseUrl": "https://collect.fangcunmount.cn",
+  "apiserverBaseUrl": "https://qs.fangcunmount.cn",
+  "tokensFile": "tokens.json",
+  "orgId": "1",
+  "scaleCodes": [
+    "3adyDE",
+    "zOO4eG",
+    "WFIRSP",
+    "bJFKi3",
+    "mbdoeV",
+    "tuixuu",
+    "sJFa2R",
+    "tssl35"
+  ],
+  "planIds": [
+    "614333603412718126",
+    "614187067651404334"
+  ],
+  "testeeSource": "daily_simulation",
+  "autoDiscoverSeeddata": true,
+  "discoverAnswers": true,
+  "qpsProfile": "pretest_60",
+  "qpsProfiles": {
+    "smoke_4": {
+      "duration": "30s",
+      "qps": {
+        "query": 1,
+        "submit": 1,
+        "report": 1,
+        "stats": 1,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 10,
+          "max": 50
+        },
+        "submit": {
+          "preAllocated": 10,
+          "max": 50
+        },
+        "report": {
+          "preAllocated": 20,
+          "max": 100
+        },
+        "stats": {
+          "preAllocated": 10,
+          "max": 50
+        },
+        "chainProbe": {
+          "preAllocated": 5,
+          "max": 20
+        }
+      }
+    },
+    "pretest_60": {
+      "duration": "3m",
+      "qps": {
+        "query": 24,
+        "submit": 12,
+        "report": 18,
+        "stats": 6,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 80,
+          "max": 400
+        },
+        "submit": {
+          "preAllocated": 120,
+          "max": 800
+        },
+        "report": {
+          "preAllocated": 500,
+          "max": 1500
+        },
+        "stats": {
+          "preAllocated": 60,
+          "max": 300
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "pretest_120": {
+      "duration": "5m",
+      "qps": {
+        "query": 48,
+        "submit": 24,
+        "report": 36,
+        "stats": 12,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 120,
+          "max": 600
+        },
+        "submit": {
+          "preAllocated": 180,
+          "max": 1000
+        },
+        "report": {
+          "preAllocated": 700,
+          "max": 1800
+        },
+        "stats": {
+          "preAllocated": 80,
+          "max": 400
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_300": {
+      "duration": "10m",
+      "qps": {
+        "query": 120,
+        "submit": 60,
+        "report": 90,
+        "stats": 30,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 200,
+          "max": 800
+        },
+        "submit": {
+          "preAllocated": 300,
+          "max": 1200
+        },
+        "report": {
+          "preAllocated": 900,
+          "max": 2200
+        },
+        "stats": {
+          "preAllocated": 120,
+          "max": 500
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_300_probe": {
+      "duration": "10m",
+      "qps": {
+        "query": 120,
+        "submit": 60,
+        "report": 90,
+        "stats": 30,
+        "chainProbe": 0.2
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 200,
+          "max": 800
+        },
+        "submit": {
+          "preAllocated": 300,
+          "max": 1200
+        },
+        "report": {
+          "preAllocated": 900,
+          "max": 2200
+        },
+        "stats": {
+          "preAllocated": 120,
+          "max": 500
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    }
+  },
+  "reportTimeout": 5,
+  "httpTimeout": "30s",
+  "strictThresholds": false,
+  "discover": {
+    "testeeLookbackDays": 7,
+    "testeeLimit": 100,
+    "assessmentLimit": 100
+  },
+  "paths": {
+    "questionnaireQuery": [
+      "/api/v1/scales?page=1&page_size=20&status=published",
+      "/api/v1/scales/categories",
+      "/api/v1/scales/hot?limit=5",
+      "/api/v1/scales/{scale_code}",
+      "/api/v1/questionnaires/{questionnaire_code}"
+    ],
+    "statistics": [
+      "/api/v1/statistics/overview?preset=7d",
+      "/api/v1/statistics/system",
+      "/api/v1/statistics/questionnaires/{questionnaire_code}?preset=7d"
+    ],
+    "submit": "/api/v1/answersheets",
+    "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
+    "answersheetAssessment": "/api/v1/answersheets/{answersheet_id}/assessment",
+    "reportStatus": "/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}"
+  }
+}
