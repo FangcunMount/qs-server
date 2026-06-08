@@ -25,9 +25,9 @@ const (
 // queryService 量表查询服务实现
 // 行为者：所有用户
 type queryService struct {
-	repo        scaleQueryRepository
-	reader      scalereadmodel.ScaleReader
-	identitySvc iambridge.IdentityResolver
+	repo         scaleQueryRepository
+	reader       scalereadmodel.ScaleReader
+	identitySvc  iambridge.IdentityResolver
 	listCache    scalelistcache.PublishedListCache
 	hotListCache scalelistcache.HotListCache
 	hotset       cachetarget.HotsetRecorder
