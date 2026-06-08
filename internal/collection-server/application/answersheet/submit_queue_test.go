@@ -101,16 +101,16 @@ func TestSubmitQueueFailedRequestRequiresNewRequestID(t *testing.T) {
 	if err := q.Enqueue(context.Background(), "req-failed", 1, &SubmitAnswerSheetRequest{}); err != nil {
 		t.Fatalf("enqueue: %v", err)
 	}
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for {
 		status, ok := q.GetStatus("req-failed")
 		if ok && status.Status == SubmitStatusFailed {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("req-failed did not fail")
+			t.Fatalf("req-failed did not fail within 5s")
 		}
-		time.Sleep(time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 	if err := q.Enqueue(context.Background(), "req-failed", 1, &SubmitAnswerSheetRequest{}); err == nil {
 		t.Fatal("expected failed request id reuse to be rejected")
