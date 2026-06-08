@@ -31,6 +31,18 @@ func (k CacheKeyspace) ScaleList() string {
 	return k.keyspace.Prefix("scale:list:v1")
 }
 
+func (k CacheKeyspace) PublishedScale(code string) string {
+	return k.keyspace.Prefix("scale:published:" + code)
+}
+
+func (k CacheKeyspace) PublishedScaleByQuestionnaire(questionnaireCode string) string {
+	return k.keyspace.Prefix("scale:published:questionnaire:" + questionnaireCode)
+}
+
+func (k CacheKeyspace) ScaleHotList(limit, windowDays int) string {
+	return k.keyspace.Prefix(fmt.Sprintf("scale:hot:list:v1:%d:%d", limit, windowDays))
+}
+
 func (k CacheKeyspace) ScaleHotDaily(day string) string {
 	return k.keyspace.Prefix("scale:hot:{rank}:daily:" + day)
 }

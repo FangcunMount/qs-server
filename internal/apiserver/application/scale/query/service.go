@@ -28,9 +28,10 @@ type queryService struct {
 	repo        scaleQueryRepository
 	reader      scalereadmodel.ScaleReader
 	identitySvc iambridge.IdentityResolver
-	listCache   scalelistcache.PublishedListCache
-	hotset      cachetarget.HotsetRecorder
-	hotRank     domscale.ScaleHotRankReadModel
+	listCache    scalelistcache.PublishedListCache
+	hotListCache scalelistcache.HotListCache
+	hotset       cachetarget.HotsetRecorder
+	hotRank      domscale.ScaleHotRankReadModel
 }
 
 type scaleQueryRepository interface {
@@ -43,26 +44,48 @@ type scaleQueryRepository interface {
 
 // NewQueryService 创建量表查询服务。
 func NewQueryService(repo scaleQueryRepository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...domscale.ScaleHotRankReadModel) ports.ScaleQueryService {
-	return newQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
+	return newQueryService(repo, reader, identitySvc, listCache, nil, hotset, hotRankReaders...)
 }
 
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
 func NewQueryServiceWithReadModel(repo scaleQueryRepository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...domscale.ScaleHotRankReadModel) ports.ScaleQueryService {
-	return newQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
+	return newQueryService(repo, reader, identitySvc, listCache, nil, hotset, hotRankReaders...)
 }
 
-func newQueryService(repo scaleQueryRepository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...domscale.ScaleHotRankReadModel) ports.ScaleQueryService {
+// NewQueryServiceWithHotListCache 创建带热门量表列表缓存的查询服务。
+func NewQueryServiceWithHotListCache(
+	repo scaleQueryRepository,
+	reader scalereadmodel.ScaleReader,
+	identitySvc iambridge.IdentityResolver,
+	listCache scalelistcache.PublishedListCache,
+	hotListCache scalelistcache.HotListCache,
+	hotset cachetarget.HotsetRecorder,
+	hotRankReaders ...domscale.ScaleHotRankReadModel,
+) ports.ScaleQueryService {
+	return newQueryService(repo, reader, identitySvc, listCache, hotListCache, hotset, hotRankReaders...)
+}
+
+func newQueryService(
+	repo scaleQueryRepository,
+	reader scalereadmodel.ScaleReader,
+	identitySvc iambridge.IdentityResolver,
+	listCache scalelistcache.PublishedListCache,
+	hotListCache scalelistcache.HotListCache,
+	hotset cachetarget.HotsetRecorder,
+	hotRankReaders ...domscale.ScaleHotRankReadModel,
+) ports.ScaleQueryService {
 	var hotRank domscale.ScaleHotRankReadModel
 	if len(hotRankReaders) > 0 {
 		hotRank = hotRankReaders[0]
 	}
 	return &queryService{
-		repo:        repo,
-		reader:      reader,
-		identitySvc: identitySvc,
-		listCache:   listCache,
-		hotset:      hotset,
-		hotRank:     hotRank,
+		repo:         repo,
+		reader:       reader,
+		identitySvc:  identitySvc,
+		listCache:    listCache,
+		hotListCache: hotListCache,
+		hotset:       hotset,
+		hotRank:      hotRank,
 	}
 }
 

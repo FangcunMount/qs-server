@@ -39,6 +39,7 @@ type ScaleModuleDeps struct {
 	Repo                   scale.Repository
 	Reader                 scalereadmodel.ScaleReader
 	ListCache              scalelistcache.PublishedListCache
+	HotListCache           scalelistcache.HotListCache
 	QuestionnaireCatalog   questionnairecatalog.Catalog
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	RankRedisClient        redis.UniversalClient
@@ -67,7 +68,15 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 	)
 	module.FactorService = scaleApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)
-	module.QueryService = scaleApp.NewQueryService(normalized.Repo, normalized.Reader, normalized.IdentityService, normalized.ListCache, normalized.HotsetRecorder, hotRankReader)
+	module.QueryService = scaleApp.NewQueryServiceWithHotListCache(
+		normalized.Repo,
+		normalized.Reader,
+		normalized.IdentityService,
+		normalized.ListCache,
+		normalized.HotListCache,
+		normalized.HotsetRecorder,
+		hotRankReader,
+	)
 	module.CategoryService = scaleApp.NewCategoryService()
 
 	return module, nil

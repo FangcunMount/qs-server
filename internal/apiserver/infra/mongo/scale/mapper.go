@@ -266,7 +266,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	// 从 map[string]interface{} 恢复计分参数
 	// 添加日志：记录 PO 层的 scoring_params
 	scoringParamsJSON, _ := json.Marshal(po.ScoringParams)
-	logger.L(ctx).Infow("mapFactorToDomain: PO scoring_params",
+	logger.L(ctx).Debugw("mapFactorToDomain: PO scoring_params",
 		"factor_code", po.Code,
 		"scoring_strategy", po.ScoringStrategy,
 		"scoring_params", string(scoringParamsJSON),
@@ -279,7 +279,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	// 添加日志：记录转换后的 ScoringParams
 	if scoringParams != nil {
 		cntContentsJSON, _ := json.Marshal(scoringParams.GetCntOptionContents())
-		logger.L(ctx).Infow("mapFactorToDomain: Domain ScoringParams",
+		logger.L(ctx).Debugw("mapFactorToDomain: Domain ScoringParams",
 			"factor_code", po.Code,
 			"cnt_option_contents", string(cntContentsJSON),
 		)
@@ -335,7 +335,7 @@ func normalizeFactorScoringStrategy(raw string) scale.ScoringStrategyCode {
 
 func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[string]interface{}, strategy scale.ScoringStrategyCode) *scale.ScoringParams {
 	paramsJSON, _ := json.Marshal(params)
-	logger.L(ctx).Infow("mapScoringParamsToDomain: input",
+	logger.L(ctx).Debugw("mapScoringParamsToDomain: input",
 		"strategy", strategy,
 		"params", string(paramsJSON),
 		"params_type", getTypeName(params),
@@ -368,7 +368,7 @@ func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[s
 	}
 
 	resultJSON, _ := json.Marshal(result.GetCntOptionContents())
-	logger.L(ctx).Infow("mapScoringParamsToDomain: final result",
+	logger.L(ctx).Debugw("mapScoringParamsToDomain: final result",
 		"cnt_option_contents", string(resultJSON),
 	)
 	return result
@@ -382,7 +382,7 @@ func stringSliceFromStoredArray(ctx context.Context, value interface{}) []string
 	case []interface{}:
 		values = v
 	case []string:
-		logger.L(ctx).Infow("mapScoringParamsToDomain: extracted cnt_option_contents (direct string array)",
+		logger.L(ctx).Debugw("mapScoringParamsToDomain: extracted cnt_option_contents (direct string array)",
 			"count", len(v),
 			"contents", v,
 		)
@@ -406,7 +406,7 @@ func stringSliceFromStoredArray(ctx context.Context, value interface{}) []string
 		}
 		result = append(result, str)
 	}
-	logger.L(ctx).Infow("mapScoringParamsToDomain: extracted cnt_option_contents",
+	logger.L(ctx).Debugw("mapScoringParamsToDomain: extracted cnt_option_contents",
 		"count", len(result),
 		"contents", result,
 	)

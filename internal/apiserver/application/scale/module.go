@@ -50,6 +50,19 @@ func NewQueryService(repo domscale.Repository, reader scalereadmodel.ScaleReader
 	return query.NewQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
 }
 
+// NewQueryServiceWithHotListCache 创建带热门量表列表缓存的查询服务。
+func NewQueryServiceWithHotListCache(
+	repo domscale.Repository,
+	reader scalereadmodel.ScaleReader,
+	identitySvc iambridge.IdentityResolver,
+	listCache scalelistcache.PublishedListCache,
+	hotListCache scalelistcache.HotListCache,
+	hotset cachetarget.HotsetRecorder,
+	hotRankReaders ...domscale.ScaleHotRankReadModel,
+) ScaleQueryService {
+	return query.NewQueryServiceWithHotListCache(repo, reader, identitySvc, listCache, hotListCache, hotset, hotRankReaders...)
+}
+
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
 func NewQueryServiceWithReadModel(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...domscale.ScaleHotRankReadModel) ScaleQueryService {
 	return query.NewQueryServiceWithReadModel(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)

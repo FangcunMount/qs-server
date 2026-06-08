@@ -65,6 +65,15 @@ func TestBuilderWithExplicitNamespace(t *testing.T) {
 	if got := builder.BuildScaleKey("SDS"); got != "prod:cache:query:scale:SDS" {
 		t.Fatalf("unexpected explicit namespaced scale key: %s", got)
 	}
+	if got := builder.BuildPublishedScaleKey("s-001"); got != "prod:cache:query:scale:published:s-001" {
+		t.Fatalf("unexpected published scale key: %s", got)
+	}
+	if got := builder.BuildPublishedScaleByQuestionnaireKey("q-001"); got != "prod:cache:query:scale:published:questionnaire:q-001" {
+		t.Fatalf("unexpected published scale questionnaire key: %s", got)
+	}
+	if got := builder.BuildScaleHotListKey(5, 30); got != "prod:cache:query:scale:hot:list:v1:5:30" {
+		t.Fatalf("unexpected hot list key: %s", got)
+	}
 	if got := builder.BuildScaleHotWindowKey("20260501:30"); got != "prod:cache:query:scale:hot:{rank}:window:20260501:30" {
 		t.Fatalf("unexpected explicit namespaced scale hot window key: %s", got)
 	}

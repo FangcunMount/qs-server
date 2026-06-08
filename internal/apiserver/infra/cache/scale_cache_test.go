@@ -3,6 +3,7 @@ package cache
 import (
 	"context"
 	"testing"
+	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -129,6 +130,82 @@ func TestCachedScaleRepositoryUsesExplicitBuilderNamespace(t *testing.T) {
 	}
 }
 
+func TestCachedScaleRepositoryFindPublishedByCodeUsesCache(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	source := newScaleCacheTestScaleWithFactor(t, "S-001")
+	baseRepo := &scaleMutationRepo{findPublishedByCodeResult: source}
+	cached := NewCachedScaleRepositoryWithBuilderAndPolicy(
+		baseRepo,
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		cachepolicy.CachePolicy{},
+	).(*CachedScaleRepository)
+	publishedKey := cached.buildPublishedScaleCacheKey("S-001")
+
+	got, err := cached.FindPublishedByCode(context.Background(), "S-001")
+	if err != nil {
+		t.Fatalf("FindPublishedByCode() first error = %v", err)
+	}
+	if got.FactorCount() != 1 {
+		t.Fatalf("factor count = %d, want 1", got.FactorCount())
+	}
+	if baseRepo.findPublishedByCodeCalls != 1 {
+		t.Fatalf("source loads = %d, want 1", baseRepo.findPublishedByCodeCalls)
+	}
+	waitForRedisKey(t, client, publishedKey)
+
+	got, err = cached.FindPublishedByCode(context.Background(), "S-001")
+	if err != nil {
+		t.Fatalf("FindPublishedByCode() second error = %v", err)
+	}
+	if got.FactorCount() != 1 {
+		t.Fatalf("second factor count = %d, want 1", got.FactorCount())
+	}
+	if baseRepo.findPublishedByCodeCalls != 1 {
+		t.Fatalf("source loads after cache hit = %d, want 1", baseRepo.findPublishedByCodeCalls)
+	}
+}
+
+func TestCachedScaleRepositoryFindPublishedByQuestionnaireCodeUsesCache(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	source := newScaleCacheTestScaleWithFactor(t, "S-001")
+	baseRepo := &scaleMutationRepo{findPublishedByQuestionnaireCodeResult: source}
+	cached := NewCachedScaleRepositoryWithBuilderAndPolicy(
+		baseRepo,
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		cachepolicy.CachePolicy{},
+	).(*CachedScaleRepository)
+	questionnaireKey := cached.buildPublishedScaleByQuestionnaireCacheKey("Q-001")
+
+	if _, err := cached.FindPublishedByQuestionnaireCode(context.Background(), "Q-001"); err != nil {
+		t.Fatalf("FindPublishedByQuestionnaireCode() first error = %v", err)
+	}
+	if baseRepo.findPublishedByQuestionnaireCodeCalls != 1 {
+		t.Fatalf("source loads = %d, want 1", baseRepo.findPublishedByQuestionnaireCodeCalls)
+	}
+	waitForRedisKey(t, client, questionnaireKey)
+
+	if _, err := cached.FindPublishedByQuestionnaireCode(context.Background(), "Q-001"); err != nil {
+		t.Fatalf("FindPublishedByQuestionnaireCode() second error = %v", err)
+	}
+	if baseRepo.findPublishedByQuestionnaireCodeCalls != 1 {
+		t.Fatalf("source loads after cache hit = %d, want 1", baseRepo.findPublishedByQuestionnaireCodeCalls)
+	}
+}
+
 func TestCachedScaleRepositoryReloadsPublishedScaleCacheWithoutFactors(t *testing.T) {
 	mr := miniredis.RunT(t)
 	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
@@ -199,8 +276,12 @@ func newScaleCacheTestScaleWithFactor(t *testing.T, code string) *scale.MedicalS
 
 type scaleMutationRepo struct {
 	scale.Repository
-	findByCodeResult *scale.MedicalScale
-	findByCodeCalls  int
+	findByCodeResult                       *scale.MedicalScale
+	findByCodeCalls                        int
+	findPublishedByCodeResult              *scale.MedicalScale
+	findPublishedByCodeCalls               int
+	findPublishedByQuestionnaireCodeResult *scale.MedicalScale
+	findPublishedByQuestionnaireCodeCalls  int
 }
 
 func (r *scaleMutationRepo) Create(context.Context, *scale.MedicalScale) error {
@@ -218,4 +299,26 @@ func (r *scaleMutationRepo) Remove(context.Context, string) error {
 func (r *scaleMutationRepo) FindByCode(context.Context, string) (*scale.MedicalScale, error) {
 	r.findByCodeCalls++
 	return r.findByCodeResult, nil
+}
+
+func (r *scaleMutationRepo) FindPublishedByCode(context.Context, string) (*scale.MedicalScale, error) {
+	r.findPublishedByCodeCalls++
+	return r.findPublishedByCodeResult, nil
+}
+
+func (r *scaleMutationRepo) FindPublishedByQuestionnaireCode(context.Context, string) (*scale.MedicalScale, error) {
+	r.findPublishedByQuestionnaireCodeCalls++
+	return r.findPublishedByQuestionnaireCodeResult, nil
+}
+
+func waitForRedisKey(t *testing.T, client redis.UniversalClient, key string) {
+	t.Helper()
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for time.Now().Before(deadline) {
+		if hasRedisKey(t, client, key) {
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatalf("redis key %s was not populated before deadline", key)
 }

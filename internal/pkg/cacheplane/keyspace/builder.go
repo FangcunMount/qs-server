@@ -56,6 +56,18 @@ func (b *Builder) BuildScaleListKey() string {
 	return NewCacheKeyspace(b.namespace()).ScaleList()
 }
 
+func (b *Builder) BuildPublishedScaleKey(code string) string {
+	return NewCacheKeyspace(b.namespace()).PublishedScale(code)
+}
+
+func (b *Builder) BuildPublishedScaleByQuestionnaireKey(questionnaireCode string) string {
+	return NewCacheKeyspace(b.namespace()).PublishedScaleByQuestionnaire(questionnaireCode)
+}
+
+func (b *Builder) BuildScaleHotListKey(limit, windowDays int) string {
+	return NewCacheKeyspace(b.namespace()).ScaleHotList(limit, windowDays)
+}
+
 func (b *Builder) BuildScaleHotDailyKey(day string) string {
 	return NewCacheKeyspace(b.namespace()).ScaleHotDaily(day)
 }

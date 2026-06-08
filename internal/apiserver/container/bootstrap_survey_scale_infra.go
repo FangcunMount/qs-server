@@ -27,6 +27,7 @@ type surveyScaleInfra struct {
 	scaleRepo           scale.Repository
 	scaleReader         scalereadmodel.ScaleReader
 	scaleListCache      scalelistcache.PublishedListCache
+	scaleHotListCache   scalelistcache.HotListCache
 }
 
 func (c *Container) ensureSurveyScaleInfra() (*surveyScaleInfra, error) {
@@ -78,11 +79,18 @@ func (c *Container) ensureSurveyScaleInfra() (*surveyScaleInfra, error) {
 	}
 
 	var scaleListCache scalelistcache.PublishedListCache
+	var scaleHotListCache scalelistcache.HotListCache
 	if staticRedis != nil {
+		staticCacheEntry := cacheentry.NewRedisCache(staticRedis)
 		scaleListCache = cachequery.NewPublishedScaleListCacheWithPolicyAndKeyBuilder(
-			cacheentry.NewRedisCache(staticRedis),
+			staticCacheEntry,
 			scaleReader,
 			c.resolveIdentityService(),
+			staticBuilder,
+			c.CachePolicy(cachepolicy.PolicyScaleList),
+		)
+		scaleHotListCache = cachequery.NewPublishedScaleHotListCacheWithPolicyAndKeyBuilder(
+			staticCacheEntry,
 			staticBuilder,
 			c.CachePolicy(cachepolicy.PolicyScaleList),
 		)
@@ -96,6 +104,7 @@ func (c *Container) ensureSurveyScaleInfra() (*surveyScaleInfra, error) {
 		scaleRepo:           scaleRepo,
 		scaleReader:         scaleReader,
 		scaleListCache:      scaleListCache,
+		scaleHotListCache:   scaleHotListCache,
 	}
 	return c.surveyScaleInfra, nil
 }

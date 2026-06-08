@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"encoding/json"
 	"strings"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -16,6 +17,10 @@ import (
 func (s *queryService) ListHotPublished(ctx context.Context, dto shared.ListHotScalesDTO) (*shared.HotScaleListResult, error) {
 	limit := normalizeHotScaleLimit(dto.Limit)
 	windowDays := normalizeHotScaleWindowDays(dto.WindowDays)
+
+	if cached, ok := s.loadHotScaleListCache(ctx, limit, windowDays); ok {
+		return cached, nil
+	}
 
 	hotItems, err := s.loadHotScaleRank(ctx, limit, windowDays)
 	if err != nil {
@@ -37,7 +42,54 @@ func (s *queryService) ListHotPublished(ctx context.Context, dto shared.ListHotS
 		hotItems = hotItems[:limit]
 	}
 
-	return shared.ToHotScaleListResult(ctx, hotItems, limit, windowDays, s.identitySvc), nil
+	result := shared.ToHotScaleListResult(ctx, hotItems, limit, windowDays, s.identitySvc)
+	s.storeHotScaleListCache(ctx, limit, windowDays, result)
+	return result, nil
+}
+
+func (s *queryService) loadHotScaleListCache(ctx context.Context, limit, windowDays int) (*shared.HotScaleListResult, bool) {
+	if s == nil || s.hotListCache == nil {
+		return nil, false
+	}
+	data, ok := s.hotListCache.Get(ctx, limit, windowDays)
+	if !ok || len(data) == 0 {
+		return nil, false
+	}
+	var result shared.HotScaleListResult
+	if err := json.Unmarshal(data, &result); err != nil {
+		logger.L(ctx).Warnw("failed to decode hot scale list cache",
+			"limit", limit,
+			"window_days", windowDays,
+			"error", err,
+		)
+		return nil, false
+	}
+	if len(result.Items) == 0 {
+		return nil, false
+	}
+	return &result, true
+}
+
+func (s *queryService) storeHotScaleListCache(ctx context.Context, limit, windowDays int, result *shared.HotScaleListResult) {
+	if s == nil || s.hotListCache == nil || result == nil || len(result.Items) == 0 {
+		return
+	}
+	data, err := json.Marshal(result)
+	if err != nil {
+		logger.L(ctx).Warnw("failed to encode hot scale list cache",
+			"limit", limit,
+			"window_days", windowDays,
+			"error", err,
+		)
+		return
+	}
+	if err := s.hotListCache.Set(ctx, limit, windowDays, data); err != nil {
+		logger.L(ctx).Warnw("failed to store hot scale list cache",
+			"limit", limit,
+			"window_days", windowDays,
+			"error", err,
+		)
+	}
 }
 
 func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]domainScale.HotScaleSummary, error) {

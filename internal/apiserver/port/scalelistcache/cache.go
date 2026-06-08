@@ -11,6 +11,12 @@ type PublishedListCache interface {
 	GetPage(ctx context.Context, page, pageSize int) (*Page, bool)
 }
 
+// HotListCache 缓存热门量表列表响应，避免重复 N+1 解析。
+type HotListCache interface {
+	Get(ctx context.Context, limit, windowDays int) ([]byte, bool)
+	Set(ctx context.Context, limit, windowDays int, payload []byte) error
+}
+
 // Page 表示缓存命中的量表摘要分页。
 type Page struct {
 	Items []Summary
