@@ -512,6 +512,27 @@ cleanup_old_backups
 rm -rf "$DEPLOY_TMP"
 rm -f "$PKG_PATH"
 
+verify_running_image() {
+  case "$SERVICE" in
+    worker)
+      return 0
+      ;;
+  esac
+
+  local running_image
+  running_image="$($SUDO docker inspect "$CONTAINER_NAME" --format '{{.Config.Image}}' 2>/dev/null || true)"
+  echo "Running image: ${running_image}"
+  case "$running_image" in
+    *:"${IMAGE_TAG}")
+      return 0
+      ;;
+  esac
+  echo "Deploy verification failed: ${CONTAINER_NAME} is not running tag ${IMAGE_TAG}" >&2
+  exit 1
+}
+
+verify_running_image
+
 echo "=========================================="
 echo "${CONTAINER_NAME} deployment completed"
 echo "=========================================="

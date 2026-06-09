@@ -29,7 +29,7 @@ echo "Uploading ${PACKAGE_FILE} and ${IMAGE_FILE} to ${RUNNER_SSH_ALIAS}..."
 scp "$PACKAGE_FILE" "$IMAGE_FILE" "${RUNNER_SSH_ALIAS}:/tmp/"
 
 echo "Running remote-deploy.sh on ${RUNNER_SSH_ALIAS}..."
-ssh "${RUNNER_SSH_ALIAS}" \
+if ! ssh "${RUNNER_SSH_ALIAS}" env \
   SERVICE="$SERVICE" \
   IMAGE_TAG="$IMAGE_TAG" \
   DEPLOY_IMAGE_SOURCE="${DEPLOY_IMAGE_SOURCE:-tarball}" \
@@ -45,7 +45,7 @@ ssh "${RUNNER_SSH_ALIAS}" \
   WWW_GID="$WWW_GID" \
   WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
   PKG_PATH="$REMOTE_PACKAGE" \
-  bash -s <<'REMOTE'
+  bash -seuo pipefail <<'REMOTE'
 set -Eeuo pipefail
 BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
 mkdir -p "$BOOTSTRAP_TMP"
@@ -53,3 +53,7 @@ trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
 tar -xzf "$PKG_PATH" -C "$BOOTSTRAP_TMP"
 bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
 REMOTE
+then
+  echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS}" >&2
+  exit 1
+fi
