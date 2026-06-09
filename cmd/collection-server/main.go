@@ -10,6 +10,12 @@ import (
 // @description Questionnaire collection/BFF layer
 // @BasePath /api/v1
 // @schemes http https
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
+// @description Bearer 用户令牌
+
+// 部署流程：cd.yml → ServerB runner → SSH(SVRB) → remote-deploy.sh。
 func main() {
 	collection.NewApp("collection-server").Run()
 }

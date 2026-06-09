@@ -4,7 +4,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/worker"
 )
 
-// 生产发布（worker）：CD 在 ServerD runner 执行；SVRD_HOST 为本机 Tailscale IP 时走本地 bootstrap。
+// @title QS Worker
+// @version 1.0
+// @description Questionnaire worker
+// @BasePath /api/v1
+// @schemes http https
+
+// 部署流程：cd.yml → ServerD runner → SSH(SVRD) → remote-deploy.sh。
 func main() {
 	worker.NewApp("qs-worker").Run()
 }
