@@ -9,7 +9,10 @@ import (
 // @description Questionnaire worker
 // @BasePath /api/v1
 // @schemes http https
-
+// @security BearerAuth
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	worker.NewApp("qs-worker").Run()
 }

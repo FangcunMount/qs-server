@@ -10,7 +10,10 @@ import (
 // @description Questionnaire Scale API server (REST & gRPC)
 // @BasePath /api/v1
 // @schemes http https
-
+// @security BearerAuth
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 func main() {
 	apiserver.NewApp("qs-apiserver").Run()
 }

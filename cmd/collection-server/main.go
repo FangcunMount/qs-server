@@ -13,7 +13,10 @@ import (
 // @securityDefinitions.apikey BearerAuth
 // @in header
 // @name Authorization
-// @description Bearer 用户令牌
+// @security BearerAuth
+// @securityDefinitions.apikey BearerAuth
+// @in header
+// @name Authorization
 
 func main() {
 	collection.NewApp("collection-server").Run()

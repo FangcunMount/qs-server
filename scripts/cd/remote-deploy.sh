@@ -225,7 +225,10 @@ load_image_from_tarball() {
   echo "Loading ${IMAGE_NAME} from tarball ${tarball}..."
   local load_started load_elapsed load_output loaded_ref
   load_started=$(date +%s)
-  load_output="$(gzip -dc "$tarball" | $SUDO docker load)"
+  # 不能用 `gzip -dc | $SUDO docker load`：带密码 sudo 是 `sudo -S ... <<<"$PASSWORD"`，
+  # here-string 会把 docker load 的 stdin 改成密码串、冲掉管道里的镜像数据，导致
+  # "unexpected EOF"。改用 docker load -i（自动解压 gzip），stdin 不被占用。
+  load_output="$($SUDO docker load -i "$tarball")"
   printf '%s\n' "$load_output"
   load_elapsed=$(($(date +%s) - load_started))
   echo "Loaded ${IMAGE_NAME} from tarball in ${load_elapsed}s"
