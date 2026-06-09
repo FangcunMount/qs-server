@@ -1,11 +1,17 @@
+# 生产拓扑（2026-06）：
+# - serverA（4C/8G）：qs-apiserver + qs-collection-server（本文件前两段）
+# - serverB：IAM（iam-apiserver，经 Tailscale 由 IAM_GRPC_HOST 解析）
+# - serverD：qs-worker（本文件 qs-worker 段，compose -p qs-worker 独立部署）
 services:
   qs-apiserver:
     image: ${DOCKER_IMAGE_QS_APISERVER:-ghcr.io/fangcunmount/qs-apiserver:latest}
     container_name: qs-apiserver
     restart: unless-stopped
-    # docker compose (非 swarm) 资源限制
-    mem_limit: "2048m"
-    cpus: "1.75"
+    # serverA 4C/8G：2C/3G；与 collection 同机，预留余量给 nginx/OS/数据层
+    mem_limit: "3072m"
+    cpus: "2"
+    extra_hosts:
+      - "iam-apiserver:${IAM_GRPC_HOST:?IAM_GRPC_HOST must be serverB Tailscale IP}"
     networks:
       - qs-network
       - infra-network
@@ -33,7 +39,7 @@ services:
       # 二维码存储目录
       - /data/image/qrcode:/data/image/qrcode:rw
     environment:
-      - GOMEMLIMIT=1536MiB
+      - GOMEMLIMIT=2304MiB
       - GOMAXPROCS=2
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
@@ -41,9 +47,11 @@ services:
     image: ${DOCKER_IMAGE_QS_COLLECTION_SERVER:-ghcr.io/fangcunmount/qs-collection-server:latest}
     container_name: qs-collection-server
     restart: unless-stopped
-    # docker compose (非 swarm) 资源限制
-    mem_limit: "896m"
-    cpus: "1.0"
+    # serverA 4C/8G：与 apiserver 同 qs-network，Nginx 本机 upstream
+    mem_limit: "2048m"
+    cpus: "1.5"
+    extra_hosts:
+      - "iam-apiserver:${IAM_GRPC_HOST:?IAM_GRPC_HOST must be serverB Tailscale IP}"
     networks:
       - qs-network
       - infra-network
@@ -63,17 +71,17 @@ services:
       - /data/logs/qs-server/qs-collection-server:/data/logs/qs
       # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
-    # 设置 Go 内存限制，帮助 GC 更积极地回收内存
     environment:
-      - GOMEMLIMIT=704MiB
+      - GOMEMLIMIT=1536MiB
+      - GOMAXPROCS=2
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
   qs-worker:
     image: ${DOCKER_IMAGE_QS_WORKER:-ghcr.io/fangcunmount/qs-worker:latest}
     restart: unless-stopped
-    # docker compose (非 swarm) 资源限制
-    mem_limit: "512m"
-    cpus: "0.5"
+    # serverD 独立部署（compose -p qs-worker）；此处为资源模板
+    mem_limit: "768m"
+    cpus: "1.0"
     networks:
       - qs-network
       - infra-network
@@ -93,7 +101,8 @@ services:
       # gRPC mTLS 证书目录（CA + 客户端证书），worker 不需要公网 REST TLS 证书
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     environment:
-      - GOMEMLIMIT=384MiB
+      - GOMEMLIMIT=576MiB
+      - GOMAXPROCS=2
     command: ["--config=/app/configs/worker.prod.yaml"]
 
 networks:

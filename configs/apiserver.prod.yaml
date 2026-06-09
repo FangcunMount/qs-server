@@ -120,8 +120,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 20        # 300QPS 目标下保留更充足的热连接
-  max-open-connections: 140       # 与下游背压预算一起控制数据库并发
+  max-idle-connections: 30        # mixed_300 目标：保留更充足的热连接
+  max-open-connections: 180       # 与 backpressure.mysql.max_inflight 对齐
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
@@ -147,8 +147,8 @@ redis:
   username: ""
   password: ""
   database: 1
-  max-idle: 40
-  max-active: 260
+  max-idle: 48
+  max-active: 320
   timeout: 300
   min-idle-conns: 10
   pool-timeout: 10
@@ -337,16 +337,16 @@ rate_limit:
 backpressure:
   mysql:
     enabled: true
-    max_inflight: 140
-    timeout_ms: 2500
+    max_inflight: 180
+    timeout_ms: 3000
   mongo:
     enabled: true
-    max_inflight: 130
-    timeout_ms: 2000
+    max_inflight: 170
+    timeout_ms: 2500
   iam:
     enabled: true
-    max_inflight: 130
-    timeout_ms: 2000
+    max_inflight: 80
+    timeout_ms: 2500
 
 # ----------------------------------------------------------------------------
 # 3.9 MongoDB 数据库配置
@@ -418,7 +418,7 @@ iam:
 
   # gRPC 连接配置
   grpc:
-    address: "iam-apiserver:9090"  # IAM gRPC 服务地址（Docker 容器，端口 9090）
+    address: "iam-apiserver:9090"  # IAM 在 serverB；compose extra_hosts 将主机名解析为 SVRB Tailscale IP
     timeout: 5s                   # 请求超时时间
     retry-max: 3                  # 最大重试次数
     

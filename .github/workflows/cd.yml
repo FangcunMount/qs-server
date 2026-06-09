@@ -27,6 +27,11 @@ name: Production Deploy
 #   JWT_SECRET
 #   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_SESSION_TOKEN（可选，apiserver 二维码 OSS）
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
+#
+# 生产拓扑（2026-06）：
+#   serverA（4C/8G）：nginx + qs-apiserver + qs-collection-server
+#   serverB：IAM（iam-apiserver）；apiserver/collection 经 IAM_GRPC_HOST=SVRB_HOST 访问
+#   serverD：qs-worker（跨云 gRPC 连 apiserver）
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）
 #
 # 可选 Repository / Organization Variables（自托管部署机 ServerD）:
@@ -279,6 +284,7 @@ jobs:
         env:
           RUNNER_SSH_ALIAS: deploy-target-apiserver
           RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          IAM_GRPC_HOST: ${{ vars.SVRB_HOST }}
           SERVICE: apiserver
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -370,17 +376,18 @@ jobs:
 
       - name: Setup deploy SSH
         env:
-          RUNNER_SSH_KEY: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ vars.SVRB_HOST }}
-          RUNNER_SSH_USER: ${{ vars.SVRB_USERNAME || vars.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ vars.SVRB_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target-collection
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy collection
         env:
           RUNNER_SSH_ALIAS: deploy-target-collection
-          RUNNER_SSH_HOST: ${{ vars.SVRB_HOST }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          IAM_GRPC_HOST: ${{ vars.SVRB_HOST }}
           SERVICE: collection
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -388,7 +395,7 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
           DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
           DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
-          SUDO_PASSWORD: ${{ secrets.SVRB_SUDO_PASSWORD || secrets.SVRA_SUDO_PASSWORD }}
+          SUDO_PASSWORD: ${{ secrets.SVRA_SUDO_PASSWORD }}
           WWW_UID: ${{ env.WWW_UID }}
           WWW_GID: ${{ env.WWW_GID }}
           IMAGE_TAG: ${{ env.DEPLOY_SHA }}

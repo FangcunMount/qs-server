@@ -356,8 +356,8 @@ func validateCollectionConcurrency(opts *ConcurrencyOptions) []error {
 	if opts.MaxConcurrency <= 0 {
 		errs = append(errs, fmt.Errorf("concurrency.max-concurrency must be greater than 0"))
 	}
-	if opts.MaxConcurrency > 100 {
-		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 100"))
+	if opts.MaxConcurrency > 512 {
+		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 512"))
 	}
 	return errs
 }

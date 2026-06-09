@@ -204,14 +204,28 @@ image_tarball_path() {
   printf '%s' "${IMAGE_TARBALL:-/tmp/deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
 }
 
-write_compose_image_env() {
+write_compose_env_file() {
   local image="$1"
   printf -v "$IMAGE_ENV_VAR" '%s' "$image"
   export "$IMAGE_ENV_VAR"
   COMPOSE_ENV_FILE="$DEPLOY_TMP/compose-image.env"
   printf '%s=%s\n' "$IMAGE_ENV_VAR" "$image" >"$COMPOSE_ENV_FILE"
+  case "$SERVICE" in
+    apiserver|collection)
+      if [ -z "${IAM_GRPC_HOST:-}" ]; then
+        echo "IAM_GRPC_HOST is required for ${SERVICE} on serverA (set to serverB Tailscale IP)" >&2
+        exit 1
+      fi
+      printf 'IAM_GRPC_HOST=%s\n' "$IAM_GRPC_HOST" >>"$COMPOSE_ENV_FILE"
+      ;;
+  esac
   chmod 0600 "$COMPOSE_ENV_FILE"
   export COMPOSE_ENV_FILE
+}
+
+# shellcheck disable=SC2120
+write_compose_image_env() {
+  write_compose_env_file "${1:?image ref is required}"
 }
 
 load_image_from_tarball() {
@@ -525,6 +539,7 @@ case "$SERVICE" in
     deploy_http_service
     ;;
   collection)
+    echo "Deploy target: serverA (co-located with qs-apiserver). Stop legacy qs-collection-server on serverB after cutover."
     setup_grpc_certs qs-collection-server
     select_image
     deploy_http_service

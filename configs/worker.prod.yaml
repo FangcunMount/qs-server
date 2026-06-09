@@ -28,7 +28,7 @@ metrics:
 # -------------------------------------------------------
 worker:
   service-name: "qs-worker"   # 服务名称（用于日志和监控）
-  concurrency: 64              # 300QPS 目标：serverD 上 3 副本，每实例保持中等并发，避免单实例硬顶
+  concurrency: 48              # 300QPS 目标：serverD 单实例消费并发（与 apiserver gRPC 跨云）
   max-retries: 3              # 最大重试次数
 
 # ============================================================
@@ -68,8 +68,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 8
-  max-open-connections: 40
+  max-idle-connections: 12
+  max-open-connections: 50
   max-connection-life-time: "1h"
   log-level: 2  # 生产环境只记录 Error
 
@@ -111,8 +111,8 @@ redis:
   username: ""
   password: ""
   database: 1
-  max-idle: 24
-  max-active: 120
+  max-idle: 32
+  max-active: 150
   timeout: 300
   min-idle-conns: 5
   pool-timeout: 10
