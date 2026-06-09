@@ -505,6 +505,9 @@ jobs:
         env:
           RUNNER_SSH_ALIAS: deploy-target-worker
           RUNNER_SSH_HOST: ${{ vars.SVRD_HOST }}
+          # worker 与 apiserver/collection 共用 docker-compose.prod.yml；
+          # compose 会解析全文件，qs-apiserver.extra_hosts 仍需 IAM_GRPC_HOST。
+          IAM_GRPC_HOST: ${{ vars.SVRB_HOST }}
           SERVICE: worker
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}

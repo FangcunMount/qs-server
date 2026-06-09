@@ -211,9 +211,11 @@ write_compose_env_file() {
   COMPOSE_ENV_FILE="$DEPLOY_TMP/compose-image.env"
   printf '%s=%s\n' "$IMAGE_ENV_VAR" "$image" >"$COMPOSE_ENV_FILE"
   case "$SERVICE" in
-    apiserver|collection)
+    apiserver|collection|worker)
+      # 三服务共用 docker-compose.prod.yml；compose 解析全文件时 qs-apiserver/collection
+      # 的 extra_hosts 均依赖 IAM_GRPC_HOST，worker 部署也需注入（值仅用于插值）。
       if [ -z "${IAM_GRPC_HOST:-}" ]; then
-        echo "IAM_GRPC_HOST is required for ${SERVICE} on serverA (set to serverB Tailscale IP)" >&2
+        echo "IAM_GRPC_HOST is required for ${SERVICE} (set to serverB Tailscale IP)" >&2
         exit 1
       fi
       printf 'IAM_GRPC_HOST=%s\n' "$IAM_GRPC_HOST" >>"$COMPOSE_ENV_FILE"
