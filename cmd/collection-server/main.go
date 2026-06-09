@@ -15,7 +15,6 @@ import (
 // @name Authorization
 // @description Bearer 用户令牌
 
-// 部署流程：cd.yml → ServerB runner → SSH(SVRB) → remote-deploy.sh。
 func main() {
 	collection.NewApp("collection-server").Run()
 }

@@ -223,11 +223,24 @@ load_image_from_tarball() {
 
   image_ref="${DOCKER_REGISTRY}/${DOCKER_REPOSITORY}/${IMAGE_NAME}:${IMAGE_TAG}"
   echo "Loading ${IMAGE_NAME} from tarball ${tarball}..."
-  local load_started load_elapsed
+  local load_started load_elapsed load_output loaded_ref
   load_started=$(date +%s)
-  gzip -dc "$tarball" | $SUDO docker load
+  load_output="$(gzip -dc "$tarball" | $SUDO docker load)"
+  printf '%s\n' "$load_output"
   load_elapsed=$(($(date +%s) - load_started))
   echo "Loaded ${IMAGE_NAME} from tarball in ${load_elapsed}s"
+
+  # 镜像可能用其它 registry（如 ACR）导出，load 进来的 repotag 与 compose 引用的
+  # ghcr ref 不一致，会导致 compose "No such image"。把实际加载的 ref retag 成期望 ref。
+  loaded_ref="$(printf '%s\n' "$load_output" | sed -n 's/^Loaded image: //p' | head -n1)"
+  if [ -n "$loaded_ref" ] && [ "$loaded_ref" != "$image_ref" ]; then
+    echo "Retagging ${loaded_ref} -> ${image_ref}"
+    $SUDO docker tag "$loaded_ref" "$image_ref"
+  fi
+  if ! $SUDO docker image inspect "$image_ref" >/dev/null 2>&1; then
+    echo "Image ${image_ref} not present after load/retag" >&2
+    return 1
+  fi
   rm -f "$tarball"
   IMAGE_LOADED_FROM_TARBALL=1
   export IMAGE_LOADED_FROM_TARBALL

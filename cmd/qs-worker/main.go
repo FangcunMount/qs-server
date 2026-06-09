@@ -10,7 +10,6 @@ import (
 // @BasePath /api/v1
 // @schemes http https
 
-// 部署流程：cd.yml → ServerD runner → SSH(SVRD) → remote-deploy.sh。
 func main() {
 	worker.NewApp("qs-worker").Run()
 }
