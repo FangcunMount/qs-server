@@ -17,8 +17,18 @@ chmod 600 "$KEY_FILE"
 
 touch "$CONFIG"
 chmod 600 "$CONFIG"
-if ! grep -q "^Host ${RUNNER_SSH_ALIAS}$" "$CONFIG" 2>/dev/null; then
-  cat >>"$CONFIG" <<EOF
+
+# Always refresh Host block so stale HostName on the runner cannot pin the wrong server.
+if [ -f "$CONFIG" ]; then
+  awk -v host="$RUNNER_SSH_ALIAS" '
+    $0 ~ "^Host " host "$" { skip=1; next }
+    skip && /^Host / { skip=0 }
+    !skip { print }
+  ' "$CONFIG" >"${CONFIG}.tmp"
+  mv "${CONFIG}.tmp" "$CONFIG"
+fi
+
+cat >>"$CONFIG" <<EOF
 
 Host ${RUNNER_SSH_ALIAS}
   HostName ${RUNNER_SSH_HOST}
@@ -27,6 +37,15 @@ Host ${RUNNER_SSH_ALIAS}
   IdentityFile ${KEY_FILE}
   StrictHostKeyChecking accept-new
 EOF
-fi
 
-echo "SSH config ready for ${RUNNER_SSH_ALIAS} (${RUNNER_SSH_USER}@${RUNNER_SSH_HOST}:${RUNNER_SSH_PORT})"
+runner_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
+echo "=========================================="
+echo "CD SSH deploy connectivity"
+echo "Deploy runner local: hostname=$(hostname) primary_ip=${runner_ip:-unknown}"
+echo "Deploy target configured: ${RUNNER_SSH_USER}@${RUNNER_SSH_HOST}:${RUNNER_SSH_PORT} (alias=${RUNNER_SSH_ALIAS})"
+if command -v ssh >/dev/null 2>&1; then
+  ssh -G "${RUNNER_SSH_ALIAS}" 2>/dev/null | awk '/^(hostname|user|port) /{print "ssh -G resolved: "$0}' || true
+fi
+echo "Probing deploy target over SSH..."
+ssh "${RUNNER_SSH_ALIAS}" 'echo "Deploy target remote: hostname=$(hostname) primary_ip=$(hostname -I 2>/dev/null | awk "{print \$1}") user=$(whoami) pwd=$(pwd)"'
+echo "=========================================="

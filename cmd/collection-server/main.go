@@ -11,8 +11,8 @@ import (
 // @BasePath /api/v1
 // @schemes http https
 //
-// 生产发布（collection）：cd.yml 在 CI 通过后由 plan-services 纳入本服务；
-// ServerD runner 经 SSH 将镜像 tarball 推到 SVRB 并执行 remote-deploy.sh。
+// 生产发布（collection）：cd.yml → ServerD runner → SSH(SVRB) → remote-deploy.sh。
+// CD 日志会打印 deploy runner / target 的 hostname 与 primary_ip，用于核对是否打到 serverB。
 
 func main() {
 	collection.NewApp("collection-server").Run()

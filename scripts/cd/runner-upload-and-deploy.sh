@@ -25,8 +25,43 @@ for f in "$PACKAGE_FILE" "$IMAGE_FILE"; do
   fi
 done
 
+echo "=========================================="
+echo "CD upload+deploy: service=${SERVICE} image_tag=${IMAGE_TAG}"
+echo "SSH alias=${RUNNER_SSH_ALIAS}"
+if command -v ssh >/dev/null 2>&1; then
+  ssh -G "${RUNNER_SSH_ALIAS}" 2>/dev/null | awk '/^(hostname|user|port) /{print "ssh -G resolved: "$0}' || true
+fi
+echo "=========================================="
+
 echo "Uploading ${PACKAGE_FILE} and ${IMAGE_FILE} to ${RUNNER_SSH_ALIAS}..."
 scp "$PACKAGE_FILE" "$IMAGE_FILE" "${RUNNER_SSH_ALIAS}:/tmp/"
+
+LOCAL_BOOT="$(mktemp)"
+REMOTE_BOOT="/tmp/qs-cd-bootstrap-${SERVICE}-$$.sh"
+trap 'rm -f "$LOCAL_BOOT"' EXIT
+
+cat >"$LOCAL_BOOT" <<'BOOT'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+: "${SERVICE:?SERVICE is required}"
+: "${PKG_PATH:?PKG_PATH is required}"
+
+echo "=========================================="
+echo "CD bootstrap remote: service=${SERVICE} pkg=${PKG_PATH}"
+echo "Deploy host: hostname=$(hostname) primary_ip=$(hostname -I 2>/dev/null | awk '{print $1}') user=$(whoami)"
+echo "=========================================="
+
+BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
+mkdir -p "$BOOTSTRAP_TMP"
+trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
+tar -xzf "$PKG_PATH" -C "$BOOTSTRAP_TMP"
+bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
+BOOT
+chmod 700 "$LOCAL_BOOT"
+
+echo "Uploading bootstrap script to ${RUNNER_SSH_ALIAS}:${REMOTE_BOOT} ..."
+scp "$LOCAL_BOOT" "${RUNNER_SSH_ALIAS}:${REMOTE_BOOT}"
 
 echo "Running remote-deploy.sh on ${RUNNER_SSH_ALIAS}..."
 if ! ssh "${RUNNER_SSH_ALIAS}" env \
@@ -45,15 +80,10 @@ if ! ssh "${RUNNER_SSH_ALIAS}" env \
   WWW_GID="$WWW_GID" \
   WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
   PKG_PATH="$REMOTE_PACKAGE" \
-  bash -seuo pipefail <<'REMOTE'
-set -Eeuo pipefail
-BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
-mkdir -p "$BOOTSTRAP_TMP"
-trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
-tar -xzf "$PKG_PATH" -C "$BOOTSTRAP_TMP"
-bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
-REMOTE
+  bash "$REMOTE_BOOT"
 then
   echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS}" >&2
   exit 1
 fi
+
+ssh "${RUNNER_SSH_ALIAS}" rm -f "$REMOTE_BOOT" || true
