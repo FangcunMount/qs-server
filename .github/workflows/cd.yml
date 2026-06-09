@@ -278,6 +278,7 @@ jobs:
       - name: Upload and deploy apiserver
         env:
           RUNNER_SSH_ALIAS: deploy-target-apiserver
+          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
           SERVICE: apiserver
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -379,6 +380,7 @@ jobs:
       - name: Upload and deploy collection
         env:
           RUNNER_SSH_ALIAS: deploy-target-collection
+          RUNNER_SSH_HOST: ${{ vars.SVRB_HOST }}
           SERVICE: collection
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -495,6 +497,7 @@ jobs:
       - name: Upload and deploy worker
         env:
           RUNNER_SSH_ALIAS: deploy-target-worker
+          RUNNER_SSH_HOST: ${{ vars.SVRD_HOST }}
           SERVICE: worker
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}

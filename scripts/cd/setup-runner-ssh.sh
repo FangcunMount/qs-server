@@ -1,6 +1,11 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
 
+# shellcheck source=/dev/null
+SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source=/dev/null
+. "$SCRIPT_DIR/deploy-target.sh"
+
 : "${RUNNER_SSH_KEY:?RUNNER_SSH_KEY is required}"
 : "${RUNNER_SSH_HOST:?RUNNER_SSH_HOST is required}"
 : "${RUNNER_SSH_USER:?RUNNER_SSH_USER is required}"
@@ -18,7 +23,6 @@ chmod 600 "$KEY_FILE"
 touch "$CONFIG"
 chmod 600 "$CONFIG"
 
-# Always refresh Host block so stale HostName on the runner cannot pin the wrong server.
 if [ -f "$CONFIG" ]; then
   awk -v host="$RUNNER_SSH_ALIAS" '
     $0 ~ "^Host " host "$" { skip=1; next }
@@ -41,8 +45,15 @@ EOF
 runner_ip="$(hostname -I 2>/dev/null | awk '{print $1}' || true)"
 echo "=========================================="
 echo "CD SSH deploy connectivity"
-echo "Deploy runner local: hostname=$(hostname) primary_ip=${runner_ip:-unknown}"
+echo "Deploy runner local: hostname=$(hostname) tailscale_ip=$(tailscale ip -4 2>/dev/null || true) primary_ip=${runner_ip:-unknown}"
 echo "Deploy target configured: ${RUNNER_SSH_USER}@${RUNNER_SSH_HOST}:${RUNNER_SSH_PORT} (alias=${RUNNER_SSH_ALIAS})"
+
+if is_local_deploy_target "$RUNNER_SSH_HOST"; then
+  echo "Deploy target is local (${RUNNER_SSH_HOST}); SSH probe skipped."
+  echo "=========================================="
+  exit 0
+fi
+
 if command -v ssh >/dev/null 2>&1; then
   ssh -G "${RUNNER_SSH_ALIAS}" 2>/dev/null | awk '/^(hostname|user|port) /{print "ssh -G resolved: "$0}' || true
 fi

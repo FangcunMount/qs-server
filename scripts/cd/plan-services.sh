@@ -110,7 +110,7 @@ classify_path() {
     scripts/cd/plan-services.sh|scripts/cd/image-metadata.sh|scripts/cd/prepare-package.sh|scripts/cd/export-image.sh|scripts/cd/setup-runner-*.sh|scripts/cd/runner-dotenv.example)
       return 0
       ;;
-    scripts/cd/runner-upload-and-deploy.sh|scripts/cd/remote-deploy.sh)
+    scripts/cd/runner-upload-and-deploy.sh|scripts/cd/remote-deploy.sh|scripts/cd/deploy-target.sh|scripts/cd/setup-runner-ssh.sh)
       add_service all
       return 0
       ;;
