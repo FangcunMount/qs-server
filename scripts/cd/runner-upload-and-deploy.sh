@@ -42,9 +42,38 @@ echo "=========================================="
 LOCAL_BOOT="$(mktemp)"
 trap 'rm -f "$LOCAL_BOOT"' EXIT
 
-cat >"$LOCAL_BOOT" <<'BOOT'
-#!/usr/bin/env bash
-set -Eeuo pipefail
+# 把部署所需的环境变量用 printf %q 安全转义后，写进 bootstrap 脚本的 export 段。
+# 这样变量不会经过 ssh 命令行传递（inline `VAR=val ... bash file` 在含特殊字符
+# 的 secret 上会被远端 shell 截断，导致脚本被忽略、命令静默成功），从根本上避免
+# 部署"看似成功实则空跑"的问题。
+emit_export() {
+  # $1=变量名 $2=值；%q 保证任意字符（# ; 空格 引号等）都安全
+  printf 'export %s=%q\n' "$1" "$2" >>"$LOCAL_BOOT"
+}
+
+{
+  echo '#!/usr/bin/env bash'
+  echo 'set -Eeuo pipefail'
+  echo ''
+} >"$LOCAL_BOOT"
+
+emit_export SERVICE             "$SERVICE"
+emit_export IMAGE_TAG           "$IMAGE_TAG"
+emit_export DEPLOY_IMAGE_SOURCE "${DEPLOY_IMAGE_SOURCE:-tarball}"
+emit_export IMAGE_TARBALL       "$REMOTE_IMAGE"
+emit_export DOCKER_REGISTRY     "$DOCKER_REGISTRY"
+emit_export DOCKER_REPOSITORY   "$DOCKER_REPOSITORY"
+emit_export GHCR_USERNAME       "${GHCR_USERNAME:-}"
+emit_export GITHUB_TOKEN        "${GITHUB_TOKEN:-}"
+emit_export DOCKERHUB_USERNAME  "${DOCKERHUB_USERNAME:-}"
+emit_export DOCKERHUB_TOKEN     "${DOCKERHUB_TOKEN:-}"
+emit_export SUDO_PASSWORD       "${SUDO_PASSWORD:-}"
+emit_export WWW_UID             "$WWW_UID"
+emit_export WWW_GID             "$WWW_GID"
+emit_export WORKER_REPLICAS     "${WORKER_REPLICAS:-}"
+emit_export PKG_PATH            "$REMOTE_PACKAGE"
+
+cat >>"$LOCAL_BOOT" <<'BOOT'
 
 : "${SERVICE:?SERVICE is required}"
 : "${PKG_PATH:?PKG_PATH is required}"
@@ -60,34 +89,16 @@ trap 'rm -rf "$BOOTSTRAP_TMP"' EXIT
 tar -xzf "$PKG_PATH" -C "$BOOTSTRAP_TMP"
 bash "$BOOTSTRAP_TMP/scripts/cd/remote-deploy.sh"
 BOOT
-chmod 700 "$LOCAL_BOOT"
 
-run_bootstrap() {
-  local boot_script="$1"
-  SERVICE="$SERVICE" \
-  IMAGE_TAG="$IMAGE_TAG" \
-  DEPLOY_IMAGE_SOURCE="${DEPLOY_IMAGE_SOURCE:-tarball}" \
-  IMAGE_TARBALL="$REMOTE_IMAGE" \
-  DOCKER_REGISTRY="$DOCKER_REGISTRY" \
-  DOCKER_REPOSITORY="$DOCKER_REPOSITORY" \
-  GHCR_USERNAME="${GHCR_USERNAME:-}" \
-  GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
-  DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}" \
-  DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}" \
-  SUDO_PASSWORD="${SUDO_PASSWORD:-}" \
-  WWW_UID="$WWW_UID" \
-  WWW_GID="$WWW_GID" \
-  WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
-  PKG_PATH="$REMOTE_PACKAGE" \
-  bash "$boot_script"
-}
+# 脚本含 secret，限制权限
+chmod 600 "$LOCAL_BOOT"
 
 if is_local_deploy_target "$DEPLOY_HOST"; then
   echo "Deploy target is local (${DEPLOY_HOST}); skipping SSH/SCP and running bootstrap on this host."
   cp -f "$PACKAGE_FILE" "$REMOTE_PACKAGE"
   cp -f "$IMAGE_FILE" "$REMOTE_IMAGE"
   echo "Running remote-deploy.sh locally..."
-  if ! run_bootstrap "$LOCAL_BOOT"; then
+  if ! bash "$LOCAL_BOOT"; then
     echo "remote-deploy.sh failed on local host" >&2
     exit 1
   fi
@@ -100,28 +111,14 @@ scp "$PACKAGE_FILE" "$IMAGE_FILE" "${RUNNER_SSH_ALIAS}:/tmp/"
 REMOTE_BOOT="/tmp/qs-cd-bootstrap-${SERVICE}-$$.sh"
 echo "Uploading bootstrap script to ${RUNNER_SSH_ALIAS}:${REMOTE_BOOT} ..."
 scp "$LOCAL_BOOT" "${RUNNER_SSH_ALIAS}:${REMOTE_BOOT}"
+ssh "${RUNNER_SSH_ALIAS}" "chmod 600 ${REMOTE_BOOT}" || true
 
+# 远端只执行脚本本身，不在命令行 inline 任何变量（变量已写进脚本的 export 段）。
 echo "Running remote-deploy.sh on ${RUNNER_SSH_ALIAS}..."
-if ! ssh "${RUNNER_SSH_ALIAS}" \
-  SERVICE="$SERVICE" \
-  IMAGE_TAG="$IMAGE_TAG" \
-  DEPLOY_IMAGE_SOURCE="${DEPLOY_IMAGE_SOURCE:-tarball}" \
-  IMAGE_TARBALL="$REMOTE_IMAGE" \
-  DOCKER_REGISTRY="$DOCKER_REGISTRY" \
-  DOCKER_REPOSITORY="$DOCKER_REPOSITORY" \
-  GHCR_USERNAME="${GHCR_USERNAME:-}" \
-  GITHUB_TOKEN="${GITHUB_TOKEN:-}" \
-  DOCKERHUB_USERNAME="${DOCKERHUB_USERNAME:-}" \
-  DOCKERHUB_TOKEN="${DOCKERHUB_TOKEN:-}" \
-  SUDO_PASSWORD="${SUDO_PASSWORD:-}" \
-  WWW_UID="$WWW_UID" \
-  WWW_GID="$WWW_GID" \
-  WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
-  PKG_PATH="$REMOTE_PACKAGE" \
-  bash "$REMOTE_BOOT"
-then
-  echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS}" >&2
-  exit 1
+rc=0
+ssh "${RUNNER_SSH_ALIAS}" "bash ${REMOTE_BOOT}" || rc=$?
+ssh "${RUNNER_SSH_ALIAS}" "rm -f ${REMOTE_BOOT}" || true
+if [ "$rc" -ne 0 ]; then
+  echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS} (exit ${rc})" >&2
+  exit "$rc"
 fi
-
-ssh "${RUNNER_SSH_ALIAS}" rm -f "$REMOTE_BOOT" || true
