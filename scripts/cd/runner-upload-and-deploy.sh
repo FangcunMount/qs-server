@@ -105,8 +105,27 @@ if is_local_deploy_target "$DEPLOY_HOST"; then
   exit 0
 fi
 
+# scp 经 Tailscale 传大文件可能被截断（曾出现 docker load "unexpected EOF"），
+# 上传后用 gzip -t 校验远端文件完整性，损坏则重试，彻底失败则报错退出。
+upload_and_verify() {
+  local local_file="$1" remote_path="$2" attempts="${3:-3}" i
+  for ((i = 1; i <= attempts; i++)); do
+    echo "Uploading $(basename "$local_file") -> ${RUNNER_SSH_ALIAS}:${remote_path} (attempt ${i}/${attempts})..."
+    if scp "$local_file" "${RUNNER_SSH_ALIAS}:${remote_path}" \
+      && ssh "${RUNNER_SSH_ALIAS}" "gzip -t ${remote_path}"; then
+      echo "Verified ${remote_path} integrity (gzip -t ok)"
+      return 0
+    fi
+    echo "Upload/verify failed for ${remote_path} (attempt ${i}); retrying..." >&2
+    sleep 3
+  done
+  echo "Failed to upload intact $(basename "$local_file") to ${RUNNER_SSH_ALIAS} after ${attempts} attempts" >&2
+  return 1
+}
+
 echo "Uploading ${PACKAGE_FILE} and ${IMAGE_FILE} to ${RUNNER_SSH_ALIAS}..."
-scp "$PACKAGE_FILE" "$IMAGE_FILE" "${RUNNER_SSH_ALIAS}:/tmp/"
+upload_and_verify "$IMAGE_FILE" "$REMOTE_IMAGE"
+upload_and_verify "$PACKAGE_FILE" "$REMOTE_PACKAGE"
 
 REMOTE_BOOT="/tmp/qs-cd-bootstrap-${SERVICE}-$$.sh"
 echo "Uploading bootstrap script to ${RUNNER_SSH_ALIAS}:${REMOTE_BOOT} ..."

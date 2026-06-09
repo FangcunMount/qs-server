@@ -343,6 +343,15 @@ docker_compose() {
   $SUDO docker compose --env-file "$COMPOSE_ENV_FILE" "$@"
 }
 
+# 镜像要么已通过 tarball docker load，要么已由 docker_compose_pull 提前拉好，
+# compose up 不应再回源拉取（否则会因 ghcr 无凭据而 "error from registry: denied"）。
+# 老版本 compose 不支持 --pull 时返回空，保持兼容。
+compose_up_pull_never_flag() {
+  if $SUDO docker compose up --help 2>/dev/null | grep -q -- '--pull'; then
+    printf '%s' '--pull never'
+  fi
+}
+
 resolve_compose_image_ref() {
   if [ -z "${COMPOSE_ENV_FILE:-}" ] || [ ! -f "$COMPOSE_ENV_FILE" ]; then
     echo "COMPOSE_ENV_FILE is not ready before resolving compose image" >&2
@@ -389,7 +398,8 @@ deploy_http_service() {
   docker_compose_pull -f "$DEPLOY_TMP/docker-compose.prod.yml"
 
   stop_single_container
-  docker_compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d "$COMPOSE_SERVICE"
+  # shellcheck disable=SC2046
+  docker_compose -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d $(compose_up_pull_never_flag) "$COMPOSE_SERVICE"
 
   echo "Waiting for service to be ready (in-container health check)..."
   local attempts=0
@@ -433,7 +443,8 @@ deploy_worker() {
     done
   fi
 
-  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
+  # shellcheck disable=SC2046
+  docker_compose -p qs-worker -f "$DEPLOY_TMP/docker-compose.prod.yml" up -d $(compose_up_pull_never_flag) --scale "${COMPOSE_SERVICE}=${WORKER_REPLICAS}" "$COMPOSE_SERVICE"
 
   echo "Waiting for container to start..."
   sleep 10
