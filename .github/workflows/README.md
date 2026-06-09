@@ -26,7 +26,7 @@
 | serverB | 2C/2G | IAM（`iam-apiserver`） |
 | serverD | 4C/4G | qs-worker |
 
-`deploy-collection` 与 `deploy-apiserver` 均 SSH 到 `SVRA_*`；`IAM_GRPC_HOST` 取 `SVRB_HOST`（Tailscale），写入 compose `extra_hosts` 解析 `iam-apiserver`。
+`deploy-collection` 与 `deploy-apiserver` 均 SSH 到 `SVRA_*`；访问 serverB 上的 `iam-apiserver:9090` 依赖 Swarm overlay `infra-network` 跨机 DNS，**不要** `extra_hosts` 到宿主机 Tailscale IP（serverB 宿主机 9090 常被 mihomo 占用）。
 
 CD 本地入口：
 

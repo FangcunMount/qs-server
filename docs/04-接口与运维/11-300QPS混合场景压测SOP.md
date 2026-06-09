@@ -1,6 +1,6 @@
 # 300 QPS 混合场景压测 SOP
 
-**本文回答**：如何用 k6 / ghz 对 qs-server 三进程架构做 300 QPS 混合压测，覆盖 collection-server 前台入口、qs-apiserver 权威业务状态和 qs-worker 异步解析链路，并记录 HTTP、gRPC、异步链路和资源指标。
+**本文回答**：如何在当前生产拓扑下，用 k6 对 qs-server 做分档混合压测（smoke → pretest_60 → pretest_120 → mixed_300），如何准备 token/数据、如何观测、以及我们实际踩过的故障如何快速定位。
 
 ---
 
@@ -8,521 +8,381 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 压测入口 | k6 压 HTTP 混合场景；ghz 压 gRPC 等价链路 |
-| 三进程覆盖 | collection 负责前台查询、提交、状态查询；apiserver 负责统计、持久化、事件 outbox；worker 负责 MQ 消费和 internal gRPC 回调 |
-| 默认配比 | 问卷/测评配置查询 120 QPS，答卷提交 60 QPS，报告状态查询 90 QPS，统计查询 30 QPS |
-| 异步观测 | worker `/metrics` 的 `qs_event_consume_*`，apiserver/worker event outbox 指标，NSQ depth |
-| 结果口径 | 具体 P95、P99、错误率、worker 消费速率和积压清空耗时必须以实测结果填写 |
+| 压测入口 | k6 打公网域名 `collect.fangcunmount.cn` + `qs.fangcunmount.cn` |
+| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_300`，每档通过再升 |
+| 配置入口 | `tmp/perf/qs-perf.config.json`（从 `scripts/perf/qs-perf.config.example.json` 复制） |
+| 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
+| 最常见假 5xx | **Nginx `limit_conn` 503**（耗时 0.000s，请求未到应用） |
+| 历史瓶颈 | 跨机 collection → 502；token 过期 → 401；conn_limit 不足 → 503 |
+| 当前拓扑 | serverA（nginx + apiserver + collection）；serverB（IAM）；serverD（worker） |
 
 ---
 
-## 1. 场景配比
+## 1. 生产拓扑与压测链路
 
-| 场景 | QPS | 说明 |
-| ---- | ---: | ---- |
-| 问卷/测评配置查询 | 120 | 模拟进入问卷页和加载配置 |
-| 答卷提交 | 60 | 写链路，触发 SubmitQueue、apiserver durable submit、Outbox、MQ、worker |
-| 报告状态查询 | 90 | 模拟提交后前端轮询 `wait-report` |
-| 统计查询 | 30 | 模拟后台运营和筛查进度查询 |
-| 合计 | 300 | 混合读写压力 |
-
----
-
-## 2. 前置数据
-
-`seeddata-runner` 当前线上配置可以直接作为压测数据口径：
-
-| 字段 | 值 |
-| ---- | ---- |
-| `COLLECTION_BASE_URL` | `https://collect.fangcunmount.cn` |
-| `APISERVER_BASE_URL` | `https://qs.fangcunmount.cn` |
-| `IAM_BASE_URL` | `https://iam.fangcunmount.cn` |
-| `ORG_ID` | `1` |
-| `SCALE_CODES` | `3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35` |
-| `PLAN_IDS` | `614333603412718126,614187067651404334` |
-| `TESTEE_SOURCE` | `daily_simulation` |
-
-压测前至少准备：
-
-| 数据 | 用途 | k6/ghz 环境变量 |
-| ---- | ---- | ---- |
-| 用户 token | collection 和 apiserver 认证 | `TOKEN`，或分别传 `COLLECTION_TOKEN` / `APISERVER_TOKEN` |
-| 多用户 token | 避免单用户限流影响吞吐测试 | `COLLECTION_TOKENS` / `APISERVER_TOKENS`，英文逗号分隔 |
-| 多用户 token 文件 | 避免命令行过长和 token 泄漏 | `TOKENS_FILE`，必要时再拆 `COLLECTION_TOKENS_FILE` / `APISERVER_TOKENS_FILE` |
-| k6 配置文件 | 集中维护压测参数 | `PERF_CONFIG_FILE` |
-| 量表 code | 自动发现问卷并生成答案 | `SCALE_CODES` |
-| 可访问 testee_id | 答卷提交和报告状态查询 | `TESTEE_IDS`，或 `AUTO_DISCOVER_SEEDDATA=true` |
-| 已存在 assessment_id | 报告状态查询样本 | `ASSESSMENT_IDS` / `REPORT_SAMPLES_FILE`，或 `AUTO_DISCOVER_SEEDDATA=true` |
-| 答案 payload | 可选，覆盖自动答案生成 | `ANSWERS_JSON` 或 `ANSWERS_FILE` |
-| gRPC mTLS 证书 | ghz 直连 apiserver | `GRPC_CACERT` / `GRPC_CERT` / `GRPC_KEY` |
-
-如果本机没有现成 token，可以用 IAM 凭据换取。`seeddata-runner/configs/seeddata.yaml` 里用户名和密码为空，线上通常由 systemd `Environment` 或 `EnvironmentFile` 注入；先从服务器确认 `IAM_USERNAME` / `IAM_PASSWORD`，不要提交到仓库：
-
-```bash
-export IAM_USERNAME='...'
-export IAM_PASSWORD='...'
-export TOKEN="$(./scripts/perf/fetch-iam-token.sh)"
-test -n "$TOKEN"
+```text
+压测机(k6)
+  → collect.fangcunmount.cn ─┐
+  → qs.fangcunmount.cn     ─┤→ serverA: Nginx
+                             │     ├─ qs-collection-server:8080（同机 Docker 网）
+                             │     └─ qs-apiserver:8080/9090
+                             │
+serverD: qs-worker ──gRPC──→ qs-apiserver:9090（异步 MQ 链路，一般不直接导致 wait-report 502）
+serverB: iam-apiserver（IAM gRPC，overlay IP 如 172.20.0.28）
 ```
 
-k6 会在 `DISCOVER_ANSWERS=true` 时按 `SCALE_CODES` 拉取 `/api/v1/scales/{code}` 和 `/api/v1/questionnaires/{code}`，并按 seeddata-runner 的口径生成 `Radio` / `Checkbox` / `Text` / `Textarea` / `Number` 答案。`Section` 题会跳过。
+A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **Docker DNS** 解析到 overlay 地址。**禁止** `extra_hosts` 把 `iam-apiserver` 指到 serverB 宿主机 Tailscale IP——serverB 宿主机 **9090 常被 mihomo 占用**，会导致 IAM mTLS 报 `first record does not look like a TLS handshake`。
 
-推荐使用配置文件集中维护 k6 参数，环境变量仍然优先于配置文件：
+| 节点 | 规格（2026-06） | 组件 | 压测相关性 |
+| ---- | --------------- | ---- | ---------- |
+| serverA | 4C/8G | nginx、qs-apiserver（2C/3G）、qs-collection-server（1.5C/2G） | **HTTP 同步链路主战场** |
+| serverB | 2C/2G | IAM | JWKS / gRPC；非 HTTP 压测主瓶颈 |
+| serverD | 4C/4G | qs-worker | 异步消费；`pretest_*` 阶段通常不是 HTTP 5xx 主因 |
+
+压测从**公网**打入，client IP 为压测机公网地址（曾用 `61.49.247.106`）。Nginx 在 serverA 统一入口，**应用容器日志无 5xx 但 k6 有 5xx 时，优先查 Nginx access/error**。
+
+---
+
+## 2. 场景配比与档位
+
+### 2.1 mixed_300 目标配比
+
+| 场景 | QPS | 接口 |
+| ---- | ---: | ---- |
+| 问卷/测评配置查询 | 120 | collection `GET /api/v1/scales*`、`/questionnaires/*` |
+| 答卷提交 | 60 | collection `POST /api/v1/answersheets` |
+| 报告状态查询 | 90 | collection `GET .../wait-report` |
+| 统计查询 | 30 | apiserver `GET /api/v1/statistics/*` |
+| **合计** | **300** | |
+
+### 2.2 内置 `QPS_PROFILE`
+
+| 档位 | 总 QPS | 配比（query/submit/report/stats） | 时长 | 用途 |
+| ---- | ---: | -------------------------------- | ---- | ---- |
+| `smoke_4` | 4 | 1/1/1/1 | 30s | 连通性、setup 自动发现 |
+| `pretest_60` | 60 | 24/12/18/6 | 3m | **第一档正式预压** |
+| `pretest_120` | 120 | 48/24/36/12 | 5m | 观察限流与资源曲线 |
+| `mixed_300` | 300 | 120/60/90/30 | 10m | 目标混合压测 |
+| `mixed_300_probe` | 300+0.2 | 同上 + chainProbe | 10m | 采样 `report_generated_latency` |
+
+**原则**：上一档 `http_req_failed < 1%`、无明显 503/502 尖刺后再升档。`pretest_60` 曾出现 p90 ~5s 但 0 失败，可接受；`pretest_120` 在跨机 collection 时大量 502/30s 超时，迁回 serverA 后应复测。
+
+---
+
+## 3. 一次性准备
+
+### 3.1 配置文件
 
 ```bash
 mkdir -p tmp/perf
 cp scripts/perf/qs-perf.config.example.json tmp/perf/qs-perf.config.json
 ```
 
-如果已经有旧版 `tmp/perf/qs-perf.config.json`，不要直接覆盖其中的真实 URL/token 文件配置；只需要把示例配置里的 `qpsProfile` 和 `qpsProfiles` 合并进去。
+已有 `tmp/perf/qs-perf.config.json` 时**不要覆盖**其中的 URL/token 路径；只合并示例里新增的 `qpsProfiles` 字段。
 
-然后编辑 `tmp/perf/qs-perf.config.json`。常用字段：
+常用字段见 `scripts/perf/qs-perf.config.example.json`：`collectionBaseUrl`、`apiserverBaseUrl`、`tokensFile`、`qpsProfile`、`scaleCodes`、`planIds`、`autoDiscoverSeeddata` 等。相对路径按配置文件所在目录解析。
 
-| 字段 | 说明 |
+### 3.2 seeddata 数据口径
+
+与线上一致（`seeddata-runner`）：
+
+| 字段 | 值 |
 | ---- | ---- |
-| `collectionBaseUrl` / `apiserverBaseUrl` | 线上或压测环境入口 |
-| `tokensFile` | 公共批量 token 输出文件 |
-| `collectionTokensFile` / `apiserverTokensFile` | 可选，collection/apiserver 权限不同才拆开 |
-| `qpsProfile` | 默认压测档位，不传 `QPS_PROFILE` 时使用 |
-| `qpsProfiles.*.qps` | 各档位的四类场景 QPS |
-| `qpsProfiles.*.duration` | 各档位的压测持续时间 |
-| `qpsProfiles.*.vusers` | 各档位的 k6 VU 预分配和上限 |
-| `scaleCodes` / `planIds` / `testeeSource` | seeddata 数据口径 |
-| `autoDiscoverSeeddata` / `discoverAnswers` | 是否自动找 testee/assessment 和生成答案 |
-| `paths.*` | 接口路径覆盖 |
+| `COLLECTION_BASE_URL` | `https://collect.fangcunmount.cn` |
+| `APISERVER_BASE_URL` | `https://qs.fangcunmount.cn` |
+| `ORG_ID` | `1` |
+| `SCALE_CODES` | `3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35` |
+| `PLAN_IDS` | `614333603412718126,614187067651404334` |
+| `TESTEE_SOURCE` | `daily_simulation` |
 
-文件类字段支持绝对路径；如果写相对路径，会优先按配置文件所在目录解析。例如配置文件在 `tmp/perf/qs-perf.config.json`，`tokensFile: "tokens.json"` 会读取 `tmp/perf/tokens.json`。
+### 3.3 多用户 token（必做）
 
-内置档位：
-
-| `QPS_PROFILE` | 总 QPS | 配比 | 用途 |
-| ---- | ---: | ---- | ---- |
-| `smoke_4` | 4 | 1 / 1 / 1 / 1 | 全链路连通性 smoke |
-| `pretest_60` | 60 | 24 / 12 / 18 / 6 | 预压测，默认档位 |
-| `pretest_120` | 120 | 48 / 24 / 36 / 12 | 中间档，观察限流和资源曲线 |
-| `mixed_300` | 300 | 120 / 60 / 90 / 30 | 正式 300 QPS 混合压测 |
-| `mixed_300_probe` | 300 + 0.2 | 300 QPS + 异步链路探针 | 采样 `report_generated_latency` |
-
-使用配置文件和指定档位运行：
-
-```bash
-k6 run -e PERF_CONFIG_FILE="$(pwd)/tmp/perf/qs-perf.config.json" \
-  -e QPS_PROFILE=pretest_60 \
-  --summary-export tmp/perf/300qps/k6-summary.json \
-  scripts/perf/k6-mixed-300qps.js
-```
-
-优先级：命令行环境变量 > `QPS_PROFILE` 档位配置 > 根配置 > 脚本默认值。因此临时调整仍可直接传 `-e QUERY_RPS=10 -e DURATION=1m`。
-
-注意限流口径：collection 默认单用户限流为 `submit=5 QPS`、`query=10 QPS`、`wait-report=2 QPS`，默认全局 `wait-report=80 QPS`。如果正式场景要打 `wait-report=90 QPS`，需要满足至少一项：
-
-- 压测环境临时调高 `rate_limit.wait_report_global_qps` 到大于 90，例如 120。
-- 准备足够多的 `COLLECTION_TOKENS`，按默认 `wait-report=2 QPS/user` 计算，90 QPS 至少 45 个前台测试用户 token；考虑抖动建议 60 个以上。
-- 如果本轮只验证服务端非限流吞吐，可以临时降低 `REPORT_RPS` 到 80 以下，并记录结论口径。
-
-多 token 传法：
-
-```bash
-export COLLECTION_TOKENS='token1,token2,token3'
-export APISERVER_TOKENS='admin-token1,admin-token2'
-```
-
-更推荐使用本地凭据文件批量换 token。凭据文件不要提交到 Git，可参考 `scripts/perf/iam-users.example.json`，复制到 `tmp/perf/`：
+collection 默认单用户限流：`submit=5`、`query=10`、`wait-report=2` QPS。要打 `report=90` QPS，至少 **45 个 collection token**（建议 **60+**）。
 
 ```bash
 cp scripts/perf/iam-users.example.json tmp/perf/iam-users.json
-```
+# 编辑凭据，勿提交 Git
 
-编辑 `tmp/perf/iam-users.json`。如果当前测试账号同时能访问 collection 和 apiserver，把用户都放在 `collection_users` 即可，生成一个公共 `tokens.json`：
-
-```json
-{
-  "collection_users": [
-    { "username": "collection-user-1", "password": "...", "tenant_id": 1 }
-  ],
-  "apiserver_users": []
-}
-```
-
-然后换 token 到临时文件：
-
-```bash
 IAM_USERS_FILE=tmp/perf/iam-users.json \
 IAM_USERS_GROUP=collection_users \
 TOKENS_OUTPUT_FILE=tmp/perf/tokens.json \
 ./scripts/perf/fetch-iam-tokens.sh
 ```
 
-`collection_users` 默认按 seeddata-runner 的 daily simulation 登录口径省略 `tenant_id`；如果要先验证 1 个账号，可以加 `IAM_USERS_LIMIT=1`：
+collection 与 apiserver 权限不同时，分别生成 `collection-tokens.json` / `apiserver-tokens.json`，在配置里设 `collectionTokensFile` / `apiserverTokensFile`。
 
-```bash
-IAM_USERS_FILE=tmp/perf/iam-users.json \
-IAM_USERS_GROUP=collection_users \
-IAM_USERS_LIMIT=1 \
-TOKENS_OUTPUT_FILE=tmp/perf/token-smoke.json \
-./scripts/perf/fetch-iam-tokens.sh
-```
+若 setup 报 `http_403` + `No testee IDs found`，说明公共 token 无 apiserver 发现权限，需单独换 `apiserver_users` token。
 
-如果 collection 和 apiserver 需要不同权限账号，再分别使用 `collection_users` / `apiserver_users` 生成 `collection-tokens.json` / `apiserver-tokens.json`，并在配置中使用 `collectionTokensFile` / `apiserverTokensFile`。
+### 3.4 Token preflight（每次 k6 前）
 
-如果 smoke 在 `setup()` 阶段出现 `setup_discovery_failed` + `http_403_total`，并报 `No testee IDs found`，通常说明公共 `tokens.json` 里的 collection 用户没有 apiserver 自动发现权限。此时生成 apiserver 专用 token：
-
-```bash
-IAM_USERS_FILE=tmp/perf/iam-users.json \
-IAM_USERS_GROUP=apiserver_users \
-TOKENS_OUTPUT_FILE=tmp/perf/apiserver-tokens.json \
-./scripts/perf/fetch-iam-tokens.sh
-```
-
-并在 `tmp/perf/qs-perf.config.json` 增加：
-
-```json
-"apiserverTokensFile": "apiserver-tokens.json"
-```
-
-k6 使用 token 文件：
-
-```bash
-export TOKENS_FILE=tmp/perf/tokens.json
-```
-
-每次运行 k6 前先做 token preflight。它只输出 token 数量、剩余 TTL 和 HTTP 状态码，不打印 token 明文：
+IAM access token TTL 短；**换完 token 立刻跑**，不要隔几小时再用同一文件。
 
 ```bash
 PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
 ./scripts/perf/check-token-preflight.sh
 ```
 
-只有 `collection scale ...: 200`、`apiserver testees: 200`，且 `min_ttl_seconds` 大于本轮压测持续时间时，再开始 k6。IAM access token TTL 较短，正式 `mixed_300` 是 10 分钟，必须刚生成完 token 就跑。
+通过标准：
 
-`ANSWERS_FILE` 可以是单个对象或数组：
+- `expired=0`
+- `collection scale ...: 200`、`apiserver testees: 200`（或你配置的 limit）
+- `min_ttl_seconds` **大于本轮压测时长**（`mixed_300` 为 10 分钟，建议 TTL > 15 分钟）
 
-```json
-[
-  {
-    "questionnaire_code": "kTC43z",
-    "questionnaire_version": "3.0.1",
-    "testee_id": "601002327771460142",
-    "answers": [
-      { "question_code": "1o8TK1yK", "question_type": "Radio", "value": "g1B0fi9d" }
-    ]
-  }
-]
-```
-
-`REPORT_SAMPLES_FILE` 格式：
-
-```json
-[
-  { "assessment_id": "601002327771460143", "testee_id": "601002327771460142" }
-]
-```
+首次 `pretest_60` 若 `expired=99/101`，会得到约 **7% 401**，与网关无关，刷新 token 即可。
 
 ---
 
-## 3. k6 HTTP 混合压测
+## 4. 压测前检查清单
 
-只读连通性 smoke，不需要 token，只打 collection 公开量表接口：
+| # | 检查项 | 命令/方法 |
+| - | ------ | --------- |
+| 1 | token 新鲜且 preflight 通过 | `check-token-preflight.sh` |
+| 2 | Nginx 对压测 IP 放宽连接数 | 见 [§7 Nginx 专项](#7-nginx-专项) |
+| 3 | collection 在 serverA 运行 | `docker ps` 见 `qs-collection-server`；Nginx upstream `qs-collection-server:8080` |
+| 4 | 压测机公网 IP 已知 | 用于 Nginx `http-conn-limit.conf` 白名单 |
+| 5 | （可选）metrics 隧道 | Mac 上 SSH 隧道采 snapshot，见 [§6](#6-观测采样) |
+
+---
+
+## 5. 执行命令
+
+### 5.1 标准升档流程
+
+```bash
+cd /path/to/qs-server
+export PERF_CONFIG=tmp/perf/qs-perf.config.json
+
+# 0. 换 token + preflight（§3.3、§3.4）
+
+# 1. smoke
+k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=smoke_4 \
+  scripts/perf/k6-mixed-300qps.js
+
+# 2. pretest_60
+mkdir -p tmp/perf/pretest60
+k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=pretest_60 \
+  --summary-export tmp/perf/pretest60/k6-summary.json \
+  scripts/perf/k6-mixed-300qps.js
+
+# 3. pretest_120
+mkdir -p tmp/perf/pretest120
+k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=pretest_120 \
+  --summary-export tmp/perf/pretest120/k6-summary.json \
+  scripts/perf/k6-mixed-300qps.js
+
+# 4. mixed_300
+mkdir -p tmp/perf/300qps
+OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh before
+k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=mixed_300 \
+  --summary-export tmp/perf/300qps/k6-summary.json \
+  scripts/perf/k6-mixed-300qps.js
+OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
+```
+
+优先级：**命令行 `-e` > `QPS_PROFILE` 档位 > 根配置 > 脚本默认**。
+
+### 5.2 只读 smoke（无需 token）
 
 ```bash
 COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
-QUERY_RPS=1 \
-SUBMIT_RPS=0 \
-REPORT_RPS=0 \
-STATS_RPS=0 \
-DURATION=5s \
-QUESTIONNAIRE_QUERY_PATHS='/api/v1/scales?page=1&page_size=20&status=published,/api/v1/scales/categories,/api/v1/scales/hot?limit=5' \
+QUERY_RPS=1 SUBMIT_RPS=0 REPORT_RPS=0 STATS_RPS=0 DURATION=5s \
+QUESTIONNAIRE_QUERY_PATHS='/api/v1/scales?page=1&page_size=20&status=published' \
 k6 run scripts/perf/k6-mixed-300qps.js
 ```
 
-小流量全链路 smoke，使用 seeddata 数据自动发现 testee/assessment 并自动生成答案：
+### 5.3 严格阈值（可选）
 
 ```bash
-TOKEN="$TOKEN" \
-COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
-APISERVER_BASE_URL=https://qs.fangcunmount.cn \
-ORG_ID=1 \
-SCALE_CODES=3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35 \
-PLAN_IDS=614333603412718126,614187067651404334 \
-TESTEE_SOURCE=daily_simulation \
-AUTO_DISCOVER_SEEDDATA=true \
-QUERY_RPS=1 \
-SUBMIT_RPS=1 \
-REPORT_RPS=1 \
-STATS_RPS=1 \
-DURATION=30s \
-k6 run --summary-export tmp/perf/k6-smoke-summary.json scripts/perf/k6-mixed-300qps.js
-```
-
-如果已经使用 token 文件，小流量 smoke 可以改为：
-
-```bash
-TOKENS_FILE=tmp/perf/tokens.json \
-COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
-APISERVER_BASE_URL=https://qs.fangcunmount.cn \
-ORG_ID=1 \
-SCALE_CODES=3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35 \
-PLAN_IDS=614333603412718126,614187067651404334 \
-TESTEE_SOURCE=daily_simulation \
-AUTO_DISCOVER_SEEDDATA=true \
-QUERY_RPS=1 \
-SUBMIT_RPS=1 \
-REPORT_RPS=1 \
-STATS_RPS=1 \
-DURATION=30s \
-k6 run --summary-export tmp/perf/k6-smoke-summary.json scripts/perf/k6-mixed-300qps.js
-```
-
-正式 300 QPS：
-
-```bash
-mkdir -p tmp/perf/300qps
-
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh before
-
-TOKEN="$TOKEN" \
-COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
-APISERVER_BASE_URL=https://qs.fangcunmount.cn \
-ORG_ID=1 \
-SCALE_CODES=3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35 \
-PLAN_IDS=614333603412718126,614187067651404334 \
-TESTEE_SOURCE=daily_simulation \
-AUTO_DISCOVER_SEEDDATA=true \
-QUERY_RPS=120 \
-SUBMIT_RPS=60 \
-REPORT_RPS=90 \
-STATS_RPS=30 \
-DURATION=10m \
-k6 run --summary-export tmp/perf/300qps/k6-summary.json scripts/perf/k6-mixed-300qps.js
-
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
-```
-
-使用 token 文件时，正式 300 QPS 命令改为：
-
-```bash
-TOKENS_FILE=tmp/perf/tokens.json \
-COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
-APISERVER_BASE_URL=https://qs.fangcunmount.cn \
-ORG_ID=1 \
-SCALE_CODES=3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35 \
-PLAN_IDS=614333603412718126,614187067651404334 \
-TESTEE_SOURCE=daily_simulation \
-AUTO_DISCOVER_SEEDDATA=true \
-QUERY_RPS=120 \
-SUBMIT_RPS=60 \
-REPORT_RPS=90 \
-STATS_RPS=30 \
-DURATION=10m \
-k6 run --summary-export tmp/perf/300qps/k6-summary.json scripts/perf/k6-mixed-300qps.js
-```
-
-如果已经把这些值写入 `tmp/perf/qs-perf.config.json`，命令可以简化为：
-
-```bash
-k6 run -e PERF_CONFIG_FILE="$(pwd)/tmp/perf/qs-perf.config.json" \
-  -e QPS_PROFILE=mixed_300 \
-  --summary-export tmp/perf/300qps/k6-summary.json \
-  scripts/perf/k6-mixed-300qps.js
-```
-
-如果预压阶段出现失败，优先查看 k6 输出中的这些计数：
-
-- `http_429_total`：限流，先检查 token 数量和服务端限流配置。
-- `http_401_total` / `http_403_total`：token 失效或权限不匹配。
-- `http_5xx_total`：服务端错误，再看服务日志、慢 SQL、worker/MQ 积压。
-- `questionnaire_query_failed` / `answer_submit_failed` / `report_status_failed` / `statistics_failed`：定位失败集中在哪类场景。
-
-可选严格阈值：
-
-```bash
-STRICT_THRESHOLDS=true k6 run scripts/perf/k6-mixed-300qps.js
-```
-
-说明：
-
-- `report_status_query` 默认打 collection `/api/v1/assessments/{assessment_id}/wait-report`。
-- 如果样本 assessment 不是终态，`wait-report` 会长轮询到 `REPORT_TIMEOUT`，P95 会反映等待时间，不应直接当作接口慢查询。
-- `CHAIN_PROBE_RPS` 默认 0。需要采样 `report.generated` 端到端延迟时，可另起小流量探针，例如 `CHAIN_PROBE_RPS=0.2`，它会提交答卷、轮询 submit-status、查 assessment、等待报告终态，并输出 `report_generated_latency`。
-
----
-
-## 4. ghz gRPC 压测
-
-`scripts/perf/ghz-qs-grpc.sh` 支持以下 case：
-
-| CASE | 链路 | RPC |
-| ---- | ---- | ---- |
-| `collection-submit` | collection -> apiserver submit 等价链路 | `answersheet.AnswerSheetService.SaveAnswerSheet` |
-| `worker-score` | worker -> apiserver internal gRPC | `internalapi.InternalService.CalculateAnswerSheetScore` |
-| `worker-create-assessment` | worker -> apiserver internal gRPC | `internalapi.InternalService.CreateAssessmentFromAnswerSheet` |
-| `worker-evaluate` | worker -> apiserver internal gRPC | `internalapi.InternalService.EvaluateAssessment` |
-| `worker-attention` | worker -> apiserver internal gRPC | `internalapi.InternalService.SyncAssessmentAttention` |
-
-collection submit 等价压测。默认 dev/prod gRPC 配置是 TLS/mTLS，按实际证书路径传 `GRPC_CACERT`、`GRPC_CERT`、`GRPC_KEY`；只有临时将 apiserver gRPC 改成 plaintext 时，才使用 `GRPC_PLAINTEXT=true`。
-
-```bash
-CASE=collection-submit \
-GRPC_TARGET=127.0.0.1:9090 \
-RPS=60 \
-DURATION=300s \
-CONCURRENCY=60 \
-QUESTIONNAIRE_CODE=kTC43z \
-QUESTIONNAIRE_VERSION=3.0.1 \
-TESTEE_ID=601002327771460142 \
-WRITER_ID=601002327771460142 \
-ORG_ID=1 \
-ANSWERS_JSON='[{"question_code":"1o8TK1yK","question_type":"Radio","value":"g1B0fi9d"}]' \
-GRPC_CACERT=/data/infra/ssl/grpc/ca/ca-chain.crt \
-GRPC_CERT=/data/infra/ssl/grpc/server/qs-collection-server.crt \
-GRPC_KEY=/data/infra/ssl/grpc/server/qs-collection-server.key \
-GRPC_CNAME=qs-apiserver \
-FORMAT=json \
-OUTPUT=tmp/perf/ghz-collection-submit.json \
-scripts/perf/ghz-qs-grpc.sh
-```
-
-worker internal gRPC 示例：
-
-```bash
-CASE=worker-evaluate \
-GRPC_TARGET=127.0.0.1:9090 \
-RPS=60 \
-DURATION=300s \
-CONCURRENCY=60 \
-ASSESSMENT_ID=601002327771460143 \
-GRPC_CACERT=/data/infra/ssl/grpc/ca/ca-chain.crt \
-GRPC_CERT=/data/infra/ssl/grpc/server/qs-worker.crt \
-GRPC_KEY=/data/infra/ssl/grpc/server/qs-worker.key \
-GRPC_CNAME=qs-apiserver \
-FORMAT=json \
-OUTPUT=tmp/perf/ghz-worker-evaluate.json \
-scripts/perf/ghz-qs-grpc.sh
-```
-
-plaintext 环境才传：
-
-```bash
-GRPC_PLAINTEXT=true
-```
-
-需要 metadata 时传 `GHZ_METADATA_JSON`：
-
-```bash
-GHZ_METADATA_JSON='{"authorization":"Bearer xxx"}'
+STRICT_THRESHOLDS=true k6 run -e PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
+  -e QPS_PROFILE=pretest_60 scripts/perf/k6-mixed-300qps.js
 ```
 
 ---
 
-## 5. 观测采样
+## 6. 观测采样
 
-压测前后各采一次：
+### 6.1 脚本 snapshot
 
 ```bash
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh before
-k6 run --summary-export tmp/perf/300qps/k6-summary.json scripts/perf/k6-mixed-300qps.js
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
+OUT_DIR=tmp/perf/pretest60 ./scripts/perf/snapshot-observability.sh before
+# ... k6 ...
+OUT_DIR=tmp/perf/pretest60 ./scripts/perf/snapshot-observability.sh after
 ```
 
-关键指标：
+默认 URL 走本机隧道端口；在 **Mac** 上先开 SSH 隧道（压测期间保持）：
+
+```bash
+# serverA — apiserver metrics
+ssh -N -L 18082:127.0.0.1:8081 root@<serverA-tailscale-ip>
+
+# serverA — collection metrics（collection 迁回 A 后）
+ssh -N -L 18083:127.0.0.1:8082 root@<serverA-tailscale-ip>
+```
+
+```bash
+export COLLECTION_METRICS_URL=http://127.0.0.1:18083/metrics
+export COLLECTION_RESILIENCE_URL=http://127.0.0.1:18083/governance/resilience
+export APISERVER_METRICS_URL=http://127.0.0.1:18082/metrics
+```
+
+worker（serverD）、NSQ 隧道为可选项；snapshot 失败写 `.err`，**不阻断** k6。
+
+### 6.2 关键指标
 
 | 指标 | 来源 |
 | ---- | ---- |
-| HTTP QPS / latency / failed | k6 summary、服务 `/metrics` |
-| collection SubmitQueue depth/status | collection `/governance/resilience` 和 `qs_resilience_queue_*` |
-| Outbox backlog | `qs_event_outbox_backlog`、`qs_event_outbox_oldest_age_seconds` |
-| NSQ topic/channel depth | `http://<nsqd>:4151/stats?format=json` |
-| worker ack/nack | worker `/metrics` 的 `qs_event_consume_total` |
-| worker 消费耗时 | worker `/metrics` 的 `qs_event_consume_duration_seconds` |
-| gRPC p95/p99/error rate | ghz JSON 输出；当前仓库未发现独立的 collection/worker gRPC latency Prometheus 指标 |
-| report.generated 延迟 | k6 `report_generated_latency` 小流量链路探针，或按事件/outbox/报告时间戳离线计算 |
+| HTTP 失败率 / 延迟 | k6 summary、`http_5xx_total` 等自定义 counter |
+| SubmitQueue | collection `/governance/resilience` |
+| Outbox / MQ | apiserver/worker metrics、NSQ stats |
+| 容器资源 | serverA 上 `docker stats qs-apiserver qs-collection-server nginx` |
+| Nginx 5xx | `/data/logs/nginx/access.log` 按时段统计 `$9` |
 
-资源指标建议同步采：
+### 6.3 k6 summary 解读
 
-- `docker stats --no-stream` 或 Prometheus/container metrics。
-- MySQL CPU、连接数、慢 SQL。
-- MongoDB 慢查询和连接池。
-- Redis `INFO stats`、`INFO commandstats`、hit rate。
+失败分类优先看自定义 counter：
 
----
+| counter | 含义 |
+| ------- | ---- |
+| `http_401_total` | token 过期或无效 → 先换 token |
+| `http_403_total` | 权限不足 → 检查 token 分组 |
+| `http_429_total` | 应用层限流 → 加 token 或调 `rate_limit` |
+| `http_5xx_total` | 服务端或 **Nginx 503/502** → 按 §8 分流 |
 
-## 6. 结果模板
+新版 k6 `--summary-export` JSON schema 可能变化；若 `jq '.metrics.*.values.count'` 为 null：
 
-### qs-server 300 QPS 混合场景压测结果
-
-### 1. 测试环境
-
-- 机器配置：
-- qs-apiserver 副本数：
-- collection-server 副本数：
-- qs-worker 副本数：
-- MySQL：
-- MongoDB：
-- Redis：
-- NSQ：
-- Git Commit：
-
-### 2. 压测场景
-
-- 总压力：300 QPS
-- 持续时间：
-- 问卷查询：120 QPS
-- 答卷提交：60 QPS
-- 报告状态查询：90 QPS
-- 统计查询：30 QPS
-
-### 3. HTTP 结果
-
-| 接口 | QPS | P95 | P99 | 错误率 |
-| --- | ---: | ---: | ---: | ---: |
-| 问卷查询 | | | | |
-| 答卷提交 | | | | |
-| 报告状态查询 | | | | |
-| 统计查询 | | | | |
-| 总体 | 300 | | | |
-
-### 4. gRPC 结果
-
-| 链路 | RPS | P95 | P99 | 错误率 |
-| --- | ---: | ---: | ---: | ---: |
-| collection -> apiserver submit | | | | |
-| worker -> apiserver internal | | | | |
-
-### 5. 异步链路结果
-
-| 指标 | 结果 |
-| --- | ---: |
-| NSQ 最大积压 | |
-| worker 平均消费速率 | |
-| worker 峰值消费速率 | |
-| 积压清空耗时 | |
-| report.generated P95 | |
-| retry / nack 数量 | |
-
-### 6. 资源使用
-
-| 组件 | CPU 峰值 | 内存峰值 | 备注 |
-| --- | ---: | ---: | --- |
-| collection-server | | | |
-| qs-apiserver | | | |
-| qs-worker | | | |
-| MySQL | | | |
-| MongoDB | | | |
-| Redis | | | |
-
-### 7. 结论
-
-- 是否达到 300 QPS：
-- 主要瓶颈：
-- 已优化项：
-- 后续优化项：
+```bash
+jq 'keys' tmp/perf/pretest60/k6-summary.json
+jq '.metrics.http_req_failed' tmp/perf/pretest60/k6-summary.json
+```
 
 ---
 
-## 7. Verify
+## 7. Nginx 专项
+
+Nginx **仅在 serverA**。仓库配置：
+
+- `configs/nginx/http-conn-limit.conf` — 压测 IP 白名单 + 默认 20 连接/IP
+- `configs/nginx/conf.d/collect.fangcunmount.cn.conf` — upstream `keepalive 512`
+- `configs/nginx/conf.d/qs.fangcunmount.cn.conf` — 同上
+
+宿主机路径（示例）：
+
+| 路径 | 说明 |
+| ---- | ---- |
+| `/opt/infra/components/nginx/nginx.conf` | 主配置 |
+| `/data/apps/nginx-configs` | `conf.d/apps` |
+| `/opt/infra/components/nginx/conf.d` | `conf.d` |
+
+### 7.1 压测前确认 limit_conn
+
+```bash
+docker exec nginx grep -E 'limit_conn|conn_limit' /etc/nginx/nginx.conf /etc/nginx/conf.d/ 2>/dev/null
+```
+
+`http-conn-limit.conf` 示例：压测机 IP → 5000 连接，其他 IP → 20。
+
+### 7.2 修改后必须 restart
+
+bind mount 场景下 **`nginx -s reload` 可能未同步宿主机改动**；改完宿主机文件后：
+
+```bash
+docker exec nginx nginx -t && docker restart nginx
+docker exec nginx grep limit_conn /etc/nginx/nginx.conf
+```
+
+若宿主机与容器 `md5sum` 不一致，说明未生效，必须 restart。
+
+### 7.3 503 特征（limit_conn）
+
+access log：`503` 且耗时 **0.000s**；error log：`limiting connections by zone "conn_limit_per_ip"`。此时 **collection/apiserver 容器日志通常无对应 5xx**。
+
+---
+
+## 8. 常见故障与根因（实测）
+
+| 现象 | 根因 | 处理 |
+| ---- | ---- | ---- |
+| ~7% 失败，k6 无 429，collection 日志全 200 | token 过期 → **401**（计入 failed） | 换 token + preflight |
+| k6 `http_5xx`，collection **0 条 5xx**，nginx access `503` 0.000s | **Nginx limit_conn** | 白名单压测 IP 或临时调高；`docker restart nginx` |
+| `pretest_120` 大量 502，`upstream prematurely closed` | 跨机 upstream（历史：collection 在 serverB） | collection 迁 serverA；调大 upstream `keepalive` |
+| 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
+| k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
+| `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
+| worker/NSQ snapshot 失败 | 未建隧道 | 可忽略，不影响 HTTP 压测结论 |
+
+**排障顺序**：k6 counter 分类 → Nginx access（是否 503/0.000s）→ 应用 access log（`middleware/logger.go` 状态码分布）→ `docker stats` → gRPC/backpressure。
+
+### 8.1 在 serverA 统计应用 HTTP 状态码
+
+```bash
+docker logs qs-collection-server --since 10m 2>&1 \
+  | grep 'middleware/logger.go' \
+  | grep -oE ' [0-9]{3} - ' | sort | uniq -c | sort -rn
+```
+
+勿用 `grep timeout` 粗筛——query 参数 `timeout=5` 会误匹配。
+
+### 8.2 在 serverA 统计 Nginx 5xx
+
+```bash
+awk '{print $9}' /data/logs/nginx/access.log | sort | uniq -c | sort -rn | head -20
+awk '$9 ~ /^5/' /data/logs/nginx/access.log | tail -20
+```
+
+---
+
+## 9. ghz gRPC 压测（可选）
+
+HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC 等价链路（collection submit、worker internal 等）。生产 gRPC 为 mTLS，需挂载 `/data/infra/ssl/grpc` 证书；仅 dev plaintext 时设 `GRPC_PLAINTEXT=true`。
+
+详见脚本内 `CASE` 说明；非 `mixed_300` 验收必选项。
+
+---
+
+## 10. 结果记录模板
+
+### 10.1 环境
+
+| 项 | 填写 |
+| -- | ---- |
+| 日期 / Git SHA | |
+| serverA 规格 | 4C/8G，apiserver 2C/3G，collection 1.5C/2G |
+| serverD worker 副本 | |
+| 压测机公网 IP | |
+| Nginx conn_limit 压测 IP 配额 | |
+| token 数量（collection / apiserver） | |
+| `QPS_PROFILE` | |
+
+### 10.2 HTTP 结果
+
+| 档位 | 总 QPS | http_req_failed | http_5xx | http_401 | http_429 | P95 | 结论 |
+| ---- | ---: | ---: | ---: | ---: | ---: | ---: | ---- |
+| pretest_60 | 60 | | | | | | |
+| pretest_120 | 120 | | | | | | |
+| mixed_300 | 300 | | | | | | |
+
+### 10.3 瓶颈与后续
+
+- 是否达到目标 QPS：
+- 主要瓶颈（Nginx / 应用 / DB / 跨机）：
+- 已做优化：
+- 待做优化：
+
+---
+
+## 11. Verify
 
 ```bash
 k6 inspect scripts/perf/k6-mixed-300qps.js
-bash -n scripts/perf/ghz-qs-grpc.sh
+bash -n scripts/perf/check-token-preflight.sh
 bash -n scripts/perf/snapshot-observability.sh
+bash -n scripts/perf/fetch-iam-tokens.sh
 ```
+
+---
+
+## 相关文档
+
+- 容量与资源配置：`10-QPS容量档位与资源配置建议.md`
+- 部署拓扑：`../../.github/workflows/README.md`（serverA/B/D）
+- Nginx 配置：`configs/nginx/http-conn-limit.conf`、`configs/nginx/conf.d/collect.fangcunmount.cn.conf`

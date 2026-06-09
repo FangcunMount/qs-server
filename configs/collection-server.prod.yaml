@@ -150,7 +150,7 @@ iam:
   
   # gRPC 客户端配置
   grpc:
-    address: "iam-apiserver:9090"  # IAM 在 serverB；compose extra_hosts 将主机名解析为 SVRB Tailscale IP
+    address: "iam-apiserver:9090"  # IAM 在 serverB；经 Swarm overlay infra-network 解析（勿映射到宿主机 9090）
     timeout: 30s
     retry-max: 3
     

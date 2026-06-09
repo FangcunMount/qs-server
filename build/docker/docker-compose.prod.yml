@@ -1,6 +1,6 @@
 # 生产拓扑（2026-06）：
 # - serverA（4C/8G）：qs-apiserver + qs-collection-server（本文件前两段）
-# - serverB：IAM（iam-apiserver，经 Tailscale 由 IAM_GRPC_HOST 解析）
+# - serverB：IAM（iam-apiserver，经 Swarm overlay infra-network 跨机 DNS 解析）
 # - serverD：qs-worker（本文件 qs-worker 段，compose -p qs-worker 独立部署）
 services:
   qs-apiserver:
@@ -10,8 +10,6 @@ services:
     # serverA 4C/8G：2C/3G；与 collection 同机，预留余量给 nginx/OS/数据层
     mem_limit: "3072m"
     cpus: "2"
-    extra_hosts:
-      - "iam-apiserver:${IAM_GRPC_HOST:?IAM_GRPC_HOST must be serverB Tailscale IP}"
     networks:
       - qs-network
       - infra-network
@@ -50,8 +48,6 @@ services:
     # serverA 4C/8G：与 apiserver 同 qs-network，Nginx 本机 upstream
     mem_limit: "2048m"
     cpus: "1.5"
-    extra_hosts:
-      - "iam-apiserver:${IAM_GRPC_HOST:?IAM_GRPC_HOST must be serverB Tailscale IP}"
     networks:
       - qs-network
       - infra-network

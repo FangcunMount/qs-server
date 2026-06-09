@@ -204,30 +204,14 @@ image_tarball_path() {
   printf '%s' "${IMAGE_TARBALL:-/tmp/deploy-image-${PACKAGE_SUFFIX}.tar.gz}"
 }
 
-write_compose_env_file() {
+write_compose_image_env() {
   local image="$1"
   printf -v "$IMAGE_ENV_VAR" '%s' "$image"
   export "$IMAGE_ENV_VAR"
   COMPOSE_ENV_FILE="$DEPLOY_TMP/compose-image.env"
   printf '%s=%s\n' "$IMAGE_ENV_VAR" "$image" >"$COMPOSE_ENV_FILE"
-  case "$SERVICE" in
-    apiserver|collection|worker)
-      # 三服务共用 docker-compose.prod.yml；compose 解析全文件时 qs-apiserver/collection
-      # 的 extra_hosts 均依赖 IAM_GRPC_HOST，worker 部署也需注入（值仅用于插值）。
-      if [ -z "${IAM_GRPC_HOST:-}" ]; then
-        echo "IAM_GRPC_HOST is required for ${SERVICE} (set to serverB Tailscale IP)" >&2
-        exit 1
-      fi
-      printf 'IAM_GRPC_HOST=%s\n' "$IAM_GRPC_HOST" >>"$COMPOSE_ENV_FILE"
-      ;;
-  esac
   chmod 0600 "$COMPOSE_ENV_FILE"
   export COMPOSE_ENV_FILE
-}
-
-# shellcheck disable=SC2120
-write_compose_image_env() {
-  write_compose_env_file "${1:?image ref is required}"
 }
 
 load_image_from_tarball() {
