@@ -40,10 +40,10 @@ jobs:
       - name: Backup MongoDB
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
@@ -102,10 +102,10 @@ jobs:
       - name: Restore MongoDB
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME,BACKUP_FILE_INPUT
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}
@@ -174,10 +174,10 @@ jobs:
       - name: Check MongoDB Status
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           envs: MONGODB_HOST,MONGODB_PORT,MONGODB_USERNAME,MONGODB_PASSWORD,MONGODB_DBNAME
         env:
           MONGODB_HOST: ${{ secrets.MONGODB_HOST }}

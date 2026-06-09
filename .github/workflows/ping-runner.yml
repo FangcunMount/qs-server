@@ -20,10 +20,10 @@ jobs:
       - name: System Health Check
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
             echo "QS-Server - Quick Check (ServerA)"
@@ -48,10 +48,10 @@ jobs:
       - name: Docker Service Check
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
             echo "Docker Service Status (ServerA)"
@@ -77,10 +77,10 @@ jobs:
       - name: API Health Check
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
             echo "API Health Check (ServerA)"
@@ -174,9 +174,9 @@ jobs:
       - name: SSH reachability to ServerA
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ secrets.SVRA_HOST }}
-          RUNNER_SSH_USER: ${{ secrets.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           key_file=~/.ssh/runner_servera_key
@@ -198,9 +198,9 @@ jobs:
       - name: SSH reachability to ServerB
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ secrets.SVRB_HOST }}
-          RUNNER_SSH_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_HOST: ${{ vars.SVRB_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRB_USERNAME || vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRB_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
         run: |
           mkdir -p ~/.ssh && chmod 700 ~/.ssh
           key_file=~/.ssh/runner_serverb_key

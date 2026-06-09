@@ -6,7 +6,7 @@ on:
 jobs:
   test-ssh:
     name: Test SSH Connection to SVRA
-    runs-on: ubuntu-latest
+    runs-on: ${{ vars.QS_DEPLOY_RUNNER || 'ubuntu-latest' }}
     timeout-minutes: 3
     steps:
       - name: Show GitHub Runner Info
@@ -23,10 +23,10 @@ jobs:
       - name: Test SSH Connection
         uses: appleboy/ssh-action@v1.0.0
         with:
-          host: ${{ secrets.SVRA_HOST }}
-          username: ${{ secrets.SVRA_USERNAME }}
+          host: ${{ vars.SVRA_HOST }}
+          username: ${{ vars.SVRA_USERNAME }}
           key: ${{ secrets.SVRA_SSH_KEY }}
-          port: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          port: ${{ vars.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
             echo "SSH Connection Test - Success!"

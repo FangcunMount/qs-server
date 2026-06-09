@@ -4,13 +4,13 @@ name: Production Deploy
 # 必需的 Secrets 配置
 # ============================================================================
 # Organization Secrets (组织级别，共享配置):
-#   SVRA_HOST (serverA: qs-apiserver)
-#   SVRB_HOST (serverB: qs-collection-server)
-#   SVRD_HOST (serverD: qs-worker)
-#   SVRA_USERNAME, SVRA_SSH_KEY, SVRA_SSH_PORT
-#   SVRB_USERNAME/SVRB_SSH_KEY/SVRB_SSH_PORT 可选，缺省复用 SVRA_*
-#   SVRD_USERNAME/SVRD_SSH_KEY/SVRD_SSH_PORT 可选，缺省复用 SVRA_*
-#   SVRA/SVRB/SVRD_SUDO_PASSWORD (可选，如果 sudo 需要密码)
+#   Organization Variables（主机连通，明文可读）:
+#   SVRA_HOST / SVRB_HOST / SVRD_HOST（建议 Tailscale 100.x）
+#   SVRA_USERNAME / SVRB_USERNAME / SVRD_USERNAME
+#   SVRA_SSH_PORT / SVRB_SSH_PORT / SVRD_SSH_PORT（可选，默认 22）
+#   Organization Secrets（敏感凭据）:
+#   SVRA_SSH_KEY；SVRB/SVRD_SSH_KEY 可选，缺省复用 SVRA_SSH_KEY
+#   SVRA/SVRB/SVRD_SUDO_PASSWORD（可选，sudo 需要密码时）
 #   MONGODB_HOST, MONGODB_PORT
 #   MYSQL_HOST, MYSQL_PORT (Worker 使用)
 #   REDIS_HOST, REDIS_PORT, REDIS_USE_SSL, REDIS_SSL_INSECURE_SKIP_VERIFY
@@ -269,9 +269,9 @@ jobs:
       - name: Setup deploy SSH
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ secrets.SVRA_HOST }}
-          RUNNER_SSH_USER: ${{ secrets.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target
         run: bash scripts/cd/setup-runner-ssh.sh
 
@@ -370,9 +370,9 @@ jobs:
       - name: Setup deploy SSH
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRB_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ secrets.SVRB_HOST }}
-          RUNNER_SSH_USER: ${{ secrets.SVRB_USERNAME || secrets.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ secrets.SVRB_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_HOST: ${{ vars.SVRB_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRB_USERNAME || vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRB_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target
         run: bash scripts/cd/setup-runner-ssh.sh
 
@@ -486,9 +486,9 @@ jobs:
       - name: Setup deploy SSH
         env:
           RUNNER_SSH_KEY: ${{ secrets.SVRD_SSH_KEY || secrets.SVRA_SSH_KEY }}
-          RUNNER_SSH_HOST: ${{ secrets.SVRD_HOST }}
-          RUNNER_SSH_USER: ${{ secrets.SVRD_USERNAME || secrets.SVRA_USERNAME }}
-          RUNNER_SSH_PORT: ${{ secrets.SVRD_SSH_PORT || secrets.SVRA_SSH_PORT || 22 }}
+          RUNNER_SSH_HOST: ${{ vars.SVRD_HOST }}
+          RUNNER_SSH_USER: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
+          RUNNER_SSH_PORT: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
           RUNNER_SSH_ALIAS: deploy-target
         run: bash scripts/cd/setup-runner-ssh.sh
 
