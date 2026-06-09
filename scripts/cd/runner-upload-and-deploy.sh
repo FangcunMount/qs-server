@@ -79,7 +79,7 @@ run_bootstrap() {
   WWW_GID="$WWW_GID" \
   WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
   PKG_PATH="$REMOTE_PACKAGE" \
-  bash -se "$boot_script"
+  bash "$boot_script"
 }
 
 if is_local_deploy_target "$DEPLOY_HOST"; then
@@ -118,7 +118,7 @@ if ! ssh "${RUNNER_SSH_ALIAS}" \
   WWW_GID="$WWW_GID" \
   WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
   PKG_PATH="$REMOTE_PACKAGE" \
-  bash -se "$REMOTE_BOOT"
+  bash "$REMOTE_BOOT"
 then
   echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS}" >&2
   exit 1
