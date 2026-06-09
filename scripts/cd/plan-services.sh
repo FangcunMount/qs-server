@@ -104,7 +104,17 @@ classify_path() {
   local path="$1"
 
   case "$path" in
-    ""|*.md|Makefile|docs/*|MONGODB_*.md|.github/*|scripts/cd/*|scripts/perf/*|scripts/oneoff/*|scripts/cert/*)
+    ""|*.md|Makefile|docs/*|MONGODB_*.md|.github/*|scripts/perf/*|scripts/oneoff/*|scripts/cert/*)
+      return 0
+      ;;
+    scripts/cd/plan-services.sh|scripts/cd/image-metadata.sh|scripts/cd/prepare-package.sh|scripts/cd/export-image.sh|scripts/cd/setup-runner-*.sh|scripts/cd/runner-dotenv.example)
+      return 0
+      ;;
+    scripts/cd/runner-upload-and-deploy.sh|scripts/cd/remote-deploy.sh)
+      add_service all
+      return 0
+      ;;
+    scripts/cd/*)
       return 0
       ;;
     *_test.go)
