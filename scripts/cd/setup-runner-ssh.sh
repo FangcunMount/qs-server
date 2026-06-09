@@ -47,5 +47,5 @@ if command -v ssh >/dev/null 2>&1; then
   ssh -G "${RUNNER_SSH_ALIAS}" 2>/dev/null | awk '/^(hostname|user|port) /{print "ssh -G resolved: "$0}' || true
 fi
 echo "Probing deploy target over SSH..."
-ssh "${RUNNER_SSH_ALIAS}" 'echo "Deploy target remote: hostname=$(hostname) primary_ip=$(hostname -I 2>/dev/null | awk "{print \$1}") user=$(whoami) pwd=$(pwd)"'
+ssh "${RUNNER_SSH_ALIAS}" 'echo "Deploy target remote: hostname=$(hostname) tailscale_ip=$(tailscale ip -4 2>/dev/null || true) primary_ip=$(hostname -I 2>/dev/null | awk "{print \$1}") user=$(whoami) pwd=$(pwd)"'
 echo "=========================================="

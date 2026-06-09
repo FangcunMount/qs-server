@@ -272,12 +272,12 @@ jobs:
           RUNNER_SSH_HOST: ${{ vars.SVRA_HOST }}
           RUNNER_SSH_USER: ${{ vars.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ vars.SVRA_SSH_PORT || 22 }}
-          RUNNER_SSH_ALIAS: deploy-target
+          RUNNER_SSH_ALIAS: deploy-target-apiserver
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy apiserver
         env:
-          RUNNER_SSH_ALIAS: deploy-target
+          RUNNER_SSH_ALIAS: deploy-target-apiserver
           SERVICE: apiserver
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -373,12 +373,12 @@ jobs:
           RUNNER_SSH_HOST: ${{ vars.SVRB_HOST }}
           RUNNER_SSH_USER: ${{ vars.SVRB_USERNAME || vars.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ vars.SVRB_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
-          RUNNER_SSH_ALIAS: deploy-target
+          RUNNER_SSH_ALIAS: deploy-target-collection
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy collection
         env:
-          RUNNER_SSH_ALIAS: deploy-target
+          RUNNER_SSH_ALIAS: deploy-target-collection
           SERVICE: collection
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}
@@ -489,12 +489,12 @@ jobs:
           RUNNER_SSH_HOST: ${{ vars.SVRD_HOST }}
           RUNNER_SSH_USER: ${{ vars.SVRD_USERNAME || vars.SVRA_USERNAME }}
           RUNNER_SSH_PORT: ${{ vars.SVRD_SSH_PORT || vars.SVRA_SSH_PORT || 22 }}
-          RUNNER_SSH_ALIAS: deploy-target
+          RUNNER_SSH_ALIAS: deploy-target-worker
         run: bash scripts/cd/setup-runner-ssh.sh
 
       - name: Upload and deploy worker
         env:
-          RUNNER_SSH_ALIAS: deploy-target
+          RUNNER_SSH_ALIAS: deploy-target-worker
           SERVICE: worker
           DOCKER_REGISTRY: ${{ env.DOCKER_REGISTRY }}
           DOCKER_REPOSITORY: ${{ env.DOCKER_REPOSITORY }}

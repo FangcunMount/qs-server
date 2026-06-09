@@ -49,7 +49,7 @@ set -Eeuo pipefail
 
 echo "=========================================="
 echo "CD bootstrap remote: service=${SERVICE} pkg=${PKG_PATH}"
-echo "Deploy host: hostname=$(hostname) primary_ip=$(hostname -I 2>/dev/null | awk '{print $1}') user=$(whoami)"
+echo "Deploy host: hostname=$(hostname) tailscale_ip=$(tailscale ip -4 2>/dev/null || true) primary_ip=$(hostname -I 2>/dev/null | awk '{print $1}') user=$(whoami)"
 echo "=========================================="
 
 BOOTSTRAP_TMP="/tmp/qs-deploy-bootstrap-${SERVICE}-$$"
@@ -64,7 +64,7 @@ echo "Uploading bootstrap script to ${RUNNER_SSH_ALIAS}:${REMOTE_BOOT} ..."
 scp "$LOCAL_BOOT" "${RUNNER_SSH_ALIAS}:${REMOTE_BOOT}"
 
 echo "Running remote-deploy.sh on ${RUNNER_SSH_ALIAS}..."
-if ! ssh "${RUNNER_SSH_ALIAS}" env \
+if ! ssh "${RUNNER_SSH_ALIAS}" \
   SERVICE="$SERVICE" \
   IMAGE_TAG="$IMAGE_TAG" \
   DEPLOY_IMAGE_SOURCE="${DEPLOY_IMAGE_SOURCE:-tarball}" \
@@ -80,7 +80,7 @@ if ! ssh "${RUNNER_SSH_ALIAS}" env \
   WWW_GID="$WWW_GID" \
   WORKER_REPLICAS="${WORKER_REPLICAS:-}" \
   PKG_PATH="$REMOTE_PACKAGE" \
-  bash "$REMOTE_BOOT"
+  bash -se "$REMOTE_BOOT"
 then
   echo "remote-deploy.sh failed on ${RUNNER_SSH_ALIAS}" >&2
   exit 1

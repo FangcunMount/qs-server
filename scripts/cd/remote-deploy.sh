@@ -481,7 +481,7 @@ deploy_worker() {
 echo "=========================================="
 echo "Deploying ${CONTAINER_NAME}"
 echo "Image tag: ${IMAGE_TAG}"
-echo "Deploy host: hostname=$(hostname) primary_ip=$(hostname -I 2>/dev/null | awk '{print $1}') user=$(id -un)"
+echo "Deploy host: hostname=$(hostname) tailscale_ip=$(tailscale ip -4 2>/dev/null || true) primary_ip=$(hostname -I 2>/dev/null | awk '{print $1}') user=$(id -un)"
 echo "=========================================="
 
 prepare_dirs_and_backup
