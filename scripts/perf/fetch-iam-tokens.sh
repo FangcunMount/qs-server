@@ -9,8 +9,42 @@ IAM_USERS_FILE="${IAM_USERS_FILE:-}"
 IAM_USERS_GROUP="${IAM_USERS_GROUP:-}"
 IAM_OMIT_TENANT_ID="${IAM_OMIT_TENANT_ID:-}"
 IAM_USERS_LIMIT="${IAM_USERS_LIMIT:-0}"
+IAM_LOGIN_RETRIES="${IAM_LOGIN_RETRIES:-5}"
+IAM_LOGIN_RETRY_DELAY="${IAM_LOGIN_RETRY_DELAY:-2}"
+IAM_LOGIN_INTERVAL="${IAM_LOGIN_INTERVAL:-0.15}"
 TOKENS_OUTPUT_FILE="${TOKENS_OUTPUT_FILE:-}"
 selected_users_group="$IAM_USERS_GROUP"
+
+iam_login() {
+  local payload="$1"
+  local attempt delay err_file
+  err_file="$(mktemp)"
+  trap 'rm -f "$err_file"' RETURN
+
+  for ((attempt = 1; attempt <= IAM_LOGIN_RETRIES; attempt++)); do
+    : >"$err_file"
+    if response="$(
+      curl -fsS \
+        --connect-timeout 15 \
+        --max-time 30 \
+        -H 'Accept: application/json' \
+        -H 'Content-Type: application/json' \
+        -X POST "$IAM_LOGIN_URL" \
+        -d "$payload" 2>"$err_file"
+    )"; then
+      printf '%s' "$response"
+      return 0
+    fi
+    if [[ "$attempt" -lt "$IAM_LOGIN_RETRIES" ]]; then
+      delay=$((IAM_LOGIN_RETRY_DELAY * attempt))
+      echo "IAM login retry ${attempt}/${IAM_LOGIN_RETRIES} in ${delay}s: $(tr -d '\n' <"$err_file")" >&2
+      sleep "$delay"
+    else
+      cat "$err_file" >&2
+      return 1
+    fi
+  done
+}
 
 if [[ -z "$selected_users_group" ]]; then
   output_lower="$(printf '%s' "$TOKENS_OUTPUT_FILE" | tr '[:upper:]' '[:lower:]')"
@@ -118,16 +152,14 @@ for ((i = 0; i < count; i++)); do
       } | if $tenant_id != "" then .method_payload.tenant_id = ($tenant_id | tonumber) else . end'
   )"
 
-  response="$(
-    curl -fsS \
-      -H 'Accept: application/json' \
-      -H 'Content-Type: application/json' \
-      -X POST "$IAM_LOGIN_URL" \
-      -d "$payload"
-  )" || {
-    echo "IAM login failed for user index $i in group ${selected_users_group:-<default>}" >&2
+  if ! response="$(iam_login "$payload")"; then
+    echo "IAM login failed for user index $i (${username}) in group ${selected_users_group:-<default>} after ${IAM_LOGIN_RETRIES} attempts" >&2
     exit 1
-  }
+  fi
+
+  if [[ "$IAM_LOGIN_INTERVAL" != "0" && "$IAM_LOGIN_INTERVAL" != "0.0" ]]; then
+    sleep "$IAM_LOGIN_INTERVAL"
+  fi
 
   token="$(jq -r '.data.access_token // .access_token // empty' <<<"$response")"
 

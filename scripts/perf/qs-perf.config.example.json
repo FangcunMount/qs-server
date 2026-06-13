@@ -2,6 +2,7 @@
   "collectionBaseUrl": "https://collect.fangcunmount.cn",
   "apiserverBaseUrl": "https://qs.fangcunmount.cn",
   "tokensFile": "tokens.json",
+  "apiserverTokensFile": "apiserver-tokens.json",
   "orgId": "1",
   "scaleCodes": [
     "3adyDE",

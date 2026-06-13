@@ -378,7 +378,11 @@ function validateScenarioData(data) {
     throw new Error('No answer templates found. Set ANSWERS_JSON/ANSWERS_FILE, or provide valid collection tokens and SCALE_CODES for auto discovery. Check setup_discovery_failed plus http_401_total/http_403_total/http_5xx_total in the k6 summary.');
   }
   if ((SUBMIT_RPS > 0 || CHAIN_PROBE_RPS > 0) && data.testeeIDs.length === 0) {
-    throw new Error('No testee IDs found. Set TESTEE_IDS or run with AUTO_DISCOVER_SEEDDATA=true.');
+    throw new Error(
+      'No testee IDs found. Set TESTEE_IDS, or ensure AUTO_DISCOVER_SEEDDATA=true with apiserverTokensFile. '
+      + 'If apiserver testees returns 200 in preflight but setup is empty, try TESTEE_SOURCE= or increase discover.testeeLookbackDays in qs-perf.config.json. '
+      + 'Run with DEBUG_SETUP=true to see discover HTTP statuses.'
+    );
   }
   if (REPORT_RPS > 0 && data.reportSamples.length === 0) {
     throw new Error('No report samples found. Set ASSESSMENT_IDS/REPORT_SAMPLES_FILE or run with AUTO_DISCOVER_SEEDDATA=true.');
@@ -435,24 +439,61 @@ function discoverQuestionnairesAndAnswers(testeeIDs) {
   };
 }
 
+function appendTesteesFromResponse(data, out, requireSourceMatch) {
+  responseItems(data).forEach((item) => {
+    const source = String(item.source || '');
+    const id = String(item.id || item.testee_id || item.testeeId || '');
+    if (!id) {
+      return;
+    }
+    if (requireSourceMatch && TESTEE_SOURCE && source !== TESTEE_SOURCE) {
+      return;
+    }
+    out.push(id);
+  });
+}
+
 function discoverTesteeIDs() {
   if (TESTEE_IDS.length > 0 || !AUTO_DISCOVER_SEEDDATA || APISERVER_TOKENS.length === 0) {
     return TESTEE_IDS;
   }
   const out = [];
+
   for (let offset = 0; offset < DISCOVER_TESTEE_LOOKBACK_DAYS && out.length < DISCOVER_TESTEE_LIMIT; offset += 1) {
     const date = dateStringDaysAgo(offset);
     const path = `/api/v1/testees?org_id=${encodeURIComponent(ORG_ID)}&page=1&page_size=100&created_start_date=${date}&created_end_date=${date}`;
-    const data = getApiserverData(path, 'discover_testees');
-    const items = responseItems(data);
-    items.forEach((item) => {
-      const source = String(item.source || '');
-      const id = String(item.id || item.testee_id || item.testeeId || '');
-      if (id && (!TESTEE_SOURCE || source === TESTEE_SOURCE)) {
-        out.push(id);
-      }
-    });
+    appendTesteesFromResponse(getApiserverData(path, 'discover_testees'), out, true);
   }
+
+  // preflight 用无日期过滤的列表；seed 数据可能不在近 N 天窗口内，或 source 字段与 TESTEE_SOURCE 不一致
+  if (out.length === 0) {
+    for (let page = 1; page <= 5 && out.length < DISCOVER_TESTEE_LIMIT; page += 1) {
+      const path = `/api/v1/testees?org_id=${encodeURIComponent(ORG_ID)}&page=${page}&page_size=100`;
+      const data = getApiserverData(path, 'discover_testees_fallback');
+      if (!data) {
+        break;
+      }
+      appendTesteesFromResponse(data, out, true);
+      if (responseItems(data).length < 100) {
+        break;
+      }
+    }
+  }
+
+  if (out.length === 0) {
+    for (let page = 1; page <= 5 && out.length < DISCOVER_TESTEE_LIMIT; page += 1) {
+      const path = `/api/v1/testees?org_id=${encodeURIComponent(ORG_ID)}&page=${page}&page_size=100`;
+      const data = getApiserverData(path, 'discover_testees_no_source');
+      if (!data) {
+        break;
+      }
+      appendTesteesFromResponse(data, out, false);
+      if (responseItems(data).length < 100) {
+        break;
+      }
+    }
+  }
+
   return uniqueList(out).slice(0, DISCOVER_TESTEE_LIMIT);
 }
 
@@ -943,7 +984,7 @@ function loadPerfConfig() {
   if (!PERF_CONFIG_PATH) {
     return {};
   }
-  const loaded = readTextFile(PERF_CONFIG_PATH, [__ENV.PERF_ROOT_DIR || '']);
+  const loaded = readTextFile(PERF_CONFIG_PATH, perfConfigBaseDirs());
   PERF_CONFIG_DIR = dirnamePath(loaded.path);
   const raw = loaded.content.trim();
   if (!raw) {
@@ -1119,7 +1160,7 @@ function debugSetupState() {
   console.log(`[setup-debug] collectionBaseUrl=${COLLECTION_BASE_URL} apiserverBaseUrl=${APISERVER_BASE_URL}`);
   console.log(`[setup-debug] tokenFileLoads=${JSON.stringify(TOKEN_FILE_LOADS)}`);
   console.log(`[setup-debug] tokenFileIssues=${JSON.stringify(TOKEN_FILE_READ_ISSUES)}`);
-  console.log(`[setup-debug] tokenCounts common=${COMMON_TOKENS.length} collectionSpecific=${COLLECTION_SPECIFIC_TOKENS.length} apiserverSpecific=${APISERVER_SPECIFIC_TOKENS.length} collectionEffective=${COLLECTION_TOKENS.length} apiserverEffective=${APISERVER_TOKENS.length}`);
+  console.log(`[setup-debug] autoDiscoverSeeddata=${AUTO_DISCOVER_SEEDDATA} testeeSource=${TESTEE_SOURCE || '<any>'} lookbackDays=${DISCOVER_TESTEE_LOOKBACK_DAYS}`);
 }
 
 function debugSetupRequest(service, endpoint, path, status, token) {
@@ -1197,12 +1238,24 @@ function filePathCandidates(path, baseDirs) {
   return uniqueList(candidates);
 }
 
+function perfConfigBaseDirs() {
+  // k6 open() 对裸相对路径以脚本目录 scripts/perf 为基准；
+  // check-token-preflight.sh 则以配置文件所在目录为基准。此处补齐仓库根等候选路径。
+  return uniqueList([
+    __ENV.PERF_ROOT_DIR || '',
+    __ENV.PWD || '',
+    '../..',
+  ]);
+}
+
 function configFileBaseDirs() {
-  return [
+  return uniqueList([
     PERF_CONFIG_DIR,
     configStringValue(['rootDir', 'root_dir'], ''),
     __ENV.PERF_ROOT_DIR || '',
-  ];
+    __ENV.PWD || '',
+    '../..',
+  ]);
 }
 
 function dirnamePath(path) {

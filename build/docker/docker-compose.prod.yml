@@ -7,9 +7,9 @@ services:
     image: ${DOCKER_IMAGE_QS_APISERVER:-ghcr.io/fangcunmount/qs-apiserver:latest}
     container_name: qs-apiserver
     restart: unless-stopped
-    # serverA 4C/8G：2C/3G；与 collection 同机，预留余量给 nginx/OS/数据层
+    # serverA 4C/8G：pretest_120 观测 apiserver CPU 打满，collection 有余量 → 3C/3G + 1C/1.5G
     mem_limit: "3072m"
-    cpus: "2"
+    cpus: "3"
     networks:
       - qs-network
       - infra-network
@@ -38,16 +38,16 @@ services:
       - /data/image/qrcode:/data/image/qrcode:rw
     environment:
       - GOMEMLIMIT=2304MiB
-      - GOMAXPROCS=2
+      - GOMAXPROCS=3
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
   qs-collection-server:
     image: ${DOCKER_IMAGE_QS_COLLECTION_SERVER:-ghcr.io/fangcunmount/qs-collection-server:latest}
     container_name: qs-collection-server
     restart: unless-stopped
-    # serverA 4C/8G：与 apiserver 同 qs-network，Nginx 本机 upstream
-    mem_limit: "2048m"
-    cpus: "1.5"
+    # BFF 转发为主；CPU 让给 apiserver
+    mem_limit: "1536m"
+    cpus: "1"
     networks:
       - qs-network
       - infra-network
@@ -68,8 +68,8 @@ services:
       # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     environment:
-      - GOMEMLIMIT=1536MiB
-      - GOMAXPROCS=2
+      - GOMEMLIMIT=1200MiB
+      - GOMAXPROCS=1
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
   qs-worker:

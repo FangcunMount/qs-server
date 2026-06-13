@@ -40,6 +40,11 @@ SECURITY_DIR := $(TMP_DIR)/security
 MAINTAINABILITY_DIR := $(TMP_DIR)/maintainability
 QUALITY_DIR := scripts/quality
 CD_SCRIPT_DIR := scripts/cd
+PERF_DIR := tmp/perf
+PERF_SCRIPT_DIR := scripts/perf
+PERF_CONFIG_FILE := $(CURDIR)/$(PERF_DIR)/qs-perf.config.json
+PERF_K6_SCRIPT := $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+QPS_PROFILE ?= pretest_60
 
 GOSEC_BASE_ARGS := -exclude-generated \
 	-exclude-dir=internal/apiserver/docs \
@@ -105,6 +110,8 @@ COLOR_RED := \033[31m
 .PHONY: quick-start
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
+.PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
+.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-mixed300 perf-verify
 
 # ============================================================================
 # 帮助信息
@@ -136,6 +143,9 @@ help: ## 显示帮助信息
 	@echo "$(COLOR_BOLD)📚 其他命令:$(COLOR_RESET)"
 	@grep -E '^(deps|install|clean|version|debug|up|down|quick|docs).*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
+	@echo "$(COLOR_BOLD)📈 K6 压测:$(COLOR_RESET)"
+	@grep -E '^perf-.*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
+	@echo ""
 	@echo "$(COLOR_BOLD)🚢 CD 命令:$(COLOR_RESET)"
 	@grep -E '^cd-.*:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "  $(COLOR_CYAN)%-25s$(COLOR_RESET) %s\n", $$1, $$2}'
 	@echo ""
@@ -155,6 +165,86 @@ docs-hygiene: ## 检查现行 docs/ 的链接、锚点与章节编号
 
 docs-verify: docs-rest docs-hygiene ## 对比 api/rest 与 swagger，并检查现行文档卫生
 	python scripts/compare_api_docs.py
+
+# ============================================================================
+# K6 混合场景压测（详见 docs/04-接口与运维/11-300QPS混合场景压测SOP.md）
+# ============================================================================
+
+perf-init: ## 初始化 tmp/perf（不覆盖已有配置与凭据）
+	@mkdir -p $(PERF_DIR)
+	@if [ ! -f $(PERF_DIR)/qs-perf.config.json ]; then \
+		cp $(PERF_SCRIPT_DIR)/qs-perf.config.example.json $(PERF_DIR)/qs-perf.config.json; \
+		echo "$(COLOR_GREEN)✅ 已创建 $(PERF_DIR)/qs-perf.config.json$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)ℹ️  保留已有 $(PERF_DIR)/qs-perf.config.json$(COLOR_RESET)"; \
+	fi
+	@if [ ! -f $(PERF_DIR)/iam-users.json ]; then \
+		cp $(PERF_SCRIPT_DIR)/iam-users.example.json $(PERF_DIR)/iam-users.json; \
+		echo "$(COLOR_YELLOW)⚠️  请编辑 $(PERF_DIR)/iam-users.json 填入真实凭据后再 make perf-tokens$(COLOR_RESET)"; \
+	else \
+		echo "$(COLOR_YELLOW)ℹ️  保留已有 $(PERF_DIR)/iam-users.json$(COLOR_RESET)"; \
+	fi
+	@$(MAKE) perf-ensure-config
+
+perf-ensure-config:
+	@command -v jq >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 jq: brew install jq$(COLOR_RESET)" >&2; exit 1; }
+	@test -f $(PERF_DIR)/qs-perf.config.json || { echo "$(COLOR_RED)❌ 先执行: make perf-init$(COLOR_RESET)" >&2; exit 1; }
+	@if ! jq -e '.apiserverTokensFile // empty | length > 0' $(PERF_DIR)/qs-perf.config.json >/dev/null; then \
+		jq '.apiserverTokensFile = "apiserver-tokens.json"' $(PERF_DIR)/qs-perf.config.json > $(PERF_DIR)/qs-perf.config.json.tmp; \
+		mv $(PERF_DIR)/qs-perf.config.json.tmp $(PERF_DIR)/qs-perf.config.json; \
+		echo "$(COLOR_GREEN)✅ 已补全 apiserverTokensFile$(COLOR_RESET)"; \
+	fi
+
+perf-tokens-collection: perf-ensure-config ## 用 collection_users 刷新 tokens.json
+	@test -f $(PERF_DIR)/iam-users.json || { echo "$(COLOR_RED)❌ 缺少 $(PERF_DIR)/iam-users.json$(COLOR_RESET)" >&2; exit 1; }
+	IAM_USERS_FILE=$(PERF_DIR)/iam-users.json \
+	IAM_USERS_GROUP=collection_users \
+	TOKENS_OUTPUT_FILE=$(PERF_DIR)/tokens.json \
+	$(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
+
+perf-tokens-apiserver: perf-ensure-config ## 用 apiserver_users 刷新 apiserver-tokens.json
+	@test -f $(PERF_DIR)/iam-users.json || { echo "$(COLOR_RED)❌ 缺少 $(PERF_DIR)/iam-users.json$(COLOR_RESET)" >&2; exit 1; }
+	IAM_USERS_FILE=$(PERF_DIR)/iam-users.json \
+	IAM_USERS_GROUP=apiserver_users \
+	TOKENS_OUTPUT_FILE=$(PERF_DIR)/apiserver-tokens.json \
+	$(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
+
+perf-tokens: perf-tokens-collection perf-tokens-apiserver ## 刷新 collection + apiserver 两套 token
+
+perf-preflight: perf-ensure-config ## Token 预检（k6 前必跑）
+	PERF_CONFIG_FILE=$(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/check-token-preflight.sh
+
+perf-check-k6:
+	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
+
+perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|pretest_120|mixed_300)
+	k6 run -e PERF_CONFIG_FILE="$(PERF_CONFIG_FILE)" -e PERF_ROOT_DIR="$(CURDIR)" \
+		-e QPS_PROFILE="$(QPS_PROFILE)" \
+		$(if $(SUMMARY_EXPORT),--summary-export $(SUMMARY_EXPORT),) \
+		$(PERF_K6_SCRIPT)
+
+perf-smoke: perf-preflight ## k6 smoke_4 全链路连通 (~30s)
+	$(MAKE) perf-k6 QPS_PROFILE=smoke_4
+
+perf-pretest60: perf-preflight ## k6 pretest_60 预压 (3min)
+	@mkdir -p $(PERF_DIR)/pretest60
+	$(MAKE) perf-k6 QPS_PROFILE=pretest_60 SUMMARY_EXPORT=$(PERF_DIR)/pretest60/k6-summary.json
+
+perf-pretest120: perf-preflight ## k6 pretest_120 中档 (5min)
+	@mkdir -p $(PERF_DIR)/pretest120
+	$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/pretest120/k6-summary.json
+
+perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min) + 前后 snapshot
+	@mkdir -p $(PERF_DIR)/300qps
+	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_300 SUMMARY_EXPORT=$(PERF_DIR)/300qps/k6-summary.json
+	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
+perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
+	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
+	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
+	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
+	k6 inspect $(PERF_K6_SCRIPT)
 
 # ============================================================================
 # CD 发布入口

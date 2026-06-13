@@ -9,8 +9,9 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 压测入口 | k6 打公网域名 `collect.fangcunmount.cn` + `qs.fangcunmount.cn` |
+| **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
 | 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_300`，每档通过再升 |
-| 配置入口 | `tmp/perf/qs-perf.config.json`（从 `scripts/perf/qs-perf.config.example.json` 复制） |
+| 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
 | 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
 | 最常见假 5xx | **Nginx `limit_conn` 503**（耗时 0.000s，请求未到应用） |
 | 历史瓶颈 | 跨机 collection → 502；token 过期 → 401；conn_limit 不足 → 503 |
@@ -35,7 +36,7 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 
 | 节点 | 规格（2026-06） | 组件 | 压测相关性 |
 | ---- | --------------- | ---- | ---------- |
-| serverA | 4C/8G | nginx、qs-apiserver（2C/3G）、qs-collection-server（1.5C/2G） | **HTTP 同步链路主战场** |
+| serverA | 4C/8G | nginx、qs-apiserver（3C/3G）、qs-collection-server（1C/1.5G） | **HTTP 同步链路主战场** |
 | serverB | 2C/2G | IAM | JWKS / gRPC；非 HTTP 压测主瓶颈 |
 | serverD | 4C/4G | qs-worker | 异步消费；`pretest_*` 阶段通常不是 HTTP 5xx 主因 |
 
@@ -100,26 +101,23 @@ cp scripts/perf/qs-perf.config.example.json tmp/perf/qs-perf.config.json
 collection 默认单用户限流：`submit=5`、`query=10`、`wait-report=2` QPS。要打 `report=90` QPS，至少 **45 个 collection token**（建议 **60+**）。
 
 ```bash
-cp scripts/perf/iam-users.example.json tmp/perf/iam-users.json
-# 编辑凭据，勿提交 Git
-
-IAM_USERS_FILE=tmp/perf/iam-users.json \
-IAM_USERS_GROUP=collection_users \
-TOKENS_OUTPUT_FILE=tmp/perf/tokens.json \
-./scripts/perf/fetch-iam-tokens.sh
+make perf-init
+# 编辑 tmp/perf/iam-users.json，勿提交 Git
+make perf-tokens
 ```
 
-collection 与 apiserver 权限不同时，分别生成 `collection-tokens.json` / `apiserver-tokens.json`，在配置里设 `collectionTokensFile` / `apiserverTokensFile`。
+或分步：`make perf-tokens-collection` / `make perf-tokens-apiserver`。
 
-若 setup 报 `http_403` + `No testee IDs found`，说明公共 token 无 apiserver 发现权限，需单独换 `apiserver_users` token。
+`qs-perf.config.example.json` 已默认 `tokensFile` + `apiserverTokensFile`。**不要**用 `cp example` 覆盖已有 `tmp/perf/qs-perf.config.json`（会丢掉自定义 URL/token 路径）。
+
+preflight 在未配置 `apiserverTokensFile` 时，会用 `tokensFile` 探测 apiserver，此时 `apiserver testees: 403` **是预期现象**，不代表 collection token 坏了。
 
 ### 3.4 Token preflight（每次 k6 前）
 
 IAM access token TTL 短；**换完 token 立刻跑**，不要隔几小时再用同一文件。
 
 ```bash
-PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
-./scripts/perf/check-token-preflight.sh
+make perf-preflight
 ```
 
 通过标准：
@@ -146,42 +144,47 @@ PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
 
 ## 5. 执行命令
 
-### 5.1 标准升档流程
+### 5.1 Makefile（推荐）
 
 ```bash
-cd /path/to/qs-server
-export PERF_CONFIG=tmp/perf/qs-perf.config.json
+make perf-init              # 首次：初始化 tmp/perf，不覆盖已有配置
+# 编辑 tmp/perf/iam-users.json
 
-# 0. 换 token + preflight（§3.3、§3.4）
+make perf-tokens            # collection + apiserver 两套 token
+make perf-preflight         # 预检（apiserver testees 须 200）
 
-# 1. smoke
-k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=smoke_4 \
-  scripts/perf/k6-mixed-300qps.js
+make perf-smoke             # smoke_4
+make perf-pretest60         # pretest_60，summary → tmp/perf/pretest60/
+make perf-pretest120        # pretest_120
+make perf-mixed300          # mixed_300 + 前后 snapshot
 
-# 2. pretest_60
-mkdir -p tmp/perf/pretest60
-k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=pretest_60 \
-  --summary-export tmp/perf/pretest60/k6-summary.json \
-  scripts/perf/k6-mixed-300qps.js
+make perf-k6 QPS_PROFILE=pretest_60   # 任意档位
+make perf-verify            # 脚本语法 + k6 inspect
+```
 
-# 3. pretest_120
-mkdir -p tmp/perf/pretest120
-k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=pretest_120 \
-  --summary-export tmp/perf/pretest120/k6-summary.json \
-  scripts/perf/k6-mixed-300qps.js
+完整列表：`make help`（**K6 压测** 段）。
 
-# 4. mixed_300
-mkdir -p tmp/perf/300qps
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh before
-k6 run -e PERF_CONFIG_FILE="$PERF_CONFIG" -e QPS_PROFILE=mixed_300 \
-  --summary-export tmp/perf/300qps/k6-summary.json \
-  scripts/perf/k6-mixed-300qps.js
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
+### 5.2 标准升档流程（原始 k6 命令）
+
+```bash
+# 0. make perf-tokens && make perf-preflight
+
+make perf-smoke
+make perf-pretest60
+make perf-pretest120
+make perf-mixed300
+```
+
+等价手写：
+
+```bash
+k6 run -e PERF_CONFIG_FILE="$(pwd)/tmp/perf/qs-perf.config.json" \
+  -e QPS_PROFILE=smoke_4 scripts/perf/k6-mixed-300qps.js
 ```
 
 优先级：**命令行 `-e` > `QPS_PROFILE` 档位 > 根配置 > 脚本默认**。
 
-### 5.2 只读 smoke（无需 token）
+### 5.3 只读 smoke（无需 token）
 
 ```bash
 COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
@@ -190,7 +193,7 @@ QUESTIONNAIRE_QUERY_PATHS='/api/v1/scales?page=1&page_size=20&status=published' 
 k6 run scripts/perf/k6-mixed-300qps.js
 ```
 
-### 5.3 严格阈值（可选）
+### 5.4 严格阈值（可选）
 
 ```bash
 STRICT_THRESHOLDS=true k6 run -e PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
@@ -346,7 +349,7 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | 项 | 填写 |
 | -- | ---- |
 | 日期 / Git SHA | |
-| serverA 规格 | 4C/8G，apiserver 2C/3G，collection 1.5C/2G |
+| serverA 规格 | 4C/8G，apiserver 3C/3G，collection 1C/1.5G |
 | serverD worker 副本 | |
 | 压测机公网 IP | |
 | Nginx conn_limit 压测 IP 配额 | |
@@ -373,10 +376,7 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 ## 11. Verify
 
 ```bash
-k6 inspect scripts/perf/k6-mixed-300qps.js
-bash -n scripts/perf/check-token-preflight.sh
-bash -n scripts/perf/snapshot-observability.sh
-bash -n scripts/perf/fetch-iam-tokens.sh
+make perf-verify
 ```
 
 ---
