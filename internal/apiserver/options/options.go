@@ -30,6 +30,7 @@ type Options struct {
 	Plan                     *PlanOptions                            `json:"plan"      mapstructure:"plan"`
 	PlanScheduler            *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
 	BehaviorPendingReconcile *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
+	OutboxRelay              *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
 	RateLimit                *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure             *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
 	Cache                    *CacheOptions                           `json:"cache"     mapstructure:"cache"`
@@ -57,6 +58,7 @@ func NewOptions() *Options {
 		Plan:                     NewPlanOptions(),
 		PlanScheduler:            NewPlanSchedulerOptions(),
 		BehaviorPendingReconcile: NewBehaviorPendingReconcileOptions(),
+		OutboxRelay:              NewOutboxRelayOptions(),
 		RateLimit:                NewRateLimitOptions(),
 		Backpressure:             NewBackpressureOptions(),
 		Cache:                    NewCacheOptions(),
@@ -237,6 +239,44 @@ func (b *BehaviorPendingReconcileOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&b.LockTTL, "behavior_pending_reconcile.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by the pending behavior reconcile scheduler.")
 }
 
+// OutboxRelayOptions controls durable outbox relay loops inside qs-apiserver.
+type OutboxRelayOptions struct {
+	Mongo      *OutboxRelayStoreOptions `json:"mongo" mapstructure:"mongo"`
+	Assessment *OutboxRelayStoreOptions `json:"assessment" mapstructure:"assessment"`
+}
+
+type OutboxRelayStoreOptions struct {
+	Interval  time.Duration `json:"interval" mapstructure:"interval"`
+	BatchSize int           `json:"batch_size" mapstructure:"batch_size"`
+}
+
+func NewOutboxRelayOptions() *OutboxRelayOptions {
+	return &OutboxRelayOptions{
+		Mongo: &OutboxRelayStoreOptions{
+			Interval:  500 * time.Millisecond,
+			BatchSize: 300,
+		},
+		Assessment: &OutboxRelayStoreOptions{
+			Interval:  2 * time.Second,
+			BatchSize: 50,
+		},
+	}
+}
+
+func (o *OutboxRelayOptions) AddFlags(fs *pflag.FlagSet) {
+	if o == nil {
+		return
+	}
+	if o.Mongo != nil {
+		fs.DurationVar(&o.Mongo.Interval, "outbox_relay.mongo.interval", o.Mongo.Interval, "Interval for dispatching Mongo durable outbox events.")
+		fs.IntVar(&o.Mongo.BatchSize, "outbox_relay.mongo.batch-size", o.Mongo.BatchSize, "Maximum Mongo durable outbox events to claim in one relay tick.")
+	}
+	if o.Assessment != nil {
+		fs.DurationVar(&o.Assessment.Interval, "outbox_relay.assessment.interval", o.Assessment.Interval, "Interval for dispatching assessment MySQL durable outbox events.")
+		fs.IntVar(&o.Assessment.BatchSize, "outbox_relay.assessment.batch-size", o.Assessment.BatchSize, "Maximum assessment MySQL durable outbox events to claim in one relay tick.")
+	}
+}
+
 // RateLimitOptions 限流配置
 type RateLimitOptions struct {
 	Enabled                bool    `json:"enabled" mapstructure:"enabled"`
@@ -300,6 +340,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
 	o.BehaviorPendingReconcile.AddFlags(fss.FlagSet("behavior_pending_reconcile"))
+	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))
 	o.Cache.AddFlags(fss.FlagSet("cache"))

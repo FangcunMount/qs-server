@@ -136,6 +136,73 @@ func TestOptionsValidateBehaviorPendingReconcile(t *testing.T) {
 	}
 }
 
+func TestOptionsValidateOutboxRelay(t *testing.T) {
+	tests := []struct {
+		name    string
+		mutate  func(*Options)
+		wantErr string
+	}{
+		{
+			name: "nil outbox relay skips validation",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay = nil
+			},
+		},
+		{
+			name: "mongo relay requires positive interval",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay.Mongo.Interval = 0
+			},
+			wantErr: "outbox_relay.mongo.interval must be greater than 0",
+		},
+		{
+			name: "mongo relay requires positive batch size",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay.Mongo.BatchSize = 0
+			},
+			wantErr: "outbox_relay.mongo.batch_size must be greater than 0",
+		},
+		{
+			name: "assessment relay requires positive interval",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay.Assessment.Interval = 0
+			},
+			wantErr: "outbox_relay.assessment.interval must be greater than 0",
+		},
+		{
+			name: "assessment relay requires positive batch size",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay.Assessment.BatchSize = 0
+			},
+			wantErr: "outbox_relay.assessment.batch_size must be greater than 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			opts := NewOptions()
+			tt.mutate(opts)
+
+			errs := opts.Validate()
+			if tt.wantErr == "" {
+				for _, err := range errs {
+					if strings.Contains(err.Error(), "outbox_relay.") {
+						t.Fatalf("unexpected outbox relay validation error: %v", err)
+					}
+				}
+				return
+			}
+
+			for _, err := range errs {
+				if strings.Contains(err.Error(), tt.wantErr) {
+					return
+				}
+			}
+			t.Fatalf("expected validation error containing %q, got %v", tt.wantErr, errs)
+		})
+	}
+}
+
 func TestOptionsValidateStatisticsSync(t *testing.T) {
 	tests := []struct {
 		name    string

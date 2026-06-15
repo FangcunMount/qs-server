@@ -112,7 +112,7 @@ COLOR_RED := \033[31m
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120
-.PHONY: perf-mixed140 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed240 perf-mixed280 perf-mixed300
+.PHONY: perf-mixed140 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed240 perf-mixed280 perf-mixed300 perf-mixed300probe
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-verify
 
 # ============================================================================
@@ -266,6 +266,12 @@ perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min) + 前后 snapsho
 	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_300 SUMMARY_EXPORT=$(PERF_DIR)/300qps/k6-summary.json
 	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
+perf-mixed300probe: perf-preflight ## k6 mixed_300_probe 目标档 + chainProbe (10min) + 前后 snapshot
+	@mkdir -p $(PERF_DIR)/300qps-probe
+	OUT_DIR=$(PERF_DIR)/300qps-probe $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_probe SUMMARY_EXPORT=$(PERF_DIR)/300qps-probe/k6-summary.json
+	OUT_DIR=$(PERF_DIR)/300qps-probe $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
 
 perf-diag-report120: perf-preflight ## 诊断 pretest_120：仅 report_status_query=36QPS
 	QUERY_RPS=0 SUBMIT_RPS=0 REPORT_RPS=36 STATS_RPS=0 \

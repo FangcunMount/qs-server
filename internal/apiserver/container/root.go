@@ -31,6 +31,7 @@ type Container struct {
 	cacheOptions               ContainerCacheOptions
 	cache                      *cachebootstrap.Subsystem
 	backpressure               BackpressureOptions
+	outboxRelay                ContainerOutboxRelayOptions
 	planEntryURL               string
 	statisticsRepairWindowDays int
 
@@ -127,6 +128,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.cacheOptions = opts.Cache
 	c.cache = opts.CacheSubsystem
 	c.backpressure = opts.Backpressure
+	c.outboxRelay = opts.OutboxRelay
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.silent = opts.Silent

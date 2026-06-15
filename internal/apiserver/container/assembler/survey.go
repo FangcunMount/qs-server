@@ -39,18 +39,19 @@ type SurveyModule struct {
 
 // SurveyModuleDeps 定义 Survey 模块的显式构造依赖。
 type SurveyModuleDeps struct {
-	MongoDB             *mongo.Database
-	EventPublisher      event.EventPublisher
-	RankRedisClient     redis.UniversalClient
-	RankCacheBuilder    *keyspace.Builder
-	IdentityService     *iam.IdentityService
-	HotsetRecorder      cachetarget.HotsetRecorder
-	TopicResolver       eventcatalog.TopicResolver
-	ScaleSyncer         quesApp.ScaleQuestionnaireBindingSyncer
-	QuestionnaireRepo   questionnaire.Repository
-	QuestionnaireReader surveyreadmodel.QuestionnaireReader
-	AnswerSheetRepo     AnswerSheetStore
-	AnswerSheetReader   surveyreadmodel.AnswerSheetReader
+	MongoDB              *mongo.Database
+	EventPublisher       event.EventPublisher
+	RankRedisClient      redis.UniversalClient
+	RankCacheBuilder     *keyspace.Builder
+	IdentityService      *iam.IdentityService
+	HotsetRecorder       cachetarget.HotsetRecorder
+	TopicResolver        eventcatalog.TopicResolver
+	ScaleSyncer          quesApp.ScaleQuestionnaireBindingSyncer
+	QuestionnaireRepo    questionnaire.Repository
+	QuestionnaireReader  surveyreadmodel.QuestionnaireReader
+	AnswerSheetRepo      AnswerSheetStore
+	AnswerSheetReader    surveyreadmodel.AnswerSheetReader
+	OutboxRelayBatchSize int
 }
 
 type AnswerSheetStore interface {
@@ -106,7 +107,7 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 	}
 
 	// 初始化答卷子模块
-	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.RankRedisClient, normalized.RankCacheBuilder, normalized.AnswerSheetRepo, normalized.AnswerSheetReader, normalized.QuestionnaireRepo); err != nil {
+	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.RankRedisClient, normalized.RankCacheBuilder, normalized.AnswerSheetRepo, normalized.AnswerSheetReader, normalized.QuestionnaireRepo, normalized.OutboxRelayBatchSize); err != nil {
 		return nil, err
 	}
 
@@ -143,7 +144,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(identitySvc *iam.IdentityServi
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
-func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository) error {
+func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int) error {
 	sub := m.AnswerSheet
 
 	// 创建答案校验引擎 adapter
@@ -159,12 +160,16 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 	sub.ManagementService = asApp.NewManagementService(repo, reader)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	hotRankProjection := cacheInfra.NewRedisScaleHotRankProjection(rankRedisClient, rankCacheBuilder)
-	sub.SubmittedEventRelay = appEventing.NewDurableOutboxRelayWithHooks(
-		"mongo-domain-events",
-		repo,
-		m.eventPublisher,
-		scaleApp.NewScaleHotRankProjectionHook(hotRankProjection),
-	)
+	sub.SubmittedEventRelay = appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
+		Name:                    "mongo-domain-events",
+		Store:                   repo,
+		Publisher:               m.eventPublisher,
+		BatchSize:               outboxRelayBatchSize,
+		RequireDurablePublisher: true,
+		BeforePublishHooks: []appEventing.OutboxBeforePublishHook{
+			scaleApp.NewScaleHotRankProjectionHook(hotRankProjection),
+		},
+	})
 	sub.SubmittedEventStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "mongo-domain-events",
 		Reader: repo,

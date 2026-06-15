@@ -80,23 +80,24 @@ type EvaluationModule struct {
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
 type EvaluationModuleDeps struct {
-	MySQLDB              *gorm.DB
-	MongoDB              *mongo.Database
-	InputResolver        evaluationinput.Resolver
-	ScaleCatalog         evaluationinput.ScaleCatalog
-	EventPublisher       event.EventPublisher
-	RedisClient          redis.UniversalClient
-	CacheBuilder         *keyspace.Builder
-	AssessmentPolicy     cachepolicy.CachePolicy
-	QueryRedisClient     redis.UniversalClient
-	QueryCacheBuilder    *keyspace.Builder
-	AssessmentListPolicy cachepolicy.CachePolicy
-	VersionStore         cachequery.VersionTokenStore
-	Observer             *observability.ComponentObserver
-	TopicResolver        eventcatalog.TopicResolver
-	MySQLLimiter         backpressure.Acquirer
-	MongoLimiter         backpressure.Acquirer
-	TesteeAccessChecker  assessmentApp.TesteeAccessChecker
+	MySQLDB                        *gorm.DB
+	MongoDB                        *mongo.Database
+	InputResolver                  evaluationinput.Resolver
+	ScaleCatalog                   evaluationinput.ScaleCatalog
+	EventPublisher                 event.EventPublisher
+	RedisClient                    redis.UniversalClient
+	CacheBuilder                   *keyspace.Builder
+	AssessmentPolicy               cachepolicy.CachePolicy
+	QueryRedisClient               redis.UniversalClient
+	QueryCacheBuilder              *keyspace.Builder
+	AssessmentListPolicy           cachepolicy.CachePolicy
+	VersionStore                   cachequery.VersionTokenStore
+	Observer                       *observability.ComponentObserver
+	TopicResolver                  eventcatalog.TopicResolver
+	MySQLLimiter                   backpressure.Acquirer
+	MongoLimiter                   backpressure.Acquirer
+	AssessmentOutboxRelayBatchSize int
+	TesteeAccessChecker            assessmentApp.TesteeAccessChecker
 }
 
 // NewEvaluationModule 创建评估模块。
@@ -167,7 +168,13 @@ func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, erro
 	}
 	infra.reportDurableSaver = evaluationResult.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
 	infra.assessmentOutboxStore = assessmentOutboxStore
-	infra.assessmentOutboxRelay = appEventing.NewDurableOutboxRelay("assessment-mysql-outbox", assessmentOutboxStore, normalized.EventPublisher)
+	infra.assessmentOutboxRelay = appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
+		Name:                    "assessment-mysql-outbox",
+		Store:                   assessmentOutboxStore,
+		Publisher:               normalized.EventPublisher,
+		BatchSize:               normalized.AssessmentOutboxRelayBatchSize,
+		RequireDurablePublisher: true,
+	})
 	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
 		Reader: assessmentOutboxStore,

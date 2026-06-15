@@ -22,14 +22,15 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 		infra = c.surveyScaleInfra
 	}
 	deps := assembler.SurveyModuleDeps{
-		MongoDB:          c.mongoDB,
-		EventPublisher:   c.eventPublisher,
-		RankRedisClient:  c.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder: c.CacheBuilder(cacheplane.FamilyRank),
-		IdentityService:  c.resolveIdentityService(),
-		HotsetRecorder:   c.hotsetRecorder(),
-		TopicResolver:    c.eventCatalog,
-		ScaleSyncer:      scaleApp.NewQuestionnaireBindingSyncer(nil),
+		MongoDB:              c.mongoDB,
+		EventPublisher:       c.eventPublisher,
+		RankRedisClient:      c.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder:     c.CacheBuilder(cacheplane.FamilyRank),
+		IdentityService:      c.resolveIdentityService(),
+		HotsetRecorder:       c.hotsetRecorder(),
+		TopicResolver:        c.eventCatalog,
+		ScaleSyncer:          scaleApp.NewQuestionnaireBindingSyncer(nil),
+		OutboxRelayBatchSize: c.outboxRelay.MongoBatchSize,
 	}
 	if infra != nil {
 		deps.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.scaleRepo)

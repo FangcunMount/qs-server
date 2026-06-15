@@ -306,6 +306,14 @@ behavior_pending_reconcile:
   lock_key: "qs:behavior-pending-reconcile:leader"
   lock_ttl: "30s"
 
+outbox_relay:
+  mongo:
+    interval: "500ms"
+    batch_size: 300
+  assessment:
+    interval: "2s"
+    batch_size: 50
+
 statistics_sync:
   enable: true
   org_ids: [1]

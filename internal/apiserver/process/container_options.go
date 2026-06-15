@@ -27,9 +27,24 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		Cache:                      s.buildContainerCacheOptions(),
 		CacheSubsystem:             input.cacheSubsystem,
 		Backpressure:               input.backpressure,
+		OutboxRelay:                buildContainerOutboxRelayOptions(s.config),
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
 	}
+}
+
+func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOutboxRelayOptions {
+	if cfg == nil || cfg.OutboxRelay == nil {
+		return container.ContainerOutboxRelayOptions{}
+	}
+	options := container.ContainerOutboxRelayOptions{}
+	if cfg.OutboxRelay.Mongo != nil {
+		options.MongoBatchSize = cfg.OutboxRelay.Mongo.BatchSize
+	}
+	if cfg.OutboxRelay.Assessment != nil {
+		options.AssessmentBatchSize = cfg.OutboxRelay.Assessment.BatchSize
+	}
+	return options
 }
 
 func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {

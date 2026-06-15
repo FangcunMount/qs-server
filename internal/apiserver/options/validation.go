@@ -19,6 +19,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
 	errs = append(errs, validateBehaviorPendingReconcile(o.BehaviorPendingReconcile)...)
+	errs = append(errs, validateOutboxRelay(o.OutboxRelay)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 
@@ -141,6 +142,32 @@ func validateBehaviorPendingReconcile(opts *BehaviorPendingReconcileOptions) []e
 	}
 	if opts.LockTTL <= 0 {
 		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_ttl must be greater than 0"))
+	}
+	return errs
+}
+
+func validateOutboxRelay(opts *OutboxRelayOptions) []error {
+	if opts == nil {
+		return nil
+	}
+
+	var errs []error
+	for _, relay := range []struct {
+		name string
+		opt  *OutboxRelayStoreOptions
+	}{
+		{name: "mongo", opt: opts.Mongo},
+		{name: "assessment", opt: opts.Assessment},
+	} {
+		if relay.opt == nil {
+			continue
+		}
+		if relay.opt.Interval <= 0 {
+			errs = append(errs, fmt.Errorf("outbox_relay.%s.interval must be greater than 0", relay.name))
+		}
+		if relay.opt.BatchSize <= 0 {
+			errs = append(errs, fmt.Errorf("outbox_relay.%s.batch_size must be greater than 0", relay.name))
+		}
 	}
 	return errs
 }

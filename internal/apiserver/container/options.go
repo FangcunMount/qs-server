@@ -25,6 +25,8 @@ type ContainerOptions struct {
 	CacheSubsystem *cachebootstrap.Subsystem
 	// Backpressure 下游依赖背压 limiter，显式传入各 infra adapter。
 	Backpressure BackpressureOptions
+	// OutboxRelay durable outbox relay options used while assembling modules.
+	OutboxRelay ContainerOutboxRelayOptions
 	// PlanEntryBaseURL 测评计划任务入口基础地址
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
@@ -37,6 +39,11 @@ type BackpressureOptions struct {
 	MySQL backpressure.Acquirer
 	Mongo backpressure.Acquirer
 	IAM   backpressure.Acquirer
+}
+
+type ContainerOutboxRelayOptions struct {
+	MongoBatchSize      int
+	AssessmentBatchSize int
 }
 
 type ContainerCacheOptions = cachebootstrap.CacheOptions

@@ -171,6 +171,7 @@ make perf-mixed200          # mixed_200
 make perf-mixed240          # mixed_240
 make perf-mixed280          # mixed_280
 make perf-mixed300          # mixed_300 + 前后 snapshot
+make perf-mixed300probe     # mixed_300_probe + chainProbe + 前后 snapshot
 
 make perf-k6 QPS_PROFILE=pretest_60   # 任意档位
 make perf-verify            # 脚本语法 + k6 inspect
@@ -250,9 +251,20 @@ worker（serverD）、NSQ 隧道为可选项；snapshot 失败写 `.err`，**不
 | ---- | ---- |
 | HTTP 失败率 / 延迟 | k6 summary、`http_5xx_total` 等自定义 counter |
 | SubmitQueue | collection `/governance/resilience` |
-| Outbox / MQ | apiserver/worker metrics、NSQ stats |
+| Outbox / MQ | apiserver event status、worker metrics、NSQ stats |
 | 容器资源 | serverA 上 `docker stats qs-apiserver qs-collection-server nginx` |
 | Nginx 5xx | `/data/logs/nginx/access.log` 按时段统计 `$9` |
+
+300 QPS 混合压测中，如果 NSQ depth 为 0 但 report 长时间不生成，必须先查 `mongo-domain-events`。事件可能还卡在 Mongo outbox，尚未进入 NSQ：
+
+```javascript
+db.domain_event_outbox.aggregate([
+  {$match:{status:{$in:["pending","failed","publishing"]}}},
+  {$group:{_id:{status:"$status",event_type:"$event_type",topic:"$topic_name"}, n:{$sum:1}, oldest:{$min:"$created_at"}, newest:{$max:"$created_at"}}},
+  {$sort:{n:-1}},
+  {$limit:50}
+])
+```
 
 ### 6.3 k6 summary 解读
 
@@ -334,6 +346,7 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | k6 `http_5xx`，collection **0 条 5xx**，nginx access `503` 0.000s | **Nginx limit_conn** | 白名单压测 IP 或临时调高；`docker restart nginx` |
 | `pretest_120` 大量 502，`upstream prematurely closed` | 跨机 upstream（历史：collection 在 serverB） | collection 迁 serverA；调大 upstream `keepalive` |
 | `wait-report` k6 EOF，但 Nginx access 只有成功数、error log 为空 | k6 report VU 过大导致入口前连接复用异常 | 下调 `REPORT_VUS/REPORT_MAX_VUS`；`pretest_120` 用 `220/500`，`mixed_300` 先用 `600/900` |
+| NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size`、主链路事件 pending 与 Mongo 慢查询 |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |

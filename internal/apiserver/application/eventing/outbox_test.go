@@ -42,6 +42,7 @@ type fakeOutboxStore struct {
 	statusErr        error
 	published        []string
 	failed           []string
+	lastLimit        int
 }
 
 type durableFakePublisher struct {
@@ -63,7 +64,8 @@ func (p *durableFakePublisher) IsMQBacked() bool {
 	return p.mqBacked
 }
 
-func (s *fakeOutboxStore) ClaimDueEvents(context.Context, int, time.Time) ([]PendingOutboxEvent, error) {
+func (s *fakeOutboxStore) ClaimDueEvents(_ context.Context, limit int, _ time.Time) ([]PendingOutboxEvent, error) {
+	s.lastLimit = limit
 	if s.claimErr != nil {
 		return nil, s.claimErr
 	}
@@ -130,6 +132,23 @@ func TestOutboxRelayObservesPublished(t *testing.T) {
 		t.Fatalf("published markers = %#v, want evt-1", store.published)
 	}
 	assertOutboxStatusScrape(t, observer, eventobservability.OutboxStatusScrapeOutcomeSuccess)
+}
+
+func TestOutboxRelayUsesConfiguredBatchSize(t *testing.T) {
+	store := &fakeOutboxStore{}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:      "test-relay",
+		Store:     store,
+		Publisher: &fakePublisher{},
+		BatchSize: 300,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	if store.lastLimit != 300 {
+		t.Fatalf("claim limit = %d, want 300", store.lastLimit)
+	}
 }
 
 func TestOutboxRelayObservesPublishFailureAndContinues(t *testing.T) {

@@ -179,3 +179,23 @@ func TestAPIServerBuildContainerOptionsUsesResourceStageCacheSubsystem(t *testin
 		t.Fatalf("CacheSubsystem = %#v, want %#v", got.CacheSubsystem, subsystem)
 	}
 }
+
+func TestAPIServerBuildContainerOptionsMapsOutboxRelayBatchSizes(t *testing.T) {
+	opts := apiserveroptions.NewOptions()
+	opts.OutboxRelay.Mongo.BatchSize = 360
+	opts.OutboxRelay.Assessment.BatchSize = 80
+	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
+	if err != nil {
+		t.Fatalf("CreateConfigFromOptions() error = %v", err)
+	}
+
+	server := &server{config: cfg}
+	got := server.buildContainerOptions(containerOptionsInput{})
+
+	if got.OutboxRelay.MongoBatchSize != 360 {
+		t.Fatalf("MongoBatchSize = %d, want 360", got.OutboxRelay.MongoBatchSize)
+	}
+	if got.OutboxRelay.AssessmentBatchSize != 80 {
+		t.Fatalf("AssessmentBatchSize = %d, want 80", got.OutboxRelay.AssessmentBatchSize)
+	}
+}

@@ -2,6 +2,7 @@ package eventoutbox
 
 import (
 	"errors"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -10,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
+	"go.mongodb.org/mongo-driver/bson"
 )
 
 type fakeTopicResolver struct {
@@ -99,6 +101,62 @@ func TestStageRequiresActiveSessionTransactionContext(t *testing.T) {
 	err := store.Stage(t.Context())
 	if !errors.Is(err, ErrActiveSessionTransactionRequired) {
 		t.Fatalf("Stage error = %v, want ErrActiveSessionTransactionRequired", err)
+	}
+}
+
+func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
+	now := time.Date(2026, 6, 15, 19, 30, 0, 0, time.UTC)
+
+	queries := pendingClaimQueries(now, defaultPriorityEventTypes())
+
+	if len(queries) != 2 {
+		t.Fatalf("query count = %d, want 2", len(queries))
+	}
+	wantPriority := []string{
+		eventcatalog.AnswerSheetSubmitted,
+		eventcatalog.AssessmentInterpreted,
+		eventcatalog.ReportGenerated,
+	}
+	assertEventTypeOperator(t, queries[0].filter, "$in", wantPriority)
+	assertEventTypeOperator(t, queries[1].filter, "$nin", wantPriority)
+	for _, query := range queries {
+		if query.filter["status"] != outboxcore.StatusPending {
+			t.Fatalf("filter status = %#v, want pending", query.filter["status"])
+		}
+		if _, ok := query.filter["next_attempt_at"].(bson.M)["$lte"]; !ok {
+			t.Fatalf("filter next_attempt_at = %#v, want $lte", query.filter["next_attempt_at"])
+		}
+		if !reflect.DeepEqual(query.sort, bson.D{{Key: "created_at", Value: 1}}) {
+			t.Fatalf("sort = %#v, want created_at asc", query.sort)
+		}
+	}
+}
+
+func TestPendingClaimQueriesFallsBackToFIFOWithoutPriority(t *testing.T) {
+	now := time.Date(2026, 6, 15, 19, 30, 0, 0, time.UTC)
+
+	queries := pendingClaimQueries(now, nil)
+
+	if len(queries) != 1 {
+		t.Fatalf("query count = %d, want 1", len(queries))
+	}
+	if _, ok := queries[0].filter["event_type"]; ok {
+		t.Fatalf("filter event_type = %#v, want absent", queries[0].filter["event_type"])
+	}
+}
+
+func assertEventTypeOperator(t *testing.T, filter bson.M, operator string, want []string) {
+	t.Helper()
+	eventTypeFilter, ok := filter["event_type"].(bson.M)
+	if !ok {
+		t.Fatalf("event_type filter = %#v, want bson.M", filter["event_type"])
+	}
+	got, ok := eventTypeFilter[operator].([]string)
+	if !ok {
+		t.Fatalf("event_type %s = %#v, want []string", operator, eventTypeFilter[operator])
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("event_type %s = %#v, want %#v", operator, got, want)
 	}
 }
 

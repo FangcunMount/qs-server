@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
+	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 
 func TestRunRuntimeStageInvokesWarmupSchedulersAndRelays(t *testing.T) {
@@ -96,6 +98,39 @@ func TestBuildRuntimeStageDepsDisablesDurableRelaysWithoutMQPublisher(t *testing
 	)
 	if len(deps.relays) != 2 {
 		t.Fatalf("relay count = %d, want 2 with MQ publisher", len(deps.relays))
+	}
+}
+
+func TestBuildRuntimeStageDepsUsesConfiguredOutboxRelayIntervals(t *testing.T) {
+	t.Parallel()
+
+	opts := apiserveroptions.NewOptions()
+	opts.OutboxRelay.Mongo.Interval = 250 * time.Millisecond
+	opts.OutboxRelay.Assessment.Interval = 750 * time.Millisecond
+	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
+	if err != nil {
+		t.Fatalf("CreateConfigFromOptions() error = %v", err)
+	}
+	s := &server{config: cfg}
+	c := &container.Container{
+		SurveyModule: &assembler.SurveyModule{
+			AnswerSheet: &assembler.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
+		},
+		EvaluationModule: &assembler.EvaluationModule{AssessmentOutboxRelay: fakeRuntimeRelay{}},
+	}
+
+	deps := s.buildRuntimeStageDeps(
+		resourceOutput{messaging: messagingOutput{mqPublisher: fakeRuntimePublisher{}}},
+		containerOutput{container: c},
+	)
+	if len(deps.relays) != 2 {
+		t.Fatalf("relay count = %d, want 2", len(deps.relays))
+	}
+	if deps.relays[0].interval != 250*time.Millisecond {
+		t.Fatalf("mongo relay interval = %s, want 250ms", deps.relays[0].interval)
+	}
+	if deps.relays[1].interval != 750*time.Millisecond {
+		t.Fatalf("assessment relay interval = %s, want 750ms", deps.relays[1].interval)
 	}
 }
 

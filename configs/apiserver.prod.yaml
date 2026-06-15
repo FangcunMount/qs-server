@@ -301,6 +301,14 @@ behavior_pending_reconcile:
   lock_key: "qs:behavior-pending-reconcile:leader"  # 分布式锁键，确保单实例执行
   lock_ttl: "5m"                # 锁过期时间，略长于调和间隔，避免死锁
 
+outbox_relay:
+  mongo:
+    interval: "500ms"           # Mongo outbox 主链路事件排水频率；300 QPS 压测起步值
+    batch_size: 300             # 每轮最多 claim 的 Mongo outbox 事件数
+  assessment:
+    interval: "2s"              # MySQL assessment outbox 当前积压较低，保持保守频率
+    batch_size: 50              # 每轮最多 claim 的 assessment outbox 事件数
+
 statistics_sync:
   enable: true                  # 启用统计数据同步任务
   org_ids: [1]                  # 组织ID列表（从配置读取，默认同步所有组织）

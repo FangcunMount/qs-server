@@ -61,7 +61,7 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 			stopHookName: "stop mongo outbox relay",
 			startLogName: "mongo outbox relay",
 			failureLog:   "answersheet submitted outbox relay",
-			interval:     2 * time.Second,
+			interval:     mongoOutboxRelayInterval(s.config),
 			dispatch:     serverDeps.AnswerSheetSubmittedRelay.DispatchDue,
 		})
 	}
@@ -70,11 +70,25 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 			stopHookName: "stop assessment outbox relay",
 			startLogName: "assessment outbox relay",
 			failureLog:   "assessment outbox relay",
-			interval:     2 * time.Second,
+			interval:     assessmentOutboxRelayInterval(s.config),
 			dispatch:     serverDeps.AssessmentOutboxRelay.DispatchDue,
 		})
 	}
 	return deps
+}
+
+func mongoOutboxRelayInterval(cfg *config.Config) time.Duration {
+	if cfg == nil || cfg.OutboxRelay == nil || cfg.OutboxRelay.Mongo == nil || cfg.OutboxRelay.Mongo.Interval <= 0 {
+		return 500 * time.Millisecond
+	}
+	return cfg.OutboxRelay.Mongo.Interval
+}
+
+func assessmentOutboxRelayInterval(cfg *config.Config) time.Duration {
+	if cfg == nil || cfg.OutboxRelay == nil || cfg.OutboxRelay.Assessment == nil || cfg.OutboxRelay.Assessment.Interval <= 0 {
+		return 2 * time.Second
+	}
+	return cfg.OutboxRelay.Assessment.Interval
 }
 
 func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) {

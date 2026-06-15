@@ -4,6 +4,7 @@ import (
 	"context"
 	stderrors "errors"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
@@ -42,13 +43,22 @@ type Store struct {
 	coll               *mongo.Collection
 	publishingStaleFor time.Duration
 	topicResolver      eventcatalog.TopicResolver
+	priorityEventTypes []string
 }
 
 func NewStore(db *mongo.Database) (*Store, error) {
 	return NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
 }
 
-func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver) (*Store, error) {
+type StoreOption func(*Store)
+
+func WithPriorityEventTypes(eventTypes []string) StoreOption {
+	return func(s *Store) {
+		s.priorityEventTypes = normalizePriorityEventTypes(eventTypes)
+	}
+}
+
+func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicResolver, opts ...StoreOption) (*Store, error) {
 	if resolver == nil {
 		resolver = eventcatalog.NewCatalog(nil)
 	}
@@ -56,6 +66,12 @@ func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicRe
 		coll:               db.Collection((&OutboxPO{}).CollectionName()),
 		publishingStaleFor: outboxcore.DefaultPublishingStaleFor,
 		topicResolver:      resolver,
+		priorityEventTypes: defaultPriorityEventTypes(),
+	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(store)
+		}
 	}
 	if err := store.ensureIndexes(context.Background()); err != nil {
 		return nil, err
@@ -75,6 +91,17 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 		{
 			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "next_attempt_at", Value: 1}},
 			Options: options.Index().SetName("idx_status_next_attempt_at"),
+		},
+		{
+			Keys: bson.D{
+				{Key: "status", Value: 1},
+				{Key: "event_type", Value: 1},
+				{Key: "next_attempt_at", Value: 1},
+				{Key: "created_at", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_pending_status_event_type_next_created").
+				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPending}),
 		},
 		{
 			Keys: bson.D{
@@ -239,21 +266,82 @@ func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]o
 	}
 
 	claimed := make([]outboxport.PendingEvent, 0, limit)
-	for len(claimed) < limit {
-		item, found, err := s.claimOne(ctx, bson.M{
-			"status":          outboxcore.StatusPending,
-			"next_attempt_at": bson.M{"$lte": now},
-		}, bson.D{{Key: "created_at", Value: 1}}, now)
-		if err != nil {
-			return nil, err
+	for _, query := range pendingClaimQueries(now, s.priorityEventTypes) {
+		for len(claimed) < limit {
+			item, found, err := s.claimOne(ctx, query.filter, query.sort, now)
+			if err != nil {
+				return nil, err
+			}
+			if !found {
+				break
+			}
+			claimed = append(claimed, item)
 		}
-		if !found {
-			break
-		}
-		claimed = append(claimed, item)
 	}
 
 	return claimed, nil
+}
+
+type pendingClaimQuery struct {
+	filter bson.M
+	sort   bson.D
+}
+
+func pendingClaimQueries(now time.Time, priorityEventTypes []string) []pendingClaimQuery {
+	sortByCreatedAt := bson.D{{Key: "created_at", Value: 1}}
+	base := bson.M{
+		"status":          outboxcore.StatusPending,
+		"next_attempt_at": bson.M{"$lte": now},
+	}
+	priorityEventTypes = normalizePriorityEventTypes(priorityEventTypes)
+	if len(priorityEventTypes) == 0 {
+		return []pendingClaimQuery{{filter: base, sort: sortByCreatedAt}}
+	}
+
+	priorityFilter := cloneBSONMap(base)
+	priorityFilter["event_type"] = bson.M{"$in": priorityEventTypes}
+	fallbackFilter := cloneBSONMap(base)
+	fallbackFilter["event_type"] = bson.M{"$nin": priorityEventTypes}
+	return []pendingClaimQuery{
+		{filter: priorityFilter, sort: sortByCreatedAt},
+		{filter: fallbackFilter, sort: sortByCreatedAt},
+	}
+}
+
+func cloneBSONMap(src bson.M) bson.M {
+	dst := make(bson.M, len(src))
+	for key, value := range src {
+		dst[key] = value
+	}
+	return dst
+}
+
+func defaultPriorityEventTypes() []string {
+	return []string{
+		eventcatalog.AnswerSheetSubmitted,
+		eventcatalog.AssessmentInterpreted,
+		eventcatalog.ReportGenerated,
+	}
+}
+
+func normalizePriorityEventTypes(eventTypes []string) []string {
+	if len(eventTypes) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(eventTypes))
+	normalized := make([]string, 0, len(eventTypes))
+	for _, eventType := range eventTypes {
+		eventType = strings.TrimSpace(eventType)
+		if eventType == "" {
+			continue
+		}
+		if _, ok := seen[eventType]; ok {
+			continue
+		}
+		seen[eventType] = struct{}{}
+		normalized = append(normalized, eventType)
+	}
+	return normalized
 }
 
 func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
