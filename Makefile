@@ -111,7 +111,8 @@ COLOR_RED := \033[31m
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
-.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-mixed300 perf-verify
+.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-mixed300
+.PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-verify
 
 # ============================================================================
 # 帮助信息
@@ -218,6 +219,7 @@ perf-check-k6:
 	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
 
 perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|pretest_120|mixed_300)
+	$(if $(SUMMARY_EXPORT),@mkdir -p $(dir $(SUMMARY_EXPORT)),)
 	k6 run -e PERF_CONFIG_FILE="$(PERF_CONFIG_FILE)" -e PERF_ROOT_DIR="$(CURDIR)" \
 		-e QPS_PROFILE="$(QPS_PROFILE)" \
 		$(if $(SUMMARY_EXPORT),--summary-export $(SUMMARY_EXPORT),) \
@@ -239,6 +241,22 @@ perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min) + 前后 snapsho
 	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_300 SUMMARY_EXPORT=$(PERF_DIR)/300qps/k6-summary.json
 	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
+perf-diag-report120: perf-preflight ## 诊断 pretest_120：仅 report_status_query=36QPS
+	QUERY_RPS=0 SUBMIT_RPS=0 REPORT_RPS=36 STATS_RPS=0 \
+		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-report-only/k6-summary.json
+
+perf-diag-query120: perf-preflight ## 诊断 pretest_120：仅 questionnaire_query=48QPS
+	QUERY_RPS=48 SUBMIT_RPS=0 REPORT_RPS=0 STATS_RPS=0 \
+		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-query-only/k6-summary.json
+
+perf-diag-submit120: perf-preflight ## 诊断 pretest_120：仅 answersheet_submit=24QPS
+	QUERY_RPS=0 SUBMIT_RPS=24 REPORT_RPS=0 STATS_RPS=0 \
+		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-submit-only/k6-summary.json
+
+perf-diag-query-submit120: perf-preflight ## 诊断 pretest_120：query=48QPS + submit=24QPS
+	QUERY_RPS=48 SUBMIT_RPS=24 REPORT_RPS=0 STATS_RPS=0 \
+		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-query-submit/k6-summary.json
 
 perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh

@@ -7,6 +7,7 @@ let PERF_CONFIG_DIR = '';
 const PERF_CONFIG = loadPerfConfig();
 const TOKEN_FILE_READ_ISSUES = [];
 const TOKEN_FILE_LOADS = [];
+const SCRIPT_INIT_AT_MS = Date.now();
 const QPS_PROFILE = resolveQpsProfileName();
 const QPS_PROFILE_CONFIG = resolveQpsProfileConfig(QPS_PROFILE);
 const DEBUG_SETUP = boolEnv('DEBUG_SETUP', false);
@@ -125,7 +126,27 @@ const setupDiscoveryFailed = new Counter('setup_discovery_failed');
 const http429Total = new Counter('http_429_total');
 const http401Total = new Counter('http_401_total');
 const http403Total = new Counter('http_403_total');
+const http4xxTotal = new Counter('http_4xx_total');
 const http5xxTotal = new Counter('http_5xx_total');
+const httpTransportErrorTotal = new Counter('http_transport_error_total');
+const httpTimeoutTotal = new Counter('http_timeout_total');
+
+const endpointFailureCounters = {
+  questionnaire_query: buildEndpointFailureCounters('questionnaire_query'),
+  answersheet_submit: buildEndpointFailureCounters('answer_submit'),
+  report_status_query: buildEndpointFailureCounters('report_status'),
+  statistics_query: buildEndpointFailureCounters('statistics'),
+  chain_probe_submit: buildEndpointFailureCounters('chain_probe_submit'),
+  chain_probe_submit_status: buildEndpointFailureCounters('chain_probe_submit_status'),
+  chain_probe_assessment_lookup: buildEndpointFailureCounters('chain_probe_assessment_lookup'),
+  chain_probe_report_status: buildEndpointFailureCounters('chain_probe_report_status'),
+  discover_scale: buildEndpointFailureCounters('discover_scale'),
+  discover_questionnaire: buildEndpointFailureCounters('discover_questionnaire'),
+  discover_testees: buildEndpointFailureCounters('discover_testees'),
+  discover_testees_fallback: buildEndpointFailureCounters('discover_testees_fallback'),
+  discover_testees_no_source: buildEndpointFailureCounters('discover_testees_no_source'),
+  discover_assessments: buildEndpointFailureCounters('discover_assessments'),
+};
 
 const answerSubmitSuccessRate = new Rate('answer_submit_success_rate');
 const reportStatusSuccessRate = new Rate('report_status_success_rate');
@@ -153,31 +174,72 @@ export const options = {
 };
 
 export function setup() {
+  const runTiming = buildRunTiming();
+  logPerfTimeEvent('setup_start', runTiming.setupStartAtMs, {
+    script_init: timeSnapshot(runTiming.scriptInitAtMs),
+    config: PERF_CONFIG_PATH || '<none>',
+    duration: DURATION,
+    http_timeout: HTTP_TIMEOUT,
+    report_timeout_seconds: REPORT_TIMEOUT,
+    qps: runTiming.qps,
+    base_urls: runTiming.baseUrls,
+  });
   debugSetupState();
-  const testeeIDs = discoverTesteeIDs();
-  const questionnaireBundle = discoverQuestionnairesAndAnswers(testeeIDs);
-  const reportSamples = discoverReportSamples(testeeIDs);
-  const data = {
-    testeeIDs,
-    questionnaireCodes: uniqueList(QUESTIONNAIRE_CODES.concat(questionnaireBundle.questionnaireCodes)),
-    scaleCodes: SCALE_CODES,
-    answerTemplates: questionnaireBundle.answerTemplates,
-    reportSamples,
-  };
-  validateScenarioData(data);
-  return data;
+  try {
+    const testeeIDs = discoverTesteeIDs();
+    const questionnaireBundle = discoverQuestionnairesAndAnswers(testeeIDs);
+    const reportSamples = discoverReportSamples(testeeIDs);
+    const data = {
+      testeeIDs,
+      questionnaireCodes: uniqueList(QUESTIONNAIRE_CODES.concat(questionnaireBundle.questionnaireCodes)),
+      scaleCodes: SCALE_CODES,
+      answerTemplates: questionnaireBundle.answerTemplates,
+      reportSamples,
+    };
+    validateScenarioData(data);
+    runTiming.trafficStartAtMs = Date.now();
+    runTiming.trafficPlannedEndAtMs = addDurationMs(runTiming.trafficStartAtMs, DURATION);
+    logPerfTimeEvent('traffic_start_estimate', runTiming.trafficStartAtMs, {
+      setup_duration_ms: runTiming.trafficStartAtMs - runTiming.setupStartAtMs,
+      traffic_planned_end: timeSnapshot(runTiming.trafficPlannedEndAtMs),
+      note: 'scenario traffic starts immediately after setup returns',
+    });
+    data._perfRun = runTiming;
+    return data;
+  } catch (err) {
+    logPerfTimeEvent('setup_failed', Date.now(), {
+      setup_duration_ms: Date.now() - runTiming.setupStartAtMs,
+      error: errorMessage(err),
+    });
+    throw err;
+  }
+}
+
+export function teardown(data) {
+  const runTiming = data && data._perfRun ? data._perfRun : {};
+  const endedAtMs = Date.now();
+  logPerfTimeEvent('run_end', endedAtMs, {
+    run_id: runTiming.runId || RUN_ID,
+    script_init: timeSnapshot(runTiming.scriptInitAtMs || SCRIPT_INIT_AT_MS),
+    setup_start: timeSnapshot(runTiming.setupStartAtMs),
+    traffic_start: timeSnapshot(runTiming.trafficStartAtMs),
+    traffic_planned_end: timeSnapshot(runTiming.trafficPlannedEndAtMs),
+    traffic_elapsed_ms: runTiming.trafficStartAtMs ? endedAtMs - runTiming.trafficStartAtMs : null,
+    run_elapsed_ms: runTiming.setupStartAtMs ? endedAtMs - runTiming.setupStartAtMs : null,
+  });
 }
 
 export function questionnaireQuery(data) {
   const ctx = scenarioData(data);
   const path = renderPath(pick(QUERY_PATHS), null, ctx);
+  const endpoint = 'questionnaire_query';
   const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
-    endpoint: 'questionnaire_query',
+    endpoint,
     service: 'collection-server',
   });
 
   questionnaireQueryDuration.add(res.timings.duration, res.tags);
-  recordHTTPStatus(res, questionnaireQueryFailed);
+  recordHTTPStatus(res, questionnaireQueryFailed, endpoint);
   check(res, {
     'questionnaire query status is 2xx': (r) => is2xx(r.status),
   });
@@ -188,8 +250,9 @@ export function answerSubmit(data) {
   const payload = buildAnswerPayload(ctx);
   const requestID = payload.idempotency_key || `${IDEMPOTENCY_PREFIX}-req-${__VU}-${__ITER}-${Date.now()}`;
   const headers = jsonHeaders(collectionToken(), requestID);
+  const endpoint = 'answersheet_submit';
   const res = timedRequest('POST', COLLECTION_BASE_URL, SUBMIT_PATH, JSON.stringify(payload), headers, {
-    endpoint: 'answersheet_submit',
+    endpoint,
     service: 'collection-server',
   });
 
@@ -198,7 +261,7 @@ export function answerSubmit(data) {
   if (accepted) {
     answerSubmitAccepted.add(1, res.tags);
   }
-  recordHTTPStatus(res, answerSubmitFailed);
+  recordHTTPStatus(res, answerSubmitFailed, endpoint);
   answerSubmitSuccessRate.add(accepted, res.tags);
   check(res, {
     'answersheet submit status is 202': (r) => r.status === 202,
@@ -213,14 +276,15 @@ export function reportStatusQuery(data) {
     testee_id: sample.testee_id,
     report_timeout: String(REPORT_TIMEOUT),
   }, ctx);
+  const endpoint = 'report_status_query';
   const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
-    endpoint: 'report_status_query',
+    endpoint,
     service: 'collection-server',
   });
 
   reportStatusDuration.add(res.timings.duration, res.tags);
   const ok = res.status === 200;
-  recordHTTPStatus(res, reportStatusFailed);
+  recordHTTPStatus(res, reportStatusFailed, endpoint);
   reportStatusSuccessRate.add(ok, res.tags);
   if (ok) {
     const status = responseData(res).status || '';
@@ -239,13 +303,14 @@ export function reportStatusQuery(data) {
 export function statisticsQuery(data) {
   const ctx = scenarioData(data);
   const path = renderPath(pick(STATS_PATHS), null, ctx);
+  const endpoint = 'statistics_query';
   const res = timedRequest('GET', APISERVER_BASE_URL, path, null, authHeaders(apiserverToken()), {
-    endpoint: 'statistics_query',
+    endpoint,
     service: 'qs-apiserver',
   });
 
   statisticsDuration.add(res.timings.duration, res.tags);
-  recordHTTPStatus(res, statisticsFailed);
+  recordHTTPStatus(res, statisticsFailed, endpoint);
   check(res, {
     'statistics query status is 2xx': (r) => is2xx(r.status),
   });
@@ -526,7 +591,7 @@ function getCollectionData(path, endpoint) {
   });
   debugSetupRequest('collection-server', endpoint, path, res.status, token);
   if (!is2xx(res.status)) {
-    recordHTTPStatus(res, setupDiscoveryFailed);
+    recordHTTPStatus(res, setupDiscoveryFailed, endpoint);
     return null;
   }
   return responseData(res);
@@ -540,7 +605,7 @@ function getApiserverData(path, endpoint) {
   });
   debugSetupRequest('qs-apiserver', endpoint, path, res.status, token);
   if (!is2xx(res.status)) {
-    recordHTTPStatus(res, setupDiscoveryFailed);
+    recordHTTPStatus(res, setupDiscoveryFailed, endpoint);
     return null;
   }
   return responseData(res);
@@ -552,6 +617,130 @@ function timedRequest(method, baseURL, path, body, headers, tags) {
     tags,
     timeout: HTTP_TIMEOUT,
   });
+}
+
+function buildRunTiming() {
+  const setupStartAtMs = Date.now();
+  return {
+    runId: RUN_ID,
+    profile: QPS_PROFILE || '<none>',
+    scriptInitAtMs: SCRIPT_INIT_AT_MS,
+    setupStartAtMs,
+    trafficStartAtMs: null,
+    trafficPlannedEndAtMs: null,
+    qps: {
+      questionnaire_query: QUERY_RPS,
+      answersheet_submit: SUBMIT_RPS,
+      report_status_query: REPORT_RPS,
+      statistics_query: STATS_RPS,
+      async_chain_probe: CHAIN_PROBE_RPS,
+    },
+    baseUrls: {
+      collection: COLLECTION_BASE_URL,
+      apiserver: APISERVER_BASE_URL,
+    },
+  };
+}
+
+function logPerfTimeEvent(event, atMs, extra) {
+  const record = Object.assign(
+    {
+      event,
+      run_id: RUN_ID,
+      profile: QPS_PROFILE || '<none>',
+      at: timeSnapshot(atMs),
+    },
+    extra || {}
+  );
+  console.log(`[perf-time] ${JSON.stringify(record)}`);
+}
+
+function timeSnapshot(ms) {
+  if (!ms) {
+    return null;
+  }
+  const date = new Date(ms);
+  return {
+    epoch_ms: ms,
+    local: formatLocalTime(date),
+    utc: date.toISOString(),
+    nginx_time: formatNginxTime(date),
+    timezone_offset: formatTimezoneOffset(date),
+  };
+}
+
+function addDurationMs(startMs, duration) {
+  const durationMs = parseDurationMs(duration);
+  if (!startMs || durationMs === null) {
+    return null;
+  }
+  return startMs + durationMs;
+}
+
+function parseDurationMs(duration) {
+  const text = String(duration || '').trim();
+  if (!text) {
+    return null;
+  }
+  const re = /(\d+(?:\.\d+)?)(ms|s|m|h)/g;
+  let match = re.exec(text);
+  let total = 0;
+  let matched = false;
+  while (match) {
+    matched = true;
+    const value = Number(match[1]);
+    const unit = match[2];
+    if (unit === 'ms') {
+      total += value;
+    } else if (unit === 's') {
+      total += value * 1000;
+    } else if (unit === 'm') {
+      total += value * 60 * 1000;
+    } else if (unit === 'h') {
+      total += value * 60 * 60 * 1000;
+    }
+    match = re.exec(text);
+  }
+  return matched ? Math.floor(total) : null;
+}
+
+function formatLocalTime(date) {
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+    + `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}.${pad3(date.getMilliseconds())}`
+    + formatTimezoneOffset(date);
+}
+
+function formatNginxTime(date) {
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  return `${pad2(date.getDate())}/${months[date.getMonth()]}/${date.getFullYear()}:`
+    + `${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())} ${formatTimezoneOffset(date).replace(':', '')}`;
+}
+
+function formatTimezoneOffset(date) {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absolute = Math.abs(offsetMinutes);
+  return `${sign}${pad2(Math.floor(absolute / 60))}:${pad2(absolute % 60)}`;
+}
+
+function pad2(value) {
+  const text = String(value);
+  return text.length >= 2 ? text : `0${text}`;
+}
+
+function pad3(value) {
+  const text = String(value);
+  if (text.length >= 3) {
+    return text;
+  }
+  return text.length === 2 ? `0${text}` : `00${text}`;
+}
+
+function errorMessage(err) {
+  if (!err) {
+    return '';
+  }
+  return err.message ? String(err.message) : String(err);
 }
 
 function buildAnswerPayload(data) {
@@ -903,11 +1092,12 @@ function apiserverToken() {
   return pick(APISERVER_TOKENS);
 }
 
-function recordHTTPStatus(res, endpointFailedCounter) {
+function recordHTTPStatus(res, endpointFailedCounter, endpoint) {
   if (is2xx(res.status)) {
     return;
   }
   endpointFailedCounter.add(1, res.tags);
+  recordEndpointFailureDetail(res, endpoint);
   if (res.status === 429) {
     http429Total.add(1, res.tags);
   }
@@ -917,9 +1107,51 @@ function recordHTTPStatus(res, endpointFailedCounter) {
   if (res.status === 403) {
     http403Total.add(1, res.tags);
   }
+  if (res.status >= 400 && res.status < 500) {
+    http4xxTotal.add(1, res.tags);
+  }
   if (res.status >= 500) {
     http5xxTotal.add(1, res.tags);
   }
+  if (res.status === 0) {
+    httpTransportErrorTotal.add(1, res.tags);
+    if (isTimeoutResponse(res)) {
+      httpTimeoutTotal.add(1, res.tags);
+    }
+  }
+}
+
+function buildEndpointFailureCounters(prefix) {
+  return {
+    status4xx: new Counter(`${prefix}_4xx`),
+    status5xx: new Counter(`${prefix}_5xx`),
+    transportError: new Counter(`${prefix}_transport_error`),
+    timeout: new Counter(`${prefix}_timeout`),
+  };
+}
+
+function recordEndpointFailureDetail(res, endpoint) {
+  const counters = endpointFailureCounters[endpoint];
+  if (!counters) {
+    return;
+  }
+  if (res.status >= 400 && res.status < 500) {
+    counters.status4xx.add(1, res.tags);
+  }
+  if (res.status >= 500) {
+    counters.status5xx.add(1, res.tags);
+  }
+  if (res.status === 0) {
+    counters.transportError.add(1, res.tags);
+    if (isTimeoutResponse(res)) {
+      counters.timeout.add(1, res.tags);
+    }
+  }
+}
+
+function isTimeoutResponse(res) {
+  const message = String((res && res.error) || '');
+  return message.toLowerCase().includes('timeout');
 }
 
 function authHeaders(token) {

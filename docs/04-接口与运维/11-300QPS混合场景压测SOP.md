@@ -248,8 +248,19 @@ worker（serverD）、NSQ 隧道为可选项；snapshot 失败写 `.err`，**不
 | ------- | ---- |
 | `http_401_total` | token 过期或无效 → 先换 token |
 | `http_403_total` | 权限不足 → 检查 token 分组 |
+| `http_4xx_total` | 所有 4xx 汇总；再看 401/403/429 细分 |
 | `http_429_total` | 应用层限流 → 加 token 或调 `rate_limit` |
 | `http_5xx_total` | 服务端或 **Nginx 503/502** → 按 §8 分流 |
+| `http_transport_error_total` | 没拿到 HTTP 响应，例如客户端 30s 超时 |
+| `http_timeout_total` | `request timeout` 汇总；注意不是 `wait-report?timeout=5` |
+
+混合压测脚本会额外输出按场景拆分的失败 counter：
+
+| counter 形态 | 含义 |
+| ------------ | ---- |
+| `report_status_5xx` / `answer_submit_5xx` / `questionnaire_query_5xx` / `statistics_5xx` | 哪类接口返回了 5xx |
+| `report_status_transport_error` / `answer_submit_transport_error` / `questionnaire_query_transport_error` / `statistics_transport_error` | 哪类接口没有拿到 HTTP 响应 |
+| `report_status_timeout` / `answer_submit_timeout` / `questionnaire_query_timeout` / `statistics_timeout` | 哪类接口打满了 k6 `HTTP_TIMEOUT` |
 
 新版 k6 `--summary-export` JSON schema 可能变化；若 `jq '.metrics.*.values.count'` 为 null：
 
@@ -315,7 +326,19 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 
 **排障顺序**：k6 counter 分类 → Nginx access（是否 503/0.000s）→ 应用 access log（`middleware/logger.go` 状态码分布）→ `docker stats` → gRPC/backpressure。
 
-### 8.1 在 serverA 统计应用 HTTP 状态码
+### 8.1 混合场景失败分流
+
+先看场景级 counter，不要只看总 `http_req_failed`：
+
+| 现象 | 下一步 |
+| ---- | ------ |
+| `*_5xx` 高，`*_timeout` 低 | 查 Nginx access/error 与应用 access，确认是网关 502/503 还是应用 5xx |
+| `*_timeout` 高，P95 接近 `HTTP_TIMEOUT` | 查应用是否排队到 30s：SubmitQueue、gRPC max inflight、apiserver backpressure、DB 慢查询 |
+| `report_status_timeout` 高于其他场景 | 区分正常长轮询等待和下游阻塞；`wait-report?timeout=5` 应约 5s 内返回 pending，不应拖到 30s |
+| `answer_submit_5xx` 或 `answer_submit_timeout` 高 | 优先查 collection SubmitQueue 与 collection → apiserver gRPC；再查 apiserver durable submit、Mongo/MySQL/NSQ |
+| 四类场景同时 timeout | 优先查 serverA 入口和 apiserver 进程整体饱和，而不是单个接口逻辑 |
+
+### 8.2 在 serverA 统计应用 HTTP 状态码
 
 ```bash
 docker logs qs-collection-server --since 10m 2>&1 \
@@ -325,7 +348,7 @@ docker logs qs-collection-server --since 10m 2>&1 \
 
 勿用 `grep timeout` 粗筛——query 参数 `timeout=5` 会误匹配。
 
-### 8.2 在 serverA 统计 Nginx 5xx
+### 8.3 在 serverA 统计 Nginx 5xx
 
 ```bash
 awk '{print $9}' /data/logs/nginx/access.log | sort | uniq -c | sort -rn | head -20
