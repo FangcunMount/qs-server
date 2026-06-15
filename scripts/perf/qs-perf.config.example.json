@@ -106,12 +106,204 @@
           "max": 1000
         },
         "report": {
-          "preAllocated": 700,
-          "max": 1800
+          "preAllocated": 220,
+          "max": 500
         },
         "stats": {
           "preAllocated": 80,
           "max": 400
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_140": {
+      "duration": "5m",
+      "qps": {
+        "query": 56,
+        "submit": 28,
+        "report": 42,
+        "stats": 14,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 130,
+          "max": 620
+        },
+        "submit": {
+          "preAllocated": 190,
+          "max": 1020
+        },
+        "report": {
+          "preAllocated": 260,
+          "max": 540
+        },
+        "stats": {
+          "preAllocated": 85,
+          "max": 410
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_160": {
+      "duration": "5m",
+      "qps": {
+        "query": 64,
+        "submit": 32,
+        "report": 48,
+        "stats": 16,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 140,
+          "max": 640
+        },
+        "submit": {
+          "preAllocated": 210,
+          "max": 1040
+        },
+        "report": {
+          "preAllocated": 300,
+          "max": 590
+        },
+        "stats": {
+          "preAllocated": 90,
+          "max": 420
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_180": {
+      "duration": "5m",
+      "qps": {
+        "query": 72,
+        "submit": 36,
+        "report": 54,
+        "stats": 18,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 150,
+          "max": 670
+        },
+        "submit": {
+          "preAllocated": 220,
+          "max": 1070
+        },
+        "report": {
+          "preAllocated": 350,
+          "max": 630
+        },
+        "stats": {
+          "preAllocated": 95,
+          "max": 430
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_200": {
+      "duration": "5m",
+      "qps": {
+        "query": 80,
+        "submit": 40,
+        "report": 60,
+        "stats": 20,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 160,
+          "max": 690
+        },
+        "submit": {
+          "preAllocated": 230,
+          "max": 1090
+        },
+        "report": {
+          "preAllocated": 390,
+          "max": 680
+        },
+        "stats": {
+          "preAllocated": 100,
+          "max": 440
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_240": {
+      "duration": "8m",
+      "qps": {
+        "query": 96,
+        "submit": 48,
+        "report": 72,
+        "stats": 24,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 170,
+          "max": 730
+        },
+        "submit": {
+          "preAllocated": 260,
+          "max": 1130
+        },
+        "report": {
+          "preAllocated": 470,
+          "max": 770
+        },
+        "stats": {
+          "preAllocated": 110,
+          "max": 470
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_280": {
+      "duration": "8m",
+      "qps": {
+        "query": 112,
+        "submit": 56,
+        "report": 84,
+        "stats": 28,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 190,
+          "max": 780
+        },
+        "submit": {
+          "preAllocated": 290,
+          "max": 1180
+        },
+        "report": {
+          "preAllocated": 560,
+          "max": 860
+        },
+        "stats": {
+          "preAllocated": 120,
+          "max": 490
         },
         "chainProbe": {
           "preAllocated": 20,
@@ -138,8 +330,8 @@
           "max": 1200
         },
         "report": {
-          "preAllocated": 900,
-          "max": 2200
+          "preAllocated": 600,
+          "max": 900
         },
         "stats": {
           "preAllocated": 120,
@@ -170,8 +362,8 @@
           "max": 1200
         },
         "report": {
-          "preAllocated": 900,
-          "max": 2200
+          "preAllocated": 600,
+          "max": 900
         },
         "stats": {
           "preAllocated": 120,

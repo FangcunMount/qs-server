@@ -30,7 +30,7 @@ insecure:
 secure:
   bind-address: "0.0.0.0"
   # serverA Nginx 统一终止公网 HTTPS，并通过 infra-network 访问本服务 HTTP 8080。
-  # collection-server 与 apiserver 同机部署（serverA 4C/8G），不挂载公网 TLS 证书。
+  # collection-server 与 apiserver 同机部署（serverA 8C/16G），不挂载公网 TLS 证书。
   bind-port: 0
   tls:
     # bind-port=0 时不会读取 Web 证书；保留字段便于回滚启用 HTTPS listener。
@@ -44,7 +44,7 @@ grpc_client:
   endpoint: "qs-apiserver:9090"  # Docker 容器服务名
   timeout: 30
   insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
-  max_inflight: 280
+  max_inflight: 360
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
@@ -71,7 +71,7 @@ redis:
   password: ""
   database: 1
   max-idle: 48
-  max-active: 200
+  max-active: 256
   timeout: 300
   min-idle-conns: 10
   pool-timeout: 10
@@ -123,7 +123,7 @@ rate_limit:
 submit_queue:
   enabled: true
   queue_size: 1200
-  worker_count: 20
+  worker_count: 24
   wait_timeout_ms: 200
 
 # ============================================================
@@ -227,11 +227,11 @@ log:
 # ============================================================
 # 控制 Go 运行时的 GC/内存行为与并发
 runtime:
-  # 将 GOMEMLIMIT 设置为容器配额的 75% 以避免 OOM（容器 mem_limit=2048MiB）
-  go-mem-limit: "1536MiB"
+  # 将 GOMEMLIMIT 设置为容器配额的 75% 以避免 OOM（容器 mem_limit=4096MiB）
+  go-mem-limit: "3072MiB"
   # 更积极的 GC，降低峰值内存
   gogc: 50
 
 # 并发/连接池调优
 concurrency:
-  max-concurrency: 320
+  max-concurrency: 512

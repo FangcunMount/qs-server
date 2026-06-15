@@ -111,7 +111,8 @@ COLOR_RED := \033[31m
 .PHONY: docs-swagger docs-rest docs-hygiene docs-verify
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
-.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-mixed300
+.PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120
+.PHONY: perf-mixed140 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed240 perf-mixed280 perf-mixed300
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-verify
 
 # ============================================================================
@@ -218,7 +219,7 @@ perf-preflight: perf-ensure-config ## Token 预检（k6 前必跑）
 perf-check-k6:
 	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
 
-perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|pretest_120|mixed_300)
+perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|pretest_120|mixed_140|…|mixed_300)
 	$(if $(SUMMARY_EXPORT),@mkdir -p $(dir $(SUMMARY_EXPORT)),)
 	k6 run -e PERF_CONFIG_FILE="$(PERF_CONFIG_FILE)" -e PERF_ROOT_DIR="$(CURDIR)" \
 		-e QPS_PROFILE="$(QPS_PROFILE)" \
@@ -235,6 +236,30 @@ perf-pretest60: perf-preflight ## k6 pretest_60 预压 (3min)
 perf-pretest120: perf-preflight ## k6 pretest_120 中档 (5min)
 	@mkdir -p $(PERF_DIR)/pretest120
 	$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/pretest120/k6-summary.json
+
+perf-mixed140: perf-preflight ## k6 mixed_140 升档 (5min)
+	@mkdir -p $(PERF_DIR)/mixed140
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_140 SUMMARY_EXPORT=$(PERF_DIR)/mixed140/k6-summary.json
+
+perf-mixed160: perf-preflight ## k6 mixed_160 升档 (5min)
+	@mkdir -p $(PERF_DIR)/mixed160
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_160 SUMMARY_EXPORT=$(PERF_DIR)/mixed160/k6-summary.json
+
+perf-mixed180: perf-preflight ## k6 mixed_180 升档 (5min)
+	@mkdir -p $(PERF_DIR)/mixed180
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_180 SUMMARY_EXPORT=$(PERF_DIR)/mixed180/k6-summary.json
+
+perf-mixed200: perf-preflight ## k6 mixed_200 升档 (5min)
+	@mkdir -p $(PERF_DIR)/mixed200
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_200 SUMMARY_EXPORT=$(PERF_DIR)/mixed200/k6-summary.json
+
+perf-mixed240: perf-preflight ## k6 mixed_240 升档 (8min)
+	@mkdir -p $(PERF_DIR)/mixed240
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_240 SUMMARY_EXPORT=$(PERF_DIR)/mixed240/k6-summary.json
+
+perf-mixed280: perf-preflight ## k6 mixed_280 升档 (8min)
+	@mkdir -p $(PERF_DIR)/mixed280
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_280 SUMMARY_EXPORT=$(PERF_DIR)/mixed280/k6-summary.json
 
 perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min) + 前后 snapshot
 	@mkdir -p $(PERF_DIR)/300qps

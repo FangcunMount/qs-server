@@ -1,6 +1,6 @@
 # 300 QPS 混合场景压测 SOP
 
-**本文回答**：如何在当前生产拓扑下，用 k6 对 qs-server 做分档混合压测（smoke → pretest_60 → pretest_120 → mixed_300），如何准备 token/数据、如何观测、以及我们实际踩过的故障如何快速定位。
+**本文回答**：如何在当前生产拓扑下，用 k6 对 qs-server 做分档混合压测（smoke → pretest_60 → pretest_120 → mixed_140…280 → mixed_300），如何准备 token/数据、如何观测、以及我们实际踩过的故障如何快速定位。
 
 ---
 
@@ -10,7 +10,7 @@
 | ---- | ---- |
 | 压测入口 | k6 打公网域名 `collect.fangcunmount.cn` + `qs.fangcunmount.cn` |
 | **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
-| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_300`，每档通过再升 |
+| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_140` → `mixed_160` → `mixed_180` → `mixed_200` → `mixed_240` → `mixed_280` → `mixed_300`，每档通过再升 |
 | 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
 | 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
 | 最常见假 5xx | **Nginx `limit_conn` 503**（耗时 0.000s，请求未到应用） |
@@ -36,7 +36,7 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 
 | 节点 | 规格（2026-06） | 组件 | 压测相关性 |
 | ---- | --------------- | ---- | ---------- |
-| serverA | 4C/8G | nginx、qs-apiserver（3C/3G）、qs-collection-server（1C/1.5G） | **HTTP 同步链路主战场** |
+| serverA | 8C/16G | nginx、qs-apiserver（5C/8G）、qs-collection-server（2C/4G） | **HTTP 同步链路主战场** |
 | serverB | 2C/2G | IAM | JWKS / gRPC；非 HTTP 压测主瓶颈 |
 | serverD | 4C/4G | qs-worker | 异步消费；`pretest_*` 阶段通常不是 HTTP 5xx 主因 |
 
@@ -63,10 +63,18 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `smoke_4` | 4 | 1/1/1/1 | 30s | 连通性、setup 自动发现 |
 | `pretest_60` | 60 | 24/12/18/6 | 3m | **第一档正式预压** |
 | `pretest_120` | 120 | 48/24/36/12 | 5m | 观察限流与资源曲线 |
+| `mixed_140` | 140 | 56/28/42/14 | 5m | 120→300 细粒度升档 |
+| `mixed_160` | 160 | 64/32/48/16 | 5m | 同上 |
+| `mixed_180` | 180 | 72/36/54/18 | 5m | 同上 |
+| `mixed_200` | 200 | 80/40/60/20 | 5m | 接近 prod 保守基线 |
+| `mixed_240` | 240 | 96/48/72/24 | 8m | 同上 |
+| `mixed_280` | 280 | 112/56/84/28 | 8m | 逼近目标档 |
 | `mixed_300` | 300 | 120/60/90/30 | 10m | 目标混合压测 |
 | `mixed_300_probe` | 300+0.2 | 同上 + chainProbe | 10m | 采样 `report_generated_latency` |
 
 **原则**：上一档 `http_req_failed < 1%`、无明显 503/502 尖刺后再升档。`pretest_60` 曾出现 p90 ~5s 但 0 失败，可接受；`pretest_120` 在跨机 collection 时大量 502/30s 超时，迁回 serverA 后应复测。
+
+**wait-report VU sizing**：`wait-report` 是长轮询接口，`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
 
 ---
 
@@ -156,6 +164,12 @@ make perf-preflight         # 预检（apiserver testees 须 200）
 make perf-smoke             # smoke_4
 make perf-pretest60         # pretest_60，summary → tmp/perf/pretest60/
 make perf-pretest120        # pretest_120
+make perf-mixed140          # mixed_140
+make perf-mixed160          # mixed_160
+make perf-mixed180          # mixed_180
+make perf-mixed200          # mixed_200
+make perf-mixed240          # mixed_240
+make perf-mixed280          # mixed_280
 make perf-mixed300          # mixed_300 + 前后 snapshot
 
 make perf-k6 QPS_PROFILE=pretest_60   # 任意档位
@@ -319,6 +333,7 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | ~7% 失败，k6 无 429，collection 日志全 200 | token 过期 → **401**（计入 failed） | 换 token + preflight |
 | k6 `http_5xx`，collection **0 条 5xx**，nginx access `503` 0.000s | **Nginx limit_conn** | 白名单压测 IP 或临时调高；`docker restart nginx` |
 | `pretest_120` 大量 502，`upstream prematurely closed` | 跨机 upstream（历史：collection 在 serverB） | collection 迁 serverA；调大 upstream `keepalive` |
+| `wait-report` k6 EOF，但 Nginx access 只有成功数、error log 为空 | k6 report VU 过大导致入口前连接复用异常 | 下调 `REPORT_VUS/REPORT_MAX_VUS`；`pretest_120` 用 `220/500`，`mixed_300` 先用 `600/900` |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
@@ -372,7 +387,7 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | 项 | 填写 |
 | -- | ---- |
 | 日期 / Git SHA | |
-| serverA 规格 | 4C/8G，apiserver 3C/3G，collection 1C/1.5G |
+| serverA 规格 | 8C/16G，apiserver 5C/8G，collection 2C/4G |
 | serverD worker 副本 | |
 | 压测机公网 IP | |
 | Nginx conn_limit 压测 IP 配额 | |
@@ -385,6 +400,12 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | ---- | ---: | ---: | ---: | ---: | ---: | ---: | ---- |
 | pretest_60 | 60 | | | | | | |
 | pretest_120 | 120 | | | | | | |
+| mixed_140 | 140 | | | | | | |
+| mixed_160 | 160 | | | | | | |
+| mixed_180 | 180 | | | | | | |
+| mixed_200 | 200 | | | | | | |
+| mixed_240 | 240 | | | | | | |
+| mixed_280 | 280 | | | | | | |
 | mixed_300 | 300 | | | | | | |
 
 ### 10.3 瓶颈与后续

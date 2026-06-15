@@ -28,17 +28,19 @@
 
 ## 1. 当前配置基线
 
-当前生产配置接近 200 QPS 保守基线：
+当前生产配置已按 `mixed_300` 目标和 serverA 8C/16G 单 apiserver 架构调整：
 
 | 位置 | 关键值 | 含义 |
 | ---- | ------ | ---- |
-| collection rate_limit | submit/query global QPS 约 250 | 前台入口保护 |
-| collection grpc_client | max_inflight 约 80 | 到 apiserver 并发 |
-| collection submit_queue | queue_size 约 500，worker_count 约 8 | 提交削峰 |
-| apiserver rate_limit | global QPS 约 200 | 后台 REST 入口 |
-| apiserver backpressure | mysql 80，mongo 100，iam 40 | 下游保护 |
-| apiserver mysql pool | max open 约 80 | DB 连接池 |
-| worker concurrency | 约 16 | 后台消费并发 |
+| collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 前台入口保护 |
+| collection grpc_client | max_inflight 360 | 到 apiserver 并发 |
+| collection submit_queue | queue_size 1200，worker_count 24 | 提交削峰 |
+| collection concurrency | max-concurrency 512 | 本进程总并发保护 |
+| collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
+| apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
+| apiserver backpressure | mysql 180，mongo 170，iam 80 | 下游保护 |
+| apiserver mysql pool | max open 180 | DB 连接池 |
+| worker concurrency | 48 | 后台消费并发 |
 
 ---
 
@@ -97,6 +99,13 @@
 | 1000 | 5 CPU / 5GiB | 3 CPU / 3GiB | 2 CPU / 2GiB |
 
 `GOMEMLIMIT` 建议设置为容器内存的 65%-75%。
+
+当前 `mixed_300` 生产验收基线采用 serverA 8C/16G 单 apiserver 架构：`qs-apiserver`
+配置为 5 CPU / 8GiB（`GOMAXPROCS=5`、`GOMEMLIMIT=6144MiB`），`qs-collection-server`
+配置为 2 CPU / 4GiB（`GOMAXPROCS=2`、`GOMEMLIMIT=3072MiB`）。collection 侧同时将
+`grpc_client.max_inflight` 调至 360、`concurrency.max-concurrency` 调至 512，以承接
+`wait-report` 长轮询带来的并发占用。这个值高于上表的通用估算，是根据 300QPS 混合场景中
+apiserver 先饱和、collection 侧需保留长轮询余量的实测结果设定。
 
 ---
 

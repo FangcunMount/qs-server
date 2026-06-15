@@ -14,7 +14,7 @@
 3. 目标机操作：
    - 备份现有 configs，展开 deploy-package。
    - 使用 `docker compose -f /tmp/deploy-package/docker-compose.prod.yml up -d <service>` 启动指定服务。
-4. 资源配额：直接维护在 `build/docker/docker-compose.prod.yml`（serverA 4C/8G：apiserver + collection 同机）。
+4. 资源配额：直接维护在 `build/docker/docker-compose.prod.yml`（serverA 8C/16G：apiserver + collection 同机）。
 5. 服务内部并发/连接池：直接维护在 `configs/apiserver.prod.yaml`、`configs/collection-server.prod.yaml`、`configs/worker.prod.yaml`。
 6. Worker 副本数：不再硬编码；workflow_dispatch 可填写 `worker_replicas`，留空时读取仓库变量 `QS_WORKER_REPLICAS`，缺失时默认 `3`。
 
@@ -22,7 +22,7 @@
 
 | 主机 | 规格 | 组件 |
 | ---- | ---- | ---- |
-| serverA | 4C/8G | nginx、qs-apiserver、qs-collection-server |
+| serverA | 8C/16G | nginx、qs-apiserver、qs-collection-server |
 | serverB | 2C/2G | IAM（`iam-apiserver`） |
 | serverD | 4C/4G | qs-worker |
 
