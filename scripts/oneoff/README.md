@@ -123,8 +123,27 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 - `--allow-old-testees`：绕过创建时间保护，只应在人工确认这些 ID 确实是压测数据后使用。
 - `--derive-ids-from-facts`：额外从 MySQL `behavior_footprint` / `assessment_episode` 反查关联 ID；大事实表上较慢，默认关闭。事实表本身仍会按 `testee_id` 清理。
 - `--scan-event-payloads`：额外扫描 MySQL outbox / pending 的 `payload_json` 兜底匹配 `testee_id`；大 outbox 表上很慢，默认关闭。
+- `--skip-counts`：跳过行数统计和 affected source date window 计算；在已有外部备份保护、只想快速执行清理时使用。
+- `--skip-mongo-outbox-event-scope`：跳过从 Mongo `domain_event_outbox` 读取 `event_id` 并回灌 MySQL 临时表。Mongo outbox 文档仍会按聚合 ID 分批删除，但 MySQL `analytics_pending_event` / `analytics_projector_checkpoint` 只会清理 MySQL outbox 已发现的事件 ID；如需清理 Mongo outbox 对应的 pending/checkpoint，可后续按事件类型和时间窗单独处理。
 - `--backup-suffix`：备份表/集合后缀，只允许字母、数字和下划线。
 - `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
+
+大数据量快速执行示例：
+
+```bash
+go run scripts/oneoff/cleanup_perf_testee_data/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --mongo-db qs \
+  --testee-ids-file /tmp/perf-testee-ids.txt \
+  --backup-suffix 20260616_perf_testee_cleanup \
+  --skip-counts \
+  --skip-mongo-outbox-event-scope \
+  --preview-limit 0 \
+  --apply
+```
+
+如果已经在云厂商侧做了 MySQL/Mongo 快照，且明确接受脚本内不再二次备份，可以再加 `--skip-backup`。没有外部备份时不要跳过备份。
 
 ## cleanup_deleted_assessment_orphans.go
 

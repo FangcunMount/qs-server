@@ -24,20 +24,22 @@ import (
 const mongoIDChunkSize = 1000
 
 type config struct {
-	mysqlDSN           string
-	mongoURI           string
-	mongoDB            string
-	testeeIDsRaw       string
-	testeeIDsFile      string
-	testeeCreatedAfter string
-	allowOldTestees    bool
-	deriveIDsFromFacts bool
-	scanEventPayloads  bool
-	backupSuffix       string
-	timeout            time.Duration
-	apply              bool
-	skipBackup         bool
-	previewLimit       int
+	mysqlDSN                  string
+	mongoURI                  string
+	mongoDB                   string
+	testeeIDsRaw              string
+	testeeIDsFile             string
+	testeeCreatedAfter        string
+	allowOldTestees           bool
+	deriveIDsFromFacts        bool
+	scanEventPayloads         bool
+	skipCounts                bool
+	skipMongoOutboxEventScope bool
+	backupSuffix              string
+	timeout                   time.Duration
+	apply                     bool
+	skipBackup                bool
+	previewLimit              int
 }
 
 type namedCount struct {
@@ -123,26 +125,33 @@ func main() {
 	if err := storeScopeIDs(ctx, conn, ids); err != nil {
 		log.Fatalf("store enriched scope ids: %v", err)
 	}
-	if err := addMongoOutboxEventIDsToMySQLScope(ctx, conn, mongoDB, ids); err != nil {
+	if cfg.skipMongoOutboxEventScope {
+		log.Print("skip mongo outbox event id scope by --skip-mongo-outbox-event-scope")
+	} else if err := addMongoOutboxEventIDsToMySQLScope(ctx, conn, mongoDB, ids); err != nil {
 		log.Fatalf("load mongo outbox event ids: %v", err)
 	}
 
-	summary, err := loadScopeSummary(ctx, conn)
-	if err != nil {
-		log.Fatalf("load scope summary: %v", err)
-	}
-	mysqlCounts, err := countMySQLRows(ctx, conn)
-	if err != nil {
-		log.Fatalf("count mysql rows: %v", err)
-	}
-	mongoCounts, err := countMongoRows(ctx, mongoDB, ids)
-	if err != nil {
-		log.Fatalf("count mongo rows: %v", err)
-	}
+	if cfg.skipCounts {
+		printScopeIDsSummary(ids, cfg)
+		log.Print("row counts skipped by --skip-counts")
+	} else {
+		summary, err := loadScopeSummary(ctx, conn)
+		if err != nil {
+			log.Fatalf("load scope summary: %v", err)
+		}
+		mysqlCounts, err := countMySQLRows(ctx, conn)
+		if err != nil {
+			log.Fatalf("count mysql rows: %v", err)
+		}
+		mongoCounts, err := countMongoRows(ctx, mongoDB, ids)
+		if err != nil {
+			log.Fatalf("count mongo rows: %v", err)
+		}
 
-	printScopeSummary(summary, cfg)
-	printCounts("mysql", mysqlCounts)
-	printCounts("mongo", mongoCounts)
+		printScopeSummary(summary, cfg)
+		printCounts("mysql", mysqlCounts)
+		printCounts("mongo", mongoCounts)
+	}
 
 	previews, err := loadTesteePreview(ctx, conn, cfg.previewLimit)
 	if err != nil {
@@ -193,6 +202,8 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.allowOldTestees, "allow-old-testees", false, "bypass --testee-created-after guard")
 	flag.BoolVar(&cfg.deriveIDsFromFacts, "derive-ids-from-facts", false, "also derive IDs from MySQL behavior_footprint and assessment_episode; slower on large fact tables")
 	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also scan MySQL outbox/pending payload_json for testee_id; expensive on large outbox tables")
+	flag.BoolVar(&cfg.skipCounts, "skip-counts", false, "skip expensive row counts and affected source date window; useful when an external backup already protects an apply run")
+	flag.BoolVar(&cfg.skipMongoOutboxEventScope, "skip-mongo-outbox-event-scope", false, "skip loading Mongo outbox event_id values into MySQL temp scope; Mongo outbox documents are still deleted by aggregate filters")
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "backup table/collection suffix")
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall timeout, for example 30m or 2h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply deletes; default is dry-run")
@@ -1227,6 +1238,13 @@ func printScopeSummary(summary scopeSummary, cfg config) {
 	if summary.MinTouchedDate.Valid || summary.MaxTouchedDate.Valid {
 		log.Printf("affected source date window: min=%s max=%s", nullableString(summary.MinTouchedDate), nullableString(summary.MaxTouchedDate))
 	}
+}
+
+func printScopeIDsSummary(ids scopeIDs, cfg config) {
+	log.Printf("scope: apply=%v backup=%v testee_created_after=%q allow_old_testees=%v skip_counts=true",
+		cfg.apply, !cfg.skipBackup, cfg.testeeCreatedAfter, cfg.allowOldTestees)
+	log.Printf("scope ids: testees=%d assessments=%d answersheets=%d reports=%d",
+		len(ids.TesteeIDs), len(ids.AssessmentIDs), len(ids.AnswerSheetIDs), len(ids.ReportIDs))
 }
 
 func printCounts(prefix string, counts []namedCount) {
