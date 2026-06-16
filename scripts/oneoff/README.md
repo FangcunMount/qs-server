@@ -19,6 +19,15 @@ export QS_TOKEN='***'
 export REDIS_PASSWORD='***'
 ```
 
+如果 MongoDB 只监听远端服务器的 `127.0.0.1:27017`，先在执行脚本的机器上建立 SSH 隧道，再把 URI 指向本地转发端口。URI 必须带有效账号密码；如果账号创建在 `admin` 库，需要追加 `authSource=admin`。
+
+```bash
+ssh -N -L 27017:127.0.0.1:27017 yangshujie@81.70.102.15
+
+export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=true'
+# 或：export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?authSource=admin&directConnection=true'
+```
+
 ## 脚本总览
 
 | 脚本 | 用途 | 主要写入对象 |
@@ -47,6 +56,8 @@ export REDIS_PASSWORD='***'
 - MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox`。
 
 脚本默认 dry-run，只输出命中数量和受试者预览。执行 `--apply` 时会先创建备份表和备份集合，除非显式传入 `--skip-backup`。
+
+脚本会在跑 MySQL 作用域查询前，对 MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox` 做只读权限预检。`ping` 成功但 `find requires authentication` 失败时，说明地址已经连通，但 `MONGO_URI` 缺少账号密码或认证库不对。
 
 ### 解决什么问题
 

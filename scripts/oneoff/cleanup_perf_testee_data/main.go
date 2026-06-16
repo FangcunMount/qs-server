@@ -102,6 +102,9 @@ func main() {
 		log.Fatalf("ping mongo: %v", err)
 	}
 	mongoDB := mongoClient.Database(cfg.mongoDB)
+	if err := verifyMongoReadAccess(ctx, mongoDB); err != nil {
+		log.Fatalf("verify mongo read access: %v", err)
+	}
 
 	if err := prepareMySQLScope(ctx, conn, cfg, testeeIDs); err != nil {
 		log.Fatalf("prepare mysql scope: %v", err)
@@ -476,6 +479,41 @@ LIMIT 20`, cfg.testeeCreatedAfter)
 		samples = append(samples, fmt.Sprintf("%d/%s/%s", id, name, createdAt.Format("2006-01-02 15:04:05")))
 	}
 	return fmt.Errorf("%d testee(s) violate --testee-created-after=%q; sample=%s; use --allow-old-testees only after manual verification", oldCount, cfg.testeeCreatedAfter, strings.Join(samples, ", "))
+}
+
+func verifyMongoReadAccess(ctx context.Context, db *mongo.Database) error {
+	collections := []string{
+		"answersheets",
+		"answersheet_submit_idempotency",
+		"interpret_reports",
+		"domain_event_outbox",
+	}
+	for _, name := range collections {
+		err := db.Collection(name).FindOne(
+			ctx,
+			bson.M{"_id": bson.M{"$exists": false}},
+			options.FindOne().SetProjection(bson.M{"_id": 1}),
+		).Err()
+		if err == nil || errors.Is(err, mongo.ErrNoDocuments) {
+			continue
+		}
+		if isMongoUnauthorized(err) {
+			return fmt.Errorf("%s find permission denied: %w; use an authenticated --mongo-uri, for example mongodb://user:password@127.0.0.1:27017/%s?directConnection=true, and add authSource=admin if the user was created in admin", name, err, db.Name())
+		}
+		return fmt.Errorf("%s find probe: %w", name, err)
+	}
+	return nil
+}
+
+func isMongoUnauthorized(err error) bool {
+	var commandErr mongo.CommandError
+	if errors.As(err, &commandErr) {
+		if commandErr.Code == 13 || strings.EqualFold(commandErr.Name, "Unauthorized") {
+			return true
+		}
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Unauthorized") || strings.Contains(msg, "requires authentication")
 }
 
 type scopeIDs struct {
