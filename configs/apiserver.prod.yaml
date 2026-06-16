@@ -304,7 +304,7 @@ behavior_pending_reconcile:
 outbox_relay:
   mongo:
     interval: "500ms"           # Mongo outbox 主链路事件排水频率；300 QPS 压测起步值
-    batch_size: 300             # 每轮最多 claim 的 Mongo outbox 事件数
+    batch_size: 1000            # 每轮最多 claim 的 Mongo outbox 事件数
   assessment:
     interval: "2s"              # MySQL assessment outbox 当前积压较低，保持保守频率
     batch_size: 50              # 每轮最多 claim 的 assessment outbox 事件数
@@ -449,8 +449,8 @@ iam:
   jwks:
     url: "https://iam.fangcunmount.cn/.well-known/jwks.json"  # JWKS HTTP 端点
     grpc-endpoint: "iam-apiserver:9090"                    # gRPC 降级端点（HTTP 失败时使用，端口 9090）
-    refresh-interval: 5m                               # 定时刷新间隔
-    cache-ttl: 30m                                     # 缓存有效期
+    refresh-interval: 1h                               # 定时刷新间隔
+    cache-ttl: 24h                                     # 缓存有效期
     fetch-strategies: ["http", "grpc", "cache"]        # 降级策略：HTTP → gRPC → 缓存
 
   # 用户信息缓存配置
