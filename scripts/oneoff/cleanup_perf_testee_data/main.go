@@ -16,9 +16,12 @@ import (
 
 	_ "github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
+
+const mongoIDChunkSize = 1000
 
 type config struct {
 	mysqlDSN           string
@@ -659,33 +662,36 @@ func storeScopeIDs(ctx context.Context, conn *sql.Conn, ids scopeIDs) error {
 }
 
 func addMongoOutboxEventIDsToMySQLScope(ctx context.Context, conn *sql.Conn, db *mongo.Database, ids scopeIDs) error {
-	filter := mongoOutboxFilter(ids)
-	if len(filter) == 0 {
-		return nil
-	}
-	cur, err := db.Collection("domain_event_outbox").Find(ctx, filter, options.Find().SetProjection(bson.M{"event_id": 1}))
-	if err != nil {
-		return err
-	}
-	defer func() { _ = cur.Close(ctx) }()
-	for cur.Next(ctx) {
-		var row struct {
-			EventID string `bson:"event_id"`
-		}
-		if err := cur.Decode(&row); err != nil {
+	for _, filter := range mongoOutboxFilters(ids) {
+		cur, err := db.Collection("domain_event_outbox").Find(ctx, filter, options.Find().SetProjection(bson.M{"event_id": 1}))
+		if err != nil {
 			return err
 		}
-		if row.EventID == "" {
-			continue
+		for cur.Next(ctx) {
+			var row struct {
+				EventID string `bson:"event_id"`
+			}
+			if err := cur.Decode(&row); err != nil {
+				_ = cur.Close(ctx)
+				return err
+			}
+			if row.EventID == "" {
+				continue
+			}
+			if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id) VALUES (?)`, row.EventID); err != nil {
+				_ = cur.Close(ctx)
+				return err
+			}
 		}
-		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id) VALUES (?)`, row.EventID); err != nil {
+		if err := cur.Err(); err != nil {
+			_ = cur.Close(ctx)
+			return err
+		}
+		if err := cur.Close(ctx); err != nil {
 			return err
 		}
 	}
-	if err := cur.Err(); err != nil {
-		return err
-	}
-	_, err = conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
+	_, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
 SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY p.event_id`)
 	return err
 }
@@ -795,19 +801,10 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 }
 
 func countMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs) ([]namedCount, error) {
-	items := []struct {
-		name   string
-		coll   string
-		filter bson.M
-	}{
-		{"answersheets", "answersheets", answersheetFilter(ids)},
-		{"answersheet_submit_idempotency", "answersheet_submit_idempotency", answerSheetIdempotencyFilter(ids)},
-		{"interpret_reports", "interpret_reports", reportFilter(ids)},
-		{"domain_event_outbox", "domain_event_outbox", mongoOutboxFilter(ids)},
-	}
+	items := mongoCollectionScopes(ids)
 	out := make([]namedCount, 0, len(items))
 	for _, item := range items {
-		count, err := db.Collection(item.coll).CountDocuments(ctx, item.filter)
+		count, err := countMongoDocumentsByFilters(ctx, db.Collection(item.coll), item.filters)
 		if err != nil {
 			return nil, fmt.Errorf("%s: %w", item.name, err)
 		}
@@ -848,18 +845,10 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 }
 
 func backupMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, suffix string) error {
-	items := []struct {
-		coll   string
-		filter bson.M
-	}{
-		{"answersheets", answersheetFilter(ids)},
-		{"answersheet_submit_idempotency", answerSheetIdempotencyFilter(ids)},
-		{"interpret_reports", reportFilter(ids)},
-		{"domain_event_outbox", mongoOutboxFilter(ids)},
-	}
+	items := mongoCollectionScopes(ids)
 	for _, item := range items {
 		backupName := "cleanup_bak_perf_testee_" + item.coll + "_" + suffix
-		count, err := backupMongoCollection(ctx, db.Collection(item.coll), db.Collection(backupName), item.filter)
+		count, err := backupMongoCollection(ctx, db.Collection(item.coll), db.Collection(backupName), item.filters)
 		if err != nil {
 			return fmt.Errorf("backup mongo %s: %w", item.coll, err)
 		}
@@ -868,12 +857,7 @@ func backupMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, suff
 	return nil
 }
 
-func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection, filter bson.M) (int64, error) {
-	cur, err := source.Find(ctx, filter)
-	if err != nil {
-		return 0, err
-	}
-	defer func() { _ = cur.Close(ctx) }()
+func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection, filters []bson.M) (int64, error) {
 	batch := make([]interface{}, 0, 1000)
 	var total int64
 	flush := func() error {
@@ -881,27 +865,49 @@ func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection
 			return nil
 		}
 		result, err := backup.InsertMany(ctx, batch, options.InsertMany().SetOrdered(false))
-		if err != nil {
+		if err != nil && !mongo.IsDuplicateKeyError(err) {
 			return err
 		}
-		total += int64(len(result.InsertedIDs))
+		if result != nil {
+			total += int64(len(result.InsertedIDs))
+		}
 		batch = batch[:0]
 		return nil
 	}
-	for cur.Next(ctx) {
-		var doc bson.M
-		if err := cur.Decode(&doc); err != nil {
+	seen := map[string]struct{}{}
+	for _, filter := range filters {
+		cur, err := source.Find(ctx, filter)
+		if err != nil {
 			return total, err
 		}
-		batch = append(batch, doc)
-		if len(batch) >= cap(batch) {
-			if err := flush(); err != nil {
+		for cur.Next(ctx) {
+			var doc bson.M
+			if err := cur.Decode(&doc); err != nil {
+				_ = cur.Close(ctx)
 				return total, err
 			}
+			key := mongoDocumentIDKey(doc["_id"])
+			if key != "" {
+				if _, ok := seen[key]; ok {
+					continue
+				}
+				seen[key] = struct{}{}
+			}
+			batch = append(batch, doc)
+			if len(batch) >= cap(batch) {
+				if err := flush(); err != nil {
+					_ = cur.Close(ctx)
+					return total, err
+				}
+			}
 		}
-	}
-	if err := cur.Err(); err != nil {
-		return total, err
+		if err := cur.Err(); err != nil {
+			_ = cur.Close(ctx)
+			return total, err
+		}
+		if err := cur.Close(ctx); err != nil {
+			return total, err
+		}
 	}
 	return total, flush()
 }
@@ -946,31 +952,78 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) 
 }
 
 func deleteMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs) ([]namedCount, error) {
-	items := []struct {
-		name   string
-		coll   string
-		filter bson.M
-	}{
-		{"answersheets", "answersheets", answersheetFilter(ids)},
-		{"answersheet_submit_idempotency", "answersheet_submit_idempotency", answerSheetIdempotencyFilter(ids)},
-		{"interpret_reports", "interpret_reports", reportFilter(ids)},
-		{"domain_event_outbox", "domain_event_outbox", mongoOutboxFilter(ids)},
-	}
+	items := mongoCollectionScopes(ids)
 	out := make([]namedCount, 0, len(items))
 	for _, item := range items {
-		result, err := db.Collection(item.coll).DeleteMany(ctx, item.filter)
-		if err != nil {
-			return nil, fmt.Errorf("%s: %w", item.name, err)
+		var deleted int64
+		for _, filter := range item.filters {
+			result, err := db.Collection(item.coll).DeleteMany(ctx, filter)
+			if err != nil {
+				return nil, fmt.Errorf("%s: %w", item.name, err)
+			}
+			deleted += result.DeletedCount
 		}
-		out = append(out, namedCount{Name: item.name, Count: result.DeletedCount})
+		out = append(out, namedCount{Name: item.name, Count: deleted})
 	}
 	return out, nil
+}
+
+type mongoCollectionScope struct {
+	name    string
+	coll    string
+	filters []bson.M
+}
+
+func mongoCollectionScopes(ids scopeIDs) []mongoCollectionScope {
+	return []mongoCollectionScope{
+		{name: "answersheets", coll: "answersheets", filters: answersheetFilters(ids)},
+		{name: "answersheet_submit_idempotency", coll: "answersheet_submit_idempotency", filters: answerSheetIdempotencyFilters(ids)},
+		{name: "interpret_reports", coll: "interpret_reports", filters: reportFilters(ids)},
+		{name: "domain_event_outbox", coll: "domain_event_outbox", filters: mongoOutboxFilters(ids)},
+	}
+}
+
+func countMongoDocumentsByFilters(ctx context.Context, coll *mongo.Collection, filters []bson.M) (int64, error) {
+	seen := map[string]struct{}{}
+	for _, filter := range filters {
+		cur, err := coll.Find(ctx, filter, options.Find().SetProjection(bson.M{"_id": 1}))
+		if err != nil {
+			return 0, err
+		}
+		for cur.Next(ctx) {
+			var row bson.M
+			if err := cur.Decode(&row); err != nil {
+				_ = cur.Close(ctx)
+				return 0, err
+			}
+			key := mongoDocumentIDKey(row["_id"])
+			if key == "" {
+				continue
+			}
+			seen[key] = struct{}{}
+		}
+		if err := cur.Err(); err != nil {
+			_ = cur.Close(ctx)
+			return 0, err
+		}
+		if err := cur.Close(ctx); err != nil {
+			return 0, err
+		}
+	}
+	return int64(len(seen)), nil
 }
 
 func answersheetFilter(ids scopeIDs) bson.M {
 	return orFilter(
 		inUint64("testee_id", ids.TesteeIDs),
 		inUint64("domain_id", ids.AnswerSheetIDs),
+	)
+}
+
+func answersheetFilters(ids scopeIDs) []bson.M {
+	return append(
+		inUint64Filters("testee_id", ids.TesteeIDs),
+		inUint64Filters("domain_id", ids.AnswerSheetIDs)...,
 	)
 }
 
@@ -981,12 +1034,26 @@ func answerSheetIdempotencyFilter(ids scopeIDs) bson.M {
 	)
 }
 
+func answerSheetIdempotencyFilters(ids scopeIDs) []bson.M {
+	return append(
+		inUint64Filters("testee_id", ids.TesteeIDs),
+		inUint64Filters("answersheet_id", ids.AnswerSheetIDs)...,
+	)
+}
+
 func reportFilter(ids scopeIDs) bson.M {
 	return orFilter(
 		inUint64("testee_id", ids.TesteeIDs),
 		inUint64("domain_id", ids.ReportIDs),
 		inUint64("domain_id", ids.AssessmentIDs),
 	)
+}
+
+func reportFilters(ids scopeIDs) []bson.M {
+	filters := inUint64Filters("testee_id", ids.TesteeIDs)
+	filters = append(filters, inUint64Filters("domain_id", ids.ReportIDs)...)
+	filters = append(filters, inUint64Filters("domain_id", ids.AssessmentIDs)...)
+	return filters
 }
 
 func mongoOutboxFilter(ids scopeIDs) bson.M {
@@ -1003,6 +1070,20 @@ func mongoOutboxFilter(ids scopeIDs) bson.M {
 	)
 }
 
+func mongoOutboxFilters(ids scopeIDs) []bson.M {
+	answerStrings := uint64Strings(ids.AnswerSheetIDs)
+	assessmentStrings := uint64Strings(ids.AssessmentIDs)
+	reportStrings := uint64Strings(ids.ReportIDs)
+	testeeStrings := uint64Strings(ids.TesteeIDs)
+	behaviorStrings := uniqueStrings(answerStrings, assessmentStrings, reportStrings, testeeStrings)
+
+	filters := inStringWithAggregateFilters("AnswerSheet", answerStrings)
+	filters = append(filters, inStringWithAggregateFilters("Assessment", assessmentStrings)...)
+	filters = append(filters, inStringWithAggregateFilters("Report", reportStrings)...)
+	filters = append(filters, inStringWithAggregateFilters("BehaviorFootprint", behaviorStrings)...)
+	return filters
+}
+
 func inUint64(field string, values []uint64) bson.M {
 	if len(values) == 0 {
 		return nil
@@ -1010,11 +1091,59 @@ func inUint64(field string, values []uint64) bson.M {
 	return bson.M{field: bson.M{"$in": values}}
 }
 
+func inUint64Filters(field string, values []uint64) []bson.M {
+	values = uniqueUint64(values)
+	filters := make([]bson.M, 0, (len(values)+mongoIDChunkSize-1)/mongoIDChunkSize)
+	for start := 0; start < len(values); start += mongoIDChunkSize {
+		end := start + mongoIDChunkSize
+		if end > len(values) {
+			end = len(values)
+		}
+		filters = append(filters, bson.M{field: bson.M{"$in": values[start:end]}})
+	}
+	return filters
+}
+
 func inStringWithAggregate(aggregateType string, values []string) bson.M {
 	if len(values) == 0 {
 		return nil
 	}
 	return bson.M{"aggregate_type": aggregateType, "aggregate_id": bson.M{"$in": values}}
+}
+
+func inStringWithAggregateFilters(aggregateType string, values []string) []bson.M {
+	values = uniqueStrings(values)
+	filters := make([]bson.M, 0, (len(values)+mongoIDChunkSize-1)/mongoIDChunkSize)
+	for start := 0; start < len(values); start += mongoIDChunkSize {
+		end := start + mongoIDChunkSize
+		if end > len(values) {
+			end = len(values)
+		}
+		filters = append(filters, bson.M{
+			"aggregate_type": aggregateType,
+			"aggregate_id":   bson.M{"$in": values[start:end]},
+		})
+	}
+	return filters
+}
+
+func mongoDocumentIDKey(id any) string {
+	switch value := id.(type) {
+	case primitive.ObjectID:
+		return "oid:" + value.Hex()
+	case string:
+		return "str:" + value
+	case int32:
+		return fmt.Sprintf("i32:%d", value)
+	case int64:
+		return fmt.Sprintf("i64:%d", value)
+	case int:
+		return fmt.Sprintf("i:%d", value)
+	case nil:
+		return ""
+	default:
+		return fmt.Sprintf("%T:%v", value, value)
+	}
 }
 
 func orFilter(filters ...bson.M) bson.M {

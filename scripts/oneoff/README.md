@@ -59,6 +59,8 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 
 脚本会在跑 MySQL 作用域查询前，对 MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox` 做只读权限预检。`ping` 成功但 `find requires authentication` 失败时，说明地址已经连通，但 `MONGO_URI` 缺少账号密码或认证库不对。
 
+MongoDB 单条命令有 16MB BSON 限制。脚本会把大量 `domain_id` / `aggregate_id` 的 `$in` 查询分批执行，避免几十万压测数据一次性塞进一条 `find`、`count`、`backup` 或 `delete` 命令。
+
 ### 解决什么问题
 
 用于清理最近几天压测产生的大量答卷、测评、报告、行为事件和 outbox 积压数据。它不会跨库删除 IAM 用户/档案，也不会直接扣减新统计聚合表；清理源数据后，应按受影响日期窗口重建统计聚合和 Redis 查询缓存。

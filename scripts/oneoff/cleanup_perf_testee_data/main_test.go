@@ -4,6 +4,7 @@ import (
 	"errors"
 	"testing"
 
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -37,4 +38,39 @@ func TestIsMongoUnauthorized(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestMongoOutboxFiltersAreChunked(t *testing.T) {
+	ids := scopeIDs{
+		AnswerSheetIDs: makeUint64Range(1, mongoIDChunkSize+1),
+		AssessmentIDs:  makeUint64Range(10_000, mongoIDChunkSize+1),
+		ReportIDs:      makeUint64Range(20_000, 2),
+		TesteeIDs:      []uint64{30_000},
+	}
+
+	filters := mongoOutboxFilters(ids)
+	if len(filters) < 5 {
+		t.Fatalf("filter count = %d, want chunked filters", len(filters))
+	}
+	for _, filter := range filters {
+		idsFilter, ok := filter["aggregate_id"].(bson.M)
+		if !ok {
+			t.Fatalf("aggregate_id filter = %#v, want bson.M", filter["aggregate_id"])
+		}
+		values, ok := idsFilter["$in"].([]string)
+		if !ok {
+			t.Fatalf("$in = %#v, want []string", idsFilter["$in"])
+		}
+		if len(values) > mongoIDChunkSize {
+			t.Fatalf("chunk size = %d, want <= %d", len(values), mongoIDChunkSize)
+		}
+	}
+}
+
+func makeUint64Range(start uint64, count int) []uint64 {
+	out := make([]uint64, count)
+	for i := range out {
+		out[i] = start + uint64(i)
+	}
+	return out
 }
