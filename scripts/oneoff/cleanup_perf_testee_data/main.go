@@ -28,6 +28,7 @@ type config struct {
 	testeeIDsFile      string
 	testeeCreatedAfter string
 	allowOldTestees    bool
+	deriveIDsFromFacts bool
 	scanEventPayloads  bool
 	backupSuffix       string
 	timeout            time.Duration
@@ -39,6 +40,11 @@ type config struct {
 type namedCount struct {
 	Name  string
 	Count int64
+}
+
+type namedSQL struct {
+	name string
+	sql  string
 }
 
 type testeePreview struct {
@@ -103,6 +109,13 @@ func main() {
 	ids, err := loadScopeIDs(ctx, conn)
 	if err != nil {
 		log.Fatalf("load scope ids: %v", err)
+	}
+	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids)
+	if err != nil {
+		log.Fatalf("enrich scope ids from mongo: %v", err)
+	}
+	if err := storeScopeIDs(ctx, conn, ids); err != nil {
+		log.Fatalf("store enriched scope ids: %v", err)
 	}
 	if err := addMongoOutboxEventIDsToMySQLScope(ctx, conn, mongoDB, ids); err != nil {
 		log.Fatalf("load mongo outbox event ids: %v", err)
@@ -172,6 +185,7 @@ func parseFlags() config {
 	flag.StringVar(&cfg.testeeIDsFile, "testee-ids-file", "", "file containing comma/space/newline separated testee IDs")
 	flag.StringVar(&cfg.testeeCreatedAfter, "testee-created-after", "2026-05-01 00:00:00", "safety guard: selected testees must have created_at after this MySQL timestamp")
 	flag.BoolVar(&cfg.allowOldTestees, "allow-old-testees", false, "bypass --testee-created-after guard")
+	flag.BoolVar(&cfg.deriveIDsFromFacts, "derive-ids-from-facts", false, "also derive IDs from MySQL behavior_footprint and assessment_episode; slower on large fact tables")
 	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also scan MySQL outbox/pending payload_json for testee_id; expensive on large outbox tables")
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "backup table/collection suffix")
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall timeout, for example 30m or 2h")
@@ -279,68 +293,92 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 		return err
 	}
 
-	populate := []string{
-		`INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
+	populate := []namedSQL{
+		{"assessment ids from assessment.testee_id", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
 SELECT a.id FROM assessment a JOIN tmp_cleanup_testee_ids t ON t.id = a.testee_id`,
-		`INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
-SELECT DISTINCT bf.assessment_id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id WHERE bf.assessment_id <> 0`,
-		`INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
-SELECT DISTINCT ae.assessment_id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id WHERE ae.assessment_id IS NOT NULL AND ae.assessment_id <> 0`,
-		`INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
-SELECT DISTINCT a.answer_sheet_id FROM assessment a JOIN tmp_cleanup_testee_ids t ON t.id = a.testee_id WHERE a.answer_sheet_id <> 0`,
-		`INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
-SELECT DISTINCT bf.answersheet_id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id WHERE bf.answersheet_id <> 0`,
-		`INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
-SELECT DISTINCT ae.answersheet_id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id WHERE ae.answersheet_id <> 0`,
-		`INSERT IGNORE INTO tmp_cleanup_report_ids (id)
-SELECT id FROM tmp_cleanup_assessment_ids`,
-		`INSERT IGNORE INTO tmp_cleanup_report_ids (id)
-SELECT DISTINCT bf.report_id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id WHERE bf.report_id <> 0`,
-		`INSERT IGNORE INTO tmp_cleanup_report_ids (id)
-SELECT DISTINCT ae.report_id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id WHERE ae.report_id IS NOT NULL AND ae.report_id <> 0`,
+		},
 	}
-	for _, stmt := range populate {
-		log.Printf("prepare mysql scope: %s", firstSQLLine(stmt))
-		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+	if cfg.deriveIDsFromFacts {
+		populate = append(populate,
+			namedSQL{"assessment ids from behavior_footprint", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
+SELECT DISTINCT bf.assessment_id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id WHERE bf.assessment_id <> 0`},
+			namedSQL{"assessment ids from assessment_episode", `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id)
+SELECT DISTINCT ae.assessment_id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id WHERE ae.assessment_id IS NOT NULL AND ae.assessment_id <> 0`},
+		)
+	}
+	populate = append(populate,
+		namedSQL{"answersheet ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
+SELECT DISTINCT a.answer_sheet_id FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id WHERE a.answer_sheet_id <> 0`},
+	)
+	if cfg.deriveIDsFromFacts {
+		populate = append(populate,
+			namedSQL{"answersheet ids from behavior_footprint", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
+SELECT DISTINCT bf.answersheet_id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id WHERE bf.answersheet_id <> 0`},
+			namedSQL{"answersheet ids from assessment_episode", `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id)
+SELECT DISTINCT ae.answersheet_id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id WHERE ae.answersheet_id <> 0`},
+		)
+	}
+	populate = append(populate,
+		namedSQL{"report ids from assessment scope", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
+SELECT id FROM tmp_cleanup_assessment_ids`,
+		},
+	)
+	if cfg.deriveIDsFromFacts {
+		populate = append(populate,
+			namedSQL{"report ids from behavior_footprint", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
+SELECT DISTINCT bf.report_id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id WHERE bf.report_id <> 0`},
+			namedSQL{"report ids from assessment_episode", `INSERT IGNORE INTO tmp_cleanup_report_ids (id)
+SELECT DISTINCT ae.report_id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id WHERE ae.report_id IS NOT NULL AND ae.report_id <> 0`},
+		)
+	}
+	for _, item := range populate {
+		log.Printf("prepare mysql scope: %s", item.name)
+		if _, err := conn.ExecContext(ctx, item.sql); err != nil {
 			return err
 		}
 	}
 
-	outboxStmts := []string{
-		`INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+	outboxStmts := []namedSQL{
+		{"mysql outbox ids from assessment aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_assessment_ids a ON o.aggregate_id = CAST(a.id AS CHAR) WHERE o.aggregate_type = 'Assessment'`,
-		`INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+		},
+		{"mysql outbox ids from report aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_report_ids r ON o.aggregate_id = CAST(r.id AS CHAR) WHERE o.aggregate_type = 'Report'`,
-		`INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+		},
+		{"mysql outbox ids from answersheet aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_answersheet_ids s ON o.aggregate_id = CAST(s.id AS CHAR) WHERE o.aggregate_type = 'AnswerSheet'`,
-		`INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+		},
+		{"mysql outbox ids from testee aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_testee_ids t ON o.aggregate_id = CAST(t.id AS CHAR)`,
+		},
 	}
 	if cfg.scanEventPayloads {
 		outboxStmts = append(outboxStmts,
-			`INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+			namedSQL{"mysql outbox ids from payload_json", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id
 FROM domain_event_outbox o
 JOIN tmp_cleanup_testee_ids t
-  ON o.payload_json REGEXP CONCAT('"testee_id"[[:space:]]*:[[:space:]]*"?', t.id, '"?([,}[:space:]]|$)')`)
+  ON o.payload_json REGEXP CONCAT('"testee_id"[[:space:]]*:[[:space:]]*"?', t.id, '"?([,}[:space:]]|$)')`})
 	}
 	outboxStmts = append(outboxStmts,
-		`INSERT IGNORE INTO tmp_cleanup_event_ids (event_id)
+		namedSQL{"event ids from mysql outbox", `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id)
 SELECT event_id FROM tmp_cleanup_mysql_outbox_ids`,
-		`INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
+		},
+		namedSQL{"analytics pending ids from event ids", `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
 SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON e.event_id = p.event_id`,
+		},
 	)
 	if cfg.scanEventPayloads {
 		outboxStmts = append(outboxStmts,
-			`INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
+			namedSQL{"analytics pending ids from payload_json", `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
 SELECT p.event_id
 FROM analytics_pending_event p
 JOIN tmp_cleanup_testee_ids t
-  ON p.payload_json REGEXP CONCAT('"testee_id"[[:space:]]*:[[:space:]]*"?', t.id, '"?([,}[:space:]]|$)')`)
+  ON p.payload_json REGEXP CONCAT('"testee_id"[[:space:]]*:[[:space:]]*"?', t.id, '"?([,}[:space:]]|$)')`})
 	}
-	for _, stmt := range outboxStmts {
-		log.Printf("prepare mysql scope: %s", firstSQLLine(stmt))
-		if _, err := conn.ExecContext(ctx, stmt); err != nil {
+	for _, item := range outboxStmts {
+		log.Printf("prepare mysql scope: %s", item.name)
+		if _, err := conn.ExecContext(ctx, item.sql); err != nil {
 			return err
 		}
 	}
@@ -446,6 +484,102 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
 		return scopeIDs{}, err
 	}
 	return scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, ReportIDs: reportIDs}, nil
+}
+
+func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs) (scopeIDs, error) {
+	answerSheetIDs, err := loadMongoUint64Field(ctx, db.Collection("answersheets"), inUint64("testee_id", ids.TesteeIDs), "domain_id")
+	if err != nil {
+		return ids, fmt.Errorf("load answersheet domain ids: %w", err)
+	}
+	idempotencyAnswerSheetIDs, err := loadMongoUint64Field(ctx, db.Collection("answersheet_submit_idempotency"), inUint64("testee_id", ids.TesteeIDs), "answersheet_id")
+	if err != nil {
+		return ids, fmt.Errorf("load answersheet idempotency ids: %w", err)
+	}
+	reportIDs, err := loadMongoUint64Field(ctx, db.Collection("interpret_reports"), inUint64("testee_id", ids.TesteeIDs), "domain_id")
+	if err != nil {
+		return ids, fmt.Errorf("load report domain ids: %w", err)
+	}
+
+	ids.AnswerSheetIDs = uniqueUint64(append(append(ids.AnswerSheetIDs, answerSheetIDs...), idempotencyAnswerSheetIDs...))
+	ids.ReportIDs = uniqueUint64(append(ids.ReportIDs, reportIDs...))
+	return ids, nil
+}
+
+func loadMongoUint64Field(ctx context.Context, coll *mongo.Collection, filter bson.M, field string) ([]uint64, error) {
+	if len(filter) == 0 {
+		return nil, nil
+	}
+	cur, err := coll.Find(ctx, filter, options.Find().SetProjection(bson.M{field: 1}))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []uint64
+	for cur.Next(ctx) {
+		var row bson.M
+		if err := cur.Decode(&row); err != nil {
+			return nil, err
+		}
+		value, ok := row[field]
+		if !ok {
+			continue
+		}
+		id, ok := bsonValueToUint64(value)
+		if !ok || id == 0 {
+			continue
+		}
+		out = append(out, id)
+	}
+	if err := cur.Err(); err != nil {
+		return nil, err
+	}
+	return uniqueUint64(out), nil
+}
+
+func bsonValueToUint64(value any) (uint64, bool) {
+	switch v := value.(type) {
+	case int32:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int64:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case int:
+		if v < 0 {
+			return 0, false
+		}
+		return uint64(v), true
+	case uint64:
+		return v, true
+	case string:
+		id, err := strconv.ParseUint(v, 10, 64)
+		return id, err == nil
+	default:
+		return 0, false
+	}
+}
+
+func storeScopeIDs(ctx context.Context, conn *sql.Conn, ids scopeIDs) error {
+	for _, id := range ids.AssessmentIDs {
+		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id) VALUES (?)`, id); err != nil {
+			return fmt.Errorf("store assessment id %d: %w", id, err)
+		}
+	}
+	for _, id := range ids.AnswerSheetIDs {
+		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id) VALUES (?)`, id); err != nil {
+			return fmt.Errorf("store answersheet id %d: %w", id, err)
+		}
+	}
+	for _, id := range ids.ReportIDs {
+		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_report_ids (id) VALUES (?)`, id); err != nil {
+			return fmt.Errorf("store report id %d: %w", id, err)
+		}
+	}
+	return nil
 }
 
 func addMongoOutboxEventIDsToMySQLScope(ctx context.Context, conn *sql.Conn, db *mongo.Database, ids scopeIDs) error {
@@ -846,6 +980,23 @@ func uniqueStrings(groups ...[]string) []string {
 		out = append(out, value)
 	}
 	sort.Strings(out)
+	return out
+}
+
+func uniqueUint64(values []uint64) []uint64 {
+	seen := make(map[uint64]struct{}, len(values))
+	out := make([]uint64, 0, len(values))
+	for _, value := range values {
+		if value == 0 {
+			continue
+		}
+		if _, ok := seen[value]; ok {
+			continue
+		}
+		seen[value] = struct{}{}
+		out = append(out, value)
+	}
+	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
 }
 

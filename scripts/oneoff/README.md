@@ -108,6 +108,7 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 - `--testee-ids` / `--testee-ids-file`：二选一或同时使用，逗号、空格、换行都可分隔。
 - `--testee-created-after`：安全边界，默认 `2026-05-01 00:00:00`；命中的受试者必须晚于该时间创建。
 - `--allow-old-testees`：绕过创建时间保护，只应在人工确认这些 ID 确实是压测数据后使用。
+- `--derive-ids-from-facts`：额外从 MySQL `behavior_footprint` / `assessment_episode` 反查关联 ID；大事实表上较慢，默认关闭。事实表本身仍会按 `testee_id` 清理。
 - `--scan-event-payloads`：额外扫描 MySQL outbox / pending 的 `payload_json` 兜底匹配 `testee_id`；大 outbox 表上很慢，默认关闭。
 - `--backup-suffix`：备份表/集合后缀，只允许字母、数字和下划线。
 - `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
