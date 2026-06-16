@@ -24,8 +24,8 @@ type Options struct {
 	Concurrency             *ConcurrencyOptions                     `json:"concurrency" mapstructure:"concurrency"`
 	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	WaitReport              *WaitReportOptions                      `json:"wait_report" mapstructure:"wait_report"`
-	ReportStatus            *genericoptions.ReportStatusOptions         `json:"report_status" mapstructure:"report_status"`
-	Signaling               *genericoptions.SignalingOptions            `json:"signaling" mapstructure:"signaling"`
+	ReportStatus            *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
+	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
@@ -147,11 +147,11 @@ func NewOptions() *Options {
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
-		RateLimit:   NewRateLimitOptions(),
-		WaitReport:  NewWaitReportOptions(),
+		RateLimit:    NewRateLimitOptions(),
+		WaitReport:   NewWaitReportOptions(),
 		ReportStatus: genericoptions.NewReportStatusOptions(),
 		Signaling:    genericoptions.NewSignalingOptions(),
-		SubmitQueue: NewSubmitQueueOptions(),
+		SubmitQueue:  NewSubmitQueueOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天

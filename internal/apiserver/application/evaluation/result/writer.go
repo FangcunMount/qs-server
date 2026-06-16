@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"

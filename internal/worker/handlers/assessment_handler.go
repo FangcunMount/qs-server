@@ -8,8 +8,8 @@ import (
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

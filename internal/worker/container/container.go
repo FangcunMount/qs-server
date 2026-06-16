@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
@@ -116,11 +116,11 @@ func (c *Container) initEventDispatcher() error {
 
 	// 构建处理器依赖
 	deps := &workereventing.HandlerDependencies{
-		Logger:            c.logger,
-		AnswerSheetClient: c.answerSheetClient,
-		EvaluationClient:  c.evaluationClient,
-		InternalClient:    c.internalClient,
-		LockManager:       c.lockManager,
+		Logger:               c.logger,
+		AnswerSheetClient:    c.answerSheetClient,
+		EvaluationClient:     c.evaluationClient,
+		InternalClient:       c.internalClient,
+		LockManager:          c.lockManager,
 		LockKeyBuilder:       c.lockBuilder,
 		Notifier:             c.buildNotifier(),
 		ReportStatusReporter: c.reportStatus,

@@ -18,11 +18,11 @@ import (
 
 // HandlerDependencies are dependencies needed to instantiate worker event handlers.
 type HandlerDependencies struct {
-	Logger            *slog.Logger
-	AnswerSheetClient *grpcclient.AnswerSheetClient
-	EvaluationClient  *grpcclient.EvaluationClient
-	InternalClient    handlers.InternalClient
-	LockManager       locklease.Manager
+	Logger               *slog.Logger
+	AnswerSheetClient    *grpcclient.AnswerSheetClient
+	EvaluationClient     *grpcclient.EvaluationClient
+	InternalClient       handlers.InternalClient
+	LockManager          locklease.Manager
 	LockKeyBuilder       *keyspace.Builder
 	Notifier             port.TaskNotifier
 	ReportStatusReporter *reportstatus.Reporter
@@ -102,11 +102,11 @@ func (d *Dispatcher) validateHandlerBindings(catalog *eventcatalog.Catalog) erro
 
 func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 	return &handlers.Dependencies{
-		Logger:            d.deps.Logger,
-		AnswerSheetClient: d.deps.AnswerSheetClient,
-		EvaluationClient:  d.deps.EvaluationClient,
-		InternalClient:    d.deps.InternalClient,
-		LockManager:       d.deps.LockManager,
+		Logger:               d.deps.Logger,
+		AnswerSheetClient:    d.deps.AnswerSheetClient,
+		EvaluationClient:     d.deps.EvaluationClient,
+		InternalClient:       d.deps.InternalClient,
+		LockManager:          d.deps.LockManager,
 		LockKeyBuilder:       d.deps.LockKeyBuilder,
 		Notifier:             d.deps.Notifier,
 		ReportStatusReporter: d.deps.ReportStatusReporter,

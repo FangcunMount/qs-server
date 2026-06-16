@@ -63,11 +63,11 @@ type InternalClient interface {
 
 // Dependencies 处理器依赖
 type Dependencies struct {
-	Logger            *slog.Logger
-	AnswerSheetClient *grpcclient.AnswerSheetClient
-	EvaluationClient  *grpcclient.EvaluationClient
-	InternalClient    InternalClient
-	LockManager       locklease.Manager
+	Logger               *slog.Logger
+	AnswerSheetClient    *grpcclient.AnswerSheetClient
+	EvaluationClient     *grpcclient.EvaluationClient
+	InternalClient       InternalClient
+	LockManager          locklease.Manager
 	LockKeyBuilder       *keyspace.Builder
 	Notifier             port.TaskNotifier
 	ReportStatusReporter *reportstatus.Reporter

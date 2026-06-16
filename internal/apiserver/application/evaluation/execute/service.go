@@ -5,8 +5,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
+	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"

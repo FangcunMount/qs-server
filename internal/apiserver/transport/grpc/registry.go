@@ -69,11 +69,11 @@ type ActorDeps struct {
 }
 
 type EvaluationDeps struct {
-	SubmissionService  assessmentApp.AssessmentSubmissionService
-	ManagementService  assessmentApp.AssessmentManagementService
-	ReportQueryService assessmentApp.ReportQueryService
-	ScoreQueryService  assessmentApp.ScoreQueryService
-	EvaluationService  execute.Service
+	SubmissionService    assessmentApp.AssessmentSubmissionService
+	ManagementService    assessmentApp.AssessmentManagementService
+	ReportQueryService   assessmentApp.ReportQueryService
+	ScoreQueryService    assessmentApp.ScoreQueryService
+	EvaluationService    execute.Service
 	ReportStatusReporter *reportstatus.Reporter
 }
 
