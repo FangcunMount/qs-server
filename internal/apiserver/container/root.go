@@ -14,6 +14,7 @@ import (
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
@@ -34,6 +35,7 @@ type Container struct {
 	outboxRelay                ContainerOutboxRelayOptions
 	planEntryURL               string
 	statisticsRepairWindowDays int
+	reportStatusConfig         reportstatus.Config
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -131,6 +133,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.outboxRelay = opts.OutboxRelay
 	c.planEntryURL = opts.PlanEntryBaseURL
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
+	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
 	c.silent = opts.Silent
 
 	return c

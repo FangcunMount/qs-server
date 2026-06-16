@@ -125,6 +125,8 @@ redis:
 redis_profiles:
   lock_cache:
     database: 6
+  ops_runtime:
+    database: 0
 
 redis_runtime:
   namespace: ""
@@ -133,6 +135,19 @@ redis_runtime:
       redis_profile: "lock_cache"
       namespace_suffix: "cache:lock"
       allow_fallback_default: true
+    ops_runtime:
+      redis_profile: "ops_runtime"
+      namespace_suffix: "ops:runtime"
+      allow_fallback_default: true
+
+report_status:
+  ttl_seconds: 172800
+
+signaling:
+  redis:
+    enabled: true
+    prefix: "qs:signal"
+    buffer_size: 100
 
 # ============================================================
 # 5. 缓存控制

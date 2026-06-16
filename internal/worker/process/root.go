@@ -35,6 +35,7 @@ type redisRuntimeOutput struct {
 	familyStatus *cachegovobs.FamilyStatusRegistry
 	redisRuntime *cacheplane.Runtime
 	lockHandle   *cacheplane.Handle
+	opsHandle    *cacheplane.Handle
 	lockManager  locklease.Manager
 }
 

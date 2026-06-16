@@ -613,10 +613,10 @@ paths:
         name: testee_id
         in: query
         required: true
-      - maximum: 60
-        minimum: 5
+      - maximum: 25
+        minimum: 1
         type: integer
-        default: 15
+        default: 20
         description: 超时时间（秒）
         name: timeout
         in: query
@@ -1492,7 +1492,15 @@ components:
     evaluation.AssessmentStatusResponse:
       type: object
       properties:
+        message:
+          type: string
+        next_poll_after_ms:
+          type: integer
+        reason:
+          type: string
         risk_level:
+          type: string
+        stage:
           type: string
         status:
           description: pending/submitted/interpreted/failed

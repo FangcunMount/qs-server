@@ -1,11 +1,14 @@
 package container
 
 import (
+	"context"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
@@ -16,9 +19,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -44,8 +49,12 @@ type Container struct {
 	submissionService         *answersheet.SubmissionService
 	questionnaireQueryService *questionnaire.QueryService
 	evaluationQueryService    *evaluation.QueryService
+	waitReportService         *reportwait.Service
 	scaleQueryService         *scale.QueryService
 	testeeService             *testee.Service
+	reportStatusReporter      *reportstatus.Reporter
+	waitHub                   reportwait.WaitHub
+	waitWatcherCancel         context.CancelFunc
 
 	// 接口层处理器
 	answerSheetHandler   *handler.AnswerSheetHandler
@@ -119,6 +128,49 @@ func (c *Container) initApplicationServices() {
 	)
 	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
+	var reportOpts *genericoptions.ReportStatusOptions
+	var sigOpts *genericoptions.SignalingOptions
+	if c.opts != nil {
+		reportOpts = c.opts.ReportStatus
+		sigOpts = c.opts.Signaling
+	}
+	reportStatusRuntime := reportstatus.ConfigFromOptions(reportOpts, sigOpts, "collection-server")
+	reporter, err := reportstatus.NewReporter(c.opsHandle, reportStatusRuntime)
+	if err != nil {
+		log.Warnf("report status reporter disabled: %v", err)
+	}
+	c.reportStatusReporter = reporter
+
+	cfg := reportwait.DefaultConfig()
+	if c.opts != nil && c.opts.WaitReport != nil {
+		cfg.DefaultTimeout = time.Duration(c.opts.WaitReport.DefaultTimeoutSeconds) * time.Second
+		cfg.MinTimeout = time.Duration(c.opts.WaitReport.MinTimeoutSeconds) * time.Second
+		cfg.MaxTimeout = time.Duration(c.opts.WaitReport.MaxTimeoutSeconds) * time.Second
+		cfg.PollInterval = time.Duration(c.opts.WaitReport.PollIntervalMs) * time.Millisecond
+		cfg.StatusTTL = time.Duration(c.opts.WaitReport.StatusTTLSeconds) * time.Second
+		cfg.MaxActiveWaiters = c.opts.WaitReport.MaxActiveWaiters
+		cfg.SignalingEnabled = reportStatusRuntime.Signaling.Enabled
+		if c.opts.WaitReport.PubSubEnabled {
+			cfg.SignalingEnabled = true
+		}
+	}
+	c.waitHub = reportwait.NewInMemoryWaitHub()
+	var signaler *signalredis.Signaler[reportstatus.ChangedSignal]
+	if reporter != nil {
+		signaler = reporter.Signaler()
+	}
+	c.waitReportService = reportwait.NewService(
+		c.evaluationQueryService,
+		reportwait.NewStatusCache(reportstatus.NewCache(c.opsHandle)),
+		c.waitHub,
+		signaler,
+		cfg,
+	)
+	if cfg.SignalingEnabled && signaler != nil {
+		watchCtx, cancel := context.WithCancel(context.Background())
+		c.waitReportService.StartSignalWatcher(watchCtx)
+		c.waitWatcherCancel = cancel
+	}
 	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
 	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
 
@@ -137,7 +189,7 @@ func (c *Container) initHandlers() {
 
 	c.answerSheetHandler = handler.NewAnswerSheetHandler(c.submissionService)
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
-	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService)
+	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService, c.waitReportService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
@@ -148,6 +200,10 @@ func (c *Container) initHandlers() {
 // Cleanup 清理资源
 func (c *Container) Cleanup() {
 	log.Info("🧹 Cleaning up container resources...")
+	if c.waitWatcherCancel != nil {
+		c.waitWatcherCancel()
+		c.waitWatcherCancel = nil
+	}
 
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")

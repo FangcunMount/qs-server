@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 )
 
 // ContainerOptions 容器配置选项。
@@ -31,6 +32,9 @@ type ContainerOptions struct {
 	PlanEntryBaseURL string
 	// StatisticsRepairWindowDays 统计夜间批处理默认回补窗口
 	StatisticsRepairWindowDays int
+	// ReportStatus report_status 与 signaling YAML 配置
+	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
+	Signaling    *genericoptions.SignalingOptions    `json:"signaling" mapstructure:"signaling"`
 	// Silent suppresses container stdout bootstrap/cleanup prints.
 	Silent bool
 }

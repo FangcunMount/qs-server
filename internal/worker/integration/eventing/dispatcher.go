@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
@@ -22,8 +23,9 @@ type HandlerDependencies struct {
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    handlers.InternalClient
 	LockManager       locklease.Manager
-	LockKeyBuilder    *keyspace.Builder
-	Notifier          port.TaskNotifier
+	LockKeyBuilder       *keyspace.Builder
+	Notifier             port.TaskNotifier
+	ReportStatusReporter *reportstatus.Reporter
 }
 
 // HandlerRegistry is the explicit worker handler factory catalog consumed by
@@ -105,8 +107,9 @@ func (d *Dispatcher) buildHandlerDependencies() *handlers.Dependencies {
 		EvaluationClient:  d.deps.EvaluationClient,
 		InternalClient:    d.deps.InternalClient,
 		LockManager:       d.deps.LockManager,
-		LockKeyBuilder:    d.deps.LockKeyBuilder,
-		Notifier:          d.deps.Notifier,
+		LockKeyBuilder:       d.deps.LockKeyBuilder,
+		Notifier:             d.deps.Notifier,
+		ReportStatusReporter: d.deps.ReportStatusReporter,
 	}
 }
 

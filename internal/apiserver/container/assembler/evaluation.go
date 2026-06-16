@@ -32,10 +32,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -76,6 +78,9 @@ type EvaluationModule struct {
 
 	// 评估引擎服务 - 服务于评估引擎 (qs-worker)
 	EvaluationService execute.Service
+
+	// ReportStatusReporter best-effort 报告等待状态写入与 signaling。
+	ReportStatusReporter *reportstatus.Reporter
 }
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
@@ -98,6 +103,8 @@ type EvaluationModuleDeps struct {
 	MongoLimiter                   backpressure.Acquirer
 	AssessmentOutboxRelayBatchSize int
 	TesteeAccessChecker            assessmentApp.TesteeAccessChecker
+	OpsHandle                      *cacheplane.Handle
+	ReportStatusConfig             reportstatus.Config
 }
 
 // NewEvaluationModule 创建评估模块。
@@ -193,6 +200,12 @@ func (m *EvaluationModule) wireEvaluationEngine(
 	var suggestionGenerator report.SuggestionGenerator
 
 	if normalized.InputResolver != nil {
+		reportStatusReporter, err := reportstatus.NewReporter(normalized.OpsHandle, normalized.ReportStatusConfig)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report status reporter: %v", err)
+		}
+		m.ReportStatusReporter = reportStatusReporter
+
 		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
 		scaleEvaluator := scaleInterpretation.NewExecutorWithService(
 			scaleInterpretation.NewService(
@@ -224,6 +237,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 			reportBuilders,
 			infra.reportDurableSaver,
 			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
+			reportStatusReporter,
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation result writer: %v", err)
@@ -235,6 +249,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 			resultWriter,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
+			execute.WithReportStatusReporter(reportStatusReporter),
 		)
 	}
 	return nil

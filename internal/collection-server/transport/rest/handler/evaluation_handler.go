@@ -6,8 +6,10 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/component-base/pkg/logger"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
@@ -30,19 +32,33 @@ type answerSheetLookupService interface {
 	Get(ctx context.Context, id uint64) (*answersheetapp.AnswerSheetResponse, error)
 }
 
+type waitReportService interface {
+	NormalizeTimeout(raw string) time.Duration
+	Wait(ctx context.Context, testeeID, assessmentID uint64, timeout time.Duration) (*evaluation.AssessmentStatusResponse, error)
+}
+
 // EvaluationHandler 测评处理器
 type EvaluationHandler struct {
 	*BaseHandler
 	queryService       evaluationQueryService
 	answerSheetService answerSheetLookupService
+	waitReportService  waitReportService
 }
 
 // NewEvaluationHandler 创建测评处理器
-func NewEvaluationHandler(queryService evaluationQueryService, answerSheetService answerSheetLookupService) *EvaluationHandler {
+func NewEvaluationHandler(
+	queryService evaluationQueryService,
+	answerSheetService answerSheetLookupService,
+	waitReportService waitReportService,
+) *EvaluationHandler {
+	if waitReportService == nil {
+		waitReportService = reportwait.NewService(queryService, nil, nil, nil, reportwait.DefaultConfig())
+	}
 	return &EvaluationHandler{
 		BaseHandler:        NewBaseHandler(),
 		queryService:       queryService,
 		answerSheetService: answerSheetService,
+		waitReportService:  waitReportService,
 	}
 }
 
@@ -226,7 +242,7 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 // @Produce json
 // @Param id path int true "测评ID"
 // @Param testee_id query int true "受试者ID"
-// @Param timeout query int false "超时时间（秒）" default(15) minimum(5) maximum(60)
+// @Param timeout query int false "超时时间（秒）" default(20) minimum(1) maximum(25)
 // @Success 200 {object} core.Response{data=evaluation.AssessmentStatusResponse}
 // @Failure 429 {object} core.ErrResponse
 // @Failure 400 {object} core.ErrResponse
@@ -238,16 +254,33 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 	if !ok {
 		return
 	}
+	start := time.Now()
 
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()
 
-	if statusResponse, ok := h.lookupAssessmentStatus(ctx, testeeID, assessmentID); ok {
-		h.Success(c, statusResponse)
+	statusResponse, err := h.waitReportService.Wait(ctx, testeeID, assessmentID, timeout)
+	if err != nil {
+		logger.L(c.Request.Context()).Errorw("wait-report failed",
+			"assessment_id", assessmentID,
+			"testee_id", testeeID,
+			"timeout_ms", timeout.Milliseconds(),
+			"elapsed_ms", time.Since(start).Milliseconds(),
+			"error", err.Error(),
+		)
+		h.InternalErrorResponse(c, "wait report failed", err)
 		return
 	}
-
-	h.Success(c, h.pollWaitReport(ctx, testeeID, assessmentID))
+	logger.L(c.Request.Context()).Infow("wait-report completed",
+		"assessment_id", assessmentID,
+		"testee_id", testeeID,
+		"status", statusResponse.Status,
+		"stage", statusResponse.Stage,
+		"next_poll_after_ms", statusResponse.NextPollAfterMs,
+		"timeout_ms", timeout.Milliseconds(),
+		"elapsed_ms", time.Since(start).Milliseconds(),
+	)
+	h.Success(c, statusResponse)
 }
 
 func (h *EvaluationHandler) parseWaitReportRequest(c *gin.Context) (uint64, uint64, time.Duration, bool) {
@@ -269,75 +302,7 @@ func (h *EvaluationHandler) parseWaitReportRequest(c *gin.Context) (uint64, uint
 		return 0, 0, 0, false
 	}
 
-	return testeeID, assessmentID, normalizeWaitReportTimeout(c.DefaultQuery("timeout", "15")), true
-}
-
-func normalizeWaitReportTimeout(timeout string) time.Duration {
-	timeoutSeconds, err := strconv.Atoi(timeout)
-	if err != nil || timeoutSeconds < 5 || timeoutSeconds > 60 {
-		timeoutSeconds = 15
-	}
-	return time.Duration(timeoutSeconds) * time.Second
-}
-
-func (h *EvaluationHandler) lookupAssessmentStatus(
-	ctx context.Context,
-	testeeID uint64,
-	assessmentID uint64,
-) (*evaluation.AssessmentStatusResponse, bool) {
-	result, err := h.queryService.GetMyAssessment(ctx, testeeID, assessmentID)
-	if err != nil || result == nil || !isTerminalAssessmentStatus(result.Status) {
-		return nil, false
-	}
-	return buildAssessmentStatusResponse(result), true
-}
-
-func (h *EvaluationHandler) pollWaitReport(
-	ctx context.Context,
-	testeeID uint64,
-	assessmentID uint64,
-) *evaluation.AssessmentStatusResponse {
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	for {
-		select {
-		case <-ctx.Done():
-			return pendingAssessmentStatusResponse()
-
-		case <-ticker.C:
-			if statusResponse, ok := h.lookupAssessmentStatus(ctx, testeeID, assessmentID); ok {
-				return statusResponse
-			}
-		}
-	}
-}
-
-func isTerminalAssessmentStatus(status string) bool {
-	return status == "interpreted" || status == "failed"
-}
-
-func pendingAssessmentStatusResponse() *evaluation.AssessmentStatusResponse {
-	return &evaluation.AssessmentStatusResponse{
-		Status:    "pending",
-		UpdatedAt: time.Now().Unix(),
-	}
-}
-
-func buildAssessmentStatusResponse(result *evaluation.AssessmentDetailResponse) *evaluation.AssessmentStatusResponse {
-	response := &evaluation.AssessmentStatusResponse{
-		Status:    result.Status,
-		UpdatedAt: time.Now().Unix(),
-	}
-	if result.TotalScore != 0 {
-		totalScore := result.TotalScore
-		response.TotalScore = &totalScore
-	}
-	if result.RiskLevel != "" {
-		riskLevel := result.RiskLevel
-		response.RiskLevel = &riskLevel
-	}
-	return response
+	return testeeID, assessmentID, h.waitReportService.NormalizeTimeout(c.DefaultQuery("timeout", "20")), true
 }
 
 // GetFactorTrend 获取因子得分趋势

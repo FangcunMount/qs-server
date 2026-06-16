@@ -30,6 +30,8 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		OutboxRelay:                buildContainerOutboxRelayOptions(s.config),
 		PlanEntryBaseURL:           s.config.Plan.EntryBaseURL,
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
+		ReportStatus:               s.config.Options.ReportStatus,
+		Signaling:                  s.config.Options.Signaling,
 	}
 }
 

@@ -23,6 +23,9 @@ type Options struct {
 	RedisRuntime            *genericoptions.RedisRuntimeOptions     `json:"redis_runtime" mapstructure:"redis_runtime"`
 	Concurrency             *ConcurrencyOptions                     `json:"concurrency" mapstructure:"concurrency"`
 	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
+	WaitReport              *WaitReportOptions                      `json:"wait_report" mapstructure:"wait_report"`
+	ReportStatus            *genericoptions.ReportStatusOptions         `json:"report_status" mapstructure:"report_status"`
+	Signaling               *genericoptions.SignalingOptions            `json:"signaling" mapstructure:"signaling"`
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
@@ -71,6 +74,17 @@ type RateLimitOptions struct {
 	WaitReportGlobalBurst int     `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
 	WaitReportUserQPS     float64 `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
 	WaitReportUserBurst   int     `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
+}
+
+type WaitReportOptions struct {
+	DefaultTimeoutSeconds int    `json:"default_timeout_seconds" mapstructure:"default_timeout_seconds"`
+	MinTimeoutSeconds     int    `json:"min_timeout_seconds" mapstructure:"min_timeout_seconds"`
+	MaxTimeoutSeconds     int    `json:"max_timeout_seconds" mapstructure:"max_timeout_seconds"`
+	PollIntervalMs        int    `json:"poll_interval_ms" mapstructure:"poll_interval_ms"`
+	StatusTTLSeconds      int    `json:"status_ttl_seconds" mapstructure:"status_ttl_seconds"`
+	MaxActiveWaiters      int    `json:"max_active_waiters" mapstructure:"max_active_waiters"`
+	PubSubEnabled         bool   `json:"pubsub_enabled" mapstructure:"pubsub_enabled"`
+	PubSubChannel         string `json:"pubsub_channel" mapstructure:"pubsub_channel"`
 }
 
 // RuntimeOptions 运行时调优（GC/内存）
@@ -134,6 +148,9 @@ func NewOptions() *Options {
 			MaxConcurrency: 10, // 默认最大并发数
 		},
 		RateLimit:   NewRateLimitOptions(),
+		WaitReport:  NewWaitReportOptions(),
+		ReportStatus: genericoptions.NewReportStatusOptions(),
+		Signaling:    genericoptions.NewSignalingOptions(),
 		SubmitQueue: NewSubmitQueueOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
@@ -200,6 +217,19 @@ func NewRateLimitOptions() *RateLimitOptions {
 	}
 }
 
+func NewWaitReportOptions() *WaitReportOptions {
+	return &WaitReportOptions{
+		DefaultTimeoutSeconds: 20,
+		MinTimeoutSeconds:     1,
+		MaxTimeoutSeconds:     25,
+		PollIntervalMs:        500,
+		StatusTTLSeconds:      172800,
+		MaxActiveWaiters:      3000,
+		PubSubEnabled:         false,
+		PubSubChannel:         "report_status_changed",
+	}
+}
+
 // Flags 返回一个 NamedFlagSets 对象，包含所有命令行参数
 func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Log.AddFlags(fss.FlagSet("log"))
@@ -212,6 +242,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.RedisRuntime.AddFlags(fss.FlagSet("redis_runtime"))
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
+	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
@@ -262,6 +293,17 @@ func (r *RateLimitOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&r.WaitReportUserBurst, "rate_limit.wait-report-user-burst", r.WaitReportUserBurst, "Per-user burst for wait-report.")
 }
 
+func (w *WaitReportOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.IntVar(&w.DefaultTimeoutSeconds, "wait_report.default-timeout-seconds", w.DefaultTimeoutSeconds, "Default wait-report timeout seconds.")
+	fs.IntVar(&w.MinTimeoutSeconds, "wait_report.min-timeout-seconds", w.MinTimeoutSeconds, "Minimum wait-report timeout seconds.")
+	fs.IntVar(&w.MaxTimeoutSeconds, "wait_report.max-timeout-seconds", w.MaxTimeoutSeconds, "Maximum wait-report timeout seconds.")
+	fs.IntVar(&w.PollIntervalMs, "wait_report.poll-interval-ms", w.PollIntervalMs, "Wait-report polling interval in milliseconds.")
+	fs.IntVar(&w.StatusTTLSeconds, "wait_report.status-ttl-seconds", w.StatusTTLSeconds, "Report status cache TTL in seconds.")
+	fs.IntVar(&w.MaxActiveWaiters, "wait_report.max-active-waiters", w.MaxActiveWaiters, "Maximum active wait-report requests before degradation.")
+	fs.BoolVar(&w.PubSubEnabled, "wait_report.pubsub-enabled", w.PubSubEnabled, "Enable Redis pubsub wakeups for wait-report.")
+	fs.StringVar(&w.PubSubChannel, "wait_report.pubsub-channel", w.PubSubChannel, "Redis pubsub channel for report status change.")
+}
+
 // AddFlags 添加运行时相关参数
 func (r *RuntimeOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.StringVar(&r.GoMemLimit, "runtime.go-mem-limit", r.GoMemLimit,
@@ -299,6 +341,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionConcurrency(o.Concurrency)...)
 	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
+	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
 
 	return errs
@@ -418,6 +461,35 @@ func validateCollectionJWT(opts *JWTOptions) []error {
 	}
 	if opts.TokenDuration <= 0 {
 		errs = append(errs, fmt.Errorf("jwt.token-duration must be greater than 0"))
+	}
+	return errs
+}
+
+func validateWaitReportOptions(opts *WaitReportOptions) []error {
+	if opts == nil {
+		return []error{fmt.Errorf("wait_report cannot be nil")}
+	}
+	var errs []error
+	if opts.DefaultTimeoutSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.default_timeout_seconds must be greater than 0"))
+	}
+	if opts.MinTimeoutSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.min_timeout_seconds must be greater than 0"))
+	}
+	if opts.MaxTimeoutSeconds < opts.MinTimeoutSeconds {
+		errs = append(errs, fmt.Errorf("wait_report.max_timeout_seconds must be greater than or equal to min_timeout_seconds"))
+	}
+	if opts.PollIntervalMs <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.poll_interval_ms must be greater than 0"))
+	}
+	if opts.StatusTTLSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.status_ttl_seconds must be greater than 0"))
+	}
+	if opts.MaxActiveWaiters <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.max_active_waiters must be greater than 0"))
+	}
+	if opts.PubSubEnabled && opts.PubSubChannel == "" {
+		errs = append(errs, fmt.Errorf("wait_report.pubsub_channel cannot be empty when pubsub is enabled"))
 	}
 	return errs
 }

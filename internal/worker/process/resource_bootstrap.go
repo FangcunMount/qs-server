@@ -29,6 +29,11 @@ func (s *server) prepareResources() (resourceOutput, error) {
 				NamespaceSuffix:      "cache:lock",
 				AllowFallbackDefault: true,
 			},
+			cacheplane.FamilyOps: {
+				RedisProfile:         "ops_runtime",
+				NamespaceSuffix:      "ops:runtime",
+				AllowFallbackDefault: true,
+			},
 		},
 		LockName: "lock_lease",
 	})
@@ -44,6 +49,7 @@ func (s *server) prepareResources() (resourceOutput, error) {
 			familyStatus: redisRuntime.StatusRegistry,
 			redisRuntime: redisRuntime.Runtime,
 			lockHandle:   redisRuntime.Handle(cacheplane.FamilyLock),
+			opsHandle:    redisRuntime.Handle(cacheplane.FamilyOps),
 			lockManager:  redisRuntime.LockManager,
 		},
 		eventCatalog: eventCatalog,

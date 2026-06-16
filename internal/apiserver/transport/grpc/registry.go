@@ -20,6 +20,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 type Registry struct {
@@ -73,6 +74,7 @@ type EvaluationDeps struct {
 	ReportQueryService assessmentApp.ReportQueryService
 	ScoreQueryService  assessmentApp.ScoreQueryService
 	EvaluationService  execute.Service
+	ReportStatusReporter *reportstatus.Reporter
 }
 
 type ScaleDeps struct {
@@ -263,6 +265,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.WarmupCoordinator,
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,
+		r.deps.Evaluation.ReportStatusReporter,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")

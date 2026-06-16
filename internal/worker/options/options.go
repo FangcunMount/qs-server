@@ -36,6 +36,9 @@ type Options struct {
 	RedisRuntime *genericoptions.RedisRuntimeOptions `json:"redis_runtime" mapstructure:"redis_runtime"`
 	// Cache 控制缓存输出
 	Cache *CacheOptions `json:"cache" mapstructure:"cache"`
+	// report_status 与 signaling
+	ReportStatus *genericoptions.ReportStatusOptions `json:"report_status" mapstructure:"report_status"`
+	Signaling    *genericoptions.SignalingOptions    `json:"signaling" mapstructure:"signaling"`
 }
 
 // MetricsOptions worker 观测端口配置。
@@ -150,6 +153,8 @@ func NewOptions() *Options {
 		RedisProfiles: map[string]*genericoptions.RedisOptions{},
 		RedisRuntime:  defaultRedisRuntimeOptions(),
 		Cache:         NewCacheOptions(),
+		ReportStatus:  genericoptions.NewReportStatusOptions(),
+		Signaling:     genericoptions.NewSignalingOptions(),
 	}
 }
 
@@ -158,6 +163,11 @@ func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
 	opts.Families["lock_lease"] = &genericoptions.RedisRuntimeFamilyRoute{
 		RedisProfile:         "lock_cache",
 		NamespaceSuffix:      "cache:lock",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	opts.Families["ops_runtime"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "ops_runtime",
+		NamespaceSuffix:      "ops:runtime",
 		AllowFallbackDefault: boolPtr(true),
 	}
 	return opts

@@ -35,6 +35,8 @@ type Options struct {
 	Backpressure             *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
 	Cache                    *CacheOptions                           `json:"cache"     mapstructure:"cache"`
 	StatisticsSync           *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
+	ReportStatus             *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
+	Signaling                *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -63,6 +65,8 @@ func NewOptions() *Options {
 		Backpressure:             NewBackpressureOptions(),
 		Cache:                    NewCacheOptions(),
 		StatisticsSync:           NewStatisticsSyncOptions(),
+		ReportStatus:             genericoptions.NewReportStatusOptions(),
+		Signaling:                genericoptions.NewSignalingOptions(),
 	}
 }
 
@@ -103,6 +107,11 @@ func defaultRedisRuntimeOptions() *genericoptions.RedisRuntimeOptions {
 	opts.Families["lock_lease"] = &genericoptions.RedisRuntimeFamilyRoute{
 		RedisProfile:         "lock_cache",
 		NamespaceSuffix:      "cache:lock",
+		AllowFallbackDefault: boolPtr(true),
+	}
+	opts.Families["ops_runtime"] = &genericoptions.RedisRuntimeFamilyRoute{
+		RedisProfile:         "ops_runtime",
+		NamespaceSuffix:      "ops:runtime",
 		AllowFallbackDefault: boolPtr(true),
 	}
 	return opts

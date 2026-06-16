@@ -6,10 +6,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -24,6 +26,7 @@ type service struct {
 
 	evaluators   EvaluatorRegistry
 	resultWriter evaluationresult.Writer
+	reportStatus *reportstatus.Reporter
 }
 
 // EventStager 事件暂存器
@@ -46,6 +49,12 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 	return func(s *service) {
 		s.evaluators = registry
+	}
+}
+
+func WithReportStatusReporter(reporter *reportstatus.Reporter) ServiceOption {
+	return func(s *service) {
+		s.reportStatus = reporter
 	}
 }
 
@@ -96,6 +105,10 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	a := loaded.assessment
+	if s.reportStatus != nil {
+		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
+		s.reportStatus.SetProcessing(ctx, assessmentID, answerSheetID, "scoring")
+	}
 
 	// 解析评估输入
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
@@ -217,8 +230,9 @@ func (s *service) assessmentLoader() assessmentLoader {
 // failureFinalizer 评估失败标记器
 func (s *service) failureFinalizer() evaluationFailureFinalizer {
 	return evaluationFailureFinalizer{
-		repo:        s.assessmentRepo,
-		txRunner:    s.txRunner,
-		eventStager: s.eventStager,
+		repo:         s.assessmentRepo,
+		txRunner:     s.txRunner,
+		eventStager:  s.eventStager,
+		reportStatus: s.reportStatus,
 	}
 }

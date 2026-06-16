@@ -191,6 +191,12 @@ redis_profiles:
     username: "app"
     password: "dev_app_123"
     database: 5
+  ops_runtime:
+    host: "127.0.0.1"
+    port: 6379
+    username: "app"
+    password: "dev_app_123"
+    database: 0
 
 redis_runtime:
   namespace: ""
@@ -225,6 +231,22 @@ redis_runtime:
       redis_profile: "lock_cache"
       namespace_suffix: "cache:lock"
       allow_fallback_default: true
+    ops_runtime:
+      redis_profile: "ops_runtime"
+      namespace_suffix: "ops:runtime"
+      allow_fallback_default: true
+
+# -------------------------------------------------------
+# 3.4.1 report_status / signaling（wait-report 唤醒）
+# -------------------------------------------------------
+report_status:
+  ttl_seconds: 172800
+
+signaling:
+  redis:
+    enabled: true
+    prefix: "qs:signal"
+    buffer_size: 100
 
 # -------------------------------------------------------
 # 3.5 Plan 业务配置

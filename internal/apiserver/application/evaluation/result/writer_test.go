@@ -129,6 +129,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 		reportBuilders,
 		reportSaver,
 		&resultNotifierStub{order: &order},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -174,6 +175,7 @@ func TestWriterReportBuilderFailureDoesNotPersistInterpretedAssessment(t *testin
 		reportBuilders,
 		&resultReportSaverStub{order: &order},
 		&resultNotifierStub{order: &order},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -207,6 +209,7 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 		reportBuilders,
 		&resultReportSaverStub{order: &order, err: reportErr},
 		&resultNotifierStub{order: &order},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -245,6 +248,7 @@ func TestWriterScoreProjectionFailureKeepsAssessmentUninterpreted(t *testing.T) 
 		reportBuilders,
 		&resultReportSaverStub{order: &order},
 		notifier,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -285,6 +289,7 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 		reportBuilders,
 		&resultReportSaverStub{order: &order},
 		notifier,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -346,6 +351,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 		reportBuilders,
 		reportSaver,
 		nil,
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("NewWriter returned error: %v", err)
@@ -371,10 +377,10 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 }
 
 func TestNewWriterReturnsEventAssemblerRegistryError(t *testing.T) {
-	if _, err := NewWriterWithEventAssemblers(nil, nil, nil, nil, nil, nil); err == nil {
+	if _, err := NewWriterWithEventAssemblers(nil, nil, nil, nil, nil, nil, nil); err == nil {
 		t.Fatal("NewWriterWithEventAssemblers error = nil, want nil assembler error")
 	}
-	if _, err := NewWriterWithEventAssemblers(nil, nil, nil, nil, nil, ScaleEventAssembler{}, ScaleEventAssembler{}); err == nil {
+	if _, err := NewWriterWithEventAssemblers(nil, nil, nil, nil, nil, nil, ScaleEventAssembler{}, ScaleEventAssembler{}); err == nil {
 		t.Fatal("NewWriterWithEventAssemblers error = nil, want duplicate assembler error")
 	}
 }

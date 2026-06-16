@@ -128,6 +128,25 @@ submit_queue:
   worker_count: 8
   wait_timeout_ms: 200
 
+wait_report:
+  default_timeout_seconds: 20
+  min_timeout_seconds: 1
+  max_timeout_seconds: 25
+  poll_interval_ms: 500
+  status_ttl_seconds: 172800
+  max_active_waiters: 3000
+  pubsub_enabled: false
+  pubsub_channel: "report_status_changed"
+
+report_status:
+  ttl_seconds: 172800
+
+signaling:
+  redis:
+    enabled: false
+    prefix: "qs:signal"
+    buffer_size: 100
+
 # ============================================================
 # 4. 集成配置
 # ============================================================

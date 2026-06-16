@@ -66,6 +66,8 @@ func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps,
 		MongoLimiter:                   c.backpressure.Mongo,
 		AssessmentOutboxRelayBatchSize: c.outboxRelay.AssessmentBatchSize,
 		TesteeAccessChecker:            newEvaluationTesteeAccessChecker(c.actorTesteeAccessService()),
+		OpsHandle:                      c.CacheHandle(cacheplane.FamilyOps),
+		ReportStatusConfig:             c.reportStatusConfig,
 	}, nil
 }
 

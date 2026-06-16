@@ -22,6 +22,7 @@ import (
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -43,6 +44,7 @@ type InternalService struct {
 	operatorRoleSyncer         operatorBootstrapRoleSyncer
 	behaviorProjectorService   statisticsApp.BehaviorProjectorService
 	warmupCoordinator          cachegov.Coordinator
+	reportStatusReporter       *reportstatus.Reporter
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -83,6 +85,7 @@ func NewInternalService(
 	warmupCoordinator cachegov.Coordinator,
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
+	reportStatusReporter *reportstatus.Reporter,
 ) *InternalService {
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
@@ -101,6 +104,7 @@ func NewInternalService(
 		warmupCoordinator:                  warmupCoordinator,
 		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
+		reportStatusReporter:               reportStatusReporter,
 	}
 }
 
@@ -322,7 +326,19 @@ func (s *InternalService) createAssessmentFromAnswerSheet(
 	}
 
 	s.completeMatchedTask(ctx, l, req.OrgId, matchedTask, result.ID)
+	s.markReportStatusQueued(ctx, result.ID, req.AnswersheetId)
 	return createdAssessmentResponse(result.ID, autoSubmitted), nil
+}
+
+func (s *InternalService) markReportStatusQueued(ctx context.Context, assessmentID, answerSheetID uint64) {
+	if s == nil || s.reportStatusReporter == nil || assessmentID == 0 {
+		return
+	}
+	s.reportStatusReporter.SetQueued(
+		ctx,
+		reportstatus.AssessmentKey(assessmentID),
+		reportstatus.AssessmentKey(answerSheetID),
+	)
 }
 
 func (s *InternalService) autoSubmitAssessment(ctx context.Context, l *logger.RequestLogger, assessmentID uint64) bool {

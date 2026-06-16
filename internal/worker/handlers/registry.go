@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
@@ -67,8 +68,9 @@ type Dependencies struct {
 	EvaluationClient  *grpcclient.EvaluationClient
 	InternalClient    InternalClient
 	LockManager       locklease.Manager
-	LockKeyBuilder    *keyspace.Builder
-	Notifier          port.TaskNotifier
+	LockKeyBuilder       *keyspace.Builder
+	Notifier             port.TaskNotifier
+	ReportStatusReporter *reportstatus.Reporter
 }
 
 // HandlerFactory 处理器工厂函数

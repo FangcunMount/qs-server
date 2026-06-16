@@ -9,7 +9,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/FangcunMount/qs-server/internal/worker/handlers"
 	"github.com/FangcunMount/qs-server/internal/worker/infra/grpcclient"
@@ -25,8 +27,10 @@ type Container struct {
 	opts         *options.Options
 	logger       *slog.Logger
 	lockManager  locklease.Manager
+	opsHandle    *cacheplane.Handle
 	lockBuilder  *keyspace.Builder
 	eventCatalog *eventcatalog.Catalog
+	reportStatus *reportstatus.Reporter
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
 	answerSheetClient *grpcclient.AnswerSheetClient
@@ -46,19 +50,45 @@ type ClientBundle struct {
 }
 
 // NewContainer 创建新的容器
-func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle *cacheplane.Handle, lockManager locklease.Manager, eventCatalog *eventcatalog.Catalog) *Container {
+func NewContainer(opts *options.Options, logger *slog.Logger, lockHandle, opsHandle *cacheplane.Handle, lockManager locklease.Manager, eventCatalog *eventcatalog.Catalog) *Container {
 	lockBuilder := keyspace.NewBuilder()
 	if lockHandle != nil {
 		lockBuilder = lockHandle.Builder
 	}
-	return &Container{
+	c := &Container{
 		opts:         opts,
 		logger:       logger,
+		opsHandle:    opsHandle,
 		lockManager:  lockManager,
 		lockBuilder:  lockBuilder,
 		eventCatalog: eventCatalog,
 		initialized:  false,
 	}
+	c.reportStatus = c.buildReportStatusReporter()
+	return c
+}
+
+func (c *Container) buildReportStatusReporter() *reportstatus.Reporter {
+	if c == nil {
+		return nil
+	}
+	reportStatusOpts := genericoptions.NewReportStatusOptions()
+	signalingOpts := genericoptions.NewSignalingOptions()
+	if c.opts != nil {
+		if c.opts.ReportStatus != nil {
+			reportStatusOpts = c.opts.ReportStatus
+		}
+		if c.opts.Signaling != nil {
+			signalingOpts = c.opts.Signaling
+		}
+	}
+	cfg := reportstatus.ConfigFromOptions(reportStatusOpts, signalingOpts, "qs-worker")
+	reporter, err := reportstatus.NewReporter(c.opsHandle, cfg)
+	if err != nil {
+		log.Warnf("report status reporter disabled: %v", err)
+		return nil
+	}
+	return reporter
 }
 
 // Initialize 初始化容器中的所有组件
@@ -91,8 +121,9 @@ func (c *Container) initEventDispatcher() error {
 		EvaluationClient:  c.evaluationClient,
 		InternalClient:    c.internalClient,
 		LockManager:       c.lockManager,
-		LockKeyBuilder:    c.lockBuilder,
-		Notifier:          c.buildNotifier(),
+		LockKeyBuilder:       c.lockBuilder,
+		Notifier:             c.buildNotifier(),
+		ReportStatusReporter: c.reportStatus,
 	}
 
 	// 创建事件分发器

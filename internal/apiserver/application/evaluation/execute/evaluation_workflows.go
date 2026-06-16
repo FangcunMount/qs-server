@@ -7,10 +7,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 // loadedAssessment 加载的评估数据
@@ -137,9 +139,10 @@ func inputResolveFailureReason(err error) string {
 
 // evaluationFailureFinalizer 评估失败标记器
 type evaluationFailureFinalizer struct {
-	repo        assessment.Repository
-	txRunner    apptransaction.Runner
-	eventStager EventStager
+	repo         assessment.Repository
+	txRunner     apptransaction.Runner
+	eventStager  EventStager
+	reportStatus *reportstatus.Reporter
 }
 
 // MarkAsFailed 标记评估失败
@@ -164,6 +167,10 @@ func (f evaluationFailureFinalizer) MarkAsFailed(ctx context.Context, a *assessm
 			"assessment_id", a.ID().Uint64(),
 			"error", err.Error(),
 		)
+	}
+	if f.reportStatus != nil {
+		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
+		f.reportStatus.SetFailed(ctx, assessmentID, answerSheetID, "evaluation_failed", reason)
 	}
 }
 

@@ -6,8 +6,10 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -18,6 +20,7 @@ type writer struct {
 	reportSaver     ReportDurableSaver
 	eventAssemblers EventAssemblerRegistry
 	notifier        CompletionNotifier
+	reportStatus    *reportstatus.Reporter
 }
 
 func NewWriter(
@@ -26,6 +29,7 @@ func NewWriter(
 	reportBuilders ReportBuilderRegistry,
 	reportSaver ReportDurableSaver,
 	notifier CompletionNotifier,
+	reportStatus *reportstatus.Reporter,
 ) (Writer, error) {
 	return NewWriterWithEventAssemblers(
 		assessmentRepo,
@@ -33,6 +37,7 @@ func NewWriter(
 		reportBuilders,
 		reportSaver,
 		notifier,
+		reportStatus,
 		ScaleEventAssembler{},
 	)
 }
@@ -43,6 +48,7 @@ func NewWriterWithEventAssemblers(
 	reportBuilders ReportBuilderRegistry,
 	reportSaver ReportDurableSaver,
 	notifier CompletionNotifier,
+	reportStatus *reportstatus.Reporter,
 	assemblers ...EventAssembler,
 ) (Writer, error) {
 	eventAssemblers, err := NewEventAssemblerRegistry(assemblers...)
@@ -56,6 +62,7 @@ func NewWriterWithEventAssemblers(
 		reportSaver:     reportSaver,
 		eventAssemblers: eventAssemblers,
 		notifier:        notifier,
+		reportStatus:    reportStatus,
 	}, nil
 }
 
@@ -114,6 +121,10 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 
 	if w.notifier != nil {
 		w.notifier.NotifyCompletion(ctx, outcome)
+	}
+	if w.reportStatus != nil && prepared.report != nil {
+		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(outcome.Assessment)
+		w.reportStatus.SetCompleted(ctx, assessmentID, answerSheetID, prepared.report.ID().String())
 	}
 	return nil
 }

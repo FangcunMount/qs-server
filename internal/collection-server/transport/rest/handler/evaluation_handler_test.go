@@ -79,6 +79,7 @@ func TestEvaluationHandlerGetMyAssessmentByAnswerSheetIDPending(t *testing.T) {
 				return &answersheetapp.AnswerSheetResponse{ID: "123"}, nil
 			},
 		},
+		nil,
 	)
 
 	recorder := httptest.NewRecorder()
@@ -128,6 +129,7 @@ func TestEvaluationHandlerGetMyAssessmentByAnswerSheetIDAnswerSheetNotFound(t *t
 				return nil, status.Error(codes.NotFound, "answer sheet not found")
 			},
 		},
+		nil,
 	)
 
 	recorder := httptest.NewRecorder()

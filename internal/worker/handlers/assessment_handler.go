@@ -4,10 +4,12 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
@@ -54,6 +56,18 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 		assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
 		if err != nil {
 			return fmt.Errorf("invalid assessment id in submitted event: %w", err)
+		}
+
+		if deps.ReportStatusReporter != nil {
+			answerSheetID, convErr := strconv.ParseUint(data.AnswerSheetID, 10, 64)
+			if convErr == nil {
+				deps.ReportStatusReporter.SetProcessing(
+					ctx,
+					reportstatus.AssessmentKey(assessmentID),
+					reportstatus.AssessmentKey(answerSheetID),
+					"processing",
+				)
+			}
 		}
 
 		// 调用 InternalClient 执行评估
