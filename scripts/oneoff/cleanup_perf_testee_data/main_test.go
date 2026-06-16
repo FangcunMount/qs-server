@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"strings"
 	"testing"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -64,6 +65,81 @@ func TestMongoOutboxFiltersAreChunked(t *testing.T) {
 		if len(values) > mongoIDChunkSize {
 			t.Fatalf("chunk size = %d, want <= %d", len(values), mongoIDChunkSize)
 		}
+	}
+}
+
+func TestMySQLOutboxScopeStatementsConstrainAggregateType(t *testing.T) {
+	statements := mysqlOutboxScopeStatements(config{})
+	required := map[string]string{
+		"mysql outbox ids from assessment aggregate":           "o.aggregate_type = 'Assessment'",
+		"mysql outbox ids from report aggregate":               "o.aggregate_type = 'Report'",
+		"mysql outbox ids from answersheet aggregate":          "o.aggregate_type = 'AnswerSheet'",
+		"mysql outbox ids from behavior testee aggregate":      "o.aggregate_type = 'BehaviorFootprint'",
+		"mysql outbox ids from behavior answersheet aggregate": "o.aggregate_type = 'BehaviorFootprint'",
+		"mysql outbox ids from behavior assessment aggregate":  "o.aggregate_type = 'BehaviorFootprint'",
+		"mysql outbox ids from behavior report aggregate":      "o.aggregate_type = 'BehaviorFootprint'",
+	}
+
+	seen := map[string]struct{}{}
+	for _, statement := range statements {
+		want, ok := required[statement.name]
+		if !ok {
+			continue
+		}
+		seen[statement.name] = struct{}{}
+		if !strings.Contains(statement.sql, want) {
+			t.Fatalf("%s SQL must constrain aggregate type with %q; sql=%s", statement.name, want, statement.sql)
+		}
+		if !strings.Contains(statement.sql, "BINARY o.aggregate_id = BINARY CAST(") {
+			t.Fatalf("%s SQL must keep binary aggregate_id comparison; sql=%s", statement.name, statement.sql)
+		}
+	}
+	for name := range required {
+		if _, ok := seen[name]; !ok {
+			t.Fatalf("missing mysql outbox scope statement %q", name)
+		}
+	}
+}
+
+func TestMySQLOutboxScopePayloadScanIsExplicitOptIn(t *testing.T) {
+	defaultStatements := mysqlOutboxScopeStatements(config{})
+	for _, statement := range defaultStatements {
+		if strings.Contains(statement.name, "payload_json") {
+			t.Fatalf("payload_json statement %q should not be enabled by default", statement.name)
+		}
+	}
+
+	optInStatements := mysqlOutboxScopeStatements(config{scanEventPayloads: true})
+	var outboxPayload, pendingPayload bool
+	for _, statement := range optInStatements {
+		outboxPayload = outboxPayload || statement.name == "mysql outbox ids from payload_json"
+		pendingPayload = pendingPayload || statement.name == "analytics pending ids from payload_json"
+	}
+	if !outboxPayload || !pendingPayload {
+		t.Fatalf("scanEventPayloads should add both payload_json statements; outbox=%v pending=%v", outboxPayload, pendingPayload)
+	}
+}
+
+func TestScopeIDsEqualNormalizesOrderDuplicatesAndZero(t *testing.T) {
+	left := scopeIDs{
+		TesteeIDs:      []uint64{2, 1, 1, 0},
+		AssessmentIDs:  []uint64{10, 11},
+		AnswerSheetIDs: []uint64{20, 20},
+		ReportIDs:      []uint64{30},
+	}
+	right := scopeIDs{
+		TesteeIDs:      []uint64{1, 2},
+		AssessmentIDs:  []uint64{11, 10},
+		AnswerSheetIDs: []uint64{20},
+		ReportIDs:      []uint64{30, 0},
+	}
+	if !scopeIDsEqual(left, right) {
+		t.Fatal("scopeIDsEqual should normalize order, duplicates, and zero values")
+	}
+
+	right.ReportIDs = append(right.ReportIDs, 31)
+	if scopeIDsEqual(left, right) {
+		t.Fatal("scopeIDsEqual should detect changed report scope")
 	}
 }
 

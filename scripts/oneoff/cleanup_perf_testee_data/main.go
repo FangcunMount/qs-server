@@ -22,6 +22,7 @@ import (
 )
 
 const mongoIDChunkSize = 1000
+const mysqlInsertChunkSize = 1000
 
 type config struct {
 	mysqlDSN                  string
@@ -50,6 +51,21 @@ type namedCount struct {
 type namedSQL struct {
 	name string
 	sql  string
+}
+
+type mysqlCountItem struct {
+	name  string
+	query string
+}
+
+type mysqlBackupItem struct {
+	table     string
+	selectSQL string
+}
+
+type mysqlDeleteItem struct {
+	name string
+	stmt string
 }
 
 type testeePreview struct {
@@ -118,6 +134,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("load scope ids: %v", err)
 	}
+	mysqlScopedIDs := ids
 	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids)
 	if err != nil {
 		log.Fatalf("enrich scope ids from mongo: %v", err)
@@ -125,8 +142,14 @@ func main() {
 	if err := storeScopeIDs(ctx, conn, ids); err != nil {
 		log.Fatalf("store enriched scope ids: %v", err)
 	}
+	if !scopeIDsEqual(mysqlScopedIDs, ids) {
+		log.Print("refresh mysql outbox scope after mongo id enrichment")
+		if err := addMySQLOutboxIDsToScope(ctx, conn, cfg); err != nil {
+			log.Fatalf("refresh mysql outbox scope after mongo id enrichment: %v", err)
+		}
+	}
 	if cfg.skipMongoOutboxEventScope {
-		log.Print("skip mongo outbox event id scope by --skip-mongo-outbox-event-scope")
+		log.Print("skip mongo outbox event id scope by --skip-mongo-outbox-event-scope; mysql pending/checkpoint cleanup will not include event_ids that exist only in Mongo outbox")
 	} else if err := addMongoOutboxEventIDsToMySQLScope(ctx, conn, mongoDB, ids); err != nil {
 		log.Fatalf("load mongo outbox event ids: %v", err)
 	}
@@ -365,6 +388,23 @@ SELECT DISTINCT ae.report_id FROM assessment_episode ae JOIN tmp_cleanup_testee_
 		}
 	}
 
+	if err := addMySQLOutboxIDsToScope(ctx, conn, cfg); err != nil {
+		return err
+	}
+	return nil
+}
+
+func addMySQLOutboxIDsToScope(ctx context.Context, conn *sql.Conn, cfg config) error {
+	for _, item := range mysqlOutboxScopeStatements(cfg) {
+		log.Printf("mysql outbox scope: %s", item.name)
+		if _, err := conn.ExecContext(ctx, item.sql); err != nil {
+			return fmt.Errorf("%s: %w", item.name, err)
+		}
+	}
+	return nil
+}
+
+func mysqlOutboxScopeStatements(cfg config) []namedSQL {
 	outboxStmts := []namedSQL{
 		{"mysql outbox ids from assessment aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_assessment_ids a ON BINARY o.aggregate_id = BINARY CAST(a.id AS CHAR) WHERE o.aggregate_type = 'Assessment'`,
@@ -375,8 +415,17 @@ SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_report_ids r
 		{"mysql outbox ids from answersheet aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
 SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_answersheet_ids s ON BINARY o.aggregate_id = BINARY CAST(s.id AS CHAR) WHERE o.aggregate_type = 'AnswerSheet'`,
 		},
-		{"mysql outbox ids from testee aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
-SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_testee_ids t ON BINARY o.aggregate_id = BINARY CAST(t.id AS CHAR)`,
+		{"mysql outbox ids from behavior testee aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_testee_ids t ON BINARY o.aggregate_id = BINARY CAST(t.id AS CHAR) WHERE o.aggregate_type = 'BehaviorFootprint'`,
+		},
+		{"mysql outbox ids from behavior answersheet aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_answersheet_ids s ON BINARY o.aggregate_id = BINARY CAST(s.id AS CHAR) WHERE o.aggregate_type = 'BehaviorFootprint'`,
+		},
+		{"mysql outbox ids from behavior assessment aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_assessment_ids a ON BINARY o.aggregate_id = BINARY CAST(a.id AS CHAR) WHERE o.aggregate_type = 'BehaviorFootprint'`,
+		},
+		{"mysql outbox ids from behavior report aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_report_ids r ON BINARY o.aggregate_id = BINARY CAST(r.id AS CHAR) WHERE o.aggregate_type = 'BehaviorFootprint'`,
 		},
 	}
 	if cfg.scanEventPayloads {
@@ -403,13 +452,7 @@ FROM analytics_pending_event p
 JOIN tmp_cleanup_testee_ids t
   ON p.payload_json REGEXP CONCAT('"testee_id"[[:space:]]*:[[:space:]]*"?', t.id, '"?([,}[:space:]]|$)')`})
 	}
-	for _, item := range outboxStmts {
-		log.Printf("prepare mysql scope: %s", item.name)
-		if _, err := conn.ExecContext(ctx, item.sql); err != nil {
-			return err
-		}
-	}
-	return nil
+	return outboxStmts
 }
 
 func loadEventIDCollation(ctx context.Context, conn *sql.Conn) (string, error) {
@@ -603,7 +646,7 @@ func loadMongoUint64Field(ctx context.Context, coll *mongo.Collection, filter bs
 	if err != nil {
 		return nil, err
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	var out []uint64
 	for cur.Next(ctx) {
 		var row bson.M
@@ -654,19 +697,35 @@ func bsonValueToUint64(value any) (uint64, bool) {
 }
 
 func storeScopeIDs(ctx context.Context, conn *sql.Conn, ids scopeIDs) error {
-	for _, id := range ids.AssessmentIDs {
-		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_assessment_ids (id) VALUES (?)`, id); err != nil {
-			return fmt.Errorf("store assessment id %d: %w", id, err)
-		}
+	if err := bulkInsertUint64IDs(ctx, conn, "tmp_cleanup_assessment_ids", ids.AssessmentIDs); err != nil {
+		return fmt.Errorf("store assessment ids: %w", err)
 	}
-	for _, id := range ids.AnswerSheetIDs {
-		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_answersheet_ids (id) VALUES (?)`, id); err != nil {
-			return fmt.Errorf("store answersheet id %d: %w", id, err)
-		}
+	if err := bulkInsertUint64IDs(ctx, conn, "tmp_cleanup_answersheet_ids", ids.AnswerSheetIDs); err != nil {
+		return fmt.Errorf("store answersheet ids: %w", err)
 	}
-	for _, id := range ids.ReportIDs {
-		if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_report_ids (id) VALUES (?)`, id); err != nil {
-			return fmt.Errorf("store report id %d: %w", id, err)
+	if err := bulkInsertUint64IDs(ctx, conn, "tmp_cleanup_report_ids", ids.ReportIDs); err != nil {
+		return fmt.Errorf("store report ids: %w", err)
+	}
+	return nil
+}
+
+func bulkInsertUint64IDs(ctx context.Context, conn *sql.Conn, table string, ids []uint64) error {
+	ids = uniqueUint64(ids)
+	for start := 0; start < len(ids); start += mysqlInsertChunkSize {
+		end := start + mysqlInsertChunkSize
+		if end > len(ids) {
+			end = len(ids)
+		}
+		chunk := ids[start:end]
+		placeholders := make([]string, 0, len(chunk))
+		args := make([]any, 0, len(chunk))
+		for _, id := range chunk {
+			placeholders = append(placeholders, "(?)")
+			args = append(args, id)
+		}
+		stmt := fmt.Sprintf("INSERT IGNORE INTO %s (id) VALUES %s", table, strings.Join(placeholders, ","))
+		if _, err := conn.ExecContext(ctx, stmt, args...); err != nil {
+			return err
 		}
 	}
 	return nil
@@ -782,10 +841,7 @@ LIMIT ?`, limit)
 }
 
 func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
-	items := []struct {
-		name  string
-		query string
-	}{
+	items := []mysqlCountItem{
 		{"testee", `SELECT COUNT(*) FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT COUNT(*) FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"assessment_score", `SELECT COUNT(*) FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
@@ -797,9 +853,12 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"analytics_pending_event", `SELECT COUNT(*) FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
 		{"analytics_projector_checkpoint", `SELECT COUNT(*) FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
-		{"statistics_daily_testee", `SELECT COUNT(*) FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
-		{"statistics_accumulated_testee", `SELECT COUNT(*) FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
 	}
+	legacyItems, err := legacyStatisticsCountItems(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
+	items = append(items, legacyItems...)
 	out := make([]namedCount, 0, len(items))
 	for _, item := range items {
 		var count int64
@@ -825,10 +884,7 @@ func countMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs) ([]na
 }
 
 func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
-	items := []struct {
-		table     string
-		selectSQL string
-	}{
+	items := []mysqlBackupItem{
 		{"testee", `SELECT t.* FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
 		{"assessment", `SELECT a.* FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
 		{"assessment_score", `SELECT s.* FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
@@ -840,9 +896,12 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"analytics_pending_event", `SELECT p.* FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
 		{"analytics_projector_checkpoint", `SELECT c.* FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
-		{"statistics_daily", `SELECT d.* FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
-		{"statistics_accumulated", `SELECT a.* FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
 	}
+	legacyItems, err := legacyStatisticsBackupItems(ctx, conn)
+	if err != nil {
+		return err
+	}
+	items = append(items, legacyItems...)
 	for _, item := range items {
 		backupTable := fmt.Sprintf("cleanup_bak_perf_testee_%s_%s", item.table, suffix)
 		if _, err := conn.ExecContext(ctx, fmt.Sprintf("CREATE TABLE IF NOT EXISTS `%s` LIKE `%s`", backupTable, item.table)); err != nil {
@@ -923,30 +982,94 @@ func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection
 	return total, flush()
 }
 
+func legacyStatisticsCountItems(ctx context.Context, conn *sql.Conn) ([]mysqlCountItem, error) {
+	items := []mysqlCountItem{}
+	if exists, err := mysqlTableExists(ctx, conn, "statistics_daily"); err != nil {
+		return nil, err
+	} else if exists {
+		items = append(items, mysqlCountItem{"statistics_daily_testee", `SELECT COUNT(*) FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`})
+	} else {
+		log.Print("optional mysql table statistics_daily does not exist; skip legacy statistics_daily scope")
+	}
+	if exists, err := mysqlTableExists(ctx, conn, "statistics_accumulated"); err != nil {
+		return nil, err
+	} else if exists {
+		items = append(items, mysqlCountItem{"statistics_accumulated_testee", `SELECT COUNT(*) FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`})
+	} else {
+		log.Print("optional mysql table statistics_accumulated does not exist; skip legacy statistics_accumulated scope")
+	}
+	return items, nil
+}
+
+func legacyStatisticsBackupItems(ctx context.Context, conn *sql.Conn) ([]mysqlBackupItem, error) {
+	items := []mysqlBackupItem{}
+	if exists, err := mysqlTableExists(ctx, conn, "statistics_daily"); err != nil {
+		return nil, err
+	} else if exists {
+		items = append(items, mysqlBackupItem{"statistics_daily", `SELECT d.* FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`})
+	}
+	if exists, err := mysqlTableExists(ctx, conn, "statistics_accumulated"); err != nil {
+		return nil, err
+	} else if exists {
+		items = append(items, mysqlBackupItem{"statistics_accumulated", `SELECT a.* FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`})
+	}
+	return items, nil
+}
+
+func mysqlDeleteItems(ctx context.Context, conn *sql.Conn) ([]mysqlDeleteItem, error) {
+	items := []mysqlDeleteItem{}
+	if exists, err := mysqlTableExists(ctx, conn, "statistics_daily"); err != nil {
+		return nil, err
+	} else if exists {
+		items = append(items, mysqlDeleteItem{"statistics_daily_testee", `DELETE d FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`})
+	} else {
+		log.Print("optional mysql table statistics_daily does not exist; skip legacy statistics_daily delete")
+	}
+	if exists, err := mysqlTableExists(ctx, conn, "statistics_accumulated"); err != nil {
+		return nil, err
+	} else if exists {
+		items = append(items, mysqlDeleteItem{"statistics_accumulated_testee", `DELETE a FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`})
+	} else {
+		log.Print("optional mysql table statistics_accumulated does not exist; skip legacy statistics_accumulated delete")
+	}
+	items = append(items,
+		mysqlDeleteItem{"analytics_projector_checkpoint", `DELETE c FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		mysqlDeleteItem{"analytics_pending_event", `DELETE p FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
+		mysqlDeleteItem{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
+		mysqlDeleteItem{"behavior_footprint", `DELETE bf FROM behavior_footprint bf LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
+		mysqlDeleteItem{"assessment_episode", `DELETE ae FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
+		mysqlDeleteItem{"assessment_entry_intake_log", `DELETE l FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id`},
+		mysqlDeleteItem{"clinician_relation", `DELETE r FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id`},
+		mysqlDeleteItem{"assessment_task", `DELETE task FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL`},
+		mysqlDeleteItem{"assessment_score", `DELETE s FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
+		mysqlDeleteItem{"assessment", `DELETE a FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
+		mysqlDeleteItem{"testee", `DELETE t FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
+	)
+	return items, nil
+}
+
+func mysqlTableExists(ctx context.Context, conn *sql.Conn, table string) (bool, error) {
+	var count int
+	if err := conn.QueryRowContext(ctx, `
+SELECT COUNT(*)
+FROM information_schema.tables
+WHERE table_schema = DATABASE()
+  AND table_name = ?`, table).Scan(&count); err != nil {
+		return false, fmt.Errorf("check mysql table %s: %w", table, err)
+	}
+	return count > 0, nil
+}
+
 func deleteMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
+	items, err := mysqlDeleteItems(ctx, conn)
+	if err != nil {
+		return nil, err
+	}
 	tx, err := conn.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	items := []struct {
-		name string
-		stmt string
-	}{
-		{"statistics_daily_testee", `DELETE d FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
-		{"statistics_accumulated_testee", `DELETE a FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
-		{"analytics_projector_checkpoint", `DELETE c FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
-		{"analytics_pending_event", `DELETE p FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
-		{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
-		{"behavior_footprint", `DELETE bf FROM behavior_footprint bf LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"assessment_episode", `DELETE ae FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
-		{"assessment_entry_intake_log", `DELETE l FROM assessment_entry_intake_log l JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id`},
-		{"clinician_relation", `DELETE r FROM clinician_relation r JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id`},
-		{"assessment_task", `DELETE task FROM assessment_task task LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id WHERE t.id IS NOT NULL OR a.id IS NOT NULL`},
-		{"assessment_score", `DELETE s FROM assessment_score s LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id WHERE a.id IS NOT NULL OR t.id IS NOT NULL`},
-		{"assessment", `DELETE a FROM assessment a JOIN tmp_cleanup_assessment_ids x ON x.id = a.id`},
-		{"testee", `DELETE t FROM testee t JOIN tmp_cleanup_testee_ids x ON x.id = t.id`},
-	}
 	out := make([]namedCount, 0, len(items))
 	for _, item := range items {
 		result, err := tx.ExecContext(ctx, item.stmt)
@@ -1024,24 +1147,10 @@ func countMongoDocumentsByFilters(ctx context.Context, coll *mongo.Collection, f
 	return int64(len(seen)), nil
 }
 
-func answersheetFilter(ids scopeIDs) bson.M {
-	return orFilter(
-		inUint64("testee_id", ids.TesteeIDs),
-		inUint64("domain_id", ids.AnswerSheetIDs),
-	)
-}
-
 func answersheetFilters(ids scopeIDs) []bson.M {
 	return append(
 		inUint64Filters("testee_id", ids.TesteeIDs),
 		inUint64Filters("domain_id", ids.AnswerSheetIDs)...,
-	)
-}
-
-func answerSheetIdempotencyFilter(ids scopeIDs) bson.M {
-	return orFilter(
-		inUint64("testee_id", ids.TesteeIDs),
-		inUint64("answersheet_id", ids.AnswerSheetIDs),
 	)
 }
 
@@ -1052,33 +1161,11 @@ func answerSheetIdempotencyFilters(ids scopeIDs) []bson.M {
 	)
 }
 
-func reportFilter(ids scopeIDs) bson.M {
-	return orFilter(
-		inUint64("testee_id", ids.TesteeIDs),
-		inUint64("domain_id", ids.ReportIDs),
-		inUint64("domain_id", ids.AssessmentIDs),
-	)
-}
-
 func reportFilters(ids scopeIDs) []bson.M {
 	filters := inUint64Filters("testee_id", ids.TesteeIDs)
 	filters = append(filters, inUint64Filters("domain_id", ids.ReportIDs)...)
 	filters = append(filters, inUint64Filters("domain_id", ids.AssessmentIDs)...)
 	return filters
-}
-
-func mongoOutboxFilter(ids scopeIDs) bson.M {
-	answerStrings := uint64Strings(ids.AnswerSheetIDs)
-	assessmentStrings := uint64Strings(ids.AssessmentIDs)
-	reportStrings := uint64Strings(ids.ReportIDs)
-	testeeStrings := uint64Strings(ids.TesteeIDs)
-	behaviorStrings := uniqueStrings(answerStrings, assessmentStrings, reportStrings, testeeStrings)
-	return orFilter(
-		inStringWithAggregate("AnswerSheet", answerStrings),
-		inStringWithAggregate("Assessment", assessmentStrings),
-		inStringWithAggregate("Report", reportStrings),
-		inStringWithAggregate("BehaviorFootprint", behaviorStrings),
-	)
 }
 
 func mongoOutboxFilters(ids scopeIDs) []bson.M {
@@ -1115,13 +1202,6 @@ func inUint64Filters(field string, values []uint64) []bson.M {
 	return filters
 }
 
-func inStringWithAggregate(aggregateType string, values []string) bson.M {
-	if len(values) == 0 {
-		return nil
-	}
-	return bson.M{"aggregate_type": aggregateType, "aggregate_id": bson.M{"$in": values}}
-}
-
 func inStringWithAggregateFilters(aggregateType string, values []string) []bson.M {
 	values = uniqueStrings(values)
 	filters := make([]bson.M, 0, (len(values)+mongoIDChunkSize-1)/mongoIDChunkSize)
@@ -1155,22 +1235,6 @@ func mongoDocumentIDKey(id any) string {
 	default:
 		return fmt.Sprintf("%T:%v", value, value)
 	}
-}
-
-func orFilter(filters ...bson.M) bson.M {
-	ors := make([]bson.M, 0, len(filters))
-	for _, filter := range filters {
-		if len(filter) > 0 {
-			ors = append(ors, filter)
-		}
-	}
-	if len(ors) == 0 {
-		return bson.M{"_id": bson.M{"$exists": false}}
-	}
-	if len(ors) == 1 {
-		return ors[0]
-	}
-	return bson.M{"$or": ors}
 }
 
 func uint64Strings(values []uint64) []string {
@@ -1214,6 +1278,25 @@ func uniqueUint64(values []uint64) []uint64 {
 	}
 	sort.Slice(out, func(i, j int) bool { return out[i] < out[j] })
 	return out
+}
+
+func scopeIDsEqual(a, b scopeIDs) bool {
+	return uint64SlicesEqual(uniqueUint64(a.TesteeIDs), uniqueUint64(b.TesteeIDs)) &&
+		uint64SlicesEqual(uniqueUint64(a.AssessmentIDs), uniqueUint64(b.AssessmentIDs)) &&
+		uint64SlicesEqual(uniqueUint64(a.AnswerSheetIDs), uniqueUint64(b.AnswerSheetIDs)) &&
+		uint64SlicesEqual(uniqueUint64(a.ReportIDs), uniqueUint64(b.ReportIDs))
+}
+
+func uint64SlicesEqual(a, b []uint64) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func validateBackupSuffix(suffix string) error {

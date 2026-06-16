@@ -61,6 +61,10 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 
 MongoDB 单条命令有 16MB BSON 限制。脚本会把大量 `domain_id` / `aggregate_id` 的 `$in` 查询分批执行，避免几十万压测数据一次性塞进一条 `find`、`count`、`backup` 或 `delete` 命令。
 
+旧版 MySQL `statistics_daily` / `statistics_accumulated` 已在新迁移中删除的环境里，脚本会自动跳过这些 legacy 统计表。
+
+MySQL / MongoDB outbox 的清理都按 `aggregate_type + aggregate_id` 收窄；不要手工改成只按 `aggregate_id` 删除，因为不同聚合根可能共用相同的数字 ID 字符串。
+
 ### 解决什么问题
 
 用于清理最近几天压测产生的大量答卷、测评、报告、行为事件和 outbox 积压数据。它不会跨库删除 IAM 用户/档案，也不会直接扣减新统计聚合表；清理源数据后，应按受影响日期窗口重建统计聚合和 Redis 查询缓存。
@@ -124,7 +128,7 @@ go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
 - `--derive-ids-from-facts`：额外从 MySQL `behavior_footprint` / `assessment_episode` 反查关联 ID；大事实表上较慢，默认关闭。事实表本身仍会按 `testee_id` 清理。
 - `--scan-event-payloads`：额外扫描 MySQL outbox / pending 的 `payload_json` 兜底匹配 `testee_id`；大 outbox 表上很慢，默认关闭。
 - `--skip-counts`：跳过行数统计和 affected source date window 计算；在已有外部备份保护、只想快速执行清理时使用。
-- `--skip-mongo-outbox-event-scope`：跳过从 Mongo `domain_event_outbox` 读取 `event_id` 并回灌 MySQL 临时表。Mongo outbox 文档仍会按聚合 ID 分批删除，但 MySQL `analytics_pending_event` / `analytics_projector_checkpoint` 只会清理 MySQL outbox 已发现的事件 ID；如需清理 Mongo outbox 对应的 pending/checkpoint，可后续按事件类型和时间窗单独处理。
+- `--skip-mongo-outbox-event-scope`：跳过从 Mongo `domain_event_outbox` 读取 `event_id` 并回灌 MySQL 临时表。Mongo outbox 文档仍会按聚合 ID 分批删除，但 MySQL `analytics_pending_event` / `analytics_projector_checkpoint` 只会清理 MySQL outbox 已发现的事件 ID；这属于快速清理模式，不是“零残留”模式。如需清理 Mongo outbox 对应的 pending/checkpoint，可后续按事件类型和时间窗单独处理。
 - `--backup-suffix`：备份表/集合后缀，只允许字母、数字和下划线。
 - `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
 
