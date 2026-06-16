@@ -89,7 +89,7 @@ func main() {
 		log.Fatalf("open mysql conn: %v", err)
 	}
 	defer func() { _ = conn.Close() }()
-	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
+	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
 	}
 
@@ -267,14 +267,24 @@ func splitIDs(raw string) []string {
 }
 
 func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeIDs []uint64) error {
+	eventIDCollation, err := loadEventIDCollation(ctx, conn)
+	if err != nil {
+		return err
+	}
+	eventIDType := "VARCHAR(128)"
+	if eventIDCollation != "" {
+		eventIDType = fmt.Sprintf("VARCHAR(128) CHARACTER SET utf8mb4 COLLATE %s", eventIDCollation)
+		log.Printf("prepare mysql scope: event_id collation=%s", eventIDCollation)
+	}
+
 	stmts := []string{
 		`CREATE TEMPORARY TABLE tmp_cleanup_testee_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_answersheet_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 		`CREATE TEMPORARY TABLE tmp_cleanup_report_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_event_ids (event_id VARCHAR(128) NOT NULL PRIMARY KEY)`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_mysql_outbox_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, event_id VARCHAR(128) NOT NULL, UNIQUE KEY uk_event_id (event_id))`,
-		`CREATE TEMPORARY TABLE tmp_cleanup_pending_event_ids (event_id VARCHAR(128) NOT NULL PRIMARY KEY)`,
+		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
+		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_mysql_outbox_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, event_id %s NOT NULL, UNIQUE KEY uk_event_id (event_id))`, eventIDType),
+		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_pending_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
 	}
 	for _, stmt := range stmts {
 		log.Printf("prepare mysql scope: %s", firstSQLLine(stmt))
@@ -383,6 +393,34 @@ JOIN tmp_cleanup_testee_ids t
 		}
 	}
 	return nil
+}
+
+func loadEventIDCollation(ctx context.Context, conn *sql.Conn) (string, error) {
+	var collation sql.NullString
+	if err := conn.QueryRowContext(ctx, `
+SELECT COALESCE(
+  MAX(CASE WHEN table_name = 'analytics_pending_event' THEN collation_name END),
+  MAX(CASE WHEN table_name = 'analytics_projector_checkpoint' THEN collation_name END),
+  MAX(CASE WHEN table_name = 'domain_event_outbox' THEN collation_name END)
+)
+FROM information_schema.columns
+WHERE table_schema = DATABASE()
+  AND table_name IN ('analytics_pending_event', 'analytics_projector_checkpoint', 'domain_event_outbox')
+  AND column_name = 'event_id'`).Scan(&collation); err != nil {
+		return "", fmt.Errorf("load event_id collation: %w", err)
+	}
+	if !collation.Valid || strings.TrimSpace(collation.String) == "" {
+		return "", nil
+	}
+	name := strings.TrimSpace(collation.String)
+	ok, err := regexp.MatchString(`^[A-Za-z0-9_]+$`, name)
+	if err != nil {
+		return "", err
+	}
+	if !ok {
+		return "", fmt.Errorf("unsafe event_id collation name %q", name)
+	}
+	return name, nil
 }
 
 func validateTesteeGuard(ctx context.Context, conn *sql.Conn, cfg config, expected int) error {

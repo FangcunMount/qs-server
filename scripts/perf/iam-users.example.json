@@ -1,4 +1,366 @@
 {
-    "collection_users": [],
-    "apiserver_users": []
+    "collection_users": [
+        {
+            "username": "lining_20260608_0102@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "machao_20260608_0101@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhangjia_20260608_0100@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhouqiang_20260608_0099@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "songlin_20260608_0098@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xuwei_20260608_0097@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "humin_20260608_0096@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "huqiang_20260608_0095@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiejie_20260608_0094@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiejie_20260608_0093@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhengmin_20260608_0092@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiejie_20260608_0091@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "guoxin_20260608_0090@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "dengtao_20260608_0089@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "caojing_20260608_0088@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "chenyong_20260608_0087@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "linping_20260608_0086@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "wutao_20260608_0085@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "songlin_20260608_0084@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "huangtao_20260608_0083@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "heyue_20260608_0082@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xubo_20260608_0081@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "hanyue_20260608_0080@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xuhao_20260608_0079@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "lilin_20260608_0078@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiebo_20260608_0077@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xuli_20260608_0076@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "linhao_20260608_0075@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "gaoping_20260608_0074@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "chenyang_20260608_0073@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "gaojuan_20260608_0072@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhupeng_20260608_0071@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "hejie_20260608_0070@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "caojian_20260608_0069@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "lilin_20260608_0068@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "linjian_20260608_0067@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "tangxin_20260608_0066@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiehao_20260608_0065@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "lijia_20260608_0064@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "sunjie_20260608_0063@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "liangyue_20260608_0062@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "linbin_20260608_0061@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "dengjing_20260608_0060@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "gaopeng_20260608_0059@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "wangyao_20260608_0058@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "luocheng_20260608_0057@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "wuqian_20260608_0056@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "guocheng_20260608_0055@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "chenlin_20260608_0054@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhangyong_20260608_0053@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "luoxin_20260608_0052@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xielei_20260608_0051@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "majie_20260608_0050@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "fengkai_20260608_0049@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "wangqian_20260608_0048@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhuyang_20260608_0047@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "huangjie_20260608_0046@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "hanlei_20260608_0045@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "maning_20260608_0044@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhoulei_20260608_0043@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiena_20260608_0042@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "luohui_20260608_0041@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "liulin_20260608_0040@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "fengbo_20260608_0039@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "huangyan_20260608_0038@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "chenjun_20260608_0037@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xudan_20260608_0036@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "zhuhao_20260608_0035@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "liwen_20260608_0034@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        },
+        {
+            "username": "xiecheng_20260608_0033@fangcunmount.com",
+            "password": "DailySim@123",
+            "tenant_id": 1
+        }
+    ],
+    "apiserver_users": [
+      {
+        "username": "system@fangcunmount.com",
+        "password": "Flzx3Qc",
+        "tenant_id": 1
+      },
+      {
+        "username": "admin@fangcunmount.com",
+        "password": "Ysyhl9T",
+        "tenant_id": 1
+      }
+    ]
 }
