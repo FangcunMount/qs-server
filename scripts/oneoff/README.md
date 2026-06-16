@@ -24,6 +24,7 @@ export REDIS_PASSWORD='***'
 | 脚本 | 用途 | 主要写入对象 |
 | ---- | ---- | ------------ |
 | `cleanup_deleted_assessment_orphans.go` | 清理物理删除 assessment 后遗留的行为、统计和 Mongo 文档引用 | MySQL `behavior_footprint` / `assessment_episode`，Mongo `answersheets` / `interpret_reports` |
+| `cleanup_perf_testee_data/main.go` | 按压测受试者 ID 物理清理 MySQL / MongoDB 垃圾数据 | MySQL testee/assessment/统计事实/outbox，Mongo answersheets/reports/outbox |
 | `rewrite_seeddata_assessment_times/main.go` | 将 seeddata plan task 测评从错误集中日期改回任务计划日期 | MySQL `assessment` / `assessment_task` / `assessment_score` / `testee` |
 | `rebuild_access_funnel_from_sources/main.go` | 从接入业务源重建接入漏斗统计源和聚合 | MySQL `assessment_entry_intake_log` / `statistics_journey_daily.access_*` |
 | `rebuild_statistics_facts_from_sources/main.go` | 从业务源表重建统计事实层 | MySQL `behavior_footprint` / `assessment_episode` |
@@ -32,6 +33,83 @@ export REDIS_PASSWORD='***'
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
+
+## cleanup_perf_testee_data/main.go
+
+### 做什么
+
+按明确给出的 `testee_id` 集合清理压测产生的垃圾数据。脚本会先在 MySQL 中创建临时作用域，补齐这些受试者关联的 `assessment_id`、`answersheet_id`、`report_id` 和 outbox `event_id`，然后清理：
+
+- MySQL `testee`、`assessment`、`assessment_score`、`assessment_task`。
+- MySQL `clinician_relation`、`assessment_entry_intake_log`。
+- MySQL `behavior_footprint`、`assessment_episode`、旧版 testee 维度 `statistics_daily` / `statistics_accumulated`。
+- MySQL `domain_event_outbox`、`analytics_pending_event`、`analytics_projector_checkpoint`。
+- MongoDB `answersheets`、`answersheet_submit_idempotency`、`interpret_reports`、`domain_event_outbox`。
+
+脚本默认 dry-run，只输出命中数量和受试者预览。执行 `--apply` 时会先创建备份表和备份集合，除非显式传入 `--skip-backup`。
+
+### 解决什么问题
+
+用于清理最近几天压测产生的大量答卷、测评、报告、行为事件和 outbox 积压数据。它不会跨库删除 IAM 用户/档案，也不会直接扣减新统计聚合表；清理源数据后，应按受影响日期窗口重建统计聚合和 Redis 查询缓存。
+
+### 如何调用
+
+先 dry-run：
+
+```bash
+go run scripts/oneoff/cleanup_perf_testee_data/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --mongo-db qs \
+  --testee-ids '624047162266759726,623766863960093230,623932256825651758,623929287728181806,623917211471327790,623906818086679086,623905256379527726,623920684539589166,623902104913719854,623922208565178926' \
+  --preview-limit 20
+```
+
+确认命中范围后执行：
+
+```bash
+go run scripts/oneoff/cleanup_perf_testee_data/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --mongo-db qs \
+  --testee-ids '624047162266759726,623766863960093230,623932256825651758,623929287728181806,623917211471327790,623906818086679086,623905256379527726,623920684539589166,623902104913719854,623922208565178926' \
+  --backup-suffix 20260616_perf_testee_cleanup \
+  --apply
+```
+
+如果 ID 很多，可以放入文件：
+
+```bash
+go run scripts/oneoff/cleanup_perf_testee_data/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --mongo-db qs \
+  --testee-ids-file /tmp/perf-testee-ids.txt \
+  --apply
+```
+
+执行后按 dry-run 输出的 affected source date window 重建统计聚合和缓存，例如：
+
+```bash
+go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
+  --mysql-dsn "$MYSQL_DSN" \
+  --org-id 1 \
+  --start-date 2026-06-15 \
+  --end-date 2026-06-17 \
+  --redis-addr "$REDIS_ADDR" \
+  --redis-query-namespace 'qs:cache:query' \
+  --redis-username "$REDIS_USERNAME" \
+  --redis-password "$REDIS_PASSWORD" \
+  --apply
+```
+
+关键参数：
+
+- `--testee-ids` / `--testee-ids-file`：二选一或同时使用，逗号、空格、换行都可分隔。
+- `--testee-created-after`：安全边界，默认 `2026-05-01 00:00:00`；命中的受试者必须晚于该时间创建。
+- `--allow-old-testees`：绕过创建时间保护，只应在人工确认这些 ID 确实是压测数据后使用。
+- `--backup-suffix`：备份表/集合后缀，只允许字母、数字和下划线。
+- `--skip-backup`：跳过内置备份，只应在已有外部备份时使用。
 
 ## cleanup_deleted_assessment_orphans.go
 
