@@ -73,7 +73,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("open mysql: %v", err)
 	}
-	defer mysqlDB.Close()
+	defer func() { _ = mysqlDB.Close() }()
 	mysqlDB.SetMaxOpenConns(1)
 	mysqlDB.SetMaxIdleConns(1)
 
@@ -81,7 +81,7 @@ func main() {
 	if err != nil {
 		log.Fatalf("open mysql conn: %v", err)
 	}
-	defer conn.Close()
+	defer func() { _ = conn.Close() }()
 	if _, err := conn.ExecContext(ctx, "SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci"); err != nil {
 		log.Fatalf("set mysql names: %v", err)
 	}
@@ -343,7 +343,7 @@ func validateTesteeGuard(ctx context.Context, conn *sql.Conn, cfg config, expect
 		if err != nil {
 			return err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		missing := []string{}
 		for rows.Next() {
 			var id uint64
@@ -374,7 +374,7 @@ LIMIT 20`, cfg.testeeCreatedAfter)
 	if err != nil {
 		return err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	samples := []string{}
 	for rows.Next() {
 		var id uint64
@@ -401,7 +401,7 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
 		if err != nil {
 			return nil, err
 		}
-		defer rows.Close()
+		defer func() { _ = rows.Close() }()
 		var out []uint64
 		for rows.Next() {
 			var id uint64
@@ -443,7 +443,7 @@ func addMongoOutboxEventIDsToMySQLScope(ctx context.Context, conn *sql.Conn, db 
 	if err != nil {
 		return err
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	for cur.Next(ctx) {
 		var row struct {
 			EventID string `bson:"event_id"`
@@ -487,7 +487,7 @@ func loadScopeSummary(ctx context.Context, conn *sql.Conn) (scopeSummary, error)
 	if err != nil {
 		return s, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	for rows.Next() {
 		var orgID int64
 		if err := rows.Scan(&orgID); err != nil {
@@ -528,7 +528,7 @@ LIMIT ?`, limit)
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 	var out []testeePreview
 	for rows.Next() {
 		var row testeePreview
@@ -649,7 +649,7 @@ func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection
 	if err != nil {
 		return 0, err
 	}
-	defer cur.Close(ctx)
+	defer func() { _ = cur.Close(ctx) }()
 	batch := make([]interface{}, 0, 1000)
 	var total int64
 	flush := func() error {
@@ -687,7 +687,7 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) 
 	if err != nil {
 		return nil, err
 	}
-	defer tx.Rollback()
+	defer func() { _ = tx.Rollback() }()
 	items := []struct {
 		name string
 		stmt string
