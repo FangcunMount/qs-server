@@ -280,7 +280,7 @@ func (o *Options) Validate() []error {
 	}
 	errs = append(errs, cacheplane.ValidateRuntimeOptions(
 		o.RedisRuntime,
-		[]cacheplane.Family{cacheplane.FamilyLock},
+		[]cacheplane.Family{cacheplane.FamilyOps, cacheplane.FamilyLock},
 		o.RedisProfiles,
 		"redis_runtime",
 	)...)

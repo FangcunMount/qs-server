@@ -32,6 +32,7 @@ func (o *Options) Validate() []error {
 			cacheplane.FamilyMeta,
 			cacheplane.FamilyRank,
 			cacheplane.FamilySDK,
+			cacheplane.FamilyOps,
 			cacheplane.FamilyLock,
 		},
 		o.RedisProfiles,
