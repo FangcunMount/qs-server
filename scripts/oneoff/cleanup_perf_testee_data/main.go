@@ -350,16 +350,16 @@ SELECT DISTINCT ae.report_id FROM assessment_episode ae JOIN tmp_cleanup_testee_
 
 	outboxStmts := []namedSQL{
 		{"mysql outbox ids from assessment aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
-SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_assessment_ids a ON o.aggregate_id = CAST(a.id AS CHAR) WHERE o.aggregate_type = 'Assessment'`,
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_assessment_ids a ON BINARY o.aggregate_id = BINARY CAST(a.id AS CHAR) WHERE o.aggregate_type = 'Assessment'`,
 		},
 		{"mysql outbox ids from report aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
-SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_report_ids r ON o.aggregate_id = CAST(r.id AS CHAR) WHERE o.aggregate_type = 'Report'`,
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_report_ids r ON BINARY o.aggregate_id = BINARY CAST(r.id AS CHAR) WHERE o.aggregate_type = 'Report'`,
 		},
 		{"mysql outbox ids from answersheet aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
-SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_answersheet_ids s ON o.aggregate_id = CAST(s.id AS CHAR) WHERE o.aggregate_type = 'AnswerSheet'`,
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_answersheet_ids s ON BINARY o.aggregate_id = BINARY CAST(s.id AS CHAR) WHERE o.aggregate_type = 'AnswerSheet'`,
 		},
 		{"mysql outbox ids from testee aggregate", `INSERT IGNORE INTO tmp_cleanup_mysql_outbox_ids (id, event_id)
-SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_testee_ids t ON o.aggregate_id = CAST(t.id AS CHAR)`,
+SELECT o.id, o.event_id FROM domain_event_outbox o JOIN tmp_cleanup_testee_ids t ON BINARY o.aggregate_id = BINARY CAST(t.id AS CHAR)`,
 		},
 	}
 	if cfg.scanEventPayloads {
@@ -375,7 +375,7 @@ JOIN tmp_cleanup_testee_ids t
 SELECT event_id FROM tmp_cleanup_mysql_outbox_ids`,
 		},
 		namedSQL{"analytics pending ids from event ids", `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
-SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON e.event_id = p.event_id`,
+SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY p.event_id`,
 		},
 	)
 	if cfg.scanEventPayloads {
@@ -648,7 +648,7 @@ func addMongoOutboxEventIDsToMySQLScope(ctx context.Context, conn *sql.Conn, db 
 		return err
 	}
 	_, err = conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
-SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON e.event_id = p.event_id`)
+SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY p.event_id`)
 	return err
 }
 
@@ -740,10 +740,10 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 		{"behavior_footprint", `SELECT COUNT(*) FROM behavior_footprint bf LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"assessment_episode", `SELECT COUNT(*) FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"domain_event_outbox", `SELECT COUNT(*) FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
-		{"analytics_pending_event", `SELECT COUNT(*) FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON x.event_id = p.event_id`},
-		{"analytics_projector_checkpoint", `SELECT COUNT(*) FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON x.event_id = c.event_id`},
-		{"statistics_daily_testee", `SELECT COUNT(*) FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON d.statistic_key = CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
-		{"statistics_accumulated_testee", `SELECT COUNT(*) FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON a.statistic_key = CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
+		{"analytics_pending_event", `SELECT COUNT(*) FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
+		{"analytics_projector_checkpoint", `SELECT COUNT(*) FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		{"statistics_daily_testee", `SELECT COUNT(*) FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
+		{"statistics_accumulated_testee", `SELECT COUNT(*) FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
 	}
 	out := make([]namedCount, 0, len(items))
 	for _, item := range items {
@@ -792,10 +792,10 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 		{"behavior_footprint", `SELECT bf.* FROM behavior_footprint bf LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"assessment_episode", `SELECT ae.* FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"domain_event_outbox", `SELECT o.* FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
-		{"analytics_pending_event", `SELECT p.* FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON x.event_id = p.event_id`},
-		{"analytics_projector_checkpoint", `SELECT c.* FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON x.event_id = c.event_id`},
-		{"statistics_daily", `SELECT d.* FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON d.statistic_key = CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
-		{"statistics_accumulated", `SELECT a.* FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON a.statistic_key = CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
+		{"analytics_pending_event", `SELECT p.* FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
+		{"analytics_projector_checkpoint", `SELECT c.* FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		{"statistics_daily", `SELECT d.* FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
+		{"statistics_accumulated", `SELECT a.* FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
 	}
 	for _, item := range items {
 		backupTable := fmt.Sprintf("cleanup_bak_perf_testee_%s_%s", item.table, suffix)
@@ -878,10 +878,10 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) 
 		name string
 		stmt string
 	}{
-		{"statistics_daily_testee", `DELETE d FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON d.statistic_key = CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
-		{"statistics_accumulated_testee", `DELETE a FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON a.statistic_key = CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
-		{"analytics_projector_checkpoint", `DELETE c FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON x.event_id = c.event_id`},
-		{"analytics_pending_event", `DELETE p FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON x.event_id = p.event_id`},
+		{"statistics_daily_testee", `DELETE d FROM statistics_daily d JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR) WHERE d.statistic_type = 'testee'`},
+		{"statistics_accumulated_testee", `DELETE a FROM statistics_accumulated a JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR) WHERE a.statistic_type = 'testee'`},
+		{"analytics_projector_checkpoint", `DELETE c FROM analytics_projector_checkpoint c JOIN tmp_cleanup_event_ids x ON BINARY x.event_id = BINARY c.event_id`},
+		{"analytics_pending_event", `DELETE p FROM analytics_pending_event p JOIN tmp_cleanup_pending_event_ids x ON BINARY x.event_id = BINARY p.event_id`},
 		{"domain_event_outbox", `DELETE o FROM domain_event_outbox o JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id`},
 		{"behavior_footprint", `DELETE bf FROM behavior_footprint bf LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
 		{"assessment_episode", `DELETE ae FROM assessment_episode ae LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`},
