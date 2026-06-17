@@ -2,17 +2,23 @@ package eventing
 
 import (
 	"context"
+	"sync"
 	"time"
 
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 )
 
+const defaultOutboxStatusReportInterval = 30 * time.Second
+
 type outboxStatusReporter struct {
-	name     string
-	reader   OutboxStatusReader
-	observer eventobservability.Observer
-	now      func() time.Time
+	name          string
+	reader        OutboxStatusReader
+	observer      eventobservability.Observer
+	now           func() time.Time
+	minInterval   time.Duration
+	mu            sync.Mutex
+	lastAttemptAt time.Time
 }
 
 // NewOutboxStatusReporter creates the best-effort metrics bridge for one outbox store.
@@ -21,21 +27,34 @@ func NewOutboxStatusReporter(name string, reader OutboxStatusReader, observer ev
 }
 
 func newOutboxStatusReporter(name string, reader OutboxStatusReader, observer eventobservability.Observer, now func() time.Time) OutboxStatusReporter {
+	return newOutboxStatusReporterWithInterval(name, reader, observer, now, defaultOutboxStatusReportInterval)
+}
+
+func newOutboxStatusReporterWithInterval(name string, reader OutboxStatusReader, observer eventobservability.Observer, now func() time.Time, minInterval time.Duration) OutboxStatusReporter {
 	if now == nil {
 		now = time.Now
 	}
 	if observer == nil {
 		observer = eventobservability.DefaultObserver()
 	}
-	return &outboxStatusReporter{name: name, reader: reader, observer: observer, now: now}
+	return &outboxStatusReporter{name: name, reader: reader, observer: observer, now: now, minInterval: minInterval}
 }
 
 func (r *outboxStatusReporter) ReportOutboxStatus(ctx context.Context) {
 	if r == nil || r.reader == nil {
 		return
 	}
+	now := r.now()
+	r.mu.Lock()
+	if r.minInterval > 0 && !r.lastAttemptAt.IsZero() && now.Sub(r.lastAttemptAt) < r.minInterval {
+		r.mu.Unlock()
+		return
+	}
+	r.lastAttemptAt = now
+	r.mu.Unlock()
+
 	storeName := r.name
-	snapshot, err := r.reader.OutboxStatusSnapshot(ctx, r.now())
+	snapshot, err := r.reader.OutboxStatusSnapshot(ctx, now)
 	if snapshot.Store != "" {
 		storeName = snapshot.Store
 	}

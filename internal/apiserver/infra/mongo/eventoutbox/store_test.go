@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 type fakeTopicResolver struct {
@@ -104,6 +105,33 @@ func TestStageRequiresActiveSessionTransactionContext(t *testing.T) {
 	}
 }
 
+func TestMongoOutboxIndexModelsCoverHotRelayAndStatusQueries(t *testing.T) {
+	indexes := mongoOutboxIndexModels()
+
+	assertMongoIndex(t, indexes, "idx_pending_status_event_type_created_next", bson.D{
+		{Key: "status", Value: 1},
+		{Key: "event_type", Value: 1},
+		{Key: "created_at", Value: 1},
+		{Key: "next_attempt_at", Value: 1},
+	})
+	assertMongoIndex(t, indexes, "idx_pending_created_at_next_attempt_at", bson.D{
+		{Key: "created_at", Value: 1},
+		{Key: "next_attempt_at", Value: 1},
+	})
+	assertMongoIndex(t, indexes, "idx_failed_next_attempt_at_created_at", bson.D{
+		{Key: "next_attempt_at", Value: 1},
+		{Key: "created_at", Value: 1},
+	})
+	assertMongoIndex(t, indexes, "idx_publishing_updated_at_created_at", bson.D{
+		{Key: "updated_at", Value: 1},
+		{Key: "created_at", Value: 1},
+	})
+	assertMongoIndex(t, indexes, "idx_status_created_at", bson.D{
+		{Key: "status", Value: 1},
+		{Key: "created_at", Value: 1},
+	})
+}
+
 func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 	now := time.Date(2026, 6, 15, 19, 30, 0, 0, time.UTC)
 
@@ -118,7 +146,9 @@ func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 		eventcatalog.ReportGenerated,
 	}
 	assertEventTypeOperator(t, queries[0].filter, "$in", wantPriority)
-	assertEventTypeOperator(t, queries[1].filter, "$nin", wantPriority)
+	if _, ok := queries[1].filter["event_type"]; ok {
+		t.Fatalf("fallback filter event_type = %#v, want absent so it can use the pending FIFO index", queries[1].filter["event_type"])
+	}
 	for _, query := range queries {
 		if query.filter["status"] != outboxcore.StatusPending {
 			t.Fatalf("filter status = %#v, want pending", query.filter["status"])
@@ -145,6 +175,24 @@ func TestPendingClaimQueriesFallsBackToFIFOWithoutPriority(t *testing.T) {
 	}
 }
 
+func TestOutboxStatusSnapshotPipelineGroupsUnfinishedStatusesOnce(t *testing.T) {
+	statuses := []string{outboxcore.StatusPending, outboxcore.StatusPublishing, outboxcore.StatusFailed}
+
+	pipeline := outboxStatusSnapshotPipeline(statuses)
+
+	want := mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{{Key: "status", Value: bson.D{{Key: "$in", Value: statuses}}}}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$status"},
+			{Key: "n", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "oldest_created_at", Value: bson.D{{Key: "$min", Value: "$created_at"}}},
+		}}},
+	}
+	if !reflect.DeepEqual(pipeline, want) {
+		t.Fatalf("pipeline = %#v, want %#v", pipeline, want)
+	}
+}
+
 func assertEventTypeOperator(t *testing.T, filter bson.M, operator string, want []string) {
 	t.Helper()
 	eventTypeFilter, ok := filter["event_type"].(bson.M)
@@ -158,6 +206,24 @@ func assertEventTypeOperator(t *testing.T, filter bson.M, operator string, want 
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("event_type %s = %#v, want %#v", operator, got, want)
 	}
+}
+
+func assertMongoIndex(t *testing.T, indexes []mongo.IndexModel, name string, keys bson.D) {
+	t.Helper()
+	for _, index := range indexes {
+		if index.Options == nil || index.Options.Name == nil || *index.Options.Name != name {
+			continue
+		}
+		got, ok := index.Keys.(bson.D)
+		if !ok {
+			t.Fatalf("index %s keys = %#v, want bson.D", name, index.Keys)
+		}
+		if !reflect.DeepEqual(got, keys) {
+			t.Fatalf("index %s keys = %#v, want %#v", name, got, keys)
+		}
+		return
+	}
+	t.Fatalf("index %s not found in %#v", name, indexes)
 }
 
 func TestOutboxStatusSnapshotNilStoreReturnsZeroBuckets(t *testing.T) {

@@ -40,6 +40,7 @@ type fakeOutboxStore struct {
 	markFailedErr    error
 	statusSnapshot   outboxport.StatusSnapshot
 	statusErr        error
+	statusCalls      int
 	published        []string
 	failed           []string
 	lastLimit        int
@@ -83,6 +84,7 @@ func (s *fakeOutboxStore) MarkEventFailed(_ context.Context, eventID, _ string, 
 }
 
 func (s *fakeOutboxStore) OutboxStatusSnapshot(context.Context, time.Time) (outboxport.StatusSnapshot, error) {
+	s.statusCalls++
 	if s.statusErr != nil {
 		return outboxport.StatusSnapshot{}, s.statusErr
 	}
@@ -298,6 +300,46 @@ func TestOutboxRelayStatusReporterFailureDoesNotChangeDispatchResult(t *testing.
 	assertOutboxStatusScrape(t, observer, eventobservability.OutboxStatusScrapeOutcomeFailure)
 	if len(store.published) != 1 || store.published[0] != "evt-1" {
 		t.Fatalf("published markers = %#v, want evt-1", store.published)
+	}
+}
+
+func TestOutboxStatusReporterThrottlesStatusScrapes(t *testing.T) {
+	current := time.Date(2026, 6, 17, 16, 0, 0, 0, time.UTC)
+	observer := &outboxObserver{}
+	store := &fakeOutboxStore{
+		statusSnapshot: outboxport.StatusSnapshot{
+			Store: "test-relay",
+			Buckets: []outboxport.StatusBucket{
+				{Status: "pending", Count: 10},
+			},
+		},
+	}
+	reporter := newOutboxStatusReporterWithInterval(
+		"test-relay",
+		store,
+		observer,
+		func() time.Time { return current },
+		30*time.Second,
+	)
+
+	reporter.ReportOutboxStatus(context.Background())
+	reporter.ReportOutboxStatus(context.Background())
+
+	if store.statusCalls != 1 {
+		t.Fatalf("status calls before interval = %d, want 1", store.statusCalls)
+	}
+	if len(observer.statusScrape) != 1 {
+		t.Fatalf("status scrapes before interval = %d, want 1", len(observer.statusScrape))
+	}
+
+	current = current.Add(31 * time.Second)
+	reporter.ReportOutboxStatus(context.Background())
+
+	if store.statusCalls != 2 {
+		t.Fatalf("status calls after interval = %d, want 2", store.statusCalls)
+	}
+	if len(observer.statusScrape) != 2 {
+		t.Fatalf("status scrapes after interval = %d, want 2", len(observer.statusScrape))
 	}
 }
 

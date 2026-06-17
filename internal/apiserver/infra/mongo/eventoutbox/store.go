@@ -18,6 +18,8 @@ import (
 
 var ErrActiveSessionTransactionRequired = stderrors.New("active mongo session transaction required")
 
+const mongoOutboxIndexCreationTimeout = 30 * time.Second
+
 // OutboxPO stores domain events until they are durably published.
 type OutboxPO struct {
 	EventID       string    `bson:"event_id"`
@@ -80,10 +82,18 @@ func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicRe
 }
 
 func (s *Store) ensureIndexes(ctx context.Context) error {
-	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	ctx, cancel := context.WithTimeout(ctx, mongoOutboxIndexCreationTimeout)
 	defer cancel()
 
-	if _, err := s.coll.Indexes().CreateMany(ctx, []mongo.IndexModel{
+	if _, err := s.coll.Indexes().CreateMany(ctx, mongoOutboxIndexModels()); err != nil {
+		return fmt.Errorf("create mongo outbox indexes: %w", err)
+	}
+
+	return nil
+}
+
+func mongoOutboxIndexModels() []mongo.IndexModel {
+	return []mongo.IndexModel{
 		{
 			Keys:    bson.D{{Key: "event_id", Value: 1}},
 			Options: options.Index().SetName("uk_event_id").SetUnique(true),
@@ -101,6 +111,17 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 			},
 			Options: options.Index().
 				SetName("idx_pending_status_event_type_next_created").
+				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPending}),
+		},
+		{
+			Keys: bson.D{
+				{Key: "status", Value: 1},
+				{Key: "event_type", Value: 1},
+				{Key: "created_at", Value: 1},
+				{Key: "next_attempt_at", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_pending_status_event_type_created_next").
 				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPending}),
 		},
 		{
@@ -130,11 +151,14 @@ func (s *Store) ensureIndexes(ctx context.Context) error {
 				SetName("idx_publishing_updated_at_created_at").
 				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPublishing}),
 		},
-	}); err != nil {
-		return fmt.Errorf("create mongo outbox indexes: %w", err)
+		{
+			Keys: bson.D{
+				{Key: "status", Value: 1},
+				{Key: "created_at", Value: 1},
+			},
+			Options: options.Index().SetName("idx_status_created_at"),
+		},
 	}
-
-	return nil
 }
 
 func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
@@ -301,7 +325,6 @@ func pendingClaimQueries(now time.Time, priorityEventTypes []string) []pendingCl
 	priorityFilter := cloneBSONMap(base)
 	priorityFilter["event_type"] = bson.M{"$in": priorityEventTypes}
 	fallbackFilter := cloneBSONMap(base)
-	fallbackFilter["event_type"] = bson.M{"$nin": priorityEventTypes}
 	return []pendingClaimQuery{
 		{filter: priorityFilter, sort: sortByCreatedAt},
 		{filter: fallbackFilter, sort: sortByCreatedAt},
@@ -472,32 +495,59 @@ func (s *Store) OutboxStatusSnapshot(ctx context.Context, now time.Time) (outbox
 	}
 
 	statuses := outboxcore.UnfinishedStatuses()
-	observations := make([]outboxcore.StatusObservation, 0, len(statuses))
-	for _, status := range statuses {
-		count, err := s.coll.CountDocuments(ctx, bson.M{"status": status})
-		if err != nil {
-			return outboxport.StatusSnapshot{}, err
-		}
-		var oldestCreatedAt *time.Time
-		if count > 0 {
-			var oldest struct {
-				CreatedAt time.Time `bson:"created_at"`
-			}
-			err := s.coll.FindOne(
-				ctx,
-				bson.M{"status": status},
-				options.FindOne().SetSort(bson.D{{Key: "created_at", Value: 1}}).SetProjection(bson.M{"created_at": 1}),
-			).Decode(&oldest)
-			if err != nil {
-				return outboxport.StatusSnapshot{}, err
-			}
-			oldestCreatedAt = &oldest.CreatedAt
-		}
-		observations = append(observations, outboxcore.StatusObservation{
-			Status:          status,
-			Count:           count,
-			OldestCreatedAt: oldestCreatedAt,
-		})
+	observations, err := s.loadStatusObservations(ctx, statuses)
+	if err != nil {
+		return outboxport.StatusSnapshot{}, err
 	}
 	return outboxcore.BuildStatusSnapshot("mongo-domain-events", now, observations), nil
+}
+
+type mongoStatusObservation struct {
+	Status          string    `bson:"_id"`
+	Count           int64     `bson:"n"`
+	OldestCreatedAt time.Time `bson:"oldest_created_at"`
+}
+
+func (s *Store) loadStatusObservations(ctx context.Context, statuses []string) ([]outboxcore.StatusObservation, error) {
+	if len(statuses) == 0 {
+		return nil, nil
+	}
+	cur, err := s.coll.Aggregate(
+		ctx,
+		outboxStatusSnapshotPipeline(statuses),
+		options.Aggregate().SetHint("idx_status_created_at"),
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cur.Close(ctx) }()
+
+	observations := make([]outboxcore.StatusObservation, 0, len(statuses))
+	for cur.Next(ctx) {
+		var row mongoStatusObservation
+		if err := cur.Decode(&row); err != nil {
+			return nil, err
+		}
+		oldestCreatedAt := row.OldestCreatedAt
+		observations = append(observations, outboxcore.StatusObservation{
+			Status:          row.Status,
+			Count:           row.Count,
+			OldestCreatedAt: &oldestCreatedAt,
+		})
+	}
+	if err := cur.Err(); err != nil {
+		return nil, err
+	}
+	return observations, nil
+}
+
+func outboxStatusSnapshotPipeline(statuses []string) mongo.Pipeline {
+	return mongo.Pipeline{
+		{{Key: "$match", Value: bson.D{{Key: "status", Value: bson.D{{Key: "$in", Value: statuses}}}}}},
+		{{Key: "$group", Value: bson.D{
+			{Key: "_id", Value: "$status"},
+			{Key: "n", Value: bson.D{{Key: "$sum", Value: 1}}},
+			{Key: "oldest_created_at", Value: bson.D{{Key: "$min", Value: "$created_at"}}},
+		}}},
+	}
 }
