@@ -47,6 +47,8 @@ type config struct {
 	skipBackup                bool
 	previewLimit              int
 	noProgress                bool
+	mysqlLockWaitTimeout      int
+	mysqlDeleteRetries        int
 }
 
 type namedCount struct {
@@ -231,7 +233,7 @@ func main() {
 	}
 
 	prog.Phase("delete mysql rows")
-	mysqlDeleted, err := deleteMySQLRows(ctx, conn)
+	mysqlDeleted, err := deleteMySQLRows(ctx, conn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries)
 	if err != nil {
 		log.Fatalf("delete mysql rows: %v", err)
 	}
@@ -267,6 +269,8 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.skipBackup, "skip-backup", false, "skip built-in MySQL/Mongo backups before deleting")
 	flag.IntVar(&cfg.previewLimit, "preview-limit", 20, "number of scoped testees to preview")
 	flag.BoolVar(&cfg.noProgress, "no-progress", false, "disable terminal progress output")
+	flag.IntVar(&cfg.mysqlLockWaitTimeout, "mysql-lock-wait-timeout", 300, "MySQL SESSION innodb_lock_wait_timeout seconds during delete; 0 keeps server default")
+	flag.IntVar(&cfg.mysqlDeleteRetries, "mysql-delete-retries", 5, "retries per table when MySQL delete hits lock wait timeout or deadlock")
 	flag.Parse()
 
 	required := map[string]string{
@@ -284,6 +288,12 @@ func parseFlags() config {
 	}
 	if cfg.previewLimit < 0 {
 		log.Fatal("--preview-limit must be >= 0")
+	}
+	if cfg.mysqlLockWaitTimeout < 0 {
+		log.Fatal("--mysql-lock-wait-timeout must be >= 0")
+	}
+	if cfg.mysqlDeleteRetries < 1 {
+		log.Fatal("--mysql-delete-retries must be >= 1")
 	}
 	if !cfg.apply && cfg.skipBackup {
 		log.Print("--skip-backup has no effect in dry-run mode")
@@ -349,7 +359,9 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 	eventIDType := "VARCHAR(128)"
 	if eventIDCollation != "" {
 		eventIDType = fmt.Sprintf("VARCHAR(128) CHARACTER SET utf8mb4 COLLATE %s", eventIDCollation)
-		log.Printf("prepare mysql scope: event_id collation=%s", eventIDCollation)
+		if !prog.enabled {
+			log.Printf("prepare mysql scope: event_id collation=%s", eventIDCollation)
+		}
 	}
 
 	stmts := []string{
@@ -725,7 +737,7 @@ func loadMongoUint64Field(ctx context.Context, coll *mongo.Collection, filter bs
 		return nil, err
 	}
 	out = uniqueUint64(out)
-	prog.Finish(label, fmt.Sprintf("ids=%d", len(out)))
+	prog.SubtaskDone(label, fmt.Sprintf("ids=%d", len(out)))
 	return out, nil
 }
 
@@ -1199,36 +1211,89 @@ func isMySQLUnknownTable(err error) bool {
 	return strings.Contains(err.Error(), "doesn't exist")
 }
 
-func deleteMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
+func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries int) ([]namedCount, error) {
+	if lockWaitTimeoutSec > 0 {
+		if _, err := conn.ExecContext(ctx, "SET SESSION innodb_lock_wait_timeout = ?", lockWaitTimeoutSec); err != nil {
+			return nil, fmt.Errorf("set innodb_lock_wait_timeout: %w", err)
+		}
+		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d", lockWaitTimeoutSec, maxRetries)
+	}
+
 	items, err := mysqlDeleteItems(ctx, conn)
 	if err != nil {
 		return nil, err
 	}
-	tx, err := conn.BeginTx(ctx, nil)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = tx.Rollback() }()
 	out := make([]namedCount, 0, len(items))
 	for i, item := range items {
 		item := item
 		var n int64
 		if err := prog.RunStep("delete mysql "+item.name, i+1, len(items), func() error {
-			result, err := tx.ExecContext(ctx, item.stmt)
-			if err != nil {
-				return err
-			}
-			n, _ = result.RowsAffected()
-			return nil
+			return execMySQLDeleteWithRetry(ctx, conn, item.stmt, maxRetries, &n)
 		}); err != nil {
 			return nil, fmt.Errorf("%s: %w", item.name, err)
 		}
 		out = append(out, namedCount{Name: item.name, Count: n})
 	}
-	if err := tx.Commit(); err != nil {
-		return nil, err
-	}
 	return out, nil
+}
+
+func execMySQLDeleteWithRetry(ctx context.Context, conn *sql.Conn, stmt string, maxRetries int, affected *int64) error {
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		tx, err := conn.BeginTx(ctx, nil)
+		if err != nil {
+			return err
+		}
+		result, err := tx.ExecContext(ctx, stmt)
+		if err != nil {
+			_ = tx.Rollback()
+			lastErr = err
+			if isMySQLLockError(err) && attempt < maxRetries {
+				wait := time.Duration(attempt) * 5 * time.Second
+				log.Printf("mysql delete lock contention: attempt=%d/%d retry_in=%s err=%v", attempt, maxRetries, wait, err)
+				if err := sleepWithContext(ctx, wait); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+		n, _ := result.RowsAffected()
+		if err := tx.Commit(); err != nil {
+			lastErr = err
+			if isMySQLLockError(err) && attempt < maxRetries {
+				wait := time.Duration(attempt) * 5 * time.Second
+				log.Printf("mysql delete commit lock contention: attempt=%d/%d retry_in=%s err=%v", attempt, maxRetries, wait, err)
+				if err := sleepWithContext(ctx, wait); err != nil {
+					return err
+				}
+				continue
+			}
+			return err
+		}
+		*affected = n
+		return nil
+	}
+	return lastErr
+}
+
+func isMySQLLockError(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) {
+		return mysqlErr.Number == 1205 || mysqlErr.Number == 1213
+	}
+	return false
+}
+
+func sleepWithContext(ctx context.Context, d time.Duration) error {
+	timer := time.NewTimer(d)
+	defer timer.Stop()
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func deleteMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs) ([]namedCount, error) {
@@ -1521,17 +1586,18 @@ func nullableString(s sql.NullString) string {
 }
 
 type progressReporter struct {
-	mu        sync.Mutex
-	enabled   bool
-	tty       bool
-	out       io.Writer
-	phase     string
-	label     string
-	current   int64
-	total     int64
-	started   time.Time
-	lastDraw  time.Time
-	lastLogAt time.Time
+	mu           sync.Mutex
+	enabled      bool
+	tty          bool
+	out          io.Writer
+	phase        string
+	label        string
+	current      int64
+	total        int64
+	phaseStarted time.Time
+	stepStarted  time.Time
+	lastDraw     time.Time
+	lastLogAt    time.Time
 }
 
 func initProgress(disable bool) {
@@ -1561,7 +1627,9 @@ func (p *progressReporter) Phase(name string) {
 	p.label = name
 	p.current = 0
 	p.total = 0
-	p.started = time.Now()
+	now := time.Now()
+	p.phaseStarted = now
+	p.stepStarted = now
 	p.lastDraw = time.Time{}
 	p.lastLogAt = time.Time{}
 	p.renderLocked()
@@ -1576,9 +1644,7 @@ func (p *progressReporter) Step(label string, current, total int64) {
 	p.label = label
 	p.current = current
 	p.total = total
-	if p.started.IsZero() {
-		p.started = time.Now()
-	}
+	p.stepStarted = time.Now()
 	p.renderLocked()
 }
 
@@ -1607,7 +1673,7 @@ func (p *progressReporter) Finish(label string, detail string) {
 	}
 	p.mu.Lock()
 	defer p.mu.Unlock()
-	elapsed := formatProgressDuration(time.Since(p.started))
+	elapsed := formatProgressDuration(time.Since(p.phaseStarted))
 	p.clearLineLocked()
 	line := fmt.Sprintf("done: %s (%s)", label, elapsed)
 	if detail != "" {
@@ -1617,7 +1683,32 @@ func (p *progressReporter) Finish(label string, detail string) {
 	p.label = ""
 	p.current = 0
 	p.total = 0
-	p.started = time.Time{}
+	p.phaseStarted = time.Time{}
+	p.stepStarted = time.Time{}
+}
+
+func (p *progressReporter) SubtaskDone(label, detail string) {
+	if !p.enabled {
+		msg := label
+		if detail != "" {
+			msg += ": " + detail
+		}
+		log.Printf("done: %s", msg)
+		return
+	}
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	started := p.stepStarted
+	if started.IsZero() {
+		started = p.phaseStarted
+	}
+	elapsed := formatProgressDuration(time.Since(started))
+	p.clearLineLocked()
+	line := fmt.Sprintf("done: %s (%s)", label, elapsed)
+	if detail != "" {
+		line += " " + detail
+	}
+	_, _ = fmt.Fprintln(p.out, line)
 }
 
 func (p *progressReporter) RunStep(label string, index, total int, fn func() error) error {
@@ -1635,9 +1726,6 @@ func (p *progressReporter) RunStep(label string, index, total int, fn func() err
 			p.mu.Unlock()
 		}
 		return err
-	}
-	if total > 0 && index == total {
-		p.Finish(label, "")
 	}
 	return nil
 }
@@ -1659,7 +1747,7 @@ func (p *progressReporter) renderLocked() {
 }
 
 func (p *progressReporter) buildLineLocked() string {
-	elapsed := formatProgressDuration(time.Since(p.started))
+	elapsed := formatProgressDuration(time.Since(p.phaseStarted))
 	title := p.phase
 	if p.label != "" && p.label != p.phase {
 		title = p.phase + " | " + p.label

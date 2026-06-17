@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
@@ -160,6 +161,40 @@ func TestValidateMySQLTableName(t *testing.T) {
 	}
 	if err := validateMySQLTableName("stats;drop"); err == nil {
 		t.Fatal("validateMySQLTableName() should reject unsafe table names")
+	}
+}
+
+func TestIsMySQLLockError(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{name: "lock wait timeout", err: &mysql.MySQLError{Number: 1205}, want: true},
+		{name: "deadlock", err: &mysql.MySQLError{Number: 1213}, want: true},
+		{name: "other", err: &mysql.MySQLError{Number: 1064}, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isMySQLLockError(tt.err); got != tt.want {
+				t.Fatalf("isMySQLLockError() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestProgressPhaseElapsedSurvivesRunStep(t *testing.T) {
+	initProgress(true)
+	prog.phaseStarted = time.Now().Add(-2 * time.Second)
+	prog.phase = "phase"
+	if err := prog.RunStep("step", 1, 1, func() error { return nil }); err != nil {
+		t.Fatalf("RunStep() = %v", err)
+	}
+	if prog.phaseStarted.IsZero() {
+		t.Fatal("phaseStarted should survive RunStep")
+	}
+	if time.Since(prog.phaseStarted) < time.Second {
+		t.Fatal("phaseStarted should keep phase timing")
 	}
 }
 
