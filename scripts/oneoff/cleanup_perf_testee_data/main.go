@@ -1520,19 +1520,6 @@ func nullableString(s sql.NullString) string {
 	return s.String
 }
 
-func firstSQLLine(sql string) string {
-	for _, line := range strings.Split(sql, "\n") {
-		line = strings.TrimSpace(line)
-		if line != "" {
-			if len(line) > 120 {
-				return line[:120] + "..."
-			}
-			return line
-		}
-	}
-	return ""
-}
-
 type progressReporter struct {
 	mu        sync.Mutex
 	enabled   bool
@@ -1626,7 +1613,7 @@ func (p *progressReporter) Finish(label string, detail string) {
 	if detail != "" {
 		line += " " + detail
 	}
-	fmt.Fprintln(p.out, line)
+	_, _ = fmt.Fprintln(p.out, line)
 	p.label = ""
 	p.current = 0
 	p.total = 0
@@ -1644,7 +1631,7 @@ func (p *progressReporter) RunStep(label string, index, total int, fn func() err
 		if p.enabled {
 			p.mu.Lock()
 			p.clearLineLocked()
-			fmt.Fprintf(p.out, "failed: %s: %v\n", label, err)
+			_, _ = fmt.Fprintf(p.out, "failed: %s: %v\n", label, err)
 			p.mu.Unlock()
 		}
 		return err
@@ -1662,7 +1649,7 @@ func (p *progressReporter) renderLocked() {
 			return
 		}
 		p.lastDraw = now
-		fmt.Fprintf(p.out, "\r%s", p.buildLineLocked())
+		_, _ = fmt.Fprintf(p.out, "\r%s", p.buildLineLocked())
 		return
 	}
 	if p.lastLogAt.IsZero() || now.Sub(p.lastLogAt) >= 5*time.Second {
@@ -1701,7 +1688,7 @@ func (p *progressReporter) clearLineLocked() {
 	if !p.tty {
 		return
 	}
-	fmt.Fprint(p.out, "\r\033[K")
+	_, _ = fmt.Fprint(p.out, "\r\033[K")
 }
 
 func truncateProgressText(s string, max int) string {
