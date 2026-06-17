@@ -14,7 +14,7 @@ import (
 	"strings"
 	"time"
 
-	_ "github.com/go-sql-driver/mysql"
+	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -1049,15 +1049,38 @@ func mysqlDeleteItems(ctx context.Context, conn *sql.Conn) ([]mysqlDeleteItem, e
 }
 
 func mysqlTableExists(ctx context.Context, conn *sql.Conn, table string) (bool, error) {
-	var count int
-	if err := conn.QueryRowContext(ctx, `
-SELECT COUNT(*)
-FROM information_schema.tables
-WHERE table_schema = DATABASE()
-  AND table_name = ?`, table).Scan(&count); err != nil {
-		return false, fmt.Errorf("check mysql table %s: %w", table, err)
+	if err := validateMySQLTableName(table); err != nil {
+		return false, err
 	}
-	return count > 0, nil
+	// Probe the live schema instead of information_schema; some environments had
+	// stale metadata while the legacy table was already dropped by migration 000028.
+	_, err := conn.ExecContext(ctx, fmt.Sprintf("SELECT 1 FROM `%s` WHERE 1=0", table))
+	if err == nil {
+		return true, nil
+	}
+	if isMySQLUnknownTable(err) {
+		return false, nil
+	}
+	return false, fmt.Errorf("probe mysql table %s: %w", table, err)
+}
+
+func validateMySQLTableName(table string) error {
+	ok, err := regexp.MatchString(`^[a-z0-9_]+$`, table)
+	if err != nil {
+		return err
+	}
+	if !ok {
+		return fmt.Errorf("unsafe mysql table name %q", table)
+	}
+	return nil
+}
+
+func isMySQLUnknownTable(err error) bool {
+	var mysqlErr *mysql.MySQLError
+	if errors.As(err, &mysqlErr) {
+		return mysqlErr.Number == 1146
+	}
+	return strings.Contains(err.Error(), "doesn't exist")
 }
 
 func deleteMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {

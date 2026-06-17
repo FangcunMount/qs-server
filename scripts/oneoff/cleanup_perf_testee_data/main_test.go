@@ -2,9 +2,11 @@ package main
 
 import (
 	"errors"
+	"fmt"
 	"strings"
 	"testing"
 
+	"github.com/go-sql-driver/mysql"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -117,6 +119,47 @@ func TestMySQLOutboxScopePayloadScanIsExplicitOptIn(t *testing.T) {
 	}
 	if !outboxPayload || !pendingPayload {
 		t.Fatalf("scanEventPayloads should add both payload_json statements; outbox=%v pending=%v", outboxPayload, pendingPayload)
+	}
+}
+
+func TestIsMySQLUnknownTable(t *testing.T) {
+	tests := []struct {
+		name string
+		err  error
+		want bool
+	}{
+		{
+			name: "mysql error 1146",
+			err:  &mysql.MySQLError{Number: 1146, Message: "Table 'qs.statistics_daily' doesn't exist"},
+			want: true,
+		},
+		{
+			name: "wrapped text error",
+			err:  fmt.Errorf("delete: %w", errors.New("Error 1146 (42S02): Table 'qs.statistics_daily' doesn't exist")),
+			want: true,
+		},
+		{
+			name: "other mysql error",
+			err:  &mysql.MySQLError{Number: 1064, Message: "syntax error"},
+			want: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := isMySQLUnknownTable(tt.err); got != tt.want {
+				t.Fatalf("isMySQLUnknownTable() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidateMySQLTableName(t *testing.T) {
+	if err := validateMySQLTableName("statistics_daily"); err != nil {
+		t.Fatalf("validateMySQLTableName() = %v, want nil", err)
+	}
+	if err := validateMySQLTableName("stats;drop"); err == nil {
+		t.Fatal("validateMySQLTableName() should reject unsafe table names")
 	}
 }
 
