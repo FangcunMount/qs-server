@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -69,7 +70,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	})
 }
 
-func mbtiPolePreferenceAnswerSheet(model *port.MBTIModelSnapshot, prefs map[string]string) *port.AnswerSheetSnapshot {
+func mbtiPolePreferenceAnswerSheet(model *rulesetmbti.ModelSnapshot, prefs map[string]string) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		meta := model.Dimensions[mapping.Dimension]
@@ -102,7 +103,7 @@ func mbtiLikertValueForSign(sign float64, wantRight bool) string {
 	return "5"
 }
 
-func mbtiLikertAnswerSheet(model *port.MBTIModelSnapshot, value string) *port.AnswerSheetSnapshot {
+func mbtiLikertAnswerSheet(model *rulesetmbti.ModelSnapshot, value string) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	score := float64(value[0] - '0')
 	for _, mapping := range model.QuestionMappings {

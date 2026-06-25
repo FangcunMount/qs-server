@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )
@@ -33,8 +33,8 @@ type RedisScaleHotRankProjection struct {
 	now       func() time.Time
 }
 
-var _ domainScale.ScaleHotRankProjection = (*RedisScaleHotRankProjection)(nil)
-var _ domainScale.ScaleHotRankReadModel = (*RedisScaleHotRankProjection)(nil)
+var _ hotrank.Projection = (*RedisScaleHotRankProjection)(nil)
+var _ hotrank.ReadModel = (*RedisScaleHotRankProjection)(nil)
 
 func NewRedisScaleHotRankProjection(client redis.UniversalClient, builder *keyspace.Builder) *RedisScaleHotRankProjection {
 	if client == nil || builder == nil {
@@ -48,7 +48,7 @@ func NewRedisScaleHotRankProjection(client redis.UniversalClient, builder *keysp
 	}
 }
 
-func (r *RedisScaleHotRankProjection) ProjectSubmission(ctx context.Context, fact domainScale.ScaleHotRankSubmissionFact) error {
+func (r *RedisScaleHotRankProjection) ProjectSubmission(ctx context.Context, fact hotrank.SubmissionFact) error {
 	if r == nil || r.client == nil || r.keys == nil {
 		return nil
 	}
@@ -74,16 +74,16 @@ func (r *RedisScaleHotRankProjection) ProjectSubmission(ctx context.Context, fac
 	return projectScaleHotSubmissionScript.Run(ctx, r.client, []string{processedKey, dailyKey}, ttlSeconds, questionnaireCode).Err()
 }
 
-func (r *RedisScaleHotRankProjection) Top(ctx context.Context, query domainScale.ScaleHotRankQuery) ([]domainScale.ScaleHotRankEntry, error) {
+func (r *RedisScaleHotRankProjection) Top(ctx context.Context, query hotrank.Query) ([]hotrank.Entry, error) {
 	windowDays := query.WindowDays
 	limit := query.Limit
 	if r == nil || r.client == nil || r.keys == nil || limit <= 0 || windowDays <= 0 {
-		return []domainScale.ScaleHotRankEntry{}, nil
+		return []hotrank.Entry{}, nil
 	}
 
 	keys := r.windowKeys(windowDays)
 	if len(keys) == 0 {
-		return []domainScale.ScaleHotRankEntry{}, nil
+		return []hotrank.Entry{}, nil
 	}
 	if len(keys) == 1 {
 		values, err := r.client.ZRevRangeWithScores(ctx, keys[0], 0, int64(limit-1)).Result()
@@ -120,14 +120,14 @@ func (r *RedisScaleHotRankProjection) windowKeys(windowDays int) []string {
 	return keys
 }
 
-func hotRankItemsFromZ(values []redis.Z) []domainScale.ScaleHotRankEntry {
-	items := make([]domainScale.ScaleHotRankEntry, 0, len(values))
+func hotRankItemsFromZ(values []redis.Z) []hotrank.Entry {
+	items := make([]hotrank.Entry, 0, len(values))
 	for _, value := range values {
 		member, ok := value.Member.(string)
 		if !ok || strings.TrimSpace(member) == "" {
 			continue
 		}
-		items = append(items, domainScale.ScaleHotRankEntry{
+		items = append(items, hotrank.Entry{
 			QuestionnaireCode: member,
 			Score:             int64(math.Round(value.Score)),
 		})

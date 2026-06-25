@@ -8,7 +8,7 @@ package event
 // 事件类型定义位置:
 //   - questionnaire.EventType*  → internal/apiserver/domain/survey/questionnaire/events.go
 //   - answersheet.EventType*    → internal/apiserver/domain/survey/answersheet/events.go
-//   - scale.EventType*          → internal/apiserver/domain/scale/events.go
+//   - scale.EventType*          → internal/apiserver/domain/authoring/scale/events.go
 //   - assessment.EventType*     → internal/apiserver/domain/evaluation/assessment/events.go
 //   - report.EventType*         → internal/apiserver/domain/report/events.go
 //

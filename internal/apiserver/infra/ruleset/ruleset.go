@@ -129,27 +129,3 @@ func RuleSetRefFromSnapshot(snapshot *domain.RuleSetSnapshot) port.RuleSetRef {
 		Title:   snapshot.Definition.Title,
 	}
 }
-
-func sbtiRuleSetRef(model *rulesetsbti.ModelSnapshot) port.RuleSetRef {
-	if model == nil {
-		return port.RuleSetRef{}
-	}
-	return port.RuleSetRef{
-		Kind:    domain.RuleSetKindSBTI,
-		Code:    model.Code,
-		Version: model.Version,
-		Title:   model.Title,
-	}
-}
-
-func mbtiRuleSetRef(model *rulesetmbti.ModelSnapshot) port.RuleSetRef {
-	if model == nil {
-		return port.RuleSetRef{}
-	}
-	return port.RuleSetRef{
-		Kind:    domain.RuleSetKindMBTI,
-		Code:    model.Code,
-		Version: model.Version,
-		Title:   model.Title,
-	}
-}

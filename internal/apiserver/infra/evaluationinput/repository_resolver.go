@@ -7,6 +7,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -113,18 +116,18 @@ func normalizeModelRef(ref port.InputRef) port.ModelRef {
 	return port.ModelRef{}
 }
 
-func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
+func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error) {
 	return r.scaleCatalog.GetScale(ctx, code)
 }
 
-func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*port.SBTIModelSnapshot, error) {
+func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetsbti.ModelSnapshot, error) {
 	if r == nil || r.sbtiCatalog == nil {
 		return nil, fmt.Errorf("sbti model catalog is not configured")
 	}
 	return r.sbtiCatalog.FindSBTIModelByQuestionnaire(ctx, code, version)
 }
 
-func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*port.MBTIModelSnapshot, error) {
+func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetmbti.ModelSnapshot, error) {
 	if r == nil || r.mbtiCatalog == nil {
 		return nil, fmt.Errorf("mbti model catalog is not configured")
 	}
@@ -243,7 +246,7 @@ func NewRepositoryScaleSnapshotCatalog(repo ScaleSnapshotRepository) *Repository
 	return &RepositoryScaleSnapshotCatalog{repo: repo}
 }
 
-func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
+func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载量表数据",
 		"scale_code", code,
@@ -270,7 +273,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 	return scaleToSnapshot(medicalScale), nil
 }
 
-func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
+func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*rulesetscale.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载解释模型数据",
 		"ruleset_kind", ref.Kind,

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
 
@@ -119,7 +119,7 @@ func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.RuleSetRef) *domain.R
 	return nil
 }
 
-func scaleRuleSetRef(model *evaluationinputPort.ScaleSnapshot) port.RuleSetRef {
+func scaleRuleSetRef(model *rulesetscale.ScaleSnapshot) port.RuleSetRef {
 	if model == nil {
 		return port.RuleSetRef{}
 	}

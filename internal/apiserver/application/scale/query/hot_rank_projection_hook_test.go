@@ -6,18 +6,18 @@ import (
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type scaleHotRankProjectionCapture struct {
-	facts []domainScale.ScaleHotRankSubmissionFact
+	facts []hotrank.SubmissionFact
 	err   error
 }
 
-func (p *scaleHotRankProjectionCapture) ProjectSubmission(_ context.Context, fact domainScale.ScaleHotRankSubmissionFact) error {
+func (p *scaleHotRankProjectionCapture) ProjectSubmission(_ context.Context, fact hotrank.SubmissionFact) error {
 	p.facts = append(p.facts, fact)
 	return p.err
 }

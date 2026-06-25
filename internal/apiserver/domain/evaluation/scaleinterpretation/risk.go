@@ -1,9 +1,6 @@
 package scaleinterpretation
 
-import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
-)
+import rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 
 func (*Evaluator) classifyRisk(model ScaleInterpretationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, RiskLevel) {
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))
@@ -86,7 +83,7 @@ func findFactor(model ScaleInterpretationModel, factorCode string) (rulesetscale
 
 func findInterpretRule(factor rulesetscale.FactorSnapshot, score float64) *rulesetscale.InterpretRuleSnapshot {
 	rules := toScoreRangeRules(factor.InterpretRules)
-	matched := interpretation.MatchRule(score, rules)
+	matched := matchScoreRule(score, rules)
 	if matched == nil {
 		return nil
 	}
@@ -102,7 +99,7 @@ func findInterpretRule(factor rulesetscale.FactorSnapshot, score float64) *rules
 
 func findInterpretRuleWithRangeFallback(factor rulesetscale.FactorSnapshot, score float64) *rulesetscale.InterpretRuleSnapshot {
 	rules := toScoreRangeRules(factor.InterpretRules)
-	matched := interpretation.MatchRuleWithRangeFallback(score, rules)
+	matched := matchScoreRuleWithRangeFallback(score, rules)
 	if matched == nil {
 		return nil
 	}
@@ -116,10 +113,10 @@ func findInterpretRuleWithRangeFallback(factor rulesetscale.FactorSnapshot, scor
 	return &rule
 }
 
-func toScoreRangeRules(rules []rulesetscale.InterpretRuleSnapshot) []interpretation.ScoreRangeRule {
-	converted := make([]interpretation.ScoreRangeRule, 0, len(rules))
+func toScoreRangeRules(rules []rulesetscale.InterpretRuleSnapshot) []scoreRangeRule {
+	converted := make([]scoreRangeRule, 0, len(rules))
 	for _, rule := range rules {
-		converted = append(converted, interpretation.ScoreRangeRule{
+		converted = append(converted, scoreRangeRule{
 			Min:        rule.Min,
 			Max:        rule.Max,
 			Level:      rule.RiskLevel,

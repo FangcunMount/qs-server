@@ -182,17 +182,17 @@ Worker 如何重试。
 Domain 层代码应重点关注以下文件或目录。
 
 ```text
-internal/apiserver/domain/scale/medical_scale.go
-internal/apiserver/domain/scale/lifecycle.go
-internal/apiserver/domain/scale/baseinfo.go
-internal/apiserver/domain/scale/factor.go
-internal/apiserver/domain/scale/scoring_spec.go
-internal/apiserver/domain/scale/interpretation_rules.go
-internal/apiserver/domain/scale/interpretation_rule.go
-internal/apiserver/domain/scale/types.go
-internal/apiserver/domain/scale/errors.go
-internal/apiserver/domain/scale/events.go
-internal/apiserver/domain/scale/validator.go
+internal/apiserver/domain/authoring/scale/medical_scale.go
+internal/apiserver/domain/authoring/scale/lifecycle.go
+internal/apiserver/domain/authoring/scale/baseinfo.go
+internal/apiserver/domain/authoring/scale/factor.go
+internal/apiserver/domain/authoring/scale/scoring_spec.go
+internal/apiserver/domain/authoring/scale/interpretation_rules.go
+internal/apiserver/domain/authoring/scale/interpretation_rule.go
+internal/apiserver/domain/authoring/scale/types.go
+internal/apiserver/domain/authoring/scale/errors.go
+internal/apiserver/domain/authoring/scale/events.go
+internal/apiserver/domain/authoring/scale/validator.go
 ```
 
 如果当前代码文件名与上面不完全一致，应以实际代码为准。
@@ -731,7 +731,7 @@ Scale 测试应覆盖六类。
 建议基础测试命令：
 
 ```bash
-go test ./internal/apiserver/domain/scale/...
+go test ./internal/apiserver/domain/authoring/scale/...
 go test ./internal/apiserver/application/scale/...
 go test ./internal/apiserver/application/evaluation/...
 go test ./internal/worker/...
@@ -1103,10 +1103,10 @@ ReadModel 是否能从 MedicalScale 重建？
 不允许：
 
 ```text
-domain/scale -> infra/mongo
-domain/scale -> redis
-domain/scale -> mq
-domain/scale -> transport dto
+domain/authoring/scale -> infra/mongo
+domain/authoring/scale -> redis
+domain/authoring/scale -> mq
+domain/authoring/scale -> transport dto
 ```
 
 Domain 只能表达规则模型、领域行为、领域错误、领域事件。
@@ -1248,7 +1248,7 @@ evaluation
 Scale 模块基础验证：
 
 ```bash
-go test ./internal/apiserver/domain/scale/...
+go test ./internal/apiserver/domain/authoring/scale/...
 go test ./internal/apiserver/application/scale/...
 ```
 

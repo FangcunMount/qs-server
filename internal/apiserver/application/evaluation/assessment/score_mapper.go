@@ -2,11 +2,11 @@ package assessment
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *evaluationinput.ScaleSnapshot) *ScoreResult {
+func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *rulesetscale.ScaleSnapshot) *ScoreResult {
 	if row == nil {
 		return nil
 	}
@@ -32,7 +32,7 @@ func scoreRowToResult(row *evaluationreadmodel.ScoreRow, medicalScale *evaluatio
 	}
 }
 
-func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadmodel.ScoreRow, medicalScale *evaluationinput.ScaleSnapshot) *HighRiskFactorsResult {
+func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadmodel.ScoreRow, medicalScale *rulesetscale.ScaleSnapshot) *HighRiskFactorsResult {
 	if row == nil {
 		return emptyHighRiskFactorsResult(assessmentID)
 	}
@@ -53,7 +53,7 @@ func highRiskFactorsResultFromScoreRow(assessmentID uint64, row *evaluationreadm
 	}
 }
 
-func factorMaxScores(medicalScale *evaluationinput.ScaleSnapshot) map[string]*float64 {
+func factorMaxScores(medicalScale *rulesetscale.ScaleSnapshot) map[string]*float64 {
 	result := make(map[string]*float64)
 	if medicalScale == nil {
 		return result

@@ -12,9 +12,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
+	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 )
 
 func main() {

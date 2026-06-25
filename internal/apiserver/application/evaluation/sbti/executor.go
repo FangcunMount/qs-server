@@ -6,6 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -54,7 +55,7 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	}), nil
 }
 
-func modelRefFromExecutionInput(input evaluationexecute.ExecutionInput, model *port.SBTIModelSnapshot) assessment.EvaluationModelRef {
+func modelRefFromExecutionInput(input evaluationexecute.ExecutionInput, model *rulesetsbti.ModelSnapshot) assessment.EvaluationModelRef {
 	if input.Assessment != nil && input.Assessment.EvaluationModelRef() != nil {
 		return *input.Assessment.EvaluationModelRef()
 	}

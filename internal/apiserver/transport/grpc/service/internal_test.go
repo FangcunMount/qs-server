@@ -568,7 +568,4 @@ func (*grpcQRCodeServiceStub) GenerateAssessmentEntryQRCode(context.Context, str
 	return "", nil
 }
 
-func uint64Ptr(v uint64) *uint64 { return &v }
-func stringPtr(v string) *string { return &v }
-
 var _ surveyScaleQRCodeGenerator = (*grpcQRCodeServiceStub)(nil)

@@ -4,22 +4,22 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestScaleRuleSetSnapshotRoundTrip(t *testing.T) {
-	model := &evaluationinputPort.ScaleSnapshot{
+	model := &rulesetscale.ScaleSnapshot{
 		Code:                 "SCL-001",
 		ScaleVersion:         "1.0.0",
 		Title:                "Demo Scale",
 		QuestionnaireCode:    "QNR-001",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		Factors: []evaluationinputPort.FactorSnapshot{
+		Factors: []rulesetscale.FactorSnapshot{
 			{Code: "total", Title: "Total", IsTotalScore: true},
 		},
 	}

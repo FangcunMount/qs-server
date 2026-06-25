@@ -5,6 +5,8 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
@@ -19,7 +21,7 @@ func NewRuleSetSBTICatalog(reader rulesetport.PublishedRuleSetReader) RuleSetSBT
 	return RuleSetSBTICatalog{reader: reader}
 }
 
-func (c RuleSetSBTICatalog) GetSBTIModelByRef(ctx context.Context, ref port.ModelRef) (*port.SBTIModelSnapshot, error) {
+func (c RuleSetSBTICatalog) GetSBTIModelByRef(ctx context.Context, ref port.ModelRef) (*rulesetsbti.ModelSnapshot, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -37,7 +39,7 @@ func (c RuleSetSBTICatalog) GetSBTIModelByRef(ctx context.Context, ref port.Mode
 	return codec.DecodeSBTI(snapshot)
 }
 
-func (c RuleSetSBTICatalog) FindSBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.SBTIModelSnapshot, error) {
+func (c RuleSetSBTICatalog) FindSBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*rulesetsbti.ModelSnapshot, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -60,7 +62,7 @@ func NewRuleSetMBTICatalog(reader rulesetport.PublishedRuleSetReader) RuleSetMBT
 	return RuleSetMBTICatalog{reader: reader}
 }
 
-func (c RuleSetMBTICatalog) GetMBTIModelByRef(ctx context.Context, ref port.ModelRef) (*port.MBTIModelSnapshot, error) {
+func (c RuleSetMBTICatalog) GetMBTIModelByRef(ctx context.Context, ref port.ModelRef) (*rulesetmbti.ModelSnapshot, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -78,7 +80,7 @@ func (c RuleSetMBTICatalog) GetMBTIModelByRef(ctx context.Context, ref port.Mode
 	return codec.DecodeMBTI(snapshot)
 }
 
-func (c RuleSetMBTICatalog) FindMBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*port.MBTIModelSnapshot, error) {
+func (c RuleSetMBTICatalog) FindMBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*rulesetmbti.ModelSnapshot, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}

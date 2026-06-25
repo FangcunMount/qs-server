@@ -5,11 +5,11 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -38,20 +38,20 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 			Version: "1.0.0",
 			Title:   "Scale",
 		},
-		MedicalScale: &evaluationinput.ScaleSnapshot{
+		MedicalScale: &rulesetscale.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
 			Status:               "published",
-			Factors: []evaluationinput.FactorSnapshot{
+			Factors: []rulesetscale.FactorSnapshot{
 				{
 					Code:            "total",
 					Title:           "total",
 					IsTotalScore:    true,
 					QuestionCodes:   []string{"q1", "q2"},
 					ScoringStrategy: "sum",
-					InterpretRules: []evaluationinput.InterpretRuleSnapshot{
+					InterpretRules: []rulesetscale.InterpretRuleSnapshot{
 						{Min: 0, Max: 10, RiskLevel: "low", Conclusion: "low", Suggestion: "keep"},
 					},
 				},
@@ -108,8 +108,8 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 	err = DefaultInputValidator{}.Validate(ScaleExecutionInput{
 		Assessment: a,
 		Input: &evaluationinput.InputSnapshot{
-			Model:        evaluationinput.NewScaleModelSnapshot(&evaluationinput.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", Title: "Scale"}),
-			ModelPayload: evaluationinput.ScaleModelPayload{Scale: &evaluationinput.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", QuestionnaireCode: "Q-001", QuestionnaireVersion: "2.0.0", Status: "published", Factors: []evaluationinput.FactorSnapshot{{Code: "total"}}}},
+			Model:        evaluationinput.NewScaleModelSnapshot(&rulesetscale.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", Title: "Scale"}),
+			ModelPayload: evaluationinput.ScaleModelPayload{Scale: &rulesetscale.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", QuestionnaireCode: "Q-001", QuestionnaireVersion: "2.0.0", Status: "published", Factors: []rulesetscale.FactorSnapshot{{Code: "total"}}}},
 			AnswerSheet:  &evaluationinput.AnswerSheetSnapshot{ID: 1, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 			Questionnaire: &evaluationinput.QuestionnaireSnapshot{
 				Code:    "Q-001",
@@ -138,19 +138,19 @@ func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	)
 	_ = a.Submit()
 	snapshot := &evaluationinput.InputSnapshot{
-		MedicalScale: &evaluationinput.ScaleSnapshot{
+		MedicalScale: &rulesetscale.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
 			Status:               "published",
-			Factors: []evaluationinput.FactorSnapshot{
+			Factors: []rulesetscale.FactorSnapshot{
 				{
 					Code:            "f1",
 					IsTotalScore:    true,
 					ScoringStrategy: "sum",
 					QuestionCodes:   []string{"f1"},
-					InterpretRules: []evaluationinput.InterpretRuleSnapshot{
+					InterpretRules: []rulesetscale.InterpretRuleSnapshot{
 						{Min: 0, Max: 10, RiskLevel: "low", Conclusion: "c", Suggestion: "s"},
 					},
 				},

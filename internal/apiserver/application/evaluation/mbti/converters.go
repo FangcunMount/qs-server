@@ -25,6 +25,6 @@ func answerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationdomain.Answ
 	}
 }
 
-func scoreMBTI(model *rulesetmbti.ModelSnapshot, sheet *port.AnswerSheetSnapshot) (ResultDetail, error) {
+func scoreMBTI(model *rulesetmbti.ModelSnapshot, sheet *port.AnswerSheetSnapshot) (evaluationdomain.MBTIResultDetail, error) {
 	return evaluationdomain.ScoreMBTI(model, answerSheetFromPort(sheet))
 }

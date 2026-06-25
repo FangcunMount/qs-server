@@ -9,6 +9,7 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -293,7 +294,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 			Code:  "S-001",
 			Title: "Scale",
 		},
-		MedicalScale:  &evaluationinput.ScaleSnapshot{Code: "S-001", Title: "Scale"},
+		MedicalScale:  &rulesetscale.ScaleSnapshot{Code: "S-001", Title: "Scale"},
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 303, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
 	}}

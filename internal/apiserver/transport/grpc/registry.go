@@ -33,14 +33,14 @@ type Registry struct {
 type Deps struct {
 	Server *grpcpkg.Server
 
-	Survey         SurveyDeps
-	Actor          ActorDeps
-	Evaluation     EvaluationDeps
-	Scale          ScaleDeps
-	Plan           PlanDeps
-	Statistics     StatisticsDeps
-	IAM            IAMDeps
-	RuleSet RuleSetDeps
+	Survey     SurveyDeps
+	Actor      ActorDeps
+	Evaluation EvaluationDeps
+	Scale      ScaleDeps
+	Plan       PlanDeps
+	Statistics StatisticsDeps
+	IAM        IAMDeps
+	RuleSet    RuleSetDeps
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator

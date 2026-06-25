@@ -24,14 +24,14 @@ type CacheSignalNotifier interface {
 // lifecycleService 量表生命周期服务实现
 // 行为者：量表设计者/管理员
 type lifecycleService struct {
-	repo                   lifecycleRepository
-	questionnaireCatalog   questionnairecatalog.Catalog
-	questionnairePublisher QuestionnairePublisher
-	lifecycle              domscale.Lifecycle
-	baseInfo               domscale.BaseInfo
-	eventPublisher         event.EventPublisher
-	listCache              scalelistcache.PublishedListCache
-	cacheSignalNotifier    CacheSignalNotifier
+	repo                    lifecycleRepository
+	questionnaireCatalog    questionnairecatalog.Catalog
+	questionnairePublisher  QuestionnairePublisher
+	lifecycle               domscale.Lifecycle
+	baseInfo                domscale.BaseInfo
+	eventPublisher          event.EventPublisher
+	listCache               scalelistcache.PublishedListCache
+	cacheSignalNotifier     CacheSignalNotifier
 	interpretationPublisher RuleSetPublisher
 }
 

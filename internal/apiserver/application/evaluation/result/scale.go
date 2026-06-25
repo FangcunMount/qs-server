@@ -7,6 +7,7 @@ import (
 	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -89,7 +90,7 @@ func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []eval
 	return scores
 }
 
-func scaleSnapshotFromOutcome(outcome Outcome) *evaluationinput.ScaleSnapshot {
+func scaleSnapshotFromOutcome(outcome Outcome) *rulesetscale.ScaleSnapshot {
 	if outcome.Input == nil {
 		return nil
 	}

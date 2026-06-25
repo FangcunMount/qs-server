@@ -5,15 +5,17 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 
 func TestSBTICodecRoundTrip(t *testing.T) {
-	model := &evaluationinputPort.SBTIModelSnapshot{
-		Code:             "SBTI_FUN",
-		Version:          "1.0.0",
+	model := &rulesetsbti.ModelSnapshot{
+		Code:              "SBTI_FUN",
+		Version:           "1.0.0",
 		QuestionnaireCode: "SBTI_FUN",
-		Status:           "published",
+		Status:            "published",
 	}
 	payload, format, err := EncodeSBTI(model)
 	if err != nil {
@@ -38,11 +40,11 @@ func TestSBTICodecRoundTrip(t *testing.T) {
 }
 
 func TestMBTICodecRoundTrip(t *testing.T) {
-	model := &evaluationinputPort.MBTIModelSnapshot{
-		Code:             "MBTI_OEJTS",
-		Version:          "1.0.0",
+	model := &rulesetmbti.ModelSnapshot{
+		Code:              "MBTI_OEJTS",
+		Version:           "1.0.0",
 		QuestionnaireCode: "MBTI_OEJTS",
-		Status:           "published",
+		Status:            "published",
 	}
 	payload, format, err := EncodeMBTI(model)
 	if err != nil {
@@ -67,7 +69,7 @@ func TestMBTICodecRoundTrip(t *testing.T) {
 }
 
 func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
-	model := &evaluationinputPort.MBTIModelSnapshot{
+	model := &rulesetmbti.ModelSnapshot{
 		Code:              "MBTI_OEJTS",
 		Version:           "1.0.0",
 		QuestionnaireCode: "MBTI_OEJTS",
@@ -95,11 +97,11 @@ func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
 }
 
 func TestScaleCodecRoundTrip(t *testing.T) {
-	model := &evaluationinputPort.ScaleSnapshot{
+	model := &rulesetscale.ScaleSnapshot{
 		Code:         "PHQ9",
 		ScaleVersion: "1.0.0",
 		Status:       "published",
-		Factors: []evaluationinputPort.FactorSnapshot{
+		Factors: []rulesetscale.FactorSnapshot{
 			{Code: "total", IsTotalScore: true},
 		},
 	}

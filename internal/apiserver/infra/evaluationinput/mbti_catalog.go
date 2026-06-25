@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -14,11 +15,11 @@ import (
 var defaultMBTIModelJSON []byte
 
 type StaticMBTIModelCatalog struct {
-	models []port.MBTIModelSnapshot
+	models []rulesetmbti.ModelSnapshot
 }
 
 func NewDefaultMBTIModelCatalog() (*StaticMBTIModelCatalog, error) {
-	var model port.MBTIModelSnapshot
+	var model rulesetmbti.ModelSnapshot
 	if err := json.Unmarshal(defaultMBTIModelJSON, &model); err != nil {
 		return nil, fmt.Errorf("load default mbti model: %w", err)
 	}
@@ -28,15 +29,15 @@ func NewDefaultMBTIModelCatalog() (*StaticMBTIModelCatalog, error) {
 	return NewStaticMBTIModelCatalog(model), nil
 }
 
-func NewStaticMBTIModelCatalog(models ...port.MBTIModelSnapshot) *StaticMBTIModelCatalog {
-	copied := make([]port.MBTIModelSnapshot, 0, len(models))
+func NewStaticMBTIModelCatalog(models ...rulesetmbti.ModelSnapshot) *StaticMBTIModelCatalog {
+	copied := make([]rulesetmbti.ModelSnapshot, 0, len(models))
 	for _, model := range models {
 		copied = append(copied, cloneMBTIModelSnapshot(model))
 	}
 	return &StaticMBTIModelCatalog{models: copied}
 }
 
-func (c *StaticMBTIModelCatalog) GetMBTIModelByRef(_ context.Context, ref port.ModelRef) (*port.MBTIModelSnapshot, error) {
+func (c *StaticMBTIModelCatalog) GetMBTIModelByRef(_ context.Context, ref port.ModelRef) (*rulesetmbti.ModelSnapshot, error) {
 	if c == nil {
 		return nil, fmt.Errorf("mbti model catalog is not configured")
 	}
@@ -57,7 +58,7 @@ func (c *StaticMBTIModelCatalog) GetMBTIModelByRef(_ context.Context, ref port.M
 	return nil, fmt.Errorf("mbti model not found: %s@%s", code, ref.Version)
 }
 
-func (c *StaticMBTIModelCatalog) FindMBTIModelByQuestionnaire(_ context.Context, code, version string) (*port.MBTIModelSnapshot, error) {
+func (c *StaticMBTIModelCatalog) FindMBTIModelByQuestionnaire(_ context.Context, code, version string) (*rulesetmbti.ModelSnapshot, error) {
 	if c == nil {
 		return nil, fmt.Errorf("mbti model catalog is not configured")
 	}
@@ -70,7 +71,7 @@ func (c *StaticMBTIModelCatalog) FindMBTIModelByQuestionnaire(_ context.Context,
 	return nil, fmt.Errorf("mbti model not found for questionnaire: %s@%s", code, version)
 }
 
-func validateMBTIModelSnapshot(model port.MBTIModelSnapshot) error {
+func validateMBTIModelSnapshot(model rulesetmbti.ModelSnapshot) error {
 	if model.Code == "" {
 		return fmt.Errorf("mbti model code is required")
 	}
@@ -92,31 +93,31 @@ func validateMBTIModelSnapshot(model port.MBTIModelSnapshot) error {
 	return nil
 }
 
-func cloneMBTIModelSnapshot(model port.MBTIModelSnapshot) port.MBTIModelSnapshot {
+func cloneMBTIModelSnapshot(model rulesetmbti.ModelSnapshot) rulesetmbti.ModelSnapshot {
 	cloned := model
 	cloned.DimensionOrder = append([]string(nil), model.DimensionOrder...)
 	cloned.Dimensions = cloneMBTIDimensions(model.Dimensions)
-	cloned.QuestionMappings = append([]port.MBTIQuestionMappingSnapshot(nil), model.QuestionMappings...)
+	cloned.QuestionMappings = append([]rulesetmbti.QuestionMappingSnapshot(nil), model.QuestionMappings...)
 	cloned.TypeProfiles = cloneMBTITypeProfiles(model.TypeProfiles)
 	return cloned
 }
 
-func cloneMBTIDimensions(source map[string]port.MBTIDimensionSnapshot) map[string]port.MBTIDimensionSnapshot {
+func cloneMBTIDimensions(source map[string]rulesetmbti.DimensionSnapshot) map[string]rulesetmbti.DimensionSnapshot {
 	if source == nil {
 		return nil
 	}
-	cloned := make(map[string]port.MBTIDimensionSnapshot, len(source))
+	cloned := make(map[string]rulesetmbti.DimensionSnapshot, len(source))
 	for key, value := range source {
 		cloned[key] = value
 	}
 	return cloned
 }
 
-func cloneMBTITypeProfiles(source []port.MBTITypeProfileSnapshot) []port.MBTITypeProfileSnapshot {
+func cloneMBTITypeProfiles(source []rulesetmbti.TypeProfileSnapshot) []rulesetmbti.TypeProfileSnapshot {
 	if source == nil {
 		return nil
 	}
-	cloned := make([]port.MBTITypeProfileSnapshot, len(source))
+	cloned := make([]rulesetmbti.TypeProfileSnapshot, len(source))
 	for i, profile := range source {
 		cloned[i] = profile
 		cloned[i].Traits = append([]string(nil), profile.Traits...)

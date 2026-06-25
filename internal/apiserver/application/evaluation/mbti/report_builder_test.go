@@ -4,23 +4,24 @@ import (
 	"testing"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestReportBuilderFillsModelExtra(t *testing.T) {
-	detail := ResultDetail{
+	detail := evaluationdomain.MBTIResultDetail{
 		TypeCode:     "INTJ",
 		TypeName:     "建筑师",
 		OneLiner:     "独立战略家",
 		MatchPercent: 75,
-		Profile: port.MBTITypeProfileSnapshot{
+		Profile: rulesetmbti.TypeProfileSnapshot{
 			TypeCode: "INTJ",
 			TypeName: "建筑师",
 			Summary:  "善于长远规划",
 		},
-		Source: port.MBTISourceSnapshot{
+		Source: rulesetmbti.SourceSnapshot{
 			Attribution:   "OEJTS",
 			License:       "CC BY-NC-SA 4.0",
 			NonCommercial: true,

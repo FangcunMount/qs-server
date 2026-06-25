@@ -626,7 +626,7 @@ tests/docs
 ```text
 eventcatalog/types.go
 configs/events.yaml
-domain/evaluation/report/events.go
+domain/report/events.go
 ReportApprovalService transaction
 Mongo/MySQL outbox stage
 Outbox relay tests

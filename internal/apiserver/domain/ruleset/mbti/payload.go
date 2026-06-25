@@ -2,17 +2,17 @@ package mbti
 
 // ModelSnapshot 已发布 MBTI 规则集 payload（ruleset.mbti.v1）。
 type ModelSnapshot struct {
-	Code                 string                           `json:"code"`
-	Version              string                           `json:"version"`
-	Title                string                           `json:"title"`
-	QuestionnaireCode    string                           `json:"questionnaire_code"`
-	QuestionnaireVersion string                           `json:"questionnaire_version"`
-	Status               string                           `json:"status"`
-	Source               SourceSnapshot                   `json:"source"`
-	DimensionOrder       []string                         `json:"dimension_order"`
-	Dimensions           map[string]DimensionSnapshot     `json:"dimensions"`
-	QuestionMappings     []QuestionMappingSnapshot        `json:"question_mappings"`
-	TypeProfiles         []TypeProfileSnapshot            `json:"type_profiles"`
+	Code                 string                       `json:"code"`
+	Version              string                       `json:"version"`
+	Title                string                       `json:"title"`
+	QuestionnaireCode    string                       `json:"questionnaire_code"`
+	QuestionnaireVersion string                       `json:"questionnaire_version"`
+	Status               string                       `json:"status"`
+	Source               SourceSnapshot               `json:"source"`
+	DimensionOrder       []string                     `json:"dimension_order"`
+	Dimensions           map[string]DimensionSnapshot `json:"dimensions"`
+	QuestionMappings     []QuestionMappingSnapshot    `json:"question_mappings"`
+	TypeProfiles         []TypeProfileSnapshot        `json:"type_profiles"`
 }
 
 func (m *ModelSnapshot) IsPublished() bool {

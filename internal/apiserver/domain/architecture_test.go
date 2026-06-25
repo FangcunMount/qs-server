@@ -18,7 +18,6 @@ func TestTopLevelDomainChainPackagesDoNotDependOnOuterLayers(t *testing.T) {
 	scanRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "ruleset"),
 		filepath.Join(root, "internal", "apiserver", "domain", "report"),
-		filepath.Join(root, "internal", "apiserver", "domain", "interpretation"),
 	}
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "application",
@@ -210,15 +209,15 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 	scanRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
 	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":   "application",
-		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":    "infrastructure",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":     "transport",
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/":          "port",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":   "scale domain",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "survey domain",
-		"github.com/FangcunMount/component-base/pkg/logger":                   "technical logging",
-		"github.com/FangcunMount/component-base/pkg/errors":                   "API error wrappers",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                 "API error codes",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":           "application",
+		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":            "infrastructure",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":             "transport",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/":                  "port",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale": "scale domain",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":         "survey domain",
+		"github.com/FangcunMount/component-base/pkg/logger":                           "technical logging",
+		"github.com/FangcunMount/component-base/pkg/errors":                           "API error wrappers",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                         "API error codes",
 	}
 	scanGoImports(t, scanRoot, func(path, importPath string) {
 		if isEvaluationRootPackageFile(root, path) {
@@ -330,11 +329,11 @@ func TestCalculationAndValidationDomainStayRuleOnly(t *testing.T) {
 	}
 }
 
-func TestEvaluationInterpretationDomainStayRuleOnly(t *testing.T) {
+func TestScaleInterpretationDomainStayRuleOnly(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scaleinterpretation")
 	forbiddenTokens := []string{
 		"RegisterStrategy",
 		"GetStrategy(",
@@ -361,7 +360,7 @@ func TestEvaluationInterpretationDomainStayRuleOnly(t *testing.T) {
 		text := string(data)
 		for _, token := range forbiddenTokens {
 			if strings.Contains(text, token) {
-				t.Fatalf("%s contains %q; evaluation interpretation domain must only expose rule language and value objects", filepath.ToSlash(mustRel(t, root, path)), token)
+				t.Fatalf("%s contains %q; scale interpretation domain must only expose rule language and value objects", filepath.ToSlash(mustRel(t, root, path)), token)
 			}
 		}
 		return nil

@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -96,7 +97,7 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 	if s == nil || s.hotRank == nil {
 		return []domainScale.HotScaleSummary{}, nil
 	}
-	rankItems, err := s.hotRank.Top(ctx, domainScale.ScaleHotRankQuery{
+	rankItems, err := s.hotRank.Top(ctx, hotrank.Query{
 		WindowDays: windowDays,
 		Limit:      hotRankCandidateLimit(limit),
 	})

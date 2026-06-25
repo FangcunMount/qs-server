@@ -4,24 +4,26 @@ import (
 	"testing"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestReportBuilderSetsModelExtra(t *testing.T) {
-	detail := ResultDetail{
+	detail := evaluationdomain.SBTIResultDetail{
 		TypeCode:   "CTRL",
 		TypeName:   "拿捏者",
 		OneLiner:   "人形自走任务管理器",
 		Similarity: 0.92,
 		ImageURL:   "https://example.com/CTRL.png",
-		Rarity: port.SBTIRaritySnapshot{
+		Rarity: rulesetsbti.RaritySnapshot{
 			Percent: 3.61,
 			Label:   "中等",
 			OneInX:  28,
 		},
-		Outcome: port.SBTIOutcomeSnapshot{
+		Outcome: rulesetsbti.OutcomeSnapshot{
 			Code:       "CTRL",
 			Name:       "拿捏者",
 			Commentary: "测试解读",

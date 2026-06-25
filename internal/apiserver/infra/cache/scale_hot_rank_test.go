@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	scale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"
@@ -96,16 +96,16 @@ func mustProjectScaleHotRank(t *testing.T, store *RedisScaleHotRankProjection, c
 	}
 }
 
-func domainScaleHotRankFact(eventID, questionnaireCode string, submittedAt time.Time) scale.ScaleHotRankSubmissionFact {
-	return scale.ScaleHotRankSubmissionFact{
+func domainScaleHotRankFact(eventID, questionnaireCode string, submittedAt time.Time) hotrank.SubmissionFact {
+	return hotrank.SubmissionFact{
 		EventID:           eventID,
 		QuestionnaireCode: questionnaireCode,
 		SubmittedAt:       submittedAt,
 	}
 }
 
-func scaleHotRankQuery(windowDays, limit int) scale.ScaleHotRankQuery {
-	return scale.ScaleHotRankQuery{
+func scaleHotRankQuery(windowDays, limit int) hotrank.Query {
+	return hotrank.Query{
 		WindowDays: windowDays,
 		Limit:      limit,
 	}

@@ -139,9 +139,9 @@ func bestSBTIOutcome(model *rulesetsbti.ModelSnapshot, dimensions []SBTIDimensio
 	}
 
 	var (
-		best      rulesetsbti.OutcomeSnapshot
-		bestScore = math.Inf(-1)
-		hasBest   bool
+		best        rulesetsbti.OutcomeSnapshot
+		bestScore   = math.Inf(-1)
+		hasBest     bool
 		maxDistance = float64(len(actual) * 2)
 	)
 	for _, outcome := range model.NormalOutcomes {

@@ -76,10 +76,12 @@ func (r *scalePublishRepoStub) Update(_ context.Context, scale *domainScale.Medi
 	r.scale = scale
 	return nil
 }
-func (r *scalePublishRepoStub) SetActivePublishedVersion(context.Context, string, string) error { return nil }
-func (r *scalePublishRepoStub) ClearActivePublishedVersion(context.Context, string) error       { return nil }
-func (r *scalePublishRepoStub) Remove(context.Context, string) error                            { return nil }
-func (r *scalePublishRepoStub) ExistsByCode(context.Context, string) (bool, error)              { return true, nil }
+func (r *scalePublishRepoStub) SetActivePublishedVersion(context.Context, string, string) error {
+	return nil
+}
+func (r *scalePublishRepoStub) ClearActivePublishedVersion(context.Context, string) error { return nil }
+func (r *scalePublishRepoStub) Remove(context.Context, string) error                      { return nil }
+func (r *scalePublishRepoStub) ExistsByCode(context.Context, string) (bool, error)        { return true, nil }
 
 func newPublishableScaleForTest(t *testing.T) *domainScale.MedicalScale {
 	t.Helper()

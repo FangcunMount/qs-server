@@ -1,6 +1,6 @@
-package interpretation
+package scaleinterpretation
 
-type ScoreRangeRule struct {
+type scoreRangeRule struct {
 	Min        float64
 	Max        float64
 	Level      string
@@ -8,7 +8,7 @@ type ScoreRangeRule struct {
 	Suggestion string
 }
 
-func MatchRule(score float64, rules []ScoreRangeRule) *ScoreRangeRule {
+func matchScoreRule(score float64, rules []scoreRangeRule) *scoreRangeRule {
 	for i := range rules {
 		if score >= rules[i].Min && score <= rules[i].Max {
 			return &rules[i]
@@ -17,8 +17,8 @@ func MatchRule(score float64, rules []ScoreRangeRule) *ScoreRangeRule {
 	return nil
 }
 
-func MatchRuleWithRangeFallback(score float64, rules []ScoreRangeRule) *ScoreRangeRule {
-	if rule := MatchRule(score, rules); rule != nil {
+func matchScoreRuleWithRangeFallback(score float64, rules []scoreRangeRule) *scoreRangeRule {
+	if rule := matchScoreRule(score, rules); rule != nil {
 		return rule
 	}
 	if len(rules) == 0 {

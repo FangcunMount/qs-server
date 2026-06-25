@@ -7,17 +7,18 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type hotRankReadModelStub struct {
-	entries []domainScale.ScaleHotRankEntry
+	entries []hotrank.Entry
 	err     error
-	queries []domainScale.ScaleHotRankQuery
+	queries []hotrank.Query
 }
 
-func (s *hotRankReadModelStub) Top(_ context.Context, query domainScale.ScaleHotRankQuery) ([]domainScale.ScaleHotRankEntry, error) {
+func (s *hotRankReadModelStub) Top(_ context.Context, query hotrank.Query) ([]hotrank.Entry, error) {
 	s.queries = append(s.queries, query)
 	if s.err != nil {
 		return nil, s.err
@@ -101,7 +102,7 @@ func TestListHotPublishedUsesHotRankReadModelOrdering(t *testing.T) {
 		summaries: []*domainScale.MedicalScale{scaleA, scaleB, scaleC},
 	}
 	rank := &hotRankReadModelStub{
-		entries: []domainScale.ScaleHotRankEntry{
+		entries: []hotrank.Entry{
 			{QuestionnaireCode: "Q-B", Score: 7},
 			{QuestionnaireCode: "Q-A", Score: 5},
 		},

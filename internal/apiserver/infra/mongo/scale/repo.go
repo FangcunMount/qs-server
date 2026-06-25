@@ -111,7 +111,7 @@ func (r *Repository) ListActivePublishedSnapshots(ctx context.Context) ([]*scale
 	if err != nil {
 		return nil, err
 	}
-	defer cursor.Close(ctx)
+	defer func() { _ = cursor.Close(ctx) }()
 
 	var results []*scale.MedicalScale
 	for cursor.Next(ctx) {

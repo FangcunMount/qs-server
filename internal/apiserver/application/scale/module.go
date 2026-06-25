@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
@@ -59,7 +60,7 @@ func NewFactorService(repo domscale.Repository, listCache scalelistcache.Publish
 }
 
 // NewQueryService 创建量表查询应用服务。
-func NewQueryService(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...domscale.ScaleHotRankReadModel) ScaleQueryService {
+func NewQueryService(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ScaleQueryService {
 	return query.NewQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
 }
 
@@ -71,13 +72,13 @@ func NewQueryServiceWithHotListCache(
 	listCache scalelistcache.PublishedListCache,
 	hotListCache scalelistcache.HotListCache,
 	hotset cachetarget.HotsetRecorder,
-	hotRankReaders ...domscale.ScaleHotRankReadModel,
+	hotRankReaders ...hotrank.ReadModel,
 ) ScaleQueryService {
 	return query.NewQueryServiceWithHotListCache(repo, reader, identitySvc, listCache, hotListCache, hotset, hotRankReaders...)
 }
 
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
-func NewQueryServiceWithReadModel(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...domscale.ScaleHotRankReadModel) ScaleQueryService {
+func NewQueryServiceWithReadModel(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ScaleQueryService {
 	return query.NewQueryServiceWithReadModel(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
 }
 
@@ -97,6 +98,6 @@ func NewQuestionnaireBindingSyncer(repo domscale.Repository) *QuestionnaireBindi
 }
 
 // NewScaleHotRankProjectionHook 注册热门量表投影钩子。
-func NewScaleHotRankProjectionHook(projection domscale.ScaleHotRankProjection) appEventing.OutboxBeforePublishHook {
+func NewScaleHotRankProjectionHook(projection hotrank.Projection) appEventing.OutboxBeforePublishHook {
 	return query.NewScaleHotRankProjectionHook(projection)
 }

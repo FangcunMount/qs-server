@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -58,7 +59,7 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 }
 
 func TestCatalogBindingResolverResolveAssessmentBindingScale(t *testing.T) {
-	scaleModel := &evaluationinputPort.ScaleSnapshot{
+	scaleModel := &rulesetscale.ScaleSnapshot{
 		ID:                   42,
 		Code:                 "SCL-001",
 		ScaleVersion:         "1.0.0",

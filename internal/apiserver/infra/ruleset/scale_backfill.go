@@ -3,8 +3,8 @@ package ruleset
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 )

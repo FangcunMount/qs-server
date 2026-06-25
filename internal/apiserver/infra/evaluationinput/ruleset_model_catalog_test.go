@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
@@ -26,7 +27,7 @@ func (s stubRuleReader) FindPublishedByQuestionnaire(context.Context, string, st
 }
 
 func TestRuleSetSBTICatalogDecodesRulesetPayload(t *testing.T) {
-	model := &port.SBTIModelSnapshot{
+	model := &rulesetsbti.ModelSnapshot{
 		Code:                 port.DefaultSBTIModelCode,
 		Version:              port.DefaultSBTIModelVersion,
 		QuestionnaireCode:    port.DefaultSBTIQuestionnaireCode,

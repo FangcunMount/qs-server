@@ -47,8 +47,8 @@ type ScaleModuleDeps struct {
 	RankCacheBuilder       *keyspace.Builder
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
-	CacheSignalNotifier       scaleLifecycle.CacheSignalNotifier
-	RuleSetPublisher scaleLifecycle.RuleSetPublisher
+	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
+	RuleSetPublisher       scaleLifecycle.RuleSetPublisher
 }
 
 // NewScaleModule 创建 Scale 模块。

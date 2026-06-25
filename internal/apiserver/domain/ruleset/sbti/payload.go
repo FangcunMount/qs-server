@@ -2,20 +2,20 @@ package sbti
 
 // ModelSnapshot 已发布 SBTI 规则集 payload（ruleset.sbti.v1）。
 type ModelSnapshot struct {
-	Code                        string                           `json:"code"`
-	Version                     string                           `json:"version"`
-	Title                       string                           `json:"title"`
-	QuestionnaireCode           string                           `json:"questionnaire_code"`
-	QuestionnaireVersion        string                           `json:"questionnaire_version"`
-	Status                      string                           `json:"status"`
-	Source                      SourceSnapshot                   `json:"source"`
-	DimensionOrder              []string                         `json:"dimension_order"`
-	Dimensions                  map[string]DimensionSnapshot     `json:"dimensions"`
-	QuestionMappings            []QuestionMappingSnapshot        `json:"question_mappings"`
-	NormalOutcomes              []OutcomeSnapshot                `json:"normal_outcomes"`
-	SpecialOutcomes             []OutcomeSnapshot                `json:"special_outcomes"`
-	FallbackSimilarityThreshold float64                          `json:"fallback_similarity_threshold"`
-	DrinkTrigger                DrinkTriggerSnapshot             `json:"drink_trigger"`
+	Code                        string                       `json:"code"`
+	Version                     string                       `json:"version"`
+	Title                       string                       `json:"title"`
+	QuestionnaireCode           string                       `json:"questionnaire_code"`
+	QuestionnaireVersion        string                       `json:"questionnaire_version"`
+	Status                      string                       `json:"status"`
+	Source                      SourceSnapshot               `json:"source"`
+	DimensionOrder              []string                     `json:"dimension_order"`
+	Dimensions                  map[string]DimensionSnapshot `json:"dimensions"`
+	QuestionMappings            []QuestionMappingSnapshot    `json:"question_mappings"`
+	NormalOutcomes              []OutcomeSnapshot            `json:"normal_outcomes"`
+	SpecialOutcomes             []OutcomeSnapshot            `json:"special_outcomes"`
+	FallbackSimilarityThreshold float64                      `json:"fallback_similarity_threshold"`
+	DrinkTrigger                DrinkTriggerSnapshot         `json:"drink_trigger"`
 }
 
 func (m *ModelSnapshot) IsPublished() bool {

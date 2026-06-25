@@ -8,6 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -139,7 +140,7 @@ func TestQuestionnaireToSnapshotPreservesOptionScores(t *testing.T) {
 }
 
 func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.T) {
-	scaleSnapshot := &port.ScaleSnapshot{
+	scaleSnapshot := &rulesetscale.ScaleSnapshot{
 		Code:                 "SDS",
 		Title:                "SDS",
 		QuestionnaireCode:    "Q-SDS",
@@ -273,16 +274,16 @@ func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.I
 }
 
 type scaleCatalogStub struct {
-	snapshot *port.ScaleSnapshot
+	snapshot *rulesetscale.ScaleSnapshot
 	err      error
 	ref      port.ModelRef
 }
 
-func (s *scaleCatalogStub) GetScale(context.Context, string) (*port.ScaleSnapshot, error) {
+func (s *scaleCatalogStub) GetScale(context.Context, string) (*rulesetscale.ScaleSnapshot, error) {
 	return s.snapshot, s.err
 }
 
-func (s *scaleCatalogStub) GetScaleByRef(_ context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
+func (s *scaleCatalogStub) GetScaleByRef(_ context.Context, ref port.ModelRef) (*rulesetscale.ScaleSnapshot, error) {
 	s.ref = ref
 	return s.snapshot, s.err
 }

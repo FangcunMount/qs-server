@@ -115,8 +115,8 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	root := repoRoot(t)
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":  "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey": "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale": "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":          "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -358,13 +358,13 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 
 	root := repoRoot(t)
 	allowedFiles := map[string]struct{}{
-		"internal/apiserver/infra/evaluationinput/repository_resolver.go": {},
-		"internal/apiserver/infra/evaluationinput/snapshot_mappers.go":    {},
+		"internal/apiserver/infra/evaluationinput/repository_resolver.go":  {},
+		"internal/apiserver/infra/evaluationinput/snapshot_mappers.go":     {},
 		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":   "catalog/read-model snapshot adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale": "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":         "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
@@ -427,7 +427,7 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 		"github.com/FangcunMount/component-base/pkg/errors":                                 "domain-native errors",
 		"github.com/FangcunMount/component-base/pkg/code":                                   "domain-native errors",
 		"github.com/FangcunMount/qs-server/internal/pkg/code":                               "application API error mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":                 "evaluation-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":       "evaluation-local snapshots/value objects",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "evaluationinput snapshots",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "report-local snapshots/value objects",
 	}

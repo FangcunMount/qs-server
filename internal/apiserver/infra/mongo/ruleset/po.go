@@ -17,9 +17,9 @@ type EvaluationRuleSetPO struct {
 
 	SchemaVersion        string     `bson:"schema_version,omitempty"`
 	PayloadFormat        string     `bson:"payload_format,omitempty"`
-	RuleSetKind            string     `bson:"ruleset_kind"`
-	RuleSetCode            string     `bson:"ruleset_code"`
-	RuleSetVersion         string     `bson:"ruleset_version"`
+	RuleSetKind          string     `bson:"ruleset_kind"`
+	RuleSetCode          string     `bson:"ruleset_code"`
+	RuleSetVersion       string     `bson:"ruleset_version"`
 	Title                string     `bson:"title"`
 	Status               string     `bson:"status"`
 	DecisionKind         string     `bson:"decision_kind"`

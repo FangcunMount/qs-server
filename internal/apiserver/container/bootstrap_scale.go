@@ -5,17 +5,17 @@ import (
 
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
-	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
+	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
 func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
-	var infra *surveyScaleInfra
-	if c != nil {
-		infra = c.surveyScaleInfra
+	if c == nil {
+		return assembler.ScaleModuleDeps{}
 	}
+	infra := c.surveyScaleInfra
 
 	deps := assembler.ScaleModuleDeps{
 		EventPublisher:      c.eventPublisher,
@@ -32,7 +32,7 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 		deps.HotListCache = infra.scaleHotListCache
 		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.questionnaireRepo)
 	}
-	if c != nil && c.mongoDB != nil {
+	if c.mongoDB != nil {
 		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
 		writer := mongoRuleset.NewRepository(c.mongoDB, mongoOpts)
 		deps.RuleSetPublisher = rulesetInfra.NewScaleRuleSetPublisher(writer)

@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -418,7 +419,7 @@ func scaleOutcomeForWriterTest(a *assessment.Assessment) Outcome {
 	return Outcome{
 		Assessment: a,
 		Input: &evaluationinput.InputSnapshot{
-			MedicalScale: &evaluationinput.ScaleSnapshot{
+			MedicalScale: &rulesetscale.ScaleSnapshot{
 				Code:                 "S-001",
 				Title:                "Scale",
 				QuestionnaireVersion: "1.0.0",

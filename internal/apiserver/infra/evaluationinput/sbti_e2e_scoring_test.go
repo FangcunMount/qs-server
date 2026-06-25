@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -66,7 +67,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	})
 }
 
-func sbtiAllThreesAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapshot {
+func sbtiAllThreesAnswerSheet(model *rulesetsbti.ModelSnapshot) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		answers = append(answers, port.AnswerSnapshot{
@@ -82,7 +83,7 @@ func sbtiAllThreesAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSn
 	}
 }
 
-func sbtiAlternatingAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapshot {
+func sbtiAlternatingAnswerSheet(model *rulesetsbti.ModelSnapshot) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for i, mapping := range model.QuestionMappings {
 		value := "1"

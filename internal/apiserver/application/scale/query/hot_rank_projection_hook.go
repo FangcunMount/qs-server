@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcodec"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -18,10 +18,10 @@ type answerSheetSubmittedPayload interface {
 }
 
 type scaleHotRankProjectionHook struct {
-	projection domainScale.ScaleHotRankProjection
+	projection hotrank.Projection
 }
 
-func NewScaleHotRankProjectionHook(projection domainScale.ScaleHotRankProjection) appEventing.OutboxBeforePublishHook {
+func NewScaleHotRankProjectionHook(projection hotrank.Projection) appEventing.OutboxBeforePublishHook {
 	if projection == nil {
 		return nil
 	}
@@ -45,7 +45,7 @@ func (h scaleHotRankProjectionHook) BeforePublish(ctx context.Context, pending a
 	if submittedAt.IsZero() {
 		submittedAt = pending.Event.OccurredAt()
 	}
-	return h.projection.ProjectSubmission(ctx, domainScale.ScaleHotRankSubmissionFact{
+	return h.projection.ProjectSubmission(ctx, hotrank.SubmissionFact{
 		EventID:           eventID,
 		QuestionnaireCode: data.QuestionnaireCode,
 		SubmittedAt:       submittedAt,

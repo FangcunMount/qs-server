@@ -3,6 +3,10 @@ package evaluationinput
 import (
 	"context"
 	"fmt"
+
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 
 type EvaluationModelKind string
@@ -54,9 +58,8 @@ type InputRef struct {
 type InputSnapshot struct {
 	Model        *ModelSnapshot
 	ModelPayload ModelPayload
-	// Deprecated: use ScalePayload(input) instead. Kept for one compatibility
-	// cycle while Scale-specific consumers move behind the model payload seam.
-	MedicalScale  *ScaleSnapshot
+	// Deprecated: use ScalePayload(input) instead.
+	MedicalScale  *rulesetscale.ScaleSnapshot
 	AnswerSheet   *AnswerSheetSnapshot
 	Questionnaire *QuestionnaireSnapshot
 }
@@ -73,7 +76,7 @@ type ModelPayload interface {
 	RuleSetKind() EvaluationModelKind
 }
 
-func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
+func NewScaleModelSnapshot(scale *rulesetscale.ScaleSnapshot) *ModelSnapshot {
 	if scale == nil {
 		return nil
 	}
@@ -91,14 +94,14 @@ func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
 }
 
 type ScaleModelPayload struct {
-	Scale *ScaleSnapshot
+	Scale *rulesetscale.ScaleSnapshot
 }
 
 func (ScaleModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindScale
 }
 
-func ScalePayload(input *InputSnapshot) (*ScaleSnapshot, bool) {
+func ScalePayload(input *InputSnapshot) (*rulesetscale.ScaleSnapshot, bool) {
 	if input == nil {
 		return nil, false
 	}
@@ -116,7 +119,7 @@ func ScalePayload(input *InputSnapshot) (*ScaleSnapshot, bool) {
 	return nil, false
 }
 
-func NewSBTIModelSnapshot(model *SBTIModelSnapshot) *ModelSnapshot {
+func NewSBTIModelSnapshot(model *rulesetsbti.ModelSnapshot) *ModelSnapshot {
 	if model == nil {
 		return nil
 	}
@@ -130,14 +133,14 @@ func NewSBTIModelSnapshot(model *SBTIModelSnapshot) *ModelSnapshot {
 }
 
 type SBTIModelPayload struct {
-	Model *SBTIModelSnapshot `json:"model"`
+	Model *rulesetsbti.ModelSnapshot `json:"model"`
 }
 
 func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindSBTI
 }
 
-func SBTIPayload(input *InputSnapshot) (*SBTIModelSnapshot, bool) {
+func SBTIPayload(input *InputSnapshot) (*rulesetsbti.ModelSnapshot, bool) {
 	if input == nil {
 		return nil, false
 	}
@@ -152,7 +155,7 @@ func SBTIPayload(input *InputSnapshot) (*SBTIModelSnapshot, bool) {
 	return nil, false
 }
 
-func NewMBTIModelSnapshot(model *MBTIModelSnapshot) *ModelSnapshot {
+func NewMBTIModelSnapshot(model *rulesetmbti.ModelSnapshot) *ModelSnapshot {
 	if model == nil {
 		return nil
 	}
@@ -166,14 +169,14 @@ func NewMBTIModelSnapshot(model *MBTIModelSnapshot) *ModelSnapshot {
 }
 
 type MBTIModelPayload struct {
-	Model *MBTIModelSnapshot `json:"model"`
+	Model *rulesetmbti.ModelSnapshot `json:"model"`
 }
 
 func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindMBTI
 }
 
-func MBTIPayload(input *InputSnapshot) (*MBTIModelSnapshot, bool) {
+func MBTIPayload(input *InputSnapshot) (*rulesetmbti.ModelSnapshot, bool) {
 	if input == nil {
 		return nil, false
 	}
@@ -226,22 +229,22 @@ type Resolver interface {
 }
 
 type ScaleCatalog interface {
-	GetScale(ctx context.Context, code string) (*ScaleSnapshot, error)
+	GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error)
 }
 
 type ScaleModelCatalog interface {
 	ScaleCatalog
-	GetScaleByRef(ctx context.Context, ref ModelRef) (*ScaleSnapshot, error)
+	GetScaleByRef(ctx context.Context, ref ModelRef) (*rulesetscale.ScaleSnapshot, error)
 }
 
 type SBTIModelCatalog interface {
-	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*SBTIModelSnapshot, error)
-	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*SBTIModelSnapshot, error)
+	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*rulesetsbti.ModelSnapshot, error)
+	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetsbti.ModelSnapshot, error)
 }
 
 type MBTIModelCatalog interface {
-	GetMBTIModelByRef(ctx context.Context, ref ModelRef) (*MBTIModelSnapshot, error)
-	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*MBTIModelSnapshot, error)
+	GetMBTIModelByRef(ctx context.Context, ref ModelRef) (*rulesetmbti.ModelSnapshot, error)
+	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetmbti.ModelSnapshot, error)
 }
 
 type AnswerSheetReader interface {

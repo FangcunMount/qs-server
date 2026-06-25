@@ -43,7 +43,7 @@ func (r *Repository) UpsertPublished(ctx context.Context, snapshot *domain.RuleS
 		"ruleset_kind":    po.RuleSetKind,
 		"ruleset_code":    po.RuleSetCode,
 		"ruleset_version": po.RuleSetVersion,
-		"deleted_at":    nil,
+		"deleted_at":      nil,
 	}
 
 	var existing EvaluationRuleSetPO
