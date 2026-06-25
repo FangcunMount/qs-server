@@ -16,7 +16,7 @@ import (
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	sbtiEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/sbti"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	scaleInterpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/interpretation"
+	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -236,12 +236,12 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		m.ReportStatusReporter = reportStatusReporter
 
 		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
-		scaleEvaluator := scaleInterpretation.NewExecutorWithService(
-			scaleInterpretation.NewService(
-				scaleInterpretation.DefaultInputValidator{},
-				scaleInterpretation.DefaultInputAssembler{},
+		scaleEvaluator := scaleEvaluation.NewExecutorWithService(
+			scaleEvaluation.NewService(
+				scaleEvaluation.DefaultInputValidator{},
+				scaleEvaluation.DefaultInputAssembler{},
 				nil,
-				scaleInterpretation.DefaultResultMapper{},
+				scaleEvaluation.DefaultResultMapper{},
 			),
 		)
 		sbtiEvaluator := sbtiEvaluation.NewExecutor()

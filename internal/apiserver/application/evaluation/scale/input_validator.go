@@ -1,4 +1,4 @@
-package interpretation
+package scale
 
 import (
 	"fmt"

@@ -1,4 +1,4 @@
-package interpretation
+package scale
 
 import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"

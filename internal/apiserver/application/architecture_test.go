@@ -145,11 +145,11 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	}
 }
 
-func TestScaleInterpretationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
+func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "scale", "interpretation"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "scale"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
