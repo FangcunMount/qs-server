@@ -43,6 +43,8 @@ type config struct {
 	scanEventPayloads         bool
 	skipCounts                bool
 	skipMongoOutboxEventScope bool
+	mongoOnly                 bool
+	allowMissingTestees       bool
 	backupSuffix              string
 	timeout                   time.Duration
 	apply                     bool
@@ -255,9 +257,15 @@ func main() {
 	}
 
 	prog.Phase("delete mysql rows")
-	mysqlDeleted, err := deleteMySQLRows(ctx, conn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.mysqlDeleteBatchSize)
-	if err != nil {
-		log.Fatalf("delete mysql rows: %v", err)
+	var mysqlDeleted []namedCount
+	if cfg.mongoOnly {
+		log.Print("mysql delete skipped by --mongo-only")
+	} else {
+		var err error
+		mysqlDeleted, err = deleteMySQLRows(ctx, conn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.mysqlDeleteBatchSize)
+		if err != nil {
+			log.Fatalf("delete mysql rows: %v", err)
+		}
 	}
 	prog.Finish("delete mysql rows", "")
 
@@ -285,6 +293,8 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.scanEventPayloads, "scan-event-payloads", false, "also scan MySQL outbox/pending payload_json for testee_id; expensive on large outbox tables")
 	flag.BoolVar(&cfg.skipCounts, "skip-counts", false, "skip expensive row counts and affected source date window; useful when an external backup already protects an apply run")
 	flag.BoolVar(&cfg.skipMongoOutboxEventScope, "skip-mongo-outbox-event-scope", false, "skip loading Mongo outbox event_id values into MySQL temp scope; Mongo outbox documents are still deleted by aggregate filters")
+	flag.BoolVar(&cfg.mongoOnly, "mongo-only", false, "skip MySQL delete; allow testee IDs already removed from MySQL (resume interrupted mongo cleanup)")
+	flag.BoolVar(&cfg.allowMissingTestees, "allow-missing-testees", false, "do not fail when testee IDs are absent from MySQL testee table")
 	flag.StringVar(&cfg.backupSuffix, "backup-suffix", time.Now().Format("20060102150405"), "backup table/collection suffix")
 	flag.DurationVar(&cfg.timeout, "timeout", 2*time.Hour, "overall timeout, for example 30m or 2h")
 	flag.BoolVar(&cfg.apply, "apply", false, "apply deletes; default is dry-run")
@@ -321,6 +331,12 @@ func parseFlags() config {
 	}
 	if cfg.workers < 1 {
 		log.Fatal("--workers must be >= 1")
+	}
+	if cfg.mongoOnly {
+		cfg.allowMissingTestees = true
+	}
+	if !cfg.apply && cfg.mongoOnly {
+		log.Print("--mongo-only has no effect in dry-run mode")
 	}
 	if !cfg.apply && cfg.skipBackup {
 		log.Print("--skip-backup has no effect in dry-run mode")
@@ -579,6 +595,10 @@ func validateTesteeGuard(ctx context.Context, conn *sql.Conn, cfg config, expect
 		return err
 	}
 	if existing != expected {
+		if cfg.allowMissingTestees {
+			log.Printf("prepare mysql scope: %d/%d testee IDs are absent from MySQL testee table (allowed)", expected-existing, expected)
+			return nil
+		}
 		rows, err := conn.QueryContext(ctx, `SELECT x.id FROM tmp_cleanup_testee_ids x LEFT JOIN testee t ON t.id = x.id WHERE t.id IS NULL ORDER BY x.id LIMIT 20`)
 		if err != nil {
 			return err
@@ -1378,11 +1398,9 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, ma
 		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d batch_size=%d", lockWaitTimeoutSec, maxRetries, batchSize)
 	}
 
-	prog.Phase("materialize mysql delete ids")
 	if err := materializeScopedDeleteIDs(ctx, conn); err != nil {
 		return nil, fmt.Errorf("materialize scoped delete ids: %w", err)
 	}
-	prog.Finish("materialize mysql delete ids", "")
 
 	items, err := mysqlDeleteItems(ctx, conn)
 	if err != nil {
@@ -2005,8 +2023,8 @@ func printScopeSummary(summary scopeSummary, cfg config) {
 }
 
 func printScopeIDsSummary(ids scopeIDs, cfg config) {
-	log.Printf("scope: apply=%v backup=%v testee_created_after=%q allow_old_testees=%v skip_counts=true",
-		cfg.apply, !cfg.skipBackup, cfg.testeeCreatedAfter, cfg.allowOldTestees)
+	log.Printf("scope: apply=%v backup=%v mongo_only=%v testee_created_after=%q allow_old_testees=%v skip_counts=true",
+		cfg.apply, !cfg.skipBackup, cfg.mongoOnly, cfg.testeeCreatedAfter, cfg.allowOldTestees)
 	log.Printf("scope ids: testees=%d assessments=%d answersheets=%d reports=%d",
 		len(ids.TesteeIDs), len(ids.AssessmentIDs), len(ids.AnswerSheetIDs), len(ids.ReportIDs))
 }
@@ -2197,7 +2215,14 @@ func (p *progressReporter) renderLocked() {
 }
 
 func (p *progressReporter) buildLineLocked() string {
-	elapsed := formatProgressDuration(time.Since(p.phaseStarted))
+	started := p.phaseStarted
+	if started.IsZero() {
+		started = p.stepStarted
+	}
+	elapsed := "0s"
+	if !started.IsZero() {
+		elapsed = formatProgressDuration(time.Since(started))
+	}
 	title := p.phase
 	if p.label != "" && p.label != p.phase {
 		title = p.phase + " | " + p.label
