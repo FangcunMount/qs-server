@@ -1,39 +1,36 @@
-package evaluation
+package report
 
-import (
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
-)
+import rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 
 type ScaleFactorReportScore struct {
 	FactorCode   string
 	FactorName   string
 	RawScore     float64
-	RiskLevel    domainReport.RiskLevel
+	RiskLevel    RiskLevel
 	Conclusion   string
 	Suggestion   string
 	IsTotalScore bool
 }
 
 type ScaleReportInput struct {
-	AssessmentID domainReport.ID
+	AssessmentID ID
 	Scale        *rulesetscale.ScaleSnapshot
 	TotalScore   float64
-	RiskLevel    domainReport.RiskLevel
+	RiskLevel    RiskLevel
 	Conclusion   string
 	Suggestion   string
 	FactorScores []ScaleFactorReportScore
 }
 
-func BuildScaleReport(composer domainReport.ReportBuilder, input ScaleReportInput) (*domainReport.InterpretReport, error) {
+func BuildScaleReport(composer ReportBuilder, input ScaleReportInput) (*InterpretReport, error) {
 	if composer == nil {
-		return nil, domainReport.ErrInvalidArgument
+		return nil, ErrInvalidArgument
 	}
 	return composer.Build(scaleGenerateReportInput(input))
 }
 
-func scaleGenerateReportInput(input ScaleReportInput) domainReport.GenerateReportInput {
-	reportInput := domainReport.GenerateReportInput{
+func scaleGenerateReportInput(input ScaleReportInput) GenerateReportInput {
+	reportInput := GenerateReportInput{
 		AssessmentID: input.AssessmentID,
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
@@ -41,8 +38,8 @@ func scaleGenerateReportInput(input ScaleReportInput) domainReport.GenerateRepor
 		Suggestion:   input.Suggestion,
 	}
 	if input.Scale != nil {
-		reportInput.ScaleName = input.Scale.Title
-		reportInput.ScaleCode = input.Scale.Code
+		reportInput.ModelName = input.Scale.Title
+		reportInput.ModelCode = input.Scale.Code
 	}
 	reportInput.FactorScores = scaleFactorScoreInputs(input.FactorScores, input.Scale)
 	return reportInput
@@ -51,14 +48,14 @@ func scaleGenerateReportInput(input ScaleReportInput) domainReport.GenerateRepor
 func scaleFactorScoreInputs(
 	factorScores []ScaleFactorReportScore,
 	scaleSnapshot *rulesetscale.ScaleSnapshot,
-) []domainReport.FactorScoreInput {
+) []FactorScoreInput {
 	factorMeta := make(map[string]rulesetscale.FactorSnapshot)
 	if scaleSnapshot != nil {
 		for _, f := range scaleSnapshot.Factors {
 			factorMeta[f.Code] = f
 		}
 	}
-	inputs := make([]domainReport.FactorScoreInput, 0, len(factorScores))
+	inputs := make([]FactorScoreInput, 0, len(factorScores))
 	for _, fs := range factorScores {
 		meta, ok := factorMeta[fs.FactorCode]
 		factorName := fs.FactorName
@@ -72,8 +69,8 @@ func scaleFactorScoreInputs(
 		if factorName == "" {
 			factorName = fs.FactorCode
 		}
-		inputs = append(inputs, domainReport.FactorScoreInput{
-			FactorCode:   domainReport.FactorCode(fs.FactorCode),
+		inputs = append(inputs, FactorScoreInput{
+			FactorCode:   FactorCode(fs.FactorCode),
 			FactorName:   factorName,
 			RawScore:     fs.RawScore,
 			MaxScore:     maxScore,

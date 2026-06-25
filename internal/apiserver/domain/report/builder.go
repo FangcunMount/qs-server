@@ -50,8 +50,8 @@ func (b *DefaultReportBuilder) Build(input GenerateReportInput) (*InterpretRepor
 
 	report := NewInterpretReport(
 		input.AssessmentID,
-		input.ScaleName,
-		input.ScaleCode,
+		input.ModelName,
+		input.ModelCode,
 		input.TotalScore,
 		input.RiskLevel,
 		conclusion,
@@ -130,8 +130,8 @@ func (b *DefaultReportBuilder) buildSuggestions(
 		// 构建临时报告用于生成建议
 		tempReport := NewInterpretReport(
 			input.AssessmentID,
-			input.ScaleName,
-			input.ScaleCode,
+			input.ModelName,
+			input.ModelCode,
 			input.TotalScore,
 			input.RiskLevel,
 			b.buildConclusion(input),

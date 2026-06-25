@@ -1,26 +1,24 @@
-package evaluation
+package report
 
 import (
 	"fmt"
 	"strings"
-
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
 
 type MBTIReportInput struct {
-	AssessmentID domainReport.ID
+	AssessmentID ID
 	ModelCode    string
 	TotalScore   float64
-	RiskLevel    domainReport.RiskLevel
-	Detail       MBTIResultDetail
+	RiskLevel    RiskLevel
+	Detail       MBTIReportDetail
 }
 
-func BuildMBTIReport(input MBTIReportInput) (*domainReport.InterpretReport, error) {
+func BuildMBTIReport(input MBTIReportInput) (*InterpretReport, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment is required")
 	}
 	detail := input.Detail
-	return domainReport.NewInterpretReport(
+	return NewInterpretReport(
 		input.AssessmentID,
 		mbtiReportModelName(detail),
 		mbtiReportModelCode(input.ModelCode, detail),
@@ -33,28 +31,14 @@ func BuildMBTIReport(input MBTIReportInput) (*domainReport.InterpretReport, erro
 	), nil
 }
 
-func MBTIResultDetailFromPayload(payload any) (MBTIResultDetail, error) {
-	switch detail := payload.(type) {
-	case MBTIResultDetail:
-		return detail, nil
-	case *MBTIResultDetail:
-		if detail == nil {
-			return MBTIResultDetail{}, fmt.Errorf("mbti result detail is nil")
-		}
-		return *detail, nil
-	default:
-		return MBTIResultDetail{}, fmt.Errorf("unsupported mbti result detail payload: %T", payload)
-	}
-}
-
-func mbtiReportModelName(detail MBTIResultDetail) string {
+func mbtiReportModelName(detail MBTIReportDetail) string {
 	if detail.TypeName == "" {
 		return "MBTI 人格类型测评"
 	}
 	return "MBTI 人格类型测评 - " + detail.TypeName
 }
 
-func mbtiReportModelCode(modelCode string, detail MBTIResultDetail) string {
+func mbtiReportModelCode(modelCode string, detail MBTIReportDetail) string {
 	if modelCode != "" {
 		return modelCode
 	}
@@ -64,7 +48,7 @@ func mbtiReportModelCode(modelCode string, detail MBTIResultDetail) string {
 	return "MBTI_OEJTS"
 }
 
-func mbtiReportConclusion(detail MBTIResultDetail) string {
+func mbtiReportConclusion(detail MBTIReportDetail) string {
 	title := strings.TrimSpace(detail.TypeCode + " " + detail.TypeName)
 	if detail.OneLiner != "" {
 		title += " - " + detail.OneLiner
@@ -72,21 +56,21 @@ func mbtiReportConclusion(detail MBTIResultDetail) string {
 	return strings.TrimSpace(title)
 }
 
-func mbtiReportDimensions(detail MBTIResultDetail) []domainReport.DimensionInterpret {
+func mbtiReportDimensions(detail MBTIReportDetail) []DimensionInterpret {
 	if len(detail.Dimensions) == 0 {
 		return nil
 	}
 	maxScore := 40.0
-	dimensions := make([]domainReport.DimensionInterpret, 0, len(detail.Dimensions))
+	dimensions := make([]DimensionInterpret, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
 		description := fmt.Sprintf("%s：倾向 %s（原始分 %.0f，偏好强度 %.0f%%）",
 			dim.Name, dim.Preference, dim.RawScore, dim.Strength)
-		dimensions = append(dimensions, domainReport.NewDimensionInterpret(
-			domainReport.FactorCode(dim.Code),
+		dimensions = append(dimensions, NewDimensionInterpret(
+			FactorCode(dim.Code),
 			dim.Name,
 			dim.RawScore,
 			&maxScore,
-			domainReport.RiskLevelNone,
+			RiskLevelNone,
 			description,
 			"",
 		))
@@ -94,15 +78,15 @@ func mbtiReportDimensions(detail MBTIResultDetail) []domainReport.DimensionInter
 	return dimensions
 }
 
-func mbtiReportSuggestions(detail MBTIResultDetail) []domainReport.Suggestion {
-	suggestions := make([]domainReport.Suggestion, 0, 8)
+func mbtiReportSuggestions(detail MBTIReportDetail) []Suggestion {
+	suggestions := make([]Suggestion, 0, 8)
 	add := func(content string) {
 		content = strings.TrimSpace(content)
 		if content == "" {
 			return
 		}
-		suggestions = append(suggestions, domainReport.Suggestion{
-			Category: domainReport.SuggestionCategoryGeneral,
+		suggestions = append(suggestions, Suggestion{
+			Category: SuggestionCategoryGeneral,
 			Content:  content,
 		})
 	}
@@ -123,8 +107,8 @@ func mbtiReportSuggestions(detail MBTIResultDetail) []domainReport.Suggestion {
 	return suggestions
 }
 
-func mbtiReportModelExtra(detail MBTIResultDetail) *domainReport.ModelExtra {
-	extra := &domainReport.ModelExtra{
+func mbtiReportModelExtra(detail MBTIReportDetail) *ModelExtra {
+	extra := &ModelExtra{
 		Kind:         "mbti",
 		TypeCode:     detail.TypeCode,
 		TypeName:     detail.TypeName,

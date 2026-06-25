@@ -1,14 +1,13 @@
-package evaluation
+package report
 
 import (
 	"testing"
 
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 )
 
 func TestBuildSBTIReportSetsModelExtra(t *testing.T) {
-	detail := SBTIResultDetail{
+	detail := SBTIReportDetail{
 		TypeCode:   "CTRL",
 		TypeName:   "拿捏者",
 		OneLiner:   "人形自走任务管理器",
@@ -27,7 +26,7 @@ func TestBuildSBTIReportSetsModelExtra(t *testing.T) {
 	}
 
 	report, err := BuildSBTIReport(SBTIReportInput{
-		AssessmentID: domainReport.ID(7001),
+		AssessmentID: ID(7001),
 		ModelCode:    "SBTI_FUN",
 		Detail:       detail,
 	})

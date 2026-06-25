@@ -76,8 +76,8 @@ func buildReportReadModelQuery(filter evaluationreadmodel.ReportFilter) bson.M {
 	if filter.HighRiskOnly {
 		query["risk_level"] = bson.M{"$in": []string{"high", "severe"}}
 	}
-	if filter.ScaleCode != "" {
-		query["scale_code"] = filter.ScaleCode
+	if filter.ModelCode != "" {
+		query["scale_code"] = filter.ModelCode
 	}
 	if filter.RiskLevel != nil {
 		query["risk_level"] = *filter.RiskLevel
@@ -131,8 +131,8 @@ func reportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
 	}
 	return evaluationreadmodel.ReportRow{
 		AssessmentID: po.DomainID.Uint64(),
-		ScaleName:    po.ScaleName,
-		ScaleCode:    po.ScaleCode,
+		ModelName:    po.ScaleName,
+		ModelCode:    po.ScaleCode,
 		TotalScore:   po.TotalScore,
 		RiskLevel:    po.RiskLevel,
 		Conclusion:   po.Conclusion,

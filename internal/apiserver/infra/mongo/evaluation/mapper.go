@@ -38,8 +38,8 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 	}
 
 	po := &InterpretReportPO{
-		ScaleName:   domain.ScaleName(),
-		ScaleCode:   domain.ScaleCode(),
+		ScaleName:   domain.ModelName(),
+		ScaleCode:   domain.ModelCode(),
 		TesteeID:    testeeID,
 		TotalScore:  domain.TotalScore(),
 		RiskLevel:   string(domain.RiskLevel()),

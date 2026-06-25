@@ -100,8 +100,8 @@ type AssessmentListResult struct {
 // ReportResult 报告结果
 type ReportResult struct {
 	AssessmentID uint64            // 测评ID
-	ScaleName    string            // 量表名称
-	ScaleCode    string            // 量表编码
+	ModelName    string            // 解释模型名称
+	ModelCode    string            // 解释模型编码
 	TotalScore   float64           // 总分
 	RiskLevel    string            // 风险等级
 	Conclusion   string            // 总结论

@@ -76,9 +76,9 @@ type GenerateReportInput struct {
 	// 测评ID（也作为报告ID）
 	AssessmentID ID
 
-	// 量表信息
-	ScaleName string
-	ScaleCode string
+	// 解释模型信息
+	ModelName string
+	ModelCode string
 
 	// 评估结果
 	TotalScore float64

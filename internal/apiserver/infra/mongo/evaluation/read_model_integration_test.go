@@ -146,7 +146,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 	highRows, total, err := reader.ListReports(ctx, evaluationreadmodel.ReportFilter{
 		TesteeID:     &testeeID,
 		HighRiskOnly: true,
-		ScaleCode:    scaleCode,
+		ModelCode:    scaleCode,
 	}, evaluationreadmodel.PageRequest{Page: 1, PageSize: 10})
 	if err != nil {
 		t.Fatalf("list high risk reports: %v", err)
@@ -172,7 +172,7 @@ func TestReportReadModelListReportsFiltersAgainstMongo(t *testing.T) {
 	if err != nil {
 		t.Fatalf("get report by assessment id: %v", err)
 	}
-	if reportRow.ScaleCode != scaleCode || reportRow.RiskLevel != "high" || reportRow.AssessmentID != baseID+1 {
+	if reportRow.ModelCode != scaleCode || reportRow.RiskLevel != "high" || reportRow.AssessmentID != baseID+1 {
 		t.Fatalf("unexpected report row: %#v", reportRow)
 	}
 }

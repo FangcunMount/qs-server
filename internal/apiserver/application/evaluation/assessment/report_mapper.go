@@ -26,8 +26,8 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 
 	return &ReportResult{
 		AssessmentID: r.ID().Uint64(),
-		ScaleName:    r.ScaleName(),
-		ScaleCode:    r.ScaleCode(),
+		ModelName:    r.ModelName(),
+		ModelCode:    r.ModelCode(),
 		TotalScore:   r.TotalScore(),
 		RiskLevel:    string(r.RiskLevel()),
 		Conclusion:   r.Conclusion(),
@@ -86,8 +86,8 @@ func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
 	}
 	return &ReportResult{
 		AssessmentID: row.AssessmentID,
-		ScaleName:    row.ScaleName,
-		ScaleCode:    row.ScaleCode,
+		ModelName:    row.ModelName,
+		ModelCode:    row.ModelCode,
 		TotalScore:   row.TotalScore,
 		RiskLevel:    row.RiskLevel,
 		Conclusion:   row.Conclusion,

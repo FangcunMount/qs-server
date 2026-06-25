@@ -5,6 +5,7 @@ import (
 
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
 )
 
 // ============= Assessment 相关响应 =============
@@ -344,8 +345,8 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 
 	return &ReportResponse{
 		AssessmentID:   fmt.Sprintf("%d", result.AssessmentID),
-		ScaleName:      result.ScaleName,
-		ScaleCode:      result.ScaleCode,
+		ScaleName:      compat.ReportScaleName(result.ModelName),
+		ScaleCode:      compat.ReportScaleCode(result.ModelCode),
 		TotalScore:     result.TotalScore,
 		RiskLevel:      result.RiskLevel,
 		RiskLevelLabel: LabelForRiskLevel(result.RiskLevel),

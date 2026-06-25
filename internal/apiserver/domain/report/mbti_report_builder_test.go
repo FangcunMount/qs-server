@@ -1,14 +1,13 @@
-package evaluation
+package report
 
 import (
 	"testing"
 
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 )
 
 func TestBuildMBTIReportFillsModelExtra(t *testing.T) {
-	detail := MBTIResultDetail{
+	detail := MBTIReportDetail{
 		TypeCode:     "INTJ",
 		TypeName:     "建筑师",
 		OneLiner:     "独立战略家",
@@ -26,7 +25,7 @@ func TestBuildMBTIReportFillsModelExtra(t *testing.T) {
 	}
 
 	report, err := BuildMBTIReport(MBTIReportInput{
-		AssessmentID: domainReport.ID(7001),
+		AssessmentID: ID(7001),
 		ModelCode:    "MBTI_OEJTS",
 		Detail:       detail,
 	})
@@ -42,11 +41,5 @@ func TestBuildMBTIReportFillsModelExtra(t *testing.T) {
 	}
 	if extra.MatchPercent != 75 {
 		t.Fatalf("MatchPercent = %v, want 75", extra.MatchPercent)
-	}
-}
-
-func TestResolveReportTypeReturnsStandard(t *testing.T) {
-	if got := ResolveReportType(); got != domainReport.ReportTypeStandard {
-		t.Fatalf("ResolveReportType() = %s, want %s", got, domainReport.ReportTypeStandard)
 	}
 }

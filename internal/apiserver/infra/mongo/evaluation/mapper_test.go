@@ -51,8 +51,8 @@ func TestReportMapperRoundTripPreservesInterpretReportFields(t *testing.T) {
 		t.Fatal("ToDomain returned nil")
 	}
 	if got.ID() != original.ID() ||
-		got.ScaleName() != original.ScaleName() ||
-		got.ScaleCode() != original.ScaleCode() ||
+		got.ModelName() != original.ModelName() ||
+		got.ModelCode() != original.ModelCode() ||
 		got.TotalScore() != original.TotalScore() ||
 		got.RiskLevel() != original.RiskLevel() ||
 		got.Conclusion() != original.Conclusion() {

@@ -4,7 +4,6 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
@@ -55,11 +54,11 @@ func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domain
 		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")
 	}
 	_ = ctx
-	return evaluationdomain.BuildScaleReport(b.composer, scaleReportInputFromOutcome(outcome))
+	return domainReport.BuildScaleReport(b.composer, scaleReportInputFromOutcome(outcome))
 }
 
-func scaleReportInputFromOutcome(outcome Outcome) evaluationdomain.ScaleReportInput {
-	input := evaluationdomain.ScaleReportInput{}
+func scaleReportInputFromOutcome(outcome Outcome) domainReport.ScaleReportInput {
+	input := domainReport.ScaleReportInput{}
 	if outcome.Assessment != nil {
 		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
 	}
@@ -74,10 +73,10 @@ func scaleReportInputFromOutcome(outcome Outcome) evaluationdomain.ScaleReportIn
 	return input
 }
 
-func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []evaluationdomain.ScaleFactorReportScore {
-	scores := make([]evaluationdomain.ScaleFactorReportScore, 0, len(factorScores))
+func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []domainReport.ScaleFactorReportScore {
+	scores := make([]domainReport.ScaleFactorReportScore, 0, len(factorScores))
 	for _, fs := range factorScores {
-		scores = append(scores, evaluationdomain.ScaleFactorReportScore{
+		scores = append(scores, domainReport.ScaleFactorReportScore{
 			FactorCode:   string(fs.FactorCode),
 			FactorName:   fs.FactorName,
 			RawScore:     fs.RawScore,

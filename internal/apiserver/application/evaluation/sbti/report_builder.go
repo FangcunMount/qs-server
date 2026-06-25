@@ -41,11 +41,11 @@ func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) 
 	if !outcome.Result.ModelRef.Code().IsEmpty() {
 		modelCode = outcome.Result.ModelRef.Code().String()
 	}
-	return evaluationdomain.BuildSBTIReport(evaluationdomain.SBTIReportInput{
+	return domainReport.BuildSBTIReport(domainReport.SBTIReportInput{
 		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
 		ModelCode:    modelCode,
 		TotalScore:   outcome.Result.TotalScore,
 		RiskLevel:    domainReport.RiskLevel(outcome.Result.RiskLevel),
-		Detail:       detail,
+		Detail:       sbtiReportDetail(detail),
 	})
 }

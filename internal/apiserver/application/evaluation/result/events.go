@@ -152,7 +152,7 @@ func (ScaleEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport
 			strconv.FormatUint(reportID, 10),
 			strconv.FormatUint(assessmentID, 10),
 			testeeID,
-			rpt.ScaleCode(),
+			rpt.ModelCode(),
 			scaleVersion,
 			rpt.TotalScore(),
 			string(rpt.RiskLevel()),

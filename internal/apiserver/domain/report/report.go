@@ -16,9 +16,9 @@ type InterpretReport struct {
 	// 身份标识（与 AssessmentID 一致）
 	id ID
 
-	// 量表信息
-	scaleName string
-	scaleCode string
+	// 解释模型信息
+	modelName string
+	modelCode string
 
 	// 评估结果汇总
 	totalScore float64
@@ -42,8 +42,8 @@ type InterpretReport struct {
 // NewInterpretReport 创建解读报告
 func NewInterpretReport(
 	id ID,
-	scaleName string,
-	scaleCode string,
+	modelName string,
+	modelCode string,
 	totalScore float64,
 	riskLevel RiskLevel,
 	conclusion string,
@@ -53,8 +53,8 @@ func NewInterpretReport(
 ) *InterpretReport {
 	return &InterpretReport{
 		id:          id,
-		scaleName:   scaleName,
-		scaleCode:   scaleCode,
+		modelName:   modelName,
+		modelCode:   modelCode,
 		totalScore:  totalScore,
 		riskLevel:   riskLevel,
 		conclusion:  conclusion,
@@ -68,8 +68,8 @@ func NewInterpretReport(
 // ReconstructInterpretReport 重建解读报告（仅供仓储层使用）
 func ReconstructInterpretReport(
 	id ID,
-	scaleName string,
-	scaleCode string,
+	modelName string,
+	modelCode string,
 	totalScore float64,
 	riskLevel RiskLevel,
 	conclusion string,
@@ -81,8 +81,8 @@ func ReconstructInterpretReport(
 ) *InterpretReport {
 	return &InterpretReport{
 		id:          id,
-		scaleName:   scaleName,
-		scaleCode:   scaleCode,
+		modelName:   modelName,
+		modelCode:   modelCode,
 		totalScore:  totalScore,
 		riskLevel:   riskLevel,
 		conclusion:  conclusion,
@@ -119,14 +119,14 @@ func (r *InterpretReport) ID() ID {
 	return r.id
 }
 
-// ScaleName 获取量表名称
-func (r *InterpretReport) ScaleName() string {
-	return r.scaleName
+// ModelName 获取解释模型名称
+func (r *InterpretReport) ModelName() string {
+	return r.modelName
 }
 
-// ScaleCode 获取量表编码
-func (r *InterpretReport) ScaleCode() string {
-	return r.scaleCode
+// ModelCode 获取解释模型编码
+func (r *InterpretReport) ModelCode() string {
+	return r.modelCode
 }
 
 // TotalScore 获取总分

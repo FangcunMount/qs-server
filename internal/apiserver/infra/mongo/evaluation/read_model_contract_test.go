@@ -44,7 +44,7 @@ func TestReportPOToReadRowMapsReportDocumentShape(t *testing.T) {
 		},
 	})
 
-	if row.AssessmentID != 7001 || row.ScaleName != "SDS" || row.ScaleCode != "sds" {
+	if row.AssessmentID != 7001 || row.ModelName != "SDS" || row.ModelCode != "sds" {
 		t.Fatalf("unexpected report identity: %#v", row)
 	}
 	if row.TotalScore != 88 || row.RiskLevel != "high" || row.Conclusion != "高风险" || !row.CreatedAt.Equal(createdAt) {
@@ -82,7 +82,7 @@ func TestBuildReportReadModelQueryDocumentsFilterContract(t *testing.T) {
 		TesteeID:     &testeeID,
 		TesteeIDs:    []uint64{8001, 8002},
 		HighRiskOnly: true,
-		ScaleCode:    "SDS",
+		ModelCode:    "SDS",
 		RiskLevel:    &riskLevel,
 	})
 

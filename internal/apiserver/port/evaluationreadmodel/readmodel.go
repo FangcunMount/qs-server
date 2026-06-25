@@ -138,7 +138,7 @@ type ReportFilter struct {
 	TesteeID     *uint64
 	TesteeIDs    []uint64
 	HighRiskOnly bool
-	ScaleCode    string
+	ModelCode    string
 	RiskLevel    *string
 }
 
@@ -160,8 +160,8 @@ type ReportSuggestionRow struct {
 
 type ReportRow struct {
 	AssessmentID uint64
-	ScaleName    string
-	ScaleCode    string
+	ModelName    string
+	ModelCode    string
 	TotalScore   float64
 	RiskLevel    string
 	Conclusion   string

@@ -11,6 +11,7 @@ import (
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -519,8 +520,8 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 
 	return &pb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
-		ScaleCode:    result.ScaleCode,
-		ScaleName:    result.ScaleName,
+		ScaleCode:    compat.ReportScaleCode(result.ModelCode),
+		ScaleName:    compat.ReportScaleName(result.ModelName),
 		TotalScore:   result.TotalScore,
 		RiskLevel:    result.RiskLevel,
 		Conclusion:   result.Conclusion,

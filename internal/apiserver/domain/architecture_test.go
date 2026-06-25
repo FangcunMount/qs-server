@@ -234,6 +234,119 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 	})
 }
 
+func TestEvaluationDomainDoesNotBuildReports(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
+	forbiddenTokens := []string{
+		"func BuildMBTIReport(",
+		"func BuildSBTIReport(",
+		"func BuildScaleReport(",
+		"func ResolveReportType(",
+		"MBTIReportInput",
+		"SBTIReportInput",
+		"ScaleReportInput",
+		"MBTIReportDetail",
+		"SBTIReportDetail",
+		"NewInterpretReport(",
+		"GenerateReportInput",
+		"type ReportBuilder ",
+	}
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		if strings.Contains(filepath.Base(path), "report_builder") {
+			t.Fatalf("%s is a report builder file; report construction belongs in domain/report or application orchestration", filepath.ToSlash(mustRel(t, root, path)))
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; evaluation domain must only produce scoring/interpretation results, not build reports", filepath.ToSlash(mustRel(t, root, path)), token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEvaluationDomainDoesNotImportReportPackage(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	const reportImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
+		if importPath == reportImport || strings.HasPrefix(importPath, reportImport+"/") {
+			t.Fatalf("%s imports %s; evaluation domain must not depend on report aggregate construction", filepath.ToSlash(mustRel(t, root, path)), importPath)
+		}
+	})
+}
+
+func TestReportBuilderEntryPointsLiveInReportDomainOnly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	reportDomain := filepath.Join(root, "internal", "apiserver", "domain", "report")
+	entryPoints := []string{
+		"BuildMBTIReport",
+		"BuildSBTIReport",
+		"BuildScaleReport",
+		"ResolveReportType",
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		names, err := topLevelFuncNames(path)
+		if err != nil {
+			return err
+		}
+		for _, name := range entryPoints {
+			if _, ok := names[name]; !ok {
+				continue
+			}
+			rel, relErr := filepath.Rel(reportDomain, path)
+			if relErr != nil || strings.HasPrefix(rel, "..") {
+				t.Fatalf("%s defines %s(); report builder entry points must live in domain/report", filepath.ToSlash(mustRel(t, root, path)), name)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func topLevelFuncNames(path string) (map[string]struct{}, error) {
+	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+	if err != nil {
+		return nil, err
+	}
+	names := make(map[string]struct{}, len(parsed.Decls))
+	for _, decl := range parsed.Decls {
+		fn, ok := decl.(*ast.FuncDecl)
+		if !ok || fn.Name == nil {
+			continue
+		}
+		names[fn.Name.Name] = struct{}{}
+	}
+	return names, nil
+}
+
 func isEvaluationRootPackageFile(root, path string) bool {
 	evaluationRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
 	rel, err := filepath.Rel(evaluationRoot, path)
@@ -272,6 +385,47 @@ func TestEvaluationReportDomainDoesNotContainUnusedExportModel(t *testing.T) {
 		for _, token := range forbiddenTokens {
 			if strings.Contains(text, token) {
 				t.Fatalf("%s contains %q; report export belongs to a real application adapter, not unused domain surface", filepath.ToSlash(mustRel(t, root, path)), token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestInterpretReportDomainUsesNeutralModelFields(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "report")
+	forbiddenTokens := []string{
+		"scaleName",
+		"scaleCode",
+		"ScaleName()",
+		"ScaleCode()",
+		"ScaleName string",
+		"ScaleCode string",
+	}
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		base := filepath.Base(path)
+		if base == "events.go" {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; InterpretReport aggregate should use neutral model fields", filepath.ToSlash(mustRel(t, root, path)), token)
 			}
 		}
 		return nil
