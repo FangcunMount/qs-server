@@ -16,6 +16,7 @@ import (
 type RepositoryResolver struct {
 	scaleCatalog port.ScaleCatalog
 	sbtiCatalog  port.SBTIModelCatalog
+	mbtiCatalog  port.MBTIModelCatalog
 	providers    *ModelInputProviderRegistry
 }
 
@@ -33,13 +34,19 @@ func NewRepositoryResolver(
 	if err != nil {
 		return nil, err
 	}
+	mbtiCatalog, err := NewDefaultMBTIModelCatalog()
+	if err != nil {
+		return nil, err
+	}
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
-	return NewResolverWithSBTI(
+	return NewResolverWithEmbeddedModels(
 		scaleCatalog,
 		sbtiCatalog,
+		mbtiCatalog,
 		NewScaleModelInputProvider(scaleCatalog, answerSheetReader, questionnaireReader),
 		NewSBTIModelInputProvider(sbtiCatalog, answerSheetReader, questionnaireReader),
+		NewMBTIModelInputProvider(mbtiCatalog, answerSheetReader, questionnaireReader),
 	)
 }
 
@@ -47,7 +54,7 @@ func NewResolver(
 	scaleCatalog port.ScaleModelCatalog,
 	providers ...ModelInputProvider,
 ) (*RepositoryResolver, error) {
-	return newResolver(scaleCatalog, nil, providers...)
+	return newResolver(scaleCatalog, nil, nil, providers...)
 }
 
 func NewResolverWithSBTI(
@@ -55,12 +62,22 @@ func NewResolverWithSBTI(
 	sbtiCatalog port.SBTIModelCatalog,
 	providers ...ModelInputProvider,
 ) (*RepositoryResolver, error) {
-	return newResolver(scaleCatalog, sbtiCatalog, providers...)
+	return newResolver(scaleCatalog, sbtiCatalog, nil, providers...)
+}
+
+func NewResolverWithEmbeddedModels(
+	scaleCatalog port.ScaleModelCatalog,
+	sbtiCatalog port.SBTIModelCatalog,
+	mbtiCatalog port.MBTIModelCatalog,
+	providers ...ModelInputProvider,
+) (*RepositoryResolver, error) {
+	return newResolver(scaleCatalog, sbtiCatalog, mbtiCatalog, providers...)
 }
 
 func newResolver(
 	scaleCatalog port.ScaleModelCatalog,
 	sbtiCatalog port.SBTIModelCatalog,
+	mbtiCatalog port.MBTIModelCatalog,
 	providers ...ModelInputProvider,
 ) (*RepositoryResolver, error) {
 	providerRegistry, err := NewModelInputProviderRegistry(providers...)
@@ -70,6 +87,7 @@ func newResolver(
 	return &RepositoryResolver{
 		scaleCatalog: scaleCatalog,
 		sbtiCatalog:  sbtiCatalog,
+		mbtiCatalog:  mbtiCatalog,
 		providers:    providerRegistry,
 	}, nil
 }
@@ -104,6 +122,13 @@ func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, c
 		return nil, fmt.Errorf("sbti model catalog is not configured")
 	}
 	return r.sbtiCatalog.FindSBTIModelByQuestionnaire(ctx, code, version)
+}
+
+func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*port.MBTIModelSnapshot, error) {
+	if r == nil || r.mbtiCatalog == nil {
+		return nil, fmt.Errorf("mbti model catalog is not configured")
+	}
+	return r.mbtiCatalog.FindMBTIModelByQuestionnaire(ctx, code, version)
 }
 
 type ModelInputProvider interface {

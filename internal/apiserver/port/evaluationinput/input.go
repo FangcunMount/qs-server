@@ -19,6 +19,12 @@ const (
 	DefaultSBTIModelTitle         = "SBTI 趣味人格测评"
 	DefaultSBTIQuestionnaireCode  = "SBTI_FUN"
 	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
+
+	DefaultMBTIModelCode          = "MBTI_OEJTS"
+	DefaultMBTIModelVersion       = "1.0.0"
+	DefaultMBTIModelTitle         = "MBTI 人格类型测评（OEJTS）"
+	DefaultMBTIQuestionnaireCode  = "MBTI_OEJTS"
+	DefaultMBTIQuestionnaireTitle = "MBTI 人格类型测评（OEJTS 32题）"
 )
 
 func (k EvaluationModelKind) String() string {
@@ -144,6 +150,114 @@ func SBTIPayload(input *InputSnapshot) (*SBTIModelSnapshot, bool) {
 		}
 	}
 	return nil, false
+}
+
+func NewMBTIModelSnapshot(model *MBTIModelSnapshot) *ModelSnapshot {
+	if model == nil {
+		return nil
+	}
+	return &ModelSnapshot{
+		Kind:    EvaluationModelKindMBTI,
+		Code:    model.Code,
+		Version: model.Version,
+		Title:   model.Title,
+		Payload: MBTIModelPayload{Model: model},
+	}
+}
+
+type MBTIModelPayload struct {
+	Model *MBTIModelSnapshot `json:"model"`
+}
+
+func (MBTIModelPayload) ModelKind() EvaluationModelKind {
+	return EvaluationModelKindMBTI
+}
+
+func MBTIPayload(input *InputSnapshot) (*MBTIModelSnapshot, bool) {
+	if input == nil {
+		return nil, false
+	}
+	if payload, ok := input.ModelPayload.(MBTIModelPayload); ok && payload.Model != nil {
+		return payload.Model, true
+	}
+	if input.Model != nil {
+		if payload, ok := input.Model.Payload.(MBTIModelPayload); ok && payload.Model != nil {
+			return payload.Model, true
+		}
+	}
+	return nil, false
+}
+
+type MBTIModelSnapshot struct {
+	Code                 string                        `json:"code"`
+	Version              string                        `json:"version"`
+	Title                string                        `json:"title"`
+	QuestionnaireCode    string                        `json:"questionnaire_code"`
+	QuestionnaireVersion string                        `json:"questionnaire_version"`
+	Status               string                        `json:"status"`
+	Source               MBTISourceSnapshot            `json:"source"`
+	DimensionOrder       []string                      `json:"dimension_order"`
+	Dimensions           map[string]MBTIDimensionSnapshot `json:"dimensions"`
+	QuestionMappings     []MBTIQuestionMappingSnapshot `json:"question_mappings"`
+	TypeProfiles         []MBTITypeProfileSnapshot     `json:"type_profiles"`
+}
+
+func (m *MBTIModelSnapshot) IsPublished() bool {
+	return m != nil && (m.Status == "" || m.Status == "published")
+}
+
+func (m *MBTIModelSnapshot) MatchesQuestionnaire(code, version string) bool {
+	if m == nil || m.QuestionnaireCode != code {
+		return false
+	}
+	return m.QuestionnaireVersion == "" || version == "" || m.QuestionnaireVersion == version
+}
+
+func (m *MBTIModelSnapshot) FindTypeProfile(typeCode string) (MBTITypeProfileSnapshot, bool) {
+	if m == nil {
+		return MBTITypeProfileSnapshot{}, false
+	}
+	for _, profile := range m.TypeProfiles {
+		if profile.TypeCode == typeCode {
+			return profile, true
+		}
+	}
+	return MBTITypeProfileSnapshot{}, false
+}
+
+type MBTISourceSnapshot struct {
+	QuestionsRepo string `json:"questions_repo"`
+	SourceSite    string `json:"source_site"`
+	License       string `json:"license"`
+	Attribution   string `json:"attribution"`
+	NonCommercial bool   `json:"non_commercial"`
+}
+
+type MBTIDimensionSnapshot struct {
+	Code       string  `json:"code"`
+	Name       string  `json:"name"`
+	LeftPole   string  `json:"left_pole"`
+	RightPole  string  `json:"right_pole"`
+	Constant   float64 `json:"constant"`
+	Threshold  float64 `json:"threshold"`
+}
+
+type MBTIQuestionMappingSnapshot struct {
+	QuestionCode string  `json:"question_code"`
+	Dimension    string  `json:"dimension"`
+	Sign         float64 `json:"sign"`
+}
+
+type MBTITypeProfileSnapshot struct {
+	TypeCode    string   `json:"type_code"`
+	TypeName    string   `json:"type_name"`
+	OneLiner    string   `json:"one_liner"`
+	Summary     string   `json:"summary"`
+	Traits      []string `json:"traits"`
+	Strengths   []string `json:"strengths"`
+	Weaknesses  []string `json:"weaknesses"`
+	Suggestions []string `json:"suggestions"`
+	ImageURL    string   `json:"image_url"`
 }
 
 type SBTIModelSnapshot struct {
@@ -334,6 +448,11 @@ type ScaleModelCatalog interface {
 type SBTIModelCatalog interface {
 	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*SBTIModelSnapshot, error)
 	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*SBTIModelSnapshot, error)
+}
+
+type MBTIModelCatalog interface {
+	GetMBTIModelByRef(ctx context.Context, ref ModelRef) (*MBTIModelSnapshot, error)
+	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*MBTIModelSnapshot, error)
 }
 
 type AnswerSheetReader interface {

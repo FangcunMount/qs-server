@@ -219,7 +219,28 @@ func buildCreateAssessmentDTO(
 		dto.OriginID = &req.OriginId
 	}
 	applySBTIModelContext(req, &dto)
+	applyMBTIModelContext(req, &dto)
 	return dto
+}
+
+func applyMBTIModelContext(req *pb.CreateAssessmentFromAnswerSheetRequest, dto *assessmentApp.CreateAssessmentDTO) {
+	if req == nil || dto == nil || dto.MedicalScaleID != nil {
+		return
+	}
+	if dto.ModelCode != nil {
+		return
+	}
+	if req.QuestionnaireCode != evaluationinput.DefaultMBTIQuestionnaireCode {
+		return
+	}
+	kind := evaluationinput.EvaluationModelKindMBTI.String()
+	code := evaluationinput.DefaultMBTIModelCode
+	version := evaluationinput.DefaultMBTIModelVersion
+	title := evaluationinput.DefaultMBTIModelTitle
+	dto.ModelKind = &kind
+	dto.ModelCode = &code
+	dto.ModelVersion = &version
+	dto.ModelTitle = &title
 }
 
 func applySBTIModelContext(req *pb.CreateAssessmentFromAnswerSheetRequest, dto *assessmentApp.CreateAssessmentDTO) {

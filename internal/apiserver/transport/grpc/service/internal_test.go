@@ -95,6 +95,56 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	}
 }
 
+func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    evaluationinput.DefaultMBTIQuestionnaireCode,
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+
+	dto := buildCreateAssessmentDTO(req, assessmentScaleContext{})
+	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindMBTI.String() {
+		t.Fatalf("ModelKind = %#v, want mbti", dto.ModelKind)
+	}
+	if dto.ModelCode == nil || *dto.ModelCode != evaluationinput.DefaultMBTIModelCode {
+		t.Fatalf("ModelCode = %#v, want MBTI_OEJTS", dto.ModelCode)
+	}
+	if dto.ModelVersion == nil || *dto.ModelVersion != evaluationinput.DefaultMBTIModelVersion {
+		t.Fatalf("ModelVersion = %#v, want %s", dto.ModelVersion, evaluationinput.DefaultMBTIModelVersion)
+	}
+	if dto.ModelTitle == nil || *dto.ModelTitle != evaluationinput.DefaultMBTIModelTitle {
+		t.Fatalf("ModelTitle = %#v, want %s", dto.ModelTitle, evaluationinput.DefaultMBTIModelTitle)
+	}
+	if !shouldAutoSubmitAssessment(dto) {
+		t.Fatal("shouldAutoSubmitAssessment() = false, want true for MBTI model")
+	}
+}
+
+func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    evaluationinput.DefaultMBTIQuestionnaireCode,
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+	scaleCtx := assessmentScaleContext{
+		medicalScaleID:   uint64Ptr(8),
+		medicalScaleCode: stringPtr("SCL-001"),
+		medicalScaleName: stringPtr("Scale"),
+	}
+
+	dto := buildCreateAssessmentDTO(req, scaleCtx)
+	if dto.ModelCode != nil {
+		t.Fatalf("ModelCode = %#v, want nil when scale is bound", dto.ModelCode)
+	}
+	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
+		t.Fatalf("MedicalScaleID = %#v, want 8", dto.MedicalScaleID)
+	}
+}
+
 func TestValidateBootstrapOperatorRequest(t *testing.T) {
 	svc := &InternalService{
 		operatorLifecycleService: &bootstrapLifecycleServiceStub{},

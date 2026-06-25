@@ -1,0 +1,555 @@
+{
+  "code": "MBTI_OEJTS",
+  "version": "1.0.0",
+  "title": "MBTI 人格类型测评（OEJTS）",
+  "questionnaire_code": "MBTI_OEJTS",
+  "questionnaire_version": "1.0.0",
+  "status": "published",
+  "source": {
+    "questions_repo": "https://github.com/openjung/core",
+    "source_site": "https://openpsychometrics.org/tests/OEJTS/",
+    "license": "CC BY-NC-SA 4.0 (OEJTS items); MIT (openjung/core translations)",
+    "attribution": "题目基于 Open Extended Jungian Type Scales 1.2 (Eric Jorgenson / Open Psychometrics)；中文题干来自 openjung/core。16 型画像为原创简版。",
+    "non_commercial": true
+  },
+  "dimension_order": [
+    "EI",
+    "SN",
+    "TF",
+    "JP"
+  ],
+  "dimensions": {
+    "EI": {
+      "code": "EI",
+      "name": "外向 / 内向",
+      "left_pole": "I",
+      "right_pole": "E",
+      "constant": 30,
+      "threshold": 24
+    },
+    "SN": {
+      "code": "SN",
+      "name": "感觉 / 直觉",
+      "left_pole": "S",
+      "right_pole": "N",
+      "constant": 12,
+      "threshold": 24
+    },
+    "TF": {
+      "code": "TF",
+      "name": "情感 / 思考",
+      "left_pole": "F",
+      "right_pole": "T",
+      "constant": 30,
+      "threshold": 24
+    },
+    "JP": {
+      "code": "JP",
+      "name": "判断 / 知觉",
+      "left_pole": "J",
+      "right_pole": "P",
+      "constant": 18,
+      "threshold": 24
+    }
+  },
+  "question_mappings": [
+    {
+      "question_code": "MBTI_Q01",
+      "dimension": "JP",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q02",
+      "dimension": "TF",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q03",
+      "dimension": "EI",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q04",
+      "dimension": "SN",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q05",
+      "dimension": "JP",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q06",
+      "dimension": "TF",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q07",
+      "dimension": "EI",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q08",
+      "dimension": "SN",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q09",
+      "dimension": "JP",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q10",
+      "dimension": "TF",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q11",
+      "dimension": "EI",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q12",
+      "dimension": "SN",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q13",
+      "dimension": "JP",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q14",
+      "dimension": "TF",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q15",
+      "dimension": "EI",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q16",
+      "dimension": "SN",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q17",
+      "dimension": "JP",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q18",
+      "dimension": "TF",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q19",
+      "dimension": "EI",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q20",
+      "dimension": "SN",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q21",
+      "dimension": "JP",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q22",
+      "dimension": "TF",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q23",
+      "dimension": "EI",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q24",
+      "dimension": "SN",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q25",
+      "dimension": "JP",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q26",
+      "dimension": "TF",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q27",
+      "dimension": "EI",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q28",
+      "dimension": "SN",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q29",
+      "dimension": "JP",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q30",
+      "dimension": "TF",
+      "sign": -1
+    },
+    {
+      "question_code": "MBTI_Q31",
+      "dimension": "EI",
+      "sign": 1
+    },
+    {
+      "question_code": "MBTI_Q32",
+      "dimension": "SN",
+      "sign": 1
+    }
+  ],
+  "type_profiles": [
+    {
+      "type_code": "INTJ",
+      "type_name": "建筑师",
+      "one_liner": "独立战略家，善于长远规划与系统思考。",
+      "summary": "理性、独立、有远见",
+      "traits": [
+        "理性",
+        "独立",
+        "有远见"
+      ],
+      "strengths": [
+        "逻辑严密、执行力强、标准高"
+      ],
+      "weaknesses": [
+        "可能显得冷漠或过于挑剔"
+      ],
+      "suggestions": [
+        "把宏大目标拆成小步，定期与信任的人交流进展。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "INTP",
+      "type_name": "逻辑学家",
+      "one_liner": "好奇的思想家，热衷探索原理与可能性。",
+      "summary": "分析力强、开放、独创",
+      "traits": [
+        "分析力强",
+        "开放",
+        "独创"
+      ],
+      "strengths": [
+        "善于发现问题本质、学习快"
+      ],
+      "weaknesses": [
+        "容易拖延、不善表达情感"
+      ],
+      "suggestions": [
+        "为想法设定截止日期，选一个项目先做完。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ENTJ",
+      "type_name": "指挥官",
+      "one_liner": "天生的组织者，推动团队向目标前进。",
+      "summary": "果断、自信、高效",
+      "traits": [
+        "果断",
+        "自信",
+        "高效"
+      ],
+      "strengths": [
+        "领导力强、善于统筹资源"
+      ],
+      "weaknesses": [
+        "可能显得强势、忽略他人感受"
+      ],
+      "suggestions": [
+        "决策前多问一句「别人需要什么」。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ENTP",
+      "type_name": "辩论家",
+      "one_liner": "点子多多，喜欢挑战现状和头脑风暴。",
+      "summary": "机智、灵活、爱争辩",
+      "traits": [
+        "机智",
+        "灵活",
+        "爱争辩"
+      ],
+      "strengths": [
+        "创新、适应快、口才好"
+      ],
+      "weaknesses": [
+        "容易分心、不喜例行公事"
+      ],
+      "suggestions": [
+        "把创意落到一件可交付的小事上。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "INFJ",
+      "type_name": "提倡者",
+      "one_liner": "理想主义者，关注意义与他人成长。",
+      "summary": "洞察力强、有原则、温和",
+      "traits": [
+        "洞察力强",
+        "有原则",
+        "温和"
+      ],
+      "strengths": [
+        "善于倾听、能激励他人"
+      ],
+      "weaknesses": [
+        "易过度承担、难说「不」"
+      ],
+      "suggestions": [
+        "保护自己的精力，把理想写成可执行清单。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "INFP",
+      "type_name": "调停者",
+      "one_liner": "内心丰富，追求价值一致与真诚连接。",
+      "summary": "敏感、理想化、有创意",
+      "traits": [
+        "敏感",
+        "理想化",
+        "有创意"
+      ],
+      "strengths": [
+        "共情强、忠于信念"
+      ],
+      "weaknesses": [
+        "易逃避冲突、易自我怀疑"
+      ],
+      "suggestions": [
+        "小步行动，让价值观体现在日常选择里。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ENFJ",
+      "type_name": "主人公",
+      "one_liner": "善于凝聚人心，关心群体和谐与成长。",
+      "summary": "热情、负责、善沟通",
+      "traits": [
+        "热情",
+        "负责",
+        "善沟通"
+      ],
+      "strengths": [
+        "鼓舞他人、组织力强"
+      ],
+      "weaknesses": [
+        "易过度取悦、忽略自己需求"
+      ],
+      "suggestions": [
+        "每周留时间只给自己，不必时刻当「桥梁」。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ENFP",
+      "type_name": "竞选者",
+      "one_liner": "热情开朗，对新体验和人充满好奇。",
+      "summary": "外向、想象力丰富、乐观",
+      "traits": [
+        "外向",
+        "想象力丰富",
+        "乐观"
+      ],
+      "strengths": [
+        "感染力强、善于联结人"
+      ],
+      "weaknesses": [
+        "易三分钟热度、难坚持细节"
+      ],
+      "suggestions": [
+        "用清单管住一件长期事，其余随意。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ISTJ",
+      "type_name": "物流师",
+      "one_liner": "务实可靠，重视责任、秩序与事实。",
+      "summary": "严谨、守信、有条理",
+      "traits": [
+        "严谨",
+        "守信",
+        "有条理"
+      ],
+      "strengths": [
+        "稳定、细致、能扛事"
+      ],
+      "weaknesses": [
+        "可能固执、不喜突变"
+      ],
+      "suggestions": [
+        "重大变化时给自己适应期，再行动。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ISFJ",
+      "type_name": "守卫者",
+      "one_liner": "默默付出，守护身边人的安稳与幸福。",
+      "summary": "体贴、忠诚、细心",
+      "traits": [
+        "体贴",
+        "忠诚",
+        "细心"
+      ],
+      "strengths": [
+        "可靠、记性好、愿帮忙"
+      ],
+      "weaknesses": [
+        "易压抑需求、怕让人失望"
+      ],
+      "suggestions": [
+        "练习直接说出自己的需要。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ESTJ",
+      "type_name": "总经理",
+      "one_liner": "讲究效率与规则，善于把事情办妥。",
+      "summary": "务实、直接、有组织",
+      "traits": [
+        "务实",
+        "直接",
+        "有组织"
+      ],
+      "strengths": [
+        "执行力强、标准清晰"
+      ],
+      "weaknesses": [
+        "可能显得刻板、不够柔软"
+      ],
+      "suggestions": [
+        "倾听不同意见后再拍板。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ESFJ",
+      "type_name": "执政官",
+      "one_liner": "重视关系与氛围，乐于照顾他人感受。",
+      "summary": "热心、合群、体贴",
+      "traits": [
+        "热心",
+        "合群",
+        "体贴"
+      ],
+      "strengths": [
+        "善于协调、让人安心"
+      ],
+      "weaknesses": [
+        "易过度在意评价、难拒绝"
+      ],
+      "suggestions": [
+        "把「对别人好」和「对自己好」放在同等位置。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ISTP",
+      "type_name": "鉴赏家",
+      "one_liner": "冷静动手派，擅长拆解问题并现场解决。",
+      "summary": "冷静、灵活、独立",
+      "traits": [
+        "冷静",
+        "灵活",
+        "独立"
+      ],
+      "strengths": [
+        "动手能力强、临危不乱"
+      ],
+      "weaknesses": [
+        "可能显得疏离、不喜空谈"
+      ],
+      "suggestions": [
+        "重要决定写下来，避免纯凭当下感觉。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ISFP",
+      "type_name": "探险家",
+      "one_liner": "温和艺术家气质，活在当下的感受与美感里。",
+      "summary": "温和、敏感、随和",
+      "traits": [
+        "温和",
+        "敏感",
+        "随和"
+      ],
+      "strengths": [
+        "审美好、包容、真实"
+      ],
+      "weaknesses": [
+        "易回避压力、不喜规划"
+      ],
+      "suggestions": [
+        "给喜欢的事留固定时间块。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ESTP",
+      "type_name": "企业家",
+      "one_liner": "行动派，喜欢现场应变与直接体验。",
+      "summary": "大胆、现实、精力充沛",
+      "traits": [
+        "大胆",
+        "现实",
+        "精力充沛"
+      ],
+      "strengths": [
+        "反应快、敢冒险、善谈判"
+      ],
+      "weaknesses": [
+        "易冲动、厌倦理论"
+      ],
+      "suggestions": [
+        "大决定前停 24 小时再确认。"
+      ],
+      "image_url": ""
+    },
+    {
+      "type_code": "ESFP",
+      "type_name": "表演者",
+      "one_liner": "活力四射，享受当下、人群与感官体验。",
+      "summary": "外向、风趣、热情",
+      "traits": [
+        "外向",
+        "风趣",
+        "热情"
+      ],
+      "strengths": [
+        "让人开心、适应力强"
+      ],
+      "weaknesses": [
+        "易逃避枯燥、难做长期计划"
+      ],
+      "suggestions": [
+        "把必须完成的事和玩乐分开排期。"
+      ],
+      "image_url": ""
+    }
+  ]
+}

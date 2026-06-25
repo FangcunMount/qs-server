@@ -168,7 +168,7 @@ const (
 	// EvaluationModelKindScale 医学/心理量表模型。
 	EvaluationModelKindScale EvaluationModelKind = "scale"
 
-	// EvaluationModelKindMBTI MBTI 人格模型，当前仅预留扩展点。
+	// EvaluationModelKindMBTI MBTI 人格模型（OEJTS 轻量实现）。
 	EvaluationModelKindMBTI EvaluationModelKind = "mbti"
 
 	// EvaluationModelKindSBTI SBTI 趣味人格模型。

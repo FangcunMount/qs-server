@@ -1,0 +1,1066 @@
+{
+  "code": "MBTI_OEJTS",
+  "version": "1.0.0",
+  "title": "MBTI 人格类型测评（OEJTS 32题）",
+  "description": "基于 Open Extended Jungian Type Scales 1.2 的 32 题人格类型测评，结果兼容 MBTI 四字母类型。仅供娱乐与自我探索，非官方 MBTI 评估。",
+  "img_url": "",
+  "type": "Survey",
+  "questions": [
+    {
+      "code": "MBTI_Q01",
+      "stem": "你如何记录任务？\n（更偏向：制定清单 ← 1 · 2 · 3 · 4 · 5 → 依靠记忆）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q02",
+      "stem": "你如何看待新信息？\n（更偏向：愿意相信 ← 1 · 2 · 3 · 4 · 5 → 持怀疑态度）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q03",
+      "stem": "你对独处有什么感受？\n（更偏向：独处时感到无聊 ← 1 · 2 · 3 · 4 · 5 → 需要独处时间）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q04",
+      "stem": "你如何看待现状？\n（更偏向：接受事物的本来面目 ← 1 · 2 · 3 · 4 · 5 → 对现状不满足）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q05",
+      "stem": "你如何整理空间？\n（更偏向：保持房间整洁 ← 1 · 2 · 3 · 4 · 5 → 随手放置东西）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q06",
+      "stem": "你如何看待逻辑思维？\n（更偏向：认为\"像机器人\"是侮辱 ← 1 · 2 · 3 · 4 · 5 → 追求机械般的思维）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q07",
+      "stem": "你的能量状态如何？\n（更偏向：精力充沛 ← 1 · 2 · 3 · 4 · 5 → 平静温和）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q08",
+      "stem": "你喜欢什么类型的考试？\n（更偏向：喜欢选择题 ← 1 · 2 · 3 · 4 · 5 → 喜欢论述题）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q09",
+      "stem": "你如何形容自己的生活方式？\n（更偏向：有条理 ← 1 · 2 · 3 · 4 · 5 → 随性混乱）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q10",
+      "stem": "你如何应对批评？\n（更偏向：容易受伤 ← 1 · 2 · 3 · 4 · 5 → 脸皮厚）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q11",
+      "stem": "你在什么环境下工作最好？\n（更偏向：在团队中表现最佳 ← 1 · 2 · 3 · 4 · 5 → 独自工作表现最佳）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q12",
+      "stem": "你的时间焦点在哪里？\n（更偏向：关注过去 ← 1 · 2 · 3 · 4 · 5 → 关注未来）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q13",
+      "stem": "你何时制定计划？\n（更偏向：提前规划 ← 1 · 2 · 3 · 4 · 5 → 最后一刻才计划）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q14",
+      "stem": "你希望从他人那里得到什么？\n（更偏向：渴望他人的爱 ← 1 · 2 · 3 · 4 · 5 → 渴望他人的尊重）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q15",
+      "stem": "聚会让你感觉如何？\n（更偏向：因聚会而兴奋 ← 1 · 2 · 3 · 4 · 5 → 因聚会而疲惫）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q16",
+      "stem": "在群体中，你倾向于...\n（更偏向：融入群体 ← 1 · 2 · 3 · 4 · 5 → 与众不同）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q17",
+      "stem": "你如何做决定？\n（更偏向：做出承诺 ← 1 · 2 · 3 · 4 · 5 → 保留选择）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q18",
+      "stem": "你想擅长什么？\n（更偏向：想擅长帮助他人 ← 1 · 2 · 3 · 4 · 5 → 想擅长修理事物）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q19",
+      "stem": "在交谈中，你更倾向于...\n（更偏向：话比较多 ← 1 · 2 · 3 · 4 · 5 → 更善于倾听）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q20",
+      "stem": "讲故事时，你会...\n（更偏向：描述发生了什么 ← 1 · 2 · 3 · 4 · 5 → 描述这意味着什么）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q21",
+      "stem": "你何时完成任务？\n（更偏向：立即完成工作 ← 1 · 2 · 3 · 4 · 5 → 拖延）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q22",
+      "stem": "你如何做决定？\n（更偏向：跟随内心 ← 1 · 2 · 3 · 4 · 5 → 跟随理性）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q23",
+      "stem": "周末你更喜欢做什么？\n（更偏向：喜欢外出活动 ← 1 · 2 · 3 · 4 · 5 → 喜欢待在家里）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q24",
+      "stem": "学习新事物时，你想要什么？\n（更偏向：想要细节 ← 1 · 2 · 3 · 4 · 5 → 想要大局观）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q25",
+      "stem": "你如何应对新情况？\n（更偏向：提前准备 ← 1 · 2 · 3 · 4 · 5 → 即兴发挥）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q26",
+      "stem": "道德的基础是什么？\n（更偏向：道德基于同情 ← 1 · 2 · 3 · 4 · 5 → 道德基于正义）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q27",
+      "stem": "你的自然音量如何？\n（更偏向：自然而然大声说话 ← 1 · 2 · 3 · 4 · 5 → 很难大声喊叫）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q28",
+      "stem": "你如何获取知识？\n（更偏向：经验主义 ← 1 · 2 · 3 · 4 · 5 → 理论主义）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q29",
+      "stem": "什么更能驱动你？\n（更偏向：努力工作 ← 1 · 2 · 3 · 4 · 5 → 尽情玩乐）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q30",
+      "stem": "你如何看待情感？\n（更偏向：重视情感 ← 1 · 2 · 3 · 4 · 5 → 对情感感到不自在）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q31",
+      "stem": "你对成为焦点有什么感受？\n（更偏向：喜欢表演 ← 1 · 2 · 3 · 4 · 5 → 避免公开演讲）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "MBTI_Q32",
+      "stem": "什么问题最让你感兴趣？\n（更偏向：想知道\"谁/什么/何时\" ← 1 · 2 · 3 · 4 · 5 → 想知道\"为什么\"）",
+      "type": "Radio",
+      "required": true,
+      "options": [
+        {
+          "code": "1",
+          "content": "非常符合左侧",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较符合左侧",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合右侧",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合右侧",
+          "score": 5.0
+        }
+      ]
+    }
+  ]
+}
