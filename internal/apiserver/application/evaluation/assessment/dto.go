@@ -108,6 +108,28 @@ type ReportResult struct {
 	Dimensions   []DimensionResult // 维度解读列表
 	Suggestions  []SuggestionDTO   // 建议列表
 	CreatedAt    time.Time         // 创建时间
+	ModelExtra   *ModelExtraResult // 解释模型扩展（SBTI 等）
+}
+
+// ModelExtraResult 解释模型扩展结果
+type ModelExtraResult struct {
+	Kind           string             `json:"kind,omitempty"`
+	TypeCode       string             `json:"type_code,omitempty"`
+	TypeName       string             `json:"type_name,omitempty"`
+	OneLiner       string             `json:"one_liner,omitempty"`
+	ImageURL       string             `json:"image_url,omitempty"`
+	MatchPercent   float64            `json:"match_percent,omitempty"`
+	IsSpecial      bool               `json:"is_special,omitempty"`
+	SpecialTrigger string             `json:"special_trigger,omitempty"`
+	Commentary     string             `json:"commentary,omitempty"`
+	Rarity         *ModelRarityResult `json:"rarity,omitempty"`
+}
+
+// ModelRarityResult 理论稀有度
+type ModelRarityResult struct {
+	Percent float64 `json:"percent,omitempty"`
+	Label   string  `json:"label,omitempty"`
+	OneInX  int     `json:"one_in_x,omitempty"`
 }
 
 // DimensionResult 维度解读结果

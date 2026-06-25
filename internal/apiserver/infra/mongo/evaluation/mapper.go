@@ -46,6 +46,7 @@ func (m *ReportMapper) ToPO(domain *report.InterpretReport, testeeID uint64) *In
 		Conclusion:  domain.Conclusion(),
 		Dimensions:  dimensions,
 		Suggestions: toSuggestionPOs(domain.Suggestions()),
+		ModelExtra:  toModelExtraPO(domain.ModelExtra()),
 	}
 
 	// 设置 DomainID（与 AssessmentID 一致）
@@ -91,6 +92,7 @@ func (m *ReportMapper) ToDomain(po *InterpretReportPO) *report.InterpretReport {
 		po.Conclusion,
 		dimensions,
 		toDomainSuggestions(po.Suggestions),
+		toDomainModelExtra(po.ModelExtra),
 		po.CreatedAt,
 		updatedAt,
 	)
@@ -134,6 +136,59 @@ func toDomainSuggestions(items []SuggestionPO) []report.Suggestion {
 		}
 	}
 	return result
+}
+
+func toModelExtraPO(extra *report.ModelExtra) *ModelExtraPO {
+	if extra == nil || extra.IsEmpty() {
+		return nil
+	}
+	po := &ModelExtraPO{
+		Kind:           extra.Kind,
+		TypeCode:       extra.TypeCode,
+		TypeName:       extra.TypeName,
+		OneLiner:       extra.OneLiner,
+		ImageURL:       extra.ImageURL,
+		MatchPercent:   extra.MatchPercent,
+		IsSpecial:      extra.IsSpecial,
+		SpecialTrigger: extra.SpecialTrigger,
+		Commentary:     extra.Commentary,
+	}
+	if extra.Rarity != nil {
+		po.Rarity = &ModelRarityPO{
+			Percent: extra.Rarity.Percent,
+			Label:   extra.Rarity.Label,
+			OneInX:  extra.Rarity.OneInX,
+		}
+	}
+	return po
+}
+
+func toDomainModelExtra(po *ModelExtraPO) *report.ModelExtra {
+	if po == nil {
+		return nil
+	}
+	extra := &report.ModelExtra{
+		Kind:           po.Kind,
+		TypeCode:       po.TypeCode,
+		TypeName:       po.TypeName,
+		OneLiner:       po.OneLiner,
+		ImageURL:       po.ImageURL,
+		MatchPercent:   po.MatchPercent,
+		IsSpecial:      po.IsSpecial,
+		SpecialTrigger: po.SpecialTrigger,
+		Commentary:     po.Commentary,
+	}
+	if po.Rarity != nil {
+		extra.Rarity = &report.ModelRarity{
+			Percent: po.Rarity.Percent,
+			Label:   po.Rarity.Label,
+			OneInX:  po.Rarity.OneInX,
+		}
+	}
+	if extra.IsEmpty() {
+		return nil
+	}
+	return extra
 }
 
 // ToDomainList 批量转换持久化对象为领域对象

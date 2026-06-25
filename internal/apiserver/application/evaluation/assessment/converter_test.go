@@ -22,6 +22,7 @@ func TestToReportResultIncludesCreatedAt(t *testing.T) {
 		"总体症状负担中度偏高，控制不理想。",
 		nil,
 		nil,
+		nil,
 		createdAt,
 		nil,
 	)

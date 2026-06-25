@@ -118,6 +118,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 			"ok",
 			nil,
 			nil,
+			nil,
 		),
 	})
 	if err != nil {
@@ -200,7 +201,7 @@ func TestWriterReportSaveFailureDoesNotPersistInterpretedAssessment(t *testing.T
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
 	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
 		order: &order,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil),
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil),
 	})
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	writer, err := NewWriter(
@@ -238,7 +239,7 @@ func TestWriterScoreProjectionFailureKeepsAssessmentUninterpreted(t *testing.T) 
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(scoreRepo))
 	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
 		order: &order,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil),
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil),
 	})
 	assessmentRepo := &resultAssessmentRepoStub{order: &order}
 	notifier := &resultNotifierStub{order: &order}
@@ -279,7 +280,7 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 	scoreProjectors, _ := NewScoreProjectorRegistry(NewScaleScoreProjector(&resultScoreRepoStub{order: &order}))
 	reportBuilders, _ := NewReportBuilderRegistry(&resultReportBuilderStub{
 		order: &order,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil),
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "Scale", "S-001", 7, domainReport.RiskLevelLow, "ok", nil, nil, nil),
 	})
 	assessmentRepo := &resultAssessmentRepoStub{order: &order, err: saveErr}
 	notifier := &resultNotifierStub{order: &order}
@@ -339,7 +340,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 	reportBuilders, err := NewReportBuilderRegistry(&resultReportBuilderStub{
 		order: &order,
 		kind:  assessment.EvaluationModelKindMBTI,
-		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil),
+		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil),
 	})
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)

@@ -42,6 +42,7 @@ func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) 
 		reportConclusion(detail),
 		reportDimensions(detail),
 		reportSuggestions(detail),
+		reportModelExtra(detail),
 	), nil
 }
 
@@ -124,15 +125,33 @@ func reportSuggestions(detail ResultDetail) []domainReport.Suggestion {
 		})
 	}
 	add(detail.Outcome.Commentary)
-	if detail.Rarity.Percent > 0 {
-		add(fmt.Sprintf("理论稀有度：%.2f%%（%s，约每 %d 人 1 个）。", detail.Rarity.Percent, detail.Rarity.Label, detail.Rarity.OneInX))
-	}
-	add("结果图片：" + detail.ImageURL)
-	if detail.SpecialTrigger != "" {
-		add("特殊触发：" + detail.SpecialTrigger)
-	}
 	if detail.Source.Attribution != "" {
 		add(fmt.Sprintf("来源与授权：%s；License: %s；非商业使用: %t。", detail.Source.Attribution, detail.Source.License, detail.Source.NonCommercial))
 	}
 	return suggestions
+}
+
+func reportModelExtra(detail ResultDetail) *domainReport.ModelExtra {
+	extra := &domainReport.ModelExtra{
+		Kind:           "sbti",
+		TypeCode:       detail.TypeCode,
+		TypeName:       detail.TypeName,
+		OneLiner:       detail.OneLiner,
+		ImageURL:       detail.ImageURL,
+		MatchPercent:   detail.Similarity * 100,
+		IsSpecial:      detail.Outcome.IsSpecial,
+		SpecialTrigger: detail.SpecialTrigger,
+		Commentary:     detail.Outcome.Commentary,
+	}
+	if detail.Rarity.Percent > 0 || detail.Rarity.Label != "" || detail.Rarity.OneInX > 0 {
+		extra.Rarity = &domainReport.ModelRarity{
+			Percent: detail.Rarity.Percent,
+			Label:   detail.Rarity.Label,
+			OneInX:  detail.Rarity.OneInX,
+		}
+	}
+	if extra.IsEmpty() {
+		return nil
+	}
+	return extra
 }

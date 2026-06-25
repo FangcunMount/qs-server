@@ -34,6 +34,9 @@ type InterpretReportPO struct {
 
 	// 建议列表
 	Suggestions []SuggestionPO `bson:"suggestions" json:"suggestions"`
+
+	// 解释模型扩展（SBTI 等人格类测评）
+	ModelExtra *ModelExtraPO `bson:"model_extra,omitempty" json:"model_extra,omitempty"`
 }
 
 // DimensionInterpretPO 维度解读持久化对象
@@ -52,6 +55,27 @@ type SuggestionPO struct {
 	Category   string  `bson:"category" json:"category"`
 	Content    string  `bson:"content" json:"content"`
 	FactorCode *string `bson:"factor_code,omitempty" json:"factor_code,omitempty"`
+}
+
+// ModelExtraPO 解释模型扩展持久化对象
+type ModelExtraPO struct {
+	Kind           string         `bson:"kind,omitempty" json:"kind,omitempty"`
+	TypeCode       string         `bson:"type_code,omitempty" json:"type_code,omitempty"`
+	TypeName       string         `bson:"type_name,omitempty" json:"type_name,omitempty"`
+	OneLiner       string         `bson:"one_liner,omitempty" json:"one_liner,omitempty"`
+	ImageURL       string         `bson:"image_url,omitempty" json:"image_url,omitempty"`
+	MatchPercent   float64        `bson:"match_percent,omitempty" json:"match_percent,omitempty"`
+	IsSpecial      bool           `bson:"is_special,omitempty" json:"is_special,omitempty"`
+	SpecialTrigger string         `bson:"special_trigger,omitempty" json:"special_trigger,omitempty"`
+	Rarity         *ModelRarityPO `bson:"rarity,omitempty" json:"rarity,omitempty"`
+	Commentary     string         `bson:"commentary,omitempty" json:"commentary,omitempty"`
+}
+
+// ModelRarityPO 理论稀有度持久化对象
+type ModelRarityPO struct {
+	Percent float64 `bson:"percent,omitempty" json:"percent,omitempty"`
+	Label   string  `bson:"label,omitempty" json:"label,omitempty"`
+	OneInX  int     `bson:"one_in_x,omitempty" json:"one_in_x,omitempty"`
 }
 
 // CollectionName 集合名称

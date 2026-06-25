@@ -127,6 +127,28 @@ message AssessmentReport {
   repeated DimensionInterpret dimensions = 7;  // 维度解读列表
   repeated Suggestion suggestions = 8;  // 建议列表
   string created_at = 9;                // 创建时间
+  ModelExtra model_extra = 10;          // 解释模型扩展（SBTI 等）
+}
+
+// 解释模型扩展信息
+message ModelExtra {
+  string kind = 1;
+  string type_code = 2;
+  string type_name = 3;
+  string one_liner = 4;
+  string image_url = 5;
+  double match_percent = 6;
+  bool is_special = 7;
+  string special_trigger = 8;
+  string commentary = 9;
+  ModelRarity rarity = 10;
+}
+
+// 理论稀有度
+message ModelRarity {
+  double percent = 1;
+  string label = 2;
+  int32 one_in_x = 3;
 }
 
 // ==================== 测评查询请求/响应 ====================

@@ -138,6 +138,32 @@ func reportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
 		Conclusion:   po.Conclusion,
 		Dimensions:   dimensions,
 		Suggestions:  suggestions,
+		ModelExtra:   reportModelExtraPOToRow(po.ModelExtra),
 		CreatedAt:    po.CreatedAt,
 	}
+}
+
+func reportModelExtraPOToRow(po *ModelExtraPO) *evaluationreadmodel.ReportModelExtraRow {
+	if po == nil {
+		return nil
+	}
+	row := &evaluationreadmodel.ReportModelExtraRow{
+		Kind:           po.Kind,
+		TypeCode:       po.TypeCode,
+		TypeName:       po.TypeName,
+		OneLiner:       po.OneLiner,
+		ImageURL:       po.ImageURL,
+		MatchPercent:   po.MatchPercent,
+		IsSpecial:      po.IsSpecial,
+		SpecialTrigger: po.SpecialTrigger,
+		Commentary:     po.Commentary,
+	}
+	if po.Rarity != nil {
+		row.Rarity = &evaluationreadmodel.ReportModelRarityRow{
+			Percent: po.Rarity.Percent,
+			Label:   po.Rarity.Label,
+			OneInX:  po.Rarity.OneInX,
+		}
+	}
+	return row
 }

@@ -31,6 +31,9 @@ type InterpretReport struct {
 	// 建议列表
 	suggestions []Suggestion
 
+	// 解释模型扩展（SBTI 等人格类测评）
+	modelExtra *ModelExtra
+
 	// 时间戳
 	createdAt time.Time
 	updatedAt *time.Time
@@ -46,6 +49,7 @@ func NewInterpretReport(
 	conclusion string,
 	dimensions []DimensionInterpret,
 	suggestions []Suggestion,
+	modelExtra *ModelExtra,
 ) *InterpretReport {
 	return &InterpretReport{
 		id:          id,
@@ -56,6 +60,7 @@ func NewInterpretReport(
 		conclusion:  conclusion,
 		dimensions:  dimensions,
 		suggestions: suggestions,
+		modelExtra:  modelExtra,
 		createdAt:   time.Now(),
 	}
 }
@@ -70,6 +75,7 @@ func ReconstructInterpretReport(
 	conclusion string,
 	dimensions []DimensionInterpret,
 	suggestions []Suggestion,
+	modelExtra *ModelExtra,
 	createdAt time.Time,
 	updatedAt *time.Time,
 ) *InterpretReport {
@@ -82,6 +88,7 @@ func ReconstructInterpretReport(
 		conclusion:  conclusion,
 		dimensions:  dimensions,
 		suggestions: suggestions,
+		modelExtra:  modelExtra,
 		createdAt:   createdAt,
 		updatedAt:   updatedAt,
 	}
@@ -145,6 +152,11 @@ func (r *InterpretReport) Dimensions() []DimensionInterpret {
 // Suggestions 获取建议列表
 func (r *InterpretReport) Suggestions() []Suggestion {
 	return r.suggestions
+}
+
+// ModelExtra 获取解释模型扩展信息
+func (r *InterpretReport) ModelExtra() *ModelExtra {
+	return r.modelExtra
 }
 
 // CreatedAt 获取创建时间

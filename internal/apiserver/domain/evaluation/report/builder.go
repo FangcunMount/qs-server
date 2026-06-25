@@ -57,6 +57,7 @@ func (b *DefaultReportBuilder) Build(input GenerateReportInput) (*InterpretRepor
 		conclusion,
 		dimensions,
 		suggestions,
+		nil,
 	)
 
 	return report, nil
@@ -136,6 +137,7 @@ func (b *DefaultReportBuilder) buildSuggestions(
 			b.buildConclusion(input),
 			dimensions,
 			nil, // 建议稍后填充
+			nil,
 		)
 
 		generatedSuggestions, err := b.suggestionGenerator.Generate(ctx, tempReport)

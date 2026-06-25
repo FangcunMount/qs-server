@@ -527,7 +527,33 @@ func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {
 		Dimensions:   dimensions,
 		Suggestions:  toProtoSuggestions(result.Suggestions),
 		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
+		ModelExtra:   toProtoModelExtra(result.ModelExtra),
 	}
+}
+
+func toProtoModelExtra(extra *assessmentApp.ModelExtraResult) *pb.ModelExtra {
+	if extra == nil {
+		return nil
+	}
+	protoExtra := &pb.ModelExtra{
+		Kind:           extra.Kind,
+		TypeCode:       extra.TypeCode,
+		TypeName:       extra.TypeName,
+		OneLiner:       extra.OneLiner,
+		ImageUrl:       extra.ImageURL,
+		MatchPercent:   extra.MatchPercent,
+		IsSpecial:      extra.IsSpecial,
+		SpecialTrigger: extra.SpecialTrigger,
+		Commentary:     extra.Commentary,
+	}
+	if extra.Rarity != nil {
+		protoExtra.Rarity = &pb.ModelRarity{
+			Percent: extra.Rarity.Percent,
+			Label:   extra.Rarity.Label,
+			OneInX:  int32(extra.Rarity.OneInX),
+		}
+	}
+	return protoExtra
 }
 
 // toProtoSuggestions 转换为 proto 建议列表

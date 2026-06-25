@@ -167,7 +167,27 @@ type ReportRow struct {
 	Conclusion   string
 	Dimensions   []ReportDimensionRow
 	Suggestions  []ReportSuggestionRow
+	ModelExtra   *ReportModelExtraRow
 	CreatedAt    time.Time
+}
+
+type ReportModelExtraRow struct {
+	Kind           string
+	TypeCode       string
+	TypeName       string
+	OneLiner       string
+	ImageURL       string
+	MatchPercent   float64
+	IsSpecial      bool
+	SpecialTrigger string
+	Commentary     string
+	Rarity         *ReportModelRarityRow
+}
+
+type ReportModelRarityRow struct {
+	Percent float64
+	Label   string
+	OneInX  int
 }
 
 type ReportReader interface {

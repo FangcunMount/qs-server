@@ -34,7 +34,33 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 		Dimensions:   dimensions,
 		Suggestions:  toSuggestionDTOs(r.Suggestions()),
 		CreatedAt:    r.CreatedAt(),
+		ModelExtra:   toModelExtraResult(r.ModelExtra()),
 	}
+}
+
+func toModelExtraResult(extra *report.ModelExtra) *ModelExtraResult {
+	if extra == nil || extra.IsEmpty() {
+		return nil
+	}
+	result := &ModelExtraResult{
+		Kind:           extra.Kind,
+		TypeCode:       extra.TypeCode,
+		TypeName:       extra.TypeName,
+		OneLiner:       extra.OneLiner,
+		ImageURL:       extra.ImageURL,
+		MatchPercent:   extra.MatchPercent,
+		IsSpecial:      extra.IsSpecial,
+		SpecialTrigger: extra.SpecialTrigger,
+		Commentary:     extra.Commentary,
+	}
+	if extra.Rarity != nil {
+		result.Rarity = &ModelRarityResult{
+			Percent: extra.Rarity.Percent,
+			Label:   extra.Rarity.Label,
+			OneInX:  extra.Rarity.OneInX,
+		}
+	}
+	return result
 }
 
 func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
@@ -67,8 +93,34 @@ func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
 		Conclusion:   row.Conclusion,
 		Dimensions:   dimensions,
 		Suggestions:  suggestions,
+		ModelExtra:   reportModelExtraRowToResult(row.ModelExtra),
 		CreatedAt:    row.CreatedAt,
 	}
+}
+
+func reportModelExtraRowToResult(row *evaluationreadmodel.ReportModelExtraRow) *ModelExtraResult {
+	if row == nil {
+		return nil
+	}
+	result := &ModelExtraResult{
+		Kind:           row.Kind,
+		TypeCode:       row.TypeCode,
+		TypeName:       row.TypeName,
+		OneLiner:       row.OneLiner,
+		ImageURL:       row.ImageURL,
+		MatchPercent:   row.MatchPercent,
+		IsSpecial:      row.IsSpecial,
+		SpecialTrigger: row.SpecialTrigger,
+		Commentary:     row.Commentary,
+	}
+	if row.Rarity != nil {
+		result.Rarity = &ModelRarityResult{
+			Percent: row.Rarity.Percent,
+			Label:   row.Rarity.Label,
+			OneInX:  row.Rarity.OneInX,
+		}
+	}
+	return result
 }
 
 func toSuggestionDTOs(items []report.Suggestion) []SuggestionDTO {
