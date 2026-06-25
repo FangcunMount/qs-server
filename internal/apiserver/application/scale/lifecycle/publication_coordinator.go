@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )

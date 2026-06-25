@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 )

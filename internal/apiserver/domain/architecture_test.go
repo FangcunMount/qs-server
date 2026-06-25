@@ -44,7 +44,7 @@ func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 	root := repoRoot(t)
 	scanRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "survey"),
-		filepath.Join(root, "internal", "apiserver", "domain", "scale"),
+		filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale"),
 		filepath.Join(root, "internal", "apiserver", "domain", "calculation"),
 		filepath.Join(root, "internal", "apiserver", "domain", "validation"),
 	}
@@ -74,7 +74,7 @@ func TestScaleDomainDoesNotExposePersistencePayloadMappers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "scale")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale")
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -109,7 +109,7 @@ func TestSurveyScaleDomainRepositoriesStayCommandSide(t *testing.T) {
 	for _, rel := range []string{
 		"internal/apiserver/domain/survey/questionnaire/repository.go",
 		"internal/apiserver/domain/survey/answersheet/repository.go",
-		"internal/apiserver/domain/scale/repository.go",
+		"internal/apiserver/domain/authoring/scale/repository.go",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
@@ -208,16 +208,13 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 
 	root := repoRoot(t)
 	scanRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
-	const (
-		rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-		scaleDomainPrefix    = "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	)
+	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/":   "application",
 		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":    "infrastructure",
 		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":     "transport",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/":          "port",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":   "scale domain",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":   "scale domain",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "survey domain",
 		"github.com/FangcunMount/component-base/pkg/logger":                   "technical logging",
 		"github.com/FangcunMount/component-base/pkg/errors":                   "API error wrappers",
@@ -225,8 +222,7 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 	}
 	scanGoImports(t, scanRoot, func(path, importPath string) {
 		if isEvaluationRootPackageFile(root, path) {
-			if strings.HasPrefix(importPath, rulesetPayloadPrefix) ||
-				strings.HasPrefix(importPath, scaleDomainPrefix) {
+			if strings.HasPrefix(importPath, rulesetPayloadPrefix) {
 				return
 			}
 		}

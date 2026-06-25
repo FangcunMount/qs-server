@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )

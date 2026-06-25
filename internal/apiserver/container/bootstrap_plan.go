@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )

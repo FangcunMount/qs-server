@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )

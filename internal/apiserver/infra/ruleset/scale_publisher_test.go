@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"

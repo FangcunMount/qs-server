@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
 	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 

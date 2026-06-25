@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )

@@ -1,4 +1,4 @@
-package interpretation
+package scaleinterpretation
 
 import (
 	"go/parser"
@@ -26,8 +26,9 @@ func TestDomainScaleInterpretationDoesNotImportApplicationInfraOrEvaluationPipel
 			if strings.Contains(path, "/internal/apiserver/application/") ||
 				strings.Contains(path, "/internal/apiserver/infra/") ||
 				strings.Contains(path, "/internal/apiserver/port/evaluationinput") ||
-				strings.Contains(path, "/application/evaluation/execute") {
-				t.Fatalf("domain/scale/interpretation must not import %s in %s", path, file)
+				strings.Contains(path, "/application/evaluation/execute") ||
+				strings.Contains(path, "/domain/authoring/scale") {
+				t.Fatalf("domain/evaluation/scaleinterpretation must not import %s in %s", path, file)
 			}
 		}
 	}

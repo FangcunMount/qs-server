@@ -1,9 +1,9 @@
-package interpretation
+package scaleinterpretation
 
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -20,8 +20,8 @@ type ScaleInterpretationModel struct {
 	Title                string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
-	Status               scale.Status
-	Factors              []scale.FactorSnapshot
+	Status               string
+	Factors              []rulesetscale.FactorSnapshot
 }
 
 type ScaleAnswerSheetSnapshot struct {
@@ -56,18 +56,18 @@ type ScaleOptionSnapshot struct {
 
 type ScaleInterpretationResult struct {
 	TotalScore   float64
-	RiskLevel    scale.RiskLevel
+	RiskLevel    RiskLevel
 	Conclusion   string
 	Suggestion   string
 	FactorScores []ScaleFactorScore
 }
 
 type ScaleFactorScore struct {
-	FactorCode   scale.FactorCode
+	FactorCode   string
 	FactorName   string
 	RawScore     float64
 	MaxScore     *float64
-	RiskLevel    scale.RiskLevel
+	RiskLevel    RiskLevel
 	Conclusion   string
 	Suggestion   string
 	IsTotalScore bool
@@ -75,5 +75,5 @@ type ScaleFactorScore struct {
 
 // ScoringStrategyRegistry 执行量表因子聚合策略。
 type ScoringStrategyRegistry interface {
-	ScoreFactor(ctx context.Context, factor scale.FactorSnapshot, values []float64) (float64, error)
+	ScoreFactor(ctx context.Context, factor rulesetscale.FactorSnapshot, values []float64) (float64, error)
 }

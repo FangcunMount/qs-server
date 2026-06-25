@@ -1,11 +1,11 @@
-package interpretation
+package scaleinterpretation
 
 import (
 	"context"
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -49,7 +49,7 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if result.RiskLevel != scale.RiskLevelSevere {
+	if result.RiskLevel != RiskLevelSevere {
 		t.Fatalf("overall risk = %s, want severe from total factor rule", result.RiskLevel)
 	}
 
@@ -59,7 +59,7 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if result.RiskLevel != scale.RiskLevelSevere {
+	if result.RiskLevel != RiskLevelSevere {
 		t.Fatalf("overall risk = %s, want severe from highest factor default risk", result.RiskLevel)
 	}
 }
@@ -106,7 +106,7 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 
 	t.Run("unsupported strategy", func(t *testing.T) {
 		input := scaleInterpretationInputForTest()
-		input.Scale.Factors[0].ScoringStrategy = scale.ScoringStrategyCode("unknown")
+		input.Scale.Factors[0].ScoringStrategy = "unknown"
 
 		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
 		if err == nil || !strings.Contains(err.Error(), "unsupported factor scoring strategy") {
@@ -119,30 +119,30 @@ func scaleInterpretationInputForTest() ScaleInterpretationInput {
 	return ScaleInterpretationInput{
 		Scale: ScaleInterpretationModel{
 			Code: "S-001",
-			Factors: []scale.FactorSnapshot{
+			Factors: []rulesetscale.FactorSnapshot{
 				{
-					Code:            scale.NewFactorCode("total"),
+					Code:            "total",
 					Title:           "total",
 					IsTotalScore:    true,
-					QuestionCodes:   []meta.Code{meta.NewCode("q1"), meta.NewCode("q2")},
-					ScoringStrategy: scale.ScoringStrategySum,
-					InterpretRules: []scale.InterpretationRule{
-						scale.NewInterpretationRule(scale.NewScoreRange(0, 10), scale.RiskLevelLow, "overall low", "keep"),
-						scale.NewInterpretationRule(scale.NewScoreRange(10, 100), scale.RiskLevelSevere, "overall severe", "help"),
+					QuestionCodes:   []string{"q1", "q2"},
+					ScoringStrategy: string(ScoringStrategySum),
+					InterpretRules: []rulesetscale.InterpretRuleSnapshot{
+						{Min: 0, Max: 10, RiskLevel: string(RiskLevelLow), Conclusion: "overall low", Suggestion: "keep"},
+						{Min: 10, Max: 100, RiskLevel: string(RiskLevelSevere), Conclusion: "overall severe", Suggestion: "help"},
 					},
 				},
 				{
-					Code:            scale.NewFactorCode("avg"),
+					Code:            "avg",
 					Title:           "avg",
-					QuestionCodes:   []meta.Code{meta.NewCode("q1"), meta.NewCode("q2")},
-					ScoringStrategy: scale.ScoringStrategyAvg,
+					QuestionCodes:   []string{"q1", "q2"},
+					ScoringStrategy: string(ScoringStrategyAvg),
 				},
 				{
-					Code:            scale.NewFactorCode("cnt"),
+					Code:            "cnt",
 					Title:           "cnt",
-					QuestionCodes:   []meta.Code{meta.NewCode("q1"), meta.NewCode("q2")},
-					ScoringStrategy: scale.ScoringStrategyCnt,
-					ScoringParams:   scale.NewScoringParams().WithCntOptionContents([]string{"是"}),
+					QuestionCodes:   []string{"q1", "q2"},
+					ScoringStrategy: string(ScoringStrategyCnt),
+					ScoringParams:   rulesetscale.ScoringParamsSnapshot{CntOptionContents: []string{"是"}},
 				},
 			},
 		},
@@ -171,7 +171,7 @@ func assertFactorScore(t *testing.T, scores []ScaleFactorScore, code string, wan
 
 func findFactorScoreForTest(scores []ScaleFactorScore, code string) ScaleFactorScore {
 	for _, score := range scores {
-		if string(score.FactorCode) == code {
+		if score.FactorCode == code {
 			return score
 		}
 	}

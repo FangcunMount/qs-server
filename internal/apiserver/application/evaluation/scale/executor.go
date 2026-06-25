@@ -7,8 +7,8 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -57,9 +57,9 @@ type scaleScoringRegistry struct {
 	scorer ruleengine.ScaleFactorScorer
 }
 
-func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor domainScale.FactorSnapshot, values []float64) (float64, error) {
+func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor rulesetscale.FactorSnapshot, values []float64) (float64, error) {
 	if r.scorer == nil {
 		return scaleinterpretation.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
-	return r.scorer.ScoreFactor(ctx, string(factor.Code), values, string(factor.ScoringStrategy), nil)
+	return r.scorer.ScoreFactor(ctx, factor.Code, values, factor.ScoringStrategy, nil)
 }

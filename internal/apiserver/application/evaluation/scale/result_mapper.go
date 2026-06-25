@@ -2,7 +2,7 @@ package scale
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -28,7 +28,7 @@ func (DefaultResultMapper) ToEvaluationResult(
 	factorScores := make([]assessment.FactorScoreResult, 0, len(result.FactorScores))
 	for _, fs := range result.FactorScores {
 		factorScores = append(factorScores, assessment.NewFactorScoreResult(
-			assessment.NewFactorCode(string(fs.FactorCode)),
+			assessment.NewFactorCode(fs.FactorCode),
 			fs.FactorName,
 			fs.RawScore,
 			assessment.RiskLevel(fs.RiskLevel),

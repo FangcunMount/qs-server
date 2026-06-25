@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"

@@ -3,7 +3,7 @@ package plan
 import (
 	"context"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 )
 
 type repositoryScaleCatalog struct {

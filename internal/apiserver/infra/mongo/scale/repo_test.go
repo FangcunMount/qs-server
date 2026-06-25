@@ -3,7 +3,7 @@ package scale
 import (
 	"testing"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

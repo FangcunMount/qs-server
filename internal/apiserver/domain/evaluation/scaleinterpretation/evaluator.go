@@ -1,11 +1,11 @@
-package interpretation
+package scaleinterpretation
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 
 // Evaluator 执行量表解释模型评估。
@@ -39,17 +39,18 @@ func (e *Evaluator) Evaluate(ctx context.Context, input ScaleInterpretationInput
 type DefaultScoringStrategyRegistry struct{}
 
 // ScoreFactor 执行量表因子聚合策略。
-func (DefaultScoringStrategyRegistry) ScoreFactor(_ context.Context, factor scale.FactorSnapshot, values []float64) (float64, error) {
+func (DefaultScoringStrategyRegistry) ScoreFactor(_ context.Context, factor rulesetscale.FactorSnapshot, values []float64) (float64, error) {
 	score, err := calculation.DefaultStrategyRegistry{}.Score(context.Background(), calculation.Dimension{
-		Code:         factor.Code.String(),
-		StrategyCode: string(factor.ScoringStrategy),
+		Code:         factor.Code,
+		StrategyCode: factor.ScoringStrategy,
 	}, values)
 	if err != nil {
 		return 0, err
 	}
-	if factor.ScoringStrategy != scale.ScoringStrategySum &&
-		factor.ScoringStrategy != scale.ScoringStrategyAvg &&
-		factor.ScoringStrategy != scale.ScoringStrategyCnt {
+	strategy := ScoringStrategy(factor.ScoringStrategy)
+	if strategy != ScoringStrategySum &&
+		strategy != ScoringStrategyAvg &&
+		strategy != ScoringStrategyCnt {
 		return 0, fmt.Errorf("unknown factor scoring strategy for %s: %s", factor.Code, factor.ScoringStrategy)
 	}
 	return score, nil
@@ -63,8 +64,8 @@ func (r scaleCalculationRegistry) Score(ctx context.Context, dimension calculati
 	if r.registry == nil {
 		return 0, nil
 	}
-	return r.registry.ScoreFactor(ctx, scale.FactorSnapshot{
-		Code:            scale.NewFactorCode(dimension.Code),
-		ScoringStrategy: scale.ScoringStrategyCode(dimension.StrategyCode),
+	return r.registry.ScoreFactor(ctx, rulesetscale.FactorSnapshot{
+		Code:            dimension.Code,
+		ScoringStrategy: dimension.StrategyCode,
 	}, values)
 }

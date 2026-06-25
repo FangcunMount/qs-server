@@ -1,8 +1,7 @@
 package evaluation
 
 import (
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
 	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -19,44 +18,14 @@ func scaleModelFromSnapshot(snapshot *rulesetscale.ScaleSnapshot) scaleinterpret
 	if snapshot == nil {
 		return scaleinterpretation.ScaleInterpretationModel{}
 	}
-	factors := make([]domainScale.FactorSnapshot, 0, len(snapshot.Factors))
-	for _, factor := range snapshot.Factors {
-		factors = append(factors, scaleFactorFromSnapshot(factor))
-	}
 	return scaleinterpretation.ScaleInterpretationModel{
 		Code:                 snapshot.Code,
 		ScaleVersion:         snapshot.ScaleVersion,
 		Title:                snapshot.Title,
 		QuestionnaireCode:    snapshot.QuestionnaireCode,
 		QuestionnaireVersion: snapshot.QuestionnaireVersion,
-		Status:               domainScale.Status(snapshot.Status),
-		Factors:              factors,
-	}
-}
-
-func scaleFactorFromSnapshot(snapshot rulesetscale.FactorSnapshot) domainScale.FactorSnapshot {
-	questionCodes := make([]meta.Code, 0, len(snapshot.QuestionCodes))
-	for _, code := range snapshot.QuestionCodes {
-		questionCodes = append(questionCodes, meta.NewCode(code))
-	}
-	rules := make([]domainScale.InterpretationRule, 0, len(snapshot.InterpretRules))
-	for _, rule := range snapshot.InterpretRules {
-		rules = append(rules, domainScale.NewInterpretationRule(
-			domainScale.NewScoreRange(rule.Min, rule.Max),
-			domainScale.RiskLevel(rule.RiskLevel),
-			rule.Conclusion,
-			rule.Suggestion,
-		))
-	}
-	return domainScale.FactorSnapshot{
-		Code:            domainScale.NewFactorCode(snapshot.Code),
-		Title:           snapshot.Title,
-		IsTotalScore:    snapshot.IsTotalScore,
-		QuestionCodes:   questionCodes,
-		ScoringStrategy: domainScale.ScoringStrategyCode(snapshot.ScoringStrategy),
-		ScoringParams:   domainScale.NewScoringParams().WithCntOptionContents(snapshot.ScoringParams.CntOptionContents),
-		MaxScore:        cloneFloat64Ptr(snapshot.MaxScore),
-		InterpretRules:  rules,
+		Status:               snapshot.Status,
+		Factors:              append([]rulesetscale.FactorSnapshot(nil), snapshot.Factors...),
 	}
 }
 
@@ -103,12 +72,4 @@ func scaleQuestionnaireFromSnapshot(snapshot *Questionnaire) *scaleinterpretatio
 		Version:   snapshot.Version,
 		Questions: questions,
 	}
-}
-
-func cloneFloat64Ptr(value *float64) *float64 {
-	if value == nil {
-		return nil
-	}
-	cloned := *value
-	return &cloned
 }

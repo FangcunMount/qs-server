@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"

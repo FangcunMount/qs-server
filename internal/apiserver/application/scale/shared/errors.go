@@ -2,7 +2,7 @@ package shared
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 

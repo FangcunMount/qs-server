@@ -1,17 +1,17 @@
-package interpretation
+package scaleinterpretation
 
 import (
 	"fmt"
 	"slices"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 
-func collectFactorValues(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) ([]float64, error) {
-	switch factor.ScoringStrategy {
-	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+func collectFactorValues(factor rulesetscale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) ([]float64, error) {
+	switch ScoringStrategy(factor.ScoringStrategy) {
+	case ScoringStrategySum, ScoringStrategyAvg:
 		return collectQuestionScores(factor, sheet), nil
-	case scale.ScoringStrategyCnt:
+	case ScoringStrategyCnt:
 		if qnr == nil {
 			return nil, fmt.Errorf("questionnaire is required")
 		}
@@ -21,19 +21,19 @@ func collectFactorValues(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSna
 	}
 }
 
-func collectQuestionScores(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot) []float64 {
+func collectQuestionScores(factor rulesetscale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot) []float64 {
 	answerMap := factorScoreAnswerMap(sheet)
 	scores := make([]float64, 0, len(factor.QuestionCodes))
 	for _, qCode := range factor.QuestionCodes {
-		if answer, found := answerMap[qCode.String()]; found {
+		if answer, found := answerMap[qCode]; found {
 			scores = append(scores, answer.Score)
 		}
 	}
 	return scores
 }
 
-func collectCntMatches(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) []float64 {
-	targetContents := factor.ScoringParams.GetCntOptionContents()
+func collectCntMatches(factor rulesetscale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) []float64 {
+	targetContents := factor.ScoringParams.CntOptionContents
 	if len(targetContents) == 0 {
 		return nil
 	}
@@ -41,7 +41,7 @@ func collectCntMatches(factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnaps
 	answerMap := factorScoreAnswerMap(sheet)
 	matchValues := make([]float64, 0, len(factor.QuestionCodes))
 	for _, qCode := range factor.QuestionCodes {
-		answer, found := answerMap[qCode.String()]
+		answer, found := answerMap[qCode]
 		if !found {
 			continue
 		}

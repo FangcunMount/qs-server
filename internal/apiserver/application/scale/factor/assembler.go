@@ -3,7 +3,7 @@ package factor
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )

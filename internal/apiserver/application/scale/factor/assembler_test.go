@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 )
 
 func TestToFactorDomainDefaultsAndMapsDTOFields(t *testing.T) {

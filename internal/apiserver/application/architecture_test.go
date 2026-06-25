@@ -115,7 +115,7 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	root := repoRoot(t)
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":  "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":  "evaluationinput snapshots",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey": "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
@@ -164,7 +164,7 @@ func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result"), func(path, importPath string) {
@@ -183,7 +183,7 @@ func TestScaleDomainDoesNotModelMBTIAsCategory(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "domain", "scale", "types.go")
+	path := filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale", "types.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -363,7 +363,7 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":   "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":   "catalog/read-model snapshot adapters",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/": "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
@@ -418,10 +418,7 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 	t.Parallel()
 
 	root := repoRoot(t)
-	const (
-		rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-		scaleDomainPrefix    = "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	)
+	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                 "application error mapping/use cases",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                       "infrastructure adapters",
@@ -430,14 +427,13 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 		"github.com/FangcunMount/component-base/pkg/errors":                                 "domain-native errors",
 		"github.com/FangcunMount/component-base/pkg/code":                                   "domain-native errors",
 		"github.com/FangcunMount/qs-server/internal/pkg/code":                               "application API error mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":                 "evaluation-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":                 "evaluation-local snapshots/value objects",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "evaluationinput snapshots",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "report-local snapshots/value objects",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
 		if isEvaluationRootPackageGoFile(root, path) {
-			if strings.HasPrefix(importPath, rulesetPayloadPrefix) ||
-				strings.HasPrefix(importPath, scaleDomainPrefix) {
+			if strings.HasPrefix(importPath, rulesetPayloadPrefix) {
 				return
 			}
 		}

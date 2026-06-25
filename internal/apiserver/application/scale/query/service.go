@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"

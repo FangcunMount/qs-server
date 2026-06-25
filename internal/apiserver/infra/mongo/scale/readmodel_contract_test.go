@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"go.mongodb.org/mongo-driver/bson"
 )

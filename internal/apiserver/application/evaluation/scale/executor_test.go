@@ -8,8 +8,8 @@ import (
 	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -209,6 +209,6 @@ func (s *stubMapper) ToEvaluationResult(
 
 type stubScoringRegistry struct{}
 
-func (stubScoringRegistry) ScoreFactor(context.Context, domainScale.FactorSnapshot, []float64) (float64, error) {
+func (stubScoringRegistry) ScoreFactor(context.Context, rulesetscale.FactorSnapshot, []float64) (float64, error) {
 	return 1, nil
 }

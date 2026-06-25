@@ -9,7 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"

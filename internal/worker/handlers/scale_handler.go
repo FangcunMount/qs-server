@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 )
 
 func handleScaleChanged(deps *Dependencies) HandlerFunc {

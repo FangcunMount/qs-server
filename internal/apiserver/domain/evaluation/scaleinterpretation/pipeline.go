@@ -1,11 +1,11 @@
-package interpretation
+package scaleinterpretation
 
 import (
 	"context"
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 
 func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleInterpretationInput) (*ScaleInterpretationResult, error) {
@@ -37,14 +37,14 @@ func (e *Evaluator) calculateScores(ctx context.Context, input ScaleInterpretati
 			FactorName:   factor.Title,
 			RawScore:     rawScore,
 			MaxScore:     cloneEvaluationFloat64Ptr(factor.MaxScore),
-			RiskLevel:    scale.RiskLevelNone,
+			RiskLevel:    RiskLevelNone,
 			IsTotalScore: factor.IsTotalScore,
 		})
 	}
 	return factorScores, calculateTotalScore(factorScores), nil
 }
 
-func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) (float64, error) {
+func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor rulesetscale.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) (float64, error) {
 	if sheet == nil {
 		return 0, fmt.Errorf("answer sheet is required for scale factor scoring")
 	}
@@ -56,8 +56,8 @@ func (e *Evaluator) calculateFactorRawScore(ctx context.Context, factor scale.Fa
 		return 0, err
 	}
 	score, err := e.calculator.ScoreDimension(ctx, calculation.Dimension{
-		Code:         factor.Code.String(),
-		StrategyCode: string(factor.ScoringStrategy),
+		Code:         factor.Code,
+		StrategyCode: factor.ScoringStrategy,
 	}, values)
 	if e.calculator == nil {
 		score, err = e.scoringRegistry.ScoreFactor(ctx, factor, values)

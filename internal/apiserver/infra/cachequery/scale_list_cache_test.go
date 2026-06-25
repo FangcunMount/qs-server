@@ -6,7 +6,7 @@ import (
 	"testing"
 	"time"
 
-	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"

@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"

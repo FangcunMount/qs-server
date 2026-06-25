@@ -1,7 +1,7 @@
 package shared
 
 import (
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 )
 
 // Classification holds domain classification values assembled from DTO string slices.
