@@ -58,6 +58,31 @@ func TestScaleChangedHandler_NonPublishedSkipsQRCode(t *testing.T) {
 	}
 }
 
+func TestScaleChangedHandler_PublishedInvokesPostActions(t *testing.T) {
+	client := &fakeWorkerInternalClient{}
+	deps := &Dependencies{
+		Logger:         slog.New(slog.NewTextHandler(io.Discard, nil)),
+		InternalClient: client,
+	}
+
+	payload := mustBuildLifecycleChangedPayload(t, "scale.changed", "MedicalScale", "12", map[string]any{
+		"scale_id":   12,
+		"code":       "SDS",
+		"version":    "1.0.0",
+		"name":       "SDS",
+		"action":     "published",
+		"changed_at": time.Date(2026, 4, 15, 12, 0, 0, 0, time.UTC),
+	})
+
+	if err := handleScaleChanged(deps)(context.Background(), "scale.changed", payload); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	if client.scaleQRCodeCalls != 1 {
+		t.Fatalf("expected 1 scale post-action call, got %d", client.scaleQRCodeCalls)
+	}
+}
+
 func mustBuildLifecycleChangedPayload(t *testing.T, eventType, aggregateType, aggregateID string, data map[string]any) []byte {
 	t.Helper()
 

@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	reportmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/mbti"
 )

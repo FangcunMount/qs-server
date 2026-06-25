@@ -3,8 +3,8 @@ package mbti
 import (
 	"testing"
 
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 )
 
 func TestResolvePreference_tieAtThresholdPrefersLeftPole(t *testing.T) {
