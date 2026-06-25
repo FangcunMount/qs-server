@@ -39,6 +39,11 @@ func WithCacheSignalNotifier(notifier lifecycle.CacheSignalNotifier) lifecycle.S
 	return lifecycle.WithCacheSignalNotifier(notifier)
 }
 
+// WithInterpretationRulePublisher injects the interpretation model sync port.
+func WithInterpretationRulePublisher(publisher lifecycle.InterpretationRulePublisher) lifecycle.ServiceOption {
+	return lifecycle.WithInterpretationRulePublisher(publisher)
+}
+
 // QuestionnairePublisherFunc adapts a function to the scale lifecycle's
 // questionnaire publication port.
 type QuestionnairePublisherFunc func(ctx context.Context, code string) (string, error)

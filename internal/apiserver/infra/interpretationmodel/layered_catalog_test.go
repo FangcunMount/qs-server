@@ -28,7 +28,7 @@ func (s stubStore) FindPublishedByQuestionnaire(ctx context.Context, questionnai
 }
 
 func TestLayeredCatalog_FallsBackToStatic(t *testing.T) {
-	static, err := NewDefaultStaticCatalog()
+	static, err := NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
@@ -66,7 +66,7 @@ func TestLayeredCatalog_PrefersMongo(t *testing.T) {
 		DecisionKind: domain.DecisionKindPoleComposition,
 		Payload:      []byte(`{}`),
 	}
-	static, err := NewDefaultStaticCatalog()
+	static, err := NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}

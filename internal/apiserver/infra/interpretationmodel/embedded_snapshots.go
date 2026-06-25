@@ -8,8 +8,17 @@ import (
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
+// DefaultEmbeddedRuleSets 从内置 SBTI/MBTI seed 构建 RuleSetSnapshot 列表。
+func DefaultEmbeddedRuleSets(ctx context.Context) ([]*domain.RuleSetSnapshot, error) {
+	return defaultEmbeddedSnapshots(ctx)
+}
+
 // DefaultEmbeddedSnapshots 从内置 SBTI/MBTI seed 构建 RuleSetSnapshot 列表。
 func DefaultEmbeddedSnapshots(ctx context.Context) ([]*domain.RuleSetSnapshot, error) {
+	return defaultEmbeddedSnapshots(ctx)
+}
+
+func defaultEmbeddedSnapshots(ctx context.Context) ([]*domain.RuleSetSnapshot, error) {
 	sbtiCatalog, err := evaluationinputInfra.NewDefaultSBTIModelCatalog()
 	if err != nil {
 		return nil, err

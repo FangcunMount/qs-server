@@ -356,6 +356,7 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 	allowedFiles := map[string]struct{}{
 		"internal/apiserver/infra/evaluationinput/repository_resolver.go": {},
 		"internal/apiserver/infra/evaluationinput/snapshot_mappers.go":    {},
+		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale":   "catalog/read-model snapshot adapters",

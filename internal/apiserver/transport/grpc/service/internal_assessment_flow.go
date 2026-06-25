@@ -150,18 +150,17 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 	}
 	req.OrgId = orgID
 
-	scaleCtx, err := s.resolveAssessmentScaleContext(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
+	dto, err := buildCreateAssessmentDTO(ctx, req, s.assessmentBindingResolver)
 	if err != nil {
-		l.Errorw("解析问卷量表绑定失败",
+		l.Errorw("解析解释模型绑定失败",
 			"action", "create_assessment_from_answersheet",
 			"questionnaire_code", questionnaireCode,
 			"questionnaire_version", req.QuestionnaireVersion,
 			"error", err,
 		)
-		return nil, status.Errorf(codes.Internal, "解析问卷量表绑定失败: %v", err)
+		return nil, status.Errorf(codes.Internal, "解析解释模型绑定失败: %v", err)
 	}
-	dto := buildCreateAssessmentDTO(ctx, req, scaleCtx, s.questionnaireModelBinding)
-	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, scaleCtx.medicalScaleCode, &dto)
+	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, dto.MedicalScaleCode, &dto)
 
 	if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
 		return response, nil

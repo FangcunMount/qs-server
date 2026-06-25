@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -28,23 +29,22 @@ func NewRepositoryResolver(
 	scaleRepo ScaleSnapshotRepository,
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
+	modelCatalog interpretationmodelport.ModelCatalog,
 ) (*RepositoryResolver, error) {
 	scaleCatalog := NewRepositoryScaleSnapshotCatalog(scaleRepo)
-	sbtiCatalog, err := NewDefaultSBTIModelCatalog()
-	if err != nil {
-		return nil, err
+	if modelCatalog == nil {
+		return nil, fmt.Errorf("interpretation model catalog is required")
 	}
-	mbtiCatalog, err := NewDefaultMBTIModelCatalog()
-	if err != nil {
-		return nil, err
-	}
+	interpretationScaleCatalog := NewInterpretationScaleCatalog(modelCatalog, scaleCatalog)
+	sbtiCatalog := NewInterpretationSBTICatalog(modelCatalog)
+	mbtiCatalog := NewInterpretationMBTICatalog(modelCatalog)
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
 	return NewResolverWithEmbeddedModels(
-		scaleCatalog,
+		interpretationScaleCatalog,
 		sbtiCatalog,
 		mbtiCatalog,
-		NewScaleModelInputProvider(scaleCatalog, answerSheetReader, questionnaireReader),
+		NewScaleModelInputProvider(interpretationScaleCatalog, answerSheetReader, questionnaireReader),
 		NewSBTIModelInputProvider(sbtiCatalog, answerSheetReader, questionnaireReader),
 		NewMBTIModelInputProvider(mbtiCatalog, answerSheetReader, questionnaireReader),
 	)
@@ -232,6 +232,7 @@ type RepositoryScaleSnapshotCatalog struct {
 type ScaleSnapshotRepository interface {
 	FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error)
 	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error)
+	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error)
 }
 
 type publishedScaleSnapshotRepository interface {

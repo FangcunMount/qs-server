@@ -105,6 +105,28 @@ func (r *Repository) FindPublishedByQuestionnaireCode(ctx context.Context, quest
 	return r.findOne(ctx, publishedQuestionnaireCodeFilter(questionnaireCode))
 }
 
+// ListActivePublishedSnapshots 列出所有当前激活的已发布量表快照（backfill 用）。
+func (r *Repository) ListActivePublishedSnapshots(ctx context.Context) ([]*scale.MedicalScale, error) {
+	cursor, err := r.Collection().Find(ctx, activePublishedSnapshotsFilter())
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var results []*scale.MedicalScale
+	for cursor.Next(ctx) {
+		var po ScalePO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		results = append(results, r.mapper.ToDomain(ctx, &po))
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return results, nil
+}
+
 // FindByQuestionnaireRef 根据问卷编码和版本查询量表。
 func (r *Repository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error) {
 	if questionnaireVersion == "" {
@@ -187,6 +209,15 @@ func publishedVersionFilter(code, scaleVersion string) bson.M {
 func publishedCodeFilter(code string) bson.M {
 	return bson.M{
 		"code":                code,
+		"record_role":         scale.RecordRolePublishedSnapshot.String(),
+		"is_active_published": true,
+		"status":              scale.StatusPublished.String(),
+		"deleted_at":          nil,
+	}
+}
+
+func activePublishedSnapshotsFilter() bson.M {
+	return bson.M{
 		"record_role":         scale.RecordRolePublishedSnapshot.String(),
 		"is_active_published": true,
 		"status":              scale.StatusPublished.String(),

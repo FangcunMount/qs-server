@@ -1,24 +1,26 @@
 package interpretationmodel
 
 import (
-	"encoding/json"
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel/codec"
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 )
 
 func SBTIRuleSetSnapshot(model *evaluationinputPort.SBTIModelSnapshot) (*domain.RuleSetSnapshot, error) {
-	payload, err := json.Marshal(model)
+	payload, format, err := codec.EncodeSBTI(model)
 	if err != nil {
-		return nil, fmt.Errorf("marshal sbti ruleset payload: %w", err)
+		return nil, err
 	}
 	status := model.Status
 	if status == "" {
 		status = "published"
 	}
 	return &domain.RuleSetSnapshot{
+		SchemaVersion: domain.RuleSetSchemaVersionV1,
+		PayloadFormat: format,
 		Definition: domain.ModelDefinition{
 			Kind:    domain.ModelKindSBTI,
 			Code:    model.Code,
@@ -44,15 +46,17 @@ func SBTIRuleSetSnapshot(model *evaluationinputPort.SBTIModelSnapshot) (*domain.
 }
 
 func MBTIRuleSetSnapshot(model *evaluationinputPort.MBTIModelSnapshot) (*domain.RuleSetSnapshot, error) {
-	payload, err := json.Marshal(model)
+	payload, format, err := codec.EncodeMBTI(model)
 	if err != nil {
-		return nil, fmt.Errorf("marshal mbti ruleset payload: %w", err)
+		return nil, err
 	}
 	status := model.Status
 	if status == "" {
 		status = "published"
 	}
 	return &domain.RuleSetSnapshot{
+		SchemaVersion: domain.RuleSetSchemaVersionV1,
+		PayloadFormat: format,
 		Definition: domain.ModelDefinition{
 			Kind:    domain.ModelKindMBTI,
 			Code:    model.Code,
@@ -73,6 +77,42 @@ func MBTIRuleSetSnapshot(model *evaluationinputPort.MBTIModelSnapshot) (*domain.
 			"non_commercial": model.Source.NonCommercial,
 		},
 		Payload: payload,
+	}, nil
+}
+
+func ScaleRuleSetSnapshot(model *evaluationinputPort.ScaleSnapshot) (*domain.RuleSetSnapshot, error) {
+	if model == nil {
+		return nil, fmt.Errorf("scale model is nil")
+	}
+	payload, format, err := codec.EncodeScale(model)
+	if err != nil {
+		return nil, err
+	}
+	status := model.Status
+	if status == "" {
+		status = "published"
+	}
+	version := model.ScaleVersion
+	if version == "" {
+		version = model.QuestionnaireVersion
+	}
+	return &domain.RuleSetSnapshot{
+		SchemaVersion: domain.RuleSetSchemaVersionV1,
+		PayloadFormat: format,
+		Definition: domain.ModelDefinition{
+			Kind:    domain.ModelKindScale,
+			Code:    model.Code,
+			Version: version,
+			Title:   model.Title,
+			Status:  status,
+		},
+		Binding: domain.QuestionnaireBinding{
+			QuestionnaireCode:    model.QuestionnaireCode,
+			QuestionnaireVersion: model.QuestionnaireVersion,
+		},
+		DecisionKind: domain.DecisionKindScoreRangeInterpretation,
+		Source:       map[string]any{},
+		Payload:      payload,
 	}, nil
 }
 

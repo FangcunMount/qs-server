@@ -22,6 +22,14 @@ const (
 	DecisionKindNearestPattern           DecisionKind = "nearest_pattern"
 )
 
+const (
+	RuleSetSchemaVersionV1 = "1"
+
+	PayloadFormatScaleV1 = "evaluationinput.scale.v1"
+	PayloadFormatMBTIV1  = "evaluationinput.mbti.v1"
+	PayloadFormatSBTIV1  = "evaluationinput.sbti.v1"
+)
+
 // QuestionnaireBinding 模型与问卷版本的绑定关系。
 type QuestionnaireBinding struct {
 	QuestionnaireCode    string
@@ -37,11 +45,13 @@ type ModelDefinition struct {
 	Status  string
 }
 
-// RuleSetSnapshot 已发布规则集快照（v1 envelope + 原始 payload）。
+// RuleSetSnapshot 已发布规则集快照（v1 envelope + typed payload bytes）。
 type RuleSetSnapshot struct {
-	Definition   ModelDefinition
-	Binding      QuestionnaireBinding
-	DecisionKind DecisionKind
-	Source       map[string]any
-	Payload      []byte
+	SchemaVersion string
+	PayloadFormat string
+	Definition    ModelDefinition
+	Binding       QuestionnaireBinding
+	DecisionKind  DecisionKind
+	Source        map[string]any
+	Payload       []byte
 }

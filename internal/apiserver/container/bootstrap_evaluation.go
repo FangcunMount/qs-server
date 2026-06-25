@@ -22,7 +22,11 @@ func (c *Container) ensureInterpretationModelCatalog() (interpretationmodelport.
 		return c.interpretationModelCatalog, nil
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
-	catalog, err := interpretationmodelInfra.NewCatalog(c.mongoDB, mongoOpts)
+	var scaleSource interpretationmodelInfra.ScaleBindingSource
+	if infra := c.surveyScaleInfra; infra != nil && infra.scaleRepo != nil {
+		scaleSource = evaluationinputInfra.NewRepositoryScaleBindingSource(infra.scaleRepo)
+	}
+	catalog, err := interpretationmodelInfra.NewCatalog(c.mongoDB, scaleSource, mongoOpts)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize interpretation model catalog: %w", err)
 	}
@@ -38,13 +42,15 @@ func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps,
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra != nil {
-		if _, err := c.ensureInterpretationModelCatalog(); err != nil {
+		catalog, err := c.ensureInterpretationModelCatalog()
+		if err != nil {
 			return assembler.EvaluationModuleDeps{}, err
 		}
 		resolver, err := evaluationinputInfra.NewRepositoryResolver(
 			infra.scaleRepo,
 			infra.answerSheetRepo,
 			infra.questionnaireRepo,
+			catalog,
 		)
 		if err != nil {
 			return assembler.EvaluationModuleDeps{}, fmt.Errorf("failed to initialize evaluation input resolver: %w", err)

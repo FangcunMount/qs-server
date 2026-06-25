@@ -1,30 +1,27 @@
 package interpretationmodel
 
 import (
+	"context"
+
 	"go.mongodb.org/mongo-driver/mongo"
 
-	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoInterpretationmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretationmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 )
 
-// NewDefaultStaticCatalog 从内置 SBTI/MBTI seed 构建静态规则目录。
-func NewDefaultStaticCatalog() (port.ModelCatalog, error) {
-	sbtiCatalog, err := evaluationinputInfra.NewDefaultSBTIModelCatalog()
+// NewDefaultStaticCatalog 从内置 SBTI/MBTI RuleSet 与可选量表 repo 回退构建静态规则目录。
+func NewDefaultStaticCatalog(scaleSource ScaleBindingSource) (port.ModelCatalog, error) {
+	ruleSets, err := DefaultEmbeddedRuleSets(context.Background())
 	if err != nil {
 		return nil, err
 	}
-	mbtiCatalog, err := evaluationinputInfra.NewDefaultMBTIModelCatalog()
-	if err != nil {
-		return nil, err
-	}
-	return NewStaticCompositeCatalog(sbtiCatalog, mbtiCatalog), nil
+	return NewStaticCompositeCatalog(ruleSets, scaleSource), nil
 }
 
-// NewCatalog 优先读 Mongo 已发布规则，未命中时回退到内置 seed。
-func NewCatalog(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) (port.ModelCatalog, error) {
-	static, err := NewDefaultStaticCatalog()
+// NewCatalog 优先读 Mongo 已发布规则，未命中时回退到内置 RuleSet / 量表 repo。
+func NewCatalog(db *mongo.Database, scaleSource ScaleBindingSource, opts ...mongoBase.BaseRepositoryOptions) (port.ModelCatalog, error) {
+	static, err := NewDefaultStaticCatalog(scaleSource)
 	if err != nil {
 		return nil, err
 	}

@@ -1,14 +1,14 @@
-package sbti
+package evaluationinput
 
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/sbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
-	catalog, err := evaluationinput.NewDefaultSBTIModelCatalog()
+	catalog, err := NewDefaultSBTIModelCatalog()
 	if err != nil {
 		t.Fatalf("NewDefaultSBTIModelCatalog: %v", err)
 	}
@@ -18,8 +18,8 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	}
 
 	t.Run("normal_outcome", func(t *testing.T) {
-		sheet := allThreesAnswerSheet(model)
-		got, err := NewScorer().Score(model, sheet)
+		sheet := sbtiAllThreesAnswerSheet(model)
+		got, err := sbti.NewScorer().Score(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -37,8 +37,8 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	t.Run("fallback_HHHH", func(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
-		sheet := alternatingAnswerSheet(&modelCopy)
-		got, err := NewScorer().Score(&modelCopy, sheet)
+		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
+		got, err := sbti.NewScorer().Score(&modelCopy, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -53,7 +53,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := NewScorer().Score(model, sheet)
+		got, err := sbti.NewScorer().Score(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -66,7 +66,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	})
 }
 
-func allThreesAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapshot {
+func sbtiAllThreesAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		answers = append(answers, port.AnswerSnapshot{
@@ -82,7 +82,7 @@ func allThreesAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapsh
 	}
 }
 
-func alternatingAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapshot {
+func sbtiAlternatingAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for i, mapping := range model.QuestionMappings {
 		value := "1"

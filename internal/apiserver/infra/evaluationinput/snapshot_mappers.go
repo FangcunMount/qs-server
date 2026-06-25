@@ -7,6 +7,11 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
+// MedicalScaleToSnapshot 将领域量表映射为评估输入快照（供规则同步与执行链路复用）。
+func MedicalScaleToSnapshot(m *scale.MedicalScale) *port.ScaleSnapshot {
+	return scaleToSnapshot(m)
+}
+
 func scaleToSnapshot(m *scale.MedicalScale) *port.ScaleSnapshot {
 	if m == nil {
 		return nil

@@ -47,7 +47,8 @@ type ScaleModuleDeps struct {
 	RankCacheBuilder       *keyspace.Builder
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
-	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
+	CacheSignalNotifier       scaleLifecycle.CacheSignalNotifier
+	InterpretationRulePublisher scaleLifecycle.InterpretationRulePublisher
 }
 
 // NewScaleModule 创建 Scale 模块。
@@ -68,6 +69,7 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 		normalized.ListCache,
 		scaleApp.WithQuestionnairePublisher(newScaleQuestionnairePublisher(normalized.QuestionnairePublisher)),
 		scaleApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
+		scaleApp.WithInterpretationRulePublisher(normalized.InterpretationRulePublisher),
 	)
 	module.FactorService = scaleApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)

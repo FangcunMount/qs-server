@@ -49,6 +49,9 @@ func (c *LayeredCatalog) GetPublishedByRef(ctx context.Context, ref port.ModelRe
 	if c == nil {
 		return nil, domain.ErrNotFound
 	}
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
+	}
 	if c.store != nil {
 		snapshot, err := c.store.GetPublishedByRef(ctx, ref)
 		if err == nil {

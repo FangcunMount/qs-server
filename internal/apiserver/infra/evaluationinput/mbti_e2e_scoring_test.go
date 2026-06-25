@@ -1,14 +1,14 @@
-package mbti
+package evaluationinput
 
 import (
 	"testing"
 
-	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/mbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
-	catalog, err := evaluationinput.NewDefaultMBTIModelCatalog()
+	catalog, err := NewDefaultMBTIModelCatalog()
 	if err != nil {
 		t.Fatalf("NewDefaultMBTIModelCatalog: %v", err)
 	}
@@ -22,8 +22,8 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	}
 
 	t.Run("all_neutral", func(t *testing.T) {
-		sheet := likertAnswerSheet(model, "3")
-		got, err := NewScorer().Score(model, sheet)
+		sheet := mbtiLikertAnswerSheet(model, "3")
+		got, err := mbti.NewScorer().Score(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -50,13 +50,13 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	})
 
 	t.Run("strong_ESTJ_profile", func(t *testing.T) {
-		sheet := polePreferenceAnswerSheet(model, map[string]string{
+		sheet := mbtiPolePreferenceAnswerSheet(model, map[string]string{
 			"EI": "E",
 			"SN": "S",
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := NewScorer().Score(model, sheet)
+		got, err := mbti.NewScorer().Score(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -69,12 +69,12 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	})
 }
 
-func polePreferenceAnswerSheet(model *port.MBTIModelSnapshot, prefs map[string]string) *port.AnswerSheetSnapshot {
+func mbtiPolePreferenceAnswerSheet(model *port.MBTIModelSnapshot, prefs map[string]string) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		meta := model.Dimensions[mapping.Dimension]
 		wantRight := prefs[mapping.Dimension] == meta.RightPole
-		value := likertValueForSign(mapping.Sign, wantRight)
+		value := mbtiLikertValueForSign(mapping.Sign, wantRight)
 		score := float64(value[0] - '0')
 		answers = append(answers, port.AnswerSnapshot{
 			QuestionCode: mapping.QuestionCode,
@@ -89,7 +89,7 @@ func polePreferenceAnswerSheet(model *port.MBTIModelSnapshot, prefs map[string]s
 	}
 }
 
-func likertValueForSign(sign float64, wantRight bool) string {
+func mbtiLikertValueForSign(sign float64, wantRight bool) string {
 	if sign > 0 {
 		if wantRight {
 			return "5"
@@ -102,7 +102,7 @@ func likertValueForSign(sign float64, wantRight bool) string {
 	return "5"
 }
 
-func likertAnswerSheet(model *port.MBTIModelSnapshot, value string) *port.AnswerSheetSnapshot {
+func mbtiLikertAnswerSheet(model *port.MBTIModelSnapshot, value string) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	score := float64(value[0] - '0')
 	for _, mapping := range model.QuestionMappings {

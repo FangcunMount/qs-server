@@ -10,17 +10,25 @@ import (
 )
 
 type StaticCompositeCatalog struct {
-	sbti evaluationinputPort.SBTIModelCatalog
-	mbti evaluationinputPort.MBTIModelCatalog
+	ruleSets []*domain.RuleSetSnapshot
+	scale    ScaleBindingSource
 }
 
 var _ port.ModelCatalog = (*StaticCompositeCatalog)(nil)
 
-func NewStaticCompositeCatalog(
-	sbti evaluationinputPort.SBTIModelCatalog,
-	mbti evaluationinputPort.MBTIModelCatalog,
-) *StaticCompositeCatalog {
-	return &StaticCompositeCatalog{sbti: sbti, mbti: mbti}
+func NewStaticCompositeCatalog(ruleSets []*domain.RuleSetSnapshot, scale ScaleBindingSource) *StaticCompositeCatalog {
+	copied := make([]*domain.RuleSetSnapshot, 0, len(ruleSets))
+	for _, snapshot := range ruleSets {
+		if snapshot == nil {
+			continue
+		}
+		clone := *snapshot
+		if len(snapshot.Payload) > 0 {
+			clone.Payload = append([]byte(nil), snapshot.Payload...)
+		}
+		copied = append(copied, &clone)
+	}
+	return &StaticCompositeCatalog{ruleSets: copied, scale: scale}
 }
 
 func (c *StaticCompositeCatalog) ResolveByQuestionnaire(
@@ -30,14 +38,12 @@ func (c *StaticCompositeCatalog) ResolveByQuestionnaire(
 	if c == nil {
 		return port.ModelRef{}, false, nil
 	}
-	if c.sbti != nil {
-		if model, err := c.sbti.FindSBTIModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion); err == nil && model != nil {
-			return sbtiModelRef(model), true, nil
-		}
+	if snapshot := c.findRuleSetByQuestionnaire(questionnaireCode, questionnaireVersion); snapshot != nil {
+		return ModelRefFromSnapshot(snapshot), true, nil
 	}
-	if c.mbti != nil {
-		if model, err := c.mbti.FindMBTIModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion); err == nil && model != nil {
-			return mbtiModelRef(model), true, nil
+	if c.scale != nil {
+		if model, err := c.scale.FindScaleByQuestionnaire(ctx, questionnaireCode, questionnaireVersion); err == nil && model != nil {
+			return scaleModelRef(model), true, nil
 		}
 	}
 	return port.ModelRef{}, false, nil
@@ -47,36 +53,23 @@ func (c *StaticCompositeCatalog) GetPublishedByRef(ctx context.Context, ref port
 	if c == nil {
 		return nil, fmt.Errorf("interpretation model catalog is not configured")
 	}
-	switch ref.Kind {
-	case domain.ModelKindSBTI:
-		if c.sbti == nil {
-			return nil, fmt.Errorf("sbti model catalog is not configured")
-		}
-		model, err := c.sbti.GetSBTIModelByRef(ctx, evaluationinputPort.ModelRef{
-			Kind:    evaluationinputPort.EvaluationModelKindSBTI,
-			Code:    ref.Code,
-			Version: ref.Version,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return sbtiRuleSetSnapshot(model)
-	case domain.ModelKindMBTI:
-		if c.mbti == nil {
-			return nil, fmt.Errorf("mbti model catalog is not configured")
-		}
-		model, err := c.mbti.GetMBTIModelByRef(ctx, evaluationinputPort.ModelRef{
-			Kind:    evaluationinputPort.EvaluationModelKindMBTI,
-			Code:    ref.Code,
-			Version: ref.Version,
-		})
-		if err != nil {
-			return nil, err
-		}
-		return mbtiRuleSetSnapshot(model)
-	default:
-		return nil, fmt.Errorf("unsupported interpretation model kind: %s", ref.Kind)
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
 	}
+	if snapshot := c.findRuleSetByRef(ref); snapshot != nil {
+		return snapshot, nil
+	}
+	if ref.Kind == domain.ModelKindScale {
+		if c.scale == nil {
+			return nil, domain.ErrNotFound
+		}
+		model, err := c.scale.GetScaleByRef(ctx, ref.Code, ref.Version)
+		if err != nil {
+			return nil, err
+		}
+		return ScaleRuleSetSnapshot(model)
+	}
+	return nil, domain.ErrNotFound
 }
 
 func (c *StaticCompositeCatalog) FindPublishedByQuestionnaire(
@@ -93,10 +86,40 @@ func (c *StaticCompositeCatalog) FindPublishedByQuestionnaire(
 	return c.GetPublishedByRef(ctx, ref)
 }
 
-func sbtiRuleSetSnapshot(model *evaluationinputPort.SBTIModelSnapshot) (*domain.RuleSetSnapshot, error) {
-	return SBTIRuleSetSnapshot(model)
+func (c *StaticCompositeCatalog) findRuleSetByQuestionnaire(questionnaireCode, questionnaireVersion string) *domain.RuleSetSnapshot {
+	for _, snapshot := range c.ruleSets {
+		if snapshot == nil {
+			continue
+		}
+		if snapshot.Binding.QuestionnaireCode == questionnaireCode && snapshot.Binding.QuestionnaireVersion == questionnaireVersion {
+			return snapshot
+		}
+	}
+	return nil
 }
 
-func mbtiRuleSetSnapshot(model *evaluationinputPort.MBTIModelSnapshot) (*domain.RuleSetSnapshot, error) {
-	return MBTIRuleSetSnapshot(model)
+func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.ModelRef) *domain.RuleSetSnapshot {
+	for _, snapshot := range c.ruleSets {
+		if snapshot == nil {
+			continue
+		}
+		if snapshot.Definition.Kind == ref.Kind &&
+			snapshot.Definition.Code == ref.Code &&
+			snapshot.Definition.Version == ref.Version {
+			return snapshot
+		}
+	}
+	return nil
+}
+
+func scaleModelRef(model *evaluationinputPort.ScaleSnapshot) port.ModelRef {
+	if model == nil {
+		return port.ModelRef{}
+	}
+	return port.ModelRef{
+		Kind:    domain.ModelKindScale,
+		Code:    model.Code,
+		Version: model.ScaleVersion,
+		Title:   model.Title,
+	}
 }

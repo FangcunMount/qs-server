@@ -15,6 +15,8 @@ const statusPublished = "published"
 type InterpretationModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
+	SchemaVersion        string     `bson:"schema_version,omitempty"`
+	PayloadFormat        string     `bson:"payload_format,omitempty"`
 	ModelKind            string     `bson:"model_kind"`
 	ModelCode            string     `bson:"model_code"`
 	ModelVersion         string     `bson:"model_version"`

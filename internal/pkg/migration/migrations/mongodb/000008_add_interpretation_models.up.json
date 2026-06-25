@@ -18,6 +18,7 @@
       {
         "key": { "questionnaire_code": 1, "questionnaire_version": 1, "status": 1 },
         "name": "idx_interpretation_models_questionnaire_published",
+        "unique": true,
         "partialFilterExpression": { "deleted_at": null, "status": "published" }
       }
     ]

@@ -16,9 +16,9 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -35,7 +35,7 @@ type InternalService struct {
 	submissionService          assessmentApp.AssessmentSubmissionService
 	managementService          assessmentApp.AssessmentManagementService
 	executeService             execute.Service
-	scaleContextResolver       scaleApp.AssessmentScaleContextResolver
+	assessmentBindingResolver  interpretationmodelport.AssessmentBindingResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
 	taskAssessmentResolver     planApp.TaskAssessmentResolver
 	planCommandService         planApp.PlanCommandService
@@ -46,7 +46,6 @@ type InternalService struct {
 	behaviorProjectorService   statisticsApp.BehaviorProjectorService
 	warmupCoordinator          cachegov.Coordinator
 	reportStatusReporter       *reportstatus.Reporter
-	questionnaireModelBinding  interpretationmodelport.QuestionnaireModelBindingResolver
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -56,13 +55,6 @@ type InternalService struct {
 type surveyScaleQRCodeGenerator interface {
 	GenerateQuestionnaireQRCode(ctx context.Context, code, version string) (string, error)
 	GenerateScaleQRCode(ctx context.Context, code string) (string, error)
-}
-
-type assessmentScaleContext struct {
-	medicalScaleID   *uint64
-	medicalScaleCode *string
-	medicalScaleName *string
-	scaleVersion     *string
 }
 
 type operatorBootstrapRoleSyncer interface {
@@ -75,7 +67,7 @@ func NewInternalService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
 	executeService execute.Service,
-	scaleContextResolver scaleApp.AssessmentScaleContextResolver,
+	assessmentBindingResolver interpretationmodelport.AssessmentBindingResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
 	taskAssessmentResolver planApp.TaskAssessmentResolver,
 	planCommandService planApp.PlanCommandService,
@@ -88,14 +80,13 @@ func NewInternalService(
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 	reportStatusReporter *reportstatus.Reporter,
-	questionnaireModelBinding interpretationmodelport.QuestionnaireModelBindingResolver,
 ) *InternalService {
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
 		submissionService:                  submissionService,
 		managementService:                  managementService,
 		executeService:                     executeService,
-		scaleContextResolver:               scaleContextResolver,
+		assessmentBindingResolver:          assessmentBindingResolver,
 		assessmentAttentionService:         assessmentAttentionService,
 		taskAssessmentResolver:             taskAssessmentResolver,
 		planCommandService:                 planCommandService,
@@ -108,7 +99,6 @@ func NewInternalService(
 		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 		reportStatusReporter:               reportStatusReporter,
-		questionnaireModelBinding:          questionnaireModelBinding,
 	}
 }
 
@@ -161,60 +151,17 @@ func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFrom
 	}
 }
 
-func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, questionnaireCode, questionnaireVersion string) (assessmentScaleContext, error) {
-	l := logger.L(ctx)
-	if s.scaleContextResolver == nil || questionnaireCode == "" {
-		return assessmentScaleContext{}, nil
-	}
-
-	result, err := s.scaleContextResolver.ResolveAssessmentScaleContext(ctx, questionnaireCode, questionnaireVersion)
-	if err != nil {
-		l.Errorw("解析问卷量表绑定失败",
-			"questionnaire_code", questionnaireCode,
-			"questionnaire_version", questionnaireVersion,
-			"error", err,
-		)
-		return assessmentScaleContext{}, err
-	}
-	if result == nil || result.MedicalScaleCode == nil {
-		l.Infow("问卷未关联量表，将创建纯问卷模式的测评",
-			"questionnaire_code", questionnaireCode,
-			"questionnaire_version", questionnaireVersion,
-		)
-		return assessmentScaleContext{}, nil
-	}
-
-	l.Infow("找到关联量表",
-		"scale_id", result.MedicalScaleID,
-		"scale_code", result.MedicalScaleCode,
-		"scale_name", result.MedicalScaleName,
-		"scale_version", result.ScaleVersion,
-	)
-
-	return assessmentScaleContext{
-		medicalScaleID:   result.MedicalScaleID,
-		medicalScaleCode: result.MedicalScaleCode,
-		medicalScaleName: result.MedicalScaleName,
-		scaleVersion:     result.ScaleVersion,
-	}, nil
-}
-
 func buildCreateAssessmentDTO(
 	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	scaleCtx assessmentScaleContext,
-	bindingResolver interpretationmodelport.QuestionnaireModelBindingResolver,
-) assessmentApp.CreateAssessmentDTO {
+	bindingResolver interpretationmodelport.AssessmentBindingResolver,
+) (assessmentApp.CreateAssessmentDTO, error) {
 	dto := assessmentApp.CreateAssessmentDTO{
 		OrgID:                req.OrgId,
 		TesteeID:             req.TesteeId,
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		AnswerSheetID:        req.AnswersheetId,
-		MedicalScaleID:       scaleCtx.medicalScaleID,
-		MedicalScaleCode:     scaleCtx.medicalScaleCode,
-		MedicalScaleName:     scaleCtx.medicalScaleName,
-		ScaleVersion:         scaleCtx.scaleVersion,
 		OriginType:           req.OriginType,
 	}
 	if dto.OriginType == "" {
@@ -223,28 +170,42 @@ func buildCreateAssessmentDTO(
 	if req.OriginId != "" {
 		dto.OriginID = &req.OriginId
 	}
-	applyInterpretationModelContext(ctx, req, &dto, bindingResolver)
-	return dto
+	if err := applyAssessmentBinding(ctx, req, &dto, bindingResolver); err != nil {
+		return assessmentApp.CreateAssessmentDTO{}, err
+	}
+	return dto, nil
 }
 
-func applyInterpretationModelContext(
+func applyAssessmentBinding(
 	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
 	dto *assessmentApp.CreateAssessmentDTO,
-	resolver interpretationmodelport.QuestionnaireModelBindingResolver,
-) {
-	if req == nil || dto == nil || resolver == nil || dto.MedicalScaleID != nil || dto.ModelCode != nil {
-		return
+	resolver interpretationmodelport.AssessmentBindingResolver,
+) error {
+	if req == nil || dto == nil || resolver == nil {
+		return nil
 	}
-	ref, ok, err := resolver.ResolveByQuestionnaire(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
-	if err != nil || !ok || ref.IsEmpty() {
-		return
+	binding, ok, err := resolver.ResolveAssessmentBinding(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
+	if err != nil {
+		return err
 	}
-	kind := ref.Kind.String()
-	dto.ModelKind = &kind
-	dto.ModelCode = &ref.Code
-	dto.ModelVersion = &ref.Version
-	dto.ModelTitle = &ref.Title
+	if !ok {
+		return nil
+	}
+	switch binding.Ref.Kind {
+	case domaininterpretation.ModelKindScale:
+		dto.MedicalScaleID = binding.MedicalScaleID
+		dto.MedicalScaleCode = binding.MedicalScaleCode
+		dto.MedicalScaleName = binding.MedicalScaleName
+		dto.ScaleVersion = binding.ScaleVersion
+	default:
+		kind := binding.Ref.Kind.String()
+		dto.ModelKind = &kind
+		dto.ModelCode = &binding.Ref.Code
+		dto.ModelVersion = &binding.Ref.Version
+		dto.ModelTitle = &binding.Ref.Title
+	}
+	return nil
 }
 
 func shouldAutoSubmitAssessment(dto assessmentApp.CreateAssessmentDTO) bool {

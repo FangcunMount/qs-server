@@ -1,6 +1,7 @@
 package interpretationmodel
 
 import (
+	"context"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
-	catalog, err := NewDefaultStaticCatalog()
+	catalog, err := NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
@@ -61,7 +62,7 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 }
 
 func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
-	catalog, err := NewDefaultStaticCatalog()
+	catalog, err := NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
@@ -84,4 +85,56 @@ func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
 	if len(snapshot.Payload) == 0 {
 		t.Fatal("expected payload")
 	}
+}
+
+func TestStaticCompositeCatalogResolveScaleBinding(t *testing.T) {
+	scaleModel := &evaluationinputPort.ScaleSnapshot{
+		Code:                 "SCL-001",
+		ScaleVersion:         "1.0.0",
+		Title:                "Demo Scale",
+		QuestionnaireCode:    "QNR-SCALE",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+	}
+	catalog := NewStaticCompositeCatalog(nil, stubScaleBindingSource{model: scaleModel})
+
+	ref, ok, err := catalog.ResolveByQuestionnaire(t.Context(), "QNR-SCALE", "1.0.0")
+	if err != nil {
+		t.Fatalf("ResolveByQuestionnaire: %v", err)
+	}
+	if !ok {
+		t.Fatal("expected scale binding")
+	}
+	if ref.Kind != domain.ModelKindScale || ref.Code != "SCL-001" || ref.Version != "1.0.0" {
+		t.Fatalf("ref = %#v", ref)
+	}
+
+	snapshot, err := catalog.GetPublishedByRef(t.Context(), ref)
+	if err != nil {
+		t.Fatalf("GetPublishedByRef: %v", err)
+	}
+	if snapshot.DecisionKind != domain.DecisionKindScoreRangeInterpretation {
+		t.Fatalf("decision = %s", snapshot.DecisionKind)
+	}
+}
+
+type stubScaleBindingSource struct {
+	model *evaluationinputPort.ScaleSnapshot
+}
+
+func (s stubScaleBindingSource) FindScaleByQuestionnaire(_ context.Context, questionnaireCode, questionnaireVersion string) (*evaluationinputPort.ScaleSnapshot, error) {
+	if s.model == nil {
+		return nil, domain.ErrNotFound
+	}
+	if s.model.QuestionnaireCode == questionnaireCode && s.model.QuestionnaireVersion == questionnaireVersion {
+		return s.model, nil
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (s stubScaleBindingSource) GetScaleByRef(_ context.Context, code, version string) (*evaluationinputPort.ScaleSnapshot, error) {
+	if s.model == nil || s.model.Code != code || s.model.ScaleVersion != version {
+		return nil, domain.ErrNotFound
+	}
+	return s.model, nil
 }

@@ -18,6 +18,7 @@ import (
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	interpretationmodelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
 	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
@@ -259,7 +260,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
-		r.deps.Scale.QueryService,
+		interpretationmodelInfra.NewAssessmentBindingResolver(r.deps.Interpretation.ModelCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,
 		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,
@@ -272,7 +273,6 @@ func (r *Registry) registerInternalService() error {
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,
 		r.deps.Evaluation.ReportStatusReporter,
-		r.deps.Interpretation.ModelCatalog,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")

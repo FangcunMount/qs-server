@@ -80,13 +80,14 @@ func (r *Repository) UpsertPublished(ctx context.Context, snapshot *domain.RuleS
 }
 
 func (r *Repository) GetPublishedByRef(ctx context.Context, ref port.ModelRef) (*domain.RuleSetSnapshot, error) {
-	filter := publishedFilter(bson.M{
-		"model_kind": ref.Kind.String(),
-		"model_code": ref.Code,
-	})
-	if ref.Version != "" {
-		filter["model_version"] = ref.Version
+	if ref.Version == "" {
+		return nil, domain.ErrVersionRequired
 	}
+	filter := publishedFilter(bson.M{
+		"model_kind":    ref.Kind.String(),
+		"model_code":    ref.Code,
+		"model_version": ref.Version,
+	})
 	return r.findOne(ctx, filter)
 }
 
@@ -101,8 +102,18 @@ func (r *Repository) FindPublishedByQuestionnaire(ctx context.Context, questionn
 }
 
 func (r *Repository) findOne(ctx context.Context, filter bson.M) (*domain.RuleSetSnapshot, error) {
+	count, err := r.Collection().CountDocuments(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	if count == 0 {
+		return nil, domain.ErrNotFound
+	}
+	if count > 1 {
+		return nil, domain.ErrAmbiguousVersion
+	}
 	var po InterpretationModelPO
-	err := r.FindOne(ctx, filter, &po)
+	err = r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, domain.ErrNotFound

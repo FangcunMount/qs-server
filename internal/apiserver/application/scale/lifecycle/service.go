@@ -32,6 +32,7 @@ type lifecycleService struct {
 	eventPublisher         event.EventPublisher
 	listCache              scalelistcache.PublishedListCache
 	cacheSignalNotifier    CacheSignalNotifier
+	interpretationPublisher InterpretationRulePublisher
 }
 
 type lifecycleRepository interface {
@@ -43,6 +44,11 @@ type lifecycleRepository interface {
 	SetActivePublishedVersion(ctx context.Context, code, scaleVersion string) error
 	ClearActivePublishedVersion(ctx context.Context, code string) error
 	Remove(ctx context.Context, code string) error
+}
+
+// InterpretationRulePublisher 将已发布量表同步到统一规则目录。
+type InterpretationRulePublisher interface {
+	PublishPublishedScale(ctx context.Context, scale *domscale.MedicalScale) error
 }
 
 // QuestionnairePublisher is the narrow port used by scale publication to
@@ -66,6 +72,13 @@ func WithQuestionnairePublisher(publisher QuestionnairePublisher) ServiceOption 
 func WithCacheSignalNotifier(notifier CacheSignalNotifier) ServiceOption {
 	return func(s *lifecycleService) {
 		s.cacheSignalNotifier = notifier
+	}
+}
+
+// WithInterpretationRulePublisher injects the interpretation model sync port.
+func WithInterpretationRulePublisher(publisher InterpretationRulePublisher) ServiceOption {
+	return func(s *lifecycleService) {
+		s.interpretationPublisher = publisher
 	}
 }
 
@@ -120,6 +133,9 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*shared.Sc
 	}
 	if err := s.repo.SetActivePublishedVersion(ctx, code, m.GetScaleVersion()); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "切换量表发布快照失败")
+	}
+	if err := s.syncInterpretationRules(ctx, m); err != nil {
+		return nil, errors.WrapC(err, errorCode.ErrDatabase, "同步解释模型规则失败")
 	}
 
 	s.publishEvents(ctx, m)
@@ -233,4 +249,11 @@ func (s *lifecycleService) notifyCacheChanged(ctx context.Context, code, action 
 		return
 	}
 	s.cacheSignalNotifier.NotifyScaleCacheChanged(ctx, code, action)
+}
+
+func (s *lifecycleService) syncInterpretationRules(ctx context.Context, m *domscale.MedicalScale) error {
+	if s == nil || s.interpretationPublisher == nil {
+		return nil
+	}
+	return s.interpretationPublisher.PublishPublishedScale(ctx, m)
 }

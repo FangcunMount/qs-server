@@ -6,6 +6,7 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
+	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -16,13 +17,42 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func testQuestionnaireModelBindingResolver(t *testing.T) interpretationmodelport.QuestionnaireModelBindingResolver {
+func testAssessmentBindingResolver(t *testing.T) interpretationmodelport.AssessmentBindingResolver {
 	t.Helper()
-	catalog, err := interpretationmodel.NewDefaultStaticCatalog()
+	catalog, err := interpretationmodel.NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
-	return catalog
+	return interpretationmodel.NewAssessmentBindingResolver(catalog)
+}
+
+func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    "QNR-001",
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+
+	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
+		binding: interpretationmodelport.ScaleAssessmentBinding(
+			interpretationmodelport.ModelRef{Kind: domaininterpretation.ModelKindScale, Code: "SCL-001", Version: "1.0.0"},
+			8, "SCL-001", "Scale", "1.0.0",
+		),
+	})
+	if err != nil {
+		t.Fatalf("buildCreateAssessmentDTO: %v", err)
+	}
+	if dto.OriginType != "adhoc" {
+		t.Fatalf("expected adhoc origin type, got %q", dto.OriginType)
+	}
+	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
+		t.Fatalf("expected medical scale id 8, got %#v", dto.MedicalScaleID)
+	}
+	if dto.MedicalScaleCode == nil || *dto.MedicalScaleCode != "SCL-001" {
+		t.Fatalf("expected medical scale code SCL-001, got %#v", dto.MedicalScaleCode)
+	}
 }
 
 func TestValidateCreateAssessmentFromAnswerSheetRequest(t *testing.T) {
@@ -59,32 +89,6 @@ func TestValidateCreateAssessmentFromAnswerSheetRequest(t *testing.T) {
 	}
 }
 
-func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
-	req := &pb.CreateAssessmentFromAnswerSheetRequest{
-		OrgId:                9,
-		TesteeId:             101,
-		QuestionnaireCode:    "QNR-001",
-		QuestionnaireVersion: "1.0.0",
-		AnswersheetId:        202,
-	}
-	scaleCtx := assessmentScaleContext{
-		medicalScaleID:   uint64Ptr(8),
-		medicalScaleCode: stringPtr("SCL-001"),
-		medicalScaleName: stringPtr("Scale"),
-	}
-
-	dto := buildCreateAssessmentDTO(context.Background(), req, scaleCtx, nil)
-	if dto.OriginType != "adhoc" {
-		t.Fatalf("expected adhoc origin type, got %q", dto.OriginType)
-	}
-	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
-		t.Fatalf("expected medical scale id 8, got %#v", dto.MedicalScaleID)
-	}
-	if dto.MedicalScaleCode == nil || *dto.MedicalScaleCode != "SCL-001" {
-		t.Fatalf("expected medical scale code SCL-001, got %#v", dto.MedicalScaleCode)
-	}
-}
-
 func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
@@ -94,7 +98,10 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 		AnswersheetId:        202,
 	}
 
-	dto := buildCreateAssessmentDTO(context.Background(), req, assessmentScaleContext{}, testQuestionnaireModelBindingResolver(t))
+	dto, err := buildCreateAssessmentDTO(context.Background(), req, testAssessmentBindingResolver(t))
+	if err != nil {
+		t.Fatalf("buildCreateAssessmentDTO: %v", err)
+	}
 	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindSBTI.String() {
 		t.Fatalf("ModelKind = %#v, want sbti", dto.ModelKind)
 	}
@@ -115,7 +122,10 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 		AnswersheetId:        202,
 	}
 
-	dto := buildCreateAssessmentDTO(context.Background(), req, assessmentScaleContext{}, testQuestionnaireModelBindingResolver(t))
+	dto, err := buildCreateAssessmentDTO(context.Background(), req, testAssessmentBindingResolver(t))
+	if err != nil {
+		t.Fatalf("buildCreateAssessmentDTO: %v", err)
+	}
 	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindMBTI.String() {
 		t.Fatalf("ModelKind = %#v, want mbti", dto.ModelKind)
 	}
@@ -133,6 +143,100 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 	}
 }
 
+func TestBuildCreateAssessmentDTOPropagatesResolverError(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    evaluationinput.DefaultSBTIQuestionnaireCode,
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+	_, err := buildCreateAssessmentDTO(context.Background(), req, failingBindingResolver{err: context.DeadlineExceeded})
+	if err == nil {
+		t.Fatal("expected resolver error")
+	}
+}
+
+type failingBindingResolver struct {
+	err error
+}
+
+func (f failingBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (interpretationmodelport.ModelRef, bool, error) {
+	return interpretationmodelport.ModelRef{}, false, f.err
+}
+
+func (f failingBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (interpretationmodelport.AssessmentBinding, bool, error) {
+	return interpretationmodelport.AssessmentBinding{}, false, f.err
+}
+
+func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    "QNR-SCALE",
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
+		binding: interpretationmodelport.ScaleAssessmentBinding(
+			interpretationmodelport.ModelRef{Kind: domaininterpretation.ModelKindScale, Code: "SCL-001", Version: "1.0.0"},
+			8, "SCL-001", "Scale", "1.0.0",
+		),
+	})
+	if err != nil {
+		t.Fatalf("buildCreateAssessmentDTO: %v", err)
+	}
+	if dto.ModelCode != nil {
+		t.Fatalf("ModelCode = %#v, want nil for scale binding", dto.ModelCode)
+	}
+	if dto.MedicalScaleID == nil || *dto.MedicalScaleID != 8 {
+		t.Fatalf("MedicalScaleID = %#v, want 8", dto.MedicalScaleID)
+	}
+}
+
+type stubScaleBindingResolver struct {
+	binding interpretationmodelport.AssessmentBinding
+	ok      bool
+}
+
+func (s stubScaleBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (interpretationmodelport.ModelRef, bool, error) {
+	if !s.ok && s.binding.Ref.IsEmpty() {
+		return interpretationmodelport.ModelRef{}, false, nil
+	}
+	if s.ok || !s.binding.Ref.IsEmpty() {
+		return s.binding.Ref, true, nil
+	}
+	return interpretationmodelport.ModelRef{}, false, nil
+}
+
+func (s stubScaleBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (interpretationmodelport.AssessmentBinding, bool, error) {
+	if !s.ok && s.binding.Ref.IsEmpty() {
+		return interpretationmodelport.AssessmentBinding{}, false, nil
+	}
+	if s.ok || !s.binding.Ref.IsEmpty() {
+		return s.binding, true, nil
+	}
+	return interpretationmodelport.AssessmentBinding{}, false, nil
+}
+
+func TestBuildCreateAssessmentDTOSkipsBindingWhenUnresolved(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    evaluationinput.DefaultMBTIQuestionnaireCode,
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+
+	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{})
+	if err != nil {
+		t.Fatalf("buildCreateAssessmentDTO: %v", err)
+	}
+	if dto.ModelCode != nil || dto.MedicalScaleID != nil {
+		t.Fatalf("dto = %#v, want no model binding", dto)
+	}
+}
+
 func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 	req := &pb.CreateAssessmentFromAnswerSheetRequest{
 		OrgId:                9,
@@ -141,13 +245,15 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 		QuestionnaireVersion: "1.0.0",
 		AnswersheetId:        202,
 	}
-	scaleCtx := assessmentScaleContext{
-		medicalScaleID:   uint64Ptr(8),
-		medicalScaleCode: stringPtr("SCL-001"),
-		medicalScaleName: stringPtr("Scale"),
+	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
+		binding: interpretationmodelport.ScaleAssessmentBinding(
+			interpretationmodelport.ModelRef{Kind: domaininterpretation.ModelKindScale, Code: "SCL-001", Version: "1.0.0"},
+			8, "SCL-001", "Scale", "1.0.0",
+		),
+	})
+	if err != nil {
+		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
-
-	dto := buildCreateAssessmentDTO(context.Background(), req, scaleCtx, nil)
 	if dto.ModelCode != nil {
 		t.Fatalf("ModelCode = %#v, want nil when scale is bound", dto.ModelCode)
 	}

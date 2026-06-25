@@ -5,6 +5,9 @@ import (
 
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	interpretationmodelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
+	mongoInterpretationmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretationmodel"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
@@ -28,6 +31,11 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 		deps.ListCache = infra.scaleListCache
 		deps.HotListCache = infra.scaleHotListCache
 		deps.QuestionnaireCatalog = quesApp.NewPublishedQuestionnaireCatalog(infra.questionnaireRepo)
+	}
+	if c != nil && c.mongoDB != nil {
+		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
+		writer := mongoInterpretationmodel.NewRepository(c.mongoDB, mongoOpts)
+		deps.InterpretationRulePublisher = interpretationmodelInfra.NewScaleInterpretationPublisher(writer)
 	}
 	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
 		deps.QuestionnairePublisher = c.SurveyModule.Questionnaire.LifecycleService

@@ -24,6 +24,8 @@ func (Mapper) ToPO(snapshot *domain.RuleSetSnapshot) *InterpretationModelPO {
 		source[key] = value
 	}
 	return &InterpretationModelPO{
+		SchemaVersion:        snapshot.SchemaVersion,
+		PayloadFormat:        snapshot.PayloadFormat,
 		ModelKind:            string(snapshot.Definition.Kind),
 		ModelCode:            snapshot.Definition.Code,
 		ModelVersion:         snapshot.Definition.Version,
@@ -46,6 +48,8 @@ func (Mapper) ToDomain(po *InterpretationModelPO) *domain.RuleSetSnapshot {
 		source[key] = value
 	}
 	return &domain.RuleSetSnapshot{
+		SchemaVersion: po.SchemaVersion,
+		PayloadFormat: po.PayloadFormat,
 		Definition: domain.ModelDefinition{
 			Kind:    domain.ModelKind(po.ModelKind),
 			Code:    po.ModelCode,
