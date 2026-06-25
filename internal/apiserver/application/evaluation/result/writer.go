@@ -141,7 +141,7 @@ func (w *writer) prepare(ctx context.Context, outcome Outcome) (preparedOutcome,
 	if w.reportBuilders == nil {
 		return preparedOutcome{}, evalerrors.ModuleNotConfigured("evaluation report builder registry is not configured")
 	}
-	builder, err := w.reportBuilders.Resolve(kind, domainReport.ReportTypeStandard)
+	builder, err := w.reportBuilders.Resolve(kind, resolveReportType(outcome))
 	if err != nil {
 		return preparedOutcome{}, err
 	}

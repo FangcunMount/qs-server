@@ -4,6 +4,7 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -33,11 +34,11 @@ func (p ScaleScoreProjector) Project(ctx context.Context, outcome Outcome) error
 }
 
 type ScaleReportBuilder struct {
-	builder domainReport.ReportBuilder
+	composer domainReport.ReportBuilder
 }
 
-func NewScaleReportBuilder(builder domainReport.ReportBuilder) ScaleReportBuilder {
-	return ScaleReportBuilder{builder: builder}
+func NewScaleReportBuilder(composer domainReport.ReportBuilder) ScaleReportBuilder {
+	return ScaleReportBuilder{composer: composer}
 }
 
 func (b ScaleReportBuilder) Kind() assessment.EvaluationModelKind {
@@ -49,69 +50,43 @@ func (ScaleReportBuilder) ReportType() domainReport.ReportType {
 }
 
 func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domainReport.InterpretReport, error) {
-	if b.builder == nil {
+	if b.composer == nil {
 		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")
 	}
 	_ = ctx
-	return b.builder.Build(scaleReportInputFromOutcome(outcome))
+	return evaluationdomain.BuildScaleReport(b.composer, scaleReportInputFromOutcome(outcome))
 }
 
-func scaleReportInputFromOutcome(outcome Outcome) domainReport.GenerateReportInput {
-	input := domainReport.GenerateReportInput{}
+func scaleReportInputFromOutcome(outcome Outcome) evaluationdomain.ScaleReportInput {
+	input := evaluationdomain.ScaleReportInput{}
 	if outcome.Assessment != nil {
 		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
 	}
-	scaleSnapshot := scaleSnapshotFromOutcome(outcome)
-	if scaleSnapshot != nil {
-		input.ScaleName = scaleSnapshot.Title
-		input.ScaleCode = scaleSnapshot.Code
-	}
+	input.Scale = scaleSnapshotFromOutcome(outcome)
 	if outcome.Result != nil {
 		input.TotalScore = outcome.Result.TotalScore
 		input.RiskLevel = domainReport.RiskLevel(outcome.Result.RiskLevel)
 		input.Conclusion = outcome.Result.Conclusion
 		input.Suggestion = outcome.Result.Suggestion
-		input.FactorScores = scaleReportFactorScoreInputs(outcome.Result.FactorScores, scaleSnapshot)
+		input.FactorScores = scaleFactorReportScores(outcome.Result.FactorScores)
 	}
 	return input
 }
 
-func scaleReportFactorScoreInputs(
-	factorScores []assessment.FactorScoreResult,
-	scaleSnapshot *evaluationinput.ScaleSnapshot,
-) []domainReport.FactorScoreInput {
-	factorMeta := make(map[string]evaluationinput.FactorSnapshot)
-	if scaleSnapshot != nil {
-		for _, f := range scaleSnapshot.Factors {
-			factorMeta[f.Code] = f
-		}
-	}
-	inputs := make([]domainReport.FactorScoreInput, 0, len(factorScores))
+func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []evaluationdomain.ScaleFactorReportScore {
+	scores := make([]evaluationdomain.ScaleFactorReportScore, 0, len(factorScores))
 	for _, fs := range factorScores {
-		meta, ok := factorMeta[string(fs.FactorCode)]
-		factorName := fs.FactorName
-		var maxScore *float64
-		if ok {
-			if factorName == "" {
-				factorName = meta.Title
-			}
-			maxScore = meta.MaxScore
-		}
-		if factorName == "" {
-			factorName = string(fs.FactorCode)
-		}
-		inputs = append(inputs, domainReport.FactorScoreInput{
-			FactorCode:   domainReport.FactorCode(fs.FactorCode),
-			FactorName:   factorName,
+		scores = append(scores, evaluationdomain.ScaleFactorReportScore{
+			FactorCode:   string(fs.FactorCode),
+			FactorName:   fs.FactorName,
 			RawScore:     fs.RawScore,
-			MaxScore:     maxScore,
 			RiskLevel:    domainReport.RiskLevel(fs.RiskLevel),
-			Description:  fs.Conclusion,
+			Conclusion:   fs.Conclusion,
 			Suggestion:   fs.Suggestion,
 			IsTotalScore: fs.IsTotalScore,
 		})
 	}
-	return inputs
+	return scores
 }
 
 func scaleSnapshotFromOutcome(outcome Outcome) *evaluationinput.ScaleSnapshot {
