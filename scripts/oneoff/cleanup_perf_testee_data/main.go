@@ -17,11 +17,11 @@ import (
 	"time"
 
 	"github.com/go-sql-driver/mysql"
-	"golang.org/x/sync/errgroup"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/errgroup"
 )
 
 const mongoIDChunkSize = 1000
