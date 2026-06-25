@@ -4,8 +4,8 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	mongoInterpretationmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretationmodel"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
+	mongoInterpretationmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretationmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 )
 

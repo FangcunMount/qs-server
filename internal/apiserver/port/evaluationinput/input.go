@@ -189,17 +189,17 @@ func MBTIPayload(input *InputSnapshot) (*MBTIModelSnapshot, bool) {
 }
 
 type MBTIModelSnapshot struct {
-	Code                 string                        `json:"code"`
-	Version              string                        `json:"version"`
-	Title                string                        `json:"title"`
-	QuestionnaireCode    string                        `json:"questionnaire_code"`
-	QuestionnaireVersion string                        `json:"questionnaire_version"`
-	Status               string                        `json:"status"`
-	Source               MBTISourceSnapshot            `json:"source"`
-	DimensionOrder       []string                      `json:"dimension_order"`
+	Code                 string                           `json:"code"`
+	Version              string                           `json:"version"`
+	Title                string                           `json:"title"`
+	QuestionnaireCode    string                           `json:"questionnaire_code"`
+	QuestionnaireVersion string                           `json:"questionnaire_version"`
+	Status               string                           `json:"status"`
+	Source               MBTISourceSnapshot               `json:"source"`
+	DimensionOrder       []string                         `json:"dimension_order"`
 	Dimensions           map[string]MBTIDimensionSnapshot `json:"dimensions"`
-	QuestionMappings     []MBTIQuestionMappingSnapshot `json:"question_mappings"`
-	TypeProfiles         []MBTITypeProfileSnapshot     `json:"type_profiles"`
+	QuestionMappings     []MBTIQuestionMappingSnapshot    `json:"question_mappings"`
+	TypeProfiles         []MBTITypeProfileSnapshot        `json:"type_profiles"`
 }
 
 func (m *MBTIModelSnapshot) IsPublished() bool {
@@ -234,12 +234,12 @@ type MBTISourceSnapshot struct {
 }
 
 type MBTIDimensionSnapshot struct {
-	Code       string  `json:"code"`
-	Name       string  `json:"name"`
-	LeftPole   string  `json:"left_pole"`
-	RightPole  string  `json:"right_pole"`
-	Constant   float64 `json:"constant"`
-	Threshold  float64 `json:"threshold"`
+	Code      string  `json:"code"`
+	Name      string  `json:"name"`
+	LeftPole  string  `json:"left_pole"`
+	RightPole string  `json:"right_pole"`
+	Constant  float64 `json:"constant"`
+	Threshold float64 `json:"threshold"`
 }
 
 type MBTIQuestionMappingSnapshot struct {

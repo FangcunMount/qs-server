@@ -92,7 +92,7 @@ func alternatingAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheetSnap
 		answers = append(answers, port.AnswerSnapshot{
 			QuestionCode: mapping.QuestionCode,
 			Value:        value,
-			Score:        float64((i%2)+1),
+			Score:        float64((i % 2) + 1),
 		})
 	}
 	return &port.AnswerSheetSnapshot{

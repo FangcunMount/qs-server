@@ -18,8 +18,8 @@ import (
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
@@ -32,13 +32,13 @@ type Registry struct {
 type Deps struct {
 	Server *grpcpkg.Server
 
-	Survey     SurveyDeps
-	Actor      ActorDeps
-	Evaluation EvaluationDeps
-	Scale      ScaleDeps
-	Plan       PlanDeps
-	Statistics StatisticsDeps
-	IAM        IAMDeps
+	Survey         SurveyDeps
+	Actor          ActorDeps
+	Evaluation     EvaluationDeps
+	Scale          ScaleDeps
+	Plan           PlanDeps
+	Statistics     StatisticsDeps
+	IAM            IAMDeps
 	Interpretation InterpretationDeps
 
 	WarmupCoordinator                  cachegov.Coordinator

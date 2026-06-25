@@ -13,12 +13,12 @@ type DimensionResult struct {
 }
 
 type ResultDetail struct {
-	TypeCode       string                        `json:"type_code"`
-	TypeName       string                        `json:"type_name"`
-	OneLiner       string                        `json:"one_liner"`
-	MatchPercent   float64                       `json:"match_percent"`
-	ImageURL       string                        `json:"image_url"`
-	Dimensions     []DimensionResult             `json:"dimensions"`
-	Profile        port.MBTITypeProfileSnapshot  `json:"profile"`
-	Source         port.MBTISourceSnapshot       `json:"source"`
+	TypeCode     string                       `json:"type_code"`
+	TypeName     string                       `json:"type_name"`
+	OneLiner     string                       `json:"one_liner"`
+	MatchPercent float64                      `json:"match_percent"`
+	ImageURL     string                       `json:"image_url"`
+	Dimensions   []DimensionResult            `json:"dimensions"`
+	Profile      port.MBTITypeProfileSnapshot `json:"profile"`
+	Source       port.MBTISourceSnapshot      `json:"source"`
 }
