@@ -167,7 +167,7 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 		return response, nil
 	}
 
-	return s.createAssessmentFromAnswerSheet(ctx, l, req, dto, matchedTask, scaleCtx.medicalScaleID != nil)
+	return s.createAssessmentFromAnswerSheet(ctx, l, req, dto, matchedTask, shouldAutoSubmitAssessment(dto))
 }
 
 func (flow assessmentFlow) EvaluateAssessment(

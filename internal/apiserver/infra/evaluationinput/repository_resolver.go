@@ -15,6 +15,7 @@ import (
 
 type RepositoryResolver struct {
 	scaleCatalog port.ScaleCatalog
+	sbtiCatalog  port.SBTIModelCatalog
 	providers    *ModelInputProviderRegistry
 }
 
@@ -28,16 +29,38 @@ func NewRepositoryResolver(
 	questionnaireRepo questionnaire.Repository,
 ) (*RepositoryResolver, error) {
 	scaleCatalog := NewRepositoryScaleSnapshotCatalog(scaleRepo)
+	sbtiCatalog, err := NewDefaultSBTIModelCatalog()
+	if err != nil {
+		return nil, err
+	}
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
-	return NewResolver(
+	return NewResolverWithSBTI(
 		scaleCatalog,
+		sbtiCatalog,
 		NewScaleModelInputProvider(scaleCatalog, answerSheetReader, questionnaireReader),
+		NewSBTIModelInputProvider(sbtiCatalog, answerSheetReader, questionnaireReader),
 	)
 }
 
 func NewResolver(
 	scaleCatalog port.ScaleModelCatalog,
+	providers ...ModelInputProvider,
+) (*RepositoryResolver, error) {
+	return newResolver(scaleCatalog, nil, providers...)
+}
+
+func NewResolverWithSBTI(
+	scaleCatalog port.ScaleModelCatalog,
+	sbtiCatalog port.SBTIModelCatalog,
+	providers ...ModelInputProvider,
+) (*RepositoryResolver, error) {
+	return newResolver(scaleCatalog, sbtiCatalog, providers...)
+}
+
+func newResolver(
+	scaleCatalog port.ScaleModelCatalog,
+	sbtiCatalog port.SBTIModelCatalog,
 	providers ...ModelInputProvider,
 ) (*RepositoryResolver, error) {
 	providerRegistry, err := NewModelInputProviderRegistry(providers...)
@@ -46,6 +69,7 @@ func NewResolver(
 	}
 	return &RepositoryResolver{
 		scaleCatalog: scaleCatalog,
+		sbtiCatalog:  sbtiCatalog,
 		providers:    providerRegistry,
 	}, nil
 }
@@ -73,6 +97,13 @@ func normalizeModelRef(ref port.InputRef) port.ModelRef {
 
 func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
 	return r.scaleCatalog.GetScale(ctx, code)
+}
+
+func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*port.SBTIModelSnapshot, error) {
+	if r == nil || r.sbtiCatalog == nil {
+		return nil, fmt.Errorf("sbti model catalog is not configured")
+	}
+	return r.sbtiCatalog.FindSBTIModelByQuestionnaire(ctx, code, version)
 }
 
 type ModelInputProvider interface {

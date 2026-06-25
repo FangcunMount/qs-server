@@ -170,6 +170,9 @@ const (
 
 	// EvaluationModelKindMBTI MBTI 人格模型，当前仅预留扩展点。
 	EvaluationModelKindMBTI EvaluationModelKind = "mbti"
+
+	// EvaluationModelKindSBTI SBTI 趣味人格模型。
+	EvaluationModelKindSBTI EvaluationModelKind = "sbti"
 )
 
 func (k EvaluationModelKind) String() string {
@@ -178,7 +181,7 @@ func (k EvaluationModelKind) String() string {
 
 func (k EvaluationModelKind) IsValid() bool {
 	switch k {
-	case EvaluationModelKindScale, EvaluationModelKindMBTI:
+	case EvaluationModelKindScale, EvaluationModelKindMBTI, EvaluationModelKindSBTI:
 		return true
 	default:
 		return false

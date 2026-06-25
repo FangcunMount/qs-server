@@ -7,6 +7,7 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -70,6 +71,27 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 	}
 	if dto.MedicalScaleCode == nil || *dto.MedicalScaleCode != "SCL-001" {
 		t.Fatalf("expected medical scale code SCL-001, got %#v", dto.MedicalScaleCode)
+	}
+}
+
+func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
+	req := &pb.CreateAssessmentFromAnswerSheetRequest{
+		OrgId:                9,
+		TesteeId:             101,
+		QuestionnaireCode:    evaluationinput.DefaultSBTIQuestionnaireCode,
+		QuestionnaireVersion: "1.0.0",
+		AnswersheetId:        202,
+	}
+
+	dto := buildCreateAssessmentDTO(req, assessmentScaleContext{})
+	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindSBTI.String() {
+		t.Fatalf("ModelKind = %#v, want sbti", dto.ModelKind)
+	}
+	if dto.ModelCode == nil || *dto.ModelCode != evaluationinput.DefaultSBTIModelCode {
+		t.Fatalf("ModelCode = %#v, want SBTI_FUN", dto.ModelCode)
+	}
+	if !shouldAutoSubmitAssessment(dto) {
+		t.Fatal("shouldAutoSubmitAssessment() = false, want true for SBTI model")
 	}
 }
 

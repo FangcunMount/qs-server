@@ -20,6 +20,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -217,7 +218,29 @@ func buildCreateAssessmentDTO(
 	if req.OriginId != "" {
 		dto.OriginID = &req.OriginId
 	}
+	applySBTIModelContext(req, &dto)
 	return dto
+}
+
+func applySBTIModelContext(req *pb.CreateAssessmentFromAnswerSheetRequest, dto *assessmentApp.CreateAssessmentDTO) {
+	if req == nil || dto == nil || dto.MedicalScaleID != nil {
+		return
+	}
+	if req.QuestionnaireCode != evaluationinput.DefaultSBTIQuestionnaireCode {
+		return
+	}
+	kind := evaluationinput.EvaluationModelKindSBTI.String()
+	code := evaluationinput.DefaultSBTIModelCode
+	version := evaluationinput.DefaultSBTIModelVersion
+	title := evaluationinput.DefaultSBTIModelTitle
+	dto.ModelKind = &kind
+	dto.ModelCode = &code
+	dto.ModelVersion = &version
+	dto.ModelTitle = &title
+}
+
+func shouldAutoSubmitAssessment(dto assessmentApp.CreateAssessmentDTO) bool {
+	return dto.MedicalScaleID != nil || dto.ModelCode != nil
 }
 
 func (s *InternalService) applyMatchedTaskOrigin(

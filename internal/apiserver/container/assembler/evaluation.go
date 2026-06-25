@@ -13,6 +13,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	sbtiEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/sbti"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	scaleInterpretation "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/interpretation"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -215,7 +216,8 @@ func (m *EvaluationModule) wireEvaluationEngine(
 				scaleInterpretation.DefaultResultMapper{},
 			),
 		)
-		evaluatorRegistry, err := execute.NewEvaluatorRegistry(scaleEvaluator)
+		sbtiEvaluator := sbtiEvaluation.NewExecutor()
+		evaluatorRegistry, err := execute.NewEvaluatorRegistry(scaleEvaluator, sbtiEvaluator)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
@@ -227,6 +229,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		}
 		reportBuilders, err := evaluationResult.NewReportBuilderRegistry(
 			evaluationResult.NewScaleReportBuilder(reportBuilder),
+			sbtiEvaluation.NewReportBuilder(),
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation report builder registry: %v", err)

@@ -71,3 +71,33 @@ func TestBuildCreateRequestRejectsOverflowOrgID(t *testing.T) {
 		t.Fatal("expected overflow org id to be rejected")
 	}
 }
+
+func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
+	kind := domainAssessment.EvaluationModelKindSBTI.String()
+	code := "SBTI_FUN"
+	version := "1.0.0"
+	title := "SBTI 趣味人格测评"
+	req, err := assessmentCreateRequestAssembler{}.Assemble(CreateAssessmentDTO{
+		OrgID:                1,
+		TesteeID:             2001,
+		QuestionnaireCode:    "SBTI_FUN",
+		QuestionnaireVersion: "1.0.0",
+		AnswerSheetID:        3001,
+		ModelKind:            &kind,
+		ModelCode:            &code,
+		ModelVersion:         &version,
+		ModelTitle:           &title,
+	})
+	if err != nil {
+		t.Fatalf("Assemble returned error: %v", err)
+	}
+	if req.ModelRef == nil {
+		t.Fatal("ModelRef is nil")
+	}
+	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindSBTI ||
+		req.ModelRef.Code().String() != "SBTI_FUN" ||
+		req.ModelRef.Version() != "1.0.0" ||
+		req.ModelRef.Title() != title {
+		t.Fatalf("ModelRef = %#v, want SBTI_FUN model ref", req.ModelRef)
+	}
+}

@@ -16,6 +16,10 @@ type CreateAssessmentDTO struct {
 	MedicalScaleCode     *string // 量表编码（可选）
 	MedicalScaleName     *string // 量表名称（可选）
 	ScaleVersion         *string // 量表解释模型版本（可选）
+	ModelKind            *string // 通用解释模型类型（可选）
+	ModelCode            *string // 通用解释模型编码（可选）
+	ModelVersion         *string // 通用解释模型版本（可选）
+	ModelTitle           *string // 通用解释模型标题（可选）
 	OriginType           string  // 来源类型：adhoc/plan
 	OriginID             *string // 来源ID（计划ID）
 }

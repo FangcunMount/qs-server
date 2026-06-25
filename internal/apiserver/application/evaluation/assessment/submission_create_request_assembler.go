@@ -1,6 +1,8 @@
 package assessment
 
 import (
+	"strings"
+
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -57,6 +59,27 @@ func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domai
 			scaleVersion,
 		)
 		req.MedicalScaleRef = &scaleRef
+		if req.ModelRef == nil {
+			modelRef := scaleRef.ToEvaluationModelRef()
+			req.ModelRef = &modelRef
+		}
+	}
+
+	if dto.ModelCode != nil {
+		kind := domainAssessment.EvaluationModelKind(strings.TrimSpace(valueOrEmpty(dto.ModelKind)))
+		if kind == "" {
+			kind = domainAssessment.EvaluationModelKindScale
+		}
+		if !kind.IsValid() {
+			return domainAssessment.CreateAssessmentRequest{}, evalerrors.InvalidArgument("不支持的解释模型类型: %s", kind)
+		}
+		modelRef := domainAssessment.NewEvaluationModelRefByCode(
+			kind,
+			meta.NewCode(strings.TrimSpace(*dto.ModelCode)),
+			strings.TrimSpace(valueOrEmpty(dto.ModelVersion)),
+			strings.TrimSpace(valueOrEmpty(dto.ModelTitle)),
+		)
+		req.ModelRef = &modelRef
 	}
 
 	switch dto.OriginType {
@@ -71,4 +94,11 @@ func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domai
 	}
 
 	return req, nil
+}
+
+func valueOrEmpty(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }

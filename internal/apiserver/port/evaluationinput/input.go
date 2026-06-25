@@ -10,6 +10,15 @@ type EvaluationModelKind string
 const (
 	EvaluationModelKindScale EvaluationModelKind = "scale"
 	EvaluationModelKindMBTI  EvaluationModelKind = "mbti"
+	EvaluationModelKindSBTI  EvaluationModelKind = "sbti"
+)
+
+const (
+	DefaultSBTIModelCode          = "SBTI_FUN"
+	DefaultSBTIModelVersion       = "1.0.0"
+	DefaultSBTIModelTitle         = "SBTI 趣味人格测评"
+	DefaultSBTIQuestionnaireCode  = "SBTI_FUN"
+	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
 )
 
 func (k EvaluationModelKind) String() string {
@@ -99,6 +108,114 @@ func ScalePayload(input *InputSnapshot) (*ScaleSnapshot, bool) {
 		return input.MedicalScale, true
 	}
 	return nil, false
+}
+
+func NewSBTIModelSnapshot(model *SBTIModelSnapshot) *ModelSnapshot {
+	if model == nil {
+		return nil
+	}
+	return &ModelSnapshot{
+		Kind:    EvaluationModelKindSBTI,
+		Code:    model.Code,
+		Version: model.Version,
+		Title:   model.Title,
+		Payload: SBTIModelPayload{Model: model},
+	}
+}
+
+type SBTIModelPayload struct {
+	Model *SBTIModelSnapshot `json:"model"`
+}
+
+func (SBTIModelPayload) ModelKind() EvaluationModelKind {
+	return EvaluationModelKindSBTI
+}
+
+func SBTIPayload(input *InputSnapshot) (*SBTIModelSnapshot, bool) {
+	if input == nil {
+		return nil, false
+	}
+	if payload, ok := input.ModelPayload.(SBTIModelPayload); ok && payload.Model != nil {
+		return payload.Model, true
+	}
+	if input.Model != nil {
+		if payload, ok := input.Model.Payload.(SBTIModelPayload); ok && payload.Model != nil {
+			return payload.Model, true
+		}
+	}
+	return nil, false
+}
+
+type SBTIModelSnapshot struct {
+	Code                        string                           `json:"code"`
+	Version                     string                           `json:"version"`
+	Title                       string                           `json:"title"`
+	QuestionnaireCode           string                           `json:"questionnaire_code"`
+	QuestionnaireVersion        string                           `json:"questionnaire_version"`
+	Status                      string                           `json:"status"`
+	Source                      SBTISourceSnapshot               `json:"source"`
+	DimensionOrder              []string                         `json:"dimension_order"`
+	Dimensions                  map[string]SBTIDimensionSnapshot `json:"dimensions"`
+	QuestionMappings            []SBTIQuestionMappingSnapshot    `json:"question_mappings"`
+	NormalOutcomes              []SBTIOutcomeSnapshot            `json:"normal_outcomes"`
+	SpecialOutcomes             []SBTIOutcomeSnapshot            `json:"special_outcomes"`
+	FallbackSimilarityThreshold float64                          `json:"fallback_similarity_threshold"`
+	DrinkTrigger                SBTIDrinkTriggerSnapshot         `json:"drink_trigger"`
+}
+
+func (m *SBTIModelSnapshot) IsPublished() bool {
+	return m != nil && (m.Status == "" || m.Status == "published")
+}
+
+func (m *SBTIModelSnapshot) MatchesQuestionnaire(code, version string) bool {
+	if m == nil || m.QuestionnaireCode != code {
+		return false
+	}
+	return m.QuestionnaireVersion == "" || version == "" || m.QuestionnaireVersion == version
+}
+
+type SBTISourceSnapshot struct {
+	WikiRepo      string `json:"wiki_repo"`
+	SourceSite    string `json:"source_site"`
+	License       string `json:"license"`
+	Attribution   string `json:"attribution"`
+	ImageBaseURL  string `json:"image_base_url"`
+	NonCommercial bool   `json:"non_commercial"`
+}
+
+type SBTIDimensionSnapshot struct {
+	Code  string `json:"code"`
+	Name  string `json:"name"`
+	Model string `json:"model"`
+}
+
+type SBTIQuestionMappingSnapshot struct {
+	QuestionCode string             `json:"question_code"`
+	Dimension    string             `json:"dimension"`
+	OptionScores map[string]float64 `json:"option_scores"`
+}
+
+type SBTIOutcomeSnapshot struct {
+	Code       string             `json:"code"`
+	Name       string             `json:"name"`
+	OneLiner   string             `json:"one_liner"`
+	Pattern    string             `json:"pattern,omitempty"`
+	Image      string             `json:"image"`
+	Rarity     SBTIRaritySnapshot `json:"rarity"`
+	IsSpecial  bool               `json:"is_special"`
+	Trigger    string             `json:"trigger,omitempty"`
+	Commentary string             `json:"commentary,omitempty"`
+}
+
+type SBTIRaritySnapshot struct {
+	Percent float64 `json:"percent"`
+	Label   string  `json:"label"`
+	OneInX  int     `json:"one_in_x"`
+}
+
+type SBTIDrinkTriggerSnapshot struct {
+	QuestionCodes []string `json:"question_codes"`
+	OptionValues  []string `json:"option_values"`
 }
 
 type ScaleSnapshot struct {
@@ -212,6 +329,11 @@ type ScaleCatalog interface {
 type ScaleModelCatalog interface {
 	ScaleCatalog
 	GetScaleByRef(ctx context.Context, ref ModelRef) (*ScaleSnapshot, error)
+}
+
+type SBTIModelCatalog interface {
+	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*SBTIModelSnapshot, error)
+	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*SBTIModelSnapshot, error)
 }
 
 type AnswerSheetReader interface {
