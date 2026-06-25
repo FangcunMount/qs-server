@@ -7,30 +7,30 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	interpretationmodelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
+	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
-func (c *Container) ensureInterpretationModelCatalog() (interpretationmodelport.ModelCatalog, error) {
+func (c *Container) ensureRuleSetCatalog() (rulesetport.RuleSetCatalog, error) {
 	if c == nil {
 		return nil, fmt.Errorf("container is nil")
 	}
-	if c.interpretationModelCatalog != nil {
-		return c.interpretationModelCatalog, nil
+	if c.ruleSetCatalog != nil {
+		return c.ruleSetCatalog, nil
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
-	var scaleSource interpretationmodelInfra.ScaleBindingSource
+	var scaleSource rulesetInfra.ScaleBindingSource
 	if infra := c.surveyScaleInfra; infra != nil && infra.scaleRepo != nil {
 		scaleSource = evaluationinputInfra.NewRepositoryScaleBindingSource(infra.scaleRepo)
 	}
-	catalog, err := interpretationmodelInfra.NewCatalog(c.mongoDB, scaleSource, mongoOpts)
+	catalog, err := rulesetInfra.NewCatalog(c.mongoDB, scaleSource, mongoOpts)
 	if err != nil {
-		return nil, fmt.Errorf("failed to initialize interpretation model catalog: %w", err)
+		return nil, fmt.Errorf("failed to initialize ruleset catalog: %w", err)
 	}
-	c.interpretationModelCatalog = catalog
+	c.ruleSetCatalog = catalog
 	return catalog, nil
 }
 
@@ -42,7 +42,7 @@ func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps,
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra != nil {
-		catalog, err := c.ensureInterpretationModelCatalog()
+		catalog, err := c.ensureRuleSetCatalog()
 		if err != nil {
 			return assembler.EvaluationModuleDeps{}, err
 		}

@@ -18,9 +18,9 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
+	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -35,7 +35,7 @@ type InternalService struct {
 	submissionService          assessmentApp.AssessmentSubmissionService
 	managementService          assessmentApp.AssessmentManagementService
 	executeService             execute.Service
-	assessmentBindingResolver  interpretationmodelport.AssessmentBindingResolver
+	assessmentBindingResolver  rulesetport.AssessmentBindingResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
 	taskAssessmentResolver     planApp.TaskAssessmentResolver
 	planCommandService         planApp.PlanCommandService
@@ -67,7 +67,7 @@ func NewInternalService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
 	executeService execute.Service,
-	assessmentBindingResolver interpretationmodelport.AssessmentBindingResolver,
+	assessmentBindingResolver rulesetport.AssessmentBindingResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
 	taskAssessmentResolver planApp.TaskAssessmentResolver,
 	planCommandService planApp.PlanCommandService,
@@ -154,7 +154,7 @@ func validateCreateAssessmentFromAnswerSheetRequest(req *pb.CreateAssessmentFrom
 func buildCreateAssessmentDTO(
 	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
-	bindingResolver interpretationmodelport.AssessmentBindingResolver,
+	bindingResolver rulesetport.AssessmentBindingResolver,
 ) (assessmentApp.CreateAssessmentDTO, error) {
 	dto := assessmentApp.CreateAssessmentDTO{
 		OrgID:                req.OrgId,
@@ -180,7 +180,7 @@ func applyAssessmentBinding(
 	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
 	dto *assessmentApp.CreateAssessmentDTO,
-	resolver interpretationmodelport.AssessmentBindingResolver,
+	resolver rulesetport.AssessmentBindingResolver,
 ) error {
 	if req == nil || dto == nil || resolver == nil {
 		return nil
@@ -193,7 +193,7 @@ func applyAssessmentBinding(
 		return nil
 	}
 	switch binding.Ref.Kind {
-	case domaininterpretation.ModelKindScale:
+	case domainruleset.RuleSetKindScale:
 		dto.MedicalScaleID = binding.MedicalScaleID
 		dto.MedicalScaleCode = binding.MedicalScaleCode
 		dto.MedicalScaleName = binding.MedicalScaleName

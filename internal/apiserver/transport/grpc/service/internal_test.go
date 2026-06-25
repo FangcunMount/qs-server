@@ -6,24 +6,24 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
-	domaininterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
+	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 
-func testAssessmentBindingResolver(t *testing.T) interpretationmodelport.AssessmentBindingResolver {
+func testAssessmentBindingResolver(t *testing.T) rulesetport.AssessmentBindingResolver {
 	t.Helper()
-	catalog, err := interpretationmodel.NewDefaultStaticCatalog(nil)
+	catalog, err := ruleset.NewDefaultStaticCatalog(nil)
 	if err != nil {
 		t.Fatalf("NewDefaultStaticCatalog: %v", err)
 	}
-	return interpretationmodel.NewAssessmentBindingResolver(catalog)
+	return ruleset.NewAssessmentBindingResolver(catalog)
 }
 
 func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
@@ -36,8 +36,8 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 	}
 
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
-		binding: interpretationmodelport.ScaleAssessmentBinding(
-			interpretationmodelport.ModelRef{Kind: domaininterpretation.ModelKindScale, Code: "SCL-001", Version: "1.0.0"},
+		binding: rulesetport.ScaleAssessmentBinding(
+			rulesetport.RuleSetRef{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})
@@ -103,7 +103,7 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
 	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindSBTI.String() {
-		t.Fatalf("ModelKind = %#v, want sbti", dto.ModelKind)
+		t.Fatalf("RuleSetKind = %#v, want sbti", dto.ModelKind)
 	}
 	if dto.ModelCode == nil || *dto.ModelCode != evaluationinput.DefaultSBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want SBTI_FUN", dto.ModelCode)
@@ -127,7 +127,7 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
 	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindMBTI.String() {
-		t.Fatalf("ModelKind = %#v, want mbti", dto.ModelKind)
+		t.Fatalf("RuleSetKind = %#v, want mbti", dto.ModelKind)
 	}
 	if dto.ModelCode == nil || *dto.ModelCode != evaluationinput.DefaultMBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want MBTI_OEJTS", dto.ModelCode)
@@ -161,12 +161,12 @@ type failingBindingResolver struct {
 	err error
 }
 
-func (f failingBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (interpretationmodelport.ModelRef, bool, error) {
-	return interpretationmodelport.ModelRef{}, false, f.err
+func (f failingBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.RuleSetRef, bool, error) {
+	return rulesetport.RuleSetRef{}, false, f.err
 }
 
-func (f failingBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (interpretationmodelport.AssessmentBinding, bool, error) {
-	return interpretationmodelport.AssessmentBinding{}, false, f.err
+func (f failingBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (rulesetport.AssessmentBinding, bool, error) {
+	return rulesetport.AssessmentBinding{}, false, f.err
 }
 
 func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
@@ -178,8 +178,8 @@ func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
 		AnswersheetId:        202,
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
-		binding: interpretationmodelport.ScaleAssessmentBinding(
-			interpretationmodelport.ModelRef{Kind: domaininterpretation.ModelKindScale, Code: "SCL-001", Version: "1.0.0"},
+		binding: rulesetport.ScaleAssessmentBinding(
+			rulesetport.RuleSetRef{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})
@@ -195,28 +195,28 @@ func TestBuildCreateAssessmentDTOBindsScaleFromCatalog(t *testing.T) {
 }
 
 type stubScaleBindingResolver struct {
-	binding interpretationmodelport.AssessmentBinding
+	binding rulesetport.AssessmentBinding
 	ok      bool
 }
 
-func (s stubScaleBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (interpretationmodelport.ModelRef, bool, error) {
+func (s stubScaleBindingResolver) ResolveByQuestionnaire(context.Context, string, string) (rulesetport.RuleSetRef, bool, error) {
 	if !s.ok && s.binding.Ref.IsEmpty() {
-		return interpretationmodelport.ModelRef{}, false, nil
+		return rulesetport.RuleSetRef{}, false, nil
 	}
 	if s.ok || !s.binding.Ref.IsEmpty() {
 		return s.binding.Ref, true, nil
 	}
-	return interpretationmodelport.ModelRef{}, false, nil
+	return rulesetport.RuleSetRef{}, false, nil
 }
 
-func (s stubScaleBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (interpretationmodelport.AssessmentBinding, bool, error) {
+func (s stubScaleBindingResolver) ResolveAssessmentBinding(context.Context, string, string) (rulesetport.AssessmentBinding, bool, error) {
 	if !s.ok && s.binding.Ref.IsEmpty() {
-		return interpretationmodelport.AssessmentBinding{}, false, nil
+		return rulesetport.AssessmentBinding{}, false, nil
 	}
 	if s.ok || !s.binding.Ref.IsEmpty() {
 		return s.binding, true, nil
 	}
-	return interpretationmodelport.AssessmentBinding{}, false, nil
+	return rulesetport.AssessmentBinding{}, false, nil
 }
 
 func TestBuildCreateAssessmentDTOSkipsBindingWhenUnresolved(t *testing.T) {
@@ -246,8 +246,8 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 		AnswersheetId:        202,
 	}
 	dto, err := buildCreateAssessmentDTO(context.Background(), req, stubScaleBindingResolver{
-		binding: interpretationmodelport.ScaleAssessmentBinding(
-			interpretationmodelport.ModelRef{Kind: domaininterpretation.ModelKindScale, Code: "SCL-001", Version: "1.0.0"},
+		binding: rulesetport.ScaleAssessmentBinding(
+			rulesetport.RuleSetRef{Kind: domainruleset.RuleSetKindScale, Code: "SCL-001", Version: "1.0.0"},
 			8, "SCL-001", "Scale", "1.0.0",
 		),
 	})

@@ -13,6 +13,9 @@ type registryReportBuilderStub struct {
 }
 
 func (b registryReportBuilderStub) Kind() assessment.EvaluationModelKind { return b.kind }
+func (registryReportBuilderStub) ReportType() domainReport.ReportType {
+	return domainReport.ReportTypeStandard
+}
 func (b registryReportBuilderStub) Build(context.Context, Outcome) (*domainReport.InterpretReport, error) {
 	return nil, nil
 }
@@ -32,7 +35,7 @@ func TestReportBuilderRegistryRejectsUnknownKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(assessment.EvaluationModelKindMBTI); err == nil {
+	if _, err := registry.Resolve(assessment.EvaluationModelKindMBTI, domainReport.ReportTypeStandard); err == nil {
 		t.Fatal("Resolve error = nil, want unsupported kind")
 	}
 }

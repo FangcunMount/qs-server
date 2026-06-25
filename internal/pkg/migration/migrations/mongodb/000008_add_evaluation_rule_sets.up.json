@@ -1,0 +1,26 @@
+[
+  {
+    "create": "evaluation_rule_sets"
+  },
+  {
+    "createIndexes": "evaluation_rule_sets",
+    "indexes": [
+      {
+        "key": { "ruleset_kind": 1, "ruleset_code": 1, "ruleset_version": 1 },
+        "name": "idx_evaluation_rule_sets_kind_code_version",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "status": 1, "ruleset_kind": 1, "ruleset_code": 1 },
+        "name": "idx_evaluation_rule_sets_status_kind_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "status": 1 },
+        "name": "idx_evaluation_rule_sets_questionnaire_published",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  }
+]

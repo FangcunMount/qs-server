@@ -1,0 +1,17 @@
+[
+  {
+    "dropIndexes": "evaluation_rule_sets",
+    "index": "idx_evaluation_rule_sets_kind_code_version"
+  },
+  {
+    "dropIndexes": "evaluation_rule_sets",
+    "index": "idx_evaluation_rule_sets_status_kind_code"
+  },
+  {
+    "dropIndexes": "evaluation_rule_sets",
+    "index": "idx_evaluation_rule_sets_questionnaire_published"
+  },
+  {
+    "drop": "evaluation_rule_sets"
+  }
+]

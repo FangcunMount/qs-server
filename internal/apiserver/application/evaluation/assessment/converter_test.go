@@ -93,12 +93,12 @@ func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
 		t.Fatalf("Assemble returned error: %v", err)
 	}
 	if req.ModelRef == nil {
-		t.Fatal("ModelRef is nil")
+		t.Fatal("RuleSetRef is nil")
 	}
 	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindSBTI ||
 		req.ModelRef.Code().String() != "SBTI_FUN" ||
 		req.ModelRef.Version() != "1.0.0" ||
 		req.ModelRef.Title() != title {
-		t.Fatalf("ModelRef = %#v, want SBTI_FUN model ref", req.ModelRef)
+		t.Fatalf("RuleSetRef = %#v, want SBTI_FUN model ref", req.ModelRef)
 	}
 }

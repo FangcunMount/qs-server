@@ -61,6 +61,10 @@ func (b *resultReportBuilderStub) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindScale
 }
 
+func (*resultReportBuilderStub) ReportType() domainReport.ReportType {
+	return domainReport.ReportTypeStandard
+}
+
 func (b *resultReportBuilderStub) Build(context.Context, Outcome) (*domainReport.InterpretReport, error) {
 	*b.order = append(*b.order, "report_build")
 	return b.rpt, b.err

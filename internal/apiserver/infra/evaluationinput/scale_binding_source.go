@@ -4,11 +4,11 @@ import (
 	"context"
 	"fmt"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretationmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel/codec"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
 
 // RepositoryScaleBindingSource 从量表 command repo 提供 scale 规则绑定回退。
@@ -40,32 +40,32 @@ func (s RepositoryScaleBindingSource) GetScaleByRef(ctx context.Context, code, v
 	})
 }
 
-// InterpretationScaleCatalog 优先从统一规则目录解码 scale payload，未命中时回退量表 repo。
-type InterpretationScaleCatalog struct {
-	reader   interpretationmodelport.PublishedModelReader
+// RuleSetScaleCatalog 优先从统一规则目录解码 scale payload，未命中时回退量表 repo。
+type RuleSetScaleCatalog struct {
+	reader   rulesetport.PublishedRuleSetReader
 	fallback port.ScaleModelCatalog
 }
 
-func NewInterpretationScaleCatalog(reader interpretationmodelport.PublishedModelReader, fallback port.ScaleModelCatalog) InterpretationScaleCatalog {
-	return InterpretationScaleCatalog{reader: reader, fallback: fallback}
+func NewRuleSetScaleCatalog(reader rulesetport.PublishedRuleSetReader, fallback port.ScaleModelCatalog) RuleSetScaleCatalog {
+	return RuleSetScaleCatalog{reader: reader, fallback: fallback}
 }
 
-func (c InterpretationScaleCatalog) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
+func (c RuleSetScaleCatalog) GetScale(ctx context.Context, code string) (*port.ScaleSnapshot, error) {
 	if c.fallback == nil {
 		return nil, port.NewResolveError(port.FailureKindScaleNotFound, fmt.Errorf("scale catalog is not configured"), "量表不存在", "加载量表失败")
 	}
 	return c.fallback.GetScale(ctx, code)
 }
 
-func (c InterpretationScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
+func (c RuleSetScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
 	if ref.Version != "" && c.reader != nil {
-		snapshot, err := c.reader.GetPublishedByRef(ctx, interpretationmodelport.ModelRef{
-			Kind:    domain.ModelKindScale,
+		snapshot, err := c.reader.GetPublishedByRef(ctx, rulesetport.RuleSetRef{
+			Kind:    domain.RuleSetKindScale,
 			Code:    ref.Code,
 			Version: ref.Version,
 		})
 		if err == nil {
-			if snapshot.Definition.Kind != domain.ModelKindScale {
+			if snapshot.Definition.Kind != domain.RuleSetKindScale {
 				return nil, domain.ErrNotFound
 			}
 			decoded, decodeErr := codec.DecodeScale(snapshot)

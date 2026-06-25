@@ -25,5 +25,6 @@ type ScoreProjector interface {
 
 type ReportBuilder interface {
 	Kind() assessment.EvaluationModelKind
+	ReportType() domainReport.ReportType
 	Build(ctx context.Context, outcome Outcome) (*domainReport.InterpretReport, error)
 }

@@ -18,8 +18,8 @@ import (
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	interpretationmodelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
-	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -40,7 +40,7 @@ type Deps struct {
 	Plan           PlanDeps
 	Statistics     StatisticsDeps
 	IAM            IAMDeps
-	Interpretation InterpretationDeps
+	RuleSet RuleSetDeps
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
@@ -94,8 +94,8 @@ type StatisticsDeps struct {
 	BehaviorProjectorService statisticsApp.BehaviorProjectorService
 }
 
-type InterpretationDeps struct {
-	ModelCatalog interpretationmodelport.ModelCatalog
+type RuleSetDeps struct {
+	RuleSetCatalog rulesetport.RuleSetCatalog
 }
 
 type IAMDeps struct {
@@ -260,7 +260,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
-		interpretationmodelInfra.NewAssessmentBindingResolver(r.deps.Interpretation.ModelCatalog),
+		rulesetInfra.NewAssessmentBindingResolver(r.deps.RuleSet.RuleSetCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,
 		r.deps.Plan.TaskAssessmentResolver,
 		r.deps.Plan.CommandService,

@@ -44,6 +44,10 @@ func (b ScaleReportBuilder) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindScale
 }
 
+func (ScaleReportBuilder) ReportType() domainReport.ReportType {
+	return domainReport.ReportTypeStandard
+}
+
 func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domainReport.InterpretReport, error) {
 	if b.builder == nil {
 		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")

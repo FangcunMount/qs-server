@@ -36,7 +36,7 @@ func TestPublishSyncsInterpretationRules(t *testing.T) {
 		catalog,
 		event.NewNopEventPublisher(),
 		nil,
-		WithInterpretationRulePublisher(publisher),
+		WithRuleSetPublisher(publisher),
 	)
 	if _, err := svc.Publish(context.Background(), "SCL-001"); err != nil {
 		t.Fatalf("Publish: %v", err)

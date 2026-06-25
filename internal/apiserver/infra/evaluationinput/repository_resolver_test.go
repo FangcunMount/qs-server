@@ -240,7 +240,7 @@ func TestNewResolverReturnsProviderRegistryError(t *testing.T) {
 	}
 }
 
-func TestRepositoryResolverUnsupportedModelKindCarriesFailureKind(t *testing.T) {
+func TestRepositoryResolverUnsupportedRuleSetKindCarriesFailureKind(t *testing.T) {
 	resolver, err := NewResolver(&scaleCatalogStub{})
 	if err != nil {
 		t.Fatalf("NewResolver returned error: %v", err)

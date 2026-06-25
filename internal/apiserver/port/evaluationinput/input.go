@@ -70,7 +70,7 @@ type ModelSnapshot struct {
 }
 
 type ModelPayload interface {
-	ModelKind() EvaluationModelKind
+	RuleSetKind() EvaluationModelKind
 }
 
 func NewScaleModelSnapshot(scale *ScaleSnapshot) *ModelSnapshot {
@@ -94,7 +94,7 @@ type ScaleModelPayload struct {
 	Scale *ScaleSnapshot
 }
 
-func (ScaleModelPayload) ModelKind() EvaluationModelKind {
+func (ScaleModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindScale
 }
 
@@ -133,7 +133,7 @@ type SBTIModelPayload struct {
 	Model *SBTIModelSnapshot `json:"model"`
 }
 
-func (SBTIModelPayload) ModelKind() EvaluationModelKind {
+func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindSBTI
 }
 
@@ -169,7 +169,7 @@ type MBTIModelPayload struct {
 	Model *MBTIModelSnapshot `json:"model"`
 }
 
-func (MBTIModelPayload) ModelKind() EvaluationModelKind {
+func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindMBTI
 }
 

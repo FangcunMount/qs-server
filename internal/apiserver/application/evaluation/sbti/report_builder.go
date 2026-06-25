@@ -22,6 +22,10 @@ func (ReportBuilder) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindSBTI
 }
 
+func (ReportBuilder) ReportType() domainReport.ReportType {
+	return domainReport.ReportTypeStandard
+}
+
 func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
 	if outcome.Assessment == nil {
 		return nil, fmt.Errorf("assessment is required")

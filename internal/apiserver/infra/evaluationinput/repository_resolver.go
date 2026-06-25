@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -29,15 +29,15 @@ func NewRepositoryResolver(
 	scaleRepo ScaleSnapshotRepository,
 	answerSheetRepo answersheet.Repository,
 	questionnaireRepo questionnaire.Repository,
-	modelCatalog interpretationmodelport.ModelCatalog,
+	modelCatalog rulesetport.RuleSetCatalog,
 ) (*RepositoryResolver, error) {
 	scaleCatalog := NewRepositoryScaleSnapshotCatalog(scaleRepo)
 	if modelCatalog == nil {
-		return nil, fmt.Errorf("interpretation model catalog is required")
+		return nil, fmt.Errorf("ruleset catalog is required")
 	}
-	interpretationScaleCatalog := NewInterpretationScaleCatalog(modelCatalog, scaleCatalog)
-	sbtiCatalog := NewInterpretationSBTICatalog(modelCatalog)
-	mbtiCatalog := NewInterpretationMBTICatalog(modelCatalog)
+	interpretationScaleCatalog := NewRuleSetScaleCatalog(modelCatalog, scaleCatalog)
+	sbtiCatalog := NewRuleSetSBTICatalog(modelCatalog)
+	mbtiCatalog := NewRuleSetMBTICatalog(modelCatalog)
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
 	return NewResolverWithEmbeddedModels(
@@ -273,9 +273,9 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*port.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载解释模型数据",
-		"model_kind", ref.Kind,
+		"ruleset_kind", ref.Kind,
 		"model_code", ref.Code,
-		"model_version", ref.Version,
+		"ruleset_version", ref.Version,
 		"action", "read",
 		"resource", "scale",
 	)
@@ -291,9 +291,9 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	}
 	if err != nil {
 		l.Errorw("加载解释模型失败",
-			"model_kind", ref.Kind,
+			"ruleset_kind", ref.Kind,
 			"model_code", ref.Code,
-			"model_version", ref.Version,
+			"ruleset_version", ref.Version,
 			"action", "read",
 			"result", "failed",
 			"error", err.Error(),
@@ -307,9 +307,9 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	}
 
 	l.Debugw("解释模型数据加载成功",
-		"model_kind", ref.Kind,
+		"ruleset_kind", ref.Kind,
 		"model_code", ref.Code,
-		"model_version", snapshot.ScaleVersion,
+		"ruleset_version", snapshot.ScaleVersion,
 		"result", "success",
 	)
 	return snapshot, nil

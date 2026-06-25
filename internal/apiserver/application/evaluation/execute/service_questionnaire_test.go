@@ -383,7 +383,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}
 }
 
-func TestEvaluateUnknownModelKindMarksAssessmentFailed(t *testing.T) {
+func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(

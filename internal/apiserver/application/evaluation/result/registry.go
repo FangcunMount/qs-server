@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
 )
 
 type ScoreProjectorRegistry interface {
@@ -50,16 +51,21 @@ func (r *mutableScoreProjectorRegistry) Resolve(kind assessment.EvaluationModelK
 	return noopScoreProjector{}
 }
 
+type reportBuilderKey struct {
+	kind       assessment.EvaluationModelKind
+	reportType domainReport.ReportType
+}
+
 type ReportBuilderRegistry interface {
-	Resolve(kind assessment.EvaluationModelKind) (ReportBuilder, error)
+	Resolve(kind assessment.EvaluationModelKind, reportType domainReport.ReportType) (ReportBuilder, error)
 }
 
 type mutableReportBuilderRegistry struct {
-	items map[assessment.EvaluationModelKind]ReportBuilder
+	items map[reportBuilderKey]ReportBuilder
 }
 
 func NewReportBuilderRegistry(builders ...ReportBuilder) (*mutableReportBuilderRegistry, error) {
-	registry := &mutableReportBuilderRegistry{items: make(map[assessment.EvaluationModelKind]ReportBuilder)}
+	registry := &mutableReportBuilderRegistry{items: make(map[reportBuilderKey]ReportBuilder)}
 	for _, builder := range builders {
 		if err := registry.Register(builder); err != nil {
 			return nil, err
@@ -76,20 +82,28 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 	if kind == "" {
 		return fmt.Errorf("evaluation report builder kind is empty")
 	}
-	if _, exists := r.items[kind]; exists {
-		return fmt.Errorf("evaluation report builder already registered for kind %s", kind)
+	reportType := builder.ReportType()
+	if reportType == "" {
+		return fmt.Errorf("evaluation report builder report type is empty")
 	}
-	r.items[kind] = builder
+	key := reportBuilderKey{kind: kind, reportType: reportType}
+	if _, exists := r.items[key]; exists {
+		return fmt.Errorf("evaluation report builder already registered for kind %s report type %s", kind, reportType)
+	}
+	r.items[key] = builder
 	return nil
 }
 
-func (r *mutableReportBuilderRegistry) Resolve(kind assessment.EvaluationModelKind) (ReportBuilder, error) {
+func (r *mutableReportBuilderRegistry) Resolve(kind assessment.EvaluationModelKind, reportType domainReport.ReportType) (ReportBuilder, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation report builder registry is not configured")
 	}
-	builder, ok := r.items[kind]
+	if reportType == "" {
+		reportType = domainReport.ReportTypeStandard
+	}
+	builder, ok := r.items[reportBuilderKey{kind: kind, reportType: reportType}]
 	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation report builder kind: %s", kind)
+		return nil, fmt.Errorf("unsupported evaluation report builder kind: %s report type: %s", kind, reportType)
 	}
 	return builder, nil
 }

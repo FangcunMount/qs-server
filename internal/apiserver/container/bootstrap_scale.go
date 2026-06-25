@@ -5,8 +5,8 @@ import (
 
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	interpretationmodelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
-	mongoInterpretationmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretationmodel"
+	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
@@ -34,8 +34,8 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 	}
 	if c != nil && c.mongoDB != nil {
 		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
-		writer := mongoInterpretationmodel.NewRepository(c.mongoDB, mongoOpts)
-		deps.InterpretationRulePublisher = interpretationmodelInfra.NewScaleInterpretationPublisher(writer)
+		writer := mongoRuleset.NewRepository(c.mongoDB, mongoOpts)
+		deps.RuleSetPublisher = rulesetInfra.NewScaleRuleSetPublisher(writer)
 	}
 	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
 		deps.QuestionnairePublisher = c.SurveyModule.Questionnaire.LifecycleService

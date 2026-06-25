@@ -221,12 +221,12 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.IAMModule != nil {
 		deps.IAM.AuthzSnapshotLoader = c.IAMModule.AuthzSnapshotLoader()
 	}
-	if c.interpretationModelCatalog != nil {
-		deps.Interpretation.ModelCatalog = c.interpretationModelCatalog
-	} else if catalog, err := c.ensureInterpretationModelCatalog(); err != nil {
-		panic(fmt.Sprintf("interpretation model catalog is required: %v", err))
+	if c.ruleSetCatalog != nil {
+		deps.RuleSet.RuleSetCatalog = c.ruleSetCatalog
+	} else if catalog, err := c.ensureRuleSetCatalog(); err != nil {
+		panic(fmt.Sprintf("ruleset catalog is required: %v", err))
 	} else {
-		deps.Interpretation.ModelCatalog = catalog
+		deps.RuleSet.RuleSetCatalog = catalog
 	}
 
 	return deps

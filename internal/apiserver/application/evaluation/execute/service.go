@@ -130,7 +130,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 	l.Infow("开始执行评估解释器",
 		"assessment_id", assessmentID,
-		"model_kind", modelKind.String(),
+		"ruleset_kind", modelKind.String(),
 		"model_code", evaluationModelCode(a, input),
 	)
 
@@ -146,7 +146,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err != nil {
 		l.Errorw("评估模型执行器解析失败",
 			"assessment_id", assessmentID,
-			"model_kind", modelKind.String(),
+			"ruleset_kind", modelKind.String(),
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -159,7 +159,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err != nil {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
-			"model_kind", modelKind.String(),
+			"ruleset_kind", modelKind.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
@@ -178,7 +178,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err := s.resultWriter.Write(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Result: evaluationResult}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
-			"model_kind", modelKind.String(),
+			"ruleset_kind", modelKind.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
@@ -192,7 +192,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"resource", "assessment",
 		"result", "success",
 		"assessment_id", assessmentID,
-		"model_kind", modelKind.String(),
+		"ruleset_kind", modelKind.String(),
 		"model_code", evaluationModelCode(a, input),
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
