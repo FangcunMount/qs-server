@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -22,7 +22,7 @@ type questionnaireBindingResolver struct {
 }
 
 type questionnaireBindingLookup interface {
-	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
 }
 
 func (r questionnaireBindingResolver) validate(ctx context.Context, questionnaireCode string, questionnaireVersion string, currentScaleCode string) error {
@@ -59,7 +59,7 @@ func (r questionnaireBindingResolver) validate(ctx context.Context, questionnair
 
 	boundScale, err := r.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
-		if domscale.IsNotFound(err) {
+		if scaledefinition.IsNotFound(err) {
 			return nil
 		}
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询问卷关联量表失败")

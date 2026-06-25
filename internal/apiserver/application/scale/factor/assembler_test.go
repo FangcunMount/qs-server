@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 )
 
 func TestToFactorDomainDefaultsAndMapsDTOFields(t *testing.T) {
@@ -26,10 +26,10 @@ func TestToFactorDomainDefaultsAndMapsDTOFields(t *testing.T) {
 		t.Fatalf("toFactorDomain() error = %v", err)
 	}
 
-	if factor.GetCode().String() != "F1" || factor.GetFactorType() != domainScale.FactorTypePrimary {
+	if factor.GetCode().String() != "F1" || factor.GetFactorType() != scaledefinition.FactorTypePrimary {
 		t.Fatalf("unexpected factor identity/type: %#v %q", factor.GetCode(), factor.GetFactorType())
 	}
-	if factor.GetScoringStrategy() != domainScale.ScoringStrategySum {
+	if factor.GetScoringStrategy() != scaledefinition.ScoringStrategySum {
 		t.Fatalf("scoring strategy = %q, want sum", factor.GetScoringStrategy())
 	}
 	if got := len(factor.GetQuestionCodes()); got != 2 {
@@ -51,7 +51,7 @@ func TestToFactorDomainRejectsCntStrategyWithoutCntOptionContents(t *testing.T) 
 		false,
 		true,
 		nil,
-		domainScale.ScoringStrategyCnt.String(),
+		scaledefinition.ScoringStrategyCnt.String(),
 		nil,
 		nil,
 		nil,
@@ -69,7 +69,7 @@ func TestToFactorDomainAcceptsLegacyFactorType(t *testing.T) {
 		false,
 		true,
 		[]string{"Q1"},
-		domainScale.ScoringStrategySum.String(),
+		scaledefinition.ScoringStrategySum.String(),
 		nil,
 		nil,
 		nil,
@@ -77,7 +77,7 @@ func TestToFactorDomainAcceptsLegacyFactorType(t *testing.T) {
 	if err != nil {
 		t.Fatalf("toFactorDomain() error = %v", err)
 	}
-	if factor.GetFactorType() != domainScale.FactorTypePrimary {
-		t.Fatalf("factor type = %q, want %q", factor.GetFactorType(), domainScale.FactorTypePrimary)
+	if factor.GetFactorType() != scaledefinition.FactorTypePrimary {
+		t.Fatalf("factor type = %q, want %q", factor.GetFactorType(), scaledefinition.FactorTypePrimary)
 	}
 }

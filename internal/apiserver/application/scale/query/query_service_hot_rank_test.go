@@ -6,8 +6,8 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -27,9 +27,9 @@ func (s *hotRankReadModelStub) Top(_ context.Context, query hotrank.Query) ([]ho
 }
 
 type hotScaleRepoStub struct {
-	byQuestionnaire           map[string]*domainScale.MedicalScale
-	byCode                    map[string]*domainScale.MedicalScale
-	summaries                 []*domainScale.MedicalScale
+	byQuestionnaire           map[string]*scaledefinition.MedicalScale
+	byCode                    map[string]*scaledefinition.MedicalScale
+	summaries                 []*scaledefinition.MedicalScale
 	findByQuestionnaireErr    error
 	findByQuestionnaireRefErr error
 	findByQuestionnaireCalls  []string
@@ -37,33 +37,33 @@ type hotScaleRepoStub struct {
 	findSummaryCalls          int
 }
 
-func (r *hotScaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error { return nil }
-func (r *hotScaleRepoStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+func (r *hotScaleRepoStub) Create(context.Context, *scaledefinition.MedicalScale) error { return nil }
+func (r *hotScaleRepoStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
 	return nil
 }
-func (r *hotScaleRepoStub) FindByCode(_ context.Context, code string) (*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) FindByCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	if item, ok := r.findByCode(code); ok {
 		return item, nil
 	}
 	return nil, errors.New("not found")
 }
-func (r *hotScaleRepoStub) FindPublishedByCode(ctx context.Context, code string) (*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByCode(ctx, code)
 }
-func (r *hotScaleRepoStub) FindByCodeVersion(ctx context.Context, code, _ string) (*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) FindByCodeVersion(ctx context.Context, code, _ string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByCode(ctx, code)
 }
-func (r *hotScaleRepoStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	r.findByQuestionnaireCalls = append(r.findByQuestionnaireCalls, questionnaireCode)
 	if r.findByQuestionnaireErr != nil {
 		return nil, r.findByQuestionnaireErr
 	}
 	return r.byQuestionnaire[questionnaireCode], nil
 }
-func (r *hotScaleRepoStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
-func (r *hotScaleRepoStub) FindByQuestionnaireRef(_ context.Context, questionnaireCode, questionnaireVersion string) (*domainScale.MedicalScale, error) {
+func (r *hotScaleRepoStub) FindByQuestionnaireRef(_ context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error) {
 	r.findByQuestionnaireRefs = append(r.findByQuestionnaireRefs, questionnaireCode+":"+questionnaireVersion)
 	if r.findByQuestionnaireRefErr != nil {
 		return nil, r.findByQuestionnaireRefErr
@@ -71,7 +71,7 @@ func (r *hotScaleRepoStub) FindByQuestionnaireRef(_ context.Context, questionnai
 	if item, ok := r.byQuestionnaire[questionnaireCode]; ok && item.GetQuestionnaireVersion() == questionnaireVersion {
 		return item, nil
 	}
-	return nil, domainScale.ErrNotFound
+	return nil, scaledefinition.ErrNotFound
 }
 func (r *hotScaleRepoStub) ListScales(context.Context, scalereadmodel.ScaleFilter, scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
 	r.findSummaryCalls++
@@ -80,9 +80,9 @@ func (r *hotScaleRepoStub) ListScales(context.Context, scalereadmodel.ScaleFilte
 func (r *hotScaleRepoStub) CountScales(context.Context, scalereadmodel.ScaleFilter) (int64, error) {
 	return int64(len(r.summaries)), nil
 }
-func (r *hotScaleRepoStub) Update(context.Context, *domainScale.MedicalScale) error { return nil }
-func (r *hotScaleRepoStub) Remove(context.Context, string) error                    { return nil }
-func (r *hotScaleRepoStub) ExistsByCode(context.Context, string) (bool, error)      { return false, nil }
+func (r *hotScaleRepoStub) Update(context.Context, *scaledefinition.MedicalScale) error { return nil }
+func (r *hotScaleRepoStub) Remove(context.Context, string) error                        { return nil }
+func (r *hotScaleRepoStub) ExistsByCode(context.Context, string) (bool, error)          { return false, nil }
 func (r *hotScaleRepoStub) SetActivePublishedVersion(context.Context, string, string) error {
 	return nil
 }
@@ -95,11 +95,11 @@ func TestListHotPublishedUsesHotRankReadModelOrdering(t *testing.T) {
 	scaleB := mustHotScale(t, "S-B", "Q-B")
 	scaleC := mustHotScale(t, "S-C", "Q-C")
 	repo := &hotScaleRepoStub{
-		byQuestionnaire: map[string]*domainScale.MedicalScale{
+		byQuestionnaire: map[string]*scaledefinition.MedicalScale{
 			"Q-A": scaleA,
 			"Q-B": scaleB,
 		},
-		summaries: []*domainScale.MedicalScale{scaleA, scaleB, scaleC},
+		summaries: []*scaledefinition.MedicalScale{scaleA, scaleB, scaleC},
 	}
 	rank := &hotRankReadModelStub{
 		entries: []hotrank.Entry{
@@ -144,8 +144,8 @@ func TestListHotPublishedFallsBackWhenHotRankEmptyOrUnavailable(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			repo := &hotScaleRepoStub{
-				byQuestionnaire: map[string]*domainScale.MedicalScale{},
-				summaries:       []*domainScale.MedicalScale{scaleA, scaleB},
+				byQuestionnaire: map[string]*scaledefinition.MedicalScale{},
+				summaries:       []*scaledefinition.MedicalScale{scaleA, scaleB},
 			}
 			repo.byCode = hotScaleByCode(scaleA, scaleB)
 			svc := NewQueryService(repo, repo, nil, nil, nil, tc.rank)
@@ -170,7 +170,7 @@ func TestListHotPublishedFallsBackWhenHotRankEmptyOrUnavailable(t *testing.T) {
 func TestResolveAssessmentScaleContextUsesScaleRepositoryBehindApplicationPort(t *testing.T) {
 	item := mustHotScale(t, "S-A", "Q-A")
 	repo := &hotScaleRepoStub{
-		byQuestionnaire: map[string]*domainScale.MedicalScale{
+		byQuestionnaire: map[string]*scaledefinition.MedicalScale{
 			"Q-A": item,
 		},
 	}
@@ -193,7 +193,7 @@ func TestResolveAssessmentScaleContextUsesScaleRepositoryBehindApplicationPort(t
 
 func TestResolveAssessmentScaleContextReturnsEmptyWhenScaleBindingNotFound(t *testing.T) {
 	repo := &hotScaleRepoStub{
-		byQuestionnaire: map[string]*domainScale.MedicalScale{},
+		byQuestionnaire: map[string]*scaledefinition.MedicalScale{},
 	}
 	svc := NewQueryService(repo, repo, nil, nil, nil)
 
@@ -212,7 +212,7 @@ func TestResolveAssessmentScaleContextReturnsEmptyWhenScaleBindingNotFound(t *te
 func TestResolveAssessmentScaleContextReturnsRepositoryError(t *testing.T) {
 	repoErr := errors.New("mongo unavailable")
 	repo := &hotScaleRepoStub{
-		byQuestionnaire:           map[string]*domainScale.MedicalScale{},
+		byQuestionnaire:           map[string]*scaledefinition.MedicalScale{},
 		findByQuestionnaireRefErr: repoErr,
 	}
 	svc := NewQueryService(repo, repo, nil, nil, nil)
@@ -226,7 +226,7 @@ func TestResolveAssessmentScaleContextReturnsRepositoryError(t *testing.T) {
 	}
 }
 
-func (r *hotScaleRepoStub) findByCode(code string) (*domainScale.MedicalScale, bool) {
+func (r *hotScaleRepoStub) findByCode(code string) (*scaledefinition.MedicalScale, bool) {
 	if r.byCode == nil {
 		return nil, false
 	}
@@ -234,8 +234,8 @@ func (r *hotScaleRepoStub) findByCode(code string) (*domainScale.MedicalScale, b
 	return item, ok
 }
 
-func hotScaleByCode(items ...*domainScale.MedicalScale) map[string]*domainScale.MedicalScale {
-	result := make(map[string]*domainScale.MedicalScale, len(items))
+func hotScaleByCode(items ...*scaledefinition.MedicalScale) map[string]*scaledefinition.MedicalScale {
+	result := make(map[string]*scaledefinition.MedicalScale, len(items))
 	for _, item := range items {
 		if item != nil {
 			result[item.GetCode().String()] = item
@@ -244,7 +244,7 @@ func hotScaleByCode(items ...*domainScale.MedicalScale) map[string]*domainScale.
 	return result
 }
 
-func hotScaleRows(items []*domainScale.MedicalScale) []scalereadmodel.ScaleSummaryRow {
+func hotScaleRows(items []*scaledefinition.MedicalScale) []scalereadmodel.ScaleSummaryRow {
 	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
 	for _, item := range items {
 		if item == nil {
@@ -266,15 +266,15 @@ func hotScaleRows(items []*domainScale.MedicalScale) []scalereadmodel.ScaleSumma
 	return rows
 }
 
-func mustHotScale(t *testing.T, code, questionnaireCode string) *domainScale.MedicalScale {
+func mustHotScale(t *testing.T, code, questionnaireCode string) *scaledefinition.MedicalScale {
 	t.Helper()
-	scale, err := domainScale.NewMedicalScale(
+	scale, err := scaledefinition.NewMedicalScale(
 		meta.NewCode(code),
 		code+" title",
-		domainScale.WithID(meta.ID(901)),
-		domainScale.WithQuestionnaire(meta.NewCode(questionnaireCode), "1.0.0"),
-		domainScale.WithStatus(domainScale.StatusPublished),
-		domainScale.WithCategory(domainScale.CategoryADHD),
+		scaledefinition.WithID(meta.ID(901)),
+		scaledefinition.WithQuestionnaire(meta.NewCode(questionnaireCode), "1.0.0"),
+		scaledefinition.WithStatus(scaledefinition.StatusPublished),
+		scaledefinition.WithCategory(scaledefinition.CategoryADHD),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)

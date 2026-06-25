@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/editable"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -27,8 +27,8 @@ type lifecycleService struct {
 	repo                    lifecycleRepository
 	questionnaireCatalog    questionnairecatalog.Catalog
 	questionnairePublisher  QuestionnairePublisher
-	lifecycle               domscale.Lifecycle
-	baseInfo                domscale.BaseInfo
+	lifecycle               scaledefinition.Lifecycle
+	baseInfo                scaledefinition.BaseInfo
 	eventPublisher          event.EventPublisher
 	listCache               scalelistcache.PublishedListCache
 	cacheSignalNotifier     CacheSignalNotifier
@@ -36,11 +36,11 @@ type lifecycleService struct {
 }
 
 type lifecycleRepository interface {
-	Create(ctx context.Context, scale *domscale.MedicalScale) error
-	CreatePublishedSnapshot(ctx context.Context, scale *domscale.MedicalScale, active bool) error
-	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
-	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
-	Update(ctx context.Context, scale *domscale.MedicalScale) error
+	Create(ctx context.Context, scale *scaledefinition.MedicalScale) error
+	CreatePublishedSnapshot(ctx context.Context, scale *scaledefinition.MedicalScale, active bool) error
+	FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
+	Update(ctx context.Context, scale *scaledefinition.MedicalScale) error
 	SetActivePublishedVersion(ctx context.Context, code, scaleVersion string) error
 	ClearActivePublishedVersion(ctx context.Context, code string) error
 	Remove(ctx context.Context, code string) error
@@ -48,7 +48,7 @@ type lifecycleRepository interface {
 
 // RuleSetPublisher 将已发布量表同步到统一规则目录。
 type RuleSetPublisher interface {
-	PublishPublishedScale(ctx context.Context, scale *domscale.MedicalScale) error
+	PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
 // QuestionnairePublisher is the narrow port used by scale publication to
@@ -93,8 +93,8 @@ func NewService(
 	service := &lifecycleService{
 		repo:                 repo,
 		questionnaireCatalog: questionnaireCatalog,
-		lifecycle:            domscale.NewLifecycle(),
-		baseInfo:             domscale.BaseInfo{},
+		lifecycle:            scaledefinition.NewLifecycle(),
+		baseInfo:             scaledefinition.BaseInfo{},
 		eventPublisher:       eventPublisher,
 		listCache:            listCache,
 	}
@@ -156,7 +156,7 @@ func (s *lifecycleService) Unpublish(ctx context.Context, code string) (*shared.
 		return nil, err
 	}
 
-	result, err := s.executeLifecycleOperation(ctx, m, func(ctx context.Context, med *domscale.MedicalScale) error {
+	result, err := s.executeLifecycleOperation(ctx, m, func(ctx context.Context, med *scaledefinition.MedicalScale) error {
 		return s.lifecycle.Unpublish(ctx, med)
 	})
 	if err != nil {
@@ -180,7 +180,7 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*shared.Sc
 		return nil, err
 	}
 
-	result, err := s.executeLifecycleOperation(ctx, m, func(ctx context.Context, med *domscale.MedicalScale) error {
+	result, err := s.executeLifecycleOperation(ctx, m, func(ctx context.Context, med *scaledefinition.MedicalScale) error {
 		return s.lifecycle.Archive(ctx, med)
 	})
 	if err != nil {
@@ -193,7 +193,7 @@ func (s *lifecycleService) Archive(ctx context.Context, code string) (*shared.Sc
 	return result, nil
 }
 
-func (s *lifecycleService) ensureHeadEditable(ctx context.Context, m *domscale.MedicalScale) error {
+func (s *lifecycleService) ensureHeadEditable(ctx context.Context, m *scaledefinition.MedicalScale) error {
 	return editable.EnsureHeadEditable(ctx, s.repo, m)
 }
 
@@ -211,7 +211,7 @@ func (s *lifecycleService) generateScaleCode(code string) (meta.Code, error) {
 	return meta.GenerateCode()
 }
 
-func (s *lifecycleService) getScaleByCode(ctx context.Context, code string) (*domscale.MedicalScale, error) {
+func (s *lifecycleService) getScaleByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	m, err := s.repo.FindByCode(ctx, code)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
@@ -219,11 +219,11 @@ func (s *lifecycleService) getScaleByCode(ctx context.Context, code string) (*do
 	return m, nil
 }
 
-type lifecycleOperation func(ctx context.Context, med *domscale.MedicalScale) error
+type lifecycleOperation func(ctx context.Context, med *scaledefinition.MedicalScale) error
 
 func (s *lifecycleService) executeLifecycleOperation(
 	ctx context.Context,
-	m *domscale.MedicalScale,
+	m *scaledefinition.MedicalScale,
 	operation lifecycleOperation,
 ) (*shared.ScaleResult, error) {
 	if err := operation(ctx, m); err != nil {
@@ -240,7 +240,7 @@ func (s *lifecycleService) executeLifecycleOperation(
 	return shared.ToScaleResult(m), nil
 }
 
-func (s *lifecycleService) publishEvents(ctx context.Context, m *domscale.MedicalScale) {
+func (s *lifecycleService) publishEvents(ctx context.Context, m *scaledefinition.MedicalScale) {
 	eventing.PublishCollectedEvents(ctx, s.eventPublisher, m, nil, nil)
 }
 
@@ -251,7 +251,7 @@ func (s *lifecycleService) notifyCacheChanged(ctx context.Context, code, action 
 	s.cacheSignalNotifier.NotifyScaleCacheChanged(ctx, code, action)
 }
 
-func (s *lifecycleService) syncInterpretationRules(ctx context.Context, m *domscale.MedicalScale) error {
+func (s *lifecycleService) syncInterpretationRules(ctx context.Context, m *scaledefinition.MedicalScale) error {
 	if s == nil || s.interpretationPublisher == nil {
 		return nil
 	}

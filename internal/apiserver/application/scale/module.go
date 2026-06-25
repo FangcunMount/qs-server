@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition/hotrank"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
@@ -19,7 +19,7 @@ import (
 
 // NewLifecycleService 创建量表生命周期应用服务。
 func NewLifecycleService(
-	repo domscale.Repository,
+	repo scaledefinition.Repository,
 	questionnaireCatalog questionnairecatalog.Catalog,
 	eventPublisher event.EventPublisher,
 	listCache scalelistcache.PublishedListCache,
@@ -55,18 +55,18 @@ func (f QuestionnairePublisherFunc) PublishQuestionnaire(ctx context.Context, co
 }
 
 // NewFactorService 创建量表因子编辑应用服务。
-func NewFactorService(repo domscale.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ScaleFactorService {
+func NewFactorService(repo scaledefinition.Repository, listCache scalelistcache.PublishedListCache, eventPublisher event.EventPublisher) ScaleFactorService {
 	return factor.NewService(repo, listCache, eventPublisher)
 }
 
 // NewQueryService 创建量表查询应用服务。
-func NewQueryService(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ScaleQueryService {
+func NewQueryService(repo scaledefinition.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ScaleQueryService {
 	return query.NewQueryService(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
 }
 
 // NewQueryServiceWithHotListCache 创建带热门量表列表缓存的查询服务。
 func NewQueryServiceWithHotListCache(
-	repo domscale.Repository,
+	repo scaledefinition.Repository,
 	reader scalereadmodel.ScaleReader,
 	identitySvc iambridge.IdentityResolver,
 	listCache scalelistcache.PublishedListCache,
@@ -78,7 +78,7 @@ func NewQueryServiceWithHotListCache(
 }
 
 // NewQueryServiceWithReadModel 创建使用显式 read model 的量表查询服务。
-func NewQueryServiceWithReadModel(repo domscale.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ScaleQueryService {
+func NewQueryServiceWithReadModel(repo scaledefinition.Repository, reader scalereadmodel.ScaleReader, identitySvc iambridge.IdentityResolver, listCache scalelistcache.PublishedListCache, hotset cachetarget.HotsetRecorder, hotRankReaders ...hotrank.ReadModel) ScaleQueryService {
 	return query.NewQueryServiceWithReadModel(repo, reader, identitySvc, listCache, hotset, hotRankReaders...)
 }
 
@@ -93,7 +93,7 @@ func NewQRCodeQueryService(generator ScaleQRCodeGenerator) ScaleQRCodeQueryServi
 }
 
 // NewQuestionnaireBindingSyncer 创建问卷发布后同步量表绑定版本的服务。
-func NewQuestionnaireBindingSyncer(repo domscale.Repository) *QuestionnaireBindingSyncer {
+func NewQuestionnaireBindingSyncer(repo scaledefinition.Repository) *QuestionnaireBindingSyncer {
 	return lifecycle.NewQuestionnaireBindingSyncer(repo)
 }
 

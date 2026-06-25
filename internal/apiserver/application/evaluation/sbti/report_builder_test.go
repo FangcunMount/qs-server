@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/sbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -12,7 +12,7 @@ import (
 )
 
 func TestReportBuilderSetsModelExtra(t *testing.T) {
-	detail := evaluationdomain.SBTIResultDetail{
+	detail := evaluationsbti.ResultDetail{
 		TypeCode:   "CTRL",
 		TypeName:   "拿捏者",
 		OneLiner:   "人形自走任务管理器",

@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -111,7 +111,7 @@ type HotScaleListResult struct {
 // ============= Converter 转换器 =============
 
 // ToScaleResult 将领域模型转换为结果对象
-func ToScaleResult(m *domainScale.MedicalScale) *ScaleResult {
+func ToScaleResult(m *scaledefinition.MedicalScale) *ScaleResult {
 	if m == nil {
 		return nil
 	}
@@ -168,7 +168,7 @@ func ToScaleResult(m *domainScale.MedicalScale) *ScaleResult {
 	return result
 }
 
-func ToScaleResultWithUsers(ctx context.Context, m *domainScale.MedicalScale, identitySvc iambridge.IdentityResolver) *ScaleResult {
+func ToScaleResultWithUsers(ctx context.Context, m *scaledefinition.MedicalScale, identitySvc iambridge.IdentityResolver) *ScaleResult {
 	if m == nil {
 		return nil
 	}
@@ -181,7 +181,7 @@ func ToScaleResultWithUsers(ctx context.Context, m *domainScale.MedicalScale, id
 }
 
 // ToFactorResult 将因子只读快照转换为结果对象。
-func ToFactorResult(snapshot domainScale.FactorSnapshot) FactorResult {
+func ToFactorResult(snapshot scaledefinition.FactorSnapshot) FactorResult {
 	result := FactorResult{
 		Code:            snapshot.Code.String(),
 		Title:           snapshot.Title,
@@ -221,18 +221,18 @@ func ToFactorResult(snapshot domainScale.FactorSnapshot) FactorResult {
 	return result
 }
 
-func scoringParamsResultMap(params *domainScale.ScoringParams, strategy domainScale.ScoringStrategyCode) map[string]interface{} {
+func scoringParamsResultMap(params *scaledefinition.ScoringParams, strategy scaledefinition.ScoringStrategyCode) map[string]interface{} {
 	result := make(map[string]interface{})
 	if params == nil {
 		return result
 	}
 	switch strategy {
-	case domainScale.ScoringStrategyCnt:
+	case scaledefinition.ScoringStrategyCnt:
 		contents := params.GetCntOptionContents()
 		if len(contents) > 0 {
 			result["cnt_option_contents"] = contents
 		}
-	case domainScale.ScoringStrategySum, domainScale.ScoringStrategyAvg:
+	case scaledefinition.ScoringStrategySum, scaledefinition.ScoringStrategyAvg:
 		// These strategies currently do not expose additional params.
 	default:
 		// Keep unknown strategies empty; strategy validation belongs to the domain.
@@ -241,7 +241,7 @@ func scoringParamsResultMap(params *domainScale.ScoringParams, strategy domainSc
 }
 
 // ToSummaryListResult 将量表摘要列表转换为结果对象
-func ToSummaryListResult(ctx context.Context, items []*domainScale.MedicalScale, total int64, identitySvc iambridge.IdentityResolver) *ScaleSummaryListResult {
+func ToSummaryListResult(ctx context.Context, items []*scaledefinition.MedicalScale, total int64, identitySvc iambridge.IdentityResolver) *ScaleSummaryListResult {
 	userNames := resolveSummaryUserNames(ctx, items, identitySvc)
 	result := &ScaleSummaryListResult{
 		Items: make([]*ScaleSummaryResult, 0, len(items)),
@@ -326,9 +326,9 @@ func ToSummaryRowsResult(ctx context.Context, items []scalereadmodel.ScaleSummar
 	return result
 }
 
-func ToHotScaleListResult(ctx context.Context, items []domainScale.HotScaleSummary, limit, windowDays int, identitySvc iambridge.IdentityResolver) *HotScaleListResult {
-	hotItems := make([]domainScale.HotScaleSummary, 0, len(items))
-	scales := make([]*domainScale.MedicalScale, 0, len(items))
+func ToHotScaleListResult(ctx context.Context, items []scaledefinition.HotScaleSummary, limit, windowDays int, identitySvc iambridge.IdentityResolver) *HotScaleListResult {
+	hotItems := make([]scaledefinition.HotScaleSummary, 0, len(items))
+	scales := make([]*scaledefinition.MedicalScale, 0, len(items))
 	for _, item := range items {
 		if item.Scale != nil {
 			hotItems = append(hotItems, item)
@@ -355,7 +355,7 @@ func ToHotScaleListResult(ctx context.Context, items []domainScale.HotScaleSumma
 	return result
 }
 
-func resolveSummaryUserNames(ctx context.Context, items []*domainScale.MedicalScale, identitySvc iambridge.IdentityResolver) map[string]string {
+func resolveSummaryUserNames(ctx context.Context, items []*scaledefinition.MedicalScale, identitySvc iambridge.IdentityResolver) map[string]string {
 	userIDs := make([]meta.ID, 0, len(items)*2)
 	for _, item := range items {
 		if item == nil {

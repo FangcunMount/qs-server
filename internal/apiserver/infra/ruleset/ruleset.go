@@ -6,7 +6,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
@@ -82,7 +82,7 @@ func MBTIRuleSetSnapshot(model *rulesetmbti.ModelSnapshot) (*domain.RuleSetSnaps
 	}, nil
 }
 
-func ScaleRuleSetSnapshot(model *rulesetscale.ScaleSnapshot) (*domain.RuleSetSnapshot, error) {
+func ScaleRuleSetSnapshot(model *scalesnapshot.ScaleSnapshot) (*domain.RuleSetSnapshot, error) {
 	if model == nil {
 		return nil, fmt.Errorf("scale model is nil")
 	}

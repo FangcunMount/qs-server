@@ -1,0 +1,640 @@
+package definition
+
+import (
+	"regexp"
+	"slices"
+	"strconv"
+	"strings"
+)
+
+// ===================== 量表状态 =================
+
+// Status 量表状态
+type Status string
+
+const (
+	StatusDraft     Status = "draft"     // 草稿
+	StatusPublished Status = "published" // 已发布
+	StatusArchived  Status = "archived"  // 已归档
+)
+
+// Value 获取状态值
+func (s Status) Value() string {
+	return string(s)
+}
+
+// String 获取状态字符串
+func (s Status) String() string {
+	return string(s)
+}
+
+// IsDraft 是否草稿状态
+func (s Status) IsDraft() bool {
+	return s == StatusDraft
+}
+
+// IsPublished 是否已发布状态
+func (s Status) IsPublished() bool {
+	return s == StatusPublished
+}
+
+// IsArchived 是否已归档状态
+func (s Status) IsArchived() bool {
+	return s == StatusArchived
+}
+
+// ParseStatus 解析状态字符串
+func ParseStatus(value string) (Status, bool) {
+	switch Status(value) {
+	case StatusDraft, StatusPublished, StatusArchived:
+		return Status(value), true
+	default:
+		return "", false
+	}
+}
+
+// RecordRole 表示量表记录在版本族中的角色。
+type RecordRole string
+
+const (
+	RecordRoleHead              RecordRole = "head"
+	RecordRolePublishedSnapshot RecordRole = "published_snapshot"
+)
+
+// String 获取角色字符串。
+func (r RecordRole) String() string {
+	return string(r)
+}
+
+// NormalizeRecordRole 将空值归一化为 head，兼容历史数据。
+func NormalizeRecordRole(value string) RecordRole {
+	switch RecordRole(value) {
+	case RecordRolePublishedSnapshot:
+		return RecordRolePublishedSnapshot
+	case RecordRoleHead:
+		fallthrough
+	default:
+		return RecordRoleHead
+	}
+}
+
+type ScaleVersion string
+
+func NewScaleVersion(value string) ScaleVersion {
+	return ScaleVersion(normalizeScaleVersion(value))
+}
+
+func (v ScaleVersion) String() string {
+	return string(v)
+}
+
+// IncrementPatch 递增 patch 版本号，例如 1.0.0 -> 1.0.1。
+func (v ScaleVersion) IncrementPatch() ScaleVersion {
+	raw := normalizeScaleVersion(string(v))
+	prefix := ""
+	if strings.HasPrefix(raw, "v") {
+		prefix = "v"
+		raw = strings.TrimPrefix(raw, "v")
+	}
+	parts := splitByDot(raw)
+	switch len(parts) {
+	case 0:
+		return ScaleVersion(prefix + "1.0.1")
+	case 1:
+		return ScaleVersion(prefix + parts[0] + ".0.1")
+	case 2:
+		return ScaleVersion(prefix + parts[0] + "." + parts[1] + ".1")
+	default:
+		patch := parseScaleVersionPart(parts[2])
+		patch++
+		return ScaleVersion(prefix + parts[0] + "." + parts[1] + "." + strconv.Itoa(patch))
+	}
+}
+
+func parseScaleVersionPart(value string) int {
+	parsed, err := strconv.Atoi(value)
+	if err != nil {
+		return 0
+	}
+	return parsed
+}
+
+func splitByDot(value string) []string {
+	if value == "" {
+		return nil
+	}
+	return strings.Split(value, ".")
+}
+
+// ===================== 因子编码 =================
+
+// FactorCode 因子编码
+type FactorCode string
+
+// NewFactorCode 创建因子编码
+func NewFactorCode(value string) FactorCode {
+	return FactorCode(value)
+}
+
+// Value 获取编码值
+func (c FactorCode) Value() string {
+	return string(c)
+}
+
+// String 获取编码字符串
+func (c FactorCode) String() string {
+	return string(c)
+}
+
+// IsEmpty 判断编码是否为空
+func (c FactorCode) IsEmpty() bool {
+	return c == ""
+}
+
+// Equals 判断编码是否相等
+func (c FactorCode) Equals(other FactorCode) bool {
+	return c == other
+}
+
+// ===================== 因子类型 =================
+
+// FactorType 因子类型
+type FactorType string
+
+const (
+	// FactorTypePrimary 一级因子
+	FactorTypePrimary FactorType = "primary"
+	// FactorTypeMultilevel 多级因子
+	FactorTypeMultilevel FactorType = "multilevel"
+)
+
+// String 返回因子类型的字符串表示
+func (ft FactorType) String() string {
+	return string(ft)
+}
+
+// IsValid 检查因子类型是否有效
+func (ft FactorType) IsValid() bool {
+	return ft == FactorTypePrimary || ft == FactorTypeMultilevel
+}
+
+// ParseFactorType maps persisted/API factor type aliases to the current domain vocabulary.
+func ParseFactorType(raw string) FactorType {
+	switch strings.TrimSpace(raw) {
+	case "", FactorTypePrimary.String(), "first_grade":
+		return FactorTypePrimary
+	case FactorTypeMultilevel.String(), "second_grade", "multi_level":
+		return FactorTypeMultilevel
+	default:
+		return FactorType(raw)
+	}
+}
+
+// ===================== 计分策略 =================
+
+// ScoringStrategyCode 因子计分策略编码
+type ScoringStrategyCode string
+
+const (
+	// ScoringStrategySum 求和策略
+	ScoringStrategySum ScoringStrategyCode = "sum"
+	// ScoringStrategyAvg 平均策略
+	ScoringStrategyAvg ScoringStrategyCode = "avg"
+	// ScoringStrategyCnt 计数策略（统计匹配特定选项的题目数量）
+	ScoringStrategyCnt ScoringStrategyCode = "cnt"
+)
+
+// String 返回计分策略的字符串表示
+func (s ScoringStrategyCode) String() string {
+	return string(s)
+}
+
+// IsValid 检查计分策略是否有效
+func (s ScoringStrategyCode) IsValid() bool {
+	return s == ScoringStrategySum || s == ScoringStrategyAvg || s == ScoringStrategyCnt
+}
+
+// ===================== 风险等级 =================
+
+// RiskLevel 风险等级
+type RiskLevel string
+
+const (
+	// RiskLevelNone 无风险
+	RiskLevelNone RiskLevel = "none"
+	// RiskLevelLow 低风险
+	RiskLevelLow RiskLevel = "low"
+	// RiskLevelMedium 中风险
+	RiskLevelMedium RiskLevel = "medium"
+	// RiskLevelHigh 高风险
+	RiskLevelHigh RiskLevel = "high"
+	// RiskLevelSevere 严重风险
+	RiskLevelSevere RiskLevel = "severe"
+)
+
+// String 返回风险等级的字符串表示
+func (r RiskLevel) String() string {
+	return string(r)
+}
+
+// DisplayName 返回风险等级的中文展示名称。
+func (r RiskLevel) DisplayName() string {
+	switch r {
+	case RiskLevelNone:
+		return "正常"
+	case RiskLevelLow:
+		return "低风险"
+	case RiskLevelMedium:
+		return "中风险"
+	case RiskLevelHigh:
+		return "高风险"
+	case RiskLevelSevere:
+		return "严重风险"
+	default:
+		return string(r)
+	}
+}
+
+// IsValid 检查风险等级是否有效
+func (r RiskLevel) IsValid() bool {
+	switch r {
+	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 分数区间 =================
+
+// ScoreRange 分数区间 [Min, Max)
+// 采用左闭右开区间，避免边界值重叠问题
+// 例如：[0, 10) 表示 0 到 10 分（不包括 10 分）都适用该规则
+// 对于 float 值如 29.52，可以设置 [20, 30) 和 [30, 40)，避免边界值重叠
+type ScoreRange struct {
+	min float64
+	max float64
+}
+
+// NewScoreRange 创建分数区间
+func NewScoreRange(min, max float64) ScoreRange {
+	return ScoreRange{min: min, max: max}
+}
+
+// Min 获取最小值
+func (r ScoreRange) Min() float64 {
+	return r.min
+}
+
+// Max 获取最大值
+func (r ScoreRange) Max() float64 {
+	return r.max
+}
+
+// Contains 判断分数是否在区间内 [min, max)
+// 使用左闭右开区间，避免边界值重叠
+// 例如：ScoreRange{0, 10}.Contains(10) 返回 false，ScoreRange{0, 10}.Contains(9.99) 返回 true
+func (r ScoreRange) Contains(score float64) bool {
+	return score >= r.min && score < r.max
+}
+
+// IsValid 检查区间是否有效
+// 左闭右开区间要求 min < max
+func (r ScoreRange) IsValid() bool {
+	return r.min < r.max
+}
+
+// ===================== 计分参数 =================
+
+// ScoringParams 计分参数值对象
+// 根据不同的计分策略，使用不同的字段
+type ScoringParams struct {
+	// 计数策略（cnt）专用参数
+	CntOptionContents []string
+}
+
+// NewScoringParams 创建计分参数
+func NewScoringParams() *ScoringParams {
+	return &ScoringParams{
+		CntOptionContents: make([]string, 0),
+	}
+}
+
+// WithCntOptionContents 设置计数策略的选项内容列表
+func (p *ScoringParams) WithCntOptionContents(contents []string) *ScoringParams {
+	if contents == nil {
+		p.CntOptionContents = make([]string, 0)
+	} else {
+		p.CntOptionContents = slices.Clone(contents)
+	}
+	return p
+}
+
+// GetCntOptionContents 获取计数策略的选项内容列表
+func (p *ScoringParams) GetCntOptionContents() []string {
+	if p == nil {
+		return nil
+	}
+	return slices.Clone(p.CntOptionContents)
+}
+
+// Clone 返回计分参数副本。
+func (p *ScoringParams) Clone() *ScoringParams {
+	if p == nil {
+		return nil
+	}
+	return NewScoringParams().WithCntOptionContents(p.CntOptionContents)
+}
+
+// ===================== 量表类别（主类）=================
+
+// Category 量表主类
+// 每个量表只选1个主类；其余信息用标签表达
+type Category string
+
+const (
+	// CategoryADHD ADHD
+	CategoryADHD Category = "adhd"
+	// CategoryTicDisorder 抽动障碍
+	CategoryTicDisorder Category = "td"
+	// CategoryASD 自闭症
+	CategoryASD Category = "asd"
+	// CategoryPressure 压力
+	CategoryPressure Category = "pressure"
+	// CategorySensoryIntegration 感统
+	CategorySensoryIntegration Category = "sii"
+	// CategoryExecutiveFunction 执行功能
+	CategoryExecutiveFunction Category = "efn"
+	// CategoryEmotion 情绪
+	CategoryEmotion Category = "emt"
+	// CategorySleep 睡眠
+	CategorySleep Category = "slp"
+	// CategoryPersonality 人格
+	CategoryPersonality Category = "personality"
+)
+
+// NewCategory 创建类别
+func NewCategory(value string) Category {
+	return Category(value)
+}
+
+// AllCategories 所有类别
+var AllCategories = []Category{
+	CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
+	CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
+	CategoryPersonality,
+}
+
+// Value 获取类别文案
+func (c Category) Label() string {
+	categoryMap := map[Category]string{
+		CategoryADHD:               "多动",
+		CategoryTicDisorder:        "抽动",
+		CategoryASD:                "自闭",
+		CategoryPressure:           "压力",
+		CategorySensoryIntegration: "感觉统合",
+		CategoryExecutiveFunction:  "执行功能",
+		CategoryEmotion:            "情绪",
+		CategorySleep:              "睡眠",
+		CategoryPersonality:        "人格",
+	}
+	return categoryMap[c]
+}
+
+// String 返回类别的字符串表示
+func (c Category) String() string {
+	return string(c)
+}
+
+// IsEmpty 判断类别是否为空
+func (c Category) IsEmpty() bool {
+	return c == ""
+}
+
+// IsValid 检查类别是否有效
+func (c Category) IsValid() bool {
+	if c.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch c {
+	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
+		CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep,
+		CategoryPersonality:
+		return true
+	default:
+		return false
+	}
+}
+
+// IsOpen 检查类别是否开放
+func (c Category) IsOpen() bool {
+	if c.IsEmpty() {
+		return false
+	}
+	// 开放的类别
+	switch c {
+	case CategoryADHD, CategoryTicDisorder, CategoryASD, CategoryPressure,
+		CategorySensoryIntegration, CategoryExecutiveFunction, CategoryEmotion, CategorySleep:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 量表阶段 =================
+
+// Stage 量表阶段
+type Stage string
+
+const (
+	// StageDeepAssessment 深评
+	StageDeepAssessment Stage = "deep_assessment"
+	// StageFollowUp 随访
+	StageFollowUp Stage = "follow_up"
+	// StageOutcome 结局
+	StageOutcome Stage = "outcome"
+)
+
+// NewStage 创建阶段
+func NewStage(value string) Stage {
+	return Stage(value)
+}
+
+// String 返回阶段的字符串表示
+func (s Stage) String() string {
+	return string(s)
+}
+
+// Value 获取阶段值
+func (s Stage) Value() string {
+	return string(s)
+}
+
+// IsEmpty 判断阶段是否为空
+func (s Stage) IsEmpty() bool {
+	return s == ""
+}
+
+// IsValid 检查阶段是否有效
+func (s Stage) IsValid() bool {
+	if s.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch s {
+	case StageDeepAssessment, StageFollowUp, StageOutcome:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 使用年龄 =================
+
+// ApplicableAge 使用年龄
+type ApplicableAge string
+
+const (
+	// ApplicableAgeInfant 婴幼儿
+	ApplicableAgeInfant ApplicableAge = "infant"
+	// ApplicableAgePreschool 学龄前
+	ApplicableAgePreschool ApplicableAge = "preschool"
+	// ApplicableAgeSchoolChild 学龄儿童
+	ApplicableAgeSchoolChild ApplicableAge = "school_child"
+	// ApplicableAgeAdolescent 青少年
+	ApplicableAgeAdolescent ApplicableAge = "adolescent"
+	// ApplicableAgeAdult 成人
+	ApplicableAgeAdult ApplicableAge = "adult"
+)
+
+// NewApplicableAge 创建使用年龄
+func NewApplicableAge(value string) ApplicableAge {
+	return ApplicableAge(value)
+}
+
+// String 返回使用年龄的字符串表示
+func (a ApplicableAge) String() string {
+	return string(a)
+}
+
+// Value 获取使用年龄值
+func (a ApplicableAge) Value() string {
+	return string(a)
+}
+
+// IsEmpty 判断使用年龄是否为空
+func (a ApplicableAge) IsEmpty() bool {
+	return a == ""
+}
+
+// IsValid 检查使用年龄是否有效
+func (a ApplicableAge) IsValid() bool {
+	if a.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch a {
+	case ApplicableAgeInfant, ApplicableAgePreschool,
+		ApplicableAgeSchoolChild, ApplicableAgeAdolescent, ApplicableAgeAdult:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 填报人 =================
+
+// Reporter 填报人
+type Reporter string
+
+const (
+	// ReporterParent 家长评
+	ReporterParent Reporter = "parent"
+	// ReporterTeacher 教师评
+	ReporterTeacher Reporter = "teacher"
+	// ReporterSelf 自评
+	ReporterSelf Reporter = "self"
+	// ReporterClinical 临床评定
+	ReporterClinical Reporter = "clinical"
+)
+
+// NewReporter 创建填报人
+func NewReporter(value string) Reporter {
+	return Reporter(value)
+}
+
+// String 返回填报人的字符串表示
+func (r Reporter) String() string {
+	return string(r)
+}
+
+// Value 获取填报人值
+func (r Reporter) Value() string {
+	return string(r)
+}
+
+// IsEmpty 判断填报人是否为空
+func (r Reporter) IsEmpty() bool {
+	return r == ""
+}
+
+// IsValid 检查填报人是否有效
+func (r Reporter) IsValid() bool {
+	if r.IsEmpty() {
+		return true // 允许为空（可选字段）
+	}
+	switch r {
+	case ReporterParent, ReporterTeacher, ReporterSelf, ReporterClinical:
+		return true
+	default:
+		return false
+	}
+}
+
+// ===================== 标签 =================
+
+// Tag 量表标签
+// 用于表达除主类外的其他信息，标签值通过后台输入设置，不再固定常量
+type Tag string
+
+// NewTag 创建标签
+func NewTag(value string) Tag {
+	return Tag(value)
+}
+
+// String 返回标签的字符串表示
+func (t Tag) String() string {
+	return string(t)
+}
+
+// Value 获取标签值
+func (t Tag) Value() string {
+	return string(t)
+}
+
+// IsEmpty 判断标签是否为空
+func (t Tag) IsEmpty() bool {
+	return t == ""
+}
+
+// Validate 验证标签格式（只验证格式，不验证固定值）
+// 标签允许：字母、数字、下划线、中文字符，长度1-50
+func (t Tag) Validate() error {
+	if t.IsEmpty() {
+		return nil // 允许为空
+	}
+
+	value := t.String()
+	if len(value) == 0 {
+		return newError(ErrorKindInvalidArgument, "标签不能为空")
+	}
+	if len(value) > 50 {
+		return newError(ErrorKindInvalidArgument, "标签长度不能超过50个字符")
+	}
+
+	// 验证字符格式：只允许字母、数字、下划线、中文字符
+	matched, _ := regexp.MatchString(`^[\w\p{Han}]+$`, value)
+	if !matched {
+		return newError(ErrorKindInvalidArgument, "标签只能包含字母、数字、下划线和中文")
+	}
+
+	return nil
+}

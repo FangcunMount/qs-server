@@ -6,58 +6,58 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/factor"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type ruleFreezeScaleRepoStub struct {
-	item          *domainScale.MedicalScale
+	item          *scaledefinition.MedicalScale
 	updateCount   int
 	snapshotCount int
 	clearedActive bool
 }
 
-func (r *ruleFreezeScaleRepoStub) Create(context.Context, *domainScale.MedicalScale) error {
+func (r *ruleFreezeScaleRepoStub) Create(context.Context, *scaledefinition.MedicalScale) error {
 	return nil
 }
 
-func (r *ruleFreezeScaleRepoStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+func (r *ruleFreezeScaleRepoStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
 	r.snapshotCount++
 	return nil
 }
 
-func (r *ruleFreezeScaleRepoStub) FindByCode(context.Context, string) (*domainScale.MedicalScale, error) {
+func (r *ruleFreezeScaleRepoStub) FindByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	if r.item == nil {
-		return nil, domainScale.ErrNotFound
+		return nil, scaledefinition.ErrNotFound
 	}
 	return r.item, nil
 }
 
-func (r *ruleFreezeScaleRepoStub) FindByCodeVersion(context.Context, string, string) (*domainScale.MedicalScale, error) {
+func (r *ruleFreezeScaleRepoStub) FindByCodeVersion(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByCode(context.Background(), "")
 }
 
-func (r *ruleFreezeScaleRepoStub) FindPublishedByCode(context.Context, string) (*domainScale.MedicalScale, error) {
+func (r *ruleFreezeScaleRepoStub) FindPublishedByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByCode(context.Background(), "")
 }
 
-func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
+func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	if r.item == nil {
-		return nil, domainScale.ErrNotFound
+		return nil, scaledefinition.ErrNotFound
 	}
 	return r.item, nil
 }
 
-func (r *ruleFreezeScaleRepoStub) FindPublishedByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
+func (r *ruleFreezeScaleRepoStub) FindPublishedByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(context.Background(), "")
 }
 
-func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*domainScale.MedicalScale, error) {
+func (r *ruleFreezeScaleRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(context.Background(), "")
 }
 
-func (r *ruleFreezeScaleRepoStub) Update(_ context.Context, item *domainScale.MedicalScale) error {
+func (r *ruleFreezeScaleRepoStub) Update(_ context.Context, item *scaledefinition.MedicalScale) error {
 	r.updateCount++
 	r.item = item
 	return nil
@@ -99,7 +99,7 @@ func (p *scaleEventPublisherStub) PublishAll(ctx context.Context, events []event
 func TestPublishedScaleFreezesRuleMutationsButAllowsDisplayUpdate(t *testing.T) {
 	t.Parallel()
 
-	published := newApplicationScaleForFreezeTest(t, domainScale.StatusPublished)
+	published := newApplicationScaleForFreezeTest(t, scaledefinition.StatusPublished)
 	repo := &ruleFreezeScaleRepoStub{item: published}
 
 	factorSvc := factor.NewService(repo, nil, &scaleEventPublisherStub{})
@@ -117,7 +117,7 @@ func TestPublishedScaleFreezesRuleMutationsButAllowsDisplayUpdate(t *testing.T) 
 	}
 
 	repo.updateCount = 0
-	lifecycleSvc := &lifecycleService{repo: repo, baseInfo: domainScale.BaseInfo{}, eventPublisher: &scaleEventPublisherStub{}}
+	lifecycleSvc := &lifecycleService{repo: repo, baseInfo: scaledefinition.BaseInfo{}, eventPublisher: &scaleEventPublisherStub{}}
 	if _, err := lifecycleSvc.UpdateQuestionnaire(context.Background(), shared.UpdateScaleQuestionnaireDTO{
 		Code:                 published.GetCode().String(),
 		QuestionnaireCode:    "Q2",
@@ -145,12 +145,12 @@ func TestQuestionnaireBindingSyncerSyncsDraftOnly(t *testing.T) {
 
 	for _, tc := range []struct {
 		name       string
-		status     domainScale.Status
+		status     scaledefinition.Status
 		wantUpdate bool
 	}{
-		{name: "draft", status: domainScale.StatusDraft, wantUpdate: true},
-		{name: "published", status: domainScale.StatusPublished, wantUpdate: false},
-		{name: "archived", status: domainScale.StatusArchived, wantUpdate: false},
+		{name: "draft", status: scaledefinition.StatusDraft, wantUpdate: true},
+		{name: "published", status: scaledefinition.StatusPublished, wantUpdate: false},
+		{name: "archived", status: scaledefinition.StatusArchived, wantUpdate: false},
 	} {
 		tc := tc
 		t.Run(tc.name, func(t *testing.T) {
@@ -173,27 +173,27 @@ func TestQuestionnaireBindingSyncerSyncsDraftOnly(t *testing.T) {
 	}
 }
 
-func newApplicationScaleForFreezeTest(t *testing.T, status domainScale.Status) *domainScale.MedicalScale {
+func newApplicationScaleForFreezeTest(t *testing.T, status scaledefinition.Status) *scaledefinition.MedicalScale {
 	t.Helper()
 
-	factor, err := domainScale.NewFactor(
-		domainScale.NewFactorCode("F1"),
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode("F1"),
 		"Factor 1",
-		domainScale.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
-		domainScale.WithInterpretRules([]domainScale.InterpretationRule{
-			domainScale.NewInterpretationRule(domainScale.NewScoreRange(0, 10), domainScale.RiskLevelLow, "low", "watch"),
+		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
+		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
+			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
 		}),
 	)
 	if err != nil {
 		t.Fatalf("NewFactor() error = %v", err)
 	}
-	item, err := domainScale.NewMedicalScale(
+	item, err := scaledefinition.NewMedicalScale(
 		meta.NewCode("S1"),
 		"Scale 1",
-		domainScale.WithID(meta.FromUint64(101)),
-		domainScale.WithQuestionnaire(meta.NewCode("Q1"), "1.0"),
-		domainScale.WithStatus(status),
-		domainScale.WithFactors([]*domainScale.Factor{factor}),
+		scaledefinition.WithID(meta.FromUint64(101)),
+		scaledefinition.WithQuestionnaire(meta.NewCode("Q1"), "1.0"),
+		scaledefinition.WithStatus(status),
+		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 )
@@ -69,7 +69,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 	// 转换摘要列表（仅保留有效分类）
 	scales := make([]ScaleSummaryResponse, 0, len(result.Scales))
 	for _, scale := range result.Scales {
-		if !domainScale.NewCategory(scale.Category).IsOpen() {
+		if !scaledefinition.NewCategory(scale.Category).IsOpen() {
 			continue
 		}
 		scales = append(scales, ScaleSummaryResponse{
@@ -111,7 +111,7 @@ func (s *QueryService) ListHot(ctx context.Context, req *ListHotScalesRequest) (
 
 	scales := make([]HotScaleSummaryResponse, 0, len(result.Scales))
 	for _, scale := range result.Scales {
-		if !domainScale.NewCategory(scale.Category).IsOpen() {
+		if !scaledefinition.NewCategory(scale.Category).IsOpen() {
 			continue
 		}
 		scales = append(scales, HotScaleSummaryResponse{

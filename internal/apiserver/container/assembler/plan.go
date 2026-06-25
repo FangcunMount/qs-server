@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	planCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	planInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/plan"
@@ -44,7 +44,7 @@ type PlanModule struct {
 type PlanModuleDeps struct {
 	MySQLDB        *gorm.DB
 	EventPublisher event.EventPublisher
-	ScaleRepo      scale.Repository
+	ScaleRepo      scaledefinition.Repository
 	RedisClient    redis.UniversalClient
 	CacheBuilder   *keyspace.Builder
 	PlanPolicy     cachepolicy.CachePolicy

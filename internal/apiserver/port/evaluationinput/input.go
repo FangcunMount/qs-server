@@ -6,7 +6,7 @@ import (
 
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 )
 
 type EvaluationModelKind string
@@ -59,7 +59,7 @@ type InputSnapshot struct {
 	Model        *ModelSnapshot
 	ModelPayload ModelPayload
 	// Deprecated: use ScalePayload(input) instead.
-	MedicalScale  *rulesetscale.ScaleSnapshot
+	MedicalScale  *scalesnapshot.ScaleSnapshot
 	AnswerSheet   *AnswerSheetSnapshot
 	Questionnaire *QuestionnaireSnapshot
 }
@@ -76,7 +76,7 @@ type ModelPayload interface {
 	RuleSetKind() EvaluationModelKind
 }
 
-func NewScaleModelSnapshot(scale *rulesetscale.ScaleSnapshot) *ModelSnapshot {
+func NewScaleModelSnapshot(scale *scalesnapshot.ScaleSnapshot) *ModelSnapshot {
 	if scale == nil {
 		return nil
 	}
@@ -94,14 +94,14 @@ func NewScaleModelSnapshot(scale *rulesetscale.ScaleSnapshot) *ModelSnapshot {
 }
 
 type ScaleModelPayload struct {
-	Scale *rulesetscale.ScaleSnapshot
+	Scale *scalesnapshot.ScaleSnapshot
 }
 
 func (ScaleModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindScale
 }
 
-func ScalePayload(input *InputSnapshot) (*rulesetscale.ScaleSnapshot, bool) {
+func ScalePayload(input *InputSnapshot) (*scalesnapshot.ScaleSnapshot, bool) {
 	if input == nil {
 		return nil, false
 	}
@@ -229,12 +229,12 @@ type Resolver interface {
 }
 
 type ScaleCatalog interface {
-	GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error)
+	GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error)
 }
 
 type ScaleModelCatalog interface {
 	ScaleCatalog
-	GetScaleByRef(ctx context.Context, ref ModelRef) (*rulesetscale.ScaleSnapshot, error)
+	GetScaleByRef(ctx context.Context, ref ModelRef) (*scalesnapshot.ScaleSnapshot, error)
 }
 
 type SBTIModelCatalog interface {

@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -81,8 +81,8 @@ func TestCachedScaleRepositoryUpdateInvalidatesOldAndNewVersionCache(t *testing.
 		mr.Close()
 	})
 
-	oldDomain := newScaleCacheTestScale(t, "S-001", scale.WithScaleVersion("1.0.0"))
-	newDomain := newScaleCacheTestScale(t, "S-001", scale.WithScaleVersion("2.0.0"))
+	oldDomain := newScaleCacheTestScale(t, "S-001", scaledefinition.WithScaleVersion("1.0.0"))
+	newDomain := newScaleCacheTestScale(t, "S-001", scaledefinition.WithScaleVersion("2.0.0"))
 	baseRepo := &scaleMutationRepo{findByCodeResult: oldDomain}
 	cached := NewCachedScaleRepositoryWithBuilderAndPolicy(
 		baseRepo,
@@ -222,7 +222,7 @@ func TestCachedScaleRepositoryReloadsPublishedScaleCacheWithoutFactors(t *testin
 		keyspace.NewBuilderWithNamespace("test-ns"),
 		cachepolicy.CachePolicy{},
 	).(*CachedScaleRepository)
-	stale := newScaleCacheTestScale(t, "S-001", scale.WithStatus(scale.StatusPublished))
+	stale := newScaleCacheTestScale(t, "S-001", scaledefinition.WithStatus(scaledefinition.StatusPublished))
 	if err := cached.setCache(context.Background(), "S-001", stale); err != nil {
 		t.Fatalf("set stale cache error = %v", err)
 	}
@@ -250,45 +250,45 @@ func TestCachedScaleRepositoryReloadsPublishedScaleCacheWithoutFactors(t *testin
 	}
 }
 
-func newScaleCacheTestScale(t *testing.T, code string, opts ...scale.MedicalScaleOption) *scale.MedicalScale {
+func newScaleCacheTestScale(t *testing.T, code string, opts ...scaledefinition.MedicalScaleOption) *scaledefinition.MedicalScale {
 	t.Helper()
 
-	domain, err := scale.NewMedicalScale(meta.NewCode(code), "Test Scale", opts...)
+	domain, err := scaledefinition.NewMedicalScale(meta.NewCode(code), "Test Scale", opts...)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
 	}
 	return domain
 }
 
-func newScaleCacheTestScaleWithFactor(t *testing.T, code string) *scale.MedicalScale {
+func newScaleCacheTestScaleWithFactor(t *testing.T, code string) *scaledefinition.MedicalScale {
 	t.Helper()
 
-	factor, err := scale.NewFactor(
-		scale.NewFactorCode("F1"),
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode("F1"),
 		"Factor 1",
-		scale.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
+		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
 	)
 	if err != nil {
 		t.Fatalf("NewFactor() error = %v", err)
 	}
-	return newScaleCacheTestScale(t, code, scale.WithStatus(scale.StatusPublished), scale.WithFactors([]*scale.Factor{factor}))
+	return newScaleCacheTestScale(t, code, scaledefinition.WithStatus(scaledefinition.StatusPublished), scaledefinition.WithFactors([]*scaledefinition.Factor{factor}))
 }
 
 type scaleMutationRepo struct {
-	scale.Repository
-	findByCodeResult                       *scale.MedicalScale
+	scaledefinition.Repository
+	findByCodeResult                       *scaledefinition.MedicalScale
 	findByCodeCalls                        int
-	findPublishedByCodeResult              *scale.MedicalScale
+	findPublishedByCodeResult              *scaledefinition.MedicalScale
 	findPublishedByCodeCalls               int
-	findPublishedByQuestionnaireCodeResult *scale.MedicalScale
+	findPublishedByQuestionnaireCodeResult *scaledefinition.MedicalScale
 	findPublishedByQuestionnaireCodeCalls  int
 }
 
-func (r *scaleMutationRepo) Create(context.Context, *scale.MedicalScale) error {
+func (r *scaleMutationRepo) Create(context.Context, *scaledefinition.MedicalScale) error {
 	return nil
 }
 
-func (r *scaleMutationRepo) Update(context.Context, *scale.MedicalScale) error {
+func (r *scaleMutationRepo) Update(context.Context, *scaledefinition.MedicalScale) error {
 	return nil
 }
 
@@ -296,17 +296,17 @@ func (r *scaleMutationRepo) Remove(context.Context, string) error {
 	return nil
 }
 
-func (r *scaleMutationRepo) FindByCode(context.Context, string) (*scale.MedicalScale, error) {
+func (r *scaleMutationRepo) FindByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	r.findByCodeCalls++
 	return r.findByCodeResult, nil
 }
 
-func (r *scaleMutationRepo) FindPublishedByCode(context.Context, string) (*scale.MedicalScale, error) {
+func (r *scaleMutationRepo) FindPublishedByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	r.findPublishedByCodeCalls++
 	return r.findPublishedByCodeResult, nil
 }
 
-func (r *scaleMutationRepo) FindPublishedByQuestionnaireCode(context.Context, string) (*scale.MedicalScale, error) {
+func (r *scaleMutationRepo) FindPublishedByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	r.findPublishedByQuestionnaireCodeCalls++
 	return r.findPublishedByQuestionnaireCodeResult, nil
 }

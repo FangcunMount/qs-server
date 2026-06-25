@@ -4,44 +4,44 @@ import (
 	"context"
 	"testing"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type scaleRepoBindingStub struct {
-	boundByQuestionnaire map[string]*domainScale.MedicalScale
+	boundByQuestionnaire map[string]*scaledefinition.MedicalScale
 }
 
-func (r *scaleRepoBindingStub) Create(_ context.Context, _ *domainScale.MedicalScale) error {
+func (r *scaleRepoBindingStub) Create(_ context.Context, _ *scaledefinition.MedicalScale) error {
 	return nil
 }
-func (r *scaleRepoBindingStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+func (r *scaleRepoBindingStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
 	return nil
 }
-func (r *scaleRepoBindingStub) FindByCode(_ context.Context, _ string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scaleRepoBindingStub) FindByCode(_ context.Context, _ string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scaleRepoBindingStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scaleRepoBindingStub) FindByCodeVersion(_ context.Context, _ string, _ string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scaleRepoBindingStub) FindPublishedByCode(context.Context, string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scaleRepoBindingStub) FindPublishedByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
+func (r *scaleRepoBindingStub) FindByQuestionnaireCode(_ context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	if scale, ok := r.boundByQuestionnaire[questionnaireCode]; ok {
 		return scale, nil
 	}
-	return nil, domainScale.ErrNotFound
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scaleRepoBindingStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domainScale.MedicalScale, error) {
+func (r *scaleRepoBindingStub) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
-func (r *scaleRepoBindingStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*domainScale.MedicalScale, error) {
+func (r *scaleRepoBindingStub) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, _ string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
-func (r *scaleRepoBindingStub) Update(_ context.Context, _ *domainScale.MedicalScale) error {
+func (r *scaleRepoBindingStub) Update(_ context.Context, _ *scaledefinition.MedicalScale) error {
 	return nil
 }
 func (r *scaleRepoBindingStub) Remove(_ context.Context, _ string) error { return nil }
@@ -124,10 +124,10 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsOtherScaleBinding(t *tes
 	if err != nil {
 		t.Fatalf("NewQuestionnaire() error = %v", err)
 	}
-	otherScale, err := domainScale.NewMedicalScale(
+	otherScale, err := scaledefinition.NewMedicalScale(
 		meta.NewCode("S-OTHER"),
 		"Other Scale",
-		domainScale.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
+		scaledefinition.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
@@ -135,7 +135,7 @@ func TestValidateMedicalScaleQuestionnaireBindingRejectsOtherScaleBinding(t *tes
 
 	svc := &lifecycleService{
 		repo: &scaleRepoBindingStub{
-			boundByQuestionnaire: map[string]*domainScale.MedicalScale{
+			boundByQuestionnaire: map[string]*scaledefinition.MedicalScale{
 				"Q-MS": otherScale,
 			},
 		},
@@ -166,10 +166,10 @@ func TestValidateMedicalScaleQuestionnaireBindingAllowsSameScaleRebind(t *testin
 	if err != nil {
 		t.Fatalf("NewQuestionnaire() error = %v", err)
 	}
-	scaleItem, err := domainScale.NewMedicalScale(
+	scaleItem, err := scaledefinition.NewMedicalScale(
 		meta.NewCode("S-001"),
 		"Scale",
-		domainScale.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
+		scaledefinition.WithQuestionnaire(meta.NewCode("Q-MS"), "1.0"),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)
@@ -177,7 +177,7 @@ func TestValidateMedicalScaleQuestionnaireBindingAllowsSameScaleRebind(t *testin
 
 	svc := &lifecycleService{
 		repo: &scaleRepoBindingStub{
-			boundByQuestionnaire: map[string]*domainScale.MedicalScale{
+			boundByQuestionnaire: map[string]*scaledefinition.MedicalScale{
 				"Q-MS": scaleItem,
 			},
 		},

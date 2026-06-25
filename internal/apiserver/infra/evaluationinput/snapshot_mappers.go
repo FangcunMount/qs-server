@@ -1,28 +1,28 @@
 package evaluationinput
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 // MedicalScaleToSnapshot 将领域量表映射为评估输入快照（供规则同步与执行链路复用）。
-func MedicalScaleToSnapshot(m *scale.MedicalScale) *rulesetscale.ScaleSnapshot {
+func MedicalScaleToSnapshot(m *scaledefinition.MedicalScale) *scalesnapshot.ScaleSnapshot {
 	return scaleToSnapshot(m)
 }
 
-func scaleToSnapshot(m *scale.MedicalScale) *rulesetscale.ScaleSnapshot {
+func scaleToSnapshot(m *scaledefinition.MedicalScale) *scalesnapshot.ScaleSnapshot {
 	if m == nil {
 		return nil
 	}
 	domainSnapshots := m.FactorSnapshots()
-	factors := make([]rulesetscale.FactorSnapshot, 0, len(domainSnapshots))
+	factors := make([]scalesnapshot.FactorSnapshot, 0, len(domainSnapshots))
 	for _, snapshot := range domainSnapshots {
 		factors = append(factors, factorSnapshotToPort(snapshot))
 	}
-	return &rulesetscale.ScaleSnapshot{
+	return &scalesnapshot.ScaleSnapshot{
 		ID:                   m.GetID().Uint64(),
 		Code:                 m.GetCode().String(),
 		ScaleVersion:         m.GetScaleVersion(),
@@ -35,15 +35,15 @@ func scaleToSnapshot(m *scale.MedicalScale) *rulesetscale.ScaleSnapshot {
 }
 
 // factorSnapshotToPort 将领域因子快照映射为评估输入端口的因子快照。
-// 输入是只读的 scale.FactorSnapshot，避免直接持有领域实体指针。
-func factorSnapshotToPort(snapshot scale.FactorSnapshot) rulesetscale.FactorSnapshot {
+// 输入是只读的 scaledefinition.FactorSnapshot，避免直接持有领域实体指针。
+func factorSnapshotToPort(snapshot scaledefinition.FactorSnapshot) scalesnapshot.FactorSnapshot {
 	questionCodes := make([]string, 0, len(snapshot.QuestionCodes))
 	for _, code := range snapshot.QuestionCodes {
 		questionCodes = append(questionCodes, code.String())
 	}
-	rules := make([]rulesetscale.InterpretRuleSnapshot, 0, len(snapshot.InterpretRules))
+	rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(snapshot.InterpretRules))
 	for _, rule := range snapshot.InterpretRules {
-		rules = append(rules, rulesetscale.InterpretRuleSnapshot{
+		rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
 			Min:        rule.GetScoreRange().Min(),
 			Max:        rule.GetScoreRange().Max(),
 			RiskLevel:  string(rule.GetRiskLevel()),
@@ -55,13 +55,13 @@ func factorSnapshotToPort(snapshot scale.FactorSnapshot) rulesetscale.FactorSnap
 	if snapshot.ScoringParams != nil {
 		cntContents = append([]string(nil), snapshot.ScoringParams.GetCntOptionContents()...)
 	}
-	return rulesetscale.FactorSnapshot{
+	return scalesnapshot.FactorSnapshot{
 		Code:            snapshot.Code.String(),
 		Title:           snapshot.Title,
 		IsTotalScore:    snapshot.IsTotalScore,
 		QuestionCodes:   questionCodes,
 		ScoringStrategy: snapshot.ScoringStrategy.String(),
-		ScoringParams: rulesetscale.ScoringParamsSnapshot{
+		ScoringParams: scalesnapshot.ScoringParamsSnapshot{
 			CntOptionContents: cntContents,
 		},
 		MaxScore:       snapshot.MaxScore,

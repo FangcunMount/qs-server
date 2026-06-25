@@ -3,7 +3,8 @@ package evaluationinput
 import (
 	"testing"
 
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/sbti"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -20,7 +21,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		got, err := evaluationdomain.ScoreSBTI(model, sbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationsbti.Score(model, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -39,7 +40,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		got, err := evaluationdomain.ScoreSBTI(&modelCopy, sbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationsbti.Score(&modelCopy, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -54,7 +55,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := evaluationdomain.ScoreSBTI(model, sbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationsbti.Score(model, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -103,19 +104,19 @@ func sbtiAlternatingAnswerSheet(model *rulesetsbti.ModelSnapshot) *port.AnswerSh
 	}
 }
 
-func sbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationdomain.AnswerSheet {
+func sbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationinputdomain.AnswerSheet {
 	if sheet == nil {
 		return nil
 	}
-	answers := make([]evaluationdomain.Answer, 0, len(sheet.Answers))
+	answers := make([]evaluationinputdomain.Answer, 0, len(sheet.Answers))
 	for _, answer := range sheet.Answers {
-		answers = append(answers, evaluationdomain.Answer{
+		answers = append(answers, evaluationinputdomain.Answer{
 			QuestionCode: answer.QuestionCode,
 			Score:        answer.Score,
 			Value:        answer.Value,
 		})
 	}
-	return &evaluationdomain.AnswerSheet{
+	return &evaluationinputdomain.AnswerSheet{
 		QuestionnaireCode:    sheet.QuestionnaireCode,
 		QuestionnaireVersion: sheet.QuestionnaireVersion,
 		Answers:              answers,

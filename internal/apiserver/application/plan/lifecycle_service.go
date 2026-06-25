@@ -7,8 +7,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -27,7 +27,7 @@ type lifecycleService struct {
 func NewLifecycleService(
 	planRepo plan.AssessmentPlanRepository,
 	taskRepo plan.AssessmentTaskRepository,
-	scaleRepo scale.Repository,
+	scaleRepo scaledefinition.Repository,
 	eventPublisher event.EventPublisher,
 ) PlanLifecycleService {
 	return NewLifecycleServiceWithScaleCatalog(planRepo, taskRepo, newRepositoryScaleCatalog(scaleRepo), eventPublisher)

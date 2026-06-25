@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -93,9 +93,9 @@ func (s *queryService) storeHotScaleListCache(ctx context.Context, limit, window
 	}
 }
 
-func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]domainScale.HotScaleSummary, error) {
+func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays int) ([]scaledefinition.HotScaleSummary, error) {
 	if s == nil || s.hotRank == nil {
-		return []domainScale.HotScaleSummary{}, nil
+		return []scaledefinition.HotScaleSummary{}, nil
 	}
 	rankItems, err := s.hotRank.Top(ctx, hotrank.Query{
 		WindowDays: windowDays,
@@ -105,7 +105,7 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 		return nil, err
 	}
 
-	result := make([]domainScale.HotScaleSummary, 0, limit)
+	result := make([]scaledefinition.HotScaleSummary, 0, limit)
 	seen := make(map[string]struct{}, len(rankItems))
 	for _, rankItem := range rankItems {
 		questionnaireCode := strings.TrimSpace(rankItem.QuestionnaireCode)
@@ -128,7 +128,7 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 			continue
 		}
 		seen[code] = struct{}{}
-		result = append(result, domainScale.HotScaleSummary{
+		result = append(result, scaledefinition.HotScaleSummary{
 			Scale:           item,
 			SubmissionCount: rankItem.Score,
 		})
@@ -140,7 +140,7 @@ func (s *queryService) loadHotScaleRank(ctx context.Context, limit, windowDays i
 	return result, nil
 }
 
-func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, existing []domainScale.HotScaleSummary) ([]domainScale.HotScaleSummary, error) {
+func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, existing []scaledefinition.HotScaleSummary) ([]scaledefinition.HotScaleSummary, error) {
 	seen := make(map[string]struct{}, len(existing))
 	for _, item := range existing {
 		if item.Scale == nil {
@@ -149,12 +149,12 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 		seen[item.Scale.GetCode().String()] = struct{}{}
 	}
 
-	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: domainScale.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
+	rows, err := s.reader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scaledefinition.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: 1, PageSize: 100})
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "获取热门量表兜底列表失败")
 	}
 
-	result := make([]domainScale.HotScaleSummary, 0, limit-len(existing))
+	result := make([]scaledefinition.HotScaleSummary, 0, limit-len(existing))
 	for _, row := range rows {
 		item, err := s.repo.FindPublishedByCode(ctx, row.Code)
 		if err != nil {
@@ -172,7 +172,7 @@ func (s *queryService) loadHotScaleFallback(ctx context.Context, limit int, exis
 			continue
 		}
 		seen[code] = struct{}{}
-		result = append(result, domainScale.HotScaleSummary{Scale: item})
+		result = append(result, scaledefinition.HotScaleSummary{Scale: item})
 		if len(existing)+len(result) >= limit {
 			break
 		}

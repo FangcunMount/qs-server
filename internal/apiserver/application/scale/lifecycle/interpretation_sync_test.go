@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -14,7 +14,7 @@ type interpretationPublisherStub struct {
 	calls int
 }
 
-func (s *interpretationPublisherStub) PublishPublishedScale(context.Context, *domainScale.MedicalScale) error {
+func (s *interpretationPublisherStub) PublishPublishedScale(context.Context, *scaledefinition.MedicalScale) error {
 	s.calls++
 	return nil
 }
@@ -47,32 +47,34 @@ func TestPublishSyncsInterpretationRules(t *testing.T) {
 }
 
 type scalePublishRepoStub struct {
-	scale *domainScale.MedicalScale
+	scale *scaledefinition.MedicalScale
 }
 
-func (r *scalePublishRepoStub) Create(context.Context, *domainScale.MedicalScale) error { return nil }
-func (r *scalePublishRepoStub) CreatePublishedSnapshot(context.Context, *domainScale.MedicalScale, bool) error {
+func (r *scalePublishRepoStub) Create(context.Context, *scaledefinition.MedicalScale) error {
 	return nil
 }
-func (r *scalePublishRepoStub) FindByCode(context.Context, string) (*domainScale.MedicalScale, error) {
+func (r *scalePublishRepoStub) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
+	return nil
+}
+func (r *scalePublishRepoStub) FindByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
 	return r.scale, nil
 }
-func (r *scalePublishRepoStub) FindByCodeVersion(context.Context, string, string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scalePublishRepoStub) FindByCodeVersion(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scalePublishRepoStub) FindPublishedByCode(context.Context, string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scalePublishRepoStub) FindPublishedByCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scalePublishRepoStub) FindByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scalePublishRepoStub) FindByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scalePublishRepoStub) FindPublishedByQuestionnaireCode(context.Context, string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scalePublishRepoStub) FindPublishedByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scalePublishRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*domainScale.MedicalScale, error) {
-	return nil, domainScale.ErrNotFound
+func (r *scalePublishRepoStub) FindByQuestionnaireRef(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
-func (r *scalePublishRepoStub) Update(_ context.Context, scale *domainScale.MedicalScale) error {
+func (r *scalePublishRepoStub) Update(_ context.Context, scale *scaledefinition.MedicalScale) error {
 	r.scale = scale
 	return nil
 }
@@ -83,27 +85,27 @@ func (r *scalePublishRepoStub) ClearActivePublishedVersion(context.Context, stri
 func (r *scalePublishRepoStub) Remove(context.Context, string) error                      { return nil }
 func (r *scalePublishRepoStub) ExistsByCode(context.Context, string) (bool, error)        { return true, nil }
 
-func newPublishableScaleForTest(t *testing.T) *domainScale.MedicalScale {
+func newPublishableScaleForTest(t *testing.T) *scaledefinition.MedicalScale {
 	t.Helper()
-	factor, err := domainScale.NewFactor(
-		domainScale.NewFactorCode("total"),
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode("total"),
 		"总分",
-		domainScale.WithIsTotalScore(true),
-		domainScale.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
-		domainScale.WithScoringStrategy(domainScale.ScoringStrategySum),
-		domainScale.WithInterpretRules([]domainScale.InterpretationRule{
-			domainScale.NewInterpretationRule(domainScale.NewScoreRange(0, 10), domainScale.RiskLevelLow, "low", "watch"),
+		scaledefinition.WithIsTotalScore(true),
+		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1")}),
+		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategySum),
+		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
+			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 10), scaledefinition.RiskLevelLow, "low", "watch"),
 		}),
 	)
 	if err != nil {
 		t.Fatalf("NewFactor: %v", err)
 	}
-	scale, err := domainScale.NewMedicalScale(
+	scale, err := scaledefinition.NewMedicalScale(
 		meta.NewCode("SCL-001"),
 		"Demo",
-		domainScale.WithQuestionnaire(meta.NewCode("QNR-001"), "1.0.0"),
-		domainScale.WithScaleVersion("1.0.0"),
-		domainScale.WithFactors([]*domainScale.Factor{factor}),
+		scaledefinition.WithQuestionnaire(meta.NewCode("QNR-001"), "1.0.0"),
+		scaledefinition.WithScaleVersion("1.0.0"),
+		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale: %v", err)

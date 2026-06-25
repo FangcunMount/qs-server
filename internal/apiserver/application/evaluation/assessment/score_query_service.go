@@ -4,7 +4,7 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
@@ -120,7 +120,7 @@ func (s *scoreQueryService) GetHighRiskFactors(ctx context.Context, assessmentID
 	return highRiskFactorsResultFromScoreRow(assessmentID, scoreRow, medicalScale), nil
 }
 
-func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *rulesetscale.ScaleSnapshot {
+func (s *scoreQueryService) loadScaleForAssessmentRow(ctx context.Context, assessmentID uint64) *scalesnapshot.ScaleSnapshot {
 	if s.scaleCatalog == nil || s.assessmentReader == nil {
 		return nil
 	}

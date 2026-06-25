@@ -3,8 +3,8 @@ package ruleset
 import (
 	"context"
 
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 )
@@ -30,7 +30,7 @@ func PublishedScaleRuleSetSnapshots(ctx context.Context, repo *mongoScale.Reposi
 }
 
 // ScaleRuleSetSnapshotsFromMedicalScales 将领域量表列表转为规则集快照。
-func ScaleRuleSetSnapshotsFromMedicalScales(scales []*domscale.MedicalScale) ([]*domain.RuleSetSnapshot, error) {
+func ScaleRuleSetSnapshotsFromMedicalScales(scales []*scaledefinition.MedicalScale) ([]*domain.RuleSetSnapshot, error) {
 	snapshots := make([]*domain.RuleSetSnapshot, 0, len(scales))
 	for _, scale := range scales {
 		if scale == nil {

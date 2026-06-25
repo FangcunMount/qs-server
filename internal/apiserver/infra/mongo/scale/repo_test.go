@@ -3,7 +3,7 @@ package scale
 import (
 	"testing"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"go.mongodb.org/mongo-driver/bson"
 )
 
@@ -41,7 +41,7 @@ func TestPublishedQuestionnaireRefFilterMatchesPublishedSnapshotVersion(t *testi
 	if filter["questionnaire_version"] != "2.0.0" {
 		t.Fatalf("questionnaire_version = %#v, want 2.0.0", filter["questionnaire_version"])
 	}
-	if filter["record_role"] != domainScale.RecordRolePublishedSnapshot.String() {
+	if filter["record_role"] != scaledefinition.RecordRolePublishedSnapshot.String() {
 		t.Fatalf("record_role = %#v, want published_snapshot", filter["record_role"])
 	}
 	if filter["deleted_at"] != nil {

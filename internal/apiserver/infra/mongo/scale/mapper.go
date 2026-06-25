@@ -6,7 +6,7 @@ import (
 	"reflect"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -20,7 +20,7 @@ func NewScaleMapper() *ScaleMapper {
 }
 
 // ToPO 将领域模型转换为持久化对象
-func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
+func (m *ScaleMapper) ToPO(domain *scaledefinition.MedicalScale) *ScalePO {
 	if domain == nil {
 		return nil
 	}
@@ -78,7 +78,7 @@ func (m *ScaleMapper) ToPO(domain *scale.MedicalScale) *ScalePO {
 }
 
 // mapFactorSnapshotsToPO 将只读因子快照列表转换为持久化对象。
-func (m *ScaleMapper) mapFactorSnapshotsToPO(factors []scale.FactorSnapshot) []FactorPO {
+func (m *ScaleMapper) mapFactorSnapshotsToPO(factors []scaledefinition.FactorSnapshot) []FactorPO {
 	if factors == nil {
 		return []FactorPO{}
 	}
@@ -91,7 +91,7 @@ func (m *ScaleMapper) mapFactorSnapshotsToPO(factors []scale.FactorSnapshot) []F
 }
 
 // mapFactorSnapshotToPO 将单个因子只读快照转换为持久化对象。
-func (m *ScaleMapper) mapFactorSnapshotToPO(f scale.FactorSnapshot) FactorPO {
+func (m *ScaleMapper) mapFactorSnapshotToPO(f scaledefinition.FactorSnapshot) FactorPO {
 	// 转换题目编码
 	questionCodes := make([]string, 0, len(f.QuestionCodes))
 	for _, qc := range f.QuestionCodes {
@@ -112,18 +112,18 @@ func (m *ScaleMapper) mapFactorSnapshotToPO(f scale.FactorSnapshot) FactorPO {
 	}
 }
 
-func scoringParamsToStoredMap(params *scale.ScoringParams, strategy scale.ScoringStrategyCode) map[string]interface{} {
+func scoringParamsToStoredMap(params *scaledefinition.ScoringParams, strategy scaledefinition.ScoringStrategyCode) map[string]interface{} {
 	result := make(map[string]interface{})
 	if params == nil {
 		return result
 	}
 	switch strategy {
-	case scale.ScoringStrategyCnt:
+	case scaledefinition.ScoringStrategyCnt:
 		contents := params.GetCntOptionContents()
 		if len(contents) > 0 {
 			result["cnt_option_contents"] = contents
 		}
-	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+	case scaledefinition.ScoringStrategySum, scaledefinition.ScoringStrategyAvg:
 		// These strategies currently do not require persisted params.
 	default:
 		// Unknown strategies are validated by the domain factor constructor.
@@ -132,7 +132,7 @@ func scoringParamsToStoredMap(params *scale.ScoringParams, strategy scale.Scorin
 }
 
 // mapInterpretRulesToPO 将解读规则列表转换为持久化对象
-func (m *ScaleMapper) mapInterpretRulesToPO(rules []scale.InterpretationRule) []InterpretRulePO {
+func (m *ScaleMapper) mapInterpretRulesToPO(rules []scaledefinition.InterpretationRule) []InterpretRulePO {
 	if rules == nil {
 		return []InterpretRulePO{}
 	}
@@ -151,7 +151,7 @@ func (m *ScaleMapper) mapInterpretRulesToPO(rules []scale.InterpretationRule) []
 }
 
 // ToDomain 将持久化对象转换为领域模型
-func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalScale {
+func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scaledefinition.MedicalScale {
 	if po == nil {
 		return nil
 	}
@@ -160,21 +160,21 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 	factors := m.mapFactorsToDomain(ctx, po.Factors)
 
 	// 转换标签列表
-	tags := make([]scale.Tag, 0, len(po.Tags))
+	tags := make([]scaledefinition.Tag, 0, len(po.Tags))
 	for _, tagStr := range po.Tags {
-		tags = append(tags, scale.NewTag(tagStr))
+		tags = append(tags, scaledefinition.NewTag(tagStr))
 	}
 
 	// 转换填报人列表
-	reporters := make([]scale.Reporter, 0, len(po.Reporters))
+	reporters := make([]scaledefinition.Reporter, 0, len(po.Reporters))
 	for _, reporterStr := range po.Reporters {
-		reporters = append(reporters, scale.NewReporter(reporterStr))
+		reporters = append(reporters, scaledefinition.NewReporter(reporterStr))
 	}
 
 	// 转换阶段列表
-	stages := make([]scale.Stage, 0, len(po.Stages))
+	stages := make([]scaledefinition.Stage, 0, len(po.Stages))
 	for _, stageStr := range po.Stages {
-		stage := scale.NewStage(stageStr)
+		stage := scaledefinition.NewStage(stageStr)
 		if !stage.IsValid() {
 			continue
 		}
@@ -182,31 +182,31 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 	}
 
 	// 转换使用年龄列表
-	applicableAges := make([]scale.ApplicableAge, 0, len(po.ApplicableAges))
+	applicableAges := make([]scaledefinition.ApplicableAge, 0, len(po.ApplicableAges))
 	for _, ageStr := range po.ApplicableAges {
-		applicableAges = append(applicableAges, scale.NewApplicableAge(ageStr))
+		applicableAges = append(applicableAges, scaledefinition.NewApplicableAge(ageStr))
 	}
 
 	// 创建领域模型
-	domain, err := scale.NewMedicalScale(
+	domain, err := scaledefinition.NewMedicalScale(
 		meta.NewCode(po.Code),
 		po.Title,
-		scale.WithDescription(po.Description),
-		scale.WithScaleVersion(scaleVersionFromPO(po)),
-		scale.WithRecordRole(scale.NormalizeRecordRole(po.RecordRole)),
-		scale.WithActivePublished(po.IsActivePublished),
-		scale.WithCategory(scale.NewCategory(po.Category)),
-		scale.WithStages(stages),
-		scale.WithApplicableAges(applicableAges),
-		scale.WithReporters(reporters),
-		scale.WithTags(tags),
-		scale.WithQuestionnaire(meta.NewCode(po.QuestionnaireCode), po.QuestionnaireVersion),
-		scale.WithStatus(scale.Status(po.Status)),
-		scale.WithFactors(factors),
-		scale.WithCreatedBy(meta.FromUint64(po.CreatedBy)),
-		scale.WithCreatedAt(po.CreatedAt),
-		scale.WithUpdatedBy(meta.FromUint64(po.UpdatedBy)),
-		scale.WithUpdatedAt(po.UpdatedAt),
+		scaledefinition.WithDescription(po.Description),
+		scaledefinition.WithScaleVersion(scaleVersionFromPO(po)),
+		scaledefinition.WithRecordRole(scaledefinition.NormalizeRecordRole(po.RecordRole)),
+		scaledefinition.WithActivePublished(po.IsActivePublished),
+		scaledefinition.WithCategory(scaledefinition.NewCategory(po.Category)),
+		scaledefinition.WithStages(stages),
+		scaledefinition.WithApplicableAges(applicableAges),
+		scaledefinition.WithReporters(reporters),
+		scaledefinition.WithTags(tags),
+		scaledefinition.WithQuestionnaire(meta.NewCode(po.QuestionnaireCode), po.QuestionnaireVersion),
+		scaledefinition.WithStatus(scaledefinition.Status(po.Status)),
+		scaledefinition.WithFactors(factors),
+		scaledefinition.WithCreatedBy(meta.FromUint64(po.CreatedBy)),
+		scaledefinition.WithCreatedAt(po.CreatedAt),
+		scaledefinition.WithUpdatedBy(meta.FromUint64(po.UpdatedBy)),
+		scaledefinition.WithUpdatedAt(po.UpdatedAt),
 	)
 	if err != nil {
 		// 如果创建失败，返回 nil（理论上不应该发生，因为 PO 数据应该是有效的）
@@ -218,7 +218,7 @@ func (m *ScaleMapper) ToDomain(ctx context.Context, po *ScalePO) *scale.MedicalS
 
 func scaleVersionFromPO(po *ScalePO) string {
 	if po == nil {
-		return scale.DefaultScaleVersion
+		return scaledefinition.DefaultScaleVersion
 	}
 	if po.ScaleVersion != "" {
 		return po.ScaleVersion
@@ -226,7 +226,7 @@ func scaleVersionFromPO(po *ScalePO) string {
 	if po.QuestionnaireVersion != "" {
 		return po.QuestionnaireVersion
 	}
-	return scale.DefaultScaleVersion
+	return scaledefinition.DefaultScaleVersion
 }
 
 func cloneFloat64Ptr(value *float64) *float64 {
@@ -238,12 +238,12 @@ func cloneFloat64Ptr(value *float64) *float64 {
 }
 
 // mapFactorsToDomain 将因子持久化对象列表转换为领域模型
-func (m *ScaleMapper) mapFactorsToDomain(ctx context.Context, factors []FactorPO) []*scale.Factor {
+func (m *ScaleMapper) mapFactorsToDomain(ctx context.Context, factors []FactorPO) []*scaledefinition.Factor {
 	if factors == nil {
-		return []*scale.Factor{}
+		return []*scaledefinition.Factor{}
 	}
 
-	result := make([]*scale.Factor, 0, len(factors))
+	result := make([]*scaledefinition.Factor, 0, len(factors))
 	for _, f := range factors {
 		if factor := m.mapFactorToDomain(ctx, f); factor != nil {
 			result = append(result, factor)
@@ -253,7 +253,7 @@ func (m *ScaleMapper) mapFactorsToDomain(ctx context.Context, factors []FactorPO
 }
 
 // mapFactorToDomain 将单个因子持久化对象转换为领域模型
-func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale.Factor {
+func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scaledefinition.Factor {
 	// 转换题目编码
 	questionCodes := make([]meta.Code, 0, len(po.QuestionCodes))
 	for _, qc := range po.QuestionCodes {
@@ -286,7 +286,7 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	}
 
 	// 验证：cnt 策略必须提供非空的 CntOptionContents
-	if strategy == scale.ScoringStrategyCnt {
+	if strategy == scaledefinition.ScoringStrategyCnt {
 		if scoringParams == nil || len(scoringParams.GetCntOptionContents()) == 0 {
 			logger.L(ctx).Warnw("mapFactorToDomain: cnt strategy requires non-empty cnt_option_contents, skipping factor",
 				"factor_code", po.Code,
@@ -299,17 +299,17 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	}
 
 	// 创建因子
-	factor, err := scale.NewFactor(
-		scale.NewFactorCode(po.Code),
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode(po.Code),
 		po.Title,
-		scale.WithFactorType(normalizeFactorType(po.FactorType)),
-		scale.WithIsTotalScore(po.IsTotalScore),
-		scale.WithIsShow(po.IsShow),
-		scale.WithQuestionCodes(questionCodes),
-		scale.WithScoringStrategy(strategy),
-		scale.WithScoringParams(scoringParams),
-		scale.WithMaxScore(po.MaxScore),
-		scale.WithInterpretRules(interpretRules),
+		scaledefinition.WithFactorType(normalizeFactorType(po.FactorType)),
+		scaledefinition.WithIsTotalScore(po.IsTotalScore),
+		scaledefinition.WithIsShow(po.IsShow),
+		scaledefinition.WithQuestionCodes(questionCodes),
+		scaledefinition.WithScoringStrategy(strategy),
+		scaledefinition.WithScoringParams(scoringParams),
+		scaledefinition.WithMaxScore(po.MaxScore),
+		scaledefinition.WithInterpretRules(interpretRules),
 	)
 	if err != nil {
 		logger.L(ctx).Errorw("mapFactorToDomain: failed to create factor",
@@ -322,18 +322,18 @@ func (m *ScaleMapper) mapFactorToDomain(ctx context.Context, po FactorPO) *scale
 	return factor
 }
 
-func normalizeFactorType(raw string) scale.FactorType {
-	return scale.ParseFactorType(raw)
+func normalizeFactorType(raw string) scaledefinition.FactorType {
+	return scaledefinition.ParseFactorType(raw)
 }
 
-func normalizeFactorScoringStrategy(raw string) scale.ScoringStrategyCode {
+func normalizeFactorScoringStrategy(raw string) scaledefinition.ScoringStrategyCode {
 	if raw == "" {
-		return scale.ScoringStrategySum
+		return scaledefinition.ScoringStrategySum
 	}
-	return scale.ScoringStrategyCode(raw)
+	return scaledefinition.ScoringStrategyCode(raw)
 }
 
-func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[string]interface{}, strategy scale.ScoringStrategyCode) *scale.ScoringParams {
+func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[string]interface{}, strategy scaledefinition.ScoringStrategyCode) *scaledefinition.ScoringParams {
 	paramsJSON, _ := json.Marshal(params)
 	logger.L(ctx).Debugw("mapScoringParamsToDomain: input",
 		"strategy", strategy,
@@ -345,12 +345,12 @@ func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[s
 		logger.L(ctx).Debugw("mapScoringParamsToDomain: params is nil or empty",
 			"strategy", strategy,
 		)
-		return scale.NewScoringParams()
+		return scaledefinition.NewScoringParams()
 	}
 
-	result := scale.NewScoringParams()
+	result := scaledefinition.NewScoringParams()
 	switch strategy {
-	case scale.ScoringStrategyCnt:
+	case scaledefinition.ScoringStrategyCnt:
 		contents, ok := params["cnt_option_contents"]
 		if !ok || contents == nil {
 			logger.L(ctx).Warnw("mapScoringParamsToDomain: cnt_option_contents not found",
@@ -361,7 +361,7 @@ func (m *ScaleMapper) mapScoringParamsToDomain(ctx context.Context, params map[s
 		}
 
 		result.WithCntOptionContents(stringSliceFromStoredArray(ctx, contents))
-	case scale.ScoringStrategySum, scale.ScoringStrategyAvg:
+	case scaledefinition.ScoringStrategySum, scaledefinition.ScoringStrategyAvg:
 		// These strategies currently do not require persisted params.
 	default:
 		// Unknown strategies are validated later by the domain factor constructor.
@@ -434,15 +434,15 @@ func getTypeName(v interface{}) string {
 }
 
 // mapInterpretRulesToDomain 将解读规则持久化对象列表转换为领域模型
-func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []InterpretRulePO) []scale.InterpretationRule {
+func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []InterpretRulePO) []scaledefinition.InterpretationRule {
 	if rules == nil {
-		return []scale.InterpretationRule{}
+		return []scaledefinition.InterpretationRule{}
 	}
 
-	result := make([]scale.InterpretationRule, 0, len(rules))
+	result := make([]scaledefinition.InterpretationRule, 0, len(rules))
 	for i, r := range rules {
 		// 创建分数区间
-		scoreRange := scale.NewScoreRange(r.MinScore, r.MaxScore)
+		scoreRange := scaledefinition.NewScoreRange(r.MinScore, r.MaxScore)
 
 		// 规范化风险等级（兼容旧数据）
 		riskLevel := normalizeRiskLevel(r.RiskLevel)
@@ -466,7 +466,7 @@ func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []Int
 			)
 		}
 
-		rule := scale.NewInterpretationRule(
+		rule := scaledefinition.NewInterpretationRule(
 			scoreRange,
 			riskLevel,
 			r.Conclusion,
@@ -479,20 +479,20 @@ func (m *ScaleMapper) mapInterpretRulesToDomain(ctx context.Context, rules []Int
 
 // normalizeRiskLevel 规范化风险等级字符串（兼容旧数据）
 // 将旧的风险等级值映射到新的有效值
-func normalizeRiskLevel(raw string) scale.RiskLevel {
+func normalizeRiskLevel(raw string) scaledefinition.RiskLevel {
 	switch raw {
 	case "none", "正常", "无风险", "normal":
-		return scale.RiskLevelNone
+		return scaledefinition.RiskLevelNone
 	case "low", "轻度", "低风险":
-		return scale.RiskLevelLow
+		return scaledefinition.RiskLevelLow
 	case "medium", "中度", "中风险":
-		return scale.RiskLevelMedium
+		return scaledefinition.RiskLevelMedium
 	case "high", "重度", "高风险":
-		return scale.RiskLevelHigh
+		return scaledefinition.RiskLevelHigh
 	case "severe", "严重", "极高风险":
-		return scale.RiskLevelSevere
+		return scaledefinition.RiskLevelSevere
 	default:
 		// 如果无法映射，返回原始值（让验证层处理）
-		return scale.RiskLevel(raw)
+		return scaledefinition.RiskLevel(raw)
 	}
 }

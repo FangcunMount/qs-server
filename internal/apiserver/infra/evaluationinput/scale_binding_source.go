@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
@@ -21,9 +21,9 @@ func NewRepositoryScaleBindingSource(repo ScaleSnapshotRepository) RepositorySca
 	return RepositoryScaleBindingSource{repo: repo}
 }
 
-func (s RepositoryScaleBindingSource) FindScaleByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*rulesetscale.ScaleSnapshot, error) {
+func (s RepositoryScaleBindingSource) FindScaleByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scalesnapshot.ScaleSnapshot, error) {
 	if s.repo == nil {
-		return nil, scale.ErrNotFound
+		return nil, scaledefinition.ErrNotFound
 	}
 	medicalScale, err := s.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
 	if err != nil {
@@ -32,7 +32,7 @@ func (s RepositoryScaleBindingSource) FindScaleByQuestionnaire(ctx context.Conte
 	return MedicalScaleToSnapshot(medicalScale), nil
 }
 
-func (s RepositoryScaleBindingSource) GetScaleByRef(ctx context.Context, code, version string) (*rulesetscale.ScaleSnapshot, error) {
+func (s RepositoryScaleBindingSource) GetScaleByRef(ctx context.Context, code, version string) (*scalesnapshot.ScaleSnapshot, error) {
 	catalog := NewRepositoryScaleSnapshotCatalog(s.repo)
 	return catalog.GetScaleByRef(ctx, port.ModelRef{
 		Kind:    port.EvaluationModelKindScale,
@@ -51,14 +51,14 @@ func NewRuleSetScaleCatalog(reader rulesetport.PublishedRuleSetReader, fallback 
 	return RuleSetScaleCatalog{reader: reader, fallback: fallback}
 }
 
-func (c RuleSetScaleCatalog) GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error) {
+func (c RuleSetScaleCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
 	if c.fallback == nil {
 		return nil, port.NewResolveError(port.FailureKindScaleNotFound, fmt.Errorf("scale catalog is not configured"), "量表不存在", "加载量表失败")
 	}
 	return c.fallback.GetScale(ctx, code)
 }
 
-func (c RuleSetScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*rulesetscale.ScaleSnapshot, error) {
+func (c RuleSetScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	if ref.Version != "" && c.reader != nil {
 		snapshot, err := c.reader.GetPublishedByRef(ctx, rulesetport.RuleSetRef{
 			Kind:    domain.RuleSetKindScale,

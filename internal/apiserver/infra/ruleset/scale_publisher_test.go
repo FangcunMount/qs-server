@@ -4,22 +4,22 @@ import (
 	"context"
 	"testing"
 
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestScaleRuleSetSnapshotRoundTrip(t *testing.T) {
-	model := &rulesetscale.ScaleSnapshot{
+	model := &scalesnapshot.ScaleSnapshot{
 		Code:                 "SCL-001",
 		ScaleVersion:         "1.0.0",
 		Title:                "Demo Scale",
 		QuestionnaireCode:    "QNR-001",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		Factors: []rulesetscale.FactorSnapshot{
+		Factors: []scalesnapshot.FactorSnapshot{
 			{Code: "total", Title: "Total", IsTotalScore: true},
 		},
 	}
@@ -45,12 +45,12 @@ func TestScaleRuleSetSnapshotRoundTrip(t *testing.T) {
 func TestScaleRuleSetPublisherUpsertsPublishedScale(t *testing.T) {
 	writer := &stubRuleWriter{}
 	publisher := NewScaleRuleSetPublisher(writer)
-	scale, err := domscale.NewMedicalScale(
+	scale, err := scaledefinition.NewMedicalScale(
 		meta.NewCode("SCL-001"),
 		"Demo",
-		domscale.WithQuestionnaire(meta.NewCode("QNR-001"), "1.0.0"),
-		domscale.WithScaleVersion("1.0.0"),
-		domscale.WithStatus(domscale.StatusPublished),
+		scaledefinition.WithQuestionnaire(meta.NewCode("QNR-001"), "1.0.0"),
+		scaledefinition.WithScaleVersion("1.0.0"),
+		scaledefinition.WithStatus(scaledefinition.StatusPublished),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale: %v", err)

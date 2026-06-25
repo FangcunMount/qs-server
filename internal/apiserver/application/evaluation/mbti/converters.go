@@ -1,30 +1,31 @@
 package mbti
 
 import (
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-func answerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationdomain.AnswerSheet {
+func answerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationinputdomain.AnswerSheet {
 	if sheet == nil {
 		return nil
 	}
-	answers := make([]evaluationdomain.Answer, 0, len(sheet.Answers))
+	answers := make([]evaluationinputdomain.Answer, 0, len(sheet.Answers))
 	for _, answer := range sheet.Answers {
-		answers = append(answers, evaluationdomain.Answer{
+		answers = append(answers, evaluationinputdomain.Answer{
 			QuestionCode: answer.QuestionCode,
 			Score:        answer.Score,
 			Value:        answer.Value,
 		})
 	}
-	return &evaluationdomain.AnswerSheet{
+	return &evaluationinputdomain.AnswerSheet{
 		QuestionnaireCode:    sheet.QuestionnaireCode,
 		QuestionnaireVersion: sheet.QuestionnaireVersion,
 		Answers:              answers,
 	}
 }
 
-func scoreMBTI(model *rulesetmbti.ModelSnapshot, sheet *port.AnswerSheetSnapshot) (evaluationdomain.MBTIResultDetail, error) {
-	return evaluationdomain.ScoreMBTI(model, answerSheetFromPort(sheet))
+func scoreMBTI(model *rulesetmbti.ModelSnapshot, sheet *port.AnswerSheetSnapshot) (evaluationmbti.ResultDetail, error) {
+	return evaluationmbti.Score(model, answerSheetFromPort(sheet))
 }

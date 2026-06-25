@@ -17,6 +17,7 @@ func TestTopLevelDomainChainPackagesDoNotDependOnOuterLayers(t *testing.T) {
 	root := repoRoot(t)
 	scanRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "ruleset"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation"),
 		filepath.Join(root, "internal", "apiserver", "domain", "report"),
 	}
 	forbiddenImports := map[string]string{
@@ -43,7 +44,7 @@ func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 	root := repoRoot(t)
 	scanRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "survey"),
-		filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale"),
+		filepath.Join(root, "internal", "apiserver", "domain", "ruleset", "scale", "definition"),
 		filepath.Join(root, "internal", "apiserver", "domain", "calculation"),
 		filepath.Join(root, "internal", "apiserver", "domain", "validation"),
 	}
@@ -73,7 +74,7 @@ func TestScaleDomainDoesNotExposePersistencePayloadMappers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "ruleset", "scale", "definition")
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -101,6 +102,18 @@ func TestScaleDomainDoesNotExposePersistencePayloadMappers(t *testing.T) {
 	}
 }
 
+func TestScaleRulesetDefinitionLivesUnderRulesetScale(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	oldPath := filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale")
+	if _, err := os.Stat(oldPath); err == nil {
+		t.Fatalf("%s exists; scale definition belongs under domain/ruleset/scale/definition", filepath.ToSlash(mustRel(t, root, oldPath)))
+	} else if !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+}
+
 func TestSurveyScaleDomainRepositoriesStayCommandSide(t *testing.T) {
 	t.Parallel()
 
@@ -108,7 +121,7 @@ func TestSurveyScaleDomainRepositoriesStayCommandSide(t *testing.T) {
 	for _, rel := range []string{
 		"internal/apiserver/domain/survey/questionnaire/repository.go",
 		"internal/apiserver/domain/survey/answersheet/repository.go",
-		"internal/apiserver/domain/authoring/scale/repository.go",
+		"internal/apiserver/domain/ruleset/scale/definition/repository.go",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
@@ -207,21 +220,20 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 
 	root := repoRoot(t)
 	scanRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
-	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":           "application",
-		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":            "infrastructure",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":             "transport",
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/":                  "port",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale": "scale domain",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":         "survey domain",
-		"github.com/FangcunMount/component-base/pkg/logger":                           "technical logging",
-		"github.com/FangcunMount/component-base/pkg/errors":                           "API error wrappers",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                         "API error codes",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                    "application",
+		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":                     "infrastructure",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                      "transport",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/":                           "port",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition": "scale definition domain",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                  "survey domain",
+		"github.com/FangcunMount/component-base/pkg/logger":                                    "technical logging",
+		"github.com/FangcunMount/component-base/pkg/errors":                                    "API error wrappers",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                                  "API error codes",
 	}
 	scanGoImports(t, scanRoot, func(path, importPath string) {
 		if isEvaluationRootPackageFile(root, path) {
-			if strings.HasPrefix(importPath, rulesetPayloadPrefix) {
+			if isEvaluationRulesetPayloadImport(importPath) {
 				return
 			}
 		}
@@ -240,15 +252,13 @@ func TestEvaluationDomainDoesNotBuildReports(t *testing.T) {
 	root := repoRoot(t)
 	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
 	forbiddenTokens := []string{
-		"func BuildMBTIReport(",
-		"func BuildSBTIReport(",
-		"func BuildScaleReport(",
+		"func BuildReport(",
 		"func ResolveReportType(",
-		"MBTIReportInput",
-		"SBTIReportInput",
-		"ScaleReportInput",
-		"MBTIReportDetail",
-		"SBTIReportDetail",
+		"reportmbti.ReportInput",
+		"reportsbti.ReportInput",
+		"reportscale.ReportInput",
+		"reportmbti.ReportDetail",
+		"reportsbti.ReportDetail",
 		"NewInterpretReport(",
 		"GenerateReportInput",
 		"type ReportBuilder ",
@@ -292,15 +302,25 @@ func TestEvaluationDomainDoesNotImportReportPackage(t *testing.T) {
 	})
 }
 
+func TestEvaluationDomainDoesNotContainScaleInterpretationPackage(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	oldPath := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scaleinterpretation")
+	if _, err := os.Stat(oldPath); err == nil {
+		t.Fatalf("%s exists; scale interpretation belongs under domain/interpretation/scale", filepath.ToSlash(mustRel(t, root, oldPath)))
+	} else if !os.IsNotExist(err) {
+		t.Fatal(err)
+	}
+}
+
 func TestReportBuilderEntryPointsLiveInReportDomainOnly(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	reportDomain := filepath.Join(root, "internal", "apiserver", "domain", "report")
 	entryPoints := []string{
-		"BuildMBTIReport",
-		"BuildSBTIReport",
-		"BuildScaleReport",
+		"BuildReport",
 		"ResolveReportType",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver")
@@ -331,6 +351,18 @@ func TestReportBuilderEntryPointsLiveInReportDomainOnly(t *testing.T) {
 	}
 }
 
+func TestReportDomainDoesNotImportRulesetPayloads(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	const rulesetImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "report"), func(path, importPath string) {
+		if importPath == rulesetImport || strings.HasPrefix(importPath, rulesetImport+"/") {
+			t.Fatalf("%s imports %s; report domain must use report-local view models instead of ruleset payloads", filepath.ToSlash(mustRel(t, root, path)), importPath)
+		}
+	})
+}
+
 func topLevelFuncNames(path string) (map[string]struct{}, error) {
 	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
@@ -354,6 +386,19 @@ func isEvaluationRootPackageFile(root, path string) bool {
 		return false
 	}
 	return strings.HasSuffix(path, ".go")
+}
+
+func isEvaluationRulesetPayloadImport(importPath string) bool {
+	for _, allowed := range []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot",
+	} {
+		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func TestEvaluationReportDomainDoesNotContainUnusedExportModel(t *testing.T) {
@@ -487,7 +532,7 @@ func TestScaleInterpretationDomainStayRuleOnly(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scaleinterpretation")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "scale")
 	forbiddenTokens := []string{
 		"RegisterStrategy",
 		"GetStrategy(",

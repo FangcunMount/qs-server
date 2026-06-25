@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -29,17 +29,17 @@ func (s *lifecycleService) Create(ctx context.Context, dto shared.CreateScaleDTO
 		}
 	}
 
-	m, err := domscale.NewMedicalScale(
+	m, err := scaledefinition.NewMedicalScale(
 		code,
 		dto.Title,
-		domscale.WithDescription(dto.Description),
-		domscale.WithCategory(classification.Category),
-		domscale.WithStages(classification.Stages),
-		domscale.WithApplicableAges(classification.ApplicableAges),
-		domscale.WithReporters(classification.Reporters),
-		domscale.WithTags(classification.Tags),
-		domscale.WithQuestionnaire(meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion),
-		domscale.WithStatus(domscale.StatusDraft),
+		scaledefinition.WithDescription(dto.Description),
+		scaledefinition.WithCategory(classification.Category),
+		scaledefinition.WithStages(classification.Stages),
+		scaledefinition.WithApplicableAges(classification.ApplicableAges),
+		scaledefinition.WithReporters(classification.Reporters),
+		scaledefinition.WithTags(classification.Tags),
+		scaledefinition.WithQuestionnaire(meta.NewCode(dto.QuestionnaireCode), dto.QuestionnaireVersion),
+		scaledefinition.WithStatus(scaledefinition.StatusDraft),
 	)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建量表失败")

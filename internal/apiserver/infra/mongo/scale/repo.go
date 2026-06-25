@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
 
@@ -28,14 +28,14 @@ func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) 
 }
 
 // Create 创建量表
-func (r *Repository) Create(ctx context.Context, domain *scale.MedicalScale) error {
-	domain.SetRecordRole(scale.RecordRoleHead)
+func (r *Repository) Create(ctx context.Context, domain *scaledefinition.MedicalScale) error {
+	domain.SetRecordRole(scaledefinition.RecordRoleHead)
 	domain.SetActivePublished(false)
 
 	po := r.mapper.ToPO(domain)
 	mongoBase.ApplyAuditCreate(ctx, po)
 	po.BeforeInsert()
-	po.RecordRole = scale.RecordRoleHead.String()
+	po.RecordRole = scaledefinition.RecordRoleHead.String()
 	po.IsActivePublished = false
 
 	insertData, err := po.ToBsonM()
@@ -48,11 +48,11 @@ func (r *Repository) Create(ctx context.Context, domain *scale.MedicalScale) err
 }
 
 // CreatePublishedSnapshot 创建或更新已发布量表快照。
-func (r *Repository) CreatePublishedSnapshot(ctx context.Context, domain *scale.MedicalScale, active bool) error {
+func (r *Repository) CreatePublishedSnapshot(ctx context.Context, domain *scaledefinition.MedicalScale, active bool) error {
 	po := r.mapper.ToPO(domain)
 	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
-	po.RecordRole = scale.RecordRolePublishedSnapshot.String()
+	po.RecordRole = scaledefinition.RecordRolePublishedSnapshot.String()
 	po.IsActivePublished = active
 
 	updateData, err := po.ToBsonM()
@@ -63,7 +63,7 @@ func (r *Repository) CreatePublishedSnapshot(ctx context.Context, domain *scale.
 	filter := bson.M{
 		"code":          domain.GetCode().String(),
 		"scale_version": domain.GetScaleVersion(),
-		"record_role":   scale.RecordRolePublishedSnapshot.String(),
+		"record_role":   scaledefinition.RecordRolePublishedSnapshot.String(),
 		"deleted_at":    nil,
 	}
 	_, err = r.Collection().UpdateOne(ctx, filter, bson.M{"$set": updateData}, options.Update().SetUpsert(true))
@@ -71,12 +71,12 @@ func (r *Repository) CreatePublishedSnapshot(ctx context.Context, domain *scale.
 }
 
 // FindByCode 根据编码查询量表
-func (r *Repository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
+func (r *Repository) FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	return r.findOne(ctx, headFilter(code))
 }
 
 // FindByCodeVersion 根据编码和量表版本查询量表。
-func (r *Repository) FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error) {
+func (r *Repository) FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scaledefinition.MedicalScale, error) {
 	if scaleVersion == "" {
 		return r.FindByCode(ctx, code)
 	}
@@ -84,36 +84,36 @@ func (r *Repository) FindByCodeVersion(ctx context.Context, code, scaleVersion s
 	if err == nil {
 		return domain, nil
 	}
-	if err != scale.ErrNotFound {
+	if err != scaledefinition.ErrNotFound {
 		return nil, err
 	}
 	return r.findOne(ctx, headVersionFilter(code, scaleVersion))
 }
 
 // FindPublishedByCode 根据编码查询当前激活的已发布快照。
-func (r *Repository) FindPublishedByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
+func (r *Repository) FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	return r.findOne(ctx, publishedCodeFilter(code))
 }
 
 // FindByQuestionnaireCode 根据问卷编码查询量表
-func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+func (r *Repository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	return r.findOne(ctx, headQuestionnaireFilter(questionnaireCode))
 }
 
 // FindPublishedByQuestionnaireCode 根据问卷编码查询当前激活的已发布量表快照。
-func (r *Repository) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+func (r *Repository) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	return r.findOne(ctx, publishedQuestionnaireCodeFilter(questionnaireCode))
 }
 
 // ListActivePublishedSnapshots 列出所有当前激活的已发布量表快照（backfill 用）。
-func (r *Repository) ListActivePublishedSnapshots(ctx context.Context) ([]*scale.MedicalScale, error) {
+func (r *Repository) ListActivePublishedSnapshots(ctx context.Context) ([]*scaledefinition.MedicalScale, error) {
 	cursor, err := r.Collection().Find(ctx, activePublishedSnapshotsFilter())
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = cursor.Close(ctx) }()
 
-	var results []*scale.MedicalScale
+	var results []*scaledefinition.MedicalScale
 	for cursor.Next(ctx) {
 		var po ScalePO
 		if err := cursor.Decode(&po); err != nil {
@@ -128,19 +128,19 @@ func (r *Repository) ListActivePublishedSnapshots(ctx context.Context) ([]*scale
 }
 
 // FindByQuestionnaireRef 根据问卷编码和版本查询量表。
-func (r *Repository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error) {
+func (r *Repository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error) {
 	if questionnaireVersion == "" {
 		return r.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 	}
 	return r.findOne(ctx, publishedQuestionnaireRefFilter(questionnaireCode, questionnaireVersion))
 }
 
-func (r *Repository) findOne(ctx context.Context, filter bson.M) (*scale.MedicalScale, error) {
+func (r *Repository) findOne(ctx context.Context, filter bson.M) (*scaledefinition.MedicalScale, error) {
 	var po ScalePO
 	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			return nil, scale.ErrNotFound
+			return nil, scaledefinition.ErrNotFound
 		}
 		return nil, err
 	}
@@ -164,7 +164,7 @@ func scaleVersionCompatibilityFilter(scaleVersion string) bson.A {
 
 func headRoleCandidates() bson.A {
 	return bson.A{
-		bson.M{"record_role": scale.RecordRoleHead.String()},
+		bson.M{"record_role": scaledefinition.RecordRoleHead.String()},
 		bson.M{"record_role": bson.M{"$exists": false}},
 		bson.M{"record_role": ""},
 	}
@@ -182,7 +182,7 @@ func headVersionFilter(code, scaleVersion string) bson.M {
 	filter := headFilter(code)
 	filter["$or"] = bson.A{
 		bson.M{
-			"record_role": scale.RecordRoleHead.String(),
+			"record_role": scaledefinition.RecordRoleHead.String(),
 			"$or":         scaleVersionCompatibilityFilter(scaleVersion),
 		},
 		bson.M{
@@ -200,7 +200,7 @@ func headVersionFilter(code, scaleVersion string) bson.M {
 func publishedVersionFilter(code, scaleVersion string) bson.M {
 	return bson.M{
 		"code":        code,
-		"record_role": scale.RecordRolePublishedSnapshot.String(),
+		"record_role": scaledefinition.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
 		"$or":         scaleVersionCompatibilityFilter(scaleVersion),
 	}
@@ -209,18 +209,18 @@ func publishedVersionFilter(code, scaleVersion string) bson.M {
 func publishedCodeFilter(code string) bson.M {
 	return bson.M{
 		"code":                code,
-		"record_role":         scale.RecordRolePublishedSnapshot.String(),
+		"record_role":         scaledefinition.RecordRolePublishedSnapshot.String(),
 		"is_active_published": true,
-		"status":              scale.StatusPublished.String(),
+		"status":              scaledefinition.StatusPublished.String(),
 		"deleted_at":          nil,
 	}
 }
 
 func activePublishedSnapshotsFilter() bson.M {
 	return bson.M{
-		"record_role":         scale.RecordRolePublishedSnapshot.String(),
+		"record_role":         scaledefinition.RecordRolePublishedSnapshot.String(),
 		"is_active_published": true,
-		"status":              scale.StatusPublished.String(),
+		"status":              scaledefinition.StatusPublished.String(),
 		"deleted_at":          nil,
 	}
 }
@@ -236,9 +236,9 @@ func headQuestionnaireFilter(questionnaireCode string) bson.M {
 func publishedQuestionnaireCodeFilter(questionnaireCode string) bson.M {
 	return bson.M{
 		"questionnaire_code":  questionnaireCode,
-		"record_role":         scale.RecordRolePublishedSnapshot.String(),
+		"record_role":         scaledefinition.RecordRolePublishedSnapshot.String(),
 		"is_active_published": true,
-		"status":              scale.StatusPublished.String(),
+		"status":              scaledefinition.StatusPublished.String(),
 		"deleted_at":          nil,
 	}
 }
@@ -247,21 +247,21 @@ func publishedQuestionnaireRefFilter(questionnaireCode, questionnaireVersion str
 	return bson.M{
 		"questionnaire_code":    questionnaireCode,
 		"questionnaire_version": questionnaireVersion,
-		"record_role":           scale.RecordRolePublishedSnapshot.String(),
-		"status":                scale.StatusPublished.String(),
+		"record_role":           scaledefinition.RecordRolePublishedSnapshot.String(),
+		"status":                scaledefinition.StatusPublished.String(),
 		"deleted_at":            nil,
 	}
 }
 
 // Update 更新量表
-func (r *Repository) Update(ctx context.Context, domain *scale.MedicalScale) error {
-	domain.SetRecordRole(scale.RecordRoleHead)
+func (r *Repository) Update(ctx context.Context, domain *scaledefinition.MedicalScale) error {
+	domain.SetRecordRole(scaledefinition.RecordRoleHead)
 	domain.SetActivePublished(false)
 
 	po := r.mapper.ToPO(domain)
 	mongoBase.ApplyAuditUpdate(ctx, po)
 	po.BeforeUpdate()
-	po.RecordRole = scale.RecordRoleHead.String()
+	po.RecordRole = scaledefinition.RecordRoleHead.String()
 	po.IsActivePublished = false
 
 	filter := headFilter(domain.GetCode().String())
@@ -284,7 +284,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, scaleV
 
 	_, err := r.Collection().UpdateMany(ctx, bson.M{
 		"code":        code,
-		"record_role": scale.RecordRolePublishedSnapshot.String(),
+		"record_role": scaledefinition.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
 	}, bson.M{"$set": bson.M{
 		"is_active_published": false,
@@ -298,7 +298,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, scaleV
 	result, err := r.Collection().UpdateOne(ctx, bson.M{
 		"code":          code,
 		"scale_version": scaleVersion,
-		"record_role":   scale.RecordRolePublishedSnapshot.String(),
+		"record_role":   scaledefinition.RecordRolePublishedSnapshot.String(),
 		"deleted_at":    nil,
 	}, bson.M{"$set": bson.M{
 		"is_active_published": true,
@@ -309,7 +309,7 @@ func (r *Repository) SetActivePublishedVersion(ctx context.Context, code, scaleV
 		return err
 	}
 	if result.MatchedCount == 0 {
-		return scale.ErrNotFound
+		return scaledefinition.ErrNotFound
 	}
 	return nil
 }
@@ -320,7 +320,7 @@ func (r *Repository) ClearActivePublishedVersion(ctx context.Context, code strin
 	userID := mongoBase.AuditUserID(ctx)
 	_, err := r.Collection().UpdateMany(ctx, bson.M{
 		"code":        code,
-		"record_role": scale.RecordRolePublishedSnapshot.String(),
+		"record_role": scaledefinition.RecordRolePublishedSnapshot.String(),
 		"deleted_at":  nil,
 	}, bson.M{"$set": bson.M{
 		"is_active_published": false,
@@ -354,7 +354,7 @@ func (r *Repository) Remove(ctx context.Context, code string) error {
 	}
 
 	if result.MatchedCount == 0 {
-		return scale.ErrNotFound
+		return scaledefinition.ErrNotFound
 	}
 
 	return nil

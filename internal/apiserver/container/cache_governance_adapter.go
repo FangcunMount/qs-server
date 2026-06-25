@@ -6,7 +6,7 @@ import (
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
@@ -66,7 +66,7 @@ func (a cacheGovernanceAdapter) listPublishedScaleCodes(ctx context.Context) ([]
 	page := 1
 	codes := make([]string, 0)
 	for {
-		items, err := infra.scaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scale.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
+		items, err := infra.scaleReader.ListScales(ctx, scalereadmodel.ScaleFilter{Status: scaledefinition.StatusPublished.Value(), PublishedOnly: true}, scalereadmodel.PageRequest{Page: page, PageSize: pageSize})
 		if err != nil {
 			return nil, err
 		}

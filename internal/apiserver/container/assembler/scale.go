@@ -10,7 +10,7 @@ import (
 	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
@@ -37,7 +37,7 @@ type ScaleModule struct {
 // ScaleModuleDeps 定义 Scale 模块的显式构造依赖。
 type ScaleModuleDeps struct {
 	EventPublisher         event.EventPublisher
-	Repo                   scale.Repository
+	Repo                   scaledefinition.Repository
 	Reader                 scalereadmodel.ScaleReader
 	ListCache              scalelistcache.PublishedListCache
 	HotListCache           scalelistcache.HotListCache

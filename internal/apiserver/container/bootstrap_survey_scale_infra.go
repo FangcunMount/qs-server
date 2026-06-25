@@ -2,7 +2,7 @@ package container
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	scaleCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
@@ -24,7 +24,7 @@ type surveyScaleInfra struct {
 	questionnaireReader surveyreadmodel.QuestionnaireReader
 	answerSheetRepo     *answerSheetMongo.Repository
 	answerSheetReader   surveyreadmodel.AnswerSheetReader
-	scaleRepo           scale.Repository
+	scaleRepo           scaledefinition.Repository
 	scaleReader         scalereadmodel.ScaleReader
 	scaleListCache      scalelistcache.PublishedListCache
 	scaleHotListCache   scalelistcache.HotListCache
@@ -67,7 +67,7 @@ func (c *Container) ensureSurveyScaleInfra() (*surveyScaleInfra, error) {
 
 	scaleBaseRepo := scaleMongo.NewRepository(c.mongoDB, mongoOpts)
 	scaleReader := scaleMongo.NewScaleReadModel(scaleBaseRepo)
-	var scaleRepo scale.Repository = scaleBaseRepo
+	var scaleRepo scaledefinition.Repository = scaleBaseRepo
 	if staticRedis != nil {
 		scaleRepo = scaleCache.NewCachedScaleRepositoryWithBuilderPolicyAndObserver(
 			scaleBaseRepo,

@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
@@ -117,16 +117,16 @@ type failingScaleBindingSource struct {
 	err error
 }
 
-func (f failingScaleBindingSource) FindScaleByQuestionnaire(context.Context, string, string) (*rulesetscale.ScaleSnapshot, error) {
+func (f failingScaleBindingSource) FindScaleByQuestionnaire(context.Context, string, string) (*scalesnapshot.ScaleSnapshot, error) {
 	return nil, f.err
 }
 
-func (f failingScaleBindingSource) GetScaleByRef(context.Context, string, string) (*rulesetscale.ScaleSnapshot, error) {
+func (f failingScaleBindingSource) GetScaleByRef(context.Context, string, string) (*scalesnapshot.ScaleSnapshot, error) {
 	return nil, f.err
 }
 
 func TestStaticCompositeCatalogResolveScaleBinding(t *testing.T) {
-	scaleModel := &rulesetscale.ScaleSnapshot{
+	scaleModel := &scalesnapshot.ScaleSnapshot{
 		Code:                 "SCL-001",
 		ScaleVersion:         "1.0.0",
 		Title:                "Demo Scale",
@@ -157,10 +157,10 @@ func TestStaticCompositeCatalogResolveScaleBinding(t *testing.T) {
 }
 
 type stubScaleBindingSource struct {
-	model *rulesetscale.ScaleSnapshot
+	model *scalesnapshot.ScaleSnapshot
 }
 
-func (s stubScaleBindingSource) FindScaleByQuestionnaire(_ context.Context, questionnaireCode, questionnaireVersion string) (*rulesetscale.ScaleSnapshot, error) {
+func (s stubScaleBindingSource) FindScaleByQuestionnaire(_ context.Context, questionnaireCode, questionnaireVersion string) (*scalesnapshot.ScaleSnapshot, error) {
 	if s.model == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -170,7 +170,7 @@ func (s stubScaleBindingSource) FindScaleByQuestionnaire(_ context.Context, ques
 	return nil, domain.ErrNotFound
 }
 
-func (s stubScaleBindingSource) GetScaleByRef(_ context.Context, code, version string) (*rulesetscale.ScaleSnapshot, error) {
+func (s stubScaleBindingSource) GetScaleByRef(_ context.Context, code, version string) (*scalesnapshot.ScaleSnapshot, error) {
 	if s.model == nil || s.model.Code != code || s.model.ScaleVersion != version {
 		return nil, domain.ErrNotFound
 	}

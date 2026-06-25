@@ -6,7 +6,8 @@ import (
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	reportscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -54,15 +55,15 @@ func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domain
 		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")
 	}
 	_ = ctx
-	return domainReport.BuildScaleReport(b.composer, scaleReportInputFromOutcome(outcome))
+	return reportscale.BuildReport(b.composer, scaleReportInputFromOutcome(outcome))
 }
 
-func scaleReportInputFromOutcome(outcome Outcome) domainReport.ScaleReportInput {
-	input := domainReport.ScaleReportInput{}
+func scaleReportInputFromOutcome(outcome Outcome) reportscale.ReportInput {
+	input := reportscale.ReportInput{}
 	if outcome.Assessment != nil {
 		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
 	}
-	input.Scale = scaleSnapshotFromOutcome(outcome)
+	input.Scale = scaleReportModelFromOutcome(outcome)
 	if outcome.Result != nil {
 		input.TotalScore = outcome.Result.TotalScore
 		input.RiskLevel = domainReport.RiskLevel(outcome.Result.RiskLevel)
@@ -73,10 +74,10 @@ func scaleReportInputFromOutcome(outcome Outcome) domainReport.ScaleReportInput 
 	return input
 }
 
-func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []domainReport.ScaleFactorReportScore {
-	scores := make([]domainReport.ScaleFactorReportScore, 0, len(factorScores))
+func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []reportscale.FactorReportScore {
+	scores := make([]reportscale.FactorReportScore, 0, len(factorScores))
 	for _, fs := range factorScores {
-		scores = append(scores, domainReport.ScaleFactorReportScore{
+		scores = append(scores, reportscale.FactorReportScore{
 			FactorCode:   string(fs.FactorCode),
 			FactorName:   fs.FactorName,
 			RawScore:     fs.RawScore,
@@ -89,10 +90,29 @@ func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []doma
 	return scores
 }
 
-func scaleSnapshotFromOutcome(outcome Outcome) *rulesetscale.ScaleSnapshot {
+func scaleReportModelFromOutcome(outcome Outcome) *reportscale.ReportModel {
 	if outcome.Input == nil {
 		return nil
 	}
 	snapshot, _ := evaluationinput.ScalePayload(outcome.Input)
-	return snapshot
+	return scaleReportModelFromSnapshot(snapshot)
+}
+
+func scaleReportModelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) *reportscale.ReportModel {
+	if snapshot == nil {
+		return nil
+	}
+	factors := make([]reportscale.FactorReportModel, 0, len(snapshot.Factors))
+	for _, factor := range snapshot.Factors {
+		factors = append(factors, reportscale.FactorReportModel{
+			Code:     factor.Code,
+			Title:    factor.Title,
+			MaxScore: factor.MaxScore,
+		})
+	}
+	return &reportscale.ReportModel{
+		Code:    snapshot.Code,
+		Title:   snapshot.Title,
+		Factors: factors,
+	}
 }

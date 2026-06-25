@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -14,8 +14,8 @@ type QuestionnaireBindingSyncer struct {
 }
 
 type questionnaireBindingSyncRepository interface {
-	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
-	Update(ctx context.Context, scale *domscale.MedicalScale) error
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
+	Update(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
 // NewQuestionnaireBindingSyncer creates a survey-facing scale binding syncer.
@@ -38,7 +38,7 @@ func syncQuestionnaireVersion(ctx context.Context, repo questionnaireBindingSync
 
 	item, err := repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 	if err != nil {
-		if domscale.IsNotFound(err) {
+		if scaledefinition.IsNotFound(err) {
 			return nil
 		}
 		return errors.WrapC(err, errorCode.ErrDatabase, "查询关联量表失败")
@@ -50,7 +50,7 @@ func syncQuestionnaireVersion(ctx context.Context, repo questionnaireBindingSync
 		return nil
 	}
 
-	baseInfo := domscale.BaseInfo{}
+	baseInfo := scaledefinition.BaseInfo{}
 	if err := baseInfo.UpdateQuestionnaire(item, item.GetQuestionnaireCode(), version); err != nil {
 		return errors.WrapC(err, errorCode.ErrInvalidArgument, "同步量表问卷版本失败")
 	}

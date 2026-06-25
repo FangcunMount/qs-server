@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -17,28 +17,30 @@ import (
 
 func TestScaleToSnapshotMapsFactorScoringAndInterpretRules(t *testing.T) {
 	maxScore := 100.0
-	factor, err := scale.NewFactor(
-		scale.NewFactorCode("total"),
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode("total"),
 		"总分",
-		scale.WithIsTotalScore(true),
-		scale.WithQuestionCodes([]meta.Code{meta.NewCode("Q1"), meta.NewCode("Q2")}),
-		scale.WithScoringStrategy(scale.ScoringStrategyCnt),
-		scale.WithScoringParams(scale.NewScoringParams().WithCntOptionContents([]string{"经常"})),
-		scale.WithMaxScore(&maxScore),
-		scale.WithInterpretRules([]scale.InterpretationRule{
-			scale.NewInterpretationRule(scale.NewScoreRange(0, 60), scale.RiskLevelLow, "低风险", "保持"),
-			scale.NewInterpretationRule(scale.NewScoreRange(60, 100), scale.RiskLevelHigh, "高风险", "干预"),
+		scaledefinition.WithIsTotalScore(true),
+		scaledefinition.WithQuestionCodes([]meta.Code{meta.NewCode("Q1"), meta.NewCode("Q2")}),
+		scaledefinition.WithScoringStrategy(scaledefinition.ScoringStrategyCnt),
+		scaledefinition.WithScoringParams(scaledefinition.NewScoringParams().WithCntOptionContents([]string{"经常"})),
+		scaledefinition.WithMaxScore(&maxScore),
+		scaledefinition.WithInterpretRules([]scaledefinition.InterpretationRule{
+			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(0, 60), scaledefinition.RiskLevelLow, "低风险", "保持"),
+			scaledefinition.NewInterpretationRule(scaledefinition.NewScoreRange(60, 100), scaledefinition.RiskLevelHigh, "高风险", "干预"),
 		}),
 	)
 	if err != nil {
 		t.Fatalf("NewFactor returned error: %v", err)
 	}
-	medicalScale, err := scale.NewMedicalScale(
+	medicalScale, err := scaledefinition.NewMedicalScale(
 		meta.NewCode("SDS"),
 		"SDS",
-		scale.WithQuestionnaire(meta.NewCode("Q-SDS"), "1.0.0"),
-		scale.WithStatus(scale.StatusPublished),
-		scale.WithFactors([]*scale.Factor{factor}),
+		scaledefinition.WithID(meta.FromUint64(101)),
+		scaledefinition.WithQuestionnaire(meta.NewCode("Q-SDS"), "1.0.0"),
+		scaledefinition.WithScaleVersion("2.0.0"),
+		scaledefinition.WithStatus(scaledefinition.StatusPublished),
+		scaledefinition.WithFactors([]*scaledefinition.Factor{factor}),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale returned error: %v", err)
@@ -49,7 +51,13 @@ func TestScaleToSnapshotMapsFactorScoringAndInterpretRules(t *testing.T) {
 		t.Fatal("snapshot is nil")
 		return
 	}
-	if snapshot.Code != "SDS" || snapshot.QuestionnaireCode != "Q-SDS" || snapshot.QuestionnaireVersion != "1.0.0" {
+	if snapshot.ID != 101 ||
+		snapshot.Code != "SDS" ||
+		snapshot.ScaleVersion != "2.0.0" ||
+		snapshot.Title != "SDS" ||
+		snapshot.QuestionnaireCode != "Q-SDS" ||
+		snapshot.QuestionnaireVersion != "1.0.0" ||
+		snapshot.Status != "published" {
 		t.Fatalf("unexpected scale snapshot: %#v", snapshot)
 	}
 	if len(snapshot.Factors) != 1 {
@@ -62,10 +70,21 @@ func TestScaleToSnapshotMapsFactorScoringAndInterpretRules(t *testing.T) {
 	if got.ScoringStrategy != "cnt" || len(got.ScoringParams.CntOptionContents) != 1 || got.ScoringParams.CntOptionContents[0] != "经常" {
 		t.Fatalf("unexpected scoring params: %#v", got.ScoringParams)
 	}
+	if len(got.QuestionCodes) != 2 || got.QuestionCodes[0] != "Q1" || got.QuestionCodes[1] != "Q2" {
+		t.Fatalf("unexpected question codes: %#v", got.QuestionCodes)
+	}
 	if got.MaxScore == nil || *got.MaxScore != maxScore {
 		t.Fatalf("max score = %v, want %v", got.MaxScore, maxScore)
 	}
-	if len(got.InterpretRules) != 2 || got.InterpretRules[1].RiskLevel != "high" || got.InterpretRules[1].Conclusion != "高风险" {
+	if len(got.InterpretRules) != 2 ||
+		got.InterpretRules[0].Min != 0 ||
+		got.InterpretRules[0].Max != 60 ||
+		got.InterpretRules[0].RiskLevel != "low" ||
+		got.InterpretRules[0].Conclusion != "低风险" ||
+		got.InterpretRules[0].Suggestion != "保持" ||
+		got.InterpretRules[1].RiskLevel != "high" ||
+		got.InterpretRules[1].Conclusion != "高风险" ||
+		got.InterpretRules[1].Suggestion != "干预" {
 		t.Fatalf("unexpected interpret rules: %#v", got.InterpretRules)
 	}
 }
@@ -140,7 +159,7 @@ func TestQuestionnaireToSnapshotPreservesOptionScores(t *testing.T) {
 }
 
 func TestResolverComposesSnapshotReadersUsingAnswerSheetExactVersion(t *testing.T) {
-	scaleSnapshot := &rulesetscale.ScaleSnapshot{
+	scaleSnapshot := &scalesnapshot.ScaleSnapshot{
 		Code:                 "SDS",
 		Title:                "SDS",
 		QuestionnaireCode:    "Q-SDS",
@@ -274,16 +293,16 @@ func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.I
 }
 
 type scaleCatalogStub struct {
-	snapshot *rulesetscale.ScaleSnapshot
+	snapshot *scalesnapshot.ScaleSnapshot
 	err      error
 	ref      port.ModelRef
 }
 
-func (s *scaleCatalogStub) GetScale(context.Context, string) (*rulesetscale.ScaleSnapshot, error) {
+func (s *scaleCatalogStub) GetScale(context.Context, string) (*scalesnapshot.ScaleSnapshot, error) {
 	return s.snapshot, s.err
 }
 
-func (s *scaleCatalogStub) GetScaleByRef(_ context.Context, ref port.ModelRef) (*rulesetscale.ScaleSnapshot, error) {
+func (s *scaleCatalogStub) GetScaleByRef(_ context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	s.ref = ref
 	return s.snapshot, s.err
 }

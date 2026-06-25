@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 )
 
 type categoryService struct{}
@@ -17,7 +17,7 @@ func NewCategoryService() ports.ScaleCategoryService {
 
 func (s *categoryService) GetCategories(_ context.Context) (*shared.ScaleCategoriesResult, error) {
 	categories := []shared.CategoryOption{}
-	for _, category := range domainScale.AllCategories {
+	for _, category := range scaledefinition.AllCategories {
 		if !category.IsEmpty() {
 			categories = append(categories, shared.CategoryOption{
 				Value: category.String(),
@@ -27,24 +27,24 @@ func (s *categoryService) GetCategories(_ context.Context) (*shared.ScaleCategor
 	}
 
 	stages := []shared.StageOption{
-		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
-		{Value: string(domainScale.StageFollowUp), Label: "随访"},
-		{Value: string(domainScale.StageOutcome), Label: "结局"},
+		{Value: string(scaledefinition.StageDeepAssessment), Label: "深评"},
+		{Value: string(scaledefinition.StageFollowUp), Label: "随访"},
+		{Value: string(scaledefinition.StageOutcome), Label: "结局"},
 	}
 
 	applicableAges := []shared.ApplicableAgeOption{
-		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿（0-3岁）"},
-		{Value: string(domainScale.ApplicableAgePreschool), Label: "学龄前（3-6岁）"},
-		{Value: string(domainScale.ApplicableAgeSchoolChild), Label: "学龄儿童（6-12岁）"},
-		{Value: string(domainScale.ApplicableAgeAdolescent), Label: "青少年（12-18岁）"},
-		{Value: string(domainScale.ApplicableAgeAdult), Label: "成人（18岁以上）"},
+		{Value: string(scaledefinition.ApplicableAgeInfant), Label: "婴幼儿（0-3岁）"},
+		{Value: string(scaledefinition.ApplicableAgePreschool), Label: "学龄前（3-6岁）"},
+		{Value: string(scaledefinition.ApplicableAgeSchoolChild), Label: "学龄儿童（6-12岁）"},
+		{Value: string(scaledefinition.ApplicableAgeAdolescent), Label: "青少年（12-18岁）"},
+		{Value: string(scaledefinition.ApplicableAgeAdult), Label: "成人（18岁以上）"},
 	}
 
 	reporters := []shared.ReporterOption{
-		{Value: string(domainScale.ReporterParent), Label: "家长评"},
-		{Value: string(domainScale.ReporterTeacher), Label: "教师评"},
-		{Value: string(domainScale.ReporterSelf), Label: "自评"},
-		{Value: string(domainScale.ReporterClinical), Label: "临床评定"},
+		{Value: string(scaledefinition.ReporterParent), Label: "家长评"},
+		{Value: string(scaledefinition.ReporterTeacher), Label: "教师评"},
+		{Value: string(scaledefinition.ReporterSelf), Label: "自评"},
+		{Value: string(scaledefinition.ReporterClinical), Label: "临床评定"},
 	}
 
 	return &shared.ScaleCategoriesResult{
@@ -58,7 +58,7 @@ func (s *categoryService) GetCategories(_ context.Context) (*shared.ScaleCategor
 
 func (s *categoryService) GetOpenCategories(_ context.Context) (*shared.ScaleCategoriesResult, error) {
 	categories := []shared.CategoryOption{}
-	for _, category := range domainScale.AllCategories {
+	for _, category := range scaledefinition.AllCategories {
 		if category.IsOpen() {
 			categories = append(categories, shared.CategoryOption{
 				Value: category.String(),
@@ -68,24 +68,24 @@ func (s *categoryService) GetOpenCategories(_ context.Context) (*shared.ScaleCat
 	}
 
 	stages := []shared.StageOption{
-		{Value: string(domainScale.StageDeepAssessment), Label: "深评"},
-		{Value: string(domainScale.StageFollowUp), Label: "随访"},
-		{Value: string(domainScale.StageOutcome), Label: "结局"},
+		{Value: string(scaledefinition.StageDeepAssessment), Label: "深评"},
+		{Value: string(scaledefinition.StageFollowUp), Label: "随访"},
+		{Value: string(scaledefinition.StageOutcome), Label: "结局"},
 	}
 
 	applicableAges := []shared.ApplicableAgeOption{
-		{Value: string(domainScale.ApplicableAgeInfant), Label: "婴幼儿（0-3岁）"},
-		{Value: string(domainScale.ApplicableAgePreschool), Label: "学龄前（3-6岁）"},
-		{Value: string(domainScale.ApplicableAgeSchoolChild), Label: "学龄儿童（6-12岁）"},
-		{Value: string(domainScale.ApplicableAgeAdolescent), Label: "青少年（12-18岁）"},
-		{Value: string(domainScale.ApplicableAgeAdult), Label: "成人（18岁以上）"},
+		{Value: string(scaledefinition.ApplicableAgeInfant), Label: "婴幼儿（0-3岁）"},
+		{Value: string(scaledefinition.ApplicableAgePreschool), Label: "学龄前（3-6岁）"},
+		{Value: string(scaledefinition.ApplicableAgeSchoolChild), Label: "学龄儿童（6-12岁）"},
+		{Value: string(scaledefinition.ApplicableAgeAdolescent), Label: "青少年（12-18岁）"},
+		{Value: string(scaledefinition.ApplicableAgeAdult), Label: "成人（18岁以上）"},
 	}
 
 	reporters := []shared.ReporterOption{
-		{Value: string(domainScale.ReporterParent), Label: "家长评"},
-		{Value: string(domainScale.ReporterTeacher), Label: "教师评"},
-		{Value: string(domainScale.ReporterSelf), Label: "自评"},
-		{Value: string(domainScale.ReporterClinical), Label: "临床评定"},
+		{Value: string(scaledefinition.ReporterParent), Label: "家长评"},
+		{Value: string(scaledefinition.ReporterTeacher), Label: "教师评"},
+		{Value: string(scaledefinition.ReporterSelf), Label: "自评"},
+		{Value: string(scaledefinition.ReporterClinical), Label: "临床评定"},
 	}
 
 	return &shared.ScaleCategoriesResult{

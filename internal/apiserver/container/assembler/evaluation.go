@@ -18,7 +18,7 @@ import (
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -236,11 +236,11 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		}
 		m.ReportStatusReporter = reportStatusReporter
 
-		reportBuilder := report.NewScaleReportBuilder(suggestionGenerator)
+		reportBuilder := report.NewDefaultInterpretReportBuilder(suggestionGenerator)
 		scaleEvaluator := scaleEvaluation.NewExecutorWithService(
 			scaleEvaluation.NewService(
 				scaleEvaluation.DefaultInputValidator{},
-				evaluationdomain.NewDefaultScaleHandler(),
+				evaluationscale.NewDefaultHandler(),
 				scaleEvaluation.DefaultResultMapper{},
 			),
 		)

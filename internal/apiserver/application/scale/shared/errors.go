@@ -2,7 +2,7 @@ package shared
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -15,12 +15,12 @@ func WrapScaleDomainError(err error, fallbackCode int, format string, args ...in
 }
 
 func ScaleDomainErrorCode(err error, fallbackCode int) int {
-	kind, ok := domainScale.ErrorKindOf(err)
+	kind, ok := scaledefinition.ErrorKindOf(err)
 	if !ok {
 		return fallbackCode
 	}
 	switch kind {
-	case domainScale.ErrorKindInvalidArgument, domainScale.ErrorKindRuleFrozen:
+	case scaledefinition.ErrorKindInvalidArgument, scaledefinition.ErrorKindRuleFrozen:
 		return errorCode.ErrInvalidArgument
 	default:
 		return fallbackCode

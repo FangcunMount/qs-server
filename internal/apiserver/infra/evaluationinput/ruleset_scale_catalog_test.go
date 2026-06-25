@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
@@ -27,14 +27,14 @@ func (s stubScaleRuleReader) FindPublishedByQuestionnaire(context.Context, strin
 }
 
 type stubScaleFallbackCatalog struct {
-	byRef *rulesetscale.ScaleSnapshot
+	byRef *scalesnapshot.ScaleSnapshot
 }
 
-func (s stubScaleFallbackCatalog) GetScale(context.Context, string) (*rulesetscale.ScaleSnapshot, error) {
+func (s stubScaleFallbackCatalog) GetScale(context.Context, string) (*scalesnapshot.ScaleSnapshot, error) {
 	return nil, domain.ErrNotFound
 }
 
-func (s stubScaleFallbackCatalog) GetScaleByRef(context.Context, port.ModelRef) (*rulesetscale.ScaleSnapshot, error) {
+func (s stubScaleFallbackCatalog) GetScaleByRef(context.Context, port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	if s.byRef == nil {
 		return nil, domain.ErrNotFound
 	}
@@ -42,7 +42,7 @@ func (s stubScaleFallbackCatalog) GetScaleByRef(context.Context, port.ModelRef) 
 }
 
 func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
-	fromMongo := &rulesetscale.ScaleSnapshot{
+	fromMongo := &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-MONGO",
 		ScaleVersion: "2.0.0",
 		Title:        "Mongo Scale",
@@ -62,7 +62,7 @@ func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
 		},
 		Payload: payload,
 	}}
-	fallback := stubScaleFallbackCatalog{byRef: &rulesetscale.ScaleSnapshot{
+	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-MONGO",
 		ScaleVersion: "1.0.0",
 		Title:        "Repo Scale",
@@ -83,7 +83,7 @@ func TestRuleSetScaleCatalogPrefersRuleSetPayload(t *testing.T) {
 }
 
 func TestRuleSetScaleCatalogFallsBackToRepo(t *testing.T) {
-	fallback := stubScaleFallbackCatalog{byRef: &rulesetscale.ScaleSnapshot{
+	fallback := stubScaleFallbackCatalog{byRef: &scalesnapshot.ScaleSnapshot{
 		Code:         "SCL-REPO",
 		ScaleVersion: "1.0.0",
 		Title:        "Repo Scale",

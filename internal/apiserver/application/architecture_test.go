@@ -115,8 +115,8 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	root := repoRoot(t)
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale": "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":          "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition": "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                   "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -164,7 +164,7 @@ func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result"), func(path, importPath string) {
@@ -183,7 +183,7 @@ func TestScaleDomainDoesNotModelMBTIAsCategory(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale", "types.go")
+	path := filepath.Join(root, "internal", "apiserver", "domain", "ruleset", "scale", "definition", "types.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -331,7 +331,6 @@ func TestEvaluationInputPortStaysIndependentFromSurveyScaleDomain(t *testing.T) 
 	t.Parallel()
 
 	root := repoRoot(t)
-	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/":      "ruleset typed payload aliases only",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "evaluationinput-owned snapshot DTOs",
@@ -342,7 +341,7 @@ func TestEvaluationInputPortStaysIndependentFromSurveyScaleDomain(t *testing.T) 
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
-		if strings.HasPrefix(importPath, rulesetPayloadPrefix) {
+		if isEvaluationRulesetPayloadImport(importPath) {
 			return
 		}
 		for forbidden, replacement := range forbiddenImports {
@@ -363,8 +362,8 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale": "catalog/read-model snapshot adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":         "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition": "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                  "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
@@ -418,22 +417,21 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 	t.Parallel()
 
 	root := repoRoot(t)
-	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                 "application error mapping/use cases",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                       "infrastructure adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                   "transport adapters",
-		"github.com/FangcunMount/component-base/pkg/logger":                                 "application/infra observability",
-		"github.com/FangcunMount/component-base/pkg/errors":                                 "domain-native errors",
-		"github.com/FangcunMount/component-base/pkg/code":                                   "domain-native errors",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                               "application API error mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale":       "evaluation-local snapshots/value objects",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "report-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                    "application error mapping/use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                          "infrastructure adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                      "transport adapters",
+		"github.com/FangcunMount/component-base/pkg/logger":                                    "application/infra observability",
+		"github.com/FangcunMount/component-base/pkg/errors":                                    "domain-native errors",
+		"github.com/FangcunMount/component-base/pkg/code":                                      "domain-native errors",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                                  "application API error mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition": "evaluation-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                   "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":    "report-local snapshots/value objects",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
 		if isEvaluationRootPackageGoFile(root, path) {
-			if strings.HasPrefix(importPath, rulesetPayloadPrefix) {
+			if isEvaluationRulesetPayloadImport(importPath) {
 				return
 			}
 		}
@@ -456,6 +454,19 @@ func isEvaluationRootPackageGoFile(root, path string) bool {
 		return false
 	}
 	return strings.HasSuffix(path, ".go")
+}
+
+func isEvaluationRulesetPayloadImport(importPath string) bool {
+	for _, allowed := range []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot",
+	} {
+		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {

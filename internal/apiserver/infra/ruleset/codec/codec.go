@@ -7,7 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 )
 
 func EncodeSBTI(model *rulesetsbti.ModelSnapshot) ([]byte, string, error) {
@@ -32,7 +32,7 @@ func EncodeMBTI(model *rulesetmbti.ModelSnapshot) ([]byte, string, error) {
 	return payload, domain.PayloadFormatMBTIV1, nil
 }
 
-func EncodeScale(model *rulesetscale.ScaleSnapshot) ([]byte, string, error) {
+func EncodeScale(model *scalesnapshot.ScaleSnapshot) ([]byte, string, error) {
 	if model == nil {
 		return nil, "", fmt.Errorf("scale model is nil")
 	}
@@ -79,7 +79,7 @@ func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*rulesetmbti.ModelSnapshot, e
 	return &model, nil
 }
 
-func DecodeScale(snapshot *domain.RuleSetSnapshot) (*rulesetscale.ScaleSnapshot, error) {
+func DecodeScale(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -90,7 +90,7 @@ func DecodeScale(snapshot *domain.RuleSetSnapshot) (*rulesetscale.ScaleSnapshot,
 	if !domain.IsScalePayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported scale payload format: %s", format)
 	}
-	var model rulesetscale.ScaleSnapshot
+	var model scalesnapshot.ScaleSnapshot
 	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
 		return nil, fmt.Errorf("decode scale payload: %w", err)
 	}

@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -116,7 +116,7 @@ func normalizeModelRef(ref port.InputRef) port.ModelRef {
 	return port.ModelRef{}
 }
 
-func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error) {
+func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
 	return r.scaleCatalog.GetScale(ctx, code)
 }
 
@@ -233,20 +233,20 @@ type RepositoryScaleSnapshotCatalog struct {
 // input resolution. Command repositories may implement it, but providers should
 // not depend on Scale mutation capabilities.
 type ScaleSnapshotRepository interface {
-	FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error)
-	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error)
-	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error)
+	FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
+	FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scaledefinition.MedicalScale, error)
+	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error)
 }
 
 type publishedScaleSnapshotRepository interface {
-	FindPublishedByCode(ctx context.Context, code string) (*scale.MedicalScale, error)
+	FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
 }
 
 func NewRepositoryScaleSnapshotCatalog(repo ScaleSnapshotRepository) *RepositoryScaleSnapshotCatalog {
 	return &RepositoryScaleSnapshotCatalog{repo: repo}
 }
 
-func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code string) (*rulesetscale.ScaleSnapshot, error) {
+func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code string) (*scalesnapshot.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载量表数据",
 		"scale_code", code,
@@ -273,7 +273,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 	return scaleToSnapshot(medicalScale), nil
 }
 
-func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*rulesetscale.ScaleSnapshot, error) {
+func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载解释模型数据",
 		"ruleset_kind", ref.Kind,
@@ -284,7 +284,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	)
 
 	var (
-		medicalScale *scale.MedicalScale
+		medicalScale *scaledefinition.MedicalScale
 		err          error
 	)
 	if ref.Version != "" {
@@ -318,7 +318,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	return snapshot, nil
 }
 
-func (r *RepositoryScaleSnapshotCatalog) findCurrentPublishedScale(ctx context.Context, code string) (*scale.MedicalScale, error) {
+func (r *RepositoryScaleSnapshotCatalog) findCurrentPublishedScale(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	if repo, ok := r.repo.(publishedScaleSnapshotRepository); ok {
 		return repo.FindPublishedByCode(ctx, code)
 	}

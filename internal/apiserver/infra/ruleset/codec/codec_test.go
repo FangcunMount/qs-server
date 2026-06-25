@@ -7,7 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 )
 
 func TestSBTICodecRoundTrip(t *testing.T) {
@@ -97,11 +97,11 @@ func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
 }
 
 func TestScaleCodecRoundTrip(t *testing.T) {
-	model := &rulesetscale.ScaleSnapshot{
+	model := &scalesnapshot.ScaleSnapshot{
 		Code:         "PHQ9",
 		ScaleVersion: "1.0.0",
 		Status:       "published",
-		Factors: []rulesetscale.FactorSnapshot{
+		Factors: []scalesnapshot.FactorSnapshot{
 			{Code: "total", IsTotalScore: true},
 		},
 	}

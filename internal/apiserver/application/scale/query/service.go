@@ -7,8 +7,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale/hotrank"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition/hotrank"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
@@ -36,11 +36,11 @@ type queryService struct {
 }
 
 type scaleQueryRepository interface {
-	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
-	FindPublishedByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
-	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
-	FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*domscale.MedicalScale, error)
-	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domscale.MedicalScale, error)
+	FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
+	FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
+	FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
+	FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error)
+	FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error)
 }
 
 // NewQueryService 创建量表查询服务。
@@ -180,7 +180,7 @@ func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questi
 		return &shared.AssessmentScaleContextResult{}, nil
 	}
 	var (
-		medicalScale *domscale.MedicalScale
+		medicalScale *scaledefinition.MedicalScale
 		err          error
 	)
 	if questionnaireVersion != "" {
@@ -189,7 +189,7 @@ func (s *queryService) ResolveAssessmentScaleContext(ctx context.Context, questi
 		medicalScale, err = s.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 	}
 	if err != nil {
-		if domscale.IsNotFound(err) {
+		if scaledefinition.IsNotFound(err) {
 			return &shared.AssessmentScaleContextResult{}, nil
 		}
 		return nil, err
@@ -223,7 +223,7 @@ func (s *queryService) normalizeScaleFilter(filter shared.ScaleListFilter) (scal
 		Category: filter.Category,
 	}
 	if normalized.Status != "" {
-		parsed, ok := domscale.ParseStatus(normalized.Status)
+		parsed, ok := scaledefinition.ParseStatus(normalized.Status)
 		if !ok {
 			return scalereadmodel.ScaleFilter{}, errors.WithCode(errorCode.ErrInvalidArgument, "状态无效")
 		}

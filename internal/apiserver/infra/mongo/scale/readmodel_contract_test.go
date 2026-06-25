@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"go.mongodb.org/mongo-driver/bson"
 )
@@ -51,7 +51,7 @@ func TestScaleFilterToBSONPublishedOnlyUsesActiveSnapshot(t *testing.T) {
 		PublishedOnly: true,
 	})
 
-	if got := query["record_role"]; got != domainScale.RecordRolePublishedSnapshot.String() {
+	if got := query["record_role"]; got != scaledefinition.RecordRolePublishedSnapshot.String() {
 		t.Fatalf("record_role = %#v, want published_snapshot", got)
 	}
 	if got := query["is_active_published"]; got != true {

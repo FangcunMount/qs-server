@@ -4,12 +4,12 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/questionnairecatalog"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-func (s *lifecycleService) ensureBoundQuestionnairePublished(ctx context.Context, scaleCode string, m *domscale.MedicalScale) error {
+func (s *lifecycleService) ensureBoundQuestionnairePublished(ctx context.Context, scaleCode string, m *scaledefinition.MedicalScale) error {
 	if m.GetQuestionnaireCode().IsEmpty() {
 		return nil
 	}

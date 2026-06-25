@@ -6,10 +6,10 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -38,20 +38,20 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 			Version: "1.0.0",
 			Title:   "Scale",
 		},
-		MedicalScale: &rulesetscale.ScaleSnapshot{
+		MedicalScale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
 			Status:               "published",
-			Factors: []rulesetscale.FactorSnapshot{
+			Factors: []scalesnapshot.FactorSnapshot{
 				{
 					Code:            "total",
 					Title:           "total",
 					IsTotalScore:    true,
 					QuestionCodes:   []string{"q1", "q2"},
 					ScoringStrategy: "sum",
-					InterpretRules: []rulesetscale.InterpretRuleSnapshot{
+					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
 						{Min: 0, Max: 10, RiskLevel: "low", Conclusion: "low", Suggestion: "keep"},
 					},
 				},
@@ -108,8 +108,8 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 	err = DefaultInputValidator{}.Validate(ScaleExecutionInput{
 		Assessment: a,
 		Input: &evaluationinput.InputSnapshot{
-			Model:        evaluationinput.NewScaleModelSnapshot(&rulesetscale.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", Title: "Scale"}),
-			ModelPayload: evaluationinput.ScaleModelPayload{Scale: &rulesetscale.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", QuestionnaireCode: "Q-001", QuestionnaireVersion: "2.0.0", Status: "published", Factors: []rulesetscale.FactorSnapshot{{Code: "total"}}}},
+			Model:        evaluationinput.NewScaleModelSnapshot(&scalesnapshot.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", Title: "Scale"}),
+			ModelPayload: evaluationinput.ScaleModelPayload{Scale: &scalesnapshot.ScaleSnapshot{Code: "S-001", ScaleVersion: "1.0.0", QuestionnaireCode: "Q-001", QuestionnaireVersion: "2.0.0", Status: "published", Factors: []scalesnapshot.FactorSnapshot{{Code: "total"}}}},
 			AnswerSheet:  &evaluationinput.AnswerSheetSnapshot{ID: 1, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 			Questionnaire: &evaluationinput.QuestionnaireSnapshot{
 				Code:    "Q-001",
@@ -127,7 +127,7 @@ func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	mapper := &stubMapper{
 		output: assessment.NewEvaluationResult(1, assessment.RiskLevelLow, "c", "s", nil),
 	}
-	service := NewService(validator, evaluationdomain.NewScaleHandler(stubScoringRegistry{}), mapper)
+	service := NewService(validator, evaluationscale.NewHandler(stubScoringRegistry{}), mapper)
 
 	a, _ := assessment.NewAssessment(
 		1,
@@ -138,19 +138,19 @@ func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	)
 	_ = a.Submit()
 	snapshot := &evaluationinput.InputSnapshot{
-		MedicalScale: &rulesetscale.ScaleSnapshot{
+		MedicalScale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			ScaleVersion:         "1.0.0",
 			QuestionnaireCode:    "Q-001",
 			QuestionnaireVersion: "1.0.0",
 			Status:               "published",
-			Factors: []rulesetscale.FactorSnapshot{
+			Factors: []scalesnapshot.FactorSnapshot{
 				{
 					Code:            "f1",
 					IsTotalScore:    true,
 					ScoringStrategy: "sum",
 					QuestionCodes:   []string{"f1"},
-					InterpretRules: []rulesetscale.InterpretRuleSnapshot{
+					InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
 						{Min: 0, Max: 10, RiskLevel: "low", Conclusion: "c", Suggestion: "s"},
 					},
 				},
@@ -209,6 +209,6 @@ func (s *stubMapper) ToEvaluationResult(
 
 type stubScoringRegistry struct{}
 
-func (stubScoringRegistry) ScoreFactor(context.Context, rulesetscale.FactorSnapshot, []float64) (float64, error) {
+func (stubScoringRegistry) ScoreFactor(context.Context, scalesnapshot.FactorSnapshot, []float64) (float64, error) {
 	return 1, nil
 }

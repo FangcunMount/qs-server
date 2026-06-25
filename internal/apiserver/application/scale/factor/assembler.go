@@ -3,7 +3,7 @@ package factor
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -16,26 +16,26 @@ func toFactorDomain(
 	scoringParams *shared.ScoringParamsDTO,
 	maxScore *float64,
 	interpretRules []shared.InterpretRuleDTO,
-) (*domscale.Factor, error) {
-	strategy := domscale.ScoringStrategySum
+) (*scaledefinition.Factor, error) {
+	strategy := scaledefinition.ScoringStrategySum
 	if scoringStrategy != "" {
-		strategy = domscale.ScoringStrategyCode(scoringStrategy)
+		strategy = scaledefinition.ScoringStrategyCode(scoringStrategy)
 	}
 
-	fType := domscale.ParseFactorType(factorType)
+	fType := scaledefinition.ParseFactorType(factorType)
 
 	scoringParamsDomain := scoringParamsFromDTO(scoringParams)
-	factor, err := domscale.NewFactor(
-		domscale.NewFactorCode(code),
+	factor, err := scaledefinition.NewFactor(
+		scaledefinition.NewFactorCode(code),
 		title,
-		domscale.WithFactorType(fType),
-		domscale.WithIsTotalScore(isTotalScore),
-		domscale.WithIsShow(isShow),
-		domscale.WithQuestionCodes(metaCodesFromStrings(questionCodes)),
-		domscale.WithScoringStrategy(strategy),
-		domscale.WithScoringParams(scoringParamsDomain),
-		domscale.WithMaxScore(maxScore),
-		domscale.WithInterpretRules(shared.InterpretRulesFromDTOs(interpretRules)),
+		scaledefinition.WithFactorType(fType),
+		scaledefinition.WithIsTotalScore(isTotalScore),
+		scaledefinition.WithIsShow(isShow),
+		scaledefinition.WithQuestionCodes(metaCodesFromStrings(questionCodes)),
+		scaledefinition.WithScoringStrategy(strategy),
+		scaledefinition.WithScoringParams(scoringParamsDomain),
+		scaledefinition.WithMaxScore(maxScore),
+		scaledefinition.WithInterpretRules(shared.InterpretRulesFromDTOs(interpretRules)),
 	)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrInvalidArgument, "创建因子失败")
@@ -43,11 +43,11 @@ func toFactorDomain(
 	return factor, nil
 }
 
-func scoringParamsFromDTO(scoringParams *shared.ScoringParamsDTO) *domscale.ScoringParams {
+func scoringParamsFromDTO(scoringParams *shared.ScoringParamsDTO) *scaledefinition.ScoringParams {
 	if scoringParams == nil {
-		return domscale.NewScoringParams()
+		return scaledefinition.NewScoringParams()
 	}
-	return domscale.NewScoringParams().
+	return scaledefinition.NewScoringParams().
 		WithCntOptionContents(scoringParams.CntOptionContents)
 }
 

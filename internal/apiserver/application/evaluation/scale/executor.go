@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scaleinterpretation"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -24,7 +24,7 @@ func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return NewExecutorWithService(
 		NewService(
 			DefaultInputValidator{},
-			evaluationdomain.NewScaleHandler(scaleScoringRegistry{scorer: scorer}),
+			evaluationscale.NewHandler(scaleScoringRegistry{scorer: scorer}),
 			DefaultResultMapper{},
 		),
 	)
@@ -35,7 +35,7 @@ func NewExecutorWithService(service Service) *Executor {
 	if service == nil {
 		service = NewService(
 			DefaultInputValidator{},
-			evaluationdomain.NewDefaultScaleHandler(),
+			evaluationscale.NewDefaultHandler(),
 			DefaultResultMapper{},
 		)
 	}
@@ -57,7 +57,7 @@ type scaleScoringRegistry struct {
 	scorer ruleengine.ScaleFactorScorer
 }
 
-func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor rulesetscale.FactorSnapshot, values []float64) (float64, error) {
+func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor scalesnapshot.FactorSnapshot, values []float64) (float64, error) {
 	if r.scorer == nil {
 		return scaleinterpretation.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}

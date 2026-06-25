@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
@@ -14,7 +14,7 @@ func (c *Container) buildPlanModuleDeps() assembler.PlanModuleDeps {
 	if c != nil {
 		infra = c.surveyScaleInfra
 	}
-	var scaleRepo scale.Repository
+	var scaleRepo scaledefinition.Repository
 	if infra != nil {
 		scaleRepo = infra.scaleRepo
 	}

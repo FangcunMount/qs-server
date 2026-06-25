@@ -5,9 +5,10 @@ import (
 	"fmt"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	reportmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/mbti"
 )
 
 type ReportBuilder struct{}
@@ -33,7 +34,7 @@ func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) 
 	if outcome.Result == nil {
 		return nil, fmt.Errorf("evaluation result is required")
 	}
-	detail, err := evaluationdomain.MBTIResultDetailFromPayload(outcome.Result.Detail.Payload)
+	detail, err := evaluationmbti.ResultDetailFromPayload(outcome.Result.Detail.Payload)
 	if err != nil {
 		return nil, err
 	}
@@ -41,7 +42,7 @@ func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) 
 	if !outcome.Result.ModelRef.Code().IsEmpty() {
 		modelCode = outcome.Result.ModelRef.Code().String()
 	}
-	return domainReport.BuildMBTIReport(domainReport.MBTIReportInput{
+	return reportmbti.BuildReport(reportmbti.ReportInput{
 		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
 		ModelCode:    modelCode,
 		TotalScore:   outcome.Result.TotalScore,

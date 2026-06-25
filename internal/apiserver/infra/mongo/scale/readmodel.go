@@ -3,7 +3,7 @@ package scale
 import (
 	"context"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"go.mongodb.org/mongo-driver/bson"
@@ -76,17 +76,17 @@ func scaleFilterToBSON(filter scalereadmodel.ScaleFilter) bson.M {
 		"deleted_at": nil,
 	}
 	if filter.PublishedOnly {
-		query["record_role"] = domainScale.RecordRolePublishedSnapshot.String()
+		query["record_role"] = scaledefinition.RecordRolePublishedSnapshot.String()
 		query["is_active_published"] = true
 	} else {
 		query["$or"] = bson.A{
-			bson.M{"record_role": domainScale.RecordRoleHead.String()},
+			bson.M{"record_role": scaledefinition.RecordRoleHead.String()},
 			bson.M{"record_role": bson.M{"$exists": false}},
 			bson.M{"record_role": ""},
 		}
 	}
 	if filter.Status != "" {
-		if parsed, ok := domainScale.ParseStatus(filter.Status); ok {
+		if parsed, ok := scaledefinition.ParseStatus(filter.Status); ok {
 			query["status"] = parsed.String()
 		}
 	}

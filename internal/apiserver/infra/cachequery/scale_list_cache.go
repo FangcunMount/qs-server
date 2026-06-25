@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
@@ -67,7 +67,7 @@ func (c *PublishedScaleListCache) Rebuild(ctx context.Context) error {
 	}
 
 	filter := scalereadmodel.ScaleFilter{
-		Status:        domainScale.StatusPublished.Value(),
+		Status:        scaledefinition.StatusPublished.Value(),
 		PublishedOnly: true,
 	}
 

@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	scaleInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -18,21 +18,21 @@ import (
 const defaultScaleCacheTTL = 24 * time.Hour
 
 // CachedScaleRepository 带缓存的量表 Repository 装饰器
-// 实现 scale.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
+// 实现 scaledefinition.Repository 接口，在原有 Repository 基础上添加 Redis 缓存层
 type CachedScaleRepository struct {
-	repo     scale.Repository
+	repo     scaledefinition.Repository
 	keys     *keyspace.Builder
 	policy   cachepolicy.CachePolicy
 	observer *observability.ComponentObserver
-	store    *ObjectCacheStore[scale.MedicalScale]
+	store    *ObjectCacheStore[scaledefinition.MedicalScale]
 }
 
 // NewCachedScaleRepositoryWithBuilderAndPolicy 创建带显式 builder/policy 的量表缓存 Repository。
-func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scale.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) scale.Repository {
+func NewCachedScaleRepositoryWithBuilderAndPolicy(repo scaledefinition.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy) scaledefinition.Repository {
 	return NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo, client, builder, policy, nil)
 }
 
-func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) scale.Repository {
+func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scaledefinition.Repository, client redis.UniversalClient, builder *keyspace.Builder, policy cachepolicy.CachePolicy, observer *observability.ComponentObserver) scaledefinition.Repository {
 	if builder == nil {
 		panic("redis builder is required")
 	}
@@ -42,7 +42,7 @@ func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository,
 		keys:     builder,
 		policy:   policy,
 		observer: observer,
-		store: NewObjectCacheStore(ObjectCacheStoreOptions[scale.MedicalScale]{
+		store: NewObjectCacheStore(ObjectCacheStoreOptions[scaledefinition.MedicalScale]{
 			Cache:     newRedisCacheIfAvailable(client),
 			PolicyKey: cachepolicy.PolicyScale,
 			Policy:    policy,
@@ -52,12 +52,12 @@ func NewCachedScaleRepositoryWithBuilderPolicyAndObserver(repo scale.Repository,
 	}
 }
 
-func newScaleCacheEntryCodec(mapper *scaleInfra.ScaleMapper) CacheEntryCodec[scale.MedicalScale] {
-	return CacheEntryCodec[scale.MedicalScale]{
-		EncodeFunc: func(domain *scale.MedicalScale) ([]byte, error) {
+func newScaleCacheEntryCodec(mapper *scaleInfra.ScaleMapper) CacheEntryCodec[scaledefinition.MedicalScale] {
+	return CacheEntryCodec[scaledefinition.MedicalScale]{
+		EncodeFunc: func(domain *scaledefinition.MedicalScale) ([]byte, error) {
 			return json.Marshal(mapper.ToPO(domain))
 		},
-		DecodeFunc: func(data []byte) (*scale.MedicalScale, error) {
+		DecodeFunc: func(data []byte) (*scaledefinition.MedicalScale, error) {
 			var po scaleInfra.ScalePO
 			if err := json.Unmarshal(data, &po); err != nil {
 				return nil, err
@@ -93,7 +93,7 @@ func (r *CachedScaleRepository) buildPublishedScaleByQuestionnaireCacheKey(quest
 }
 
 // Create 创建量表（同时写入缓存）
-func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.MedicalScale) error {
+func (r *CachedScaleRepository) Create(ctx context.Context, domain *scaledefinition.MedicalScale) error {
 	if err := r.repo.Create(ctx, domain); err != nil {
 		return err
 	}
@@ -122,7 +122,7 @@ func (r *CachedScaleRepository) Create(ctx context.Context, domain *scale.Medica
 }
 
 // CreatePublishedSnapshot 创建或更新已发布快照并失效相关缓存。
-func (r *CachedScaleRepository) CreatePublishedSnapshot(ctx context.Context, domain *scale.MedicalScale, active bool) error {
+func (r *CachedScaleRepository) CreatePublishedSnapshot(ctx context.Context, domain *scaledefinition.MedicalScale, active bool) error {
 	if err := r.repo.CreatePublishedSnapshot(ctx, domain, active); err != nil {
 		return err
 	}
@@ -131,14 +131,14 @@ func (r *CachedScaleRepository) CreatePublishedSnapshot(ctx context.Context, dom
 }
 
 // FindByCode 根据编码查询量表（优先从缓存读取）
-func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
+func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scaledefinition.MedicalScale]{
 		PolicyKey:      cachepolicy.PolicyScale,
 		CacheKey:       r.buildCacheKey(code),
 		Policy:         r.policy,
 		Observer:       r.observer,
 		Store:          r.store,
-		Load:           func(ctx context.Context) (*scale.MedicalScale, error) { return r.repo.FindByCode(ctx, code) },
+		Load:           func(ctx context.Context) (*scaledefinition.MedicalScale, error) { return r.repo.FindByCode(ctx, code) },
 		AsyncSetCached: true,
 	})
 	if err != nil || !isStalePublishedScaleCache(domain) {
@@ -148,17 +148,17 @@ func (r *CachedScaleRepository) FindByCode(ctx context.Context, code string) (*s
 }
 
 // FindByCodeVersion 根据量表编码和版本查询量表。
-func (r *CachedScaleRepository) FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) FindByCodeVersion(ctx context.Context, code, scaleVersion string) (*scaledefinition.MedicalScale, error) {
 	if scaleVersion == "" {
 		return r.FindByCode(ctx, code)
 	}
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scaledefinition.MedicalScale]{
 		PolicyKey: cachepolicy.PolicyScale,
 		CacheKey:  r.buildVersionCacheKey(code, scaleVersion),
 		Policy:    r.policy,
 		Observer:  r.observer,
 		Store:     r.store,
-		Load: func(ctx context.Context) (*scale.MedicalScale, error) {
+		Load: func(ctx context.Context) (*scaledefinition.MedicalScale, error) {
 			return r.repo.FindByCodeVersion(ctx, code, scaleVersion)
 		},
 		AsyncSetCached: true,
@@ -170,14 +170,14 @@ func (r *CachedScaleRepository) FindByCodeVersion(ctx context.Context, code, sca
 }
 
 // FindPublishedByCode 根据编码查询当前激活的已发布量表快照。
-func (r *CachedScaleRepository) FindPublishedByCode(ctx context.Context, code string) (*scale.MedicalScale, error) {
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
+func (r *CachedScaleRepository) FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scaledefinition.MedicalScale]{
 		PolicyKey: cachepolicy.PolicyScale,
 		CacheKey:  r.buildPublishedScaleCacheKey(code),
 		Policy:    r.policy,
 		Observer:  r.observer,
 		Store:     r.store,
-		Load: func(ctx context.Context) (*scale.MedicalScale, error) {
+		Load: func(ctx context.Context) (*scaledefinition.MedicalScale, error) {
 			return r.repo.FindPublishedByCode(ctx, code)
 		},
 		AsyncSetCached: true,
@@ -192,20 +192,20 @@ func (r *CachedScaleRepository) FindPublishedByCode(ctx context.Context, code st
 }
 
 // FindByQuestionnaireCode 根据问卷编码查询量表
-func (r *CachedScaleRepository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) FindByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	// 问卷编码查询不缓存（使用频率低，且需要维护额外索引）
 	return r.repo.FindByQuestionnaireCode(ctx, questionnaireCode)
 }
 
 // FindPublishedByQuestionnaireCode 根据问卷编码查询当前激活的已发布量表快照。
-func (r *CachedScaleRepository) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
-	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scale.MedicalScale]{
+func (r *CachedScaleRepository) FindPublishedByQuestionnaireCode(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
+	domain, err := ReadThroughObject(ctx, ObjectReadThroughOptions[scaledefinition.MedicalScale]{
 		PolicyKey: cachepolicy.PolicyScale,
 		CacheKey:  r.buildPublishedScaleByQuestionnaireCacheKey(questionnaireCode),
 		Policy:    r.policy,
 		Observer:  r.observer,
 		Store:     r.store,
-		Load: func(ctx context.Context) (*scale.MedicalScale, error) {
+		Load: func(ctx context.Context) (*scaledefinition.MedicalScale, error) {
 			return r.repo.FindPublishedByQuestionnaireCode(ctx, questionnaireCode)
 		},
 		AsyncSetCached: true,
@@ -220,20 +220,20 @@ func (r *CachedScaleRepository) FindPublishedByQuestionnaireCode(ctx context.Con
 }
 
 // FindByQuestionnaireRef 根据问卷编码和版本查询量表
-func (r *CachedScaleRepository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) FindByQuestionnaireRef(ctx context.Context, questionnaireCode, questionnaireVersion string) (*scaledefinition.MedicalScale, error) {
 	// 问卷引用查询不缓存（使用频率低，且需要维护额外索引）
 	return r.repo.FindByQuestionnaireRef(ctx, questionnaireCode, questionnaireVersion)
 }
 
 // Update 更新量表（同时失效缓存）
-func (r *CachedScaleRepository) Update(ctx context.Context, domain *scale.MedicalScale) error {
+func (r *CachedScaleRepository) Update(ctx context.Context, domain *scaledefinition.MedicalScale) error {
 	oldCode := domain.GetCode().String()
 	var oldVersion string
 	var questionnaireCode string
 	if existing, err := r.repo.FindByCode(ctx, oldCode); err == nil && existing != nil {
 		oldVersion = existing.GetScaleVersion()
 		questionnaireCode = existing.GetQuestionnaireCode().String()
-	} else if err != nil && !scale.IsNotFound(err) {
+	} else if err != nil && !scaledefinition.IsNotFound(err) {
 		logger.L(ctx).Warnw("failed to load old scale version before cache invalidation",
 			"code", oldCode,
 			"error", err,
@@ -376,19 +376,19 @@ func (r *CachedScaleRepository) invalidateScaleFamilyCache(ctx context.Context, 
 // ==================== 缓存操作 ====================
 
 // setCache 写入缓存
-func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domain *scale.MedicalScale) error {
+func (r *CachedScaleRepository) setCache(ctx context.Context, code string, domain *scaledefinition.MedicalScale) error {
 	return r.store.Set(ctx, r.buildCacheKey(code), domain)
 }
 
-func (r *CachedScaleRepository) setVersionCache(ctx context.Context, code, version string, domain *scale.MedicalScale) error {
+func (r *CachedScaleRepository) setVersionCache(ctx context.Context, code, version string, domain *scaledefinition.MedicalScale) error {
 	return r.store.Set(ctx, r.buildVersionCacheKey(code, version), domain)
 }
 
-func (r *CachedScaleRepository) setPublishedScaleCache(ctx context.Context, code string, domain *scale.MedicalScale) error {
+func (r *CachedScaleRepository) setPublishedScaleCache(ctx context.Context, code string, domain *scaledefinition.MedicalScale) error {
 	return r.store.Set(ctx, r.buildPublishedScaleCacheKey(code), domain)
 }
 
-func (r *CachedScaleRepository) setPublishedScaleByQuestionnaireCache(ctx context.Context, questionnaireCode string, domain *scale.MedicalScale) error {
+func (r *CachedScaleRepository) setPublishedScaleByQuestionnaireCache(ctx context.Context, questionnaireCode string, domain *scaledefinition.MedicalScale) error {
 	return r.store.Set(ctx, r.buildPublishedScaleByQuestionnaireCacheKey(questionnaireCode), domain)
 }
 
@@ -413,7 +413,7 @@ func (r *CachedScaleRepository) deletePublishedScaleFamilyCache(ctx context.Cont
 	return r.deletePublishedScaleByQuestionnaireCache(ctx, questionnaireCode)
 }
 
-func (r *CachedScaleRepository) warmPublishedScaleCodeCacheAlias(ctx context.Context, domain *scale.MedicalScale) {
+func (r *CachedScaleRepository) warmPublishedScaleCodeCacheAlias(ctx context.Context, domain *scaledefinition.MedicalScale) {
 	if domain == nil || !r.store.available() {
 		return
 	}
@@ -429,7 +429,7 @@ func (r *CachedScaleRepository) warmPublishedScaleCodeCacheAlias(ctx context.Con
 	}
 }
 
-func (r *CachedScaleRepository) warmPublishedScaleQuestionnaireCacheAlias(ctx context.Context, domain *scale.MedicalScale) {
+func (r *CachedScaleRepository) warmPublishedScaleQuestionnaireCacheAlias(ctx context.Context, domain *scaledefinition.MedicalScale) {
 	if domain == nil || !r.store.available() {
 		return
 	}
@@ -445,7 +445,7 @@ func (r *CachedScaleRepository) warmPublishedScaleQuestionnaireCacheAlias(ctx co
 	}
 }
 
-func (r *CachedScaleRepository) warmPublishedScaleAliasCaches(ctx context.Context, domain *scale.MedicalScale) {
+func (r *CachedScaleRepository) warmPublishedScaleAliasCaches(ctx context.Context, domain *scaledefinition.MedicalScale) {
 	r.warmPublishedScaleCodeCacheAlias(ctx, domain)
 	r.warmPublishedScaleQuestionnaireCacheAlias(ctx, domain)
 }
@@ -459,11 +459,11 @@ func (r *CachedScaleRepository) deleteVersionCache(ctx context.Context, code, ve
 	return r.store.Delete(ctx, r.buildVersionCacheKey(code, version))
 }
 
-func isStalePublishedScaleCache(domain *scale.MedicalScale) bool {
+func isStalePublishedScaleCache(domain *scaledefinition.MedicalScale) bool {
 	return domain != nil && domain.IsPublished() && domain.FactorCount() == 0
 }
 
-func (r *CachedScaleRepository) reloadScaleCacheFromSource(ctx context.Context, code string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) reloadScaleCacheFromSource(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	logger.L(ctx).Warnw("published scale cache has no factors, reloading from source",
 		"code", code,
 	)
@@ -491,7 +491,7 @@ func (r *CachedScaleRepository) reloadScaleCacheFromSource(ctx context.Context, 
 	return domain, nil
 }
 
-func (r *CachedScaleRepository) reloadPublishedScaleCacheFromSource(ctx context.Context, code string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) reloadPublishedScaleCacheFromSource(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	logger.L(ctx).Warnw("published scale cache has no factors, reloading from source",
 		"code", code,
 	)
@@ -520,7 +520,7 @@ func (r *CachedScaleRepository) reloadPublishedScaleCacheFromSource(ctx context.
 	return domain, nil
 }
 
-func (r *CachedScaleRepository) reloadPublishedScaleByQuestionnaireCacheFromSource(ctx context.Context, questionnaireCode string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) reloadPublishedScaleByQuestionnaireCacheFromSource(ctx context.Context, questionnaireCode string) (*scaledefinition.MedicalScale, error) {
 	logger.L(ctx).Warnw("published scale cache has no factors, reloading from source",
 		"questionnaire_code", questionnaireCode,
 	)
@@ -549,7 +549,7 @@ func (r *CachedScaleRepository) reloadPublishedScaleByQuestionnaireCacheFromSour
 	return domain, nil
 }
 
-func (r *CachedScaleRepository) reloadScaleVersionCacheFromSource(ctx context.Context, code, version string) (*scale.MedicalScale, error) {
+func (r *CachedScaleRepository) reloadScaleVersionCacheFromSource(ctx context.Context, code, version string) (*scaledefinition.MedicalScale, error) {
 	logger.L(ctx).Warnw("published scale version cache has no factors, reloading from source",
 		"code", code,
 		"scale_version", version,

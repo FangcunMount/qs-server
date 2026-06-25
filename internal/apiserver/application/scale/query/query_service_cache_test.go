@@ -9,7 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domainscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -48,8 +48,8 @@ func TestScaleQueryServiceListPublishedFallsBackWhenCacheMisses(t *testing.T) {
 
 	repo := &scaleCacheQueryRepo{
 		count: 1,
-		pages: map[int][]*domainscale.MedicalScale{
-			1: {newScaleCacheQueryScale(t, "SCALE_DB", "DB Scale", domainscale.StatusPublished)},
+		pages: map[int][]*scaledefinition.MedicalScale{
+			1: {newScaleCacheQueryScale(t, "SCALE_DB", "DB Scale", scaledefinition.StatusPublished)},
 		},
 	}
 	cache := &publishedScaleListCacheStub{hit: false}
@@ -71,8 +71,8 @@ func TestScaleLifecycleDeleteIgnoresListCacheRebuildFailure(t *testing.T) {
 	t.Parallel()
 
 	repo := &scaleCacheQueryRepo{
-		byCode: map[string]*domainscale.MedicalScale{
-			"SCALE_DRAFT": newScaleCacheQueryScale(t, "SCALE_DRAFT", "Draft Scale", domainscale.StatusDraft),
+		byCode: map[string]*scaledefinition.MedicalScale{
+			"SCALE_DRAFT": newScaleCacheQueryScale(t, "SCALE_DRAFT", "Draft Scale", scaledefinition.StatusDraft),
 		},
 	}
 	cache := &publishedScaleListCacheStub{rebuildErr: stderrors.New("cache unavailable")}
@@ -107,46 +107,46 @@ func (c *publishedScaleListCacheStub) GetPage(context.Context, int, int) (*scale
 
 type scaleCacheQueryRepo struct {
 	count            int64
-	pages            map[int][]*domainscale.MedicalScale
-	byCode           map[string]*domainscale.MedicalScale
+	pages            map[int][]*scaledefinition.MedicalScale
+	byCode           map[string]*scaledefinition.MedicalScale
 	findSummaryCalls atomic.Int32
 	countCalls       atomic.Int32
 	removeCalls      atomic.Int32
 }
 
-func (r *scaleCacheQueryRepo) Create(context.Context, *domainscale.MedicalScale) error {
+func (r *scaleCacheQueryRepo) Create(context.Context, *scaledefinition.MedicalScale) error {
 	return nil
 }
 
-func (r *scaleCacheQueryRepo) CreatePublishedSnapshot(context.Context, *domainscale.MedicalScale, bool) error {
+func (r *scaleCacheQueryRepo) CreatePublishedSnapshot(context.Context, *scaledefinition.MedicalScale, bool) error {
 	return nil
 }
 
-func (r *scaleCacheQueryRepo) FindByCode(_ context.Context, code string) (*domainscale.MedicalScale, error) {
+func (r *scaleCacheQueryRepo) FindByCode(_ context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	if item, ok := r.byCode[code]; ok {
 		return item, nil
 	}
-	return nil, domainscale.ErrNotFound
+	return nil, scaledefinition.ErrNotFound
 }
 
-func (r *scaleCacheQueryRepo) FindPublishedByCode(ctx context.Context, code string) (*domainscale.MedicalScale, error) {
+func (r *scaleCacheQueryRepo) FindPublishedByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByCode(ctx, code)
 }
 
-func (r *scaleCacheQueryRepo) FindByCodeVersion(ctx context.Context, code, _ string) (*domainscale.MedicalScale, error) {
+func (r *scaleCacheQueryRepo) FindByCodeVersion(ctx context.Context, code, _ string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByCode(ctx, code)
 }
 
-func (r *scaleCacheQueryRepo) FindByQuestionnaireCode(context.Context, string) (*domainscale.MedicalScale, error) {
-	return nil, domainscale.ErrNotFound
+func (r *scaleCacheQueryRepo) FindByQuestionnaireCode(context.Context, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
 
-func (r *scaleCacheQueryRepo) FindPublishedByQuestionnaireCode(ctx context.Context, code string) (*domainscale.MedicalScale, error) {
+func (r *scaleCacheQueryRepo) FindPublishedByQuestionnaireCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error) {
 	return r.FindByQuestionnaireCode(ctx, code)
 }
 
-func (r *scaleCacheQueryRepo) FindByQuestionnaireRef(context.Context, string, string) (*domainscale.MedicalScale, error) {
-	return nil, domainscale.ErrNotFound
+func (r *scaleCacheQueryRepo) FindByQuestionnaireRef(context.Context, string, string) (*scaledefinition.MedicalScale, error) {
+	return nil, scaledefinition.ErrNotFound
 }
 
 func (r *scaleCacheQueryRepo) ListScales(_ context.Context, _ scalereadmodel.ScaleFilter, page scalereadmodel.PageRequest) ([]scalereadmodel.ScaleSummaryRow, error) {
@@ -159,7 +159,7 @@ func (r *scaleCacheQueryRepo) CountScales(context.Context, scalereadmodel.ScaleF
 	return r.count, nil
 }
 
-func (r *scaleCacheQueryRepo) Update(context.Context, *domainscale.MedicalScale) error {
+func (r *scaleCacheQueryRepo) Update(context.Context, *scaledefinition.MedicalScale) error {
 	return nil
 }
 
@@ -180,7 +180,7 @@ func (r *scaleCacheQueryRepo) ExistsByCode(context.Context, string) (bool, error
 	return false, nil
 }
 
-func scaleCacheQueryRows(items []*domainscale.MedicalScale) []scalereadmodel.ScaleSummaryRow {
+func scaleCacheQueryRows(items []*scaledefinition.MedicalScale) []scalereadmodel.ScaleSummaryRow {
 	rows := make([]scalereadmodel.ScaleSummaryRow, 0, len(items))
 	for _, item := range items {
 		if item == nil {
@@ -202,21 +202,21 @@ func scaleCacheQueryRows(items []*domainscale.MedicalScale) []scalereadmodel.Sca
 	return rows
 }
 
-func newScaleCacheQueryScale(t *testing.T, code, title string, status domainscale.Status) *domainscale.MedicalScale {
+func newScaleCacheQueryScale(t *testing.T, code, title string, status scaledefinition.Status) *scaledefinition.MedicalScale {
 	t.Helper()
 
 	now := time.Date(2026, 4, 24, 10, 0, 0, 0, time.UTC)
-	scale, err := domainscale.NewMedicalScale(
+	scale, err := scaledefinition.NewMedicalScale(
 		meta.NewCode(code),
 		title,
-		domainscale.WithDescription("description"),
-		domainscale.WithQuestionnaire(meta.NewCode("Q_"+code), "v1"),
-		domainscale.WithStatus(status),
-		domainscale.WithCategory(domainscale.CategoryADHD),
-		domainscale.WithCreatedBy(meta.ID(101)),
-		domainscale.WithUpdatedBy(meta.ID(102)),
-		domainscale.WithCreatedAt(now),
-		domainscale.WithUpdatedAt(now),
+		scaledefinition.WithDescription("description"),
+		scaledefinition.WithQuestionnaire(meta.NewCode("Q_"+code), "v1"),
+		scaledefinition.WithStatus(status),
+		scaledefinition.WithCategory(scaledefinition.CategoryADHD),
+		scaledefinition.WithCreatedBy(meta.ID(101)),
+		scaledefinition.WithUpdatedBy(meta.ID(102)),
+		scaledefinition.WithCreatedAt(now),
+		scaledefinition.WithUpdatedAt(now),
 	)
 	if err != nil {
 		t.Fatalf("NewMedicalScale() error = %v", err)

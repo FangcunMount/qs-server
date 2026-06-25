@@ -82,7 +82,7 @@ func (s *CustomSuggestionStrategy) Name() string {
 
 func (s *CustomSuggestionStrategy) CanHandle(report *report.InterpretReport) bool {
     // 判断是否处理该报告
-    return report.ScaleCode() == "YOUR_SCALE_CODE"
+    return report.ModelCode() == "YOUR_MODEL_CODE"
 }
 
 func (s *CustomSuggestionStrategy) GenerateSuggestions(ctx context.Context, rpt *report.InterpretReport) ([]report.Suggestion, error) {
@@ -192,7 +192,7 @@ func (s *AISuggestionStrategy) buildPrompt(rpt *report.InterpretReport) string {
 3. 针对不同风险等级提供差异化建议
 
 建议列表：`,
-        rpt.ScaleName(),
+        rpt.ModelName(),
         rpt.TotalScore(),
         rpt.RiskLevel(),
         rpt.Conclusion(),
@@ -211,7 +211,7 @@ func (s *DatabaseSuggestionStrategy) GenerateSuggestions(ctx context.Context, rp
     // 从数据库查询建议模板
     templates, err := s.repo.FindTemplatesByScaleAndRisk(
         ctx,
-        rpt.ScaleCode(),
+        rpt.ModelCode(),
         string(rpt.RiskLevel()),
     )
     if err != nil {

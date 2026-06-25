@@ -3,7 +3,8 @@ package evaluationinput
 import (
 	"testing"
 
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -24,7 +25,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := evaluationdomain.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationmbti.Score(model, mbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -57,7 +58,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := evaluationdomain.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationmbti.Score(model, mbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -120,19 +121,19 @@ func mbtiLikertAnswerSheet(model *rulesetmbti.ModelSnapshot, value string) *port
 	}
 }
 
-func mbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationdomain.AnswerSheet {
+func mbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationinputdomain.AnswerSheet {
 	if sheet == nil {
 		return nil
 	}
-	answers := make([]evaluationdomain.Answer, 0, len(sheet.Answers))
+	answers := make([]evaluationinputdomain.Answer, 0, len(sheet.Answers))
 	for _, answer := range sheet.Answers {
-		answers = append(answers, evaluationdomain.Answer{
+		answers = append(answers, evaluationinputdomain.Answer{
 			QuestionCode: answer.QuestionCode,
 			Score:        answer.Score,
 			Value:        answer.Value,
 		})
 	}
-	return &evaluationdomain.AnswerSheet{
+	return &evaluationinputdomain.AnswerSheet{
 		QuestionnaireCode:    sheet.QuestionnaireCode,
 		QuestionnaireVersion: sheet.QuestionnaireVersion,
 		Answers:              answers,

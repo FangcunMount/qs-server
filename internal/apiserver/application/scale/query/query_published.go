@@ -6,7 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -21,7 +21,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListScalesD
 	if err != nil {
 		return nil, err
 	}
-	filter.Status = domainScale.StatusPublished.Value()
+	filter.Status = scaledefinition.StatusPublished.Value()
 	filter.PublishedOnly = true
 
 	if s.canUsePublishedListCache(filter) {

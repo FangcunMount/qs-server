@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
@@ -18,14 +18,14 @@ func NewScaleRuleSetPublisher(writer rulesetport.PublishedRuleSetWriter) *ScaleR
 	return &ScaleRuleSetPublisher{writer: writer}
 }
 
-func (p *ScaleRuleSetPublisher) PublishPublishedScale(ctx context.Context, scale *domscale.MedicalScale) error {
+func (p *ScaleRuleSetPublisher) PublishPublishedScale(ctx context.Context, scale *scaledefinition.MedicalScale) error {
 	if scale == nil {
 		return fmt.Errorf("scale is nil")
 	}
 	if p == nil || p.writer == nil {
 		return nil
 	}
-	if scale.GetStatus() != domscale.StatusPublished {
+	if scale.GetStatus() != scaledefinition.StatusPublished {
 		return fmt.Errorf("scale %s is not published", scale.GetCode().String())
 	}
 	snapshot, err := ScaleRuleSetSnapshot(evaluationinputInfra.MedicalScaleToSnapshot(scale))

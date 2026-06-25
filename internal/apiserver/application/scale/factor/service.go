@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/editable"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/ports"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale/shared"
-	domscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -23,9 +23,9 @@ type factorService struct {
 }
 
 type factorRepository interface {
-	CreatePublishedSnapshot(ctx context.Context, scale *domscale.MedicalScale, active bool) error
-	FindByCode(ctx context.Context, code string) (*domscale.MedicalScale, error)
-	Update(ctx context.Context, scale *domscale.MedicalScale) error
+	CreatePublishedSnapshot(ctx context.Context, scale *scaledefinition.MedicalScale, active bool) error
+	FindByCode(ctx context.Context, code string) (*scaledefinition.MedicalScale, error)
+	Update(ctx context.Context, scale *scaledefinition.MedicalScale) error
 }
 
 // NewService 创建量表因子编辑应用服务。
@@ -108,7 +108,7 @@ func (s *factorService) RemoveFactor(ctx context.Context, scaleCode, factorCode 
 		return nil, err
 	}
 
-	if err := m.RemoveFactor(domscale.NewFactorCode(factorCode)); err != nil {
+	if err := m.RemoveFactor(scaledefinition.NewFactorCode(factorCode)); err != nil {
 		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "删除因子失败")
 	}
 
@@ -129,8 +129,8 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 		return nil, err
 	}
 
-	factors := make([]*domscale.Factor, 0, len(factorDTOs))
-	var allValidationErrors []domscale.ValidationError
+	factors := make([]*scaledefinition.Factor, 0, len(factorDTOs))
+	var allValidationErrors []scaledefinition.ValidationError
 
 	for _, dto := range factorDTOs {
 		factor, err := toFactorDomain(dto.Code, dto.Title, dto.FactorType, dto.IsTotalScore, dto.IsShow,
@@ -139,7 +139,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 			return nil, err
 		}
 
-		factorErrs := domscale.ValidateFactor(factor)
+		factorErrs := scaledefinition.ValidateFactor(factor)
 		if len(factorErrs) > 0 {
 			allValidationErrors = append(allValidationErrors, factorErrs...)
 		}
@@ -148,7 +148,7 @@ func (s *factorService) ReplaceFactors(ctx context.Context, scaleCode string, fa
 	}
 
 	if len(allValidationErrors) > 0 {
-		return nil, shared.WrapScaleDomainError(domscale.ToError(allValidationErrors), errorCode.ErrInvalidArgument, "验证因子失败")
+		return nil, shared.WrapScaleDomainError(scaledefinition.ToError(allValidationErrors), errorCode.ErrInvalidArgument, "验证因子失败")
 	}
 
 	if err := m.ReplaceFactors(factors); err != nil {
@@ -174,7 +174,7 @@ func (s *factorService) UpdateFactorInterpretRules(ctx context.Context, dto shar
 
 	rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
 
-	if err := m.UpdateFactorInterpretRules(domscale.NewFactorCode(dto.FactorCode), rules); err != nil {
+	if err := m.UpdateFactorInterpretRules(scaledefinition.NewFactorCode(dto.FactorCode), rules); err != nil {
 		return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新解读规则失败")
 	}
 
@@ -202,7 +202,7 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 
 		rules := shared.InterpretRulesFromDTOs(dto.InterpretRules)
 
-		if err := m.UpdateFactorInterpretRules(domscale.NewFactorCode(dto.FactorCode), rules); err != nil {
+		if err := m.UpdateFactorInterpretRules(scaledefinition.NewFactorCode(dto.FactorCode), rules); err != nil {
 			return nil, shared.WrapScaleDomainError(err, errorCode.ErrInvalidArgument, "更新因子[%s]解读规则失败", dto.FactorCode)
 		}
 	}
@@ -210,7 +210,7 @@ func (s *factorService) ReplaceInterpretRules(ctx context.Context, scaleCode str
 	return s.persistFactorMutation(ctx, m)
 }
 
-func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string) (*domscale.MedicalScale, error) {
+func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string) (*scaledefinition.MedicalScale, error) {
 	m, err := s.repo.FindByCode(ctx, scaleCode)
 	if err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrMedicalScaleNotFound, "获取量表失败")
@@ -221,7 +221,7 @@ func (s *factorService) loadEditableScale(ctx context.Context, scaleCode string)
 	return m, nil
 }
 
-func (s *factorService) persistFactorMutation(ctx context.Context, m *domscale.MedicalScale) (*shared.ScaleResult, error) {
+func (s *factorService) persistFactorMutation(ctx context.Context, m *scaledefinition.MedicalScale) (*shared.ScaleResult, error) {
 	if err := s.repo.Update(ctx, m); err != nil {
 		return nil, errors.WrapC(err, errorCode.ErrDatabase, "保存量表失败")
 	}

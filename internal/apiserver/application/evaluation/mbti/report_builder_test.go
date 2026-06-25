@@ -4,14 +4,14 @@ import (
 	"testing"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestReportBuilderFillsModelExtra(t *testing.T) {
-	detail := evaluationdomain.MBTIResultDetail{
+	detail := evaluationmbti.ResultDetail{
 		TypeCode:     "INTJ",
 		TypeName:     "建筑师",
 		OneLiner:     "独立战略家",

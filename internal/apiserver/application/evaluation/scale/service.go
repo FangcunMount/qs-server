@@ -3,7 +3,7 @@ package scale
 import (
 	"context"
 
-	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -18,20 +18,20 @@ type Service interface {
 
 type scaleInterpretationService struct {
 	validator InputValidator
-	handler   *evaluationdomain.ScaleHandler
+	handler   *evaluationscale.Handler
 	mapper    ResultMapper
 }
 
 func NewService(
 	validator InputValidator,
-	handler *evaluationdomain.ScaleHandler,
+	handler *evaluationscale.Handler,
 	mapper ResultMapper,
 ) Service {
 	if validator == nil {
 		validator = DefaultInputValidator{}
 	}
 	if handler == nil {
-		handler = evaluationdomain.NewDefaultScaleHandler()
+		handler = evaluationscale.NewDefaultHandler()
 	}
 	if mapper == nil {
 		mapper = DefaultResultMapper{}

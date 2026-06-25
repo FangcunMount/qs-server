@@ -3,14 +3,14 @@ package plan
 import (
 	"context"
 
-	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/authoring/scale"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
 )
 
 type repositoryScaleCatalog struct {
-	repo domainScale.Repository
+	repo scaledefinition.Repository
 }
 
-func newRepositoryScaleCatalog(repo domainScale.Repository) ScaleCatalog {
+func newRepositoryScaleCatalog(repo scaledefinition.Repository) ScaleCatalog {
 	if repo == nil {
 		return nil
 	}
@@ -18,7 +18,7 @@ func newRepositoryScaleCatalog(repo domainScale.Repository) ScaleCatalog {
 }
 
 // NewRepositoryScaleCatalog adapts the legacy scale repository to the narrow plan catalog.
-func NewRepositoryScaleCatalog(repo domainScale.Repository) ScaleCatalog {
+func NewRepositoryScaleCatalog(repo scaledefinition.Repository) ScaleCatalog {
 	return newRepositoryScaleCatalog(repo)
 }
 

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
@@ -24,8 +24,8 @@ func TestScoreRowToResultUsesRulesetFactorMaxScores(t *testing.T) {
 			},
 		},
 	}
-	scale := &rulesetscale.ScaleSnapshot{
-		Factors: []rulesetscale.FactorSnapshot{
+	scale := &scalesnapshot.ScaleSnapshot{
+		Factors: []scalesnapshot.FactorSnapshot{
 			{Code: "total", MaxScore: &maxScore, IsTotalScore: true},
 		},
 	}
