@@ -11,6 +11,33 @@ import (
 	"testing"
 )
 
+func TestTopLevelDomainChainPackagesDoNotDependOnOuterLayers(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "domain", "ruleset"),
+		filepath.Join(root, "internal", "apiserver", "domain", "report"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation"),
+	}
+	forbiddenImports := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "application",
+		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":  "infrastructure",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":   "transport",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/":        "port",
+	}
+	for _, scanRoot := range scanRoots {
+		scanGoImports(t, scanRoot, func(path, importPath string) {
+			for forbidden, label := range forbiddenImports {
+				if strings.HasPrefix(importPath, forbidden) {
+					rel := filepath.ToSlash(mustRel(t, root, path))
+					t.Fatalf("%s imports %s; top-level domain chain packages must not depend on %s", rel, importPath, label)
+				}
+			}
+		})
+	}
+}
+
 func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 	t.Parallel()
 
@@ -133,7 +160,7 @@ func TestEvaluationDomainRepositoriesStayCommandSide(t *testing.T) {
 			interfaces: []string{"Repository", "ScoreRepository"},
 		},
 		{
-			rel:        "internal/apiserver/domain/evaluation/report/repository.go",
+			rel:        "internal/apiserver/domain/report/repository.go",
 			interfaces: []string{"ReportRepository"},
 		},
 	} {
@@ -206,7 +233,7 @@ func TestEvaluationReportDomainDoesNotContainUnusedExportModel(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "report")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "report")
 	forbiddenTokens := []string{
 		"ReportExporter",
 		"ExportFormat",
@@ -292,7 +319,7 @@ func TestEvaluationInterpretationDomainStayRuleOnly(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "interpretation")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
 	forbiddenTokens := []string{
 		"RegisterStrategy",
 		"GetStrategy(",

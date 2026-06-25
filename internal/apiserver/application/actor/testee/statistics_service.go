@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )

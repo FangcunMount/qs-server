@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
 
 type registryReportBuilderStub struct {

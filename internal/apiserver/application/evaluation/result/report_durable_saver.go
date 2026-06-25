@@ -8,7 +8,7 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 

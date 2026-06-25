@@ -19,7 +19,7 @@ import (
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"

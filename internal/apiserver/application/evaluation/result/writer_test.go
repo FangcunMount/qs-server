@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"

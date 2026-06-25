@@ -20,7 +20,7 @@ func TestInterpretEnginePortOwnsExecutionDTOs(t *testing.T) {
 	}
 	for _, imported := range parsed.Imports {
 		importPath := strings.Trim(imported.Path.Value, `"`)
-		if strings.Contains(importPath, "/domain/evaluation/interpretation") {
+		if strings.Contains(importPath, "/domain/interpretation") {
 			t.Fatalf("port/interpretengine imports %s; execution DTOs must be port-owned", importPath)
 		}
 	}

@@ -385,7 +385,7 @@ func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"internal/apiserver/domain/evaluation/assessment",
-		"internal/apiserver/domain/evaluation/report",
+		"internal/apiserver/domain/report",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {

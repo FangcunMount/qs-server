@@ -10,7 +10,7 @@ package event
 //   - answersheet.EventType*    → internal/apiserver/domain/survey/answersheet/events.go
 //   - scale.EventType*          → internal/apiserver/domain/scale/events.go
 //   - assessment.EventType*     → internal/apiserver/domain/evaluation/assessment/events.go
-//   - report.EventType*         → internal/apiserver/domain/evaluation/report/events.go
+//   - report.EventType*         → internal/apiserver/domain/report/events.go
 //
 // 事件格式规范:
 //   - 事件类型: {aggregate}.{action}，如 "questionnaire.published"

@@ -64,7 +64,7 @@ func TestEvaluationGRPCTransportDoesNotHoldEvaluationDomainRepository(t *testing
 
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "evaluation application service",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report":     "evaluation application service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/report":     "evaluation application service",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter":                 "evaluation application wait service",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access":     "evaluation application access query service",
 	}

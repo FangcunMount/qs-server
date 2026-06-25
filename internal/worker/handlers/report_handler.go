@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"strings"
 
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 

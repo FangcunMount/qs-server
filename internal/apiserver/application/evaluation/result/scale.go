@@ -5,7 +5,7 @@ import (
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
