@@ -484,9 +484,9 @@ func TestOutboxRelayFailureReenqueuesCorrectReadyBucket(t *testing.T) {
 		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
 	}
 	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
-		Name:      "test-relay",
-		Store:     store,
-		Publisher: &fakePublisher{failAt: map[string]error{eventcatalog.AssessmentSubmitted: errors.New("publish failed")}},
+		Name:       "test-relay",
+		Store:      store,
+		Publisher:  &fakePublisher{failAt: map[string]error{eventcatalog.AssessmentSubmitted: errors.New("publish failed")}},
 		ReadyIndex: ready,
 	})
 

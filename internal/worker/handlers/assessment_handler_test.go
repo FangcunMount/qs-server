@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"testing"
 	"time"
+
+	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
 func TestHandleAssessmentSubmittedRejectsNegativeAssessmentID(t *testing.T) {
@@ -16,6 +18,41 @@ func TestHandleAssessmentSubmittedRejectsNegativeAssessmentID(t *testing.T) {
 	if err == nil {
 		t.Fatal("expected negative assessment id to be rejected")
 	}
+}
+
+func TestHandleAssessmentSubmittedAcksWhenEvaluationAlreadyProcessed(t *testing.T) {
+	client := &assessmentEvaluateClient{
+		resp: &pb.EvaluateAssessmentResponse{
+			Success: false,
+			Status:  "already_interpreted",
+			Message: "assessment already processed",
+		},
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentSubmitted(deps)
+
+	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
+	if err != nil {
+		t.Fatalf("expected duplicate evaluation to ack without error, got %v", err)
+	}
+	if client.evaluateCalls != 1 {
+		t.Fatalf("evaluate calls = %d, want 1", client.evaluateCalls)
+	}
+}
+
+type assessmentEvaluateClient struct {
+	fakeWorkerInternalClient
+	resp          *pb.EvaluateAssessmentResponse
+	err           error
+	evaluateCalls int
+}
+
+func (c *assessmentEvaluateClient) EvaluateAssessment(
+	_ context.Context,
+	_ uint64,
+) (*pb.EvaluateAssessmentResponse, error) {
+	c.evaluateCalls++
+	return c.resp, c.err
 }
 
 func TestHandleAssessmentFailedRejectsNegativeAssessmentID(t *testing.T) {

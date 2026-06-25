@@ -3,6 +3,7 @@ package eventing
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -24,11 +25,14 @@ func (f *fakeCollector) ClearEvents() {
 }
 
 type fakePublisher struct {
+	mu        sync.Mutex
 	published []string
 	failAt    map[string]error
 }
 
 func (f *fakePublisher) Publish(_ context.Context, evt event.DomainEvent) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	f.published = append(f.published, evt.EventType())
 	if err, ok := f.failAt[evt.EventType()]; ok {
 		return err

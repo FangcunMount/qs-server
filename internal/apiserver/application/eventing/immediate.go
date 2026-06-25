@@ -20,27 +20,27 @@ var immediateDispatchEventTypes = map[string]struct{}{
 
 // ImmediateDispatcher best-effort publishes staged outbox events right after commit.
 type ImmediateDispatcher struct {
-	name       string
-	store      OutboxStore
-	reader     outboxport.ImmediatePublishReader
-	publisher  event.EventPublisher
-	observer   eventobservability.Observer
-	enabled    bool
-	timeout    time.Duration
-	hooks      []OutboxBeforePublishHook
-	readyIndex     ReadyIndex
-	readyIndexer   *PostCommitReadyIndexer
+	name         string
+	store        OutboxStore
+	reader       outboxport.ImmediatePublishReader
+	publisher    event.EventPublisher
+	observer     eventobservability.Observer
+	enabled      bool
+	timeout      time.Duration
+	hooks        []OutboxBeforePublishHook
+	readyIndex   ReadyIndex
+	readyIndexer *PostCommitReadyIndexer
 }
 
 type ImmediateDispatcherOptions struct {
-	Name        string
-	Store       OutboxStore
-	Publisher   event.EventPublisher
-	Observer    eventobservability.Observer
-	Enabled     bool
-	Timeout     time.Duration
-	Hooks       []OutboxBeforePublishHook
-	ReadyIndex  ReadyIndex
+	Name       string
+	Store      OutboxStore
+	Publisher  event.EventPublisher
+	Observer   eventobservability.Observer
+	Enabled    bool
+	Timeout    time.Duration
+	Hooks      []OutboxBeforePublishHook
+	ReadyIndex ReadyIndex
 }
 
 func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatcher {
