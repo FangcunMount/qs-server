@@ -1,37 +1,27 @@
-package scale
+package evaluation
 
 import (
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
 	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-type InputAssembler interface {
-	FromSnapshot(snapshot *evaluationinput.InputSnapshot) scaleinterpretation.ScaleInterpretationInput
-}
-
-type DefaultInputAssembler struct{}
-
-func (DefaultInputAssembler) FromSnapshot(snapshot *evaluationinput.InputSnapshot) scaleinterpretation.ScaleInterpretationInput {
-	if snapshot == nil {
-		return scaleinterpretation.ScaleInterpretationInput{}
-	}
-	scaleSnapshot, _ := evaluationinput.ScalePayload(snapshot)
+func assembleScaleInterpretationInput(input ScaleEvaluateInput) scaleinterpretation.ScaleInterpretationInput {
 	return scaleinterpretation.ScaleInterpretationInput{
-		Scale:         modelFromSnapshot(scaleSnapshot),
-		AnswerSheet:   answerSheetFromSnapshot(snapshot.AnswerSheet),
-		Questionnaire: questionnaireFromSnapshot(snapshot.Questionnaire),
+		Scale:         scaleModelFromSnapshot(input.Scale),
+		AnswerSheet:   scaleAnswerSheetFromSnapshot(input.AnswerSheet),
+		Questionnaire: scaleQuestionnaireFromSnapshot(input.Questionnaire),
 	}
 }
 
-func modelFromSnapshot(snapshot *evaluationinput.ScaleSnapshot) scaleinterpretation.ScaleInterpretationModel {
+func scaleModelFromSnapshot(snapshot *rulesetscale.ScaleSnapshot) scaleinterpretation.ScaleInterpretationModel {
 	if snapshot == nil {
 		return scaleinterpretation.ScaleInterpretationModel{}
 	}
 	factors := make([]domainScale.FactorSnapshot, 0, len(snapshot.Factors))
 	for _, factor := range snapshot.Factors {
-		factors = append(factors, factorFromSnapshot(factor))
+		factors = append(factors, scaleFactorFromSnapshot(factor))
 	}
 	return scaleinterpretation.ScaleInterpretationModel{
 		Code:                 snapshot.Code,
@@ -44,7 +34,7 @@ func modelFromSnapshot(snapshot *evaluationinput.ScaleSnapshot) scaleinterpretat
 	}
 }
 
-func factorFromSnapshot(snapshot evaluationinput.FactorSnapshot) domainScale.FactorSnapshot {
+func scaleFactorFromSnapshot(snapshot rulesetscale.FactorSnapshot) domainScale.FactorSnapshot {
 	questionCodes := make([]meta.Code, 0, len(snapshot.QuestionCodes))
 	for _, code := range snapshot.QuestionCodes {
 		questionCodes = append(questionCodes, meta.NewCode(code))
@@ -70,7 +60,7 @@ func factorFromSnapshot(snapshot evaluationinput.FactorSnapshot) domainScale.Fac
 	}
 }
 
-func answerSheetFromSnapshot(snapshot *evaluationinput.AnswerSheetSnapshot) *scaleinterpretation.ScaleAnswerSheetSnapshot {
+func scaleAnswerSheetFromSnapshot(snapshot *AnswerSheet) *scaleinterpretation.ScaleAnswerSheetSnapshot {
 	if snapshot == nil {
 		return nil
 	}
@@ -83,14 +73,13 @@ func answerSheetFromSnapshot(snapshot *evaluationinput.AnswerSheetSnapshot) *sca
 		})
 	}
 	return &scaleinterpretation.ScaleAnswerSheetSnapshot{
-		ID:                   snapshot.ID,
 		QuestionnaireCode:    snapshot.QuestionnaireCode,
 		QuestionnaireVersion: snapshot.QuestionnaireVersion,
 		Answers:              answers,
 	}
 }
 
-func questionnaireFromSnapshot(snapshot *evaluationinput.QuestionnaireSnapshot) *scaleinterpretation.ScaleQuestionnaireSnapshot {
+func scaleQuestionnaireFromSnapshot(snapshot *Questionnaire) *scaleinterpretation.ScaleQuestionnaireSnapshot {
 	if snapshot == nil {
 		return nil
 	}

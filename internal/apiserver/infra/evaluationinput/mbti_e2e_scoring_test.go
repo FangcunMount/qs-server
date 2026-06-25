@@ -3,7 +3,7 @@ package evaluationinput
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/mbti"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -23,7 +23,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := mbti.NewScorer().Score(model, sheet)
+		got, err := evaluationdomain.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -56,7 +56,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := mbti.NewScorer().Score(model, sheet)
+		got, err := evaluationdomain.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -115,6 +115,25 @@ func mbtiLikertAnswerSheet(model *port.MBTIModelSnapshot, value string) *port.An
 	return &port.AnswerSheetSnapshot{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
+		Answers:              answers,
+	}
+}
+
+func mbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationdomain.AnswerSheet {
+	if sheet == nil {
+		return nil
+	}
+	answers := make([]evaluationdomain.Answer, 0, len(sheet.Answers))
+	for _, answer := range sheet.Answers {
+		answers = append(answers, evaluationdomain.Answer{
+			QuestionCode: answer.QuestionCode,
+			Score:        answer.Score,
+			Value:        answer.Value,
+		})
+	}
+	return &evaluationdomain.AnswerSheet{
+		QuestionnaireCode:    sheet.QuestionnaireCode,
+		QuestionnaireVersion: sheet.QuestionnaireVersion,
 		Answers:              answers,
 	}
 }

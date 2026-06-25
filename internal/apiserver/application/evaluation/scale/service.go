@@ -3,8 +3,8 @@ package scale
 import (
 	"context"
 
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -18,33 +18,27 @@ type Service interface {
 
 type scaleInterpretationService struct {
 	validator InputValidator
-	assembler InputAssembler
-	evaluator *scaleinterpretation.Evaluator
+	handler   *evaluationdomain.ScaleHandler
 	mapper    ResultMapper
 }
 
 func NewService(
 	validator InputValidator,
-	assembler InputAssembler,
-	evaluator *scaleinterpretation.Evaluator,
+	handler *evaluationdomain.ScaleHandler,
 	mapper ResultMapper,
 ) Service {
 	if validator == nil {
 		validator = DefaultInputValidator{}
 	}
-	if assembler == nil {
-		assembler = DefaultInputAssembler{}
-	}
-	if evaluator == nil {
-		evaluator = scaleinterpretation.NewDefaultEvaluator()
+	if handler == nil {
+		handler = evaluationdomain.NewDefaultScaleHandler()
 	}
 	if mapper == nil {
 		mapper = DefaultResultMapper{}
 	}
 	return &scaleInterpretationService{
 		validator: validator,
-		assembler: assembler,
-		evaluator: evaluator,
+		handler:   handler,
 		mapper:    mapper,
 	}
 }
@@ -61,8 +55,7 @@ func (s *scaleInterpretationService) Evaluate(
 	if err := s.validator.Validate(input); err != nil {
 		return nil, err
 	}
-	scaleInput := s.assembler.FromSnapshot(snapshot)
-	result, err := s.evaluator.Evaluate(ctx, scaleInput)
+	result, err := s.handler.Evaluate(ctx, scaleEvaluateInputFromSnapshot(snapshot))
 	if err != nil {
 		return nil, err
 	}

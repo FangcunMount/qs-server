@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainScale "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -123,21 +124,10 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 
 func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	validator := &stubValidator{}
-	assembler := &stubAssembler{
-		output: scaleinterpretation.ScaleInterpretationInput{
-			Scale: scaleinterpretation.ScaleInterpretationModel{
-				Factors: []domainScale.FactorSnapshot{{Code: domainScale.NewFactorCode("f1"), IsTotalScore: true, ScoringStrategy: domainScale.ScoringStrategySum}},
-			},
-			AnswerSheet: &scaleinterpretation.ScaleAnswerSheetSnapshot{
-				Answers: []scaleinterpretation.ScaleAnswerSnapshot{{QuestionCode: meta.NewCode("f1"), Score: 1}},
-			},
-		},
-	}
-	evaluator := scaleinterpretation.NewEvaluator(stubScoringRegistry{})
 	mapper := &stubMapper{
 		output: assessment.NewEvaluationResult(1, assessment.RiskLevelLow, "c", "s", nil),
 	}
-	service := NewService(validator, assembler, evaluator, mapper)
+	service := NewService(validator, evaluationdomain.NewScaleHandler(stubScoringRegistry{}), mapper)
 
 	a, _ := assessment.NewAssessment(
 		1,
@@ -149,13 +139,37 @@ func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	_ = a.Submit()
 	snapshot := &evaluationinput.InputSnapshot{
 		MedicalScale: &evaluationinput.ScaleSnapshot{
-			QuestionnaireCode: "Q-001",
-			Status:            "published",
+			Code:                 "S-001",
+			ScaleVersion:         "1.0.0",
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
+			Status:               "published",
 			Factors: []evaluationinput.FactorSnapshot{
-				{Code: "f1", IsTotalScore: true, ScoringStrategy: "sum"},
+				{
+					Code:            "f1",
+					IsTotalScore:    true,
+					ScoringStrategy: "sum",
+					QuestionCodes:   []string{"f1"},
+					InterpretRules: []evaluationinput.InterpretRuleSnapshot{
+						{Min: 0, Max: 10, RiskLevel: "low", Conclusion: "c", Suggestion: "s"},
+					},
+				},
 			},
 		},
-		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []evaluationinput.AnswerSnapshot{
+				{QuestionCode: "f1", Score: 1},
+			},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{
+			Code:    "Q-001",
+			Version: "1.0.0",
+			Questions: []evaluationinput.QuestionSnapshot{
+				{Code: "f1"},
+			},
+		},
 	}
 	result, err := service.Evaluate(context.Background(), a, snapshot)
 	if err != nil {
@@ -164,8 +178,8 @@ func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 	if result == nil {
 		t.Fatal("expected result, got nil")
 	}
-	if !validator.called || !assembler.called || !mapper.called {
-		t.Fatalf("expected validator/assembler/mapper to be called, got %v/%v/%v", validator.called, assembler.called, mapper.called)
+	if !validator.called || !mapper.called {
+		t.Fatalf("expected validator/mapper to be called, got %v/%v", validator.called, mapper.called)
 	}
 }
 
@@ -177,16 +191,6 @@ type stubValidator struct {
 func (s *stubValidator) Validate(input ScaleExecutionInput) error {
 	s.called = true
 	return s.err
-}
-
-type stubAssembler struct {
-	called bool
-	output scaleinterpretation.ScaleInterpretationInput
-}
-
-func (s *stubAssembler) FromSnapshot(_ *evaluationinput.InputSnapshot) scaleinterpretation.ScaleInterpretationInput {
-	s.called = true
-	return s.output
 }
 
 type stubMapper struct {

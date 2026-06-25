@@ -10,14 +10,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-type Executor struct {
-	scorer Scorer
-}
+type Executor struct{}
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
 func NewExecutor() *Executor {
-	return &Executor{scorer: NewScorer()}
+	return &Executor{}
 }
 
 func (e *Executor) Kind() assessment.EvaluationModelKind {
@@ -38,7 +36,7 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	if !ok {
 		return nil, fmt.Errorf("sbti model payload is required")
 	}
-	detail, err := e.scorer.Score(model, input.Input.AnswerSheet)
+	detail, err := scoreSBTI(model, input.Input.AnswerSheet)
 	if err != nil {
 		return nil, err
 	}

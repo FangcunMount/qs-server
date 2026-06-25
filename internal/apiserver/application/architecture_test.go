@@ -418,6 +418,10 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 	t.Parallel()
 
 	root := repoRoot(t)
+	const (
+		rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+		scaleDomainPrefix    = "github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
+	)
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                 "application error mapping/use cases",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                       "infrastructure adapters",
@@ -431,6 +435,12 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "report-local snapshots/value objects",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
+		if isEvaluationRootPackageGoFile(root, path) {
+			if strings.HasPrefix(importPath, rulesetPayloadPrefix) ||
+				strings.HasPrefix(importPath, scaleDomainPrefix) {
+				return
+			}
+		}
 		for forbidden, replacement := range forbiddenImports {
 			if strings.HasPrefix(importPath, forbidden) {
 				rel := filepath.ToSlash(mustRel(t, root, path))
@@ -441,6 +451,15 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 			}
 		}
 	})
+}
+
+func isEvaluationRootPackageGoFile(root, path string) bool {
+	evaluationRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
+	rel, err := filepath.Rel(evaluationRoot, path)
+	if err != nil || strings.Contains(rel, string(os.PathSeparator)) {
+		return false
+	}
+	return strings.HasSuffix(path, ".go")
 }
 
 func scanGoImports(t *testing.T, root string, visit func(path, importPath string)) {

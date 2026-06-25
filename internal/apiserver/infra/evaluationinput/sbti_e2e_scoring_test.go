@@ -3,7 +3,7 @@ package evaluationinput
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/sbti"
+	evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -19,7 +19,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		got, err := sbti.NewScorer().Score(model, sheet)
+		got, err := evaluationdomain.ScoreSBTI(model, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -38,7 +38,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		got, err := sbti.NewScorer().Score(&modelCopy, sheet)
+		got, err := evaluationdomain.ScoreSBTI(&modelCopy, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -53,7 +53,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := sbti.NewScorer().Score(model, sheet)
+		got, err := evaluationdomain.ScoreSBTI(model, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -98,6 +98,25 @@ func sbtiAlternatingAnswerSheet(model *port.SBTIModelSnapshot) *port.AnswerSheet
 	return &port.AnswerSheetSnapshot{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
+		Answers:              answers,
+	}
+}
+
+func sbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationdomain.AnswerSheet {
+	if sheet == nil {
+		return nil
+	}
+	answers := make([]evaluationdomain.Answer, 0, len(sheet.Answers))
+	for _, answer := range sheet.Answers {
+		answers = append(answers, evaluationdomain.Answer{
+			QuestionCode: answer.QuestionCode,
+			Score:        answer.Score,
+			Value:        answer.Value,
+		})
+	}
+	return &evaluationdomain.AnswerSheet{
+		QuestionnaireCode:    sheet.QuestionnaireCode,
+		QuestionnaireVersion: sheet.QuestionnaireVersion,
 		Answers:              answers,
 	}
 }

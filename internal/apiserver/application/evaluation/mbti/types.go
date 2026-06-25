@@ -1,24 +1,6 @@
 package mbti
 
-import port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+import evaluationdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 
-type DimensionResult struct {
-	Code       string  `json:"code"`
-	Name       string  `json:"name"`
-	LeftPole   string  `json:"left_pole"`
-	RightPole  string  `json:"right_pole"`
-	RawScore   float64 `json:"raw_score"`
-	Preference string  `json:"preference"`
-	Strength   float64 `json:"strength"`
-}
-
-type ResultDetail struct {
-	TypeCode     string                       `json:"type_code"`
-	TypeName     string                       `json:"type_name"`
-	OneLiner     string                       `json:"one_liner"`
-	MatchPercent float64                      `json:"match_percent"`
-	ImageURL     string                       `json:"image_url"`
-	Dimensions   []DimensionResult            `json:"dimensions"`
-	Profile      port.MBTITypeProfileSnapshot `json:"profile"`
-	Source       port.MBTISourceSnapshot      `json:"source"`
-}
+type DimensionResult = evaluationdomain.MBTIDimensionResult
+type ResultDetail = evaluationdomain.MBTIResultDetail
