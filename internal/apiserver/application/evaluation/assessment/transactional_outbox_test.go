@@ -79,6 +79,7 @@ func TestSaveAssessmentAndStageEventsBuildsAdditionalEventsAfterPersistedID(t *t
 				),
 			}
 		},
+		nil,
 	)
 	if err != nil {
 		t.Fatalf("saveAssessmentAndStageEvents() error = %v", err)

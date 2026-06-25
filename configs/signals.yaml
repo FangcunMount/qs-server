@@ -1,0 +1,42 @@
+# ============================================================================
+# 一次性唤醒信令配置（ephemeral_signal）
+# ============================================================================
+# 这些信令不走 Outbox/NSQ，仅用于在线唤醒、本地缓存失效与预热。
+# 丢失可接受：订阅方可通过 TTL、查询或下次变更兜底。
+# ============================================================================
+
+version: "1.0"
+
+delivery_semantics:
+  durable_outbox: "可靠业务事件，Outbox + NSQ"
+  best_effort_mq: "尽力投递领域事件，direct publish，可丢"
+  ephemeral_signal: "Redis Pub/Sub 一次性唤醒，非业务事实"
+
+signals:
+  report_status_changed:
+    delivery: ephemeral_signal
+    transport: redis_pubsub
+    description: "报告状态变更唤醒（collection-server wait-report）"
+    publisher: apiserver
+    subscribers:
+      - collection-server
+
+  questionnaire_cache_changed:
+    delivery: ephemeral_signal
+    transport: redis_pubsub
+    description: "问卷缓存失效/预热唤醒"
+    publisher: apiserver
+    subscribers:
+      - apiserver
+      - worker
+      - collection-server
+
+  scale_cache_changed:
+    delivery: ephemeral_signal
+    transport: redis_pubsub
+    description: "量表缓存失效/预热唤醒"
+    publisher: apiserver
+    subscribers:
+      - apiserver
+      - worker
+      - collection-server

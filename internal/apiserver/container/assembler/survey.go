@@ -15,8 +15,10 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	cacheInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	ruleengineInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -52,6 +54,8 @@ type SurveyModuleDeps struct {
 	AnswerSheetRepo      AnswerSheetStore
 	AnswerSheetReader    surveyreadmodel.AnswerSheetReader
 	OutboxRelayBatchSize int
+	CacheSignalNotifier  quesApp.CacheSignalNotifier
+	OpsHandle            *cacheplane.Handle
 }
 
 type AnswerSheetStore interface {
@@ -78,6 +82,7 @@ type AnswerSheetSubModule struct {
 	ScoringService             asApp.AnswerSheetScoringService // 新增：计分服务
 	SubmittedEventRelay        asApp.SubmittedEventRelay
 	SubmittedEventStatusReader appEventing.NamedOutboxStatusReader
+	OutboxReadyIndex           *outboxready.Index
 }
 
 // NewSurveyModule 创建 Survey 模块。
@@ -102,12 +107,22 @@ func NewSurveyModule(deps SurveyModuleDeps) (*SurveyModule, error) {
 		normalized.ScaleSyncer,
 		normalized.QuestionnaireRepo,
 		normalized.QuestionnaireReader,
+		normalized.CacheSignalNotifier,
 	); err != nil {
 		return nil, err
 	}
 
 	// 初始化答卷子模块
-	if err := module.initAnswerSheetSubModule(normalized.MongoDB, normalized.RankRedisClient, normalized.RankCacheBuilder, normalized.AnswerSheetRepo, normalized.AnswerSheetReader, normalized.QuestionnaireRepo, normalized.OutboxRelayBatchSize); err != nil {
+	if err := module.initAnswerSheetSubModule(
+		normalized.MongoDB,
+		normalized.RankRedisClient,
+		normalized.RankCacheBuilder,
+		normalized.AnswerSheetRepo,
+		normalized.AnswerSheetReader,
+		normalized.QuestionnaireRepo,
+		normalized.OutboxRelayBatchSize,
+		normalized.OpsHandle,
+	); err != nil {
 		return nil, err
 	}
 
@@ -128,7 +143,7 @@ func normalizeSurveyModuleDeps(deps SurveyModuleDeps) (SurveyModuleDeps, error) 
 }
 
 // initQuestionnaireSubModule 初始化问卷子模块
-func (m *SurveyModule) initQuestionnaireSubModule(identitySvc *iam.IdentityService, hotset cachetarget.HotsetRecorder, scaleSyncer quesApp.ScaleQuestionnaireBindingSyncer, repo questionnaire.Repository, reader surveyreadmodel.QuestionnaireReader) error {
+func (m *SurveyModule) initQuestionnaireSubModule(identitySvc *iam.IdentityService, hotset cachetarget.HotsetRecorder, scaleSyncer quesApp.ScaleQuestionnaireBindingSyncer, repo questionnaire.Repository, reader surveyreadmodel.QuestionnaireReader, cacheSignalNotifier quesApp.CacheSignalNotifier) error {
 	sub := m.Questionnaire
 
 	// 初始化领域服务
@@ -136,7 +151,14 @@ func (m *SurveyModule) initQuestionnaireSubModule(identitySvc *iam.IdentityServi
 	lifecycle := questionnaire.NewLifecycle()
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
-	sub.LifecycleService = quesApp.NewLifecycleService(repo, scaleSyncer, validator, lifecycle, m.eventPublisher)
+	sub.LifecycleService = quesApp.NewLifecycleService(
+		repo,
+		scaleSyncer,
+		validator,
+		lifecycle,
+		m.eventPublisher,
+		quesApp.WithCacheSignalNotifier(cacheSignalNotifier),
+	)
 	sub.ContentService = quesApp.NewContentService(repo)
 	sub.QueryService = quesApp.NewQueryService(repo, identitySvc, hotset, reader)
 
@@ -144,7 +166,7 @@ func (m *SurveyModule) initQuestionnaireSubModule(identitySvc *iam.IdentityServi
 }
 
 // initAnswerSheetSubModule 初始化答卷子模块
-func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int) error {
+func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, opsHandle *cacheplane.Handle) error {
 	sub := m.AnswerSheet
 
 	// 创建答案校验引擎 adapter
@@ -155,7 +177,19 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 
 	// 初始化 service 层 - 按行为者组织的服务（使用模块统一的事件发布器）
 	mongoTxRunner := newMongoTransactionRunner(mongoDB)
-	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo)
+	var opsClient redis.UniversalClient
+	if opsHandle != nil {
+		opsClient = opsHandle.Client
+	}
+	readyIndex := outboxready.NewIndex(opsClient)
+	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
+		Name:       "mongo-domain-events",
+		Store:      repo,
+		Publisher:  m.eventPublisher,
+		Enabled:    true,
+		ReadyIndex: readyIndex,
+	})
+	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo, immediate)
 	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)
 	sub.ManagementService = asApp.NewManagementService(repo, reader)
 	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
@@ -166,6 +200,7 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 		Publisher:               m.eventPublisher,
 		BatchSize:               outboxRelayBatchSize,
 		RequireDurablePublisher: true,
+		ReadyIndex:              readyIndex,
 		BeforePublishHooks: []appEventing.OutboxBeforePublishHook{
 			scaleApp.NewScaleHotRankProjectionHook(hotRankProjection),
 		},
@@ -174,6 +209,7 @@ func (m *SurveyModule) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRed
 		Name:   "mongo-domain-events",
 		Reader: repo,
 	}
+	sub.OutboxReadyIndex = readyIndex
 
 	return nil
 }

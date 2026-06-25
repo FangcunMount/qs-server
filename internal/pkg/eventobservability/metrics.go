@@ -58,6 +58,20 @@ var (
 		},
 		[]string{"store", "outcome"},
 	)
+	eventOutboxBacklogByType = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "qs_event_outbox_backlog_by_type",
+			Help: "Current unfinished event outbox backlog by store, event type and status.",
+		},
+		[]string{"store", "event_type", "status"},
+	)
+	eventOutboxOldestAgeByType = promauto.NewGaugeVec(
+		prometheus.GaugeOpts{
+			Name: "qs_event_outbox_oldest_age_by_type_seconds",
+			Help: "Age in seconds of the oldest unfinished event outbox row by store, event type and status.",
+		},
+		[]string{"store", "event_type", "status"},
+	)
 )
 
 type PrometheusObserver struct{}
@@ -97,4 +111,13 @@ func (PrometheusObserver) ObserveOutboxStatus(_ context.Context, evt OutboxStatu
 
 func (PrometheusObserver) ObserveOutboxStatusScrape(_ context.Context, evt OutboxStatusScrapeEvent) {
 	eventOutboxStatusScrapeTotal.WithLabelValues(evt.Store, evt.Outcome.String()).Inc()
+}
+
+func (PrometheusObserver) ObserveOutboxEventTypeStatus(_ context.Context, evt OutboxEventTypeStatusEvent) {
+	eventOutboxBacklogByType.WithLabelValues(evt.Store, evt.EventType, evt.Status).Set(float64(evt.Count))
+	age := evt.OldestAgeSeconds
+	if age < 0 {
+		age = 0
+	}
+	eventOutboxOldestAgeByType.WithLabelValues(evt.Store, evt.EventType, evt.Status).Set(age)
 }

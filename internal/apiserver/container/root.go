@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -36,6 +37,7 @@ type Container struct {
 	planEntryURL               string
 	statisticsRepairWindowDays int
 	reportStatusConfig         reportstatus.Config
+	cacheSignalNotifier        *cachesignal.Notifier
 
 	// 消息队列（可选）
 	mqPublisher messaging.Publisher
@@ -148,6 +150,10 @@ func (c *Container) Initialize() error {
 	// 初始化事件发布器（所有模块共享）
 	c.initEventPublisher()
 	c.printf("📡 Event publisher initialized (mode=%s)\n", c.publisherMode)
+
+	if err := c.initCacheSignalNotifier(); err != nil {
+		return fmt.Errorf("failed to initialize cache signal notifier: %w", err)
+	}
 
 	// 初始化 IAM 模块（优先，因为其他模块可能依赖）
 	// 注意：这里需要传入 IAMOptions，在实际调用时需要从外部传入

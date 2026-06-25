@@ -31,6 +31,8 @@ func (c *Container) buildSurveyModuleDeps() assembler.SurveyModuleDeps {
 		TopicResolver:        c.eventCatalog,
 		ScaleSyncer:          scaleApp.NewQuestionnaireBindingSyncer(nil),
 		OutboxRelayBatchSize: c.outboxRelay.MongoBatchSize,
+		CacheSignalNotifier:  c.CacheSignalNotifier(),
+		OpsHandle:            c.CacheHandle(cacheplane.FamilyOps),
 	}
 	if infra != nil {
 		deps.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.scaleRepo)

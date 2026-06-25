@@ -16,6 +16,11 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
+// CacheSignalNotifier 缓存失效信令发布端口（best-effort，非领域事件）。
+type CacheSignalNotifier interface {
+	NotifyScaleCacheChanged(ctx context.Context, code, action string)
+}
+
 // lifecycleService 量表生命周期服务实现
 // 行为者：量表设计者/管理员
 type lifecycleService struct {
@@ -26,6 +31,7 @@ type lifecycleService struct {
 	baseInfo               domscale.BaseInfo
 	eventPublisher         event.EventPublisher
 	listCache              scalelistcache.PublishedListCache
+	cacheSignalNotifier    CacheSignalNotifier
 }
 
 type lifecycleRepository interface {
@@ -53,6 +59,13 @@ type ServiceOption func(*lifecycleService)
 func WithQuestionnairePublisher(publisher QuestionnairePublisher) ServiceOption {
 	return func(s *lifecycleService) {
 		s.questionnairePublisher = publisher
+	}
+}
+
+// WithCacheSignalNotifier injects the best-effort cache invalidation notifier.
+func WithCacheSignalNotifier(notifier CacheSignalNotifier) ServiceOption {
+	return func(s *lifecycleService) {
+		s.cacheSignalNotifier = notifier
 	}
 }
 
@@ -111,6 +124,7 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*shared.Sc
 
 	s.publishEvents(ctx, m)
 	s.refreshListCache(ctx)
+	s.notifyCacheChanged(ctx, code, "published")
 
 	return shared.ToScaleResult(m), nil
 }
@@ -212,4 +226,11 @@ func (s *lifecycleService) executeLifecycleOperation(
 
 func (s *lifecycleService) publishEvents(ctx context.Context, m *domscale.MedicalScale) {
 	eventing.PublishCollectedEvents(ctx, s.eventPublisher, m, nil, nil)
+}
+
+func (s *lifecycleService) notifyCacheChanged(ctx context.Context, code, action string) {
+	if s == nil || s.cacheSignalNotifier == nil || code == "" {
+		return
+	}
+	s.cacheSignalNotifier.NotifyScaleCacheChanged(ctx, code, action)
 }

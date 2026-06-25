@@ -77,7 +77,7 @@ func TestTransactionalSubmissionDurableStoreRequiresAnswerSheet(t *testing.T) {
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{}
 	stager := &durableStoreStagerStub{}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager)
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
 	_, existed, err := store.CreateDurably(t.Context(), nil, DurableSubmitMeta{})
 	if err == nil {
@@ -96,7 +96,7 @@ func TestTransactionalSubmissionDurableStoreIdempotencyHitDoesNotOpenTransaction
 	runner := &durableStoreRunnerStub{}
 	writer := &durableStoreWriterStub{existing: existing}
 	stager := &durableStoreStagerStub{}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager)
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
 	got, existed, err := store.CreateDurably(t.Context(), newDurableStoreTestSheet(t), DurableSubmitMeta{IdempotencyKey: "idem-1"})
 	if err != nil {
@@ -117,7 +117,7 @@ func TestTransactionalSubmissionDurableStoreStagesInTransactionContext(t *testin
 		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{"id": "1"})},
 	}
 	stager := &durableStoreStagerStub{}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager)
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
 	got, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{})
 	if err != nil {
@@ -142,7 +142,7 @@ func TestTransactionalSubmissionDurableStoreStageFailureDoesNotClearEvents(t *te
 		saveEvents: []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
 	}
 	stager := &durableStoreStagerStub{err: stageErr}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager)
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
 	_, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{})
 	if !errors.Is(err, stageErr) {
@@ -166,7 +166,7 @@ func TestTransactionalSubmissionDurableStoreFailureCanReturnCompletedIdempotentR
 		saveEvents:   []event.DomainEvent{event.New("survey.answersheet.submitted", "AnswerSheet", "1", map[string]string{})},
 	}
 	stager := &durableStoreStagerStub{err: stageErr}
-	store := NewTransactionalSubmissionDurableStore(runner, writer, stager)
+	store := NewTransactionalSubmissionDurableStore(runner, writer, stager, nil)
 
 	got, existed, err := store.CreateDurably(t.Context(), sheet, DurableSubmitMeta{IdempotencyKey: "idem-1"})
 	if err != nil {

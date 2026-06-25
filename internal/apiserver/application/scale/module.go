@@ -22,13 +22,21 @@ func NewLifecycleService(
 	questionnaireCatalog questionnairecatalog.Catalog,
 	eventPublisher event.EventPublisher,
 	listCache scalelistcache.PublishedListCache,
-	questionnairePublishers ...lifecycle.QuestionnairePublisher,
+	opts ...lifecycle.ServiceOption,
 ) ScaleLifecycleService {
-	var questionnairePublisher lifecycle.QuestionnairePublisher
-	if len(questionnairePublishers) > 0 {
-		questionnairePublisher = questionnairePublishers[0]
-	}
-	return lifecycle.NewService(repo, questionnaireCatalog, eventPublisher, listCache, lifecycle.WithQuestionnairePublisher(questionnairePublisher))
+	serviceOpts := make([]lifecycle.ServiceOption, 0, len(opts))
+	serviceOpts = append(serviceOpts, opts...)
+	return lifecycle.NewService(repo, questionnaireCatalog, eventPublisher, listCache, serviceOpts...)
+}
+
+// WithQuestionnairePublisher injects the questionnaire publisher used during scale publication.
+func WithQuestionnairePublisher(publisher lifecycle.QuestionnairePublisher) lifecycle.ServiceOption {
+	return lifecycle.WithQuestionnairePublisher(publisher)
+}
+
+// WithCacheSignalNotifier injects the best-effort cache invalidation notifier.
+func WithCacheSignalNotifier(notifier lifecycle.CacheSignalNotifier) lifecycle.ServiceOption {
+	return lifecycle.WithCacheSignalNotifier(notifier)
 }
 
 // QuestionnairePublisherFunc adapts a function to the scale lifecycle's

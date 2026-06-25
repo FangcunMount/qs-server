@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -31,6 +32,15 @@ type submissionService struct {
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 	listCache   assessmentListCache
+	immediate   *appEventing.ImmediateDispatcher
+}
+
+type SubmissionServiceOption func(*submissionService)
+
+func WithImmediateDispatcher(dispatcher *appEventing.ImmediateDispatcher) SubmissionServiceOption {
+	return func(s *submissionService) {
+		s.immediate = dispatcher
+	}
 }
 
 // NewSubmissionService 创建测评提交服务实例
@@ -41,8 +51,9 @@ func NewSubmissionService(
 	txRunner apptransaction.Runner,
 	eventStager EventStager,
 	listCache assessmentListCache,
+	opts ...SubmissionServiceOption,
 ) AssessmentSubmissionService {
-	return &submissionService{
+	s := &submissionService{
 		repo:        repo,
 		reader:      reader,
 		creator:     creator,
@@ -50,6 +61,12 @@ func NewSubmissionService(
 		eventStager: eventStager,
 		listCache:   listCache,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(s)
+		}
+	}
+	return s
 }
 
 // Create 创建测评
@@ -139,6 +156,7 @@ func (w assessmentCreatorWorkflow) Create(ctx context.Context, dto CreateAssessm
 		txRunner:    s.txRunner,
 		eventStager: s.eventStager,
 		cache:       s.listCache,
+		immediate:   s.immediate,
 	}
 	if err := finalizer.SaveAndStage(ctx, a, req, dto); err != nil {
 		l.Errorw("保存测评失败",
@@ -233,6 +251,7 @@ func (w assessmentSubmitWorkflow) Submit(ctx context.Context, assessmentID uint6
 		txRunner:    s.txRunner,
 		eventStager: s.eventStager,
 		cache:       s.listCache,
+		immediate:   s.immediate,
 	}
 	if err := finalizer.SaveAndStage(ctx, a); err != nil {
 		l.Errorw("保存测评失败",

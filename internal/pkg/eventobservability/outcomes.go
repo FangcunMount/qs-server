@@ -96,6 +96,14 @@ type OutboxStatusScrapeEvent struct {
 	Outcome OutboxStatusScrapeOutcome
 }
 
+type OutboxEventTypeStatusEvent struct {
+	Store            string
+	EventType        string
+	Status           string
+	Count            int64
+	OldestAgeSeconds float64
+}
+
 type Observer interface {
 	ObservePublish(context.Context, PublishEvent)
 	ObserveOutbox(context.Context, OutboxEvent)
@@ -114,6 +122,10 @@ type OutboxStatusScrapeObserver interface {
 	ObserveOutboxStatusScrape(context.Context, OutboxStatusScrapeEvent)
 }
 
+type OutboxEventTypeStatusObserver interface {
+	ObserveOutboxEventTypeStatus(context.Context, OutboxEventTypeStatusEvent)
+}
+
 type NopObserver struct{}
 
 func (NopObserver) ObservePublish(context.Context, PublishEvent)                 {}
@@ -123,6 +135,7 @@ func (NopObserver) ObserveConsumeDuration(context.Context, ConsumeDurationEvent)
 func (NopObserver) ObserveOutboxStatus(context.Context, OutboxStatusEvent)       {}
 func (NopObserver) ObserveOutboxStatusScrape(context.Context, OutboxStatusScrapeEvent) {
 }
+func (NopObserver) ObserveOutboxEventTypeStatus(context.Context, OutboxEventTypeStatusEvent) {}
 
 func NormalizeObserver(observer Observer) Observer {
 	if observer == nil {
@@ -166,4 +179,15 @@ func ObserveOutboxStatusScrape(ctx context.Context, observer Observer, evt Outbo
 		return
 	}
 	scrapeObserver.ObserveOutboxStatusScrape(ctx, evt)
+}
+
+func ObserveOutboxEventTypeStatus(ctx context.Context, observer Observer, evt OutboxEventTypeStatusEvent) {
+	if observer == nil {
+		return
+	}
+	typeObserver, ok := observer.(OutboxEventTypeStatusObserver)
+	if !ok {
+		return
+	}
+	typeObserver.ObserveOutboxEventTypeStatus(ctx, evt)
 }

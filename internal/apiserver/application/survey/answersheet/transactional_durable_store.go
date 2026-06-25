@@ -4,15 +4,18 @@ import (
 	"context"
 	"fmt"
 
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 type transactionalSubmissionDurableStore struct {
 	runner interface {
 		WithinTransaction(context.Context, func(context.Context) error) error
 	}
-	writer SubmissionDurableWriter
-	stager EventStager
+	writer    SubmissionDurableWriter
+	stager    EventStager
+	immediate *appEventing.ImmediateDispatcher
 }
 
 func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, sheet *domainAnswerSheet.AnswerSheet, meta DurableSubmitMeta) (*domainAnswerSheet.AnswerSheet, bool, error) {
@@ -34,11 +37,13 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 		}
 	}
 
+	var stagedEvents []event.DomainEvent
 	if err := s.runner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		events, err := s.writer.SaveSubmittedAnswerSheet(txCtx, sheet, meta)
 		if err != nil {
 			return err
 		}
+		stagedEvents = events
 		if len(events) == 0 {
 			return nil
 		}
@@ -52,6 +57,9 @@ func (s transactionalSubmissionDurableStore) CreateDurably(ctx context.Context, 
 			}
 		}
 		return nil, false, err
+	}
+	if s.immediate != nil && len(stagedEvents) > 0 {
+		s.immediate.TryDispatchAfterCommit(ctx, stagedEvents)
 	}
 
 	sheet.ClearEvents()

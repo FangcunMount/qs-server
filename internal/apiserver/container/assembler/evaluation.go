@@ -27,9 +27,11 @@ import (
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -37,6 +39,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -81,6 +84,9 @@ type EvaluationModule struct {
 
 	// ReportStatusReporter best-effort 报告等待状态写入与 signaling。
 	ReportStatusReporter *reportstatus.Reporter
+
+	OutboxReadyIndex              *outboxready.Index
+	AssessmentOutboxPendingLister outboxport.PendingEventRefLister
 }
 
 // EvaluationModuleDeps 定义 Evaluation 模块的显式构造依赖。
@@ -119,8 +125,10 @@ func NewEvaluationModule(deps EvaluationModuleDeps) (*EvaluationModule, error) {
 	}
 
 	module := &EvaluationModule{
-		AssessmentOutboxRelay:        infra.assessmentOutboxRelay,
-		AssessmentOutboxStatusReader: infra.assessmentOutboxStatusReader,
+		AssessmentOutboxRelay:         infra.assessmentOutboxRelay,
+		AssessmentOutboxStatusReader:  infra.assessmentOutboxStatusReader,
+		OutboxReadyIndex:              infra.readyIndex,
+		AssessmentOutboxPendingLister: infra.assessmentOutboxStore,
 	}
 	if err := module.wireEvaluationEngine(normalized, infra); err != nil {
 		return nil, err
@@ -143,6 +151,9 @@ type evaluationInfra struct {
 	waiterRegistry               *waiter.WaiterRegistry
 	assessmentOutboxRelay        appEventing.OutboxRelay
 	assessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
+	assessmentImmediate          *appEventing.ImmediateDispatcher
+	readyIndex                   *outboxready.Index
+	readyIndexer                 *appEventing.PostCommitReadyIndexer
 }
 
 func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, error) {
@@ -168,19 +179,35 @@ func newEvaluationInfra(normalized EvaluationModuleDeps) (*evaluationInfra, erro
 	infra.reportReader = mongoEval.NewReportReadModel(normalized.MongoDB, mongoOptions)
 	infra.txRunner = newMySQLTransactionRunner(normalized.MySQLDB)
 	mongoTxRunner := newMongoTransactionRunner(normalized.MongoDB)
-	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver)
-	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(normalized.MongoDB, normalized.TopicResolver)
+	priorityOpts := []mongoEventOutbox.StoreOption{mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil))}
+	mysqlPriorityOpts := []mysqlEventOutbox.StoreOption{mysqlEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil))}
+	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlPriorityOpts...)
+	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(normalized.MongoDB, normalized.TopicResolver, priorityOpts...)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)
 	}
-	infra.reportDurableSaver = evaluationResult.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore)
+	var opsClient redis.UniversalClient
+	if normalized.OpsHandle != nil {
+		opsClient = normalized.OpsHandle.Client
+	}
+	infra.readyIndex = outboxready.NewIndex(opsClient)
+	infra.readyIndexer = appEventing.NewPostCommitReadyIndexer(infra.readyIndex)
+	infra.reportDurableSaver = evaluationResult.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore, infra.readyIndexer)
 	infra.assessmentOutboxStore = assessmentOutboxStore
+	infra.assessmentImmediate = appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
+		Name:       "assessment-mysql-outbox",
+		Store:      assessmentOutboxStore,
+		Publisher:  normalized.EventPublisher,
+		Enabled:    true,
+		ReadyIndex: infra.readyIndex,
+	})
 	infra.assessmentOutboxRelay = appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
 		Name:                    "assessment-mysql-outbox",
 		Store:                   assessmentOutboxStore,
 		Publisher:               normalized.EventPublisher,
 		BatchSize:               normalized.AssessmentOutboxRelayBatchSize,
 		RequireDurablePublisher: true,
+		ReadyIndex:              infra.readyIndex,
 	})
 	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
@@ -248,6 +275,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 			normalized.InputResolver,
 			resultWriter,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
+			execute.WithPostCommitReadyIndexer(infra.readyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
 			execute.WithReportStatusReporter(reportStatusReporter),
 		)
@@ -275,6 +303,7 @@ func (m *EvaluationModule) wireAssessmentApplications(
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			listCache,
+			assessmentApp.WithImmediateDispatcher(infra.assessmentImmediate),
 		)
 	} else {
 		m.SubmissionService = assessmentApp.NewSubmissionService(
@@ -284,6 +313,7 @@ func (m *EvaluationModule) wireAssessmentApplications(
 			infra.txRunner,
 			infra.assessmentOutboxStore,
 			nil,
+			assessmentApp.WithImmediateDispatcher(infra.assessmentImmediate),
 		)
 	}
 

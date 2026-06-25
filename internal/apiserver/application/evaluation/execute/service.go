@@ -8,6 +8,7 @@ import (
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -21,8 +22,9 @@ type service struct {
 	assessmentRepo assessment.Repository
 	inputResolver  evaluationinput.Resolver
 
-	txRunner    apptransaction.Runner
-	eventStager EventStager
+	txRunner     apptransaction.Runner
+	eventStager  EventStager
+	readyIndexer *appEventing.PostCommitReadyIndexer
 
 	evaluators   EvaluatorRegistry
 	resultWriter evaluationresult.Writer
@@ -36,6 +38,12 @@ type EventStager interface {
 
 // ServiceOption 服务选项
 type ServiceOption func(*service)
+
+func WithPostCommitReadyIndexer(indexer *appEventing.PostCommitReadyIndexer) ServiceOption {
+	return func(s *service) {
+		s.readyIndexer = indexer
+	}
+}
 
 // WithTransactionalOutbox 配置事务和事件暂存器
 func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventStager) ServiceOption {
@@ -234,5 +242,6 @@ func (s *service) failureFinalizer() evaluationFailureFinalizer {
 		txRunner:     s.txRunner,
 		eventStager:  s.eventStager,
 		reportStatus: s.reportStatus,
+		readyIndexer: s.readyIndexer,
 	}
 }

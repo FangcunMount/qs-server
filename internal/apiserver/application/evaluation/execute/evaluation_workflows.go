@@ -8,11 +8,13 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // loadedAssessment 加载的评估数据
@@ -50,6 +52,15 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 		"status", a.Status().String(),
 		"result", "success",
 	)
+
+	if a.Status().IsInterpreted() {
+		log.Infow("测评已解读，跳过重复评估",
+			"assessment_id", assessmentID,
+			"status", a.Status().String(),
+			"result", "duplicate_skipped",
+		)
+		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
+	}
 
 	if !a.Status().IsSubmitted() {
 		log.Warnw("测评状态不正确",
@@ -143,6 +154,7 @@ type evaluationFailureFinalizer struct {
 	txRunner     apptransaction.Runner
 	eventStager  EventStager
 	reportStatus *reportstatus.Reporter
+	readyIndexer *appEventing.PostCommitReadyIndexer
 }
 
 // MarkAsFailed 标记评估失败
@@ -182,6 +194,7 @@ func (f evaluationFailureFinalizer) SaveAssessmentWithEvents(ctx context.Context
 	if a == nil {
 		return nil
 	}
+	var stagedEvents []event.DomainEvent
 	err := f.txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := f.repo.Save(txCtx, a); err != nil {
 			return err
@@ -190,10 +203,14 @@ func (f evaluationFailureFinalizer) SaveAssessmentWithEvents(ctx context.Context
 		if len(eventsToStage) == 0 {
 			return nil
 		}
+		stagedEvents = eventsToStage
 		return f.eventStager.Stage(txCtx, eventsToStage...)
 	})
 	if err != nil {
 		return err
+	}
+	if f.readyIndexer != nil && len(stagedEvents) > 0 {
+		f.readyIndexer.EnqueueAfterCommit(ctx, stagedEvents, time.Now())
 	}
 	a.ClearEvents()
 	return nil

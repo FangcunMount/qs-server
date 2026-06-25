@@ -66,6 +66,9 @@ func (r *outboxStatusReporter) ReportOutboxStatus(ctx context.Context) {
 		return
 	}
 	reportOutboxStatusSnapshot(ctx, r.observer, storeName, snapshot)
+	if typeReader, ok := r.reader.(outboxport.EventTypeStatusReader); ok {
+		reportOutboxEventTypeStatus(ctx, r.observer, storeName, typeReader, now)
+	}
 }
 
 func reportOutboxStatusSnapshot(ctx context.Context, observer eventobservability.Observer, storeName string, snapshot outboxport.StatusSnapshot) {
@@ -84,4 +87,24 @@ func reportOutboxStatusSnapshot(ctx context.Context, observer eventobservability
 		Store:   storeName,
 		Outcome: eventobservability.OutboxStatusScrapeOutcomeSuccess,
 	})
+}
+
+func reportOutboxEventTypeStatus(ctx context.Context, observer eventobservability.Observer, storeName string, reader outboxport.EventTypeStatusReader, now time.Time) {
+	buckets, err := reader.OutboxStatusByEventType(ctx, now)
+	if err != nil {
+		return
+	}
+	for _, bucket := range buckets {
+		age := 0.0
+		if bucket.OldestCreatedAt != nil {
+			age = now.Sub(*bucket.OldestCreatedAt).Seconds()
+		}
+		eventobservability.ObserveOutboxEventTypeStatus(ctx, observer, eventobservability.OutboxEventTypeStatusEvent{
+			Store:            storeName,
+			EventType:        bucket.EventType,
+			Status:           bucket.Status,
+			Count:            bucket.Count,
+			OldestAgeSeconds: age,
+		})
+	}
 }

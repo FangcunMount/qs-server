@@ -79,6 +79,14 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			)
 			return fmt.Errorf("failed to evaluate assessment: %w", err)
 		}
+		if resp != nil && !resp.Success {
+			deps.Logger.Info("assessment evaluation skipped",
+				slog.Int64("assessment_id", data.AssessmentID),
+				slog.String("status", resp.Status),
+				slog.String("message", resp.Message),
+			)
+			return nil
+		}
 
 		deps.Logger.Debug("assessment evaluation completed",
 			slog.Int64("assessment_id", data.AssessmentID),

@@ -12,14 +12,30 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
+// CacheSignalNotifier 缓存失效信令发布端口（best-effort，非领域事件）。
+type CacheSignalNotifier interface {
+	NotifyQuestionnaireCacheChanged(ctx context.Context, code, version, action string)
+}
+
 // lifecycleService 问卷生命周期服务实现
 // 行为者：问卷设计者/管理员
 type lifecycleService struct {
-	repo           questionnaire.Repository
-	scaleSyncer    ScaleQuestionnaireBindingSyncer
-	validator      questionnaire.Validator
-	lifecycle      questionnaire.Lifecycle
-	eventPublisher event.EventPublisher
+	repo                questionnaire.Repository
+	scaleSyncer         ScaleQuestionnaireBindingSyncer
+	validator           questionnaire.Validator
+	lifecycle           questionnaire.Lifecycle
+	eventPublisher      event.EventPublisher
+	cacheSignalNotifier CacheSignalNotifier
+}
+
+// LifecycleServiceOption configures questionnaire lifecycle service collaborators.
+type LifecycleServiceOption func(*lifecycleService)
+
+// WithCacheSignalNotifier injects the best-effort cache invalidation notifier.
+func WithCacheSignalNotifier(notifier CacheSignalNotifier) LifecycleServiceOption {
+	return func(s *lifecycleService) {
+		s.cacheSignalNotifier = notifier
+	}
 }
 
 // NewLifecycleService 创建问卷生命周期服务
@@ -29,14 +45,21 @@ func NewLifecycleService(
 	validator questionnaire.Validator,
 	lifecycle questionnaire.Lifecycle,
 	eventPublisher event.EventPublisher,
+	opts ...LifecycleServiceOption,
 ) QuestionnaireLifecycleService {
-	return &lifecycleService{
+	s := &lifecycleService{
 		repo:           repo,
 		scaleSyncer:    scaleSyncer,
 		validator:      validator,
 		lifecycle:      lifecycle,
 		eventPublisher: eventPublisher,
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(s)
+		}
+	}
+	return s
 }
 
 // Create 创建问卷
@@ -130,6 +153,7 @@ func (s *lifecycleService) Publish(ctx context.Context, code string) (*Questionn
 	}
 
 	s.publishEvents(ctx, q)
+	s.notifyCacheChanged(ctx, q, "published")
 
 	s.logSuccess(ctx, "publish", code, startTime,
 		"version", q.GetVersion().String(),
@@ -253,6 +277,13 @@ func (s *lifecycleService) logSuccess(ctx context.Context, action string, code s
 // publishEvents 发布聚合根收集的领域事件
 func (s *lifecycleService) publishEvents(ctx context.Context, q *questionnaire.Questionnaire) {
 	eventing.PublishCollectedEvents(ctx, s.eventPublisher, q, nil, nil)
+}
+
+func (s *lifecycleService) notifyCacheChanged(ctx context.Context, q *questionnaire.Questionnaire, action string) {
+	if s == nil || s.cacheSignalNotifier == nil || q == nil {
+		return
+	}
+	s.cacheSignalNotifier.NotifyQuestionnaireCacheChanged(ctx, q.GetCode().String(), q.GetVersion().String(), action)
 }
 
 func (s *lifecycleService) syncScaleQuestionnaireVersion(ctx context.Context, questionnaireCode, version string) error {

@@ -211,7 +211,7 @@ func (w assessmentRetryWorkflow) Retry(ctx context.Context, orgID int64, assessm
 		"new_status", a.Status().String(),
 	)
 
-	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, nil); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, s.repo, s.txRunner, s.eventStager, a, nil, nil); err != nil {
 		l.Errorw("保存测评失败",
 			"assessment_id", assessmentID,
 			"action", "retry_assessment",
