@@ -25,6 +25,7 @@ import (
 
 const mongoIDChunkSize = 1000
 const mysqlInsertChunkSize = 1000
+const defaultMySQLDeleteBatchSize = 1000
 const progressBarWidth = 32
 
 var prog progressReporter
@@ -49,6 +50,7 @@ type config struct {
 	noProgress                bool
 	mysqlLockWaitTimeout      int
 	mysqlDeleteRetries        int
+	mysqlDeleteBatchSize      int
 }
 
 type namedCount struct {
@@ -74,6 +76,14 @@ type mysqlBackupItem struct {
 type mysqlDeleteItem struct {
 	name string
 	stmt string
+}
+
+type mysqlChunkedDeleteSpec struct {
+	name             string
+	createBatchTable string
+	clearBatchTable  string
+	fillBatchTable   string
+	deleteBatch      string
 }
 
 type testeePreview struct {
@@ -233,7 +243,7 @@ func main() {
 	}
 
 	prog.Phase("delete mysql rows")
-	mysqlDeleted, err := deleteMySQLRows(ctx, conn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries)
+	mysqlDeleted, err := deleteMySQLRows(ctx, conn, cfg.mysqlLockWaitTimeout, cfg.mysqlDeleteRetries, cfg.mysqlDeleteBatchSize)
 	if err != nil {
 		log.Fatalf("delete mysql rows: %v", err)
 	}
@@ -271,6 +281,7 @@ func parseFlags() config {
 	flag.BoolVar(&cfg.noProgress, "no-progress", false, "disable terminal progress output")
 	flag.IntVar(&cfg.mysqlLockWaitTimeout, "mysql-lock-wait-timeout", 300, "MySQL SESSION innodb_lock_wait_timeout seconds during delete; 0 keeps server default")
 	flag.IntVar(&cfg.mysqlDeleteRetries, "mysql-delete-retries", 5, "retries per table when MySQL delete hits lock wait timeout or deadlock")
+	flag.IntVar(&cfg.mysqlDeleteBatchSize, "mysql-delete-batch-size", defaultMySQLDeleteBatchSize, "rows per transaction for chunked MySQL deletes")
 	flag.Parse()
 
 	required := map[string]string{
@@ -1211,12 +1222,12 @@ func isMySQLUnknownTable(err error) bool {
 	return strings.Contains(err.Error(), "doesn't exist")
 }
 
-func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries int) ([]namedCount, error) {
+func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries, batchSize int) ([]namedCount, error) {
 	if lockWaitTimeoutSec > 0 {
 		if _, err := conn.ExecContext(ctx, "SET SESSION innodb_lock_wait_timeout = ?", lockWaitTimeoutSec); err != nil {
 			return nil, fmt.Errorf("set innodb_lock_wait_timeout: %w", err)
 		}
-		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d", lockWaitTimeoutSec, maxRetries)
+		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d batch_size=%d", lockWaitTimeoutSec, maxRetries, batchSize)
 	}
 
 	items, err := mysqlDeleteItems(ctx, conn)
@@ -1228,6 +1239,9 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, ma
 		item := item
 		var n int64
 		if err := prog.RunStep("delete mysql "+item.name, i+1, len(items), func() error {
+			if spec, ok := mysqlChunkedDeleteSpecFor(item.name); ok && batchSize > 0 {
+				return execMySQLChunkedDeleteWithRetry(ctx, conn, spec, batchSize, maxRetries, &n)
+			}
 			return execMySQLDeleteWithRetry(ctx, conn, item.stmt, maxRetries, &n)
 		}); err != nil {
 			return nil, fmt.Errorf("%s: %w", item.name, err)
@@ -1235,6 +1249,295 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, ma
 		out = append(out, namedCount{Name: item.name, Count: n})
 	}
 	return out, nil
+}
+
+func mysqlChunkedDeleteSpecFor(name string) (mysqlChunkedDeleteSpec, bool) {
+	switch name {
+	case "statistics_daily_testee":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT d.id
+FROM statistics_daily d
+JOIN tmp_cleanup_testee_ids t ON BINARY d.statistic_key = BINARY CAST(t.id AS CHAR)
+WHERE d.statistic_type = 'testee'
+ORDER BY d.id
+LIMIT ?`,
+			deleteBatch: `DELETE d
+FROM statistics_daily d
+JOIN tmp_cleanup_batch_ids b ON b.id = d.id`,
+		}, true
+	case "statistics_accumulated_testee":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT a.id
+FROM statistics_accumulated a
+JOIN tmp_cleanup_testee_ids t ON BINARY a.statistic_key = BINARY CAST(t.id AS CHAR)
+WHERE a.statistic_type = 'testee'
+ORDER BY a.id
+LIMIT ?`,
+			deleteBatch: `DELETE a
+FROM statistics_accumulated a
+JOIN tmp_cleanup_batch_ids b ON b.id = a.id`,
+		}, true
+	case "analytics_projector_checkpoint":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_event_ids LIKE tmp_cleanup_event_ids`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_event_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_event_ids (event_id)
+SELECT c.event_id
+FROM analytics_projector_checkpoint c
+JOIN tmp_cleanup_event_ids x ON x.event_id = c.event_id
+ORDER BY c.event_id
+LIMIT ?`,
+			deleteBatch: `DELETE c
+FROM analytics_projector_checkpoint c
+JOIN tmp_cleanup_batch_event_ids b ON b.event_id = c.event_id`,
+		}, true
+	case "analytics_pending_event":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_event_ids LIKE tmp_cleanup_event_ids`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_event_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_event_ids (event_id)
+SELECT p.event_id
+FROM analytics_pending_event p
+JOIN tmp_cleanup_pending_event_ids x ON x.event_id = p.event_id
+ORDER BY p.event_id
+LIMIT ?`,
+			deleteBatch: `DELETE p
+FROM analytics_pending_event p
+JOIN tmp_cleanup_batch_event_ids b ON b.event_id = p.event_id`,
+		}, true
+	case "domain_event_outbox":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT o.id
+FROM domain_event_outbox o
+JOIN tmp_cleanup_mysql_outbox_ids x ON x.id = o.id
+ORDER BY o.id
+LIMIT ?`,
+			deleteBatch: `DELETE o
+FROM domain_event_outbox o
+JOIN tmp_cleanup_batch_ids b ON b.id = o.id`,
+		}, true
+	case "behavior_footprint":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_string_ids (id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_string_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_string_ids (id)
+SELECT id FROM (
+  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id LIMIT ?)
+) scoped
+ORDER BY id
+LIMIT ?`,
+			deleteBatch: `DELETE bf
+FROM behavior_footprint bf
+JOIN tmp_cleanup_batch_string_ids b ON b.id = bf.id`,
+		}, true
+	case "assessment_episode":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT id FROM (
+  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id LIMIT ?)
+) scoped
+ORDER BY id
+LIMIT ?`,
+			deleteBatch: `DELETE ae
+FROM assessment_episode ae
+JOIN tmp_cleanup_batch_ids b ON b.id = ae.episode_id`,
+		}, true
+	case "assessment_entry_intake_log":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT l.id
+FROM assessment_entry_intake_log l
+JOIN tmp_cleanup_testee_ids t ON t.id = l.testee_id
+ORDER BY l.id
+LIMIT ?`,
+			deleteBatch: `DELETE l
+FROM assessment_entry_intake_log l
+JOIN tmp_cleanup_batch_ids b ON b.id = l.id`,
+		}, true
+	case "clinician_relation":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT r.id
+FROM clinician_relation r
+JOIN tmp_cleanup_testee_ids t ON t.id = r.testee_id
+ORDER BY r.id
+LIMIT ?`,
+			deleteBatch: `DELETE r
+FROM clinician_relation r
+JOIN tmp_cleanup_batch_ids b ON b.id = r.id`,
+		}, true
+	case "assessment_task":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT id FROM (
+  (SELECT task.id AS id FROM assessment_task task JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT task.id AS id FROM assessment_task task JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LIMIT ?)
+) scoped
+ORDER BY id
+LIMIT ?`,
+			deleteBatch: `DELETE task
+FROM assessment_task task
+JOIN tmp_cleanup_batch_ids b ON b.id = task.id`,
+		}, true
+	case "assessment_score":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT id FROM (
+  (SELECT s.id AS id FROM assessment_score s JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LIMIT ?)
+  UNION DISTINCT
+  (SELECT s.id AS id FROM assessment_score s JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id LIMIT ?)
+) scoped
+ORDER BY id
+LIMIT ?`,
+			deleteBatch: `DELETE s
+FROM assessment_score s
+JOIN tmp_cleanup_batch_ids b ON b.id = s.id`,
+		}, true
+	case "assessment":
+		return mysqlChunkedDeleteSpec{
+			name:             name,
+			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
+			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
+SELECT a.id
+FROM assessment a
+JOIN tmp_cleanup_assessment_ids x ON x.id = a.id
+ORDER BY a.id
+LIMIT ?`,
+			deleteBatch: `DELETE a
+FROM assessment a
+JOIN tmp_cleanup_batch_ids b ON b.id = a.id`,
+		}, true
+	default:
+		return mysqlChunkedDeleteSpec{}, false
+	}
+}
+
+func execMySQLChunkedDeleteWithRetry(ctx context.Context, conn *sql.Conn, spec mysqlChunkedDeleteSpec, batchSize, maxRetries int, affected *int64) error {
+	if batchSize <= 0 {
+		return fmt.Errorf("invalid mysql delete batch size %d", batchSize)
+	}
+	if _, err := conn.ExecContext(ctx, spec.createBatchTable); err != nil {
+		return fmt.Errorf("create batch table: %w", err)
+	}
+	var total int64
+	for batch := 1; ; batch++ {
+		selected, deleted, err := execMySQLChunkedDeleteBatchWithRetry(ctx, conn, spec, batchSize, maxRetries)
+		if err != nil {
+			return err
+		}
+		if selected == 0 {
+			*affected = total
+			return nil
+		}
+		total += deleted
+		log.Printf("mysql delete %s: batch=%d selected=%d deleted=%d total=%d", spec.name, batch, selected, deleted, total)
+		if selected < int64(batchSize) {
+			*affected = total
+			return nil
+		}
+	}
+}
+
+func execMySQLChunkedDeleteBatchWithRetry(ctx context.Context, conn *sql.Conn, spec mysqlChunkedDeleteSpec, batchSize, maxRetries int) (int64, int64, error) {
+	var lastErr error
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		selected, deleted, err := execMySQLChunkedDeleteBatch(ctx, conn, spec, batchSize)
+		if err == nil {
+			return selected, deleted, nil
+		}
+		lastErr = err
+		if isMySQLLockError(err) && attempt < maxRetries {
+			wait := time.Duration(attempt) * 5 * time.Second
+			log.Printf("mysql delete %s lock contention: attempt=%d/%d retry_in=%s err=%v", spec.name, attempt, maxRetries, wait, err)
+			if err := sleepWithContext(ctx, wait); err != nil {
+				return 0, 0, err
+			}
+			continue
+		}
+		return 0, 0, err
+	}
+	return 0, 0, lastErr
+}
+
+func execMySQLChunkedDeleteBatch(ctx context.Context, conn *sql.Conn, spec mysqlChunkedDeleteSpec, batchSize int) (int64, int64, error) {
+	tx, err := conn.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, 0, err
+	}
+	if _, err := tx.ExecContext(ctx, spec.clearBatchTable); err != nil {
+		_ = tx.Rollback()
+		return 0, 0, fmt.Errorf("clear batch table: %w", err)
+	}
+	fillArgs := make([]any, strings.Count(spec.fillBatchTable, "?"))
+	for i := range fillArgs {
+		fillArgs[i] = batchSize
+	}
+	fillResult, err := tx.ExecContext(ctx, spec.fillBatchTable, fillArgs...)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, 0, fmt.Errorf("fill batch table: %w", err)
+	}
+	selected, _ := fillResult.RowsAffected()
+	if selected == 0 {
+		if err := tx.Commit(); err != nil {
+			return 0, 0, err
+		}
+		return 0, 0, nil
+	}
+	deleteResult, err := tx.ExecContext(ctx, spec.deleteBatch)
+	if err != nil {
+		_ = tx.Rollback()
+		return 0, 0, fmt.Errorf("delete batch: %w", err)
+	}
+	deleted, _ := deleteResult.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return 0, 0, err
+	}
+	return selected, deleted, nil
 }
 
 func execMySQLDeleteWithRetry(ctx context.Context, conn *sql.Conn, stmt string, maxRetries int, affected *int64) error {

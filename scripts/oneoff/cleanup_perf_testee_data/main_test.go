@@ -183,6 +183,47 @@ func TestIsMySQLLockError(t *testing.T) {
 	}
 }
 
+func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
+	for _, name := range []string{
+		"statistics_daily_testee",
+		"statistics_accumulated_testee",
+		"analytics_projector_checkpoint",
+		"analytics_pending_event",
+		"domain_event_outbox",
+		"behavior_footprint",
+		"assessment_episode",
+		"assessment_entry_intake_log",
+		"clinician_relation",
+		"assessment_task",
+		"assessment_score",
+		"assessment",
+	} {
+		t.Run(name, func(t *testing.T) {
+			spec, ok := mysqlChunkedDeleteSpecFor(name)
+			if !ok {
+				t.Fatalf("mysqlChunkedDeleteSpecFor(%q) ok = false, want true", name)
+			}
+			for label, sql := range map[string]string{
+				"create": spec.createBatchTable,
+				"clear":  spec.clearBatchTable,
+				"fill":   spec.fillBatchTable,
+				"delete": spec.deleteBatch,
+			} {
+				if strings.TrimSpace(sql) == "" {
+					t.Fatalf("%s %s SQL is empty", name, label)
+				}
+			}
+			if !strings.Contains(spec.fillBatchTable, "LIMIT ?") {
+				t.Fatalf("%s fill SQL should limit each batch; sql=%s", name, spec.fillBatchTable)
+			}
+		})
+	}
+
+	if _, ok := mysqlChunkedDeleteSpecFor("testee"); ok {
+		t.Fatal("testee should keep the ordinary delete path")
+	}
+}
+
 func TestProgressPhaseElapsedSurvivesRunStep(t *testing.T) {
 	initProgress(true)
 	prog.phaseStarted = time.Now().Add(-2 * time.Second)
