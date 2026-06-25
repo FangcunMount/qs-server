@@ -1,6 +1,9 @@
 package assessment
 
-import "github.com/FangcunMount/qs-server/internal/pkg/meta"
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+)
 
 // ==================== ID 类型定义 ====================
 
@@ -161,34 +164,21 @@ func IsHighRisk(r RiskLevel) bool {
 
 // ==================== 解释模型引用 ====================
 
-// EvaluationModelKind 测评解释模型类型。
-type EvaluationModelKind string
+// EvaluationModelKind 测评模型类型。
+type EvaluationModelKind = assessmentmodel.Kind
 
 const (
 	// EvaluationModelKindScale 医学/心理量表模型。
-	EvaluationModelKindScale EvaluationModelKind = "scale"
+	EvaluationModelKindScale EvaluationModelKind = assessmentmodel.KindScale
 
 	// EvaluationModelKindMBTI MBTI 人格模型（OEJTS 轻量实现）。
-	EvaluationModelKindMBTI EvaluationModelKind = "mbti"
+	EvaluationModelKindMBTI EvaluationModelKind = assessmentmodel.KindMBTI
 
 	// EvaluationModelKindSBTI SBTI 趣味人格模型。
-	EvaluationModelKindSBTI EvaluationModelKind = "sbti"
+	EvaluationModelKindSBTI EvaluationModelKind = assessmentmodel.KindSBTI
 )
 
-func (k EvaluationModelKind) String() string {
-	return string(k)
-}
-
-func (k EvaluationModelKind) IsValid() bool {
-	switch k {
-	case EvaluationModelKindScale, EvaluationModelKindMBTI, EvaluationModelKindSBTI:
-		return true
-	default:
-		return false
-	}
-}
-
-// EvaluationModelRef 表示本次 Assessment 要使用的解释模型。
+// EvaluationModelRef 表示本次 Assessment 要使用的测评模型。
 type EvaluationModelRef struct {
 	id      meta.ID
 	kind    EvaluationModelKind
@@ -197,7 +187,7 @@ type EvaluationModelRef struct {
 	title   string
 }
 
-// NewEvaluationModelRef 创建通用解释模型引用。
+// NewEvaluationModelRef 创建通用测评模型引用。
 func NewEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
 	return EvaluationModelRef{
 		id:      id,
@@ -208,12 +198,12 @@ func NewEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code,
 	}
 }
 
-// NewEvaluationModelRefByCode 创建不带底层模型 ID 的解释模型引用。
+// NewEvaluationModelRefByCode 创建不带底层模型 ID 的测评模型引用。
 func NewEvaluationModelRefByCode(kind EvaluationModelKind, code meta.Code, version, title string) EvaluationModelRef {
 	return NewEvaluationModelRef(kind, meta.ID(0), code, version, title)
 }
 
-// NewScaleEvaluationModelRef 创建 Scale 解释模型引用。
+// NewScaleEvaluationModelRef 创建 Scale 测评模型引用。
 func NewScaleEvaluationModelRef(id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
 	return NewEvaluationModelRef(EvaluationModelKindScale, id, code, version, title)
 }

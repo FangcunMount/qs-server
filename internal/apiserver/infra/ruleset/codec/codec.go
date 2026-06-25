@@ -4,10 +4,10 @@ import (
 	"encoding/json"
 	"fmt"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 )
 
 func EncodeSBTI(model *rulesetsbti.ModelSnapshot) ([]byte, string, error) {

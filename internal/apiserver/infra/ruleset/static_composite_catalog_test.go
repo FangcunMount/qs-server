@@ -4,10 +4,10 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
 
 func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {

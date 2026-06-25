@@ -5,8 +5,8 @@ import (
 	"math"
 	"strings"
 
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 )
 
 func Score(model *rulesetmbti.ModelSnapshot, answerSheet *evaluationinput.AnswerSheet) (ResultDetail, error) {

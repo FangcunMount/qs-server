@@ -12,7 +12,7 @@
 
 Scale 的核心定位是：
 
-> **Scale 是 Interpretation Model 的医学量表实现，是 Evaluation 的规则输入源，不是测评执行引擎。**
+> **Scale 是 Assessment Model 的医学量表模型资产，也是 Evaluation 的 scale 执行插件输入源，不是测评执行引擎。**
 
 在当前 qs-server 中，Scale 负责医学量表规则。
 
@@ -47,26 +47,28 @@ Scale 的核心定位是：
 从完整测评链路看，qs-server 可以拆成三段：
 
 ```text
-Survey      管“问卷如何定义、用户提交了什么答卷事实”
-Scale       管“医学量表如何根据答卷进行计分和解释”
-Evaluation  管“一次测评如何执行、如何保存结果、如何生成报告”
+Survey          管“问卷如何定义、用户提交了什么答卷事实”
+AssessmentModel 管“医学量表等模型资产如何定义、发布和冻结”
+Evaluation      管“一次测评如何执行、如何保存结果”
+Report          管“最终解读报告如何组装和保存”
 ```
 
 更面向未来的表达是：
 
 ```text
-Survey                作答事实层
-Interpretation Model  解释模型层
-Evaluation            通用测评执行层
+Survey            作答事实层
+Assessment Model  测评模型资产层
+Evaluation        通用测评执行层
+Report            最终报告层
 ```
 
 在这个体系里：
 
 ```text
-Scale 是医学量表解释模型；
-MBTI 是未来的人格类型解释模型；
-BigFive / 职业兴趣测评也可以作为新的解释模型；
-Evaluation 通过统一 ModelRef / Provider 加载不同解释模型。
+Scale 是医学量表模型资产和执行插件；
+MBTI / SBTI 是人格模型资产和执行插件；
+BigFive / 职业兴趣测评也可以作为新的模型资产和执行插件；
+Evaluation 通过统一 ModelRef / evaluator registry 执行不同模型。
 ```
 
 关系可以表示为：
@@ -74,14 +76,16 @@ Evaluation 通过统一 ModelRef / Provider 加载不同解释模型。
 ```mermaid
 flowchart LR
     Survey[Survey\nQuestionnaire / AnswerSheet]
-    Model[Interpretation Model\nScale / MBTI / BigFive]
-    Eval[Evaluation\nAssessment / Score / Report]
+    Model[Assessment Model\nScale / MBTI / SBTI]
+    Eval[Evaluation\nAssessment / Result]
+    Report[Report\nInterpretReport]
 
     Survey -->|AnswerSheet / QuestionnaireRef| Eval
-    Model -->|Rules / Context / Provider| Eval
+    Model -->|Snapshot / Payload| Eval
+    Eval -->|EvaluationResult| Report
 ```
 
-Scale 只是 `Interpretation Model` 的一种具体实现，不应该膨胀成所有解释模型的总包。
+Scale 只是 `Assessment Model` 的一种具体模型资产，不应该膨胀成所有模型的总包。
 
 ---
 
@@ -214,7 +218,7 @@ InterpretationRules 解读规则集合；
 InterpretationRule 单条规则；
 RiskLevel 风险等级；
 ScaleChangedEvent 领域事件；
-Scale 作为 Interpretation Model 的定位。
+Scale 作为 Assessment Model 模型资产的定位。
 ```
 
 核心句子：
@@ -316,7 +320,7 @@ ScoreCalculationEngine 如何消费 ScoringSpec；
 AssessmentAnalysisEngine 如何消费 InterpretationRules；
 FactorScore / RiskLevelResult / InterpretationResult / InterpretReport 的归属；
 ScaleChangedEvent 与 AssessmentInterpretedEvent 的区别；
-Scale 与 MBTI 作为 Interpretation Model 的同级关系。
+Scale 与 MBTI / SBTI 作为 Assessment Model 具体模型资产的同级关系。
 ```
 
 核心句子：
@@ -368,7 +372,7 @@ Docs 事实源；
 修改 ScoringSpec / InterpretationRules 要同步检查什么？
 修改问卷绑定、查询输出、事件、缓存要同步检查什么？
 Scale 模块有哪些架构护栏？
-Scale 文档与 interpretation-model 文档如何分工？
+Scale 文档与 assessmentmodel / evaluation 文档如何分工？
 ```
 
 ---
@@ -509,34 +513,34 @@ Evaluation 只消费 Scale 的规则快照。
 
 ---
 
-## 14. 与 interpretation-model 的边界
+## 14. 与 assessmentmodel / evaluation 的边界
 
 Scale 文档只负责医学量表模型。
 
-`interpretation-model` 文档负责更高层抽象：
+`assessmentmodel` 与 `evaluation` 负责更高层抽象：
 
 ```text
-什么是解释模型；
+什么是测评模型资产；
 Scale 与 MBTI 为什么同级；
-Evaluation 如何通过 ModelRef 选择解释模型；
-Provider / Registry 如何接入不同模型；
-新增解释模型需要遵循哪些契约。
+Evaluation 如何通过 ModelRef 选择模型执行插件；
+evaluator registry 如何接入不同模型；
+新增模型需要遵循哪些契约。
 ```
 
 推荐关系：
 
 ```text
-interpretation-model
-    定义解释模型抽象和扩展协议
+assessmentmodel
+    定义模型资产快照和 payload 协议
 
 scale
-    实现医学量表解释模型
+    实现医学量表模型资产
 
 mbti
-    实现人格类型解释模型
+    实现人格类型模型资产
 
 evaluation
-    消费解释模型并执行测评
+    消费模型快照并执行测评
 ```
 
 因此，不要把 MBTI 塞进 Scale。
@@ -544,9 +548,9 @@ evaluation
 正确方向是：
 
 ```text
-Scale 与 MBTI 都是 Interpretation Model 的具体实现；
-Evaluation 通过统一 ModelRef / Provider 加载不同模型；
-各模型只维护自己的规则语义。
+Scale 与 MBTI / SBTI 都是 Assessment Model 的具体模型资产；
+Evaluation 通过统一 ModelRef / evaluator registry 执行不同模型；
+各模型只维护自己的资产和 payload 语义。
 ```
 
 ---
@@ -562,7 +566,7 @@ AnswerSheet 属于 Survey。
 ### 15.2 Scale 不保存执行结果
 
 ```text
-FactorScore / RiskLevelResult / InterpretationResult / InterpretReport 属于 Evaluation。
+FactorScore / RiskLevelResult / InterpretationResult 属于 Evaluation；InterpretReport 属于 Report。
 ```
 
 ### 15.3 Application 不绕过聚合根
@@ -624,8 +628,8 @@ ScaleVersion：让 MedicalScale 发布版本成为明确规则事实；
 RuleSnapshot：让 Evaluation 保存当时使用的规则快照；
 QuestionCode 发布前校验增强：确保 Factor.QuestionCodes 存在于绑定 QuestionnaireVersion；
 EvaluationScaleContext 标准化：统一 Evaluation 消费规则的输入结构；
-InterpretationModelRef：让 Scale 与 MBTI / BigFive 等模型并列接入；
-Provider 插件化：ScaleProvider 只是 Evaluation 的一种解释模型提供者。
+EvaluationModelRef：让 Scale 与 MBTI / BigFive 等模型并列接入；
+Evaluator 插件化：Scale evaluator 只是 Evaluation 的一种模型执行器。
 ```
 
 ---
@@ -635,8 +639,8 @@ Provider 插件化：ScaleProvider 只是 Evaluation 的一种解释模型提供
 Scale 模块基础验证：
 
 ```bash
-go test ./internal/apiserver/domain/ruleset/scale/definition/...
-go test ./internal/apiserver/domain/interpretation/scale/...
+go test ./internal/apiserver/domain/assessmentmodel/scale/definition/...
+go test ./internal/apiserver/domain/evaluation/scale/...
 go test ./internal/apiserver/application/scale/...
 ```
 
@@ -692,7 +696,7 @@ Scale 的聚合根是 MedicalScale。一份 MedicalScale 绑定一个确定的 Q
 
 Evaluation 会加载 AnswerSheet 和 MedicalScale 规则快照，先校验二者基于同一 QuestionnaireVersion，再根据 Factor.QuestionCodes 取答案，根据 ScoringSpec 计算 FactorScore，根据 InterpretationRules 命中 RiskLevel 和解释结果，最后生成报告。
 
-下一阶段支持 MBTI 时，不应该把 MBTI 塞进 Scale，而应该抽象 interpretation-model，让 Scale 和 MBTI 作为同级解释模型接入 Evaluation。
+支持 MBTI / SBTI 时，不应该把它们塞进 Scale，而应该通过 assessmentmodel 快照和 evaluation 执行插件，让 Scale、MBTI、SBTI 作为同级模型接入 Evaluation。
 ```
 
 ### 18.3 高频追问
@@ -707,7 +711,7 @@ Evaluation 会加载 AnswerSheet 和 MedicalScale 规则快照，先校验二者
 | 为什么绑定 QuestionnaireVersion？ | 保证规则基于确定问卷版本，可追溯 |
 | FactorScore 属于 Scale 吗？ | 不属于，FactorScore 是 Evaluation 的执行结果 |
 | ScaleChangedEvent 表示测评完成了吗？ | 不表示，它只表示规则发生变化 |
-| MBTI 应该放进 Scale 吗？ | 不应该，应作为同级解释模型通过 InterpretationModelRef / Provider 接入 |
+| MBTI 应该放进 Scale 吗？ | 不应该，应作为同级模型通过 EvaluationModelRef / evaluator registry 接入 |
 
 ---
 

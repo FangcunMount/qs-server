@@ -16,8 +16,8 @@
 | 真值层 | `00-05` 是现行真值层，`06-宣讲` 是讲解层，`_archive` 是历史层 |
 | 事实优先级 | 源码与机器契约优先于 prose 文档 |
 | 业务模块入口 | 统一从 `02-业务模块/README.md` 进入 |
-| 核心业务模块 | `survey / scale / interpretation-model / evaluation` |
-| 执行主线 | Survey 提供答卷事实，Interpretation Model 提供解释模型协议，Scale / MBTI 等模型提供规则，Evaluation 执行测评并保存结果 |
+| 核心业务模块 | `survey / assessmentmodel / evaluation / report` |
+| 执行主线 | Survey 提供答卷事实，Assessment Model 提供发布模型资产，Evaluation 执行测评并产出结果，Report 保存最终解读报告 |
 | 事件入口 | 统一从 `03-基础设施/01-事件系统.md` 与 `03-基础设施/event/README.md` 进入 |
 | Redis 入口 | 统一从 `03-基础设施/12-Redis文档中心.md` 进入 |
 | Resilience 入口 | 限流、队列、背压、锁、幂等和降级统一从 `03-基础设施/resilience/README.md` 进入 |
@@ -35,7 +35,7 @@ qs-server 当前文档的主线是：
 ```text
 00-总览        先理解系统地图、代码边界和核心链路
 01-运行时      再理解 qs-apiserver / collection-server / qs-worker 如何协作
-02-业务模块    再深入 survey / scale / interpretation-model / evaluation 等业务模块
+02-业务模块    再深入 survey / scale / assessmentmodel / evaluation / report 等业务模块
 03-基础设施    再理解事件、存储、Redis、安全、韧性、外部集成等横切能力
 04-接口与运维  再查看 REST / gRPC / 部署 / 运维入口
 05-专题分析    最后理解关键设计判断和系统级权衡
@@ -49,14 +49,17 @@ _archive       仅保留历史文档，不作为当前事实源
 Survey
     管问卷定义和答卷提交事实
 
-Interpretation Model
-    管解释模型接入协议：ModelRef / Provider / Context / Registry
+Assessment Model
+    管测评模型资产：Kind / Snapshot / Binding / Payload
 
 Scale / MBTI / BigFive
-    管具体解释模型规则
+    作为具体模型资产和 Evaluation 执行插件存在
 
 Evaluation
-    管一次测评执行：Assessment / Result / Report / Retry / Events
+    管一次测评执行：Assessment / Result / Retry / Events
+
+Report
+    管最终报告聚合和模型报告 adapter
 ```
 
 当前已重建的重点文档是：
@@ -64,8 +67,9 @@ Evaluation
 ```text
 survey              作答事实层
 scale               医学量表解释模型
-interpretation-model 解释模型抽象层
-evaluation          通用测评执行引擎
+assessmentmodel     测评模型资产层
+evaluation          通用测评执行层
+report              最终报告聚合
 ```
 
 ---
@@ -148,8 +152,8 @@ evaluation          通用测评执行引擎
 ```text
 survey/
 scale/
-interpretation-model/
 evaluation/
+report/
 ```
 
 建议顺序：
@@ -161,11 +165,14 @@ survey
 scale
     再理解 MedicalScale / Factor / ScoringSpec / InterpretationRules
 
-interpretation-model
-    再理解 ModelRef / Provider / Context / Registry 抽象
+assessmentmodel
+    再理解 Kind / Snapshot / Binding / Payload 抽象
 
 evaluation
-    最后理解 Assessment / EvaluationEngine / Result / Report / Retry / Events
+    再理解 Assessment / Model Execution / Result / Retry / Events
+
+report
+    最后理解 InterpretReport / personality adapter / score-based adapter
 ```
 
 ---
@@ -246,36 +253,38 @@ InterpretReport。
 
 ---
 
-### 6.3 Interpretation Model：解释模型抽象层
+### 6.3 Assessment Model：测评模型资产层
 
 入口：
 
 ```text
-02-业务模块/interpretation-model/README.md
+internal/apiserver/domain/assessmentmodel
 ```
 
-Interpretation Model 文档包括：
+Assessment Model 当前事实源包括：
 
 ```text
-01-解释模型抽象--ModelRef-Provider-Context模型设计.md
-02-解释模型接入链路--注册-加载-执行-结果返回.md
-03-新增解释模型链路--以MBTI接入为例.md
-04-解释模型分层架构与事实源索引.md
+domain/assessmentmodel
+domain/assessmentmodel/scale/definition
+domain/assessmentmodel/scale/snapshot
+domain/assessmentmodel/mbti
+domain/assessmentmodel/sbti
+port/assessmentmodel
 ```
 
-Interpretation Model 负责：
+Assessment Model 负责：
 
 ```text
-ModelType；
-InterpretationModelRef；
-InterpretationProvider；
-InterpretationContext；
-InterpretationRegistry；
-EvaluationInput / EvaluationResult 的接入协议；
-新增解释模型 SOP。
+Kind；
+Snapshot；
+QuestionnaireBinding；
+DecisionKind；
+PayloadFormat；
+具体模型 payload；
+发布模型目录端口。
 ```
 
-Interpretation Model 不负责：
+Assessment Model 不负责：
 
 ```text
 MedicalScale 内部规则；
@@ -314,7 +323,6 @@ EvaluationRun；
 EvaluationEngine；
 EvaluationResult；
 ScoreResult / InterpretationResult / ProfileResult；
-InterpretReport；
 FailureReason；
 RetryPolicy；
 AssessmentInterpretedEvent；
@@ -327,7 +335,38 @@ Evaluation 不负责：
 Questionnaire 定义；
 AnswerSheet 提交事实；
 MedicalScale 规则维护；
-MBTI 规则维护。
+MBTI 规则维护；
+InterpretReport 领域聚合。
+```
+
+---
+
+### 6.5 Report：最终报告聚合
+
+入口：
+
+```text
+internal/apiserver/domain/report
+```
+
+Report 负责：
+
+```text
+InterpretReport；
+DimensionInterpret；
+Suggestion；
+ModelExtra；
+personality adapter；
+score-based adapter。
+```
+
+Report 不负责：
+
+```text
+AnswerSheet 提交流程；
+Assessment 状态机；
+模型资产 payload；
+模型执行计算。
 ```
 
 ---
@@ -385,10 +424,11 @@ Evaluation 如何消费 Scale 规则。
 推荐阅读：
 
 ```text
-02-业务模块/interpretation-model/README.md
-02-业务模块/interpretation-model/01-解释模型抽象--ModelRef-Provider-Context模型设计.md
-02-业务模块/interpretation-model/02-解释模型接入链路--注册-加载-执行-结果返回.md
-02-业务模块/interpretation-model/03-新增解释模型链路--以MBTI接入为例.md
+internal/apiserver/domain/assessmentmodel
+internal/apiserver/domain/assessmentmodel/mbti
+internal/apiserver/domain/assessmentmodel/sbti
+internal/apiserver/domain/evaluation/mbti
+internal/apiserver/domain/evaluation/sbti
 02-业务模块/evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 ```
 
@@ -397,7 +437,7 @@ Evaluation 如何消费 Scale 规则。
 ```text
 为什么 Scale 与 MBTI 同级；
 为什么不能把 MBTI 塞进 Scale；
-ModelRef / Provider / Context 如何抽象；
+ModelRef / Snapshot / evaluator registry 如何抽象；
 Evaluation 如何避免硬编码 scale / mbti；
 新增模型需要改哪些代码和文档。
 ```
@@ -793,8 +833,8 @@ internal/worker/
 
 ```text
 Survey 保持作答事实层；
-Scale 收敛为医学量表解释模型；
-Interpretation Model 抽象解释模型接入协议；
-Evaluation 升级为通用测评执行引擎；
-MBTI 未来作为与 Scale 同级的解释模型接入。
+Assessment Model 收敛模型资产和发布快照；
+Scale / MBTI / SBTI 作为模型资产与执行插件存在；
+Evaluation 保持通用测评执行层；
+Report 保持最终报告聚合。
 ```

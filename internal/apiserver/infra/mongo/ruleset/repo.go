@@ -7,9 +7,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 type Repository struct {

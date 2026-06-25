@@ -19,7 +19,7 @@ import (
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"

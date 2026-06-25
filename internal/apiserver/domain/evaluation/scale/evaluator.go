@@ -1,11 +1,11 @@
-package scaleinterpretation
+package scale
 
 import (
 	"context"
 	"fmt"
 
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 )
 
 // Evaluator 执行量表解释模型评估。

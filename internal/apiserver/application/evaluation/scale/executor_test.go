@@ -6,10 +6,9 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scale"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -199,7 +198,7 @@ type stubMapper struct {
 }
 
 func (s *stubMapper) ToEvaluationResult(
-	_ *scaleinterpretation.ScaleInterpretationResult,
+	_ *evaluationscale.ScaleInterpretationResult,
 	_ *assessment.Assessment,
 	_ *evaluationinput.InputSnapshot,
 ) *assessment.EvaluationResult {

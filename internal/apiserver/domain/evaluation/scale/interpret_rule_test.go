@@ -1,9 +1,9 @@
-package scaleinterpretation
+package scale
 
 import (
 	"testing"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 )
 
 func TestFindInterpretRuleUsesLeftClosedRightOpenIntervals(t *testing.T) {

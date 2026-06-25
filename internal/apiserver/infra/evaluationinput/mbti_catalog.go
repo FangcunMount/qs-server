@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 

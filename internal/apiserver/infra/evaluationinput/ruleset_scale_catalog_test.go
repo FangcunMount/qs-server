@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
 
 type stubScaleRuleReader struct {

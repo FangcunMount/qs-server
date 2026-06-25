@@ -3,8 +3,8 @@ package mbti
 import (
 	"testing"
 
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
 	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
 )
 
 func TestMBTIReportDetailMapperPreservesAllReportFields(t *testing.T) {

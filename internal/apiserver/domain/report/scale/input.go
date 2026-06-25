@@ -2,17 +2,10 @@ package scale
 
 import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/score"
 )
 
-type FactorReportScore struct {
-	FactorCode   string
-	FactorName   string
-	RawScore     float64
-	RiskLevel    domainreport.RiskLevel
-	Conclusion   string
-	Suggestion   string
-	IsTotalScore bool
-}
+type FactorReportScore = reportscore.FactorReportScore
 
 type ReportInput struct {
 	AssessmentID domainreport.ID
@@ -24,14 +17,6 @@ type ReportInput struct {
 	FactorScores []FactorReportScore
 }
 
-type ReportModel struct {
-	Code    string
-	Title   string
-	Factors []FactorReportModel
-}
+type ReportModel = reportscore.ReportModel
 
-type FactorReportModel struct {
-	Code     string
-	Title    string
-	MaxScore *float64
-}
+type FactorReportModel = reportscore.FactorReportModel

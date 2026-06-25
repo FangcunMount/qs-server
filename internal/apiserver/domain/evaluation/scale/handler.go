@@ -4,9 +4,8 @@ import (
 	"context"
 	"fmt"
 
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scale"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 )
 
 type EvaluateInput struct {
@@ -16,18 +15,18 @@ type EvaluateInput struct {
 }
 
 type Handler struct {
-	evaluator *scaleinterpretation.Evaluator
+	evaluator *Evaluator
 }
 
-func NewHandler(registry scaleinterpretation.ScoringStrategyRegistry) *Handler {
-	return &Handler{evaluator: scaleinterpretation.NewEvaluator(registry)}
+func NewHandler(registry ScoringStrategyRegistry) *Handler {
+	return &Handler{evaluator: NewEvaluator(registry)}
 }
 
 func NewDefaultHandler() *Handler {
-	return &Handler{evaluator: scaleinterpretation.NewDefaultEvaluator()}
+	return &Handler{evaluator: NewDefaultEvaluator()}
 }
 
-func (h *Handler) Evaluate(ctx context.Context, input EvaluateInput) (*scaleinterpretation.ScaleInterpretationResult, error) {
+func (h *Handler) Evaluate(ctx context.Context, input EvaluateInput) (*ScaleInterpretationResult, error) {
 	if h == nil || h.evaluator == nil {
 		return nil, fmt.Errorf("scale handler is not configured")
 	}

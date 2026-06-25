@@ -1,4 +1,4 @@
-package scaleinterpretation
+package scale
 
 import (
 	"go/parser"
@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestDomainScaleInterpretationDoesNotImportApplicationInfraOrEvaluationPipeline(t *testing.T) {
+func TestDomainScaleExecutionDoesNotImportApplicationInfraOrEvaluationPipeline(t *testing.T) {
 	matches, err := filepath.Glob("*.go")
 	if err != nil {
 		t.Fatalf("Glob returned error: %v", err)
@@ -27,8 +27,8 @@ func TestDomainScaleInterpretationDoesNotImportApplicationInfraOrEvaluationPipel
 				strings.Contains(path, "/internal/apiserver/infra/") ||
 				strings.Contains(path, "/internal/apiserver/port/evaluationinput") ||
 				strings.Contains(path, "/application/evaluation/execute") ||
-				strings.Contains(path, "/domain/ruleset/scale/definition") {
-				t.Fatalf("domain/interpretation/scale must not import %s in %s", path, file)
+				strings.Contains(path, "/domain/assessmentmodel/scale/definition") {
+				t.Fatalf("domain/evaluation/scale must not import %s in %s", path, file)
 			}
 		}
 	}

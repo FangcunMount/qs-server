@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 type StaticCompositeCatalog struct {

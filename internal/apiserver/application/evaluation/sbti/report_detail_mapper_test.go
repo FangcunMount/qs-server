@@ -3,8 +3,8 @@ package sbti
 import (
 	"testing"
 
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
 	evaluationsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/sbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 )
 
 func TestSBTIReportDetailMapperPreservesAllReportFields(t *testing.T) {

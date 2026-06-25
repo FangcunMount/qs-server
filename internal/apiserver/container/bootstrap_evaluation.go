@@ -9,8 +9,8 @@ import (
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 

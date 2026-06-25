@@ -1,6 +1,6 @@
-package scaleinterpretation
+package scale
 
-import scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+import scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 
 func findInterpretRule(factor scalesnapshot.FactorSnapshot, score float64) *scalesnapshot.InterpretRuleSnapshot {
 	for i := range factor.InterpretRules {

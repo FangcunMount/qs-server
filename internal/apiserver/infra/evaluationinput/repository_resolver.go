@@ -6,14 +6,14 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -276,6 +276,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScale(ctx context.Context, code stri
 func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRef) (*scalesnapshot.ScaleSnapshot, error) {
 	l := logger.L(ctx)
 	l.Debugw("加载解释模型数据",
+		"model_kind", ref.Kind,
 		"ruleset_kind", ref.Kind,
 		"model_code", ref.Code,
 		"ruleset_version", ref.Version,
@@ -294,6 +295,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	}
 	if err != nil {
 		l.Errorw("加载解释模型失败",
+			"model_kind", ref.Kind,
 			"ruleset_kind", ref.Kind,
 			"model_code", ref.Code,
 			"ruleset_version", ref.Version,
@@ -310,6 +312,7 @@ func (r *RepositoryScaleSnapshotCatalog) GetScaleByRef(ctx context.Context, ref 
 	}
 
 	l.Debugw("解释模型数据加载成功",
+		"model_kind", ref.Kind,
 		"ruleset_kind", ref.Kind,
 		"model_code", ref.Code,
 		"ruleset_version", snapshot.ScaleVersion,

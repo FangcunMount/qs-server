@@ -1,10 +1,10 @@
-package scaleinterpretation
+package scale
 
 import (
 	"fmt"
 	"slices"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 )
 
 func collectFactorValues(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) ([]float64, error) {

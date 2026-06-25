@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"

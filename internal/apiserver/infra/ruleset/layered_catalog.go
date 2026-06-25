@@ -3,8 +3,8 @@ package ruleset
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 type publishedStore interface {

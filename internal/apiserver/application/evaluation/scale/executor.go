@@ -5,10 +5,9 @@ import (
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
-	scaleinterpretation "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/scale"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -59,7 +58,7 @@ type scaleScoringRegistry struct {
 
 func (r scaleScoringRegistry) ScoreFactor(ctx context.Context, factor scalesnapshot.FactorSnapshot, values []float64) (float64, error) {
 	if r.scorer == nil {
-		return scaleinterpretation.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
+		return evaluationscale.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
 	return r.scorer.ScoreFactor(ctx, factor.Code, values, factor.ScoringStrategy, nil)
 }

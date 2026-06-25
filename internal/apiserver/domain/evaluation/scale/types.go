@@ -1,9 +1,9 @@
-package scaleinterpretation
+package scale
 
 import (
 	"context"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 

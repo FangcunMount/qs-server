@@ -3,9 +3,9 @@ package ruleset
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 // CatalogBindingResolver 从统一规则目录解析建测评绑定。

@@ -1,6 +1,6 @@
 package mbti
 
-import rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+import rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
 
 type DimensionResult struct {
 	Code       string  `json:"code"`

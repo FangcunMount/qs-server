@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/definition"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 // ScaleRuleSetPublisher 将已发布量表同步到 evaluation_rule_sets。

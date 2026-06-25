@@ -3,7 +3,7 @@ package ruleset
 import (
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 )
 
 func TestMapperRoundTrip(t *testing.T) {

@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
 
 type stubRuleReader struct {

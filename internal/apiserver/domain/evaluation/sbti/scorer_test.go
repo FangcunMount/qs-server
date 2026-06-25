@@ -3,8 +3,8 @@ package sbti
 import (
 	"testing"
 
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
 )
 
 func TestScoreMatchesClosestOutcome(t *testing.T) {

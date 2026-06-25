@@ -1,6 +1,6 @@
-package scaleinterpretation
+package scale
 
-import scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale/snapshot"
+import scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 
 func (*Evaluator) classifyRisk(model ScaleInterpretationModel, factorScores []ScaleFactorScore) ([]ScaleFactorScore, RiskLevel) {
 	updatedScores := make([]ScaleFactorScore, 0, len(factorScores))

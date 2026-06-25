@@ -7,7 +7,7 @@ import (
 
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 // NewDefaultStaticCatalog 从内置 SBTI/MBTI RuleSet 与可选量表 repo 回退构建静态规则目录。

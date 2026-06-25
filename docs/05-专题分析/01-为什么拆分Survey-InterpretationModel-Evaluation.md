@@ -1063,7 +1063,7 @@ Survey / Interpretation Model / Concrete Models / Evaluation
 
 - `internal/apiserver/container/assembler/scale.go`
 - `internal/apiserver/application/scale`
-- `internal/apiserver/domain/ruleset/scale/definition`
+- `internal/apiserver/domain/assessmentmodel/scale/definition`
 
 ### Interpretation Model
 

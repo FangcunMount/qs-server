@@ -6,11 +6,11 @@ import (
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
-	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
