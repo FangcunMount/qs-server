@@ -6,10 +6,29 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	interpretationmodelInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
+	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
+
+func (c *Container) ensureInterpretationModelCatalog() (interpretationmodelport.ModelCatalog, error) {
+	if c == nil {
+		return nil, fmt.Errorf("container is nil")
+	}
+	if c.interpretationModelCatalog != nil {
+		return c.interpretationModelCatalog, nil
+	}
+	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
+	catalog, err := interpretationmodelInfra.NewCatalog(c.mongoDB, mongoOpts)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize interpretation model catalog: %w", err)
+	}
+	c.interpretationModelCatalog = catalog
+	return catalog, nil
+}
 
 func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps, error) {
 	var infra *surveyScaleInfra
@@ -19,6 +38,9 @@ func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps,
 	var inputResolver evaluationinput.Resolver
 	var scaleCatalog evaluationinput.ScaleCatalog
 	if infra != nil {
+		if _, err := c.ensureInterpretationModelCatalog(); err != nil {
+			return assembler.EvaluationModuleDeps{}, err
+		}
 		resolver, err := evaluationinputInfra.NewRepositoryResolver(
 			infra.scaleRepo,
 			infra.answerSheetRepo,

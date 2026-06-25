@@ -7,12 +7,23 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/interpretationmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
+
+func testQuestionnaireModelBindingResolver(t *testing.T) interpretationmodelport.QuestionnaireModelBindingResolver {
+	t.Helper()
+	catalog, err := interpretationmodel.NewDefaultStaticCatalog()
+	if err != nil {
+		t.Fatalf("NewDefaultStaticCatalog: %v", err)
+	}
+	return catalog
+}
 
 func TestValidateCreateAssessmentFromAnswerSheetRequest(t *testing.T) {
 	tests := []struct {
@@ -62,7 +73,7 @@ func TestBuildCreateAssessmentDTODefaultsOriginType(t *testing.T) {
 		medicalScaleName: stringPtr("Scale"),
 	}
 
-	dto := buildCreateAssessmentDTO(req, scaleCtx)
+	dto := buildCreateAssessmentDTO(context.Background(), req, scaleCtx, nil)
 	if dto.OriginType != "adhoc" {
 		t.Fatalf("expected adhoc origin type, got %q", dto.OriginType)
 	}
@@ -83,7 +94,7 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 		AnswersheetId:        202,
 	}
 
-	dto := buildCreateAssessmentDTO(req, assessmentScaleContext{})
+	dto := buildCreateAssessmentDTO(context.Background(), req, assessmentScaleContext{}, testQuestionnaireModelBindingResolver(t))
 	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindSBTI.String() {
 		t.Fatalf("ModelKind = %#v, want sbti", dto.ModelKind)
 	}
@@ -104,7 +115,7 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 		AnswersheetId:        202,
 	}
 
-	dto := buildCreateAssessmentDTO(req, assessmentScaleContext{})
+	dto := buildCreateAssessmentDTO(context.Background(), req, assessmentScaleContext{}, testQuestionnaireModelBindingResolver(t))
 	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindMBTI.String() {
 		t.Fatalf("ModelKind = %#v, want mbti", dto.ModelKind)
 	}
@@ -136,7 +147,7 @@ func TestBuildCreateAssessmentDTOSkipsMBTIModelWhenScaleBound(t *testing.T) {
 		medicalScaleName: stringPtr("Scale"),
 	}
 
-	dto := buildCreateAssessmentDTO(req, scaleCtx)
+	dto := buildCreateAssessmentDTO(context.Background(), req, scaleCtx, nil)
 	if dto.ModelCode != nil {
 		t.Fatalf("ModelCode = %#v, want nil when scale is bound", dto.ModelCode)
 	}

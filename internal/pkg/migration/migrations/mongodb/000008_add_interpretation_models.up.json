@@ -1,0 +1,25 @@
+[
+  {
+    "create": "interpretation_models"
+  },
+  {
+    "createIndexes": "interpretation_models",
+    "indexes": [
+      {
+        "key": { "model_kind": 1, "model_code": 1, "model_version": 1 },
+        "name": "idx_interpretation_models_kind_code_version",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "status": 1, "model_kind": 1, "model_code": 1 },
+        "name": "idx_interpretation_models_status_kind_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "status": 1 },
+        "name": "idx_interpretation_models_questionnaire_published",
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  }
+]

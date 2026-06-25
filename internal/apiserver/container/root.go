@@ -11,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
@@ -56,6 +57,8 @@ type Container struct {
 	StatisticsModule *assembler.StatisticsModule // Statistics 模块（统计）
 	IAMModule        *IAMModule                  // IAM 集成模块
 	CodesService     codesapp.CodesService       // CodesService 应用服务（code 申请）
+
+	interpretationModelCatalog interpretationmodelport.ModelCatalog
 
 	// Survey/Scale 基础设施由容器持有，业务模块只暴露应用服务。
 	surveyScaleInfra *surveyScaleInfra

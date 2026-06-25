@@ -19,6 +19,7 @@ import (
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
+	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
@@ -38,6 +39,7 @@ type Deps struct {
 	Plan       PlanDeps
 	Statistics StatisticsDeps
 	IAM        IAMDeps
+	Interpretation InterpretationDeps
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator
@@ -89,6 +91,10 @@ type PlanDeps struct {
 
 type StatisticsDeps struct {
 	BehaviorProjectorService statisticsApp.BehaviorProjectorService
+}
+
+type InterpretationDeps struct {
+	ModelCatalog interpretationmodelport.ModelCatalog
 }
 
 type IAMDeps struct {
@@ -266,6 +272,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.QRCodeService,
 		r.deps.MiniProgramTaskNotificationService,
 		r.deps.Evaluation.ReportStatusReporter,
+		r.deps.Interpretation.ModelCatalog,
 	)
 	r.server.RegisterService(internalService)
 	log.Info("   🔧 Internal service registered (for Worker)")

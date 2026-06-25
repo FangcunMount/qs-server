@@ -219,6 +219,9 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 	if c.IAMModule != nil {
 		deps.IAM.AuthzSnapshotLoader = c.IAMModule.AuthzSnapshotLoader()
 	}
+	if catalog, err := c.ensureInterpretationModelCatalog(); err == nil {
+		deps.Interpretation.ModelCatalog = catalog
+	}
 
 	return deps
 }

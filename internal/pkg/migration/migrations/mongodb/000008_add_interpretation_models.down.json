@@ -1,0 +1,17 @@
+[
+  {
+    "dropIndexes": "interpretation_models",
+    "index": "idx_interpretation_models_kind_code_version"
+  },
+  {
+    "dropIndexes": "interpretation_models",
+    "index": "idx_interpretation_models_status_kind_code"
+  },
+  {
+    "dropIndexes": "interpretation_models",
+    "index": "idx_interpretation_models_questionnaire_published"
+  },
+  {
+    "drop": "interpretation_models"
+  }
+]

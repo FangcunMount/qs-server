@@ -20,7 +20,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	interpretationmodelport "github.com/FangcunMount/qs-server/internal/apiserver/port/interpretationmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -46,6 +46,7 @@ type InternalService struct {
 	behaviorProjectorService   statisticsApp.BehaviorProjectorService
 	warmupCoordinator          cachegov.Coordinator
 	reportStatusReporter       *reportstatus.Reporter
+	questionnaireModelBinding  interpretationmodelport.QuestionnaireModelBindingResolver
 	// 小程序码生成服务（可选）
 	qrCodeService surveyScaleQRCodeGenerator
 	// 小程序 task 消息服务（可选）
@@ -87,6 +88,7 @@ func NewInternalService(
 	qrCodeService surveyScaleQRCodeGenerator,
 	miniProgramTaskNotificationService notificationApp.MiniProgramTaskNotificationService,
 	reportStatusReporter *reportstatus.Reporter,
+	questionnaireModelBinding interpretationmodelport.QuestionnaireModelBindingResolver,
 ) *InternalService {
 	return &InternalService{
 		answerSheetScoringService:          answerSheetScoringService,
@@ -106,6 +108,7 @@ func NewInternalService(
 		qrCodeService:                      qrCodeService,
 		miniProgramTaskNotificationService: miniProgramTaskNotificationService,
 		reportStatusReporter:               reportStatusReporter,
+		questionnaireModelBinding:          questionnaireModelBinding,
 	}
 }
 
@@ -197,8 +200,10 @@ func (s *InternalService) resolveAssessmentScaleContext(ctx context.Context, que
 }
 
 func buildCreateAssessmentDTO(
+	ctx context.Context,
 	req *pb.CreateAssessmentFromAnswerSheetRequest,
 	scaleCtx assessmentScaleContext,
+	bindingResolver interpretationmodelport.QuestionnaireModelBindingResolver,
 ) assessmentApp.CreateAssessmentDTO {
 	dto := assessmentApp.CreateAssessmentDTO{
 		OrgID:                req.OrgId,
@@ -218,46 +223,28 @@ func buildCreateAssessmentDTO(
 	if req.OriginId != "" {
 		dto.OriginID = &req.OriginId
 	}
-	applySBTIModelContext(req, &dto)
-	applyMBTIModelContext(req, &dto)
+	applyInterpretationModelContext(ctx, req, &dto, bindingResolver)
 	return dto
 }
 
-func applyMBTIModelContext(req *pb.CreateAssessmentFromAnswerSheetRequest, dto *assessmentApp.CreateAssessmentDTO) {
-	if req == nil || dto == nil || dto.MedicalScaleID != nil {
+func applyInterpretationModelContext(
+	ctx context.Context,
+	req *pb.CreateAssessmentFromAnswerSheetRequest,
+	dto *assessmentApp.CreateAssessmentDTO,
+	resolver interpretationmodelport.QuestionnaireModelBindingResolver,
+) {
+	if req == nil || dto == nil || resolver == nil || dto.MedicalScaleID != nil || dto.ModelCode != nil {
 		return
 	}
-	if dto.ModelCode != nil {
+	ref, ok, err := resolver.ResolveByQuestionnaire(ctx, req.QuestionnaireCode, req.QuestionnaireVersion)
+	if err != nil || !ok || ref.IsEmpty() {
 		return
 	}
-	if req.QuestionnaireCode != evaluationinput.DefaultMBTIQuestionnaireCode {
-		return
-	}
-	kind := evaluationinput.EvaluationModelKindMBTI.String()
-	code := evaluationinput.DefaultMBTIModelCode
-	version := evaluationinput.DefaultMBTIModelVersion
-	title := evaluationinput.DefaultMBTIModelTitle
+	kind := ref.Kind.String()
 	dto.ModelKind = &kind
-	dto.ModelCode = &code
-	dto.ModelVersion = &version
-	dto.ModelTitle = &title
-}
-
-func applySBTIModelContext(req *pb.CreateAssessmentFromAnswerSheetRequest, dto *assessmentApp.CreateAssessmentDTO) {
-	if req == nil || dto == nil || dto.MedicalScaleID != nil {
-		return
-	}
-	if req.QuestionnaireCode != evaluationinput.DefaultSBTIQuestionnaireCode {
-		return
-	}
-	kind := evaluationinput.EvaluationModelKindSBTI.String()
-	code := evaluationinput.DefaultSBTIModelCode
-	version := evaluationinput.DefaultSBTIModelVersion
-	title := evaluationinput.DefaultSBTIModelTitle
-	dto.ModelKind = &kind
-	dto.ModelCode = &code
-	dto.ModelVersion = &version
-	dto.ModelTitle = &title
+	dto.ModelCode = &ref.Code
+	dto.ModelVersion = &ref.Version
+	dto.ModelTitle = &ref.Title
 }
 
 func shouldAutoSubmitAssessment(dto assessmentApp.CreateAssessmentDTO) bool {

@@ -160,7 +160,7 @@ func (flow assessmentFlow) CreateAssessmentFromAnswerSheet(
 		)
 		return nil, status.Errorf(codes.Internal, "解析问卷量表绑定失败: %v", err)
 	}
-	dto := buildCreateAssessmentDTO(req, scaleCtx)
+	dto := buildCreateAssessmentDTO(ctx, req, scaleCtx, s.questionnaireModelBinding)
 	matchedTask := s.applyMatchedTaskOrigin(ctx, l, req, scaleCtx.medicalScaleCode, &dto)
 
 	if response, ok := s.loadExistingAssessmentResponse(ctx, l, req.AnswersheetId, req.OrgId, matchedTask); ok {
