@@ -5,10 +5,12 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 )
 
-func EncodeSBTI(model *evaluationinputPort.SBTIModelSnapshot) ([]byte, string, error) {
+func EncodeSBTI(model *rulesetsbti.ModelSnapshot) ([]byte, string, error) {
 	if model == nil {
 		return nil, "", fmt.Errorf("sbti model is nil")
 	}
@@ -19,7 +21,7 @@ func EncodeSBTI(model *evaluationinputPort.SBTIModelSnapshot) ([]byte, string, e
 	return payload, domain.PayloadFormatSBTIV1, nil
 }
 
-func EncodeMBTI(model *evaluationinputPort.MBTIModelSnapshot) ([]byte, string, error) {
+func EncodeMBTI(model *rulesetmbti.ModelSnapshot) ([]byte, string, error) {
 	if model == nil {
 		return nil, "", fmt.Errorf("mbti model is nil")
 	}
@@ -30,7 +32,7 @@ func EncodeMBTI(model *evaluationinputPort.MBTIModelSnapshot) ([]byte, string, e
 	return payload, domain.PayloadFormatMBTIV1, nil
 }
 
-func EncodeScale(model *evaluationinputPort.ScaleSnapshot) ([]byte, string, error) {
+func EncodeScale(model *rulesetscale.ScaleSnapshot) ([]byte, string, error) {
 	if model == nil {
 		return nil, "", fmt.Errorf("scale model is nil")
 	}
@@ -41,7 +43,7 @@ func EncodeScale(model *evaluationinputPort.ScaleSnapshot) ([]byte, string, erro
 	return payload, domain.PayloadFormatScaleV1, nil
 }
 
-func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*evaluationinputPort.SBTIModelSnapshot, error) {
+func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*rulesetsbti.ModelSnapshot, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -52,14 +54,14 @@ func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*evaluationinputPort.SBTIMode
 	if !domain.IsSBTIPayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported sbti payload format: %s", format)
 	}
-	var model evaluationinputPort.SBTIModelSnapshot
+	var model rulesetsbti.ModelSnapshot
 	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
 		return nil, fmt.Errorf("decode sbti payload: %w", err)
 	}
 	return &model, nil
 }
 
-func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*evaluationinputPort.MBTIModelSnapshot, error) {
+func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*rulesetmbti.ModelSnapshot, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -70,14 +72,14 @@ func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*evaluationinputPort.MBTIMode
 	if !domain.IsMBTIPayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported mbti payload format: %s", format)
 	}
-	var model evaluationinputPort.MBTIModelSnapshot
+	var model rulesetmbti.ModelSnapshot
 	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
 		return nil, fmt.Errorf("decode mbti payload: %w", err)
 	}
 	return &model, nil
 }
 
-func DecodeScale(snapshot *domain.RuleSetSnapshot) (*evaluationinputPort.ScaleSnapshot, error) {
+func DecodeScale(snapshot *domain.RuleSetSnapshot) (*rulesetscale.ScaleSnapshot, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
@@ -88,7 +90,7 @@ func DecodeScale(snapshot *domain.RuleSetSnapshot) (*evaluationinputPort.ScaleSn
 	if !domain.IsScalePayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported scale payload format: %s", format)
 	}
-	var model evaluationinputPort.ScaleSnapshot
+	var model rulesetscale.ScaleSnapshot
 	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
 		return nil, fmt.Errorf("decode scale payload: %w", err)
 	}

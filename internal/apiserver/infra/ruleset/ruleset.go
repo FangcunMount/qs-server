@@ -4,12 +4,14 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
+	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/mbti"
+	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/sbti"
+	rulesetscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleset"
 )
 
-func SBTIRuleSetSnapshot(model *evaluationinputPort.SBTIModelSnapshot) (*domain.RuleSetSnapshot, error) {
+func SBTIRuleSetSnapshot(model *rulesetsbti.ModelSnapshot) (*domain.RuleSetSnapshot, error) {
 	payload, format, err := codec.EncodeSBTI(model)
 	if err != nil {
 		return nil, err
@@ -45,7 +47,7 @@ func SBTIRuleSetSnapshot(model *evaluationinputPort.SBTIModelSnapshot) (*domain.
 	}, nil
 }
 
-func MBTIRuleSetSnapshot(model *evaluationinputPort.MBTIModelSnapshot) (*domain.RuleSetSnapshot, error) {
+func MBTIRuleSetSnapshot(model *rulesetmbti.ModelSnapshot) (*domain.RuleSetSnapshot, error) {
 	payload, format, err := codec.EncodeMBTI(model)
 	if err != nil {
 		return nil, err
@@ -80,7 +82,7 @@ func MBTIRuleSetSnapshot(model *evaluationinputPort.MBTIModelSnapshot) (*domain.
 	}, nil
 }
 
-func ScaleRuleSetSnapshot(model *evaluationinputPort.ScaleSnapshot) (*domain.RuleSetSnapshot, error) {
+func ScaleRuleSetSnapshot(model *rulesetscale.ScaleSnapshot) (*domain.RuleSetSnapshot, error) {
 	if model == nil {
 		return nil, fmt.Errorf("scale model is nil")
 	}
@@ -128,7 +130,7 @@ func RuleSetRefFromSnapshot(snapshot *domain.RuleSetSnapshot) port.RuleSetRef {
 	}
 }
 
-func sbtiRuleSetRef(model *evaluationinputPort.SBTIModelSnapshot) port.RuleSetRef {
+func sbtiRuleSetRef(model *rulesetsbti.ModelSnapshot) port.RuleSetRef {
 	if model == nil {
 		return port.RuleSetRef{}
 	}
@@ -140,7 +142,7 @@ func sbtiRuleSetRef(model *evaluationinputPort.SBTIModelSnapshot) port.RuleSetRe
 	}
 }
 
-func mbtiRuleSetRef(model *evaluationinputPort.MBTIModelSnapshot) port.RuleSetRef {
+func mbtiRuleSetRef(model *rulesetmbti.ModelSnapshot) port.RuleSetRef {
 	if model == nil {
 		return port.RuleSetRef{}
 	}

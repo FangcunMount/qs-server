@@ -94,6 +94,37 @@ func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
 	}
 }
 
+func TestScaleCodecRoundTrip(t *testing.T) {
+	model := &evaluationinputPort.ScaleSnapshot{
+		Code:         "PHQ9",
+		ScaleVersion: "1.0.0",
+		Status:       "published",
+		Factors: []evaluationinputPort.FactorSnapshot{
+			{Code: "total", IsTotalScore: true},
+		},
+	}
+	payload, format, err := EncodeScale(model)
+	if err != nil {
+		t.Fatalf("EncodeScale: %v", err)
+	}
+	snapshot := &domain.RuleSetSnapshot{
+		SchemaVersion: domain.RuleSetSchemaVersionV1,
+		PayloadFormat: format,
+		Definition: domain.RuleSetDefinition{
+			Kind: domain.RuleSetKindScale,
+			Code: model.Code,
+		},
+		Payload: payload,
+	}
+	got, err := DecodeScale(snapshot)
+	if err != nil {
+		t.Fatalf("DecodeScale: %v", err)
+	}
+	if got.Code != model.Code {
+		t.Fatalf("Code = %s, want %s", got.Code, model.Code)
+	}
+}
+
 func TestDecodeRejectsInvalidPayload(t *testing.T) {
 	snapshot := &domain.RuleSetSnapshot{
 		PayloadFormat: domain.PayloadFormatMBTIV1,

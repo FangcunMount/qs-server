@@ -331,14 +331,18 @@ func TestEvaluationInputPortStaysIndependentFromSurveyScaleDomain(t *testing.T) 
 	t.Parallel()
 
 	root := repoRoot(t)
+	const rulesetPayloadPrefix = "github.com/FangcunMount/qs-server/internal/apiserver/domain/ruleset"
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/":      "evaluationinput-owned snapshot DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/":      "ruleset typed payload aliases only",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "evaluationinput-owned snapshot DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":       "evaluationinput-owned snapshot DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":   "evaluationinput-owned snapshot DTOs",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "port", "evaluationinput"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
+			return
+		}
+		if strings.HasPrefix(importPath, rulesetPayloadPrefix) {
 			return
 		}
 		for forbidden, replacement := range forbiddenImports {
