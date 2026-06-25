@@ -3,12 +3,14 @@ package eventoutbox
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
 
@@ -40,21 +42,49 @@ type Store struct {
 	db                 *gorm.DB
 	publishingStaleFor time.Duration
 	topicResolver      eventcatalog.TopicResolver
+	priorityTiers      [][]string
+}
+
+type StoreOption func(*Store)
+
+func WithPriorityEventTypes(eventTypes []string) StoreOption {
+	return func(s *Store) {
+		if len(eventTypes) == 0 {
+			return
+		}
+		s.priorityTiers = [][]string{normalizePriorityEventTypes(eventTypes), nil}
+	}
+}
+
+func WithPriorityTiers(tiers [][]string) StoreOption {
+	return func(s *Store) {
+		if len(tiers) == 0 {
+			return
+		}
+		s.priorityTiers = tiers
+	}
 }
 
 func NewStore(db *gorm.DB) *Store {
 	return NewStoreWithTopicResolver(db, eventcatalog.NewCatalog(nil))
 }
 
-func NewStoreWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver) *Store {
+func NewStoreWithTopicResolver(db *gorm.DB, resolver eventcatalog.TopicResolver, opts ...StoreOption) *Store {
 	if resolver == nil {
 		resolver = eventcatalog.NewCatalog(nil)
 	}
-	return &Store{
+	store := &Store{
 		db:                 db,
 		publishingStaleFor: outboxcore.DefaultPublishingStaleFor,
 		topicResolver:      resolver,
+		priorityTiers:      defaultPriorityTiers(),
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(store)
+		}
+	}
+	return store
 }
 
 func (s *Store) Stage(ctx context.Context, events ...event.DomainEvent) error {
@@ -122,33 +152,60 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 		return nil, nil
 	}
 
-	var rows []*OutboxPO
+	rows := make([]*OutboxPO, 0, limit)
 	err := s.db.WithContext(ctx).Transaction(func(tx *gorm.DB) error {
-		if err := s.dueEventsSelectionQuery(tx, now).
-			Order("created_at ASC").
-			Limit(limit).
-			Find(&rows).Error; err != nil {
-			return err
+		remaining := limit
+		for _, tier := range s.priorityTiers {
+			if remaining <= 0 {
+				break
+			}
+			batch, err := s.claimDueBatch(tx, remaining, now, tier)
+			if err != nil {
+				return err
+			}
+			rows = append(rows, batch...)
+			remaining = limit - len(rows)
 		}
-		if len(rows) == 0 {
-			return nil
-		}
-
-		ids := make([]uint64, 0, len(rows))
-		for _, row := range rows {
-			ids = append(ids, row.ID)
-		}
-		return tx.Model(&OutboxPO{}).
-			Where("id IN ?", ids).
-			Updates(map[string]interface{}{
-				"status":     outboxcore.StatusPublishing,
-				"updated_at": now,
-			}).Error
+		return nil
 	})
 	if err != nil {
 		return nil, err
 	}
 
+	return s.pendingFromRows(ctx, rows)
+}
+
+func (s *Store) claimDueBatch(tx *gorm.DB, limit int, now time.Time, eventTypes []string) ([]*OutboxPO, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	var rows []*OutboxPO
+	query := s.dueEventsSelectionQuery(tx, now)
+	if len(eventTypes) > 0 {
+		query = query.Where("event_type IN ?", eventTypes)
+	}
+	if err := query.Order("created_at ASC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	if len(rows) == 0 {
+		return nil, nil
+	}
+	ids := make([]uint64, 0, len(rows))
+	for _, row := range rows {
+		ids = append(ids, row.ID)
+	}
+	if err := tx.Model(&OutboxPO{}).
+		Where("id IN ?", ids).
+		Updates(map[string]interface{}{
+			"status":     outboxcore.StatusPublishing,
+			"updated_at": now,
+		}).Error; err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+func (s *Store) pendingFromRows(ctx context.Context, rows []*OutboxPO) ([]outboxport.PendingEvent, error) {
 	claimed := make([]outboxport.PendingEvent, 0, len(rows))
 	for _, row := range rows {
 		pending, err := outboxcore.DecodePendingEvent(row.EventID, row.PayloadJSON)
@@ -159,7 +216,6 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 		}
 		claimed = append(claimed, pending)
 	}
-
 	return claimed, nil
 }
 
@@ -249,4 +305,28 @@ func outboxOldestStatusQuery(db *gorm.DB, status string) *gorm.DB {
 	return db.Where("status = ?", status).
 		Order("created_at ASC").
 		Limit(1)
+}
+
+func defaultPriorityTiers() [][]string {
+	return outboxpriority.ClaimOrder(nil, nil)
+}
+
+func normalizePriorityEventTypes(eventTypes []string) []string {
+	if len(eventTypes) == 0 {
+		return nil
+	}
+	seen := make(map[string]struct{}, len(eventTypes))
+	normalized := make([]string, 0, len(eventTypes))
+	for _, eventType := range eventTypes {
+		eventType = strings.TrimSpace(eventType)
+		if eventType == "" {
+			continue
+		}
+		if _, ok := seen[eventType]; ok {
+			continue
+		}
+		seen[eventType] = struct{}{}
+		normalized = append(normalized, eventType)
+	}
+	return normalized
 }

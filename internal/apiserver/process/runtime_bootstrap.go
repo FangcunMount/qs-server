@@ -12,10 +12,12 @@ import (
 )
 
 type runtimeStageDeps struct {
-	hasMongo        bool
-	warmup          func()
-	startSchedulers func(*runtimeOutput)
-	relays          []relayRuntimeDeps
+	hasMongo               bool
+	warmup                 func()
+	startCacheSignals      func()
+	startOutboxReconcilers func()
+	startSchedulers        func(*runtimeOutput)
+	relays                 []relayRuntimeDeps
 }
 
 type relayRuntimeDeps struct {
@@ -46,6 +48,12 @@ func (s *server) buildRuntimeStageDeps(resources resourceOutput, containerOutput
 	if containerOutput.container != nil {
 		deps.warmup = func() {
 			startWarmupContainer(containerOutput.container)
+		}
+		deps.startCacheSignals = func() {
+			startCacheSignalWatcher(containerOutput.container)
+		}
+		deps.startOutboxReconcilers = func() {
+			startOutboxReadyReconcilers(containerOutput.container)
 		}
 	}
 
@@ -93,6 +101,12 @@ func assessmentOutboxRelayInterval(cfg *config.Config) time.Duration {
 
 func runRuntimeStage(deps runtimeStageDeps, runtimeOutput *runtimeOutput) {
 	logInitialization(deps.hasMongo)
+	if deps.startCacheSignals != nil {
+		deps.startCacheSignals()
+	}
+	if deps.startOutboxReconcilers != nil {
+		deps.startOutboxReconcilers()
+	}
 	if deps.warmup != nil {
 		deps.warmup()
 	}
@@ -116,6 +130,20 @@ func startWarmupContainer(c *container.Container) {
 			logger.L(ctx).Infow("Cache warmup completed")
 		}
 	}()
+}
+
+func startCacheSignalWatcher(c *container.Container) {
+	if c == nil {
+		return
+	}
+	c.StartCacheSignalWatcher(context.Background())
+}
+
+func startOutboxReadyReconcilers(c *container.Container) {
+	if c == nil {
+		return
+	}
+	c.StartOutboxReadyReconcilers(context.Background())
 }
 
 func buildSchedulerManager(cfg *config.Config, deps container.ServerRuntimeDeps) *runtimescheduler.Manager {

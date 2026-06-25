@@ -135,19 +135,26 @@ func TestMongoOutboxIndexModelsCoverHotRelayAndStatusQueries(t *testing.T) {
 func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 	now := time.Date(2026, 6, 15, 19, 30, 0, 0, time.UTC)
 
-	queries := pendingClaimQueries(now, defaultPriorityEventTypes())
+	queries := pendingClaimQueries(now, defaultPriorityTiers())
 
-	if len(queries) != 2 {
-		t.Fatalf("query count = %d, want 2", len(queries))
+	if len(queries) != 3 {
+		t.Fatalf("query count = %d, want 3", len(queries))
 	}
 	wantPriority := []string{
 		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.AssessmentInterpreted,
-		eventcatalog.ReportGenerated,
+		eventcatalog.AssessmentSubmitted,
 	}
 	assertEventTypeOperator(t, queries[0].filter, "$in", wantPriority)
-	if _, ok := queries[1].filter["event_type"]; ok {
-		t.Fatalf("fallback filter event_type = %#v, want absent so it can use the pending FIFO index", queries[1].filter["event_type"])
+	wantP1 := []string{
+		eventcatalog.AnswerSheetSubmitted,
+		eventcatalog.AssessmentSubmitted,
+		eventcatalog.AssessmentFailed,
+		eventcatalog.ReportGenerated,
+		eventcatalog.AssessmentInterpreted,
+	}
+	assertEventTypeOperator(t, queries[1].filter, "$in", wantP1)
+	if _, ok := queries[2].filter["event_type"]; ok {
+		t.Fatalf("fallback filter event_type = %#v, want absent so it can use the pending FIFO index", queries[2].filter["event_type"])
 	}
 	for _, query := range queries {
 		if query.filter["status"] != outboxcore.StatusPending {

@@ -12,6 +12,7 @@ import (
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 )
 
@@ -35,7 +36,11 @@ func NewRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.To
 		mapper:          NewAnswerSheetMapper(),
 		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
 	}
-	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(db, resolver)
+	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(
+		db,
+		resolver,
+		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
+	)
 	if err != nil {
 		return nil, err
 	}

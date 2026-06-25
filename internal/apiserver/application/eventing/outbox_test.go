@@ -9,6 +9,7 @@ import (
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
+	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -35,6 +36,8 @@ func (o *outboxObserver) ObserveOutboxStatusScrape(_ context.Context, evt evento
 
 type fakeOutboxStore struct {
 	pending          []PendingOutboxEvent
+	claimByIDs       map[string]PendingOutboxEvent
+	claimByIDsCalls  [][]string
 	claimErr         error
 	markPublishedErr error
 	markFailedErr    error
@@ -44,6 +47,56 @@ type fakeOutboxStore struct {
 	published        []string
 	failed           []string
 	lastLimit        int
+}
+
+type fakeReadyIndex struct {
+	buckets  map[string][]string
+	enqueues []readyIndexEnqueue
+}
+
+type readyIndexEnqueue struct {
+	eventType     string
+	eventID       string
+	nextAttemptAt time.Time
+}
+
+func (f *fakeReadyIndex) Enqueue(_ context.Context, eventType, eventID string, nextAttemptAt time.Time) error {
+	f.enqueues = append(f.enqueues, readyIndexEnqueue{
+		eventType:     eventType,
+		eventID:       eventID,
+		nextAttemptAt: nextAttemptAt,
+	})
+	return nil
+}
+
+func (f *fakeReadyIndex) Remove(context.Context, string, string) error {
+	return nil
+}
+
+func (f *fakeReadyIndex) RemoveByEventID(_ context.Context, eventID string) error {
+	for bucket, ids := range f.buckets {
+		filtered := ids[:0]
+		for _, id := range ids {
+			if id != eventID {
+				filtered = append(filtered, id)
+			}
+		}
+		if len(filtered) == 0 {
+			delete(f.buckets, bucket)
+			continue
+		}
+		f.buckets[bucket] = filtered
+	}
+	return nil
+}
+
+func (f *fakeReadyIndex) ClaimDueIDs(_ context.Context, bucket string, limit int, _ time.Time) ([]string, error) {
+	ids := f.buckets[bucket]
+	if len(ids) > limit {
+		ids = ids[:limit]
+	}
+	f.buckets[bucket] = f.buckets[bucket][len(ids):]
+	return ids, nil
 }
 
 type durableFakePublisher struct {
@@ -71,6 +124,17 @@ func (s *fakeOutboxStore) ClaimDueEvents(_ context.Context, limit int, _ time.Ti
 		return nil, s.claimErr
 	}
 	return s.pending, nil
+}
+
+func (s *fakeOutboxStore) ClaimEventsByIDs(_ context.Context, eventIDs []string, _ time.Time) ([]PendingOutboxEvent, error) {
+	s.claimByIDsCalls = append(s.claimByIDsCalls, append([]string(nil), eventIDs...))
+	claimed := make([]PendingOutboxEvent, 0, len(eventIDs))
+	for _, eventID := range eventIDs {
+		if pending, ok := s.claimByIDs[eventID]; ok {
+			claimed = append(claimed, pending)
+		}
+	}
+	return claimed, nil
 }
 
 func (s *fakeOutboxStore) MarkEventPublished(_ context.Context, eventID string, _ time.Time) error {
@@ -379,6 +443,64 @@ func TestDurableOutboxRelayAcceptsMQBackedPublisher(t *testing.T) {
 	}
 	if len(store.published) != 1 || store.published[0] != "evt-1" {
 		t.Fatalf("published markers = %#v, want evt-1", store.published)
+	}
+}
+
+func TestOutboxRelayClaimsFromReadyIndexFirst(t *testing.T) {
+	ready := &fakeReadyIndex{
+		buckets: map[string][]string{
+			outboxpriority.BucketP0: {"evt-zset"},
+		},
+	}
+	store := &fakeOutboxStore{
+		claimByIDs: map[string]PendingOutboxEvent{
+			"evt-zset": pendingEvent("evt-zset", eventcatalog.AnswerSheetSubmitted),
+		},
+	}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:       "test-relay",
+		Store:      store,
+		Publisher:  &fakePublisher{},
+		ReadyIndex: ready,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	if len(store.claimByIDsCalls) != 1 || len(store.claimByIDsCalls[0]) != 1 || store.claimByIDsCalls[0][0] != "evt-zset" {
+		t.Fatalf("claim by ids calls = %#v, want evt-zset", store.claimByIDsCalls)
+	}
+	if len(store.published) != 1 || store.published[0] != "evt-zset" {
+		t.Fatalf("published markers = %#v, want evt-zset", store.published)
+	}
+	if store.lastLimit != 0 {
+		t.Fatalf("db fallback claim limit = %d, want 0 when ready index hit", store.lastLimit)
+	}
+}
+
+func TestOutboxRelayFailureReenqueuesCorrectReadyBucket(t *testing.T) {
+	ready := &fakeReadyIndex{buckets: map[string][]string{}}
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{pendingEvent("evt-1", eventcatalog.AssessmentSubmitted)},
+	}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:       "test-relay",
+		Store:      store,
+		Publisher:  &fakePublisher{failAt: map[string]error{eventcatalog.AssessmentSubmitted: errors.New("publish failed")}},
+		ReadyIndex: ready,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	if len(ready.enqueues) != 1 {
+		t.Fatalf("ready index enqueues = %#v, want one", ready.enqueues)
+	}
+	if ready.enqueues[0].eventType != eventcatalog.AssessmentSubmitted || ready.enqueues[0].eventID != "evt-1" {
+		t.Fatalf("ready index enqueue = %#v, want assessment.submitted evt-1", ready.enqueues[0])
+	}
+	if outboxpriority.Bucket(ready.enqueues[0].eventType) != outboxpriority.BucketP0 {
+		t.Fatalf("bucket = %q, want %q", outboxpriority.Bucket(ready.enqueues[0].eventType), outboxpriority.BucketP0)
 	}
 }
 

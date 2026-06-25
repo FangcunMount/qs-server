@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -45,7 +46,7 @@ type Store struct {
 	coll               *mongo.Collection
 	publishingStaleFor time.Duration
 	topicResolver      eventcatalog.TopicResolver
-	priorityEventTypes []string
+	priorityTiers      [][]string
 }
 
 func NewStore(db *mongo.Database) (*Store, error) {
@@ -56,7 +57,19 @@ type StoreOption func(*Store)
 
 func WithPriorityEventTypes(eventTypes []string) StoreOption {
 	return func(s *Store) {
-		s.priorityEventTypes = normalizePriorityEventTypes(eventTypes)
+		if len(eventTypes) == 0 {
+			return
+		}
+		s.priorityTiers = [][]string{normalizePriorityEventTypes(eventTypes), nil}
+	}
+}
+
+func WithPriorityTiers(tiers [][]string) StoreOption {
+	return func(s *Store) {
+		if len(tiers) == 0 {
+			return
+		}
+		s.priorityTiers = tiers
 	}
 }
 
@@ -68,7 +81,7 @@ func NewStoreWithTopicResolver(db *mongo.Database, resolver eventcatalog.TopicRe
 		coll:               db.Collection((&OutboxPO{}).CollectionName()),
 		publishingStaleFor: outboxcore.DefaultPublishingStaleFor,
 		topicResolver:      resolver,
-		priorityEventTypes: defaultPriorityEventTypes(),
+		priorityTiers:      defaultPriorityTiers(),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -290,7 +303,7 @@ func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]o
 	}
 
 	claimed := make([]outboxport.PendingEvent, 0, limit)
-	for _, query := range pendingClaimQueries(now, s.priorityEventTypes) {
+	for _, query := range pendingClaimQueries(now, s.priorityTiers) {
 		for len(claimed) < limit {
 			item, found, err := s.claimOne(ctx, query.filter, query.sort, now)
 			if err != nil {
@@ -311,24 +324,27 @@ type pendingClaimQuery struct {
 	sort   bson.D
 }
 
-func pendingClaimQueries(now time.Time, priorityEventTypes []string) []pendingClaimQuery {
+func pendingClaimQueries(now time.Time, tiers [][]string) []pendingClaimQuery {
 	sortByCreatedAt := bson.D{{Key: "created_at", Value: 1}}
 	base := bson.M{
 		"status":          outboxcore.StatusPending,
 		"next_attempt_at": bson.M{"$lte": now},
 	}
-	priorityEventTypes = normalizePriorityEventTypes(priorityEventTypes)
-	if len(priorityEventTypes) == 0 {
+	if len(tiers) == 0 {
 		return []pendingClaimQuery{{filter: base, sort: sortByCreatedAt}}
 	}
 
-	priorityFilter := cloneBSONMap(base)
-	priorityFilter["event_type"] = bson.M{"$in": priorityEventTypes}
-	fallbackFilter := cloneBSONMap(base)
-	return []pendingClaimQuery{
-		{filter: priorityFilter, sort: sortByCreatedAt},
-		{filter: fallbackFilter, sort: sortByCreatedAt},
+	queries := make([]pendingClaimQuery, 0, len(tiers))
+	for _, tier := range tiers {
+		if len(tier) == 0 {
+			queries = append(queries, pendingClaimQuery{filter: cloneBSONMap(base), sort: sortByCreatedAt})
+			continue
+		}
+		priorityFilter := cloneBSONMap(base)
+		priorityFilter["event_type"] = bson.M{"$in": normalizePriorityEventTypes(tier)}
+		queries = append(queries, pendingClaimQuery{filter: priorityFilter, sort: sortByCreatedAt})
 	}
+	return queries
 }
 
 func cloneBSONMap(src bson.M) bson.M {
@@ -339,12 +355,8 @@ func cloneBSONMap(src bson.M) bson.M {
 	return dst
 }
 
-func defaultPriorityEventTypes() []string {
-	return []string{
-		eventcatalog.AnswerSheetSubmitted,
-		eventcatalog.AssessmentInterpreted,
-		eventcatalog.ReportGenerated,
-	}
+func defaultPriorityTiers() [][]string {
+	return outboxpriority.ClaimOrder(nil, nil)
 }
 
 func normalizePriorityEventTypes(eventTypes []string) []string {

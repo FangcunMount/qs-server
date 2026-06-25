@@ -29,6 +29,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 )
 
 // ActorModule Actor 模块（测评对象和工作人员）
@@ -114,7 +115,11 @@ func NewActorModule(deps ActorModuleDeps) (*ActorModule, error) {
 	statisticsRepo := statisticsInfra.NewStatisticsRepository(mysqlDB, mysqlOptions)
 	resolveLogWriter := statisticsInfra.NewAssessmentEntryResolveLogger(statisticsRepo)
 	intakeLogWriter := statisticsInfra.NewAssessmentEntryIntakeLogger(statisticsRepo)
-	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStoreWithTopicResolver(mysqlDB, deps.TopicResolver))
+	behaviorEvents := statisticsApp.NewBehaviorEventStager(mysqlEventOutbox.NewStoreWithTopicResolver(
+		mysqlDB,
+		deps.TopicResolver,
+		mysqlEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
+	))
 
 	// 初始化 testee domain services
 	testeeValidator := testee.NewValidator(testeeRepo)

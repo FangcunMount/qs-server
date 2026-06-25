@@ -152,12 +152,12 @@ func TestSaveAssessmentAndStageEventsRequiresCompleteTransactionalOutboxConfig(t
 
 	t.Run("missing tx runner", func(t *testing.T) {
 		repo := &managementRepoStub{}
-		err := saveAssessmentAndStageEvents(context.Background(), repo, nil, &recordingEventStager{}, a, nil)
+		err := saveAssessmentAndStageEvents(context.Background(), repo, nil, &recordingEventStager{}, a, nil, nil)
 		assertMissingDependency(t, repo, err)
 	})
 	t.Run("missing stager", func(t *testing.T) {
 		repo := &managementRepoStub{}
-		err := saveAssessmentAndStageEvents(context.Background(), repo, &recordingTxRunner{}, nil, a, nil)
+		err := saveAssessmentAndStageEvents(context.Background(), repo, &recordingTxRunner{}, nil, a, nil, nil)
 		assertMissingDependency(t, repo, err)
 	})
 }

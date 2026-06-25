@@ -4,6 +4,7 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -29,6 +30,7 @@ func saveAssessmentAndStageEvents(
 	stager EventStager,
 	a *domainAssessment.Assessment,
 	additional AdditionalEventBuilder,
+	immediate *appEventing.ImmediateDispatcher,
 ) error {
 	if txRunner == nil || stager == nil {
 		return evalerrors.ModuleNotConfigured("assessment transactional outbox requires transaction runner and event stager")
@@ -37,6 +39,7 @@ func saveAssessmentAndStageEvents(
 		return nil
 	}
 
+	var stagedEvents []event.DomainEvent
 	err := txRunner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := repo.Save(txCtx, a); err != nil {
 			return err
@@ -48,6 +51,7 @@ func saveAssessmentAndStageEvents(
 		eventsToStage := make([]event.DomainEvent, 0, len(a.Events())+len(extra))
 		eventsToStage = append(eventsToStage, a.Events()...)
 		eventsToStage = append(eventsToStage, extra...)
+		stagedEvents = eventsToStage
 		if len(eventsToStage) == 0 {
 			return nil
 		}
@@ -55,6 +59,9 @@ func saveAssessmentAndStageEvents(
 	})
 	if err != nil {
 		return err
+	}
+	if immediate != nil && len(stagedEvents) > 0 {
+		immediate.TryDispatchAfterCommit(ctx, stagedEvents)
 	}
 	a.ClearEvents()
 	return nil

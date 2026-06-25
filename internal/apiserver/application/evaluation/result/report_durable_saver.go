@@ -3,7 +3,9 @@ package result
 import (
 	"context"
 	"fmt"
+	"time"
 
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/report"
@@ -23,20 +25,23 @@ type ReportEventStager interface {
 }
 
 type transactionalReportDurableSaver struct {
-	runner apptransaction.Runner
-	writer ReportDurableWriter
-	stager ReportEventStager
+	runner       apptransaction.Runner
+	writer       ReportDurableWriter
+	stager       ReportEventStager
+	readyIndexer *appEventing.PostCommitReadyIndexer
 }
 
 func NewTransactionalReportDurableSaver(
 	runner apptransaction.Runner,
 	writer ReportDurableWriter,
 	stager ReportEventStager,
+	readyIndexer *appEventing.PostCommitReadyIndexer,
 ) ReportDurableSaver {
 	return transactionalReportDurableSaver{
-		runner: runner,
-		writer: writer,
-		stager: stager,
+		runner:       runner,
+		writer:       writer,
+		stager:       stager,
+		readyIndexer: readyIndexer,
 	}
 }
 
@@ -48,13 +53,22 @@ func (s transactionalReportDurableSaver) SaveReportDurably(ctx context.Context, 
 		return fmt.Errorf("report transactional durable saver requires transaction runner, writer and event stager")
 	}
 
-	return s.runner.WithinTransaction(ctx, func(txCtx context.Context) error {
+	var stagedEvents []event.DomainEvent
+	err := s.runner.WithinTransaction(ctx, func(txCtx context.Context) error {
 		if err := s.writer.SaveReportRecord(txCtx, rpt, testeeID); err != nil {
 			return err
 		}
 		if len(events) == 0 {
 			return nil
 		}
+		stagedEvents = events
 		return s.stager.Stage(txCtx, events...)
 	})
+	if err != nil {
+		return err
+	}
+	if s.readyIndexer != nil && len(stagedEvents) > 0 {
+		s.readyIndexer.EnqueueAfterCommit(ctx, stagedEvents, time.Now())
+	}
+	return nil
 }

@@ -15,11 +15,12 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 	}
 
 	deps := assembler.ScaleModuleDeps{
-		EventPublisher:   c.eventPublisher,
-		RankRedisClient:  c.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder: c.CacheBuilder(cacheplane.FamilyRank),
-		IdentityService:  c.resolveIdentityService(),
-		HotsetRecorder:   c.hotsetRecorder(),
+		EventPublisher:      c.eventPublisher,
+		RankRedisClient:     c.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder:    c.CacheBuilder(cacheplane.FamilyRank),
+		IdentityService:     c.resolveIdentityService(),
+		HotsetRecorder:      c.hotsetRecorder(),
+		CacheSignalNotifier: c.CacheSignalNotifier(),
 	}
 	if infra != nil {
 		deps.Repo = infra.scaleRepo

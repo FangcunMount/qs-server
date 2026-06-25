@@ -180,6 +180,13 @@ func (r *Repository) ClaimDueEvents(ctx context.Context, limit int, now time.Tim
 	return r.outboxStore.ClaimDueEvents(ctx, limit, now)
 }
 
+func (r *Repository) ClaimEventsByIDs(ctx context.Context, eventIDs []string, now time.Time) ([]outboxport.PendingEvent, error) {
+	if r == nil || r.outboxStore == nil {
+		return nil, nil
+	}
+	return r.outboxStore.ClaimEventsByIDs(ctx, eventIDs, now)
+}
+
 func (r *Repository) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
 	return r.outboxStore.MarkEventPublished(ctx, eventID, publishedAt)
 }
@@ -193,6 +200,41 @@ func (r *Repository) OutboxStatusSnapshot(ctx context.Context, now time.Time) (o
 		return outboxport.StatusSnapshot{}, nil
 	}
 	return r.outboxStore.OutboxStatusSnapshot(ctx, now)
+}
+
+func (r *Repository) GetPublishableEvent(ctx context.Context, eventID string, now time.Time) (outboxport.PendingEvent, bool, error) {
+	if r == nil || r.outboxStore == nil {
+		return outboxport.PendingEvent{}, false, nil
+	}
+	return r.outboxStore.GetPublishableEvent(ctx, eventID, now)
+}
+
+func (r *Repository) MarkEventsPublished(ctx context.Context, eventIDs []string, publishedAt time.Time) error {
+	if r == nil || r.outboxStore == nil {
+		return nil
+	}
+	return r.outboxStore.MarkEventsPublished(ctx, eventIDs, publishedAt)
+}
+
+func (r *Repository) MarkEventsFailed(ctx context.Context, failures []outboxport.FailedMark, nextAttemptAt time.Time) error {
+	if r == nil || r.outboxStore == nil {
+		return nil
+	}
+	return r.outboxStore.MarkEventsFailed(ctx, failures, nextAttemptAt)
+}
+
+func (r *Repository) OutboxStatusByEventType(ctx context.Context, now time.Time) ([]outboxport.EventTypeStatusBucket, error) {
+	if r == nil || r.outboxStore == nil {
+		return nil, nil
+	}
+	return r.outboxStore.OutboxStatusByEventType(ctx, now)
+}
+
+func (r *Repository) ListPendingEventRefs(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEventRef, error) {
+	if r == nil || r.outboxStore == nil {
+		return nil, nil
+	}
+	return r.outboxStore.ListPendingEventRefs(ctx, limit, now)
 }
 
 func (r *Repository) withTransaction(ctx context.Context, fn func(txCtx mongo.SessionContext) error) error {

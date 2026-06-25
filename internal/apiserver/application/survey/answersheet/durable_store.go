@@ -33,11 +33,13 @@ func NewTransactionalSubmissionDurableStore(
 	runner apptransaction.Runner,
 	writer SubmissionDurableWriter,
 	stager EventStager,
+	immediate *appEventing.ImmediateDispatcher,
 ) SubmissionDurableStore {
 	return transactionalSubmissionDurableStore{
-		runner: runner,
-		writer: writer,
-		stager: stager,
+		runner:    runner,
+		writer:    writer,
+		stager:    stager,
+		immediate: immediate,
 	}
 }
 

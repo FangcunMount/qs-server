@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/scale"
@@ -46,6 +47,7 @@ type ScaleModuleDeps struct {
 	RankCacheBuilder       *keyspace.Builder
 	IdentityService        *iam.IdentityService
 	HotsetRecorder         cachetarget.HotsetRecorder
+	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
 }
 
 // NewScaleModule 创建 Scale 模块。
@@ -64,7 +66,8 @@ func NewScaleModule(deps ScaleModuleDeps) (*ScaleModule, error) {
 		normalized.QuestionnaireCatalog,
 		module.eventPublisher,
 		normalized.ListCache,
-		newScaleQuestionnairePublisher(normalized.QuestionnairePublisher),
+		scaleApp.WithQuestionnairePublisher(newScaleQuestionnairePublisher(normalized.QuestionnairePublisher)),
+		scaleApp.WithCacheSignalNotifier(normalized.CacheSignalNotifier),
 	)
 	module.FactorService = scaleApp.NewFactorService(normalized.Repo, normalized.ListCache, module.eventPublisher)
 	hotRankReader := scaleCache.NewRedisScaleHotRankProjection(normalized.RankRedisClient, normalized.RankCacheBuilder)

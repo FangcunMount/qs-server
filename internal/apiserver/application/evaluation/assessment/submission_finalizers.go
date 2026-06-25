@@ -5,6 +5,7 @@ import (
 	"time"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
@@ -17,6 +18,7 @@ type assessmentCreateFinalizer struct {
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 	cache       assessmentListCache
+	immediate   *appEventing.ImmediateDispatcher
 }
 
 // SaveAndStage 保存并阶段测评
@@ -37,7 +39,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 				occurredAt,
 			),
 		}
-	}); err != nil {
+	}, f.immediate); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil
@@ -54,11 +56,12 @@ type assessmentSubmitFinalizer struct {
 	txRunner    apptransaction.Runner
 	eventStager EventStager
 	cache       assessmentListCache
+	immediate   *appEventing.ImmediateDispatcher
 }
 
 // SaveAndStage 保存并阶段测评
 func (f assessmentSubmitFinalizer) SaveAndStage(ctx context.Context, a *domainAssessment.Assessment) error {
-	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, nil); err != nil {
+	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, nil, f.immediate); err != nil {
 		return evalerrors.Database(err, "保存测评失败")
 	}
 	return nil

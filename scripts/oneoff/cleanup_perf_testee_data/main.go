@@ -21,6 +21,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"golang.org/x/sync/errgroup"
 )
 
 const mongoIDChunkSize = 1000
@@ -51,6 +52,7 @@ type config struct {
 	mysqlLockWaitTimeout      int
 	mysqlDeleteRetries        int
 	mysqlDeleteBatchSize      int
+	workers                   int
 }
 
 type namedCount struct {
@@ -160,7 +162,7 @@ func main() {
 	}
 	mysqlScopedIDs := ids
 	prog.Phase("enrich scope from mongo")
-	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids)
+	ids, err = enrichScopeIDsFromMongo(ctx, mongoDB, ids, cfg.workers)
 	if err != nil {
 		log.Fatalf("enrich scope ids from mongo: %v", err)
 	}
@@ -184,7 +186,7 @@ func main() {
 		log.Print("skip mongo outbox event id scope by --skip-mongo-outbox-event-scope; mysql pending/checkpoint cleanup will not include event_ids that exist only in Mongo outbox")
 	} else {
 		prog.Phase("load mongo outbox event ids")
-		if err := addMongoOutboxEventIDsToMySQLScope(ctx, conn, mongoDB, ids); err != nil {
+		if err := addMongoOutboxEventIDsToMySQLScope(ctx, conn, mongoDB, ids, cfg.workers); err != nil {
 			log.Fatalf("load mongo outbox event ids: %v", err)
 		}
 	}
@@ -198,13 +200,20 @@ func main() {
 		if err != nil {
 			log.Fatalf("load scope summary: %v", err)
 		}
-		mysqlCounts, err := countMySQLRows(ctx, conn)
-		if err != nil {
-			log.Fatalf("count mysql rows: %v", err)
-		}
-		mongoCounts, err := countMongoRows(ctx, mongoDB, ids)
-		if err != nil {
-			log.Fatalf("count mongo rows: %v", err)
+		var mysqlCounts, mongoCounts []namedCount
+		countGroup, countCtx := errgroup.WithContext(ctx)
+		countGroup.Go(func() error {
+			var err error
+			mysqlCounts, err = countMySQLRows(countCtx, conn)
+			return err
+		})
+		countGroup.Go(func() error {
+			var err error
+			mongoCounts, err = countMongoRows(countCtx, mongoDB, ids, cfg.workers)
+			return err
+		})
+		if err := countGroup.Wait(); err != nil {
+			log.Fatalf("count scoped rows: %v", err)
 		}
 		prog.Finish("count scoped rows", "")
 
@@ -227,16 +236,18 @@ func main() {
 		if err := validateBackupSuffix(cfg.backupSuffix); err != nil {
 			log.Fatalf("invalid backup suffix: %v", err)
 		}
-		prog.Phase("backup mongo rows")
-		if err := backupMongoRows(ctx, mongoDB, ids, cfg.backupSuffix); err != nil {
-			log.Fatalf("backup mongo rows: %v", err)
+		prog.Phase("backup mysql and mongo rows")
+		backupGroup, backupCtx := errgroup.WithContext(ctx)
+		backupGroup.Go(func() error {
+			return backupMongoRows(backupCtx, mongoDB, ids, cfg.backupSuffix, cfg.workers)
+		})
+		backupGroup.Go(func() error {
+			return backupMySQLRows(backupCtx, conn, cfg.backupSuffix)
+		})
+		if err := backupGroup.Wait(); err != nil {
+			log.Fatalf("backup rows: %v", err)
 		}
-		prog.Finish("backup mongo rows", "suffix="+cfg.backupSuffix)
-		prog.Phase("backup mysql rows")
-		if err := backupMySQLRows(ctx, conn, cfg.backupSuffix); err != nil {
-			log.Fatalf("backup mysql rows: %v", err)
-		}
-		prog.Finish("backup mysql rows", "suffix="+cfg.backupSuffix)
+		prog.Finish("backup mysql and mongo rows", "suffix="+cfg.backupSuffix)
 		log.Printf("backup completed: suffix=%s", cfg.backupSuffix)
 	} else {
 		log.Print("backup skipped by --skip-backup")
@@ -250,7 +261,7 @@ func main() {
 	prog.Finish("delete mysql rows", "")
 
 	prog.Phase("delete mongo rows")
-	mongoDeleted, err := deleteMongoRows(ctx, mongoDB, ids)
+	mongoDeleted, err := deleteMongoRows(ctx, mongoDB, ids, cfg.workers)
 	if err != nil {
 		log.Fatalf("delete mongo rows: %v", err)
 	}
@@ -282,6 +293,7 @@ func parseFlags() config {
 	flag.IntVar(&cfg.mysqlLockWaitTimeout, "mysql-lock-wait-timeout", 300, "MySQL SESSION innodb_lock_wait_timeout seconds during delete; 0 keeps server default")
 	flag.IntVar(&cfg.mysqlDeleteRetries, "mysql-delete-retries", 5, "retries per table when MySQL delete hits lock wait timeout or deadlock")
 	flag.IntVar(&cfg.mysqlDeleteBatchSize, "mysql-delete-batch-size", defaultMySQLDeleteBatchSize, "rows per transaction for chunked MySQL deletes")
+	flag.IntVar(&cfg.workers, "workers", 4, "parallel workers for independent Mongo scans and cross-store backup/count")
 	flag.Parse()
 
 	required := map[string]string{
@@ -305,6 +317,9 @@ func parseFlags() config {
 	}
 	if cfg.mysqlDeleteRetries < 1 {
 		log.Fatal("--mysql-delete-retries must be >= 1")
+	}
+	if cfg.workers < 1 {
+		log.Fatal("--workers must be >= 1")
 	}
 	if !cfg.apply && cfg.skipBackup {
 		log.Print("--skip-backup has no effect in dry-run mode")
@@ -394,15 +409,8 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 			return err
 		}
 	}
-	for i, id := range testeeIDs {
-		if err := prog.RunStep("insert testee ids", i+1, len(testeeIDs), func() error {
-			if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_testee_ids (id) VALUES (?)`, id); err != nil {
-				return fmt.Errorf("insert testee id %d: %w", id, err)
-			}
-			return nil
-		}); err != nil {
-			return err
-		}
+	if err := bulkInsertUint64IDs(ctx, conn, "tmp_cleanup_testee_ids", testeeIDs); err != nil {
+		return fmt.Errorf("insert testee ids: %w", err)
 	}
 
 	if err := validateTesteeGuard(ctx, conn, cfg, len(testeeIDs)); err != nil {
@@ -696,22 +704,38 @@ func loadScopeIDs(ctx context.Context, conn *sql.Conn) (scopeIDs, error) {
 	return scopeIDs{TesteeIDs: testeeIDs, AssessmentIDs: assessmentIDs, AnswerSheetIDs: answerSheetIDs, ReportIDs: reportIDs}, nil
 }
 
-func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs) (scopeIDs, error) {
-	answerSheetIDs, err := loadMongoUint64Field(ctx, db.Collection("answersheets"), inUint64("testee_id", ids.TesteeIDs), "domain_id", "answersheets.domain_id")
-	if err != nil {
-		return ids, fmt.Errorf("load answersheet domain ids: %w", err)
+func enrichScopeIDsFromMongo(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) (scopeIDs, error) {
+	type mongoFieldTask struct {
+		coll  string
+		field string
+		label string
 	}
-	idempotencyAnswerSheetIDs, err := loadMongoUint64Field(ctx, db.Collection("answersheet_submit_idempotency"), inUint64("testee_id", ids.TesteeIDs), "answersheet_id", "answersheet_submit_idempotency.answersheet_id")
-	if err != nil {
-		return ids, fmt.Errorf("load answersheet idempotency ids: %w", err)
+	tasks := []mongoFieldTask{
+		{coll: "answersheets", field: "domain_id", label: "answersheets.domain_id"},
+		{coll: "answersheet_submit_idempotency", field: "answersheet_id", label: "answersheet_submit_idempotency.answersheet_id"},
+		{coll: "interpret_reports", field: "domain_id", label: "interpret_reports.domain_id"},
 	}
-	reportIDs, err := loadMongoUint64Field(ctx, db.Collection("interpret_reports"), inUint64("testee_id", ids.TesteeIDs), "domain_id", "interpret_reports.domain_id")
-	if err != nil {
-		return ids, fmt.Errorf("load report domain ids: %w", err)
+	results := make([][]uint64, len(tasks))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(workers)
+	for i, task := range tasks {
+		i, task := i, task
+		group.Go(func() error {
+			filter := inUint64("testee_id", ids.TesteeIDs)
+			out, err := loadMongoUint64Field(groupCtx, db.Collection(task.coll), filter, task.field, task.label)
+			if err != nil {
+				return fmt.Errorf("load %s: %w", task.label, err)
+			}
+			results[i] = out
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return ids, err
 	}
 
-	ids.AnswerSheetIDs = uniqueUint64(append(append(ids.AnswerSheetIDs, answerSheetIDs...), idempotencyAnswerSheetIDs...))
-	ids.ReportIDs = uniqueUint64(append(ids.ReportIDs, reportIDs...))
+	ids.AnswerSheetIDs = uniqueUint64(append(append(ids.AnswerSheetIDs, results[0]...), results[1]...))
+	ids.ReportIDs = uniqueUint64(append(ids.ReportIDs, results[2]...))
 	return ids, nil
 }
 
@@ -831,53 +855,106 @@ func bulkInsertUint64IDs(ctx context.Context, conn *sql.Conn, table string, ids 
 	return nil
 }
 
-func addMongoOutboxEventIDsToMySQLScope(ctx context.Context, conn *sql.Conn, db *mongo.Database, ids scopeIDs) error {
+func bulkInsertStringColumn(ctx context.Context, conn *sql.Conn, table, column string, values []string) error {
+	values = uniqueStrings(values)
+	chunkCount := (len(values) + mysqlInsertChunkSize - 1) / mysqlInsertChunkSize
+	if chunkCount == 0 {
+		return nil
+	}
+	chunkIndex := 0
+	for start := 0; start < len(values); start += mysqlInsertChunkSize {
+		end := start + mysqlInsertChunkSize
+		if end > len(values) {
+			end = len(values)
+		}
+		chunk := values[start:end]
+		chunkIndex++
+		prog.Step(table+"."+column, int64(chunkIndex), int64(chunkCount))
+		placeholders := make([]string, 0, len(chunk))
+		args := make([]any, 0, len(chunk))
+		for _, value := range chunk {
+			placeholders = append(placeholders, "(?)")
+			args = append(args, value)
+		}
+		stmt := fmt.Sprintf("INSERT IGNORE INTO %s (%s) VALUES %s", table, column, strings.Join(placeholders, ","))
+		if _, err := conn.ExecContext(ctx, stmt, args...); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func addMongoOutboxEventIDsToMySQLScope(ctx context.Context, conn *sql.Conn, db *mongo.Database, ids scopeIDs, workers int) error {
 	filters := mongoOutboxFilters(ids)
-	var eventCount int64
-	for i, filter := range filters {
+	eventIDs, err := scanMongoOutboxEventIDs(ctx, db, filters, workers)
+	if err != nil {
+		return err
+	}
+	if err := bulkInsertStringColumn(ctx, conn, "tmp_cleanup_event_ids", "event_id", eventIDs); err != nil {
+		return fmt.Errorf("store mongo outbox event ids: %w", err)
+	}
+	prog.Indeterminate("sync analytics pending event ids")
+	_, err = conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
+SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY p.event_id`)
+	if err != nil {
+		return err
+	}
+	prog.Finish("load mongo outbox event ids", fmt.Sprintf("event_ids=%d", len(eventIDs)))
+	return nil
+}
+
+func scanMongoOutboxEventIDs(ctx context.Context, db *mongo.Database, filters []bson.M, workers int) ([]string, error) {
+	if len(filters) == 0 {
+		return nil, nil
+	}
+	seen := make(map[string]struct{})
+	var mu sync.Mutex
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(workers)
+	for _, filter := range filters {
 		filter := filter
-		if err := prog.RunStep("scan mongo outbox filters", i+1, len(filters), func() error {
-			cur, err := db.Collection("domain_event_outbox").Find(ctx, filter, options.Find().SetProjection(bson.M{"event_id": 1}))
+		group.Go(func() error {
+			cur, err := db.Collection("domain_event_outbox").Find(groupCtx, filter, options.Find().SetProjection(bson.M{"event_id": 1}))
 			if err != nil {
 				return err
 			}
-			for cur.Next(ctx) {
+			defer func() { _ = cur.Close(groupCtx) }()
+			local := make([]string, 0, 128)
+			for cur.Next(groupCtx) {
 				var row struct {
 					EventID string `bson:"event_id"`
 				}
 				if err := cur.Decode(&row); err != nil {
-					_ = cur.Close(ctx)
 					return err
 				}
 				if row.EventID == "" {
 					continue
 				}
-				if _, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_event_ids (event_id) VALUES (?)`, row.EventID); err != nil {
-					_ = cur.Close(ctx)
-					return err
-				}
-				eventCount++
-				if eventCount%10000 == 0 {
-					prog.Step("insert mongo outbox event ids", eventCount, 0)
-				}
+				local = append(local, row.EventID)
 			}
 			if err := cur.Err(); err != nil {
-				_ = cur.Close(ctx)
 				return err
 			}
-			return cur.Close(ctx)
-		}); err != nil {
-			return err
-		}
+			if len(local) == 0 {
+				return nil
+			}
+			mu.Lock()
+			for _, eventID := range local {
+				seen[eventID] = struct{}{}
+			}
+			mu.Unlock()
+			return nil
+		})
 	}
-	prog.Indeterminate("sync analytics pending event ids")
-	_, err := conn.ExecContext(ctx, `INSERT IGNORE INTO tmp_cleanup_pending_event_ids (event_id)
-SELECT p.event_id FROM analytics_pending_event p JOIN tmp_cleanup_event_ids e ON BINARY e.event_id = BINARY p.event_id`)
-	if err != nil {
-		return err
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
-	prog.Finish("load mongo outbox event ids", fmt.Sprintf("event_ids=%d", eventCount))
-	return nil
+	out := make([]string, 0, len(seen))
+	for eventID := range seen {
+		out = append(out, eventID)
+	}
+	sort.Strings(out)
+	return out, nil
 }
 
 func loadScopeSummary(ctx context.Context, conn *sql.Conn) (scopeSummary, error) {
@@ -987,20 +1064,24 @@ func countMySQLRows(ctx context.Context, conn *sql.Conn) ([]namedCount, error) {
 	return out, nil
 }
 
-func countMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs) ([]namedCount, error) {
+func countMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) ([]namedCount, error) {
 	items := mongoCollectionScopes(ids)
-	out := make([]namedCount, 0, len(items))
+	out := make([]namedCount, len(items))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(workers)
 	for i, item := range items {
-		item := item
-		var count int64
-		if err := prog.RunStep("count mongo "+item.name, i+1, len(items), func() error {
-			var err error
-			count, err = countMongoDocumentsByFilters(ctx, db.Collection(item.coll), item.filters, item.name)
-			return err
-		}); err != nil {
-			return nil, fmt.Errorf("%s: %w", item.name, err)
-		}
-		out = append(out, namedCount{Name: item.name, Count: count})
+		i, item := i, item
+		group.Go(func() error {
+			count, err := countMongoDocumentsByFilters(groupCtx, db.Collection(item.coll), item.filters, item.name)
+			if err != nil {
+				return fmt.Errorf("%s: %w", item.name, err)
+			}
+			out[i] = namedCount{Name: item.name, Count: count}
+			return nil
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
@@ -1042,22 +1123,23 @@ func backupMySQLRows(ctx context.Context, conn *sql.Conn, suffix string) error {
 	return nil
 }
 
-func backupMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, suffix string) error {
+func backupMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, suffix string, workers int) error {
 	items := mongoCollectionScopes(ids)
-	for i, item := range items {
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(workers)
+	for _, item := range items {
 		item := item
-		var count int64
-		if err := prog.RunStep("backup mongo "+item.coll, i+1, len(items), func() error {
+		group.Go(func() error {
 			backupName := "cleanup_bak_perf_testee_" + item.coll + "_" + suffix
-			var err error
-			count, err = backupMongoCollection(ctx, db.Collection(item.coll), db.Collection(backupName), item.filters, item.coll)
-			return err
-		}); err != nil {
-			return fmt.Errorf("backup mongo %s: %w", item.coll, err)
-		}
-		log.Printf("mongo backup: source=%s backup=%s docs=%d", item.coll, "cleanup_bak_perf_testee_"+item.coll+"_"+suffix, count)
+			count, err := backupMongoCollection(groupCtx, db.Collection(item.coll), db.Collection(backupName), item.filters, item.coll)
+			if err != nil {
+				return fmt.Errorf("backup mongo %s: %w", item.coll, err)
+			}
+			log.Printf("mongo backup: source=%s backup=%s docs=%d", item.coll, backupName, count)
+			return nil
+		})
 	}
-	return nil
+	return group.Wait()
 }
 
 func backupMongoCollection(ctx context.Context, source, backup *mongo.Collection, filters []bson.M, label string) (int64, error) {
@@ -1599,33 +1681,28 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-func deleteMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs) ([]namedCount, error) {
+func deleteMongoRows(ctx context.Context, db *mongo.Database, ids scopeIDs, workers int) ([]namedCount, error) {
 	items := mongoCollectionScopes(ids)
-	out := make([]namedCount, 0, len(items))
+	out := make([]namedCount, len(items))
+	group, groupCtx := errgroup.WithContext(ctx)
+	group.SetLimit(workers)
 	for i, item := range items {
-		item := item
-		var deleted int64
-		if err := prog.RunStep("delete mongo "+item.name, i+1, len(items), func() error {
-			for j, filter := range item.filters {
-				filter := filter
-				var batchDeleted int64
-				if err := prog.RunStep(item.name+" filter", j+1, len(item.filters), func() error {
-					result, err := db.Collection(item.coll).DeleteMany(ctx, filter)
-					if err != nil {
-						return err
-					}
-					batchDeleted = result.DeletedCount
-					return nil
-				}); err != nil {
+		i, item := i, item
+		group.Go(func() error {
+			var deleted int64
+			for _, filter := range item.filters {
+				result, err := db.Collection(item.coll).DeleteMany(groupCtx, filter)
+				if err != nil {
 					return err
 				}
-				deleted += batchDeleted
+				deleted += result.DeletedCount
 			}
+			out[i] = namedCount{Name: item.name, Count: deleted}
 			return nil
-		}); err != nil {
-			return nil, fmt.Errorf("%s: %w", item.name, err)
-		}
-		out = append(out, namedCount{Name: item.name, Count: deleted})
+		})
+	}
+	if err := group.Wait(); err != nil {
+		return nil, err
 	}
 	return out, nil
 }
