@@ -26,7 +26,7 @@ import (
 
 const mongoIDChunkSize = 1000
 const mysqlInsertChunkSize = 1000
-const defaultMySQLDeleteBatchSize = 1000
+const defaultMySQLDeleteBatchSize = 5000
 const progressBarWidth = 32
 
 var prog progressReporter
@@ -81,11 +81,12 @@ type mysqlDeleteItem struct {
 }
 
 type mysqlChunkedDeleteSpec struct {
-	name             string
-	createBatchTable string
-	clearBatchTable  string
-	fillBatchTable   string
-	deleteBatch      string
+	name              string
+	createBatchTable  string
+	clearBatchTable   string
+	fillBatchTable    string
+	deleteBatch       string
+	pruneStagingTable string
 }
 
 type testeePreview struct {
@@ -398,6 +399,10 @@ func prepareMySQLScope(ctx context.Context, conn *sql.Conn, cfg config, testeeID
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_mysql_outbox_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY, event_id %s NOT NULL, UNIQUE KEY uk_event_id (event_id))`, eventIDType),
 		fmt.Sprintf(`CREATE TEMPORARY TABLE tmp_cleanup_pending_event_ids (event_id %s NOT NULL PRIMARY KEY)`, eventIDType),
+		`CREATE TEMPORARY TABLE tmp_cleanup_behavior_footprint_ids (id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_episode_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_task_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
+		`CREATE TEMPORARY TABLE tmp_cleanup_assessment_score_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 	}
 	for i, stmt := range stmts {
 		if err := prog.RunStep("create temp tables", i+1, len(stmts), func() error {
@@ -1304,6 +1309,67 @@ func isMySQLUnknownTable(err error) bool {
 	return strings.Contains(err.Error(), "doesn't exist")
 }
 
+func materializeScopedDeleteIDs(ctx context.Context, conn *sql.Conn) error {
+	items := []namedSQL{
+		{
+			name: "behavior_footprint ids",
+			sql: `INSERT IGNORE INTO tmp_cleanup_behavior_footprint_ids (id)
+SELECT bf.id
+FROM behavior_footprint bf
+LEFT JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id
+LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id
+LEFT JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id
+WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`,
+		},
+		{
+			name: "assessment_episode ids",
+			sql: `INSERT IGNORE INTO tmp_cleanup_assessment_episode_ids (id)
+SELECT ae.episode_id
+FROM assessment_episode ae
+LEFT JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id
+LEFT JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id
+LEFT JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id
+WHERE t.id IS NOT NULL OR s.id IS NOT NULL OR a.id IS NOT NULL OR r.id IS NOT NULL`,
+		},
+		{
+			name: "assessment_task ids",
+			sql: `INSERT IGNORE INTO tmp_cleanup_assessment_task_ids (id)
+SELECT task.id
+FROM assessment_task task
+LEFT JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id
+WHERE t.id IS NOT NULL OR a.id IS NOT NULL`,
+		},
+		{
+			name: "assessment_score ids",
+			sql: `INSERT IGNORE INTO tmp_cleanup_assessment_score_ids (id)
+SELECT s.id
+FROM assessment_score s
+LEFT JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id
+LEFT JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id
+WHERE a.id IS NOT NULL OR t.id IS NOT NULL`,
+		},
+	}
+	for i, item := range items {
+		item := item
+		if err := prog.RunStep("materialize "+item.name, i+1, len(items), func() error {
+			result, err := conn.ExecContext(ctx, item.sql)
+			if err != nil {
+				return err
+			}
+			if affected, err := result.RowsAffected(); err == nil {
+				log.Printf("materialize %s: rows=%d", item.name, affected)
+			}
+			return nil
+		}); err != nil {
+			return fmt.Errorf("%s: %w", item.name, err)
+		}
+	}
+	return nil
+}
+
 func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, maxRetries, batchSize int) ([]namedCount, error) {
 	if lockWaitTimeoutSec > 0 {
 		if _, err := conn.ExecContext(ctx, "SET SESSION innodb_lock_wait_timeout = ?", lockWaitTimeoutSec); err != nil {
@@ -1311,6 +1377,12 @@ func deleteMySQLRows(ctx context.Context, conn *sql.Conn, lockWaitTimeoutSec, ma
 		}
 		log.Printf("mysql delete: innodb_lock_wait_timeout=%ds per-table commit retries=%d batch_size=%d", lockWaitTimeoutSec, maxRetries, batchSize)
 	}
+
+	prog.Phase("materialize mysql delete ids")
+	if err := materializeScopedDeleteIDs(ctx, conn); err != nil {
+		return nil, fmt.Errorf("materialize scoped delete ids: %w", err)
+	}
+	prog.Finish("materialize mysql delete ids", "")
 
 	items, err := mysqlDeleteItems(ctx, conn)
 	if err != nil {
@@ -1418,20 +1490,16 @@ JOIN tmp_cleanup_batch_ids b ON b.id = o.id`,
 			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_string_ids (id VARCHAR(128) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci NOT NULL PRIMARY KEY)`,
 			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_string_ids`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_string_ids (id)
-SELECT id FROM (
-  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_testee_ids t ON t.id = bf.testee_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_answersheet_ids s ON s.id = bf.answersheet_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_assessment_ids a ON a.id = bf.assessment_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT bf.id AS id FROM behavior_footprint bf JOIN tmp_cleanup_report_ids r ON r.id = bf.report_id LIMIT ?)
-) scoped
-ORDER BY id
+SELECT s.id
+FROM tmp_cleanup_behavior_footprint_ids s
+ORDER BY s.id
 LIMIT ?`,
 			deleteBatch: `DELETE bf
 FROM behavior_footprint bf
 JOIN tmp_cleanup_batch_string_ids b ON b.id = bf.id`,
+			pruneStagingTable: `DELETE s
+FROM tmp_cleanup_behavior_footprint_ids s
+JOIN tmp_cleanup_batch_string_ids b ON b.id = s.id`,
 		}, true
 	case "assessment_episode":
 		return mysqlChunkedDeleteSpec{
@@ -1439,20 +1507,16 @@ JOIN tmp_cleanup_batch_string_ids b ON b.id = bf.id`,
 			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
-SELECT id FROM (
-  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_testee_ids t ON t.id = ae.testee_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_answersheet_ids s ON s.id = ae.answersheet_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_assessment_ids a ON a.id = ae.assessment_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT ae.episode_id AS id FROM assessment_episode ae JOIN tmp_cleanup_report_ids r ON r.id = ae.report_id LIMIT ?)
-) scoped
-ORDER BY id
+SELECT s.id
+FROM tmp_cleanup_assessment_episode_ids s
+ORDER BY s.id
 LIMIT ?`,
 			deleteBatch: `DELETE ae
 FROM assessment_episode ae
 JOIN tmp_cleanup_batch_ids b ON b.id = ae.episode_id`,
+			pruneStagingTable: `DELETE s
+FROM tmp_cleanup_assessment_episode_ids s
+JOIN tmp_cleanup_batch_ids b ON b.id = s.id`,
 		}, true
 	case "assessment_entry_intake_log":
 		return mysqlChunkedDeleteSpec{
@@ -1490,16 +1554,16 @@ JOIN tmp_cleanup_batch_ids b ON b.id = r.id`,
 			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
-SELECT id FROM (
-  (SELECT task.id AS id FROM assessment_task task JOIN tmp_cleanup_testee_ids t ON t.id = task.testee_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT task.id AS id FROM assessment_task task JOIN tmp_cleanup_assessment_ids a ON a.id = task.assessment_id LIMIT ?)
-) scoped
-ORDER BY id
+SELECT s.id
+FROM tmp_cleanup_assessment_task_ids s
+ORDER BY s.id
 LIMIT ?`,
 			deleteBatch: `DELETE task
 FROM assessment_task task
 JOIN tmp_cleanup_batch_ids b ON b.id = task.id`,
+			pruneStagingTable: `DELETE s
+FROM tmp_cleanup_assessment_task_ids s
+JOIN tmp_cleanup_batch_ids b ON b.id = s.id`,
 		}, true
 	case "assessment_score":
 		return mysqlChunkedDeleteSpec{
@@ -1507,16 +1571,16 @@ JOIN tmp_cleanup_batch_ids b ON b.id = task.id`,
 			createBatchTable: `CREATE TEMPORARY TABLE IF NOT EXISTS tmp_cleanup_batch_ids (id BIGINT UNSIGNED NOT NULL PRIMARY KEY)`,
 			clearBatchTable:  `DELETE FROM tmp_cleanup_batch_ids`,
 			fillBatchTable: `INSERT IGNORE INTO tmp_cleanup_batch_ids (id)
-SELECT id FROM (
-  (SELECT s.id AS id FROM assessment_score s JOIN tmp_cleanup_assessment_ids a ON a.id = s.assessment_id LIMIT ?)
-  UNION DISTINCT
-  (SELECT s.id AS id FROM assessment_score s JOIN tmp_cleanup_testee_ids t ON t.id = s.testee_id LIMIT ?)
-) scoped
-ORDER BY id
+SELECT s.id
+FROM tmp_cleanup_assessment_score_ids s
+ORDER BY s.id
 LIMIT ?`,
 			deleteBatch: `DELETE s
 FROM assessment_score s
 JOIN tmp_cleanup_batch_ids b ON b.id = s.id`,
+			pruneStagingTable: `DELETE scoped
+FROM tmp_cleanup_assessment_score_ids scoped
+JOIN tmp_cleanup_batch_ids b ON b.id = scoped.id`,
 		}, true
 	case "assessment":
 		return mysqlChunkedDeleteSpec{
@@ -1616,6 +1680,12 @@ func execMySQLChunkedDeleteBatch(ctx context.Context, conn *sql.Conn, spec mysql
 		return 0, 0, fmt.Errorf("delete batch: %w", err)
 	}
 	deleted, _ := deleteResult.RowsAffected()
+	if spec.pruneStagingTable != "" {
+		if _, err := tx.ExecContext(ctx, spec.pruneStagingTable); err != nil {
+			_ = tx.Rollback()
+			return 0, 0, fmt.Errorf("prune staging table: %w", err)
+		}
+	}
 	if err := tx.Commit(); err != nil {
 		return 0, 0, err
 	}

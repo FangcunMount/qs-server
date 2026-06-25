@@ -224,6 +224,26 @@ func TestMySQLChunkedDeleteSpecForLargeDeleteTables(t *testing.T) {
 	}
 }
 
+func TestMySQLChunkedDeleteUsesStagingTablesForMultiSourceTables(t *testing.T) {
+	for _, name := range []string{"behavior_footprint", "assessment_episode", "assessment_task", "assessment_score"} {
+		t.Run(name, func(t *testing.T) {
+			spec, ok := mysqlChunkedDeleteSpecFor(name)
+			if !ok {
+				t.Fatalf("mysqlChunkedDeleteSpecFor(%q) ok = false, want true", name)
+			}
+			if strings.Contains(spec.fillBatchTable, "UNION") {
+				t.Fatalf("%s fill SQL should read from staging table, not UNION scans; sql=%s", name, spec.fillBatchTable)
+			}
+			if spec.pruneStagingTable == "" {
+				t.Fatalf("%s should prune staging ids after each batch", name)
+			}
+			if strings.Count(spec.fillBatchTable, "?") != 1 {
+				t.Fatalf("%s fill SQL should accept one batch size placeholder; sql=%s", name, spec.fillBatchTable)
+			}
+		})
+	}
+}
+
 func TestProgressPhaseElapsedSurvivesRunStep(t *testing.T) {
 	initProgress(true)
 	prog.phaseStarted = time.Now().Add(-2 * time.Second)
