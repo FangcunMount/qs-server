@@ -50,6 +50,36 @@ func TestPersonalityAssessmentSessionHandlerStartReturnsSession(t *testing.T) {
 	}
 }
 
+func TestPersonalityAssessmentSessionHandlerStartAcceptsStringTesteeID(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	handler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(
+		&sessionModelReader{model: &personalitymodel.PersonalityModelResponse{
+			Code:                 "MBTI_OEJTS",
+			QuestionnaireCode:    "MBTI_OEJTS",
+			QuestionnaireVersion: "1.0.0",
+			Status:               "published",
+		}},
+		&sessionQuestionnaireReader{questionnaire: &questionnaire.QuestionnaireResponse{
+			Code:    "MBTI_OEJTS",
+			Version: "1.0.0",
+		}},
+	))
+
+	body := []byte(`{"model_code":"MBTI_OEJTS","testee_id":"618855887087350318"}`)
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/api/v1/personality-assessment-sessions", bytes.NewReader(body))
+	c.Request.Header.Set("Content-Type", "application/json")
+
+	handler.Start(c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d body=%s", recorder.Code, recorder.Body.String())
+	}
+}
+
 type sessionModelReader struct {
 	model *personalitymodel.PersonalityModelResponse
 }

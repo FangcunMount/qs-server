@@ -1,6 +1,7 @@
 package personalitysession
 
 import (
+	"encoding/json"
 	"fmt"
 	"strconv"
 
@@ -11,6 +12,45 @@ import (
 type StartSessionRequest struct {
 	ModelCode string `json:"model_code" binding:"required"`
 	TesteeID  uint64 `json:"testee_id" binding:"required"`
+}
+
+// UnmarshalJSON 支持 testee_id 为字符串或数字（小程序侧大整数常以字符串传输）。
+func (r *StartSessionRequest) UnmarshalJSON(data []byte) error {
+	type Alias StartSessionRequest
+	aux := &struct {
+		TesteeID json.RawMessage `json:"testee_id"`
+		*Alias
+	}{
+		Alias: (*Alias)(r),
+	}
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+	if len(aux.TesteeID) == 0 {
+		return fmt.Errorf("testee_id must be a string or number")
+	}
+	if aux.TesteeID[0] == '"' {
+		var text string
+		if err := json.Unmarshal(aux.TesteeID, &text); err != nil {
+			return fmt.Errorf("invalid testee_id format: %w", err)
+		}
+		testeeID, err := strconv.ParseUint(text, 10, 64)
+		if err != nil {
+			return fmt.Errorf("invalid testee_id format: %w", err)
+		}
+		r.TesteeID = testeeID
+		return nil
+	}
+	var number json.Number
+	if err := json.Unmarshal(aux.TesteeID, &number); err != nil {
+		return fmt.Errorf("testee_id must be a string or number")
+	}
+	testeeID, err := strconv.ParseUint(number.String(), 10, 64)
+	if err != nil {
+		return fmt.Errorf("invalid testee_id format: %w", err)
+	}
+	r.TesteeID = testeeID
+	return nil
 }
 
 type SubmitContractResponse struct {
