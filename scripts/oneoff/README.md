@@ -40,8 +40,78 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `rebuild_statistics_aggregates_and_cache/main.go` | 重建统计聚合表并刷新统计查询缓存 | MySQL 统计聚合表，Redis 统计查询缓存 |
 | `rebuild_seeddata_access_statistics/main.go` | 一站式修复 seeddata 接入统计历史数据 | MySQL intake/resolve log、`behavior_footprint`、`statistics_journey_daily` |
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
+| `backfill_published_assessment_models/main.go` | 从 legacy `evaluation_rule_sets` 回填 `published_assessment_models` | Mongo `published_assessment_models` |
+| `seed_evaluation_rule_sets/main.go` | 写入内置 MBTI/SBTI + 已发布量表到 `published_assessment_models` | Mongo `published_assessment_models` |
+| `seed_mbti_questionnaire/` | 发布 `MBTI_OEJTS` 问卷快照 | Mongo `questionnaires` |
+| `seed_sbti_questionnaire/` | 发布 `SBTI_FUN` 问卷快照 | Mongo `questionnaires` |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
+
+> **注意**：`seed_*_questionnaire` 是**包目录**，必须用 `go run ./scripts/oneoff/seed_mbti_questionnaire/`（带尾部 `/` 或 `.`），**不要** `go run .../main.go`，否则不会编译同目录的 `types.go` 与 `//go:embed` 资源。
+
+## backfill_published_assessment_models / seed_evaluation_rule_sets
+
+### 做什么
+
+- `backfill_published_assessment_models`：仅当 Mongo 里已有 legacy `evaluation_rule_sets` 已发布行、但 `published_assessment_models` 为空时才有数据可迁。
+- `seed_evaluation_rule_sets`：写入内置 SBTI/MBTI，并从已发布量表快照生成 scale 规则到 `published_assessment_models`。
+
+`seed_evaluation_rule_sets` 扫描量表时，个别历史量表因子配置不合法会打 ERROR 日志（如 duplicate question code、`multi_grade`），**通常会跳过该因子但继续处理其余模型**；以脚本最终 `seeded N published assessment model(s)` 为准。
+
+### 如何调用
+
+```bash
+# 1. legacy 回填（dry-run 为 0 则无需 --apply）
+go run ./scripts/oneoff/backfill_published_assessment_models/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs
+
+# 2. 种子解释模型（先 dry-run 看 plan，再 --apply）
+go run ./scripts/oneoff/seed_evaluation_rule_sets/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --apply
+```
+
+仅补 MBTI/SBTI、不扫量表：
+
+```bash
+go run ./scripts/oneoff/seed_evaluation_rule_sets/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --skip-scales --apply
+```
+
+验收：
+
+```javascript
+db.published_assessment_models.countDocuments({ status: "published", deleted_at: null })
+db.published_assessment_models.find(
+  { model_code: { $in: ["MBTI_OEJTS", "SBTI_FUN"] } },
+  { model_kind: 1, model_code: 1, model_version: 1, questionnaire_code: 1 }
+)
+```
+
+## seed_mbti_questionnaire / seed_sbti_questionnaire
+
+### 做什么
+
+将内置 JSON 问卷发布为 `MBTI_OEJTS@1.0.0` / `SBTI_FUN@1.0.0`。若线上已有同 code+version 的已发布问卷，默认 skip；需覆盖时用 `--force`。
+
+### 如何调用
+
+```bash
+# 必须用包路径，不要用 main.go
+go run ./scripts/oneoff/seed_mbti_questionnaire/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --apply
+
+go run ./scripts/oneoff/seed_sbti_questionnaire/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --apply
+```
+
+上线前可先查是否已存在（存在则不必 seed）：
+
+```javascript
+db.questionnaires.find(
+  { code: { $in: ["MBTI_OEJTS", "SBTI_FUN"] }, deleted_at: null },
+  { code: 1, version: 1, status: 1, question_count: 1 }
+)
+```
 
 ## cleanup_perf_testee_data/main.go
 
