@@ -11,8 +11,10 @@ import (
 type EvaluationModelKind string
 
 const (
-	EvaluationModelKindScale         EvaluationModelKind = "scale"
-	EvaluationModelKindPersonality   EvaluationModelKind = "personality"
+	EvaluationModelKindScale       EvaluationModelKind = "scale"
+	EvaluationModelKindPersonality EvaluationModelKind = "personality"
+	// EvaluationModelKindMBTIMigration and EvaluationModelKindSBTIMigration are legacy
+	// ModelRef.Kind values kept for routing compatibility only.
 	EvaluationModelKindMBTIMigration EvaluationModelKind = "mbti"
 	EvaluationModelKindSBTIMigration EvaluationModelKind = "sbti"
 )
@@ -165,80 +167,38 @@ func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {
 	return EvaluationModelKindPersonality
 }
 
-func (p TypologyModelPayload) ModelKind() EvaluationModelKind {
-	if p.Payload == nil {
-		return ""
-	}
-	switch p.Payload.Algorithm {
-	case "sbti":
-		return EvaluationModelKindSBTIMigration
-	case "mbti":
-		return EvaluationModelKindMBTIMigration
-	default:
-		return EvaluationModelKind(p.Payload.Algorithm)
-	}
+func (TypologyModelPayload) ModelKind() EvaluationModelKind {
+	return EvaluationModelKindPersonality
 }
 
 func NewMBTIModelSnapshot(model *typology.MBTILegacyModel) *ModelSnapshot {
 	return NewTypologyModelSnapshot(typology.FromMBTI(model))
 }
 
-type SBTIModelPayload struct {
-	Model *typology.SBTILegacyModel `json:"model"`
-}
-
-func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindPersonality
-}
-
-func SBTIPayload(input *InputSnapshot) (*typology.SBTILegacyModel, bool) {
-	if payload, ok := TypologyPayload(input); ok && payload.Algorithm == "sbti" {
-		legacy, err := typology.ToSBTI(payload)
-		if err == nil {
-			return legacy, true
-		}
-	}
-	if input == nil {
-		return nil, false
-	}
-	if payload, ok := input.ModelPayload.(SBTIModelPayload); ok && payload.Model != nil {
-		return payload.Model, true
-	}
-	if input.Model != nil {
-		if payload, ok := input.Model.Payload.(SBTIModelPayload); ok && payload.Model != nil {
-			return payload.Model, true
-		}
-	}
-	return nil, false
-}
-
-type MBTIModelPayload struct {
-	Model *typology.MBTILegacyModel `json:"model"`
-}
-
-func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindPersonality
-}
-
+// MBTIPayload extracts a legacy MBTI model from a unified typology input snapshot.
 func MBTIPayload(input *InputSnapshot) (*typology.MBTILegacyModel, bool) {
-	if payload, ok := TypologyPayload(input); ok && payload.Algorithm == "mbti" {
-		legacy, err := typology.ToMBTI(payload)
-		if err == nil {
-			return legacy, true
-		}
-	}
-	if input == nil {
+	payload, ok := TypologyPayload(input)
+	if !ok || payload.Algorithm != "mbti" {
 		return nil, false
 	}
-	if payload, ok := input.ModelPayload.(MBTIModelPayload); ok && payload.Model != nil {
-		return payload.Model, true
+	legacy, err := typology.ToMBTI(payload)
+	if err != nil {
+		return nil, false
 	}
-	if input.Model != nil {
-		if payload, ok := input.Model.Payload.(MBTIModelPayload); ok && payload.Model != nil {
-			return payload.Model, true
-		}
+	return legacy, true
+}
+
+// SBTIPayload extracts a legacy SBTI model from a unified typology input snapshot.
+func SBTIPayload(input *InputSnapshot) (*typology.SBTILegacyModel, bool) {
+	payload, ok := TypologyPayload(input)
+	if !ok || payload.Algorithm != "sbti" {
+		return nil, false
 	}
-	return nil, false
+	legacy, err := typology.ToSBTI(payload)
+	if err != nil {
+		return nil, false
+	}
+	return legacy, true
 }
 
 type AnswerSheetSnapshot struct {

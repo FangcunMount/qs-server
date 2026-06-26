@@ -6,66 +6,57 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-var registeredAlgorithmRunners = map[assessmentmodel.Algorithm]algorithmRunner{
-	assessmentmodel.AlgorithmMBTI: mbtiAlgorithmRunner{},
-	assessmentmodel.AlgorithmSBTI: sbtiAlgorithmRunner{},
+type algorithmRunner struct {
+	adapter       personalityadapter.ModelAdapter
+	reportBuilder reportBuilderFunc
 }
 
-type algorithmRunner interface {
-	algorithm() assessmentmodel.Algorithm
-	buildOutcome(
-		modelRef assessment.EvaluationModelRef,
-		payload *modeltypology.Payload,
-		sheet *port.AnswerSheetSnapshot,
-	) (*assessment.AssessmentOutcome, error)
-	buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error)
+type reportBuilderFunc func(evaluationresult.Outcome) (*domainReport.InterpretReport, error)
+
+var reportBuilders = map[assessmentmodel.Algorithm]reportBuilderFunc{
+	assessmentmodel.AlgorithmMBTI: buildMBTIReport,
+	assessmentmodel.AlgorithmSBTI: buildSBTIReport,
 }
 
 func algorithmRunnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
-	runner, ok := registeredAlgorithmRunners[algorithm]
-	if !ok {
-		return nil, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
+	adapter, err := personalityadapter.DefaultRegistry().Resolve(algorithm)
+	if err != nil {
+		return algorithmRunner{}, err
 	}
-	return runner, nil
+	reportBuilder, ok := reportBuilders[algorithm]
+	if !ok {
+		return algorithmRunner{}, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
+	}
+	return algorithmRunner{
+		adapter:       adapter,
+		reportBuilder: reportBuilder,
+	}, nil
 }
 
-type mbtiAlgorithmRunner struct{}
-
-func (mbtiAlgorithmRunner) algorithm() assessmentmodel.Algorithm {
-	return assessmentmodel.AlgorithmMBTI
+func (r algorithmRunner) algorithm() assessmentmodel.Algorithm {
+	if r.adapter == nil {
+		return ""
+	}
+	return r.adapter.Algorithm()
 }
 
-func (mbtiAlgorithmRunner) buildOutcome(
+func (r algorithmRunner) buildOutcome(
 	modelRef assessment.EvaluationModelRef,
 	payload *modeltypology.Payload,
 	sheet *port.AnswerSheetSnapshot,
 ) (*assessment.AssessmentOutcome, error) {
-	return buildMBTIOutcome(modelRef, payload, sheet)
+	return r.adapter.BuildOutcome(modelRef, payload, answerSheetFromPort(sheet))
 }
 
-func (mbtiAlgorithmRunner) buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
-	return buildMBTIReport(outcome)
-}
-
-type sbtiAlgorithmRunner struct{}
-
-func (sbtiAlgorithmRunner) algorithm() assessmentmodel.Algorithm {
-	return assessmentmodel.AlgorithmSBTI
-}
-
-func (sbtiAlgorithmRunner) buildOutcome(
-	modelRef assessment.EvaluationModelRef,
-	payload *modeltypology.Payload,
-	sheet *port.AnswerSheetSnapshot,
-) (*assessment.AssessmentOutcome, error) {
-	return buildSBTIOutcome(modelRef, payload, sheet)
-}
-
-func (sbtiAlgorithmRunner) buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
-	return buildSBTIReport(outcome)
+func (r algorithmRunner) buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+	if r.reportBuilder == nil {
+		return nil, fmt.Errorf("personality typology report builder is not configured")
+	}
+	return r.reportBuilder(outcome)
 }

@@ -19,16 +19,27 @@ func TestExecutorImplementsEvaluatorContract(t *testing.T) {
 }
 
 func TestExecutorKeys(t *testing.T) {
-	if got := NewMBTIExecutor().Key(); got != evaluation.EvaluatorKeyMBTI {
+	mbtiExecutor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
+	}
+	if got := mbtiExecutor.Key(); got != evaluation.EvaluatorKeyMBTI {
 		t.Fatalf("mbti key = %s, want %s", got, evaluation.EvaluatorKeyMBTI)
 	}
-	if got := NewSBTIExecutor().Key(); got != evaluation.EvaluatorKeySBTI {
+	sbtiExecutor, err := NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
+	}
+	if got := sbtiExecutor.Key(); got != evaluation.EvaluatorKeySBTI {
 		t.Fatalf("sbti key = %s, want %s", got, evaluation.EvaluatorKeySBTI)
 	}
 }
 
 func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
-	executor := NewMBTIExecutor()
+	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
 		Assessment: submittedMBTIAssessment(t),
 		Input:      mbtiExecutorInputSnapshot(),
@@ -51,8 +62,11 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 }
 
 func TestExecutorAlgorithmGuard(t *testing.T) {
-	executor := NewMBTIExecutor()
-	_, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{})
+	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
+	_, err = executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{})
 	if err == nil {
 		t.Fatal("Execute error = nil, want configuration error")
 	}
@@ -66,7 +80,10 @@ func TestNewTypologyExecutorRejectsUnsupportedAlgorithm(t *testing.T) {
 }
 
 func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
-	executor := NewSBTIExecutor()
+	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
 		Assessment: submittedSBTIAssessment(t),
 		Input:      sbtiExecutorInputSnapshot(),
@@ -163,9 +180,10 @@ func submittedSBTIAssessment(t *testing.T) *assessment.Assessment {
 
 func mbtiExecutorInputSnapshot() *port.InputSnapshot {
 	model := mbtiINTJFixtureModel()
+	payload := modeltypology.FromMBTI(model)
 	return &port.InputSnapshot{
-		Model:        port.NewMBTIModelSnapshot(model),
-		ModelPayload: port.MBTIModelPayload{Model: model},
+		Model:        port.NewTypologyModelSnapshot(payload),
+		ModelPayload: port.TypologyModelPayload{Payload: payload},
 		AnswerSheet: &port.AnswerSheetSnapshot{
 			QuestionnaireCode:    "MBTI_TEST",
 			QuestionnaireVersion: "1.0.0",

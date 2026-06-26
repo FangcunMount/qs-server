@@ -9,6 +9,7 @@ import (
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
+// Deprecated: use sbti adapter Score via profile.ScoreGraph instead. Kept for characterization equivalence tests.
 func ScoreSBTI(model *modeltypology.SBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (SBTIResultDetail, error) {
 	if model == nil {
 		return SBTIResultDetail{}, fmt.Errorf("sbti model is required")

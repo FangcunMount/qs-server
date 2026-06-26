@@ -112,28 +112,3 @@ func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
 		t.Fatalf("payload = %#v, ok=%v", got, ok)
 	}
 }
-
-func TestMBTIModelInputProviderDelegatesToTypologyProvider(t *testing.T) {
-	payload := modeltypology.FromMBTI(&modeltypology.MBTILegacyModel{
-		Code:                 "MBTI_TEST",
-		Version:              "1.0.0",
-		QuestionnaireCode:    "MBTI_TEST",
-		QuestionnaireVersion: "1.0.0",
-		Status:               "published",
-	})
-	provider := NewMBTIModelInputProvider(
-		fakeTypologyCatalog{payload: payload},
-		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
-			QuestionnaireCode:    "MBTI_TEST",
-			QuestionnaireVersion: "1.0.0",
-		}},
-		fakeQuestionnaireReader{},
-	)
-	snapshot, err := provider.ResolveInput(context.Background(), port.InputRef{AnswerSheetID: 1})
-	if err != nil {
-		t.Fatalf("ResolveInput: %v", err)
-	}
-	if _, ok := snapshot.ModelPayload.(port.TypologyModelPayload); !ok {
-		t.Fatalf("payload type = %T, want TypologyModelPayload", snapshot.ModelPayload)
-	}
-}

@@ -9,6 +9,7 @@ import (
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
+// Deprecated: use mbti adapter Score via profile.ScoreGraph instead. Kept for characterization equivalence tests.
 func ScoreMBTI(model *modeltypology.MBTILegacyModel, answerSheet *evaluationinput.AnswerSheet) (MBTIResultDetail, error) {
 	if model == nil {
 		return MBTIResultDetail{}, fmt.Errorf("mbti model is required")

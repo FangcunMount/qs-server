@@ -32,11 +32,5 @@ func TypologyPayload(input *InputSnapshot) (*typology.Payload, bool) {
 			return payload.Payload, true
 		}
 	}
-	if model, ok := MBTIPayload(input); ok {
-		return typology.FromMBTI(model), true
-	}
-	if model, ok := SBTIPayload(input); ok {
-		return typology.FromSBTI(model), true
-	}
 	return nil, false
 }

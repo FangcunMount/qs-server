@@ -12,7 +12,7 @@ import (
 )
 
 type ReportBuilder struct {
-	runner algorithmRunner
+	runner *algorithmRunner
 }
 
 var _ evaluationresult.ReportBuilder = ReportBuilder{}
@@ -22,7 +22,7 @@ func NewReportBuilder(algorithm assessmentmodel.Algorithm) (ReportBuilder, error
 	if err != nil {
 		return ReportBuilder{}, err
 	}
-	return ReportBuilder{runner: runner}, nil
+	return ReportBuilder{runner: &runner}, nil
 }
 
 func NewMBTIReportBuilder() evaluationresult.ReportBuilder {

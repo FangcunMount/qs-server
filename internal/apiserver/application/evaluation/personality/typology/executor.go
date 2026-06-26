@@ -12,7 +12,7 @@ import (
 )
 
 type Executor struct {
-	runner algorithmRunner
+	runner *algorithmRunner
 }
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
@@ -21,28 +21,12 @@ func NewTypologyExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error)
 	return newExecutor(algorithm)
 }
 
-func NewMBTIExecutor() *Executor {
-	executor, err := newExecutor(assessmentmodel.AlgorithmMBTI)
-	if err != nil {
-		panic(err)
-	}
-	return executor
-}
-
-func NewSBTIExecutor() *Executor {
-	executor, err := newExecutor(assessmentmodel.AlgorithmSBTI)
-	if err != nil {
-		panic(err)
-	}
-	return executor
-}
-
 func newExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error) {
 	runner, err := algorithmRunnerFor(algorithm)
 	if err != nil {
 		return nil, err
 	}
-	return &Executor{runner: runner}, nil
+	return &Executor{runner: &runner}, nil
 }
 
 func (e *Executor) Key() evaluation.EvaluatorKey {

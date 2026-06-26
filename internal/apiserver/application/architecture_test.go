@@ -906,8 +906,6 @@ func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
 	}
 	for _, want := range []string{
 		"func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
-		"func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
-		"func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
 	} {
 		if !strings.Contains(text, want) {
 			t.Fatalf("port/evaluationinput missing v2 RuleSetKind: %q", want)

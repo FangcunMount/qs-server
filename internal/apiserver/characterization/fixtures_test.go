@@ -256,9 +256,10 @@ func ptrFloat64(v float64) *float64 { return &v }
 
 func mbtiInputSnapshot() *evaluationinput.InputSnapshot {
 	model := mbtiINTJModel()
+	payload := modeltypology.FromMBTI(model)
 	return &evaluationinput.InputSnapshot{
-		Model:        evaluationinput.NewMBTIModelSnapshot(model),
-		ModelPayload: evaluationinput.MBTIModelPayload{Model: model},
+		Model:        evaluationinput.NewTypologyModelSnapshot(payload),
+		ModelPayload: evaluationinput.TypologyModelPayload{Payload: payload},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "MBTI_TEST",
 			QuestionnaireVersion: "1.0.0",
@@ -275,9 +276,10 @@ func mbtiInputSnapshot() *evaluationinput.InputSnapshot {
 
 func sbtiInputSnapshot() *evaluationinput.InputSnapshot {
 	model := sbtiCharacterizationModel()
+	payload := modeltypology.FromSBTI(model)
 	return &evaluationinput.InputSnapshot{
-		Model:        evaluationinput.NewSBTIModelSnapshot(model),
-		ModelPayload: evaluationinput.SBTIModelPayload{Model: model},
+		Model:        evaluationinput.NewTypologyModelSnapshot(payload),
+		ModelPayload: evaluationinput.TypologyModelPayload{Payload: payload},
 		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
 			QuestionnaireCode:    "SBTI_FUN",
 			QuestionnaireVersion: "1.0.0",

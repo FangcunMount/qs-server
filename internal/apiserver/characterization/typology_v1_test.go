@@ -6,6 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
 
@@ -17,7 +18,10 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 		t.Fatalf("domain Score: %v", err)
 	}
 
-	executor := typologyeval.NewMBTIExecutor()
+	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedMBTIAssessment(t),
 		Input:      mbtiInputSnapshot(),
@@ -45,7 +49,10 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 		t.Fatalf("domain Score: %v", err)
 	}
 
-	executor := typologyeval.NewSBTIExecutor()
+	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedSBTIAssessment(t),
 		Input:      sbtiInputSnapshot(),
@@ -67,10 +74,18 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 
 // V1 contract: typology executor keys map to personality/typology/{mbti,sbti}.
 func TestV1TypologyExecutorKeys(t *testing.T) {
-	if got := typologyeval.NewMBTIExecutor().Key().String(); got != "personality/typology/mbti" {
+	mbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
+	}
+	if got := mbtiExecutor.Key().String(); got != "personality/typology/mbti" {
 		t.Fatalf("mbti key = %q", got)
 	}
-	if got := typologyeval.NewSBTIExecutor().Key().String(); got != "personality/typology/sbti" {
+	sbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
+	}
+	if got := sbtiExecutor.Key().String(); got != "personality/typology/sbti" {
 		t.Fatalf("sbti key = %q", got)
 	}
 }
