@@ -91,11 +91,11 @@ func NewQuestionnaireClient(client *Client) *QuestionnaireClient {
 }
 
 // GetQuestionnaire 获取问卷详情
-func (c *QuestionnaireClient) GetQuestionnaire(ctx context.Context, code string) (*QuestionnaireOutput, error) {
+func (c *QuestionnaireClient) GetQuestionnaire(ctx context.Context, code, version string) (*QuestionnaireOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	req := &pb.GetQuestionnaireRequest{Code: code}
+	req := &pb.GetQuestionnaireRequest{Code: code, Version: version}
 	resp, err := c.grpcClient.GetQuestionnaire(ctx, req)
 	if err != nil {
 		return nil, err

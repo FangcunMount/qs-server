@@ -70,6 +70,10 @@ func (s *questionnaireQRCodeQueryStub) GetPublishedByCode(context.Context, strin
 	return s.published, nil
 }
 
+func (s *questionnaireQRCodeQueryStub) GetPublishedByCodeVersion(context.Context, string, string) (*QuestionnaireResult, error) {
+	return nil, nil
+}
+
 func (s *questionnaireQRCodeQueryStub) GetQuestionCount(context.Context, string) (int32, error) {
 	return 0, nil
 }

@@ -62,7 +62,7 @@ func (f *fakeEvaluationQueryService) ListMyAssessmentsV2(context.Context, uint64
 	panic("unexpected ListMyAssessmentsV2 call")
 }
 
-func (f *fakeEvaluationQueryService) GetAssessmentReportV2(context.Context, uint64) (*evaluation.AssessmentReportV2Response, error) {
+func (f *fakeEvaluationQueryService) GetAssessmentReportV2(context.Context, uint64, uint64) (*evaluation.AssessmentReportV2Response, error) {
 	panic("unexpected GetAssessmentReportV2 call")
 }
 

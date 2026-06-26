@@ -98,8 +98,11 @@ func (s *EvaluationService) ListMyAssessmentsV2(ctx context.Context, req *pb.Lis
 }
 
 func (s *EvaluationService) GetAssessmentReportV2(ctx context.Context, req *pb.GetAssessmentReportV2Request) (*pb.GetAssessmentReportV2Response, error) {
-	if req.AssessmentId == 0 {
-		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	if req.AssessmentId == 0 || req.TesteeId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
+	}
+	if _, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId); err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
 	}
 	if s.reportQueryService == nil {
 		return nil, status.Error(codes.FailedPrecondition, "report query service is not configured")

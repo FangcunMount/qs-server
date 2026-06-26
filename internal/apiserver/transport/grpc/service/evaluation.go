@@ -186,6 +186,8 @@ func toAssessmentQueryGRPCError(err error) error {
 	switch coder.Code() {
 	case errorCode.ErrAssessmentNotFound:
 		return status.Error(codes.NotFound, err.Error())
+	case errorCode.ErrPermissionDenied, errorCode.ErrForbidden:
+		return status.Error(codes.PermissionDenied, err.Error())
 	default:
 		return status.Error(codes.Internal, err.Error())
 	}

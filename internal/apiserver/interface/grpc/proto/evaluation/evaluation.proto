@@ -376,6 +376,7 @@ message ListMyAssessmentsV2Response {
 
 message GetAssessmentReportV2Request {
   uint64 assessment_id = 1;
+  uint64 testee_id = 2;
 }
 
 message GetAssessmentReportV2Response {

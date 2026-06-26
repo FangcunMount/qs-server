@@ -9,6 +9,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
 )
 
@@ -16,13 +17,18 @@ import (
 // 提供问卷的查询功能：列表查询、详情查看
 type QuestionnaireService struct {
 	pb.UnimplementedQuestionnaireServiceServer
-	queryService questionnaire.QuestionnaireQueryService
+	queryService    questionnaire.QuestionnaireQueryService
+	publishedReader rulesetport.PublishedReader
 }
 
 // NewQuestionnaireService 创建问卷 gRPC 服务
-func NewQuestionnaireService(queryService questionnaire.QuestionnaireQueryService) *QuestionnaireService {
+func NewQuestionnaireService(
+	queryService questionnaire.QuestionnaireQueryService,
+	publishedReader rulesetport.PublishedReader,
+) *QuestionnaireService {
 	return &QuestionnaireService{
-		queryService: queryService,
+		queryService:    queryService,
+		publishedReader: publishedReader,
 	}
 }
 
@@ -68,8 +74,15 @@ func (s *QuestionnaireService) ListQuestionnaires(ctx context.Context, req *pb.L
 // GetQuestionnaire 获取已发布问卷的详情（C端）
 // @Description C端用户查看问卷详情和题目
 func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.GetQuestionnaireRequest) (*pb.GetQuestionnaireResponse, error) {
-	// 调用应用服务
-	result, err := s.queryService.GetPublishedByCode(ctx, req.Code)
+	var (
+		result *questionnaire.QuestionnaireResult
+		err    error
+	)
+	if req.GetVersion() == "" {
+		result, err = s.queryService.GetPublishedByCode(ctx, req.Code)
+	} else {
+		result, err = s.queryService.GetPublishedByCodeVersion(ctx, req.Code, req.GetVersion())
+	}
 	if err != nil {
 		return nil, status.Error(codes.Internal, pkgerrors.Reduce(err).Error())
 	}
@@ -78,8 +91,7 @@ func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.Get
 		return nil, status.Error(codes.NotFound, "问卷不存在或未发布")
 	}
 
-	// 仅允许访问医学量表
-	if result.Type != questionnaire.QuestionnaireTypeMedicalScale {
+	if !s.isConsumerAccessible(ctx, result) {
 		return nil, status.Error(codes.NotFound, "问卷不存在或未发布")
 	}
 
@@ -92,6 +104,20 @@ func (s *QuestionnaireService) GetQuestionnaire(ctx context.Context, req *pb.Get
 	return &pb.GetQuestionnaireResponse{
 		Questionnaire: protoQuestionnaire,
 	}, nil
+}
+
+func (s *QuestionnaireService) isConsumerAccessible(ctx context.Context, result *questionnaire.QuestionnaireResult) bool {
+	if result == nil {
+		return false
+	}
+	if result.Type == questionnaire.QuestionnaireTypeMedicalScale {
+		return true
+	}
+	if s.publishedReader == nil {
+		return false
+	}
+	snapshot, err := s.publishedReader.FindPublishedByQuestionnaire(ctx, result.Code, result.Version)
+	return err == nil && snapshot != nil
 }
 
 // toProtoQuestionnaire 转换为 protobuf 问卷

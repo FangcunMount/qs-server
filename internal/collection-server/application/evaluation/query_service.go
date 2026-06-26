@@ -483,8 +483,8 @@ func (s *QueryService) ListMyAssessmentsV2(ctx context.Context, testeeID uint64,
 }
 
 // GetAssessmentReportV2 loads report via apiserver Evaluation V2 gRPC without scale factor filtering.
-func (s *QueryService) GetAssessmentReportV2(ctx context.Context, assessmentID uint64) (*AssessmentReportV2Response, error) {
-	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, assessmentID)
+func (s *QueryService) GetAssessmentReportV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportV2Response, error) {
+	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, testeeID, assessmentID)
 	if err != nil {
 		log.Errorf("Failed to get assessment report v2 via gRPC: %v", err)
 		return nil, err

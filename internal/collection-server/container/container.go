@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
@@ -56,6 +57,7 @@ type Container struct {
 	scaleQueryService                 *scale.QueryService
 	personalityModelQueryService      *personalitymodel.QueryService
 	personalityAssessmentQueryService *personalityassessment.QueryService
+	personalitySessionService         *personalitysession.Service
 	testeeService                     *testee.Service
 	reportStatusReporter              *reportstatus.Reporter
 	waitHub                           reportwait.WaitHub
@@ -67,8 +69,9 @@ type Container struct {
 	evaluationHandler            *handler.EvaluationHandler
 	scaleHandler                 *handler.ScaleHandler
 	personalityModelHandler      *handler.PersonalityModelHandler
-	personalityAssessmentHandler *handler.PersonalityAssessmentHandler
-	testeeHandler                *handler.TesteeHandler
+	personalityAssessmentHandler        *handler.PersonalityAssessmentHandler
+	personalityAssessmentSessionHandler *handler.PersonalityAssessmentSessionHandler
+	testeeHandler                       *handler.TesteeHandler
 	healthHandler                *handler.HealthHandler
 }
 
@@ -182,6 +185,7 @@ func (c *Container) initApplicationServices() {
 	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
 	c.personalityModelQueryService = personalitymodel.NewQueryService(c.personalityModelClient)
 	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(c.evaluationClient, c.waitReportService)
+	c.personalitySessionService = personalitysession.NewService(c.personalityModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
 
 	log.Info("✅ Application services initialized")
@@ -203,6 +207,7 @@ func (c *Container) initHandlers() {
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
 	c.personalityModelHandler = handler.NewPersonalityModelHandler(c.personalityModelQueryService)
 	c.personalityAssessmentHandler = handler.NewPersonalityAssessmentHandler(c.personalityAssessmentQueryService, c.waitReportService)
+	c.personalityAssessmentSessionHandler = handler.NewPersonalityAssessmentSessionHandler(c.personalitySessionService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
 
@@ -261,6 +266,11 @@ func (c *Container) ScaleHandler() *handler.ScaleHandler {
 // PersonalityModelHandler 获取人格测评模型处理器
 func (c *Container) PersonalityModelHandler() *handler.PersonalityModelHandler {
 	return c.personalityModelHandler
+}
+
+// PersonalityAssessmentSessionHandler 获取人格测评会话处理器
+func (c *Container) PersonalityAssessmentSessionHandler() *handler.PersonalityAssessmentSessionHandler {
+	return c.personalityAssessmentSessionHandler
 }
 
 // PersonalityAssessmentHandler 获取人格测评处理器

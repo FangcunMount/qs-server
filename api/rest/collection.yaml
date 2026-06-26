@@ -13,10 +13,16 @@ servers:
 - url: https://collect.fangcunmount.cn/api/v1
   description: 生产环境
 tags:
+- name: 人格测评
+  description: 人格测评
+- name: 人格测评模型
+  description: 人格测评模型
 - name: 受试者
   description: 受试者
 - name: 测评
   description: 测评管理
+- name: 测评-V2
+  description: 测评-V2
 - name: 答卷
   description: 答卷提交与查询
 - name: 系统
@@ -650,6 +656,265 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /personality-assessment-sessions:
+    post:
+      tags:
+      - 人格测评
+      summary: 开始人格测评会话
+      description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session
+        → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。
+      operationId: 开始人格测评会话
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/personalitysession.StartSessionRequest'
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalitysession.StartSessionResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /personality-assessments:
+    get:
+      tags:
+      - 人格测评
+      summary: 查询人格测评列表
+      operationId: 查询人格测评列表
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      - type: string
+        description: 算法过滤（legacy，推荐改用 model.code 或 categories）
+        name: algorithm
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalityassessment.ListAssessmentsResponse'
+  /personality-assessments/{id}:
+    get:
+      tags:
+      - 人格测评
+      summary: 获取人格测评详情
+      operationId: 获取人格测评详情
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalityassessment.AssessmentDetailResponse'
+  /personality-assessments/{id}/report:
+    get:
+      tags:
+      - 人格测评
+      summary: 获取人格测评报告
+      operationId: 获取人格测评报告
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalityassessment.AssessmentReportResponse'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+  /personality-assessments/{id}/wait-report:
+    get:
+      tags:
+      - 人格测评
+      summary: 长轮询等待人格测评报告
+      operationId: 长轮询等待人格测评报告
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      - type: integer
+        default: 20
+        description: 超时时间（秒）
+        name: timeout
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalityassessment.AssessmentStatusResponse'
+  /personality-models:
+    get:
+      tags:
+      - 人格测评模型
+      summary: 获取人格测评模型列表
+      description: 浏览已发布人格模型目录。单模型详情与题版绑定请用 GET /personality-models/{code} 或推荐入口 POST
+        /personality-assessment-sessions。
+      operationId: 获取人格测评模型列表
+      parameters:
+      - type: integer
+        default: 1
+        description: 页码
+        name: page
+        in: query
+      - type: integer
+        default: 20
+        description: 每页数量
+        name: page_size
+        in: query
+      - type: string
+        description: 算法过滤（legacy，推荐改用 categories 或按 code 精确查询）
+        name: algorithm
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse'
+  /personality-models/categories:
+    get:
+      tags:
+      - 人格测评模型
+      summary: 获取人格测评模型分类
+      operationId: 获取人格测评模型分类
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalitymodel.PersonalityModelCategoriesResponse'
+  /personality-models/{code}:
+    get:
+      tags:
+      - 人格测评模型
+      summary: 获取人格测评模型详情
+      operationId: 获取人格测评模型详情
+      parameters:
+      - type: string
+        description: 模型编码
+        name: code
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/personalitymodel.PersonalityModelResponse'
   /public/info:
     get:
       tags:
@@ -719,7 +984,8 @@ paths:
       tags:
       - 问卷
       summary: 获取问卷详情
-      description: 根据问卷编码获取问卷详情，问题包含校验规则
+      description: 根据问卷编码获取问卷详情，问题包含校验规则。人格测评请优先使用 session 返回的 questionnaire_code
+        + questionnaire_version，通过 version 查询精确题版。
       operationId: 获取问卷详情
       parameters:
       - type: string
@@ -727,6 +993,10 @@ paths:
         name: code
         in: path
         required: true
+      - type: string
+        description: 问卷版本（人格测评推荐传入模型绑定版本）
+        name: version
+        in: query
       responses:
         '200':
           description: OK
@@ -994,86 +1264,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
-  /personality-models:
-    get:
-      tags: [人格测评模型]
-      summary: 获取人格测评模型列表
-      operationId: listPersonalityModels
-      responses:
-        '200':
-          description: OK
-  /personality-models/categories:
-    get:
-      tags: [人格测评模型]
-      summary: 获取人格测评模型分类
-      operationId: getPersonalityModelCategories
-      responses:
-        '200':
-          description: OK
-  /personality-models/{code}:
-    get:
-      tags: [人格测评模型]
-      summary: 获取人格测评模型详情
-      operationId: getPersonalityModel
-      parameters:
-      - name: code
-        in: path
-        required: true
-        schema:
-          type: string
-      responses:
-        '200':
-          description: OK
-  /personality-assessments:
-    get:
-      tags: [人格测评]
-      summary: 查询人格测评列表
-      operationId: listPersonalityAssessments
-      responses:
-        '200':
-          description: OK
-  /personality-assessments/{id}:
-    get:
-      tags: [人格测评]
-      summary: 获取人格测评详情
-      operationId: getPersonalityAssessment
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
-  /personality-assessments/{id}/report:
-    get:
-      tags: [人格测评]
-      summary: 获取人格测评报告
-      operationId: getPersonalityAssessmentReport
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
-  /personality-assessments/{id}/wait-report:
-    get:
-      tags: [人格测评]
-      summary: 长轮询等待人格测评报告
-      operationId: waitPersonalityAssessmentReport
-      parameters:
-      - name: id
-        in: path
-        required: true
-        schema:
-          type: integer
-      responses:
-        '200':
-          description: OK
   /testees:
     get:
       tags:
@@ -1341,6 +1531,109 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /api/v2/assessments:
+    get:
+      tags:
+      - 测评-V2
+      summary: 查询我的 v2 测评列表
+      description: 分页查询测评列表，响应使用 model/primary_score/level 投影
+      operationId: 查询我的v2测评列表
+      parameters:
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.ListAssessmentsV2Response'
+  /api/v2/assessments/{id}:
+    get:
+      tags:
+      - 测评-V2
+      summary: 获取我的 v2 测评详情
+      description: 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
+      operationId: 获取我的v2测评详情
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentDetailV2Response'
+  /api/v2/assessments/{id}/report:
+    get:
+      tags:
+      - 测评-V2
+      summary: 获取 v2 测评报告
+      description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
+      operationId: 获取v2测评报告
+      parameters:
+      - type: integer
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        description: 受试者ID
+        name: testee_id
+        in: query
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/evaluation.AssessmentReportV2Response'
+        '400':
+          description: Bad Request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '404':
+          description: Not Found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
+        '500':
+          description: Internal Server Error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.ErrResponse'
   /health:
     get:
       tags:
@@ -1507,6 +1800,43 @@ components:
           type: string
         total_score:
           type: number
+    evaluation.AssessmentDetailV2Response:
+      type: object
+      properties:
+        answer_sheet_id:
+          type: string
+        created_at:
+          type: string
+        failed_at:
+          type: string
+        failure_reason:
+          type: string
+        id:
+          type: string
+        interpreted_at:
+          type: string
+        level:
+          $ref: '#/components/schemas/evaluation.ResultLevelResponse'
+        model:
+          $ref: '#/components/schemas/evaluation.ModelIdentityResponse'
+        org_id:
+          type: string
+        origin_id:
+          type: string
+        origin_type:
+          type: string
+        primary_score:
+          $ref: '#/components/schemas/evaluation.ScoreValueResponse'
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+        testee_id:
+          type: string
     evaluation.AssessmentFactorChangeResponse:
       type: object
       properties:
@@ -1569,6 +1899,31 @@ components:
             $ref: '#/components/schemas/evaluation.SuggestionResponse'
         total_score:
           type: number
+    evaluation.AssessmentReportV2Response:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        conclusion:
+          type: string
+        created_at:
+          type: string
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.DimensionInterpretResponse'
+        level:
+          $ref: '#/components/schemas/evaluation.ResultLevelResponse'
+        model:
+          $ref: '#/components/schemas/evaluation.ModelIdentityResponse'
+        model_extra:
+          $ref: '#/components/schemas/evaluation.ModelExtraResponse'
+        primary_score:
+          $ref: '#/components/schemas/evaluation.ScoreValueResponse'
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.SuggestionResponse'
     evaluation.AssessmentStatusResponse:
       type: object
       properties:
@@ -1619,6 +1974,33 @@ components:
           type: string
         total_score:
           type: number
+    evaluation.AssessmentSummaryV2Response:
+      type: object
+      properties:
+        answer_sheet_id:
+          type: string
+        created_at:
+          type: string
+        id:
+          type: string
+        interpreted_at:
+          type: string
+        level:
+          $ref: '#/components/schemas/evaluation.ResultLevelResponse'
+        model:
+          $ref: '#/components/schemas/evaluation.ModelIdentityResponse'
+        origin_type:
+          type: string
+        primary_score:
+          $ref: '#/components/schemas/evaluation.ScoreValueResponse'
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
     evaluation.AssessmentTrendMetaResponse:
       type: object
       properties:
@@ -1730,6 +2112,88 @@ components:
           type: integer
         total_pages:
           type: integer
+    evaluation.ListAssessmentsV2Response:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.AssessmentSummaryV2Response'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+    evaluation.ModelExtraResponse:
+      type: object
+      properties:
+        commentary:
+          type: string
+        image_url:
+          type: string
+        is_special:
+          type: boolean
+        kind:
+          type: string
+        match_percent:
+          type: number
+        one_liner:
+          type: string
+        rarity:
+          $ref: '#/components/schemas/evaluation.ModelRarityResponse'
+        special_trigger:
+          type: string
+        type_code:
+          type: string
+        type_name:
+          type: string
+    evaluation.ModelIdentityResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        code:
+          type: string
+        kind:
+          type: string
+        sub_kind:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+    evaluation.ModelRarityResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        one_in_x:
+          type: integer
+        percent:
+          type: number
+    evaluation.ResultLevelResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        label:
+          type: string
+        severity:
+          type: string
+    evaluation.ScoreValueResponse:
+      type: object
+      properties:
+        kind:
+          type: string
+        label:
+          type: string
+        max:
+          type: number
+        value:
+          type: number
     evaluation.SuggestionResponse:
       type: object
       properties:
@@ -1766,6 +2230,21 @@ components:
         value:
           description: JSON 字符串
           type: string
+    github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse:
+      type: object
+      properties:
+        models:
+          type: array
+          items:
+            $ref: '#/components/schemas/personalitymodel.PersonalityModelSummaryResponse'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
     github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
       type: object
       properties:
@@ -1807,6 +2286,323 @@ components:
           type: integer
     meta.Birthday:
       type: object
+    personalityassessment.AssessmentDetailResponse:
+      type: object
+      properties:
+        answer_sheet_id:
+          type: string
+        failed_at:
+          type: string
+        failure_reason:
+          type: string
+        id:
+          type: string
+        interpreted_at:
+          type: string
+        level:
+          $ref: '#/components/schemas/personalityassessment.ResultLevelResponse'
+        model:
+          $ref: '#/components/schemas/personalityassessment.ModelIdentityResponse'
+        org_id:
+          type: string
+        origin_id:
+          type: string
+        origin_type:
+          type: string
+        primary_score:
+          $ref: '#/components/schemas/personalityassessment.ScoreValueResponse'
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+        testee_id:
+          type: string
+    personalityassessment.AssessmentReportResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: string
+        conclusion:
+          type: string
+        created_at:
+          type: string
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.DimensionInterpretResponse'
+        level:
+          $ref: '#/components/schemas/personalityassessment.ResultLevelResponse'
+        model:
+          $ref: '#/components/schemas/personalityassessment.ModelIdentityResponse'
+        model_extra:
+          $ref: '#/components/schemas/personalityassessment.ModelExtraResponse'
+        primary_score:
+          $ref: '#/components/schemas/personalityassessment.ScoreValueResponse'
+        suggestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/evaluation.SuggestionResponse'
+    personalityassessment.AssessmentStatusResponse:
+      type: object
+      properties:
+        level:
+          $ref: '#/components/schemas/personalityassessment.ResultLevelResponse'
+        message:
+          type: string
+        model:
+          $ref: '#/components/schemas/personalityassessment.ModelIdentityResponse'
+        next_poll_after_ms:
+          type: integer
+        reason:
+          type: string
+        stage:
+          type: string
+        status:
+          type: string
+        updated_at:
+          type: integer
+    personalityassessment.AssessmentSummaryResponse:
+      type: object
+      properties:
+        answer_sheet_id:
+          type: string
+        id:
+          type: string
+        interpreted_at:
+          type: string
+        level:
+          $ref: '#/components/schemas/personalityassessment.ResultLevelResponse'
+        model:
+          $ref: '#/components/schemas/personalityassessment.ModelIdentityResponse'
+        origin_type:
+          type: string
+        primary_score:
+          $ref: '#/components/schemas/personalityassessment.ScoreValueResponse'
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        submitted_at:
+          type: string
+    personalityassessment.ListAssessmentsResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/personalityassessment.AssessmentSummaryResponse'
+        page:
+          type: integer
+        page_size:
+          type: integer
+        total:
+          type: integer
+        total_pages:
+          type: integer
+    personalityassessment.ModelExtraResponse:
+      type: object
+      properties:
+        commentary:
+          type: string
+        image_url:
+          type: string
+        is_special:
+          type: boolean
+        kind:
+          type: string
+        match_percent:
+          type: number
+        one_liner:
+          type: string
+        rarity:
+          $ref: '#/components/schemas/personalityassessment.ModelRarityResponse'
+        special_trigger:
+          type: string
+        type_code:
+          type: string
+        type_name:
+          type: string
+    personalityassessment.ModelIdentityResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        code:
+          type: string
+        kind:
+          type: string
+        sub_kind:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+    personalityassessment.ModelRarityResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        one_in_x:
+          type: integer
+        percent:
+          type: number
+    personalityassessment.ResultLevelResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        label:
+          type: string
+        severity:
+          type: string
+    personalityassessment.ScoreValueResponse:
+      type: object
+      properties:
+        kind:
+          type: string
+        label:
+          type: string
+        max:
+          type: number
+        value:
+          type: number
+    personalitymodel.CategoryResponse:
+      type: object
+      properties:
+        label:
+          type: string
+        value:
+          type: string
+    personalitymodel.PersonalityDimensionResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        left_pole:
+          type: string
+        name:
+          type: string
+        right_pole:
+          type: string
+    personalitymodel.PersonalityModelCategoriesResponse:
+      type: object
+      properties:
+        categories:
+          type: array
+          items:
+            $ref: '#/components/schemas/personalitymodel.CategoryResponse'
+    personalitymodel.PersonalityModelResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        dimension_order:
+          type: array
+          items:
+            type: string
+        dimensions:
+          type: array
+          items:
+            $ref: '#/components/schemas/personalitymodel.PersonalityDimensionResponse'
+        outcomes:
+          type: array
+          items:
+            $ref: '#/components/schemas/personalitymodel.PersonalityOutcomeResponse'
+        question_count:
+          type: integer
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+    personalitymodel.PersonalityModelSummaryResponse:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        code:
+          type: string
+        description:
+          type: string
+        question_count:
+          type: integer
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        title:
+          type: string
+        version:
+          type: string
+    personalitymodel.PersonalityOutcomeResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        image_url:
+          type: string
+        name:
+          type: string
+        one_liner:
+          type: string
+    personalitysession.SessionEndpointsResponse:
+      type: object
+      properties:
+        assessment_by_answer_sheet:
+          type: string
+        report:
+          type: string
+        submit_answer_sheet:
+          type: string
+        wait_report:
+          type: string
+    personalitysession.StartSessionRequest:
+      type: object
+      required:
+      - model_code
+      - testee_id
+      properties:
+        model_code:
+          type: string
+        testee_id:
+          type: integer
+    personalitysession.StartSessionResponse:
+      type: object
+      properties:
+        endpoints:
+          $ref: '#/components/schemas/personalitysession.SessionEndpointsResponse'
+        model:
+          $ref: '#/components/schemas/personalitymodel.PersonalityModelSummaryResponse'
+        questionnaire:
+          $ref: '#/components/schemas/questionnaire.QuestionnaireResponse'
+        submit_contract:
+          $ref: '#/components/schemas/personalitysession.SubmitContractResponse'
+    personalitysession.SubmitContractResponse:
+      type: object
+      properties:
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        testee_id:
+          type: string
     questionnaire.CalculationRuleResponse:
       type: object
       properties:
@@ -2269,3 +3065,8 @@ components:
           type: array
           items:
             type: string
+  securitySchemes:
+    BearerAuth:
+      type: apiKey
+      name: Authorization
+      in: header

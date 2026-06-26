@@ -5,6 +5,8 @@ import (
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // GetMyAssessmentV2 获取我的 v2 测评详情。
@@ -83,21 +85,39 @@ func (h *EvaluationHandler) ListMyAssessmentsV2(c *gin.Context) {
 // GetAssessmentReportV2 获取 v2 测评报告。
 // Deprecated: 请优先使用 /api/v1/personality-assessments/{id}/report。
 // @Summary 获取 v2 测评报告
-// @Description 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影
+// @Description 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
 // @Tags 测评-V2
 // @Produce json
 // @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
 // @Success 200 {object} core.Response{data=evaluation.AssessmentReportV2Response}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
 // @Router /api/v2/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetAssessmentReportV2(c *gin.Context) {
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
+	if testeeIDStr == "" {
+		h.BadRequestResponse(c, "testee_id is required", nil)
+		return
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid testee_id format", err)
+		return
+	}
 	assessmentID, err := strconv.ParseUint(h.GetPathParam(c, "id"), 10, 64)
 	if err != nil {
 		h.BadRequestResponse(c, "invalid assessment id", err)
 		return
 	}
 
-	result, err := h.queryService.GetAssessmentReportV2(c.Request.Context(), assessmentID)
+	result, err := h.queryService.GetAssessmentReportV2(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
+		if status.Code(err) == codes.PermissionDenied {
+			h.NotFoundResponse(c, "report not found", nil)
+			return
+		}
 		h.InternalErrorResponse(c, "get report failed", err)
 		return
 	}

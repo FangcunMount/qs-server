@@ -2829,6 +2829,7 @@ func (x *ListMyAssessmentsV2Response) GetTotalPages() int32 {
 type GetAssessmentReportV2Request struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	TesteeId      uint64                 `protobuf:"varint,2,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2866,6 +2867,13 @@ func (*GetAssessmentReportV2Request) Descriptor() ([]byte, []int) {
 func (x *GetAssessmentReportV2Request) GetAssessmentId() uint64 {
 	if x != nil {
 		return x.AssessmentId
+	}
+	return 0
+}
+
+func (x *GetAssessmentReportV2Request) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
 	}
 	return 0
 }
@@ -3225,9 +3233,10 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1f\n" +
 	"\vtotal_pages\x18\x05 \x01(\x05R\n" +
-	"totalPages\"C\n" +
+	"totalPages\"`\n" +
 	"\x1cGetAssessmentReportV2Request\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"W\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x1b\n" +
+	"\ttestee_id\x18\x02 \x01(\x04R\btesteeId\"W\n" +
 	"\x1dGetAssessmentReportV2Response\x126\n" +
 	"\x06report\x18\x01 \x01(\v2\x1e.evaluation.AssessmentReportV2R\x06report2\xf7\b\n" +
 	"\x11EvaluationService\x12Z\n" +

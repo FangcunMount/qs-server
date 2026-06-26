@@ -21,10 +21,11 @@ func NewQuestionnaireHandler(queryService *questionnaire.QueryService) *Question
 
 // Get 获取问卷详情
 // @Summary 获取问卷详情
-// @Description 根据问卷编码获取问卷详情，问题包含校验规则
+// @Description 根据问卷编码获取问卷详情，问题包含校验规则。人格测评请优先使用 session 返回的 questionnaire_code + questionnaire_version，通过 version 查询精确题版。
 // @Tags 问卷
 // @Produce json
 // @Param code path string true "问卷编码"
+// @Param version query string false "问卷版本（人格测评推荐传入模型绑定版本）"
 // @Success 200 {object} core.Response{data=questionnaire.QuestionnaireResponse}
 // @Failure 400 {object} core.ErrResponse
 // @Failure 404 {object} core.ErrResponse
@@ -37,7 +38,9 @@ func (h *QuestionnaireHandler) Get(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queryService.Get(c.Request.Context(), qcode)
+	version := c.Query("version")
+
+	result, err := h.queryService.Get(c.Request.Context(), qcode, version)
 	if err != nil {
 		h.InternalErrorResponse(c, "get questionnaire failed", err)
 		return

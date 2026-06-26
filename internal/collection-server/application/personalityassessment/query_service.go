@@ -75,8 +75,8 @@ func (s *QueryService) Get(ctx context.Context, testeeID, assessmentID uint64) (
 	return toAssessmentDetail(result), nil
 }
 
-func (s *QueryService) GetReport(ctx context.Context, assessmentID uint64) (*AssessmentReportResponse, error) {
-	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, assessmentID)
+func (s *QueryService) GetReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error) {
+	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, testeeID, assessmentID)
 	if err != nil {
 		logPersonalityAssessmentError("get personality assessment report failed", err)
 		return nil, err

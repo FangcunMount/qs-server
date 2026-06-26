@@ -27,10 +27,10 @@ func NewQueryService(
 }
 
 // Get 获取问卷详情
-func (s *QueryService) Get(ctx context.Context, code string) (*QuestionnaireResponse, error) {
-	log.Infof("Getting questionnaire: code=%s", code)
+func (s *QueryService) Get(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
+	log.Infof("Getting questionnaire: code=%s version=%s", code, version)
 
-	result, err := s.questionnaireClient.GetQuestionnaire(ctx, code)
+	result, err := s.questionnaireClient.GetQuestionnaire(ctx, code, version)
 	if err != nil {
 		logQuestionnaireGRPCError("Failed to get questionnaire via gRPC", err)
 		return nil, err

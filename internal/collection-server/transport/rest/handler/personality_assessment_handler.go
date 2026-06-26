@@ -1,21 +1,32 @@
 package handler
 
 import (
+	"context"
 	"strconv"
+	"time"
 
 	personalityassessment "github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/gin-gonic/gin"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
+
+type personalityAssessmentQueryService interface {
+	List(ctx context.Context, testeeID uint64, req *personalityassessment.ListAssessmentsRequest) (*personalityassessment.ListAssessmentsResponse, error)
+	Get(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentDetailResponse, error)
+	GetReport(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error)
+	WaitReport(ctx context.Context, testeeID, assessmentID uint64, timeout time.Duration) (*personalityassessment.AssessmentStatusResponse, error)
+}
 
 type PersonalityAssessmentHandler struct {
 	*BaseHandler
-	queryService      *personalityassessment.QueryService
+	queryService      personalityAssessmentQueryService
 	waitReportService *reportwait.Service
 }
 
 func NewPersonalityAssessmentHandler(
-	queryService *personalityassessment.QueryService,
+	queryService personalityAssessmentQueryService,
 	waitReportService *reportwait.Service,
 ) *PersonalityAssessmentHandler {
 	return &PersonalityAssessmentHandler{
@@ -30,7 +41,7 @@ func NewPersonalityAssessmentHandler(
 // @Tags 人格测评
 // @Produce json
 // @Param testee_id query int true "受试者ID"
-// @Param algorithm query string false "算法过滤 mbti/sbti"
+// @Param algorithm query string false "算法过滤（legacy，推荐改用 model.code 或 categories）"
 // @Success 200 {object} core.Response{data=personalityassessment.ListAssessmentsResponse}
 // @Router /api/v1/personality-assessments [get]
 func (h *PersonalityAssessmentHandler) List(c *gin.Context) {
@@ -88,17 +99,29 @@ func (h *PersonalityAssessmentHandler) Get(c *gin.Context) {
 // @Tags 人格测评
 // @Produce json
 // @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
 // @Success 200 {object} core.Response{data=personalityassessment.AssessmentReportResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
 // @Router /api/v1/personality-assessments/{id}/report [get]
 func (h *PersonalityAssessmentHandler) GetReport(c *gin.Context) {
+	testeeID, ok := h.parseTesteeID(c)
+	if !ok {
+		return
+	}
 	assessmentID, ok := h.parseAssessmentID(c)
 	if !ok {
 		return
 	}
-	result, err := h.queryService.GetReport(c.Request.Context(), assessmentID)
+	result, err := h.queryService.GetReport(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		if personalityassessment.IsNotPersonalityAssessment(err) {
 			h.NotFoundResponse(c, "personality assessment report not found", err)
+			return
+		}
+		if status.Code(err) == codes.PermissionDenied {
+			h.NotFoundResponse(c, "personality assessment report not found", nil)
 			return
 		}
 		h.InternalErrorResponse(c, "get personality assessment report failed", err)

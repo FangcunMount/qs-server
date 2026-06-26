@@ -74,6 +74,7 @@ message CalculationRule {
 // 获取问卷请求
 message GetQuestionnaireRequest {
   string code = 1;
+  string version = 2;
 }
 
 // 获取问卷响应

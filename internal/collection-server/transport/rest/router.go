@@ -109,6 +109,7 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 人格测评相关路由
 	r.registerPersonalityAssessmentRoutes(api)
+	r.registerPersonalityAssessmentSessionRoutes(api)
 
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
@@ -608,6 +609,22 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 			handler.Get,
 		)...)
 	}
+}
+
+func (r *Router) registerPersonalityAssessmentSessionRoutes(api *gin.RouterGroup) {
+	handler := r.container.PersonalityAssessmentSessionHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+
+	api.POST("/personality-assessment-sessions", rateLimitedHandlers(
+		r.container.RateLimitBackend(),
+		"query",
+		rateCfg,
+		rateCfg.QueryGlobalQPS,
+		rateCfg.QueryGlobalBurst,
+		rateCfg.QueryUserQPS,
+		rateCfg.QueryUserBurst,
+		handler.Start,
+	)...)
 }
 
 // registerTesteeRoutes 注册受试者相关路由

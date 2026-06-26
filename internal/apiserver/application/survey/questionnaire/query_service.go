@@ -117,6 +117,52 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*Qu
 	return toQuestionnaireResult(q), nil
 }
 
+// GetPublishedByCodeVersion 获取指定版本的已发布问卷
+func (s *queryService) GetPublishedByCodeVersion(ctx context.Context, code, version string) (*QuestionnaireResult, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+
+	l.Debugw("获取已发布问卷",
+		"action", "get_published_by_code_version",
+		"resource", "questionnaire",
+		"code", code,
+		"version", version,
+	)
+
+	if err := s.validateCode(ctx, code, "get_published_by_code_version"); err != nil {
+		return nil, err
+	}
+	if version == "" {
+		return s.GetPublishedByCode(ctx, code)
+	}
+
+	q, err := s.repo.FindByCodeVersion(ctx, code, version)
+	if err != nil {
+		l.Errorw("获取已发布问卷失败",
+			"action", "get_published_by_code_version",
+			"code", code,
+			"version", version,
+			"result", "failed",
+			"error", err.Error(),
+		)
+		return nil, errors.WrapC(err, errorCode.ErrQuestionnaireNotFound, "获取已发布问卷失败")
+	}
+	if q == nil {
+		return nil, errors.WithCode(errorCode.ErrQuestionnaireNotFound, "问卷不存在")
+	}
+	if !q.IsPublished() {
+		return nil, errors.WithCode(errorCode.ErrQuestionnaireInvalidStatus, "问卷未发布")
+	}
+
+	s.logSuccess(ctx, "get_published_by_code_version", startTime,
+		"code", code,
+		"version", version,
+	)
+	s.recordHotset(ctx, cachetarget.NewStaticQuestionnaireWarmupTarget(code))
+
+	return toQuestionnaireResult(q), nil
+}
+
 // GetQuestionCount 获取问卷题目数量（轻量，不加载 questions）
 func (s *queryService) GetQuestionCount(ctx context.Context, code string) (int32, error) {
 	if err := s.validateCode(ctx, code, "get_question_count"); err != nil {

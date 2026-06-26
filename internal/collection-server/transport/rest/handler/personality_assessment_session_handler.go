@@ -1,0 +1,51 @@
+package handler
+
+import (
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
+	"github.com/gin-gonic/gin"
+)
+
+type PersonalityAssessmentSessionHandler struct {
+	*BaseHandler
+	service *personalitysession.Service
+}
+
+func NewPersonalityAssessmentSessionHandler(service *personalitysession.Service) *PersonalityAssessmentSessionHandler {
+	return &PersonalityAssessmentSessionHandler{
+		BaseHandler: NewBaseHandler(),
+		service:     service,
+	}
+}
+
+// Start starts a stateless personality assessment session for mini-program clients.
+// @Summary 开始人格测评会话
+// @Description 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。
+// @Tags 人格测评
+// @Accept json
+// @Produce json
+// @Param body body personalitysession.StartSessionRequest true "开始会话请求"
+// @Success 200 {object} core.Response{data=personalitysession.StartSessionResponse}
+// @Failure 400 {object} core.ErrResponse
+// @Failure 404 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Router /api/v1/personality-assessment-sessions [post]
+func (h *PersonalityAssessmentSessionHandler) Start(c *gin.Context) {
+	var req personalitysession.StartSessionRequest
+	if err := h.BindJSON(c, &req); err != nil {
+		return
+	}
+	if req.ModelCode == "" || req.TesteeID == 0 {
+		h.BadRequestResponse(c, "model_code and testee_id are required", nil)
+		return
+	}
+	result, err := h.service.Start(c.Request.Context(), &req)
+	if err != nil {
+		h.InternalErrorResponse(c, "start personality assessment session failed", err)
+		return
+	}
+	if result == nil {
+		h.NotFoundResponse(c, "personality model not found", nil)
+		return
+	}
+	h.Success(c, result)
+}

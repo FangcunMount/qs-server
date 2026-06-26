@@ -177,7 +177,10 @@ func (r *Registry) registerQuestionnaireService() error {
 		return nil
 	}
 
-	questionnaireService := service.NewQuestionnaireService(r.deps.Survey.QuestionnaireQueryService)
+	questionnaireService := service.NewQuestionnaireService(
+		r.deps.Survey.QuestionnaireQueryService,
+		r.deps.RuleSet.RuleSetCatalog,
+	)
 	r.server.RegisterService(questionnaireService)
 	log.Info("   📝 Questionnaire service registered (read-only)")
 	return nil

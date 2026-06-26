@@ -519,6 +519,7 @@ func (x *CalculationRule) GetFormulaType() string {
 type GetQuestionnaireRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Version       string                 `protobuf:"bytes,2,opt,name=version,proto3" json:"version,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -556,6 +557,13 @@ func (*GetQuestionnaireRequest) Descriptor() ([]byte, []int) {
 func (x *GetQuestionnaireRequest) GetCode() string {
 	if x != nil {
 		return x.Code
+	}
+	return ""
+}
+
+func (x *GetQuestionnaireRequest) GetVersion() string {
+	if x != nil {
+		return x.Version
 	}
 	return ""
 }
@@ -777,9 +785,10 @@ const file_questionnaire_questionnaire_proto_rawDesc = "" +
 	"\trule_type\x18\x01 \x01(\tR\bruleType\x12!\n" +
 	"\ftarget_value\x18\x02 \x01(\tR\vtargetValue\"4\n" +
 	"\x0fCalculationRule\x12!\n" +
-	"\fformula_type\x18\x01 \x01(\tR\vformulaType\"-\n" +
+	"\fformula_type\x18\x01 \x01(\tR\vformulaType\"G\n" +
 	"\x17GetQuestionnaireRequest\x12\x12\n" +
-	"\x04code\x18\x01 \x01(\tR\x04code\"^\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\aversion\x18\x02 \x01(\tR\aversion\"^\n" +
 	"\x18GetQuestionnaireResponse\x12B\n" +
 	"\rquestionnaire\x18\x01 \x01(\v2\x1c.questionnaire.QuestionnaireR\rquestionnaire\"z\n" +
 	"\x19ListQuestionnairesRequest\x12\x12\n" +

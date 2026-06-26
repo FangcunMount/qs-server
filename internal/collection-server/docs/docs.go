@@ -917,6 +917,70 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/personality-assessment-sessions": {
+            "post": {
+                "description": "小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评"
+                ],
+                "summary": "开始人格测评会话",
+                "parameters": [
+                    {
+                        "description": "开始会话请求",
+                        "name": "body",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/personalitysession.StartSessionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalitysession.StartSessionResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/personality-assessments": {
             "get": {
                 "produces": [
@@ -936,7 +1000,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "算法过滤 mbti/sbti",
+                        "description": "算法过滤（legacy，推荐改用 model.code 或 categories）",
                         "name": "algorithm",
                         "in": "query"
                     }
@@ -1026,6 +1090,13 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -1045,6 +1116,24 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -1106,6 +1195,7 @@ const docTemplate = `{
         },
         "/api/v1/personality-models": {
             "get": {
+                "description": "浏览已发布人格模型目录。单模型详情与题版绑定请用 GET /personality-models/{code} 或推荐入口 POST /personality-assessment-sessions。",
                 "produces": [
                     "application/json"
                 ],
@@ -1130,7 +1220,7 @@ const docTemplate = `{
                     },
                     {
                         "type": "string",
-                        "description": "算法过滤 mbti/sbti",
+                        "description": "算法过滤（legacy，推荐改用 categories 或按 code 精确查询）",
                         "name": "algorithm",
                         "in": "query"
                     }
@@ -1322,7 +1412,7 @@ const docTemplate = `{
         },
         "/api/v1/questionnaires/{code}": {
             "get": {
-                "description": "根据问卷编码获取问卷详情，问题包含校验规则",
+                "description": "根据问卷编码获取问卷详情，问题包含校验规则。人格测评请优先使用 session 返回的 questionnaire_code + questionnaire_version，通过 version 查询精确题版。",
                 "produces": [
                     "application/json"
                 ],
@@ -1337,6 +1427,12 @@ const docTemplate = `{
                         "name": "code",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "问卷版本（人格测评推荐传入模型绑定版本）",
+                        "name": "version",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -2149,7 +2245,7 @@ const docTemplate = `{
         },
         "/api/v2/assessments/{id}/report": {
             "get": {
-                "description": "根据测评 ID 获取报告，响应使用 model/primary_score/level 投影",
+                "description": "根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。",
                 "produces": [
                     "application/json"
                 ],
@@ -2163,6 +2259,13 @@ const docTemplate = `{
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
                         "required": true
                     }
                 ],
@@ -2183,6 +2286,24 @@ const docTemplate = `{
                                     }
                                 }
                             ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
                         }
                     }
                 }
@@ -3589,6 +3710,69 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "one_liner": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalitysession.SessionEndpointsResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_by_answer_sheet": {
+                    "type": "string"
+                },
+                "report": {
+                    "type": "string"
+                },
+                "submit_answer_sheet": {
+                    "type": "string"
+                },
+                "wait_report": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalitysession.StartSessionRequest": {
+            "type": "object",
+            "required": [
+                "model_code",
+                "testee_id"
+            ],
+            "properties": {
+                "model_code": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "integer"
+                }
+            }
+        },
+        "personalitysession.StartSessionResponse": {
+            "type": "object",
+            "properties": {
+                "endpoints": {
+                    "$ref": "#/definitions/personalitysession.SessionEndpointsResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/personalitymodel.PersonalityModelSummaryResponse"
+                },
+                "questionnaire": {
+                    "$ref": "#/definitions/questionnaire.QuestionnaireResponse"
+                },
+                "submit_contract": {
+                    "$ref": "#/definitions/personalitysession.SubmitContractResponse"
+                }
+            }
+        },
+        "personalitysession.SubmitContractResponse": {
+            "type": "object",
+            "properties": {
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "testee_id": {
                     "type": "string"
                 }
             }

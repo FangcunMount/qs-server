@@ -149,12 +149,13 @@ func (c *EvaluationClient) ListMyAssessmentsV2(
 	}, nil
 }
 
-func (c *EvaluationClient) GetAssessmentReportV2(ctx context.Context, assessmentID uint64) (*AssessmentReportV2Output, error) {
+func (c *EvaluationClient) GetAssessmentReportV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportV2Output, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
 	resp, err := c.grpcClient.GetAssessmentReportV2(ctx, &pb.GetAssessmentReportV2Request{
 		AssessmentId: assessmentID,
+		TesteeId:     testeeID,
 	})
 	if err != nil {
 		return nil, err

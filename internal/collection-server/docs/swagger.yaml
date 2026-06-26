@@ -898,6 +898,47 @@ definitions:
       one_liner:
         type: string
     type: object
+  personalitysession.SessionEndpointsResponse:
+    properties:
+      assessment_by_answer_sheet:
+        type: string
+      report:
+        type: string
+      submit_answer_sheet:
+        type: string
+      wait_report:
+        type: string
+    type: object
+  personalitysession.StartSessionRequest:
+    properties:
+      model_code:
+        type: string
+      testee_id:
+        type: integer
+    required:
+    - model_code
+    - testee_id
+    type: object
+  personalitysession.StartSessionResponse:
+    properties:
+      endpoints:
+        $ref: '#/definitions/personalitysession.SessionEndpointsResponse'
+      model:
+        $ref: '#/definitions/personalitymodel.PersonalityModelSummaryResponse'
+      questionnaire:
+        $ref: '#/definitions/questionnaire.QuestionnaireResponse'
+      submit_contract:
+        $ref: '#/definitions/personalitysession.SubmitContractResponse'
+    type: object
+  personalitysession.SubmitContractResponse:
+    properties:
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      testee_id:
+        type: string
+    type: object
   questionnaire.CalculationRuleResponse:
     properties:
       formula_type:
@@ -1918,6 +1959,46 @@ paths:
       summary: 获取因子得分趋势
       tags:
       - 测评
+  /api/v1/personality-assessment-sessions:
+    post:
+      consumes:
+      - application/json
+      description: 小程序推荐入口。根据 model_code 聚合返回模型摘要、精确题版问卷、答卷提交契约与后续查询端点模板；不提前创建测评。推荐流程：session
+        → POST /answersheets → GET /answersheets/{id}/assessment → wait-report → report。
+      parameters:
+      - description: 开始会话请求
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/personalitysession.StartSessionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalitysession.StartSessionResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 开始人格测评会话
+      tags:
+      - 人格测评
   /api/v1/personality-assessments:
     get:
       parameters:
@@ -1926,7 +2007,7 @@ paths:
         name: testee_id
         required: true
         type: integer
-      - description: 算法过滤 mbti/sbti
+      - description: 算法过滤（legacy，推荐改用 model.code 或 categories）
         in: query
         name: algorithm
         type: string
@@ -1981,6 +2062,11 @@ paths:
         name: id
         required: true
         type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       produces:
       - application/json
       responses:
@@ -1993,6 +2079,18 @@ paths:
                 data:
                   $ref: '#/definitions/personalityassessment.AssessmentReportResponse'
               type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取人格测评报告
       tags:
       - 人格测评
@@ -2031,6 +2129,8 @@ paths:
       - 人格测评
   /api/v1/personality-models:
     get:
+      description: 浏览已发布人格模型目录。单模型详情与题版绑定请用 GET /personality-models/{code} 或推荐入口 POST
+        /personality-assessment-sessions。
       parameters:
       - default: 1
         description: 页码
@@ -2042,7 +2142,7 @@ paths:
         in: query
         name: page_size
         type: integer
-      - description: 算法过滤 mbti/sbti
+      - description: 算法过滤（legacy，推荐改用 categories 或按 code 精确查询）
         in: query
         name: algorithm
         type: string
@@ -2161,12 +2261,17 @@ paths:
       - 问卷
   /api/v1/questionnaires/{code}:
     get:
-      description: 根据问卷编码获取问卷详情，问题包含校验规则
+      description: 根据问卷编码获取问卷详情，问题包含校验规则。人格测评请优先使用 session 返回的 questionnaire_code
+        + questionnaire_version，通过 version 查询精确题版。
       parameters:
       - description: 问卷编码
         in: path
         name: code
         required: true
+        type: string
+      - description: 问卷版本（人格测评推荐传入模型绑定版本）
+        in: query
+        name: version
         type: string
       produces:
       - application/json
@@ -2688,11 +2793,16 @@ paths:
       - 测评-V2
   /api/v2/assessments/{id}/report:
     get:
-      description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影
+      description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
       parameters:
       - description: 测评ID
         in: path
         name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
         required: true
         type: integer
       produces:
@@ -2707,6 +2817,18 @@ paths:
                 data:
                   $ref: '#/definitions/evaluation.AssessmentReportV2Response'
               type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
       summary: 获取 v2 测评报告
       tags:
       - 测评-V2

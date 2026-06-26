@@ -44,11 +44,12 @@ func (h *PersonalityModelHandler) Get(c *gin.Context) {
 
 // List returns published personality model summaries.
 // @Summary 获取人格测评模型列表
+// @Description 浏览已发布人格模型目录。单模型详情与题版绑定请用 GET /personality-models/{code} 或推荐入口 POST /personality-assessment-sessions。
 // @Tags 人格测评模型
 // @Produce json
 // @Param page query int false "页码" default(1)
 // @Param page_size query int false "每页数量" default(20)
-// @Param algorithm query string false "算法过滤 mbti/sbti"
+// @Param algorithm query string false "算法过滤（legacy，推荐改用 categories 或按 code 精确查询）"
 // @Success 200 {object} core.Response{data=personalitymodel.ListPersonalityModelsResponse}
 // @Router /api/v1/personality-models [get]
 func (h *PersonalityModelHandler) List(c *gin.Context) {
