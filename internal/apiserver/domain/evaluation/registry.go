@@ -17,21 +17,15 @@ type ModelDescriptor struct {
 	Algorithm assessmentmodel.Algorithm
 }
 
-// DefaultModelDescriptors returns the built-in evaluation model registry.
+// ScaleModelDescriptor returns the built-in scale evaluation descriptor.
+func ScaleModelDescriptor() ModelDescriptor {
+	return ModelDescriptor{Key: EvaluatorKeyScaleDefault, Kind: ModelKindScale}
+}
+
+// DefaultModelDescriptors returns built-in scale descriptors only.
+// Typology descriptors are owned by application typology.DefaultModules() at composition root.
 func DefaultModelDescriptors() []ModelDescriptor {
-	return []ModelDescriptor{
-		{Key: EvaluatorKeyScaleDefault, Kind: ModelKindScale},
-		{
-			Key:       PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI),
-			Kind:      ModelKindTypology,
-			Algorithm: assessmentmodel.AlgorithmMBTI,
-		},
-		{
-			Key:       PersonalityTypologyKey(assessmentmodel.AlgorithmSBTI),
-			Kind:      ModelKindTypology,
-			Algorithm: assessmentmodel.AlgorithmSBTI,
-		},
-	}
+	return []ModelDescriptor{ScaleModelDescriptor()}
 }
 
 // TypologyAlgorithms returns typology algorithms from descriptors.

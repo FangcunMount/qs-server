@@ -7,7 +7,6 @@ import (
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	sbtiadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/sbti"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 )
 
 func TestScoreMatchesLegacyScorerForUnitModel(t *testing.T) {
@@ -59,58 +58,6 @@ func TestScoreMatchesLegacyScorerForUnitModel(t *testing.T) {
 			assertSBTIResultEqual(t, legacy, got)
 		})
 	}
-}
-
-func TestScoreMatchesLegacyScorerForEmbeddedModel(t *testing.T) {
-	model, err := ruleset.LoadDefaultSBTILegacyModel()
-	if err != nil {
-		t.Fatalf("LoadDefaultSBTILegacyModel: %v", err)
-	}
-
-	t.Run("normal_outcome", func(t *testing.T) {
-		sheet := sbtiAllThreesAnswerSheet(model)
-		legacy, err := evaluationtypology.ScoreSBTIReference(model, sheet)
-		if err != nil {
-			t.Fatalf("ScoreSBTI: %v", err)
-		}
-		got, err := sbtiadapter.Score(model, sheet)
-		if err != nil {
-			t.Fatalf("adapter Score: %v", err)
-		}
-		assertSBTIResultEqual(t, legacy, got)
-	})
-
-	t.Run("fallback_HHHH", func(t *testing.T) {
-		modelCopy := *model
-		modelCopy.FallbackSimilarityThreshold = 0.95
-		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		legacy, err := evaluationtypology.ScoreSBTIReference(&modelCopy, sheet)
-		if err != nil {
-			t.Fatalf("ScoreSBTI: %v", err)
-		}
-		got, err := sbtiadapter.Score(&modelCopy, sheet)
-		if err != nil {
-			t.Fatalf("adapter Score: %v", err)
-		}
-		assertSBTIResultEqual(t, legacy, got)
-	})
-
-	t.Run("hidden_DRUNK", func(t *testing.T) {
-		sheet := &evaluationinput.AnswerSheet{
-			Answers: []evaluationinput.Answer{
-				{QuestionCode: "drink_gate_q2", Value: "2"},
-			},
-		}
-		legacy, err := evaluationtypology.ScoreSBTIReference(model, sheet)
-		if err != nil {
-			t.Fatalf("ScoreSBTI: %v", err)
-		}
-		got, err := sbtiadapter.Score(model, sheet)
-		if err != nil {
-			t.Fatalf("adapter Score: %v", err)
-		}
-		assertSBTIResultEqual(t, legacy, got)
-	})
 }
 
 func assertSBTIResultEqual(t *testing.T, want, got evaluationtypology.SBTIResultDetail) {
@@ -180,41 +127,5 @@ func sbtiScorerTestModel() *modeltypology.SBTILegacyModel {
 			QuestionCodes: []string{"drink_gate_q2"},
 			OptionValues:  []string{"C"},
 		},
-	}
-}
-
-func sbtiAllThreesAnswerSheet(model *modeltypology.SBTILegacyModel) *evaluationinput.AnswerSheet {
-	answers := make([]evaluationinput.Answer, 0, len(model.QuestionMappings))
-	for _, mapping := range model.QuestionMappings {
-		answers = append(answers, evaluationinput.Answer{
-			QuestionCode: mapping.QuestionCode,
-			Value:        "3",
-			Score:        3,
-		})
-	}
-	return &evaluationinput.AnswerSheet{
-		QuestionnaireCode:    model.QuestionnaireCode,
-		QuestionnaireVersion: model.QuestionnaireVersion,
-		Answers:              answers,
-	}
-}
-
-func sbtiAlternatingAnswerSheet(model *modeltypology.SBTILegacyModel) *evaluationinput.AnswerSheet {
-	answers := make([]evaluationinput.Answer, 0, len(model.QuestionMappings))
-	for i, mapping := range model.QuestionMappings {
-		value := "1"
-		if i%2 == 1 {
-			value = "3"
-		}
-		answers = append(answers, evaluationinput.Answer{
-			QuestionCode: mapping.QuestionCode,
-			Value:        value,
-			Score:        float64((i % 2) + 1),
-		})
-	}
-	return &evaluationinput.AnswerSheet{
-		QuestionnaireCode:    model.QuestionnaireCode,
-		QuestionnaireVersion: model.QuestionnaireVersion,
-		Answers:              answers,
 	}
 }

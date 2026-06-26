@@ -2,8 +2,8 @@ package query
 
 import (
 	"context"
-	"strings"
 
+	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
@@ -116,18 +116,9 @@ func (s *queryService) listPublishedAlgorithms(ctx context.Context) ([]domain.Al
 			return algorithms, nil
 		}
 	}
-	return []domain.Algorithm{domain.AlgorithmMBTI, domain.AlgorithmSBTI}, nil
+	return typologyeval.DefaultAlgorithms(), nil
 }
 
 func algorithmCategoryLabel(algorithm domain.Algorithm) string {
-	switch algorithm {
-	case domain.AlgorithmMBTI:
-		return "MBTI"
-	case domain.AlgorithmSBTI:
-		return "SBTI"
-	case domain.AlgorithmBigFive:
-		return "Big Five"
-	default:
-		return strings.ToUpper(string(algorithm))
-	}
+	return typologyeval.CategoryLabelFor(algorithm)
 }

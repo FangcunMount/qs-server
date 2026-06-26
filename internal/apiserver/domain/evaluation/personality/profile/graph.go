@@ -44,9 +44,21 @@ func (g FactorGraph) Validate() error {
 			if len(factor.Weights) == 0 {
 				return fmt.Errorf("weighted factor %s requires weights", id)
 			}
-			for childID := range factor.Weights {
-				if _, ok := g.Factors[childID]; !ok {
-					return fmt.Errorf("factor %s references unknown weighted child %s", id, childID)
+			children := make(map[FactorID]struct{}, len(factor.Children))
+			for _, childID := range factor.Children {
+				children[childID] = struct{}{}
+			}
+			for childID, weight := range factor.Weights {
+				if _, ok := children[childID]; !ok {
+					return fmt.Errorf("factor %s weight %s is not a child", id, childID)
+				}
+				if weight <= 0 {
+					return fmt.Errorf("factor %s child %s weight must be > 0", id, childID)
+				}
+			}
+			for _, childID := range factor.Children {
+				if _, ok := factor.Weights[childID]; !ok {
+					return fmt.Errorf("factor %s child %s is missing weight", id, childID)
 				}
 			}
 		}

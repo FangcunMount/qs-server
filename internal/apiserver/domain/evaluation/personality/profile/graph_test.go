@@ -148,3 +148,86 @@ func TestSelectTraitProfileReturnsFactorScores(t *testing.T) {
 		t.Fatalf("traits = %#v", outcome.TraitScores)
 	}
 }
+
+func TestFactorGraphRejectsNonChildWeight(t *testing.T) {
+	graph := profile.FactorGraph{
+		Factors: map[profile.FactorID]profile.PersonalityFactor{
+			"a": {ID: "a", Kind: profile.FactorKindLeaf},
+			"b": {ID: "b", Kind: profile.FactorKindLeaf},
+			"total": {
+				ID:          "total",
+				Kind:        profile.FactorKindComposite,
+				Children:    []profile.FactorID{"a", "b"},
+				Aggregation: profile.AggregationWeightedAvg,
+				Weights:     map[profile.FactorID]float64{"a": 1, "c": 1},
+			},
+		},
+		LeafSpecs: map[profile.FactorID]profile.LeafScoringSpec{
+			"a": {Contributions: []profile.AnswerContribution{{QuestionCode: "q1", Sign: 1}}},
+			"b": {Contributions: []profile.AnswerContribution{{QuestionCode: "q2", Sign: 1}}},
+		},
+		Roots: []profile.FactorID{"total"},
+	}
+	if err := graph.Validate(); err == nil || !strings.Contains(err.Error(), "not a child") {
+		t.Fatalf("Validate() = %v, want non-child weight error", err)
+	}
+}
+
+func TestFactorGraphRejectsMissingChildWeight(t *testing.T) {
+	graph := profile.FactorGraph{
+		Factors: map[profile.FactorID]profile.PersonalityFactor{
+			"a": {ID: "a", Kind: profile.FactorKindLeaf},
+			"b": {ID: "b", Kind: profile.FactorKindLeaf},
+			"total": {
+				ID:          "total",
+				Kind:        profile.FactorKindComposite,
+				Children:    []profile.FactorID{"a", "b"},
+				Aggregation: profile.AggregationWeightedAvg,
+				Weights:     map[profile.FactorID]float64{"a": 1},
+			},
+		},
+		LeafSpecs: map[profile.FactorID]profile.LeafScoringSpec{
+			"a": {Contributions: []profile.AnswerContribution{{QuestionCode: "q1", Sign: 1}}},
+			"b": {Contributions: []profile.AnswerContribution{{QuestionCode: "q2", Sign: 1}}},
+		},
+		Roots: []profile.FactorID{"total"},
+	}
+	if err := graph.Validate(); err == nil || !strings.Contains(err.Error(), "missing weight") {
+		t.Fatalf("Validate() = %v, want missing child weight error", err)
+	}
+}
+
+func TestFactorGraphScoresWeightedAverageByChildrenOrder(t *testing.T) {
+	graph := profile.FactorGraph{
+		Factors: map[profile.FactorID]profile.PersonalityFactor{
+			"a": {ID: "a", Code: "a", Kind: profile.FactorKindLeaf},
+			"b": {ID: "b", Code: "b", Kind: profile.FactorKindLeaf},
+			"total": {
+				ID:          "total",
+				Code:        "total",
+				Kind:        profile.FactorKindComposite,
+				Children:    []profile.FactorID{"a", "b"},
+				Aggregation: profile.AggregationWeightedAvg,
+				Weights:     map[profile.FactorID]float64{"a": 1, "b": 3},
+			},
+		},
+		LeafSpecs: map[profile.FactorID]profile.LeafScoringSpec{
+			"a": {Contributions: []profile.AnswerContribution{{QuestionCode: "q1", Sign: 1}}},
+			"b": {Contributions: []profile.AnswerContribution{{QuestionCode: "q2", Sign: 2}}},
+		},
+		Roots: []profile.FactorID{"total"},
+	}
+	sheet := &evaluationinput.AnswerSheet{
+		Answers: []evaluationinput.Answer{
+			{QuestionCode: "q1", Score: 2},
+			{QuestionCode: "q2", Score: 4},
+		},
+	}
+	vector, err := profile.ScoreGraph(graph, sheet)
+	if err != nil {
+		t.Fatalf("ScoreGraph: %v", err)
+	}
+	if vector.Scores["total"].Raw != 6.5 {
+		t.Fatalf("total raw = %v, want 6.5", vector.Scores["total"].Raw)
+	}
+}

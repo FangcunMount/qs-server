@@ -46,7 +46,10 @@ func BuildFromLegacy(model *modeltypology.SBTILegacyModel) (profile.FactorGraph,
 			Name: meta.Name,
 			Kind: profile.FactorKindLeaf,
 		}
-		leafSpecs[factorID] = profile.LeafScoringSpec{Contributions: contributions}
+		leafSpecs[factorID] = profile.LeafScoringSpec{
+			Contributions: contributions,
+			OptionScoring: profile.OptionScoringCompat,
+		}
 		patternOrder = append(patternOrder, factorID)
 		roots = append(roots, factorID)
 	}

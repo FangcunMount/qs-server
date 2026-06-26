@@ -72,7 +72,7 @@ func scoreLeaf(spec LeafScoringSpec, answers map[string]evaluationinput.Answer) 
 		if !ok {
 			return 0, fmt.Errorf("missing answer for question %s", contribution.QuestionCode)
 		}
-		value, err := contributionScore(contribution, answer)
+		value, err := contributionScore(spec.OptionScoring, contribution, answer)
 		if err != nil {
 			return 0, err
 		}
@@ -81,9 +81,9 @@ func scoreLeaf(spec LeafScoringSpec, answers map[string]evaluationinput.Answer) 
 	return total, nil
 }
 
-func contributionScore(contribution AnswerContribution, answer evaluationinput.Answer) (float64, error) {
+func contributionScore(policy OptionScoringPolicy, contribution AnswerContribution, answer evaluationinput.Answer) (float64, error) {
 	if len(contribution.OptionScores) > 0 {
-		return scoreOptionAnswer(contribution.OptionScores, answer)
+		return scoreOptionAnswer(policy, contribution.OptionScores, answer)
 	}
 	value, err := likertValue(answer)
 	if err != nil {
@@ -92,7 +92,7 @@ func contributionScore(contribution AnswerContribution, answer evaluationinput.A
 	return contribution.Sign * value, nil
 }
 
-func scoreOptionAnswer(optionScores map[string]float64, answer evaluationinput.Answer) (float64, error) {
+func scoreOptionAnswer(policy OptionScoringPolicy, optionScores map[string]float64, answer evaluationinput.Answer) (float64, error) {
 	value := evaluationinput.AnswerValueKey(answer.Value)
 	if value != "" {
 		if score, ok := optionScores[value]; ok {
@@ -102,7 +102,7 @@ func scoreOptionAnswer(optionScores map[string]float64, answer evaluationinput.A
 			return score, nil
 		}
 	}
-	if answer.Score > 0 {
+	if policy == OptionScoringCompat && answer.Score > 0 {
 		return answer.Score, nil
 	}
 	return 0, fmt.Errorf("invalid answer for question %s: %v", answer.QuestionCode, answer.Value)
@@ -152,7 +152,11 @@ func aggregateChildren(factor PersonalityFactor, scores map[FactorID]FactorScore
 	case AggregationWeightedAvg:
 		var weighted float64
 		var weightSum float64
-		for childID, weight := range factor.Weights {
+		for _, childID := range factor.Children {
+			weight, ok := factor.Weights[childID]
+			if !ok {
+				return 0, fmt.Errorf("missing weight for child %s", childID)
+			}
 			childScore, ok := scores[childID]
 			if !ok {
 				return 0, fmt.Errorf("missing weighted child score for %s", childID)

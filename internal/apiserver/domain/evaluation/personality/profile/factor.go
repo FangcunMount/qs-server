@@ -20,6 +20,16 @@ const (
 	AggregationWeightedAvg AggregationMethod = "weighted_avg"
 )
 
+// OptionScoringPolicy controls how option-mapped answers are scored.
+type OptionScoringPolicy string
+
+const (
+	// OptionScoringStrict requires a known option key in OptionScores.
+	OptionScoringStrict OptionScoringPolicy = "strict"
+	// OptionScoringCompat falls back to answer.Score when option key is unknown.
+	OptionScoringCompat OptionScoringPolicy = "compat"
+)
+
 // AnswerContribution maps a questionnaire item to a leaf factor score.
 type AnswerContribution struct {
 	QuestionCode string
@@ -31,6 +41,7 @@ type AnswerContribution struct {
 type LeafScoringSpec struct {
 	Constant      float64
 	Contributions []AnswerContribution
+	OptionScoring OptionScoringPolicy
 }
 
 // PersonalityFactor is a node in the factor hierarchy.

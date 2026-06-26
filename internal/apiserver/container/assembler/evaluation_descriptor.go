@@ -17,13 +17,43 @@ import (
 type EvaluationWiringDeps struct {
 	ScaleReportBuilder report.ReportBuilder
 	ScaleScorer        portruleengine.ScaleFactorScorer
+	TypologyRegistry   typologyEvaluation.ModuleRegistry
 }
 
 func DefaultEvaluationWiringDeps(scaleReportBuilder report.ReportBuilder) EvaluationWiringDeps {
+	registry, err := typologyEvaluation.DefaultModuleRegistry()
+	if err != nil {
+		panic(err)
+	}
 	return EvaluationWiringDeps{
 		ScaleReportBuilder: scaleReportBuilder,
 		ScaleScorer:        ruleengine.NewScaleFactorScorer(),
+		TypologyRegistry:   registry,
 	}
+}
+
+func (deps EvaluationWiringDeps) typologyRegistry() typologyEvaluation.ModuleRegistry {
+	if deps.TypologyRegistry.Len() > 0 {
+		return deps.TypologyRegistry
+	}
+	return mustDefaultTypologyRegistry()
+}
+
+func mustDefaultTypologyRegistry() typologyEvaluation.ModuleRegistry {
+	registry, err := typologyEvaluation.DefaultModuleRegistry()
+	if err != nil {
+		panic(err)
+	}
+	return registry
+}
+
+// DefaultEvaluationDescriptors returns scale + typology descriptors from composition-root modules.
+func DefaultEvaluationDescriptors() []evaldomain.ModelDescriptor {
+	scale := evaldomain.ModelDescriptor{
+		Key:  evaldomain.EvaluatorKeyScaleDefault,
+		Kind: evaldomain.ModelKindScale,
+	}
+	return append([]evaldomain.ModelDescriptor{scale}, typologyEvaluation.ModuleDescriptors(typologyEvaluation.DefaultModules())...)
 }
 
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps EvaluationWiringDeps) ([]execute.Evaluator, error) {
@@ -78,7 +108,7 @@ func materializeEvaluator(desc evaldomain.ModelDescriptor, deps EvaluationWiring
 	case evaldomain.ModelKindScale:
 		return scaleEvaluation.NewExecutor(deps.ScaleScorer), nil
 	case evaldomain.ModelKindTypology:
-		return typologyEvaluation.NewTypologyExecutor(desc.Algorithm)
+		return typologyEvaluation.NewTypologyExecutorWithRegistry(deps.typologyRegistry(), desc.Algorithm)
 	default:
 		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
 	}
@@ -89,7 +119,7 @@ func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps EvaluationWi
 	case evaldomain.ModelKindScale:
 		return evaluationResult.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
 	case evaldomain.ModelKindTypology:
-		return typologyEvaluation.NewReportBuilder(desc.Algorithm)
+		return typologyEvaluation.NewReportBuilderWithRegistry(deps.typologyRegistry(), desc.Algorithm)
 	default:
 		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
 	}

@@ -13,7 +13,7 @@ import (
 )
 
 func TestMaterializeRegistryKeyParity(t *testing.T) {
-	descs := evaldomain.DefaultModelDescriptors()
+	descs := DefaultEvaluationDescriptors()
 	deps := DefaultEvaluationWiringDeps(report.NewDefaultInterpretReportBuilder(nil))
 	evaluators, err := MaterializeEvaluators(descs, deps)
 	if err != nil {
@@ -34,6 +34,20 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 	}
 	if err := AssertRegistryKeyParity(descs, evaluators, builders, providers); err != nil {
 		t.Fatalf("AssertRegistryKeyParity: %v", err)
+	}
+}
+
+func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T) {
+	descs := DefaultEvaluationDescriptors()
+	if len(descs) < 3 {
+		t.Fatalf("descriptor count = %d, want at least 3", len(descs))
+	}
+	if descs[0].Kind != evaldomain.ModelKindScale {
+		t.Fatalf("first descriptor kind = %s, want scale", descs[0].Kind)
+	}
+	typology := evaldomain.TypologyAlgorithms(descs)
+	if len(typology) != 2 {
+		t.Fatalf("typology algorithms = %#v", typology)
 	}
 }
 

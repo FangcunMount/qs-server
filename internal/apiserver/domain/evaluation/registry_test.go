@@ -1,21 +1,16 @@
 package evaluation
 
-import (
-	"testing"
+import "testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-)
-
-func TestDefaultModelDescriptors(t *testing.T) {
+func TestDefaultModelDescriptorsReturnsScaleOnly(t *testing.T) {
 	descs := DefaultModelDescriptors()
-	if len(descs) != 3 {
-		t.Fatalf("descriptor count = %d, want 3", len(descs))
+	if len(descs) != 1 {
+		t.Fatalf("descriptor count = %d, want 1", len(descs))
 	}
-	algorithms := TypologyAlgorithms(descs)
-	if len(algorithms) != 2 {
-		t.Fatalf("typology algorithms = %#v", algorithms)
+	if descs[0].Kind != ModelKindScale {
+		t.Fatalf("descriptor kind = %s, want %s", descs[0].Kind, ModelKindScale)
 	}
-	if algorithms[0] != assessmentmodel.AlgorithmMBTI || algorithms[1] != assessmentmodel.AlgorithmSBTI {
-		t.Fatalf("algorithms = %#v", algorithms)
+	if len(TypologyAlgorithms(descs)) != 0 {
+		t.Fatalf("typology algorithms = %#v, want empty", TypologyAlgorithms(descs))
 	}
 }

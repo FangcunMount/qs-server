@@ -19,24 +19,8 @@ type algorithmRunner struct {
 
 type reportBuilderFunc func(evaluationresult.Outcome) (*domainReport.InterpretReport, error)
 
-var reportBuilders = map[assessmentmodel.Algorithm]reportBuilderFunc{
-	assessmentmodel.AlgorithmMBTI: buildMBTIReport,
-	assessmentmodel.AlgorithmSBTI: buildSBTIReport,
-}
-
-func algorithmRunnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
-	adapter, err := personalityadapter.DefaultRegistry().Resolve(algorithm)
-	if err != nil {
-		return algorithmRunner{}, err
-	}
-	reportBuilder, ok := reportBuilders[algorithm]
-	if !ok {
-		return algorithmRunner{}, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
-	}
-	return algorithmRunner{
-		adapter:       adapter,
-		reportBuilder: reportBuilder,
-	}, nil
+func algorithmRunnerFor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
+	return registry.runnerFor(algorithm)
 }
 
 func (r algorithmRunner) algorithm() assessmentmodel.Algorithm {
@@ -51,7 +35,11 @@ func (r algorithmRunner) buildOutcome(
 	payload *modeltypology.Payload,
 	sheet *port.AnswerSheetSnapshot,
 ) (*assessment.AssessmentOutcome, error) {
-	return r.adapter.BuildOutcome(modelRef, payload, answerSheetFromPort(sheet))
+	result, err := r.adapter.Score(payload, answerSheetFromPort(sheet))
+	if err != nil {
+		return nil, err
+	}
+	return assessmentOutcomeFromScoringResult(r.algorithm(), modelRef, result)
 }
 
 func (r algorithmRunner) buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {

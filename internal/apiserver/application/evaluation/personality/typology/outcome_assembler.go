@@ -1,0 +1,91 @@
+package typology
+
+import (
+	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+)
+
+func assessmentOutcomeFromScoringResult(
+	algorithm assessmentmodel.Algorithm,
+	modelRef assessment.EvaluationModelRef,
+	result evaluationtypology.ScoringResult,
+) (*assessment.AssessmentOutcome, error) {
+	switch algorithm {
+	case assessmentmodel.AlgorithmMBTI:
+		detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail)
+		if err != nil {
+			return nil, err
+		}
+		return assessmentOutcomeFromMBTI(modelRef, detail), nil
+	case assessmentmodel.AlgorithmSBTI:
+		detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail)
+		if err != nil {
+			return nil, err
+		}
+		return assessmentOutcomeFromSBTI(modelRef, detail), nil
+	default:
+		return nil, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
+	}
+}
+
+func assessmentOutcomeFromMBTI(modelRef assessment.EvaluationModelRef, detail evaluationtypology.MBTIResultDetail) *assessment.AssessmentOutcome {
+	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
+		PrimaryLabel: detail.TypeCode,
+		Tags:         []string{detail.TypeName, detail.OneLiner},
+	}, assessment.EvaluationDetail{
+		Kind:    assessment.EvaluationModelKindPersonality,
+		Payload: detail,
+	})
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindMatchPercent,
+		Value: detail.MatchPercent,
+		Label: detail.TypeCode,
+	}
+	outcome.Level = &assessment.OutcomeResultLevel{
+		Code:     detail.TypeCode,
+		Label:    detail.TypeName,
+		Severity: "none",
+	}
+	outcome.Profile = &assessment.ProfileResult{
+		Kind:        assessment.ProfileKindPersonalityType,
+		Code:        detail.TypeCode,
+		Name:        detail.TypeName,
+		Summary:     detail.OneLiner,
+		Strengths:   append([]string(nil), detail.Profile.Strengths...),
+		Weaknesses:  append([]string(nil), detail.Profile.Weaknesses...),
+		Suggestions: append([]string(nil), detail.Profile.Suggestions...),
+	}
+	return outcome
+}
+
+func assessmentOutcomeFromSBTI(modelRef assessment.EvaluationModelRef, detail evaluationtypology.SBTIResultDetail) *assessment.AssessmentOutcome {
+	score := detail.Similarity * 100
+	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
+		PrimaryLabel: detail.TypeCode,
+		Score:        &score,
+		Tags:         []string{detail.TypeName, detail.OneLiner},
+	}, assessment.EvaluationDetail{
+		Kind:    assessment.EvaluationModelKindPersonality,
+		Payload: detail,
+	})
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindMatchPercent,
+		Value: score,
+		Label: detail.TypeCode,
+	}
+	outcome.Level = &assessment.OutcomeResultLevel{
+		Code:     detail.TypeCode,
+		Label:    detail.TypeName,
+		Severity: "none",
+	}
+	outcome.Profile = &assessment.ProfileResult{
+		Kind:    assessment.ProfileKindPersonalityType,
+		Code:    detail.TypeCode,
+		Name:    detail.TypeName,
+		Summary: detail.OneLiner,
+	}
+	return outcome
+}

@@ -6,17 +6,16 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
 
-// ModelAdapter scores a typology payload and maps it to an assessment outcome.
+// ModelAdapter scores a typology payload through the personality profile pipeline.
 type ModelAdapter interface {
 	Algorithm() assessmentmodel.Algorithm
-	BuildOutcome(
-		modelRef assessment.EvaluationModelRef,
+	Score(
 		payload *modeltypology.Payload,
 		sheet *evaluationinput.AnswerSheet,
-	) (*assessment.AssessmentOutcome, error)
+	) (evaluationtypology.ScoringResult, error)
 }
 
 // Registry resolves personality model adapters by algorithm.

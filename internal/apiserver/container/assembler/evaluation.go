@@ -15,7 +15,6 @@ import (
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
@@ -237,7 +236,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		m.ReportStatusReporter = reportStatusReporter
 
 		reportBuilder := report.NewDefaultInterpretReportBuilder(suggestionGenerator)
-		descs := evaldomain.DefaultModelDescriptors()
+		descs := DefaultEvaluationDescriptors()
 		wiringDeps := DefaultEvaluationWiringDeps(reportBuilder)
 		evaluators, err := MaterializeEvaluators(descs, wiringDeps)
 		if err != nil {

@@ -18,11 +18,15 @@ type Executor struct {
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
 func NewTypologyExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error) {
-	return newExecutor(algorithm)
+	return NewTypologyExecutorWithRegistry(mustDefaultModuleRegistry(), algorithm)
 }
 
-func newExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error) {
-	runner, err := algorithmRunnerFor(algorithm)
+func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+	return newExecutor(registry, algorithm)
+}
+
+func newExecutor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+	runner, err := algorithmRunnerFor(registry, algorithm)
 	if err != nil {
 		return nil, err
 	}

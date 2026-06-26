@@ -51,6 +51,7 @@ func (c *Container) buildEvaluationModuleDeps() (assembler.EvaluationModuleDeps,
 			infra.answerSheetRepo,
 			infra.questionnaireRepo,
 			catalog,
+			assembler.DefaultEvaluationDescriptors(),
 		)
 		if err != nil {
 			return assembler.EvaluationModuleDeps{}, fmt.Errorf("failed to initialize evaluation input resolver: %w", err)
