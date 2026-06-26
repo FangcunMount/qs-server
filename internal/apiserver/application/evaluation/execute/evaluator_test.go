@@ -26,8 +26,10 @@ func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*asse
 	if e.execute != nil {
 		return e.execute(ctx, input)
 	}
-	return assessment.AssessmentOutcomeFromEvaluationResult(
-		assessment.NewEvaluationResult(0, assessment.RiskLevelNone, "", "", nil),
+	return assessment.NewAssessmentOutcome(
+		assessment.EvaluationModelRef{},
+		assessment.ResultSummary{},
+		assessment.EvaluationDetail{},
 	), nil
 }
 

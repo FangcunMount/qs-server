@@ -12,3 +12,7 @@ func legacyResultForPersistence(outcome Outcome) *assessment.EvaluationResult {
 	}
 	return outcome.Execution.ToEvaluationResult()
 }
+
+func outcomeFromLegacyEvaluationResult(result *assessment.EvaluationResult) *assessment.AssessmentOutcome {
+	return assessment.AssessmentOutcomeFromEvaluationResult(result) //nolint:staticcheck // single boundary adapter for characterization
+}

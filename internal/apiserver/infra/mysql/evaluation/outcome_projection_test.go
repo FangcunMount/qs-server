@@ -12,9 +12,28 @@ import (
 
 func TestApplyAssessmentOutcomeV2FieldsProjectsScaleRiskLevel(t *testing.T) {
 	a := newSubmittedScaleAssessment(t)
-	result := assessment.NewEvaluationResult(18.5, assessment.RiskLevelHigh, "high", "follow up", nil)
-	if err := a.ApplyEvaluation(result); err != nil {
-		t.Fatalf("ApplyEvaluation returned error: %v", err)
+	score := 18.5
+	level := string(assessment.RiskLevelHigh)
+	outcome := assessment.NewAssessmentOutcome(
+		assessment.EvaluationModelRef{},
+		assessment.ResultSummary{
+			PrimaryLabel: "high",
+			Score:        &score,
+			Level:        &level,
+		},
+		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindScale},
+	)
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindRawTotal,
+		Value: score,
+	}
+	outcome.Level = &assessment.OutcomeResultLevel{
+		Code:     "high",
+		Label:    "high",
+		Severity: "high",
+	}
+	if err := a.ApplyOutcome(outcome); err != nil {
+		t.Fatalf("ApplyOutcome returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)
@@ -61,13 +80,23 @@ func TestApplyAssessmentOutcomeV2FieldsKeepsTypologyLevelWhenRiskIsNone(t *testi
 		t.Fatalf("Submit returned error: %v", err)
 	}
 	score := 92.0
-	result := assessment.NewModelEvaluationResult(
+	outcome := assessment.NewAssessmentOutcome(
 		modelRef,
 		assessment.ResultSummary{PrimaryLabel: "INTJ", Score: &score},
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality},
 	)
-	if err := a.ApplyEvaluation(result); err != nil {
-		t.Fatalf("ApplyEvaluation returned error: %v", err)
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindMatchPercent,
+		Value: score,
+		Label: "INTJ",
+	}
+	outcome.Level = &assessment.OutcomeResultLevel{
+		Code:     "INTJ",
+		Label:    "INTJ",
+		Severity: "none",
+	}
+	if err := a.ApplyOutcome(outcome); err != nil {
+		t.Fatalf("ApplyOutcome returned error: %v", err)
 	}
 
 	po := NewAssessmentMapper().ToPO(a)

@@ -306,10 +306,24 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 		key: evaluation.EvaluatorKeyScaleDefault,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
 			executionInput = input
-			return domainAssessment.AssessmentOutcomeFromEvaluationResult(
-				domainAssessment.NewEvaluationResult(7, domainAssessment.RiskLevelLow, "ok", "keep", nil).
-					WithModelRef(*input.Assessment.EvaluationModelRef()),
-			), nil
+			modelRef := *input.Assessment.EvaluationModelRef()
+			score := 7.0
+			level := string(domainAssessment.RiskLevelLow)
+			outcome := domainAssessment.NewAssessmentOutcome(
+				modelRef,
+				domainAssessment.ResultSummary{
+					PrimaryLabel: "ok",
+					Score:        &score,
+					Level:        &level,
+				},
+				domainAssessment.EvaluationDetail{Kind: domainAssessment.EvaluationModelKindScale},
+			)
+			outcome.Primary = &domainAssessment.OutcomeScoreValue{
+				Kind:  domainAssessment.OutcomeScoreKindRawTotal,
+				Value: score,
+			}
+			outcome.Level = &domainAssessment.OutcomeResultLevel{Code: level, Label: "ok"}
+			return outcome, nil
 		},
 	})
 	if err != nil {
@@ -376,12 +390,21 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.EvaluatorKeyMBTI,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
-			return domainAssessment.AssessmentOutcomeFromEvaluationResult(
-				domainAssessment.NewModelEvaluationResult(*input.Assessment.EvaluationModelRef(), domainAssessment.ResultSummary{PrimaryLabel: "INTJ"}, domainAssessment.EvaluationDetail{
+			modelRef := *input.Assessment.EvaluationModelRef()
+			outcome := domainAssessment.NewAssessmentOutcome(
+				modelRef,
+				domainAssessment.ResultSummary{PrimaryLabel: "INTJ"},
+				domainAssessment.EvaluationDetail{
 					Kind:    domainAssessment.EvaluationModelKindPersonality,
 					Payload: "INTJ",
-				}),
-			), nil
+				},
+			)
+			outcome.Level = &domainAssessment.OutcomeResultLevel{
+				Code:     "INTJ",
+				Label:    "INTJ",
+				Severity: "none",
+			}
+			return outcome, nil
 		},
 	})
 	if err != nil {

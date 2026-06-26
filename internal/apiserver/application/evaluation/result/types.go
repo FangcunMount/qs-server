@@ -25,7 +25,7 @@ func NewOutcomeFromLegacyResult(a *assessment.Assessment, input *evaluationinput
 	return Outcome{
 		Assessment: a,
 		Input:      input,
-		Execution:  assessment.AssessmentOutcomeFromEvaluationResult(result),
+		Execution:  outcomeFromLegacyEvaluationResult(result),
 	}
 }
 

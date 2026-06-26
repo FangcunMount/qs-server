@@ -771,7 +771,7 @@ func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
 	root := repoRoot(t)
 	allowedRelFiles := map[string]struct{}{
 		"internal/apiserver/application/evaluation/result/legacy_projection.go": {},
-		"internal/apiserver/application/evaluation/result/types.go":               {},
+		"internal/apiserver/application/evaluation/result/types.go":             {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
