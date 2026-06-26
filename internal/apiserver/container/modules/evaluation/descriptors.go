@@ -15,10 +15,10 @@ import (
 
 // WiringDeps groups evaluator/report-builder wiring dependencies.
 type WiringDeps struct {
-	ScaleReportBuilder    report.ReportBuilder
-	ScaleScorer           portruleengine.ScaleFactorScorer
-	TypologyRegistry      typologyEvaluation.ModuleRegistry
-	sharedTypologyExecutor     **typologyEvaluation.Executor
+	ScaleReportBuilder          report.ReportBuilder
+	ScaleScorer                 portruleengine.ScaleFactorScorer
+	TypologyRegistry            typologyEvaluation.ModuleRegistry
+	sharedTypologyExecutor      **typologyEvaluation.Executor
 	sharedTypologyReportBuilder *typologyEvaluation.ReportBuilder
 }
 

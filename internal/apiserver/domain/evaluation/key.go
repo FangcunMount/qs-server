@@ -15,9 +15,9 @@ var (
 		SubKind:   assessmentmodel.SubKindEmpty,
 		Algorithm: assessmentmodel.AlgorithmScaleDefault,
 	}
-	EvaluatorKeyMBTI = PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI)
-	EvaluatorKeySBTI = PersonalityTypologyKey(assessmentmodel.AlgorithmSBTI)
-	EvaluatorKeyBigFive = PersonalityTypologyKey(assessmentmodel.AlgorithmBigFive)
+	EvaluatorKeyMBTI                = PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI)
+	EvaluatorKeySBTI                = PersonalityTypologyKey(assessmentmodel.AlgorithmSBTI)
+	EvaluatorKeyBigFive             = PersonalityTypologyKey(assessmentmodel.AlgorithmBigFive)
 	EvaluatorKeyPersonalityTypology = EvaluatorKey{
 		Kind:      assessmentmodel.KindPersonality,
 		SubKind:   assessmentmodel.SubKindTypology,

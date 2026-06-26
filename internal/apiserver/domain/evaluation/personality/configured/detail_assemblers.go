@@ -130,11 +130,7 @@ func assembleBigFiveDetail(input DetailInput) (any, error) {
 }
 
 func convertRarity(rarity modeltypology.Rarity) modeltypology.SBTILegacyRarity {
-	return modeltypology.SBTILegacyRarity{
-		Percent: rarity.Percent,
-		Label:   rarity.Label,
-		OneInX:  rarity.OneInX,
-	}
+	return modeltypology.SBTILegacyRarity(rarity)
 }
 
 func convertOutcome(outcome modeltypology.Outcome) modeltypology.SBTILegacyOutcome {

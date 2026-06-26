@@ -17,11 +17,11 @@ func TestV1MBTIMultiVersionExecutorPreservesScoringWithoutNewModule(t *testing.T
 	t.Parallel()
 
 	cases := []struct {
-		name       string
-		payload    *modeltypology.Payload
-		answers    []port.AnswerSnapshot
-		wantType   string
-		wantMatch  float64
+		name      string
+		payload   *modeltypology.Payload
+		answers   []port.AnswerSnapshot
+		wantType  string
+		wantMatch float64
 	}{
 		{
 			name:      "MBTI_16",

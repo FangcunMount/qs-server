@@ -3,8 +3,8 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 )
 
 // DefaultModules returns algorithm alias entries for the configured typology runtime.

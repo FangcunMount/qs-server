@@ -106,12 +106,12 @@ const (
 
 // SpecialRuleSpec describes a configurable special outcome rule.
 type SpecialRuleSpec struct {
-	Code        string               `json:"code"`
-	Kind        SpecialRuleKind      `json:"kind,omitempty"`
-	Phase       SpecialRulePhase     `json:"phase"`
-	Trigger     string               `json:"trigger,omitempty"`
-	OutcomeCode string               `json:"outcome_code,omitempty"`
-	Condition   SpecialRuleCondition   `json:"condition,omitempty"`
+	Code          string               `json:"code"`
+	Kind          SpecialRuleKind      `json:"kind,omitempty"`
+	Phase         SpecialRulePhase     `json:"phase"`
+	Trigger       string               `json:"trigger,omitempty"`
+	OutcomeCode   string               `json:"outcome_code,omitempty"`
+	Condition     SpecialRuleCondition `json:"condition,omitempty"`
 	QuestionCodes []string             `json:"question_codes,omitempty"`
 	OptionValues  []string             `json:"option_values,omitempty"`
 }

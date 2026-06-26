@@ -42,13 +42,13 @@ const (
 type Algorithm string
 
 const (
-	AlgorithmScaleDefault       Algorithm = "scale_default"
+	AlgorithmScaleDefault        Algorithm = "scale_default"
 	AlgorithmPersonalityTypology Algorithm = "personality_typology"
-	AlgorithmBigFive            Algorithm = "bigfive"
-	AlgorithmMBTI         Algorithm = "mbti"
-	AlgorithmSBTI         Algorithm = "sbti"
-	AlgorithmBrief2       Algorithm = "brief2"
-	AlgorithmSPM          Algorithm = "spm"
+	AlgorithmBigFive             Algorithm = "bigfive"
+	AlgorithmMBTI                Algorithm = "mbti"
+	AlgorithmSBTI                Algorithm = "sbti"
+	AlgorithmBrief2              Algorithm = "brief2"
+	AlgorithmSPM                 Algorithm = "spm"
 )
 
 func (k Kind) String() string { return string(k) }
