@@ -19,6 +19,10 @@ func (f fakeTypologyCatalog) GetTypologyModelByRef(context.Context, port.ModelRe
 	return f.payload, f.err
 }
 
+func (f fakeTypologyCatalog) FindTypologyModelByQuestionnaire(context.Context, string, string) (*modeltypology.Payload, error) {
+	return f.payload, f.err
+}
+
 type fakeAnswerSheetReader struct {
 	sheet *port.AnswerSheetSnapshot
 }
@@ -86,6 +90,29 @@ func TestTypologyModelInputProviderRejectsAlgorithmMismatch(t *testing.T) {
 	}
 }
 
+func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
+	payload := &modeltypology.Payload{
+		Code:      "BF",
+		Version:   "1.0.0",
+		Algorithm: assessmentmodel.AlgorithmBigFive,
+		Status:    "published",
+	}
+	provider := NewTypologyModelInputProvider(
+		assessmentmodel.AlgorithmBigFive,
+		fakeTypologyCatalog{payload: payload},
+		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{}},
+		fakeQuestionnaireReader{},
+	)
+	snapshot, err := provider.ResolveInput(context.Background(), port.InputRef{AnswerSheetID: 1})
+	if err != nil {
+		t.Fatalf("ResolveInput: %v", err)
+	}
+	got, ok := port.TypologyPayload(snapshot)
+	if !ok || got.Algorithm != assessmentmodel.AlgorithmBigFive {
+		t.Fatalf("payload = %#v, ok=%v", got, ok)
+	}
+}
+
 func TestMBTIModelInputProviderDelegatesToTypologyProvider(t *testing.T) {
 	payload := modeltypology.FromMBTI(&modeltypology.MBTILegacyModel{
 		Code:                 "MBTI_TEST",
@@ -95,7 +122,7 @@ func TestMBTIModelInputProviderDelegatesToTypologyProvider(t *testing.T) {
 		Status:               "published",
 	})
 	provider := NewMBTIModelInputProvider(
-		fakeMBTICatalog{payload: payload},
+		fakeTypologyCatalog{payload: payload},
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
 			QuestionnaireCode:    "MBTI_TEST",
 			QuestionnaireVersion: "1.0.0",
@@ -109,17 +136,4 @@ func TestMBTIModelInputProviderDelegatesToTypologyProvider(t *testing.T) {
 	if _, ok := snapshot.ModelPayload.(port.TypologyModelPayload); !ok {
 		t.Fatalf("payload type = %T, want TypologyModelPayload", snapshot.ModelPayload)
 	}
-}
-
-type fakeMBTICatalog struct {
-	payload *modeltypology.Payload
-}
-
-func (f fakeMBTICatalog) GetMBTIModelByRef(context.Context, port.ModelRef) (*modeltypology.MBTILegacyModel, error) {
-	legacy, err := modeltypology.ToMBTI(f.payload)
-	return legacy, err
-}
-
-func (fakeMBTICatalog) FindMBTIModelByQuestionnaire(context.Context, string, string) (*modeltypology.MBTILegacyModel, error) {
-	return nil, nil
 }

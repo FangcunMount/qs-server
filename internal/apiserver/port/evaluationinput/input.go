@@ -287,19 +287,10 @@ type ScaleModelCatalog interface {
 	GetScaleByRef(ctx context.Context, ref ModelRef) (*scalesnapshot.ScaleSnapshot, error)
 }
 
-type SBTIModelCatalog interface {
-	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*typology.SBTILegacyModel, error)
-	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*typology.SBTILegacyModel, error)
-}
-
-type MBTIModelCatalog interface {
-	GetMBTIModelByRef(ctx context.Context, ref ModelRef) (*typology.MBTILegacyModel, error)
-	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*typology.MBTILegacyModel, error)
-}
-
 // TypologyModelCatalog loads unified typology payloads for evaluation input resolution.
 type TypologyModelCatalog interface {
 	GetTypologyModelByRef(ctx context.Context, ref ModelRef) (*typology.Payload, error)
+	FindTypologyModelByQuestionnaire(ctx context.Context, code, version string) (*typology.Payload, error)
 }
 
 type AnswerSheetReader interface {

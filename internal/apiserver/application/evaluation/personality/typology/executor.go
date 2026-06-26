@@ -17,6 +17,10 @@ type Executor struct {
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
+func NewTypologyExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error) {
+	return newExecutor(algorithm)
+}
+
 func NewMBTIExecutor() *Executor {
 	executor, err := newExecutor(assessmentmodel.AlgorithmMBTI)
 	if err != nil {

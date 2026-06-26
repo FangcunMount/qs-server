@@ -5,48 +5,9 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
-
-type mbtiTypologyCatalog struct {
-	catalog port.MBTIModelCatalog
-}
-
-func NewMBTITypologyCatalog(catalog port.MBTIModelCatalog) port.TypologyModelCatalog {
-	return mbtiTypologyCatalog{catalog: catalog}
-}
-
-func (c mbtiTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref port.ModelRef) (*modeltypology.Payload, error) {
-	if c.catalog == nil {
-		return nil, fmt.Errorf("mbti model catalog is not configured")
-	}
-	model, err := c.catalog.GetMBTIModelByRef(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return modeltypology.FromMBTI(model), nil
-}
-
-type sbtiTypologyCatalog struct {
-	catalog port.SBTIModelCatalog
-}
-
-func NewSBTITypologyCatalog(catalog port.SBTIModelCatalog) port.TypologyModelCatalog {
-	return sbtiTypologyCatalog{catalog: catalog}
-}
-
-func (c sbtiTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref port.ModelRef) (*modeltypology.Payload, error) {
-	if c.catalog == nil {
-		return nil, fmt.Errorf("sbti model catalog is not configured")
-	}
-	model, err := c.catalog.GetSBTIModelByRef(ctx, ref)
-	if err != nil {
-		return nil, err
-	}
-	return modeltypology.FromSBTI(model), nil
-}
 
 type TypologyModelInputProvider struct {
 	algorithm           assessmentmodel.Algorithm

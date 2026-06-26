@@ -1,4 +1,4 @@
-package evaluationinput
+package ruleset
 
 import (
 	"testing"
@@ -6,26 +6,17 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
-	catalog, err := NewDefaultMBTIModelCatalog()
+	model, err := LoadDefaultMBTILegacyModel()
 	if err != nil {
-		t.Fatalf("NewDefaultMBTIModelCatalog: %v", err)
-	}
-	model, err := catalog.GetMBTIModelByRef(t.Context(), port.ModelRef{
-		Kind:    port.EvaluationModelKindPersonality,
-		Code:    port.DefaultMBTIModelCode,
-		Version: port.DefaultMBTIModelVersion,
-	})
-	if err != nil {
-		t.Fatalf("GetMBTIModelByRef: %v", err)
+		t.Fatalf("LoadDefaultMBTILegacyModel: %v", err)
 	}
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := evaluationtypology.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreMBTI(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -58,7 +49,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := evaluationtypology.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreMBTI(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -71,20 +62,20 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	})
 }
 
-func mbtiPolePreferenceAnswerSheet(model *modeltypology.MBTILegacyModel, prefs map[string]string) *port.AnswerSheetSnapshot {
-	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
+func mbtiPolePreferenceAnswerSheet(model *modeltypology.MBTILegacyModel, prefs map[string]string) *evaluationinputdomain.AnswerSheet {
+	answers := make([]evaluationinputdomain.Answer, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		meta := model.Dimensions[mapping.Dimension]
 		wantRight := prefs[mapping.Dimension] == meta.RightPole
 		value := mbtiLikertValueForSign(mapping.Sign, wantRight)
 		score := float64(value[0] - '0')
-		answers = append(answers, port.AnswerSnapshot{
+		answers = append(answers, evaluationinputdomain.Answer{
 			QuestionCode: mapping.QuestionCode,
 			Value:        value,
 			Score:        score,
 		})
 	}
-	return &port.AnswerSheetSnapshot{
+	return &evaluationinputdomain.AnswerSheet{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
 		Answers:              answers,
@@ -104,38 +95,19 @@ func mbtiLikertValueForSign(sign float64, wantRight bool) string {
 	return "5"
 }
 
-func mbtiLikertAnswerSheet(model *modeltypology.MBTILegacyModel, value string) *port.AnswerSheetSnapshot {
-	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
+func mbtiLikertAnswerSheet(model *modeltypology.MBTILegacyModel, value string) *evaluationinputdomain.AnswerSheet {
+	answers := make([]evaluationinputdomain.Answer, 0, len(model.QuestionMappings))
 	score := float64(value[0] - '0')
 	for _, mapping := range model.QuestionMappings {
-		answers = append(answers, port.AnswerSnapshot{
+		answers = append(answers, evaluationinputdomain.Answer{
 			QuestionCode: mapping.QuestionCode,
 			Value:        value,
 			Score:        score,
 		})
 	}
-	return &port.AnswerSheetSnapshot{
+	return &evaluationinputdomain.AnswerSheet{
 		QuestionnaireCode:    model.QuestionnaireCode,
 		QuestionnaireVersion: model.QuestionnaireVersion,
-		Answers:              answers,
-	}
-}
-
-func mbtiAnswerSheetFromPort(sheet *port.AnswerSheetSnapshot) *evaluationinputdomain.AnswerSheet {
-	if sheet == nil {
-		return nil
-	}
-	answers := make([]evaluationinputdomain.Answer, 0, len(sheet.Answers))
-	for _, answer := range sheet.Answers {
-		answers = append(answers, evaluationinputdomain.Answer{
-			QuestionCode: answer.QuestionCode,
-			Score:        answer.Score,
-			Value:        answer.Value,
-		})
-	}
-	return &evaluationinputdomain.AnswerSheet{
-		QuestionnaireCode:    sheet.QuestionnaireCode,
-		QuestionnaireVersion: sheet.QuestionnaireVersion,
 		Answers:              answers,
 	}
 }

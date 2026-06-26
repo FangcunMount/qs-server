@@ -4,8 +4,6 @@ import (
 	"context"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 // DefaultEmbeddedRuleSets 从内置 SBTI/MBTI seed 构建 RuleSetSnapshot 列表。
@@ -18,24 +16,12 @@ func DefaultEmbeddedSnapshots(ctx context.Context) ([]*domain.RuleSetSnapshot, e
 	return defaultEmbeddedSnapshots(ctx)
 }
 
-func defaultEmbeddedSnapshots(ctx context.Context) ([]*domain.RuleSetSnapshot, error) {
-	sbtiCatalog, err := evaluationinputInfra.NewDefaultSBTIModelCatalog()
+func defaultEmbeddedSnapshots(_ context.Context) ([]*domain.RuleSetSnapshot, error) {
+	sbtiModel, err := LoadDefaultSBTILegacyModel()
 	if err != nil {
 		return nil, err
 	}
-	mbtiCatalog, err := evaluationinputInfra.NewDefaultMBTIModelCatalog()
-	if err != nil {
-		return nil, err
-	}
-	sbtiModel, err := sbtiCatalog.GetSBTIModelByRef(ctx, evaluationinputPort.ModelRef{
-		Code: evaluationinputPort.DefaultSBTIModelCode,
-	})
-	if err != nil {
-		return nil, err
-	}
-	mbtiModel, err := mbtiCatalog.GetMBTIModelByRef(ctx, evaluationinputPort.ModelRef{
-		Code: evaluationinputPort.DefaultMBTIModelCode,
-	})
+	mbtiModel, err := LoadDefaultMBTILegacyModel()
 	if err != nil {
 		return nil, err
 	}

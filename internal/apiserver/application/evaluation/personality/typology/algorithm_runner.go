@@ -11,6 +11,11 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
+var registeredAlgorithmRunners = map[assessmentmodel.Algorithm]algorithmRunner{
+	assessmentmodel.AlgorithmMBTI: mbtiAlgorithmRunner{},
+	assessmentmodel.AlgorithmSBTI: sbtiAlgorithmRunner{},
+}
+
 type algorithmRunner interface {
 	algorithm() assessmentmodel.Algorithm
 	buildOutcome(
@@ -22,14 +27,11 @@ type algorithmRunner interface {
 }
 
 func algorithmRunnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
-	switch algorithm {
-	case assessmentmodel.AlgorithmMBTI:
-		return mbtiAlgorithmRunner{}, nil
-	case assessmentmodel.AlgorithmSBTI:
-		return sbtiAlgorithmRunner{}, nil
-	default:
+	runner, ok := registeredAlgorithmRunners[algorithm]
+	if !ok {
 		return nil, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
 	}
+	return runner, nil
 }
 
 type mbtiAlgorithmRunner struct{}

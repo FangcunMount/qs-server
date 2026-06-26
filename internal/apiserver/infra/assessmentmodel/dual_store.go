@@ -201,51 +201,50 @@ func (s *DualStore) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algor
 	if s == nil {
 		return nil, domain.ErrNotFound
 	}
-	seen := make(map[domain.Algorithm]struct{})
-	add := func(algorithm domain.Algorithm) {
-		if algorithm == "" {
-			return
-		}
-		seen[algorithm] = struct{}{}
-	}
-
+	parts := make([][]domain.Algorithm, 0, 2)
 	if s.v2 != nil {
-		snapshots, _, err := s.v2.ListPublished(ctx, port.ListPublishedFilter{
-			Kind:     domain.KindPersonality,
-			Page:     1,
-			PageSize: 500,
-		})
+		algorithms, err := s.v2.ListPublishedAlgorithms(ctx)
 		if err != nil {
 			return nil, err
 		}
-		for _, snapshot := range snapshots {
-			algorithm, err := resolveLegacyAlgorithm(snapshot)
-			if err != nil {
-				continue
-			}
-			add(algorithm)
-		}
+		parts = append(parts, algorithms)
 	}
 	if s.legacy != nil {
 		all, err := s.legacy.ListPublished(ctx)
 		if err != nil {
 			return nil, err
 		}
+		legacyAlgorithms := make([]domain.Algorithm, 0)
 		for _, snapshot := range all {
 			algorithm, err := resolveLegacyAlgorithm(snapshot)
 			if err != nil {
 				continue
 			}
-			add(algorithm)
+			if algorithm != "" {
+				legacyAlgorithms = append(legacyAlgorithms, algorithm)
+			}
+		}
+		parts = append(parts, legacyAlgorithms)
+	}
+	return mergeAlgorithmSets(parts...), nil
+}
+
+func mergeAlgorithmSets(parts ...[]domain.Algorithm) []domain.Algorithm {
+	seen := make(map[domain.Algorithm]struct{})
+	for _, algorithms := range parts {
+		for _, algorithm := range algorithms {
+			if algorithm == "" {
+				continue
+			}
+			seen[algorithm] = struct{}{}
 		}
 	}
-
 	out := make([]domain.Algorithm, 0, len(seen))
 	for algorithm := range seen {
 		out = append(out, algorithm)
 	}
 	sortAlgorithms(out)
-	return out, nil
+	return out
 }
 
 func sortAlgorithms(algorithms []domain.Algorithm) {

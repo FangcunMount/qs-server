@@ -2,6 +2,7 @@ package assessmentmodel
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -19,9 +20,10 @@ type Repository struct {
 }
 
 var (
-	_ port.PublishedReader = (*Repository)(nil)
-	_ port.PublishedLister = (*Repository)(nil)
-	_ port.PublishedWriter = (*Repository)(nil)
+	_ port.PublishedReader          = (*Repository)(nil)
+	_ port.PublishedLister          = (*Repository)(nil)
+	_ port.PublishedWriter          = (*Repository)(nil)
+	_ port.PublishedAlgorithmLister = (*Repository)(nil)
 )
 
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
@@ -173,6 +175,70 @@ func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishe
 		return nil, 0, err
 	}
 	return snapshots, total, nil
+}
+
+func (r *Repository) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {
+	if r == nil {
+		return nil, domain.ErrNotFound
+	}
+	mongoFilter := publishedFilter(bson.M{
+		"model_kind":     string(domain.KindPersonality),
+		"model_sub_kind": string(domain.SubKindTypology),
+	})
+	pipeline := mongo.Pipeline{
+		bson.D{{Key: "$match", Value: mongoFilter}},
+		bson.D{{Key: "$group", Value: bson.M{"_id": "$model_algorithm"}}},
+	}
+	cursor, err := r.Collection().Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	seen := make(map[domain.Algorithm]struct{})
+	for cursor.Next(ctx) {
+		var grouped struct {
+			ID string `bson:"_id"`
+		}
+		if err := cursor.Decode(&grouped); err != nil {
+			return nil, err
+		}
+		if grouped.ID == "" {
+			continue
+		}
+		seen[domain.Algorithm(grouped.ID)] = struct{}{}
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	out := make([]domain.Algorithm, 0, len(seen))
+	for algorithm := range seen {
+		out = append(out, algorithm)
+	}
+	sortAlgorithms(out)
+	return out, nil
+}
+
+func sortAlgorithms(algorithms []domain.Algorithm) {
+	order := map[domain.Algorithm]int{
+		domain.AlgorithmMBTI:    0,
+		domain.AlgorithmSBTI:    1,
+		domain.AlgorithmBigFive: 2,
+	}
+	sort.Slice(algorithms, func(i, j int) bool {
+		left, okLeft := order[algorithms[i]]
+		right, okRight := order[algorithms[j]]
+		switch {
+		case okLeft && okRight:
+			return left < right
+		case okLeft:
+			return true
+		case okRight:
+			return false
+		default:
+			return algorithms[i] < algorithms[j]
+		}
+	})
 }
 
 func (r *Repository) refFilter(ref port.Ref) bson.M {

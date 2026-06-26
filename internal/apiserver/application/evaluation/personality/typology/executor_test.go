@@ -58,6 +58,13 @@ func TestExecutorAlgorithmGuard(t *testing.T) {
 	}
 }
 
+func TestNewTypologyExecutorRejectsUnsupportedAlgorithm(t *testing.T) {
+	_, err := NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	if err == nil {
+		t.Fatal("NewTypologyExecutor error = nil, want unsupported algorithm")
+	}
+}
+
 func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
 	executor := NewSBTIExecutor()
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{

@@ -18,10 +18,9 @@ import (
 )
 
 type RepositoryResolver struct {
-	scaleCatalog port.ScaleCatalog
-	sbtiCatalog  port.SBTIModelCatalog
-	mbtiCatalog  port.MBTIModelCatalog
-	providers    *ModelInputProviderRegistry
+	scaleCatalog    port.ScaleCatalog
+	typologyCatalog port.TypologyModelCatalog
+	providers       *ModelInputProviderRegistry
 }
 
 // NewRepositoryResolver builds the current compatibility adapter from Survey/Scale
@@ -39,48 +38,32 @@ func NewRepositoryResolver(
 		return nil, fmt.Errorf("ruleset catalog is required")
 	}
 	interpretationScaleCatalog := NewRuleSetScaleCatalog(modelCatalog, scaleCatalog)
-	sbtiCatalog := NewRuleSetSBTICatalog(modelCatalog)
-	mbtiCatalog := NewRuleSetMBTICatalog(modelCatalog)
+	typologyCatalog := NewRuleSetTypologyCatalog(modelCatalog)
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
-	return NewResolverWithEmbeddedModels(
-		interpretationScaleCatalog,
-		sbtiCatalog,
-		mbtiCatalog,
-		NewScaleModelInputProvider(interpretationScaleCatalog, answerSheetReader, questionnaireReader),
-		NewSBTIModelInputProvider(sbtiCatalog, answerSheetReader, questionnaireReader),
-		NewMBTIModelInputProvider(mbtiCatalog, answerSheetReader, questionnaireReader),
-	)
+	descs := evaldomain.DefaultModelDescriptors()
+	providers, err := MaterializeInputProviders(descs, InputProviderDeps{
+		ScaleCatalog:    interpretationScaleCatalog,
+		TypologyCatalog: typologyCatalog,
+		AnswerSheets:    answerSheetReader,
+		Questionnaires:  questionnaireReader,
+	})
+	if err != nil {
+		return nil, err
+	}
+	return newResolver(interpretationScaleCatalog, typologyCatalog, providers...)
 }
 
 func NewResolver(
 	scaleCatalog port.ScaleModelCatalog,
 	providers ...ModelInputProvider,
 ) (*RepositoryResolver, error) {
-	return newResolver(scaleCatalog, nil, nil, providers...)
-}
-
-func NewResolverWithSBTI(
-	scaleCatalog port.ScaleModelCatalog,
-	sbtiCatalog port.SBTIModelCatalog,
-	providers ...ModelInputProvider,
-) (*RepositoryResolver, error) {
-	return newResolver(scaleCatalog, sbtiCatalog, nil, providers...)
-}
-
-func NewResolverWithEmbeddedModels(
-	scaleCatalog port.ScaleModelCatalog,
-	sbtiCatalog port.SBTIModelCatalog,
-	mbtiCatalog port.MBTIModelCatalog,
-	providers ...ModelInputProvider,
-) (*RepositoryResolver, error) {
-	return newResolver(scaleCatalog, sbtiCatalog, mbtiCatalog, providers...)
+	return newResolver(scaleCatalog, nil, providers...)
 }
 
 func newResolver(
 	scaleCatalog port.ScaleModelCatalog,
-	sbtiCatalog port.SBTIModelCatalog,
-	mbtiCatalog port.MBTIModelCatalog,
+	typologyCatalog port.TypologyModelCatalog,
 	providers ...ModelInputProvider,
 ) (*RepositoryResolver, error) {
 	providerRegistry, err := NewModelInputProviderRegistry(providers...)
@@ -88,10 +71,9 @@ func newResolver(
 		return nil, err
 	}
 	return &RepositoryResolver{
-		scaleCatalog: scaleCatalog,
-		sbtiCatalog:  sbtiCatalog,
-		mbtiCatalog:  mbtiCatalog,
-		providers:    providerRegistry,
+		scaleCatalog:    scaleCatalog,
+		typologyCatalog: typologyCatalog,
+		providers:       providerRegistry,
 	}, nil
 }
 
@@ -120,18 +102,11 @@ func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*scales
 	return r.scaleCatalog.GetScale(ctx, code)
 }
 
-func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*modeltypology.SBTILegacyModel, error) {
-	if r == nil || r.sbtiCatalog == nil {
-		return nil, fmt.Errorf("sbti model catalog is not configured")
+func (r *RepositoryResolver) FindTypologyModelByQuestionnaire(ctx context.Context, code, version string) (*modeltypology.Payload, error) {
+	if r == nil || r.typologyCatalog == nil {
+		return nil, fmt.Errorf("typology model catalog is not configured")
 	}
-	return r.sbtiCatalog.FindSBTIModelByQuestionnaire(ctx, code, version)
-}
-
-func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*modeltypology.MBTILegacyModel, error) {
-	if r == nil || r.mbtiCatalog == nil {
-		return nil, fmt.Errorf("mbti model catalog is not configured")
-	}
-	return r.mbtiCatalog.FindMBTIModelByQuestionnaire(ctx, code, version)
+	return r.typologyCatalog.FindTypologyModelByQuestionnaire(ctx, code, version)
 }
 
 type ModelInputProvider interface {

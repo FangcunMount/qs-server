@@ -13,6 +13,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -236,8 +237,9 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		m.ReportStatusReporter = reportStatusReporter
 
 		reportBuilder := report.NewDefaultInterpretReportBuilder(suggestionGenerator)
-		modelRegs := defaultEvaluationModelRegistrations(reportBuilder)
-		evaluators, err := buildEvaluators(modelRegs)
+		descs := evaldomain.DefaultModelDescriptors()
+		wiringDeps := DefaultEvaluationWiringDeps(reportBuilder)
+		evaluators, err := MaterializeEvaluators(descs, wiringDeps)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation evaluators: %v", err)
 		}
@@ -251,7 +253,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
 		}
-		reportBuilders, err := buildReportBuilders(modelRegs)
+		reportBuilders, err := MaterializeReportBuilders(descs, wiringDeps)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation report builders: %v", err)
 		}
