@@ -83,6 +83,14 @@ func TestScaleChangedHandler_PublishedInvokesPostActions(t *testing.T) {
 	}
 }
 
+func TestScaleChangedHandler_RejectsMalformedPayload(t *testing.T) {
+	deps := &Dependencies{Logger: slog.New(slog.NewTextHandler(io.Discard, nil))}
+	err := handleScaleChanged(deps)(context.Background(), "scale.changed", []byte("{"))
+	if err == nil {
+		t.Fatal("expected malformed payload to be rejected")
+	}
+}
+
 func mustBuildLifecycleChangedPayload(t *testing.T, eventType, aggregateType, aggregateID string, data map[string]any) []byte {
 	t.Helper()
 
