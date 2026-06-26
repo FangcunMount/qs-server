@@ -2,6 +2,7 @@ package typology
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 )
@@ -49,7 +50,7 @@ func FromSBTI(model *SBTILegacyModel) *Payload {
 			Trigger:     outcome.Trigger,
 			OutcomeCode: outcome.Code,
 		}
-		if len(model.DrinkTrigger.QuestionCodes) > 0 && outcome.Code == "DRUNK" {
+		if len(model.DrinkTrigger.QuestionCodes) > 0 && strings.HasPrefix(outcome.Trigger, "hidden:") {
 			trigger.QuestionCodes = append([]string(nil), model.DrinkTrigger.QuestionCodes...)
 			trigger.OptionValues = append([]string(nil), model.DrinkTrigger.OptionValues...)
 		}

@@ -15,3 +15,15 @@ func TestPersonalityTypologyKey(t *testing.T) {
 		t.Fatalf("key string = %s", got.String())
 	}
 }
+
+func TestEvaluatorKeyPersonalityTypology(t *testing.T) {
+	if EvaluatorKeyPersonalityTypology.String() != "personality/typology/personality_typology" {
+		t.Fatalf("key string = %s", EvaluatorKeyPersonalityTypology.String())
+	}
+	if !EvaluatorKeyMBTI.IsPersonalityTypologyLegacyKey() {
+		t.Fatal("mbti key should be legacy typology alias")
+	}
+	if ResolvePersonalityTypologyExecutorKey(EvaluatorKeyMBTI) != EvaluatorKeyPersonalityTypology {
+		t.Fatalf("resolved key = %#v", ResolvePersonalityTypologyExecutorKey(EvaluatorKeyMBTI))
+	}
+}

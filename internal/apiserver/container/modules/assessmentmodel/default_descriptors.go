@@ -5,19 +5,19 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
-// DefaultTypologyModules returns built-in typology modules owned by assessment-model composition.
+// DefaultTypologyModules returns built-in typology algorithm aliases.
 func DefaultTypologyModules() []typologyEvaluation.Module {
 	return typologyEvaluation.DefaultModules()
 }
 
-// DefaultTypologyRegistry builds the typology module registry for evaluation wiring.
+// DefaultTypologyRegistry builds the typology runtime registry for evaluation wiring.
 func DefaultTypologyRegistry() (typologyEvaluation.ModuleRegistry, error) {
-	return typologyEvaluation.NewModuleRegistry(DefaultTypologyModules()...)
+	return typologyEvaluation.DefaultPersonalityRuntimeRegistry().AsModuleRegistry(), nil
 }
 
 // DefaultTypologyDescriptors projects built-in typology modules to evaluation descriptors.
 func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
-	return typologyEvaluation.ModuleDescriptors(DefaultTypologyModules())
+	return typologyEvaluation.ConfiguredAndLegacyTypologyDescriptors()
 }
 
 // DefaultEvaluationDescriptors returns scale + built-in typology descriptors for evaluation/input wiring.

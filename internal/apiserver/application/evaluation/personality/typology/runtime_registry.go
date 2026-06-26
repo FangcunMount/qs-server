@@ -1,0 +1,88 @@
+package typology
+
+import (
+	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
+	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/configured"
+)
+
+// PersonalityRuntimeRegistry resolves typology execution capabilities by evaluator key and algorithm alias.
+type PersonalityRuntimeRegistry struct {
+	assembler      OutcomeAssembler
+	reportRegistry ReportAdapterRegistry
+	configured     configuredadapter.Adapter
+	aliases        map[assessmentmodel.Algorithm]configuredadapter.Adapter
+}
+
+// DefaultPersonalityRuntimeRegistry builds the default configured typology runtime.
+func DefaultPersonalityRuntimeRegistry() PersonalityRuntimeRegistry {
+	return NewPersonalityRuntimeRegistry(
+		typologylegacy.DefaultAlgorithmAliases()...,
+	)
+}
+
+// NewPersonalityRuntimeRegistry registers algorithm aliases over the configured runtime.
+func NewPersonalityRuntimeRegistry(algorithms ...assessmentmodel.Algorithm) PersonalityRuntimeRegistry {
+	aliases := make(map[assessmentmodel.Algorithm]configuredadapter.Adapter, len(algorithms))
+	for _, algorithm := range algorithms {
+		if algorithm == "" {
+			continue
+		}
+		aliases[algorithm] = configuredadapter.NewAdapter(algorithm)
+	}
+	return PersonalityRuntimeRegistry{
+		assembler:      NewOutcomeAssembler(),
+		reportRegistry: DefaultReportAdapterRegistry(),
+		configured:     configuredadapter.NewRuntimeAdapter(),
+		aliases:        aliases,
+	}
+}
+
+func (r PersonalityRuntimeRegistry) runnerForKey(key evaluation.EvaluatorKey) (algorithmRunner, error) {
+	switch evaluation.ResolvePersonalityTypologyExecutorKey(key) {
+	case evaluation.EvaluatorKeyPersonalityTypology:
+		return r.runnerForConfigured(), nil
+	default:
+		return algorithmRunner{}, fmt.Errorf("unsupported typology evaluator key: %s", key)
+	}
+}
+
+func (r PersonalityRuntimeRegistry) runnerForConfigured() algorithmRunner {
+	return algorithmRunner{
+		adapter:          r.configured,
+		outcomeAssembler: r.assembler,
+		reportRegistry:   r.reportRegistry,
+	}
+}
+
+func (r PersonalityRuntimeRegistry) runnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
+	adapter, ok := r.aliases[algorithm]
+	if !ok {
+		return algorithmRunner{}, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
+	}
+	return algorithmRunner{
+		adapter:          adapter,
+		outcomeAssembler: r.assembler,
+		reportRegistry:   r.reportRegistry,
+	}, nil
+}
+
+func (r PersonalityRuntimeRegistry) Algorithms() []assessmentmodel.Algorithm {
+	out := make([]assessmentmodel.Algorithm, 0, len(r.aliases))
+	for algorithm := range r.aliases {
+		out = append(out, algorithm)
+	}
+	return out
+}
+
+func (r PersonalityRuntimeRegistry) Len() int {
+	return len(r.aliases)
+}
+
+// AsModuleRegistry adapts the runtime registry to the legacy module registry API.
+func (r PersonalityRuntimeRegistry) AsModuleRegistry() ModuleRegistry {
+	return ModuleRegistry{runtime: r}
+}

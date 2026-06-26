@@ -42,8 +42,9 @@ const (
 type Algorithm string
 
 const (
-	AlgorithmScaleDefault Algorithm = "scale_default"
-	AlgorithmBigFive      Algorithm = "bigfive"
+	AlgorithmScaleDefault       Algorithm = "scale_default"
+	AlgorithmPersonalityTypology Algorithm = "personality_typology"
+	AlgorithmBigFive            Algorithm = "bigfive"
 	AlgorithmMBTI         Algorithm = "mbti"
 	AlgorithmSBTI         Algorithm = "sbti"
 	AlgorithmBrief2       Algorithm = "brief2"

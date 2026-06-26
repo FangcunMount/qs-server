@@ -11,12 +11,15 @@ import (
 
 // ReportWiringDeps groups dependencies for materializing report builders from descriptors.
 type ReportWiringDeps struct {
-	ScaleReportBuilder domainreport.ReportBuilder
-	TypologyRegistry   typologyEvaluation.ModuleRegistry
+	ScaleReportBuilder          domainreport.ReportBuilder
+	TypologyRegistry            typologyEvaluation.ModuleRegistry
+	sharedTypologyReportBuilder *typologyEvaluation.ReportBuilder
 }
 
 // MaterializeReportBuilders builds report builders from evaluation model descriptors.
 func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps ReportWiringDeps) ([]evaluationResult.ReportBuilder, error) {
+	var sharedConfigured typologyEvaluation.ReportBuilder
+	deps.sharedTypologyReportBuilder = &sharedConfigured
 	builders := make([]evaluationResult.ReportBuilder, 0, len(descs))
 	for _, desc := range descs {
 		builder, err := materializeReportBuilder(desc, deps)
@@ -37,7 +40,7 @@ func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps ReportWiring
 		if err != nil {
 			return nil, err
 		}
-		return typologyEvaluation.NewReportBuilderWithRegistry(registry, desc.Algorithm)
+		return typologyEvaluation.MaterializeTypologyReportBuilder(desc, registry, deps.sharedTypologyReportBuilder)
 	default:
 		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
 	}

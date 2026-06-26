@@ -34,7 +34,44 @@ func (p TypologyModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
 	return evaldomain.PersonalityTypologyKey(p.algorithm)
 }
 
+// ConfiguredTypologyModelInputProvider resolves typology payloads without algorithm-alias guards.
+type ConfiguredTypologyModelInputProvider struct {
+	catalog             port.TypologyModelCatalog
+	answerSheetReader   port.AnswerSheetReader
+	questionnaireReader port.QuestionnaireReader
+}
+
+func NewConfiguredTypologyModelInputProvider(
+	catalog port.TypologyModelCatalog,
+	answerSheetReader port.AnswerSheetReader,
+	questionnaireReader port.QuestionnaireReader,
+) ConfiguredTypologyModelInputProvider {
+	return ConfiguredTypologyModelInputProvider{
+		catalog:             catalog,
+		answerSheetReader:   answerSheetReader,
+		questionnaireReader: questionnaireReader,
+	}
+}
+
+func (ConfiguredTypologyModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
+	return evaldomain.EvaluatorKeyPersonalityTypology
+}
+
+func (p ConfiguredTypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
+	provider := TypologyModelInputProvider{
+		algorithm:           assessmentmodel.AlgorithmPersonalityTypology,
+		catalog:             p.catalog,
+		answerSheetReader:   p.answerSheetReader,
+		questionnaireReader: p.questionnaireReader,
+	}
+	return provider.resolveConfiguredInput(ctx, ref)
+}
+
 func (p TypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
+	return p.resolveConfiguredInput(ctx, ref)
+}
+
+func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	if p.catalog == nil {
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model catalog is not configured"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
 	}
@@ -45,7 +82,9 @@ func (p TypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.I
 	if payload == nil {
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model payload is nil"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
 	}
-	if payload.Algorithm != p.algorithm {
+	if p.algorithm != "" &&
+		p.algorithm != assessmentmodel.AlgorithmPersonalityTypology &&
+		payload.Algorithm != p.algorithm {
 		err := fmt.Errorf("typology algorithm %s does not match provider %s", payload.Algorithm, p.algorithm)
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}

@@ -2,21 +2,21 @@ package typology
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
-	mbtiadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/mbti"
-	sbtiadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/sbti"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
 )
 
-// DefaultModules returns the built-in personality typology modules for composition root wiring.
+// DefaultModules returns algorithm alias entries for the configured typology runtime.
 func DefaultModules() []Module {
-	return []Module{
-		MBTIModule(),
-		SBTIModule(),
-		BigFiveModule(),
+	modules := make([]Module, 0, len(typologylegacy.DefaultAlgorithmAliases()))
+	for _, algorithm := range typologylegacy.DefaultAlgorithmAliases() {
+		modules = append(modules, Module{
+			Algorithm:     algorithm,
+			CategoryLabel: typologylegacy.CategoryLabelFor(algorithm),
+		})
 	}
+	return modules
 }
 
 // AllModules returns all built-in typology modules.
@@ -24,62 +24,19 @@ func AllModules() []Module {
 	return DefaultModules()
 }
 
-// MBTIModule wires the MBTI typology adapter and report builder.
-func MBTIModule() Module {
-	return Module{
-		Algorithm:        assessmentmodel.AlgorithmMBTI,
-		CategoryLabel:    "MBTI",
-		Adapter:          mbtiadapter.Adapter{},
-		outcomeAssembler: assembleMBTIOutcome,
-		reportBuilder:    buildMBTIReport,
-	}
-}
-
-// SBTIModule wires the SBTI typology adapter and report builder.
-func SBTIModule() Module {
-	return Module{
-		Algorithm:        assessmentmodel.AlgorithmSBTI,
-		CategoryLabel:    "SBTI",
-		Adapter:          sbtiadapter.Adapter{},
-		outcomeAssembler: assembleSBTIOutcome,
-		reportBuilder:    buildSBTIReport,
-	}
-}
-
-// BigFiveModule wires the Big Five typology adapter and report builder.
-func BigFiveModule() Module {
-	return Module{
-		Algorithm:        assessmentmodel.AlgorithmBigFive,
-		CategoryLabel:    "Big Five",
-		Adapter:          bigfiveadapter.Adapter{},
-		outcomeAssembler: assembleBigFiveOutcome,
-		reportBuilder:    buildBigFiveReport,
-	}
-}
-
 // DefaultAlgorithms returns algorithms registered by DefaultModules.
 func DefaultAlgorithms() []assessmentmodel.Algorithm {
-	modules := DefaultModules()
-	out := make([]assessmentmodel.Algorithm, 0, len(modules))
-	for _, module := range modules {
-		out = append(out, module.Algorithm)
-	}
-	return out
+	return typologylegacy.DefaultAlgorithmAliases()
 }
 
 // CategoryLabelFor resolves the display label for a typology algorithm.
 func CategoryLabelFor(algorithm assessmentmodel.Algorithm) string {
-	for _, module := range AllModules() {
-		if module.Algorithm == algorithm && module.CategoryLabel != "" {
-			return module.CategoryLabel
-		}
-	}
-	return strings.ToUpper(string(algorithm))
+	return typologylegacy.CategoryLabelFor(algorithm)
 }
 
 // DefaultModuleRegistry builds the default typology module registry.
 func DefaultModuleRegistry() (ModuleRegistry, error) {
-	return NewModuleRegistry(DefaultModules()...)
+	return DefaultPersonalityRuntimeRegistry().AsModuleRegistry(), nil
 }
 
 func mustDefaultModuleRegistry() ModuleRegistry {

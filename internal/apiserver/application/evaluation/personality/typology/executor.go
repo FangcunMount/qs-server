@@ -12,7 +12,9 @@ import (
 )
 
 type Executor struct {
-	runner *algorithmRunner
+	runner          *algorithmRunner
+	key             evaluation.EvaluatorKey
+	legacyAlgorithm assessmentmodel.Algorithm
 }
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
@@ -21,23 +23,42 @@ func NewTypologyExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error)
 	return NewTypologyExecutorWithRegistry(mustDefaultModuleRegistry(), algorithm)
 }
 
-func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
-	return newExecutor(registry, algorithm)
+func NewConfiguredTypologyExecutor() (*Executor, error) {
+	return NewConfiguredTypologyExecutorWithRegistry(mustDefaultModuleRegistry())
 }
 
-func newExecutor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+func NewConfiguredTypologyExecutorWithRegistry(registry ModuleRegistry) (*Executor, error) {
+	runner, err := registry.runnerForKey(evaluation.EvaluatorKeyPersonalityTypology)
+	if err != nil {
+		return nil, err
+	}
+	return &Executor{
+		runner: &runner,
+		key:    evaluation.EvaluatorKeyPersonalityTypology,
+	}, nil
+}
+
+func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+	return newLegacyExecutor(registry, algorithm)
+}
+
+func newLegacyExecutor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
 	runner, err := algorithmRunnerFor(registry, algorithm)
 	if err != nil {
 		return nil, err
 	}
-	return &Executor{runner: &runner}, nil
+	return &Executor{
+		runner:          &runner,
+		key:             evaluation.PersonalityTypologyKey(algorithm),
+		legacyAlgorithm: algorithm,
+	}, nil
 }
 
 func (e *Executor) Key() evaluation.EvaluatorKey {
-	if e == nil || e.runner == nil {
+	if e == nil {
 		return evaluation.EvaluatorKey{}
 	}
-	return evaluation.PersonalityTypologyKey(e.runner.algorithm())
+	return e.key
 }
 
 func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
@@ -54,10 +75,22 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	if !ok {
 		return nil, fmt.Errorf("personality typology payload is required")
 	}
-	if payload.Algorithm != e.runner.algorithm() {
-		return nil, fmt.Errorf("typology algorithm %s does not match executor %s", payload.Algorithm, e.runner.algorithm())
+	if e.legacyAlgorithm != "" && payload.Algorithm != e.legacyAlgorithm {
+		return nil, fmt.Errorf("typology algorithm %s does not match executor %s", payload.Algorithm, e.legacyAlgorithm)
 	}
 
 	modelRef := modelRefFromExecutionInput(input, payload)
 	return e.runner.buildOutcome(modelRef, payload, input.Input.AnswerSheet)
+}
+
+// NewLegacyTypologyAliasExecutor returns a legacy-key executor that delegates to the configured runtime.
+func NewLegacyTypologyAliasExecutor(configured *Executor, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+	if configured == nil || configured.runner == nil {
+		return nil, fmt.Errorf("configured typology executor is required")
+	}
+	return &Executor{
+		runner:          configured.runner,
+		key:             evaluation.PersonalityTypologyKey(algorithm),
+		legacyAlgorithm: algorithm,
+	}, nil
 }

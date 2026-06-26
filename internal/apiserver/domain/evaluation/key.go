@@ -17,6 +17,12 @@ var (
 	}
 	EvaluatorKeyMBTI = PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI)
 	EvaluatorKeySBTI = PersonalityTypologyKey(assessmentmodel.AlgorithmSBTI)
+	EvaluatorKeyBigFive = PersonalityTypologyKey(assessmentmodel.AlgorithmBigFive)
+	EvaluatorKeyPersonalityTypology = EvaluatorKey{
+		Kind:      assessmentmodel.KindPersonality,
+		SubKind:   assessmentmodel.SubKindTypology,
+		Algorithm: assessmentmodel.AlgorithmPersonalityTypology,
+	}
 )
 
 // PersonalityTypologyKey builds the execution routing key for a typology algorithm.
@@ -37,6 +43,36 @@ func (k EvaluatorKey) String() string {
 
 func (k EvaluatorKey) IsZero() bool {
 	return k.Kind == "" && k.SubKind == "" && k.Algorithm == ""
+}
+
+// IsPersonalityTypologyLegacyKey reports whether key is a built-in typology algorithm alias.
+func (k EvaluatorKey) IsPersonalityTypologyLegacyKey() bool {
+	if k.Kind != assessmentmodel.KindPersonality || k.SubKind != assessmentmodel.SubKindTypology {
+		return false
+	}
+	switch k.Algorithm {
+	case assessmentmodel.AlgorithmMBTI, assessmentmodel.AlgorithmSBTI, assessmentmodel.AlgorithmBigFive:
+		return true
+	default:
+		return false
+	}
+}
+
+// PersonalityTypologyLegacyKeys returns built-in typology algorithm routing keys.
+func PersonalityTypologyLegacyKeys() []EvaluatorKey {
+	return []EvaluatorKey{
+		EvaluatorKeyMBTI,
+		EvaluatorKeySBTI,
+		EvaluatorKeyBigFive,
+	}
+}
+
+// ResolvePersonalityTypologyExecutorKey maps legacy typology keys to the configured runtime key.
+func ResolvePersonalityTypologyExecutorKey(key EvaluatorKey) EvaluatorKey {
+	if key == EvaluatorKeyPersonalityTypology || key.IsPersonalityTypologyLegacyKey() {
+		return EvaluatorKeyPersonalityTypology
+	}
+	return key
 }
 
 func EvaluatorKeyFromLegacyKind(kind assessmentmodel.Kind) (EvaluatorKey, bool) {

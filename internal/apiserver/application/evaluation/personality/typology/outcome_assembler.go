@@ -5,39 +5,6 @@ import (
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
 
-func assembleMBTIOutcome(
-	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail)
-	if err != nil {
-		return nil, err
-	}
-	return assessmentOutcomeFromMBTI(modelRef, detail), nil
-}
-
-func assembleSBTIOutcome(
-	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail)
-	if err != nil {
-		return nil, err
-	}
-	return assessmentOutcomeFromSBTI(modelRef, detail), nil
-}
-
-func assembleBigFiveOutcome(
-	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.BigFiveResultDetailFromPayload(result.Detail)
-	if err != nil {
-		return nil, err
-	}
-	return assessmentOutcomeFromBigFive(modelRef, detail), nil
-}
-
 func assessmentOutcomeFromMBTI(modelRef assessment.EvaluationModelRef, detail evaluationtypology.MBTIResultDetail) *assessment.AssessmentOutcome {
 	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
 		PrimaryLabel: detail.TypeCode,

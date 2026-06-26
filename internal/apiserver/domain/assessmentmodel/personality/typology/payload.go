@@ -18,6 +18,12 @@ type Payload struct {
 	Outcomes             []Outcome                 `json:"outcomes"`
 	MatchingSpec         MatchingSpec              `json:"matching_spec"`
 	SpecialTriggers      []SpecialTrigger          `json:"special_triggers"`
+	Runtime              *RuntimeSpec              `json:"runtime,omitempty"`
+}
+
+// HasExplicitRuntime reports whether the payload carries an author-defined runtime spec.
+func (p *Payload) HasExplicitRuntime() bool {
+	return p != nil && p.Runtime != nil
 }
 
 func (p *Payload) IsPublished() bool {

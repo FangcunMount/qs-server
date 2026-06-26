@@ -75,13 +75,28 @@ func TestEvaluatorRegistryRejectsDuplicateKey(t *testing.T) {
 	}
 }
 
+func TestEvaluatorRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
+	configured := evaluatorStub{key: evaluation.EvaluatorKeyPersonalityTypology}
+	registry, err := NewEvaluatorRegistry(configured)
+	if err != nil {
+		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
+	}
+	got, err := registry.Resolve(evaluation.EvaluatorKeyMBTI)
+	if err != nil {
+		t.Fatalf("Resolve returned error: %v", err)
+	}
+	if got.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+		t.Fatalf("resolved key = %s, want configured typology", got.Key())
+	}
+}
+
 func TestEvaluatorRegistryRejectsUnknownKey(t *testing.T) {
 	registry, err := NewEvaluatorRegistry(evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	_, err = registry.Resolve(evaluation.EvaluatorKeyMBTI)
+	_, err = registry.Resolve(evaluation.EvaluatorKey{Kind: assessmentmodel.KindCustom})
 	if err == nil {
 		t.Fatal("Resolve error = nil, want unsupported model key")
 	}

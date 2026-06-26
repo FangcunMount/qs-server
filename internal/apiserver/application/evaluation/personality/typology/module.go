@@ -3,16 +3,12 @@ package typology
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
 )
 
-// Module aggregates one personality typology algorithm's adapter and report path.
+// Module describes a typology algorithm alias exposed to evaluation wiring.
 type Module struct {
-	Algorithm        assessmentmodel.Algorithm
-	CategoryLabel    string
-	Adapter          personalityadapter.ModelAdapter
-	outcomeAssembler outcomeAssemblerFunc
-	reportBuilder    reportBuilderFunc
+	Algorithm     assessmentmodel.Algorithm
+	CategoryLabel string
 }
 
 // Descriptor returns the evaluation registry entry for this module.
@@ -28,10 +24,25 @@ func (m Module) Descriptor() evaldomain.ModelDescriptor {
 func ModuleDescriptors(modules []Module) []evaldomain.ModelDescriptor {
 	out := make([]evaldomain.ModelDescriptor, 0, len(modules))
 	for _, module := range modules {
-		if module.Algorithm == "" || module.Adapter == nil {
+		if module.Algorithm == "" {
 			continue
 		}
 		out = append(out, module.Descriptor())
 	}
 	return out
+}
+
+// ConfiguredTypologyDescriptor returns the generic configured typology routing descriptor.
+func ConfiguredTypologyDescriptor() evaldomain.ModelDescriptor {
+	return evaldomain.ModelDescriptor{
+		Key:       evaldomain.EvaluatorKeyPersonalityTypology,
+		Kind:      evaldomain.ModelKindTypology,
+		Algorithm: assessmentmodel.AlgorithmPersonalityTypology,
+	}
+}
+
+// ConfiguredAndLegacyTypologyDescriptors returns the configured runtime key plus legacy algorithm aliases.
+func ConfiguredAndLegacyTypologyDescriptors() []evaldomain.ModelDescriptor {
+	descs := []evaldomain.ModelDescriptor{ConfiguredTypologyDescriptor()}
+	return append(descs, ModuleDescriptors(DefaultModules())...)
 }

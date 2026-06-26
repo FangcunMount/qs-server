@@ -69,13 +69,17 @@ func TestTypologyApplicationLayerKeepsConcreteModelsInAdapters(t *testing.T) {
 		"module.go":              {},
 		"module_registry.go":     {},
 		"modules.go":             {},
+		"runtime_registry.go":      {},
+		"materialize.go":           {},
 		"report_builder.go":      {},
+		"report_registry.go":     {},
 		"report_mbti.go":         {},
 		"report_sbti.go":         {},
 		"report_bigfive.go":      {},
 		"converters.go":          {},
 		"report_input_mapper.go": {},
 		"outcome_assembler.go":   {},
+		"outcome_mapper.go":      {},
 		"model_ref.go":           {},
 		"executor.go":            {},
 	}
@@ -186,6 +190,105 @@ func TestProfileCoreDoesNotDependOnLegacyTypologyPayload(t *testing.T) {
 			}
 		}
 	})
+}
+
+func TestTypologyApplicationMainPathDoesNotReferenceLegacyModules(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	mainPathFiles := []string{
+		"internal/apiserver/application/evaluation/personality/typology/executor.go",
+		"internal/apiserver/application/evaluation/personality/typology/module_registry.go",
+		"internal/apiserver/application/evaluation/personality/typology/runtime_registry.go",
+		"internal/apiserver/application/evaluation/personality/typology/algorithm_runner.go",
+		"internal/apiserver/application/evaluation/personality/typology/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/personality/typology/report_registry.go",
+		"internal/apiserver/application/evaluation/personality/typology/materialize.go",
+	}
+	forbidden := []string{
+		"MBTIModule",
+		"SBTIModule",
+		"BigFiveModule",
+		"mbtiadapter",
+		"sbtiadapter",
+		"bigfiveadapter",
+		"outcomeMappingFromAlgorithm",
+		"reportSpecForAlgorithm",
+		"reportSpecFromPayload",
+		"OutcomeMappingFromAlgorithm",
+		"ReportSpecFromAlgorithm",
+		"ReportSpecFromPayload",
+		"LegacyOutcomeMappingFromAlgorithm",
+		"LegacyReportSpecFromAlgorithm",
+		"LegacyReportSpecFromPayload",
+		"categoryLabelFor(",
+	}
+	for _, rel := range mainPathFiles {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		text := string(data)
+		for _, token := range forbidden {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; main path must use configured runtime", rel, token)
+			}
+		}
+	}
+}
+
+func TestTypologyLegacyDerivationStaysInLegacyPackages(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	legacyOnlyTokens := []string{
+		"outcomeMappingFromAlgorithm",
+		"reportSpecFromPayload",
+		"reportSpecForAlgorithm",
+	}
+	legacyFileMarkers := []string{
+		"legacy_derivation.go",
+		string(filepath.Separator) + "legacy" + string(filepath.Separator),
+	}
+	mainRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "personality", "typology"),
+		filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "personality", "typology"),
+	}
+	for _, typologyRoot := range mainRoots {
+		err := filepath.WalkDir(typologyRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			skip := false
+			for _, marker := range legacyFileMarkers {
+				if strings.Contains(path, marker) {
+					skip = true
+					break
+				}
+			}
+			if skip {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			rel := filepath.ToSlash(mustRel(t, root, path))
+			for _, token := range legacyOnlyTokens {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains %q; move algorithm-derived runtime helpers to legacy/", rel, token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 }
 
 func walkGoFiles(t *testing.T, root string, check func(rel, text string)) {

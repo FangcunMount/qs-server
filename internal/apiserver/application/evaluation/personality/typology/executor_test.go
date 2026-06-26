@@ -20,6 +20,14 @@ func TestExecutorImplementsEvaluatorContract(t *testing.T) {
 }
 
 func TestExecutorKeys(t *testing.T) {
+	configured, err := NewConfiguredTypologyExecutor()
+	if err != nil {
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
+	}
+	if got := configured.Key(); got != evaluation.EvaluatorKeyPersonalityTypology {
+		t.Fatalf("configured key = %s, want %s", got, evaluation.EvaluatorKeyPersonalityTypology)
+	}
+
 	mbtiExecutor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(mbti): %v", err)

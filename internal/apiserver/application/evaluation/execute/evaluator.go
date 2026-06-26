@@ -47,9 +47,13 @@ func (r *mutableEvaluatorRegistry) Resolve(key evaluation.EvaluatorKey) (Evaluat
 	if r == nil {
 		return nil, fmt.Errorf("evaluation evaluator registry is not configured")
 	}
-	evaluator, ok := r.items[key]
-	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
+	if evaluator, ok := r.items[key]; ok {
+		return evaluator, nil
 	}
-	return evaluator, nil
+	if key.IsPersonalityTypologyLegacyKey() {
+		if evaluator, ok := r.items[evaluation.EvaluatorKeyPersonalityTypology]; ok {
+			return evaluator, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 }

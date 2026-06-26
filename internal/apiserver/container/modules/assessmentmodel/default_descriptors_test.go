@@ -18,14 +18,17 @@ func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	if len(descs) < 3 {
-		t.Fatalf("descriptor count = %d, want at least 3", len(descs))
+	if len(descs) < 4 {
+		t.Fatalf("descriptor count = %d, want at least 4", len(descs))
 	}
 	if descs[0].Kind != evaldomain.ModelKindScale {
 		t.Fatalf("first descriptor kind = %s, want scale", descs[0].Kind)
 	}
+	if descs[1].Key != evaldomain.EvaluatorKeyPersonalityTypology {
+		t.Fatalf("configured typology key = %#v", descs[1].Key)
+	}
 	typology := evaldomain.TypologyAlgorithms(descs)
-	if len(typology) != 3 {
+	if len(typology) != 4 {
 		t.Fatalf("typology algorithms = %#v", typology)
 	}
 }

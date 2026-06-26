@@ -15,13 +15,17 @@ import (
 
 // WiringDeps groups evaluator/report-builder wiring dependencies.
 type WiringDeps struct {
-	ScaleReportBuilder report.ReportBuilder
-	ScaleScorer        portruleengine.ScaleFactorScorer
-	TypologyRegistry   typologyEvaluation.ModuleRegistry
+	ScaleReportBuilder    report.ReportBuilder
+	ScaleScorer           portruleengine.ScaleFactorScorer
+	TypologyRegistry      typologyEvaluation.ModuleRegistry
+	sharedTypologyExecutor     **typologyEvaluation.Executor
+	sharedTypologyReportBuilder *typologyEvaluation.ReportBuilder
 }
 
 // MaterializeEvaluators builds evaluators from descriptors.
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
+	var sharedConfigured *typologyEvaluation.Executor
+	deps.sharedTypologyExecutor = &sharedConfigured
 	evaluators := make([]execute.Evaluator, 0, len(descs))
 	for _, desc := range descs {
 		evaluator, err := materializeEvaluator(desc, deps)
@@ -35,6 +39,8 @@ func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) 
 
 // MaterializeReportBuilders builds report builders from descriptors.
 func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]evaluationResult.ReportBuilder, error) {
+	var sharedConfigured typologyEvaluation.ReportBuilder
+	deps.sharedTypologyReportBuilder = &sharedConfigured
 	builders := make([]evaluationResult.ReportBuilder, 0, len(descs))
 	for _, desc := range descs {
 		builder, err := materializeReportBuilder(desc, deps)
@@ -79,7 +85,7 @@ func materializeEvaluator(desc evaldomain.ModelDescriptor, deps WiringDeps) (exe
 		if err != nil {
 			return nil, err
 		}
-		return typologyEvaluation.NewTypologyExecutorWithRegistry(registry, desc.Algorithm)
+		return typologyEvaluation.MaterializeTypologyEvaluator(desc, registry, deps.sharedTypologyExecutor)
 	default:
 		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
 	}
@@ -94,7 +100,7 @@ func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps) 
 		if err != nil {
 			return nil, err
 		}
-		return typologyEvaluation.NewReportBuilderWithRegistry(registry, desc.Algorithm)
+		return typologyEvaluation.MaterializeTypologyReportBuilder(desc, registry, deps.sharedTypologyReportBuilder)
 	default:
 		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
 	}

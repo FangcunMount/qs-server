@@ -7,6 +7,7 @@ require (
 	github.com/FangcunMount/iam/v2 v2.0.8
 	github.com/alicebob/miniredis/v2 v2.30.0
 	github.com/aliyun/alibabacloud-oss-go-sdk-v2 v1.4.1
+	github.com/google/go-cmp v0.7.0
 	github.com/google/uuid v1.6.0
 	github.com/mattn/go-isatty v0.0.20
 	github.com/moby/term v0.5.2
