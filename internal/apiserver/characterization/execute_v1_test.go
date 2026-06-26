@@ -43,7 +43,7 @@ func TestV1ExecuteServiceDispatchesScaleByEvaluatorKey(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d, want 1", writer.calls)
 	}
-	result := writer.outcome.Result
+	result := writer.outcome.LegacyResult()
 	if result == nil {
 		t.Fatal("expected evaluation result")
 	}
@@ -74,7 +74,7 @@ func TestV1ExecuteServiceDispatchesMBTIByLegacyKind(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d, want 1", writer.calls)
 	}
-	result := writer.outcome.Result
+	result := writer.outcome.LegacyResult()
 	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
 		t.Fatalf("model kind = %s, want mbti", result.ModelRef.Kind())
 	}
@@ -102,7 +102,7 @@ func TestV1ExecuteServiceDispatchesSBTIByLegacyKind(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d, want 1", writer.calls)
 	}
-	result := writer.outcome.Result
+	result := writer.outcome.LegacyResult()
 	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
 		t.Fatalf("model kind = %s, want sbti", result.ModelRef.Kind())
 	}

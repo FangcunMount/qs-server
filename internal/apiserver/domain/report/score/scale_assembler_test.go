@@ -1,4 +1,4 @@
-package scale
+package score
 
 import (
 	"testing"
@@ -6,10 +6,10 @@ import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
 
-func TestBuildReportAssemblesInterpretReport(t *testing.T) {
+func TestBuildScaleReportAssemblesInterpretReport(t *testing.T) {
 	totalMax := 27.0
 	sleepMax := 3.0
-	report, err := BuildReport(domainreport.NewDefaultInterpretReportBuilder(nil), ReportInput{
+	report, err := BuildScaleReport(domainreport.NewDefaultInterpretReportBuilder(nil), ScaleReportInput{
 		AssessmentID: domainreport.ID(9001),
 		Scale: &ReportModel{
 			Code:  "PHQ9",
@@ -42,7 +42,7 @@ func TestBuildReportAssemblesInterpretReport(t *testing.T) {
 		},
 	})
 	if err != nil {
-		t.Fatalf("BuildReport: %v", err)
+		t.Fatalf("BuildScaleReport: %v", err)
 	}
 	if report.ModelName() != "抑郁筛查" {
 		t.Fatalf("ModelName = %q", report.ModelName())
@@ -71,16 +71,16 @@ func TestBuildReportAssemblesInterpretReport(t *testing.T) {
 		t.Fatalf("unexpected sleep dimension: %#v", dimensions[1])
 	}
 
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "持续观察整体状态")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "保持规律作息")
+	assertScaleReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "持续观察整体状态")
+	assertScaleReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "保持规律作息")
 	sleepCode := domainreport.FactorCode("SLEEP")
-	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryDimension, &sleepCode, "建立睡前放松流程")
+	assertScaleReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryDimension, &sleepCode, "建立睡前放松流程")
 	if report.ModelExtra() != nil {
 		t.Fatalf("ModelExtra = %#v, want nil", report.ModelExtra())
 	}
 }
 
-func assertReportSuggestion(
+func assertScaleReportSuggestion(
 	t *testing.T,
 	suggestions []domainreport.Suggestion,
 	category domainreport.SuggestionCategory,

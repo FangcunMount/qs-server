@@ -4,27 +4,27 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // EventAssembler 事件装配器。
 type EventAssembler interface {
-	Kind() assessment.EvaluationModelKind
+	Key() evaluation.EvaluatorKey
 	BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent
 }
 
 type EventAssemblerRegistry interface {
-	Resolve(kind assessment.EvaluationModelKind) EventAssembler
+	Resolve(key evaluation.EvaluatorKey) EventAssembler
 }
 
 type mutableEventAssemblerRegistry struct {
-	items map[assessment.EvaluationModelKind]EventAssembler
+	items map[evaluation.EvaluatorKey]EventAssembler
 }
 
 func NewEventAssemblerRegistry(assemblers ...EventAssembler) (*mutableEventAssemblerRegistry, error) {
-	registry := &mutableEventAssemblerRegistry{items: make(map[assessment.EvaluationModelKind]EventAssembler)}
+	registry := &mutableEventAssemblerRegistry{items: make(map[evaluation.EvaluatorKey]EventAssembler)}
 	for _, assembler := range assemblers {
 		if err := registry.Register(assembler); err != nil {
 			return nil, err
@@ -37,22 +37,22 @@ func (r *mutableEventAssemblerRegistry) Register(assembler EventAssembler) error
 	if assembler == nil {
 		return fmt.Errorf("evaluation event assembler is nil")
 	}
-	kind := assembler.Kind()
-	if kind == "" {
-		return fmt.Errorf("evaluation event assembler kind is empty")
+	key := assembler.Key()
+	if key.IsZero() {
+		return fmt.Errorf("evaluation event assembler key is empty")
 	}
-	if _, exists := r.items[kind]; exists {
-		return fmt.Errorf("evaluation event assembler already registered for kind %s", kind)
+	if _, exists := r.items[key]; exists {
+		return fmt.Errorf("evaluation event assembler already registered for key %s", key)
 	}
-	r.items[kind] = assembler
+	r.items[key] = assembler
 	return nil
 }
 
-func (r *mutableEventAssemblerRegistry) Resolve(kind assessment.EvaluationModelKind) EventAssembler {
+func (r *mutableEventAssemblerRegistry) Resolve(key evaluation.EvaluatorKey) EventAssembler {
 	if r == nil {
 		return GenericEventAssembler{}
 	}
-	if assembler, ok := r.items[kind]; ok {
+	if assembler, ok := r.items[key]; ok {
 		return assembler
 	}
 	return GenericEventAssembler{}
@@ -60,12 +60,12 @@ func (r *mutableEventAssemblerRegistry) Resolve(kind assessment.EvaluationModelK
 
 type GenericEventAssembler struct{}
 
-func (GenericEventAssembler) Kind() assessment.EvaluationModelKind {
-	return ""
+func (GenericEventAssembler) Key() evaluation.EvaluatorKey {
+	return evaluation.EvaluatorKey{}
 }
 
 func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
-	if outcome.Assessment == nil || outcome.Result == nil {
+	if outcome.Assessment == nil || outcome.LegacyResult() == nil {
 		return nil
 	}
 	now := time.Now()
@@ -79,21 +79,14 @@ func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainRepo
 	return events
 }
 
+// ScaleEventAssembler is kept for explicit scale registration in tests.
 type ScaleEventAssembler struct{}
 
-func (ScaleEventAssembler) Kind() assessment.EvaluationModelKind {
-	return assessment.EvaluationModelKindScale
+func (ScaleEventAssembler) Key() evaluation.EvaluatorKey {
+	return evaluation.EvaluatorKeyScaleDefault
 }
 
 // BuildSuccessEvents 构建 Scale 成功事件，新写路径只发布 v2 outcome 事件。
 func (ScaleEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
-	if outcome.Assessment == nil || outcome.Result == nil || rpt == nil {
-		return nil
-	}
-	now := time.Now()
-	return []event.DomainEvent{
-		buildInterpretedV2Event(outcome, rpt, now),
-		buildReportGeneratedV2Event(outcome, rpt, now),
-		buildFootprintReportGeneratedEvent(outcome, rpt, now),
-	}
+	return (GenericEventAssembler{}).BuildSuccessEvents(outcome, rpt)
 }

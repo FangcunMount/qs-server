@@ -1,6 +1,6 @@
-package mbti
+package typology
 
-type DimensionReport struct {
+type MBTIDimensionReport struct {
 	Code       string
 	Name       string
 	LeftPole   string
@@ -10,18 +10,18 @@ type DimensionReport struct {
 	Strength   float64
 }
 
-type ReportDetail struct {
+type MBTIReportDetail struct {
 	TypeCode     string
 	TypeName     string
 	OneLiner     string
 	MatchPercent float64
 	ImageURL     string
-	Dimensions   []DimensionReport
-	Profile      ProfileReport
-	Source       SourceReport
+	Dimensions   []MBTIDimensionReport
+	Profile      MBTIProfileReport
+	Source       MBTISourceReport
 }
 
-type ProfileReport struct {
+type MBTIProfileReport struct {
 	TypeCode    string
 	TypeName    string
 	OneLiner    string
@@ -33,7 +33,7 @@ type ProfileReport struct {
 	ImageURL    string
 }
 
-type SourceReport struct {
+type MBTISourceReport struct {
 	QuestionsRepo string
 	SourceSite    string
 	License       string

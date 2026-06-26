@@ -22,11 +22,8 @@ func TestScaleEventAssemblerPublishesV2Events(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewAssessment: %v", err)
 	}
-	outcome := Outcome{
-		Assessment: a,
-		Result: assessment.NewEvaluationResult(12, assessment.RiskLevelMedium, "medium", "follow", nil).
-			WithModelRef(*a.EvaluationModelRef()),
-	}
+	outcome := NewOutcomeFromLegacyResult(a, nil, assessment.NewEvaluationResult(12, assessment.RiskLevelMedium, "medium", "follow", nil).
+		WithModelRef(*a.EvaluationModelRef()))
 	rpt := domainreport.NewInterpretReport(
 		domainreport.ID(a.ID()),
 		"抑郁自评",

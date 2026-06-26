@@ -7,6 +7,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -38,7 +40,6 @@ func NewWriter(
 		reportSaver,
 		notifier,
 		reportStatus,
-		ScaleEventAssembler{},
 	)
 }
 
@@ -81,7 +82,7 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 	if outcome.Assessment == nil {
 		return evalerrors.ModuleNotConfigured("assessment is required for evaluation result writer")
 	}
-	if outcome.Result == nil {
+	if outcome.LegacyResult() == nil {
 		return evalerrors.ModuleNotConfigured("evaluation result is required for evaluation result writer")
 	}
 	if w.reportSaver == nil {
@@ -103,7 +104,7 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 		}
 	}
 
-	if err := outcome.Assessment.ApplyEvaluation(outcome.Result); err != nil {
+	if err := outcome.Assessment.ApplyEvaluation(outcome.LegacyResult()); err != nil {
 		l.Errorw("Failed to apply evaluation result",
 			"assessment_id", outcome.Assessment.ID().Uint64(),
 			"error", err)
@@ -130,18 +131,18 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 }
 
 func (w *writer) prepare(ctx context.Context, outcome Outcome) (preparedOutcome, error) {
-	kind := resolveOutcomeKind(outcome)
+	key := resolveOutcomeKey(outcome)
 	if err := ensureOutcomeCanApplyEvaluation(outcome); err != nil {
 		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "应用评估结果失败")
 	}
 	var projector ScoreProjector
 	if w.scoreProjectors != nil {
-		projector = w.scoreProjectors.Resolve(kind)
+		projector = w.scoreProjectors.Resolve(key)
 	}
 	if w.reportBuilders == nil {
 		return preparedOutcome{}, evalerrors.ModuleNotConfigured("evaluation report builder registry is not configured")
 	}
-	builder, err := w.reportBuilders.Resolve(kind, resolveReportType(outcome))
+	builder, err := w.reportBuilders.Resolve(key, resolveReportType(outcome))
 	if err != nil {
 		return preparedOutcome{}, err
 	}
@@ -149,7 +150,7 @@ func (w *writer) prepare(ctx context.Context, outcome Outcome) (preparedOutcome,
 	if err != nil {
 		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "生成报告失败")
 	}
-	assembler := w.eventAssemblers.Resolve(kind)
+	assembler := w.eventAssemblers.Resolve(key)
 	return preparedOutcome{
 		projector: projector,
 		report:    rpt,
@@ -161,7 +162,7 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 	if outcome.Assessment == nil {
 		return fmt.Errorf("assessment is required")
 	}
-	if outcome.Result == nil {
+	if outcome.LegacyResult() == nil {
 		return fmt.Errorf("evaluation result is required")
 	}
 	if !outcome.Assessment.Status().IsSubmitted() {
@@ -171,25 +172,31 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 	if modelRef == nil || modelRef.IsEmpty() {
 		return assessment.ErrNoEvaluationModel
 	}
-	if outcome.Result.ModelRef.IsEmpty() {
-		outcome.Result.WithModelRef(*modelRef)
+	result := outcome.LegacyResult()
+	if result.ModelRef.IsEmpty() {
+		result.WithModelRef(*modelRef)
 		return nil
 	}
-	if !modelRef.SameIdentity(outcome.Result.ModelRef) {
+	if !modelRef.SameIdentity(result.ModelRef) {
 		return assessment.ErrEvaluationModelMismatch
 	}
 	return nil
 }
 
-func resolveOutcomeKind(outcome Outcome) assessment.EvaluationModelKind {
-	if !outcome.Result.ModelRef.IsEmpty() {
-		return outcome.Result.ModelRef.Kind()
+func resolveOutcomeKey(outcome Outcome) evaluation.EvaluatorKey {
+	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
+		return outcome.Execution.ModelRef.EvaluatorKey()
+	}
+	if result := outcome.LegacyResult(); result != nil && !result.ModelRef.IsEmpty() {
+		return result.ModelRef.EvaluatorKey()
 	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
-		return outcome.Assessment.EvaluationModelRef().Kind()
+		return outcome.Assessment.EvaluationModelRef().EvaluatorKey()
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
-		return assessment.EvaluationModelKind(outcome.Input.Model.Kind)
+		if key, ok := evaluation.EvaluatorKeyFromLegacyKind(assessmentmodel.Kind(outcome.Input.Model.Kind)); ok {
+			return key
+		}
 	}
-	return ""
+	return evaluation.EvaluatorKey{}
 }

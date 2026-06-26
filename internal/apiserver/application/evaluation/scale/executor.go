@@ -50,11 +50,15 @@ func (e *Executor) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindScale
 }
 
-func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.EvaluationResult, error) {
+func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
 	if e == nil || e.service == nil {
 		return nil, fmt.Errorf("scale evaluation service is not configured")
 	}
-	return e.service.Evaluate(ctx, input.Assessment, input.Input)
+	result, err := e.service.Evaluate(ctx, input.Assessment, input.Input)
+	if err != nil {
+		return nil, err
+	}
+	return assessment.AssessmentOutcomeFromEvaluationResult(result), nil
 }
 
 type scaleScoringRegistry struct {

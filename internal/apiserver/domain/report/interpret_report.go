@@ -133,23 +133,33 @@ func (r *InterpretReport) IsHighRisk() bool {
 
 func (r *InterpretReport) HasDimensions() bool { return len(r.dimensions) > 0 }
 
-func (r *InterpretReport) FindDimension(factorCode FactorCode) (*DimensionInterpret, bool) {
+func (r *InterpretReport) FindDimensionByCode(code DimensionCode) (*DimensionInterpret, bool) {
 	for i := range r.dimensions {
-		if r.dimensions[i].FactorCode() == factorCode {
+		if r.dimensions[i].Code() == code {
 			return &r.dimensions[i], true
 		}
 	}
 	return nil, false
 }
 
-func (r *InterpretReport) GetHighRiskDimensions() []DimensionInterpret {
+// FindDimension is deprecated; use FindDimensionByCode.
+func (r *InterpretReport) FindDimension(factorCode FactorCode) (*DimensionInterpret, bool) {
+	return r.FindDimensionByCode(NewDimensionCode(factorCode.String()))
+}
+
+func (r *InterpretReport) GetHighSeverityDimensions() []DimensionInterpret {
 	var result []DimensionInterpret
 	for _, d := range r.dimensions {
-		if d.IsHighRisk() {
+		if d.IsHighSeverity() {
 			result = append(result, d)
 		}
 	}
 	return result
+}
+
+// GetHighRiskDimensions is deprecated; use GetHighSeverityDimensions.
+func (r *InterpretReport) GetHighRiskDimensions() []DimensionInterpret {
+	return r.GetHighSeverityDimensions()
 }
 
 func (r *InterpretReport) HasSuggestions() bool { return len(r.suggestions) > 0 }

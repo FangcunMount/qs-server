@@ -1,4 +1,4 @@
-package sbti
+package typology
 
 import (
 	"fmt"
@@ -8,67 +8,56 @@ import (
 	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality"
 )
 
-type ReportInput struct {
+type MBTIReportInput struct {
 	AssessmentID domainreport.ID
 	ModelCode    string
 	TotalScore   float64
 	RiskLevel    domainreport.RiskLevel
-	Detail       ReportDetail
+	Detail       MBTIReportDetail
 }
 
-func BuildReport(input ReportInput) (*domainreport.InterpretReport, error) {
+// BuildMBTIReport 组装 MBTI typology 解读报告。
+func BuildMBTIReport(input MBTIReportInput) (*domainreport.InterpretReport, error) {
 	if input.AssessmentID.IsZero() {
 		return nil, fmt.Errorf("assessment is required")
 	}
 	detail := input.Detail
-	profile := personalityProfile(detail)
+	profile := mbtiPersonalityProfile(detail)
 	return reportpersonality.Build(reportpersonality.Input{
 		AssessmentID: input.AssessmentID,
 		ModelCode:    input.ModelCode,
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
 		Profile:      profile,
-		Conclusion:   profile.Conclusion(reportConclusionSuffix(detail)),
-		Dimensions:   reportDimensions(detail),
-		Suggestions:  reportSuggestions(detail),
+		Conclusion:   profile.Conclusion(""),
+		Dimensions:   mbtiReportDimensions(detail),
+		Suggestions:  mbtiReportSuggestions(detail),
 	}), nil
 }
 
-func personalityProfile(detail ReportDetail) reportpersonality.Profile {
+func mbtiPersonalityProfile(detail MBTIReportDetail) reportpersonality.Profile {
 	return reportpersonality.Profile{
-		Kind:             "sbti",
-		DefaultModelName: "SBTI 趣味人格测评",
-		DefaultModelCode: "SBTI_FUN",
+		Kind:             "mbti",
+		DefaultModelName: "MBTI 人格类型测评",
+		DefaultModelCode: "MBTI_OEJTS",
 		TypeCode:         detail.TypeCode,
 		TypeName:         detail.TypeName,
 		OneLiner:         detail.OneLiner,
 		ImageURL:         detail.ImageURL,
-		MatchPercent:     detail.Similarity * 100,
-		IsSpecial:        detail.Outcome.IsSpecial,
-		SpecialTrigger:   detail.SpecialTrigger,
-		Rarity:           reportRarity(detail.Rarity),
-		Commentary:       detail.Outcome.Commentary,
+		MatchPercent:     detail.MatchPercent,
+		Commentary:       detail.Profile.Summary,
 	}
 }
 
-func reportConclusionSuffix(detail ReportDetail) string {
-	if detail.Similarity > 0 {
-		return fmt.Sprintf("（匹配度 %.0f%%）", detail.Similarity*100)
-	}
-	return ""
-}
-
-func reportDimensions(detail ReportDetail) []domainreport.DimensionInterpret {
+func mbtiReportDimensions(detail MBTIReportDetail) []domainreport.DimensionInterpret {
 	if len(detail.Dimensions) == 0 {
 		return nil
 	}
-	maxScore := 6.0
+	maxScore := 40.0
 	dimensions := make([]domainreport.DimensionInterpret, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
-		description := strings.TrimSpace(fmt.Sprintf("%s：%s 档，原始分 %.0f/6", dim.Name, dim.Level, dim.RawScore))
-		if dim.Model != "" {
-			description = dim.Model + " / " + description
-		}
+		description := fmt.Sprintf("%s：倾向 %s（原始分 %.0f，偏好强度 %.0f%%）",
+			dim.Name, dim.Preference, dim.RawScore, dim.Strength)
 		dimensions = append(dimensions, domainreport.NewDimensionInterpret(
 			domainreport.FactorCode(dim.Code),
 			dim.Name,
@@ -82,8 +71,8 @@ func reportDimensions(detail ReportDetail) []domainreport.DimensionInterpret {
 	return dimensions
 }
 
-func reportSuggestions(detail ReportDetail) []domainreport.Suggestion {
-	suggestions := make([]domainreport.Suggestion, 0, 5)
+func mbtiReportSuggestions(detail MBTIReportDetail) []domainreport.Suggestion {
+	suggestions := make([]domainreport.Suggestion, 0, 8)
 	add := func(content string) {
 		content = strings.TrimSpace(content)
 		if content == "" {
@@ -94,21 +83,19 @@ func reportSuggestions(detail ReportDetail) []domainreport.Suggestion {
 			Content:  content,
 		})
 	}
-	add(detail.Outcome.Commentary)
+	add(detail.Profile.Summary)
+	for _, s := range detail.Profile.Strengths {
+		add("优势：" + s)
+	}
+	for _, s := range detail.Profile.Weaknesses {
+		add("注意：" + s)
+	}
+	for _, s := range detail.Profile.Suggestions {
+		add("建议：" + s)
+	}
 	if detail.Source.Attribution != "" {
 		add(fmt.Sprintf("来源与授权：%s；License: %s；非商业使用: %t。",
 			detail.Source.Attribution, detail.Source.License, detail.Source.NonCommercial))
 	}
 	return suggestions
-}
-
-func reportRarity(rarity RarityReport) *domainreport.ModelRarity {
-	if rarity.Percent == 0 && rarity.Label == "" && rarity.OneInX == 0 {
-		return nil
-	}
-	return &domainreport.ModelRarity{
-		Percent: rarity.Percent,
-		Label:   rarity.Label,
-		OneInX:  rarity.OneInX,
-	}
 }

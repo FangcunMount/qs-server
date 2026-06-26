@@ -1,6 +1,6 @@
 # qs-server
 
-> **qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统。它不是普通问卷 CRUD，而是一个多解释模型测评平台：Survey 负责作答事实，Interpretation Model 定义统一接入协议，Scale、MBTI、BigFive 等具体模型负责规则表达，Evaluation 作为通用测评执行引擎，按 ModelRef 加载 Provider 执行模型，并产出 EvaluationResult 和 InterpretReport。**
+> **qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统。它不是普通问卷 CRUD，而是一个多测评模型平台：Survey 负责作答事实，Assessment Model 定义统一模型资产与接入协议，Scale / Personality Typology 等具体模型家族负责规则表达，Evaluation 作为通用测评执行引擎按 EvaluatorKey 路由执行，并产出 AssessmentOutcome 与 InterpretReport。**
 
 [![Go Version](https://img.shields.io/badge/Go-1.25.9-00ADD8?style=flat&logo=go)](https://go.dev/)
 [![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
@@ -36,15 +36,18 @@
 Survey
     管“用户填了什么”
 
-Interpretation Model
-    管“模型如何统一接入”
+Assessment Model
+    管“测评模型资产与统一接入协议”
 
-Concrete Models
+Concrete Model Families
     管“具体规则是什么”
-    例如 Scale / MBTI / BigFive
+    例如 Scale / Personality Typology / BigFive
 
 Evaluation
     管“这一次测评如何执行、失败、重试和生成报告”
+
+Report
+    管“如何把 AssessmentOutcome 投影为可读的 InterpretReport”
 ```
 
 运行时上，系统采用三进程协作：
@@ -68,9 +71,9 @@ qs-worker：事件消费者与异步测评执行驱动器
 | 能力 | 说明 |
 | ---- | ---- |
 | Survey 作答事实 | 管理 Questionnaire，接收 AnswerSheet，完成答案校验与答卷持久化 |
-| Interpretation Model 接入协议 | 通过 ModelRef、Provider、Context、Registry 抽象多解释模型接入 |
-| Concrete Models 具体规则 | Scale、MBTI、BigFive 等具体解释模型各自维护规则资产 |
-| Evaluation 通用执行引擎 | 管理 Assessment、EvaluationRun、EvaluationResult、InterpretReport 和失败重试 |
+| Assessment Model 模型资产 | 通过 Kind / SubKind / Algorithm、PublishedModelSnapshot 与 QuestionnaireBinding 管理测评模型资产 |
+| Concrete Model Families 具体规则 | Scale、Personality Typology（MBTI/SBTI）、BigFive 等模型家族各自维护规则资产 |
+| Evaluation 通用执行引擎 | 管理 Assessment、EvaluatorKey 路由、AssessmentOutcome、InterpretReport 和失败重试 |
 | 异步测评执行 | 答卷提交后通过 Outbox、MQ、worker、internal gRPC 推进 Assessment、Interpretation、Report |
 | 事件与 Outbox | 关键事件通过 Outbox 可靠出站，再进入 MQ 驱动 worker |
 | 前台保护层 | collection-server 提供 RateLimit、SubmitQueue、SubmitGuard、submit-status、wait-report |

@@ -16,7 +16,7 @@ import (
 type evaluatorStub struct {
 	key     evaluation.EvaluatorKey
 	kind    assessment.EvaluationModelKind
-	execute func(context.Context, ExecutionInput) (*assessment.EvaluationResult, error)
+	execute func(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
 func (e evaluatorStub) Key() evaluation.EvaluatorKey {
@@ -33,11 +33,13 @@ func (e evaluatorStub) Kind() assessment.EvaluationModelKind {
 	return e.kind
 }
 
-func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error) {
+func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error) {
 	if e.execute != nil {
 		return e.execute(ctx, input)
 	}
-	return assessment.NewEvaluationResult(0, assessment.RiskLevelNone, "", "", nil), nil
+	return assessment.AssessmentOutcomeFromEvaluationResult(
+		assessment.NewEvaluationResult(0, assessment.RiskLevelNone, "", "", nil),
+	), nil
 }
 
 func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {

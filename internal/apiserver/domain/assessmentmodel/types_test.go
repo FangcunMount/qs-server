@@ -1,6 +1,8 @@
 package assessmentmodel
 
-import "testing"
+import (
+	"testing"
+)
 
 func TestLegacyKindMapping(t *testing.T) {
 	tests := []struct {
@@ -19,6 +21,34 @@ func TestLegacyKindMapping(t *testing.T) {
 			t.Fatalf("LegacyKindMapping(%s) = (%s,%s,%s,%v), want (%s,%s,%s,true)",
 				tc.legacy, kind, subKind, algorithm, ok, tc.wantKind, tc.wantSubKind, tc.wantAlgorithm)
 		}
+	}
+}
+
+func TestPayloadFormatHelpers(t *testing.T) {
+	if IsMBTIPayloadFormat(PayloadFormatPersonalityTypologyV1) {
+		t.Fatal("typology v1 must not be treated as legacy MBTI format")
+	}
+	if IsSBTIPayloadFormat(PayloadFormatPersonalityTypologyV1) {
+		t.Fatal("typology v1 must not be treated as legacy SBTI format")
+	}
+	if !IsMBTIPayloadFormat(PayloadFormatMBTIV1) || !IsMBTIPayloadFormat(PayloadFormatMBTIV1Legacy) {
+		t.Fatal("legacy MBTI formats must be recognized")
+	}
+	if !IsSBTIPayloadFormat(PayloadFormatSBTIV1) || !IsSBTIPayloadFormat(PayloadFormatSBTIV1Legacy) {
+		t.Fatal("legacy SBTI formats must be recognized")
+	}
+	if !IsPersonalityTypologyPayloadFormat(PayloadFormatPersonalityTypologyV1) {
+		t.Fatal("typology v1 format must be recognized")
+	}
+}
+
+func TestAlgorithmFromTypologyPayload(t *testing.T) {
+	algorithm, err := AlgorithmFromTypologyPayload([]byte(`{"algorithm":"mbti"}`))
+	if err != nil || algorithm != AlgorithmMBTI {
+		t.Fatalf("AlgorithmFromTypologyPayload() = (%q, %v), want (mbti, nil)", algorithm, err)
+	}
+	if _, err := AlgorithmFromTypologyPayload([]byte(`{}`)); err == nil {
+		t.Fatal("empty typology payload algorithm must fail")
 	}
 }
 

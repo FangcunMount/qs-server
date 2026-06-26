@@ -156,7 +156,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	// 执行评估模型
-	evaluationResult, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
+	evaluationOutcome, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
 	if err != nil {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
@@ -176,7 +176,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		return err
 	}
-	if err := s.resultWriter.Write(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Result: evaluationResult}); err != nil {
+	if err := s.resultWriter.Write(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
 			"model_key", evaluatorKey.String(),

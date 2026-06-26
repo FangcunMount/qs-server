@@ -21,10 +21,10 @@ func NewWaiterCompletionNotifier(waiterRegistry evaluationwaiter.Notifier) Compl
 }
 
 func (n waiterCompletionNotifier) NotifyCompletion(ctx context.Context, outcome Outcome) {
-	if n.waiterRegistry == nil || outcome.Result == nil || outcome.Assessment == nil {
+	if n.waiterRegistry == nil || outcome.LegacyResult() == nil || outcome.Assessment == nil {
 		return
 	}
-	result := outcome.Result
+	result := outcome.LegacyResult()
 	assessmentID := outcome.Assessment.ID().Uint64()
 	riskLevelStr := string(result.RiskLevel)
 	summary := evaluationwaiter.StatusSummary{

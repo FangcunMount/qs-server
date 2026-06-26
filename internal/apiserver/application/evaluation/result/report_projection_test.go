@@ -20,19 +20,17 @@ func TestModelIdentityFromOutcomeMapsLegacyMBTIToPersonalityTypology(t *testing.
 		"1.0.0",
 		"MBTI",
 	)
-	outcome := Outcome{
-		Result: &assessment.EvaluationResult{
-			ModelRef: modelRef,
-			Summary:  assessment.ResultSummary{PrimaryLabel: "INTJ"},
-			Detail: assessment.EvaluationDetail{
-				Kind: assessment.EvaluationModelKindPersonality,
-				Payload: evaluationtypology.MBTIResultDetail{
-					TypeCode:     "INTJ",
-					MatchPercent: 40,
-				},
+	outcome := NewOutcomeFromLegacyResult(nil, nil, &assessment.EvaluationResult{
+		ModelRef: modelRef,
+		Summary:  assessment.ResultSummary{PrimaryLabel: "INTJ"},
+		Detail: assessment.EvaluationDetail{
+			Kind: assessment.EvaluationModelKindPersonality,
+			Payload: evaluationtypology.MBTIResultDetail{
+				TypeCode:     "INTJ",
+				MatchPercent: 40,
 			},
 		},
-	}
+	})
 	identity := modelIdentityFromOutcome(outcome)
 	if identity.Kind != "personality" || identity.SubKind != "typology" || identity.Algorithm != "mbti" {
 		t.Fatalf("identity = %#v", identity)

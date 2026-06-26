@@ -5,20 +5,20 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
 
 type ScoreProjectorRegistry interface {
-	Resolve(kind assessment.EvaluationModelKind) ScoreProjector
+	Resolve(key evaluation.EvaluatorKey) ScoreProjector
 }
 
 type mutableScoreProjectorRegistry struct {
-	items map[assessment.EvaluationModelKind]ScoreProjector
+	items map[evaluation.EvaluatorKey]ScoreProjector
 }
 
 func NewScoreProjectorRegistry(projectors ...ScoreProjector) (*mutableScoreProjectorRegistry, error) {
-	registry := &mutableScoreProjectorRegistry{items: make(map[assessment.EvaluationModelKind]ScoreProjector)}
+	registry := &mutableScoreProjectorRegistry{items: make(map[evaluation.EvaluatorKey]ScoreProjector)}
 	for _, projector := range projectors {
 		if err := registry.Register(projector); err != nil {
 			return nil, err
@@ -31,34 +31,34 @@ func (r *mutableScoreProjectorRegistry) Register(projector ScoreProjector) error
 	if projector == nil {
 		return fmt.Errorf("evaluation score projector is nil")
 	}
-	kind := projector.Kind()
-	if kind == "" {
-		return fmt.Errorf("evaluation score projector kind is empty")
+	key := projector.Key()
+	if key.IsZero() {
+		return fmt.Errorf("evaluation score projector key is empty")
 	}
-	if _, exists := r.items[kind]; exists {
-		return fmt.Errorf("evaluation score projector already registered for kind %s", kind)
+	if _, exists := r.items[key]; exists {
+		return fmt.Errorf("evaluation score projector already registered for key %s", key)
 	}
-	r.items[kind] = projector
+	r.items[key] = projector
 	return nil
 }
 
-func (r *mutableScoreProjectorRegistry) Resolve(kind assessment.EvaluationModelKind) ScoreProjector {
+func (r *mutableScoreProjectorRegistry) Resolve(key evaluation.EvaluatorKey) ScoreProjector {
 	if r == nil {
 		return noopScoreProjector{}
 	}
-	if projector, ok := r.items[kind]; ok {
+	if projector, ok := r.items[key]; ok {
 		return projector
 	}
 	return noopScoreProjector{}
 }
 
 type reportBuilderKey struct {
-	kind       assessment.EvaluationModelKind
+	key        evaluation.EvaluatorKey
 	reportType domainReport.ReportType
 }
 
 type ReportBuilderRegistry interface {
-	Resolve(kind assessment.EvaluationModelKind, reportType domainReport.ReportType) (ReportBuilder, error)
+	Resolve(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error)
 }
 
 type mutableReportBuilderRegistry struct {
@@ -79,46 +79,46 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 	if builder == nil {
 		return fmt.Errorf("evaluation report builder is nil")
 	}
-	kind := builder.Kind()
-	if kind == "" {
-		return fmt.Errorf("evaluation report builder kind is empty")
+	key := builder.Key()
+	if key.IsZero() {
+		return fmt.Errorf("evaluation report builder key is empty")
 	}
 	reportType := builder.ReportType()
 	if reportType == "" {
 		return fmt.Errorf("evaluation report builder report type is empty")
 	}
-	key := reportBuilderKey{kind: kind, reportType: reportType}
-	if _, exists := r.items[key]; exists {
-		return fmt.Errorf("evaluation report builder already registered for kind %s report type %s", kind, reportType)
+	registryKey := reportBuilderKey{key: key, reportType: reportType}
+	if _, exists := r.items[registryKey]; exists {
+		return fmt.Errorf("evaluation report builder already registered for key %s report type %s", key, reportType)
 	}
-	r.items[key] = builder
+	r.items[registryKey] = builder
 	return nil
 }
 
-func (r *mutableReportBuilderRegistry) Resolve(kind assessment.EvaluationModelKind, reportType domainReport.ReportType) (ReportBuilder, error) {
+func (r *mutableReportBuilderRegistry) Resolve(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation report builder registry is not configured")
 	}
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
 	}
-	key := reportBuilderKey{kind: kind, reportType: reportType}
-	if builder, ok := r.items[key]; ok {
+	registryKey := reportBuilderKey{key: key, reportType: reportType}
+	if builder, ok := r.items[registryKey]; ok {
 		return builder, nil
 	}
-	if mappedKind, _, _, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(kind)); ok {
-		key.kind = assessment.EvaluationModelKind(mappedKind)
-		if builder, ok := r.items[key]; ok {
+	if mappedKind, subKind, algorithm, ok := assessmentmodel.LegacyKindMapping(key.Kind); ok {
+		registryKey.key = evaluation.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}
+		if builder, ok := r.items[registryKey]; ok {
 			return builder, nil
 		}
 	}
-	return nil, fmt.Errorf("unsupported evaluation report builder kind: %s report type: %s", kind, reportType)
+	return nil, fmt.Errorf("unsupported evaluation report builder key: %s report type: %s", key, reportType)
 }
 
 type noopScoreProjector struct{}
 
-func (noopScoreProjector) Kind() assessment.EvaluationModelKind {
-	return ""
+func (noopScoreProjector) Key() evaluation.EvaluatorKey {
+	return evaluation.EvaluatorKey{}
 }
 
 func (noopScoreProjector) Project(context.Context, Outcome) error {

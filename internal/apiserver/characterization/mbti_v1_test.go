@@ -41,10 +41,7 @@ func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
 	)
 
-	report, err := typologyapp.NewReportBuilder().Build(context.Background(), evaluationresult.Outcome{
-		Assessment: a,
-		Result:     result,
-	})
+	report, err := typologyapp.NewReportBuilder().Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(a, nil, result))
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

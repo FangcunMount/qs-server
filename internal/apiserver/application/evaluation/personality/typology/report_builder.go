@@ -6,11 +6,10 @@ import (
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	reportmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/mbti"
-	reportsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/sbti"
+	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality/typology"
 )
 
 type ReportBuilder struct{}
@@ -21,8 +20,32 @@ func NewReportBuilder() ReportBuilder {
 	return ReportBuilder{}
 }
 
-func (ReportBuilder) Kind() assessment.EvaluationModelKind {
-	return assessment.EvaluationModelKindPersonality
+func NewMBTIReportBuilder() evaluationresult.ReportBuilder {
+	return algorithmReportBuilder{key: evaluation.EvaluatorKeyMBTI}
+}
+
+func NewSBTIReportBuilder() evaluationresult.ReportBuilder {
+	return algorithmReportBuilder{key: evaluation.EvaluatorKeySBTI}
+}
+
+type algorithmReportBuilder struct {
+	key evaluation.EvaluatorKey
+}
+
+func (b algorithmReportBuilder) Key() evaluation.EvaluatorKey {
+	return b.key
+}
+
+func (algorithmReportBuilder) ReportType() domainReport.ReportType {
+	return domainReport.ReportTypeStandard
+}
+
+func (b algorithmReportBuilder) Build(ctx context.Context, outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+	return (ReportBuilder{}).Build(ctx, outcome)
+}
+
+func (ReportBuilder) Key() evaluation.EvaluatorKey {
+	return evaluation.EvaluatorKeyMBTI
 }
 
 func (ReportBuilder) ReportType() domainReport.ReportType {
@@ -33,12 +56,13 @@ func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) 
 	if outcome.Assessment == nil {
 		return nil, fmt.Errorf("assessment is required")
 	}
-	if outcome.Result == nil {
+	result := outcome.LegacyResult()
+	if result == nil {
 		return nil, fmt.Errorf("evaluation result is required")
 	}
-	algorithm := outcome.Result.ModelRef.Algorithm()
+	algorithm := result.ModelRef.Algorithm()
 	if algorithm == "" {
-		switch outcome.Result.Detail.Payload.(type) {
+		switch result.Detail.Payload.(type) {
 		case evaluationtypology.SBTIResultDetail, *evaluationtypology.SBTIResultDetail:
 			algorithm = assessmentmodel.AlgorithmSBTI
 		default:
@@ -54,19 +78,23 @@ func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) 
 }
 
 func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
-	detail, err := evaluationtypology.MBTIResultDetailFromPayload(outcome.Result.Detail.Payload)
+	result := outcome.LegacyResult()
+	if result == nil {
+		return nil, fmt.Errorf("evaluation result is required")
+	}
+	detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail.Payload)
 	if err != nil {
 		return nil, err
 	}
 	modelCode := ""
-	if !outcome.Result.ModelRef.Code().IsEmpty() {
-		modelCode = outcome.Result.ModelRef.Code().String()
+	if !result.ModelRef.Code().IsEmpty() {
+		modelCode = result.ModelRef.Code().String()
 	}
-	rpt, err := reportmbti.BuildReport(reportmbti.ReportInput{
+	rpt, err := reporttypology.BuildMBTIReport(reporttypology.MBTIReportInput{
 		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
 		ModelCode:    modelCode,
-		TotalScore:   outcome.Result.TotalScore,
-		RiskLevel:    domainReport.RiskLevel(outcome.Result.RiskLevel),
+		TotalScore:   result.TotalScore,
+		RiskLevel:    domainReport.RiskLevel(result.RiskLevel),
 		Detail:       mbtiReportDetail(detail),
 	})
 	if err != nil {
@@ -76,19 +104,23 @@ func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretR
 }
 
 func buildSBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
-	detail, err := evaluationtypology.SBTIResultDetailFromPayload(outcome.Result.Detail.Payload)
+	result := outcome.LegacyResult()
+	if result == nil {
+		return nil, fmt.Errorf("evaluation result is required")
+	}
+	detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail.Payload)
 	if err != nil {
 		return nil, err
 	}
 	modelCode := ""
-	if !outcome.Result.ModelRef.Code().IsEmpty() {
-		modelCode = outcome.Result.ModelRef.Code().String()
+	if !result.ModelRef.Code().IsEmpty() {
+		modelCode = result.ModelRef.Code().String()
 	}
-	rpt, err := reportsbti.BuildReport(reportsbti.ReportInput{
+	rpt, err := reporttypology.BuildSBTIReport(reporttypology.SBTIReportInput{
 		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
 		ModelCode:    modelCode,
-		TotalScore:   outcome.Result.TotalScore,
-		RiskLevel:    domainReport.RiskLevel(outcome.Result.RiskLevel),
+		TotalScore:   result.TotalScore,
+		RiskLevel:    domainReport.RiskLevel(result.RiskLevel),
 		Detail:       sbtiReportDetail(detail),
 	})
 	if err != nil {
@@ -97,10 +129,10 @@ func buildSBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretR
 	return evaluationresult.AttachReportOutcomeSummary(outcome, rpt), nil
 }
 
-func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reportmbti.ReportDetail {
-	dimensions := make([]reportmbti.DimensionReport, 0, len(detail.Dimensions))
+func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reporttypology.MBTIReportDetail {
+	dimensions := make([]reporttypology.MBTIDimensionReport, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
-		dimensions = append(dimensions, reportmbti.DimensionReport{
+		dimensions = append(dimensions, reporttypology.MBTIDimensionReport{
 			Code:       dim.Code,
 			Name:       dim.Name,
 			LeftPole:   dim.LeftPole,
@@ -110,14 +142,14 @@ func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reportmbti.Rep
 			Strength:   dim.Strength,
 		})
 	}
-	return reportmbti.ReportDetail{
+	return reporttypology.MBTIReportDetail{
 		TypeCode:     detail.TypeCode,
 		TypeName:     detail.TypeName,
 		OneLiner:     detail.OneLiner,
 		MatchPercent: detail.MatchPercent,
 		ImageURL:     detail.ImageURL,
 		Dimensions:   dimensions,
-		Profile: reportmbti.ProfileReport{
+		Profile: reporttypology.MBTIProfileReport{
 			TypeCode:    detail.Profile.TypeCode,
 			TypeName:    detail.Profile.TypeName,
 			OneLiner:    detail.Profile.OneLiner,
@@ -128,7 +160,7 @@ func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reportmbti.Rep
 			Suggestions: append([]string(nil), detail.Profile.Suggestions...),
 			ImageURL:    detail.Profile.ImageURL,
 		},
-		Source: reportmbti.SourceReport{
+		Source: reporttypology.MBTISourceReport{
 			QuestionsRepo: detail.Source.QuestionsRepo,
 			SourceSite:    detail.Source.SourceSite,
 			License:       detail.Source.License,
@@ -138,10 +170,10 @@ func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reportmbti.Rep
 	}
 }
 
-func sbtiReportDetail(detail evaluationtypology.SBTIResultDetail) reportsbti.ReportDetail {
-	dimensions := make([]reportsbti.DimensionReport, 0, len(detail.Dimensions))
+func sbtiReportDetail(detail evaluationtypology.SBTIResultDetail) reporttypology.SBTIReportDetail {
+	dimensions := make([]reporttypology.SBTIDimensionReport, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
-		dimensions = append(dimensions, reportsbti.DimensionReport{
+		dimensions = append(dimensions, reporttypology.SBTIDimensionReport{
 			Code:     dim.Code,
 			Name:     dim.Name,
 			Model:    dim.Model,
@@ -149,26 +181,26 @@ func sbtiReportDetail(detail evaluationtypology.SBTIResultDetail) reportsbti.Rep
 			Level:    dim.Level,
 		})
 	}
-	return reportsbti.ReportDetail{
+	return reporttypology.SBTIReportDetail{
 		TypeCode:   detail.TypeCode,
 		TypeName:   detail.TypeName,
 		OneLiner:   detail.OneLiner,
 		Pattern:    detail.Pattern,
 		Similarity: detail.Similarity,
 		ImageURL:   detail.ImageURL,
-		Rarity: reportsbti.RarityReport{
+		Rarity: reporttypology.SBTIRarityReport{
 			Percent: detail.Rarity.Percent,
 			Label:   detail.Rarity.Label,
 			OneInX:  detail.Rarity.OneInX,
 		},
 		Dimensions: dimensions,
-		Outcome: reportsbti.OutcomeReport{
+		Outcome: reporttypology.SBTIOutcomeReport{
 			Code:     detail.Outcome.Code,
 			Name:     detail.Outcome.Name,
 			OneLiner: detail.Outcome.OneLiner,
 			Pattern:  detail.Outcome.Pattern,
 			Image:    detail.Outcome.Image,
-			Rarity: reportsbti.RarityReport{
+			Rarity: reporttypology.SBTIRarityReport{
 				Percent: detail.Outcome.Rarity.Percent,
 				Label:   detail.Outcome.Rarity.Label,
 				OneInX:  detail.Outcome.Rarity.OneInX,
@@ -177,7 +209,7 @@ func sbtiReportDetail(detail evaluationtypology.SBTIResultDetail) reportsbti.Rep
 			Trigger:    detail.Outcome.Trigger,
 			Commentary: detail.Outcome.Commentary,
 		},
-		Source: reportsbti.SourceReport{
+		Source: reporttypology.SBTISourceReport{
 			WikiRepo:      detail.Source.WikiRepo,
 			SourceSite:    detail.Source.SourceSite,
 			License:       detail.Source.License,

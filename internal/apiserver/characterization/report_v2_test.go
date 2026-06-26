@@ -15,20 +15,17 @@ import (
 func TestV2ScaleReportProjectsOutcomeSummaryFields(t *testing.T) {
 	a := submittedScaleAssessment(t)
 	snapshot := scaleInputSnapshot()
-	result, err := evaluationscale.NewExecutor(nil).Execute(context.Background(), evaluationexecute.ExecutionInput{
+	execution, err := evaluationscale.NewExecutor(nil).Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: a,
 		Input:      snapshot,
 	})
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
+	result := execution.ToEvaluationResult()
 
 	report, err := evaluationresult.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaluationresult.Outcome{
-			Assessment: a,
-			Input:      snapshot,
-			Result:     result,
-		})
+		Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(a, snapshot, result))
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

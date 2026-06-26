@@ -8,8 +8,8 @@ import (
 )
 
 func modelIdentityFromOutcome(outcome Outcome) domainreport.ModelIdentity {
-	if outcome.Result != nil && !outcome.Result.ModelRef.IsEmpty() {
-		return modelIdentityFromRef(outcome.Result.ModelRef)
+	if result := outcome.LegacyResult(); result != nil && !result.ModelRef.IsEmpty() {
+		return modelIdentityFromRef(result.ModelRef)
 	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
 		return modelIdentityFromRef(*outcome.Assessment.EvaluationModelRef())
@@ -47,10 +47,10 @@ func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelI
 }
 
 func primaryScoreFromOutcome(outcome Outcome) *domainreport.ScoreValue {
-	if outcome.Result == nil {
+	result := outcome.LegacyResult()
+	if result == nil {
 		return nil
 	}
-	result := outcome.Result
 	switch {
 	case result.ModelRef.IsScale() || result.Detail.Kind == assessment.EvaluationModelKindScale:
 		return domainreport.NewRawTotalScore(result.TotalScore, nil)
@@ -75,10 +75,10 @@ func primaryScoreFromOutcome(outcome Outcome) *domainreport.ScoreValue {
 }
 
 func levelFromOutcome(outcome Outcome) *domainreport.ResultLevel {
-	if outcome.Result == nil {
+	result := outcome.LegacyResult()
+	if result == nil {
 		return nil
 	}
-	result := outcome.Result
 	if result.RiskLevel != "" && result.RiskLevel != assessment.RiskLevelNone {
 		return domainreport.LevelFromRisk(domainreport.RiskLevel(result.RiskLevel))
 	}

@@ -207,7 +207,7 @@ func NewScoreMapper() *ScoreMapper {
 }
 
 // ToPOs 将领域对象转换为持久化对象列表（一个 AssessmentScore 对应多个 PO）
-func (m *ScoreMapper) ToPOs(domain *assessment.AssessmentScore, testeeID uint64, scaleID uint64, scaleCode string) []*AssessmentScorePO {
+func (m *ScoreMapper) ToPOs(domain *assessment.ScaleScoreProjection, testeeID uint64, scaleID uint64, scaleCode string) []*AssessmentScorePO {
 	if domain == nil {
 		return nil
 	}
@@ -237,7 +237,7 @@ func (m *ScoreMapper) ToPOs(domain *assessment.AssessmentScore, testeeID uint64,
 
 // ToDomain 将持久化对象列表转换为领域对象（多个 PO 聚合为一个 AssessmentScore）
 // 要求输入的 POs 必须属于同一个 Assessment
-func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.AssessmentScore {
+func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.ScaleScoreProjection {
 	if len(pos) == 0 {
 		return nil
 	}
@@ -251,9 +251,9 @@ func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.AssessmentS
 	riskLevel := assessment.RiskLevelNone
 
 	// 构建因子得分列表
-	factorScores := make([]assessment.FactorScore, 0, len(pos))
+	factorScores := make([]assessment.ScaleFactorScore, 0, len(pos))
 	for _, po := range pos {
-		fs := assessment.NewFactorScore(
+		fs := assessment.NewScaleFactorScore(
 			assessment.FactorCode(po.FactorCode),
 			po.FactorName,
 			po.RawScore,
@@ -269,7 +269,7 @@ func (m *ScoreMapper) ToDomain(pos []*AssessmentScorePO) *assessment.AssessmentS
 		}
 	}
 
-	return assessment.ReconstructAssessmentScore(
+	return assessment.ReconstructScaleScoreProjection(
 		assessmentID,
 		totalScore,
 		riskLevel,
@@ -287,9 +287,9 @@ func (m *ScoreMapper) GroupByAssessmentID(pos []*AssessmentScorePO) map[uint64][
 }
 
 // ToDomainList 将 PO 列表转换为领域对象列表（按 AssessmentID 聚合）
-func (m *ScoreMapper) ToDomainList(pos []*AssessmentScorePO) []*assessment.AssessmentScore {
+func (m *ScoreMapper) ToDomainList(pos []*AssessmentScorePO) []*assessment.ScaleScoreProjection {
 	grouped := m.GroupByAssessmentID(pos)
-	result := make([]*assessment.AssessmentScore, 0, len(grouped))
+	result := make([]*assessment.ScaleScoreProjection, 0, len(grouped))
 	for _, group := range grouped {
 		if score := m.ToDomain(group); score != nil {
 			result = append(result, score)

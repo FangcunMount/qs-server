@@ -2,6 +2,30 @@ package score
 
 import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 
+// ScaleReportInput 是 scale 家族报告组装输入。
+type ScaleReportInput struct {
+	AssessmentID domainreport.ID
+	Scale        *ReportModel
+	TotalScore   float64
+	RiskLevel    domainreport.RiskLevel
+	Conclusion   string
+	Suggestion   string
+	FactorScores []FactorReportScore
+}
+
+// BuildScaleReport 组装 scale 家族解读报告。
+func BuildScaleReport(composer domainreport.ReportBuilder, input ScaleReportInput) (*domainreport.InterpretReport, error) {
+	return BuildReport(composer, ReportInput{
+		AssessmentID: input.AssessmentID,
+		Model:        input.Scale,
+		TotalScore:   input.TotalScore,
+		RiskLevel:    input.RiskLevel,
+		Conclusion:   input.Conclusion,
+		Suggestion:   input.Suggestion,
+		FactorScores: input.FactorScores,
+	})
+}
+
 func BuildReport(composer domainreport.ReportBuilder, input ReportInput) (*domainreport.InterpretReport, error) {
 	if composer == nil {
 		return nil, domainreport.ErrInvalidArgument

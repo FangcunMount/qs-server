@@ -40,8 +40,8 @@ type Evaluator interface {
 	Key() evaluation.EvaluatorKey
 	// Kind 返回兼容用 flat kind（报告/投影注册仍使用）。
 	Kind() assessment.EvaluationModelKind
-	// Execute 执行评估模型
-	Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error)
+	// Execute 执行评估模型并返回 canonical outcome。
+	Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
 // EvaluatorRegistry 评估模型评估器注册表。

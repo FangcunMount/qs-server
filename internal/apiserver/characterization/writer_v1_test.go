@@ -6,6 +6,7 @@ import (
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -17,12 +18,8 @@ import (
 func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
-	outcome := evaluationresult.Outcome{
-		Assessment: a,
-		Input:      scaleInputSnapshot(),
-		Result: assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "low", "keep", nil).
-			WithModelRef(*a.EvaluationModelRef()),
-	}
+	outcome := evaluationresult.NewOutcomeFromLegacyResult(a, scaleInputSnapshot(), assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "low", "keep", nil).
+		WithModelRef(*a.EvaluationModelRef()))
 
 	scoreProjectors, err := evaluationresult.NewScoreProjectorRegistry(
 		evaluationresult.NewScaleScoreProjector(&writerScoreRepoStub{order: &order}),
@@ -104,7 +101,7 @@ type writerScoreRepoStub struct {
 	order *[]string
 }
 
-func (r *writerScoreRepoStub) SaveScoresWithContext(_ context.Context, _ *assessment.Assessment, _ *assessment.AssessmentScore) error {
+func (r *writerScoreRepoStub) SaveScoresWithContext(_ context.Context, _ *assessment.Assessment, _ *assessment.ScaleScoreProjection) error {
 	*r.order = append(*r.order, "score")
 	return nil
 }
@@ -115,8 +112,8 @@ type writerReportBuilderStub struct {
 	rpt   *domainreport.InterpretReport
 }
 
-func (*writerReportBuilderStub) Kind() assessment.EvaluationModelKind {
-	return assessment.EvaluationModelKindScale
+func (*writerReportBuilderStub) Key() evaluation.EvaluatorKey {
+	return evaluation.EvaluatorKeyScaleDefault
 }
 func (*writerReportBuilderStub) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard

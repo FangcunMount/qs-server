@@ -260,7 +260,8 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		}
 		reportBuilders, err := evaluationResult.NewReportBuilderRegistry(
 			evaluationResult.NewScaleReportBuilder(reportBuilder),
-			typologyEvaluation.NewReportBuilder(),
+			typologyEvaluation.NewMBTIReportBuilder(),
+			typologyEvaluation.NewSBTIReportBuilder(),
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation report builder registry: %v", err)

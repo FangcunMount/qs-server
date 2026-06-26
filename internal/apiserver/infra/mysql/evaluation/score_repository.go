@@ -30,7 +30,7 @@ func NewScoreRepository(db *gorm.DB, opts ...mysql.BaseRepositoryOptions) assess
 }
 
 // SaveScoresWithContext 带上下文保存得分（包含受试者和量表信息）
-func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentDomain *assessment.Assessment, score *assessment.AssessmentScore) error {
+func (r *scoreRepository) SaveScoresWithContext(ctx context.Context, assessmentDomain *assessment.Assessment, score *assessment.ScaleScoreProjection) error {
 	if score == nil || assessmentDomain == nil {
 		return nil
 	}

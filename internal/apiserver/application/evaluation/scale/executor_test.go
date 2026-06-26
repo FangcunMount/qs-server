@@ -7,6 +7,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -77,14 +78,15 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 	if result.ModelRef.Kind() != assessment.EvaluationModelKindScale || result.ModelRef.Code().String() != "S-001" {
 		t.Fatalf("unexpected model ref: %#v", result.ModelRef)
 	}
-	if result.TotalScore != 7 || result.RiskLevel != assessment.RiskLevelLow {
-		t.Fatalf("result summary = score %.1f risk %s, want 7/low", result.TotalScore, result.RiskLevel)
+	legacy := result.ToEvaluationResult()
+	if legacy.TotalScore != 7 || legacy.RiskLevel != assessment.RiskLevelLow {
+		t.Fatalf("result summary = score %.1f risk %s, want 7/low", legacy.TotalScore, legacy.RiskLevel)
 	}
 }
 
 func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 	var _ interface {
-		Kind() assessment.EvaluationModelKind
+		Key() evaluation.EvaluatorKey
 	} = (*Executor)(nil)
 }
 

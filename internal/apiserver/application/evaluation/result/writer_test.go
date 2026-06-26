@@ -6,7 +6,9 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -36,11 +38,11 @@ func (r *resultAssessmentRepoStub) FindByAnswerSheetID(context.Context, assessme
 
 type resultScoreRepoStub struct {
 	order *[]string
-	score *assessment.AssessmentScore
+	score *assessment.ScaleScoreProjection
 	err   error
 }
 
-func (r *resultScoreRepoStub) SaveScoresWithContext(_ context.Context, _ *assessment.Assessment, score *assessment.AssessmentScore) error {
+func (r *resultScoreRepoStub) SaveScoresWithContext(_ context.Context, _ *assessment.Assessment, score *assessment.ScaleScoreProjection) error {
 	*r.order = append(*r.order, "score")
 	r.score = score
 	return r.err
@@ -51,15 +53,15 @@ func (r *resultScoreRepoStub) DeleteByAssessmentID(context.Context, assessment.I
 type resultReportBuilderStub struct {
 	order *[]string
 	rpt   *domainReport.InterpretReport
-	kind  assessment.EvaluationModelKind
+	key   evaluation.EvaluatorKey
 	err   error
 }
 
-func (b *resultReportBuilderStub) Kind() assessment.EvaluationModelKind {
-	if b.kind != "" {
-		return b.kind
+func (b *resultReportBuilderStub) Key() evaluation.EvaluatorKey {
+	if !b.key.IsZero() {
+		return b.key
 	}
-	return assessment.EvaluationModelKindScale
+	return evaluation.EvaluatorKeyScaleDefault
 }
 
 func (*resultReportBuilderStub) ReportType() domainReport.ReportType {
@@ -98,8 +100,8 @@ func (n *resultNotifierStub) NotifyCompletion(context.Context, Outcome) {
 }
 
 func TestGenericEventAssemblerIsFallbackOnly(t *testing.T) {
-	if got := (GenericEventAssembler{}).Kind(); got != "" {
-		t.Fatalf("GenericEventAssembler kind = %q, want empty fallback kind", got)
+	if got := (GenericEventAssembler{}).Key(); !got.IsZero() {
+		t.Fatalf("GenericEventAssembler key = %q, want empty fallback key", got)
 	}
 }
 
@@ -324,7 +326,15 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 
 func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *testing.T) {
 	order := make([]string, 0)
-	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindPersonality,
+		assessmentmodel.SubKindTypology,
+		assessmentmodel.AlgorithmMBTI,
+		meta.ID(0),
+		meta.NewCode("MBTI-16P"),
+		"1.0.0",
+		"MBTI",
+	)
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(8002),
@@ -344,7 +354,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 
 	reportBuilders, err := NewReportBuilderRegistry(&resultReportBuilderStub{
 		order: &order,
-		kind:  assessment.EvaluationModelKindPersonality,
+		key:   evaluation.EvaluatorKeyMBTI,
 		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil),
 	})
 	if err != nil {
@@ -367,7 +377,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 		Payload: "INTJ",
 	})
 
-	if err := writer.Write(context.Background(), Outcome{Assessment: a, Result: result}); err != nil {
+	if err := writer.Write(context.Background(), NewOutcomeFromLegacyResult(a, nil, result)); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
@@ -422,15 +432,11 @@ func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 func scaleOutcomeForWriterTest(a *assessment.Assessment) Outcome {
 	result := assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "ok", "keep", nil).
 		WithModelRef(*a.EvaluationModelRef())
-	return Outcome{
-		Assessment: a,
-		Input: &evaluationinput.InputSnapshot{
-			MedicalScale: &scalesnapshot.ScaleSnapshot{
-				Code:                 "S-001",
-				Title:                "Scale",
-				QuestionnaireVersion: "1.0.0",
-			},
+	return NewOutcomeFromLegacyResult(a, &evaluationinput.InputSnapshot{
+		MedicalScale: &scalesnapshot.ScaleSnapshot{
+			Code:                 "S-001",
+			Title:                "Scale",
+			QuestionnaireVersion: "1.0.0",
 		},
-		Result: result,
-	}
+	}, result)
 }

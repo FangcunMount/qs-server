@@ -41,7 +41,7 @@ func (e *Executor) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindPersonality
 }
 
-func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.EvaluationResult, error) {
+func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
 	if e == nil {
 		return nil, fmt.Errorf("personality typology evaluator is not configured")
 	}
@@ -60,12 +60,18 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	}
 
 	modelRef := modelRefFromExecutionInput(input, payload)
+	var result *assessment.EvaluationResult
+	var err error
 	switch e.algorithm {
 	case assessmentmodel.AlgorithmSBTI:
-		return buildSBTIResult(modelRef, payload, input.Input.AnswerSheet)
+		result, err = buildSBTIResult(modelRef, payload, input.Input.AnswerSheet)
 	default:
-		return buildMBTIResult(modelRef, payload, input.Input.AnswerSheet)
+		result, err = buildMBTIResult(modelRef, payload, input.Input.AnswerSheet)
 	}
+	if err != nil {
+		return nil, err
+	}
+	return assessment.AssessmentOutcomeFromEvaluationResult(result), nil
 }
 
 func buildMBTIResult(

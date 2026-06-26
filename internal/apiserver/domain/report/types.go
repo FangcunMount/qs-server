@@ -67,3 +67,33 @@ func (c FactorCode) IsEmpty() bool {
 func (c FactorCode) Equals(other FactorCode) bool {
 	return c == other
 }
+
+// DimensionCode is the neutral dimension identifier on reports.
+type DimensionCode string
+
+func NewDimensionCode(code string) DimensionCode {
+	return DimensionCode(code)
+}
+
+func (c DimensionCode) String() string {
+	return string(c)
+}
+
+func (c DimensionCode) IsEmpty() bool {
+	return c == ""
+}
+
+func (c DimensionCode) Equals(other DimensionCode) bool {
+	return c == other
+}
+
+// DimensionKind classifies a report dimension independent of scale factor semantics.
+type DimensionKind string
+
+const (
+	DimensionKindFactor  DimensionKind = "factor"
+	DimensionKindPole    DimensionKind = "pole"
+	DimensionKindTrait   DimensionKind = "trait"
+	DimensionKindIndex   DimensionKind = "index"
+	DimensionKindAbility DimensionKind = "ability"
+)

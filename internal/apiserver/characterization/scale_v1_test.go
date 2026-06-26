@@ -17,13 +17,14 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 	a := submittedScaleAssessment(t)
 	snapshot := scaleInputSnapshot()
 
-	result, err := evaluationscale.NewExecutor(nil).Execute(context.Background(), evaluationexecute.ExecutionInput{
+	execution, err := evaluationscale.NewExecutor(nil).Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: a,
 		Input:      snapshot,
 	})
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
+	result := execution.ToEvaluationResult()
 	if result.TotalScore != 5 {
 		t.Fatalf("TotalScore = %.1f, want 5", result.TotalScore)
 	}
@@ -38,11 +39,7 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 	}
 
 	report, err := evaluationresult.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaluationresult.Outcome{
-			Assessment: a,
-			Input:      snapshot,
-			Result:     result,
-		})
+		Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(a, snapshot, result))
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

@@ -1,5 +1,10 @@
 package assessmentmodel
 
+import (
+	"encoding/json"
+	"fmt"
+)
+
 // Kind is the canonical assessment model family.
 type Kind string
 
@@ -170,20 +175,22 @@ func IsScalePayloadFormat(format string) bool {
 	}
 }
 
+// IsMBTIPayloadFormat reports legacy MBTI payload formats only.
+// v2 typology payloads must be distinguished by AlgorithmFromTypologyPayload.
 func IsMBTIPayloadFormat(format string) bool {
 	switch format {
-	case PayloadFormatPersonalityTypologyV1,
-		PayloadFormatMBTIV1, PayloadFormatMBTIV1Legacy:
+	case PayloadFormatMBTIV1, PayloadFormatMBTIV1Legacy:
 		return true
 	default:
 		return false
 	}
 }
 
+// IsSBTIPayloadFormat reports legacy SBTI payload formats only.
+// v2 typology payloads must be distinguished by AlgorithmFromTypologyPayload.
 func IsSBTIPayloadFormat(format string) bool {
 	switch format {
-	case PayloadFormatPersonalityTypologyV1,
-		PayloadFormatSBTIV1, PayloadFormatSBTIV1Legacy:
+	case PayloadFormatSBTIV1, PayloadFormatSBTIV1Legacy:
 		return true
 	default:
 		return false
@@ -192,6 +199,22 @@ func IsSBTIPayloadFormat(format string) bool {
 
 func IsPersonalityTypologyPayloadFormat(format string) bool {
 	return format == PayloadFormatPersonalityTypologyV1
+}
+
+type typologyAlgorithmEnvelope struct {
+	Algorithm Algorithm `json:"algorithm"`
+}
+
+// AlgorithmFromTypologyPayload reads the algorithm identity from a v2 typology payload.
+func AlgorithmFromTypologyPayload(payload []byte) (Algorithm, error) {
+	var envelope typologyAlgorithmEnvelope
+	if err := json.Unmarshal(payload, &envelope); err != nil {
+		return "", fmt.Errorf("decode typology payload algorithm: %w", err)
+	}
+	if envelope.Algorithm == "" {
+		return "", fmt.Errorf("typology payload algorithm is empty")
+	}
+	return envelope.Algorithm, nil
 }
 
 // LegacyKindMapping resolves deprecated flat kinds to v2 identity triples.

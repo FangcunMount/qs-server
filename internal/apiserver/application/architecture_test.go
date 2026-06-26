@@ -497,6 +497,33 @@ func scanGoImports(t *testing.T, root string, visit func(path, importPath string
 	}
 }
 
+func TestReportDomainDoesNotUseAlgorithmNamedTopLevelPackages(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenDirs := []string{
+		filepath.Join(root, "internal", "apiserver", "domain", "report", "mbti"),
+		filepath.Join(root, "internal", "apiserver", "domain", "report", "sbti"),
+	}
+	for _, dir := range forbiddenDirs {
+		if _, err := os.Stat(dir); err == nil {
+			t.Fatalf("%s must not exist; typology report assembly belongs in domain/report/personality/typology", filepath.ToSlash(mustRel(t, root, dir)))
+		}
+	}
+
+	forbiddenImports := []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/report/mbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/report/sbti",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {
+		for _, forbidden := range forbiddenImports {
+			if importPath == forbidden || strings.HasPrefix(importPath, forbidden+"/") {
+				t.Fatalf("%s imports %s; use domain/report/personality/typology instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
+			}
+		}
+	})
+}
+
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	_, file, _, ok := runtime.Caller(0)
@@ -560,5 +587,109 @@ func TestApplicationLayerDoesNotReferenceLegacyRuleSetTypes(t *testing.T) {
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestNewWritesDoNotUseMigrationKinds(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"KindMBTIMigration",
+		"KindSBTIMigration",
+		"RuleSetKindMBTI",
+		"RuleSetKindSBTI",
+	}
+	allowedRelPrefixes := []string{
+		"internal/apiserver/infra/",
+		"internal/apiserver/characterization/",
+		"internal/pkg/migration/",
+		"scripts/",
+	}
+	scanRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "application"),
+		filepath.Join(root, "internal", "apiserver", "transport"),
+		filepath.Join(root, "internal", "apiserver", "domain", "evaluation"),
+	}
+	for _, scanRoot := range scanRoots {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+				return nil
+			}
+			if filepath.Base(path) == "architecture_test.go" {
+				return nil
+			}
+			rel := filepath.ToSlash(mustRel(t, root, path))
+			for _, prefix := range allowedRelPrefixes {
+				if strings.HasPrefix(rel, prefix) {
+					return nil
+				}
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range forbiddenTokens {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains %q; migration kinds belong in legacy adapters only", rel, token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"MBTI",
+		"SBTI",
+		"BigFive",
+		"BRIEF",
+		"SPM",
+		"Typology",
+		"TScore",
+		"Percentile",
+		"Ability",
+		"SubKindTrait",
+	}
+	scaleRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "scale"),
+		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scale"),
+		filepath.Join(root, "internal", "apiserver", "domain", "report", "score"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "scale"),
+	}
+	for _, scanRoot := range scaleRoots {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range forbiddenTokens {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains %q; scale packages must stay scale-only", filepath.ToSlash(mustRel(t, root, path)), token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
 	}
 }

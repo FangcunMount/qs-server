@@ -3,7 +3,7 @@
 // It assembles already-interpreted results into InterpretReport, including
 // v2 outcome summary fields (model identity, primary_score, level),
 // display dimensions, structured suggestions, and optional model-specific
-// extras for personality-style reports. Model-specific builders live in
-// report/scale, report/mbti, report/sbti, and shared personality assembly
-// lives in report/personality.
+// extras for personality-style reports. Model-family builders live in
+// report/score, report/personality/typology, and shared
+// personality assembly lives in report/personality.
 package report
