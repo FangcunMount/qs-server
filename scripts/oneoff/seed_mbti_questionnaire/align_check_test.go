@@ -63,7 +63,7 @@ func loadMBTIModelSeed(t *testing.T) mbtiModelSeedFile {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
-	path := filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput", "seed", "mbti_oejts.json")
+	path := filepath.Join(root, "internal", "apiserver", "infra", "ruleset", "seed", "mbti_oejts.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read mbti model seed: %v", err)

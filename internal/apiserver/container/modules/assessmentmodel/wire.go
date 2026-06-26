@@ -3,9 +3,9 @@ package assessmentmodel
 import (
 	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
@@ -20,15 +20,15 @@ import (
 
 // WireInput carries composition-root inputs for assessment-model installation.
 type WireInput struct {
-	MongoDB              *mongo.Database
-	MongoLimiter         backpressure.Acquirer
-	EventPublisher       event.EventPublisher
-	RankRedisClient      redis.UniversalClient
-	RankCacheBuilder     *keyspace.Builder
-	IdentityService      *iam.IdentityService
-	HotsetRecorder       cachetarget.HotsetRecorder
-	CacheSignalNotifier  scaleLifecycle.CacheSignalNotifier
-	ScaleInfra           *surveymod.ScaleInfra
+	MongoDB                *mongo.Database
+	MongoLimiter           backpressure.Acquirer
+	EventPublisher         event.EventPublisher
+	RankRedisClient        redis.UniversalClient
+	RankCacheBuilder       *keyspace.Builder
+	IdentityService        *iam.IdentityService
+	HotsetRecorder         cachetarget.HotsetRecorder
+	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
+	ScaleInfra             *surveymod.ScaleInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 }
 

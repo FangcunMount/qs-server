@@ -22,18 +22,18 @@ type Module = modules.Module
 type ModuleInfo = modules.ModuleInfo
 
 type (
-	SurveyModule           = surveymod.Module
-	QuestionnaireSubModule = surveymod.QuestionnaireSubModule
-	AnswerSheetSubModule   = surveymod.AnswerSheetSubModule
-	AssessmentModelModule  = ammod.Module
-	ScaleModule            = ammod.Scale
-	PersonalityModelModule = ammod.Personality
-	ActorModule            = actormod.Module
-	EvaluationModule       = evalmod.Module
-	ReportModule           = reportmod.Module
-	PlanModule             = planmod.Module
-	StatisticsModule       = statmod.Module
-	IAMModule              = iammod.Module
+	SurveyModule            = surveymod.Module
+	QuestionnaireSubModule  = surveymod.QuestionnaireSubModule
+	AnswerSheetSubModule    = surveymod.AnswerSheetSubModule
+	AssessmentModelModule   = ammod.Module
+	ScaleModule             = ammod.Scale
+	PersonalityModelModule  = ammod.Personality
+	ActorModule             = actormod.Module
+	EvaluationModule        = evalmod.Module
+	ReportModule            = reportmod.Module
+	PlanModule              = planmod.Module
+	StatisticsModule        = statmod.Module
+	IAMModule               = iammod.Module
 	IAMModuleRuntimeOptions = iammod.RuntimeOptions
 )
 

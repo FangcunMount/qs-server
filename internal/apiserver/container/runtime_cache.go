@@ -4,8 +4,8 @@ import (
 	"context"
 	"strings"
 
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -129,7 +129,6 @@ func (c *Container) StartCacheSignalWatcher(ctx context.Context) {
 		notifier.ScaleSignaler(),
 	)
 }
-
 
 type cacheGovernanceAdapter struct {
 	container *Container

@@ -8,8 +8,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
+	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 

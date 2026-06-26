@@ -143,7 +143,7 @@ model = {
 }
 
 root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
-model_path = os.path.join(root, "internal", "apiserver", "infra", "evaluationinput", "seed", "mbti_oejts.json")
+model_path = os.path.join(root, "internal", "apiserver", "infra", "ruleset", "seed", "mbti_oejts.json")
 q_path = os.path.join(os.path.dirname(__file__), "mbti_questionnaire.json")
 for path, data in [(model_path, model), (q_path, q_seed)]:
     with open(path, "w", encoding="utf-8") as f:

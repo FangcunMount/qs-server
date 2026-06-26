@@ -7,11 +7,11 @@ import (
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -62,10 +62,10 @@ type QRCodeServiceWireInput struct {
 
 // QRCodeServiceWireResult describes QR code service initialization outcome.
 type QRCodeServiceWireResult struct {
-	State           IntegrationState
-	SkipReason      string
-	UseIAMWeChatApp bool
-	DirectAppID     string
+	State             IntegrationState
+	SkipReason        string
+	UseIAMWeChatApp   bool
+	DirectAppID       string
 	ObjectStoreBucket string
 }
 
@@ -100,14 +100,14 @@ func WireQRCodeService(in QRCodeServiceWireInput) (QRCodeServiceWireResult, erro
 
 // MiniProgramNotificationWireInput carries dependencies for task notification wiring.
 type MiniProgramNotificationWireInput struct {
-	State             IntegrationState
-	WeChatAppService  *iam.WeChatAppService
+	State              IntegrationState
+	WeChatAppService   *iam.WeChatAppService
 	ProfileLinkService *iam.ProfileLinkService
-	IdentityService   *iam.IdentityService
-	ScaleQuery        scaleApp.ScaleQueryService
-	TesteeQuery       testeeApp.TesteeQueryService
-	TaskContext       planApp.TaskNotificationContextReader
-	WeChatOptions     *options.WeChatOptions
+	IdentityService    *iam.IdentityService
+	ScaleQuery         scaleApp.ScaleQueryService
+	TesteeQuery        testeeApp.TesteeQueryService
+	TaskContext        planApp.TaskNotificationContextReader
+	WeChatOptions      *options.WeChatOptions
 }
 
 // MiniProgramNotificationWireResult describes notification service initialization outcome.

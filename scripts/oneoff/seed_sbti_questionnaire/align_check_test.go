@@ -90,7 +90,7 @@ func loadSBTIModelSeed(t *testing.T) sbtiModelSeedFile {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
 	root := filepath.Clean(filepath.Join(filepath.Dir(file), "..", "..", ".."))
-	path := filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput", "seed", "sbti_fun.json")
+	path := filepath.Join(root, "internal", "apiserver", "infra", "ruleset", "seed", "sbti_fun.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read sbti model seed: %v", err)

@@ -6,17 +6,17 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
 	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
-	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
+	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/report"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
@@ -293,13 +293,13 @@ func (c *Container) resolveIdentityService() *iam.IdentityService {
 
 // compile-time checks
 var (
-	_ compose.Host                    = (*Container)(nil)
-	_ surveymod.InstallHost           = (*Container)(nil)
-	_ ammod.InstallHost               = (*Container)(nil)
-	_ actormod.InstallHost            = (*Container)(nil)
-	_ reportmod.InstallHost           = (*Container)(nil)
-	_ evalmod.InstallHost             = (*Container)(nil)
-	_ planmod.InstallHost             = (*Container)(nil)
-	_ statmod.InstallHost             = (*Container)(nil)
-	_ platformmod.InstallHost         = (*Container)(nil)
+	_ compose.Host            = (*Container)(nil)
+	_ surveymod.InstallHost   = (*Container)(nil)
+	_ ammod.InstallHost       = (*Container)(nil)
+	_ actormod.InstallHost    = (*Container)(nil)
+	_ reportmod.InstallHost   = (*Container)(nil)
+	_ evalmod.InstallHost     = (*Container)(nil)
+	_ planmod.InstallHost     = (*Container)(nil)
+	_ statmod.InstallHost     = (*Container)(nil)
+	_ platformmod.InstallHost = (*Container)(nil)
 )
