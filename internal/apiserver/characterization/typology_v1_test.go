@@ -13,7 +13,7 @@ import (
 // V1 contract: typology executor scores legacy MBTI payload identically to domain scorer.
 func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	model := mbtiINTJModel()
-	want, err := evaluationtypology.ScoreMBTI(model, mbtiINTJAnswerSheet())
+	want, err := evaluationtypology.ScoreMBTIReference(model, mbtiINTJAnswerSheet())
 	if err != nil {
 		t.Fatalf("domain Score: %v", err)
 	}
@@ -44,7 +44,7 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 // V1 contract: typology executor scores legacy SBTI payload identically to domain scorer.
 func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	model := sbtiCharacterizationModel()
-	want, err := evaluationtypology.ScoreSBTI(model, sbtiHighAnswerSheet())
+	want, err := evaluationtypology.ScoreSBTIReference(model, sbtiHighAnswerSheet())
 	if err != nil {
 		t.Fatalf("domain Score: %v", err)
 	}

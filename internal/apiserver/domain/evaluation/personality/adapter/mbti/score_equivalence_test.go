@@ -37,7 +37,7 @@ func TestScoreMatchesLegacyScorerForEmbeddedModel(t *testing.T) {
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			legacy, err := evaluationtypology.ScoreMBTI(model, tc.sheet)
+			legacy, err := evaluationtypology.ScoreMBTIReference(model, tc.sheet)
 			if err != nil {
 				t.Fatalf("ScoreMBTI: %v", err)
 			}

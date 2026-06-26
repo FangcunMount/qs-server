@@ -6,9 +6,9 @@ import (
 
 // FactorGraph is a directed acyclic hierarchy of personality factors.
 type FactorGraph struct {
-	Factors    map[FactorID]PersonalityFactor
-	LeafSpecs  map[FactorID]LeafScoringSpec
-	Roots      []FactorID
+	Factors   map[FactorID]PersonalityFactor
+	LeafSpecs map[FactorID]LeafScoringSpec
+	Roots     []FactorID
 }
 
 // Validate checks graph invariants: known children, leaf specs, and acyclicity.

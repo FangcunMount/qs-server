@@ -123,9 +123,9 @@ func selectNearestPattern(vector ProfileVector, spec DecisionSpec) (OutcomeCandi
 	}
 
 	var (
-		best      PatternCandidate
-		bestScore = math.Inf(-1)
-		hasBest   bool
+		best        PatternCandidate
+		bestScore   = math.Inf(-1)
+		hasBest     bool
 		maxDistance = float64(len(actual) * 2)
 	)
 	for _, candidate := range spec.Patterns {

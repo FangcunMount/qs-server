@@ -69,10 +69,10 @@ func BuildFromLegacy(model *modeltypology.SBTILegacyModel) (profile.FactorGraph,
 		return profile.FactorGraph{}, profile.DecisionSpec{}, err
 	}
 	return graph, profile.DecisionSpec{
-		Kind:         profile.DecisionKindNearestPattern,
-		PatternOrder: patternOrder,
-		Patterns:     patterns,
-		LevelRule:    profile.LevelRule{LowMax: 3, HighMin: 5},
+		Kind:              profile.DecisionKindNearestPattern,
+		PatternOrder:      patternOrder,
+		Patterns:          patterns,
+		LevelRule:         profile.LevelRule{LowMax: 3, HighMin: 5},
 		FallbackThreshold: fallbackThreshold(model),
 		FallbackCode:      "HHHH",
 	}, nil

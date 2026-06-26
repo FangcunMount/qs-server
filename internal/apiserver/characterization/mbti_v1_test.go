@@ -16,7 +16,7 @@ import (
 // dimension preference text, and profile-derived suggestions.
 func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 	model := mbtiINTJModel()
-	detail, err := evaluationtypology.ScoreMBTI(model, mbtiINTJAnswerSheet())
+	detail, err := evaluationtypology.ScoreMBTIReference(model, mbtiINTJAnswerSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}

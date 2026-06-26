@@ -6,8 +6,8 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
-	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )

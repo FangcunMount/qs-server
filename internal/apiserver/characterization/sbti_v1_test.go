@@ -16,7 +16,7 @@ import (
 // outcome commentary, rarity, and dimension level descriptions.
 func TestV1SBTIPipelinePreservesOutcomeSimilarityAndReportFields(t *testing.T) {
 	model := sbtiCharacterizationModel()
-	detail, err := evaluationtypology.ScoreSBTI(model, sbtiHighAnswerSheet())
+	detail, err := evaluationtypology.ScoreSBTIReference(model, sbtiHighAnswerSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}

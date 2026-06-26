@@ -48,7 +48,7 @@ func TestScoreMatchesLegacyScorerForUnitModel(t *testing.T) {
 			if tc.name == "fallback" {
 				testModel.FallbackSimilarityThreshold = 0.9
 			}
-			legacy, err := evaluationtypology.ScoreSBTI(&testModel, tc.sheet)
+			legacy, err := evaluationtypology.ScoreSBTIReference(&testModel, tc.sheet)
 			if err != nil {
 				t.Fatalf("ScoreSBTI: %v", err)
 			}
@@ -69,7 +69,7 @@ func TestScoreMatchesLegacyScorerForEmbeddedModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		legacy, err := evaluationtypology.ScoreSBTI(model, sheet)
+		legacy, err := evaluationtypology.ScoreSBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("ScoreSBTI: %v", err)
 		}
@@ -84,7 +84,7 @@ func TestScoreMatchesLegacyScorerForEmbeddedModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		legacy, err := evaluationtypology.ScoreSBTI(&modelCopy, sheet)
+		legacy, err := evaluationtypology.ScoreSBTIReference(&modelCopy, sheet)
 		if err != nil {
 			t.Fatalf("ScoreSBTI: %v", err)
 		}
@@ -101,7 +101,7 @@ func TestScoreMatchesLegacyScorerForEmbeddedModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		legacy, err := evaluationtypology.ScoreSBTI(model, sheet)
+		legacy, err := evaluationtypology.ScoreSBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("ScoreSBTI: %v", err)
 		}

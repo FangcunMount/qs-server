@@ -15,9 +15,9 @@ const (
 type AggregationMethod string
 
 const (
-	AggregationSum          AggregationMethod = "sum"
-	AggregationAvg          AggregationMethod = "avg"
-	AggregationWeightedAvg  AggregationMethod = "weighted_avg"
+	AggregationSum         AggregationMethod = "sum"
+	AggregationAvg         AggregationMethod = "avg"
+	AggregationWeightedAvg AggregationMethod = "weighted_avg"
 )
 
 // AnswerContribution maps a questionnaire item to a leaf factor score.
@@ -29,8 +29,8 @@ type AnswerContribution struct {
 
 // LeafScoringSpec scores a leaf factor from answer values.
 type LeafScoringSpec struct {
-	Constant       float64
-	Contributions  []AnswerContribution
+	Constant      float64
+	Contributions []AnswerContribution
 }
 
 // PersonalityFactor is a node in the factor hierarchy.

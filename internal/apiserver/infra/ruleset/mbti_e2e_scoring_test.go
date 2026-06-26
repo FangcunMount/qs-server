@@ -16,7 +16,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := evaluationtypology.ScoreMBTI(model, sheet)
+		got, err := evaluationtypology.ScoreMBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -49,7 +49,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := evaluationtypology.ScoreMBTI(model, sheet)
+		got, err := evaluationtypology.ScoreMBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}

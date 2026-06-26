@@ -16,7 +16,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		got, err := evaluationtypology.ScoreSBTI(model, sheet)
+		got, err := evaluationtypology.ScoreSBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -35,7 +35,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		got, err := evaluationtypology.ScoreSBTI(&modelCopy, sheet)
+		got, err := evaluationtypology.ScoreSBTIReference(&modelCopy, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -50,7 +50,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := evaluationtypology.ScoreSBTI(model, sheet)
+		got, err := evaluationtypology.ScoreSBTIReference(model, sheet)
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
