@@ -15,9 +15,9 @@ func DefaultTypologyRegistry() (typologyEvaluation.ModuleRegistry, error) {
 	return typologyEvaluation.DefaultPersonalityRuntimeRegistry().AsModuleRegistry(), nil
 }
 
-// DefaultTypologyDescriptors projects built-in typology modules to evaluation descriptors.
+// DefaultTypologyDescriptors projects the configured typology descriptor for evaluation wiring.
 func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
-	return typologyEvaluation.ConfiguredAndLegacyTypologyDescriptors()
+	return typologyEvaluation.DefaultTypologyDescriptors()
 }
 
 // DefaultEvaluationDescriptors returns scale + built-in typology descriptors for evaluation/input wiring.

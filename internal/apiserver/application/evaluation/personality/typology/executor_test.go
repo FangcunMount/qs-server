@@ -45,9 +45,9 @@ func TestExecutorKeys(t *testing.T) {
 }
 
 func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
-	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	executor, err := NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
 		Assessment: submittedMBTIAssessment(t),
@@ -89,9 +89,9 @@ func TestNewTypologyExecutorRejectsUnsupportedAlgorithm(t *testing.T) {
 }
 
 func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
-	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	executor, err := NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
 		Assessment: submittedSBTIAssessment(t),
@@ -112,9 +112,9 @@ func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
 }
 
 func TestBigFiveExecutorFillsTraitProfile(t *testing.T) {
-	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	executor, err := NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
 		Assessment: submittedBigFiveAssessment(t),

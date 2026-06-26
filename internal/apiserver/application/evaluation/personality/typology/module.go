@@ -41,8 +41,7 @@ func ConfiguredTypologyDescriptor() evaldomain.ModelDescriptor {
 	}
 }
 
-// ConfiguredAndLegacyTypologyDescriptors returns the configured runtime key plus legacy algorithm aliases.
-func ConfiguredAndLegacyTypologyDescriptors() []evaldomain.ModelDescriptor {
-	descs := []evaldomain.ModelDescriptor{ConfiguredTypologyDescriptor()}
-	return append(descs, ModuleDescriptors(DefaultModules())...)
+// DefaultTypologyDescriptors returns the single configured typology routing descriptor.
+func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
+	return []evaldomain.ModelDescriptor{ConfiguredTypologyDescriptor()}
 }

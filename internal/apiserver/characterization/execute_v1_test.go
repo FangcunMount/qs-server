@@ -7,24 +7,18 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
 	t.Helper()
-	mbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	configured, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
-	}
-	sbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	registry, err := evaluationexecute.NewEvaluatorRegistry(
 		evaluationscale.NewExecutor(nil),
-		sbtiExecutor,
-		mbtiExecutor,
+		configured,
 	)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)

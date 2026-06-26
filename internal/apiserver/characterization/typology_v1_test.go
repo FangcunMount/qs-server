@@ -6,7 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -20,9 +20,9 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 		t.Fatalf("domain Score: %v", err)
 	}
 
-	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedMBTIAssessment(t),
@@ -51,9 +51,9 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 		t.Fatalf("domain Score: %v", err)
 	}
 
-	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedSBTIAssessment(t),
@@ -82,9 +82,9 @@ func TestV1TypologyBigFiveExecutorPreservesTraitProfileOutcome(t *testing.T) {
 		t.Fatalf("domain Score: %v", err)
 	}
 
-	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedBigFiveAssessment(t),
@@ -108,27 +108,13 @@ func TestV1TypologyBigFiveExecutorPreservesTraitProfileOutcome(t *testing.T) {
 	}
 }
 
-// V1 contract: typology executor keys map to personality/typology/{mbti,sbti,bigfive}.
-func TestV1TypologyExecutorKeys(t *testing.T) {
-	mbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+// V1 contract: configured typology executor advertises the generic routing key.
+func TestV1ConfiguredTypologyExecutorKey(t *testing.T) {
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
-	if got := mbtiExecutor.Key().String(); got != "personality/typology/mbti" {
-		t.Fatalf("mbti key = %q", got)
-	}
-	sbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
-	}
-	if got := sbtiExecutor.Key().String(); got != "personality/typology/sbti" {
-		t.Fatalf("sbti key = %q", got)
-	}
-	bigFiveExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
-	if err != nil {
-		t.Fatalf("NewTypologyExecutor(bigfive): %v", err)
-	}
-	if got := bigFiveExecutor.Key().String(); got != "personality/typology/bigfive" {
-		t.Fatalf("bigfive key = %q", got)
+	if got := executor.Key(); got != evaluation.EvaluatorKeyPersonalityTypology {
+		t.Fatalf("executor key = %s, want %s", got, evaluation.EvaluatorKeyPersonalityTypology)
 	}
 }

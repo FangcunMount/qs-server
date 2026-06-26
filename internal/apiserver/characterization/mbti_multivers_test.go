@@ -6,7 +6,6 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -40,9 +39,9 @@ func TestV1MBTIMultiVersionExecutorPreservesScoringWithoutNewModule(t *testing.T
 		},
 	}
 
-	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 
 	for _, tc := range cases {

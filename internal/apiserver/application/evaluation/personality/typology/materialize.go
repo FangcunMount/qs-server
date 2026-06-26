@@ -17,27 +17,17 @@ func MaterializeTypologyEvaluator(
 	if shared == nil {
 		return nil, fmt.Errorf("shared typology executor holder is required")
 	}
-	if desc.Key == evaldomain.EvaluatorKeyPersonalityTypology {
-		if *shared == nil {
-			executor, err := NewConfiguredTypologyExecutorWithRegistry(registry)
-			if err != nil {
-				return nil, err
-			}
-			*shared = executor
-		}
-		return *shared, nil
+	if desc.Key != evaldomain.EvaluatorKeyPersonalityTypology {
+		return nil, fmt.Errorf("unsupported typology descriptor key: %s", desc.Key)
 	}
-	if desc.Key.IsPersonalityTypologyLegacyKey() {
-		if *shared == nil {
-			executor, err := NewConfiguredTypologyExecutorWithRegistry(registry)
-			if err != nil {
-				return nil, err
-			}
-			*shared = executor
+	if *shared == nil {
+		executor, err := NewConfiguredTypologyExecutorWithRegistry(registry)
+		if err != nil {
+			return nil, err
 		}
-		return NewLegacyTypologyAliasExecutor(*shared, desc.Algorithm)
+		*shared = executor
 	}
-	return nil, fmt.Errorf("unsupported typology descriptor key: %s", desc.Key)
+	return *shared, nil
 }
 
 // MaterializeTypologyReportBuilder builds or reuses the configured typology report builder for a descriptor.
@@ -49,25 +39,15 @@ func MaterializeTypologyReportBuilder(
 	if shared == nil {
 		return nil, fmt.Errorf("shared typology report builder holder is required")
 	}
-	if desc.Key == evaldomain.EvaluatorKeyPersonalityTypology {
-		if shared.runner == nil {
-			builder, err := NewConfiguredReportBuilderWithRegistry(registry)
-			if err != nil {
-				return nil, err
-			}
-			*shared = builder
-		}
-		return *shared, nil
+	if desc.Key != evaldomain.EvaluatorKeyPersonalityTypology {
+		return nil, fmt.Errorf("unsupported typology descriptor key: %s", desc.Key)
 	}
-	if desc.Key.IsPersonalityTypologyLegacyKey() {
-		if shared.runner == nil {
-			builder, err := NewConfiguredReportBuilderWithRegistry(registry)
-			if err != nil {
-				return nil, err
-			}
-			*shared = builder
+	if shared.runner == nil {
+		builder, err := NewConfiguredReportBuilderWithRegistry(registry)
+		if err != nil {
+			return nil, err
 		}
-		return NewLegacyTypologyAliasReportBuilder(*shared, desc.Algorithm)
+		*shared = builder
 	}
-	return nil, fmt.Errorf("unsupported typology descriptor key: %s", desc.Key)
+	return *shared, nil
 }

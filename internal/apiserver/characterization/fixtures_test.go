@@ -405,3 +405,110 @@ func bigFiveInputSnapshot() *evaluationinput.InputSnapshot {
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "BIGFIVE_V1", Version: "1.0.0"},
 	}
 }
+
+func customExplicitRuntimePayload() *modeltypology.Payload {
+	return &modeltypology.Payload{
+		Code:                 "CUSTOM_POLE_V1",
+		Version:              "1.0.0",
+		QuestionnaireCode:    "CUSTOM_POLE_V1",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		DimensionOrder:       []string{"EI", "SN", "TF", "JP"},
+		Dimensions: map[string]modeltypology.Dimension{
+			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E", Constant: 24, Threshold: 24},
+			"SN": {Code: "SN", Name: "感觉-直觉", LeftPole: "S", RightPole: "N", Constant: 24, Threshold: 24},
+			"TF": {Code: "TF", Name: "思考-情感", LeftPole: "T", RightPole: "F", Constant: 24, Threshold: 24},
+			"JP": {Code: "JP", Name: "判断-知觉", LeftPole: "J", RightPole: "P", Constant: 24, Threshold: 24},
+		},
+		QuestionMappings: []modeltypology.QuestionMapping{
+			{QuestionCode: "Q_EI", Dimension: "EI", Sign: -1},
+			{QuestionCode: "Q_SN", Dimension: "SN", Sign: 1},
+			{QuestionCode: "Q_TF", Dimension: "TF", Sign: -1},
+			{QuestionCode: "Q_JP", Dimension: "JP", Sign: -1},
+		},
+		Outcomes: []modeltypology.Outcome{
+			{Code: "INTJ", Name: "建筑师", OneLiner: "独立战略家"},
+		},
+		Runtime: &modeltypology.RuntimeSpec{
+			FactorGraph: modeltypology.FactorGraphSpec{
+				DimensionOrder: []string{"EI", "SN", "TF", "JP"},
+				Dimensions: map[string]modeltypology.Dimension{
+					"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E", Constant: 24, Threshold: 24},
+					"SN": {Code: "SN", Name: "感觉-直觉", LeftPole: "S", RightPole: "N", Constant: 24, Threshold: 24},
+					"TF": {Code: "TF", Name: "思考-情感", LeftPole: "T", RightPole: "F", Constant: 24, Threshold: 24},
+					"JP": {Code: "JP", Name: "判断-知觉", LeftPole: "J", RightPole: "P", Constant: 24, Threshold: 24},
+				},
+				QuestionMappings: []modeltypology.QuestionMapping{
+					{QuestionCode: "Q_EI", Dimension: "EI", Sign: -1},
+					{QuestionCode: "Q_SN", Dimension: "SN", Sign: 1},
+					{QuestionCode: "Q_TF", Dimension: "TF", Sign: -1},
+					{QuestionCode: "Q_JP", Dimension: "JP", Sign: -1},
+				},
+			},
+			Decision: modeltypology.PersonalityDecisionSpec{
+				Kind: assessmentmodel.DecisionKindPoleComposition,
+			},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{
+				DetailKind:       modeltypology.OutcomeDetailPersonalityType,
+				DetailAdapterKey: modeltypology.DetailAdapterMBTI,
+			},
+			Report: modeltypology.ReportSpec{
+				Kind:          modeltypology.ReportKindPersonalityType,
+				AdapterKey:    modeltypology.ReportAdapterMBTI,
+				CategoryLabel: "Custom Pole Model",
+			},
+		},
+	}
+}
+
+func customRuntimeInputSnapshot() *evaluationinput.InputSnapshot {
+	payload := customExplicitRuntimePayload()
+	return &evaluationinput.InputSnapshot{
+		Model:        evaluationinput.NewTypologyModelSnapshot(payload),
+		ModelPayload: evaluationinput.TypologyModelPayload{Payload: payload},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    payload.QuestionnaireCode,
+			QuestionnaireVersion: payload.QuestionnaireVersion,
+			Answers: []evaluationinput.AnswerSnapshot{
+				{QuestionCode: "Q_EI", Score: 1},
+				{QuestionCode: "Q_SN", Score: 5},
+				{QuestionCode: "Q_TF", Score: 1},
+				{QuestionCode: "Q_JP", Score: 1},
+			},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{
+			Code:    payload.QuestionnaireCode,
+			Version: payload.QuestionnaireVersion,
+		},
+	}
+}
+
+func submittedCustomRuntimeAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindPersonality,
+		assessmentmodel.SubKindTypology,
+		assessmentmodel.AlgorithmPersonalityTypology,
+		meta.ID(0),
+		meta.NewCode("CUSTOM_POLE_V1"),
+		"1.0.0",
+		"Custom Pole Model",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8010),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("CUSTOM_POLE_V1"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6010)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7010)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	a.ClearEvents()
+	return a
+}

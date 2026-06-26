@@ -22,10 +22,37 @@ func resolveReportBuildContext(
 			}
 		}
 	}
+	algorithm := assessmentmodel.Algorithm("")
 	if runner.adapter != nil {
-		algorithm := runner.adapter.Algorithm()
+		algorithm = runner.adapter.Algorithm()
+	}
+	if algorithm == "" || algorithm == assessmentmodel.AlgorithmPersonalityTypology {
+		algorithm = legacyAlgorithmFromOutcome(outcome)
+	}
+	if algorithm != "" {
 		spec = legacy.ReportSpecForAlgorithm(algorithm)
 		mapping = legacy.OutcomeMappingForAlgorithm(algorithm)
 	}
 	return spec, mapping, decisionKind
+}
+
+func legacyAlgorithmFromOutcome(outcome evaluationresult.Outcome) assessmentmodel.Algorithm {
+	if outcome.Assessment != nil {
+		if ref := outcome.Assessment.EvaluationModelRef(); ref != nil {
+			if algorithm := ref.Algorithm(); algorithm != "" && algorithm != assessmentmodel.AlgorithmPersonalityTypology {
+				return algorithm
+			}
+		}
+	}
+	if outcome.Execution != nil {
+		if algorithm := outcome.Execution.ModelRef.Algorithm(); algorithm != "" && algorithm != assessmentmodel.AlgorithmPersonalityTypology {
+			return algorithm
+		}
+	}
+	if outcome.Input != nil && outcome.Input.Model != nil {
+		if algorithm := assessmentmodel.Algorithm(outcome.Input.Model.ModelRef().Algorithm); algorithm != "" && algorithm != assessmentmodel.AlgorithmPersonalityTypology {
+			return algorithm
+		}
+	}
+	return ""
 }

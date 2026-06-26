@@ -106,6 +106,12 @@ func (r *mutableReportBuilderRegistry) Resolve(key evaluation.EvaluatorKey, repo
 	if builder, ok := r.items[registryKey]; ok {
 		return builder, nil
 	}
+	if routed := evaluation.ResolvePersonalityTypologyExecutorKey(key); routed != key {
+		registryKey.key = routed
+		if builder, ok := r.items[registryKey]; ok {
+			return builder, nil
+		}
+	}
 	if mappedKind, subKind, algorithm, ok := assessmentmodel.LegacyKindMapping(key.Kind); ok {
 		registryKey.key = evaluation.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}
 		if builder, ok := r.items[registryKey]; ok {

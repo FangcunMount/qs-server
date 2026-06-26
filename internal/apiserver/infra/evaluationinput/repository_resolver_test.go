@@ -255,6 +255,24 @@ func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) 
 	}
 }
 
+func TestModelInputProviderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
+	registry, err := NewModelInputProviderRegistry(fakeInputProvider{
+		key: evaldomain.EvaluatorKeyPersonalityTypology,
+	})
+	if err != nil {
+		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
+	}
+	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyKeys() {
+		provider, err := registry.Resolve(legacyKey)
+		if err != nil {
+			t.Fatalf("Resolve(%s): %v", legacyKey, err)
+		}
+		if provider.EvaluatorKey() != evaldomain.EvaluatorKeyPersonalityTypology {
+			t.Fatalf("provider key = %#v", provider.EvaluatorKey())
+		}
+	}
+}
+
 func TestNewResolverReturnsProviderRegistryError(t *testing.T) {
 	if _, err := NewResolver(
 		&scaleCatalogStub{},

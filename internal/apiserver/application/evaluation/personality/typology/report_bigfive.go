@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality/typology"
@@ -29,9 +28,9 @@ func BigFiveResultDetailFromOutcome(outcome evaluationresult.Outcome) (evaluatio
 	return evaluationtypology.BigFiveResultDetailFromPayload(outcome.Execution.Detail.Payload)
 }
 
-// NewBigFiveReportBuilder is a characterization helper for the Big Five typology module.
+// NewBigFiveReportBuilder is a characterization helper for typology reports.
 func NewBigFiveReportBuilder() evaluationresult.ReportBuilder {
-	builder, err := NewReportBuilder(assessmentmodel.AlgorithmBigFive)
+	builder, err := NewConfiguredReportBuilder()
 	if err != nil {
 		panic(err)
 	}

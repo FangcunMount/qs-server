@@ -28,16 +28,7 @@ func MaterializeInputProviders(descs []evaldomain.ModelDescriptor, deps InputPro
 				deps.Questionnaires,
 			))
 		case evaldomain.ModelKindTypology:
-			if desc.Key == evaldomain.EvaluatorKeyPersonalityTypology {
-				providers = append(providers, NewConfiguredTypologyModelInputProvider(
-					deps.TypologyCatalog,
-					deps.AnswerSheets,
-					deps.Questionnaires,
-				))
-				continue
-			}
-			providers = append(providers, NewTypologyModelInputProvider(
-				desc.Algorithm,
+			providers = append(providers, NewConfiguredTypologyModelInputProvider(
 				deps.TypologyCatalog,
 				deps.AnswerSheets,
 				deps.Questionnaires,

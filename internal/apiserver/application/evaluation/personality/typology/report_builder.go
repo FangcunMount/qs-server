@@ -32,6 +32,10 @@ func NewConfiguredReportBuilderWithRegistry(registry ModuleRegistry) (ReportBuil
 	}, nil
 }
 
+func NewConfiguredReportBuilder() (ReportBuilder, error) {
+	return NewConfiguredReportBuilderWithRegistry(mustDefaultModuleRegistry())
+}
+
 func NewReportBuilderWithRegistry(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (ReportBuilder, error) {
 	runner, err := algorithmRunnerFor(registry, algorithm)
 	if err != nil {

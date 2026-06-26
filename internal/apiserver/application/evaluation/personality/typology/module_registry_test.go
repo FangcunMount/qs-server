@@ -4,7 +4,6 @@ import (
 	"testing"
 
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 )
 
 func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {
@@ -12,18 +11,12 @@ func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {
 	if err != nil {
 		t.Fatalf("DefaultModuleRegistry: %v", err)
 	}
-	for _, algorithm := range []assessmentmodel.Algorithm{
-		assessmentmodel.AlgorithmMBTI,
-		assessmentmodel.AlgorithmSBTI,
-		assessmentmodel.AlgorithmBigFive,
-	} {
-		runner, err := typologyeval.NewTypologyExecutorWithRegistry(registry, algorithm)
-		if err != nil {
-			t.Fatalf("NewTypologyExecutorWithRegistry(%s): %v", algorithm, err)
-		}
-		if runner.Key().String() == "" {
-			t.Fatalf("executor key for %s is empty", algorithm)
-		}
+	executor, err := typologyeval.NewConfiguredTypologyExecutorWithRegistry(registry)
+	if err != nil {
+		t.Fatalf("NewConfiguredTypologyExecutorWithRegistry: %v", err)
+	}
+	if executor.Key().String() != "personality/typology/personality_typology" {
+		t.Fatalf("executor key = %s", executor.Key().String())
 	}
 }
 
@@ -45,11 +38,11 @@ func TestBigFiveModuleCanBeRegistered(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewModuleRegistry: %v", err)
 	}
-	executor, err := typologyeval.NewTypologyExecutorWithRegistry(registry, assessmentmodel.AlgorithmBigFive)
+	executor, err := typologyeval.NewConfiguredTypologyExecutorWithRegistry(registry)
 	if err != nil {
-		t.Fatalf("NewTypologyExecutorWithRegistry: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutorWithRegistry: %v", err)
 	}
-	if executor.Key().String() != "personality/typology/bigfive" {
+	if executor.Key().String() != "personality/typology/personality_typology" {
 		t.Fatalf("key = %s", executor.Key().String())
 	}
 }

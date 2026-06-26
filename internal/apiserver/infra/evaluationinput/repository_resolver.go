@@ -150,11 +150,15 @@ func (r *ModelInputProviderRegistry) Resolve(key evaldomain.EvaluatorKey) (Model
 	if r == nil {
 		return nil, fmt.Errorf("evaluation input provider registry is not configured")
 	}
-	provider, ok := r.items[key]
-	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
+	if provider, ok := r.items[key]; ok {
+		return provider, nil
 	}
-	return provider, nil
+	if routed := evaldomain.ResolvePersonalityTypologyExecutorKey(key); routed != key {
+		if provider, ok := r.items[routed]; ok {
+			return provider, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 }
 
 type ScaleModelInputProvider struct {

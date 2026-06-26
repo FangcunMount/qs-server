@@ -8,7 +8,6 @@ import (
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -20,9 +19,9 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 	model := sbtiSpecialTestModel()
 	payload := modeltypology.FromSBTI(model)
 
-	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedSBTIAssessment(t),
@@ -70,9 +69,9 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 	model.FallbackSimilarityThreshold = 0.9
 	payload := modeltypology.FromSBTI(model)
 
-	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	executor, err := typologyeval.NewConfiguredTypologyExecutor()
 	if err != nil {
-		t.Fatalf("NewTypologyExecutor: %v", err)
+		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
 		Assessment: submittedSBTIAssessment(t),
