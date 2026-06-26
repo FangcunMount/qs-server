@@ -77,7 +77,23 @@ type ReportV2Response struct {
 
 // ModelExtraResponse carries typology-specific report extensions.
 type ModelExtraResponse struct {
-	TypeCode string `json:"type_code,omitempty"`
+	Kind           string              `json:"kind,omitempty"`
+	TypeCode       string              `json:"type_code,omitempty"`
+	TypeName       string              `json:"type_name,omitempty"`
+	OneLiner       string              `json:"one_liner,omitempty"`
+	ImageURL       string              `json:"image_url,omitempty"`
+	MatchPercent   float64             `json:"match_percent,omitempty"`
+	IsSpecial      bool                `json:"is_special,omitempty"`
+	SpecialTrigger string              `json:"special_trigger,omitempty"`
+	Commentary     string              `json:"commentary,omitempty"`
+	Rarity         *ModelRarityResponse `json:"rarity,omitempty"`
+}
+
+// ModelRarityResponse is the theoretical rarity projection.
+type ModelRarityResponse struct {
+	Percent float64 `json:"percent,omitempty"`
+	Label   string  `json:"label,omitempty"`
+	OneInX  int     `json:"one_in_x,omitempty"`
 }
 
 // ReportV2ListResponse is a paginated v2 report list.
@@ -161,7 +177,7 @@ func NewReportV2Response(result *assessment.ReportV2Result) *ReportV2Response {
 	}
 	var modelExtra *ModelExtraResponse
 	if result.ModelExtra != nil {
-		modelExtra = &ModelExtraResponse{TypeCode: result.ModelExtra.TypeCode}
+		modelExtra = newModelExtraResponse(result.ModelExtra)
 	}
 	return &ReportV2Response{
 		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
@@ -226,4 +242,29 @@ func newResultLevelResponse(level *assessment.ResultLevelResult) *ResultLevelRes
 		Label:    level.Label,
 		Severity: level.Severity,
 	}
+}
+
+func newModelExtraResponse(extra *assessment.ModelExtraResult) *ModelExtraResponse {
+	if extra == nil {
+		return nil
+	}
+	resp := &ModelExtraResponse{
+		Kind:           extra.Kind,
+		TypeCode:       extra.TypeCode,
+		TypeName:       extra.TypeName,
+		OneLiner:       extra.OneLiner,
+		ImageURL:       extra.ImageURL,
+		MatchPercent:   extra.MatchPercent,
+		IsSpecial:      extra.IsSpecial,
+		SpecialTrigger: extra.SpecialTrigger,
+		Commentary:     extra.Commentary,
+	}
+	if extra.Rarity != nil {
+		resp.Rarity = &ModelRarityResponse{
+			Percent: extra.Rarity.Percent,
+			Label:   extra.Rarity.Label,
+			OneInX:  extra.Rarity.OneInX,
+		}
+	}
+	return resp
 }

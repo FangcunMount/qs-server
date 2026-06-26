@@ -8,6 +8,7 @@ import (
 )
 
 // GetMyAssessmentV2 获取我的 v2 测评详情。
+// Deprecated: 请优先使用 /api/v1/personality-assessments 或未来的 scale-assessments 专用路由。
 // @Summary 获取我的 v2 测评详情
 // @Description 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
 // @Tags 测评-V2
@@ -33,15 +34,20 @@ func (h *EvaluationHandler) GetMyAssessmentV2(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queryService.GetMyAssessment(c.Request.Context(), testeeID, assessmentID)
+	result, err := h.queryService.GetMyAssessmentV2(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get assessment failed", err)
 		return
 	}
-	h.Success(c, evaluationapp.AssessmentDetailToV2(result))
+	if result == nil {
+		h.NotFoundResponse(c, "assessment not found", nil)
+		return
+	}
+	h.Success(c, result)
 }
 
 // ListMyAssessmentsV2 查询我的 v2 测评列表。
+// Deprecated: 请优先使用 /api/v1/personality-assessments 或未来的 scale-assessments 专用路由。
 // @Summary 查询我的 v2 测评列表
 // @Description 分页查询测评列表，响应使用 model/primary_score/level 投影
 // @Tags 测评-V2
@@ -66,15 +72,16 @@ func (h *EvaluationHandler) ListMyAssessmentsV2(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queryService.ListMyAssessments(c.Request.Context(), testeeID, &req)
+	result, err := h.queryService.ListMyAssessmentsV2(c.Request.Context(), testeeID, &req)
 	if err != nil {
 		h.InternalErrorResponse(c, "list assessments failed", err)
 		return
 	}
-	h.Success(c, evaluationapp.ListAssessmentsToV2(result))
+	h.Success(c, result)
 }
 
 // GetAssessmentReportV2 获取 v2 测评报告。
+// Deprecated: 请优先使用 /api/v1/personality-assessments/{id}/report。
 // @Summary 获取 v2 测评报告
 // @Description 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影
 // @Tags 测评-V2
@@ -89,7 +96,7 @@ func (h *EvaluationHandler) GetAssessmentReportV2(c *gin.Context) {
 		return
 	}
 
-	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), assessmentID)
+	result, err := h.queryService.GetAssessmentReportV2(c.Request.Context(), assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get report failed", err)
 		return
@@ -98,5 +105,5 @@ func (h *EvaluationHandler) GetAssessmentReportV2(c *gin.Context) {
 		h.NotFoundResponse(c, "report not found", nil)
 		return
 	}
-	h.Success(c, evaluationapp.AssessmentReportToV2(result))
+	h.Success(c, result)
 }

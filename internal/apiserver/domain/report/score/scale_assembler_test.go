@@ -61,11 +61,11 @@ func TestBuildScaleReportAssemblesInterpretReport(t *testing.T) {
 	if len(dimensions) != 2 {
 		t.Fatalf("len(Dimensions) = %d, want 2", len(dimensions))
 	}
-	if dimensions[0].FactorName() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != 27 {
+	if dimensions[0].Name() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != 27 {
 		t.Fatalf("unexpected total dimension: %#v", dimensions[0])
 	}
-	if dimensions[1].FactorName() != "睡眠" ||
-		dimensions[1].RiskLevel() != domainreport.RiskLevelMedium ||
+	if dimensions[1].Name() != "睡眠" ||
+		dimensions[1].Severity() != string(domainreport.RiskLevelMedium) ||
 		dimensions[1].Description() != "睡眠问题明显" ||
 		dimensions[1].Suggestion() != "建立睡前放松流程" {
 		t.Fatalf("unexpected sleep dimension: %#v", dimensions[1])

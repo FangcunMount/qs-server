@@ -8,6 +8,8 @@ import (
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
@@ -43,15 +45,18 @@ type Container struct {
 	questionnaireClient *grpcclient.QuestionnaireClient
 	evaluationClient    *grpcclient.EvaluationClient
 	actorClient         *grpcclient.ActorClient
-	scaleClient         *grpcclient.ScaleClient
+	scaleClient              *grpcclient.ScaleClient
+	personalityModelClient   *grpcclient.PersonalityModelClient
 
 	// 应用层服务
 	submissionService         *answersheet.SubmissionService
 	questionnaireQueryService *questionnaire.QueryService
 	evaluationQueryService    *evaluation.QueryService
 	waitReportService         *reportwait.Service
-	scaleQueryService         *scale.QueryService
-	testeeService             *testee.Service
+	scaleQueryService              *scale.QueryService
+	personalityModelQueryService   *personalitymodel.QueryService
+	personalityAssessmentQueryService *personalityassessment.QueryService
+	testeeService                  *testee.Service
 	reportStatusReporter      *reportstatus.Reporter
 	waitHub                   reportwait.WaitHub
 	waitWatcherCancel         context.CancelFunc
@@ -60,8 +65,10 @@ type Container struct {
 	answerSheetHandler   *handler.AnswerSheetHandler
 	questionnaireHandler *handler.QuestionnaireHandler
 	evaluationHandler    *handler.EvaluationHandler
-	scaleHandler         *handler.ScaleHandler
-	testeeHandler        *handler.TesteeHandler
+	scaleHandler                 *handler.ScaleHandler
+	personalityModelHandler      *handler.PersonalityModelHandler
+	personalityAssessmentHandler *handler.PersonalityAssessmentHandler
+	testeeHandler                *handler.TesteeHandler
 	healthHandler        *handler.HealthHandler
 }
 
@@ -72,7 +79,8 @@ type ClientBundle struct {
 	Questionnaire *grpcclient.QuestionnaireClient
 	Evaluation    *grpcclient.EvaluationClient
 	Actor         *grpcclient.ActorClient
-	Scale         *grpcclient.ScaleClient
+	Scale               *grpcclient.ScaleClient
+	PersonalityModel    *grpcclient.PersonalityModelClient
 }
 
 // NewContainer 创建新的容器
@@ -172,6 +180,8 @@ func (c *Container) initApplicationServices() {
 		c.waitWatcherCancel = cancel
 	}
 	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
+	c.personalityModelQueryService = personalitymodel.NewQueryService(c.personalityModelClient)
+	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(c.evaluationClient, c.waitReportService)
 	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
 
 	log.Info("✅ Application services initialized")
@@ -191,6 +201,8 @@ func (c *Container) initHandlers() {
 	c.questionnaireHandler = handler.NewQuestionnaireHandler(c.questionnaireQueryService)
 	c.evaluationHandler = handler.NewEvaluationHandler(c.evaluationQueryService, c.submissionService, c.waitReportService)
 	c.scaleHandler = handler.NewScaleHandler(c.scaleQueryService)
+	c.personalityModelHandler = handler.NewPersonalityModelHandler(c.personalityModelQueryService)
+	c.personalityAssessmentHandler = handler.NewPersonalityAssessmentHandler(c.personalityAssessmentQueryService, c.waitReportService)
 	c.testeeHandler = handler.NewTesteeHandler(c.testeeService, profileLinkService)
 	c.healthHandler = handler.NewHealthHandlerWithResilience("collection-server", "2.0.0", c.familyStatus, c.ResilienceSnapshot)
 
@@ -244,6 +256,16 @@ func (c *Container) TesteeHandler() *handler.TesteeHandler {
 // ScaleHandler 获取量表处理器
 func (c *Container) ScaleHandler() *handler.ScaleHandler {
 	return c.scaleHandler
+}
+
+// PersonalityModelHandler 获取人格测评模型处理器
+func (c *Container) PersonalityModelHandler() *handler.PersonalityModelHandler {
+	return c.personalityModelHandler
+}
+
+// PersonalityAssessmentHandler 获取人格测评处理器
+func (c *Container) PersonalityAssessmentHandler() *handler.PersonalityAssessmentHandler {
+	return c.personalityAssessmentHandler
 }
 
 // RateLimitOptions 获取限流配置
@@ -316,6 +338,7 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 	c.evaluationClient = bundle.Evaluation
 	c.actorClient = bundle.Actor
 	c.scaleClient = bundle.Scale
+	c.personalityModelClient = bundle.PersonalityModel
 }
 
 // ActorClient 获取 Actor 客户端

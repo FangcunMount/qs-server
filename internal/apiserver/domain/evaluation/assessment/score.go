@@ -41,7 +41,7 @@ func ReconstructScaleScoreProjection(
 
 // ScaleScoreProjectionFromOutcome projects a canonical outcome into scale storage.
 func ScaleScoreProjectionFromOutcome(assessmentID ID, outcome *AssessmentOutcome) *ScaleScoreProjection {
-	if outcome == nil {
+	if outcome == nil || !outcome.ModelRef.IsScale() {
 		return nil
 	}
 
@@ -50,7 +50,7 @@ func ScaleScoreProjectionFromOutcome(assessmentID ID, outcome *AssessmentOutcome
 	if outcome.Primary != nil {
 		totalScore = outcome.Primary.Value
 	}
-	if outcome.Level != nil && outcome.Level.Code != "" {
+	if outcome.Level != nil && IsRiskLevelCode(outcome.Level.Code) {
 		riskLevel = RiskLevel(outcome.Level.Code)
 	}
 

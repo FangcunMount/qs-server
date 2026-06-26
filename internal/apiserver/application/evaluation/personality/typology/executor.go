@@ -94,6 +94,15 @@ func buildMBTIOutcome(
 		Label:    detail.TypeName,
 		Severity: "none",
 	}
+	outcome.Profile = &assessment.ProfileResult{
+		Kind:        assessment.ProfileKindPersonalityType,
+		Code:        detail.TypeCode,
+		Name:        detail.TypeName,
+		Summary:     detail.OneLiner,
+		Strengths:   append([]string(nil), detail.Profile.Strengths...),
+		Weaknesses:  append([]string(nil), detail.Profile.Weaknesses...),
+		Suggestions: append([]string(nil), detail.Profile.Suggestions...),
+	}
 	return outcome, nil
 }
 
@@ -128,6 +137,12 @@ func buildSBTIOutcome(
 		Code:     detail.TypeCode,
 		Label:    detail.TypeName,
 		Severity: "none",
+	}
+	outcome.Profile = &assessment.ProfileResult{
+		Kind:    assessment.ProfileKindPersonalityType,
+		Code:    detail.TypeCode,
+		Name:    detail.TypeName,
+		Summary: detail.OneLiner,
 	}
 	return outcome, nil
 }

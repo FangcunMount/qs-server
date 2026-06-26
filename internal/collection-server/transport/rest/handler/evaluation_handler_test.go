@@ -54,6 +54,18 @@ func (f *fakeEvaluationQueryService) GetHighRiskFactors(context.Context, uint64,
 	panic("unexpected GetHighRiskFactors call")
 }
 
+func (f *fakeEvaluationQueryService) GetMyAssessmentV2(context.Context, uint64, uint64) (*evaluation.AssessmentDetailV2Response, error) {
+	panic("unexpected GetMyAssessmentV2 call")
+}
+
+func (f *fakeEvaluationQueryService) ListMyAssessmentsV2(context.Context, uint64, *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsV2Response, error) {
+	panic("unexpected ListMyAssessmentsV2 call")
+}
+
+func (f *fakeEvaluationQueryService) GetAssessmentReportV2(context.Context, uint64) (*evaluation.AssessmentReportV2Response, error) {
+	panic("unexpected GetAssessmentReportV2 call")
+}
+
 type fakeAnswerSheetLookupService struct {
 	get func(ctx context.Context, id uint64) (*answersheetapp.AnswerSheetResponse, error)
 }

@@ -50,8 +50,9 @@ type Container struct {
 
 	// 业务模块
 	SurveyModule     *assembler.SurveyModule     // Survey 模块（包含问卷和答卷子模块）
-	ScaleModule      *assembler.ScaleModule      // Scale 模块
-	ActorModule      *assembler.ActorModule      // Actor 模块
+	ScaleModule             *assembler.ScaleModule             // Scale 模块
+	PersonalityModelModule  *assembler.PersonalityModelModule  // Personality model catalog 模块
+	ActorModule             *assembler.ActorModule             // Actor 模块
 	EvaluationModule *assembler.EvaluationModule // Evaluation 模块（测评、得分、报告）
 	PlanModule       *assembler.PlanModule       // Plan 模块（测评计划）
 	StatisticsModule *assembler.StatisticsModule // Statistics 模块（统计）
@@ -170,6 +171,11 @@ func (c *Container) Initialize() error {
 	// 初始化 Scale 模块
 	if err := c.initScaleModule(); err != nil {
 		return fmt.Errorf("failed to initialize scale module: %w", err)
+	}
+
+	// 初始化 Personality model 模块
+	if err := c.initPersonalityModelModule(); err != nil {
+		return fmt.Errorf("failed to initialize personality model module: %w", err)
 	}
 	graph := newModuleGraph(c)
 

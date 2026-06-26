@@ -54,6 +54,9 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome.Level == nil || outcome.Level.Code != "INTJ" {
 		t.Fatalf("level = %#v, want INTJ type code", outcome.Level)
 	}
+	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || outcome.Profile.Kind != assessment.ProfileKindPersonalityType {
+		t.Fatalf("profile = %#v, want INTJ personality_type", outcome.Profile)
+	}
 }
 
 func mbtiExecutorInputSnapshot() *port.InputSnapshot {

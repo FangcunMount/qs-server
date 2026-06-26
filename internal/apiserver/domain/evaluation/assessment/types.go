@@ -162,6 +162,16 @@ func IsHighRisk(r RiskLevel) bool {
 	return r == RiskLevelHigh || r == RiskLevelSevere
 }
 
+// IsRiskLevelCode reports whether code is a legacy scale risk-level value.
+func IsRiskLevelCode(code string) bool {
+	switch RiskLevel(code) {
+	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:
+		return true
+	default:
+		return false
+	}
+}
+
 // ==================== 解释模型引用 ====================
 
 // EvaluationModelKind 测评模型类型。

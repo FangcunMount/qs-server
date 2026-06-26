@@ -49,6 +49,8 @@ flowchart TB
     Biz --> answersheets["/answersheets"]
     Biz --> assessments["/assessments"]
     Biz --> scales["/scales"]
+    Biz --> personalityModels["/personality-models"]
+    Biz --> personalityAssessments["/personality-assessments"]
     Biz --> testees["/testees"]
 ```
 
@@ -90,21 +92,31 @@ collection RegisterRoutes 先设置：
 | answersheet | `POST /api/v1/answersheets`、`GET /api/v1/answersheets/submit-status`、`GET /api/v1/answersheets/:id` |
 | assessment | `GET /api/v1/assessments`、`/trend`、`/high-risk`、`/:id`、`/:id/scores`、`/:id/report`、`/:id/wait-report` |
 | scale | `GET /api/v1/scales`、`/hot`、`/categories`、`/:code` |
+| personality-model | `GET /api/v1/personality-models`、`/categories`、`/:code` |
+| personality-assessment | `GET /api/v1/personality-assessments`、`/:id`、`/:id/report`、`/:id/wait-report` |
 | testee | `POST/GET /api/v1/testees`、`/exists`、`/:id`、`/:id/care-context`、`PUT /:id` |
+
+人格测评提交仍复用 `POST /api/v1/answersheets`；`questionnaire_code` 来自 `personality-models` 详情。
+
+| 资源 | v2（deprecated） |
+| ---- | ---- |
+| assessment | `GET /api/v2/assessments`、`/:id`、`/:id/report`（请迁移到 personality-assessments） |
 
 ---
 
 ## 5. Auth Skip 白名单
 
-collection 中 `isPublicScaleReadOnly` 允许部分 GET 量表接口跳过 auth：
+collection 中 `isPublicScaleReadOnly` 允许部分 GET 量表/人格模型接口跳过 auth：
 
 ```text
 GET /api/v1/scales
 GET /api/v1/scales/hot
 GET /api/v1/scales/categories
+GET /api/v1/personality-models
+GET /api/v1/personality-models/categories
 ```
 
-原因：前台可以公开拉取量表元数据。
+原因：前台可以公开拉取量表/人格测评模型元数据。
 
 注意：这不是所有 scale 路由都公开，`/scales/:code` 是否公开以代码和中间件 skip 函数为准。
 

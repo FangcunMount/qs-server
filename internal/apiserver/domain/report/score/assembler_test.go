@@ -45,7 +45,7 @@ func TestBuildReportAssemblesScoreBasedInterpretReport(t *testing.T) {
 		t.Fatalf("Conclusion = %q", report.Conclusion())
 	}
 	dimensions := report.Dimensions()
-	if len(dimensions) != 1 || dimensions[0].FactorName() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != totalMax {
+	if len(dimensions) != 1 || dimensions[0].Name() != "总分" || dimensions[0].MaxScore() == nil || *dimensions[0].MaxScore() != totalMax {
 		t.Fatalf("unexpected dimensions: %#v", dimensions)
 	}
 }

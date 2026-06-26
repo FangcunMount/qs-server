@@ -58,10 +58,10 @@ func TestBuildMBTIReportFillsModelExtra(t *testing.T) {
 	if len(dimensions) != 1 {
 		t.Fatalf("len(Dimensions) = %d, want 1", len(dimensions))
 	}
-	if dimensions[0].FactorCode() != domainreport.FactorCode("E_I") ||
-		dimensions[0].FactorName() != "外向-内向" ||
+	if dimensions[0].Code() != domainreport.DimensionCode("E_I") ||
+		dimensions[0].Name() != "外向-内向" ||
 		dimensions[0].RawScore() != 31 ||
-		dimensions[0].RiskLevel() != domainreport.RiskLevelNone ||
+		dimensions[0].Severity() != string(domainreport.RiskLevelNone) ||
 		dimensions[0].Description() != "外向-内向：倾向 I（原始分 31，偏好强度 78%）" {
 		t.Fatalf("unexpected dimension: %#v", dimensions[0])
 	}
@@ -144,10 +144,10 @@ func TestBuildSBTIReportSetsModelExtra(t *testing.T) {
 	if len(dimensions) != 1 {
 		t.Fatalf("len(Dimensions) = %d, want 1", len(dimensions))
 	}
-	if dimensions[0].FactorCode() != domainreport.FactorCode("SOCIAL") ||
-		dimensions[0].FactorName() != "社交姿态" ||
+	if dimensions[0].Code() != domainreport.DimensionCode("SOCIAL") ||
+		dimensions[0].Name() != "社交姿态" ||
 		dimensions[0].RawScore() != 5 ||
-		dimensions[0].RiskLevel() != domainreport.RiskLevelNone ||
+		dimensions[0].Severity() != string(domainreport.RiskLevelNone) ||
 		dimensions[0].Description() != "狗塑 / 社交姿态：高 档，原始分 5/6" {
 		t.Fatalf("unexpected dimension: %#v", dimensions[0])
 	}

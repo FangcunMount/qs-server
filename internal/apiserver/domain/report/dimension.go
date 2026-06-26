@@ -89,12 +89,21 @@ func (d DimensionInterpret) Kind() DimensionKind {
 	return d.kind
 }
 
+// Name returns the neutral dimension display name.
+func (d DimensionInterpret) Name() string {
+	return d.factorName
+}
+
 // FactorCode 获取因子编码
+//
+// Deprecated: use Code().
 func (d DimensionInterpret) FactorCode() FactorCode {
 	return d.factorCode
 }
 
 // FactorName 获取因子名称
+//
+// Deprecated: use Name().
 func (d DimensionInterpret) FactorName() string {
 	return d.factorName
 }
@@ -105,6 +114,8 @@ func (d DimensionInterpret) RawScore() float64 {
 }
 
 // RiskLevel 获取风险等级
+//
+// Deprecated: use Severity() for neutral semantics; RiskLevel is scale-legacy only.
 func (d DimensionInterpret) RiskLevel() RiskLevel {
 	return d.riskLevel
 }

@@ -212,6 +212,9 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		deps.Scale.QueryService = c.ScaleModule.QueryService
 		deps.Scale.CategoryService = c.ScaleModule.CategoryService
 	}
+	if c.PersonalityModelModule != nil {
+		deps.PersonalityModel.QueryService = c.PersonalityModelModule.QueryService
+	}
 	if c.PlanModule != nil {
 		deps.Plan.CommandService = c.PlanModule.CommandService
 		deps.Plan.TaskAssessmentResolver = c.PlanModule.TaskAssessmentResolver

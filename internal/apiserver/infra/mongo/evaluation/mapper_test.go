@@ -58,7 +58,7 @@ func TestReportMapperRoundTripPreservesInterpretReportFields(t *testing.T) {
 		got.Conclusion() != original.Conclusion() {
 		t.Fatalf("round trip summary mismatch: got=%#v want=%#v", got, original)
 	}
-	if len(got.Dimensions()) != 1 || got.Dimensions()[0].FactorCode().String() != "total" {
+	if len(got.Dimensions()) != 1 || got.Dimensions()[0].Code().String() != "total" {
 		t.Fatalf("dimensions = %#v", got.Dimensions())
 	}
 	if len(got.Suggestions()) != 1 || got.Suggestions()[0].Content != "follow-up" {

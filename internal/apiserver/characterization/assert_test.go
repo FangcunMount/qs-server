@@ -30,14 +30,14 @@ func assertDimensionField(
 	wantDescription string,
 ) {
 	t.Helper()
-	if dim.FactorName() != wantName {
-		t.Fatalf("FactorName = %q, want %q", dim.FactorName(), wantName)
+	if dim.Name() != wantName {
+		t.Fatalf("Name = %q, want %q", dim.Name(), wantName)
 	}
 	if dim.RawScore() != wantScore {
 		t.Fatalf("RawScore = %v, want %v", dim.RawScore(), wantScore)
 	}
-	if dim.RiskLevel() != wantRisk {
-		t.Fatalf("RiskLevel = %s, want %s", dim.RiskLevel(), wantRisk)
+	if dim.Severity() != string(wantRisk) {
+		t.Fatalf("Severity = %s, want %s", dim.Severity(), wantRisk)
 	}
 	if dim.Description() != wantDescription {
 		t.Fatalf("Description = %q, want %q", dim.Description(), wantDescription)

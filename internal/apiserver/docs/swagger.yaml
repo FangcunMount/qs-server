@@ -615,6 +615,60 @@ definitions:
         description: 总次数
         type: integer
     type: object
+  response.AssessmentV2ListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.AssessmentV2Response'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  response.AssessmentV2Response:
+    properties:
+      answer_sheet_id:
+        type: string
+      failed_at:
+        type: string
+      failure_reason:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      level:
+        $ref: '#/definitions/response.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/response.ModelIdentityResponse'
+      org_id:
+        type: string
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      origin_type_label:
+        type: string
+      primary_score:
+        $ref: '#/definitions/response.ScoreValueResponse'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      status_label:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        type: string
+    type: object
   response.BatchEvaluationResponse:
     properties:
       failed_count:
@@ -897,6 +951,53 @@ definitions:
       suggestion:
         type: string
     type: object
+  response.ModelExtraResponse:
+    properties:
+      commentary:
+        type: string
+      image_url:
+        type: string
+      is_special:
+        type: boolean
+      kind:
+        type: string
+      match_percent:
+        type: number
+      one_liner:
+        type: string
+      rarity:
+        $ref: '#/definitions/response.ModelRarityResponse'
+      special_trigger:
+        type: string
+      type_code:
+        type: string
+      type_name:
+        type: string
+    type: object
+  response.ModelIdentityResponse:
+    properties:
+      algorithm:
+        type: string
+      code:
+        type: string
+      kind:
+        type: string
+      sub_kind:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  response.ModelRarityResponse:
+    properties:
+      label:
+        type: string
+      one_in_x:
+        type: integer
+      percent:
+        type: number
+    type: object
   response.PeriodicProjectResponse:
     properties:
       completed_weeks:
@@ -1126,11 +1227,60 @@ definitions:
         description: 总分
         type: number
     type: object
+  response.ReportV2ListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.ReportV2Response'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  response.ReportV2Response:
+    properties:
+      assessment_id:
+        type: string
+      conclusion:
+        type: string
+      created_at:
+        type: string
+      dimensions:
+        items:
+          $ref: '#/definitions/response.DimensionItem'
+        type: array
+      level:
+        $ref: '#/definitions/response.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/response.ModelIdentityResponse'
+      model_extra:
+        $ref: '#/definitions/response.ModelExtraResponse'
+      primary_score:
+        $ref: '#/definitions/response.ScoreValueResponse'
+      suggestions:
+        items:
+          $ref: '#/definitions/response.SuggestionItem'
+        type: array
+    type: object
   response.ReporterResponse:
     properties:
       label:
         type: string
       value:
+        type: string
+    type: object
+  response.ResultLevelResponse:
+    properties:
+      code:
+        type: string
+      label:
+        type: string
+      severity:
         type: string
     type: object
   response.ScaleCategoriesResponse:
@@ -1238,6 +1388,17 @@ definitions:
         type: string
       total_score:
         description: 总分
+        type: number
+    type: object
+  response.ScoreValueResponse:
+    properties:
+      kind:
+        type: string
+      label:
+        type: string
+      max:
+        type: number
+      value:
         type: number
     type: object
   response.StageResponse:
@@ -5082,6 +5243,141 @@ paths:
       summary: 查询受试者的所有任务
       tags:
       - Plan-Query
+  /api/v2/evaluations/assessments:
+    get:
+      description: 分页查询测评列表，响应使用 model/primary_score/level 投影
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 状态筛选
+        in: query
+        name: status
+        type: string
+      - description: 受试者ID筛选
+        in: query
+        name: testee_id
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentV2ListResponse'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 v2 测评列表
+      tags:
+      - Evaluation-Assessment-V2
+  /api/v2/evaluations/assessments/{id}:
+    get:
+      description: 根据 ID 获取测评，响应使用 model/primary_score/level 投影
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentV2Response'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取 v2 测评详情
+      tags:
+      - Evaluation-Assessment-V2
+  /api/v2/evaluations/assessments/{id}/report:
+    get:
+      description: 获取指定测评的解读报告，响应使用 model/primary_score/level 投影
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ReportV2Response'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 获取 v2 测评报告
+      tags:
+      - Evaluation-Report-V2
+  /api/v2/evaluations/reports:
+    get:
+      description: 查询指定受试者的报告列表，响应使用 model/primary_score/level 投影
+      parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: string
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.ReportV2ListResponse'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 查询 v2 报告列表
+      tags:
+      - Evaluation-Report-V2
   /clinicians/me/workbench/queues/{queue_type}:
     get:
       description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up
@@ -5507,4 +5803,11 @@ paths:
 schemes:
 - http
 - https
+security:
+- BearerAuth: []
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

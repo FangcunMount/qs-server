@@ -52,7 +52,7 @@ func TestV1MongoReportMapperPreservesScaleAndPersonalityFields(t *testing.T) {
 		got.Conclusion() != original.Conclusion() {
 		t.Fatalf("scale round trip summary mismatch: got=%#v", got)
 	}
-	if len(got.Dimensions()) != 1 || got.Dimensions()[0].FactorCode().String() != "TOTAL" {
+	if len(got.Dimensions()) != 1 || got.Dimensions()[0].Code().String() != "TOTAL" {
 		t.Fatalf("dimensions = %#v", got.Dimensions())
 	}
 	if len(got.Suggestions()) != 2 {

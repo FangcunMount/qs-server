@@ -231,7 +231,7 @@ func toEvaluationProtoAssessmentReportV2(result *assessmentApp.ReportV2Result) *
 		report.Suggestions = append(report.Suggestions, item)
 	}
 	if result.ModelExtra != nil {
-		report.ModelExtra = &evaluationpb.ModelExtra{TypeCode: result.ModelExtra.TypeCode}
+		report.ModelExtra = toProtoModelExtra(result.ModelExtra)
 	}
 	return report
 }

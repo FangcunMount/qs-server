@@ -104,6 +104,12 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	// 量表相关路由
 	r.registerScaleRoutes(api)
 
+	// 人格测评模型相关路由
+	r.registerPersonalityModelRoutes(api)
+
+	// 人格测评相关路由
+	r.registerPersonalityAssessmentRoutes(api)
+
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
 }
@@ -224,6 +230,8 @@ func isPublicScaleReadOnly(c *gin.Context) bool {
 		"/api/v1/scales",
 		"/api/v1/scales/hot",
 		"/api/v1/scales/categories",
+		"/api/v1/personality-models",
+		"/api/v1/personality-models/categories",
 	}
 
 	return slices.Contains(whitelist, strings.TrimRight(c.Request.URL.Path, "/"))
@@ -509,6 +517,96 @@ func (r *Router) registerScaleRoutes(api *gin.RouterGroup) {
 		scales.GET("", scaleHandler.List)
 		// 获取量表详情
 		scales.GET("/:code", scaleHandler.Get)
+	}
+}
+
+// registerPersonalityModelRoutes 注册人格测评模型相关路由
+func (r *Router) registerPersonalityModelRoutes(api *gin.RouterGroup) {
+	handler := r.container.PersonalityModelHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+
+	models := api.Group("/personality-models")
+	{
+		models.GET("/categories", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.GetCategories,
+		)...)
+		models.GET("", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.List,
+		)...)
+		models.GET("/:code", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.Get,
+		)...)
+	}
+}
+
+// registerPersonalityAssessmentRoutes 注册人格测评相关路由
+func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
+	handler := r.container.PersonalityAssessmentHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+
+	assessments := api.Group("/personality-assessments")
+	{
+		assessments.GET("", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.List,
+		)...)
+		assessments.GET("/:id/wait-report", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"wait-report",
+			rateCfg,
+			rateCfg.WaitReportGlobalQPS,
+			rateCfg.WaitReportGlobalBurst,
+			rateCfg.WaitReportUserQPS,
+			rateCfg.WaitReportUserBurst,
+			handler.WaitReport,
+		)...)
+		assessments.GET("/:id/report", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.GetReport,
+		)...)
+		assessments.GET("/:id", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.Get,
+		)...)
 	}
 }
 

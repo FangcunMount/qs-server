@@ -14,11 +14,11 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 	dimensions := make([]DimensionResult, len(r.Dimensions()))
 	for i, d := range r.Dimensions() {
 		dimensions[i] = DimensionResult{
-			FactorCode:  string(d.FactorCode()),
-			FactorName:  d.FactorName(),
+			FactorCode:  d.Code().String(),
+			FactorName:  d.Name(),
 			RawScore:    d.RawScore(),
 			MaxScore:    d.MaxScore(),
-			RiskLevel:   string(d.RiskLevel()),
+			RiskLevel:   d.Severity(),
 			Description: d.Description(),
 			Suggestion:  d.Suggestion(),
 		}

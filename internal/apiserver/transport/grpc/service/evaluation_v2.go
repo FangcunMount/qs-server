@@ -62,6 +62,9 @@ func (s *EvaluationService) ListMyAssessmentsV2(ctx context.Context, req *pb.Lis
 		Statuses:  normalizeGRPCAssessmentStatuses(req.Status),
 		ScaleCode: req.ScaleCode,
 		RiskLevel: req.RiskLevel,
+		ModelKind: req.ModelKind,
+		ModelAlgorithm: req.ModelAlgorithm,
+		ModelCode: req.ModelCode,
 	}
 	if req.DateFrom != "" {
 		if parsed, err := time.Parse(time.RFC3339, req.DateFrom); err == nil {

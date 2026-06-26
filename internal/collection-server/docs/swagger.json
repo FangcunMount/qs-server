@@ -865,10 +865,10 @@
                         "required": true
                     },
                     {
-                        "maximum": 60,
-                        "minimum": 5,
+                        "maximum": 25,
+                        "minimum": 1,
                         "type": "integer",
-                        "default": 15,
+                        "default": 20,
                         "description": "超时时间（秒）",
                         "name": "timeout",
                         "in": "query"
@@ -909,6 +909,317 @@
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-assessments": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评"
+                ],
+                "summary": "查询人格测评列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "算法过滤 mbti/sbti",
+                        "name": "algorithm",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalityassessment.ListAssessmentsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-assessments/{id}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评"
+                ],
+                "summary": "获取人格测评详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalityassessment.AssessmentDetailResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-assessments/{id}/report": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评"
+                ],
+                "summary": "获取人格测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalityassessment.AssessmentReportResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-assessments/{id}/wait-report": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评"
+                ],
+                "summary": "长轮询等待人格测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "超时时间（秒）",
+                        "name": "timeout",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalityassessment.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-models": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评模型"
+                ],
+                "summary": "获取人格测评模型列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "算法过滤 mbti/sbti",
+                        "name": "algorithm",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-models/categories": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评模型"
+                ],
+                "summary": "获取人格测评模型分类",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalitymodel.PersonalityModelCategoriesResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-models/{code}": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评模型"
+                ],
+                "summary": "获取人格测评模型详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "模型编码",
+                        "name": "code",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalitymodel.PersonalityModelResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -1744,6 +2055,136 @@
                 }
             }
         },
+        "/api/v2/assessments": {
+            "get": {
+                "description": "分页查询测评列表，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评-V2"
+                ],
+                "summary": "查询我的 v2 测评列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.ListAssessmentsV2Response"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/assessments/{id}": {
+            "get": {
+                "description": "根据测评 ID 获取详情，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评-V2"
+                ],
+                "summary": "获取我的 v2 测评详情",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentDetailV2Response"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/assessments/{id}/report": {
+            "get": {
+                "description": "根据测评 ID 获取报告，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评-V2"
+                ],
+                "summary": "获取 v2 测评报告",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentReportV2Response"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/health": {
             "get": {
                 "description": "检查服务健康状态",
@@ -1986,6 +2427,62 @@
                 }
             }
         },
+        "evaluation.AssessmentDetailV2Response": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                }
+            }
+        },
         "evaluation.AssessmentFactorChangeResponse": {
             "type": "object",
             "properties": {
@@ -2081,10 +2578,60 @@
                 }
             }
         },
+        "evaluation.AssessmentReportV2Response": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/evaluation.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
+                }
+            }
+        },
         "evaluation.AssessmentStatusResponse": {
             "type": "object",
             "properties": {
+                "message": {
+                    "type": "string"
+                },
+                "next_poll_after_ms": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
                 "risk_level": {
+                    "type": "string"
+                },
+                "stage": {
                     "type": "string"
                 },
                 "status": {
@@ -2141,6 +2688,47 @@
                 },
                 "total_score": {
                     "type": "number"
+                }
+            }
+        },
+        "evaluation.AssessmentSummaryV2Response": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
                 }
             }
         },
@@ -2314,6 +2902,132 @@
                 }
             }
         },
+        "evaluation.ListAssessmentsV2Response": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.AssessmentSummaryV2Response"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "evaluation.ModelExtraResponse": {
+            "type": "object",
+            "properties": {
+                "commentary": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_special": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "match_percent": {
+                    "type": "number"
+                },
+                "one_liner": {
+                    "type": "string"
+                },
+                "rarity": {
+                    "$ref": "#/definitions/evaluation.ModelRarityResponse"
+                },
+                "special_trigger": {
+                    "type": "string"
+                },
+                "type_code": {
+                    "type": "string"
+                },
+                "type_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.ModelIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.ModelRarityResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "one_in_x": {
+                    "type": "integer"
+                },
+                "percent": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.ResultLevelResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                }
+            }
+        },
+        "evaluation.ScoreValueResponse": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
         "evaluation.SuggestionResponse": {
             "type": "object",
             "properties": {
@@ -2365,6 +3079,29 @@
                 "value": {
                     "description": "JSON 字符串",
                     "type": "string"
+                }
+            }
+        },
+        "github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse": {
+            "type": "object",
+            "properties": {
+                "models": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/personalitymodel.PersonalityModelSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
                 }
             }
         },
@@ -2430,6 +3167,428 @@
         },
         "meta.Birthday": {
             "type": "object"
+        },
+        "personalityassessment.AssessmentDetailResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/personalityassessment.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalityassessment.AssessmentReportResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/personalityassessment.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/personalityassessment.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
+                }
+            }
+        },
+        "personalityassessment.AssessmentStatusResponse": {
+            "type": "object",
+            "properties": {
+                "level": {
+                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "model": {
+                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
+                },
+                "next_poll_after_ms": {
+                    "type": "integer"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "stage": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "integer"
+                }
+            }
+        },
+        "personalityassessment.AssessmentSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/personalityassessment.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalityassessment.ListAssessmentsResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/personalityassessment.AssessmentSummaryResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "personalityassessment.ModelExtraResponse": {
+            "type": "object",
+            "properties": {
+                "commentary": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_special": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "match_percent": {
+                    "type": "number"
+                },
+                "one_liner": {
+                    "type": "string"
+                },
+                "rarity": {
+                    "$ref": "#/definitions/personalityassessment.ModelRarityResponse"
+                },
+                "special_trigger": {
+                    "type": "string"
+                },
+                "type_code": {
+                    "type": "string"
+                },
+                "type_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalityassessment.ModelIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalityassessment.ModelRarityResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "one_in_x": {
+                    "type": "integer"
+                },
+                "percent": {
+                    "type": "number"
+                }
+            }
+        },
+        "personalityassessment.ResultLevelResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "severity": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalityassessment.ScoreValueResponse": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "value": {
+                    "type": "number"
+                }
+            }
+        },
+        "personalitymodel.CategoryResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalitymodel.PersonalityDimensionResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "left_pole": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "right_pole": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalitymodel.PersonalityModelCategoriesResponse": {
+            "type": "object",
+            "properties": {
+                "categories": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/personalitymodel.CategoryResponse"
+                    }
+                }
+            }
+        },
+        "personalitymodel.PersonalityModelResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "dimension_order": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/personalitymodel.PersonalityDimensionResponse"
+                    }
+                },
+                "outcomes": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/personalitymodel.PersonalityOutcomeResponse"
+                    }
+                },
+                "question_count": {
+                    "type": "integer"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalitymodel.PersonalityModelSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "question_count": {
+                    "type": "integer"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "personalitymodel.PersonalityOutcomeResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "one_liner": {
+                    "type": "string"
+                }
+            }
         },
         "questionnaire.CalculationRuleResponse": {
             "type": "object",
@@ -3124,6 +4283,13 @@
                     }
                 }
             }
+        }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
         }
     }
 }

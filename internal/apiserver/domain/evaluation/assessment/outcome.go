@@ -17,8 +17,28 @@ type OutcomeScoreKind string
 const (
 	OutcomeScoreKindRawTotal     OutcomeScoreKind = "raw_total"
 	OutcomeScoreKindMatchPercent OutcomeScoreKind = "match_percent"
-	OutcomeScoreKindTypeCode     OutcomeScoreKind = "type_code"
 )
+
+// ProfileKind classifies a profile result independent of model family.
+type ProfileKind string
+
+const (
+	ProfileKindPersonalityType  ProfileKind = "personality_type"
+	ProfileKindPersonalityTrait ProfileKind = "personality_trait"
+	ProfileKindAbilityProfile   ProfileKind = "ability_profile"
+)
+
+// ProfileResult records portrait-style results such as personality type or ability profile.
+type ProfileResult struct {
+	Kind        ProfileKind
+	Code        string
+	Name        string
+	Summary     string
+	Traits      []string
+	Strengths   []string
+	Weaknesses  []string
+	Suggestions []string
+}
 
 // OutcomeScoreValue is the canonical score representation on an assessment outcome.
 type OutcomeScoreValue struct {
@@ -61,6 +81,7 @@ type AssessmentOutcome struct {
 	Detail     EvaluationDetail
 	Primary    *OutcomeScoreValue
 	Level      *OutcomeResultLevel
+	Profile    *ProfileResult
 	Dimensions []DimensionResult
 	Validity   []ValidityResult
 }
@@ -128,13 +149,19 @@ func (o *AssessmentOutcome) ToEvaluationResult() *EvaluationResult {
 		}
 	}
 	if o.Level != nil && o.Level.Code != "" {
-		result.RiskLevel = RiskLevel(o.Level.Code)
-		level := o.Level.Code
-		if result.Summary.Level == nil {
-			result.Summary.Level = &level
+		if IsRiskLevelCode(o.Level.Code) {
+			result.RiskLevel = RiskLevel(o.Level.Code)
+			level := o.Level.Code
+			if result.Summary.Level == nil {
+				result.Summary.Level = &level
+			}
 		}
-		if result.Summary.PrimaryLabel == "" && o.Level.Label != "" {
-			result.Summary.PrimaryLabel = o.Level.Label
+		if result.Summary.PrimaryLabel == "" {
+			if o.Level.Label != "" {
+				result.Summary.PrimaryLabel = o.Level.Label
+			} else if !IsRiskLevelCode(o.Level.Code) {
+				result.Summary.PrimaryLabel = o.Level.Code
+			}
 		}
 	}
 	if scores, ok := o.Detail.Payload.([]FactorScoreResult); ok && len(scores) > 0 {
@@ -177,7 +204,7 @@ func factorScoreResultsFromDimensions(dimensions []DimensionResult) []FactorScor
 			continue
 		}
 		risk := RiskLevelNone
-		if dim.Level != nil {
+		if dim.Level != nil && IsRiskLevelCode(dim.Level.Code) {
 			risk = RiskLevel(dim.Level.Code)
 		}
 		results = append(results, FactorScoreResult{

@@ -55,4 +55,12 @@ protoc --proto_path=${PROTO_PATH} \
        --go-grpc_opt=paths=source_relative \
        ${PROTO_PATH}/scale/scale.proto
 
+# 生成 personalitymodel 服务代码
+protoc --proto_path=${PROTO_PATH} \
+       --go_out=${GO_OUT_PATH} \
+       --go_opt=paths=source_relative \
+       --go-grpc_out=${GO_OUT_PATH} \
+       --go-grpc_opt=paths=source_relative \
+       ${PROTO_PATH}/personalitymodel/personality_model.proto
+
 echo "Proto files generated successfully!" 

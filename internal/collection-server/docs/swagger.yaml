@@ -136,6 +136,43 @@ definitions:
       total_score:
         type: number
     type: object
+  evaluation.AssessmentDetailV2Response:
+    properties:
+      answer_sheet_id:
+        type: string
+      created_at:
+        type: string
+      failed_at:
+        type: string
+      failure_reason:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      level:
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
+      org_id:
+        type: string
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      primary_score:
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        type: string
+    type: object
   evaluation.AssessmentFactorChangeResponse:
     properties:
       current_score:
@@ -198,9 +235,42 @@ definitions:
       total_score:
         type: number
     type: object
+  evaluation.AssessmentReportV2Response:
+    properties:
+      assessment_id:
+        type: string
+      conclusion:
+        type: string
+      created_at:
+        type: string
+      dimensions:
+        items:
+          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
+        type: array
+      level:
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
+      model_extra:
+        $ref: '#/definitions/evaluation.ModelExtraResponse'
+      primary_score:
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
+      suggestions:
+        items:
+          $ref: '#/definitions/evaluation.SuggestionResponse'
+        type: array
+    type: object
   evaluation.AssessmentStatusResponse:
     properties:
+      message:
+        type: string
+      next_poll_after_ms:
+        type: integer
+      reason:
+        type: string
       risk_level:
+        type: string
+      stage:
         type: string
       status:
         description: pending/submitted/interpreted/failed
@@ -239,6 +309,33 @@ definitions:
         type: string
       total_score:
         type: number
+    type: object
+  evaluation.AssessmentSummaryV2Response:
+    properties:
+      answer_sheet_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      level:
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
+      origin_type:
+        type: string
+      primary_score:
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
     type: object
   evaluation.AssessmentTrendMetaResponse:
     properties:
@@ -351,6 +448,88 @@ definitions:
       total_pages:
         type: integer
     type: object
+  evaluation.ListAssessmentsV2Response:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/evaluation.AssessmentSummaryV2Response'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  evaluation.ModelExtraResponse:
+    properties:
+      commentary:
+        type: string
+      image_url:
+        type: string
+      is_special:
+        type: boolean
+      kind:
+        type: string
+      match_percent:
+        type: number
+      one_liner:
+        type: string
+      rarity:
+        $ref: '#/definitions/evaluation.ModelRarityResponse'
+      special_trigger:
+        type: string
+      type_code:
+        type: string
+      type_name:
+        type: string
+    type: object
+  evaluation.ModelIdentityResponse:
+    properties:
+      algorithm:
+        type: string
+      code:
+        type: string
+      kind:
+        type: string
+      sub_kind:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  evaluation.ModelRarityResponse:
+    properties:
+      label:
+        type: string
+      one_in_x:
+        type: integer
+      percent:
+        type: number
+    type: object
+  evaluation.ResultLevelResponse:
+    properties:
+      code:
+        type: string
+      label:
+        type: string
+      severity:
+        type: string
+    type: object
+  evaluation.ScoreValueResponse:
+    properties:
+      kind:
+        type: string
+      label:
+        type: string
+      max:
+        type: number
+      value:
+        type: number
+    type: object
   evaluation.SuggestionResponse:
     properties:
       category:
@@ -386,6 +565,21 @@ definitions:
     - question_code
     - question_type
     - value
+    type: object
+  github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse:
+    properties:
+      models:
+        items:
+          $ref: '#/definitions/personalitymodel.PersonalityModelSummaryResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
     type: object
   github_com_FangcunMount_qs-server_internal_collection-server_application_questionnaire.ListQuestionnairesResponse:
     properties:
@@ -427,6 +621,282 @@ definitions:
         type: integer
     type: object
   meta.Birthday:
+    type: object
+  personalityassessment.AssessmentDetailResponse:
+    properties:
+      answer_sheet_id:
+        type: string
+      failed_at:
+        type: string
+      failure_reason:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      level:
+        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
+      org_id:
+        type: string
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      primary_score:
+        $ref: '#/definitions/personalityassessment.ScoreValueResponse'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        type: string
+    type: object
+  personalityassessment.AssessmentReportResponse:
+    properties:
+      assessment_id:
+        type: string
+      conclusion:
+        type: string
+      created_at:
+        type: string
+      dimensions:
+        items:
+          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
+        type: array
+      level:
+        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
+      model_extra:
+        $ref: '#/definitions/personalityassessment.ModelExtraResponse'
+      primary_score:
+        $ref: '#/definitions/personalityassessment.ScoreValueResponse'
+      suggestions:
+        items:
+          $ref: '#/definitions/evaluation.SuggestionResponse'
+        type: array
+    type: object
+  personalityassessment.AssessmentStatusResponse:
+    properties:
+      level:
+        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
+      message:
+        type: string
+      model:
+        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
+      next_poll_after_ms:
+        type: integer
+      reason:
+        type: string
+      stage:
+        type: string
+      status:
+        type: string
+      updated_at:
+        type: integer
+    type: object
+  personalityassessment.AssessmentSummaryResponse:
+    properties:
+      answer_sheet_id:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      level:
+        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
+      model:
+        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
+      origin_type:
+        type: string
+      primary_score:
+        $ref: '#/definitions/personalityassessment.ScoreValueResponse'
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+    type: object
+  personalityassessment.ListAssessmentsResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/personalityassessment.AssessmentSummaryResponse'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+      total_pages:
+        type: integer
+    type: object
+  personalityassessment.ModelExtraResponse:
+    properties:
+      commentary:
+        type: string
+      image_url:
+        type: string
+      is_special:
+        type: boolean
+      kind:
+        type: string
+      match_percent:
+        type: number
+      one_liner:
+        type: string
+      rarity:
+        $ref: '#/definitions/personalityassessment.ModelRarityResponse'
+      special_trigger:
+        type: string
+      type_code:
+        type: string
+      type_name:
+        type: string
+    type: object
+  personalityassessment.ModelIdentityResponse:
+    properties:
+      algorithm:
+        type: string
+      code:
+        type: string
+      kind:
+        type: string
+      sub_kind:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  personalityassessment.ModelRarityResponse:
+    properties:
+      label:
+        type: string
+      one_in_x:
+        type: integer
+      percent:
+        type: number
+    type: object
+  personalityassessment.ResultLevelResponse:
+    properties:
+      code:
+        type: string
+      label:
+        type: string
+      severity:
+        type: string
+    type: object
+  personalityassessment.ScoreValueResponse:
+    properties:
+      kind:
+        type: string
+      label:
+        type: string
+      max:
+        type: number
+      value:
+        type: number
+    type: object
+  personalitymodel.CategoryResponse:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  personalitymodel.PersonalityDimensionResponse:
+    properties:
+      code:
+        type: string
+      left_pole:
+        type: string
+      name:
+        type: string
+      right_pole:
+        type: string
+    type: object
+  personalitymodel.PersonalityModelCategoriesResponse:
+    properties:
+      categories:
+        items:
+          $ref: '#/definitions/personalitymodel.CategoryResponse'
+        type: array
+    type: object
+  personalitymodel.PersonalityModelResponse:
+    properties:
+      algorithm:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      dimension_order:
+        items:
+          type: string
+        type: array
+      dimensions:
+        items:
+          $ref: '#/definitions/personalitymodel.PersonalityDimensionResponse'
+        type: array
+      outcomes:
+        items:
+          $ref: '#/definitions/personalitymodel.PersonalityOutcomeResponse'
+        type: array
+      question_count:
+        type: integer
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  personalitymodel.PersonalityModelSummaryResponse:
+    properties:
+      algorithm:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      question_count:
+        type: integer
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      title:
+        type: string
+      version:
+        type: string
+    type: object
+  personalitymodel.PersonalityOutcomeResponse:
+    properties:
+      code:
+        type: string
+      image_url:
+        type: string
+      name:
+        type: string
+      one_liner:
+        type: string
     type: object
   questionnaire.CalculationRuleResponse:
     properties:
@@ -1362,11 +1832,11 @@ paths:
         name: testee_id
         required: true
         type: integer
-      - default: 15
+      - default: 20
         description: 超时时间（秒）
         in: query
-        maximum: 60
-        minimum: 5
+        maximum: 25
+        minimum: 1
         name: timeout
         type: integer
       produces:
@@ -1448,6 +1918,189 @@ paths:
       summary: 获取因子得分趋势
       tags:
       - 测评
+  /api/v1/personality-assessments:
+    get:
+      parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      - description: 算法过滤 mbti/sbti
+        in: query
+        name: algorithm
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalityassessment.ListAssessmentsResponse'
+              type: object
+      summary: 查询人格测评列表
+      tags:
+      - 人格测评
+  /api/v1/personality-assessments/{id}:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalityassessment.AssessmentDetailResponse'
+              type: object
+      summary: 获取人格测评详情
+      tags:
+      - 人格测评
+  /api/v1/personality-assessments/{id}/report:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalityassessment.AssessmentReportResponse'
+              type: object
+      summary: 获取人格测评报告
+      tags:
+      - 人格测评
+  /api/v1/personality-assessments/{id}/wait-report:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      - default: 20
+        description: 超时时间（秒）
+        in: query
+        name: timeout
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalityassessment.AssessmentStatusResponse'
+              type: object
+      summary: 长轮询等待人格测评报告
+      tags:
+      - 人格测评
+  /api/v1/personality-models:
+    get:
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 20
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      - description: 算法过滤 mbti/sbti
+        in: query
+        name: algorithm
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/github_com_FangcunMount_qs-server_internal_collection-server_application_personalitymodel.ListPersonalityModelsResponse'
+              type: object
+      summary: 获取人格测评模型列表
+      tags:
+      - 人格测评模型
+  /api/v1/personality-models/{code}:
+    get:
+      parameters:
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalitymodel.PersonalityModelResponse'
+              type: object
+      summary: 获取人格测评模型详情
+      tags:
+      - 人格测评模型
+  /api/v1/personality-models/categories:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalitymodel.PersonalityModelCategoriesResponse'
+              type: object
+      summary: 获取人格测评模型分类
+      tags:
+      - 人格测评模型
   /api/v1/public/info:
     get:
       description: 获取服务基本信息
@@ -1980,6 +2633,83 @@ paths:
       summary: 检查受试者是否存在
       tags:
       - 受试者
+  /api/v2/assessments:
+    get:
+      description: 分页查询测评列表，响应使用 model/primary_score/level 投影
+      parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.ListAssessmentsV2Response'
+              type: object
+      summary: 查询我的 v2 测评列表
+      tags:
+      - 测评-V2
+  /api/v2/assessments/{id}:
+    get:
+      description: 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.AssessmentDetailV2Response'
+              type: object
+      summary: 获取我的 v2 测评详情
+      tags:
+      - 测评-V2
+  /api/v2/assessments/{id}/report:
+    get:
+      description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.AssessmentReportV2Response'
+              type: object
+      summary: 获取 v2 测评报告
+      tags:
+      - 测评-V2
   /health:
     get:
       description: 检查服务健康状态
@@ -2009,4 +2739,9 @@ paths:
 schemes:
 - http
 - https
+securityDefinitions:
+  BearerAuth:
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"

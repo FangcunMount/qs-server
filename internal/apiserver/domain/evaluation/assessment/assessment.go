@@ -281,7 +281,7 @@ func (a *Assessment) ApplyOutcome(outcome *AssessmentOutcome) error {
 		score := outcome.Primary.Value
 		a.totalScore = &score
 	}
-	if outcome.Level != nil && outcome.Level.Code != "" {
+	if outcome.Level != nil && IsRiskLevelCode(outcome.Level.Code) {
 		risk := RiskLevel(outcome.Level.Code)
 		a.riskLevel = &risk
 	}

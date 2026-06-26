@@ -72,7 +72,8 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 		"InternalService":      "NewInternalService",
 		"PlanCommandService":   "NewPlanCommandService",
 		"QuestionnaireService": "NewQuestionnaireService",
-		"ScaleService":         "NewScaleService",
+		"ScaleService":              "NewScaleService",
+		"PersonalityModelService":   "NewPersonalityModelService",
 	}
 
 	err = filepath.WalkDir(protoRoot, func(path string, d os.DirEntry, err error) error {

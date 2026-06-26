@@ -994,6 +994,86 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /personality-models:
+    get:
+      tags: [人格测评模型]
+      summary: 获取人格测评模型列表
+      operationId: listPersonalityModels
+      responses:
+        '200':
+          description: OK
+  /personality-models/categories:
+    get:
+      tags: [人格测评模型]
+      summary: 获取人格测评模型分类
+      operationId: getPersonalityModelCategories
+      responses:
+        '200':
+          description: OK
+  /personality-models/{code}:
+    get:
+      tags: [人格测评模型]
+      summary: 获取人格测评模型详情
+      operationId: getPersonalityModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+  /personality-assessments:
+    get:
+      tags: [人格测评]
+      summary: 查询人格测评列表
+      operationId: listPersonalityAssessments
+      responses:
+        '200':
+          description: OK
+  /personality-assessments/{id}:
+    get:
+      tags: [人格测评]
+      summary: 获取人格测评详情
+      operationId: getPersonalityAssessment
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+  /personality-assessments/{id}/report:
+    get:
+      tags: [人格测评]
+      summary: 获取人格测评报告
+      operationId: getPersonalityAssessmentReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+  /personality-assessments/{id}/wait-report:
+    get:
+      tags: [人格测评]
+      summary: 长轮询等待人格测评报告
+      operationId: waitPersonalityAssessmentReport
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
   /testees:
     get:
       tags:

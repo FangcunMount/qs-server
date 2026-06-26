@@ -23,6 +23,11 @@ func TestCollectionOpenAPIContractCoversKeyRoutes(t *testing.T) {
 	assertOpenAPIOperation(t, spec, "/questionnaires/{code}", "get")
 	assertOpenAPIOperation(t, spec, "/scales/hot", "get")
 	assertOpenAPIOperation(t, spec, "/scales/categories", "get")
+	assertOpenAPIOperation(t, spec, "/personality-models", "get")
+	assertOpenAPIOperation(t, spec, "/personality-models/categories", "get")
+	assertOpenAPIOperation(t, spec, "/personality-assessments", "get")
+	assertOpenAPIOperation(t, spec, "/personality-assessments/{id}/report", "get")
+	assertOpenAPIOperation(t, spec, "/personality-assessments/{id}/wait-report", "get")
 	assertOpenAPIOperation(t, spec, "/testees/{id}/care-context", "get")
 	assertOpenAPIOperation(t, spec, "/health", "get")
 }

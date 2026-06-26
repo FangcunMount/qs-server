@@ -26,6 +26,9 @@ type evaluationQueryService interface {
 	GetFactorTrend(ctx context.Context, testeeID uint64, req *evaluation.GetFactorTrendRequest) ([]evaluation.TrendPointResponse, error)
 	GetAssessmentTrendSummary(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentTrendSummaryResponse, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]evaluation.FactorScoreResponse, error)
+	GetMyAssessmentV2(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentDetailV2Response, error)
+	ListMyAssessmentsV2(ctx context.Context, testeeID uint64, req *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsV2Response, error)
+	GetAssessmentReportV2(ctx context.Context, assessmentID uint64) (*evaluation.AssessmentReportV2Response, error)
 }
 
 type answerSheetLookupService interface {

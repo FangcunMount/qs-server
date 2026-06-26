@@ -4674,6 +4674,227 @@
                 }
             }
         },
+        "/api/v2/evaluations/assessments": {
+            "get": {
+                "description": "分页查询测评列表，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Assessment-V2"
+                ],
+                "summary": "查询 v2 测评列表",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "状态筛选",
+                        "name": "status",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "受试者ID筛选",
+                        "name": "testee_id",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentV2ListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/evaluations/assessments/{id}": {
+            "get": {
+                "description": "根据 ID 获取测评，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Assessment-V2"
+                ],
+                "summary": "获取 v2 测评详情",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.AssessmentV2Response"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/evaluations/assessments/{id}/report": {
+            "get": {
+                "description": "获取指定测评的解读报告，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Report-V2"
+                ],
+                "summary": "获取 v2 测评报告",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ReportV2Response"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v2/evaluations/reports": {
+            "get": {
+                "description": "查询指定受试者的报告列表，响应使用 model/primary_score/level 投影",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Report-V2"
+                ],
+                "summary": "查询 v2 报告列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 1,
+                        "description": "页码",
+                        "name": "page",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 10,
+                        "description": "每页数量",
+                        "name": "page_size",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.ReportV2ListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/clinicians/me/workbench/queues/summary": {
             "get": {
                 "security": [
@@ -6247,6 +6468,88 @@
                 }
             }
         },
+        "response.AssessmentV2ListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.AssessmentV2Response"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.AssessmentV2Response": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/response.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/response.ModelIdentityResponse"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "origin_type_label": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/response.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_label": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                }
+            }
+        },
         "response.BatchEvaluationResponse": {
             "type": "object",
             "properties": {
@@ -6662,6 +6965,78 @@
                 }
             }
         },
+        "response.ModelExtraResponse": {
+            "type": "object",
+            "properties": {
+                "commentary": {
+                    "type": "string"
+                },
+                "image_url": {
+                    "type": "string"
+                },
+                "is_special": {
+                    "type": "boolean"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "match_percent": {
+                    "type": "number"
+                },
+                "one_liner": {
+                    "type": "string"
+                },
+                "rarity": {
+                    "$ref": "#/definitions/response.ModelRarityResponse"
+                },
+                "special_trigger": {
+                    "type": "string"
+                },
+                "type_code": {
+                    "type": "string"
+                },
+                "type_name": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ModelIdentityResponse": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ModelRarityResponse": {
+            "type": "object",
+            "properties": {
+                "label": {
+                    "type": "string"
+                },
+                "one_in_x": {
+                    "type": "integer"
+                },
+                "percent": {
+                    "type": "number"
+                }
+            }
+        },
         "response.PeriodicProjectResponse": {
             "type": "object",
             "properties": {
@@ -6986,6 +7361,67 @@
                 }
             }
         },
+        "response.ReportV2ListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ReportV2Response"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.ReportV2Response": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DimensionItem"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/response.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/response.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/response.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/response.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.SuggestionItem"
+                    }
+                }
+            }
+        },
         "response.ReporterResponse": {
             "type": "object",
             "properties": {
@@ -6993,6 +7429,20 @@
                     "type": "string"
                 },
                 "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "response.ResultLevelResponse": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "severity": {
                     "type": "string"
                 }
             }
@@ -7151,6 +7601,23 @@
                 },
                 "total_score": {
                     "description": "总分",
+                    "type": "number"
+                }
+            }
+        },
+        "response.ScoreValueResponse": {
+            "type": "object",
+            "properties": {
+                "kind": {
+                    "type": "string"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "max": {
+                    "type": "number"
+                },
+                "value": {
                     "type": "number"
                 }
             }
@@ -8461,5 +8928,17 @@
                 }
             }
         }
-    }
+    },
+    "securityDefinitions": {
+        "BearerAuth": {
+            "type": "apiKey",
+            "name": "Authorization",
+            "in": "header"
+        }
+    },
+    "security": [
+        {
+            "BearerAuth": []
+        }
+    ]
 }

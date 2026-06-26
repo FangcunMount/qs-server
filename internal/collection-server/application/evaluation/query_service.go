@@ -440,3 +440,54 @@ func (s *QueryService) GetHighRiskFactors(ctx context.Context, testeeID, assessm
 
 	return factors, nil
 }
+
+// GetMyAssessmentV2 loads assessment detail via apiserver Evaluation V2 gRPC.
+func (s *QueryService) GetMyAssessmentV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailV2Response, error) {
+	result, err := s.evaluationClient.GetMyAssessmentV2(ctx, testeeID, assessmentID)
+	if err != nil {
+		log.Errorf("Failed to get assessment v2 via gRPC: %v", err)
+		return nil, err
+	}
+	return AssessmentDetailV2FromOutput(result), nil
+}
+
+// ListMyAssessmentsV2 loads assessment list via apiserver Evaluation V2 gRPC.
+func (s *QueryService) ListMyAssessmentsV2(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsV2Response, error) {
+	page := req.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := req.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+	result, err := s.evaluationClient.ListMyAssessmentsV2(
+		ctx,
+		testeeID,
+		req.Status,
+		req.ScaleCode,
+		req.RiskLevel,
+		"",
+		"",
+		page,
+		pageSize,
+	)
+	if err != nil {
+		log.Errorf("Failed to list assessments v2 via gRPC: %v", err)
+		return nil, err
+	}
+	return ListAssessmentsV2FromOutput(result), nil
+}
+
+// GetAssessmentReportV2 loads report via apiserver Evaluation V2 gRPC without scale factor filtering.
+func (s *QueryService) GetAssessmentReportV2(ctx context.Context, assessmentID uint64) (*AssessmentReportV2Response, error) {
+	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, assessmentID)
+	if err != nil {
+		log.Errorf("Failed to get assessment report v2 via gRPC: %v", err)
+		return nil, err
+	}
+	return AssessmentReportV2FromOutput(result), nil
+}

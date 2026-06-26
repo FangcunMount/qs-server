@@ -361,6 +361,9 @@ message ListMyAssessmentsV2Request {
   string risk_level = 6;
   string date_from = 7;
   string date_to = 8;
+  string model_kind = 9;
+  string model_algorithm = 10;
+  string model_code = 11;
 }
 
 message ListMyAssessmentsV2Response {

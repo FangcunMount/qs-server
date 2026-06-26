@@ -37,6 +37,9 @@ type AssessmentFilter struct {
 	Statuses              []string
 	ScaleCode             string
 	RiskLevel             string
+	ModelKind             string
+	ModelAlgorithm        string
+	ModelCode             string
 	DateFrom              *time.Time
 	DateTo                *time.Time
 }

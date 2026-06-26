@@ -21,10 +21,24 @@ func (r Ref) IsEmpty() bool {
 // RuleSetRef is kept as a compatibility name while callers migrate to Ref.
 type RuleSetRef = Ref
 
+// ListPublishedFilter narrows published-model list queries for C-side catalogs.
+type ListPublishedFilter struct {
+	Kind      domain.Kind
+	Algorithm domain.Algorithm
+	Page      int
+	PageSize  int
+}
+
 // PublishedReader 读取已发布测评模型快照。
 type PublishedReader interface {
 	GetPublishedByRef(ctx context.Context, ref Ref) (*domain.Snapshot, error)
 	FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error)
+}
+
+// PublishedLister lists published models for C-side catalogs.
+type PublishedLister interface {
+	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error)
+	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.Snapshot, int64, error)
 }
 
 // PublishedRuleSetReader is kept as a compatibility name while callers migrate to PublishedReader.

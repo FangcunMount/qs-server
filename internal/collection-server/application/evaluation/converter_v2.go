@@ -1,26 +1,28 @@
 package evaluation
 
-import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+import (
+	"strconv"
 
-func AssessmentDetailToV2(detail *AssessmentDetailResponse) *AssessmentDetailV2Response {
+	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+)
+
+func AssessmentDetailV2FromOutput(detail *grpcclient.AssessmentDetailV2Output) *AssessmentDetailV2Response {
 	if detail == nil {
 		return nil
 	}
-	model, primary, level := legacyAssessmentOutcome(detail.ScaleCode, detail.ScaleName, detail.TotalScore, detail.RiskLevel)
 	return &AssessmentDetailV2Response{
-		ID:                   detail.ID,
-		OrgID:                detail.OrgID,
-		TesteeID:             detail.TesteeID,
+		ID:                   strconv.FormatUint(detail.ID, 10),
+		OrgID:                strconv.FormatUint(detail.OrgID, 10),
+		TesteeID:             strconv.FormatUint(detail.TesteeID, 10),
 		QuestionnaireCode:    detail.QuestionnaireCode,
 		QuestionnaireVersion: detail.QuestionnaireVersion,
-		AnswerSheetID:        detail.AnswerSheetID,
-		Model:                model,
-		PrimaryScore:         primary,
-		Level:                level,
+		AnswerSheetID:        strconv.FormatUint(detail.AnswerSheetID, 10),
+		Model:                modelIdentityFromOutput(detail.Model),
+		PrimaryScore:         scoreValueFromOutput(detail.PrimaryScore),
+		Level:                resultLevelFromOutput(detail.Level),
 		OriginType:           detail.OriginType,
 		OriginID:             detail.OriginID,
 		Status:               detail.Status,
-		CreatedAt:            detail.CreatedAt,
 		SubmittedAt:          detail.SubmittedAt,
 		InterpretedAt:        detail.InterpretedAt,
 		FailedAt:             detail.FailedAt,
@@ -28,31 +30,29 @@ func AssessmentDetailToV2(detail *AssessmentDetailResponse) *AssessmentDetailV2R
 	}
 }
 
-func AssessmentSummaryToV2(summary AssessmentSummaryResponse) AssessmentSummaryV2Response {
-	model, primary, level := legacyAssessmentOutcome(summary.ScaleCode, summary.ScaleName, summary.TotalScore, summary.RiskLevel)
+func AssessmentSummaryV2FromOutput(summary grpcclient.AssessmentSummaryV2Output) AssessmentSummaryV2Response {
 	return AssessmentSummaryV2Response{
-		ID:                   summary.ID,
+		ID:                   strconv.FormatUint(summary.ID, 10),
 		QuestionnaireCode:    summary.QuestionnaireCode,
 		QuestionnaireVersion: summary.QuestionnaireVersion,
-		AnswerSheetID:        summary.AnswerSheetID,
-		Model:                model,
-		PrimaryScore:         primary,
-		Level:                level,
+		AnswerSheetID:        strconv.FormatUint(summary.AnswerSheetID, 10),
+		Model:                modelIdentityFromOutput(summary.Model),
+		PrimaryScore:         scoreValueFromOutput(summary.PrimaryScore),
+		Level:                resultLevelFromOutput(summary.Level),
 		OriginType:           summary.OriginType,
 		Status:               summary.Status,
-		CreatedAt:            summary.CreatedAt,
 		SubmittedAt:          summary.SubmittedAt,
 		InterpretedAt:        summary.InterpretedAt,
 	}
 }
 
-func ListAssessmentsToV2(resp *ListAssessmentsResponse) *ListAssessmentsV2Response {
+func ListAssessmentsV2FromOutput(resp *grpcclient.ListAssessmentsV2Output) *ListAssessmentsV2Response {
 	if resp == nil {
 		return nil
 	}
 	items := make([]AssessmentSummaryV2Response, 0, len(resp.Items))
 	for _, item := range resp.Items {
-		items = append(items, AssessmentSummaryToV2(item))
+		items = append(items, AssessmentSummaryV2FromOutput(item))
 	}
 	return &ListAssessmentsV2Response{
 		Items:      items,
@@ -63,39 +63,98 @@ func ListAssessmentsToV2(resp *ListAssessmentsResponse) *ListAssessmentsV2Respon
 	}
 }
 
-func AssessmentReportToV2(report *AssessmentReportResponse) *AssessmentReportV2Response {
+func AssessmentReportV2FromOutput(report *grpcclient.AssessmentReportV2Output) *AssessmentReportV2Response {
 	if report == nil {
 		return nil
 	}
-	model, primary, level := legacyAssessmentOutcome(report.ScaleCode, report.ScaleName, report.TotalScore, report.RiskLevel)
+	dimensions := make([]DimensionInterpretResponse, 0, len(report.Dimensions))
+	for _, dim := range report.Dimensions {
+		dimensions = append(dimensions, DimensionInterpretResponse{
+			FactorCode:  dim.FactorCode,
+			FactorName:  dim.FactorName,
+			RawScore:    dim.RawScore,
+			MaxScore:    dim.MaxScore,
+			RiskLevel:   dim.RiskLevel,
+			Description: dim.Description,
+			Suggestion:  dim.Suggestion,
+		})
+	}
+	suggestions := make([]SuggestionResponse, 0, len(report.Suggestions))
+	for _, item := range report.Suggestions {
+		suggestions = append(suggestions, SuggestionResponse{
+			Category:   item.Category,
+			Content:    item.Content,
+			FactorCode: item.FactorCode,
+		})
+	}
 	return &AssessmentReportV2Response{
-		AssessmentID: report.AssessmentID,
-		Model:        model,
-		PrimaryScore: primary,
-		Level:        level,
+		AssessmentID: strconv.FormatUint(report.AssessmentID, 10),
+		Model:        modelIdentityFromOutput(report.Model),
+		PrimaryScore: scoreValueFromOutput(report.PrimaryScore),
+		Level:        resultLevelFromOutput(report.Level),
 		Conclusion:   report.Conclusion,
-		Dimensions:   report.Dimensions,
-		Suggestions:  report.Suggestions,
+		Dimensions:   dimensions,
+		Suggestions:  suggestions,
+		ModelExtra:   modelExtraFromOutput(report.ModelExtra),
 		CreatedAt:    report.CreatedAt,
 	}
 }
 
-func legacyAssessmentOutcome(scaleCode, scaleName string, totalScore float64, riskLevel string) (ModelIdentityResponse, *ScoreValueResponse, *ResultLevelResponse) {
-	model := ModelIdentityResponse{
-		Kind:      "scale",
-		Algorithm: "scale_default",
-		Code:      scaleCode,
-		Title:     scaleName,
+func modelIdentityFromOutput(model grpcclient.ModelIdentityOutput) ModelIdentityResponse {
+	return ModelIdentityResponse{
+		Kind:      model.Kind,
+		SubKind:   model.SubKind,
+		Algorithm: model.Algorithm,
+		Code:      model.Code,
+		Version:   model.Version,
+		Title:     model.Title,
 	}
-	var primary *ScoreValueResponse
-	if totalScore != 0 {
-		primary = &ScoreValueResponse{Kind: domainreport.ScoreKindRawTotal, Value: totalScore}
+}
+
+func scoreValueFromOutput(score *grpcclient.ScoreValueOutput) *ScoreValueResponse {
+	if score == nil {
+		return nil
 	}
-	var level *ResultLevelResponse
-	if riskLevel != "" && domainreport.IsRiskLevelCode(riskLevel) {
-		if lv := domainreport.LevelFromRisk(domainreport.RiskLevel(riskLevel)); lv != nil {
-			level = &ResultLevelResponse{Code: lv.Code, Label: lv.Label, Severity: lv.Severity}
+	return &ScoreValueResponse{
+		Kind:  score.Kind,
+		Value: score.Value,
+		Label: score.Label,
+		Max:   score.Max,
+	}
+}
+
+func resultLevelFromOutput(level *grpcclient.ResultLevelOutput) *ResultLevelResponse {
+	if level == nil {
+		return nil
+	}
+	return &ResultLevelResponse{
+		Code:     level.Code,
+		Label:    level.Label,
+		Severity: level.Severity,
+	}
+}
+
+func modelExtraFromOutput(extra *grpcclient.ModelExtraOutput) *ModelExtraResponse {
+	if extra == nil {
+		return nil
+	}
+	resp := &ModelExtraResponse{
+		Kind:           extra.Kind,
+		TypeCode:       extra.TypeCode,
+		TypeName:       extra.TypeName,
+		OneLiner:       extra.OneLiner,
+		ImageURL:       extra.ImageURL,
+		MatchPercent:   extra.MatchPercent,
+		IsSpecial:      extra.IsSpecial,
+		SpecialTrigger: extra.SpecialTrigger,
+		Commentary:     extra.Commentary,
+	}
+	if extra.Rarity != nil {
+		resp.Rarity = &ModelRarityResponse{
+			Percent: extra.Rarity.Percent,
+			Label:   extra.Rarity.Label,
+			OneInX:  extra.Rarity.OneInX,
 		}
 	}
-	return model, primary, level
+	return resp
 }

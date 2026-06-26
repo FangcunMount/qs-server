@@ -129,6 +129,11 @@ func decodeTypologyPayload(payload []byte) (*typology.Payload, error) {
 	return &model, nil
 }
 
+// DecodeTypologyFromSnapshot decodes a published snapshot into a typology payload.
+func DecodeTypologyFromSnapshot(snapshot *domain.Snapshot) (*typology.Payload, error) {
+	return typology.DecodeFromSnapshot(snapshot)
+}
+
 func resolvePayloadFormat(snapshot *domain.RuleSetSnapshot, kind domain.Kind, defaultFormat string) (string, error) {
 	if snapshot.PayloadFormat != "" {
 		return snapshot.PayloadFormat, nil

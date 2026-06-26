@@ -80,5 +80,27 @@ type AssessmentReportV2Response struct {
 	Conclusion   string                       `json:"conclusion"`
 	Dimensions   []DimensionInterpretResponse `json:"dimensions"`
 	Suggestions  []SuggestionResponse         `json:"suggestions"`
+	ModelExtra   *ModelExtraResponse          `json:"model_extra,omitempty"`
 	CreatedAt    string                       `json:"created_at"`
+}
+
+// ModelExtraResponse carries typology-specific report extensions.
+type ModelExtraResponse struct {
+	Kind           string               `json:"kind,omitempty"`
+	TypeCode       string               `json:"type_code,omitempty"`
+	TypeName       string               `json:"type_name,omitempty"`
+	OneLiner       string               `json:"one_liner,omitempty"`
+	ImageURL       string               `json:"image_url,omitempty"`
+	MatchPercent   float64              `json:"match_percent,omitempty"`
+	IsSpecial      bool                 `json:"is_special,omitempty"`
+	SpecialTrigger string               `json:"special_trigger,omitempty"`
+	Commentary     string               `json:"commentary,omitempty"`
+	Rarity         *ModelRarityResponse `json:"rarity,omitempty"`
+}
+
+// ModelRarityResponse is the theoretical rarity projection.
+type ModelRarityResponse struct {
+	Percent float64 `json:"percent,omitempty"`
+	Label   string  `json:"label,omitempty"`
+	OneInX  int32   `json:"one_in_x,omitempty"`
 }

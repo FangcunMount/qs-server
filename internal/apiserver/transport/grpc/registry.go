@@ -14,6 +14,7 @@ import (
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -37,8 +38,9 @@ type Deps struct {
 	Survey     SurveyDeps
 	Actor      ActorDeps
 	Evaluation EvaluationDeps
-	Scale      ScaleDeps
-	Plan       PlanDeps
+	Scale             ScaleDeps
+	PersonalityModel  PersonalityModelDeps
+	Plan              PlanDeps
 	Statistics StatisticsDeps
 	IAM        IAMDeps
 	RuleSet    RuleSetDeps
@@ -87,6 +89,10 @@ type ScaleDeps struct {
 	CategoryService scaleApp.ScaleCategoryService
 }
 
+type PersonalityModelDeps struct {
+	QueryService personalityModelApp.PersonalityModelQueryService
+}
+
 type PlanDeps struct {
 	CommandService         planApp.PlanCommandService
 	TaskAssessmentResolver planApp.TaskAssessmentResolver
@@ -131,6 +137,9 @@ func (r *Registry) RegisterServices() error {
 		return err
 	}
 	if err := r.registerScaleService(); err != nil {
+		return err
+	}
+	if err := r.registerPersonalityModelService(); err != nil {
 		return err
 	}
 	if err := r.registerInternalService(); err != nil {
@@ -226,6 +235,20 @@ func (r *Registry) registerScaleService() error {
 
 	r.server.RegisterService(scaleService)
 	log.Info("   📊 Scale service registered (read-only)")
+	return nil
+}
+
+func (r *Registry) registerPersonalityModelService() error {
+	if r.deps.PersonalityModel.QueryService == nil {
+		log.Warn("PersonalityModelModule is not initialized, skipping personality model service registration")
+		return nil
+	}
+
+	personalityModelService := service.NewPersonalityModelService(
+		r.deps.PersonalityModel.QueryService,
+	)
+	r.server.RegisterService(personalityModelService)
+	log.Info("   📊 Personality model service registered (read-only)")
 	return nil
 }
 

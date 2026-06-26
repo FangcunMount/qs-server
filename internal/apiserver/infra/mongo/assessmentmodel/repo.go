@@ -6,6 +6,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -19,6 +20,7 @@ type Repository struct {
 
 var (
 	_ port.PublishedReader = (*Repository)(nil)
+	_ port.PublishedLister = (*Repository)(nil)
 	_ port.PublishedWriter = (*Repository)(nil)
 )
 
@@ -108,6 +110,69 @@ func (r *Repository) FindPublishedByQuestionnaire(ctx context.Context, questionn
 		filter["questionnaire_version"] = questionnaireVersion
 	}
 	return r.findOne(ctx, filter)
+}
+
+func (r *Repository) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
+	if code == "" {
+		return nil, domain.ErrNotFound
+	}
+	filter := publishedFilter(bson.M{
+		"model_kind": string(kind),
+		"model_code": code,
+	})
+	return r.findOne(ctx, filter)
+}
+
+func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
+	page := filter.Page
+	if page <= 0 {
+		page = 1
+	}
+	pageSize := filter.PageSize
+	if pageSize <= 0 {
+		pageSize = 10
+	}
+	if pageSize > 100 {
+		pageSize = 100
+	}
+
+	extra := bson.M{}
+	if filter.Kind != "" {
+		extra["model_kind"] = string(filter.Kind)
+	}
+	if filter.Algorithm != "" {
+		extra["model_algorithm"] = string(filter.Algorithm)
+	}
+	mongoFilter := publishedFilter(extra)
+
+	total, err := r.Collection().CountDocuments(ctx, mongoFilter)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	opts := options.Find().
+		SetSort(bson.D{{Key: "model_code", Value: 1}}).
+		SetSkip(int64((page - 1) * pageSize)).
+		SetLimit(int64(pageSize))
+
+	cursor, err := r.Collection().Find(ctx, mongoFilter, opts)
+	if err != nil {
+		return nil, 0, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	snapshots := make([]*domain.Snapshot, 0)
+	for cursor.Next(ctx) {
+		var po PublishedAssessmentModelPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, 0, err
+		}
+		snapshots = append(snapshots, r.mapper.ToLegacySnapshot(&po))
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, 0, err
+	}
+	return snapshots, total, nil
 }
 
 func (r *Repository) refFilter(ref port.Ref) bson.M {

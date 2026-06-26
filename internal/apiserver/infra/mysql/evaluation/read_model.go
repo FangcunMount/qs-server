@@ -230,6 +230,15 @@ func applyAssessmentReadModelFilter(query *gorm.DB, filter evaluationreadmodel.A
 	if filter.ScaleCode != "" {
 		query = query.Where("medical_scale_code = ?", filter.ScaleCode)
 	}
+	if filter.ModelKind != "" {
+		query = query.Where("evaluation_model_kind = ?", filter.ModelKind)
+	}
+	if filter.ModelAlgorithm != "" {
+		query = query.Where("evaluation_model_algorithm = ?", filter.ModelAlgorithm)
+	}
+	if filter.ModelCode != "" {
+		query = query.Where("evaluation_model_code = ?", filter.ModelCode)
+	}
 	if filter.RiskLevel != "" {
 		query = query.Where("risk_level = ?", strings.ToLower(filter.RiskLevel))
 	}

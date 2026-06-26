@@ -210,16 +210,18 @@ func toDomainModelExtra(po *ModelExtraPO) *report.ModelExtra {
 
 func dimensionToPO(d report.DimensionInterpret) DimensionInterpretPO {
 	po := DimensionInterpretPO{
-		FactorCode:  d.FactorCode().String(),
-		FactorName:  d.FactorName(),
+		FactorCode:  d.Code().String(),
+		FactorName:  d.Name(),
 		RawScore:    d.RawScore(),
 		MaxScore:    d.MaxScore(),
-		RiskLevel:   string(d.RiskLevel()),
+		RiskLevel:   d.Severity(),
 		Description: d.Description(),
 		Suggestion:  d.Suggestion(),
 	}
 	po.Score = scoreValueToPO(report.NewRawTotalScore(d.RawScore(), d.MaxScore()))
-	po.Level = resultLevelToPO(report.LevelFromRisk(d.RiskLevel()))
+	if report.IsRiskLevelCode(d.Severity()) {
+		po.Level = resultLevelToPO(report.LevelFromRisk(report.RiskLevel(d.Severity())))
+	}
 	return po
 }
 
