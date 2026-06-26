@@ -86,6 +86,30 @@ func TestRuntimeSpecJSONRoundTripPreservesExplicitConfig(t *testing.T) {
 	}
 }
 
+func TestRuntimeSpecTemplateReportRequiresAdapterKey(t *testing.T) {
+	payload := explicitPoleCompositionPayload()
+	payload.Runtime.Report = ReportSpec{Kind: ReportKindTemplate, TemplateID: "custom-template"}
+
+	_, err := payload.ToRuntimeSpec()
+	if err == nil {
+		t.Fatal("ToRuntimeSpec error = nil, want template adapter key error")
+	}
+}
+
+func TestRuntimeSpecRejectsUnsupportedSpecialRulePhase(t *testing.T) {
+	payload := explicitPoleCompositionPayload()
+	payload.Runtime.SpecialRules = []SpecialRuleSpec{{
+		Code:  "before-decision",
+		Kind:  SpecialRuleKindAnswerMatch,
+		Phase: SpecialRuleBeforeDecision,
+	}}
+
+	_, err := payload.ToRuntimeSpec()
+	if err == nil {
+		t.Fatal("ToRuntimeSpec error = nil, want unsupported special rule phase")
+	}
+}
+
 func explicitPoleCompositionPayload() *Payload {
 	return &Payload{
 		Code:                 "CUSTOM_POLE_V1",

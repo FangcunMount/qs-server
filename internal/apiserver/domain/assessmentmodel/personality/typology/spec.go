@@ -179,9 +179,11 @@ type OutcomeMappingSpec struct {
 type DetailAdapterKey string
 
 const (
-	DetailAdapterMBTI    DetailAdapterKey = "mbti"
-	DetailAdapterSBTI    DetailAdapterKey = "sbti"
-	DetailAdapterBigFive DetailAdapterKey = "bigfive"
+	DetailAdapterPersonalityType DetailAdapterKey = "personality_type"
+	DetailAdapterTraitProfile    DetailAdapterKey = "trait_profile"
+	DetailAdapterMBTI            DetailAdapterKey = "mbti"
+	DetailAdapterSBTI            DetailAdapterKey = "sbti"
+	DetailAdapterBigFive         DetailAdapterKey = "bigfive"
 )
 
 // ResolvedDetailAdapterKey returns the configured adapter key, deriving from legacy fields when needed.
@@ -190,12 +192,9 @@ func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind assessmentmode
 		return m.DetailAdapterKey
 	}
 	if m.DetailKind == OutcomeDetailTraitProfile {
-		return DetailAdapterBigFive
+		return DetailAdapterTraitProfile
 	}
-	if decisionKind == assessmentmodel.DecisionKindNearestPattern {
-		return DetailAdapterSBTI
-	}
-	return DetailAdapterMBTI
+	return DetailAdapterPersonalityType
 }
 
 // ReportKind selects the report adapter strategy.
@@ -219,9 +218,11 @@ type ReportSpec struct {
 type ReportAdapterKey string
 
 const (
-	ReportAdapterMBTI    ReportAdapterKey = "mbti"
-	ReportAdapterSBTI    ReportAdapterKey = "sbti"
-	ReportAdapterBigFive ReportAdapterKey = "bigfive"
+	ReportAdapterPersonalityType ReportAdapterKey = "personality_type"
+	ReportAdapterTraitProfile    ReportAdapterKey = "trait_profile"
+	ReportAdapterMBTI            ReportAdapterKey = "mbti"
+	ReportAdapterSBTI            ReportAdapterKey = "sbti"
+	ReportAdapterBigFive         ReportAdapterKey = "bigfive"
 )
 
 // ResolvedAdapterKey returns the configured report adapter, deriving from kind and outcome mapping when needed.
@@ -229,15 +230,20 @@ func (r ReportSpec) ResolvedAdapterKey(mapping OutcomeMappingSpec, decisionKind 
 	if r.AdapterKey != "" {
 		return r.AdapterKey
 	}
+	if r.Kind == ReportKindTemplate {
+		return ""
+	}
 	if r.Kind == ReportKindTraitProfile {
-		return ReportAdapterBigFive
+		return ReportAdapterTraitProfile
 	}
 	switch mapping.ResolvedDetailAdapterKey(decisionKind) {
 	case DetailAdapterSBTI:
 		return ReportAdapterSBTI
 	case DetailAdapterBigFive:
 		return ReportAdapterBigFive
+	case DetailAdapterTraitProfile:
+		return ReportAdapterTraitProfile
 	default:
-		return ReportAdapterMBTI
+		return ReportAdapterPersonalityType
 	}
 }

@@ -20,9 +20,11 @@ type ReportAdapterRegistry struct {
 func DefaultReportAdapterRegistry() ReportAdapterRegistry {
 	return ReportAdapterRegistry{
 		adapters: map[modeltypology.ReportAdapterKey]reportBuilderFunc{
-			modeltypology.ReportAdapterMBTI:    buildMBTIReport,
-			modeltypology.ReportAdapterSBTI:    buildSBTIReport,
-			modeltypology.ReportAdapterBigFive: buildBigFiveReport,
+			modeltypology.ReportAdapterPersonalityType: buildPersonalityTypeReport,
+			modeltypology.ReportAdapterTraitProfile:    buildTraitProfileReport,
+			modeltypology.ReportAdapterMBTI:            buildMBTIReport,
+			modeltypology.ReportAdapterSBTI:            buildSBTIReport,
+			modeltypology.ReportAdapterBigFive:         buildBigFiveReport,
 		},
 	}
 }
@@ -33,10 +35,10 @@ func (r ReportAdapterRegistry) build(
 	decisionKind assessmentmodel.DecisionKind,
 	outcome evaluationresult.Outcome,
 ) (*domainReport.InterpretReport, error) {
-	if spec.Kind == modeltypology.ReportKindTemplate {
-		return nil, fmt.Errorf("report kind template is not implemented")
-	}
 	adapterKey := spec.ResolvedAdapterKey(mapping, decisionKind)
+	if adapterKey == "" {
+		return nil, fmt.Errorf("report adapter key is required")
+	}
 	builder, ok := r.adapters[adapterKey]
 	if !ok {
 		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)

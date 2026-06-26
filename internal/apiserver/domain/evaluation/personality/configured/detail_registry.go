@@ -46,9 +46,11 @@ type DetailAssemblerRegistry struct {
 func DefaultDetailAssemblerRegistry() DetailAssemblerRegistry {
 	return DetailAssemblerRegistry{
 		assemblers: map[modeltypology.DetailAdapterKey]detailAssemblerFunc{
-			modeltypology.DetailAdapterMBTI:    assembleMBTIDetail,
-			modeltypology.DetailAdapterSBTI:    assembleSBTIDetail,
-			modeltypology.DetailAdapterBigFive: assembleBigFiveDetail,
+			modeltypology.DetailAdapterPersonalityType: assemblePersonalityTypeDetail,
+			modeltypology.DetailAdapterTraitProfile:    assembleTraitProfileDetail,
+			modeltypology.DetailAdapterMBTI:            assembleMBTIDetail,
+			modeltypology.DetailAdapterSBTI:            assembleSBTIDetail,
+			modeltypology.DetailAdapterBigFive:         assembleBigFiveDetail,
 		},
 	}
 }

@@ -16,7 +16,7 @@ func TestEvaluatorCompositeFactorAggregatesBeforePoleDecision(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
-	detail, err := evaluationtypology.MBTIResultDetailFromPayload(got.Detail)
+	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
@@ -41,7 +41,7 @@ func TestEvaluatorCompositeFactorMatchesFlatTraitProfileScores(t *testing.T) {
 		t.Fatalf("flat Score: %v", err)
 	}
 
-	explicitDetail, err := evaluationtypology.BigFiveResultDetailFromPayload(explicitResult.Detail)
+	explicitDetail, err := evaluationtypology.TraitProfileDetailFromPayload(explicitResult.Detail)
 	if err != nil {
 		t.Fatalf("explicit detail: %v", err)
 	}

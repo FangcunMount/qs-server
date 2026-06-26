@@ -449,12 +449,10 @@ func customExplicitRuntimePayload() *modeltypology.Payload {
 				Kind: assessmentmodel.DecisionKindPoleComposition,
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
-				DetailKind:       modeltypology.OutcomeDetailPersonalityType,
-				DetailAdapterKey: modeltypology.DetailAdapterMBTI,
+				DetailKind: modeltypology.OutcomeDetailPersonalityType,
 			},
 			Report: modeltypology.ReportSpec{
 				Kind:          modeltypology.ReportKindPersonalityType,
-				AdapterKey:    modeltypology.ReportAdapterMBTI,
 				CategoryLabel: "Custom Pole Model",
 			},
 		},

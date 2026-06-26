@@ -22,8 +22,8 @@ func TestReportSpecResolvedAdapterKey(t *testing.T) {
 
 	t.Run("trait profile kind", func(t *testing.T) {
 		spec := ReportSpec{Kind: ReportKindTraitProfile}
-		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindTraitProfile); got != ReportAdapterBigFive {
-			t.Fatalf("ResolvedAdapterKey() = %s, want bigfive", got)
+		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindTraitProfile); got != ReportAdapterTraitProfile {
+			t.Fatalf("ResolvedAdapterKey() = %s, want trait_profile", got)
 		}
 	})
 
@@ -32,10 +32,29 @@ func TestReportSpecResolvedAdapterKey(t *testing.T) {
 		if got := spec.ResolvedAdapterKey(sbtiMapping, assessmentmodel.DecisionKindNearestPattern); got != ReportAdapterSBTI {
 			t.Fatalf("ResolvedAdapterKey() = %s, want sbti", got)
 		}
-		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindPoleComposition); got != ReportAdapterMBTI {
-			t.Fatalf("ResolvedAdapterKey() = %s, want mbti", got)
+		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindPoleComposition); got != ReportAdapterPersonalityType {
+			t.Fatalf("ResolvedAdapterKey() = %s, want personality_type", got)
 		}
 	})
+}
+
+func TestOutcomeMappingResolvedDetailAdapterKeyUsesGenericDefaults(t *testing.T) {
+	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType}).ResolvedDetailAdapterKey(assessmentmodel.DecisionKindNearestPattern); got != DetailAdapterPersonalityType {
+		t.Fatalf("ResolvedDetailAdapterKey() = %s, want personality_type", got)
+	}
+	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailTraitProfile}).ResolvedDetailAdapterKey(assessmentmodel.DecisionKindTraitProfile); got != DetailAdapterTraitProfile {
+		t.Fatalf("ResolvedDetailAdapterKey() = %s, want trait_profile", got)
+	}
+	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType, DetailAdapterKey: DetailAdapterSBTI}).ResolvedDetailAdapterKey(assessmentmodel.DecisionKindNearestPattern); got != DetailAdapterSBTI {
+		t.Fatalf("ResolvedDetailAdapterKey() = %s, want sbti", got)
+	}
+}
+
+func TestReportSpecTemplateWithoutAdapterHasNoResolvedAdapter(t *testing.T) {
+	spec := ReportSpec{Kind: ReportKindTemplate, TemplateID: "custom"}
+	if got := spec.ResolvedAdapterKey(OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType}, assessmentmodel.DecisionKindPoleComposition); got != "" {
+		t.Fatalf("ResolvedAdapterKey() = %s, want empty", got)
+	}
 }
 
 func TestToRuntimeSpecSetsReportAdapterKey(t *testing.T) {

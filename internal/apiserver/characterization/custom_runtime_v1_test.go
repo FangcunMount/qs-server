@@ -50,9 +50,9 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := outcome.Detail.Payload.(evaluationtypology.MBTIResultDetail)
+	detail, ok := outcome.Detail.Payload.(evaluationtypology.PersonalityTypeDetail)
 	if !ok {
-		t.Fatalf("detail type = %T, want MBTIResultDetail", outcome.Detail.Payload)
+		t.Fatalf("detail type = %T, want PersonalityTypeDetail", outcome.Detail.Payload)
 	}
 	if detail.TypeCode != "INTJ" {
 		t.Fatalf("TypeCode = %s, want INTJ", detail.TypeCode)

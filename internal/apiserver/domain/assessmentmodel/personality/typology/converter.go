@@ -140,7 +140,31 @@ func validateRuntimeSpec(spec *RuntimeSpec) error {
 	if spec.Report.Kind == "" {
 		return fmt.Errorf("runtime report kind is required")
 	}
+	if spec.Report.Kind == ReportKindTemplate && spec.Report.AdapterKey == "" {
+		return fmt.Errorf("runtime template report adapter key is required")
+	}
+	for _, rule := range spec.SpecialRules {
+		if err := validateSpecialRuleSpec(rule); err != nil {
+			return err
+		}
+	}
 	return nil
+}
+
+func validateSpecialRuleSpec(rule SpecialRuleSpec) error {
+	switch rule.Phase {
+	case "", SpecialRuleBeforeScore, SpecialRuleAfterDecision:
+	case SpecialRuleBeforeDecision:
+		return fmt.Errorf("runtime special rule phase %s is not implemented", rule.Phase)
+	default:
+		return fmt.Errorf("runtime special rule phase %s is unsupported", rule.Phase)
+	}
+	switch rule.ResolvedKind() {
+	case "", SpecialRuleKindAnswerMatch, SpecialRuleKindFallbackThreshold:
+		return nil
+	default:
+		return fmt.Errorf("runtime special rule kind %s is unsupported", rule.ResolvedKind())
+	}
 }
 
 func cloneRuntimeSpec(source *RuntimeSpec) *RuntimeSpec {

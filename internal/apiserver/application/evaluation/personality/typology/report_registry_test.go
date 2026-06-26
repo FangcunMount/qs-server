@@ -1,6 +1,7 @@
 package typology
 
 import (
+	"strings"
 	"testing"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
@@ -33,5 +34,21 @@ func TestReportAdapterRegistryRejectsTemplateKind(t *testing.T) {
 	)
 	if err == nil {
 		t.Fatal("expected template kind error")
+	}
+	if !strings.Contains(err.Error(), "report adapter key is required") {
+		t.Fatalf("build error = %v, want report adapter key required", err)
+	}
+}
+
+func TestReportAdapterRegistryRejectsUnknownAdapter(t *testing.T) {
+	registry := DefaultReportAdapterRegistry()
+	_, err := registry.build(
+		modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterKey("custom_unknown")},
+		modeltypology.OutcomeMappingSpec{},
+		assessmentmodel.DecisionKindPoleComposition,
+		evaluationresult.Outcome{},
+	)
+	if err == nil || !strings.Contains(err.Error(), "unsupported report adapter key") {
+		t.Fatalf("build error = %v, want unsupported report adapter key", err)
 	}
 }

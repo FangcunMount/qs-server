@@ -59,6 +59,48 @@ func TestTypologyExecutorStaysAlgorithmAgnostic(t *testing.T) {
 	}
 }
 
+func TestConfiguredEvaluatorDoesNotSpecialCaseLegacyAdapters(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "personality", "configured", "evaluator.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"DetailAdapterSBTI",
+		"DetailAdapterMBTI",
+		"DetailAdapterBigFive",
+		"buildSBTIDimensionLevels",
+	} {
+		if strings.Contains(text, token) {
+			t.Fatalf("configured evaluator contains %q; legacy adapter details belong in detail assemblers", token)
+		}
+	}
+}
+
+func TestOutcomeAssemblerUsesAdapterRegistry(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "personality", "typology", "outcome_mapper.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"switch adapterKey",
+		"case modeltypology.DetailAdapter",
+	} {
+		if strings.Contains(text, token) {
+			t.Fatalf("outcome_mapper.go contains %q; outcome assembly must resolve through OutcomeAdapterRegistry", token)
+		}
+	}
+}
+
 func TestTypologyApplicationLayerKeepsConcreteModelsInAdapters(t *testing.T) {
 	t.Parallel()
 

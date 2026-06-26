@@ -47,7 +47,7 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 			OutcomeCode: match.OutcomeCode,
 			Trigger:     match.Trigger,
 			SkipScoring: match.SkipScoring,
-		}, modeltypology.DetailAdapterSBTI)
+		}, adapterKey)
 	}
 
 	graph, decision, err := buildGraphAndDecision(payload, spec)
@@ -68,15 +68,12 @@ func (e Evaluator) Score(payload *modeltypology.Payload, sheet *evaluationinput.
 		Similarity: candidate.MatchScore,
 	}
 	var specialMatch *evaluationtypology.ScoringSpecialMatch
-	if adapterKey == modeltypology.DetailAdapterSBTI {
-		selected.Dimensions = buildSBTIDimensionLevels(spec, vector, decision.LevelRule)
-		if match, ok := e.rules.ApplyAfterDecision(spec.SpecialRules, spec.Decision, payload, candidate.MatchScore); ok {
-			selected.Code = match.OutcomeCode
-			selected.Trigger = match.Trigger
-			specialMatch = &evaluationtypology.ScoringSpecialMatch{
-				OutcomeCode: match.OutcomeCode,
-				Trigger:     match.Trigger,
-			}
+	if match, ok := e.rules.ApplyAfterDecision(spec.SpecialRules, spec.Decision, payload, candidate.MatchScore); ok {
+		selected.Code = match.OutcomeCode
+		selected.Trigger = match.Trigger
+		specialMatch = &evaluationtypology.ScoringSpecialMatch{
+			OutcomeCode: match.OutcomeCode,
+			Trigger:     match.Trigger,
 		}
 	}
 
@@ -113,17 +110,4 @@ func (e Evaluator) assembleResult(
 		SpecialMatch:    specialMatch,
 		Detail:          detail,
 	}, nil
-}
-
-func buildSBTIDimensionLevels(
-	spec *modeltypology.RuntimeSpec,
-	vector profile.ProfileVector,
-	rule profile.LevelRule,
-) []DimensionLevel {
-	input := DetailInput{
-		Spec:     spec,
-		Vector:   vector,
-		Decision: profile.DecisionSpec{LevelRule: rule},
-	}
-	return buildSBTIDimensions(input)
 }

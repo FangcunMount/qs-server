@@ -10,28 +10,23 @@ import (
 )
 
 // OutcomeAssembler maps scoring results to assessment outcomes using outcome mapping spec.
-type OutcomeAssembler struct{}
+type OutcomeAssembler struct {
+	registry OutcomeAdapterRegistry
+}
 
 // NewOutcomeAssembler returns the default typology outcome assembler.
 func NewOutcomeAssembler() OutcomeAssembler {
-	return OutcomeAssembler{}
+	return OutcomeAssembler{registry: DefaultOutcomeAdapterRegistry()}
 }
 
 // Assemble converts a scoring result into an AssessmentOutcome.
-func (OutcomeAssembler) Assemble(
+func (a OutcomeAssembler) Assemble(
 	modelRef assessment.EvaluationModelRef,
 	result evaluationtypology.ScoringResult,
 	mapping modeltypology.OutcomeMappingSpec,
 ) (*assessment.AssessmentOutcome, error) {
 	adapterKey := mapping.ResolvedDetailAdapterKey(decisionKindFromResult(result))
-	switch adapterKey {
-	case modeltypology.DetailAdapterBigFive:
-		return assembleTraitProfileOutcome(modelRef, result)
-	case modeltypology.DetailAdapterSBTI:
-		return assemblePersonalityTypeFromSBTI(modelRef, result)
-	default:
-		return assemblePersonalityTypeFromMBTI(modelRef, result)
-	}
+	return a.registryOrDefault().Assemble(adapterKey, modelRef, result)
 }
 
 func decisionKindFromResult(result evaluationtypology.ScoringResult) assessmentmodel.DecisionKind {
@@ -50,6 +45,28 @@ func assembleTraitProfileOutcome(
 		return nil, err
 	}
 	return assessmentOutcomeFromBigFive(modelRef, detail), nil
+}
+
+func assembleGenericTraitProfileOutcome(
+	modelRef assessment.EvaluationModelRef,
+	result evaluationtypology.ScoringResult,
+) (*assessment.AssessmentOutcome, error) {
+	detail, err := evaluationtypology.TraitProfileDetailFromPayload(result.Detail)
+	if err != nil {
+		return nil, err
+	}
+	return assessmentOutcomeFromTraitProfile(modelRef, detail), nil
+}
+
+func assembleGenericPersonalityTypeOutcome(
+	modelRef assessment.EvaluationModelRef,
+	result evaluationtypology.ScoringResult,
+) (*assessment.AssessmentOutcome, error) {
+	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(result.Detail)
+	if err != nil {
+		return nil, err
+	}
+	return assessmentOutcomeFromPersonalityType(modelRef, detail), nil
 }
 
 func assemblePersonalityTypeFromMBTI(
@@ -88,4 +105,11 @@ func (a OutcomeAssembler) AssembleFromPayload(
 		return nil, err
 	}
 	return a.Assemble(modelRef, result, spec.OutcomeMapping)
+}
+
+func (a OutcomeAssembler) registryOrDefault() OutcomeAdapterRegistry {
+	if a.registry.Len() == 0 {
+		return DefaultOutcomeAdapterRegistry()
+	}
+	return a.registry
 }

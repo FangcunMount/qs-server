@@ -17,12 +17,30 @@ func TestEvaluatorScoresExplicitRuntimeWithoutAlgorithm(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}
-	detail, err := evaluationtypology.MBTIResultDetailFromPayload(got.Detail)
+	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail: %v", err)
 	}
 	if detail.TypeCode != "INTJ" {
 		t.Fatalf("TypeCode = %s, want INTJ", detail.TypeCode)
+	}
+}
+
+func TestEvaluatorAppliesGenericFallbackSpecialRule(t *testing.T) {
+	payload := explicitNearestPatternPayload()
+	got, err := configured.NewEvaluator().Score(payload, explicitNearestPatternLowSheet())
+	if err != nil {
+		t.Fatalf("Score: %v", err)
+	}
+	detail, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
+	if err != nil {
+		t.Fatalf("detail: %v", err)
+	}
+	if detail.TypeCode != "LOW_MATCH" {
+		t.Fatalf("TypeCode = %s, want LOW_MATCH", detail.TypeCode)
+	}
+	if got.SpecialMatch == nil || got.SpecialMatch.OutcomeCode != "LOW_MATCH" {
+		t.Fatalf("SpecialMatch = %#v, want LOW_MATCH", got.SpecialMatch)
 	}
 }
 
@@ -85,5 +103,75 @@ func explicitPoleCompositionSheet() *evaluationinput.AnswerSheet {
 		{QuestionCode: "Q_SN", Score: 5},
 		{QuestionCode: "Q_TF", Score: 1},
 		{QuestionCode: "Q_JP", Score: 1},
+	}}
+}
+
+func explicitNearestPatternPayload() *modeltypology.Payload {
+	return &modeltypology.Payload{
+		Code:    "CUSTOM_PATTERN_V1",
+		Version: "1.0.0",
+		Status:  "published",
+		Outcomes: []modeltypology.Outcome{
+			{Code: "HIGH", Name: "High", Pattern: "HH"},
+			{Code: "LOW_MATCH", Name: "Low Match", IsSpecial: true, Trigger: "fallback:best_match<90%"},
+		},
+		Runtime: &modeltypology.RuntimeSpec{
+			FactorGraph: modeltypology.FactorGraphSpec{
+				Factors: map[string]modeltypology.FactorSpec{
+					"D1": {
+						ID:   "D1",
+						Code: "D1",
+						Name: "Dimension 1",
+						Kind: modeltypology.FactorSpecKindLeaf,
+						Contributions: []modeltypology.FactorContributionSpec{
+							{QuestionCode: "Q1", OptionScores: map[string]float64{"A": 1, "C": 6}},
+						},
+						OptionScoring: modeltypology.FactorOptionScoringStrict,
+					},
+					"D2": {
+						ID:   "D2",
+						Code: "D2",
+						Name: "Dimension 2",
+						Kind: modeltypology.FactorSpecKindLeaf,
+						Contributions: []modeltypology.FactorContributionSpec{
+							{QuestionCode: "Q2", OptionScores: map[string]float64{"A": 1, "C": 6}},
+						},
+						OptionScoring: modeltypology.FactorOptionScoringStrict,
+					},
+				},
+				Roots: []string{"D1", "D2"},
+				Dimensions: map[string]modeltypology.Dimension{
+					"D1": {Code: "D1", Name: "Dimension 1"},
+					"D2": {Code: "D2", Name: "Dimension 2"},
+				},
+			},
+			Decision: modeltypology.PersonalityDecisionSpec{
+				Kind:                        "nearest_pattern",
+				FallbackSimilarityThreshold: 0.9,
+				FallbackCode:                "LOW_MATCH",
+				LevelRule:                   &modeltypology.LevelRuleSpec{LowMax: 3, HighMin: 5},
+			},
+			SpecialRules: []modeltypology.SpecialRuleSpec{
+				{
+					Code:        "fallback:LOW_MATCH",
+					Kind:        modeltypology.SpecialRuleKindFallbackThreshold,
+					Phase:       modeltypology.SpecialRuleAfterDecision,
+					OutcomeCode: "LOW_MATCH",
+				},
+			},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{
+				DetailKind: modeltypology.OutcomeDetailPersonalityType,
+			},
+			Report: modeltypology.ReportSpec{
+				Kind: modeltypology.ReportKindPersonalityType,
+			},
+		},
+	}
+}
+
+func explicitNearestPatternLowSheet() *evaluationinput.AnswerSheet {
+	return &evaluationinput.AnswerSheet{Answers: []evaluationinput.Answer{
+		{QuestionCode: "Q1", Value: "A"},
+		{QuestionCode: "Q2", Value: "C"},
 	}}
 }
