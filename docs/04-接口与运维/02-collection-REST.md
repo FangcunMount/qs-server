@@ -93,10 +93,11 @@ collection RegisterRoutes 先设置：
 | assessment | `GET /api/v1/assessments`、`/trend`、`/high-risk`、`/:id`、`/:id/scores`、`/:id/report`、`/:id/wait-report` |
 | scale | `GET /api/v1/scales`、`/hot`、`/categories`、`/:code` |
 | personality-model | `GET /api/v1/personality-models`、`/categories`、`/:code` |
-| personality-assessment | `GET /api/v1/personality-assessments`、`/:id`、`/:id/report`、`/:id/wait-report` |
+| personality-session | `POST /api/v1/personality-assessment-sessions`（**小程序推荐入口**） |
+| personality-assessment | `GET /api/v1/personality-assessments`、`/:id`、`/:id/report`、`/:id/wait-report`（report/wait 需 `testee_id`） |
 | testee | `POST/GET /api/v1/testees`、`/exists`、`/:id`、`/:id/care-context`、`PUT /:id` |
 
-人格测评提交仍复用 `POST /api/v1/answersheets`；`questionnaire_code` 来自 `personality-models` 详情。
+人格测评推荐流程见 **[小程序人格测评接入说明](./03-小程序人格测评接入.md)**。题版读取支持 `GET /questionnaires/:code?version=`；提交仍复用 `POST /answersheets`。
 
 | 资源 | v2（deprecated） |
 | ---- | ---- |
