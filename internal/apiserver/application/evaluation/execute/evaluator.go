@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 // mutableEvaluatorRegistry routes execution by v2 EvaluatorKey.
@@ -53,13 +52,4 @@ func (r *mutableEvaluatorRegistry) Resolve(key evaluation.EvaluatorKey) (Evaluat
 		return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 	}
 	return evaluator, nil
-}
-
-// ResolveLegacyKind maps legacy flat kinds to v2 keys for compatibility.
-func (r *mutableEvaluatorRegistry) ResolveLegacyKind(kind assessment.EvaluationModelKind) (Evaluator, error) {
-	key, ok := evaluation.EvaluatorKeyFromLegacyKind(kind)
-	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation model kind: %s", kind)
-	}
-	return r.Resolve(key)
 }

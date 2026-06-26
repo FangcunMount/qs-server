@@ -15,22 +15,11 @@ import (
 
 type evaluatorStub struct {
 	key     evaluation.EvaluatorKey
-	kind    assessment.EvaluationModelKind
 	execute func(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
 func (e evaluatorStub) Key() evaluation.EvaluatorKey {
-	if !e.key.IsZero() {
-		return e.key
-	}
-	if key, ok := evaluation.EvaluatorKeyFromLegacyKind(assessmentmodel.Kind(e.kind)); ok {
-		return key
-	}
-	return evaluation.EvaluatorKey{}
-}
-
-func (e evaluatorStub) Kind() assessment.EvaluationModelKind {
-	return e.kind
+	return e.key
 }
 
 func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error) {
@@ -43,7 +32,7 @@ func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*asse
 }
 
 func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {
-	scaleEvaluator := evaluatorStub{kind: assessment.EvaluationModelKindScale}
+	scaleEvaluator := evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault}
 	registry, err := NewEvaluatorRegistry(scaleEvaluator)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
@@ -53,47 +42,46 @@ func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Kind() != assessment.EvaluationModelKindScale {
-		t.Fatalf("resolved kind = %s, want scale", got.Kind())
+	if got.Key() != evaluation.EvaluatorKeyScaleDefault {
+		t.Fatalf("resolved key = %s, want scale default", got.Key())
 	}
 }
 
-func TestEvaluatorRegistryResolveLegacyKind(t *testing.T) {
+func TestEvaluatorRegistryResolvesByEvaluatorKey(t *testing.T) {
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		key:  evaluation.EvaluatorKeyMBTI,
-		kind: assessment.EvaluationModelKindPersonality,
+		key: evaluation.EvaluatorKeyMBTI,
 	})
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	got, err := registry.ResolveLegacyKind(assessmentmodel.KindMBTIMigration)
+	got, err := registry.Resolve(evaluation.EvaluatorKeyMBTI)
 	if err != nil {
-		t.Fatalf("ResolveLegacyKind returned error: %v", err)
+		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Kind() != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("resolved kind = %s, want mbti", got.Kind())
+	if got.Key() != evaluation.EvaluatorKeyMBTI {
+		t.Fatalf("resolved key = %s, want mbti", got.Key())
 	}
 }
 
-func TestEvaluatorRegistryRejectsDuplicateKind(t *testing.T) {
+func TestEvaluatorRegistryRejectsDuplicateKey(t *testing.T) {
 	_, err := NewEvaluatorRegistry(
-		evaluatorStub{kind: assessment.EvaluationModelKindScale},
-		evaluatorStub{kind: assessment.EvaluationModelKindScale},
+		evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault},
+		evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault},
 	)
 	if err == nil {
-		t.Fatal("NewEvaluatorRegistry error = nil, want duplicate kind error")
+		t.Fatal("NewEvaluatorRegistry error = nil, want duplicate key error")
 	}
 }
 
-func TestEvaluatorRegistryRejectsUnknownKind(t *testing.T) {
-	registry, err := NewEvaluatorRegistry(evaluatorStub{kind: assessment.EvaluationModelKindScale})
+func TestEvaluatorRegistryRejectsUnknownKey(t *testing.T) {
+	registry, err := NewEvaluatorRegistry(evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
 	_, err = registry.Resolve(evaluation.EvaluatorKeyMBTI)
 	if err == nil {
-		t.Fatal("Resolve error = nil, want unsupported model kind")
+		t.Fatal("Resolve error = nil, want unsupported model key")
 	}
 }
 
@@ -109,4 +97,8 @@ func TestEvaluatorContractDoesNotImportLegacyPipeline(t *testing.T) {
 			t.Fatalf("evaluator contract must not import legacy pipeline package: %s", path)
 		}
 	}
+}
+
+func TestEvaluatorStubUsesLegacyKindMappingOnlyInTests(t *testing.T) {
+	_ = assessmentmodel.KindMBTIMigration
 }

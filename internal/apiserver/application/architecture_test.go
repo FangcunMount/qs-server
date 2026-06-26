@@ -693,3 +693,74 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 		}
 	}
 }
+
+func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"NewEvaluationResult(",
+		"NewModelEvaluationResult(",
+	}
+	allowedRelPrefixes := []string{
+		"internal/apiserver/characterization/",
+		"internal/apiserver/application/evaluation/scale/result_mapper.go",
+		"internal/apiserver/application/evaluation/scale/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/result/legacy_projection.go",
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		for _, prefix := range allowedRelPrefixes {
+			if strings.HasPrefix(rel, prefix) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; application evaluation write paths must use AssessmentOutcome as the primary model", rel, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApplicationEvaluationExecuteDoesNotExposeFlatKindRouting(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	dir := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
+	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "ResolveLegacyKind") {
+			t.Fatalf("%s contains ResolveLegacyKind; routing must use EvaluatorKey only", filepath.ToSlash(mustRel(t, root, path)))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

@@ -82,8 +82,8 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 	if outcome.Assessment == nil {
 		return evalerrors.ModuleNotConfigured("assessment is required for evaluation result writer")
 	}
-	if outcome.LegacyResult() == nil {
-		return evalerrors.ModuleNotConfigured("evaluation result is required for evaluation result writer")
+	if outcome.Execution == nil {
+		return evalerrors.ModuleNotConfigured("evaluation outcome is required for evaluation result writer")
 	}
 	if w.reportSaver == nil {
 		return evalerrors.ModuleNotConfigured("report durable saver is not configured")
@@ -104,7 +104,7 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 		}
 	}
 
-	if err := outcome.Assessment.ApplyEvaluation(outcome.LegacyResult()); err != nil {
+	if err := outcome.Assessment.ApplyEvaluation(legacyResultForPersistence(outcome)); err != nil {
 		l.Errorw("Failed to apply evaluation result",
 			"assessment_id", outcome.Assessment.ID().Uint64(),
 			"error", err)
@@ -162,8 +162,8 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 	if outcome.Assessment == nil {
 		return fmt.Errorf("assessment is required")
 	}
-	if outcome.LegacyResult() == nil {
-		return fmt.Errorf("evaluation result is required")
+	if outcome.Execution == nil {
+		return fmt.Errorf("evaluation outcome is required")
 	}
 	if !outcome.Assessment.Status().IsSubmitted() {
 		return assessment.NewInvalidStatusError("apply evaluation", outcome.Assessment.Status())
@@ -172,7 +172,7 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 	if modelRef == nil || modelRef.IsEmpty() {
 		return assessment.ErrNoEvaluationModel
 	}
-	result := outcome.LegacyResult()
+	result := legacyResultForPersistence(outcome)
 	if result.ModelRef.IsEmpty() {
 		result.WithModelRef(*modelRef)
 		return nil

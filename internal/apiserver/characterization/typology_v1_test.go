@@ -6,7 +6,6 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
 
@@ -73,11 +72,5 @@ func TestV1TypologyExecutorKeys(t *testing.T) {
 	}
 	if got := typologyeval.NewSBTIExecutor().Key().String(); got != "personality/typology/sbti" {
 		t.Fatalf("sbti key = %q", got)
-	}
-	if typologyeval.NewMBTIExecutor().Kind() != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("mbti legacy kind mismatch")
-	}
-	if typologyeval.NewSBTIExecutor().Kind() != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("sbti legacy kind mismatch")
 	}
 }

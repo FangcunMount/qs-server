@@ -25,10 +25,10 @@ func (p ScaleScoreProjector) Key() evaluation.EvaluatorKey {
 }
 
 func (p ScaleScoreProjector) Project(ctx context.Context, outcome Outcome) error {
-	if p.scoreRepo == nil || outcome.Assessment == nil || outcome.LegacyResult() == nil {
+	if p.scoreRepo == nil || outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
-	score := assessment.ScaleScoreProjectionFromEvaluationResult(outcome.Assessment.ID(), outcome.LegacyResult())
+	score := assessment.ScaleScoreProjectionFromOutcome(outcome.Assessment.ID(), outcome.Execution)
 	if err := p.scoreRepo.SaveScoresWithContext(ctx, outcome.Assessment, score); err != nil {
 		return evalerrors.Database(err, "保存测评得分失败")
 	}

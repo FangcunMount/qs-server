@@ -303,7 +303,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	writer := &recordingResultWriter{}
 	var executionInput ExecutionInput
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		kind: domainAssessment.EvaluationModelKindScale,
+		key: evaluation.EvaluatorKeyScaleDefault,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
 			executionInput = input
 			return domainAssessment.AssessmentOutcomeFromEvaluationResult(
@@ -374,8 +374,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}}
 	writer := &recordingResultWriter{}
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		key:  evaluation.EvaluatorKeyMBTI,
-		kind: domainAssessment.EvaluationModelKindPersonality,
+		key: evaluation.EvaluatorKeyMBTI,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
 			return domainAssessment.AssessmentOutcomeFromEvaluationResult(
 				domainAssessment.NewModelEvaluationResult(*input.Assessment.EvaluationModelRef(), domainAssessment.ResultSummary{PrimaryLabel: "INTJ"}, domainAssessment.EvaluationDetail{
@@ -434,7 +433,7 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	}}
 	txRunner := &engineRecordingTxRunner{}
 	stager := &engineRecordingEventStager{}
-	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{kind: domainAssessment.EvaluationModelKindScale})
+	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
 	if registryErr != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", registryErr)
 	}

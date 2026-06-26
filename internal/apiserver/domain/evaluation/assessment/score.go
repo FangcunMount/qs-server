@@ -39,6 +39,14 @@ func ReconstructScaleScoreProjection(
 	}
 }
 
+// ScaleScoreProjectionFromOutcome projects a canonical outcome into scale storage.
+func ScaleScoreProjectionFromOutcome(assessmentID ID, outcome *AssessmentOutcome) *ScaleScoreProjection {
+	if outcome == nil {
+		return nil
+	}
+	return ScaleScoreProjectionFromEvaluationResult(assessmentID, outcome.ToEvaluationResult())
+}
+
 // ScaleScoreProjectionFromEvaluationResult projects a legacy evaluation result into scale storage.
 func ScaleScoreProjectionFromEvaluationResult(assessmentID ID, result *EvaluationResult) *ScaleScoreProjection {
 	if result == nil {

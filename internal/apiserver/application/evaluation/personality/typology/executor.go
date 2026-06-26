@@ -37,10 +37,6 @@ func (e *Executor) Key() evaluation.EvaluatorKey {
 	}
 }
 
-func (e *Executor) Kind() assessment.EvaluationModelKind {
-	return assessment.EvaluationModelKindPersonality
-}
-
 func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
 	if e == nil {
 		return nil, fmt.Errorf("personality typology evaluator is not configured")
@@ -60,25 +56,19 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	}
 
 	modelRef := modelRefFromExecutionInput(input, payload)
-	var result *assessment.EvaluationResult
-	var err error
 	switch e.algorithm {
 	case assessmentmodel.AlgorithmSBTI:
-		result, err = buildSBTIResult(modelRef, payload, input.Input.AnswerSheet)
+		return buildSBTIOutcome(modelRef, payload, input.Input.AnswerSheet)
 	default:
-		result, err = buildMBTIResult(modelRef, payload, input.Input.AnswerSheet)
+		return buildMBTIOutcome(modelRef, payload, input.Input.AnswerSheet)
 	}
-	if err != nil {
-		return nil, err
-	}
-	return assessment.AssessmentOutcomeFromEvaluationResult(result), nil
 }
 
-func buildMBTIResult(
+func buildMBTIOutcome(
 	modelRef assessment.EvaluationModelRef,
 	payload *modeltypology.Payload,
 	sheet *port.AnswerSheetSnapshot,
-) (*assessment.EvaluationResult, error) {
+) (*assessment.AssessmentOutcome, error) {
 	model, err := modeltypology.ToMBTI(payload)
 	if err != nil {
 		return nil, err
@@ -87,20 +77,31 @@ func buildMBTIResult(
 	if err != nil {
 		return nil, err
 	}
-	return assessment.NewModelEvaluationResult(modelRef, assessment.ResultSummary{
+	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
 		PrimaryLabel: detail.TypeCode,
 		Tags:         []string{detail.TypeName, detail.OneLiner},
 	}, assessment.EvaluationDetail{
 		Kind:    assessment.EvaluationModelKindPersonality,
 		Payload: detail,
-	}), nil
+	})
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindMatchPercent,
+		Value: detail.MatchPercent,
+		Label: detail.TypeCode,
+	}
+	outcome.Level = &assessment.OutcomeResultLevel{
+		Code:     detail.TypeCode,
+		Label:    detail.TypeName,
+		Severity: "none",
+	}
+	return outcome, nil
 }
 
-func buildSBTIResult(
+func buildSBTIOutcome(
 	modelRef assessment.EvaluationModelRef,
 	payload *modeltypology.Payload,
 	sheet *port.AnswerSheetSnapshot,
-) (*assessment.EvaluationResult, error) {
+) (*assessment.AssessmentOutcome, error) {
 	model, err := modeltypology.ToSBTI(payload)
 	if err != nil {
 		return nil, err
@@ -110,14 +111,25 @@ func buildSBTIResult(
 		return nil, err
 	}
 	score := detail.Similarity * 100
-	return assessment.NewModelEvaluationResult(modelRef, assessment.ResultSummary{
+	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
 		PrimaryLabel: detail.TypeCode,
 		Score:        &score,
 		Tags:         []string{detail.TypeName, detail.OneLiner},
 	}, assessment.EvaluationDetail{
 		Kind:    assessment.EvaluationModelKindPersonality,
 		Payload: detail,
-	}), nil
+	})
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindMatchPercent,
+		Value: score,
+		Label: detail.TypeCode,
+	}
+	outcome.Level = &assessment.OutcomeResultLevel{
+		Code:     detail.TypeCode,
+		Label:    detail.TypeName,
+		Severity: "none",
+	}
+	return outcome, nil
 }
 
 func modelRefFromExecutionInput(input evaluationexecute.ExecutionInput, payload *modeltypology.Payload) assessment.EvaluationModelRef {

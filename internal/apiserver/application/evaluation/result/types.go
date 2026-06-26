@@ -17,10 +17,7 @@ type Outcome struct {
 
 // LegacyResult projects the canonical outcome into the legacy write model.
 func (o Outcome) LegacyResult() *assessment.EvaluationResult {
-	if o.Execution == nil {
-		return nil
-	}
-	return o.Execution.ToEvaluationResult()
+	return legacyResultForPersistence(o)
 }
 
 // NewOutcomeFromLegacyResult adapts a legacy evaluation result for tests and compatibility callers.

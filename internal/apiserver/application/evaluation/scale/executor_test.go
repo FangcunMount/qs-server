@@ -123,12 +123,10 @@ func TestInputValidatorRejectsQuestionnaireVersionMismatch(t *testing.T) {
 	}
 }
 
-func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
+func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	validator := &stubValidator{}
-	mapper := &stubMapper{
-		output: assessment.NewEvaluationResult(1, assessment.RiskLevelLow, "c", "s", nil),
-	}
-	service := NewService(validator, evaluationscale.NewHandler(stubScoringRegistry{}), mapper)
+	handler := evaluationscale.NewHandler(stubScoringRegistry{})
+	executor := NewExecutorWithDeps(validator, handler)
 
 	a, _ := assessment.NewAssessment(
 		1,
@@ -172,15 +170,21 @@ func TestScaleInterpretationServiceOrchestratesDependencies(t *testing.T) {
 			},
 		},
 	}
-	result, err := service.Evaluate(context.Background(), a, snapshot)
+	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
+		Assessment: a,
+		Input:      snapshot,
+	})
 	if err != nil {
-		t.Fatalf("Evaluate returned error: %v", err)
+		t.Fatalf("Execute returned error: %v", err)
 	}
 	if result == nil {
-		t.Fatal("expected result, got nil")
+		t.Fatal("expected outcome, got nil")
 	}
-	if !validator.called || !mapper.called {
-		t.Fatalf("expected validator/mapper to be called, got %v/%v", validator.called, mapper.called)
+	if !validator.called {
+		t.Fatal("expected validator to be called")
+	}
+	if result.Primary == nil || result.Primary.Value != 1 {
+		t.Fatalf("primary score = %#v, want raw total 1", result.Primary)
 	}
 }
 
@@ -193,21 +197,6 @@ func (s *stubValidator) Validate(input ScaleExecutionInput) error {
 	s.called = true
 	return s.err
 }
-
-type stubMapper struct {
-	called bool
-	output *assessment.EvaluationResult
-}
-
-func (s *stubMapper) ToEvaluationResult(
-	_ *evaluationscale.ScaleInterpretationResult,
-	_ *assessment.Assessment,
-	_ *evaluationinput.InputSnapshot,
-) *assessment.EvaluationResult {
-	s.called = true
-	return s.output
-}
-
 type stubScoringRegistry struct{}
 
 func (stubScoringRegistry) ScoreFactor(context.Context, scalesnapshot.FactorSnapshot, []float64) (float64, error) {

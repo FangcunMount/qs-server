@@ -18,7 +18,6 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	assessmentCache "github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cacheentry"
@@ -239,13 +238,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		m.ReportStatusReporter = reportStatusReporter
 
 		reportBuilder := report.NewDefaultInterpretReportBuilder(suggestionGenerator)
-		scaleEvaluator := scaleEvaluation.NewExecutorWithService(
-			scaleEvaluation.NewService(
-				scaleEvaluation.DefaultInputValidator{},
-				evaluationscale.NewDefaultHandler(),
-				scaleEvaluation.DefaultResultMapper{},
-			),
-		)
+		scaleEvaluator := scaleEvaluation.NewExecutor(nil)
 		sbtiEvaluator := typologyEvaluation.NewSBTIExecutor()
 		mbtiEvaluator := typologyEvaluation.NewMBTIExecutor()
 		evaluatorRegistry, err := execute.NewEvaluatorRegistry(scaleEvaluator, sbtiEvaluator, mbtiEvaluator)

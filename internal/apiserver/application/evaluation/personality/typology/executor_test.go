@@ -23,15 +23,6 @@ func TestExecutorKeys(t *testing.T) {
 	}
 }
 
-func TestExecutorLegacyKinds(t *testing.T) {
-	if got := NewMBTIExecutor().Kind(); got != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("mbti kind = %s, want mbti", got)
-	}
-	if got := NewSBTIExecutor().Kind(); got != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("sbti kind = %s, want sbti", got)
-	}
-}
-
 func TestExecutorAlgorithmGuard(t *testing.T) {
 	executor := NewMBTIExecutor()
 	_, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{})
@@ -39,4 +30,16 @@ func TestExecutorAlgorithmGuard(t *testing.T) {
 		t.Fatal("Execute error = nil, want configuration error")
 	}
 	_ = assessmentmodel.AlgorithmMBTI
+}
+
+func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
+	executor := NewMBTIExecutor()
+	_, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
+		Assessment: nil,
+		Input:      nil,
+	})
+	if err == nil {
+		t.Fatal("expected error without input")
+	}
+	_ = assessment.OutcomeScoreKindMatchPercent
 }

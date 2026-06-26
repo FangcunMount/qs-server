@@ -8,7 +8,10 @@ import (
 )
 
 func modelIdentityFromOutcome(outcome Outcome) domainreport.ModelIdentity {
-	if result := outcome.LegacyResult(); result != nil && !result.ModelRef.IsEmpty() {
+	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
+		return modelIdentityFromRef(outcome.Execution.ModelRef)
+	}
+	if result := legacyResultForPersistence(outcome); result != nil && !result.ModelRef.IsEmpty() {
 		return modelIdentityFromRef(result.ModelRef)
 	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
@@ -47,7 +50,30 @@ func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelI
 }
 
 func primaryScoreFromOutcome(outcome Outcome) *domainreport.ScoreValue {
-	result := outcome.LegacyResult()
+	if outcome.Execution != nil && outcome.Execution.Primary != nil {
+		return reportScoreFromOutcomeValue(outcome.Execution.Primary)
+	}
+	return primaryScoreFromLegacyResult(legacyResultForPersistence(outcome))
+}
+
+func reportScoreFromOutcomeValue(score *assessment.OutcomeScoreValue) *domainreport.ScoreValue {
+	if score == nil {
+		return nil
+	}
+	switch score.Kind {
+	case assessment.OutcomeScoreKindMatchPercent:
+		return domainreport.NewMatchPercentScore(score.Value, score.Label)
+	case assessment.OutcomeScoreKindRawTotal:
+		return domainreport.NewRawTotalScore(score.Value, score.Max)
+	default:
+		if score.Label != "" {
+			return domainreport.NewMatchPercentScore(score.Value, score.Label)
+		}
+		return domainreport.NewRawTotalScore(score.Value, score.Max)
+	}
+}
+
+func primaryScoreFromLegacyResult(result *assessment.EvaluationResult) *domainreport.ScoreValue {
 	if result == nil {
 		return nil
 	}
@@ -75,7 +101,27 @@ func primaryScoreFromOutcome(outcome Outcome) *domainreport.ScoreValue {
 }
 
 func levelFromOutcome(outcome Outcome) *domainreport.ResultLevel {
-	result := outcome.LegacyResult()
+	if outcome.Execution != nil && outcome.Execution.Level != nil {
+		return reportLevelFromOutcomeLevel(outcome.Execution.Level)
+	}
+	return levelFromLegacyResult(legacyResultForPersistence(outcome))
+}
+
+func reportLevelFromOutcomeLevel(level *assessment.OutcomeResultLevel) *domainreport.ResultLevel {
+	if level == nil {
+		return nil
+	}
+	if domainreport.IsRiskLevelCode(level.Code) {
+		return domainreport.LevelFromRisk(domainreport.RiskLevel(level.Code))
+	}
+	return &domainreport.ResultLevel{
+		Code:     level.Code,
+		Label:    level.Label,
+		Severity: level.Severity,
+	}
+}
+
+func levelFromLegacyResult(result *assessment.EvaluationResult) *domainreport.ResultLevel {
 	if result == nil {
 		return nil
 	}
