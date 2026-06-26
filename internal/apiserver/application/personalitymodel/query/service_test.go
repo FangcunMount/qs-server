@@ -41,7 +41,7 @@ func TestGetCategoriesFallsBackToMBTIAndSBTI(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetCategories: %v", err)
 	}
-	if len(got.Categories) != 2 {
+	if len(got.Categories) != 3 {
 		t.Fatalf("categories = %#v", got.Categories)
 	}
 }

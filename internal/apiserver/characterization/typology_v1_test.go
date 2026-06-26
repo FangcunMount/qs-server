@@ -7,6 +7,8 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
 
@@ -72,7 +74,41 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	}
 }
 
-// V1 contract: typology executor keys map to personality/typology/{mbti,sbti}.
+// V1 contract: typology executor scores v2 Big Five payload through trait-profile pipeline.
+func TestV1TypologyBigFiveExecutorPreservesTraitProfileOutcome(t *testing.T) {
+	model := bigFiveCharacterizationModel()
+	want, err := bigfiveadapter.Score(model, bigFiveAnswerSheet())
+	if err != nil {
+		t.Fatalf("domain Score: %v", err)
+	}
+
+	executor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
+	result, err := executor.Execute(context.Background(), evaluationexecute.ExecutionInput{
+		Assessment: submittedBigFiveAssessment(t),
+		Input:      bigFiveInputSnapshot(),
+	})
+	if err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	detail, ok := result.Detail.Payload.(evaluationtypology.BigFiveResultDetail)
+	if !ok {
+		t.Fatalf("payload type = %T, want typology.BigFiveResultDetail", result.Detail.Payload)
+	}
+	if len(detail.Traits) != len(want.Traits) || detail.Traits[0].RawScore != want.Traits[0].RawScore {
+		t.Fatalf("detail = %#v, want traits %#v", detail.Traits, want.Traits)
+	}
+	if result.Summary.PrimaryLabel != "O" {
+		t.Fatalf("PrimaryLabel = %q, want O", result.Summary.PrimaryLabel)
+	}
+	if result.Profile == nil || result.Profile.Kind != assessment.ProfileKindPersonalityTrait {
+		t.Fatalf("profile = %#v, want personality_trait", result.Profile)
+	}
+}
+
+// V1 contract: typology executor keys map to personality/typology/{mbti,sbti,bigfive}.
 func TestV1TypologyExecutorKeys(t *testing.T) {
 	mbtiExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
 	if err != nil {
@@ -87,5 +123,12 @@ func TestV1TypologyExecutorKeys(t *testing.T) {
 	}
 	if got := sbtiExecutor.Key().String(); got != "personality/typology/sbti" {
 		t.Fatalf("sbti key = %q", got)
+	}
+	bigFiveExecutor, err := typologyeval.NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor(bigfive): %v", err)
+	}
+	if got := bigFiveExecutor.Key().String(); got != "personality/typology/bigfive" {
+		t.Fatalf("bigfive key = %q", got)
 	}
 }

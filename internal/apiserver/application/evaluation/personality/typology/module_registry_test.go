@@ -3,8 +3,8 @@ package typology_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 )
 
 func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {
@@ -15,6 +15,7 @@ func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {
 	for _, algorithm := range []assessmentmodel.Algorithm{
 		assessmentmodel.AlgorithmMBTI,
 		assessmentmodel.AlgorithmSBTI,
+		assessmentmodel.AlgorithmBigFive,
 	} {
 		runner, err := typologyeval.NewTypologyExecutorWithRegistry(registry, algorithm)
 		if err != nil {
@@ -23,9 +24,6 @@ func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {
 		if runner.Key().String() == "" {
 			t.Fatalf("executor key for %s is empty", algorithm)
 		}
-	}
-	if _, err := typologyeval.NewTypologyExecutorWithRegistry(registry, assessmentmodel.AlgorithmBigFive); err == nil {
-		t.Fatal("expected BigFive module to be unsupported")
 	}
 }
 
@@ -39,5 +37,19 @@ func TestModuleDescriptorsCoverDefaultModules(t *testing.T) {
 		if got[i].Algorithm != module.Algorithm {
 			t.Fatalf("descriptor[%d] algorithm = %s, want %s", i, got[i].Algorithm, module.Algorithm)
 		}
+	}
+}
+
+func TestBigFiveModuleCanBeRegistered(t *testing.T) {
+	registry, err := typologyeval.NewModuleRegistry(typologyeval.AllModules()...)
+	if err != nil {
+		t.Fatalf("NewModuleRegistry: %v", err)
+	}
+	executor, err := typologyeval.NewTypologyExecutorWithRegistry(registry, assessmentmodel.AlgorithmBigFive)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutorWithRegistry: %v", err)
+	}
+	if executor.Key().String() != "personality/typology/bigfive" {
+		t.Fatalf("key = %s", executor.Key().String())
 	}
 }

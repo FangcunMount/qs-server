@@ -46,6 +46,7 @@ type InterpretReportPO struct {
 
 // DimensionInterpretPO 维度解读持久化对象
 type DimensionInterpretPO struct {
+	Kind        string         `bson:"kind,omitempty" json:"kind,omitempty"`
 	FactorCode  string         `bson:"factor_code" json:"factor_code"`
 	FactorName  string         `bson:"factor_name" json:"factor_name"`
 	RawScore    float64        `bson:"raw_score" json:"raw_score"`

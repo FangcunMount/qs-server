@@ -8,10 +8,11 @@ import (
 
 // Module aggregates one personality typology algorithm's adapter and report path.
 type Module struct {
-	Algorithm     assessmentmodel.Algorithm
-	CategoryLabel string
-	Adapter       personalityadapter.ModelAdapter
-	reportBuilder reportBuilderFunc
+	Algorithm        assessmentmodel.Algorithm
+	CategoryLabel    string
+	Adapter          personalityadapter.ModelAdapter
+	outcomeAssembler outcomeAssemblerFunc
+	reportBuilder    reportBuilderFunc
 }
 
 // Descriptor returns the evaluation registry entry for this module.

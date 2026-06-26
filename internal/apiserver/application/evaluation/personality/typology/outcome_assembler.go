@@ -1,34 +1,41 @@
 package typology
 
 import (
-	"fmt"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
 
-func assessmentOutcomeFromScoringResult(
-	algorithm assessmentmodel.Algorithm,
+func assembleMBTIOutcome(
 	modelRef assessment.EvaluationModelRef,
 	result evaluationtypology.ScoringResult,
 ) (*assessment.AssessmentOutcome, error) {
-	switch algorithm {
-	case assessmentmodel.AlgorithmMBTI:
-		detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail)
-		if err != nil {
-			return nil, err
-		}
-		return assessmentOutcomeFromMBTI(modelRef, detail), nil
-	case assessmentmodel.AlgorithmSBTI:
-		detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail)
-		if err != nil {
-			return nil, err
-		}
-		return assessmentOutcomeFromSBTI(modelRef, detail), nil
-	default:
-		return nil, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
+	detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail)
+	if err != nil {
+		return nil, err
 	}
+	return assessmentOutcomeFromMBTI(modelRef, detail), nil
+}
+
+func assembleSBTIOutcome(
+	modelRef assessment.EvaluationModelRef,
+	result evaluationtypology.ScoringResult,
+) (*assessment.AssessmentOutcome, error) {
+	detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail)
+	if err != nil {
+		return nil, err
+	}
+	return assessmentOutcomeFromSBTI(modelRef, detail), nil
+}
+
+func assembleBigFiveOutcome(
+	modelRef assessment.EvaluationModelRef,
+	result evaluationtypology.ScoringResult,
+) (*assessment.AssessmentOutcome, error) {
+	detail, err := evaluationtypology.BigFiveResultDetailFromPayload(result.Detail)
+	if err != nil {
+		return nil, err
+	}
+	return assessmentOutcomeFromBigFive(modelRef, detail), nil
 }
 
 func assessmentOutcomeFromMBTI(modelRef assessment.EvaluationModelRef, detail evaluationtypology.MBTIResultDetail) *assessment.AssessmentOutcome {
@@ -86,6 +93,28 @@ func assessmentOutcomeFromSBTI(modelRef assessment.EvaluationModelRef, detail ev
 		Code:    detail.TypeCode,
 		Name:    detail.TypeName,
 		Summary: detail.OneLiner,
+	}
+	return outcome
+}
+
+func assessmentOutcomeFromBigFive(modelRef assessment.EvaluationModelRef, detail evaluationtypology.BigFiveResultDetail) *assessment.AssessmentOutcome {
+	primaryLabel := "trait_profile"
+	if len(detail.Traits) > 0 {
+		primaryLabel = detail.Traits[0].Code
+	}
+	outcome := assessment.NewAssessmentOutcome(modelRef, assessment.ResultSummary{
+		PrimaryLabel: primaryLabel,
+	}, assessment.EvaluationDetail{
+		Kind:    assessment.EvaluationModelKindPersonality,
+		Payload: detail,
+	})
+	if len(detail.Traits) > 0 {
+		outcome.Profile = &assessment.ProfileResult{
+			Kind:    assessment.ProfileKindPersonalityTrait,
+			Code:    detail.Traits[0].Code,
+			Name:    detail.Traits[0].Name,
+			Summary: detail.Traits[0].Name,
+		}
 	}
 	return outcome
 }

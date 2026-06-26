@@ -38,6 +38,7 @@ func DefaultRegistry() Registry {
 	return NewRegistry(
 		mbtiAdapter(),
 		sbtiAdapter(),
+		bigfiveAdapter(),
 	)
 }
 

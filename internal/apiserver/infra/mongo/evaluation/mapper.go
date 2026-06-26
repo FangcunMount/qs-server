@@ -210,6 +210,7 @@ func toDomainModelExtra(po *ModelExtraPO) *report.ModelExtra {
 
 func dimensionToPO(d report.DimensionInterpret) DimensionInterpretPO {
 	po := DimensionInterpretPO{
+		Kind:        string(d.Kind()),
 		FactorCode:  d.Code().String(),
 		FactorName:  d.Name(),
 		RawScore:    d.RawScore(),
@@ -239,6 +240,19 @@ func dimensionToDomain(po DimensionInterpretPO) report.DimensionInterpret {
 		if level := resultLevelToDomain(po.Level); level != nil && level.Code != "" {
 			risk = report.RiskLevel(level.Code)
 		}
+	}
+	kind := report.DimensionKind(po.Kind)
+	if kind == report.DimensionKindTrait {
+		return report.NewNeutralDimensionInterpret(
+			report.NewDimensionCode(po.FactorCode),
+			kind,
+			po.FactorName,
+			rawScore,
+			maxScore,
+			nil,
+			po.Description,
+			po.Suggestion,
+		)
 	}
 	return report.NewDimensionInterpret(
 		report.NewFactorCode(po.FactorCode),

@@ -180,6 +180,61 @@ func TestBuildSBTIReportSetsModelExtra(t *testing.T) {
 	}
 }
 
+func TestBuildBigFiveReportFillsTraitDimensions(t *testing.T) {
+	detail := BigFiveReportDetail{
+		Traits: []BigFiveTraitReport{
+			{Code: "O", Name: "Openness", RawScore: 6},
+			{Code: "C", Name: "Conscientiousness", RawScore: 8},
+		},
+		Source: BigFiveSourceReport{
+			Attribution:   "IPIP",
+			License:       "CC0",
+			NonCommercial: false,
+		},
+	}
+
+	report, err := BuildBigFiveReport(BigFiveReportInput{
+		AssessmentID: domainreport.ID(7001),
+		ModelCode:    "BIGFIVE_V1",
+		Detail:       detail,
+	})
+	if err != nil {
+		t.Fatalf("BuildBigFiveReport: %v", err)
+	}
+	if report.ModelName() != "Big Five 五大人格特质测评 - 五大人格特质" {
+		t.Fatalf("ModelName = %q", report.ModelName())
+	}
+	if report.ModelCode() != "BIGFIVE_V1" {
+		t.Fatalf("ModelCode = %q", report.ModelCode())
+	}
+	if report.Conclusion() != "五大人格特质画像 - Openness 6 / Conscientiousness 8" {
+		t.Fatalf("Conclusion = %q", report.Conclusion())
+	}
+	dimensions := report.Dimensions()
+	if len(dimensions) != 2 {
+		t.Fatalf("len(Dimensions) = %d, want 2", len(dimensions))
+	}
+	if dimensions[0].Code() != domainreport.DimensionCode("O") ||
+		dimensions[0].Name() != "Openness" ||
+		dimensions[0].RawScore() != 6 ||
+		dimensions[0].Kind() != domainreport.DimensionKindTrait ||
+		dimensions[0].Description() != "Openness：原始分 6" {
+		t.Fatalf("unexpected dimension[0]: %#v", dimensions[0])
+	}
+	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "特质分布：Openness 6 / Conscientiousness 8")
+	assertReportSuggestion(t, report.Suggestions(), domainreport.SuggestionCategoryGeneral, nil, "来源与授权：IPIP；License: CC0；非商业使用: false。")
+	extra := report.ModelExtra()
+	if extra == nil {
+		t.Fatal("expected model extra")
+	}
+	if extra.Kind != "bigfive" || extra.TypeName != "五大人格特质" {
+		t.Fatalf("unexpected model extra: %#v", extra)
+	}
+	if extra.Commentary != "Openness 6 / Conscientiousness 8" {
+		t.Fatalf("Commentary = %q", extra.Commentary)
+	}
+}
+
 func assertReportSuggestion(
 	t *testing.T,
 	suggestions []domainreport.Suggestion,

@@ -74,3 +74,36 @@ func TestReportMapperRoundTripPreservesInterpretReportFields(t *testing.T) {
 		t.Fatalf("model identity = %#v", po.Model)
 	}
 }
+
+func TestReportMapperRoundTripPreservesTraitDimensionKind(t *testing.T) {
+	mapper := NewReportMapper()
+	original := domainReport.ReconstructInterpretReport(
+		domainReport.ID(43),
+		"Big Five",
+		"BIGFIVE_V1",
+		0,
+		domainReport.RiskLevelNone,
+		"trait profile",
+		[]domainReport.DimensionInterpret{
+			domainReport.NewNeutralDimensionInterpret(
+				domainReport.NewDimensionCode("O"),
+				domainReport.DimensionKindTrait,
+				"Openness",
+				6,
+				nil,
+				nil,
+				"Openness：原始分 6",
+				"",
+			),
+		},
+		nil,
+		nil,
+		time.Now(),
+		nil,
+	)
+
+	got := mapper.ToDomain(mapper.ToPO(original, 10))
+	if got.Dimensions()[0].Kind() != domainReport.DimensionKindTrait {
+		t.Fatalf("dimension kind = %s, want trait", got.Dimensions()[0].Kind())
+	}
+}

@@ -46,7 +46,7 @@ func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T
 		t.Fatalf("first descriptor kind = %s, want scale", descs[0].Kind)
 	}
 	typology := evaldomain.TypologyAlgorithms(descs)
-	if len(typology) != 2 {
+	if len(typology) != 3 {
 		t.Fatalf("typology algorithms = %#v", typology)
 	}
 }

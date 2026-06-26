@@ -10,6 +10,7 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -73,7 +74,7 @@ func TestExecutorAlgorithmGuard(t *testing.T) {
 }
 
 func TestNewTypologyExecutorRejectsUnsupportedAlgorithm(t *testing.T) {
-	_, err := NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	_, err := NewTypologyExecutor(assessmentmodel.Algorithm("typology_unknown"))
 	if err == nil {
 		t.Fatal("NewTypologyExecutor error = nil, want unsupported algorithm")
 	}
@@ -100,6 +101,104 @@ func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome.Profile == nil || outcome.Profile.Kind != assessment.ProfileKindPersonalityType {
 		t.Fatalf("profile = %#v, want personality_type", outcome.Profile)
 	}
+}
+
+func TestBigFiveExecutorFillsTraitProfile(t *testing.T) {
+	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmBigFive)
+	if err != nil {
+		t.Fatalf("NewTypologyExecutor: %v", err)
+	}
+	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
+		Assessment: submittedBigFiveAssessment(t),
+		Input:      bigFiveExecutorInputSnapshot(),
+	})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	detail, ok := outcome.Detail.Payload.(evaluationtypology.BigFiveResultDetail)
+	if !ok {
+		t.Fatalf("payload type = %T, want BigFiveResultDetail", outcome.Detail.Payload)
+	}
+	if len(detail.Traits) != 2 || detail.Traits[0].RawScore != 6 {
+		t.Fatalf("traits = %#v, want openness raw 6", detail.Traits)
+	}
+	if outcome.Summary.PrimaryLabel != "O" {
+		t.Fatalf("PrimaryLabel = %q, want O", outcome.Summary.PrimaryLabel)
+	}
+	if outcome.Profile == nil || outcome.Profile.Kind != assessment.ProfileKindPersonalityTrait {
+		t.Fatalf("profile = %#v, want personality_trait", outcome.Profile)
+	}
+}
+
+func bigFiveExecutorInputSnapshot() *port.InputSnapshot {
+	payload := &modeltypology.Payload{
+		Code:                 "BIGFIVE_V1",
+		Version:              "1.0.0",
+		Title:                "Big Five",
+		QuestionnaireCode:    "BIGFIVE_V1",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		Algorithm:            assessmentmodel.AlgorithmBigFive,
+		DimensionOrder:       []string{"O", "C"},
+		Dimensions: map[string]modeltypology.Dimension{
+			"O": {Code: "O", Name: "Openness"},
+			"C": {Code: "C", Name: "Conscientiousness"},
+		},
+		QuestionMappings: []modeltypology.QuestionMapping{
+			{QuestionCode: "O1", Dimension: "O", Sign: 1},
+			{QuestionCode: "O2", Dimension: "O", Sign: 1},
+			{QuestionCode: "C1", Dimension: "C", Sign: 1},
+			{QuestionCode: "C2", Dimension: "C", Sign: 1},
+		},
+		MatchingSpec: modeltypology.MatchingSpec{
+			Kind: assessmentmodel.DecisionKindTraitProfile,
+		},
+	}
+	return &port.InputSnapshot{
+		Model:        port.NewTypologyModelSnapshot(payload),
+		ModelPayload: port.TypologyModelPayload{Payload: payload},
+		AnswerSheet: &port.AnswerSheetSnapshot{
+			QuestionnaireCode:    "BIGFIVE_V1",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []port.AnswerSnapshot{
+				{QuestionCode: "O1", Score: 4},
+				{QuestionCode: "O2", Score: 2},
+				{QuestionCode: "C1", Score: 5},
+				{QuestionCode: "C2", Score: 3},
+			},
+		},
+		Questionnaire: &port.QuestionnaireSnapshot{Code: "BIGFIVE_V1", Version: "1.0.0"},
+	}
+}
+
+func submittedBigFiveAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindPersonality,
+		assessmentmodel.SubKindTypology,
+		assessmentmodel.AlgorithmBigFive,
+		meta.ID(0),
+		meta.NewCode("BIGFIVE_V1"),
+		"1.0.0",
+		"Big Five",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8004),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("BIGFIVE_V1"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6004)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7004)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	a.ClearEvents()
+	return a
 }
 
 func sbtiFixtureModel() *modeltypology.SBTILegacyModel {

@@ -29,3 +29,17 @@ func SBTIResultDetailFromPayload(payload any) (SBTIResultDetail, error) {
 		return SBTIResultDetail{}, fmt.Errorf("unsupported sbti result detail payload: %T", payload)
 	}
 }
+
+func BigFiveResultDetailFromPayload(payload any) (BigFiveResultDetail, error) {
+	switch detail := payload.(type) {
+	case BigFiveResultDetail:
+		return detail, nil
+	case *BigFiveResultDetail:
+		if detail == nil {
+			return BigFiveResultDetail{}, fmt.Errorf("bigfive result detail is nil")
+		}
+		return *detail, nil
+	default:
+		return BigFiveResultDetail{}, fmt.Errorf("unsupported bigfive result detail payload: %T", payload)
+	}
+}

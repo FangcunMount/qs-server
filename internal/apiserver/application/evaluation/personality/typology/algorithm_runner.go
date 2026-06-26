@@ -8,16 +8,23 @@ import (
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 type algorithmRunner struct {
-	adapter       personalityadapter.ModelAdapter
-	reportBuilder reportBuilderFunc
+	adapter          personalityadapter.ModelAdapter
+	outcomeAssembler outcomeAssemblerFunc
+	reportBuilder    reportBuilderFunc
 }
 
 type reportBuilderFunc func(evaluationresult.Outcome) (*domainReport.InterpretReport, error)
+
+type outcomeAssemblerFunc func(
+	modelRef assessment.EvaluationModelRef,
+	result evaluationtypology.ScoringResult,
+) (*assessment.AssessmentOutcome, error)
 
 func algorithmRunnerFor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
 	return registry.runnerFor(algorithm)
@@ -39,7 +46,7 @@ func (r algorithmRunner) buildOutcome(
 	if err != nil {
 		return nil, err
 	}
-	return assessmentOutcomeFromScoringResult(r.algorithm(), modelRef, result)
+	return r.outcomeAssembler(modelRef, result)
 }
 
 func (r algorithmRunner) buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {

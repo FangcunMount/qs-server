@@ -35,6 +35,26 @@ func MBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypolog
 	}, nil
 }
 
+func BigFiveReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypology.BigFiveReportInput, error) {
+	if outcome.Assessment == nil {
+		return reporttypology.BigFiveReportInput{}, errAssessmentRequired
+	}
+	if outcome.Execution == nil {
+		return reporttypology.BigFiveReportInput{}, errEvaluationOutcomeRequired
+	}
+	detail, err := evaluationtypology.BigFiveResultDetailFromPayload(outcome.Execution.Detail.Payload)
+	if err != nil {
+		return reporttypology.BigFiveReportInput{}, err
+	}
+	return reporttypology.BigFiveReportInput{
+		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
+		ModelCode:    typologyModelCode(outcome),
+		TotalScore:   typologyTotalScore(outcome.Execution),
+		RiskLevel:    typologyRiskLevel(outcome.Execution),
+		Detail:       bigFiveReportDetail(detail),
+	}, nil
+}
+
 func SBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypology.SBTIReportInput, error) {
 	if outcome.Assessment == nil {
 		return reporttypology.SBTIReportInput{}, errAssessmentRequired
@@ -108,6 +128,27 @@ func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reporttypology
 			ImageURL:    detail.Profile.ImageURL,
 		},
 		Source: reporttypology.MBTISourceReport{
+			QuestionsRepo: detail.Source.QuestionsRepo,
+			SourceSite:    detail.Source.SourceSite,
+			License:       detail.Source.License,
+			Attribution:   detail.Source.Attribution,
+			NonCommercial: detail.Source.NonCommercial,
+		},
+	}
+}
+
+func bigFiveReportDetail(detail evaluationtypology.BigFiveResultDetail) reporttypology.BigFiveReportDetail {
+	traits := make([]reporttypology.BigFiveTraitReport, 0, len(detail.Traits))
+	for _, trait := range detail.Traits {
+		traits = append(traits, reporttypology.BigFiveTraitReport{
+			Code:     trait.Code,
+			Name:     trait.Name,
+			RawScore: trait.RawScore,
+		})
+	}
+	return reporttypology.BigFiveReportDetail{
+		Traits: traits,
+		Source: reporttypology.BigFiveSourceReport{
 			QuestionsRepo: detail.Source.QuestionsRepo,
 			SourceSite:    detail.Source.SourceSite,
 			License:       detail.Source.License,

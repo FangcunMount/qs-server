@@ -293,3 +293,115 @@ func sbtiInputSnapshot() *evaluationinput.InputSnapshot {
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "SBTI_FUN", Version: "1.0.0"},
 	}
 }
+
+func bigFiveCharacterizationModel() *modeltypology.Payload {
+	return &modeltypology.Payload{
+		Code:                 "BIGFIVE_V1",
+		Version:              "1.0.0",
+		Title:                "Big Five",
+		QuestionnaireCode:    "BIGFIVE_V1",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		Algorithm:            assessmentmodel.AlgorithmBigFive,
+		DimensionOrder:       []string{"O", "C", "E", "A", "N"},
+		Dimensions: map[string]modeltypology.Dimension{
+			"O": {Code: "O", Name: "Openness"},
+			"C": {Code: "C", Name: "Conscientiousness"},
+			"E": {Code: "E", Name: "Extraversion"},
+			"A": {Code: "A", Name: "Agreeableness"},
+			"N": {Code: "N", Name: "Neuroticism"},
+		},
+		QuestionMappings: []modeltypology.QuestionMapping{
+			{QuestionCode: "O1", Dimension: "O", Sign: 1},
+			{QuestionCode: "O2", Dimension: "O", Sign: 1},
+			{QuestionCode: "C1", Dimension: "C", Sign: 1},
+			{QuestionCode: "C2", Dimension: "C", Sign: 1},
+			{QuestionCode: "E1", Dimension: "E", Sign: 1},
+			{QuestionCode: "E2", Dimension: "E", Sign: 1},
+			{QuestionCode: "A1", Dimension: "A", Sign: 1},
+			{QuestionCode: "A2", Dimension: "A", Sign: 1},
+			{QuestionCode: "N1", Dimension: "N", Sign: 1},
+			{QuestionCode: "N2", Dimension: "N", Sign: 1},
+		},
+		MatchingSpec: modeltypology.MatchingSpec{
+			Kind: assessmentmodel.DecisionKindTraitProfile,
+		},
+		Source: modeltypology.Source{
+			Attribution:   "IPIP",
+			License:       "CC0",
+			NonCommercial: false,
+		},
+	}
+}
+
+func bigFiveAnswerSheet() *evaluationinputdomain.AnswerSheet {
+	return &evaluationinputdomain.AnswerSheet{
+		Answers: []evaluationinputdomain.Answer{
+			{QuestionCode: "O1", Score: 4},
+			{QuestionCode: "O2", Score: 2},
+			{QuestionCode: "C1", Score: 5},
+			{QuestionCode: "C2", Score: 3},
+			{QuestionCode: "E1", Score: 3},
+			{QuestionCode: "E2", Score: 3},
+			{QuestionCode: "A1", Score: 4},
+			{QuestionCode: "A2", Score: 4},
+			{QuestionCode: "N1", Score: 2},
+			{QuestionCode: "N2", Score: 2},
+		},
+	}
+}
+
+func submittedBigFiveAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindPersonality,
+		assessmentmodel.SubKindTypology,
+		assessmentmodel.AlgorithmBigFive,
+		meta.ID(0),
+		meta.NewCode("BIGFIVE_V1"),
+		"1.0.0",
+		"Big Five",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8004),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("BIGFIVE_V1"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6004)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7004)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	a.ClearEvents()
+	return a
+}
+
+func bigFiveInputSnapshot() *evaluationinput.InputSnapshot {
+	payload := bigFiveCharacterizationModel()
+	return &evaluationinput.InputSnapshot{
+		Model:        evaluationinput.NewTypologyModelSnapshot(payload),
+		ModelPayload: evaluationinput.TypologyModelPayload{Payload: payload},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    "BIGFIVE_V1",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []evaluationinput.AnswerSnapshot{
+				{QuestionCode: "O1", Score: 4},
+				{QuestionCode: "O2", Score: 2},
+				{QuestionCode: "C1", Score: 5},
+				{QuestionCode: "C2", Score: 3},
+				{QuestionCode: "E1", Score: 3},
+				{QuestionCode: "E2", Score: 3},
+				{QuestionCode: "A1", Score: 4},
+				{QuestionCode: "A2", Score: 4},
+				{QuestionCode: "N1", Score: 2},
+				{QuestionCode: "N2", Score: 2},
+			},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "BIGFIVE_V1", Version: "1.0.0"},
+	}
+}

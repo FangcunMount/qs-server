@@ -21,6 +21,9 @@ func NewModuleRegistry(modules ...Module) (ModuleRegistry, error) {
 		if module.Adapter == nil {
 			return ModuleRegistry{}, fmt.Errorf("typology module %s adapter is required", module.Algorithm)
 		}
+		if module.outcomeAssembler == nil {
+			return ModuleRegistry{}, fmt.Errorf("typology module %s outcome assembler is required", module.Algorithm)
+		}
 		if module.reportBuilder == nil {
 			return ModuleRegistry{}, fmt.Errorf("typology module %s report builder is required", module.Algorithm)
 		}
@@ -38,8 +41,9 @@ func (r ModuleRegistry) runnerFor(algorithm assessmentmodel.Algorithm) (algorith
 		return algorithmRunner{}, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
 	}
 	return algorithmRunner{
-		adapter:       module.Adapter,
-		reportBuilder: module.reportBuilder,
+		adapter:          module.Adapter,
+		outcomeAssembler: module.outcomeAssembler,
+		reportBuilder:    module.reportBuilder,
 	}, nil
 }
 

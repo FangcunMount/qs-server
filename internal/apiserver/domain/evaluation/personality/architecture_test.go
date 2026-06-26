@@ -72,6 +72,7 @@ func TestTypologyApplicationLayerKeepsConcreteModelsInAdapters(t *testing.T) {
 		"report_builder.go":      {},
 		"report_mbti.go":         {},
 		"report_sbti.go":         {},
+		"report_bigfive.go":      {},
 		"converters.go":          {},
 		"report_input_mapper.go": {},
 		"outcome_assembler.go":   {},
