@@ -64,15 +64,15 @@ type Container struct {
 	waitWatcherCancel                 context.CancelFunc
 
 	// 接口层处理器
-	answerSheetHandler           *handler.AnswerSheetHandler
-	questionnaireHandler         *handler.QuestionnaireHandler
-	evaluationHandler            *handler.EvaluationHandler
-	scaleHandler                 *handler.ScaleHandler
-	personalityModelHandler      *handler.PersonalityModelHandler
+	answerSheetHandler                  *handler.AnswerSheetHandler
+	questionnaireHandler                *handler.QuestionnaireHandler
+	evaluationHandler                   *handler.EvaluationHandler
+	scaleHandler                        *handler.ScaleHandler
+	personalityModelHandler             *handler.PersonalityModelHandler
 	personalityAssessmentHandler        *handler.PersonalityAssessmentHandler
 	personalityAssessmentSessionHandler *handler.PersonalityAssessmentSessionHandler
 	testeeHandler                       *handler.TesteeHandler
-	healthHandler                *handler.HealthHandler
+	healthHandler                       *handler.HealthHandler
 }
 
 // ClientBundle is the collection-server runtime client graph produced by the

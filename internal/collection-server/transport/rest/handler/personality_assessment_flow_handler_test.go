@@ -20,12 +20,12 @@ func TestMiniProgramPersonalityAssessmentHTTPFlowContract(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
 	const (
-		testeeID      uint64 = 1001
-		answerSheetID uint64 = 9001
-		assessmentID  uint64 = 8001
-		modelCode            = "PERSONALITY_MODEL_A"
-		questionnaireCode    = "Q_PERSONALITY_A"
-		questionnaireVersion = "1.0.0"
+		testeeID             uint64 = 1001
+		answerSheetID        uint64 = 9001
+		assessmentID         uint64 = 8001
+		modelCode                   = "PERSONALITY_MODEL_A"
+		questionnaireCode           = "Q_PERSONALITY_A"
+		questionnaireVersion        = "1.0.0"
 	)
 
 	sessionHandler := NewPersonalityAssessmentSessionHandler(personalitysession.NewService(

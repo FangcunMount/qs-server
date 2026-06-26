@@ -27,10 +27,10 @@ type SessionEndpointsResponse struct {
 }
 
 type StartSessionResponse struct {
-	Model            personalitymodel.PersonalityModelSummaryResponse `json:"model"`
-	Questionnaire    questionnaire.QuestionnaireResponse            `json:"questionnaire"`
-	SubmitContract   SubmitContractResponse                         `json:"submit_contract"`
-	Endpoints        SessionEndpointsResponse                       `json:"endpoints"`
+	Model          personalitymodel.PersonalityModelSummaryResponse `json:"model"`
+	Questionnaire  questionnaire.QuestionnaireResponse              `json:"questionnaire"`
+	SubmitContract SubmitContractResponse                           `json:"submit_contract"`
+	Endpoints      SessionEndpointsResponse                         `json:"endpoints"`
 }
 
 func buildSubmitContract(model *personalitymodel.PersonalityModelResponse, testeeID uint64) SubmitContractResponse {

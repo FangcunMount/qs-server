@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
