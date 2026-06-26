@@ -94,24 +94,24 @@ type ListAssessmentsResponse struct {
 }
 
 type AssessmentReportResponse struct {
-	AssessmentID string                           `json:"assessment_id"`
-	Model        ModelIdentityResponse            `json:"model"`
-	PrimaryScore *ScoreValueResponse              `json:"primary_score,omitempty"`
-	Level        *ResultLevelResponse             `json:"level,omitempty"`
-	Conclusion   string                           `json:"conclusion"`
+	AssessmentID string                                     `json:"assessment_id"`
+	Model        ModelIdentityResponse                      `json:"model"`
+	PrimaryScore *ScoreValueResponse                        `json:"primary_score,omitempty"`
+	Level        *ResultLevelResponse                       `json:"level,omitempty"`
+	Conclusion   string                                     `json:"conclusion"`
 	Dimensions   []evaluationapp.DimensionInterpretResponse `json:"dimensions"`
 	Suggestions  []evaluationapp.SuggestionResponse         `json:"suggestions"`
-	ModelExtra   *ModelExtraResponse              `json:"model_extra,omitempty"`
-	CreatedAt    string                           `json:"created_at"`
+	ModelExtra   *ModelExtraResponse                        `json:"model_extra,omitempty"`
+	CreatedAt    string                                     `json:"created_at"`
 }
 
 type AssessmentStatusResponse struct {
-	Status          string                `json:"status"`
-	Stage           string                `json:"stage,omitempty"`
-	Message         string                `json:"message,omitempty"`
-	Reason          string                `json:"reason,omitempty"`
-	NextPollAfterMs int                   `json:"next_poll_after_ms,omitempty"`
+	Status          string                 `json:"status"`
+	Stage           string                 `json:"stage,omitempty"`
+	Message         string                 `json:"message,omitempty"`
+	Reason          string                 `json:"reason,omitempty"`
+	NextPollAfterMs int                    `json:"next_poll_after_ms,omitempty"`
 	Model           *ModelIdentityResponse `json:"model,omitempty"`
-	Level           *ResultLevelResponse  `json:"level,omitempty"`
-	UpdatedAt       int64                 `json:"updated_at"`
+	Level           *ResultLevelResponse   `json:"level,omitempty"`
+	UpdatedAt       int64                  `json:"updated_at"`
 }

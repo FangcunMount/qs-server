@@ -41,46 +41,46 @@ type Container struct {
 	IAMModule *IAMModule
 
 	// gRPC 客户端（由 GRPCClientRegistry 注入）
-	answerSheetClient   *grpcclient.AnswerSheetClient
-	questionnaireClient *grpcclient.QuestionnaireClient
-	evaluationClient    *grpcclient.EvaluationClient
-	actorClient         *grpcclient.ActorClient
-	scaleClient              *grpcclient.ScaleClient
-	personalityModelClient   *grpcclient.PersonalityModelClient
+	answerSheetClient      *grpcclient.AnswerSheetClient
+	questionnaireClient    *grpcclient.QuestionnaireClient
+	evaluationClient       *grpcclient.EvaluationClient
+	actorClient            *grpcclient.ActorClient
+	scaleClient            *grpcclient.ScaleClient
+	personalityModelClient *grpcclient.PersonalityModelClient
 
 	// 应用层服务
-	submissionService         *answersheet.SubmissionService
-	questionnaireQueryService *questionnaire.QueryService
-	evaluationQueryService    *evaluation.QueryService
-	waitReportService         *reportwait.Service
-	scaleQueryService              *scale.QueryService
-	personalityModelQueryService   *personalitymodel.QueryService
+	submissionService                 *answersheet.SubmissionService
+	questionnaireQueryService         *questionnaire.QueryService
+	evaluationQueryService            *evaluation.QueryService
+	waitReportService                 *reportwait.Service
+	scaleQueryService                 *scale.QueryService
+	personalityModelQueryService      *personalitymodel.QueryService
 	personalityAssessmentQueryService *personalityassessment.QueryService
-	testeeService                  *testee.Service
-	reportStatusReporter      *reportstatus.Reporter
-	waitHub                   reportwait.WaitHub
-	waitWatcherCancel         context.CancelFunc
+	testeeService                     *testee.Service
+	reportStatusReporter              *reportstatus.Reporter
+	waitHub                           reportwait.WaitHub
+	waitWatcherCancel                 context.CancelFunc
 
 	// 接口层处理器
-	answerSheetHandler   *handler.AnswerSheetHandler
-	questionnaireHandler *handler.QuestionnaireHandler
-	evaluationHandler    *handler.EvaluationHandler
+	answerSheetHandler           *handler.AnswerSheetHandler
+	questionnaireHandler         *handler.QuestionnaireHandler
+	evaluationHandler            *handler.EvaluationHandler
 	scaleHandler                 *handler.ScaleHandler
 	personalityModelHandler      *handler.PersonalityModelHandler
 	personalityAssessmentHandler *handler.PersonalityAssessmentHandler
 	testeeHandler                *handler.TesteeHandler
-	healthHandler        *handler.HealthHandler
+	healthHandler                *handler.HealthHandler
 }
 
 // ClientBundle is the collection-server runtime client graph produced by the
 // gRPC integration stage and consumed by the container composition root.
 type ClientBundle struct {
-	AnswerSheet   *grpcclient.AnswerSheetClient
-	Questionnaire *grpcclient.QuestionnaireClient
-	Evaluation    *grpcclient.EvaluationClient
-	Actor         *grpcclient.ActorClient
-	Scale               *grpcclient.ScaleClient
-	PersonalityModel    *grpcclient.PersonalityModelClient
+	AnswerSheet      *grpcclient.AnswerSheetClient
+	Questionnaire    *grpcclient.QuestionnaireClient
+	Evaluation       *grpcclient.EvaluationClient
+	Actor            *grpcclient.ActorClient
+	Scale            *grpcclient.ScaleClient
+	PersonalityModel *grpcclient.PersonalityModelClient
 }
 
 // NewContainer 创建新的容器

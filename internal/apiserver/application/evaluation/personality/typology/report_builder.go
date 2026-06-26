@@ -7,77 +7,60 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality/typology"
 )
 
-var (
-	errAssessmentRequired        = fmt.Errorf("assessment is required")
-	errEvaluationOutcomeRequired = fmt.Errorf("evaluation outcome is required")
-)
-
-type ReportBuilder struct{}
+type ReportBuilder struct {
+	runner algorithmRunner
+}
 
 var _ evaluationresult.ReportBuilder = ReportBuilder{}
 
-func NewReportBuilder() ReportBuilder {
-	return ReportBuilder{}
+func NewReportBuilder(algorithm assessmentmodel.Algorithm) (ReportBuilder, error) {
+	runner, err := algorithmRunnerFor(algorithm)
+	if err != nil {
+		return ReportBuilder{}, err
+	}
+	return ReportBuilder{runner: runner}, nil
 }
 
 func NewMBTIReportBuilder() evaluationresult.ReportBuilder {
-	return algorithmReportBuilder{key: evaluation.EvaluatorKeyMBTI}
+	builder, err := NewReportBuilder(assessmentmodel.AlgorithmMBTI)
+	if err != nil {
+		panic(err)
+	}
+	return builder
 }
 
 func NewSBTIReportBuilder() evaluationresult.ReportBuilder {
-	return algorithmReportBuilder{key: evaluation.EvaluatorKeySBTI}
+	builder, err := NewReportBuilder(assessmentmodel.AlgorithmSBTI)
+	if err != nil {
+		panic(err)
+	}
+	return builder
 }
 
-type algorithmReportBuilder struct {
-	key evaluation.EvaluatorKey
-}
-
-func (b algorithmReportBuilder) Key() evaluation.EvaluatorKey {
-	return b.key
-}
-
-func (algorithmReportBuilder) ReportType() domainReport.ReportType {
-	return domainReport.ReportTypeStandard
-}
-
-func (b algorithmReportBuilder) Build(ctx context.Context, outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
-	return (ReportBuilder{}).Build(ctx, outcome)
-}
-
-func (ReportBuilder) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyMBTI
+func (b ReportBuilder) Key() evaluation.EvaluatorKey {
+	if b.runner == nil {
+		return evaluation.EvaluatorKey{}
+	}
+	return evaluation.PersonalityTypologyKey(b.runner.algorithm())
 }
 
 func (ReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
-	algorithm := resolveTypologyAlgorithm(outcome)
-	switch algorithm {
-	case assessmentmodel.AlgorithmSBTI:
-		return buildSBTIReport(outcome)
-	default:
-		return buildMBTIReport(outcome)
+func (b ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+	if b.runner == nil {
+		return nil, fmt.Errorf("personality typology report builder is not configured")
 	}
-}
-
-func resolveTypologyAlgorithm(outcome evaluationresult.Outcome) assessmentmodel.Algorithm {
-	if outcome.Execution != nil && outcome.Execution.ModelRef.Algorithm() != "" {
-		return outcome.Execution.ModelRef.Algorithm()
+	rpt, err := b.runner.buildReport(outcome)
+	if err != nil {
+		return nil, err
 	}
-	if outcome.Execution != nil {
-		switch outcome.Execution.Detail.Payload.(type) {
-		case evaluationtypology.SBTIResultDetail, *evaluationtypology.SBTIResultDetail:
-			return assessmentmodel.AlgorithmSBTI
-		}
-	}
-	return assessmentmodel.AlgorithmMBTI
+	return evaluationresult.AttachReportOutcomeSummary(outcome, rpt), nil
 }
 
 func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
@@ -89,7 +72,7 @@ func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretR
 	if err != nil {
 		return nil, err
 	}
-	return evaluationresult.AttachReportOutcomeSummary(outcome, rpt), nil
+	return rpt, nil
 }
 
 func buildSBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
@@ -101,5 +84,5 @@ func buildSBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretR
 	if err != nil {
 		return nil, err
 	}
-	return evaluationresult.AttachReportOutcomeSummary(outcome, rpt), nil
+	return rpt, nil
 }

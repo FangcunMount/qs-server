@@ -1,11 +1,18 @@
 package typology
 
 import (
+	"fmt"
+
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality/typology"
+)
+
+var (
+	errAssessmentRequired        = fmt.Errorf("assessment is required")
+	errEvaluationOutcomeRequired = fmt.Errorf("evaluation outcome is required")
 )
 
 func MBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypology.MBTIReportInput, error) {

@@ -1,18 +1,18 @@
 package personalitymodel
 
 type PersonalityModelResponse struct {
-	Code                 string                        `json:"code"`
-	Version              string                        `json:"version"`
-	Title                string                        `json:"title"`
-	Algorithm            string                        `json:"algorithm"`
-	Description          string                        `json:"description"`
-	QuestionnaireCode    string                        `json:"questionnaire_code"`
-	QuestionnaireVersion string                        `json:"questionnaire_version"`
-	Status               string                        `json:"status"`
-	QuestionCount        int32                         `json:"question_count"`
-	DimensionOrder       []string                      `json:"dimension_order,omitempty"`
+	Code                 string                         `json:"code"`
+	Version              string                         `json:"version"`
+	Title                string                         `json:"title"`
+	Algorithm            string                         `json:"algorithm"`
+	Description          string                         `json:"description"`
+	QuestionnaireCode    string                         `json:"questionnaire_code"`
+	QuestionnaireVersion string                         `json:"questionnaire_version"`
+	Status               string                         `json:"status"`
+	QuestionCount        int32                          `json:"question_count"`
+	DimensionOrder       []string                       `json:"dimension_order,omitempty"`
 	Dimensions           []PersonalityDimensionResponse `json:"dimensions,omitempty"`
-	Outcomes             []PersonalityOutcomeResponse  `json:"outcomes,omitempty"`
+	Outcomes             []PersonalityOutcomeResponse   `json:"outcomes,omitempty"`
 }
 
 type PersonalityDimensionResponse struct {

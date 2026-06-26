@@ -297,6 +297,11 @@ type MBTIModelCatalog interface {
 	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*typology.MBTILegacyModel, error)
 }
 
+// TypologyModelCatalog loads unified typology payloads for evaluation input resolution.
+type TypologyModelCatalog interface {
+	GetTypologyModelByRef(ctx context.Context, ref ModelRef) (*typology.Payload, error)
+}
+
 type AnswerSheetReader interface {
 	GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetSnapshot, error)
 }

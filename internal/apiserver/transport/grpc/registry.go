@@ -12,9 +12,9 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
+	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -35,15 +35,15 @@ type Registry struct {
 type Deps struct {
 	Server *grpcpkg.Server
 
-	Survey     SurveyDeps
-	Actor      ActorDeps
-	Evaluation EvaluationDeps
-	Scale             ScaleDeps
-	PersonalityModel  PersonalityModelDeps
-	Plan              PlanDeps
-	Statistics StatisticsDeps
-	IAM        IAMDeps
-	RuleSet    RuleSetDeps
+	Survey           SurveyDeps
+	Actor            ActorDeps
+	Evaluation       EvaluationDeps
+	Scale            ScaleDeps
+	PersonalityModel PersonalityModelDeps
+	Plan             PlanDeps
+	Statistics       StatisticsDeps
+	IAM              IAMDeps
+	RuleSet          RuleSetDeps
 
 	WarmupCoordinator                  cachegov.Coordinator
 	QRCodeService                      SurveyScaleQRCodeGenerator

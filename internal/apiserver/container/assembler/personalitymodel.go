@@ -14,15 +14,22 @@ type PersonalityModelModule struct {
 
 // PersonalityModelModuleDeps defines explicit construction dependencies.
 type PersonalityModelModuleDeps struct {
-	PublishedLister port.PublishedLister
+	PublishedLister          port.PublishedLister
+	PublishedAlgorithmLister port.PublishedAlgorithmLister
 }
 
 func NewPersonalityModelModule(deps PersonalityModelModuleDeps) (*PersonalityModelModule, error) {
 	if deps.PublishedLister == nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "personality model published lister is required")
 	}
+	var queryService appPersonalityModel.PersonalityModelQueryService
+	if deps.PublishedAlgorithmLister != nil {
+		queryService = appPersonalityModel.NewQueryServiceWithAlgorithmLister(deps.PublishedLister, deps.PublishedAlgorithmLister)
+	} else {
+		queryService = appPersonalityModel.NewQueryService(deps.PublishedLister)
+	}
 	return &PersonalityModelModule{
-		QueryService: appPersonalityModel.NewQueryService(deps.PublishedLister),
+		QueryService: queryService,
 	}, nil
 }
 

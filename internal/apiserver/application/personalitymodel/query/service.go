@@ -2,6 +2,7 @@ package query
 
 import (
 	"context"
+	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
@@ -16,11 +17,19 @@ type PersonalityModelQueryService interface {
 }
 
 type queryService struct {
-	lister port.PublishedLister
+	lister          port.PublishedLister
+	algorithmLister port.PublishedAlgorithmLister
 }
 
 func NewQueryService(lister port.PublishedLister) PersonalityModelQueryService {
 	return &queryService{lister: lister}
+}
+
+func NewQueryServiceWithAlgorithmLister(
+	lister port.PublishedLister,
+	algorithmLister port.PublishedAlgorithmLister,
+) PersonalityModelQueryService {
+	return &queryService{lister: lister, algorithmLister: algorithmLister}
 }
 
 func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*shared.PersonalityModelResult, error) {
@@ -83,11 +92,42 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListPersona
 }
 
 func (s *queryService) GetCategories(ctx context.Context) (*shared.PersonalityModelCategoriesResult, error) {
-	_ = ctx
-	return &shared.PersonalityModelCategoriesResult{
-		Categories: []shared.PersonalityModelCategoryResult{
-			{Value: string(domain.AlgorithmMBTI), Label: "MBTI"},
-			{Value: string(domain.AlgorithmSBTI), Label: "SBTI"},
-		},
-	}, nil
+	algorithms, err := s.listPublishedAlgorithms(ctx)
+	if err != nil {
+		return nil, err
+	}
+	categories := make([]shared.PersonalityModelCategoryResult, 0, len(algorithms))
+	for _, algorithm := range algorithms {
+		categories = append(categories, shared.PersonalityModelCategoryResult{
+			Value: string(algorithm),
+			Label: algorithmCategoryLabel(algorithm),
+		})
+	}
+	return &shared.PersonalityModelCategoriesResult{Categories: categories}, nil
+}
+
+func (s *queryService) listPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {
+	if s != nil && s.algorithmLister != nil {
+		algorithms, err := s.algorithmLister.ListPublishedAlgorithms(ctx)
+		if err != nil {
+			return nil, err
+		}
+		if len(algorithms) > 0 {
+			return algorithms, nil
+		}
+	}
+	return []domain.Algorithm{domain.AlgorithmMBTI, domain.AlgorithmSBTI}, nil
+}
+
+func algorithmCategoryLabel(algorithm domain.Algorithm) string {
+	switch algorithm {
+	case domain.AlgorithmMBTI:
+		return "MBTI"
+	case domain.AlgorithmSBTI:
+		return "SBTI"
+	case domain.AlgorithmBigFive:
+		return "Big Five"
+	default:
+		return strings.ToUpper(string(algorithm))
+	}
 }

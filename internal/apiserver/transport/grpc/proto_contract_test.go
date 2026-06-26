@@ -66,14 +66,14 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 	protoRoot := filepath.Clean("../../interface/grpc/proto")
 	serviceRe := regexp.MustCompile(`(?m)^service\s+(\w+)`)
 	constructorByService := map[string]string{
-		"ActorService":         "NewActorService",
-		"AnswerSheetService":   "NewAnswerSheetService",
-		"EvaluationService":    "NewEvaluationService",
-		"InternalService":      "NewInternalService",
-		"PlanCommandService":   "NewPlanCommandService",
-		"QuestionnaireService": "NewQuestionnaireService",
-		"ScaleService":              "NewScaleService",
-		"PersonalityModelService":   "NewPersonalityModelService",
+		"ActorService":            "NewActorService",
+		"AnswerSheetService":      "NewAnswerSheetService",
+		"EvaluationService":       "NewEvaluationService",
+		"InternalService":         "NewInternalService",
+		"PlanCommandService":      "NewPlanCommandService",
+		"QuestionnaireService":    "NewQuestionnaireService",
+		"ScaleService":            "NewScaleService",
+		"PersonalityModelService": "NewPersonalityModelService",
 	}
 
 	err = filepath.WalkDir(protoRoot, func(path string, d os.DirEntry, err error) error {

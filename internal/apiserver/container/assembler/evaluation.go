@@ -12,9 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -238,10 +236,12 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		m.ReportStatusReporter = reportStatusReporter
 
 		reportBuilder := report.NewDefaultInterpretReportBuilder(suggestionGenerator)
-		scaleEvaluator := scaleEvaluation.NewExecutor(nil)
-		sbtiEvaluator := typologyEvaluation.NewSBTIExecutor()
-		mbtiEvaluator := typologyEvaluation.NewMBTIExecutor()
-		evaluatorRegistry, err := execute.NewEvaluatorRegistry(scaleEvaluator, sbtiEvaluator, mbtiEvaluator)
+		modelRegs := defaultEvaluationModelRegistrations(reportBuilder)
+		evaluators, err := buildEvaluators(modelRegs)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation evaluators: %v", err)
+		}
+		evaluatorRegistry, err := execute.NewEvaluatorRegistry(evaluators...)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
@@ -251,18 +251,18 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
 		}
-		reportBuilders, err := evaluationResult.NewReportBuilderRegistry(
-			evaluationResult.NewScaleReportBuilder(reportBuilder),
-			typologyEvaluation.NewMBTIReportBuilder(),
-			typologyEvaluation.NewSBTIReportBuilder(),
-		)
+		reportBuilders, err := buildReportBuilders(modelRegs)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation report builders: %v", err)
+		}
+		reportBuilderRegistry, err := evaluationResult.NewReportBuilderRegistry(reportBuilders...)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation report builder registry: %v", err)
 		}
 		resultWriter, err := evaluationResult.NewWriter(
 			infra.assessmentRepo,
 			scoreProjectors,
-			reportBuilders,
+			reportBuilderRegistry,
 			infra.reportDurableSaver,
 			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
 			reportStatusReporter,

@@ -29,10 +29,10 @@ func NewRegistry(manager *grpcclient.Manager) *GRPCClientRegistry {
 func (r *GRPCClientRegistry) ClientBundle() container.ClientBundle {
 	log.Info("🔧 Building collection gRPC client bundle...")
 	bundle := container.ClientBundle{
-		AnswerSheet:   r.answerSheetClient(),
-		Questionnaire: r.questionnaireClient(),
-		Evaluation:    r.evaluationClient(),
-		Actor:         r.actorClient(),
+		AnswerSheet:      r.answerSheetClient(),
+		Questionnaire:    r.questionnaireClient(),
+		Evaluation:       r.evaluationClient(),
+		Actor:            r.actorClient(),
 		Scale:            r.scaleClient(),
 		PersonalityModel: r.personalityModelClient(),
 	}

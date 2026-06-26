@@ -77,15 +77,15 @@ type ReportV2Response struct {
 
 // ModelExtraResponse carries typology-specific report extensions.
 type ModelExtraResponse struct {
-	Kind           string              `json:"kind,omitempty"`
-	TypeCode       string              `json:"type_code,omitempty"`
-	TypeName       string              `json:"type_name,omitempty"`
-	OneLiner       string              `json:"one_liner,omitempty"`
-	ImageURL       string              `json:"image_url,omitempty"`
-	MatchPercent   float64             `json:"match_percent,omitempty"`
-	IsSpecial      bool                `json:"is_special,omitempty"`
-	SpecialTrigger string              `json:"special_trigger,omitempty"`
-	Commentary     string              `json:"commentary,omitempty"`
+	Kind           string               `json:"kind,omitempty"`
+	TypeCode       string               `json:"type_code,omitempty"`
+	TypeName       string               `json:"type_name,omitempty"`
+	OneLiner       string               `json:"one_liner,omitempty"`
+	ImageURL       string               `json:"image_url,omitempty"`
+	MatchPercent   float64              `json:"match_percent,omitempty"`
+	IsSpecial      bool                 `json:"is_special,omitempty"`
+	SpecialTrigger string               `json:"special_trigger,omitempty"`
+	Commentary     string               `json:"commentary,omitempty"`
 	Rarity         *ModelRarityResponse `json:"rarity,omitempty"`
 }
 

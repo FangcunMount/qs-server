@@ -176,9 +176,15 @@ func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishe
 }
 
 func (r *Repository) refFilter(ref port.Ref) bson.M {
-	kind, subKind, algorithm, mapped := domain.LegacyKindMapping(ref.Kind)
-	if !mapped {
-		kind = ref.Kind
+	kind := ref.Kind
+	subKind := ref.SubKind
+	algorithm := ref.Algorithm
+	if subKind == "" && algorithm == "" {
+		if mappedKind, mappedSubKind, mappedAlgorithm, mapped := domain.LegacyKindMapping(ref.Kind); mapped {
+			kind = mappedKind
+			subKind = mappedSubKind
+			algorithm = mappedAlgorithm
+		}
 	}
 	filter := bson.M{
 		"model_kind":    string(kind),

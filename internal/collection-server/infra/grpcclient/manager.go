@@ -47,10 +47,10 @@ type Manager struct {
 	clients map[string]interface{}
 
 	// 已注册的客户端
-	answerSheetClient   *AnswerSheetClient
-	questionnaireClient *QuestionnaireClient
-	evaluationClient    *EvaluationClient
-	actorClient         *ActorClient
+	answerSheetClient      *AnswerSheetClient
+	questionnaireClient    *QuestionnaireClient
+	evaluationClient       *EvaluationClient
+	actorClient            *ActorClient
 	scaleClient            *ScaleClient
 	personalityModelClient *PersonalityModelClient
 }

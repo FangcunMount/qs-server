@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -130,9 +131,7 @@ func cloneMBTITypeProfiles(source []modeltypology.MBTILegacyTypeProfile) []model
 }
 
 type MBTIModelInputProvider struct {
-	catalog             port.MBTIModelCatalog
-	answerSheetReader   port.AnswerSheetReader
-	questionnaireReader port.QuestionnaireReader
+	TypologyModelInputProvider
 }
 
 func NewMBTIModelInputProvider(
@@ -141,52 +140,15 @@ func NewMBTIModelInputProvider(
 	questionnaireReader port.QuestionnaireReader,
 ) MBTIModelInputProvider {
 	return MBTIModelInputProvider{
-		catalog:             catalog,
-		answerSheetReader:   answerSheetReader,
-		questionnaireReader: questionnaireReader,
+		TypologyModelInputProvider: NewTypologyModelInputProvider(
+			assessmentmodel.AlgorithmMBTI,
+			NewMBTITypologyCatalog(catalog),
+			answerSheetReader,
+			questionnaireReader,
+		),
 	}
 }
 
 func (MBTIModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
 	return evaldomain.EvaluatorKeyMBTI
-}
-
-func (p MBTIModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
-	if p.catalog == nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("mbti model catalog is not configured"), "MBTI 模型不存在", "加载解释模型失败")
-	}
-	model, err := p.catalog.GetMBTIModelByRef(ctx, ref.ModelRef)
-	if err != nil {
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "MBTI 模型不存在", "加载解释模型失败")
-	}
-	if !model.IsPublished() {
-		err := fmt.Errorf("mbti model is not published: %s", model.Code)
-		return nil, port.NewResolveError(port.FailureKindModelNotFound, err, "MBTI 模型不可用", "加载解释模型失败")
-	}
-
-	answerSheet, err := p.answerSheetReader.GetAnswerSheet(ctx, ref.AnswerSheetID)
-	if err != nil {
-		return nil, err
-	}
-	if !model.MatchesQuestionnaire(answerSheet.QuestionnaireCode, answerSheet.QuestionnaireVersion) {
-		err := fmt.Errorf("answersheet questionnaire %s@%s does not match mbti model questionnaire %s@%s",
-			answerSheet.QuestionnaireCode,
-			answerSheet.QuestionnaireVersion,
-			model.QuestionnaireCode,
-			model.QuestionnaireVersion,
-		)
-		return nil, port.NewResolveError(port.FailureKindQuestionnaireVersionMismatch, err, "问卷版本不匹配", "加载问卷失败")
-	}
-
-	qnr, err := p.questionnaireReader.GetQuestionnaire(ctx, answerSheet.QuestionnaireCode, answerSheet.QuestionnaireVersion)
-	if err != nil {
-		return nil, err
-	}
-	payload := port.MBTIModelPayload{Model: model}
-	return &port.InputSnapshot{
-		Model:         port.NewMBTIModelSnapshot(model),
-		ModelPayload:  payload,
-		AnswerSheet:   answerSheet,
-		Questionnaire: qnr,
-	}, nil
 }

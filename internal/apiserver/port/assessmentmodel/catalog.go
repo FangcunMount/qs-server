@@ -8,10 +8,12 @@ import (
 
 // Ref 测评模型引用，供绑定解析与执行路由使用。
 type Ref struct {
-	Kind    domain.Kind
-	Code    string
-	Version string
-	Title   string
+	Kind      domain.Kind
+	SubKind   domain.SubKind
+	Algorithm domain.Algorithm
+	Code      string
+	Version   string
+	Title     string
 }
 
 func (r Ref) IsEmpty() bool {
@@ -39,6 +41,11 @@ type PublishedReader interface {
 type PublishedLister interface {
 	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error)
 	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.Snapshot, int64, error)
+}
+
+// PublishedAlgorithmLister lists distinct published personality typology algorithms.
+type PublishedAlgorithmLister interface {
+	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)
 }
 
 // PublishedRuleSetReader is kept as a compatibility name while callers migrate to PublishedReader.

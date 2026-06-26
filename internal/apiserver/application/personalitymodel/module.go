@@ -14,13 +14,21 @@ func NewQueryService(lister port.PublishedLister) PersonalityModelQueryService {
 	return query.NewQueryService(lister)
 }
 
+// NewQueryServiceWithAlgorithmLister creates the query service with dynamic category support.
+func NewQueryServiceWithAlgorithmLister(
+	lister port.PublishedLister,
+	algorithmLister port.PublishedAlgorithmLister,
+) PersonalityModelQueryService {
+	return query.NewQueryServiceWithAlgorithmLister(lister, algorithmLister)
+}
+
 type (
-	ListPersonalityModelsDTO            = shared.ListPersonalityModelsDTO
-	PersonalityModelSummaryResult       = shared.PersonalityModelSummaryResult
-	PersonalityModelSummaryListResult   = shared.PersonalityModelSummaryListResult
-	PersonalityDimensionResult          = shared.PersonalityDimensionResult
-	PersonalityOutcomeSummaryResult     = shared.PersonalityOutcomeSummaryResult
-	PersonalityModelResult              = shared.PersonalityModelResult
-	PersonalityModelCategoryResult      = shared.PersonalityModelCategoryResult
-	PersonalityModelCategoriesResult    = shared.PersonalityModelCategoriesResult
+	ListPersonalityModelsDTO          = shared.ListPersonalityModelsDTO
+	PersonalityModelSummaryResult     = shared.PersonalityModelSummaryResult
+	PersonalityModelSummaryListResult = shared.PersonalityModelSummaryListResult
+	PersonalityDimensionResult        = shared.PersonalityDimensionResult
+	PersonalityOutcomeSummaryResult   = shared.PersonalityOutcomeSummaryResult
+	PersonalityModelResult            = shared.PersonalityModelResult
+	PersonalityModelCategoryResult    = shared.PersonalityModelCategoryResult
+	PersonalityModelCategoriesResult  = shared.PersonalityModelCategoriesResult
 )

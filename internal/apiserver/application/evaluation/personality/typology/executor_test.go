@@ -27,15 +27,6 @@ func TestExecutorKeys(t *testing.T) {
 	}
 }
 
-func TestExecutorAlgorithmGuard(t *testing.T) {
-	executor := NewMBTIExecutor()
-	_, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{})
-	if err == nil {
-		t.Fatal("Execute error = nil, want configuration error")
-	}
-	_ = assessmentmodel.AlgorithmMBTI
-}
-
 func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 	executor := NewMBTIExecutor()
 	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
@@ -57,6 +48,110 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 	if outcome.Profile == nil || outcome.Profile.Code != "INTJ" || outcome.Profile.Kind != assessment.ProfileKindPersonalityType {
 		t.Fatalf("profile = %#v, want INTJ personality_type", outcome.Profile)
 	}
+}
+
+func TestExecutorAlgorithmGuard(t *testing.T) {
+	executor := NewMBTIExecutor()
+	_, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{})
+	if err == nil {
+		t.Fatal("Execute error = nil, want configuration error")
+	}
+}
+
+func TestSBTIExecutorFillsPrimaryAndLevel(t *testing.T) {
+	executor := NewSBTIExecutor()
+	outcome, err := executor.Execute(context.TODO(), evaluationexecute.ExecutionInput{
+		Assessment: submittedSBTIAssessment(t),
+		Input:      sbtiExecutorInputSnapshot(),
+	})
+	if err != nil {
+		t.Fatalf("Execute returned error: %v", err)
+	}
+	if outcome == nil || outcome.Primary == nil {
+		t.Fatal("outcome primary is required")
+	}
+	if outcome.Level == nil || outcome.Level.Code != "HIGH" {
+		t.Fatalf("level = %#v, want HIGH type code", outcome.Level)
+	}
+	if outcome.Profile == nil || outcome.Profile.Kind != assessment.ProfileKindPersonalityType {
+		t.Fatalf("profile = %#v, want personality_type", outcome.Profile)
+	}
+}
+
+func sbtiFixtureModel() *modeltypology.SBTILegacyModel {
+	return &modeltypology.SBTILegacyModel{
+		Code:                        "SBTI_FUN",
+		Version:                     "1.0.0",
+		Title:                       "SBTI 测试",
+		QuestionnaireCode:           "SBTI_FUN",
+		QuestionnaireVersion:        "1.0.0",
+		Status:                      "published",
+		FallbackSimilarityThreshold: 0.6,
+		DimensionOrder:              []string{"D1", "D2"},
+		Dimensions: map[string]modeltypology.SBTILegacyDimension{
+			"D1": {Code: "D1", Name: "D1", Model: "M1"},
+			"D2": {Code: "D2", Name: "D2", Model: "M2"},
+		},
+		QuestionMappings: []modeltypology.SBTILegacyQuestionMapping{
+			{QuestionCode: "Q1", Dimension: "D1", OptionScores: map[string]float64{"A": 1, "B": 2, "C": 3}},
+			{QuestionCode: "Q2", Dimension: "D1", OptionScores: map[string]float64{"A": 1, "B": 2, "C": 3}},
+			{QuestionCode: "Q3", Dimension: "D2", OptionScores: map[string]float64{"A": 1, "B": 2, "C": 3}},
+			{QuestionCode: "Q4", Dimension: "D2", OptionScores: map[string]float64{"A": 1, "B": 2, "C": 3}},
+		},
+		NormalOutcomes: []modeltypology.SBTILegacyOutcome{
+			{Code: "HIGH", Name: "高能者", Pattern: "HH", OneLiner: "活力满满"},
+		},
+	}
+}
+
+func sbtiExecutorInputSnapshot() *port.InputSnapshot {
+	model := sbtiFixtureModel()
+	payload := modeltypology.FromSBTI(model)
+	return &port.InputSnapshot{
+		Model:        port.NewTypologyModelSnapshot(payload),
+		ModelPayload: port.TypologyModelPayload{Payload: payload},
+		AnswerSheet: &port.AnswerSheetSnapshot{
+			QuestionnaireCode:    "SBTI_FUN",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []port.AnswerSnapshot{
+				{QuestionCode: "Q1", Value: "C"},
+				{QuestionCode: "Q2", Value: "C"},
+				{QuestionCode: "Q3", Value: "C"},
+				{QuestionCode: "Q4", Value: "C"},
+			},
+		},
+		Questionnaire: &port.QuestionnaireSnapshot{Code: "SBTI_FUN", Version: "1.0.0"},
+	}
+}
+
+func submittedSBTIAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefWithIdentity(
+		assessment.EvaluationModelKindPersonality,
+		assessmentmodel.SubKindTypology,
+		assessmentmodel.AlgorithmSBTI,
+		meta.ID(0),
+		meta.NewCode("SBTI_FUN"),
+		"1.0.0",
+		"SBTI 测试",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8003),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("SBTI_FUN"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6003)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7003)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit: %v", err)
+	}
+	a.ClearEvents()
+	return a
 }
 
 func mbtiExecutorInputSnapshot() *port.InputSnapshot {

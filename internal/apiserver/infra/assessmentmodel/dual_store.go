@@ -2,6 +2,7 @@ package assessmentmodel
 
 import (
 	"context"
+	"sort"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
@@ -16,9 +17,10 @@ type DualStore struct {
 }
 
 var (
-	_ port.PublishedReader = (*DualStore)(nil)
-	_ port.PublishedLister = (*DualStore)(nil)
-	_ port.PublishedWriter = (*DualStore)(nil)
+	_ port.PublishedReader          = (*DualStore)(nil)
+	_ port.PublishedLister          = (*DualStore)(nil)
+	_ port.PublishedWriter          = (*DualStore)(nil)
+	_ port.PublishedAlgorithmLister = (*DualStore)(nil)
 )
 
 func NewDualStore(v2 *mongoassessmentmodel.Repository, legacy *mongoruleset.Repository) *DualStore {
@@ -193,4 +195,77 @@ func resolveLegacyAlgorithm(snapshot *domain.Snapshot) (domain.Algorithm, error)
 	default:
 		return "", nil
 	}
+}
+
+func (s *DualStore) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {
+	if s == nil {
+		return nil, domain.ErrNotFound
+	}
+	seen := make(map[domain.Algorithm]struct{})
+	add := func(algorithm domain.Algorithm) {
+		if algorithm == "" {
+			return
+		}
+		seen[algorithm] = struct{}{}
+	}
+
+	if s.v2 != nil {
+		snapshots, _, err := s.v2.ListPublished(ctx, port.ListPublishedFilter{
+			Kind:     domain.KindPersonality,
+			Page:     1,
+			PageSize: 500,
+		})
+		if err != nil {
+			return nil, err
+		}
+		for _, snapshot := range snapshots {
+			algorithm, err := resolveLegacyAlgorithm(snapshot)
+			if err != nil {
+				continue
+			}
+			add(algorithm)
+		}
+	}
+	if s.legacy != nil {
+		all, err := s.legacy.ListPublished(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, snapshot := range all {
+			algorithm, err := resolveLegacyAlgorithm(snapshot)
+			if err != nil {
+				continue
+			}
+			add(algorithm)
+		}
+	}
+
+	out := make([]domain.Algorithm, 0, len(seen))
+	for algorithm := range seen {
+		out = append(out, algorithm)
+	}
+	sortAlgorithms(out)
+	return out, nil
+}
+
+func sortAlgorithms(algorithms []domain.Algorithm) {
+	order := map[domain.Algorithm]int{
+		domain.AlgorithmMBTI:    0,
+		domain.AlgorithmSBTI:    1,
+		domain.AlgorithmBigFive: 2,
+	}
+	sort.Slice(algorithms, func(i, j int) bool {
+		left, okLeft := order[algorithms[i]]
+		right, okRight := order[algorithms[j]]
+		switch {
+		case okLeft && okRight:
+			return left < right
+		case okLeft:
+			return true
+		case okRight:
+			return false
+		default:
+			return algorithms[i] < algorithms[j]
+		}
+	})
 }

@@ -15,17 +15,18 @@ var (
 		SubKind:   assessmentmodel.SubKindEmpty,
 		Algorithm: assessmentmodel.AlgorithmScaleDefault,
 	}
-	EvaluatorKeyMBTI = EvaluatorKey{
-		Kind:      assessmentmodel.KindPersonality,
-		SubKind:   assessmentmodel.SubKindTypology,
-		Algorithm: assessmentmodel.AlgorithmMBTI,
-	}
-	EvaluatorKeySBTI = EvaluatorKey{
-		Kind:      assessmentmodel.KindPersonality,
-		SubKind:   assessmentmodel.SubKindTypology,
-		Algorithm: assessmentmodel.AlgorithmSBTI,
-	}
+	EvaluatorKeyMBTI = PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI)
+	EvaluatorKeySBTI = PersonalityTypologyKey(assessmentmodel.AlgorithmSBTI)
 )
+
+// PersonalityTypologyKey builds the execution routing key for a typology algorithm.
+func PersonalityTypologyKey(algorithm assessmentmodel.Algorithm) EvaluatorKey {
+	return EvaluatorKey{
+		Kind:      assessmentmodel.KindPersonality,
+		SubKind:   assessmentmodel.SubKindTypology,
+		Algorithm: algorithm,
+	}
+}
 
 func (k EvaluatorKey) String() string {
 	if k.SubKind == "" && k.Algorithm == "" {

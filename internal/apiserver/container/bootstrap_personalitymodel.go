@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
 )
 
 func (c *Container) buildPersonalityModelModuleDeps() assembler.PersonalityModelModuleDeps {
@@ -17,8 +17,10 @@ func (c *Container) buildPersonalityModelModuleDeps() assembler.PersonalityModel
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
 	v2Repo := mongoassessmentmodel.NewRepository(c.mongoDB, mongoOpts)
 	legacyRepo := mongoruleset.NewRepository(c.mongoDB, mongoOpts)
+	dualStore := aminfra.NewDualStore(v2Repo, legacyRepo)
 	return assembler.PersonalityModelModuleDeps{
-		PublishedLister: aminfra.NewDualStore(v2Repo, legacyRepo),
+		PublishedLister:          dualStore,
+		PublishedAlgorithmLister: dualStore,
 	}
 }
 

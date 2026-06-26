@@ -58,13 +58,13 @@ func (s *EvaluationService) ListMyAssessmentsV2(ctx context.Context, req *pb.Lis
 	}
 	testeeID := req.TesteeId
 	filter := evaluationreadmodel.AssessmentFilter{
-		TesteeID:  &testeeID,
-		Statuses:  normalizeGRPCAssessmentStatuses(req.Status),
-		ScaleCode: req.ScaleCode,
-		RiskLevel: req.RiskLevel,
-		ModelKind: req.ModelKind,
+		TesteeID:       &testeeID,
+		Statuses:       normalizeGRPCAssessmentStatuses(req.Status),
+		ScaleCode:      req.ScaleCode,
+		RiskLevel:      req.RiskLevel,
+		ModelKind:      req.ModelKind,
 		ModelAlgorithm: req.ModelAlgorithm,
-		ModelCode: req.ModelCode,
+		ModelCode:      req.ModelCode,
 	}
 	if req.DateFrom != "" {
 		if parsed, err := time.Parse(time.RFC3339, req.DateFrom); err == nil {
