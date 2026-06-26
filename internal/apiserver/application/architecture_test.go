@@ -457,9 +457,14 @@ func isEvaluationRootPackageGoFile(root, path string) bool {
 }
 
 func isEvaluationRulesetPayloadImport(importPath string) bool {
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel" {
+		return true
+	}
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation" {
+		return true
+	}
 	for _, allowed := range []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
@@ -518,4 +523,42 @@ func mustRel(t *testing.T, root, path string) string {
 		t.Fatal(err)
 	}
 	return rel
+}
+
+func TestApplicationLayerDoesNotReferenceLegacyRuleSetTypes(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenTokens := []string{
+		"RuleSetSnapshot",
+		"RuleSetDefinition",
+		"RuleSetKind",
+		"domain/ruleset",
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		if filepath.Base(path) == "architecture_test.go" {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbiddenTokens {
+			if strings.Contains(text, token) {
+				t.Fatalf("%s contains %q; application must use assessmentmodel v2 types", filepath.ToSlash(mustRel(t, root, path)), token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
 }

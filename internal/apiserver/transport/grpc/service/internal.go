@@ -199,8 +199,20 @@ func applyAssessmentBinding(
 		dto.MedicalScaleName = binding.MedicalScaleName
 		dto.ScaleVersion = binding.ScaleVersion
 	default:
-		kind := binding.Ref.Kind.String()
+		mappedKind, subKind, algorithm, ok := domainruleset.LegacyKindMapping(binding.Ref.Kind)
+		if !ok {
+			mappedKind = binding.Ref.Kind
+		}
+		kind := mappedKind.String()
 		dto.ModelKind = &kind
+		if subKind != "" {
+			subKindStr := subKind.String()
+			dto.ModelSubKind = &subKindStr
+		}
+		if algorithm != "" {
+			algorithmStr := algorithm.String()
+			dto.ModelAlgorithm = &algorithmStr
+		}
 		dto.ModelCode = &binding.Ref.Code
 		dto.ModelVersion = &binding.Ref.Version
 		dto.ModelTitle = &binding.Ref.Title

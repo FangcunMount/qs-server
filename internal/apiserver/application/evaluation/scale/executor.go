@@ -6,6 +6,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -39,6 +40,10 @@ func NewExecutorWithService(service Service) *Executor {
 		)
 	}
 	return &Executor{service: service}
+}
+
+func (e *Executor) Key() evaluation.EvaluatorKey {
+	return evaluation.EvaluatorKeyScaleDefault
 }
 
 func (e *Executor) Kind() assessment.EvaluationModelKind {

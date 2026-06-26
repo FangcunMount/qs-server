@@ -6,11 +6,13 @@ const (
 
 	AnswerSheetSubmitted = "answersheet.submitted"
 
-	AssessmentSubmitted   = "assessment.submitted"
-	AssessmentInterpreted = "assessment.interpreted"
-	AssessmentFailed      = "assessment.failed"
+	AssessmentSubmitted     = "assessment.submitted"
+	AssessmentInterpreted   = "assessment.interpreted"
+	AssessmentInterpretedV2 = "assessment.interpreted.v2"
+	AssessmentFailed        = "assessment.failed"
 
-	ReportGenerated = "report.generated"
+	ReportGenerated   = "report.generated"
+	ReportGeneratedV2 = "report.generated.v2"
 
 	FootprintEntryOpened                 = "footprint.entry_opened"
 	FootprintIntakeConfirmed             = "footprint.intake_confirmed"
@@ -36,8 +38,10 @@ func EventTypes() []string {
 		AnswerSheetSubmitted,
 		AssessmentSubmitted,
 		AssessmentInterpreted,
+		AssessmentInterpretedV2,
 		AssessmentFailed,
 		ReportGenerated,
+		ReportGeneratedV2,
 		FootprintEntryOpened,
 		FootprintIntakeConfirmed,
 		FootprintTesteeProfileCreated,

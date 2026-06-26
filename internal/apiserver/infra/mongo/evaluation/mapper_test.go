@@ -67,4 +67,10 @@ func TestReportMapperRoundTripPreservesInterpretReportFields(t *testing.T) {
 	if got.ModelExtra() == nil || got.ModelExtra().TypeCode != "MBTI_OEJTS" {
 		t.Fatalf("model extra = %#v", got.ModelExtra())
 	}
+	if po.Model == nil || po.PrimaryScore == nil || po.Level == nil {
+		t.Fatalf("v2 fields missing: model=%#v primary=%#v level=%#v", po.Model, po.PrimaryScore, po.Level)
+	}
+	if po.Model.Kind == "" && po.Model.Code == "" {
+		t.Fatalf("model identity = %#v", po.Model)
+	}
 }

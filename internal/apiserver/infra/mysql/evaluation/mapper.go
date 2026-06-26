@@ -83,6 +83,8 @@ func (m *AssessmentMapper) ToPO(domain *assessment.Assessment) *AssessmentPO {
 	po.FailedAt = domain.FailedAt()
 	po.FailureReason = domain.FailureReason()
 
+	applyAssessmentOutcomeV2Fields(po, domain)
+
 	return po
 }
 
@@ -132,8 +134,10 @@ func (m *AssessmentMapper) ToDomain(po *AssessmentPO) *assessment.Assessment {
 		if po.MedicalScaleID != nil && assessment.EvaluationModelKind(*po.EvaluationModelKind) == assessment.EvaluationModelKindScale {
 			id = mustMetaIDFromUint64("assessment.medical_scale_id", *po.MedicalScaleID)
 		}
-		ref := assessment.NewEvaluationModelRef(
+		ref := assessment.NewEvaluationModelRefWithIdentity(
 			assessment.EvaluationModelKind(*po.EvaluationModelKind),
+			subKindFromPO(po),
+			algorithmFromPO(po),
 			id,
 			meta.NewCode(*po.EvaluationModelCode),
 			version,

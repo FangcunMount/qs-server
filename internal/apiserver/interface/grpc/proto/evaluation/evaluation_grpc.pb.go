@@ -27,6 +27,9 @@ const (
 	EvaluationService_GetHighRiskFactors_FullMethodName             = "/evaluation.EvaluationService/GetHighRiskFactors"
 	EvaluationService_GetAssessmentReport_FullMethodName            = "/evaluation.EvaluationService/GetAssessmentReport"
 	EvaluationService_ListMyReports_FullMethodName                  = "/evaluation.EvaluationService/ListMyReports"
+	EvaluationService_GetMyAssessmentV2_FullMethodName              = "/evaluation.EvaluationService/GetMyAssessmentV2"
+	EvaluationService_ListMyAssessmentsV2_FullMethodName            = "/evaluation.EvaluationService/ListMyAssessmentsV2"
+	EvaluationService_GetAssessmentReportV2_FullMethodName          = "/evaluation.EvaluationService/GetAssessmentReportV2"
 )
 
 // EvaluationServiceClient is the client API for EvaluationService service.
@@ -52,6 +55,9 @@ type EvaluationServiceClient interface {
 	GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error)
 	// 获取我的报告列表
 	ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error)
+	GetMyAssessmentV2(ctx context.Context, in *GetMyAssessmentV2Request, opts ...grpc.CallOption) (*GetMyAssessmentV2Response, error)
+	ListMyAssessmentsV2(ctx context.Context, in *ListMyAssessmentsV2Request, opts ...grpc.CallOption) (*ListMyAssessmentsV2Response, error)
+	GetAssessmentReportV2(ctx context.Context, in *GetAssessmentReportV2Request, opts ...grpc.CallOption) (*GetAssessmentReportV2Response, error)
 }
 
 type evaluationServiceClient struct {
@@ -142,6 +148,36 @@ func (c *evaluationServiceClient) ListMyReports(ctx context.Context, in *ListMyR
 	return out, nil
 }
 
+func (c *evaluationServiceClient) GetMyAssessmentV2(ctx context.Context, in *GetMyAssessmentV2Request, opts ...grpc.CallOption) (*GetMyAssessmentV2Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetMyAssessmentV2Response)
+	err := c.cc.Invoke(ctx, EvaluationService_GetMyAssessmentV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationServiceClient) ListMyAssessmentsV2(ctx context.Context, in *ListMyAssessmentsV2Request, opts ...grpc.CallOption) (*ListMyAssessmentsV2Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMyAssessmentsV2Response)
+	err := c.cc.Invoke(ctx, EvaluationService_ListMyAssessmentsV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationServiceClient) GetAssessmentReportV2(ctx context.Context, in *GetAssessmentReportV2Request, opts ...grpc.CallOption) (*GetAssessmentReportV2Response, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GetAssessmentReportV2Response)
+	err := c.cc.Invoke(ctx, EvaluationService_GetAssessmentReportV2_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // EvaluationServiceServer is the server API for EvaluationService service.
 // All implementations must embed UnimplementedEvaluationServiceServer
 // for forward compatibility.
@@ -165,6 +201,9 @@ type EvaluationServiceServer interface {
 	GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error)
 	// 获取我的报告列表
 	ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error)
+	GetMyAssessmentV2(context.Context, *GetMyAssessmentV2Request) (*GetMyAssessmentV2Response, error)
+	ListMyAssessmentsV2(context.Context, *ListMyAssessmentsV2Request) (*ListMyAssessmentsV2Response, error)
+	GetAssessmentReportV2(context.Context, *GetAssessmentReportV2Request) (*GetAssessmentReportV2Response, error)
 	mustEmbedUnimplementedEvaluationServiceServer()
 }
 
@@ -198,6 +237,15 @@ func (UnimplementedEvaluationServiceServer) GetAssessmentReport(context.Context,
 }
 func (UnimplementedEvaluationServiceServer) ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMyReports not implemented")
+}
+func (UnimplementedEvaluationServiceServer) GetMyAssessmentV2(context.Context, *GetMyAssessmentV2Request) (*GetMyAssessmentV2Response, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetMyAssessmentV2 not implemented")
+}
+func (UnimplementedEvaluationServiceServer) ListMyAssessmentsV2(context.Context, *ListMyAssessmentsV2Request) (*ListMyAssessmentsV2Response, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMyAssessmentsV2 not implemented")
+}
+func (UnimplementedEvaluationServiceServer) GetAssessmentReportV2(context.Context, *GetAssessmentReportV2Request) (*GetAssessmentReportV2Response, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAssessmentReportV2 not implemented")
 }
 func (UnimplementedEvaluationServiceServer) mustEmbedUnimplementedEvaluationServiceServer() {}
 func (UnimplementedEvaluationServiceServer) testEmbeddedByValue()                           {}
@@ -364,6 +412,60 @@ func _EvaluationService_ListMyReports_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _EvaluationService_GetMyAssessmentV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetMyAssessmentV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationServiceServer).GetMyAssessmentV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationService_GetMyAssessmentV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationServiceServer).GetMyAssessmentV2(ctx, req.(*GetMyAssessmentV2Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationService_ListMyAssessmentsV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMyAssessmentsV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationServiceServer).ListMyAssessmentsV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationService_ListMyAssessmentsV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationServiceServer).ListMyAssessmentsV2(ctx, req.(*ListMyAssessmentsV2Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationService_GetAssessmentReportV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAssessmentReportV2Request)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationServiceServer).GetAssessmentReportV2(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationService_GetAssessmentReportV2_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationServiceServer).GetAssessmentReportV2(ctx, req.(*GetAssessmentReportV2Request))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // EvaluationService_ServiceDesc is the grpc.ServiceDesc for EvaluationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -402,6 +504,18 @@ var EvaluationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMyReports",
 			Handler:    _EvaluationService_ListMyReports_Handler,
+		},
+		{
+			MethodName: "GetMyAssessmentV2",
+			Handler:    _EvaluationService_GetMyAssessmentV2_Handler,
+		},
+		{
+			MethodName: "ListMyAssessmentsV2",
+			Handler:    _EvaluationService_ListMyAssessmentsV2_Handler,
+		},
+		{
+			MethodName: "GetAssessmentReportV2",
+			Handler:    _EvaluationService_GetAssessmentReportV2_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

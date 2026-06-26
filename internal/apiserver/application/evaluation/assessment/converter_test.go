@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -100,7 +101,9 @@ func TestBuildCreateRequestRejectsOverflowOrgID(t *testing.T) {
 }
 
 func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
-	kind := domainAssessment.EvaluationModelKindSBTI.String()
+	kind := domainAssessment.EvaluationModelKindPersonality.String()
+	subKind := "typology"
+	algorithm := "sbti"
 	code := "SBTI_FUN"
 	version := "1.0.0"
 	title := "SBTI 趣味人格测评"
@@ -111,6 +114,8 @@ func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
 		QuestionnaireVersion: "1.0.0",
 		AnswerSheetID:        3001,
 		ModelKind:            &kind,
+		ModelSubKind:         &subKind,
+		ModelAlgorithm:       &algorithm,
 		ModelCode:            &code,
 		ModelVersion:         &version,
 		ModelTitle:           &title,
@@ -121,10 +126,37 @@ func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
 	if req.ModelRef == nil {
 		t.Fatal("RuleSetRef is nil")
 	}
-	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindSBTI ||
+	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality ||
+		req.ModelRef.SubKind() != assessmentmodel.SubKindTypology ||
+		req.ModelRef.Algorithm() != assessmentmodel.AlgorithmSBTI ||
 		req.ModelRef.Code().String() != "SBTI_FUN" ||
 		req.ModelRef.Version() != "1.0.0" ||
 		req.ModelRef.Title() != title {
-		t.Fatalf("RuleSetRef = %#v, want SBTI_FUN model ref", req.ModelRef)
+		t.Fatalf("RuleSetRef = %#v, want SBTI_FUN typology identity", req.ModelRef)
+	}
+}
+
+func TestBuildCreateRequestMapsLegacyKindToTypologyIdentity(t *testing.T) {
+	kind := assessmentmodel.KindMBTIMigration.String()
+	code := "MBTI_OEJTS"
+	req, err := assessmentCreateRequestAssembler{}.Assemble(CreateAssessmentDTO{
+		OrgID:                1,
+		TesteeID:             2001,
+		QuestionnaireCode:    "MBTI_OEJTS",
+		QuestionnaireVersion: "1.0.0",
+		AnswerSheetID:        3001,
+		ModelKind:            &kind,
+		ModelCode:            &code,
+	})
+	if err != nil {
+		t.Fatalf("Assemble returned error: %v", err)
+	}
+	if req.ModelRef == nil {
+		t.Fatal("ModelRef is nil")
+	}
+	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality ||
+		req.ModelRef.SubKind() != assessmentmodel.SubKindTypology ||
+		req.ModelRef.Algorithm() != assessmentmodel.AlgorithmMBTI {
+		t.Fatalf("ModelRef = %#v, want personality/typology/mbti", req.ModelRef)
 	}
 }

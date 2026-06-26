@@ -61,6 +61,25 @@ func (q assessmentAdminQuery) List(
 	return results, total, err
 }
 
+func (q assessmentAdminQuery) ListV2(
+	ctx context.Context,
+	dto ListAssessmentsDTO,
+	orgID int64,
+	page int,
+	pageSize int,
+	filter *assessmentListFilter,
+) ([]*AssessmentV2Result, int64, error) {
+	if q.reader == nil {
+		return nil, 0, evalerrors.ModuleNotConfigured("assessment read model is not configured")
+	}
+	rows, total, err := q.queryRows(ctx, dto, orgID, page, pageSize, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	results, err := assessmentRowsToV2Results(rows)
+	return results, total, err
+}
+
 func (q assessmentAdminQuery) queryRows(
 	ctx context.Context,
 	dto ListAssessmentsDTO,

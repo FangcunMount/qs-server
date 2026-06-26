@@ -205,6 +205,7 @@ func (c *Container) BuildGRPCDeps(server *grpcpkg.Server) grpctransport.Deps {
 		deps.Evaluation.ManagementService = c.EvaluationModule.ManagementService
 		deps.Evaluation.ReportQueryService = c.EvaluationModule.ReportQueryService
 		deps.Evaluation.ScoreQueryService = c.EvaluationModule.ScoreQueryService
+		deps.Evaluation.AssessmentReader = c.EvaluationModule.AssessmentReader
 		deps.Evaluation.EvaluationService = c.EvaluationModule.EvaluationService
 	}
 	if c.ScaleModule != nil {

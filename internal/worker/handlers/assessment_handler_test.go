@@ -6,6 +6,7 @@ import (
 	"testing"
 	"time"
 
+	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
 )
 
@@ -85,6 +86,56 @@ func mustBuildAssessmentSubmittedPayload(t *testing.T, assessmentID int64) []byt
 			"answersheet_id":        "456",
 			"scale_code":            "scale-1",
 			"submitted_at":          now,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	return payload
+}
+
+func TestAssessmentInterpretedV2Helpers(t *testing.T) {
+	level := &domainAssessment.EventResultLevel{Code: "severe", Severity: "high"}
+	score := &domainAssessment.EventScoreValue{Value: 18.5}
+	if got := assessmentLevelCode(level); got != "severe" {
+		t.Fatalf("level code = %q, want severe", got)
+	}
+	if got := assessmentLevelSeverity(level); got != "high" {
+		t.Fatalf("severity = %q, want high", got)
+	}
+	if got := assessmentPrimaryScoreValue(score); got != 18.5 {
+		t.Fatalf("score = %v, want 18.5", got)
+	}
+	if got := assessmentPrimaryScoreValue(nil); got != 0 {
+		t.Fatalf("nil score = %v, want 0", got)
+	}
+}
+
+func TestHandleAssessmentInterpretedV2AcksHighSeverityPayload(t *testing.T) {
+	deps := newAnswerSheetHandlerTestDeps(&fakeWorkerInternalClient{}, nil)
+	handler := handleAssessmentInterpreted(deps)
+	if err := handler(context.Background(), "assessment.interpreted.v2", mustBuildAssessmentInterpretedV2Payload(t)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+}
+
+func mustBuildAssessmentInterpretedV2Payload(t *testing.T) []byte {
+	t.Helper()
+
+	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
+	payload, err := json.Marshal(map[string]any{
+		"id":            "evt-assessment-interpreted-v2",
+		"eventType":     "assessment.interpreted.v2",
+		"occurredAt":    now,
+		"aggregateType": "Assessment",
+		"aggregateID":   "agg-3",
+		"data": map[string]any{
+			"org_id":         18,
+			"assessment_id":  42,
+			"testee_id":      99,
+			"level":          map[string]any{"code": "severe", "label": "severe", "severity": "high"},
+			"primary_score":  map[string]any{"kind": "raw_total", "value": 18.5},
+			"interpreted_at": now,
 		},
 	})
 	if err != nil {

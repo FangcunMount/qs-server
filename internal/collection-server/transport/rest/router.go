@@ -45,6 +45,7 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 
 	// 注册业务路由
 	r.registerBusinessRoutes(engine)
+	r.registerBusinessV2Routes(engine)
 }
 
 // setupGlobalMiddleware 设置全局中间件
@@ -105,6 +106,53 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
+}
+
+// registerBusinessV2Routes 注册 v2 业务路由。
+func (r *Router) registerBusinessV2Routes(engine *gin.Engine) {
+	api := engine.Group("/api/v2")
+	r.applyIAMAuth(api, isPublicScaleReadOnly)
+	r.registerEvaluationV2Routes(api)
+}
+
+// registerEvaluationV2Routes 注册测评 v2 路由。
+func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
+	evaluationHandler := r.container.EvaluationHandler()
+	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
+
+	assessments := api.Group("/assessments")
+	{
+		assessments.GET("", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.ListMyAssessmentsV2,
+		)...)
+		assessments.GET("/:id", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetMyAssessmentV2,
+		)...)
+		assessments.GET("/:id/report", rateLimitedHandlers(
+			r.container.RateLimitBackend(),
+			"query",
+			rateCfg,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetAssessmentReportV2,
+		)...)
+	}
 }
 
 func (r *Router) applyIAMAuth(api *gin.RouterGroup, skip func(*gin.Context) bool) {

@@ -405,9 +405,14 @@ func isEvaluationRootPackageFile(root, path string) bool {
 }
 
 func isEvaluationRulesetPayloadImport(importPath string) bool {
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel" {
+		return true
+	}
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation" {
+		return true
+	}
 	for _, allowed := range []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {

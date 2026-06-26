@@ -3,9 +3,9 @@ package evaluationinput
 import (
 	"testing"
 
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/mbti"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -15,7 +15,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 		t.Fatalf("NewDefaultMBTIModelCatalog: %v", err)
 	}
 	model, err := catalog.GetMBTIModelByRef(t.Context(), port.ModelRef{
-		Kind:    port.EvaluationModelKindMBTI,
+		Kind:    port.EvaluationModelKindPersonality,
 		Code:    port.DefaultMBTIModelCode,
 		Version: port.DefaultMBTIModelVersion,
 	})
@@ -25,7 +25,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 
 	t.Run("all_neutral", func(t *testing.T) {
 		sheet := mbtiLikertAnswerSheet(model, "3")
-		got, err := evaluationmbti.Score(model, mbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -58,7 +58,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 			"TF": "T",
 			"JP": "J",
 		})
-		got, err := evaluationmbti.Score(model, mbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreMBTI(model, mbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -71,7 +71,7 @@ func TestE2EScoreWithEmbeddedMBTIModel(t *testing.T) {
 	})
 }
 
-func mbtiPolePreferenceAnswerSheet(model *rulesetmbti.ModelSnapshot, prefs map[string]string) *port.AnswerSheetSnapshot {
+func mbtiPolePreferenceAnswerSheet(model *modeltypology.MBTILegacyModel, prefs map[string]string) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		meta := model.Dimensions[mapping.Dimension]
@@ -104,7 +104,7 @@ func mbtiLikertValueForSign(sign float64, wantRight bool) string {
 	return "5"
 }
 
-func mbtiLikertAnswerSheet(model *rulesetmbti.ModelSnapshot, value string) *port.AnswerSheetSnapshot {
+func mbtiLikertAnswerSheet(model *modeltypology.MBTILegacyModel, value string) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	score := float64(value[0] - '0')
 	for _, mapping := range model.QuestionMappings {

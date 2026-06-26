@@ -32,10 +32,21 @@ type AssessmentPO struct {
 	MedicalScaleName *string `gorm:"column:medical_scale_name;size:255"`
 
 	// 通用解释模型引用（可选）
-	EvaluationModelKind    *string `gorm:"column:evaluation_model_kind;size:50;index:idx_evaluation_model"`
-	EvaluationModelCode    *string `gorm:"column:evaluation_model_code;size:100;index:idx_evaluation_model"`
-	EvaluationModelVersion *string `gorm:"column:evaluation_model_version;size:50"`
-	EvaluationModelTitle   *string `gorm:"column:evaluation_model_title;size:255"`
+	EvaluationModelKind      *string `gorm:"column:evaluation_model_kind;size:50;index:idx_evaluation_model"`
+	EvaluationModelSubKind   *string `gorm:"column:evaluation_model_sub_kind;size:50"`
+	EvaluationModelAlgorithm *string `gorm:"column:evaluation_model_algorithm;size:50"`
+	EvaluationModelCode      *string `gorm:"column:evaluation_model_code;size:100;index:idx_evaluation_model"`
+	EvaluationModelVersion   *string `gorm:"column:evaluation_model_version;size:50"`
+	EvaluationModelTitle     *string `gorm:"column:evaluation_model_title;size:255"`
+
+	// v2 outcome summary projection
+	PrimaryScoreKind  *string  `gorm:"column:primary_score_kind;size:50"`
+	PrimaryScoreValue *float64 `gorm:"column:primary_score_value"`
+	PrimaryScoreLabel *string  `gorm:"column:primary_score_label;size:100"`
+	PrimaryScoreMax   *float64 `gorm:"column:primary_score_max"`
+	LevelCode         *string  `gorm:"column:level_code;size:50;index:idx_assessment_level_code"`
+	LevelLabel        *string  `gorm:"column:level_label;size:100"`
+	Severity          *string  `gorm:"column:severity;size:50;index:idx_assessment_severity"`
 
 	// 答卷引用
 	AnswerSheetID uint64 `gorm:"column:answer_sheet_id;not null;uniqueIndex:uk_answer_sheet_id"`

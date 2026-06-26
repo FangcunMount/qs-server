@@ -122,3 +122,24 @@ func (r *Repository) findOne(ctx context.Context, filter bson.M) (*domain.RuleSe
 	}
 	return r.mapper.ToDomain(&po), nil
 }
+
+func (r *Repository) ListPublished(ctx context.Context) ([]*domain.Snapshot, error) {
+	cursor, err := r.Collection().Find(ctx, publishedFilter(bson.M{}))
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = cursor.Close(ctx) }()
+
+	snapshots := make([]*domain.Snapshot, 0)
+	for cursor.Next(ctx) {
+		var po EvaluationRuleSetPO
+		if err := cursor.Decode(&po); err != nil {
+			return nil, err
+		}
+		snapshots = append(snapshots, r.mapper.ToDomain(&po))
+	}
+	if err := cursor.Err(); err != nil {
+		return nil, err
+	}
+	return snapshots, nil
+}

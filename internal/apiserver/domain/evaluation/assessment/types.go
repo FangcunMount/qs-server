@@ -171,36 +171,49 @@ const (
 	// EvaluationModelKindScale 医学/心理量表模型。
 	EvaluationModelKindScale EvaluationModelKind = assessmentmodel.KindScale
 
-	// EvaluationModelKindMBTI MBTI 人格模型（OEJTS 轻量实现）。
-	EvaluationModelKindMBTI EvaluationModelKind = assessmentmodel.KindMBTI
-
-	// EvaluationModelKindSBTI SBTI 趣味人格模型。
-	EvaluationModelKindSBTI EvaluationModelKind = assessmentmodel.KindSBTI
+	// EvaluationModelKindPersonality 人格类模型（typology/trait 等子形态由 SubKind/Algorithm 区分）。
+	EvaluationModelKindPersonality EvaluationModelKind = assessmentmodel.KindPersonality
 )
 
 // EvaluationModelRef 表示本次 Assessment 要使用的测评模型。
 type EvaluationModelRef struct {
-	id      meta.ID
-	kind    EvaluationModelKind
-	code    meta.Code
-	version string
-	title   string
+	id        meta.ID
+	kind      EvaluationModelKind
+	subKind   assessmentmodel.SubKind
+	algorithm assessmentmodel.Algorithm
+	code      meta.Code
+	version   string
+	title     string
 }
 
 // NewEvaluationModelRef 创建通用测评模型引用。
 func NewEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
-	return EvaluationModelRef{
-		id:      id,
-		kind:    kind,
-		code:    code,
-		version: version,
-		title:   title,
-	}
+	return NewEvaluationModelRefWithIdentity(kind, assessmentmodel.SubKindEmpty, "", id, code, version, title)
 }
 
 // NewEvaluationModelRefByCode 创建不带底层模型 ID 的测评模型引用。
 func NewEvaluationModelRefByCode(kind EvaluationModelKind, code meta.Code, version, title string) EvaluationModelRef {
-	return NewEvaluationModelRef(kind, meta.ID(0), code, version, title)
+	return NewEvaluationModelRefWithIdentity(kind, assessmentmodel.SubKindEmpty, "", meta.ID(0), code, version, title)
+}
+
+// NewEvaluationModelRefWithIdentity 创建带 v2 身份三元组的测评模型引用。
+func NewEvaluationModelRefWithIdentity(
+	kind EvaluationModelKind,
+	subKind assessmentmodel.SubKind,
+	algorithm assessmentmodel.Algorithm,
+	id meta.ID,
+	code meta.Code,
+	version, title string,
+) EvaluationModelRef {
+	return EvaluationModelRef{
+		id:        id,
+		kind:      kind,
+		subKind:   subKind,
+		algorithm: algorithm,
+		code:      code,
+		version:   version,
+		title:     title,
+	}
 }
 
 // NewScaleEvaluationModelRef 创建 Scale 测评模型引用。
@@ -228,6 +241,14 @@ func (r EvaluationModelRef) Title() string {
 	return r.title
 }
 
+func (r EvaluationModelRef) SubKind() assessmentmodel.SubKind {
+	return r.subKind
+}
+
+func (r EvaluationModelRef) Algorithm() assessmentmodel.Algorithm {
+	return r.algorithm
+}
+
 func (r EvaluationModelRef) IsEmpty() bool {
 	return r.kind == "" && r.code.IsEmpty()
 }
@@ -237,7 +258,7 @@ func (r EvaluationModelRef) IsScale() bool {
 }
 
 func (r EvaluationModelRef) SameIdentity(other EvaluationModelRef) bool {
-	return r.kind == other.kind &&
+	return r.EvaluatorKey() == other.EvaluatorKey() &&
 		r.code == other.code &&
 		r.version == other.version
 }

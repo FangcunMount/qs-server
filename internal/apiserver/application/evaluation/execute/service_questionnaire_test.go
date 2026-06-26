@@ -8,7 +8,9 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -328,7 +330,15 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 }
 
 func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
-	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindMBTI, meta.NewCode("FAKE-MODEL"), "1.0.0", "Fake Model")
+	modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
+		domainAssessment.EvaluationModelKindPersonality,
+		assessmentmodel.SubKindTypology,
+		assessmentmodel.AlgorithmMBTI,
+		meta.ID(0),
+		meta.NewCode("FAKE-MODEL"),
+		"1.0.0",
+		"Fake Model",
+	)
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(
 			meta.FromUint64(103),
@@ -350,20 +360,23 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:    evaluationinput.EvaluationModelKindMBTI,
-			Code:    "FAKE-MODEL",
-			Version: "1.0.0",
-			Title:   "Fake Model",
+			Kind:      evaluationinput.EvaluationModelKindPersonality,
+			SubKind:   string(assessmentmodel.SubKindTypology),
+			Algorithm: string(assessmentmodel.AlgorithmMBTI),
+			Code:      "FAKE-MODEL",
+			Version:   "1.0.0",
+			Title:     "Fake Model",
 		},
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 305, QuestionnaireCode: "Q-FAKE", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-FAKE", Version: "1.0.0"},
 	}}
 	writer := &recordingResultWriter{}
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		kind: domainAssessment.EvaluationModelKindMBTI,
+		key:  evaluation.EvaluatorKeyMBTI,
+		kind: domainAssessment.EvaluationModelKindPersonality,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.EvaluationResult, error) {
 			return domainAssessment.NewModelEvaluationResult(*input.Assessment.EvaluationModelRef(), domainAssessment.ResultSummary{PrimaryLabel: "INTJ"}, domainAssessment.EvaluationDetail{
-				Kind:    domainAssessment.EvaluationModelKindMBTI,
+				Kind:    domainAssessment.EvaluationModelKindPersonality,
 				Payload: "INTJ",
 			}), nil
 		},
@@ -376,16 +389,16 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if writer.calls != 1 || writer.outcome.Result == nil || writer.outcome.Result.ModelRef.Kind() != domainAssessment.EvaluationModelKindMBTI {
+	if writer.calls != 1 || writer.outcome.Result == nil || writer.outcome.Result.ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
 		t.Fatalf("unexpected writer outcome: %#v", writer.outcome)
 	}
-	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindMBTI || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
+	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)
 	}
 }
 
 func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
-	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := domainAssessment.NewEvaluationModelRefByCode(domainAssessment.EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	aRepo := &fakeAssessmentRepo{
 		assessment: domainAssessment.Reconstruct(
 			meta.FromUint64(102),
@@ -407,7 +420,7 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	}
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
-			Kind:    evaluationinput.EvaluationModelKindMBTI,
+			Kind:    evaluationinput.EvaluationModelKindPersonality,
 			Code:    "MBTI-16P",
 			Version: "1.0.0",
 			Title:   "MBTI",

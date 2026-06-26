@@ -162,7 +162,7 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 	r.registerProtectedRoutes(engine)
 	r.registerInternalRoutes(engine)
 
-	fmt.Printf("🔗 Registered routes for: public, protected(api/v1), internal(internal/v1)\n")
+	fmt.Printf("🔗 Registered routes for: public, protected(api/v1, api/v2), internal(internal/v1)\n")
 }
 
 func registerRouteSpecs(group *gin.RouterGroup, routes []routeSpec) {

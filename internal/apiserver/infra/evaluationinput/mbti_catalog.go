@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -15,11 +15,11 @@ import (
 var defaultMBTIModelJSON []byte
 
 type StaticMBTIModelCatalog struct {
-	models []rulesetmbti.ModelSnapshot
+	models []modeltypology.MBTILegacyModel
 }
 
 func NewDefaultMBTIModelCatalog() (*StaticMBTIModelCatalog, error) {
-	var model rulesetmbti.ModelSnapshot
+	var model modeltypology.MBTILegacyModel
 	if err := json.Unmarshal(defaultMBTIModelJSON, &model); err != nil {
 		return nil, fmt.Errorf("load default mbti model: %w", err)
 	}
@@ -29,15 +29,15 @@ func NewDefaultMBTIModelCatalog() (*StaticMBTIModelCatalog, error) {
 	return NewStaticMBTIModelCatalog(model), nil
 }
 
-func NewStaticMBTIModelCatalog(models ...rulesetmbti.ModelSnapshot) *StaticMBTIModelCatalog {
-	copied := make([]rulesetmbti.ModelSnapshot, 0, len(models))
+func NewStaticMBTIModelCatalog(models ...modeltypology.MBTILegacyModel) *StaticMBTIModelCatalog {
+	copied := make([]modeltypology.MBTILegacyModel, 0, len(models))
 	for _, model := range models {
 		copied = append(copied, cloneMBTIModelSnapshot(model))
 	}
 	return &StaticMBTIModelCatalog{models: copied}
 }
 
-func (c *StaticMBTIModelCatalog) GetMBTIModelByRef(_ context.Context, ref port.ModelRef) (*rulesetmbti.ModelSnapshot, error) {
+func (c *StaticMBTIModelCatalog) GetMBTIModelByRef(_ context.Context, ref port.ModelRef) (*modeltypology.MBTILegacyModel, error) {
 	if c == nil {
 		return nil, fmt.Errorf("mbti model catalog is not configured")
 	}
@@ -58,7 +58,7 @@ func (c *StaticMBTIModelCatalog) GetMBTIModelByRef(_ context.Context, ref port.M
 	return nil, fmt.Errorf("mbti model not found: %s@%s", code, ref.Version)
 }
 
-func (c *StaticMBTIModelCatalog) FindMBTIModelByQuestionnaire(_ context.Context, code, version string) (*rulesetmbti.ModelSnapshot, error) {
+func (c *StaticMBTIModelCatalog) FindMBTIModelByQuestionnaire(_ context.Context, code, version string) (*modeltypology.MBTILegacyModel, error) {
 	if c == nil {
 		return nil, fmt.Errorf("mbti model catalog is not configured")
 	}
@@ -71,7 +71,7 @@ func (c *StaticMBTIModelCatalog) FindMBTIModelByQuestionnaire(_ context.Context,
 	return nil, fmt.Errorf("mbti model not found for questionnaire: %s@%s", code, version)
 }
 
-func validateMBTIModelSnapshot(model rulesetmbti.ModelSnapshot) error {
+func validateMBTIModelSnapshot(model modeltypology.MBTILegacyModel) error {
 	if model.Code == "" {
 		return fmt.Errorf("mbti model code is required")
 	}
@@ -93,31 +93,31 @@ func validateMBTIModelSnapshot(model rulesetmbti.ModelSnapshot) error {
 	return nil
 }
 
-func cloneMBTIModelSnapshot(model rulesetmbti.ModelSnapshot) rulesetmbti.ModelSnapshot {
+func cloneMBTIModelSnapshot(model modeltypology.MBTILegacyModel) modeltypology.MBTILegacyModel {
 	cloned := model
 	cloned.DimensionOrder = append([]string(nil), model.DimensionOrder...)
 	cloned.Dimensions = cloneMBTIDimensions(model.Dimensions)
-	cloned.QuestionMappings = append([]rulesetmbti.QuestionMappingSnapshot(nil), model.QuestionMappings...)
+	cloned.QuestionMappings = append([]modeltypology.MBTILegacyQuestionMapping(nil), model.QuestionMappings...)
 	cloned.TypeProfiles = cloneMBTITypeProfiles(model.TypeProfiles)
 	return cloned
 }
 
-func cloneMBTIDimensions(source map[string]rulesetmbti.DimensionSnapshot) map[string]rulesetmbti.DimensionSnapshot {
+func cloneMBTIDimensions(source map[string]modeltypology.MBTILegacyDimension) map[string]modeltypology.MBTILegacyDimension {
 	if source == nil {
 		return nil
 	}
-	cloned := make(map[string]rulesetmbti.DimensionSnapshot, len(source))
+	cloned := make(map[string]modeltypology.MBTILegacyDimension, len(source))
 	for key, value := range source {
 		cloned[key] = value
 	}
 	return cloned
 }
 
-func cloneMBTITypeProfiles(source []rulesetmbti.TypeProfileSnapshot) []rulesetmbti.TypeProfileSnapshot {
+func cloneMBTITypeProfiles(source []modeltypology.MBTILegacyTypeProfile) []modeltypology.MBTILegacyTypeProfile {
 	if source == nil {
 		return nil
 	}
-	cloned := make([]rulesetmbti.TypeProfileSnapshot, len(source))
+	cloned := make([]modeltypology.MBTILegacyTypeProfile, len(source))
 	for i, profile := range source {
 		cloned[i] = profile
 		cloned[i].Traits = append([]string(nil), profile.Traits...)
@@ -147,7 +147,7 @@ func NewMBTIModelInputProvider(
 }
 
 func (MBTIModelInputProvider) Kind() port.EvaluationModelKind {
-	return port.EvaluationModelKindMBTI
+	return port.EvaluationModelKindMBTIMigration
 }
 
 func (p MBTIModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

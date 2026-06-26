@@ -28,3 +28,29 @@ func TestEvaluationModelRefMigrationBackfillsFromMedicalScaleFields(t *testing.T
 		}
 	}
 }
+
+func TestAssessmentOutcomeV2MigrationBackfillsInterpretedRows(t *testing.T) {
+	t.Parallel()
+
+	data, err := os.ReadFile("../../../../pkg/migration/migrations/mysql/000036_add_assessment_outcome_v2_fields.up.sql")
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"evaluation_model_sub_kind",
+		"evaluation_model_algorithm",
+		"primary_score_kind",
+		"primary_score_value",
+		"level_code",
+		"severity",
+		"WHEN 'scale' THEN 'scale_default'",
+		"WHEN 'mbti' THEN 'typology'",
+		"WHEN 'mbti' THEN 'mbti'",
+		"WHERE `status` = 'interpreted'",
+	} {
+		if !strings.Contains(text, token) {
+			t.Fatalf("migration does not contain %q", token)
+		}
+	}
+}

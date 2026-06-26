@@ -42,28 +42,37 @@ type AssessmentFilter struct {
 }
 
 type AssessmentRow struct {
-	ID                     uint64
-	OrgID                  int64
-	TesteeID               uint64
-	QuestionnaireCode      string
-	QuestionnaireVersion   string
-	AnswerSheetID          uint64
-	MedicalScaleID         *uint64
-	MedicalScaleCode       *string
-	MedicalScaleName       *string
-	EvaluationModelKind    *string
-	EvaluationModelCode    *string
-	EvaluationModelVersion *string
-	EvaluationModelTitle   *string
-	OriginType             string
-	OriginID               *string
-	Status                 string
-	TotalScore             *float64
-	RiskLevel              *string
-	SubmittedAt            *time.Time
-	InterpretedAt          *time.Time
-	FailedAt               *time.Time
-	FailureReason          *string
+	ID                       uint64
+	OrgID                    int64
+	TesteeID                 uint64
+	QuestionnaireCode        string
+	QuestionnaireVersion     string
+	AnswerSheetID            uint64
+	MedicalScaleID           *uint64
+	MedicalScaleCode         *string
+	MedicalScaleName         *string
+	EvaluationModelKind      *string
+	EvaluationModelSubKind   *string
+	EvaluationModelAlgorithm *string
+	EvaluationModelCode      *string
+	EvaluationModelVersion   *string
+	EvaluationModelTitle     *string
+	PrimaryScoreKind         *string
+	PrimaryScoreValue        *float64
+	PrimaryScoreLabel        *string
+	PrimaryScoreMax          *float64
+	LevelCode                *string
+	LevelLabel               *string
+	Severity                 *string
+	OriginType               string
+	OriginID                 *string
+	Status                   string
+	TotalScore               *float64
+	RiskLevel                *string
+	SubmittedAt              *time.Time
+	InterpretedAt            *time.Time
+	FailedAt                 *time.Time
+	FailureReason            *string
 }
 
 type LatestRiskFilter struct {
@@ -162,6 +171,9 @@ type ReportRow struct {
 	AssessmentID uint64
 	ModelName    string
 	ModelCode    string
+	Model        ModelIdentityRow
+	PrimaryScore *ScoreValueRow
+	Level        *ResultLevelRow
 	TotalScore   float64
 	RiskLevel    string
 	Conclusion   string
@@ -169,6 +181,28 @@ type ReportRow struct {
 	Suggestions  []ReportSuggestionRow
 	ModelExtra   *ReportModelExtraRow
 	CreatedAt    time.Time
+}
+
+type ModelIdentityRow struct {
+	Kind      string
+	SubKind   string
+	Algorithm string
+	Code      string
+	Version   string
+	Title     string
+}
+
+type ScoreValueRow struct {
+	Kind  string
+	Value float64
+	Label string
+	Max   *float64
+}
+
+type ResultLevelRow struct {
+	Code     string
+	Label    string
+	Severity string
 }
 
 type ReportModelExtraRow struct {

@@ -37,7 +37,7 @@ func TestDefaultAssessmentCreatorCreateKeepsPendingByDefault(t *testing.T) {
 func TestDefaultAssessmentCreatorUsesEvaluationModelValidator(t *testing.T) {
 	validator := &creatorModelValidatorStub{}
 	creator := NewDefaultAssessmentCreator(WithEvaluationModelValidator(validator))
-	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	req := NewCreateAssessmentRequest(
 		1,
 		testee.NewID(1001),
@@ -50,7 +50,7 @@ func TestDefaultAssessmentCreatorUsesEvaluationModelValidator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
 	}
-	if got.EvaluationModelRef() == nil || got.EvaluationModelRef().Kind() != EvaluationModelKindMBTI {
+	if got.EvaluationModelRef() == nil || got.EvaluationModelRef().Kind() != EvaluationModelKindPersonality {
 		t.Fatalf("unexpected model ref: %#v", got.EvaluationModelRef())
 	}
 	if !validator.called || validator.modelRef.Code() != modelRef.Code() || validator.questionnaireRef.Code().String() != "q-code" {
@@ -214,7 +214,7 @@ func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 }
 
 func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
-	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := NewAssessment(
 		1,
 		testee.NewID(1005),
@@ -232,7 +232,7 @@ func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
 	}
 
 	result := NewModelEvaluationResult(modelRef, ResultSummary{PrimaryLabel: "INTJ"}, EvaluationDetail{
-		Kind:    EvaluationModelKindMBTI,
+		Kind:    EvaluationModelKindPersonality,
 		Payload: "INTJ",
 	})
 	if err := a.ApplyEvaluation(result); err != nil {
@@ -241,7 +241,7 @@ func TestApplyEvaluationValidatesEvaluationModelRef(t *testing.T) {
 	if !a.Status().IsInterpreted() {
 		t.Fatalf("expected interpreted status, got %s", a.Status())
 	}
-	if result.Detail.Kind != EvaluationModelKindMBTI {
+	if result.Detail.Kind != EvaluationModelKindPersonality {
 		t.Fatalf("result detail kind = %s, want mbti", result.Detail.Kind)
 	}
 }
@@ -254,7 +254,7 @@ func TestApplyEvaluationRejectsMismatchedEvaluationModelRef(t *testing.T) {
 		NewAnswerSheetRef(meta.FromUint64(2006)),
 		NewAdhocOrigin(),
 		WithID(NewID(5005)),
-		WithEvaluationModel(NewEvaluationModelRefByCode(EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")),
+		WithEvaluationModel(NewEvaluationModelRefByCode(EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")),
 	)
 	if err != nil {
 		t.Fatalf("NewAssessment returned error: %v", err)

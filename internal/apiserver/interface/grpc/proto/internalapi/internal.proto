@@ -323,8 +323,37 @@ message EvaluateAssessmentResponse {
   bool success = 1;                  // 是否成功
   string status = 2;                 // 处理后的状态：interpreted/failed/skipped
   string message = 3;                // 描述信息
-  double total_score = 4;            // 总分（成功时）
-  string risk_level = 5;             // 风险等级（成功时）
+  double total_score = 4;            // 总分（成功时，legacy）
+  string risk_level = 5;             // 风险等级（成功时，legacy）
+  OutcomeSummary outcome = 6;        // v2 outcome 投影
+}
+
+message OutcomeSummary {
+  ModelIdentity model = 1;
+  ScoreValue primary_score = 2;
+  ResultLevel level = 3;
+}
+
+message ModelIdentity {
+  string kind = 1;
+  string sub_kind = 2;
+  string algorithm = 3;
+  string code = 4;
+  string version = 5;
+  string title = 6;
+}
+
+message ScoreValue {
+  string kind = 1;
+  double value = 2;
+  string label = 3;
+  optional double max = 4;
+}
+
+message ResultLevel {
+  string code = 1;
+  string label = 2;
+  string severity = 3;
 }
 
 // ==================== Assessment Attention Sync ====================

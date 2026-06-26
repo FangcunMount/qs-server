@@ -53,7 +53,7 @@ func TestAssessmentMapperWritesAndReadsScaleEvaluationModelRef(t *testing.T) {
 }
 
 func TestAssessmentMapperWritesModelOnlyAssessmentWithoutLegacyScaleFields(t *testing.T) {
-	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(2001),
@@ -69,8 +69,8 @@ func TestAssessmentMapperWritesModelOnlyAssessmentWithoutLegacyScaleFields(t *te
 
 	mapper := NewAssessmentMapper()
 	po := mapper.ToPO(a)
-	if po.EvaluationModelKind == nil || *po.EvaluationModelKind != "mbti" {
-		t.Fatalf("evaluation model kind = %v, want mbti", po.EvaluationModelKind)
+	if po.EvaluationModelKind == nil || *po.EvaluationModelKind != "personality" {
+		t.Fatalf("evaluation model kind = %v, want personality", po.EvaluationModelKind)
 	}
 	if po.EvaluationModelCode == nil || *po.EvaluationModelCode != "MBTI-16P" {
 		t.Fatalf("evaluation model code = %v, want MBTI-16P", po.EvaluationModelCode)
@@ -86,7 +86,7 @@ func TestAssessmentMapperWritesModelOnlyAssessmentWithoutLegacyScaleFields(t *te
 	if roundTrip.EvaluationModelRef() == nil {
 		t.Fatal("round trip assessment should have evaluation model ref")
 	}
-	if roundTrip.EvaluationModelRef().Kind() != assessment.EvaluationModelKindMBTI ||
+	if roundTrip.EvaluationModelRef().Kind() != assessment.EvaluationModelKindPersonality ||
 		roundTrip.EvaluationModelRef().Code().String() != "MBTI-16P" ||
 		roundTrip.MedicalScaleRef() != nil {
 		t.Fatalf("unexpected round trip assessment refs: model=%#v scale=%#v", roundTrip.EvaluationModelRef(), roundTrip.MedicalScaleRef())

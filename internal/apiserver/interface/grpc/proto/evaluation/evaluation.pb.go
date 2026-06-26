@@ -1922,6 +1922,974 @@ func (x *ListMyReportsResponse) GetTotalPages() int32 {
 	return 0
 }
 
+type ModelIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	SubKind       string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
+	Algorithm     string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	Code          string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	Version       string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	Title         string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModelIdentity) Reset() {
+	*x = ModelIdentity{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[25]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelIdentity) ProtoMessage() {}
+
+func (x *ModelIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[25]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelIdentity.ProtoReflect.Descriptor instead.
+func (*ModelIdentity) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{25}
+}
+
+func (x *ModelIdentity) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetSubKind() string {
+	if x != nil {
+		return x.SubKind
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+type ScoreValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Value         float64                `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"`
+	Label         string                 `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
+	Max           *float64               `protobuf:"fixed64,4,opt,name=max,proto3,oneof" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScoreValue) Reset() {
+	*x = ScoreValue{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[26]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScoreValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScoreValue) ProtoMessage() {}
+
+func (x *ScoreValue) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[26]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScoreValue.ProtoReflect.Descriptor instead.
+func (*ScoreValue) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{26}
+}
+
+func (x *ScoreValue) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ScoreValue) GetValue() float64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *ScoreValue) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ScoreValue) GetMax() float64 {
+	if x != nil && x.Max != nil {
+		return *x.Max
+	}
+	return 0
+}
+
+type ResultLevel struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Severity      string                 `protobuf:"bytes,3,opt,name=severity,proto3" json:"severity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResultLevel) Reset() {
+	*x = ResultLevel{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[27]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResultLevel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResultLevel) ProtoMessage() {}
+
+func (x *ResultLevel) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[27]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResultLevel.ProtoReflect.Descriptor instead.
+func (*ResultLevel) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{27}
+}
+
+func (x *ResultLevel) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ResultLevel) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ResultLevel) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
+type AssessmentDetailV2 struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	OrgId                uint64                 `protobuf:"varint,2,opt,name=org_id,json=orgId,proto3" json:"org_id,omitempty"`
+	TesteeId             uint64                 `protobuf:"varint,3,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	QuestionnaireCode    string                 `protobuf:"bytes,4,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,5,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
+	AnswerSheetId        uint64                 `protobuf:"varint,6,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"`
+	Model                *ModelIdentity         `protobuf:"bytes,7,opt,name=model,proto3" json:"model,omitempty"`
+	PrimaryScore         *ScoreValue            `protobuf:"bytes,8,opt,name=primary_score,json=primaryScore,proto3" json:"primary_score,omitempty"`
+	Level                *ResultLevel           `protobuf:"bytes,9,opt,name=level,proto3" json:"level,omitempty"`
+	OriginType           string                 `protobuf:"bytes,10,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`
+	OriginId             string                 `protobuf:"bytes,11,opt,name=origin_id,json=originId,proto3" json:"origin_id,omitempty"`
+	Status               string                 `protobuf:"bytes,12,opt,name=status,proto3" json:"status,omitempty"`
+	SubmittedAt          string                 `protobuf:"bytes,13,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	InterpretedAt        string                 `protobuf:"bytes,14,opt,name=interpreted_at,json=interpretedAt,proto3" json:"interpreted_at,omitempty"`
+	FailedAt             string                 `protobuf:"bytes,15,opt,name=failed_at,json=failedAt,proto3" json:"failed_at,omitempty"`
+	FailureReason        string                 `protobuf:"bytes,16,opt,name=failure_reason,json=failureReason,proto3" json:"failure_reason,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AssessmentDetailV2) Reset() {
+	*x = AssessmentDetailV2{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[28]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssessmentDetailV2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssessmentDetailV2) ProtoMessage() {}
+
+func (x *AssessmentDetailV2) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[28]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssessmentDetailV2.ProtoReflect.Descriptor instead.
+func (*AssessmentDetailV2) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{28}
+}
+
+func (x *AssessmentDetailV2) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AssessmentDetailV2) GetOrgId() uint64 {
+	if x != nil {
+		return x.OrgId
+	}
+	return 0
+}
+
+func (x *AssessmentDetailV2) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *AssessmentDetailV2) GetQuestionnaireCode() string {
+	if x != nil {
+		return x.QuestionnaireCode
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetQuestionnaireVersion() string {
+	if x != nil {
+		return x.QuestionnaireVersion
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetAnswerSheetId() uint64 {
+	if x != nil {
+		return x.AnswerSheetId
+	}
+	return 0
+}
+
+func (x *AssessmentDetailV2) GetModel() *ModelIdentity {
+	if x != nil {
+		return x.Model
+	}
+	return nil
+}
+
+func (x *AssessmentDetailV2) GetPrimaryScore() *ScoreValue {
+	if x != nil {
+		return x.PrimaryScore
+	}
+	return nil
+}
+
+func (x *AssessmentDetailV2) GetLevel() *ResultLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
+func (x *AssessmentDetailV2) GetOriginType() string {
+	if x != nil {
+		return x.OriginType
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetOriginId() string {
+	if x != nil {
+		return x.OriginId
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetSubmittedAt() string {
+	if x != nil {
+		return x.SubmittedAt
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetInterpretedAt() string {
+	if x != nil {
+		return x.InterpretedAt
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetFailedAt() string {
+	if x != nil {
+		return x.FailedAt
+	}
+	return ""
+}
+
+func (x *AssessmentDetailV2) GetFailureReason() string {
+	if x != nil {
+		return x.FailureReason
+	}
+	return ""
+}
+
+type AssessmentSummaryV2 struct {
+	state                protoimpl.MessageState `protogen:"open.v1"`
+	Id                   uint64                 `protobuf:"varint,1,opt,name=id,proto3" json:"id,omitempty"`
+	QuestionnaireCode    string                 `protobuf:"bytes,2,opt,name=questionnaire_code,json=questionnaireCode,proto3" json:"questionnaire_code,omitempty"`
+	QuestionnaireVersion string                 `protobuf:"bytes,3,opt,name=questionnaire_version,json=questionnaireVersion,proto3" json:"questionnaire_version,omitempty"`
+	AnswerSheetId        uint64                 `protobuf:"varint,4,opt,name=answer_sheet_id,json=answerSheetId,proto3" json:"answer_sheet_id,omitempty"`
+	Model                *ModelIdentity         `protobuf:"bytes,5,opt,name=model,proto3" json:"model,omitempty"`
+	PrimaryScore         *ScoreValue            `protobuf:"bytes,6,opt,name=primary_score,json=primaryScore,proto3" json:"primary_score,omitempty"`
+	Level                *ResultLevel           `protobuf:"bytes,7,opt,name=level,proto3" json:"level,omitempty"`
+	OriginType           string                 `protobuf:"bytes,8,opt,name=origin_type,json=originType,proto3" json:"origin_type,omitempty"`
+	Status               string                 `protobuf:"bytes,9,opt,name=status,proto3" json:"status,omitempty"`
+	SubmittedAt          string                 `protobuf:"bytes,10,opt,name=submitted_at,json=submittedAt,proto3" json:"submitted_at,omitempty"`
+	InterpretedAt        string                 `protobuf:"bytes,11,opt,name=interpreted_at,json=interpretedAt,proto3" json:"interpreted_at,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *AssessmentSummaryV2) Reset() {
+	*x = AssessmentSummaryV2{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[29]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssessmentSummaryV2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssessmentSummaryV2) ProtoMessage() {}
+
+func (x *AssessmentSummaryV2) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[29]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssessmentSummaryV2.ProtoReflect.Descriptor instead.
+func (*AssessmentSummaryV2) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{29}
+}
+
+func (x *AssessmentSummaryV2) GetId() uint64 {
+	if x != nil {
+		return x.Id
+	}
+	return 0
+}
+
+func (x *AssessmentSummaryV2) GetQuestionnaireCode() string {
+	if x != nil {
+		return x.QuestionnaireCode
+	}
+	return ""
+}
+
+func (x *AssessmentSummaryV2) GetQuestionnaireVersion() string {
+	if x != nil {
+		return x.QuestionnaireVersion
+	}
+	return ""
+}
+
+func (x *AssessmentSummaryV2) GetAnswerSheetId() uint64 {
+	if x != nil {
+		return x.AnswerSheetId
+	}
+	return 0
+}
+
+func (x *AssessmentSummaryV2) GetModel() *ModelIdentity {
+	if x != nil {
+		return x.Model
+	}
+	return nil
+}
+
+func (x *AssessmentSummaryV2) GetPrimaryScore() *ScoreValue {
+	if x != nil {
+		return x.PrimaryScore
+	}
+	return nil
+}
+
+func (x *AssessmentSummaryV2) GetLevel() *ResultLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
+func (x *AssessmentSummaryV2) GetOriginType() string {
+	if x != nil {
+		return x.OriginType
+	}
+	return ""
+}
+
+func (x *AssessmentSummaryV2) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *AssessmentSummaryV2) GetSubmittedAt() string {
+	if x != nil {
+		return x.SubmittedAt
+	}
+	return ""
+}
+
+func (x *AssessmentSummaryV2) GetInterpretedAt() string {
+	if x != nil {
+		return x.InterpretedAt
+	}
+	return ""
+}
+
+type AssessmentReportV2 struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	Model         *ModelIdentity         `protobuf:"bytes,2,opt,name=model,proto3" json:"model,omitempty"`
+	PrimaryScore  *ScoreValue            `protobuf:"bytes,3,opt,name=primary_score,json=primaryScore,proto3" json:"primary_score,omitempty"`
+	Level         *ResultLevel           `protobuf:"bytes,4,opt,name=level,proto3" json:"level,omitempty"`
+	Conclusion    string                 `protobuf:"bytes,5,opt,name=conclusion,proto3" json:"conclusion,omitempty"`
+	Dimensions    []*DimensionInterpret  `protobuf:"bytes,6,rep,name=dimensions,proto3" json:"dimensions,omitempty"`
+	Suggestions   []*Suggestion          `protobuf:"bytes,7,rep,name=suggestions,proto3" json:"suggestions,omitempty"`
+	ModelExtra    *ModelExtra            `protobuf:"bytes,8,opt,name=model_extra,json=modelExtra,proto3" json:"model_extra,omitempty"`
+	CreatedAt     string                 `protobuf:"bytes,9,opt,name=created_at,json=createdAt,proto3" json:"created_at,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AssessmentReportV2) Reset() {
+	*x = AssessmentReportV2{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[30]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AssessmentReportV2) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AssessmentReportV2) ProtoMessage() {}
+
+func (x *AssessmentReportV2) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[30]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AssessmentReportV2.ProtoReflect.Descriptor instead.
+func (*AssessmentReportV2) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{30}
+}
+
+func (x *AssessmentReportV2) GetAssessmentId() uint64 {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return 0
+}
+
+func (x *AssessmentReportV2) GetModel() *ModelIdentity {
+	if x != nil {
+		return x.Model
+	}
+	return nil
+}
+
+func (x *AssessmentReportV2) GetPrimaryScore() *ScoreValue {
+	if x != nil {
+		return x.PrimaryScore
+	}
+	return nil
+}
+
+func (x *AssessmentReportV2) GetLevel() *ResultLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
+func (x *AssessmentReportV2) GetConclusion() string {
+	if x != nil {
+		return x.Conclusion
+	}
+	return ""
+}
+
+func (x *AssessmentReportV2) GetDimensions() []*DimensionInterpret {
+	if x != nil {
+		return x.Dimensions
+	}
+	return nil
+}
+
+func (x *AssessmentReportV2) GetSuggestions() []*Suggestion {
+	if x != nil {
+		return x.Suggestions
+	}
+	return nil
+}
+
+func (x *AssessmentReportV2) GetModelExtra() *ModelExtra {
+	if x != nil {
+		return x.ModelExtra
+	}
+	return nil
+}
+
+func (x *AssessmentReportV2) GetCreatedAt() string {
+	if x != nil {
+		return x.CreatedAt
+	}
+	return ""
+}
+
+type GetMyAssessmentV2Request struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	AssessmentId  uint64                 `protobuf:"varint,2,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyAssessmentV2Request) Reset() {
+	*x = GetMyAssessmentV2Request{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[31]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyAssessmentV2Request) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyAssessmentV2Request) ProtoMessage() {}
+
+func (x *GetMyAssessmentV2Request) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[31]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyAssessmentV2Request.ProtoReflect.Descriptor instead.
+func (*GetMyAssessmentV2Request) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{31}
+}
+
+func (x *GetMyAssessmentV2Request) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *GetMyAssessmentV2Request) GetAssessmentId() uint64 {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return 0
+}
+
+type GetMyAssessmentV2Response struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Assessment    *AssessmentDetailV2    `protobuf:"bytes,1,opt,name=assessment,proto3" json:"assessment,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetMyAssessmentV2Response) Reset() {
+	*x = GetMyAssessmentV2Response{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[32]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetMyAssessmentV2Response) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetMyAssessmentV2Response) ProtoMessage() {}
+
+func (x *GetMyAssessmentV2Response) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[32]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetMyAssessmentV2Response.ProtoReflect.Descriptor instead.
+func (*GetMyAssessmentV2Response) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{32}
+}
+
+func (x *GetMyAssessmentV2Response) GetAssessment() *AssessmentDetailV2 {
+	if x != nil {
+		return x.Assessment
+	}
+	return nil
+}
+
+type ListMyAssessmentsV2Request struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	TesteeId      uint64                 `protobuf:"varint,1,opt,name=testee_id,json=testeeId,proto3" json:"testee_id,omitempty"`
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	ScaleCode     string                 `protobuf:"bytes,5,opt,name=scale_code,json=scaleCode,proto3" json:"scale_code,omitempty"`
+	RiskLevel     string                 `protobuf:"bytes,6,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`
+	DateFrom      string                 `protobuf:"bytes,7,opt,name=date_from,json=dateFrom,proto3" json:"date_from,omitempty"`
+	DateTo        string                 `protobuf:"bytes,8,opt,name=date_to,json=dateTo,proto3" json:"date_to,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyAssessmentsV2Request) Reset() {
+	*x = ListMyAssessmentsV2Request{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[33]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyAssessmentsV2Request) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyAssessmentsV2Request) ProtoMessage() {}
+
+func (x *ListMyAssessmentsV2Request) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[33]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyAssessmentsV2Request.ProtoReflect.Descriptor instead.
+func (*ListMyAssessmentsV2Request) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{33}
+}
+
+func (x *ListMyAssessmentsV2Request) GetTesteeId() uint64 {
+	if x != nil {
+		return x.TesteeId
+	}
+	return 0
+}
+
+func (x *ListMyAssessmentsV2Request) GetStatus() string {
+	if x != nil {
+		return x.Status
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsV2Request) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListMyAssessmentsV2Request) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListMyAssessmentsV2Request) GetScaleCode() string {
+	if x != nil {
+		return x.ScaleCode
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsV2Request) GetRiskLevel() string {
+	if x != nil {
+		return x.RiskLevel
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsV2Request) GetDateFrom() string {
+	if x != nil {
+		return x.DateFrom
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsV2Request) GetDateTo() string {
+	if x != nil {
+		return x.DateTo
+	}
+	return ""
+}
+
+type ListMyAssessmentsV2Response struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Items         []*AssessmentSummaryV2 `protobuf:"bytes,1,rep,name=items,proto3" json:"items,omitempty"`
+	Total         int32                  `protobuf:"varint,2,opt,name=total,proto3" json:"total,omitempty"`
+	Page          int32                  `protobuf:"varint,3,opt,name=page,proto3" json:"page,omitempty"`
+	PageSize      int32                  `protobuf:"varint,4,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	TotalPages    int32                  `protobuf:"varint,5,opt,name=total_pages,json=totalPages,proto3" json:"total_pages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyAssessmentsV2Response) Reset() {
+	*x = ListMyAssessmentsV2Response{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyAssessmentsV2Response) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyAssessmentsV2Response) ProtoMessage() {}
+
+func (x *ListMyAssessmentsV2Response) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyAssessmentsV2Response.ProtoReflect.Descriptor instead.
+func (*ListMyAssessmentsV2Response) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *ListMyAssessmentsV2Response) GetItems() []*AssessmentSummaryV2 {
+	if x != nil {
+		return x.Items
+	}
+	return nil
+}
+
+func (x *ListMyAssessmentsV2Response) GetTotal() int32 {
+	if x != nil {
+		return x.Total
+	}
+	return 0
+}
+
+func (x *ListMyAssessmentsV2Response) GetPage() int32 {
+	if x != nil {
+		return x.Page
+	}
+	return 0
+}
+
+func (x *ListMyAssessmentsV2Response) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListMyAssessmentsV2Response) GetTotalPages() int32 {
+	if x != nil {
+		return x.TotalPages
+	}
+	return 0
+}
+
+type GetAssessmentReportV2Request struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AssessmentId  uint64                 `protobuf:"varint,1,opt,name=assessment_id,json=assessmentId,proto3" json:"assessment_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssessmentReportV2Request) Reset() {
+	*x = GetAssessmentReportV2Request{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssessmentReportV2Request) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssessmentReportV2Request) ProtoMessage() {}
+
+func (x *GetAssessmentReportV2Request) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssessmentReportV2Request.ProtoReflect.Descriptor instead.
+func (*GetAssessmentReportV2Request) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *GetAssessmentReportV2Request) GetAssessmentId() uint64 {
+	if x != nil {
+		return x.AssessmentId
+	}
+	return 0
+}
+
+type GetAssessmentReportV2Response struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Report        *AssessmentReportV2    `protobuf:"bytes,1,opt,name=report,proto3" json:"report,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAssessmentReportV2Response) Reset() {
+	*x = GetAssessmentReportV2Response{}
+	mi := &file_evaluation_evaluation_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAssessmentReportV2Response) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAssessmentReportV2Response) ProtoMessage() {}
+
+func (x *GetAssessmentReportV2Response) ProtoReflect() protoreflect.Message {
+	mi := &file_evaluation_evaluation_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAssessmentReportV2Response.ProtoReflect.Descriptor instead.
+func (*GetAssessmentReportV2Response) Descriptor() ([]byte, []int) {
+	return file_evaluation_evaluation_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *GetAssessmentReportV2Response) GetReport() *AssessmentReportV2 {
+	if x != nil {
+		return x.Report
+	}
+	return nil
+}
+
 var File_evaluation_evaluation_proto protoreflect.FileDescriptor
 
 const file_evaluation_evaluation_proto_rawDesc = "" +
@@ -2135,7 +3103,103 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
 	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1f\n" +
 	"\vtotal_pages\x18\x05 \x01(\x05R\n" +
-	"totalPages2\xbf\x06\n" +
+	"totalPages\"\xa0\x01\n" +
+	"\rModelIdentity\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
+	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
+	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\tR\x04code\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\tR\aversion\x12\x14\n" +
+	"\x05title\x18\x06 \x01(\tR\x05title\"k\n" +
+	"\n" +
+	"ScoreValue\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value\x12\x14\n" +
+	"\x05label\x18\x03 \x01(\tR\x05label\x12\x15\n" +
+	"\x03max\x18\x04 \x01(\x01H\x00R\x03max\x88\x01\x01B\x06\n" +
+	"\x04_max\"S\n" +
+	"\vResultLevel\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
+	"\bseverity\x18\x03 \x01(\tR\bseverity\"\xe5\x04\n" +
+	"\x12AssessmentDetailV2\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12\x15\n" +
+	"\x06org_id\x18\x02 \x01(\x04R\x05orgId\x12\x1b\n" +
+	"\ttestee_id\x18\x03 \x01(\x04R\btesteeId\x12-\n" +
+	"\x12questionnaire_code\x18\x04 \x01(\tR\x11questionnaireCode\x123\n" +
+	"\x15questionnaire_version\x18\x05 \x01(\tR\x14questionnaireVersion\x12&\n" +
+	"\x0fanswer_sheet_id\x18\x06 \x01(\x04R\ranswerSheetId\x12/\n" +
+	"\x05model\x18\a \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
+	"\rprimary_score\x18\b \x01(\v2\x16.evaluation.ScoreValueR\fprimaryScore\x12-\n" +
+	"\x05level\x18\t \x01(\v2\x17.evaluation.ResultLevelR\x05level\x12\x1f\n" +
+	"\vorigin_type\x18\n" +
+	" \x01(\tR\n" +
+	"originType\x12\x1b\n" +
+	"\torigin_id\x18\v \x01(\tR\boriginId\x12\x16\n" +
+	"\x06status\x18\f \x01(\tR\x06status\x12!\n" +
+	"\fsubmitted_at\x18\r \x01(\tR\vsubmittedAt\x12%\n" +
+	"\x0einterpreted_at\x18\x0e \x01(\tR\rinterpretedAt\x12\x1b\n" +
+	"\tfailed_at\x18\x0f \x01(\tR\bfailedAt\x12%\n" +
+	"\x0efailure_reason\x18\x10 \x01(\tR\rfailureReason\"\xd1\x03\n" +
+	"\x13AssessmentSummaryV2\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\x04R\x02id\x12-\n" +
+	"\x12questionnaire_code\x18\x02 \x01(\tR\x11questionnaireCode\x123\n" +
+	"\x15questionnaire_version\x18\x03 \x01(\tR\x14questionnaireVersion\x12&\n" +
+	"\x0fanswer_sheet_id\x18\x04 \x01(\x04R\ranswerSheetId\x12/\n" +
+	"\x05model\x18\x05 \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
+	"\rprimary_score\x18\x06 \x01(\v2\x16.evaluation.ScoreValueR\fprimaryScore\x12-\n" +
+	"\x05level\x18\a \x01(\v2\x17.evaluation.ResultLevelR\x05level\x12\x1f\n" +
+	"\vorigin_type\x18\b \x01(\tR\n" +
+	"originType\x12\x16\n" +
+	"\x06status\x18\t \x01(\tR\x06status\x12!\n" +
+	"\fsubmitted_at\x18\n" +
+	" \x01(\tR\vsubmittedAt\x12%\n" +
+	"\x0einterpreted_at\x18\v \x01(\tR\rinterpretedAt\"\xc8\x03\n" +
+	"\x12AssessmentReportV2\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12/\n" +
+	"\x05model\x18\x02 \x01(\v2\x19.evaluation.ModelIdentityR\x05model\x12;\n" +
+	"\rprimary_score\x18\x03 \x01(\v2\x16.evaluation.ScoreValueR\fprimaryScore\x12-\n" +
+	"\x05level\x18\x04 \x01(\v2\x17.evaluation.ResultLevelR\x05level\x12\x1e\n" +
+	"\n" +
+	"conclusion\x18\x05 \x01(\tR\n" +
+	"conclusion\x12>\n" +
+	"\n" +
+	"dimensions\x18\x06 \x03(\v2\x1e.evaluation.DimensionInterpretR\n" +
+	"dimensions\x128\n" +
+	"\vsuggestions\x18\a \x03(\v2\x16.evaluation.SuggestionR\vsuggestions\x127\n" +
+	"\vmodel_extra\x18\b \x01(\v2\x16.evaluation.ModelExtraR\n" +
+	"modelExtra\x12\x1d\n" +
+	"\n" +
+	"created_at\x18\t \x01(\tR\tcreatedAt\"\\\n" +
+	"\x18GetMyAssessmentV2Request\x12\x1b\n" +
+	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12#\n" +
+	"\rassessment_id\x18\x02 \x01(\x04R\fassessmentId\"[\n" +
+	"\x19GetMyAssessmentV2Response\x12>\n" +
+	"\n" +
+	"assessment\x18\x01 \x01(\v2\x1e.evaluation.AssessmentDetailV2R\n" +
+	"assessment\"\xf6\x01\n" +
+	"\x1aListMyAssessmentsV2Request\x12\x1b\n" +
+	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x16\n" +
+	"\x06status\x18\x02 \x01(\tR\x06status\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1d\n" +
+	"\n" +
+	"scale_code\x18\x05 \x01(\tR\tscaleCode\x12\x1d\n" +
+	"\n" +
+	"risk_level\x18\x06 \x01(\tR\triskLevel\x12\x1b\n" +
+	"\tdate_from\x18\a \x01(\tR\bdateFrom\x12\x17\n" +
+	"\adate_to\x18\b \x01(\tR\x06dateTo\"\xbc\x01\n" +
+	"\x1bListMyAssessmentsV2Response\x125\n" +
+	"\x05items\x18\x01 \x03(\v2\x1f.evaluation.AssessmentSummaryV2R\x05items\x12\x14\n" +
+	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x12\n" +
+	"\x04page\x18\x03 \x01(\x05R\x04page\x12\x1b\n" +
+	"\tpage_size\x18\x04 \x01(\x05R\bpageSize\x12\x1f\n" +
+	"\vtotal_pages\x18\x05 \x01(\x05R\n" +
+	"totalPages\"C\n" +
+	"\x1cGetAssessmentReportV2Request\x12#\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"W\n" +
+	"\x1dGetAssessmentReportV2Response\x126\n" +
+	"\x06report\x18\x01 \x01(\v2\x1e.evaluation.AssessmentReportV2R\x06report2\xf7\b\n" +
 	"\x11EvaluationService\x12Z\n" +
 	"\x0fGetMyAssessment\x12\".evaluation.GetMyAssessmentRequest\x1a#.evaluation.GetMyAssessmentResponse\x12\x87\x01\n" +
 	"\x1eGetMyAssessmentByAnswerSheetID\x121.evaluation.GetMyAssessmentByAnswerSheetIDRequest\x1a2.evaluation.GetMyAssessmentByAnswerSheetIDResponse\x12`\n" +
@@ -2144,7 +3208,10 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x0eGetFactorTrend\x12!.evaluation.GetFactorTrendRequest\x1a\".evaluation.GetFactorTrendResponse\x12c\n" +
 	"\x12GetHighRiskFactors\x12%.evaluation.GetHighRiskFactorsRequest\x1a&.evaluation.GetHighRiskFactorsResponse\x12f\n" +
 	"\x13GetAssessmentReport\x12&.evaluation.GetAssessmentReportRequest\x1a'.evaluation.GetAssessmentReportResponse\x12T\n" +
-	"\rListMyReports\x12 .evaluation.ListMyReportsRequest\x1a!.evaluation.ListMyReportsResponseBVZTgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluationb\x06proto3"
+	"\rListMyReports\x12 .evaluation.ListMyReportsRequest\x1a!.evaluation.ListMyReportsResponse\x12`\n" +
+	"\x11GetMyAssessmentV2\x12$.evaluation.GetMyAssessmentV2Request\x1a%.evaluation.GetMyAssessmentV2Response\x12f\n" +
+	"\x13ListMyAssessmentsV2\x12&.evaluation.ListMyAssessmentsV2Request\x1a'.evaluation.ListMyAssessmentsV2Response\x12l\n" +
+	"\x15GetAssessmentReportV2\x12(.evaluation.GetAssessmentReportV2Request\x1a).evaluation.GetAssessmentReportV2ResponseBVZTgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluationb\x06proto3"
 
 var (
 	file_evaluation_evaluation_proto_rawDescOnce sync.Once
@@ -2158,7 +3225,7 @@ func file_evaluation_evaluation_proto_rawDescGZIP() []byte {
 	return file_evaluation_evaluation_proto_rawDescData
 }
 
-var file_evaluation_evaluation_proto_msgTypes = make([]protoimpl.MessageInfo, 25)
+var file_evaluation_evaluation_proto_msgTypes = make([]protoimpl.MessageInfo, 37)
 var file_evaluation_evaluation_proto_goTypes = []any{
 	(*AssessmentSummary)(nil),                      // 0: evaluation.AssessmentSummary
 	(*AssessmentDetail)(nil),                       // 1: evaluation.AssessmentDetail
@@ -2185,6 +3252,18 @@ var file_evaluation_evaluation_proto_goTypes = []any{
 	(*GetAssessmentReportResponse)(nil),            // 22: evaluation.GetAssessmentReportResponse
 	(*ListMyReportsRequest)(nil),                   // 23: evaluation.ListMyReportsRequest
 	(*ListMyReportsResponse)(nil),                  // 24: evaluation.ListMyReportsResponse
+	(*ModelIdentity)(nil),                          // 25: evaluation.ModelIdentity
+	(*ScoreValue)(nil),                             // 26: evaluation.ScoreValue
+	(*ResultLevel)(nil),                            // 27: evaluation.ResultLevel
+	(*AssessmentDetailV2)(nil),                     // 28: evaluation.AssessmentDetailV2
+	(*AssessmentSummaryV2)(nil),                    // 29: evaluation.AssessmentSummaryV2
+	(*AssessmentReportV2)(nil),                     // 30: evaluation.AssessmentReportV2
+	(*GetMyAssessmentV2Request)(nil),               // 31: evaluation.GetMyAssessmentV2Request
+	(*GetMyAssessmentV2Response)(nil),              // 32: evaluation.GetMyAssessmentV2Response
+	(*ListMyAssessmentsV2Request)(nil),             // 33: evaluation.ListMyAssessmentsV2Request
+	(*ListMyAssessmentsV2Response)(nil),            // 34: evaluation.ListMyAssessmentsV2Response
+	(*GetAssessmentReportV2Request)(nil),           // 35: evaluation.GetAssessmentReportV2Request
+	(*GetAssessmentReportV2Response)(nil),          // 36: evaluation.GetAssessmentReportV2Response
 }
 var file_evaluation_evaluation_proto_depIdxs = []int32{
 	5,  // 0: evaluation.AssessmentReport.dimensions:type_name -> evaluation.DimensionInterpret
@@ -2199,27 +3278,48 @@ var file_evaluation_evaluation_proto_depIdxs = []int32{
 	2,  // 9: evaluation.GetHighRiskFactorsResponse.high_risk_factors:type_name -> evaluation.FactorScore
 	6,  // 10: evaluation.GetAssessmentReportResponse.report:type_name -> evaluation.AssessmentReport
 	6,  // 11: evaluation.ListMyReportsResponse.items:type_name -> evaluation.AssessmentReport
-	9,  // 12: evaluation.EvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
-	11, // 13: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:input_type -> evaluation.GetMyAssessmentByAnswerSheetIDRequest
-	13, // 14: evaluation.EvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
-	15, // 15: evaluation.EvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
-	17, // 16: evaluation.EvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
-	19, // 17: evaluation.EvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
-	21, // 18: evaluation.EvaluationService.GetAssessmentReport:input_type -> evaluation.GetAssessmentReportRequest
-	23, // 19: evaluation.EvaluationService.ListMyReports:input_type -> evaluation.ListMyReportsRequest
-	10, // 20: evaluation.EvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
-	12, // 21: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:output_type -> evaluation.GetMyAssessmentByAnswerSheetIDResponse
-	14, // 22: evaluation.EvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
-	16, // 23: evaluation.EvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
-	18, // 24: evaluation.EvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
-	20, // 25: evaluation.EvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
-	22, // 26: evaluation.EvaluationService.GetAssessmentReport:output_type -> evaluation.GetAssessmentReportResponse
-	24, // 27: evaluation.EvaluationService.ListMyReports:output_type -> evaluation.ListMyReportsResponse
-	20, // [20:28] is the sub-list for method output_type
-	12, // [12:20] is the sub-list for method input_type
-	12, // [12:12] is the sub-list for extension type_name
-	12, // [12:12] is the sub-list for extension extendee
-	0,  // [0:12] is the sub-list for field type_name
+	25, // 12: evaluation.AssessmentDetailV2.model:type_name -> evaluation.ModelIdentity
+	26, // 13: evaluation.AssessmentDetailV2.primary_score:type_name -> evaluation.ScoreValue
+	27, // 14: evaluation.AssessmentDetailV2.level:type_name -> evaluation.ResultLevel
+	25, // 15: evaluation.AssessmentSummaryV2.model:type_name -> evaluation.ModelIdentity
+	26, // 16: evaluation.AssessmentSummaryV2.primary_score:type_name -> evaluation.ScoreValue
+	27, // 17: evaluation.AssessmentSummaryV2.level:type_name -> evaluation.ResultLevel
+	25, // 18: evaluation.AssessmentReportV2.model:type_name -> evaluation.ModelIdentity
+	26, // 19: evaluation.AssessmentReportV2.primary_score:type_name -> evaluation.ScoreValue
+	27, // 20: evaluation.AssessmentReportV2.level:type_name -> evaluation.ResultLevel
+	5,  // 21: evaluation.AssessmentReportV2.dimensions:type_name -> evaluation.DimensionInterpret
+	4,  // 22: evaluation.AssessmentReportV2.suggestions:type_name -> evaluation.Suggestion
+	7,  // 23: evaluation.AssessmentReportV2.model_extra:type_name -> evaluation.ModelExtra
+	28, // 24: evaluation.GetMyAssessmentV2Response.assessment:type_name -> evaluation.AssessmentDetailV2
+	29, // 25: evaluation.ListMyAssessmentsV2Response.items:type_name -> evaluation.AssessmentSummaryV2
+	30, // 26: evaluation.GetAssessmentReportV2Response.report:type_name -> evaluation.AssessmentReportV2
+	9,  // 27: evaluation.EvaluationService.GetMyAssessment:input_type -> evaluation.GetMyAssessmentRequest
+	11, // 28: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:input_type -> evaluation.GetMyAssessmentByAnswerSheetIDRequest
+	13, // 29: evaluation.EvaluationService.ListMyAssessments:input_type -> evaluation.ListMyAssessmentsRequest
+	15, // 30: evaluation.EvaluationService.GetAssessmentScores:input_type -> evaluation.GetAssessmentScoresRequest
+	17, // 31: evaluation.EvaluationService.GetFactorTrend:input_type -> evaluation.GetFactorTrendRequest
+	19, // 32: evaluation.EvaluationService.GetHighRiskFactors:input_type -> evaluation.GetHighRiskFactorsRequest
+	21, // 33: evaluation.EvaluationService.GetAssessmentReport:input_type -> evaluation.GetAssessmentReportRequest
+	23, // 34: evaluation.EvaluationService.ListMyReports:input_type -> evaluation.ListMyReportsRequest
+	31, // 35: evaluation.EvaluationService.GetMyAssessmentV2:input_type -> evaluation.GetMyAssessmentV2Request
+	33, // 36: evaluation.EvaluationService.ListMyAssessmentsV2:input_type -> evaluation.ListMyAssessmentsV2Request
+	35, // 37: evaluation.EvaluationService.GetAssessmentReportV2:input_type -> evaluation.GetAssessmentReportV2Request
+	10, // 38: evaluation.EvaluationService.GetMyAssessment:output_type -> evaluation.GetMyAssessmentResponse
+	12, // 39: evaluation.EvaluationService.GetMyAssessmentByAnswerSheetID:output_type -> evaluation.GetMyAssessmentByAnswerSheetIDResponse
+	14, // 40: evaluation.EvaluationService.ListMyAssessments:output_type -> evaluation.ListMyAssessmentsResponse
+	16, // 41: evaluation.EvaluationService.GetAssessmentScores:output_type -> evaluation.GetAssessmentScoresResponse
+	18, // 42: evaluation.EvaluationService.GetFactorTrend:output_type -> evaluation.GetFactorTrendResponse
+	20, // 43: evaluation.EvaluationService.GetHighRiskFactors:output_type -> evaluation.GetHighRiskFactorsResponse
+	22, // 44: evaluation.EvaluationService.GetAssessmentReport:output_type -> evaluation.GetAssessmentReportResponse
+	24, // 45: evaluation.EvaluationService.ListMyReports:output_type -> evaluation.ListMyReportsResponse
+	32, // 46: evaluation.EvaluationService.GetMyAssessmentV2:output_type -> evaluation.GetMyAssessmentV2Response
+	34, // 47: evaluation.EvaluationService.ListMyAssessmentsV2:output_type -> evaluation.ListMyAssessmentsV2Response
+	36, // 48: evaluation.EvaluationService.GetAssessmentReportV2:output_type -> evaluation.GetAssessmentReportV2Response
+	38, // [38:49] is the sub-list for method output_type
+	27, // [27:38] is the sub-list for method input_type
+	27, // [27:27] is the sub-list for extension type_name
+	27, // [27:27] is the sub-list for extension extendee
+	0,  // [0:27] is the sub-list for field type_name
 }
 
 func init() { file_evaluation_evaluation_proto_init() }
@@ -2227,13 +3327,14 @@ func file_evaluation_evaluation_proto_init() {
 	if File_evaluation_evaluation_proto != nil {
 		return
 	}
+	file_evaluation_evaluation_proto_msgTypes[26].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_evaluation_evaluation_proto_rawDesc), len(file_evaluation_evaluation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   25,
+			NumMessages:   37,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

@@ -6,7 +6,7 @@ import (
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
+	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
@@ -34,8 +34,8 @@ func (c *Container) buildScaleModuleDeps() assembler.ScaleModuleDeps {
 	}
 	if c.mongoDB != nil {
 		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: c.backpressure.Mongo}
-		writer := mongoRuleset.NewRepository(c.mongoDB, mongoOpts)
-		deps.RuleSetPublisher = rulesetInfra.NewScaleRuleSetPublisher(writer)
+		v2Repo := mongoassessmentmodel.NewRepository(c.mongoDB, mongoOpts)
+		deps.RuleSetPublisher = rulesetInfra.NewScaleRuleSetPublisher(v2Repo)
 	}
 	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
 		deps.QuestionnairePublisher = c.SurveyModule.Questionnaire.LifecycleService

@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
@@ -101,11 +102,17 @@ func (r *mutableReportBuilderRegistry) Resolve(kind assessment.EvaluationModelKi
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
 	}
-	builder, ok := r.items[reportBuilderKey{kind: kind, reportType: reportType}]
-	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation report builder kind: %s report type: %s", kind, reportType)
+	key := reportBuilderKey{kind: kind, reportType: reportType}
+	if builder, ok := r.items[key]; ok {
+		return builder, nil
 	}
-	return builder, nil
+	if mappedKind, _, _, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(kind)); ok {
+		key.kind = assessment.EvaluationModelKind(mappedKind)
+		if builder, ok := r.items[key]; ok {
+			return builder, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported evaluation report builder kind: %s report type: %s", kind, reportType)
 }
 
 type noopScoreProjector struct{}

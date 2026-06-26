@@ -5,17 +5,20 @@ import "time"
 // InterpretReport 解读报告聚合根。
 // 与 Assessment 关系：1:1，ID 与 AssessmentID 一致。
 type InterpretReport struct {
-	id          ID
-	modelName   string
-	modelCode   string
-	totalScore  float64
-	riskLevel   RiskLevel
-	conclusion  string
-	dimensions  []DimensionInterpret
-	suggestions []Suggestion
-	modelExtra  *ModelExtra
-	createdAt   time.Time
-	updatedAt   *time.Time
+	id           ID
+	model        ModelIdentity
+	primaryScore *ScoreValue
+	level        *ResultLevel
+	modelName    string
+	modelCode    string
+	totalScore   float64
+	riskLevel    RiskLevel
+	conclusion   string
+	dimensions   []DimensionInterpret
+	suggestions  []Suggestion
+	modelExtra   *ModelExtra
+	createdAt    time.Time
+	updatedAt    *time.Time
 }
 
 // NewInterpretReport 创建解读报告。
@@ -30,7 +33,7 @@ func NewInterpretReport(
 	suggestions []Suggestion,
 	modelExtra *ModelExtra,
 ) *InterpretReport {
-	return &InterpretReport{
+	r := &InterpretReport{
 		id:          id,
 		modelName:   modelName,
 		modelCode:   modelCode,
@@ -42,6 +45,8 @@ func NewInterpretReport(
 		modelExtra:  modelExtra,
 		createdAt:   time.Now(),
 	}
+	FinalizeInterpretReport(r)
+	return r
 }
 
 // ReconstructInterpretReport 重建解读报告（仅供仓储层使用）。
@@ -58,7 +63,7 @@ func ReconstructInterpretReport(
 	createdAt time.Time,
 	updatedAt *time.Time,
 ) *InterpretReport {
-	return &InterpretReport{
+	r := &InterpretReport{
 		id:          id,
 		modelName:   modelName,
 		modelCode:   modelCode,
@@ -71,6 +76,8 @@ func ReconstructInterpretReport(
 		createdAt:   createdAt,
 		updatedAt:   updatedAt,
 	}
+	FinalizeInterpretReport(r)
+	return r
 }
 
 // UpdateSuggestions 更新建议列表。
@@ -90,6 +97,12 @@ func (r *InterpretReport) AppendSuggestion(suggestion Suggestion) {
 }
 
 func (r *InterpretReport) ID() ID { return r.id }
+
+func (r *InterpretReport) Model() ModelIdentity { return r.model }
+
+func (r *InterpretReport) PrimaryScore() *ScoreValue { return r.primaryScore }
+
+func (r *InterpretReport) Level() *ResultLevel { return r.level }
 
 func (r *InterpretReport) ModelName() string { return r.modelName }
 
@@ -111,7 +124,12 @@ func (r *InterpretReport) CreatedAt() time.Time { return r.createdAt }
 
 func (r *InterpretReport) UpdatedAt() *time.Time { return r.updatedAt }
 
-func (r *InterpretReport) IsHighRisk() bool { return IsHighRisk(r.riskLevel) }
+func (r *InterpretReport) IsHighRisk() bool {
+	if r.level != nil && r.level.Severity == "high" {
+		return true
+	}
+	return IsHighRisk(r.riskLevel)
+}
 
 func (r *InterpretReport) HasDimensions() bool { return len(r.dimensions) > 0 }
 

@@ -114,6 +114,7 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/answersheets")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/scales")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/evaluations/assessments")
+	assertRoutePresent(t, routes, http.MethodGet, "/api/v2/evaluations/assessments")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/testees/:id/clinicians")
 	assertRoutePresent(t, routes, http.MethodGet, "/api/v1/clinicians")
@@ -329,6 +330,7 @@ func newRouterTestContainer() *container.Container {
 		evaluationModule.ScoreQueryService,
 		nil,
 		evaluationModule.AccessQueryService,
+		nil,
 	)
 	return &container.Container{
 		SurveyModule: surveyModule,
@@ -418,6 +420,7 @@ func routeMustBeDocumented(route gin.RouteInfo) bool {
 
 func normalizeOpenAPIPath(path string) string {
 	path = strings.TrimPrefix(path, "/api/v1")
+	path = strings.TrimPrefix(path, "/api/v2")
 	if path == "" {
 		path = "/"
 	}

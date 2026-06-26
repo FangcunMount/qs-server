@@ -8,6 +8,7 @@ import (
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -102,36 +103,81 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 }
 
 // handleAssessmentInterpreted 处理测评解读完成事件
-// 业务逻辑：
-// 1. 检查是否高风险
-// 2. 发送预警通知（如有必要）
 func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
-	return func(_ context.Context, _ string, payload []byte) error {
-		var data domainAssessment.AssessmentInterpretedData
-		_, err := ParseEventData(payload, &data)
-		if err != nil {
-			return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
+	return func(_ context.Context, eventType string, payload []byte) error {
+		switch eventType {
+		case eventcatalog.AssessmentInterpretedV2:
+			return handleAssessmentInterpretedV2(deps, payload)
+		default:
+			return handleAssessmentInterpretedV1(deps, payload)
 		}
-
-		deps.Logger.Debug("assessment interpreted detail",
-			"org_id", data.OrgID,
-			"total_score", data.TotalScore,
-			"risk_level", data.RiskLevel,
-			"is_high_risk", data.IsHighRisk(),
-		)
-
-		// 高风险预警
-		if data.IsHighRisk() {
-			deps.Logger.Warn("HIGH RISK ALERT",
-				"assessment_id", data.AssessmentID,
-				"testee_id", data.TesteeID,
-				"risk_level", data.RiskLevel,
-				"total_score", data.TotalScore,
-			)
-		}
-
-		return nil
 	}
+}
+
+func handleAssessmentInterpretedV1(deps *Dependencies, payload []byte) error {
+	var data domainAssessment.AssessmentInterpretedData
+	_, err := ParseEventData(payload, &data)
+	if err != nil {
+		return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
+	}
+	deps.Logger.Debug("assessment interpreted detail",
+		"org_id", data.OrgID,
+		"total_score", data.TotalScore,
+		"risk_level", data.RiskLevel,
+		"is_high_risk", data.IsHighRisk(),
+	)
+	if data.IsHighRisk() {
+		logAssessmentHighRisk(deps, data.AssessmentID, data.TesteeID, data.RiskLevel, data.TotalScore)
+	}
+	return nil
+}
+
+func handleAssessmentInterpretedV2(deps *Dependencies, payload []byte) error {
+	var data domainAssessment.AssessmentInterpretedV2Data
+	_, err := ParseEventData(payload, &data)
+	if err != nil {
+		return fmt.Errorf("failed to parse assessment interpreted v2 event: %w", err)
+	}
+	deps.Logger.Debug("assessment interpreted v2 detail",
+		"org_id", data.OrgID,
+		"level_code", assessmentLevelCode(data.Level),
+		"severity", assessmentLevelSeverity(data.Level),
+		"is_high_risk", data.IsHighRisk(),
+	)
+	if data.IsHighRisk() {
+		logAssessmentHighRisk(deps, data.AssessmentID, data.TesteeID, assessmentLevelCode(data.Level), assessmentPrimaryScoreValue(data.PrimaryScore))
+	}
+	return nil
+}
+
+func logAssessmentHighRisk(deps *Dependencies, assessmentID int64, testeeID uint64, riskLevel string, totalScore float64) {
+	deps.Logger.Warn("HIGH RISK ALERT",
+		"assessment_id", assessmentID,
+		"testee_id", testeeID,
+		"risk_level", riskLevel,
+		"total_score", totalScore,
+	)
+}
+
+func assessmentPrimaryScoreValue(score *domainAssessment.EventScoreValue) float64 {
+	if score == nil {
+		return 0
+	}
+	return score.Value
+}
+
+func assessmentLevelCode(level *domainAssessment.EventResultLevel) string {
+	if level == nil {
+		return ""
+	}
+	return level.Code
+}
+
+func assessmentLevelSeverity(level *domainAssessment.EventResultLevel) string {
+	if level == nil {
+		return ""
+	}
+	return level.Severity
 }
 
 // handleAssessmentFailed 处理测评失败事件

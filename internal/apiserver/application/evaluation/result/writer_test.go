@@ -154,7 +154,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 			t.Fatalf("order = %#v, want %#v", order, wantOrder)
 		}
 	}
-	wantEvents := []string{assessment.EventTypeInterpreted, domainReport.EventTypeGenerated, "footprint.report_generated"}
+	wantEvents := []string{assessment.EventTypeInterpretedV2, domainReport.EventTypeGeneratedV2, "footprint.report_generated"}
 	if len(reportSaver.eventTypes) != len(wantEvents) {
 		t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
 	}
@@ -324,7 +324,7 @@ func TestWriterAssessmentSaveFailureDoesNotNotifyWaiter(t *testing.T) {
 
 func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *testing.T) {
 	order := make([]string, 0)
-	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindMBTI, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
+	modelRef := assessment.NewEvaluationModelRefByCode(assessment.EvaluationModelKindPersonality, meta.NewCode("MBTI-16P"), "1.0.0", "MBTI")
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(8002),
@@ -344,7 +344,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 
 	reportBuilders, err := NewReportBuilderRegistry(&resultReportBuilderStub{
 		order: &order,
-		kind:  assessment.EvaluationModelKindMBTI,
+		kind:  assessment.EvaluationModelKindPersonality,
 		rpt:   domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil),
 	})
 	if err != nil {
@@ -363,7 +363,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 		t.Fatalf("NewWriter returned error: %v", err)
 	}
 	result := assessment.NewModelEvaluationResult(modelRef, assessment.ResultSummary{PrimaryLabel: "INTJ"}, assessment.EvaluationDetail{
-		Kind:    assessment.EvaluationModelKindMBTI,
+		Kind:    assessment.EvaluationModelKindPersonality,
 		Payload: "INTJ",
 	})
 
@@ -377,8 +377,14 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
 		}
 	}
-	if len(reportSaver.eventTypes) != 1 || reportSaver.eventTypes[0] != assessment.EventTypeInterpreted {
-		t.Fatalf("event types = %#v, want generic assessment interpreted only", reportSaver.eventTypes)
+	wantEvents := []string{assessment.EventTypeInterpretedV2, domainReport.EventTypeGeneratedV2, "footprint.report_generated"}
+	if len(reportSaver.eventTypes) != len(wantEvents) {
+		t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
+	}
+	for i := range wantEvents {
+		if reportSaver.eventTypes[i] != wantEvents[i] {
+			t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
+		}
 	}
 }
 

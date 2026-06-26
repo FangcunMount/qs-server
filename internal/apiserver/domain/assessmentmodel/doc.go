@@ -1,6 +1,6 @@
 // Package assessmentmodel owns published assessment model assets.
 //
-// It defines the stable model snapshot envelope and typed payload packages used
-// by evaluation executors. The legacy ruleset wording is kept only in
-// compatibility aliases and storage field names while callers migrate.
+// v2 introduces Kind/SubKind/Algorithm identity, PublishedModelSnapshot,
+// and unified personality typology payloads. Legacy ruleset.* payload formats
+// remain readable for migration; new writes use assessmentmodel.* formats.
 package assessmentmodel

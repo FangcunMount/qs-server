@@ -5,13 +5,12 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 )
 
 func TestSBTICodecRoundTrip(t *testing.T) {
-	model := &rulesetsbti.ModelSnapshot{
+	model := &modeltypology.SBTILegacyModel{
 		Code:              "SBTI_FUN",
 		Version:           "1.0.0",
 		QuestionnaireCode: "SBTI_FUN",
@@ -20,6 +19,9 @@ func TestSBTICodecRoundTrip(t *testing.T) {
 	payload, format, err := EncodeSBTI(model)
 	if err != nil {
 		t.Fatalf("EncodeSBTI: %v", err)
+	}
+	if format != domain.PayloadFormatPersonalityTypologyV1 {
+		t.Fatalf("format = %s, want %s", format, domain.PayloadFormatPersonalityTypologyV1)
 	}
 	snapshot := &domain.RuleSetSnapshot{
 		SchemaVersion: domain.RuleSetSchemaVersionV1,
@@ -40,7 +42,7 @@ func TestSBTICodecRoundTrip(t *testing.T) {
 }
 
 func TestMBTICodecRoundTrip(t *testing.T) {
-	model := &rulesetmbti.ModelSnapshot{
+	model := &modeltypology.MBTILegacyModel{
 		Code:              "MBTI_OEJTS",
 		Version:           "1.0.0",
 		QuestionnaireCode: "MBTI_OEJTS",
@@ -49,6 +51,9 @@ func TestMBTICodecRoundTrip(t *testing.T) {
 	payload, format, err := EncodeMBTI(model)
 	if err != nil {
 		t.Fatalf("EncodeMBTI: %v", err)
+	}
+	if format != domain.PayloadFormatPersonalityTypologyV1 {
+		t.Fatalf("format = %s, want %s", format, domain.PayloadFormatPersonalityTypologyV1)
 	}
 	snapshot := &domain.RuleSetSnapshot{
 		SchemaVersion: domain.RuleSetSchemaVersionV1,
@@ -69,7 +74,7 @@ func TestMBTICodecRoundTrip(t *testing.T) {
 }
 
 func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
-	model := &rulesetmbti.ModelSnapshot{
+	model := &modeltypology.MBTILegacyModel{
 		Code:              "MBTI_OEJTS",
 		Version:           "1.0.0",
 		QuestionnaireCode: "MBTI_OEJTS",
@@ -108,6 +113,9 @@ func TestScaleCodecRoundTrip(t *testing.T) {
 	payload, format, err := EncodeScale(model)
 	if err != nil {
 		t.Fatalf("EncodeScale: %v", err)
+	}
+	if format != domain.PayloadFormatAssessmentScaleV1 {
+		t.Fatalf("format = %s, want %s", format, domain.PayloadFormatAssessmentScaleV1)
 	}
 	snapshot := &domain.RuleSetSnapshot{
 		SchemaVersion: domain.RuleSetSchemaVersionV1,

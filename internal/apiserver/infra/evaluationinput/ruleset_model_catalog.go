@@ -5,8 +5,7 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -21,7 +20,7 @@ func NewRuleSetSBTICatalog(reader rulesetport.PublishedRuleSetReader) RuleSetSBT
 	return RuleSetSBTICatalog{reader: reader}
 }
 
-func (c RuleSetSBTICatalog) GetSBTIModelByRef(ctx context.Context, ref port.ModelRef) (*rulesetsbti.ModelSnapshot, error) {
+func (c RuleSetSBTICatalog) GetSBTIModelByRef(ctx context.Context, ref port.ModelRef) (*modeltypology.SBTILegacyModel, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -39,7 +38,7 @@ func (c RuleSetSBTICatalog) GetSBTIModelByRef(ctx context.Context, ref port.Mode
 	return codec.DecodeSBTI(snapshot)
 }
 
-func (c RuleSetSBTICatalog) FindSBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*rulesetsbti.ModelSnapshot, error) {
+func (c RuleSetSBTICatalog) FindSBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*modeltypology.SBTILegacyModel, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -62,7 +61,7 @@ func NewRuleSetMBTICatalog(reader rulesetport.PublishedRuleSetReader) RuleSetMBT
 	return RuleSetMBTICatalog{reader: reader}
 }
 
-func (c RuleSetMBTICatalog) GetMBTIModelByRef(ctx context.Context, ref port.ModelRef) (*rulesetmbti.ModelSnapshot, error) {
+func (c RuleSetMBTICatalog) GetMBTIModelByRef(ctx context.Context, ref port.ModelRef) (*modeltypology.MBTILegacyModel, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}
@@ -80,7 +79,7 @@ func (c RuleSetMBTICatalog) GetMBTIModelByRef(ctx context.Context, ref port.Mode
 	return codec.DecodeMBTI(snapshot)
 }
 
-func (c RuleSetMBTICatalog) FindMBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*rulesetmbti.ModelSnapshot, error) {
+func (c RuleSetMBTICatalog) FindMBTIModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*modeltypology.MBTILegacyModel, error) {
 	if c.reader == nil {
 		return nil, fmt.Errorf("ruleset catalog is not configured")
 	}

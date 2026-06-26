@@ -2,6 +2,9 @@ package report
 
 type interpretReportDraft struct {
 	assessmentID ID
+	model        ModelIdentity
+	primaryScore *ScoreValue
+	level        *ResultLevel
 	modelName    string
 	modelCode    string
 	totalScore   float64
@@ -13,7 +16,7 @@ type interpretReportDraft struct {
 }
 
 func (d interpretReportDraft) build() *InterpretReport {
-	return NewInterpretReport(
+	r := NewInterpretReport(
 		d.assessmentID,
 		d.modelName,
 		d.modelCode,
@@ -24,4 +27,5 @@ func (d interpretReportDraft) build() *InterpretReport {
 		d.suggestions,
 		d.modelExtra,
 	)
+	return AttachOutcomeSummary(r, d.model, d.primaryScore, d.level)
 }

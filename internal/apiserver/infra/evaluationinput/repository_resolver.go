@@ -6,8 +6,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -120,14 +119,14 @@ func (r *RepositoryResolver) GetScale(ctx context.Context, code string) (*scales
 	return r.scaleCatalog.GetScale(ctx, code)
 }
 
-func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetsbti.ModelSnapshot, error) {
+func (r *RepositoryResolver) FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*modeltypology.SBTILegacyModel, error) {
 	if r == nil || r.sbtiCatalog == nil {
 		return nil, fmt.Errorf("sbti model catalog is not configured")
 	}
 	return r.sbtiCatalog.FindSBTIModelByQuestionnaire(ctx, code, version)
 }
 
-func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetmbti.ModelSnapshot, error) {
+func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*modeltypology.MBTILegacyModel, error) {
 	if r == nil || r.mbtiCatalog == nil {
 		return nil, fmt.Errorf("mbti model catalog is not configured")
 	}

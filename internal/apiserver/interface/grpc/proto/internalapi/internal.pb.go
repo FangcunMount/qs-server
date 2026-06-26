@@ -2061,8 +2061,9 @@ type EvaluateAssessmentResponse struct {
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                          // 是否成功
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                             // 处理后的状态：interpreted/failed/skipped
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                           // 描述信息
-	TotalScore    float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"` // 总分（成功时）
-	RiskLevel     string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`      // 风险等级（成功时）
+	TotalScore    float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"` // 总分（成功时，legacy）
+	RiskLevel     string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`      // 风险等级（成功时，legacy）
+	Outcome       *OutcomeSummary        `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`                           // v2 outcome 投影
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2132,6 +2133,285 @@ func (x *EvaluateAssessmentResponse) GetRiskLevel() string {
 	return ""
 }
 
+func (x *EvaluateAssessmentResponse) GetOutcome() *OutcomeSummary {
+	if x != nil {
+		return x.Outcome
+	}
+	return nil
+}
+
+type OutcomeSummary struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Model         *ModelIdentity         `protobuf:"bytes,1,opt,name=model,proto3" json:"model,omitempty"`
+	PrimaryScore  *ScoreValue            `protobuf:"bytes,2,opt,name=primary_score,json=primaryScore,proto3" json:"primary_score,omitempty"`
+	Level         *ResultLevel           `protobuf:"bytes,3,opt,name=level,proto3" json:"level,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *OutcomeSummary) Reset() {
+	*x = OutcomeSummary{}
+	mi := &file_internalapi_internal_proto_msgTypes[34]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *OutcomeSummary) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*OutcomeSummary) ProtoMessage() {}
+
+func (x *OutcomeSummary) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[34]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use OutcomeSummary.ProtoReflect.Descriptor instead.
+func (*OutcomeSummary) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{34}
+}
+
+func (x *OutcomeSummary) GetModel() *ModelIdentity {
+	if x != nil {
+		return x.Model
+	}
+	return nil
+}
+
+func (x *OutcomeSummary) GetPrimaryScore() *ScoreValue {
+	if x != nil {
+		return x.PrimaryScore
+	}
+	return nil
+}
+
+func (x *OutcomeSummary) GetLevel() *ResultLevel {
+	if x != nil {
+		return x.Level
+	}
+	return nil
+}
+
+type ModelIdentity struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	SubKind       string                 `protobuf:"bytes,2,opt,name=sub_kind,json=subKind,proto3" json:"sub_kind,omitempty"`
+	Algorithm     string                 `protobuf:"bytes,3,opt,name=algorithm,proto3" json:"algorithm,omitempty"`
+	Code          string                 `protobuf:"bytes,4,opt,name=code,proto3" json:"code,omitempty"`
+	Version       string                 `protobuf:"bytes,5,opt,name=version,proto3" json:"version,omitempty"`
+	Title         string                 `protobuf:"bytes,6,opt,name=title,proto3" json:"title,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ModelIdentity) Reset() {
+	*x = ModelIdentity{}
+	mi := &file_internalapi_internal_proto_msgTypes[35]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ModelIdentity) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ModelIdentity) ProtoMessage() {}
+
+func (x *ModelIdentity) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[35]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ModelIdentity.ProtoReflect.Descriptor instead.
+func (*ModelIdentity) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{35}
+}
+
+func (x *ModelIdentity) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetSubKind() string {
+	if x != nil {
+		return x.SubKind
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetAlgorithm() string {
+	if x != nil {
+		return x.Algorithm
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetVersion() string {
+	if x != nil {
+		return x.Version
+	}
+	return ""
+}
+
+func (x *ModelIdentity) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+type ScoreValue struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Kind          string                 `protobuf:"bytes,1,opt,name=kind,proto3" json:"kind,omitempty"`
+	Value         float64                `protobuf:"fixed64,2,opt,name=value,proto3" json:"value,omitempty"`
+	Label         string                 `protobuf:"bytes,3,opt,name=label,proto3" json:"label,omitempty"`
+	Max           *float64               `protobuf:"fixed64,4,opt,name=max,proto3,oneof" json:"max,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ScoreValue) Reset() {
+	*x = ScoreValue{}
+	mi := &file_internalapi_internal_proto_msgTypes[36]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ScoreValue) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ScoreValue) ProtoMessage() {}
+
+func (x *ScoreValue) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[36]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ScoreValue.ProtoReflect.Descriptor instead.
+func (*ScoreValue) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{36}
+}
+
+func (x *ScoreValue) GetKind() string {
+	if x != nil {
+		return x.Kind
+	}
+	return ""
+}
+
+func (x *ScoreValue) GetValue() float64 {
+	if x != nil {
+		return x.Value
+	}
+	return 0
+}
+
+func (x *ScoreValue) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ScoreValue) GetMax() float64 {
+	if x != nil && x.Max != nil {
+		return *x.Max
+	}
+	return 0
+}
+
+type ResultLevel struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Label         string                 `protobuf:"bytes,2,opt,name=label,proto3" json:"label,omitempty"`
+	Severity      string                 `protobuf:"bytes,3,opt,name=severity,proto3" json:"severity,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResultLevel) Reset() {
+	*x = ResultLevel{}
+	mi := &file_internalapi_internal_proto_msgTypes[37]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResultLevel) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResultLevel) ProtoMessage() {}
+
+func (x *ResultLevel) ProtoReflect() protoreflect.Message {
+	mi := &file_internalapi_internal_proto_msgTypes[37]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResultLevel.ProtoReflect.Descriptor instead.
+func (*ResultLevel) Descriptor() ([]byte, []int) {
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{37}
+}
+
+func (x *ResultLevel) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *ResultLevel) GetLabel() string {
+	if x != nil {
+		return x.Label
+	}
+	return ""
+}
+
+func (x *ResultLevel) GetSeverity() string {
+	if x != nil {
+		return x.Severity
+	}
+	return ""
+}
+
 // 同步测评后置关注状态请求
 type SyncAssessmentAttentionRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -2144,7 +2424,7 @@ type SyncAssessmentAttentionRequest struct {
 
 func (x *SyncAssessmentAttentionRequest) Reset() {
 	*x = SyncAssessmentAttentionRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[34]
+	mi := &file_internalapi_internal_proto_msgTypes[38]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2156,7 +2436,7 @@ func (x *SyncAssessmentAttentionRequest) String() string {
 func (*SyncAssessmentAttentionRequest) ProtoMessage() {}
 
 func (x *SyncAssessmentAttentionRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[34]
+	mi := &file_internalapi_internal_proto_msgTypes[38]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2169,7 +2449,7 @@ func (x *SyncAssessmentAttentionRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAssessmentAttentionRequest.ProtoReflect.Descriptor instead.
 func (*SyncAssessmentAttentionRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{34}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{38}
 }
 
 func (x *SyncAssessmentAttentionRequest) GetTesteeId() uint64 {
@@ -2205,7 +2485,7 @@ type SyncAssessmentAttentionResponse struct {
 
 func (x *SyncAssessmentAttentionResponse) Reset() {
 	*x = SyncAssessmentAttentionResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[35]
+	mi := &file_internalapi_internal_proto_msgTypes[39]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2217,7 +2497,7 @@ func (x *SyncAssessmentAttentionResponse) String() string {
 func (*SyncAssessmentAttentionResponse) ProtoMessage() {}
 
 func (x *SyncAssessmentAttentionResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[35]
+	mi := &file_internalapi_internal_proto_msgTypes[39]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2230,7 +2510,7 @@ func (x *SyncAssessmentAttentionResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SyncAssessmentAttentionResponse.ProtoReflect.Descriptor instead.
 func (*SyncAssessmentAttentionResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{35}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{39}
 }
 
 func (x *SyncAssessmentAttentionResponse) GetSuccess() bool {
@@ -2271,7 +2551,7 @@ type TagTesteeRequest struct {
 
 func (x *TagTesteeRequest) Reset() {
 	*x = TagTesteeRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[36]
+	mi := &file_internalapi_internal_proto_msgTypes[40]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2283,7 +2563,7 @@ func (x *TagTesteeRequest) String() string {
 func (*TagTesteeRequest) ProtoMessage() {}
 
 func (x *TagTesteeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[36]
+	mi := &file_internalapi_internal_proto_msgTypes[40]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2296,7 +2576,7 @@ func (x *TagTesteeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TagTesteeRequest.ProtoReflect.Descriptor instead.
 func (*TagTesteeRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{36}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{40}
 }
 
 func (x *TagTesteeRequest) GetTesteeId() uint64 {
@@ -2351,7 +2631,7 @@ type TagTesteeResponse struct {
 
 func (x *TagTesteeResponse) Reset() {
 	*x = TagTesteeResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[37]
+	mi := &file_internalapi_internal_proto_msgTypes[41]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2363,7 +2643,7 @@ func (x *TagTesteeResponse) String() string {
 func (*TagTesteeResponse) ProtoMessage() {}
 
 func (x *TagTesteeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[37]
+	mi := &file_internalapi_internal_proto_msgTypes[41]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2376,7 +2656,7 @@ func (x *TagTesteeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use TagTesteeResponse.ProtoReflect.Descriptor instead.
 func (*TagTesteeResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{37}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{41}
 }
 
 func (x *TagTesteeResponse) GetSuccess() bool {
@@ -2419,7 +2699,7 @@ type GenerateQuestionnaireQRCodeRequest struct {
 
 func (x *GenerateQuestionnaireQRCodeRequest) Reset() {
 	*x = GenerateQuestionnaireQRCodeRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[38]
+	mi := &file_internalapi_internal_proto_msgTypes[42]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2431,7 +2711,7 @@ func (x *GenerateQuestionnaireQRCodeRequest) String() string {
 func (*GenerateQuestionnaireQRCodeRequest) ProtoMessage() {}
 
 func (x *GenerateQuestionnaireQRCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[38]
+	mi := &file_internalapi_internal_proto_msgTypes[42]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2444,7 +2724,7 @@ func (x *GenerateQuestionnaireQRCodeRequest) ProtoReflect() protoreflect.Message
 
 // Deprecated: Use GenerateQuestionnaireQRCodeRequest.ProtoReflect.Descriptor instead.
 func (*GenerateQuestionnaireQRCodeRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{38}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{42}
 }
 
 func (x *GenerateQuestionnaireQRCodeRequest) GetCode() string {
@@ -2473,7 +2753,7 @@ type GenerateQuestionnaireQRCodeResponse struct {
 
 func (x *GenerateQuestionnaireQRCodeResponse) Reset() {
 	*x = GenerateQuestionnaireQRCodeResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[39]
+	mi := &file_internalapi_internal_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2485,7 +2765,7 @@ func (x *GenerateQuestionnaireQRCodeResponse) String() string {
 func (*GenerateQuestionnaireQRCodeResponse) ProtoMessage() {}
 
 func (x *GenerateQuestionnaireQRCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[39]
+	mi := &file_internalapi_internal_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2498,7 +2778,7 @@ func (x *GenerateQuestionnaireQRCodeResponse) ProtoReflect() protoreflect.Messag
 
 // Deprecated: Use GenerateQuestionnaireQRCodeResponse.ProtoReflect.Descriptor instead.
 func (*GenerateQuestionnaireQRCodeResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{39}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *GenerateQuestionnaireQRCodeResponse) GetSuccess() bool {
@@ -2532,7 +2812,7 @@ type GenerateScaleQRCodeRequest struct {
 
 func (x *GenerateScaleQRCodeRequest) Reset() {
 	*x = GenerateScaleQRCodeRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[40]
+	mi := &file_internalapi_internal_proto_msgTypes[44]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2544,7 +2824,7 @@ func (x *GenerateScaleQRCodeRequest) String() string {
 func (*GenerateScaleQRCodeRequest) ProtoMessage() {}
 
 func (x *GenerateScaleQRCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[40]
+	mi := &file_internalapi_internal_proto_msgTypes[44]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2557,7 +2837,7 @@ func (x *GenerateScaleQRCodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateScaleQRCodeRequest.ProtoReflect.Descriptor instead.
 func (*GenerateScaleQRCodeRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{40}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{44}
 }
 
 func (x *GenerateScaleQRCodeRequest) GetCode() string {
@@ -2579,7 +2859,7 @@ type GenerateScaleQRCodeResponse struct {
 
 func (x *GenerateScaleQRCodeResponse) Reset() {
 	*x = GenerateScaleQRCodeResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[41]
+	mi := &file_internalapi_internal_proto_msgTypes[45]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2591,7 +2871,7 @@ func (x *GenerateScaleQRCodeResponse) String() string {
 func (*GenerateScaleQRCodeResponse) ProtoMessage() {}
 
 func (x *GenerateScaleQRCodeResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[41]
+	mi := &file_internalapi_internal_proto_msgTypes[45]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2604,7 +2884,7 @@ func (x *GenerateScaleQRCodeResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GenerateScaleQRCodeResponse.ProtoReflect.Descriptor instead.
 func (*GenerateScaleQRCodeResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{41}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{45}
 }
 
 func (x *GenerateScaleQRCodeResponse) GetSuccess() bool {
@@ -2648,7 +2928,7 @@ type ProjectBehaviorEventRequest struct {
 
 func (x *ProjectBehaviorEventRequest) Reset() {
 	*x = ProjectBehaviorEventRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[42]
+	mi := &file_internalapi_internal_proto_msgTypes[46]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2660,7 +2940,7 @@ func (x *ProjectBehaviorEventRequest) String() string {
 func (*ProjectBehaviorEventRequest) ProtoMessage() {}
 
 func (x *ProjectBehaviorEventRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[42]
+	mi := &file_internalapi_internal_proto_msgTypes[46]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2673,7 +2953,7 @@ func (x *ProjectBehaviorEventRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectBehaviorEventRequest.ProtoReflect.Descriptor instead.
 func (*ProjectBehaviorEventRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{42}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{46}
 }
 
 func (x *ProjectBehaviorEventRequest) GetEventId() string {
@@ -2770,7 +3050,7 @@ type ProjectBehaviorEventResponse struct {
 
 func (x *ProjectBehaviorEventResponse) Reset() {
 	*x = ProjectBehaviorEventResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[43]
+	mi := &file_internalapi_internal_proto_msgTypes[47]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2782,7 +3062,7 @@ func (x *ProjectBehaviorEventResponse) String() string {
 func (*ProjectBehaviorEventResponse) ProtoMessage() {}
 
 func (x *ProjectBehaviorEventResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[43]
+	mi := &file_internalapi_internal_proto_msgTypes[47]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2795,7 +3075,7 @@ func (x *ProjectBehaviorEventResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ProjectBehaviorEventResponse.ProtoReflect.Descriptor instead.
 func (*ProjectBehaviorEventResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{43}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{47}
 }
 
 func (x *ProjectBehaviorEventResponse) GetStatus() string {
@@ -2825,7 +3105,7 @@ type SendTaskOpenedMiniProgramNotificationRequest struct {
 
 func (x *SendTaskOpenedMiniProgramNotificationRequest) Reset() {
 	*x = SendTaskOpenedMiniProgramNotificationRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[44]
+	mi := &file_internalapi_internal_proto_msgTypes[48]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2837,7 +3117,7 @@ func (x *SendTaskOpenedMiniProgramNotificationRequest) String() string {
 func (*SendTaskOpenedMiniProgramNotificationRequest) ProtoMessage() {}
 
 func (x *SendTaskOpenedMiniProgramNotificationRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[44]
+	mi := &file_internalapi_internal_proto_msgTypes[48]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2850,7 +3130,7 @@ func (x *SendTaskOpenedMiniProgramNotificationRequest) ProtoReflect() protorefle
 
 // Deprecated: Use SendTaskOpenedMiniProgramNotificationRequest.ProtoReflect.Descriptor instead.
 func (*SendTaskOpenedMiniProgramNotificationRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{44}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{48}
 }
 
 func (x *SendTaskOpenedMiniProgramNotificationRequest) GetOrgId() int64 {
@@ -2902,7 +3182,7 @@ type SendTaskOpenedMiniProgramNotificationResponse struct {
 
 func (x *SendTaskOpenedMiniProgramNotificationResponse) Reset() {
 	*x = SendTaskOpenedMiniProgramNotificationResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[45]
+	mi := &file_internalapi_internal_proto_msgTypes[49]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2914,7 +3194,7 @@ func (x *SendTaskOpenedMiniProgramNotificationResponse) String() string {
 func (*SendTaskOpenedMiniProgramNotificationResponse) ProtoMessage() {}
 
 func (x *SendTaskOpenedMiniProgramNotificationResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[45]
+	mi := &file_internalapi_internal_proto_msgTypes[49]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2927,7 +3207,7 @@ func (x *SendTaskOpenedMiniProgramNotificationResponse) ProtoReflect() protorefl
 
 // Deprecated: Use SendTaskOpenedMiniProgramNotificationResponse.ProtoReflect.Descriptor instead.
 func (*SendTaskOpenedMiniProgramNotificationResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{45}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{49}
 }
 
 func (x *SendTaskOpenedMiniProgramNotificationResponse) GetSuccess() bool {
@@ -2986,7 +3266,7 @@ type BootstrapOperatorRequest struct {
 
 func (x *BootstrapOperatorRequest) Reset() {
 	*x = BootstrapOperatorRequest{}
-	mi := &file_internalapi_internal_proto_msgTypes[46]
+	mi := &file_internalapi_internal_proto_msgTypes[50]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2998,7 +3278,7 @@ func (x *BootstrapOperatorRequest) String() string {
 func (*BootstrapOperatorRequest) ProtoMessage() {}
 
 func (x *BootstrapOperatorRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[46]
+	mi := &file_internalapi_internal_proto_msgTypes[50]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3011,7 +3291,7 @@ func (x *BootstrapOperatorRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapOperatorRequest.ProtoReflect.Descriptor instead.
 func (*BootstrapOperatorRequest) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{46}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{50}
 }
 
 func (x *BootstrapOperatorRequest) GetOrgId() int64 {
@@ -3068,7 +3348,7 @@ type BootstrapOperatorResponse struct {
 
 func (x *BootstrapOperatorResponse) Reset() {
 	*x = BootstrapOperatorResponse{}
-	mi := &file_internalapi_internal_proto_msgTypes[47]
+	mi := &file_internalapi_internal_proto_msgTypes[51]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -3080,7 +3360,7 @@ func (x *BootstrapOperatorResponse) String() string {
 func (*BootstrapOperatorResponse) ProtoMessage() {}
 
 func (x *BootstrapOperatorResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_internalapi_internal_proto_msgTypes[47]
+	mi := &file_internalapi_internal_proto_msgTypes[51]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -3093,7 +3373,7 @@ func (x *BootstrapOperatorResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BootstrapOperatorResponse.ProtoReflect.Descriptor instead.
 func (*BootstrapOperatorResponse) Descriptor() ([]byte, []int) {
-	return file_internalapi_internal_proto_rawDescGZIP(), []int{47}
+	return file_internalapi_internal_proto_rawDescGZIP(), []int{51}
 }
 
 func (x *BootstrapOperatorResponse) GetOperatorId() uint64 {
@@ -3295,7 +3575,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x0eauto_submitted\x18\x03 \x01(\bR\rautoSubmitted\x12\x18\n" +
 	"\amessage\x18\x04 \x01(\tR\amessage\"@\n" +
 	"\x19EvaluateAssessmentRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xa8\x01\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xdf\x01\n" +
 	"\x1aEvaluateAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
@@ -3303,7 +3583,30 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\vtotal_score\x18\x04 \x01(\x01R\n" +
 	"totalScore\x12\x1d\n" +
 	"\n" +
-	"risk_level\x18\x05 \x01(\tR\triskLevel\"\x82\x01\n" +
+	"risk_level\x18\x05 \x01(\tR\triskLevel\x125\n" +
+	"\aoutcome\x18\x06 \x01(\v2\x1b.internalapi.OutcomeSummaryR\aoutcome\"\xb0\x01\n" +
+	"\x0eOutcomeSummary\x120\n" +
+	"\x05model\x18\x01 \x01(\v2\x1a.internalapi.ModelIdentityR\x05model\x12<\n" +
+	"\rprimary_score\x18\x02 \x01(\v2\x17.internalapi.ScoreValueR\fprimaryScore\x12.\n" +
+	"\x05level\x18\x03 \x01(\v2\x18.internalapi.ResultLevelR\x05level\"\xa0\x01\n" +
+	"\rModelIdentity\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x19\n" +
+	"\bsub_kind\x18\x02 \x01(\tR\asubKind\x12\x1c\n" +
+	"\talgorithm\x18\x03 \x01(\tR\talgorithm\x12\x12\n" +
+	"\x04code\x18\x04 \x01(\tR\x04code\x12\x18\n" +
+	"\aversion\x18\x05 \x01(\tR\aversion\x12\x14\n" +
+	"\x05title\x18\x06 \x01(\tR\x05title\"k\n" +
+	"\n" +
+	"ScoreValue\x12\x12\n" +
+	"\x04kind\x18\x01 \x01(\tR\x04kind\x12\x14\n" +
+	"\x05value\x18\x02 \x01(\x01R\x05value\x12\x14\n" +
+	"\x05label\x18\x03 \x01(\tR\x05label\x12\x15\n" +
+	"\x03max\x18\x04 \x01(\x01H\x00R\x03max\x88\x01\x01B\x06\n" +
+	"\x04_max\"S\n" +
+	"\vResultLevel\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x14\n" +
+	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
+	"\bseverity\x18\x03 \x01(\tR\bseverity\"\x82\x01\n" +
 	"\x1eSyncAssessmentAttentionRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x1d\n" +
 	"\n" +
@@ -3433,7 +3736,7 @@ func file_internalapi_internal_proto_rawDescGZIP() []byte {
 	return file_internalapi_internal_proto_rawDescData
 }
 
-var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 49)
+var file_internalapi_internal_proto_msgTypes = make([]protoimpl.MessageInfo, 53)
 var file_internalapi_internal_proto_goTypes = []any{
 	(*PlanResultMessage)(nil),                             // 0: internalapi.PlanResultMessage
 	(*TaskResultMessage)(nil),                             // 1: internalapi.TaskResultMessage
@@ -3469,28 +3772,32 @@ var file_internalapi_internal_proto_goTypes = []any{
 	(*CreateAssessmentFromAnswerSheetResponse)(nil),       // 31: internalapi.CreateAssessmentFromAnswerSheetResponse
 	(*EvaluateAssessmentRequest)(nil),                     // 32: internalapi.EvaluateAssessmentRequest
 	(*EvaluateAssessmentResponse)(nil),                    // 33: internalapi.EvaluateAssessmentResponse
-	(*SyncAssessmentAttentionRequest)(nil),                // 34: internalapi.SyncAssessmentAttentionRequest
-	(*SyncAssessmentAttentionResponse)(nil),               // 35: internalapi.SyncAssessmentAttentionResponse
-	(*TagTesteeRequest)(nil),                              // 36: internalapi.TagTesteeRequest
-	(*TagTesteeResponse)(nil),                             // 37: internalapi.TagTesteeResponse
-	(*GenerateQuestionnaireQRCodeRequest)(nil),            // 38: internalapi.GenerateQuestionnaireQRCodeRequest
-	(*GenerateQuestionnaireQRCodeResponse)(nil),           // 39: internalapi.GenerateQuestionnaireQRCodeResponse
-	(*GenerateScaleQRCodeRequest)(nil),                    // 40: internalapi.GenerateScaleQRCodeRequest
-	(*GenerateScaleQRCodeResponse)(nil),                   // 41: internalapi.GenerateScaleQRCodeResponse
-	(*ProjectBehaviorEventRequest)(nil),                   // 42: internalapi.ProjectBehaviorEventRequest
-	(*ProjectBehaviorEventResponse)(nil),                  // 43: internalapi.ProjectBehaviorEventResponse
-	(*SendTaskOpenedMiniProgramNotificationRequest)(nil),  // 44: internalapi.SendTaskOpenedMiniProgramNotificationRequest
-	(*SendTaskOpenedMiniProgramNotificationResponse)(nil), // 45: internalapi.SendTaskOpenedMiniProgramNotificationResponse
-	(*BootstrapOperatorRequest)(nil),                      // 46: internalapi.BootstrapOperatorRequest
-	(*BootstrapOperatorResponse)(nil),                     // 47: internalapi.BootstrapOperatorResponse
-	nil,                                                   // 48: internalapi.ResumePlanRequest.TesteeStartDatesEntry
-	(*timestamppb.Timestamp)(nil),                         // 49: google.protobuf.Timestamp
+	(*OutcomeSummary)(nil),                                // 34: internalapi.OutcomeSummary
+	(*ModelIdentity)(nil),                                 // 35: internalapi.ModelIdentity
+	(*ScoreValue)(nil),                                    // 36: internalapi.ScoreValue
+	(*ResultLevel)(nil),                                   // 37: internalapi.ResultLevel
+	(*SyncAssessmentAttentionRequest)(nil),                // 38: internalapi.SyncAssessmentAttentionRequest
+	(*SyncAssessmentAttentionResponse)(nil),               // 39: internalapi.SyncAssessmentAttentionResponse
+	(*TagTesteeRequest)(nil),                              // 40: internalapi.TagTesteeRequest
+	(*TagTesteeResponse)(nil),                             // 41: internalapi.TagTesteeResponse
+	(*GenerateQuestionnaireQRCodeRequest)(nil),            // 42: internalapi.GenerateQuestionnaireQRCodeRequest
+	(*GenerateQuestionnaireQRCodeResponse)(nil),           // 43: internalapi.GenerateQuestionnaireQRCodeResponse
+	(*GenerateScaleQRCodeRequest)(nil),                    // 44: internalapi.GenerateScaleQRCodeRequest
+	(*GenerateScaleQRCodeResponse)(nil),                   // 45: internalapi.GenerateScaleQRCodeResponse
+	(*ProjectBehaviorEventRequest)(nil),                   // 46: internalapi.ProjectBehaviorEventRequest
+	(*ProjectBehaviorEventResponse)(nil),                  // 47: internalapi.ProjectBehaviorEventResponse
+	(*SendTaskOpenedMiniProgramNotificationRequest)(nil),  // 48: internalapi.SendTaskOpenedMiniProgramNotificationRequest
+	(*SendTaskOpenedMiniProgramNotificationResponse)(nil), // 49: internalapi.SendTaskOpenedMiniProgramNotificationResponse
+	(*BootstrapOperatorRequest)(nil),                      // 50: internalapi.BootstrapOperatorRequest
+	(*BootstrapOperatorResponse)(nil),                     // 51: internalapi.BootstrapOperatorResponse
+	nil,                                                   // 52: internalapi.ResumePlanRequest.TesteeStartDatesEntry
+	(*timestamppb.Timestamp)(nil),                         // 53: google.protobuf.Timestamp
 }
 var file_internalapi_internal_proto_depIdxs = []int32{
 	1,  // 0: internalapi.EnrollmentResultMessage.tasks:type_name -> internalapi.TaskResultMessage
 	0,  // 1: internalapi.CreatePlanResponse.plan:type_name -> internalapi.PlanResultMessage
 	0,  // 2: internalapi.PausePlanResponse.plan:type_name -> internalapi.PlanResultMessage
-	48, // 3: internalapi.ResumePlanRequest.testee_start_dates:type_name -> internalapi.ResumePlanRequest.TesteeStartDatesEntry
+	52, // 3: internalapi.ResumePlanRequest.testee_start_dates:type_name -> internalapi.ResumePlanRequest.TesteeStartDatesEntry
 	0,  // 4: internalapi.ResumePlanResponse.plan:type_name -> internalapi.PlanResultMessage
 	0,  // 5: internalapi.FinishPlanResponse.plan:type_name -> internalapi.PlanResultMessage
 	2,  // 6: internalapi.EnrollTesteeResponse.enrollment:type_name -> internalapi.EnrollmentResultMessage
@@ -3499,61 +3806,65 @@ var file_internalapi_internal_proto_depIdxs = []int32{
 	1,  // 9: internalapi.OpenTaskResponse.task:type_name -> internalapi.TaskResultMessage
 	1,  // 10: internalapi.CompleteTaskResponse.task:type_name -> internalapi.TaskResultMessage
 	1,  // 11: internalapi.ExpireTaskResponse.task:type_name -> internalapi.TaskResultMessage
-	49, // 12: internalapi.ProjectBehaviorEventRequest.occurred_at:type_name -> google.protobuf.Timestamp
-	49, // 13: internalapi.SendTaskOpenedMiniProgramNotificationRequest.open_at:type_name -> google.protobuf.Timestamp
-	28, // 14: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
-	30, // 15: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
-	32, // 16: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
-	34, // 17: internalapi.InternalService.SyncAssessmentAttention:input_type -> internalapi.SyncAssessmentAttentionRequest
-	36, // 18: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
-	38, // 19: internalapi.InternalService.GenerateQuestionnaireQRCode:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
-	38, // 20: internalapi.InternalService.HandleQuestionnairePublishedPostActions:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
-	40, // 21: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
-	40, // 22: internalapi.InternalService.HandleScalePublishedPostActions:input_type -> internalapi.GenerateScaleQRCodeRequest
-	42, // 23: internalapi.InternalService.ProjectBehaviorEvent:input_type -> internalapi.ProjectBehaviorEventRequest
-	44, // 24: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:input_type -> internalapi.SendTaskOpenedMiniProgramNotificationRequest
-	46, // 25: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
-	4,  // 26: internalapi.PlanCommandService.CreatePlan:input_type -> internalapi.CreatePlanRequest
-	6,  // 27: internalapi.PlanCommandService.PausePlan:input_type -> internalapi.PausePlanRequest
-	8,  // 28: internalapi.PlanCommandService.ResumePlan:input_type -> internalapi.ResumePlanRequest
-	10, // 29: internalapi.PlanCommandService.FinishPlan:input_type -> internalapi.FinishPlanRequest
-	12, // 30: internalapi.PlanCommandService.CancelPlan:input_type -> internalapi.CancelPlanRequest
-	14, // 31: internalapi.PlanCommandService.EnrollTestee:input_type -> internalapi.EnrollTesteeRequest
-	16, // 32: internalapi.PlanCommandService.TerminateEnrollment:input_type -> internalapi.TerminateEnrollmentRequest
-	18, // 33: internalapi.PlanCommandService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
-	20, // 34: internalapi.PlanCommandService.OpenTask:input_type -> internalapi.OpenTaskRequest
-	22, // 35: internalapi.PlanCommandService.CompleteTask:input_type -> internalapi.CompleteTaskRequest
-	24, // 36: internalapi.PlanCommandService.ExpireTask:input_type -> internalapi.ExpireTaskRequest
-	26, // 37: internalapi.PlanCommandService.CancelTask:input_type -> internalapi.CancelTaskRequest
-	29, // 38: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
-	31, // 39: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
-	33, // 40: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
-	35, // 41: internalapi.InternalService.SyncAssessmentAttention:output_type -> internalapi.SyncAssessmentAttentionResponse
-	37, // 42: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
-	39, // 43: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
-	39, // 44: internalapi.InternalService.HandleQuestionnairePublishedPostActions:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
-	41, // 45: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
-	41, // 46: internalapi.InternalService.HandleScalePublishedPostActions:output_type -> internalapi.GenerateScaleQRCodeResponse
-	43, // 47: internalapi.InternalService.ProjectBehaviorEvent:output_type -> internalapi.ProjectBehaviorEventResponse
-	45, // 48: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:output_type -> internalapi.SendTaskOpenedMiniProgramNotificationResponse
-	47, // 49: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
-	5,  // 50: internalapi.PlanCommandService.CreatePlan:output_type -> internalapi.CreatePlanResponse
-	7,  // 51: internalapi.PlanCommandService.PausePlan:output_type -> internalapi.PausePlanResponse
-	9,  // 52: internalapi.PlanCommandService.ResumePlan:output_type -> internalapi.ResumePlanResponse
-	11, // 53: internalapi.PlanCommandService.FinishPlan:output_type -> internalapi.FinishPlanResponse
-	13, // 54: internalapi.PlanCommandService.CancelPlan:output_type -> internalapi.CancelPlanResponse
-	15, // 55: internalapi.PlanCommandService.EnrollTestee:output_type -> internalapi.EnrollTesteeResponse
-	17, // 56: internalapi.PlanCommandService.TerminateEnrollment:output_type -> internalapi.TerminateEnrollmentResponse
-	19, // 57: internalapi.PlanCommandService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
-	21, // 58: internalapi.PlanCommandService.OpenTask:output_type -> internalapi.OpenTaskResponse
-	23, // 59: internalapi.PlanCommandService.CompleteTask:output_type -> internalapi.CompleteTaskResponse
-	25, // 60: internalapi.PlanCommandService.ExpireTask:output_type -> internalapi.ExpireTaskResponse
-	27, // 61: internalapi.PlanCommandService.CancelTask:output_type -> internalapi.CancelTaskResponse
-	38, // [38:62] is the sub-list for method output_type
-	14, // [14:38] is the sub-list for method input_type
-	14, // [14:14] is the sub-list for extension type_name
-	14, // [14:14] is the sub-list for extension extendee
-	0,  // [0:14] is the sub-list for field type_name
+	34, // 12: internalapi.EvaluateAssessmentResponse.outcome:type_name -> internalapi.OutcomeSummary
+	35, // 13: internalapi.OutcomeSummary.model:type_name -> internalapi.ModelIdentity
+	36, // 14: internalapi.OutcomeSummary.primary_score:type_name -> internalapi.ScoreValue
+	37, // 15: internalapi.OutcomeSummary.level:type_name -> internalapi.ResultLevel
+	53, // 16: internalapi.ProjectBehaviorEventRequest.occurred_at:type_name -> google.protobuf.Timestamp
+	53, // 17: internalapi.SendTaskOpenedMiniProgramNotificationRequest.open_at:type_name -> google.protobuf.Timestamp
+	28, // 18: internalapi.InternalService.CalculateAnswerSheetScore:input_type -> internalapi.CalculateAnswerSheetScoreRequest
+	30, // 19: internalapi.InternalService.CreateAssessmentFromAnswerSheet:input_type -> internalapi.CreateAssessmentFromAnswerSheetRequest
+	32, // 20: internalapi.InternalService.EvaluateAssessment:input_type -> internalapi.EvaluateAssessmentRequest
+	38, // 21: internalapi.InternalService.SyncAssessmentAttention:input_type -> internalapi.SyncAssessmentAttentionRequest
+	40, // 22: internalapi.InternalService.TagTestee:input_type -> internalapi.TagTesteeRequest
+	42, // 23: internalapi.InternalService.GenerateQuestionnaireQRCode:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
+	42, // 24: internalapi.InternalService.HandleQuestionnairePublishedPostActions:input_type -> internalapi.GenerateQuestionnaireQRCodeRequest
+	44, // 25: internalapi.InternalService.GenerateScaleQRCode:input_type -> internalapi.GenerateScaleQRCodeRequest
+	44, // 26: internalapi.InternalService.HandleScalePublishedPostActions:input_type -> internalapi.GenerateScaleQRCodeRequest
+	46, // 27: internalapi.InternalService.ProjectBehaviorEvent:input_type -> internalapi.ProjectBehaviorEventRequest
+	48, // 28: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:input_type -> internalapi.SendTaskOpenedMiniProgramNotificationRequest
+	50, // 29: internalapi.InternalService.BootstrapOperator:input_type -> internalapi.BootstrapOperatorRequest
+	4,  // 30: internalapi.PlanCommandService.CreatePlan:input_type -> internalapi.CreatePlanRequest
+	6,  // 31: internalapi.PlanCommandService.PausePlan:input_type -> internalapi.PausePlanRequest
+	8,  // 32: internalapi.PlanCommandService.ResumePlan:input_type -> internalapi.ResumePlanRequest
+	10, // 33: internalapi.PlanCommandService.FinishPlan:input_type -> internalapi.FinishPlanRequest
+	12, // 34: internalapi.PlanCommandService.CancelPlan:input_type -> internalapi.CancelPlanRequest
+	14, // 35: internalapi.PlanCommandService.EnrollTestee:input_type -> internalapi.EnrollTesteeRequest
+	16, // 36: internalapi.PlanCommandService.TerminateEnrollment:input_type -> internalapi.TerminateEnrollmentRequest
+	18, // 37: internalapi.PlanCommandService.SchedulePendingTasks:input_type -> internalapi.SchedulePendingTasksRequest
+	20, // 38: internalapi.PlanCommandService.OpenTask:input_type -> internalapi.OpenTaskRequest
+	22, // 39: internalapi.PlanCommandService.CompleteTask:input_type -> internalapi.CompleteTaskRequest
+	24, // 40: internalapi.PlanCommandService.ExpireTask:input_type -> internalapi.ExpireTaskRequest
+	26, // 41: internalapi.PlanCommandService.CancelTask:input_type -> internalapi.CancelTaskRequest
+	29, // 42: internalapi.InternalService.CalculateAnswerSheetScore:output_type -> internalapi.CalculateAnswerSheetScoreResponse
+	31, // 43: internalapi.InternalService.CreateAssessmentFromAnswerSheet:output_type -> internalapi.CreateAssessmentFromAnswerSheetResponse
+	33, // 44: internalapi.InternalService.EvaluateAssessment:output_type -> internalapi.EvaluateAssessmentResponse
+	39, // 45: internalapi.InternalService.SyncAssessmentAttention:output_type -> internalapi.SyncAssessmentAttentionResponse
+	41, // 46: internalapi.InternalService.TagTestee:output_type -> internalapi.TagTesteeResponse
+	43, // 47: internalapi.InternalService.GenerateQuestionnaireQRCode:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	43, // 48: internalapi.InternalService.HandleQuestionnairePublishedPostActions:output_type -> internalapi.GenerateQuestionnaireQRCodeResponse
+	45, // 49: internalapi.InternalService.GenerateScaleQRCode:output_type -> internalapi.GenerateScaleQRCodeResponse
+	45, // 50: internalapi.InternalService.HandleScalePublishedPostActions:output_type -> internalapi.GenerateScaleQRCodeResponse
+	47, // 51: internalapi.InternalService.ProjectBehaviorEvent:output_type -> internalapi.ProjectBehaviorEventResponse
+	49, // 52: internalapi.InternalService.SendTaskOpenedMiniProgramNotification:output_type -> internalapi.SendTaskOpenedMiniProgramNotificationResponse
+	51, // 53: internalapi.InternalService.BootstrapOperator:output_type -> internalapi.BootstrapOperatorResponse
+	5,  // 54: internalapi.PlanCommandService.CreatePlan:output_type -> internalapi.CreatePlanResponse
+	7,  // 55: internalapi.PlanCommandService.PausePlan:output_type -> internalapi.PausePlanResponse
+	9,  // 56: internalapi.PlanCommandService.ResumePlan:output_type -> internalapi.ResumePlanResponse
+	11, // 57: internalapi.PlanCommandService.FinishPlan:output_type -> internalapi.FinishPlanResponse
+	13, // 58: internalapi.PlanCommandService.CancelPlan:output_type -> internalapi.CancelPlanResponse
+	15, // 59: internalapi.PlanCommandService.EnrollTestee:output_type -> internalapi.EnrollTesteeResponse
+	17, // 60: internalapi.PlanCommandService.TerminateEnrollment:output_type -> internalapi.TerminateEnrollmentResponse
+	19, // 61: internalapi.PlanCommandService.SchedulePendingTasks:output_type -> internalapi.SchedulePendingTasksResponse
+	21, // 62: internalapi.PlanCommandService.OpenTask:output_type -> internalapi.OpenTaskResponse
+	23, // 63: internalapi.PlanCommandService.CompleteTask:output_type -> internalapi.CompleteTaskResponse
+	25, // 64: internalapi.PlanCommandService.ExpireTask:output_type -> internalapi.ExpireTaskResponse
+	27, // 65: internalapi.PlanCommandService.CancelTask:output_type -> internalapi.CancelTaskResponse
+	42, // [42:66] is the sub-list for method output_type
+	18, // [18:42] is the sub-list for method input_type
+	18, // [18:18] is the sub-list for extension type_name
+	18, // [18:18] is the sub-list for extension extendee
+	0,  // [0:18] is the sub-list for field type_name
 }
 
 func init() { file_internalapi_internal_proto_init() }
@@ -3562,13 +3873,14 @@ func file_internalapi_internal_proto_init() {
 		return
 	}
 	file_internalapi_internal_proto_msgTypes[1].OneofWrappers = []any{}
+	file_internalapi_internal_proto_msgTypes[36].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_internalapi_internal_proto_rawDesc), len(file_internalapi_internal_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   49,
+			NumMessages:   53,
 			NumExtensions: 0,
 			NumServices:   2,
 		},

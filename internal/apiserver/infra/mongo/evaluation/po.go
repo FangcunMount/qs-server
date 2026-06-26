@@ -17,9 +17,14 @@ import (
 type InterpretReportPO struct {
 	base.BaseDocument `bson:",inline"`
 
-	// 量表信息
+	// 量表信息（legacy v1）
 	ScaleName string `bson:"scale_name" json:"scale_name"`
 	ScaleCode string `bson:"scale_code" json:"scale_code"`
+
+	// v2 model identity and outcome summary
+	Model        *ModelIdentityPO `bson:"model,omitempty" json:"model,omitempty"`
+	PrimaryScore *ScoreValuePO    `bson:"primary_score,omitempty" json:"primary_score,omitempty"`
+	Level        *ResultLevelPO   `bson:"level,omitempty" json:"level,omitempty"`
 
 	// 受试者ID（冗余，用于查询）
 	TesteeID uint64 `bson:"testee_id" json:"testee_id"`
@@ -41,13 +46,37 @@ type InterpretReportPO struct {
 
 // DimensionInterpretPO 维度解读持久化对象
 type DimensionInterpretPO struct {
-	FactorCode  string   `bson:"factor_code" json:"factor_code"`
-	FactorName  string   `bson:"factor_name" json:"factor_name"`
-	RawScore    float64  `bson:"raw_score" json:"raw_score"`
-	MaxScore    *float64 `bson:"max_score,omitempty" json:"max_score,omitempty"`
-	RiskLevel   string   `bson:"risk_level" json:"risk_level"`
-	Description string   `bson:"description" json:"description"`
-	Suggestion  string   `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
+	FactorCode  string         `bson:"factor_code" json:"factor_code"`
+	FactorName  string         `bson:"factor_name" json:"factor_name"`
+	RawScore    float64        `bson:"raw_score" json:"raw_score"`
+	MaxScore    *float64       `bson:"max_score,omitempty" json:"max_score,omitempty"`
+	RiskLevel   string         `bson:"risk_level" json:"risk_level"`
+	Score       *ScoreValuePO  `bson:"score,omitempty" json:"score,omitempty"`
+	Level       *ResultLevelPO `bson:"level,omitempty" json:"level,omitempty"`
+	Description string         `bson:"description" json:"description"`
+	Suggestion  string         `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
+}
+
+type ModelIdentityPO struct {
+	Kind      string `bson:"kind,omitempty" json:"kind,omitempty"`
+	SubKind   string `bson:"sub_kind,omitempty" json:"sub_kind,omitempty"`
+	Algorithm string `bson:"algorithm,omitempty" json:"algorithm,omitempty"`
+	Code      string `bson:"code,omitempty" json:"code,omitempty"`
+	Version   string `bson:"version,omitempty" json:"version,omitempty"`
+	Title     string `bson:"title,omitempty" json:"title,omitempty"`
+}
+
+type ScoreValuePO struct {
+	Kind  string   `bson:"kind,omitempty" json:"kind,omitempty"`
+	Value float64  `bson:"value" json:"value"`
+	Label string   `bson:"label,omitempty" json:"label,omitempty"`
+	Max   *float64 `bson:"max,omitempty" json:"max,omitempty"`
+}
+
+type ResultLevelPO struct {
+	Code     string `bson:"code,omitempty" json:"code,omitempty"`
+	Label    string `bson:"label,omitempty" json:"label,omitempty"`
+	Severity string `bson:"severity,omitempty" json:"severity,omitempty"`
 }
 
 // SuggestionPO 结构化建议持久化对象

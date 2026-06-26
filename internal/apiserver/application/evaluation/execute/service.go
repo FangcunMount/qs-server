@@ -10,6 +10,7 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -125,13 +126,12 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	// 解析评估模型类型
-	modelKind := resolveEvaluationModelKind(a, input)
+	// 解析评估模型执行键
+	evaluatorKey := resolveEvaluatorKey(a, input)
 
 	l.Infow("开始执行评估解释器",
 		"assessment_id", assessmentID,
-		"model_kind", modelKind.String(),
-		"ruleset_kind", modelKind.String(),
+		"model_key", evaluatorKey.String(),
 		"model_code", evaluationModelCode(a, input),
 	)
 
@@ -143,12 +143,11 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	// 解析评估模型执行器
-	evaluator, err := s.evaluators.Resolve(modelKind)
+	evaluator, err := s.evaluators.Resolve(evaluatorKey)
 	if err != nil {
 		l.Errorw("评估模型执行器解析失败",
 			"assessment_id", assessmentID,
-			"model_kind", modelKind.String(),
-			"ruleset_kind", modelKind.String(),
+			"model_key", evaluatorKey.String(),
 			"result", "failed",
 			"error", err.Error(),
 		)
@@ -161,8 +160,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err != nil {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
-			"model_kind", modelKind.String(),
-			"ruleset_kind", modelKind.String(),
+			"model_key", evaluatorKey.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
@@ -181,8 +179,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	if err := s.resultWriter.Write(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Result: evaluationResult}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
-			"model_kind", modelKind.String(),
-			"ruleset_kind", modelKind.String(),
+			"model_key", evaluatorKey.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
 			"error", err.Error(),
@@ -196,8 +193,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"resource", "assessment",
 		"result", "success",
 		"assessment_id", assessmentID,
-		"model_kind", modelKind.String(),
-		"ruleset_kind", modelKind.String(),
+		"model_key", evaluatorKey.String(),
 		"model_code", evaluationModelCode(a, input),
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
@@ -205,15 +201,15 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	return nil
 }
 
-// resolveEvaluationModelKind 解析评估模型类型
-func resolveEvaluationModelKind(a *assessment.Assessment, input *evaluationinput.InputSnapshot) assessment.EvaluationModelKind {
-	if input != nil && input.Model != nil && input.Model.Kind != "" {
-		return assessment.EvaluationModelKind(input.Model.Kind)
+// resolveEvaluatorKey 解析 v2 评估执行键。
+func resolveEvaluatorKey(a *assessment.Assessment, input *evaluationinput.InputSnapshot) evaluation.EvaluatorKey {
+	if a != nil && a.EvaluationModelRef() != nil && !a.EvaluationModelRef().IsEmpty() {
+		return a.EvaluationModelRef().EvaluatorKey()
 	}
-	if a != nil && a.EvaluationModelRef() != nil {
-		return a.EvaluationModelRef().Kind()
+	if input != nil && input.Model != nil {
+		return input.Model.ModelRef().EvaluatorKey()
 	}
-	return ""
+	return evaluation.EvaluatorKey{}
 }
 
 // evaluationModelCode 解析评估模型代码

@@ -151,7 +151,7 @@ func TestStaticCompositeCatalogResolveScaleBinding(t *testing.T) {
 	if err != nil {
 		t.Fatalf("GetPublishedByRef: %v", err)
 	}
-	if snapshot.DecisionKind != domain.DecisionKindScoreRangeInterpretation {
+	if snapshot.DecisionKind != domain.DecisionKindScoreRange {
 		t.Fatalf("decision = %s", snapshot.DecisionKind)
 	}
 }

@@ -20,6 +20,7 @@ import (
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc/service"
 	grpcpkg "github.com/FangcunMount/qs-server/internal/pkg/grpc"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -76,6 +77,7 @@ type EvaluationDeps struct {
 	ManagementService    assessmentApp.AssessmentManagementService
 	ReportQueryService   assessmentApp.ReportQueryService
 	ScoreQueryService    assessmentApp.ScoreQueryService
+	AssessmentReader     evaluationreadmodel.AssessmentReader
 	EvaluationService    execute.Service
 	ReportStatusReporter *reportstatus.Reporter
 }
@@ -204,6 +206,7 @@ func (r *Registry) registerEvaluationService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ReportQueryService,
 		r.deps.Evaluation.ScoreQueryService,
+		r.deps.Evaluation.AssessmentReader,
 	)
 	r.server.RegisterService(evaluationService)
 	log.Info("   📊 Evaluation service registered")

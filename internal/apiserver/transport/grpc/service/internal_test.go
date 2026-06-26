@@ -102,8 +102,14 @@ func TestBuildCreateAssessmentDTOAddsSBTIModelContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
-	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindSBTI.String() {
-		t.Fatalf("RuleSetKind = %#v, want sbti", dto.ModelKind)
+	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindPersonality.String() {
+		t.Fatalf("ModelKind = %#v, want personality", dto.ModelKind)
+	}
+	if dto.ModelSubKind == nil || *dto.ModelSubKind != "typology" {
+		t.Fatalf("ModelSubKind = %#v, want typology", dto.ModelSubKind)
+	}
+	if dto.ModelAlgorithm == nil || *dto.ModelAlgorithm != "sbti" {
+		t.Fatalf("ModelAlgorithm = %#v, want sbti", dto.ModelAlgorithm)
 	}
 	if dto.ModelCode == nil || *dto.ModelCode != evaluationinput.DefaultSBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want SBTI_FUN", dto.ModelCode)
@@ -126,8 +132,14 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 	if err != nil {
 		t.Fatalf("buildCreateAssessmentDTO: %v", err)
 	}
-	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindMBTI.String() {
-		t.Fatalf("RuleSetKind = %#v, want mbti", dto.ModelKind)
+	if dto.ModelKind == nil || *dto.ModelKind != evaluationinput.EvaluationModelKindPersonality.String() {
+		t.Fatalf("ModelKind = %#v, want personality", dto.ModelKind)
+	}
+	if dto.ModelSubKind == nil || *dto.ModelSubKind != "typology" {
+		t.Fatalf("ModelSubKind = %#v, want typology", dto.ModelSubKind)
+	}
+	if dto.ModelAlgorithm == nil || *dto.ModelAlgorithm != "mbti" {
+		t.Fatalf("ModelAlgorithm = %#v, want mbti", dto.ModelAlgorithm)
 	}
 	if dto.ModelCode == nil || *dto.ModelCode != evaluationinput.DefaultMBTIModelCode {
 		t.Fatalf("ModelCode = %#v, want MBTI_OEJTS", dto.ModelCode)

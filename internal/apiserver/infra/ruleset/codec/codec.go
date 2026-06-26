@@ -5,31 +5,27 @@ import (
 	"fmt"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 )
 
-func EncodeSBTI(model *rulesetsbti.ModelSnapshot) ([]byte, string, error) {
-	if model == nil {
-		return nil, "", fmt.Errorf("sbti model is nil")
-	}
-	payload, err := json.Marshal(model)
-	if err != nil {
-		return nil, "", fmt.Errorf("marshal sbti payload: %w", err)
-	}
-	return payload, domain.PayloadFormatSBTIV1, nil
+func EncodeSBTI(model *typology.SBTILegacyModel) ([]byte, string, error) {
+	return EncodeTypology(typology.FromSBTI(model))
 }
 
-func EncodeMBTI(model *rulesetmbti.ModelSnapshot) ([]byte, string, error) {
+func EncodeMBTI(model *typology.MBTILegacyModel) ([]byte, string, error) {
+	return EncodeTypology(typology.FromMBTI(model))
+}
+
+func EncodeTypology(model *typology.Payload) ([]byte, string, error) {
 	if model == nil {
-		return nil, "", fmt.Errorf("mbti model is nil")
+		return nil, "", fmt.Errorf("typology model is nil")
 	}
 	payload, err := json.Marshal(model)
 	if err != nil {
-		return nil, "", fmt.Errorf("marshal mbti payload: %w", err)
+		return nil, "", fmt.Errorf("marshal typology payload: %w", err)
 	}
-	return payload, domain.PayloadFormatMBTIV1, nil
+	return payload, domain.PayloadFormatPersonalityTypologyV1, nil
 }
 
 func EncodeScale(model *scalesnapshot.ScaleSnapshot) ([]byte, string, error) {
@@ -40,39 +36,53 @@ func EncodeScale(model *scalesnapshot.ScaleSnapshot) ([]byte, string, error) {
 	if err != nil {
 		return nil, "", fmt.Errorf("marshal scale payload: %w", err)
 	}
-	return payload, domain.PayloadFormatScaleV1, nil
+	return payload, domain.PayloadFormatAssessmentScaleV1, nil
 }
 
-func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*rulesetsbti.ModelSnapshot, error) {
+func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*typology.SBTILegacyModel, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
-	format, err := resolvePayloadFormat(snapshot, domain.RuleSetKindSBTI, domain.PayloadFormatSBTIV1)
+	format, err := resolvePayloadFormat(snapshot, domain.KindSBTIMigration, domain.PayloadFormatSBTIV1)
 	if err != nil {
 		return nil, err
+	}
+	if domain.IsPersonalityTypologyPayloadFormat(format) {
+		payload, err := decodeTypologyPayload(snapshot.Payload)
+		if err != nil {
+			return nil, err
+		}
+		return typology.ToSBTI(payload)
 	}
 	if !domain.IsSBTIPayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported sbti payload format: %s", format)
 	}
-	var model rulesetsbti.ModelSnapshot
+	var model typology.SBTILegacyModel
 	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
 		return nil, fmt.Errorf("decode sbti payload: %w", err)
 	}
 	return &model, nil
 }
 
-func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*rulesetmbti.ModelSnapshot, error) {
+func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*typology.MBTILegacyModel, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
-	format, err := resolvePayloadFormat(snapshot, domain.RuleSetKindMBTI, domain.PayloadFormatMBTIV1)
+	format, err := resolvePayloadFormat(snapshot, domain.KindMBTIMigration, domain.PayloadFormatMBTIV1)
 	if err != nil {
 		return nil, err
+	}
+	if domain.IsPersonalityTypologyPayloadFormat(format) {
+		payload, err := decodeTypologyPayload(snapshot.Payload)
+		if err != nil {
+			return nil, err
+		}
+		return typology.ToMBTI(payload)
 	}
 	if !domain.IsMBTIPayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported mbti payload format: %s", format)
 	}
-	var model rulesetmbti.ModelSnapshot
+	var model typology.MBTILegacyModel
 	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
 		return nil, fmt.Errorf("decode mbti payload: %w", err)
 	}
@@ -83,7 +93,7 @@ func DecodeScale(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
-	format, err := resolvePayloadFormat(snapshot, domain.RuleSetKindScale, domain.PayloadFormatScaleV1)
+	format, err := resolvePayloadFormat(snapshot, domain.KindScale, domain.PayloadFormatScaleV1)
 	if err != nil {
 		return nil, err
 	}
@@ -97,7 +107,29 @@ func DecodeScale(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot
 	return &model, nil
 }
 
-func resolvePayloadFormat(snapshot *domain.RuleSetSnapshot, kind domain.RuleSetKind, defaultFormat string) (string, error) {
+func DecodeTypology(snapshot *domain.PublishedModelSnapshot) (*typology.Payload, error) {
+	if snapshot == nil {
+		return nil, fmt.Errorf("published model snapshot is nil")
+	}
+	format := snapshot.PayloadFormat
+	if format == "" {
+		format = domain.PayloadFormatPersonalityTypologyV1
+	}
+	if !domain.IsPersonalityTypologyPayloadFormat(format) {
+		return nil, fmt.Errorf("unsupported typology payload format: %s", format)
+	}
+	return decodeTypologyPayload(snapshot.Payload)
+}
+
+func decodeTypologyPayload(payload []byte) (*typology.Payload, error) {
+	var model typology.Payload
+	if err := json.Unmarshal(payload, &model); err != nil {
+		return nil, fmt.Errorf("decode typology payload: %w", err)
+	}
+	return &model, nil
+}
+
+func resolvePayloadFormat(snapshot *domain.RuleSetSnapshot, kind domain.Kind, defaultFormat string) (string, error) {
 	if snapshot.PayloadFormat != "" {
 		return snapshot.PayloadFormat, nil
 	}

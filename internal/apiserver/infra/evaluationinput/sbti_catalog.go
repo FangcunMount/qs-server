@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -15,11 +15,11 @@ import (
 var defaultSBTIModelJSON []byte
 
 type StaticSBTIModelCatalog struct {
-	models []rulesetsbti.ModelSnapshot
+	models []modeltypology.SBTILegacyModel
 }
 
 func NewDefaultSBTIModelCatalog() (*StaticSBTIModelCatalog, error) {
-	var model rulesetsbti.ModelSnapshot
+	var model modeltypology.SBTILegacyModel
 	if err := json.Unmarshal(defaultSBTIModelJSON, &model); err != nil {
 		return nil, fmt.Errorf("load default sbti model: %w", err)
 	}
@@ -29,15 +29,15 @@ func NewDefaultSBTIModelCatalog() (*StaticSBTIModelCatalog, error) {
 	return NewStaticSBTIModelCatalog(model), nil
 }
 
-func NewStaticSBTIModelCatalog(models ...rulesetsbti.ModelSnapshot) *StaticSBTIModelCatalog {
-	copied := make([]rulesetsbti.ModelSnapshot, 0, len(models))
+func NewStaticSBTIModelCatalog(models ...modeltypology.SBTILegacyModel) *StaticSBTIModelCatalog {
+	copied := make([]modeltypology.SBTILegacyModel, 0, len(models))
 	for _, model := range models {
 		copied = append(copied, cloneSBTIModelSnapshot(model))
 	}
 	return &StaticSBTIModelCatalog{models: copied}
 }
 
-func (c *StaticSBTIModelCatalog) GetSBTIModelByRef(_ context.Context, ref port.ModelRef) (*rulesetsbti.ModelSnapshot, error) {
+func (c *StaticSBTIModelCatalog) GetSBTIModelByRef(_ context.Context, ref port.ModelRef) (*modeltypology.SBTILegacyModel, error) {
 	if c == nil {
 		return nil, fmt.Errorf("sbti model catalog is not configured")
 	}
@@ -58,7 +58,7 @@ func (c *StaticSBTIModelCatalog) GetSBTIModelByRef(_ context.Context, ref port.M
 	return nil, fmt.Errorf("sbti model not found: %s@%s", code, ref.Version)
 }
 
-func (c *StaticSBTIModelCatalog) FindSBTIModelByQuestionnaire(_ context.Context, code, version string) (*rulesetsbti.ModelSnapshot, error) {
+func (c *StaticSBTIModelCatalog) FindSBTIModelByQuestionnaire(_ context.Context, code, version string) (*modeltypology.SBTILegacyModel, error) {
 	if c == nil {
 		return nil, fmt.Errorf("sbti model catalog is not configured")
 	}
@@ -71,7 +71,7 @@ func (c *StaticSBTIModelCatalog) FindSBTIModelByQuestionnaire(_ context.Context,
 	return nil, fmt.Errorf("sbti model not found for questionnaire: %s@%s", code, version)
 }
 
-func validateSBTIModelSnapshot(model rulesetsbti.ModelSnapshot) error {
+func validateSBTIModelSnapshot(model modeltypology.SBTILegacyModel) error {
 	if model.Code == "" {
 		return fmt.Errorf("sbti model code is required")
 	}
@@ -93,11 +93,11 @@ func validateSBTIModelSnapshot(model rulesetsbti.ModelSnapshot) error {
 	return nil
 }
 
-func cloneSBTIModelSnapshot(model rulesetsbti.ModelSnapshot) rulesetsbti.ModelSnapshot {
+func cloneSBTIModelSnapshot(model modeltypology.SBTILegacyModel) modeltypology.SBTILegacyModel {
 	cloned := model
 	cloned.DimensionOrder = append([]string(nil), model.DimensionOrder...)
 	cloned.Dimensions = cloneSBTIDimensions(model.Dimensions)
-	cloned.QuestionMappings = append([]rulesetsbti.QuestionMappingSnapshot(nil), model.QuestionMappings...)
+	cloned.QuestionMappings = append([]modeltypology.SBTILegacyQuestionMapping(nil), model.QuestionMappings...)
 	for i := range cloned.QuestionMappings {
 		cloned.QuestionMappings[i].OptionScores = cloneFloatMap(model.QuestionMappings[i].OptionScores)
 	}
@@ -108,22 +108,22 @@ func cloneSBTIModelSnapshot(model rulesetsbti.ModelSnapshot) rulesetsbti.ModelSn
 	return cloned
 }
 
-func cloneSBTIDimensions(source map[string]rulesetsbti.DimensionSnapshot) map[string]rulesetsbti.DimensionSnapshot {
+func cloneSBTIDimensions(source map[string]modeltypology.SBTILegacyDimension) map[string]modeltypology.SBTILegacyDimension {
 	if source == nil {
 		return nil
 	}
-	cloned := make(map[string]rulesetsbti.DimensionSnapshot, len(source))
+	cloned := make(map[string]modeltypology.SBTILegacyDimension, len(source))
 	for key, value := range source {
 		cloned[key] = value
 	}
 	return cloned
 }
 
-func cloneSBTIOutcomes(source []rulesetsbti.OutcomeSnapshot) []rulesetsbti.OutcomeSnapshot {
+func cloneSBTIOutcomes(source []modeltypology.SBTILegacyOutcome) []modeltypology.SBTILegacyOutcome {
 	if source == nil {
 		return nil
 	}
-	return append([]rulesetsbti.OutcomeSnapshot(nil), source...)
+	return append([]modeltypology.SBTILegacyOutcome(nil), source...)
 }
 
 func cloneFloatMap(source map[string]float64) map[string]float64 {
@@ -156,7 +156,7 @@ func NewSBTIModelInputProvider(
 }
 
 func (SBTIModelInputProvider) Kind() port.EvaluationModelKind {
-	return port.EvaluationModelKindSBTI
+	return port.EvaluationModelKindSBTIMigration
 }
 
 func (p SBTIModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

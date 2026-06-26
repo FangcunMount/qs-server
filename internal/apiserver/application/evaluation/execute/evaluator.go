@@ -3,20 +3,20 @@ package execute
 import (
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// mutableEvaluatorRegistry 可变评估模型评估器注册表。
+// mutableEvaluatorRegistry routes execution by v2 EvaluatorKey.
 type mutableEvaluatorRegistry struct {
-	items map[assessment.EvaluationModelKind]Evaluator
+	items map[evaluation.EvaluatorKey]Evaluator
 }
 
-// newEmptyEvaluatorRegistry 创建空的评估模型评估器注册表。
 func newEmptyEvaluatorRegistry() *mutableEvaluatorRegistry {
-	return &mutableEvaluatorRegistry{items: make(map[assessment.EvaluationModelKind]Evaluator)}
+	return &mutableEvaluatorRegistry{items: make(map[evaluation.EvaluatorKey]Evaluator)}
 }
 
-// NewEvaluatorRegistry 创建评估模型评估器注册表。
+// NewEvaluatorRegistry creates an evaluator registry keyed by EvaluatorKey.
 func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, error) {
 	registry := newEmptyEvaluatorRegistry()
 	for _, evaluator := range evaluators {
@@ -27,30 +27,39 @@ func NewEvaluatorRegistry(evaluators ...Evaluator) (*mutableEvaluatorRegistry, e
 	return registry, nil
 }
 
-// Register 注册评估模型评估器。
+// Register registers an evaluator for its EvaluatorKey.
 func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	if evaluator == nil {
 		return fmt.Errorf("evaluation evaluator is nil")
 	}
-	kind := evaluator.Kind()
-	if kind == "" {
-		return fmt.Errorf("evaluation evaluator kind is empty")
+	key := evaluator.Key()
+	if key.IsZero() {
+		return fmt.Errorf("evaluation evaluator key is empty")
 	}
-	if _, exists := r.items[kind]; exists {
-		return fmt.Errorf("evaluation evaluator already registered for kind %s", kind)
+	if _, exists := r.items[key]; exists {
+		return fmt.Errorf("evaluation evaluator already registered for key %s", key)
 	}
-	r.items[kind] = evaluator
+	r.items[key] = evaluator
 	return nil
 }
 
-// Resolve 解析评估模型评估器。
-func (r *mutableEvaluatorRegistry) Resolve(kind assessment.EvaluationModelKind) (Evaluator, error) {
+// Resolve finds an evaluator by v2 key.
+func (r *mutableEvaluatorRegistry) Resolve(key evaluation.EvaluatorKey) (Evaluator, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation evaluator registry is not configured")
 	}
-	evaluator, ok := r.items[kind]
+	evaluator, ok := r.items[key]
+	if !ok {
+		return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
+	}
+	return evaluator, nil
+}
+
+// ResolveLegacyKind maps legacy flat kinds to v2 keys for compatibility.
+func (r *mutableEvaluatorRegistry) ResolveLegacyKind(kind assessment.EvaluationModelKind) (Evaluator, error) {
+	key, ok := evaluation.EvaluatorKeyFromLegacyKind(kind)
 	if !ok {
 		return nil, fmt.Errorf("unsupported evaluation model kind: %s", kind)
 	}
-	return evaluator, nil
+	return r.Resolve(key)
 }

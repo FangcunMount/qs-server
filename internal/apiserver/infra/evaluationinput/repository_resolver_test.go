@@ -246,7 +246,7 @@ func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) 
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(port.EvaluationModelKindMBTI); err == nil {
+	if _, err := registry.Resolve(port.EvaluationModelKindPersonality); err == nil {
 		t.Fatal("expected unknown provider kind error")
 	}
 }
@@ -266,7 +266,7 @@ func TestRepositoryResolverUnsupportedRuleSetKindCarriesFailureKind(t *testing.T
 		t.Fatalf("NewResolver returned error: %v", err)
 	}
 	_, err = resolver.Resolve(context.Background(), port.InputRef{
-		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindMBTI, Code: "MBTI-16P"},
+		ModelRef: port.ModelRef{Kind: port.EvaluationModelKindPersonality, Code: "MBTI-16P"},
 	})
 	if err == nil {
 		t.Fatal("expected unsupported model kind error")

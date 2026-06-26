@@ -5,12 +5,14 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoRuleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
+	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
+	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
-// NewDefaultStaticCatalog 从内置 SBTI/MBTI RuleSet 与可选量表 repo 回退构建静态规则目录。
+// NewDefaultStaticCatalog 从内置 SBTI/MBTI 与可选量表 repo 回退构建静态规则目录。
 func NewDefaultStaticCatalog(scaleSource ScaleBindingSource) (port.RuleSetCatalog, error) {
 	ruleSets, err := DefaultEmbeddedRuleSets(context.Background())
 	if err != nil {
@@ -19,7 +21,7 @@ func NewDefaultStaticCatalog(scaleSource ScaleBindingSource) (port.RuleSetCatalo
 	return NewStaticCompositeCatalog(ruleSets, scaleSource), nil
 }
 
-// NewCatalog 优先读 Mongo 已发布规则，未命中时回退到内置 RuleSet / 量表 repo。
+// NewCatalog 优先读 published_assessment_models，未命中时回退 evaluation_rule_sets / 静态 seed。
 func NewCatalog(db *mongo.Database, scaleSource ScaleBindingSource, opts ...mongoBase.BaseRepositoryOptions) (port.RuleSetCatalog, error) {
 	static, err := NewDefaultStaticCatalog(scaleSource)
 	if err != nil {
@@ -28,6 +30,8 @@ func NewCatalog(db *mongo.Database, scaleSource ScaleBindingSource, opts ...mong
 	if db == nil {
 		return static, nil
 	}
-	store := mongoRuleset.NewRepository(db, opts...)
+	v2 := mongoassessmentmodel.NewRepository(db, opts...)
+	legacy := mongoruleset.NewRepository(db, opts...)
+	store := aminfra.NewDualStore(v2, legacy)
 	return NewLayeredCatalog(store, static), nil
 }

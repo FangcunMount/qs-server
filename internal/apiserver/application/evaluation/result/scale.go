@@ -55,7 +55,11 @@ func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domain
 		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")
 	}
 	_ = ctx
-	return reportscale.BuildReport(b.composer, scaleReportInputFromOutcome(outcome))
+	rpt, err := reportscale.BuildReport(b.composer, scaleReportInputFromOutcome(outcome))
+	if err != nil {
+		return nil, err
+	}
+	return attachOutcomeSummary(outcome, rpt), nil
 }
 
 func scaleReportInputFromOutcome(outcome Outcome) reportscale.ReportInput {

@@ -30,7 +30,10 @@ func TestScaleRuleSetSnapshotRoundTrip(t *testing.T) {
 	if snapshot.Definition.Kind != domain.RuleSetKindScale {
 		t.Fatalf("kind = %s", snapshot.Definition.Kind)
 	}
-	if snapshot.DecisionKind != domain.DecisionKindScoreRangeInterpretation {
+	if snapshot.PayloadFormat != domain.PayloadFormatAssessmentScaleV1 {
+		t.Fatalf("payload format = %s", snapshot.PayloadFormat)
+	}
+	if snapshot.DecisionKind != domain.DecisionKindScoreRange {
 		t.Fatalf("decision = %s", snapshot.DecisionKind)
 	}
 	got, err := codec.DecodeScale(snapshot)

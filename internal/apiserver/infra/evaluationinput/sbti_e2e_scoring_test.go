@@ -3,9 +3,9 @@ package evaluationinput
 import (
 	"testing"
 
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/sbti"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -21,7 +21,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 
 	t.Run("normal_outcome", func(t *testing.T) {
 		sheet := sbtiAllThreesAnswerSheet(model)
-		got, err := evaluationsbti.Score(model, sbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreSBTI(model, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -40,7 +40,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 		modelCopy := *model
 		modelCopy.FallbackSimilarityThreshold = 0.95
 		sheet := sbtiAlternatingAnswerSheet(&modelCopy)
-		got, err := evaluationsbti.Score(&modelCopy, sbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreSBTI(&modelCopy, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -55,7 +55,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 				{QuestionCode: "drink_gate_q2", Value: "2"},
 			},
 		}
-		got, err := evaluationsbti.Score(model, sbtiAnswerSheetFromPort(sheet))
+		got, err := evaluationtypology.ScoreSBTI(model, sbtiAnswerSheetFromPort(sheet))
 		if err != nil {
 			t.Fatalf("Score: %v", err)
 		}
@@ -68,7 +68,7 @@ func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {
 	})
 }
 
-func sbtiAllThreesAnswerSheet(model *rulesetsbti.ModelSnapshot) *port.AnswerSheetSnapshot {
+func sbtiAllThreesAnswerSheet(model *modeltypology.SBTILegacyModel) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for _, mapping := range model.QuestionMappings {
 		answers = append(answers, port.AnswerSnapshot{
@@ -84,7 +84,7 @@ func sbtiAllThreesAnswerSheet(model *rulesetsbti.ModelSnapshot) *port.AnswerShee
 	}
 }
 
-func sbtiAlternatingAnswerSheet(model *rulesetsbti.ModelSnapshot) *port.AnswerSheetSnapshot {
+func sbtiAlternatingAnswerSheet(model *modeltypology.SBTILegacyModel) *port.AnswerSheetSnapshot {
 	answers := make([]port.AnswerSnapshot, 0, len(model.QuestionMappings))
 	for i, mapping := range model.QuestionMappings {
 		value := "1"

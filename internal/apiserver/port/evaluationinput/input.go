@@ -4,17 +4,17 @@ import (
 	"context"
 	"fmt"
 
-	rulesetmbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/mbti"
-	rulesetsbti "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/sbti"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 )
 
 type EvaluationModelKind string
 
 const (
-	EvaluationModelKindScale EvaluationModelKind = "scale"
-	EvaluationModelKindMBTI  EvaluationModelKind = "mbti"
-	EvaluationModelKindSBTI  EvaluationModelKind = "sbti"
+	EvaluationModelKindScale         EvaluationModelKind = "scale"
+	EvaluationModelKindPersonality   EvaluationModelKind = "personality"
+	EvaluationModelKindMBTIMigration EvaluationModelKind = "mbti"
+	EvaluationModelKindSBTIMigration EvaluationModelKind = "sbti"
 )
 
 const (
@@ -36,10 +36,12 @@ func (k EvaluationModelKind) String() string {
 }
 
 type ModelRef struct {
-	Kind    EvaluationModelKind
-	Code    string
-	Version string
-	Title   string
+	Kind      EvaluationModelKind
+	SubKind   string
+	Algorithm string
+	Code      string
+	Version   string
+	Title     string
 }
 
 func (r ModelRef) IsEmpty() bool {
@@ -65,11 +67,27 @@ type InputSnapshot struct {
 }
 
 type ModelSnapshot struct {
-	Kind    EvaluationModelKind
-	Code    string
-	Version string
-	Title   string
-	Payload ModelPayload
+	Kind      EvaluationModelKind
+	SubKind   string
+	Algorithm string
+	Code      string
+	Version   string
+	Title     string
+	Payload   ModelPayload
+}
+
+func (m *ModelSnapshot) ModelRef() ModelRef {
+	if m == nil {
+		return ModelRef{}
+	}
+	return ModelRef{
+		Kind:      m.Kind,
+		SubKind:   m.SubKind,
+		Algorithm: m.Algorithm,
+		Code:      m.Code,
+		Version:   m.Version,
+		Title:     m.Title,
+	}
 }
 
 type ModelPayload interface {
@@ -85,11 +103,12 @@ func NewScaleModelSnapshot(scale *scalesnapshot.ScaleSnapshot) *ModelSnapshot {
 		version = scale.QuestionnaireVersion
 	}
 	return &ModelSnapshot{
-		Kind:    EvaluationModelKindScale,
-		Code:    scale.Code,
-		Version: version,
-		Title:   scale.Title,
-		Payload: ScaleModelPayload{Scale: scale},
+		Kind:      EvaluationModelKindScale,
+		Algorithm: "scale_default",
+		Code:      scale.Code,
+		Version:   version,
+		Title:     scale.Title,
+		Payload:   ScaleModelPayload{Scale: scale},
 	}
 }
 
@@ -119,28 +138,66 @@ func ScalePayload(input *InputSnapshot) (*scalesnapshot.ScaleSnapshot, bool) {
 	return nil, false
 }
 
-func NewSBTIModelSnapshot(model *rulesetsbti.ModelSnapshot) *ModelSnapshot {
-	if model == nil {
+func NewTypologyModelSnapshot(payload *typology.Payload) *ModelSnapshot {
+	if payload == nil {
 		return nil
 	}
 	return &ModelSnapshot{
-		Kind:    EvaluationModelKindSBTI,
-		Code:    model.Code,
-		Version: model.Version,
-		Title:   model.Title,
-		Payload: SBTIModelPayload{Model: model},
+		Kind:      EvaluationModelKindPersonality,
+		SubKind:   "typology",
+		Algorithm: string(payload.Algorithm),
+		Code:      payload.Code,
+		Version:   payload.Version,
+		Title:     payload.Title,
+		Payload:   TypologyModelPayload{Payload: payload},
 	}
 }
 
+func NewSBTIModelSnapshot(model *typology.SBTILegacyModel) *ModelSnapshot {
+	return NewTypologyModelSnapshot(typology.FromSBTI(model))
+}
+
+type TypologyModelPayload struct {
+	Payload *typology.Payload
+}
+
+func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {
+	return EvaluationModelKindPersonality
+}
+
+func (p TypologyModelPayload) ModelKind() EvaluationModelKind {
+	if p.Payload == nil {
+		return ""
+	}
+	switch p.Payload.Algorithm {
+	case "sbti":
+		return EvaluationModelKindSBTIMigration
+	case "mbti":
+		return EvaluationModelKindMBTIMigration
+	default:
+		return EvaluationModelKind(p.Payload.Algorithm)
+	}
+}
+
+func NewMBTIModelSnapshot(model *typology.MBTILegacyModel) *ModelSnapshot {
+	return NewTypologyModelSnapshot(typology.FromMBTI(model))
+}
+
 type SBTIModelPayload struct {
-	Model *rulesetsbti.ModelSnapshot `json:"model"`
+	Model *typology.SBTILegacyModel `json:"model"`
 }
 
 func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindSBTI
+	return EvaluationModelKindSBTIMigration
 }
 
-func SBTIPayload(input *InputSnapshot) (*rulesetsbti.ModelSnapshot, bool) {
+func SBTIPayload(input *InputSnapshot) (*typology.SBTILegacyModel, bool) {
+	if payload, ok := TypologyPayload(input); ok && payload.Algorithm == "sbti" {
+		legacy, err := typology.ToSBTI(payload)
+		if err == nil {
+			return legacy, true
+		}
+	}
 	if input == nil {
 		return nil, false
 	}
@@ -155,28 +212,21 @@ func SBTIPayload(input *InputSnapshot) (*rulesetsbti.ModelSnapshot, bool) {
 	return nil, false
 }
 
-func NewMBTIModelSnapshot(model *rulesetmbti.ModelSnapshot) *ModelSnapshot {
-	if model == nil {
-		return nil
-	}
-	return &ModelSnapshot{
-		Kind:    EvaluationModelKindMBTI,
-		Code:    model.Code,
-		Version: model.Version,
-		Title:   model.Title,
-		Payload: MBTIModelPayload{Model: model},
-	}
-}
-
 type MBTIModelPayload struct {
-	Model *rulesetmbti.ModelSnapshot `json:"model"`
+	Model *typology.MBTILegacyModel `json:"model"`
 }
 
 func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindMBTI
+	return EvaluationModelKindMBTIMigration
 }
 
-func MBTIPayload(input *InputSnapshot) (*rulesetmbti.ModelSnapshot, bool) {
+func MBTIPayload(input *InputSnapshot) (*typology.MBTILegacyModel, bool) {
+	if payload, ok := TypologyPayload(input); ok && payload.Algorithm == "mbti" {
+		legacy, err := typology.ToMBTI(payload)
+		if err == nil {
+			return legacy, true
+		}
+	}
 	if input == nil {
 		return nil, false
 	}
@@ -238,13 +288,13 @@ type ScaleModelCatalog interface {
 }
 
 type SBTIModelCatalog interface {
-	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*rulesetsbti.ModelSnapshot, error)
-	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetsbti.ModelSnapshot, error)
+	GetSBTIModelByRef(ctx context.Context, ref ModelRef) (*typology.SBTILegacyModel, error)
+	FindSBTIModelByQuestionnaire(ctx context.Context, code, version string) (*typology.SBTILegacyModel, error)
 }
 
 type MBTIModelCatalog interface {
-	GetMBTIModelByRef(ctx context.Context, ref ModelRef) (*rulesetmbti.ModelSnapshot, error)
-	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*rulesetmbti.ModelSnapshot, error)
+	GetMBTIModelByRef(ctx context.Context, ref ModelRef) (*typology.MBTILegacyModel, error)
+	FindMBTIModelByQuestionnaire(ctx context.Context, code, version string) (*typology.MBTILegacyModel, error)
 }
 
 type AnswerSheetReader interface {

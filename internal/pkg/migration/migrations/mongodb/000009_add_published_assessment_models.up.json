@@ -1,0 +1,32 @@
+[
+  {
+    "create": "published_assessment_models"
+  },
+  {
+    "createIndexes": "published_assessment_models",
+    "indexes": [
+      {
+        "key": {
+          "model_kind": 1,
+          "model_sub_kind": 1,
+          "model_algorithm": 1,
+          "model_code": 1,
+          "model_version": 1
+        },
+        "name": "idx_published_assessment_models_identity_version",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "status": 1, "model_kind": 1, "model_code": 1 },
+        "name": "idx_published_assessment_models_status_kind_code"
+      },
+      {
+        "key": { "questionnaire_code": 1, "questionnaire_version": 1, "status": 1 },
+        "name": "idx_published_assessment_models_questionnaire_published",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null, "status": "published" }
+      }
+    ]
+  }
+]

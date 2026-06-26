@@ -18,6 +18,7 @@ func TestProtectedQueryServiceListAssessmentsAdminKeepsWideScopeAndDefaults(t *t
 		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
+		nil,
 	)
 
 	_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
@@ -52,6 +53,7 @@ func TestProtectedQueryServiceListAssessmentsClinicianScopeRestrictsToAccessible
 		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
+		nil,
 	)
 
 	_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{Page: 2, PageSize: 20})
@@ -81,6 +83,7 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			nil,
 			nil,
 			NewAssessmentAccessQueryService(management, checker),
+			nil,
 		)
 
 		_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{TesteeID: &testeeID})
@@ -99,6 +102,7 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			nil,
 			nil,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
+			nil,
 		)
 
 		_, err := svc.ListReports(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListReportsDTO{TesteeID: 102})
@@ -120,6 +124,7 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			scoreQuery,
 			nil,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
+			nil,
 		)
 
 		_, err := svc.GetFactorTrend(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, GetFactorTrendDTO{TesteeID: 103, FactorCode: "sleep"})
@@ -142,6 +147,7 @@ func TestProtectedQueryServiceEmptyAccessibleIDsKeepRestrictedEmptyScope(t *test
 		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
+		nil,
 	)
 
 	_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
@@ -169,6 +175,7 @@ func TestProtectedQueryServiceWaitReportValidatesAccessBeforeWaiting(t *testing.
 		nil,
 		wait,
 		NewAssessmentAccessQueryService(management, checker),
+		nil,
 	)
 
 	summary, err := svc.WaitReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
@@ -195,6 +202,7 @@ func TestProtectedQueryServiceWaitReportWithoutWaitServiceReturnsPendingAfterAcc
 		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
+		nil,
 	)
 
 	summary, err := svc.WaitReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 902)
@@ -211,15 +219,15 @@ func TestProtectedQueryServiceWaitReportWithoutWaitServiceReturnsPendingAfterAcc
 }
 
 func TestProtectedQueryServiceMissingDependenciesReturnModuleNotConfigured(t *testing.T) {
-	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil).
+	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil, nil).
 		ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
 		GetScores(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
 		GetReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 }
@@ -305,6 +313,22 @@ func (s *protectedReportQueryStub) ListByTesteeID(_ context.Context, dto ListRep
 		return nil, s.listErr
 	}
 	return &ReportListResult{Items: []*ReportResult{}, Page: dto.Page, PageSize: dto.PageSize}, nil
+}
+
+func (s *protectedReportQueryStub) GetV2ByAssessmentID(_ context.Context, assessmentID uint64) (*ReportV2Result, error) {
+	s.lastGetAssessmentID = assessmentID
+	if s.getErr != nil {
+		return nil, s.getErr
+	}
+	return &ReportV2Result{AssessmentID: assessmentID}, nil
+}
+
+func (s *protectedReportQueryStub) ListV2ByTesteeID(_ context.Context, dto ListReportsDTO) (*ReportV2ListResult, error) {
+	s.lastListDTO = dto
+	if s.listErr != nil {
+		return nil, s.listErr
+	}
+	return &ReportV2ListResult{Items: []*ReportV2Result{}, Page: dto.Page, PageSize: dto.PageSize}, nil
 }
 
 type protectedScoreQueryStub struct {

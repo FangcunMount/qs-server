@@ -236,6 +236,7 @@ func (flow assessmentFlow) EvaluateAssessment(
 		Message:    "评估完成",
 		TotalScore: totalScore,
 		RiskLevel:  riskLevel,
+		Outcome:    outcomeSummaryFromAssessmentResult(result),
 	}, nil
 }
 

@@ -2,13 +2,10 @@ package result
 
 import (
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -67,28 +64,19 @@ func (GenericEventAssembler) Kind() assessment.EvaluationModelKind {
 	return ""
 }
 
-func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, _ *domainReport.InterpretReport) []event.DomainEvent {
+func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
 	if outcome.Assessment == nil || outcome.Result == nil {
 		return nil
 	}
-	modelRef := outcome.Result.ModelRef
-	if modelRef.IsEmpty() && outcome.Assessment.EvaluationModelRef() != nil {
-		modelRef = *outcome.Assessment.EvaluationModelRef()
+	now := time.Now()
+	events := []event.DomainEvent{buildInterpretedV2Event(outcome, rpt, now)}
+	if generated := buildReportGeneratedV2Event(outcome, rpt, now); generated != nil {
+		events = append(events, generated)
 	}
-	if modelRef.IsEmpty() {
-		return nil
+	if footprint := buildFootprintReportGeneratedEvent(outcome, rpt, now); footprint != nil {
+		events = append(events, footprint)
 	}
-	return []event.DomainEvent{
-		assessment.NewAssessmentModelInterpretedEvent(
-			outcome.Assessment.OrgID(),
-			outcome.Assessment.ID(),
-			outcome.Assessment.TesteeID(),
-			modelRef,
-			outcome.Result.TotalScore,
-			outcome.Result.RiskLevel,
-			time.Now(),
-		),
-	}
+	return events
 }
 
 type ScaleEventAssembler struct{}
@@ -97,73 +85,15 @@ func (ScaleEventAssembler) Kind() assessment.EvaluationModelKind {
 	return assessment.EvaluationModelKindScale
 }
 
-// BuildSuccessEvents 构建 Scale 成功事件，保留旧 report/footprint 兼容事件。
+// BuildSuccessEvents 构建 Scale 成功事件，新写路径只发布 v2 outcome 事件。
 func (ScaleEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
 	if outcome.Assessment == nil || outcome.Result == nil || rpt == nil {
 		return nil
 	}
 	now := time.Now()
-	assessmentRef := outcome.Assessment.MedicalScaleRef()
-	if assessmentRef == nil {
-		return GenericEventAssembler{}.BuildSuccessEvents(outcome, rpt)
-	}
-	modelRef := outcome.Assessment.EvaluationModelRef()
-	if modelRef == nil {
-		ref := assessmentRef.ToEvaluationModelRef()
-		modelRef = &ref
-	}
-
-	scaleVersion := modelRef.Version()
-	if scaleVersion == "" && outcome.Input != nil && outcome.Input.Model != nil {
-		scaleVersion = outcome.Input.Model.Version
-	}
-	if scaleVersion == "" && outcome.Input != nil {
-		if scaleSnapshot, ok := evaluationinput.ScalePayload(outcome.Input); ok && scaleSnapshot != nil {
-			scaleVersion = scaleSnapshot.ScaleVersion
-		}
-	}
-	if scaleVersion == "" && !outcome.Assessment.QuestionnaireRef().IsEmpty() {
-		scaleVersion = outcome.Assessment.QuestionnaireRef().Version()
-	}
-
-	scaleRef := assessment.NewMedicalScaleRefWithVersion(
-		assessmentRef.ID(),
-		assessmentRef.Code(),
-		assessmentRef.Name(),
-		scaleVersion,
-	)
-
-	assessmentID := outcome.Assessment.ID().Uint64()
-	reportID := rpt.ID().Uint64()
-	testeeID := outcome.Assessment.TesteeID().Uint64()
-
 	return []event.DomainEvent{
-		assessment.NewAssessmentInterpretedEvent(
-			outcome.Assessment.OrgID(),
-			outcome.Assessment.ID(),
-			outcome.Assessment.TesteeID(),
-			*modelRef,
-			scaleRef,
-			outcome.Result.TotalScore,
-			outcome.Result.RiskLevel,
-			now,
-		),
-		domainReport.NewReportGeneratedEvent(
-			strconv.FormatUint(reportID, 10),
-			strconv.FormatUint(assessmentID, 10),
-			testeeID,
-			rpt.ModelCode(),
-			scaleVersion,
-			rpt.TotalScore(),
-			string(rpt.RiskLevel()),
-			now,
-		),
-		domainStatistics.NewFootprintReportGeneratedEvent(
-			outcome.Assessment.OrgID(),
-			testeeID,
-			assessmentID,
-			reportID,
-			now,
-		),
+		buildInterpretedV2Event(outcome, rpt, now),
+		buildReportGeneratedV2Event(outcome, rpt, now),
+		buildFootprintReportGeneratedEvent(outcome, rpt, now),
 	}
 }

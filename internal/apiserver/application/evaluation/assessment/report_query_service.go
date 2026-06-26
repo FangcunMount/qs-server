@@ -32,6 +32,18 @@ func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID
 	return reportRowToResult(*row), nil
 }
 
+// GetV2ByAssessmentID 根据测评ID获取 v2 报告投影。
+func (s *reportQueryService) GetV2ByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportV2Result, error) {
+	if s.reader == nil {
+		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
+	}
+	row, err := s.reader.GetReportByAssessmentID(ctx, assessmentID)
+	if err != nil {
+		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
+	}
+	return reportRowToV2Result(*row), nil
+}
+
 // ListByTesteeID 获取受试者的报告列表
 func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error) {
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
@@ -48,6 +60,30 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 	}
 	totalInt := int(total)
 	return &ReportListResult{
+		Items:      items,
+		Total:      totalInt,
+		Page:       page,
+		PageSize:   pageSize,
+		TotalPages: (totalInt + pageSize - 1) / pageSize,
+	}, nil
+}
+
+// ListV2ByTesteeID 获取受试者的 v2 报告列表。
+func (s *reportQueryService) ListV2ByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportV2ListResult, error) {
+	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
+	if s.reader == nil {
+		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
+	}
+	rows, total, err := s.listReportRows(ctx, dto, page, pageSize)
+	if err != nil {
+		return nil, evalerrors.Database(err, "查询报告列表失败")
+	}
+	items := make([]*ReportV2Result, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, reportRowToV2Result(row))
+	}
+	totalInt := int(total)
+	return &ReportV2ListResult{
 		Items:      items,
 		Total:      totalInt,
 		Page:       page,

@@ -1,0 +1,12 @@
+ALTER TABLE `assessment`
+    DROP INDEX `idx_assessment_level_code`,
+    DROP INDEX `idx_assessment_severity`,
+    DROP COLUMN `severity`,
+    DROP COLUMN `level_label`,
+    DROP COLUMN `level_code`,
+    DROP COLUMN `primary_score_max`,
+    DROP COLUMN `primary_score_label`,
+    DROP COLUMN `primary_score_value`,
+    DROP COLUMN `primary_score_kind`,
+    DROP COLUMN `evaluation_model_algorithm`,
+    DROP COLUMN `evaluation_model_sub_kind`;

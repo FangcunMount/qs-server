@@ -12,9 +12,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	mbtiEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/mbti"
+	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	sbtiEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/sbti"
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
@@ -79,6 +78,9 @@ type EvaluationModule struct {
 
 	// 最新风险读模型 - 服务于医生工作台等跨模块读侧编排
 	LatestRiskReader evaluationreadmodel.LatestRiskReader
+
+	// 测评读模型 - 服务于 gRPC v2 outcome 查询
+	AssessmentReader evaluationreadmodel.AssessmentReader
 
 	// ==================== 评估引擎 ====================
 
@@ -244,8 +246,8 @@ func (m *EvaluationModule) wireEvaluationEngine(
 				scaleEvaluation.DefaultResultMapper{},
 			),
 		)
-		sbtiEvaluator := sbtiEvaluation.NewExecutor()
-		mbtiEvaluator := mbtiEvaluation.NewExecutor()
+		sbtiEvaluator := typologyEvaluation.NewSBTIExecutor()
+		mbtiEvaluator := typologyEvaluation.NewMBTIExecutor()
 		evaluatorRegistry, err := execute.NewEvaluatorRegistry(scaleEvaluator, sbtiEvaluator, mbtiEvaluator)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
@@ -258,8 +260,7 @@ func (m *EvaluationModule) wireEvaluationEngine(
 		}
 		reportBuilders, err := evaluationResult.NewReportBuilderRegistry(
 			evaluationResult.NewScaleReportBuilder(reportBuilder),
-			sbtiEvaluation.NewReportBuilder(),
-			mbtiEvaluation.NewReportBuilder(),
+			typologyEvaluation.NewReportBuilder(),
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation report builder registry: %v", err)
@@ -342,8 +343,10 @@ func (m *EvaluationModule) wireAssessmentApplications(
 		m.ScoreQueryService,
 		m.WaitService,
 		m.AccessQueryService,
+		infra.assessmentReader,
 	)
 	m.LatestRiskReader = infra.latestRiskReader
+	m.AssessmentReader = infra.assessmentReader
 }
 
 func normalizeEvaluationModuleDeps(deps EvaluationModuleDeps) (EvaluationModuleDeps, error) {

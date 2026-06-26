@@ -8,12 +8,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 type evaluatorStub struct {
+	key     evaluation.EvaluatorKey
 	kind    assessment.EvaluationModelKind
 	execute func(context.Context, ExecutionInput) (*assessment.EvaluationResult, error)
+}
+
+func (e evaluatorStub) Key() evaluation.EvaluatorKey {
+	if !e.key.IsZero() {
+		return e.key
+	}
+	if key, ok := evaluation.EvaluatorKeyFromLegacyKind(assessmentmodel.Kind(e.kind)); ok {
+		return key
+	}
+	return evaluation.EvaluatorKey{}
 }
 
 func (e evaluatorStub) Kind() assessment.EvaluationModelKind {
@@ -34,12 +47,29 @@ func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	got, err := registry.Resolve(assessment.EvaluationModelKindScale)
+	got, err := registry.Resolve(evaluation.EvaluatorKeyScaleDefault)
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
 	if got.Kind() != assessment.EvaluationModelKindScale {
 		t.Fatalf("resolved kind = %s, want scale", got.Kind())
+	}
+}
+
+func TestEvaluatorRegistryResolveLegacyKind(t *testing.T) {
+	registry, err := NewEvaluatorRegistry(evaluatorStub{
+		key:  evaluation.EvaluatorKeyMBTI,
+		kind: assessment.EvaluationModelKindPersonality,
+	})
+	if err != nil {
+		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
+	}
+	got, err := registry.ResolveLegacyKind(assessmentmodel.KindMBTIMigration)
+	if err != nil {
+		t.Fatalf("ResolveLegacyKind returned error: %v", err)
+	}
+	if got.Kind() != assessment.EvaluationModelKindPersonality {
+		t.Fatalf("resolved kind = %s, want mbti", got.Kind())
 	}
 }
 
@@ -59,7 +89,7 @@ func TestEvaluatorRegistryRejectsUnknownKind(t *testing.T) {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	_, err = registry.Resolve(assessment.EvaluationModelKindMBTI)
+	_, err = registry.Resolve(evaluation.EvaluatorKeyMBTI)
 	if err == nil {
 		t.Fatal("Resolve error = nil, want unsupported model kind")
 	}

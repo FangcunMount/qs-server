@@ -35,7 +35,7 @@ func TestReportBuilderRegistryRejectsUnknownKind(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(assessment.EvaluationModelKindMBTI, domainReport.ReportTypeStandard); err == nil {
+	if _, err := registry.Resolve(assessment.EvaluationModelKindPersonality, domainReport.ReportTypeStandard); err == nil {
 		t.Fatal("Resolve error = nil, want unsupported kind")
 	}
 }

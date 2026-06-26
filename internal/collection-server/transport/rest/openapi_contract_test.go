@@ -121,6 +121,7 @@ func collectionRouteMustBeDocumented(route gin.RouteInfo) bool {
 
 func normalizeCollectionOpenAPIPath(path string) string {
 	path = strings.TrimPrefix(path, "/api/v1")
+	path = strings.TrimPrefix(path, "/api/v2")
 	if path == "" {
 		path = "/"
 	}

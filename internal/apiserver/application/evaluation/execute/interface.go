@@ -9,6 +9,7 @@ package execute
 import (
 	"context"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -35,7 +36,9 @@ type Service interface {
 
 // Evaluator 执行某一类评估模型的评估。
 type Evaluator interface {
-	// Kind 返回评估模型类型
+	// Key 返回 v2 执行路由键。
+	Key() evaluation.EvaluatorKey
+	// Kind 返回兼容用 flat kind（报告/投影注册仍使用）。
 	Kind() assessment.EvaluationModelKind
 	// Execute 执行评估模型
 	Execute(ctx context.Context, input ExecutionInput) (*assessment.EvaluationResult, error)
@@ -43,8 +46,8 @@ type Evaluator interface {
 
 // EvaluatorRegistry 评估模型评估器注册表。
 type EvaluatorRegistry interface {
-	// Resolve 解析评估模型评估器
-	Resolve(kind assessment.EvaluationModelKind) (Evaluator, error)
+	Resolve(key evaluation.EvaluatorKey) (Evaluator, error)
+	ResolveLegacyKind(kind assessment.EvaluationModelKind) (Evaluator, error)
 }
 
 // ExecutionInput 执行输入

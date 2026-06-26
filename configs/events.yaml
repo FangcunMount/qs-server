@@ -68,6 +68,14 @@ events:
     description: "测评已解读"
     handler: assessment_interpreted_handler
 
+  assessment.interpreted.v2:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: Assessment
+    domain: evaluation/assessment
+    description: "测评已解读（v2 outcome 投影）"
+    handler: assessment_interpreted_handler
+
   assessment.failed:
     topic: assessment-lifecycle
     delivery: durable_outbox
@@ -82,6 +90,14 @@ events:
     aggregate: Report
     domain: evaluation/report
     description: "报告已生成（在 assessment.interpreted 之后发布）"
+    handler: report_generated_handler
+
+  report.generated.v2:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: Report
+    domain: evaluation/report
+    description: "报告已生成（v2 outcome 投影）"
     handler: report_generated_handler
 
   footprint.entry_opened:

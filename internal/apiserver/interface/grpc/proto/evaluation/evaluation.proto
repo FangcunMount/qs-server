@@ -36,6 +36,12 @@ service EvaluationService {
   
   // 获取我的报告列表
   rpc ListMyReports(ListMyReportsRequest) returns (ListMyReportsResponse);
+
+  // ==================== v2 outcome 查询 ====================
+
+  rpc GetMyAssessmentV2(GetMyAssessmentV2Request) returns (GetMyAssessmentV2Response);
+  rpc ListMyAssessmentsV2(ListMyAssessmentsV2Request) returns (ListMyAssessmentsV2Response);
+  rpc GetAssessmentReportV2(GetAssessmentReportV2Request) returns (GetAssessmentReportV2Response);
 }
 
 // ==================== 通用消息类型 ====================
@@ -266,4 +272,109 @@ message ListMyReportsResponse {
   int32 page = 3;
   int32 page_size = 4;
   int32 total_pages = 5;
+}
+
+// ==================== v2 outcome 消息 ====================
+
+message ModelIdentity {
+  string kind = 1;
+  string sub_kind = 2;
+  string algorithm = 3;
+  string code = 4;
+  string version = 5;
+  string title = 6;
+}
+
+message ScoreValue {
+  string kind = 1;
+  double value = 2;
+  string label = 3;
+  optional double max = 4;
+}
+
+message ResultLevel {
+  string code = 1;
+  string label = 2;
+  string severity = 3;
+}
+
+message AssessmentDetailV2 {
+  uint64 id = 1;
+  uint64 org_id = 2;
+  uint64 testee_id = 3;
+  string questionnaire_code = 4;
+  string questionnaire_version = 5;
+  uint64 answer_sheet_id = 6;
+  ModelIdentity model = 7;
+  ScoreValue primary_score = 8;
+  ResultLevel level = 9;
+  string origin_type = 10;
+  string origin_id = 11;
+  string status = 12;
+  string submitted_at = 13;
+  string interpreted_at = 14;
+  string failed_at = 15;
+  string failure_reason = 16;
+}
+
+message AssessmentSummaryV2 {
+  uint64 id = 1;
+  string questionnaire_code = 2;
+  string questionnaire_version = 3;
+  uint64 answer_sheet_id = 4;
+  ModelIdentity model = 5;
+  ScoreValue primary_score = 6;
+  ResultLevel level = 7;
+  string origin_type = 8;
+  string status = 9;
+  string submitted_at = 10;
+  string interpreted_at = 11;
+}
+
+message AssessmentReportV2 {
+  uint64 assessment_id = 1;
+  ModelIdentity model = 2;
+  ScoreValue primary_score = 3;
+  ResultLevel level = 4;
+  string conclusion = 5;
+  repeated DimensionInterpret dimensions = 6;
+  repeated Suggestion suggestions = 7;
+  ModelExtra model_extra = 8;
+  string created_at = 9;
+}
+
+message GetMyAssessmentV2Request {
+  uint64 testee_id = 1;
+  uint64 assessment_id = 2;
+}
+
+message GetMyAssessmentV2Response {
+  AssessmentDetailV2 assessment = 1;
+}
+
+message ListMyAssessmentsV2Request {
+  uint64 testee_id = 1;
+  string status = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  string scale_code = 5;
+  string risk_level = 6;
+  string date_from = 7;
+  string date_to = 8;
+}
+
+message ListMyAssessmentsV2Response {
+  repeated AssessmentSummaryV2 items = 1;
+  int32 total = 2;
+  int32 page = 3;
+  int32 page_size = 4;
+  int32 total_pages = 5;
+}
+
+message GetAssessmentReportV2Request {
+  uint64 assessment_id = 1;
+}
+
+message GetAssessmentReportV2Response {
+  AssessmentReportV2 report = 1;
 }

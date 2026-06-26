@@ -11,6 +11,7 @@ import (
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -22,6 +23,7 @@ type EvaluationService struct {
 	submissionService  assessmentApp.AssessmentSubmissionService
 	reportQueryService assessmentApp.ReportQueryService
 	scoreQueryService  assessmentApp.ScoreQueryService
+	assessmentReader   evaluationreadmodel.AssessmentReader
 }
 
 // NewEvaluationService 创建测评 gRPC 服务
@@ -29,11 +31,13 @@ func NewEvaluationService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	reportQueryService assessmentApp.ReportQueryService,
 	scoreQueryService assessmentApp.ScoreQueryService,
+	assessmentReader evaluationreadmodel.AssessmentReader,
 ) *EvaluationService {
 	return &EvaluationService{
 		submissionService:  submissionService,
 		reportQueryService: reportQueryService,
 		scoreQueryService:  scoreQueryService,
+		assessmentReader:   assessmentReader,
 	}
 }
 
