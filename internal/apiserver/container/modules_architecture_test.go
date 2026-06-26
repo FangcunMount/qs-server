@@ -325,6 +325,55 @@ func TestAssessmentModelLegacyRegisterNamesCoverScaleAndPersonalityModel(t *test
 	}
 }
 
+func TestAssessmentModelRegistersAggregateName(t *testing.T) {
+	t.Parallel()
+
+	found := false
+	for _, step := range modules.LegacyInitializeSequence {
+		if step.InitMethod != "initAssessmentModelModule" {
+			continue
+		}
+		for _, name := range step.RegisterNames {
+			if name == string(modules.PackageAssessmentModel) {
+				found = true
+				break
+			}
+		}
+	}
+	if !found {
+		t.Fatal("initAssessmentModelModule must register assessmentmodel aggregate module name")
+	}
+}
+
+func TestEvaluationAndReportModulesUseAssessmentModelCatalogPort(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	for _, rel := range []string{
+		"internal/apiserver/container/modules/evaluation/install.go",
+		"internal/apiserver/container/modules/report/install.go",
+	} {
+		data, err := os.ReadFile(filepath.Join(root, rel))
+		if err != nil {
+			t.Fatal(err)
+		}
+		content := string(data)
+		if !strings.Contains(content, "DefaultEvaluationCatalog()") {
+			t.Fatalf("%s must resolve descriptors through DefaultEvaluationCatalog", rel)
+		}
+		for _, token := range []string{
+			"typologyEvaluation.DefaultModules()",
+			"typologyEvaluation.DefaultModuleRegistry()",
+			"typologyEvaluation.DefaultPersonalityRuntimeRegistry()",
+			"typologyEvaluation.DefaultTypologyDescriptors()",
+		} {
+			if strings.Contains(content, token) {
+				t.Fatalf("%s contains %s; downstream modules must depend on assessmentmodel catalog ports", rel, token)
+			}
+		}
+	}
+}
+
 func TestEvaluationModuleDoesNotOwnDefaultTypologyCatalog(t *testing.T) {
 	t.Parallel()
 

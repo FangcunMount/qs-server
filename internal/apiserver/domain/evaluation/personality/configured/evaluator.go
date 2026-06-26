@@ -16,11 +16,16 @@ type Evaluator struct {
 	details DetailAssemblerRegistry
 }
 
-// NewEvaluator returns a configured personality evaluator.
+// NewEvaluator returns a configured personality evaluator with built-in detail assemblers.
 func NewEvaluator() Evaluator {
+	return NewEvaluatorWithDetails(DefaultDetailAssemblerRegistry())
+}
+
+// NewEvaluatorWithDetails returns a configured evaluator that resolves detail assembly through registry.
+func NewEvaluatorWithDetails(details DetailAssemblerRegistry) Evaluator {
 	return Evaluator{
 		rules:   specialrule.Engine{},
-		details: DefaultDetailAssemblerRegistry(),
+		details: details,
 	}
 }
 

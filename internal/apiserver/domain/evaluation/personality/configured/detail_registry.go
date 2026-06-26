@@ -44,6 +44,11 @@ type DetailAssemblerRegistry struct {
 
 // DefaultDetailAssemblerRegistry returns the built-in typology detail assemblers.
 func DefaultDetailAssemblerRegistry() DetailAssemblerRegistry {
+	return NewDetailAssemblerRegistry()
+}
+
+// NewDetailAssemblerRegistry returns the built-in typology detail assemblers.
+func NewDetailAssemblerRegistry() DetailAssemblerRegistry {
 	return DetailAssemblerRegistry{
 		assemblers: map[modeltypology.DetailAdapterKey]detailAssemblerFunc{
 			modeltypology.DetailAdapterPersonalityType: assemblePersonalityTypeDetail,
@@ -53,6 +58,21 @@ func DefaultDetailAssemblerRegistry() DetailAssemblerRegistry {
 			modeltypology.DetailAdapterBigFive:         assembleBigFiveDetail,
 		},
 	}
+}
+
+// Len reports how many detail assemblers are registered.
+func (r DetailAssemblerRegistry) Len() int {
+	return len(r.assemblers)
+}
+
+// Register returns a registry copy with an additional or overridden detail assembler.
+func (r DetailAssemblerRegistry) Register(key modeltypology.DetailAdapterKey, assembler detailAssemblerFunc) DetailAssemblerRegistry {
+	next := DetailAssemblerRegistry{assemblers: make(map[modeltypology.DetailAdapterKey]detailAssemblerFunc, len(r.assemblers)+1)}
+	for k, v := range r.assemblers {
+		next.assemblers[k] = v
+	}
+	next.assemblers[key] = assembler
+	return next
 }
 
 func (r DetailAssemblerRegistry) Assemble(input DetailInput) (any, error) {

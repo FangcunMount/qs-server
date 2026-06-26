@@ -101,14 +101,7 @@ func (c *Container) SurveyScaleInfra() *surveymod.ScaleInfra {
 }
 
 func (c *Container) DefaultEvaluationCatalog() (compose.EvaluationCatalog, error) {
-	registry, err := ammod.DefaultTypologyRegistry()
-	if err != nil {
-		return compose.EvaluationCatalog{}, fmt.Errorf("typology registry: %w", err)
-	}
-	return compose.EvaluationCatalog{
-		Descriptors:      ammod.DefaultEvaluationDescriptors(),
-		TypologyRegistry: registry,
-	}, nil
+	return ammod.ExportEvaluationCatalog()
 }
 
 func (c *Container) RuleSetCatalog() rulesetport.RuleSetCatalog {
@@ -154,6 +147,7 @@ func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
 	c.ScaleModule = module.Scale
 	c.PersonalityModelModule = module.Personality
+	c.registerModule("assessmentmodel", module)
 	c.registerModule("scale", module.Scale)
 	c.registerModule("personalitymodel", module.Personality)
 }

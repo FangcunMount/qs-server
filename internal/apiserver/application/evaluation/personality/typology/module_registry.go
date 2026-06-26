@@ -14,6 +14,11 @@ type ModuleRegistry struct {
 
 // NewModuleRegistry registers typology modules by algorithm.
 func NewModuleRegistry(modules ...Module) (ModuleRegistry, error) {
+	return NewModuleRegistryWith(PersonalityRuntimeOptions{}, modules...)
+}
+
+// NewModuleRegistryWith registers typology modules with injectable adapter registries.
+func NewModuleRegistryWith(opts PersonalityRuntimeOptions, modules ...Module) (ModuleRegistry, error) {
 	if len(modules) == 0 {
 		return ModuleRegistry{}, fmt.Errorf("typology modules are required")
 	}
@@ -24,7 +29,7 @@ func NewModuleRegistry(modules ...Module) (ModuleRegistry, error) {
 		}
 		algorithms = append(algorithms, module.Algorithm)
 	}
-	return ModuleRegistry{runtime: NewPersonalityRuntimeRegistry(algorithms...)}, nil
+	return ModuleRegistry{runtime: NewPersonalityRuntimeRegistryWith(opts, algorithms...)}, nil
 }
 
 func (r ModuleRegistry) runnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {

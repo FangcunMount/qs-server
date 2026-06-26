@@ -225,23 +225,16 @@ const (
 	ReportAdapterBigFive         ReportAdapterKey = "bigfive"
 )
 
-// ResolvedAdapterKey returns the configured report adapter, deriving from kind and outcome mapping when needed.
-func (r ReportSpec) ResolvedAdapterKey(mapping OutcomeMappingSpec, decisionKind assessmentmodel.DecisionKind) ReportAdapterKey {
+// ResolvedAdapterKey returns the configured report adapter from explicit key or generic report kind.
+// Legacy model-specific report adapters must be set on AdapterKey during legacy derivation.
+func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ assessmentmodel.DecisionKind) ReportAdapterKey {
 	if r.AdapterKey != "" {
 		return r.AdapterKey
 	}
-	if r.Kind == ReportKindTemplate {
+	switch r.Kind {
+	case ReportKindTemplate:
 		return ""
-	}
-	if r.Kind == ReportKindTraitProfile {
-		return ReportAdapterTraitProfile
-	}
-	switch mapping.ResolvedDetailAdapterKey(decisionKind) {
-	case DetailAdapterSBTI:
-		return ReportAdapterSBTI
-	case DetailAdapterBigFive:
-		return ReportAdapterBigFive
-	case DetailAdapterTraitProfile:
+	case ReportKindTraitProfile:
 		return ReportAdapterTraitProfile
 	default:
 		return ReportAdapterPersonalityType

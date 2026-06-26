@@ -17,6 +17,11 @@ type OutcomeAdapterRegistry struct {
 
 // DefaultOutcomeAdapterRegistry returns the built-in generic and legacy outcome adapters.
 func DefaultOutcomeAdapterRegistry() OutcomeAdapterRegistry {
+	return NewOutcomeAdapterRegistry()
+}
+
+// NewOutcomeAdapterRegistry returns the built-in generic and legacy outcome adapters.
+func NewOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 	return OutcomeAdapterRegistry{
 		adapters: map[modeltypology.DetailAdapterKey]outcomeAdapterFunc{
 			modeltypology.DetailAdapterPersonalityType: assembleGenericPersonalityTypeOutcome,
@@ -26,6 +31,16 @@ func DefaultOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 			modeltypology.DetailAdapterBigFive:         assembleTraitProfileOutcome,
 		},
 	}
+}
+
+// Register returns a registry copy with an additional or overridden outcome adapter.
+func (r OutcomeAdapterRegistry) Register(key modeltypology.DetailAdapterKey, adapter outcomeAdapterFunc) OutcomeAdapterRegistry {
+	next := OutcomeAdapterRegistry{adapters: make(map[modeltypology.DetailAdapterKey]outcomeAdapterFunc, len(r.adapters)+1)}
+	for k, v := range r.adapters {
+		next.adapters[k] = v
+	}
+	next.adapters[key] = adapter
+	return next
 }
 
 func (r OutcomeAdapterRegistry) Assemble(

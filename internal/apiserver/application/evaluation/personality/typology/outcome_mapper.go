@@ -16,7 +16,12 @@ type OutcomeAssembler struct {
 
 // NewOutcomeAssembler returns the default typology outcome assembler.
 func NewOutcomeAssembler() OutcomeAssembler {
-	return OutcomeAssembler{registry: DefaultOutcomeAdapterRegistry()}
+	return NewOutcomeAssemblerWithRegistry(DefaultOutcomeAdapterRegistry())
+}
+
+// NewOutcomeAssemblerWithRegistry returns an outcome assembler bound to a specific adapter registry.
+func NewOutcomeAssemblerWithRegistry(registry OutcomeAdapterRegistry) OutcomeAssembler {
+	return OutcomeAssembler{registry: registry}
 }
 
 // Assemble converts a scoring result into an AssessmentOutcome.
@@ -26,7 +31,7 @@ func (a OutcomeAssembler) Assemble(
 	mapping modeltypology.OutcomeMappingSpec,
 ) (*assessment.AssessmentOutcome, error) {
 	adapterKey := mapping.ResolvedDetailAdapterKey(decisionKindFromResult(result))
-	return a.registryOrDefault().Assemble(adapterKey, modelRef, result)
+	return a.registry.Assemble(adapterKey, modelRef, result)
 }
 
 func decisionKindFromResult(result evaluationtypology.ScoringResult) assessmentmodel.DecisionKind {
@@ -105,11 +110,4 @@ func (a OutcomeAssembler) AssembleFromPayload(
 		return nil, err
 	}
 	return a.Assemble(modelRef, result, spec.OutcomeMapping)
-}
-
-func (a OutcomeAssembler) registryOrDefault() OutcomeAdapterRegistry {
-	if a.registry.Len() == 0 {
-		return DefaultOutcomeAdapterRegistry()
-	}
-	return a.registry
 }

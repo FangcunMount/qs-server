@@ -27,3 +27,20 @@ func TestEvaluatorKeyPersonalityTypology(t *testing.T) {
 		t.Fatalf("resolved key = %#v", ResolvePersonalityTypologyExecutorKey(EvaluatorKeyMBTI))
 	}
 }
+
+func TestPersonalityTypologyLegacyKeysStayFrozen(t *testing.T) {
+	want := []EvaluatorKey{
+		EvaluatorKeyMBTI,
+		EvaluatorKeySBTI,
+		EvaluatorKeyBigFive,
+	}
+	got := PersonalityTypologyLegacyKeys()
+	if len(got) != len(want) {
+		t.Fatalf("legacy keys = %#v, want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("legacy keys[%d] = %#v, want %#v", i, got[i], want[i])
+		}
+	}
+}

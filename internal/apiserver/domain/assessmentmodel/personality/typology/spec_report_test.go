@@ -27,10 +27,10 @@ func TestReportSpecResolvedAdapterKey(t *testing.T) {
 		}
 	})
 
-	t.Run("personality type from outcome mapping", func(t *testing.T) {
+	t.Run("personality type kind without explicit adapter", func(t *testing.T) {
 		spec := ReportSpec{Kind: ReportKindPersonalityType}
-		if got := spec.ResolvedAdapterKey(sbtiMapping, assessmentmodel.DecisionKindNearestPattern); got != ReportAdapterSBTI {
-			t.Fatalf("ResolvedAdapterKey() = %s, want sbti", got)
+		if got := spec.ResolvedAdapterKey(sbtiMapping, assessmentmodel.DecisionKindNearestPattern); got != ReportAdapterPersonalityType {
+			t.Fatalf("ResolvedAdapterKey() = %s, want personality_type", got)
 		}
 		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindPoleComposition); got != ReportAdapterPersonalityType {
 			t.Fatalf("ResolvedAdapterKey() = %s, want personality_type", got)

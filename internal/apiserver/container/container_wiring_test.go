@@ -98,7 +98,7 @@ func TestContainerBuildScaleModuleDepsUsesSharedApplicationWiring(t *testing.T) 
 	}
 }
 
-func TestAssessmentModelModuleLegacyFieldAliases(t *testing.T) {
+func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
@@ -106,17 +106,17 @@ func TestAssessmentModelModuleLegacyFieldAliases(t *testing.T) {
 		Scale:       &ScaleModule{},
 		Personality: &PersonalityModelModule{},
 	}
-	c.AssessmentModelModule = module
-	c.ScaleModule = module.Scale
-	c.PersonalityModelModule = module.Personality
-	c.registerModule("scale", module.Scale)
-	c.registerModule("personalitymodel", module.Personality)
+	c.SetAssessmentModelModule(module)
 
 	if c.ScaleModule != module.Scale || c.PersonalityModelModule != module.Personality {
 		t.Fatalf("legacy field aliases not wired to assessment model module")
 	}
-	if got := c.GetLoadedModules(); len(got) != 2 || got[0] != "scale" || got[1] != "personalitymodel" {
-		t.Fatalf("GetLoadedModules() = %v, want [scale personalitymodel]", got)
+	got := c.GetLoadedModules()
+	if len(got) != 3 {
+		t.Fatalf("GetLoadedModules() = %v, want 3 entries", got)
+	}
+	if got[0] != "assessmentmodel" || got[1] != "scale" || got[2] != "personalitymodel" {
+		t.Fatalf("GetLoadedModules() = %v, want [assessmentmodel scale personalitymodel]", got)
 	}
 }
 

@@ -279,6 +279,31 @@ func TestTypologyApplicationMainPathDoesNotReferenceLegacyModules(t *testing.T) 
 	}
 }
 
+func TestReportSpecResolvedAdapterKeyStaysGeneric(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "personality", "typology", "spec.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	for _, token := range []string{
+		"case DetailAdapterSBTI",
+		"case DetailAdapterBigFive",
+		"case DetailAdapterMBTI",
+		"return ReportAdapterSBTI",
+		"return ReportAdapterBigFive",
+		"return ReportAdapterMBTI",
+		"mapping.ResolvedDetailAdapterKey",
+	} {
+		if strings.Contains(text, token) {
+			t.Fatalf("spec.go contains %q; legacy report adapter derivation belongs in legacy_derivation.go", token)
+		}
+	}
+}
+
 func TestTypologyLegacyDerivationStaysInLegacyPackages(t *testing.T) {
 	t.Parallel()
 

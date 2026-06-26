@@ -18,9 +18,14 @@ type Adapter struct {
 
 // NewAdapter returns a configured model adapter for the given algorithm alias.
 func NewAdapter(algorithm assessmentmodel.Algorithm) Adapter {
+	return NewAdapterWithEvaluator(algorithm, personalityconfigured.NewEvaluator())
+}
+
+// NewAdapterWithEvaluator returns a configured model adapter bound to a specific evaluator.
+func NewAdapterWithEvaluator(algorithm assessmentmodel.Algorithm, evaluator personalityconfigured.Evaluator) Adapter {
 	return Adapter{
 		algorithm: algorithm,
-		evaluator: personalityconfigured.NewEvaluator(),
+		evaluator: evaluator,
 	}
 }
 
@@ -30,7 +35,12 @@ func (a Adapter) Algorithm() assessmentmodel.Algorithm {
 
 // NewRuntimeAdapter returns a configured adapter that routes purely by payload runtime spec.
 func NewRuntimeAdapter() Adapter {
-	return Adapter{evaluator: personalityconfigured.NewEvaluator()}
+	return NewRuntimeAdapterWithEvaluator(personalityconfigured.NewEvaluator())
+}
+
+// NewRuntimeAdapterWithEvaluator returns a runtime adapter bound to a specific evaluator.
+func NewRuntimeAdapterWithEvaluator(evaluator personalityconfigured.Evaluator) Adapter {
+	return Adapter{evaluator: evaluator}
 }
 
 func (a Adapter) Score(

@@ -18,6 +18,11 @@ type ReportAdapterRegistry struct {
 
 // DefaultReportAdapterRegistry returns the built-in typology report adapters.
 func DefaultReportAdapterRegistry() ReportAdapterRegistry {
+	return NewReportAdapterRegistry()
+}
+
+// NewReportAdapterRegistry returns the built-in typology report adapters.
+func NewReportAdapterRegistry() ReportAdapterRegistry {
 	return ReportAdapterRegistry{
 		adapters: map[modeltypology.ReportAdapterKey]reportBuilderFunc{
 			modeltypology.ReportAdapterPersonalityType: buildPersonalityTypeReport,
@@ -27,6 +32,21 @@ func DefaultReportAdapterRegistry() ReportAdapterRegistry {
 			modeltypology.ReportAdapterBigFive:         buildBigFiveReport,
 		},
 	}
+}
+
+// Len reports how many report builders are registered.
+func (r ReportAdapterRegistry) Len() int {
+	return len(r.adapters)
+}
+
+// Register returns a registry copy with an additional or overridden report builder.
+func (r ReportAdapterRegistry) Register(key modeltypology.ReportAdapterKey, builder reportBuilderFunc) ReportAdapterRegistry {
+	next := ReportAdapterRegistry{adapters: make(map[modeltypology.ReportAdapterKey]reportBuilderFunc, len(r.adapters)+1)}
+	for k, v := range r.adapters {
+		next.adapters[k] = v
+	}
+	next.adapters[key] = builder
+	return next
 }
 
 func (r ReportAdapterRegistry) build(

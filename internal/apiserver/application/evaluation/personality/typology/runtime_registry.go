@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/configured"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
 )
 
 // PersonalityRuntimeRegistry resolves typology execution capabilities by evaluator key and algorithm alias.
@@ -26,17 +27,24 @@ func DefaultPersonalityRuntimeRegistry() PersonalityRuntimeRegistry {
 
 // NewPersonalityRuntimeRegistry registers algorithm aliases over the configured runtime.
 func NewPersonalityRuntimeRegistry(algorithms ...assessmentmodel.Algorithm) PersonalityRuntimeRegistry {
+	return NewPersonalityRuntimeRegistryWith(PersonalityRuntimeOptions{}, algorithms...)
+}
+
+// NewPersonalityRuntimeRegistryWith registers algorithm aliases with injectable adapter registries.
+func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithms ...assessmentmodel.Algorithm) PersonalityRuntimeRegistry {
+	opts = resolvePersonalityRuntimeOptions(opts)
+	evaluator := personalityconfigured.NewEvaluatorWithDetails(opts.DetailRegistry)
 	aliases := make(map[assessmentmodel.Algorithm]configuredadapter.Adapter, len(algorithms))
 	for _, algorithm := range algorithms {
 		if algorithm == "" {
 			continue
 		}
-		aliases[algorithm] = configuredadapter.NewAdapter(algorithm)
+		aliases[algorithm] = configuredadapter.NewAdapterWithEvaluator(algorithm, evaluator)
 	}
 	return PersonalityRuntimeRegistry{
-		assembler:      NewOutcomeAssembler(),
-		reportRegistry: DefaultReportAdapterRegistry(),
-		configured:     configuredadapter.NewRuntimeAdapter(),
+		assembler:      NewOutcomeAssemblerWithRegistry(opts.OutcomeRegistry),
+		reportRegistry: opts.ReportRegistry,
+		configured:     configuredadapter.NewRuntimeAdapterWithEvaluator(evaluator),
 		aliases:        aliases,
 	}
 }

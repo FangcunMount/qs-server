@@ -15,6 +15,11 @@ func DefaultTypologyRegistry() (typologyEvaluation.ModuleRegistry, error) {
 	return typologyEvaluation.DefaultPersonalityRuntimeRegistry().AsModuleRegistry(), nil
 }
 
+// TypologyRegistryWith builds a typology module registry with injectable adapter registries.
+func TypologyRegistryWith(opts typologyEvaluation.PersonalityRuntimeOptions) (typologyEvaluation.ModuleRegistry, error) {
+	return typologyEvaluation.NewPersonalityRuntimeRegistryWith(opts).AsModuleRegistry(), nil
+}
+
 // DefaultTypologyDescriptors projects the configured typology descriptor for evaluation wiring.
 func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
 	return typologyEvaluation.DefaultTypologyDescriptors()
