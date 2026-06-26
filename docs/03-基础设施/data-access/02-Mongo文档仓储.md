@@ -478,7 +478,7 @@ MarkEventFailed
 
 ## 11. Mongo Transaction Runner
 
-container assembler 提供 Mongo transaction runner：
+container modules 提供 Mongo transaction runner：
 
 ```text
 newMongoTransactionRunner(db)
@@ -730,7 +730,7 @@ InsertOne / FindOne / UpdateOne / Find / CountDocuments
 ### Base
 
 - Mongo BaseRepository：[../../../internal/apiserver/infra/mongo/base.go](../../../internal/apiserver/infra/mongo/base.go)
-- Transaction assembler：[../../../internal/apiserver/container/assembler/transaction.go](../../../internal/apiserver/container/assembler/transaction.go)
+- Transaction assembler：[../../../internal/apiserver/container/internal/transaction/runner.go](../../../internal/apiserver/container/internal/transaction/runner.go)
 
 ### AnswerSheet
 
@@ -765,7 +765,7 @@ go test ./internal/apiserver/infra/mongo/answersheet ./internal/apiserver/outbox
 如果修改事务装配：
 
 ```bash
-go test ./internal/apiserver/container/assembler ./internal/apiserver/application/transaction
+go test ./internal/apiserver/container/modules/... ./internal/apiserver/application/transaction
 ```
 
 如果修改文档：

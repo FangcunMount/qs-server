@@ -1,0 +1,48 @@
+package statistics
+
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
+	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+)
+
+// InstallHost extends the shared compose seam with statistics module bindings.
+type InstallHost interface {
+	compose.Host
+	SurveyScaleInfra() *surveymod.ScaleInfra
+	SetStatisticsModule(*Module)
+}
+
+// InstallFrom wires and registers the statistics module using composition-root host inputs.
+func InstallFrom(host InstallHost) error {
+	var answerSheetReader surveyreadmodel.AnswerSheetReader
+	if infra := host.SurveyScaleInfra(); infra != nil {
+		answerSheetReader = infra.AnswerSheetReader
+	}
+	module, err := Wire(WireInput{
+		MySQLDB:                host.MySQLDB(),
+		RedisClient:            host.RedisCache(),
+		FallbackRedisClient:    host.CacheClient(cacheplane.FamilyQuery),
+		CacheBuilder:           host.CacheBuilder(cacheplane.FamilyQuery),
+		AnswerSheetReader:      answerSheetReader,
+		RepairWindowDays:       host.StatisticsRepairWindowDays(),
+		QueryPolicy:            host.CachePolicy(cachepolicy.PolicyStatsQuery),
+		HotsetRecorder:         host.HotsetRecorder(),
+		LockManager:            host.CacheLockManager(),
+		Observer:               host.CacheObserver(),
+		MySQLLimiter:           host.MySQLLimiter(),
+		WarmupCoordinator:      host.WarmupCoordinator(),
+		StatusService:          host.CacheGovernanceStatusService(),
+		DisableStatisticsCache: host.DisableStatisticsCache(),
+		MetaRedisClient:        host.CacheClient(cacheplane.FamilyMeta),
+	})
+	if err != nil {
+		return err
+	}
+	host.SetStatisticsModule(module)
+	host.RegisterModule("statistics", module)
+	host.Printf("📦 Statistics module initialized\n")
+	return nil
+}

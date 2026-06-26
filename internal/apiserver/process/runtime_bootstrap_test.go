@@ -8,7 +8,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 )
 
@@ -81,10 +82,10 @@ func TestBuildRuntimeStageDepsDisablesDurableRelaysWithoutMQPublisher(t *testing
 
 	s := &server{}
 	c := &container.Container{
-		SurveyModule: &assembler.SurveyModule{
-			AnswerSheet: &assembler.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
+		SurveyModule: &surveymod.Module{
+			AnswerSheet: &surveymod.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
 		},
-		EvaluationModule: &assembler.EvaluationModule{AssessmentOutboxRelay: fakeRuntimeRelay{}},
+		EvaluationModule: &evalmod.Module{AssessmentOutboxRelay: fakeRuntimeRelay{}},
 	}
 
 	deps := s.buildRuntimeStageDeps(resourceOutput{}, containerOutput{container: c})
@@ -113,10 +114,10 @@ func TestBuildRuntimeStageDepsUsesConfiguredOutboxRelayIntervals(t *testing.T) {
 	}
 	s := &server{config: cfg}
 	c := &container.Container{
-		SurveyModule: &assembler.SurveyModule{
-			AnswerSheet: &assembler.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
+		SurveyModule: &surveymod.Module{
+			AnswerSheet: &surveymod.AnswerSheetSubModule{SubmittedEventRelay: fakeRuntimeRelay{}},
 		},
-		EvaluationModule: &assembler.EvaluationModule{AssessmentOutboxRelay: fakeRuntimeRelay{}},
+		EvaluationModule: &evalmod.Module{AssessmentOutboxRelay: fakeRuntimeRelay{}},
 	}
 
 	deps := s.buildRuntimeStageDeps(

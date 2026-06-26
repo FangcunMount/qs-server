@@ -71,16 +71,14 @@
 flowchart TD
     start["Container.Initialize"] --> event["initEventPublisher"]
     event --> survey["initSurveyModule"]
-    survey --> scale["initScaleModule"]
-    scale --> graph["newModuleGraph"]
-    graph --> actor["initActorModule"]
-    actor --> evaluation["initEvaluationModule"]
+    survey --> am["initAssessmentModelModule"]
+    am --> actor["initActorModule"]
+    actor --> report["initReportModule"]
+    report --> evaluation["initEvaluationModule"]
     evaluation --> plan["initPlanModule"]
     plan --> statistics["initStatisticsModule"]
     statistics --> warmup["initWarmupCoordinator"]
-    warmup --> postCache["postWireCacheGovernanceDependencies"]
-    postCache --> postScope["postWireProtectedScopeDependencies"]
-    postScope --> codes["initCodesService"]
+    warmup --> codes["initCodesService"]
     codes --> qr["initQRCodeGenerator"]
     qr --> done["initialized=true"]
 ```
@@ -198,7 +196,7 @@ Container 有 `Cleanup` 语义，用于 shutdown 阶段释放容器持有的资�
 
 必须：
 
-1. 定义 assembler module。
+1. 在 `container/modules/<module>/` 定义 assemble + bootstrap。
 2. 明确依赖。
 3. 在 Container 增加字段。
 4. 在 Initialize 中选择位置。

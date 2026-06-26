@@ -18,21 +18,24 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 	allowedDefinitions := map[string]string{}
 
 	got := map[string]struct{}{}
-	scanGoFiles(t, filepath.Join(root, "internal", "apiserver", "container", "assembler"), func(path string, file *ast.File) {
-		rel := filepath.ToSlash(mustRel(t, root, path))
-		for _, decl := range file.Decls {
-			fn, ok := decl.(*ast.FuncDecl)
-			if !ok || fn.Recv == nil || !strings.HasPrefix(fn.Name.Name, "Set") {
-				continue
+	assemblerRoot := filepath.Join(root, "internal", "apiserver", "container", "assembler")
+	if _, err := os.Stat(assemblerRoot); err == nil {
+		scanGoFiles(t, assemblerRoot, func(path string, file *ast.File) {
+			rel := filepath.ToSlash(mustRel(t, root, path))
+			for _, decl := range file.Decls {
+				fn, ok := decl.(*ast.FuncDecl)
+				if !ok || fn.Recv == nil || !strings.HasPrefix(fn.Name.Name, "Set") {
+					continue
+				}
+				recv := receiverTypeName(fn)
+				key := rel + ":" + recv + "." + fn.Name.Name
+				if _, ok := allowedDefinitions[key]; !ok {
+					t.Fatalf("%s is a new composition setter; document constructor-deps wiring before allowing it", key)
+				}
+				got[key] = struct{}{}
 			}
-			recv := receiverTypeName(fn)
-			key := rel + ":" + recv + "." + fn.Name.Name
-			if _, ok := allowedDefinitions[key]; !ok {
-				t.Fatalf("%s is a new composition setter; add it to ModuleGraph/PostWire with a tested reason before allowing it", key)
-			}
-			got[key] = struct{}{}
-		}
-	})
+		})
+	}
 	for key, reason := range allowedDefinitions {
 		if strings.TrimSpace(reason) == "" {
 			t.Fatalf("%s has an empty allowlist reason", key)
@@ -43,23 +46,14 @@ func TestAPIServerCompositionSettersAreAllowlisted(t *testing.T) {
 	}
 }
 
-func TestAPIServerPostWireCallsStayInModuleGraph(t *testing.T) {
+func TestAPIServerCompositionSettersAreNotUsed(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
 	containerRoot := filepath.Join(root, "internal", "apiserver", "container")
-	allowedFiles := map[string]struct{}{
-		"internal/apiserver/container/module_graph.go": {},
-	}
 
 	scanGoSourceFiles(t, containerRoot, func(path, content string) {
 		rel := filepath.ToSlash(mustRel(t, root, path))
-		if strings.HasPrefix(rel, "internal/apiserver/container/assembler/") {
-			return
-		}
-		if _, ok := allowedFiles[rel]; ok {
-			return
-		}
 		for _, token := range []string{
 			".SetEvaluationServices(",
 			".SetTesteeAccessService(",
@@ -68,7 +62,7 @@ func TestAPIServerPostWireCallsStayInModuleGraph(t *testing.T) {
 			".SetWarmupCoordinator(",
 		} {
 			if strings.Contains(content, token) {
-				t.Fatalf("%s calls %s; cross-module wiring must live in module_graph.go", rel, token)
+				t.Fatalf("%s calls %s; cross-module wiring must use constructor deps, not composition setters", rel, token)
 			}
 		}
 	})
@@ -78,8 +72,15 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	for _, fileName := range []string{"actor.go", "survey.go", "scale.go", "evaluation.go", "plan.go", "statistics.go"} {
-		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", fileName)
+	for _, rel := range []string{
+		"internal/apiserver/container/modules/actor/assemble.go",
+		"internal/apiserver/container/modules/plan/assemble.go",
+		"internal/apiserver/container/modules/statistics/assemble.go",
+		"internal/apiserver/container/modules/survey/assemble.go",
+		"internal/apiserver/container/modules/assessmentmodel/assemble_scale.go",
+		"internal/apiserver/container/modules/evaluation/assemble.go",
+	} {
+		path := filepath.Join(root, rel)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 		if err != nil {
 			t.Fatal(err)
@@ -87,7 +88,7 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
 			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler") {
-				t.Fatalf("internal/apiserver/container/assembler/%s imports %s; business REST handlers must be composed outside module assemblers", fileName, importPath)
+				t.Fatalf("%s imports %s; business REST handlers must be composed outside module assembly", rel, importPath)
 			}
 		}
 	}
@@ -98,13 +99,13 @@ func TestPlanStatisticsModulesDoNotExposeInfraAdaptersOrHandlers(t *testing.T) {
 
 	root := repoRoot(t)
 	for _, tc := range []struct {
-		fileName string
+		rel      string
 		typeName string
 	}{
-		{fileName: "plan.go", typeName: "PlanModule"},
-		{fileName: "statistics.go", typeName: "StatisticsModule"},
+		{rel: "internal/apiserver/container/modules/plan/assemble.go", typeName: "Module"},
+		{rel: "internal/apiserver/container/modules/statistics/assemble.go", typeName: "Module"},
 	} {
-		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", tc.fileName)
+		path := filepath.Join(root, tc.rel)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -126,7 +127,7 @@ func TestPlanStatisticsModulesDoNotExposeInfraAdaptersOrHandlers(t *testing.T) {
 				for _, field := range structType.Fields.List {
 					for _, name := range field.Names {
 						if name.Name == "Handler" || name.Name == "Cache" || name.Name == "Repo" || strings.HasSuffix(name.Name, "Repo") {
-							t.Fatalf("%s exposes %s.%s; plan/statistics modules must expose application ports, not repositories, caches, or REST handlers", tc.fileName, tc.typeName, name.Name)
+							t.Fatalf("%s exposes %s.%s; plan/statistics modules must expose application ports, not repositories, caches, or REST handlers", tc.rel, tc.typeName, name.Name)
 						}
 					}
 				}
@@ -222,7 +223,7 @@ func TestTransportDepsDoesNotComposeSurveyScaleRESTHandlers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "transport_deps.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "transport.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +235,7 @@ func TestTransportDepsDoesNotComposeSurveyScaleRESTHandlers(t *testing.T) {
 		"NewScaleHandler(",
 	} {
 		if strings.Contains(content, token) {
-			t.Fatalf("transport_deps.go calls %s; survey/scale REST handlers must be composed inside transport/rest", token)
+			t.Fatalf("transport.go calls %s; survey/scale REST handlers must be composed inside transport/rest", token)
 		}
 	}
 }
@@ -243,7 +244,7 @@ func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "actor.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "actor", "assemble.go")
 	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -255,7 +256,7 @@ func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
 		}
 		for _, spec := range gen.Specs {
 			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok || typeSpec.Name.Name != "ActorModule" {
+			if !ok || typeSpec.Name.Name != "Module" {
 				continue
 			}
 			structType, ok := typeSpec.Type.(*ast.StructType)
@@ -265,7 +266,7 @@ func TestActorModuleDoesNotExposeRepositories(t *testing.T) {
 			for _, field := range structType.Fields.List {
 				for _, name := range field.Names {
 					if strings.HasSuffix(name.Name, "Repo") {
-						t.Fatalf("ActorModule exposes %s; actor repositories must stay private to the actor assembler", name.Name)
+						t.Fatalf("actor.Module exposes %s; actor repositories must stay private to the actor module assembly", name.Name)
 					}
 				}
 			}
@@ -277,7 +278,7 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "evaluation.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
 	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 	if err != nil {
 		t.Fatal(err)
@@ -289,7 +290,7 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 		}
 		for _, spec := range gen.Specs {
 			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok || typeSpec.Name.Name != "EvaluationModule" {
+			if !ok || typeSpec.Name.Name != "Module" {
 				continue
 			}
 			structType, ok := typeSpec.Type.(*ast.StructType)
@@ -311,18 +312,18 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 						"reportDurableSaver",
 					} {
 						if name.Name == privateInfra {
-							t.Fatalf("EvaluationModule keeps private infra field %s; evaluation repositories/read models/stores must stay in local assembler factories", name.Name)
+							t.Fatalf("evaluation.Module keeps private infra field %s; evaluation repositories/read models/stores must stay in local module assembly factories", name.Name)
 						}
 					}
 					if !name.IsExported() {
 						continue
 					}
 					if name.Name == "Handler" || strings.HasSuffix(name.Name, "Repo") {
-						t.Fatalf("EvaluationModule exposes %s; evaluation repositories and REST handlers must stay private to assembler/transport composition", name.Name)
+						t.Fatalf("evaluation.Module exposes %s; evaluation repositories and REST handlers must stay private to module/transport composition", name.Name)
 					}
 					for _, unused := range []string{"ReportGenerationService", "ReportExportService", "SuggestionService"} {
 						if name.Name == unused {
-							t.Fatalf("EvaluationModule exposes %s; unused report command services must not be part of module public surface", name.Name)
+							t.Fatalf("evaluation.Module exposes %s; unused report command services must not be part of module public surface", name.Name)
 						}
 					}
 				}
@@ -331,11 +332,69 @@ func TestEvaluationModuleDoesNotExposeRepositoriesOrHandlers(t *testing.T) {
 	}
 }
 
+func TestEvaluationAssemblerDoesNotOwnReportCapabilities(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, token := range []string{
+		"NewReportReadModel(",
+		"NewReportBuilderRegistry(",
+		"MaterializeReportBuilders(",
+		"NewReportRepositoryWithTopicResolver(",
+		"NewTransactionalReportDurableSaver(",
+		"outboxready.NewIndex(",
+	} {
+		if strings.Contains(content, token) {
+			t.Fatalf("evaluation assemble.go contains %s; report capabilities must be owned by report module", token)
+		}
+	}
+}
+
+func TestTransportDepsDelegatesToModuleExports(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "container", "transport.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	content := string(data)
+	for _, token := range []string{
+		"SurveyModule.Questionnaire.",
+		"SurveyModule.AnswerSheet.Submission",
+		"SurveyModule.AnswerSheet.Query",
+		".LifecycleService = c.",
+		".ManagementService = c.",
+		".SubmissionService = c.",
+		".SystemStatisticsService = c.",
+		"NewQRCodeQueryService(",
+	} {
+		if strings.Contains(content, token) {
+			t.Fatalf("transport.go contains %s; transport assembly must delegate to module ExportRESTDeps/ExportGRPCDeps", token)
+		}
+	}
+	for _, token := range []string{
+		"ExportRESTDeps(",
+		"ExportGRPCDeps(",
+	} {
+		if !strings.Contains(content, token) {
+			t.Fatalf("transport.go missing %s; transport assembly must delegate to module exports", token)
+		}
+	}
+}
+
 func TestEvaluationAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "evaluation.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
 	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 	if err != nil {
 		t.Fatal(err)
@@ -343,7 +402,7 @@ func TestEvaluationAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 	for _, imported := range parsed.Imports {
 		importPath := strings.Trim(imported.Path.Value, `"`)
 		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
-			t.Fatalf("evaluation assembler imports %s; actor access adaptation must stay in container/bootstrap composition", importPath)
+			t.Fatalf("evaluation module assembly imports %s; actor access adaptation must stay in container/bootstrap composition", importPath)
 		}
 	}
 }
@@ -352,7 +411,7 @@ func TestStatisticsAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "container", "assembler", "statistics.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "statistics", "assemble.go")
 	parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, parser.ImportsOnly)
 	if err != nil {
 		t.Fatal(err)
@@ -360,7 +419,7 @@ func TestStatisticsAssemblerDoesNotAcceptActorAccessApplication(t *testing.T) {
 	for _, imported := range parsed.Imports {
 		importPath := strings.Trim(imported.Path.Value, `"`)
 		if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access" {
-			t.Fatalf("statistics assembler imports %s; actor access adaptation belongs in container/bootstrap or REST deps composition", importPath)
+			t.Fatalf("statistics module assembly imports %s; actor access adaptation belongs in container/bootstrap or REST deps composition", importPath)
 		}
 	}
 }
@@ -370,13 +429,13 @@ func TestSurveyScaleModulesDoNotExposeInfraAdapters(t *testing.T) {
 
 	root := repoRoot(t)
 	for _, tc := range []struct {
-		fileName string
-		types    []string
+		rel   string
+		types []string
 	}{
-		{fileName: "survey.go", types: []string{"QuestionnaireSubModule", "AnswerSheetSubModule"}},
-		{fileName: "scale.go", types: []string{"ScaleModule"}},
+		{rel: "internal/apiserver/container/modules/survey/assemble.go", types: []string{"QuestionnaireSubModule", "AnswerSheetSubModule"}},
+		{rel: "internal/apiserver/container/modules/assessmentmodel/assemble_scale.go", types: []string{"Scale"}},
 	} {
-		path := filepath.Join(root, "internal", "apiserver", "container", "assembler", tc.fileName)
+		path := filepath.Join(root, tc.rel)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
 		if err != nil {
 			t.Fatal(err)
@@ -405,7 +464,7 @@ func TestSurveyScaleModulesDoNotExposeInfraAdapters(t *testing.T) {
 				for _, field := range structType.Fields.List {
 					for _, name := range field.Names {
 						if name.Name == "Repo" || name.Name == "Reader" || name.Name == "ListCache" || strings.HasSuffix(name.Name, "Repo") {
-							t.Fatalf("%s exposes %s.%s; survey/scale modules must expose application services, not infra adapters", tc.fileName, typeSpec.Name.Name, name.Name)
+							t.Fatalf("%s exposes %s.%s; survey/scale modules must expose application services, not infra adapters", tc.rel, typeSpec.Name.Name, name.Name)
 						}
 					}
 				}

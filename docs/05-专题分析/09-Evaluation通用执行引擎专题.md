@@ -930,7 +930,7 @@ report_save_failed
 
 ### Evaluation
 
-- `internal/apiserver/container/assembler/evaluation.go`
+- `internal/apiserver/container/modules/evaluation/assemble.go`
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
 - `docs/02-业务模块/evaluation/README.md`

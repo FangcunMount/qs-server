@@ -1,0 +1,62 @@
+package evaluation
+
+import (
+	"go.mongodb.org/mongo-driver/mongo"
+	"gorm.io/gorm"
+
+	redis "github.com/redis/go-redis/v9"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
+	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
+	"github.com/FangcunMount/qs-server/pkg/event"
+)
+
+// BootstrapInput carries container integration inputs for evaluation module bootstrap.
+type BootstrapInput struct {
+	MySQLDB                        *gorm.DB
+	MongoDB                        *mongo.Database
+	InputResolver                  evaluationinput.Resolver
+	ScaleCatalog                   evaluationinput.ScaleCatalog
+	EventPublisher                 event.EventPublisher
+	RedisClient                    redis.UniversalClient
+	CacheBuilder                   *keyspace.Builder
+	AssessmentPolicy               cachepolicy.CachePolicy
+	QueryRedisClient               redis.UniversalClient
+	QueryCacheBuilder              *keyspace.Builder
+	AssessmentListPolicy           cachepolicy.CachePolicy
+	VersionStore                   cachequery.VersionTokenStore
+	Observer                       *observability.ComponentObserver
+	TopicResolver                  eventcatalog.TopicResolver
+	MySQLLimiter                   backpressure.Acquirer
+	MongoLimiter                   backpressure.Acquirer
+	AssessmentOutboxRelayBatchSize int
+	TesteeAccessChecker            assessment.TesteeAccessChecker
+	OpsHandle                      *cacheplane.Handle
+	ReportStatusConfig             reportstatus.Config
+	ModelDescriptors               []evaldomain.ModelDescriptor
+	TypologyRegistry               typologyEvaluation.ModuleRegistry
+	ReportReader                   evaluationreadmodel.ReportReader
+	ReportBuilderRegistry          evaluationResult.ReportBuilderRegistry
+	ReportDurableSaver             evaluationResult.ReportDurableSaver
+	PostCommitReadyIndexer         *appEventing.PostCommitReadyIndexer
+	OutboxReadyIndex               *outboxready.Index
+}
+
+// Bootstrap assembles the evaluation module from container integration inputs.
+func Bootstrap(in BootstrapInput) (*Module, error) {
+	return New(Deps(in))
+}

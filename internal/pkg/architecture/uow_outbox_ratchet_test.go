@@ -77,7 +77,7 @@ func TestAssessmentEventfulSaveCompatibilityEntrypointsStayContained(t *testing.
 
 func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal/apiserver/container/assembler/evaluation.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read evaluation assembler: %v", err)
@@ -97,7 +97,7 @@ func TestEvaluationAssemblerWiresAssessmentTransactionalOutbox(t *testing.T) {
 
 func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal/apiserver/container/assembler/survey.go")
+	path := filepath.Join(root, "internal", "apiserver", "container", "modules", "survey", "assemble.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read survey assembler: %v", err)
@@ -133,27 +133,35 @@ func TestMongoReportEventfulSaveCompatibilityEntrypointsAreRemoved(t *testing.T)
 
 func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal/apiserver/container/assembler/evaluation.go")
-	data, err := os.ReadFile(path)
+	evalPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation", "assemble.go")
+	evalData, err := os.ReadFile(evalPath)
 	if err != nil {
 		t.Fatalf("read evaluation assembler: %v", err)
 	}
-	text := string(data)
-	required := []string{
-		"evaluationResult.NewTransactionalReportDurableSaver(",
-		"reportBuilders",
-		"infra.reportDurableSaver",
-	}
-	for _, token := range required {
-		if !strings.Contains(text, token) {
-			t.Fatalf("evaluation production assembler must wire transactional report durable saver with %q", token)
+	evalText := string(evalData)
+	for _, token := range []string{
+		"normalized.ReportDurableSaver",
+		"normalized.ReportBuilderRegistry",
+	} {
+		if !strings.Contains(evalText, token) {
+			t.Fatalf("evaluation assembler must inject report write ports with %q", token)
 		}
+	}
+
+	reportPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "report", "assemble.go")
+	reportData, err := os.ReadFile(reportPath)
+	if err != nil {
+		t.Fatalf("read report assembler: %v", err)
+	}
+	reportText := string(reportData)
+	if !strings.Contains(reportText, "evaluationResult.NewTransactionalReportDurableSaver(") {
+		t.Fatalf("report module must wire transactional report durable saver")
 	}
 }
 
 func TestContainerUsesDurableOutboxRelayConstructor(t *testing.T) {
 	root := repoRoot(t)
-	walkGoFiles(t, filepath.Join(root, "internal/apiserver/container/assembler"), func(path string, text string) {
+	walkGoFiles(t, filepath.Join(root, "internal", "apiserver", "container", "modules"), func(path string, text string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}

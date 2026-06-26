@@ -138,7 +138,6 @@ initEventPublisher
   -> initPlanModule
   -> initStatisticsModule
   -> initWarmupCoordinator
-  -> postWire markers
   -> initCodesService
   -> initQRCodeGenerator
 ```
@@ -374,7 +373,7 @@ domain 不依赖 process/container/transport/infra
 
 | 场景 | 建议 |
 | ---- | ---- |
-| 新模块依赖另一个模块的应用服务 | 优先通过 assembler constructor deps |
+| 新模块依赖另一个模块的应用服务 | 优先通过 module bootstrap / wire constructor deps |
 | 初始化顺序确实无法满足 | 才考虑 moduleGraph 后置连接 |
 | 只为方便而 setter 注入 | 不建议 |
 | 改动 moduleGraph | 同步更新 runtime composition 文档和架构测试 |
@@ -450,7 +449,7 @@ AssessmentOutboxRelay.DispatchDue
 | 失败阶段 | 常见原因 | 首先检查 |
 | ---- | ---- | ---- |
 | `prepare resources` | MySQL/Mongo/Redis 不可用；events.yaml 加载失败；MQ publisher 创建失败 | `configs/apiserver.*.yaml`、`configs/events.yaml`、基础设施连接 |
-| `initialize container` | 模块依赖缺失；IAM module 初始化失败；repository/adapter 构造失败 | `internal/apiserver/container/*`、`assembler/*` |
+| `initialize container` | 模块依赖缺失；IAM module 初始化失败；repository/adapter 构造失败 | `internal/apiserver/container/*`、`container/modules/*` |
 | `initialize integrations` | WeChat / OSS / notification 配置错误；authz version subscriber 创建失败 | integration config、IAM authz sync |
 | `initialize transports` | 端口冲突；TLS/mTLS 证书错误；gRPC auth/ACL 配置错误；路由注册依赖缺失 | server/gRPC config、证书、`BuildRESTDeps`、`BuildGRPCDeps` |
 | `start background runtimes` | scheduler 配置错误；lock manager 不可用；relay 依赖缺失 | `runtime_bootstrap.go`、plan/statistics/behavior 配置 |
@@ -464,7 +463,7 @@ AssessmentOutboxRelay.DispatchDue
 | ---- | ------------ |
 | 新增 REST API | `transport/rest` handler/router + `container.BuildRESTDeps` |
 | 新增 gRPC 方法 | proto + gRPC service + `container.BuildGRPCDeps` + registry |
-| 新增业务模块 | `domain/application/infra` + `container/assembler` + `container/root.go` |
+| 新增业务模块 | `domain/application/infra` + `container/modules` + `container/root.go` |
 | 新增外部资源 | `process/resource_bootstrap.go` + config/options + container options |
 | 新增后台调度 | `runtime/scheduler` + `process/runtime_bootstrap.go` |
 | 新增 outbox relay | 对应 outbox store/relay + `process/runtime_bootstrap.go` |
@@ -516,8 +515,9 @@ AssessmentOutboxRelay.DispatchDue
 | runtime stage | `internal/apiserver/process/runtime_bootstrap.go` |
 | shutdown / Run | `internal/apiserver/process/lifecycle.go` |
 | Container 主结构 | `internal/apiserver/container/root.go` |
-| moduleGraph | `internal/apiserver/container/module_graph.go` |
-| REST/gRPC deps | `internal/apiserver/container/transport_deps.go` |
+| 模块装配与 wiring | `internal/apiserver/container/module_init.go`、`internal/apiserver/container/modules/*/wire.go` |
+| REST/gRPC deps | `internal/apiserver/container/transport.go` |
+| IAM 集成 | `internal/apiserver/container/modules/iam/` |
 | gRPC server 基础设施 | `internal/pkg/grpc/server.go` |
 | 事件契约 | `configs/events.yaml` |
 | dev 配置 | `configs/apiserver.dev.yaml` |

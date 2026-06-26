@@ -216,7 +216,7 @@ Client / 小程序
 | ---- | ---- |
 | 三进程入口 | [../../cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)、[../../cmd/collection-server/main.go](../../cmd/collection-server/main.go)、[../../cmd/qs-worker/main.go](../../cmd/qs-worker/main.go) |
 | apiserver 启动编排 | [../../internal/apiserver/process/runner.go](../../internal/apiserver/process/runner.go)、[../../internal/apiserver/process/resource_bootstrap.go](../../internal/apiserver/process/resource_bootstrap.go)、[../../internal/apiserver/process/transport_bootstrap.go](../../internal/apiserver/process/transport_bootstrap.go)、[../../internal/apiserver/process/runtime_bootstrap.go](../../internal/apiserver/process/runtime_bootstrap.go) |
-| apiserver 组合根 | [../../internal/apiserver/container/root.go](../../internal/apiserver/container/root.go)、[../../internal/apiserver/container/assembler/](../../internal/apiserver/container/assembler/) |
+| apiserver 组合根 | [../../internal/apiserver/container/root.go](../../internal/apiserver/container/root.go)、[../../internal/apiserver/container/modules/.../](../../internal/apiserver/container/modules/.../) |
 | collection 提交入口 | [../../internal/collection-server/transport/rest/handler/answersheet_handler.go](../../internal/collection-server/transport/rest/handler/answersheet_handler.go)、[../../internal/collection-server/application/answersheet/submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) |
 | worker 事件派发 | [../../internal/worker/integration/eventing/dispatcher.go](../../internal/worker/integration/eventing/dispatcher.go)、[../../internal/worker/handlers/registry.go](../../internal/worker/handlers/registry.go) |
 | 事件契约 | [../../configs/events.yaml](../../configs/events.yaml) |

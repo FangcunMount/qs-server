@@ -3,7 +3,6 @@ package container
 import (
 	"context"
 	"io"
-	"reflect"
 	"testing"
 
 	cbdatabase "github.com/FangcunMount/component-base/pkg/database"
@@ -11,14 +10,13 @@ import (
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	redis "github.com/redis/go-redis/v9"
 )
 
 type fakeModule struct {
-	info         assembler.ModuleInfo
+	info         ModuleInfo
 	checkHealth  error
 	cleanup      error
 	checkCalls   int
@@ -77,20 +75,7 @@ func (m *fakeModule) Cleanup() error {
 	return m.cleanup
 }
 
-func (m *fakeModule) ModuleInfo() assembler.ModuleInfo { return m.info }
-
-func isNilInterfaceValue(value interface{}) bool {
-	if value == nil {
-		return true
-	}
-	rv := reflect.ValueOf(value)
-	switch rv.Kind() {
-	case reflect.Chan, reflect.Func, reflect.Interface, reflect.Map, reflect.Pointer, reflect.Slice:
-		return rv.IsNil()
-	default:
-		return false
-	}
-}
+func (m *fakeModule) ModuleInfo() ModuleInfo { return m.info }
 
 type codesServiceStub struct{}
 
@@ -142,7 +127,7 @@ func (*miniProgramTaskNotificationServiceStub) SendTaskOpened(context.Context, n
 	}, nil
 }
 
-var _ assembler.Module = (*fakeModule)(nil)
+var _ Module = (*fakeModule)(nil)
 var _ codesapp.CodesService = (*codesServiceStub)(nil)
 var _ wechatmini.QRCodeGenerator = (*qrCodeGeneratorStub)(nil)
 var _ wechatmini.MiniProgramSubscribeSender = (*subscribeSenderStub)(nil)

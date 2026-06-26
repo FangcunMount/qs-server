@@ -823,8 +823,8 @@ MySQL outbox interpretation.completed
 
 ### 模块装配
 
-- `internal/apiserver/container/assembler/survey.go`
-- `internal/apiserver/container/assembler/evaluation.go`
+- `internal/apiserver/container/modules/survey/assemble.go`
+- `internal/apiserver/container/modules/evaluation/assemble.go`
 
 ### Worker Handlers
 

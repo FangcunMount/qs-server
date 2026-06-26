@@ -4,8 +4,6 @@ import (
 	"context"
 	"reflect"
 	"testing"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 )
 
 func TestContainerModulesAreInstanceScoped(t *testing.T) {
@@ -38,6 +36,6 @@ func TestContainerModulesAreInstanceScoped(t *testing.T) {
 	}
 }
 
-func moduleInfo(name string) assembler.ModuleInfo {
-	return assembler.ModuleInfo{Name: name}
+func moduleInfo(name string) ModuleInfo {
+	return ModuleInfo{Name: name}
 }

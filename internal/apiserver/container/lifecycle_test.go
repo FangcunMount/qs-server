@@ -5,7 +5,6 @@ import (
 	"errors"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	redis "github.com/redis/go-redis/v9"
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -15,8 +14,8 @@ func TestContainerCleanupUsesRegisteredModules(t *testing.T) {
 	t.Parallel()
 
 	c := NewContainer(nil, nil, nil)
-	first := &fakeModule{info: assembler.ModuleInfo{Name: "survey"}}
-	second := &fakeModule{info: assembler.ModuleInfo{Name: "plan"}}
+	first := &fakeModule{info: ModuleInfo{Name: "survey"}}
+	second := &fakeModule{info: ModuleInfo{Name: "plan"}}
 	c.registerModule("survey", first)
 	c.registerModule("plan", second)
 	c.initialized = true
@@ -39,7 +38,7 @@ func TestContainerCheckModulesHealthReturnsModuleError(t *testing.T) {
 	c := NewContainer(nil, nil, nil)
 	want := errors.New("boom")
 	c.registerModule("broken", &fakeModule{
-		info:        assembler.ModuleInfo{Name: "broken"},
+		info:        ModuleInfo{Name: "broken"},
 		checkHealth: want,
 	})
 
@@ -55,8 +54,8 @@ func TestContainerGetContainerInfoReflectsModulesAndInfrastructure(t *testing.T)
 	t.Cleanup(func() { _ = redisClient.Close() })
 
 	c := NewContainer(&gorm.DB{}, &mongo.Database{}, redisClient)
-	c.registerModule("survey", &fakeModule{info: assembler.ModuleInfo{Name: "survey", Version: "1.0.0"}})
-	c.registerModule("plan", &fakeModule{info: assembler.ModuleInfo{Name: "plan", Version: "1.0.0"}})
+	c.registerModule("survey", &fakeModule{info: ModuleInfo{Name: "survey", Version: "1.0.0"}})
+	c.registerModule("plan", &fakeModule{info: ModuleInfo{Name: "plan", Version: "1.0.0"}})
 	c.initialized = true
 
 	info := c.GetContainerInfo()

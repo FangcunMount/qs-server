@@ -3,6 +3,9 @@ package container
 import (
 	"context"
 	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
+	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
 
 // HealthCheck 健康检查
@@ -146,4 +149,61 @@ func (c *Container) PrintContainerInfo() {
 	for _, module := range c.GetLoadedModules() {
 		fmt.Printf("     • %s\n", module)
 	}
+}
+
+// WarmupCache 预热缓存（异步执行，不阻塞）
+func (c *Container) WarmupCache(ctx context.Context) error {
+	if !c.initialized {
+		return fmt.Errorf("container not initialized")
+	}
+	if coordinator := c.WarmupCoordinator(); coordinator != nil {
+		if err := coordinator.WarmStartup(ctx); err != nil {
+			return fmt.Errorf("cache governance startup warmup failed: %w", err)
+		}
+		return nil
+	}
+	return fmt.Errorf("cache governance warmup coordinator is unavailable")
+}
+
+func (c *Container) StartOutboxReadyReconcilers(ctx context.Context) {
+	if c == nil {
+		return
+	}
+	startReconciler(ctx, c.mongoOutboxReadyIndex(), c.mongoOutboxPendingLister())
+	startReconciler(ctx, c.assessmentOutboxReadyIndex(), c.assessmentOutboxPendingLister())
+}
+
+func startReconciler(ctx context.Context, index *outboxready.Index, lister outboxport.PendingEventRefLister) {
+	if index == nil || lister == nil {
+		return
+	}
+	outboxready.NewReconciler(index, lister, 0).Start(ctx)
+}
+
+func (c *Container) mongoOutboxReadyIndex() *outboxready.Index {
+	if c == nil || c.SurveyModule == nil || c.SurveyModule.AnswerSheet == nil {
+		return nil
+	}
+	return c.SurveyModule.AnswerSheet.OutboxReadyIndex
+}
+
+func (c *Container) assessmentOutboxReadyIndex() *outboxready.Index {
+	if c == nil || c.EvaluationModule == nil {
+		return nil
+	}
+	return c.EvaluationModule.OutboxReadyIndex
+}
+
+func (c *Container) mongoOutboxPendingLister() outboxport.PendingEventRefLister {
+	if c == nil || c.surveyScaleInfra == nil || c.surveyScaleInfra.AnswerSheetRepo == nil {
+		return nil
+	}
+	return c.surveyScaleInfra.AnswerSheetRepo
+}
+
+func (c *Container) assessmentOutboxPendingLister() outboxport.PendingEventRefLister {
+	if c == nil || c.EvaluationModule == nil {
+		return nil
+	}
+	return c.EvaluationModule.AssessmentOutboxPendingLister
 }

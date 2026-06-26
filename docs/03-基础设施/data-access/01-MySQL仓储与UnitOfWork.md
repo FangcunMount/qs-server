@@ -275,7 +275,7 @@ WithinTransaction
 
 ### 7.2 Container 装配
 
-container assembler 中：
+container modules 中：
 
 ```text
 newMySQLTransactionRunner(db)
@@ -663,7 +663,7 @@ statistics_org_snapshot
 ### Application transaction
 
 - Transaction Runner interface：[../../../internal/apiserver/application/transaction/runner.go](../../../internal/apiserver/application/transaction/runner.go)
-- Transaction assembler：[../../../internal/apiserver/container/assembler/transaction.go](../../../internal/apiserver/container/assembler/transaction.go)
+- Transaction assembler：[../../../internal/apiserver/container/internal/transaction/runner.go](../../../internal/apiserver/container/internal/transaction/runner.go)
 
 ### Outbox
 
@@ -680,7 +680,7 @@ statistics_org_snapshot
 ```bash
 go test ./internal/pkg/database/mysql
 go test ./internal/apiserver/application/transaction
-go test ./internal/apiserver/container/assembler
+go test ./internal/apiserver/container/modules/...
 go test ./internal/apiserver/infra/mysql/...
 ```
 

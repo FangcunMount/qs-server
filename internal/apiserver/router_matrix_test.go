@@ -20,7 +20,12 @@ import (
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
+	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
+	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
+	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
+	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
+	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
 	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	restmiddleware "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/middleware"
@@ -301,24 +306,24 @@ func TestRouterProtectedClinicianRoutePassesCapabilityMiddleware(t *testing.T) {
 
 func newRouterTestContainer() *container.Container {
 	clinicianQuery := &routerClinicianQueryStub{}
-	surveyModule := &assembler.SurveyModule{
-		Questionnaire: &assembler.QuestionnaireSubModule{
+	surveyModule := &surveymod.Module{
+		Questionnaire: &surveymod.QuestionnaireSubModule{
 			LifecycleService: questionnaireApp.NewLifecycleService(nil, nil, domainQuestionnaire.Validator{}, domainQuestionnaire.NewLifecycle(), nil),
 			ContentService:   questionnaireApp.NewContentService(nil),
 			QueryService:     questionnaireApp.NewQueryService(nil, nil, nil, nil),
 		},
-		AnswerSheet: &assembler.AnswerSheetSubModule{
+		AnswerSheet: &surveymod.AnswerSheetSubModule{
 			SubmissionService: answerSheetApp.NewSubmissionService(nil, nil, nil, nil, nil),
 			ManagementService: answerSheetApp.NewManagementService(nil, nil),
 		},
 	}
-	scaleModule := &assembler.ScaleModule{
+	scaleModule := &ammod.Scale{
 		LifecycleService: scaleApp.NewLifecycleService(nil, nil, nil, nil),
 		FactorService:    scaleApp.NewFactorService(nil, nil, nil),
 		QueryService:     scaleApp.NewQueryService(nil, nil, nil, nil, nil),
 		CategoryService:  scaleApp.NewCategoryService(),
 	}
-	evaluationModule := &assembler.EvaluationModule{
+	evaluationModule := &evalmod.Module{
 		ManagementService:  assessmentApp.NewManagementService(nil, nil, nil, nil),
 		ReportQueryService: assessmentApp.NewReportQueryService(nil),
 		ScoreQueryService:  assessmentApp.NewScoreQueryService(nil, nil, nil),
@@ -335,17 +340,17 @@ func newRouterTestContainer() *container.Container {
 	return &container.Container{
 		SurveyModule: surveyModule,
 		ScaleModule:  scaleModule,
-		ActorModule: &assembler.ActorModule{
+		ActorModule: &actormod.Module{
 			TesteeQueryService:     &routerTesteeQueryStub{},
 			ClinicianQueryService:  clinicianQuery,
 			AssessmentEntryService: &routerAssessmentEntryServiceStub{},
 		},
 		EvaluationModule: evaluationModule,
-		PlanModule: &assembler.PlanModule{
+		PlanModule: &planmod.Module{
 			CommandService: planApp.NewCommandService(nil, nil, nil, nil, nil, nil),
 			QueryService:   planApp.NewQueryService(nil, nil, nil),
 		},
-		StatisticsModule: &assembler.StatisticsModule{},
+		StatisticsModule: &statmod.Module{},
 	}
 }
 

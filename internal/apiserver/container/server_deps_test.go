@@ -11,8 +11,8 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/assembler"
 	domainoperator "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/operator"
+	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
@@ -24,11 +24,11 @@ func TestContainerBuildServerGRPCBootstrapDeps(t *testing.T) {
 	authzSnapshot := &iaminfra.AuthzSnapshotLoader{}
 
 	c := NewContainer(nil, nil, nil)
-	c.IAMModule = &IAMModule{
-		tokenVerifier:       &iaminfra.TokenVerifier{},
-		authzSnapshotLoader: authzSnapshot,
-	}
-	c.ActorModule = &assembler.ActorModule{
+	c.IAMModule = iammod.NewTestModule(iammod.TestModuleOptions{
+		TokenVerifier:       &iaminfra.TokenVerifier{},
+		AuthzSnapshotLoader: authzSnapshot,
+	})
+	c.ActorModule = &ActorModule{
 		OperatorRoleProjectionUpdater: roleUpdater,
 	}
 
@@ -57,15 +57,15 @@ func TestContainerBuildServerRuntimeDeps(t *testing.T) {
 	answerSheetRelay := &outboxRelayStub{}
 	assessmentRelay := &outboxRelayStub{}
 
-	c.PlanModule = &assembler.PlanModule{CommandService: planCommand}
-	c.StatisticsModule = &assembler.StatisticsModule{
+	c.PlanModule = &PlanModule{CommandService: planCommand}
+	c.StatisticsModule = &StatisticsModule{
 		SyncService:              statsSync,
 		BehaviorProjectorService: behaviorProjector,
 	}
-	c.SurveyModule = &assembler.SurveyModule{
-		AnswerSheet: &assembler.AnswerSheetSubModule{SubmittedEventRelay: answerSheetRelay},
+	c.SurveyModule = &SurveyModule{
+		AnswerSheet: &AnswerSheetSubModule{SubmittedEventRelay: answerSheetRelay},
 	}
-	c.EvaluationModule = &assembler.EvaluationModule{AssessmentOutboxRelay: assessmentRelay}
+	c.EvaluationModule = &EvaluationModule{AssessmentOutboxRelay: assessmentRelay}
 
 	deps := c.BuildServerRuntimeDeps()
 	if deps.LockBuilder != c.CacheBuilder(cacheplane.FamilyLock) {

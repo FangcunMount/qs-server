@@ -11,7 +11,7 @@
 | 模块定位 | Backpressure 是**下游依赖保护**，限制同时进入 MySQL/Mongo/IAM 的 in-flight 操作数 |
 | Primitive | `backpressure.Limiter` 包装 component-base backpressure limiter |
 | 接入依赖 | apiserver 当前显式构建 MySQL、Mongo、IAM 三类 limiter |
-| 注入方式 | `process.resource_bootstrap` 构建 `container.BackpressureOptions`，container/assembler 显式传入 repository/client |
+| 注入方式 | `process.resource_bootstrap` 构建 `container.BackpressureOptions`，container/modules 显式传入 repository/client |
 | MySQL 接入 | `internal/pkg/database/mysql.BaseRepository` 的 CRUD helper 执行前 acquire |
 | Mongo 接入 | `internal/apiserver/infra/mongo.BaseRepository` 的 collection 操作执行前 acquire |
 | IAM 接入 | `ProfileLinkService` 等 IAM SDK 调用前 acquire |

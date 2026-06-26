@@ -15,7 +15,7 @@
 | 补充模块 | `actor` 提供参与者与访问上下文，`plan` 提供计划和任务编排，`statistics` 提供读侧统计与行为投影 |
 | 运行时边界 | 六个模块不是六个微服务，当前都装配在 `qs-apiserver` 的业务容器内 |
 | 阅读顺序 | 第一次读按 `survey → scale → evaluation → actor → plan → statistics`；排障或改造时按问题进入对应模块 |
-| 真值来源 | 以 `internal/apiserver/domain`、`application`、`container/assembler`、REST/OpenAPI、gRPC proto、`configs/events.yaml` 为准 |
+| 真值来源 | 以 `internal/apiserver/domain`、`application`、`container/modules`、REST/OpenAPI、gRPC proto、`configs/events.yaml` 为准 |
 | 不在这里展开 | 三进程调用、MQ 消费、outbox relay、IAM 拦截器、Redis runtime、部署端口、完整接口清单 |
 
 一句话概括：**这一组文档讲“业务能力如何建模”，不是讲“进程如何运行”。**
@@ -296,7 +296,7 @@ survey → scale → evaluation → actor → plan → statistics
 | 类型 | 锚点 |
 | ---- | ---- |
 | apiserver 容器 | [`internal/apiserver/container/`](../../internal/apiserver/container/) |
-| 模块 assembler | [`internal/apiserver/container/assembler/`](../../internal/apiserver/container/assembler/) |
+| 模块装配 | [`internal/apiserver/container/modules/`](../../internal/apiserver/container/modules/) |
 | 领域层 | [`internal/apiserver/domain/`](../../internal/apiserver/domain/) |
 | 应用层 | [`internal/apiserver/application/`](../../internal/apiserver/application/) |
 | 基础设施层 | [`internal/apiserver/infra/`](../../internal/apiserver/infra/) |

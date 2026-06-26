@@ -1,6 +1,8 @@
-# ModuleGraph 与 PostWire 边界
+# ModuleGraph 与 PostWire 边界（历史）
 
-**本文回答**：apiserver 为什么保留 `moduleGraph` / post-wire hook；哪些依赖应构造期注入，哪些依赖可以 late-bound；当前 hooks 为什么很多已经退化成显式阶段标记；后续如何避免滥用 post-wire。
+> **2026-06 更新**：`module_graph.go` 与空 post-wire hook 已删除；跨模块依赖一律通过 constructor deps、`module_init.go` 与 `modules/*/wire.go` 编排。本文保留设计约束说明。
+
+**本文回答**：apiserver 历史上为何保留 `moduleGraph` / post-wire hook；哪些依赖应构造期注入；为何不应滥用 post-wire。
 
 ---
 

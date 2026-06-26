@@ -1058,14 +1058,14 @@ Worker
 
 ### Scale
 
-- `internal/apiserver/container/assembler/scale.go`
+- `internal/apiserver/container/modules/assessmentmodel/assemble_scale.go`
 - `internal/apiserver/application/scale`
 - `internal/apiserver/domain/assessmentmodel/scale/definition`
 - `docs/02-业务模块/scale/README.md`
 
 ### Evaluation
 
-- `internal/apiserver/container/assembler/evaluation.go`
+- `internal/apiserver/container/modules/evaluation/assemble.go`
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
 - `docs/02-业务模块/evaluation/README.md`

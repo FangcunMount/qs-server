@@ -1053,7 +1053,7 @@ Survey / Interpretation Model / Concrete Models / Evaluation
 
 ### Survey
 
-- `internal/apiserver/container/assembler/survey.go`
+- `internal/apiserver/container/modules/survey/assemble.go`
 - `internal/apiserver/application/survey/questionnaire`
 - `internal/apiserver/application/survey/answersheet`
 - `internal/apiserver/domain/survey/questionnaire`
@@ -1061,7 +1061,7 @@ Survey / Interpretation Model / Concrete Models / Evaluation
 
 ### Scale
 
-- `internal/apiserver/container/assembler/scale.go`
+- `internal/apiserver/container/modules/assessmentmodel/assemble_scale.go`
 - `internal/apiserver/application/scale`
 - `internal/apiserver/domain/assessmentmodel/scale/definition`
 
@@ -1074,7 +1074,7 @@ Survey / Interpretation Model / Concrete Models / Evaluation
 
 ### Evaluation
 
-- `internal/apiserver/container/assembler/evaluation.go`
+- `internal/apiserver/container/modules/evaluation/assemble.go`
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
 - `docs/02-业务模块/evaluation/README.md`
@@ -1093,7 +1093,7 @@ Survey / Interpretation Model / Concrete Models / Evaluation
 ## 20. Verify
 
 ```bash
-go test ./internal/apiserver/container/assembler
+go test ./internal/apiserver/container/modules/...
 go test ./internal/apiserver/application/survey/...
 go test ./internal/apiserver/application/scale/...
 go test ./internal/apiserver/application/evaluation/...
