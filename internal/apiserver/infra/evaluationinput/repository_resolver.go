@@ -11,6 +11,7 @@ import (
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
@@ -96,9 +97,9 @@ func newResolver(
 
 func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	modelRef := normalizeModelRef(ref)
-	provider, err := r.providers.Resolve(modelRef.Kind)
+	provider, err := r.providers.Resolve(modelRef.EvaluatorKey())
 	if err != nil {
-		err := fmt.Errorf("unsupported evaluation model kind: %s", modelRef.Kind)
+		err := fmt.Errorf("unsupported evaluation model key: %s", modelRef.EvaluatorKey())
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}
 	ref.ModelRef = modelRef
@@ -134,16 +135,16 @@ func (r *RepositoryResolver) FindMBTIModelByQuestionnaire(ctx context.Context, c
 }
 
 type ModelInputProvider interface {
-	Kind() port.EvaluationModelKind
+	EvaluatorKey() evaldomain.EvaluatorKey
 	ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error)
 }
 
 type ModelInputProviderRegistry struct {
-	items map[port.EvaluationModelKind]ModelInputProvider
+	items map[evaldomain.EvaluatorKey]ModelInputProvider
 }
 
 func NewModelInputProviderRegistry(providers ...ModelInputProvider) (*ModelInputProviderRegistry, error) {
-	registry := &ModelInputProviderRegistry{items: make(map[port.EvaluationModelKind]ModelInputProvider)}
+	registry := &ModelInputProviderRegistry{items: make(map[evaldomain.EvaluatorKey]ModelInputProvider)}
 	for _, provider := range providers {
 		if err := registry.Register(provider); err != nil {
 			return nil, err
@@ -156,24 +157,24 @@ func (r *ModelInputProviderRegistry) Register(provider ModelInputProvider) error
 	if provider == nil {
 		return fmt.Errorf("evaluation input provider is nil")
 	}
-	kind := provider.Kind()
-	if kind == "" {
-		return fmt.Errorf("evaluation input provider kind is empty")
+	key := provider.EvaluatorKey()
+	if key.IsZero() {
+		return fmt.Errorf("evaluation input provider key is empty")
 	}
-	if _, exists := r.items[kind]; exists {
-		return fmt.Errorf("evaluation input provider already registered for kind %s", kind)
+	if _, exists := r.items[key]; exists {
+		return fmt.Errorf("evaluation input provider already registered for key %s", key)
 	}
-	r.items[kind] = provider
+	r.items[key] = provider
 	return nil
 }
 
-func (r *ModelInputProviderRegistry) Resolve(kind port.EvaluationModelKind) (ModelInputProvider, error) {
+func (r *ModelInputProviderRegistry) Resolve(key evaldomain.EvaluatorKey) (ModelInputProvider, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation input provider registry is not configured")
 	}
-	provider, ok := r.items[kind]
+	provider, ok := r.items[key]
 	if !ok {
-		return nil, fmt.Errorf("unsupported evaluation model kind: %s", kind)
+		return nil, fmt.Errorf("unsupported evaluation model key: %s", key)
 	}
 	return provider, nil
 }
@@ -196,8 +197,8 @@ func NewScaleModelInputProvider(
 	}
 }
 
-func (ScaleModelInputProvider) Kind() port.EvaluationModelKind {
-	return port.EvaluationModelKindScale
+func (ScaleModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
+	return evaldomain.EvaluatorKeyScaleDefault
 }
 
 func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

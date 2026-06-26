@@ -44,10 +44,44 @@ func ScaleScoreProjectionFromOutcome(assessmentID ID, outcome *AssessmentOutcome
 	if outcome == nil {
 		return nil
 	}
-	return ScaleScoreProjectionFromEvaluationResult(assessmentID, outcome.ToEvaluationResult())
+
+	var totalScore float64
+	var riskLevel RiskLevel
+	if outcome.Primary != nil {
+		totalScore = outcome.Primary.Value
+	}
+	if outcome.Level != nil && outcome.Level.Code != "" {
+		riskLevel = RiskLevel(outcome.Level.Code)
+	}
+
+	factorScores := factorScoresForScaleProjection(outcome)
+	scaleFactors := make([]ScaleFactorScore, 0, len(factorScores))
+	for _, fs := range factorScores {
+		scaleFactors = append(scaleFactors, NewScaleFactorScore(
+			fs.FactorCode,
+			fs.FactorName,
+			fs.RawScore,
+			fs.RiskLevel,
+			fs.IsTotalScore,
+		))
+	}
+
+	return NewScaleScoreProjection(assessmentID, totalScore, riskLevel, scaleFactors)
+}
+
+func factorScoresForScaleProjection(outcome *AssessmentOutcome) []FactorScoreResult {
+	if scores, ok := outcome.Detail.Payload.([]FactorScoreResult); ok && len(scores) > 0 {
+		return scores
+	}
+	if len(outcome.Dimensions) > 0 {
+		return factorScoreResultsFromDimensions(outcome.Dimensions)
+	}
+	return nil
 }
 
 // ScaleScoreProjectionFromEvaluationResult projects a legacy evaluation result into scale storage.
+//
+// Deprecated: characterization boundary only; persistence should use ScaleScoreProjectionFromOutcome.
 func ScaleScoreProjectionFromEvaluationResult(assessmentID ID, result *EvaluationResult) *ScaleScoreProjection {
 	if result == nil {
 		return nil

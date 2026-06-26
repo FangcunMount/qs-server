@@ -65,7 +65,7 @@ func (GenericEventAssembler) Key() evaluation.EvaluatorKey {
 }
 
 func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
-	if outcome.Assessment == nil || outcome.LegacyResult() == nil {
+	if outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
 	now := time.Now()

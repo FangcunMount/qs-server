@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
@@ -21,15 +22,21 @@ func NewWaiterCompletionNotifier(waiterRegistry evaluationwaiter.Notifier) Compl
 }
 
 func (n waiterCompletionNotifier) NotifyCompletion(ctx context.Context, outcome Outcome) {
-	if n.waiterRegistry == nil || outcome.LegacyResult() == nil || outcome.Assessment == nil {
+	if n.waiterRegistry == nil || outcome.Assessment == nil || outcome.Execution == nil {
 		return
 	}
-	result := outcome.LegacyResult()
 	assessmentID := outcome.Assessment.ID().Uint64()
-	riskLevelStr := string(result.RiskLevel)
+	var totalScore float64
+	if outcome.Execution.Primary != nil {
+		totalScore = outcome.Execution.Primary.Value
+	}
+	riskLevelStr := string(assessment.RiskLevelNone)
+	if outcome.Execution.Level != nil && outcome.Execution.Level.Code != "" {
+		riskLevelStr = outcome.Execution.Level.Code
+	}
 	summary := evaluationwaiter.StatusSummary{
 		Status:     "interpreted",
-		TotalScore: &result.TotalScore,
+		TotalScore: &totalScore,
 		RiskLevel:  &riskLevelStr,
 		UpdatedAt:  time.Now().Unix(),
 	}

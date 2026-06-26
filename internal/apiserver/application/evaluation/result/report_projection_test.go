@@ -31,6 +31,16 @@ func TestModelIdentityFromOutcomeMapsLegacyMBTIToPersonalityTypology(t *testing.
 			},
 		},
 	})
+	outcome.Execution.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindMatchPercent,
+		Value: 40,
+		Label: "INTJ",
+	}
+	outcome.Execution.Level = &assessment.OutcomeResultLevel{
+		Code:     "INTJ",
+		Label:    "INTJ",
+		Severity: "none",
+	}
 	identity := modelIdentityFromOutcome(outcome)
 	if identity.Kind != "personality" || identity.SubKind != "typology" || identity.Algorithm != "mbti" {
 		t.Fatalf("identity = %#v", identity)

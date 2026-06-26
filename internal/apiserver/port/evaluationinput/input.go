@@ -188,7 +188,7 @@ type SBTIModelPayload struct {
 }
 
 func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindSBTIMigration
+	return EvaluationModelKindPersonality
 }
 
 func SBTIPayload(input *InputSnapshot) (*typology.SBTILegacyModel, bool) {
@@ -217,7 +217,7 @@ type MBTIModelPayload struct {
 }
 
 func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {
-	return EvaluationModelKindMBTIMigration
+	return EvaluationModelKindPersonality
 }
 
 func MBTIPayload(input *InputSnapshot) (*typology.MBTILegacyModel, bool) {

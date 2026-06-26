@@ -14,8 +14,9 @@ func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) 
 		subKind, algorithm := ref.SubKind(), ref.Algorithm()
 		if algorithm == "" {
 			if _, mappedSubKind, mappedAlgorithm, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(ref.Kind())); ok {
-				_ = mappedSubKind
-				subKind = mappedSubKind
+				if subKind == "" {
+					subKind = mappedSubKind
+				}
 				algorithm = mappedAlgorithm
 			}
 		}

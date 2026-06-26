@@ -5,7 +5,7 @@ import (
 )
 
 // legacyResultForPersistence projects the canonical outcome into the legacy write model.
-// Keep this as the single persistence boundary until ApplyEvaluation accepts AssessmentOutcome.
+// This is the single application-layer boundary for ToEvaluationResult until characterization migrates off LegacyResult().
 func legacyResultForPersistence(outcome Outcome) *assessment.EvaluationResult {
 	if outcome.Execution == nil {
 		return nil

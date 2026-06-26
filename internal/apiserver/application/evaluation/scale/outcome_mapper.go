@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ToAssessmentOutcome maps a scale interpretation result into the canonical domain outcome.
@@ -12,16 +13,67 @@ func ToAssessmentOutcome(
 	a *assessment.Assessment,
 	snapshot *evaluationinput.InputSnapshot,
 ) *assessment.AssessmentOutcome {
-	legacy := DefaultResultMapper{}.ToEvaluationResult(result, a, snapshot)
-	if legacy == nil {
+	if result == nil {
 		return nil
 	}
-	outcome := assessment.AssessmentOutcomeFromEvaluationResult(legacy)
-	if outcome == nil {
-		return nil
+	factorScores := factorScoreResultsFromInterpretation(result)
+	level := string(result.RiskLevel)
+	summaryScore := result.TotalScore
+	outcome := assessment.NewAssessmentOutcome(
+		scaleModelRef(a, snapshot),
+		assessment.ResultSummary{
+			PrimaryLabel: level,
+			Score:        &summaryScore,
+			Level:        &level,
+		},
+		assessment.EvaluationDetail{
+			Kind:    assessment.EvaluationModelKindScale,
+			Payload: factorScores,
+		},
+	)
+	outcome.Primary = &assessment.OutcomeScoreValue{
+		Kind:  assessment.OutcomeScoreKindRawTotal,
+		Value: result.TotalScore,
 	}
-	outcome.Dimensions = assessmentDimensionResultsFromFactorScores(legacy.FactorScores)
+	if result.RiskLevel != "" {
+		outcome.Level = &assessment.OutcomeResultLevel{
+			Code:  string(result.RiskLevel),
+			Label: string(result.RiskLevel),
+		}
+	}
+	outcome.Dimensions = assessmentDimensionResultsFromFactorScores(factorScores)
 	return outcome
+}
+
+func scaleModelRef(a *assessment.Assessment, snapshot *evaluationinput.InputSnapshot) assessment.EvaluationModelRef {
+	if a != nil && a.EvaluationModelRef() != nil {
+		return *a.EvaluationModelRef()
+	}
+	if snapshot != nil && snapshot.Model != nil {
+		return assessment.NewEvaluationModelRefByCode(
+			assessment.EvaluationModelKind(snapshot.Model.Kind),
+			meta.NewCode(snapshot.Model.Code),
+			snapshot.Model.Version,
+			snapshot.Model.Title,
+		)
+	}
+	return assessment.EvaluationModelRef{}
+}
+
+func factorScoreResultsFromInterpretation(result *evaluationscale.ScaleInterpretationResult) []assessment.FactorScoreResult {
+	factorScores := make([]assessment.FactorScoreResult, 0, len(result.FactorScores))
+	for _, fs := range result.FactorScores {
+		factorScores = append(factorScores, assessment.NewFactorScoreResult(
+			assessment.NewFactorCode(fs.FactorCode),
+			fs.FactorName,
+			fs.RawScore,
+			assessment.RiskLevel(fs.RiskLevel),
+			fs.Conclusion,
+			fs.Suggestion,
+			fs.IsTotalScore,
+		))
+	}
+	return factorScores
 }
 
 func assessmentDimensionResultsFromFactorScores(scores []assessment.FactorScoreResult) []assessment.DimensionResult {

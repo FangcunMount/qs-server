@@ -13,8 +13,8 @@ import (
 )
 
 var (
-	errAssessmentRequired       = fmt.Errorf("assessment is required")
-	errEvaluationResultRequired = fmt.Errorf("evaluation result is required")
+	errAssessmentRequired        = fmt.Errorf("assessment is required")
+	errEvaluationOutcomeRequired = fmt.Errorf("evaluation outcome is required")
 )
 
 type ReportBuilder struct{}
@@ -71,19 +71,13 @@ func resolveTypologyAlgorithm(outcome evaluationresult.Outcome) assessmentmodel.
 	if outcome.Execution != nil && outcome.Execution.ModelRef.Algorithm() != "" {
 		return outcome.Execution.ModelRef.Algorithm()
 	}
-	result := outcome.LegacyResult()
-	if result == nil {
-		return assessmentmodel.AlgorithmMBTI
+	if outcome.Execution != nil {
+		switch outcome.Execution.Detail.Payload.(type) {
+		case evaluationtypology.SBTIResultDetail, *evaluationtypology.SBTIResultDetail:
+			return assessmentmodel.AlgorithmSBTI
+		}
 	}
-	if result.ModelRef.Algorithm() != "" {
-		return result.ModelRef.Algorithm()
-	}
-	switch result.Detail.Payload.(type) {
-	case evaluationtypology.SBTIResultDetail, *evaluationtypology.SBTIResultDetail:
-		return assessmentmodel.AlgorithmSBTI
-	default:
-		return assessmentmodel.AlgorithmMBTI
-	}
+	return assessmentmodel.AlgorithmMBTI
 }
 
 func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {

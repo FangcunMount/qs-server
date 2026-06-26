@@ -21,7 +21,7 @@ Evaluation 如何识别要使用哪种解释模型？
 Evaluation 如何根据 ModelRef 找到对应 Provider？
 Provider 如何加载模型规则上下文？
 Provider 如何执行解释逻辑？
-不同模型如何返回统一的 EvaluationResult？
+不同模型如何返回统一的 AssessmentOutcome（经 EvaluatorKey 路由）？
 新增模型时如何避免修改 Evaluation 主流程？
 ```
 
@@ -35,7 +35,8 @@ Provider
 Context
 Registry
 EvaluationInput
-EvaluationResult
+AssessmentOutcome
+EvaluatorKey
 ```
 
 MedicalScale / ScaleProvider 是当前最重要的示例，但不是抽象本身。

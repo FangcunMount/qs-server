@@ -9,6 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -239,21 +240,28 @@ func TestQuestionnaireSnapshotReaderExactVersionMissCarriesFailureReason(t *test
 }
 
 func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) {
-	if _, err := NewModelInputProviderRegistry(fakeInputProvider{kind: port.EvaluationModelKindScale}, fakeInputProvider{kind: port.EvaluationModelKindScale}); err == nil {
-		t.Fatal("expected duplicate provider kind error")
+	if _, err := NewModelInputProviderRegistry(
+		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+	); err == nil {
+		t.Fatal("expected duplicate provider key error")
 	}
-	registry, err := NewModelInputProviderRegistry(fakeInputProvider{kind: port.EvaluationModelKindScale})
+	registry, err := NewModelInputProviderRegistry(fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault})
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(port.EvaluationModelKindPersonality); err == nil {
-		t.Fatal("expected unknown provider kind error")
+	if _, err := registry.Resolve(evaldomain.EvaluatorKeyMBTI); err == nil {
+		t.Fatal("expected unknown provider key error")
 	}
 }
 
 func TestNewResolverReturnsProviderRegistryError(t *testing.T) {
-	if _, err := NewResolver(&scaleCatalogStub{}, fakeInputProvider{kind: port.EvaluationModelKindScale}, fakeInputProvider{kind: port.EvaluationModelKindScale}); err == nil {
-		t.Fatal("NewResolver error = nil, want duplicate provider kind error")
+	if _, err := NewResolver(
+		&scaleCatalogStub{},
+		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+	); err == nil {
+		t.Fatal("NewResolver error = nil, want duplicate provider key error")
 	}
 	if _, err := NewResolver(&scaleCatalogStub{}, nil); err == nil {
 		t.Fatal("NewResolver error = nil, want nil provider error")
@@ -281,11 +289,11 @@ func TestRepositoryResolverUnsupportedRuleSetKindCarriesFailureKind(t *testing.T
 }
 
 type fakeInputProvider struct {
-	kind port.EvaluationModelKind
+	key evaldomain.EvaluatorKey
 }
 
-func (p fakeInputProvider) Kind() port.EvaluationModelKind {
-	return p.kind
+func (p fakeInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
+	return p.key
 }
 
 func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.InputSnapshot, error) {

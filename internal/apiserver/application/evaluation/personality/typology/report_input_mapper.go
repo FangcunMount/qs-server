@@ -2,6 +2,7 @@ package typology
 
 import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality/typology"
@@ -11,23 +12,18 @@ func MBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypolog
 	if outcome.Assessment == nil {
 		return reporttypology.MBTIReportInput{}, errAssessmentRequired
 	}
-	result := outcome.LegacyResult()
-	if result == nil {
-		return reporttypology.MBTIReportInput{}, errEvaluationResultRequired
+	if outcome.Execution == nil {
+		return reporttypology.MBTIReportInput{}, errEvaluationOutcomeRequired
 	}
-	detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail.Payload)
+	detail, err := evaluationtypology.MBTIResultDetailFromPayload(outcome.Execution.Detail.Payload)
 	if err != nil {
 		return reporttypology.MBTIReportInput{}, err
 	}
-	modelCode := ""
-	if !result.ModelRef.Code().IsEmpty() {
-		modelCode = result.ModelRef.Code().String()
-	}
 	return reporttypology.MBTIReportInput{
 		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
-		ModelCode:    modelCode,
-		TotalScore:   result.TotalScore,
-		RiskLevel:    domainReport.RiskLevel(result.RiskLevel),
+		ModelCode:    typologyModelCode(outcome),
+		TotalScore:   typologyTotalScore(outcome.Execution),
+		RiskLevel:    typologyRiskLevel(outcome.Execution),
 		Detail:       mbtiReportDetail(detail),
 	}, nil
 }
@@ -36,25 +32,41 @@ func SBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypolog
 	if outcome.Assessment == nil {
 		return reporttypology.SBTIReportInput{}, errAssessmentRequired
 	}
-	result := outcome.LegacyResult()
-	if result == nil {
-		return reporttypology.SBTIReportInput{}, errEvaluationResultRequired
+	if outcome.Execution == nil {
+		return reporttypology.SBTIReportInput{}, errEvaluationOutcomeRequired
 	}
-	detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail.Payload)
+	detail, err := evaluationtypology.SBTIResultDetailFromPayload(outcome.Execution.Detail.Payload)
 	if err != nil {
 		return reporttypology.SBTIReportInput{}, err
 	}
-	modelCode := ""
-	if !result.ModelRef.Code().IsEmpty() {
-		modelCode = result.ModelRef.Code().String()
-	}
 	return reporttypology.SBTIReportInput{
 		AssessmentID: domainReport.ID(outcome.Assessment.ID()),
-		ModelCode:    modelCode,
-		TotalScore:   result.TotalScore,
-		RiskLevel:    domainReport.RiskLevel(result.RiskLevel),
+		ModelCode:    typologyModelCode(outcome),
+		TotalScore:   typologyTotalScore(outcome.Execution),
+		RiskLevel:    typologyRiskLevel(outcome.Execution),
 		Detail:       sbtiReportDetail(detail),
 	}, nil
+}
+
+func typologyModelCode(outcome evaluationresult.Outcome) string {
+	if outcome.Execution != nil && !outcome.Execution.ModelRef.Code().IsEmpty() {
+		return outcome.Execution.ModelRef.Code().String()
+	}
+	return ""
+}
+
+func typologyTotalScore(execution *assessment.AssessmentOutcome) float64 {
+	if execution == nil || execution.Primary == nil {
+		return 0
+	}
+	return execution.Primary.Value
+}
+
+func typologyRiskLevel(execution *assessment.AssessmentOutcome) domainReport.RiskLevel {
+	if execution == nil || execution.Level == nil {
+		return domainReport.RiskLevelNone
+	}
+	return domainReport.RiskLevel(execution.Level.Code)
 }
 
 func mbtiReportDetail(detail evaluationtypology.MBTIResultDetail) reporttypology.MBTIReportDetail {

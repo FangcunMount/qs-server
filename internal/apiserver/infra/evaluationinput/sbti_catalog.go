@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -155,8 +156,8 @@ func NewSBTIModelInputProvider(
 	}
 }
 
-func (SBTIModelInputProvider) Kind() port.EvaluationModelKind {
-	return port.EvaluationModelKindSBTIMigration
+func (SBTIModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
+	return evaldomain.EvaluatorKeySBTI
 }
 
 func (p SBTIModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

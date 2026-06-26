@@ -136,8 +136,10 @@ func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
 	}
 }
 
-func TestBuildCreateRequestMapsLegacyKindToTypologyIdentity(t *testing.T) {
-	kind := assessmentmodel.KindMBTIMigration.String()
+func TestBuildCreateRequestMapsExplicitTypologyIdentity(t *testing.T) {
+	kind := domainAssessment.EvaluationModelKindPersonality.String()
+	subKind := string(assessmentmodel.SubKindTypology)
+	algorithm := string(assessmentmodel.AlgorithmMBTI)
 	code := "MBTI_OEJTS"
 	req, err := assessmentCreateRequestAssembler{}.Assemble(CreateAssessmentDTO{
 		OrgID:                1,
@@ -146,6 +148,8 @@ func TestBuildCreateRequestMapsLegacyKindToTypologyIdentity(t *testing.T) {
 		QuestionnaireVersion: "1.0.0",
 		AnswerSheetID:        3001,
 		ModelKind:            &kind,
+		ModelSubKind:         &subKind,
+		ModelAlgorithm:       &algorithm,
 		ModelCode:            &code,
 	})
 	if err != nil {

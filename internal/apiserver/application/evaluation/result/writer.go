@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
@@ -104,7 +103,7 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 		}
 	}
 
-	if err := outcome.Assessment.ApplyEvaluation(legacyResultForPersistence(outcome)); err != nil {
+	if err := outcome.Assessment.ApplyOutcome(outcome.Execution); err != nil {
 		l.Errorw("Failed to apply evaluation result",
 			"assessment_id", outcome.Assessment.ID().Uint64(),
 			"error", err)
@@ -172,12 +171,11 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 	if modelRef == nil || modelRef.IsEmpty() {
 		return assessment.ErrNoEvaluationModel
 	}
-	result := legacyResultForPersistence(outcome)
-	if result.ModelRef.IsEmpty() {
-		result.WithModelRef(*modelRef)
+	if outcome.Execution.ModelRef.IsEmpty() {
+		outcome.Execution.ModelRef = *modelRef
 		return nil
 	}
-	if !modelRef.SameIdentity(result.ModelRef) {
+	if !modelRef.SameIdentity(outcome.Execution.ModelRef) {
 		return assessment.ErrEvaluationModelMismatch
 	}
 	return nil
@@ -187,16 +185,11 @@ func resolveOutcomeKey(outcome Outcome) evaluation.EvaluatorKey {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		return outcome.Execution.ModelRef.EvaluatorKey()
 	}
-	if result := outcome.LegacyResult(); result != nil && !result.ModelRef.IsEmpty() {
-		return result.ModelRef.EvaluatorKey()
-	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
 		return outcome.Assessment.EvaluationModelRef().EvaluatorKey()
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
-		if key, ok := evaluation.EvaluatorKeyFromLegacyKind(assessmentmodel.Kind(outcome.Input.Model.Kind)); ok {
-			return key
-		}
+		return outcome.Input.Model.ModelRef().EvaluatorKey()
 	}
 	return evaluation.EvaluatorKey{}
 }

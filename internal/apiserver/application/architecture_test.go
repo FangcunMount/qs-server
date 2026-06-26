@@ -704,9 +704,9 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 	}
 	allowedRelPrefixes := []string{
 		"internal/apiserver/characterization/",
-		"internal/apiserver/application/evaluation/scale/result_mapper.go",
 		"internal/apiserver/application/evaluation/scale/outcome_mapper.go",
 		"internal/apiserver/application/evaluation/result/legacy_projection.go",
+		"internal/apiserver/application/evaluation/result/types.go",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -762,5 +762,155 @@ func TestApplicationEvaluationExecuteDoesNotExposeFlatKindRouting(t *testing.T) 
 	})
 	if err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowedRelFiles := map[string]struct{}{
+		"internal/apiserver/application/evaluation/result/legacy_projection.go": {},
+		"internal/apiserver/application/evaluation/result/types.go":               {},
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if _, ok := allowedRelFiles[rel]; ok {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "LegacyResult()") {
+			t.Fatalf("%s contains LegacyResult(); legacy projection must stay in boundary files only", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApplicationEvaluationToEvaluationResultIsBoundaryOnly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowedRelFiles := map[string]struct{}{
+		"internal/apiserver/application/evaluation/result/legacy_projection.go": {},
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if _, ok := allowedRelFiles[rel]; ok {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "ToEvaluationResult()") {
+			t.Fatalf("%s contains ToEvaluationResult(); legacy projection must stay in boundary files only", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApplicationEvaluationAssessmentOutcomeFromEvaluationResultIsBoundaryOnly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	allowedRelFiles := map[string]struct{}{
+		"internal/apiserver/application/evaluation/result/types.go": {},
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		if _, ok := allowedRelFiles[rel]; ok {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), "AssessmentOutcomeFromEvaluationResult(") {
+			t.Fatalf("%s contains AssessmentOutcomeFromEvaluationResult(); adapter must stay in boundary files only", rel)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestApplicationEvaluationDoesNotCallApplyEvaluation(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		if strings.Contains(string(data), ".ApplyEvaluation(") {
+			t.Fatalf("%s calls ApplyEvaluation; application must use ApplyOutcome via writer", filepath.ToSlash(mustRel(t, root, path)))
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestEvaluationInputPortTypologySnapshotsUseV2Kind(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "port", "evaluationinput", "input.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "Kind:      EvaluationModelKindPersonality") {
+		t.Fatal("port/evaluationinput typology snapshots must set Kind=personality")
+	}
+	for _, want := range []string{
+		"func (TypologyModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
+		"func (SBTIModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
+		"func (MBTIModelPayload) RuleSetKind() EvaluationModelKind {\n\treturn EvaluationModelKindPersonality",
+	} {
+		if !strings.Contains(text, want) {
+			t.Fatalf("port/evaluationinput missing v2 RuleSetKind: %q", want)
+		}
 	}
 }

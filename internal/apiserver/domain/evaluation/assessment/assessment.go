@@ -256,36 +256,53 @@ func (a *Assessment) Submit() error {
 	return nil
 }
 
-// ApplyEvaluation 应用评估结果
-// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型
-// 后置条件：状态变为 interpreted，记录评估结果
-//
-// 注意：assessment.interpreted 的可靠出站绑定在报告成功落库的 Mongo 边界，
-// 因此这里不直接添加领域事件。
-func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
+// ApplyOutcome 应用 canonical 评估结果。
+// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型。
+func (a *Assessment) ApplyOutcome(outcome *AssessmentOutcome) error {
 	if !a.status.IsSubmitted() {
 		return NewInvalidStatusError("apply evaluation", a.status)
 	}
 	if !a.HasEvaluationModel() {
 		return ErrNoEvaluationModel
 	}
-	if result == nil {
+	if outcome == nil {
 		return ErrInvalidArgument
 	}
-	if result.ModelRef.IsEmpty() {
-		result.WithModelRef(*a.modelRef)
-	} else if !a.modelRef.SameIdentity(result.ModelRef) {
+	modelRef := outcome.ModelRef
+	if modelRef.IsEmpty() {
+		modelRef = *a.modelRef
+		outcome.ModelRef = modelRef
+	} else if !a.modelRef.SameIdentity(modelRef) {
 		return ErrEvaluationModelMismatch
 	}
 
 	now := time.Now()
-	a.totalScore = &result.TotalScore
-	a.riskLevel = &result.RiskLevel
-	a.summary = &result.Summary
+	if outcome.Primary != nil {
+		score := outcome.Primary.Value
+		a.totalScore = &score
+	}
+	if outcome.Level != nil && outcome.Level.Code != "" {
+		risk := RiskLevel(outcome.Level.Code)
+		a.riskLevel = &risk
+	}
+	summary := outcome.Summary
+	a.summary = &summary
 	a.status = StatusInterpreted
 	a.interpretedAt = &now
 
 	return nil
+}
+
+// ApplyEvaluation 应用评估结果
+// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型
+// 后置条件：状态变为 interpreted，记录评估结果
+//
+// Deprecated: Use ApplyOutcome. Retained for lifecycle/infra tests and legacy adapters.
+//
+// 注意：assessment.interpreted 的可靠出站绑定在报告成功落库的 Mongo 边界，
+// 因此这里不直接添加领域事件。
+func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
+	return a.ApplyOutcome(AssessmentOutcomeFromEvaluationResult(result))
 }
 
 // MarkAsFailed 标记评估失败

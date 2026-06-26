@@ -12,7 +12,21 @@
 
 Evaluation 的核心定位是：
 
-> **Evaluation 是通用测评执行引擎，负责一次 Assessment 的生命周期管理、模型执行编排、结果保存、报告生成、失败重试和事件出站。**
+> **Evaluation 是通用测评执行引擎，负责一次 Assessment 的生命周期管理、按 EvaluatorKey 路由模型执行、保存 AssessmentOutcome、报告生成、失败重试和事件出站。**
+
+写路径主模型为 **AssessmentOutcome**（含 `Primary` / `Level` / `Dimensions`）；**EvaluationResult** 仅作为聚合持久化边界上的 legacy 投影，不再作为 application 层编排主模型。
+
+### Round 2 边界（legacy 收口）
+
+```text
+AssessmentOutcome (Execution)
+    ├─► ScaleScoreProjectionFromOutcome（domain 原生，不经 ToEvaluationResult）
+    ├─► Writer.ApplyOutcome + resolveOutcomeKey（ModelRef → EvaluatorKey，无 legacy fallback）
+    └─► legacy_projection.ToEvaluationResult（仅 characterization / LegacyResult 边界）
+
+port/evaluationinput typology snapshot：Kind=personality, SubKind=typology, Algorithm=mbti|sbti
+RuleSetKind() 返回 personality（migration flat kind 仅 codec / 旧 InputRef fallback）
+```
 
 Evaluation 回答这些问题：
 
@@ -68,8 +82,8 @@ flowchart LR
     Eval -->|ModelRef| IM
     IM -->|resolve provider| Scale
     IM -->|resolve provider| MBTI
-    Scale -->|EvaluationResult| Eval
-    MBTI -->|EvaluationResult| Eval
+    Scale -->|AssessmentOutcome| Eval
+    MBTI -->|AssessmentOutcome| Eval
 ```
 
 其中：
@@ -134,7 +148,8 @@ Assessment              一次测评执行聚合根
 AssessmentStatus        测评状态
 EvaluationRun           一次执行尝试记录
 EvaluationInput         执行输入
-EvaluationResult        执行结果
+AssessmentOutcome         模型执行 canonical 结果（Primary / Level / Dimensions）
+EvaluationResult        legacy 持久化投影（边界适配，非 application 主模型）
 ScoreResult             分数结果
 InterpretationResult    解释结果
 RiskLevelResult         风险等级命中结果
@@ -147,7 +162,7 @@ EvaluationEvent         测评事件
 
 一句话概括：
 
-> **Assessment 是一次测评的执行事实；EvaluationRun 记录一次执行尝试；EvaluationResult 记录模型执行产物；InterpretReport 记录最终报告事实。**
+> **Assessment 是一次测评的执行事实；EvaluationRun 记录一次执行尝试；AssessmentOutcome 记录模型执行产物；InterpretReport 记录最终报告事实。**
 
 ---
 

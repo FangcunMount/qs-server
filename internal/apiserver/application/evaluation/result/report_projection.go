@@ -3,16 +3,12 @@ package result
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
 
 func modelIdentityFromOutcome(outcome Outcome) domainreport.ModelIdentity {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		return modelIdentityFromRef(outcome.Execution.ModelRef)
-	}
-	if result := legacyResultForPersistence(outcome); result != nil && !result.ModelRef.IsEmpty() {
-		return modelIdentityFromRef(result.ModelRef)
 	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
 		return modelIdentityFromRef(*outcome.Assessment.EvaluationModelRef())
@@ -50,10 +46,16 @@ func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelI
 }
 
 func primaryScoreFromOutcome(outcome Outcome) *domainreport.ScoreValue {
-	if outcome.Execution != nil && outcome.Execution.Primary != nil {
+	if outcome.Execution == nil {
+		return nil
+	}
+	if outcome.Execution.Primary != nil {
 		return reportScoreFromOutcomeValue(outcome.Execution.Primary)
 	}
-	return primaryScoreFromLegacyResult(legacyResultForPersistence(outcome))
+	if outcome.Execution.Summary.Score != nil {
+		return domainreport.NewMatchPercentScore(*outcome.Execution.Summary.Score, outcome.Execution.Summary.PrimaryLabel)
+	}
+	return nil
 }
 
 func reportScoreFromOutcomeValue(score *assessment.OutcomeScoreValue) *domainreport.ScoreValue {
@@ -73,38 +75,28 @@ func reportScoreFromOutcomeValue(score *assessment.OutcomeScoreValue) *domainrep
 	}
 }
 
-func primaryScoreFromLegacyResult(result *assessment.EvaluationResult) *domainreport.ScoreValue {
-	if result == nil {
+func levelFromOutcome(outcome Outcome) *domainreport.ResultLevel {
+	if outcome.Execution == nil {
 		return nil
 	}
-	switch {
-	case result.ModelRef.IsScale() || result.Detail.Kind == assessment.EvaluationModelKindScale:
-		return domainreport.NewRawTotalScore(result.TotalScore, nil)
-	case result.Detail.Kind == assessment.EvaluationModelKindPersonality:
-		switch result.ModelRef.Algorithm() {
-		case assessmentmodel.AlgorithmSBTI:
-			if result.Summary.Score != nil {
-				return domainreport.NewMatchPercentScore(*result.Summary.Score, result.Summary.PrimaryLabel)
-			}
-			if detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail.Payload); err == nil {
-				return domainreport.NewMatchPercentScore(detail.Similarity*100, detail.TypeCode)
-			}
-		default:
-			if detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail.Payload); err == nil {
-				return domainreport.NewMatchPercentScore(detail.MatchPercent, detail.TypeCode)
-			}
-		}
-	case result.Summary.Score != nil:
-		return domainreport.NewMatchPercentScore(*result.Summary.Score, result.Summary.PrimaryLabel)
-	}
-	return nil
-}
-
-func levelFromOutcome(outcome Outcome) *domainreport.ResultLevel {
-	if outcome.Execution != nil && outcome.Execution.Level != nil {
+	if outcome.Execution.Level != nil {
 		return reportLevelFromOutcomeLevel(outcome.Execution.Level)
 	}
-	return levelFromLegacyResult(legacyResultForPersistence(outcome))
+	if outcome.Execution.Summary.Level != nil {
+		level := domainreport.LevelFromRisk(domainreport.RiskLevel(*outcome.Execution.Summary.Level))
+		if level != nil && outcome.Execution.Summary.PrimaryLabel != "" && outcome.Execution.Summary.PrimaryLabel != level.Code {
+			level.Label = outcome.Execution.Summary.PrimaryLabel
+		}
+		return level
+	}
+	if outcome.Execution.Summary.PrimaryLabel != "" {
+		return &domainreport.ResultLevel{
+			Code:     outcome.Execution.Summary.PrimaryLabel,
+			Label:    outcome.Execution.Summary.PrimaryLabel,
+			Severity: "none",
+		}
+	}
+	return domainreport.LevelFromRisk(domainreport.RiskLevelNone)
 }
 
 func reportLevelFromOutcomeLevel(level *assessment.OutcomeResultLevel) *domainreport.ResultLevel {
@@ -119,30 +111,6 @@ func reportLevelFromOutcomeLevel(level *assessment.OutcomeResultLevel) *domainre
 		Label:    level.Label,
 		Severity: level.Severity,
 	}
-}
-
-func levelFromLegacyResult(result *assessment.EvaluationResult) *domainreport.ResultLevel {
-	if result == nil {
-		return nil
-	}
-	if result.RiskLevel != "" && result.RiskLevel != assessment.RiskLevelNone {
-		return domainreport.LevelFromRisk(domainreport.RiskLevel(result.RiskLevel))
-	}
-	if result.Summary.Level != nil {
-		level := domainreport.LevelFromRisk(domainreport.RiskLevel(*result.Summary.Level))
-		if level != nil && result.Summary.PrimaryLabel != "" && result.Summary.PrimaryLabel != level.Code {
-			level.Label = result.Summary.PrimaryLabel
-		}
-		return level
-	}
-	if result.Summary.PrimaryLabel != "" {
-		return &domainreport.ResultLevel{
-			Code:     result.Summary.PrimaryLabel,
-			Label:    result.Summary.PrimaryLabel,
-			Severity: "none",
-		}
-	}
-	return domainreport.LevelFromRisk(domainreport.RiskLevelNone)
 }
 
 func AttachReportOutcomeSummary(outcome Outcome, report *domainreport.InterpretReport) *domainreport.InterpretReport {

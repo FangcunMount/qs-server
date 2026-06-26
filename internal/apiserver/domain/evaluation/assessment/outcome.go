@@ -84,6 +84,8 @@ func NewAssessmentOutcome(
 }
 
 // AssessmentOutcomeFromEvaluationResult adapts a legacy evaluation result.
+//
+// Deprecated: characterization and ApplyEvaluation adapter only; application write paths must use AssessmentOutcome directly.
 func AssessmentOutcomeFromEvaluationResult(result *EvaluationResult) *AssessmentOutcome {
 	if result == nil {
 		return nil

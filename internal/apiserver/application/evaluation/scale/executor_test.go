@@ -183,8 +183,11 @@ func TestExecutorOrchestratesValidatorAndHandler(t *testing.T) {
 	if !validator.called {
 		t.Fatal("expected validator to be called")
 	}
-	if result.Primary == nil || result.Primary.Value != 1 {
-		t.Fatalf("primary score = %#v, want raw total 1", result.Primary)
+	if result.Primary == nil || result.Primary.Kind != assessment.OutcomeScoreKindRawTotal || result.Primary.Value != 1 {
+		t.Fatalf("primary = %#v, want raw_total 1", result.Primary)
+	}
+	if result.Level == nil || result.Level.Code != string(assessment.RiskLevelLow) {
+		t.Fatalf("level = %#v, want low", result.Level)
 	}
 }
 
@@ -197,6 +200,7 @@ func (s *stubValidator) Validate(input ScaleExecutionInput) error {
 	s.called = true
 	return s.err
 }
+
 type stubScoringRegistry struct{}
 
 func (stubScoringRegistry) ScoreFactor(context.Context, scalesnapshot.FactorSnapshot, []float64) (float64, error) {

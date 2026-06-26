@@ -76,13 +76,6 @@ func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domai
 		}
 		subKind := assessmentmodel.SubKind(strings.TrimSpace(valueOrEmpty(dto.ModelSubKind)))
 		algorithm := assessmentmodel.Algorithm(strings.TrimSpace(valueOrEmpty(dto.ModelAlgorithm)))
-		if subKind == "" && algorithm == "" {
-			if mappedKind, mappedSubKind, mappedAlgorithm, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(kind)); ok {
-				kind = domainAssessment.EvaluationModelKind(mappedKind)
-				subKind = mappedSubKind
-				algorithm = mappedAlgorithm
-			}
-		}
 		modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
 			kind,
 			subKind,

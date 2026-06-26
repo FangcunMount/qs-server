@@ -69,12 +69,23 @@ func scaleReportInputFromOutcome(outcome Outcome) reportscore.ScaleReportInput {
 		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
 	}
 	input.Scale = scaleReportModelFromOutcome(outcome)
-	if result := outcome.LegacyResult(); result != nil {
-		input.TotalScore = result.TotalScore
-		input.RiskLevel = domainReport.RiskLevel(result.RiskLevel)
-		input.Conclusion = result.Conclusion
-		input.Suggestion = result.Suggestion
-		input.FactorScores = scaleFactorReportScores(result.FactorScores)
+	if execution := outcome.Execution; execution != nil {
+		if execution.Primary != nil {
+			input.TotalScore = execution.Primary.Value
+		}
+		if execution.Level != nil {
+			input.RiskLevel = domainReport.RiskLevel(execution.Level.Code)
+		}
+		if scores, ok := execution.Detail.Payload.([]assessment.FactorScoreResult); ok {
+			input.FactorScores = scaleFactorReportScores(scores)
+			for _, fs := range scores {
+				if fs.IsTotalScore {
+					input.Conclusion = fs.Conclusion
+					input.Suggestion = fs.Suggestion
+					break
+				}
+			}
+		}
 	}
 	return input
 }

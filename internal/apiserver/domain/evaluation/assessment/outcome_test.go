@@ -20,10 +20,10 @@ func TestAssessmentOutcomeRoundTripFromEvaluationResult(t *testing.T) {
 			Kind: EvaluationModelKindScale,
 			Payload: []FactorScoreResult{
 				{
-					FactorCode: NewFactorCode("total"),
-					FactorName: "Total",
-					RawScore:   12.5,
-					RiskLevel:  RiskLevelMedium,
+					FactorCode:   NewFactorCode("total"),
+					FactorName:   "Total",
+					RawScore:     12.5,
+					RiskLevel:    RiskLevelMedium,
 					IsTotalScore: true,
 				},
 			},
