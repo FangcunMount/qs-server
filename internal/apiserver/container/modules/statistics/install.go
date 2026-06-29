@@ -31,6 +31,7 @@ func InstallFrom(host InstallHost) error {
 		CacheBuilder:           host.CacheBuilder(cacheplane.FamilyQuery),
 		AnswerSheetReader:      answerSheetReader,
 		AnswerSheetScanSource:  answerSheetScanSource,
+		MongoDB:                host.MongoDB(),
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
 		QueryPolicy:            host.CachePolicy(cachepolicy.PolicyStatsQuery),
 		HotsetRecorder:         host.HotsetRecorder(),

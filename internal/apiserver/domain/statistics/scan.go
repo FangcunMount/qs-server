@@ -9,6 +9,7 @@ const (
 	ScanSourceEntryResolve = "entry_resolve_log"
 	ScanSourceEntryIntake  = "entry_intake_log"
 	ScanSourceAnswerSheet  = "answersheet"
+	ScanSourceAssessment   = "assessment"
 	ScanSourceReport       = "report"
 )
 
@@ -57,6 +58,15 @@ type AnswerSheetSubmittedFact struct {
 	OrgID         int64
 	TesteeID      uint64
 	AnswerSheetID uint64
+	OccurredAt    time.Time
+}
+
+// AssessmentCreatedFact is a scan source row for created assessments.
+type AssessmentCreatedFact struct {
+	OrgID         int64
+	TesteeID      uint64
+	AnswerSheetID uint64
+	AssessmentID  uint64
 	OccurredAt    time.Time
 }
 

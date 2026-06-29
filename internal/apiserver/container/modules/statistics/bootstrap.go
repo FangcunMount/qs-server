@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -24,6 +25,7 @@ type BootstrapInput struct {
 	CacheBuilder          *keyspace.Builder
 	AnswerSheetReader     surveyreadmodel.AnswerSheetReader
 	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
+	MongoDB               *mongo.Database
 	RepairWindowDays      int
 	QueryPolicy           cachepolicy.CachePolicy
 	HotsetRecorder        cachetarget.HotsetRecorder

@@ -153,6 +153,52 @@ func TestSaveAssessmentAndStageEventsFiltersDisabledFootprintEvents(t *testing.T
 	}
 }
 
+func TestSaveAssessmentAndStageEventsFiltersDisabledAssessmentFootprint(t *testing.T) {
+	statisticsApp.InstallFootprintDurableStagingPolicy(
+		statisticsApp.NewFootprintDurableStagingPolicy(statisticsApp.DefaultDisabledHighFrequencyFootprintEvents()),
+	)
+	t.Cleanup(func() { statisticsApp.InstallFootprintDurableStagingPolicy(nil) })
+
+	stager := &footprintEventStager{}
+	a, err := domainAssessment.NewAssessment(
+		1,
+		testee.NewID(618855887087350318),
+		domainAssessment.NewQuestionnaireRefByCode(meta.NewCode("3adyDE"), "7.0.1"),
+		domainAssessment.NewAnswerSheetRef(meta.FromUint64(622776820663595566)),
+		domainAssessment.NewAdhocOrigin(),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment() error = %v", err)
+	}
+
+	occurredAt := time.Date(2026, 6, 6, 16, 11, 53, 0, time.UTC)
+	err = saveAssessmentAndStageEvents(
+		context.Background(),
+		idAssigningRepoStub{},
+		passthroughTxRunner{},
+		stager,
+		a,
+		func(saved *domainAssessment.Assessment) []event.DomainEvent {
+			return []event.DomainEvent{
+				domainStatistics.NewFootprintAssessmentCreatedEvent(
+					1,
+					618855887087350318,
+					622776820663595566,
+					saved.ID().Uint64(),
+					occurredAt,
+				),
+			}
+		},
+		nil,
+	)
+	if err != nil {
+		t.Fatalf("saveAssessmentAndStageEvents() error = %v", err)
+	}
+	if len(stager.events) != 0 {
+		t.Fatalf("staged events = %d, want 0 after footprint filter", len(stager.events))
+	}
+}
+
 func TestSaveAssessmentAndStageEventsKeepsAllowedFootprintEvents(t *testing.T) {
 	statisticsApp.InstallFootprintDurableStagingPolicy(
 		statisticsApp.NewFootprintDurableStagingPolicy([]string{eventcatalog.FootprintReportGenerated}),

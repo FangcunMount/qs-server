@@ -45,40 +45,36 @@ func (r *StatisticsRepository) SaveScanWatermark(ctx context.Context, watermark 
 	}).Create(po).Error
 }
 
-// ListReportGeneratedFacts scans interpreted assessments as report facts.
-func (r *StatisticsRepository) ListReportGeneratedFacts(
+// ListAssessmentCreatedFacts scans created assessments as assessment-created facts.
+func (r *StatisticsRepository) ListAssessmentCreatedFacts(
 	ctx context.Context,
 	orgID int64,
 	sinceID uint64,
 	sinceTime time.Time,
 	limit int,
-) ([]domainStatistics.ReportGeneratedFact, error) {
+) ([]domainStatistics.AssessmentCreatedFact, error) {
 	if limit <= 0 {
 		return nil, nil
 	}
 	query := r.WithContext(ctx).
 		Model(&evaluationInfra.AssessmentPO{}).
-		Select("id, org_id, testee_id, answer_sheet_id, interpreted_at, created_at").
-		Where("org_id = ? AND deleted_at IS NULL AND interpreted_at IS NOT NULL", orgID)
+		Select("id, org_id, testee_id, answer_sheet_id, created_at").
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
 	if !sinceTime.IsZero() {
-		query = query.Where("(id > ? OR interpreted_at > ?)", sinceID, sinceTime)
+		query = query.Where("(id > ? OR created_at > ?)", sinceID, sinceTime)
 	}
 	var rows []evaluationInfra.AssessmentPO
 	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
 		return nil, err
 	}
-	facts := make([]domainStatistics.ReportGeneratedFact, 0, len(rows))
+	facts := make([]domainStatistics.AssessmentCreatedFact, 0, len(rows))
 	for _, row := range rows {
-		occurredAt := row.CreatedAt
-		if row.InterpretedAt != nil {
-			occurredAt = *row.InterpretedAt
-		}
-		facts = append(facts, domainStatistics.ReportGeneratedFact{
-			OrgID:        row.OrgID,
-			TesteeID:     row.TesteeID,
-			AssessmentID: row.ID.Uint64(),
-			ReportID:     row.ID.Uint64(),
-			OccurredAt:   occurredAt,
+		facts = append(facts, domainStatistics.AssessmentCreatedFact{
+			OrgID:         row.OrgID,
+			TesteeID:      row.TesteeID,
+			AnswerSheetID: row.AnswerSheetID,
+			AssessmentID:  row.ID.Uint64(),
+			OccurredAt:    row.CreatedAt,
 		})
 	}
 	return facts, nil

@@ -25,11 +25,15 @@ func (r *Repository) ListSubmittedAnswerSheetFacts(
 		"org_id":     uint64(orgID),
 		"deleted_at": nil,
 	}
-	if !sinceTime.IsZero() {
-		filter["filled_at"] = bson.M{"$gte": sinceTime}
-	}
-	if sinceID > 0 {
-		filter["domain_id"] = bson.M{"$gt": meta.FromUint64(sinceID)}
+	if sinceID > 0 || !sinceTime.IsZero() {
+		or := make([]bson.M, 0, 2)
+		if sinceID > 0 {
+			or = append(or, bson.M{"domain_id": bson.M{"$gt": meta.FromUint64(sinceID)}})
+		}
+		if !sinceTime.IsZero() {
+			or = append(or, bson.M{"filled_at": bson.M{"$gte": sinceTime}})
+		}
+		filter["$or"] = or
 	}
 	cursor, err := r.Collection().Find(ctx, filter, options.Find().
 		SetProjection(bson.M{

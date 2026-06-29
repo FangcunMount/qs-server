@@ -281,6 +281,7 @@ func NewBehaviorJourneyScanOptions() *BehaviorJourneyScanOptions {
 			"entry_resolve_log",
 			"entry_intake_log",
 			"answersheet",
+			"assessment",
 			"report",
 		},
 		WindowRecalc: true,
@@ -319,6 +320,7 @@ func NewBehaviorFootprintOptions() *BehaviorFootprintOptions {
 			"footprint.testee_profile_created",
 			"footprint.care_relationship_established",
 			"footprint.answersheet_submitted",
+			"footprint.assessment_created",
 			"footprint.report_generated",
 		},
 	}

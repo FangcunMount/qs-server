@@ -20,6 +20,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/database/mysql"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 )
 
@@ -43,6 +44,7 @@ type Deps struct {
 	CacheBuilder          *keyspace.Builder
 	AnswerSheetReader     surveyreadmodel.AnswerSheetReader
 	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
+	MongoDB               *mongo.Database
 	RepairWindowDays      int
 	QueryPolicy           cachepolicy.CachePolicy
 	HotsetRecorder        cachetarget.HotsetRecorder
@@ -90,7 +92,12 @@ func New(deps Deps) (*Module, error) {
 	)
 	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(repo)
 	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, repo)
-	module.BehaviorJourneyScanService = statisticsApp.NewBehaviorJourneyScanService(txRunner, repo, normalized.AnswerSheetScanSource)
+	module.BehaviorJourneyScanService = statisticsApp.NewBehaviorJourneyScanService(
+		txRunner,
+		repo,
+		normalized.AnswerSheetScanSource,
+		statisticsCache.NewReportScanSource(normalized.MySQLDB, normalized.MongoDB),
+	)
 	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, repo, normalized.RepairWindowDays, normalized.LockManager)
 
 	return module, nil

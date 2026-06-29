@@ -25,6 +25,7 @@ func DefaultDisabledHighFrequencyFootprintEvents() []string {
 		eventcatalog.FootprintTesteeProfileCreated,
 		eventcatalog.FootprintCareRelationshipEstablished,
 		eventcatalog.FootprintAnswerSheetSubmitted,
+		eventcatalog.FootprintAssessmentCreated,
 		eventcatalog.FootprintReportGenerated,
 	}
 }

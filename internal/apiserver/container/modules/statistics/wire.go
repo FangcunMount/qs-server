@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	redis "github.com/redis/go-redis/v9"
+	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
 )
 
@@ -23,6 +24,7 @@ type WireInput struct {
 	CacheBuilder           *keyspace.Builder
 	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
 	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
+	MongoDB                *mongo.Database
 	RepairWindowDays       int
 	QueryPolicy            cachepolicy.CachePolicy
 	HotsetRecorder         cachetarget.HotsetRecorder
@@ -61,6 +63,7 @@ func Wire(in WireInput) (*Module, error) {
 		CacheBuilder:          in.CacheBuilder,
 		AnswerSheetReader:     in.AnswerSheetReader,
 		AnswerSheetScanSource: in.AnswerSheetScanSource,
+		MongoDB:               in.MongoDB,
 		RepairWindowDays:      in.RepairWindowDays,
 		QueryPolicy:           in.QueryPolicy,
 		HotsetRecorder:        in.HotsetRecorder,

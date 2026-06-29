@@ -335,10 +335,11 @@ behavior_footprint:
     - footprint.testee_profile_created
     - footprint.care_relationship_established
     - footprint.answersheet_submitted
+    - footprint.assessment_created
     - footprint.report_generated
 
 behavior_journey_scan:
-  enable: false
+  enable: true
   org_ids: [1]
   initial_delay: "2m"
   interval: "30m"
@@ -346,12 +347,13 @@ behavior_journey_scan:
   lookback: "2h"
   lock_key: "qs:behavior-journey-scan:leader"
   lock_ttl: "25m"
-  dry_run: false
+  dry_run: true
   window_recalc: true
   sources:
     - entry_resolve_log
     - entry_intake_log
     - answersheet
+    - assessment
     - report
 
 outbox_relay:

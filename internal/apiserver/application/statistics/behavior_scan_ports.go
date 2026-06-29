@@ -54,10 +54,15 @@ type BehaviorJourneyScanRepository interface {
 	BehaviorJourneyRepository
 	LoadScanWatermark(ctx context.Context, orgID int64, sourceName string) (*domainStatistics.ScanWatermark, error)
 	SaveScanWatermark(ctx context.Context, watermark *domainStatistics.ScanWatermark) error
-	ListReportGeneratedFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.ReportGeneratedFact, error)
 	ListEntryResolveFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.EntryResolveFact, error)
 	ListEntryIntakeFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.EntryIntakeFact, error)
+	ListAssessmentCreatedFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.AssessmentCreatedFact, error)
 	RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error
+}
+
+// ReportScanSource lists generated reports from durable stores.
+type ReportScanSource interface {
+	ListReportGeneratedFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.ReportGeneratedFact, error)
 }
 
 // AnswerSheetScanSource lists submitted answer sheets from Mongo.

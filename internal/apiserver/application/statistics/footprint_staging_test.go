@@ -24,6 +24,9 @@ func TestFootprintDurableStagingPolicyDisablesHighFrequencyEvents(t *testing.T) 
 	if FootprintEventAllowed(eventcatalog.FootprintIntakeConfirmed) {
 		t.Fatal("intake_confirmed footprint should be disabled")
 	}
+	if FootprintEventAllowed(eventcatalog.FootprintAssessmentCreated) {
+		t.Fatal("assessment_created footprint should be disabled")
+	}
 }
 
 func TestFilterFootprintStagingEventsRemovesDisabledTypes(t *testing.T) {

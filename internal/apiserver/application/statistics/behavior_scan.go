@@ -12,6 +12,7 @@ type behaviorJourneyScanner struct {
 	uow          transactionRunner
 	repo         BehaviorJourneyScanRepository
 	answerSheets AnswerSheetScanSource
+	reports      ReportScanSource
 	lifecycler   episodeLifecycler
 }
 
@@ -19,11 +20,19 @@ type transactionRunner interface {
 	WithinTransaction(ctx context.Context, fn func(context.Context) error) error
 }
 
+type scanBatchResult struct {
+	scanned      int
+	projected    int
+	lastSeenID   uint64
+	lastSeenTime *time.Time
+}
+
 // NewBehaviorJourneyScanService creates the background scan projector.
 func NewBehaviorJourneyScanService(
 	runner transactionRunner,
 	repo BehaviorJourneyScanRepository,
 	answerSheets AnswerSheetScanSource,
+	reports ReportScanSource,
 ) BehaviorJourneyScanService {
 	if runner == nil || repo == nil {
 		return nil
@@ -33,6 +42,7 @@ func NewBehaviorJourneyScanService(
 		uow:          runner,
 		repo:         repo,
 		answerSheets: answerSheets,
+		reports:      reports,
 		lifecycler:   episodeLifecycler{repo: repo, journey: journey},
 	}
 }
@@ -60,23 +70,28 @@ func (s *behaviorJourneyScanner) ScanDue(ctx context.Context, input BehaviorJour
 			domainStatistics.ScanSourceEntryResolve,
 			domainStatistics.ScanSourceEntryIntake,
 			domainStatistics.ScanSourceAnswerSheet,
+			domainStatistics.ScanSourceAssessment,
 			domainStatistics.ScanSourceReport,
 		}
 	}
-	windowRecalc := input.WindowRecalc
-	s.lifecycler.skipStatisticsMutations = windowRecalc
 
 	for _, orgID := range input.OrgIDs {
 		for _, source := range sources {
-			sourceResult := s.scanSource(ctx, orgID, source, batchSize, lookback, now, input.DryRun)
+			sourceResult := s.scanSource(ctx, orgID, source, batchSize, lookback, now, input.DryRun, input.WindowRecalc)
 			result.SourceResults = append(result.SourceResults, sourceResult)
 		}
-		if windowRecalc && !input.DryRun {
+		if input.WindowRecalc && !input.DryRun {
 			recalcResult := s.recalcJourneyDailyWindow(ctx, orgID, lookback, now)
 			result.RecalcResults = append(result.RecalcResults, recalcResult)
 		}
 	}
 	return result, nil
+}
+
+func (s *behaviorJourneyScanner) lifecyclerForScan(skipStatisticsMutations bool) episodeLifecycler {
+	lc := s.lifecycler
+	lc.skipStatisticsMutations = skipStatisticsMutations
+	return lc
 }
 
 func (s *behaviorJourneyScanner) recalcJourneyDailyWindow(ctx context.Context, orgID int64, lookback time.Duration, now time.Time) BehaviorJourneyScanRecalcResult {
@@ -113,6 +128,7 @@ func (s *behaviorJourneyScanner) scanSource(
 	lookback time.Duration,
 	now time.Time,
 	dryRun bool,
+	windowRecalc bool,
 ) BehaviorJourneyScanSourceResult {
 	result := BehaviorJourneyScanSourceResult{SourceName: source, OrgID: orgID}
 	watermark, err := s.repo.LoadScanWatermark(ctx, orgID, source)
@@ -148,63 +164,36 @@ func (s *behaviorJourneyScanner) scanSource(
 		}
 	}
 
-	var projected int
-	var scanned int
+	var batch scanBatchResult
 	switch source {
 	case domainStatistics.ScanSourceEntryResolve:
-		scanned, projected, err = s.scanEntryResolve(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun)
+		batch, err = s.scanEntryResolve(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun, windowRecalc)
 	case domainStatistics.ScanSourceEntryIntake:
-		scanned, projected, err = s.scanEntryIntake(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun)
+		batch, err = s.scanEntryIntake(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun, windowRecalc)
 	case domainStatistics.ScanSourceAnswerSheet:
-		scanned, projected, err = s.scanAnswerSheets(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun)
+		batch, err = s.scanAnswerSheets(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun, windowRecalc)
+	case domainStatistics.ScanSourceAssessment:
+		batch, err = s.scanAssessments(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun, windowRecalc)
 	case domainStatistics.ScanSourceReport:
-		scanned, projected, err = s.scanReports(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun)
+		batch, err = s.scanReports(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize, dryRun, windowRecalc)
 	default:
 		err = nil
 	}
-	result.Scanned = scanned
-	result.Projected = projected
+	result.Scanned = batch.scanned
+	result.Projected = batch.projected
 	if err != nil {
 		watermark.Status = domainStatistics.ScanWatermarkStatusFailed
 		watermark.LastError = err.Error()
 		result.Error = err.Error()
-		result.Failed = scanned - projected
+		result.Failed = batch.scanned - batch.projected
 		if !dryRun {
 			_ = s.repo.SaveScanWatermark(ctx, watermark)
 		}
 		return result
 	}
-	if scanned > 0 {
-		switch source {
-		case domainStatistics.ScanSourceEntryResolve:
-			if facts, listErr := s.repo.ListEntryResolveFacts(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize); listErr == nil && len(facts) > 0 {
-				last := facts[len(facts)-1]
-				watermark.LastSeenID = last.LogID
-				occurredAt := last.OccurredAt
-				watermark.LastSeenTime = &occurredAt
-			}
-		case domainStatistics.ScanSourceEntryIntake:
-			if facts, listErr := s.repo.ListEntryIntakeFacts(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize); listErr == nil && len(facts) > 0 {
-				last := facts[len(facts)-1]
-				watermark.LastSeenID = last.LogID
-				occurredAt := last.OccurredAt
-				watermark.LastSeenTime = &occurredAt
-			}
-		case domainStatistics.ScanSourceAnswerSheet:
-			if facts, listErr := s.answerSheets.ListSubmittedAnswerSheetFacts(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize); listErr == nil && len(facts) > 0 {
-				last := facts[len(facts)-1]
-				watermark.LastSeenID = last.AnswerSheetID
-				occurredAt := last.OccurredAt
-				watermark.LastSeenTime = &occurredAt
-			}
-		case domainStatistics.ScanSourceReport:
-			if facts, listErr := s.repo.ListReportGeneratedFacts(ctx, orgID, watermark.LastSeenID, sinceTime, batchSize); listErr == nil && len(facts) > 0 {
-				last := facts[len(facts)-1]
-				watermark.LastSeenID = last.AssessmentID
-				occurredAt := last.OccurredAt
-				watermark.LastSeenTime = &occurredAt
-			}
-		}
+	if batch.scanned > 0 && batch.lastSeenTime != nil {
+		watermark.LastSeenID = batch.lastSeenID
+		watermark.LastSeenTime = batch.lastSeenTime
 	}
 	watermark.Status = domainStatistics.ScanWatermarkStatusIdle
 	if !dryRun {
@@ -214,8 +203,35 @@ func (s *behaviorJourneyScanner) scanSource(
 			return result
 		}
 	}
-	result.Skipped = scanned - projected
+	result.Skipped = batch.scanned - batch.projected
 	return result
+}
+
+func scanBatchFromFacts[T any](
+	facts []T,
+	dryRun bool,
+	lastSeenID func(T) uint64,
+	lastSeenTime func(T) time.Time,
+	project func(T) error,
+) (scanBatchResult, error) {
+	result := scanBatchResult{scanned: len(facts)}
+	for _, fact := range facts {
+		if dryRun {
+			result.projected++
+			continue
+		}
+		if err := project(fact); err != nil {
+			return result, err
+		}
+		result.projected++
+	}
+	if len(facts) > 0 {
+		last := facts[len(facts)-1]
+		occurredAt := lastSeenTime(last)
+		result.lastSeenID = lastSeenID(last)
+		result.lastSeenTime = &occurredAt
+	}
+	return result, nil
 }
 
 func (s *behaviorJourneyScanner) scanEntryResolve(
@@ -225,25 +241,22 @@ func (s *behaviorJourneyScanner) scanEntryResolve(
 	sinceTime time.Time,
 	limit int,
 	dryRun bool,
-) (int, int, error) {
+	windowRecalc bool,
+) (scanBatchResult, error) {
 	facts, err := s.repo.ListEntryResolveFacts(ctx, orgID, sinceID, sinceTime, limit)
 	if err != nil {
-		return 0, 0, err
+		return scanBatchResult{}, err
 	}
-	projected := 0
-	for _, fact := range facts {
-		if dryRun {
-			projected++
-			continue
-		}
-		if err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			return s.projectEntryResolve(txCtx, fact)
-		}); err != nil {
-			return len(facts), projected, err
-		}
-		projected++
-	}
-	return len(facts), projected, nil
+	lc := s.lifecyclerForScan(windowRecalc)
+	return scanBatchFromFacts(facts, dryRun,
+		func(f domainStatistics.EntryResolveFact) uint64 { return f.LogID },
+		func(f domainStatistics.EntryResolveFact) time.Time { return f.OccurredAt },
+		func(f domainStatistics.EntryResolveFact) error {
+			return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return s.projectEntryResolve(txCtx, lc, f)
+			})
+		},
+	)
 }
 
 func (s *behaviorJourneyScanner) scanEntryIntake(
@@ -253,28 +266,106 @@ func (s *behaviorJourneyScanner) scanEntryIntake(
 	sinceTime time.Time,
 	limit int,
 	dryRun bool,
-) (int, int, error) {
+	windowRecalc bool,
+) (scanBatchResult, error) {
 	facts, err := s.repo.ListEntryIntakeFacts(ctx, orgID, sinceID, sinceTime, limit)
 	if err != nil {
-		return 0, 0, err
+		return scanBatchResult{}, err
 	}
-	projected := 0
-	for _, fact := range facts {
-		if dryRun {
-			projected++
-			continue
-		}
-		if err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			return s.projectEntryIntake(txCtx, fact)
-		}); err != nil {
-			return len(facts), projected, err
-		}
-		projected++
-	}
-	return len(facts), projected, nil
+	lc := s.lifecyclerForScan(windowRecalc)
+	return scanBatchFromFacts(facts, dryRun,
+		func(f domainStatistics.EntryIntakeFact) uint64 { return f.LogID },
+		func(f domainStatistics.EntryIntakeFact) time.Time { return f.OccurredAt },
+		func(f domainStatistics.EntryIntakeFact) error {
+			return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return s.projectEntryIntake(txCtx, lc, f)
+			})
+		},
+	)
 }
 
-func (s *behaviorJourneyScanner) projectEntryResolve(ctx context.Context, fact domainStatistics.EntryResolveFact) error {
+func (s *behaviorJourneyScanner) scanAnswerSheets(
+	ctx context.Context,
+	orgID int64,
+	sinceID uint64,
+	sinceTime time.Time,
+	limit int,
+	dryRun bool,
+	windowRecalc bool,
+) (scanBatchResult, error) {
+	if s.answerSheets == nil {
+		return scanBatchResult{}, nil
+	}
+	facts, err := s.answerSheets.ListSubmittedAnswerSheetFacts(ctx, orgID, sinceID, sinceTime, limit)
+	if err != nil {
+		return scanBatchResult{}, err
+	}
+	lc := s.lifecyclerForScan(windowRecalc)
+	return scanBatchFromFacts(facts, dryRun,
+		func(f domainStatistics.AnswerSheetSubmittedFact) uint64 { return f.AnswerSheetID },
+		func(f domainStatistics.AnswerSheetSubmittedFact) time.Time { return f.OccurredAt },
+		func(f domainStatistics.AnswerSheetSubmittedFact) error {
+			return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return s.projectAnswerSheetSubmitted(txCtx, lc, f)
+			})
+		},
+	)
+}
+
+func (s *behaviorJourneyScanner) scanAssessments(
+	ctx context.Context,
+	orgID int64,
+	sinceID uint64,
+	sinceTime time.Time,
+	limit int,
+	dryRun bool,
+	windowRecalc bool,
+) (scanBatchResult, error) {
+	facts, err := s.repo.ListAssessmentCreatedFacts(ctx, orgID, sinceID, sinceTime, limit)
+	if err != nil {
+		return scanBatchResult{}, err
+	}
+	lc := s.lifecyclerForScan(windowRecalc)
+	return scanBatchFromFacts(facts, dryRun,
+		func(f domainStatistics.AssessmentCreatedFact) uint64 { return f.AssessmentID },
+		func(f domainStatistics.AssessmentCreatedFact) time.Time { return f.OccurredAt },
+		func(f domainStatistics.AssessmentCreatedFact) error {
+			return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return s.projectAssessmentCreated(txCtx, lc, f)
+			})
+		},
+	)
+}
+
+func (s *behaviorJourneyScanner) scanReports(
+	ctx context.Context,
+	orgID int64,
+	sinceID uint64,
+	sinceTime time.Time,
+	limit int,
+	dryRun bool,
+	windowRecalc bool,
+) (scanBatchResult, error) {
+	if s.reports == nil {
+		return scanBatchResult{}, nil
+	}
+	facts, err := s.reports.ListReportGeneratedFacts(ctx, orgID, sinceID, sinceTime, limit)
+	if err != nil {
+		return scanBatchResult{}, err
+	}
+	lc := s.lifecyclerForScan(windowRecalc)
+	return scanBatchFromFacts(facts, dryRun,
+		func(f domainStatistics.ReportGeneratedFact) uint64 { return f.AssessmentID },
+		func(f domainStatistics.ReportGeneratedFact) time.Time { return f.OccurredAt },
+		func(f domainStatistics.ReportGeneratedFact) error {
+			return s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
+				return s.projectReportGenerated(txCtx, lc, f)
+			})
+		},
+	)
+}
+
+func (s *behaviorJourneyScanner) projectEntryResolve(ctx context.Context, lc episodeLifecycler, fact domainStatistics.EntryResolveFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:     domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventEntryOpened, fact.LogID),
 		EventType:   eventcatalog.FootprintEntryOpened,
@@ -283,10 +374,10 @@ func (s *behaviorJourneyScanner) projectEntryResolve(ctx context.Context, fact d
 		EntryID:     fact.EntryID,
 		OccurredAt:  fact.OccurredAt,
 	}
-	return s.lifecycler.applyEntryOpened(ctx, input)
+	return lc.applyEntryOpened(ctx, input)
 }
 
-func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, fact domainStatistics.EntryIntakeFact) error {
+func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, lc episodeLifecycler, fact domainStatistics.EntryIntakeFact) error {
 	base := BehaviorProjectEventInput{
 		OrgID:       fact.OrgID,
 		ClinicianID: fact.ClinicianID,
@@ -297,14 +388,14 @@ func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, fact do
 	intakeInput := base
 	intakeInput.EventID = domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventIntakeConfirmed, fact.LogID)
 	intakeInput.EventType = eventcatalog.FootprintIntakeConfirmed
-	if err := s.lifecycler.applyIntakeConfirmed(ctx, intakeInput); err != nil {
+	if err := lc.applyIntakeConfirmed(ctx, intakeInput); err != nil {
 		return err
 	}
 	if fact.TesteeCreated {
 		testeeInput := base
 		testeeInput.EventID = domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventTesteeProfileCreated, fact.LogID)
 		testeeInput.EventType = eventcatalog.FootprintTesteeProfileCreated
-		if err := s.lifecycler.applyTesteeProfileCreated(ctx, testeeInput); err != nil {
+		if err := lc.applyTesteeProfileCreated(ctx, testeeInput); err != nil {
 			return err
 		}
 	}
@@ -312,73 +403,14 @@ func (s *behaviorJourneyScanner) projectEntryIntake(ctx context.Context, fact do
 		relationshipInput := base
 		relationshipInput.EventID = domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventCareRelationshipEstablished, fact.LogID)
 		relationshipInput.EventType = eventcatalog.FootprintCareRelationshipEstablished
-		if err := s.lifecycler.applyCareRelationshipEstablished(ctx, relationshipInput); err != nil {
+		if err := lc.applyCareRelationshipEstablished(ctx, relationshipInput); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
-func (s *behaviorJourneyScanner) scanAnswerSheets(
-	ctx context.Context,
-	orgID int64,
-	sinceID uint64,
-	sinceTime time.Time,
-	limit int,
-	dryRun bool,
-) (int, int, error) {
-	if s.answerSheets == nil {
-		return 0, 0, nil
-	}
-	facts, err := s.answerSheets.ListSubmittedAnswerSheetFacts(ctx, orgID, sinceID, sinceTime, limit)
-	if err != nil {
-		return 0, 0, err
-	}
-	projected := 0
-	for _, fact := range facts {
-		if dryRun {
-			projected++
-			continue
-		}
-		if err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			return s.projectAnswerSheetSubmitted(txCtx, fact)
-		}); err != nil {
-			return len(facts), projected, err
-		}
-		projected++
-	}
-	return len(facts), projected, nil
-}
-
-func (s *behaviorJourneyScanner) scanReports(
-	ctx context.Context,
-	orgID int64,
-	sinceID uint64,
-	sinceTime time.Time,
-	limit int,
-	dryRun bool,
-) (int, int, error) {
-	facts, err := s.repo.ListReportGeneratedFacts(ctx, orgID, sinceID, sinceTime, limit)
-	if err != nil {
-		return 0, 0, err
-	}
-	projected := 0
-	for _, fact := range facts {
-		if dryRun {
-			projected++
-			continue
-		}
-		if err := s.uow.WithinTransaction(ctx, func(txCtx context.Context) error {
-			return s.projectReportGenerated(txCtx, fact)
-		}); err != nil {
-			return len(facts), projected, err
-		}
-		projected++
-	}
-	return len(facts), projected, nil
-}
-
-func (s *behaviorJourneyScanner) projectAnswerSheetSubmitted(ctx context.Context, fact domainStatistics.AnswerSheetSubmittedFact) error {
+func (s *behaviorJourneyScanner) projectAnswerSheetSubmitted(ctx context.Context, lc episodeLifecycler, fact domainStatistics.AnswerSheetSubmittedFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:       domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventAnswerSheetSubmitted, fact.AnswerSheetID),
 		EventType:     eventcatalog.FootprintAnswerSheetSubmitted,
@@ -387,10 +419,24 @@ func (s *behaviorJourneyScanner) projectAnswerSheetSubmitted(ctx context.Context
 		AnswerSheetID: fact.AnswerSheetID,
 		OccurredAt:    fact.OccurredAt,
 	}
-	return s.lifecycler.applyAnswerSheetSubmitted(ctx, input)
+	return lc.applyAnswerSheetSubmitted(ctx, input)
 }
 
-func (s *behaviorJourneyScanner) projectReportGenerated(ctx context.Context, fact domainStatistics.ReportGeneratedFact) error {
+func (s *behaviorJourneyScanner) projectAssessmentCreated(ctx context.Context, lc episodeLifecycler, fact domainStatistics.AssessmentCreatedFact) error {
+	input := BehaviorProjectEventInput{
+		EventID:       domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventAssessmentCreated, fact.AssessmentID),
+		EventType:     eventcatalog.FootprintAssessmentCreated,
+		OrgID:         fact.OrgID,
+		TesteeID:      fact.TesteeID,
+		AnswerSheetID: fact.AnswerSheetID,
+		AssessmentID:  fact.AssessmentID,
+		OccurredAt:    fact.OccurredAt,
+	}
+	_, err := lc.applyAssessmentCreated(ctx, input)
+	return err
+}
+
+func (s *behaviorJourneyScanner) projectReportGenerated(ctx context.Context, lc episodeLifecycler, fact domainStatistics.ReportGeneratedFact) error {
 	input := BehaviorProjectEventInput{
 		EventID:      domainStatistics.ScanBehaviorFootprintID(domainStatistics.BehaviorEventReportGenerated, fact.ReportID),
 		EventType:    eventcatalog.FootprintReportGenerated,
@@ -400,11 +446,11 @@ func (s *behaviorJourneyScanner) projectReportGenerated(ctx context.Context, fac
 		ReportID:     fact.ReportID,
 		OccurredAt:   fact.OccurredAt,
 	}
-	return s.projectReportGeneratedFromScan(ctx, input)
+	return s.projectReportGeneratedFromScan(ctx, lc, input)
 }
 
-func (s *behaviorJourneyScanner) projectReportGeneratedFromScan(ctx context.Context, input BehaviorProjectEventInput) error {
-	if err := s.lifecycler.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventReportGenerated, "report", input.ReportID, "assessment", input.AssessmentID); err != nil {
+func (s *behaviorJourneyScanner) projectReportGeneratedFromScan(ctx context.Context, lc episodeLifecycler, input BehaviorProjectEventInput) error {
+	if err := lc.journey.appendBehaviorFootprint(ctx, input, domainStatistics.BehaviorEventReportGenerated, "report", input.ReportID, "assessment", input.AssessmentID); err != nil {
 		return err
 	}
 	episode, err := s.repo.FindEpisodeByAssessmentID(ctx, input.OrgID, input.AssessmentID)
@@ -423,7 +469,7 @@ func (s *behaviorJourneyScanner) projectReportGeneratedFromScan(ctx context.Cont
 	if err := s.repo.SaveEpisode(ctx, episode); err != nil {
 		return err
 	}
-	if s.lifecycler.skipStatisticsMutations {
+	if lc.skipStatisticsMutations {
 		return nil
 	}
 	return s.repo.ApplyStatisticsJourneyMutation(ctx, domainStatistics.StatisticsJourneyMutation{
