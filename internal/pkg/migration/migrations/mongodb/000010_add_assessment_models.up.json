@@ -1,0 +1,32 @@
+[
+  {
+    "create": "assessment_models"
+  },
+  {
+    "createIndexes": "assessment_models",
+    "indexes": [
+      {
+        "key": { "code": 1 },
+        "name": "idx_assessment_models_code",
+        "unique": true,
+        "partialFilterExpression": { "deleted_at": null }
+      },
+      {
+        "key": { "kind": 1, "status": 1 },
+        "name": "idx_assessment_models_kind_status"
+      },
+      {
+        "key": { "kind": 1, "algorithm": 1, "status": 1 },
+        "name": "idx_assessment_models_kind_algorithm_status"
+      },
+      {
+        "key": { "kind": 1, "category": 1, "status": 1 },
+        "name": "idx_assessment_models_kind_category_status"
+      },
+      {
+        "key": { "updated_at": -1 },
+        "name": "idx_assessment_models_updated_at"
+      }
+    ]
+  }
+]

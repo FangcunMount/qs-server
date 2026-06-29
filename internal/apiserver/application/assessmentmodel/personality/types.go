@@ -1,24 +1,17 @@
-package assessmentmodel
+package personality
 
 import "encoding/json"
 
 const (
 	KindPersonality      = "personality"
-	KindBehaviorAbility  = "behavior_ability"
 	SubKindTypology      = "typology"
 	StatusDraft          = "draft"
 	StatusPublished      = "published"
 	StatusArchived       = "archived"
-	PayloadFormatScaleV1 = "assessmentmodel.behavior_ability.scale.v1"
-	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
+	PayloadFormatTypologyV1 = "assessmentmodel.personality.typology.v1"
 )
 
-type Option struct {
-	Label string `json:"label"`
-	Value string `json:"value"`
-}
-
-type ListModelsDTO struct {
+type ListInput struct {
 	Kind      string
 	SubKind   string
 	Status    string
@@ -29,20 +22,19 @@ type ListModelsDTO struct {
 	PageSize  int
 }
 
-type CreateModelDTO struct {
+type CreateInput struct {
 	Code                 string
-	Kind                 string
-	SubKind              string
-	Algorithm            string
 	Title                string
 	Description          string
+	SubKind              string
+	Algorithm            string
 	Category             string
 	Tags                 []string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 }
 
-type UpdateBasicInfoDTO struct {
+type UpdateBasicInfoInput struct {
 	Code        string
 	Title       string
 	Description string
@@ -52,24 +44,17 @@ type UpdateBasicInfoDTO struct {
 	Tags        []string
 }
 
-type BindQuestionnaireDTO struct {
+type BindQuestionnaireInput struct {
 	Code                 string
 	QuestionnaireCode    string
 	QuestionnaireVersion string
 }
 
-type DefinitionDTO struct {
-	Kind          string          `json:"kind"`
-	SubKind       string          `json:"sub_kind,omitempty"`
-	Algorithm     string          `json:"algorithm,omitempty"`
-	PayloadFormat string          `json:"payload_format"`
-	Payload       json.RawMessage `json:"payload"`
-}
-
-type ApplyCodesDTO struct {
-	Code   string
-	Target string
-	Count  int
+type DefinitionInput struct {
+	SubKind       string
+	Algorithm     string
+	PayloadFormat string
+	Payload       json.RawMessage
 }
 
 type ModelSummary struct {
@@ -102,12 +87,12 @@ type QuestionnaireBindingResult struct {
 	QuestionCount        int    `json:"question_count"`
 }
 
-type OptionsResult struct {
-	Kinds      []Option `json:"kinds"`
-	Categories []Option `json:"categories"`
-	Algorithms []Option `json:"algorithms"`
-	SubKinds   []Option `json:"sub_kinds"`
-	Tags       []Option `json:"tags,omitempty"`
+type DefinitionResult struct {
+	Kind          string          `json:"kind"`
+	SubKind       string          `json:"sub_kind,omitempty"`
+	Algorithm     string          `json:"algorithm,omitempty"`
+	PayloadFormat string          `json:"payload_format"`
+	Payload       json.RawMessage `json:"payload"`
 }
 
 type ValidationIssue struct {
@@ -119,9 +104,9 @@ type ValidationIssue struct {
 
 type ValidationResult struct {
 	Passed bool              `json:"passed"`
-	Valid  bool              `json:"valid"` // deprecated: mirror Passed for backward compatibility
+	Valid  bool              `json:"valid"`
 	Issues []ValidationIssue `json:"issues"`
-	Errors []string          `json:"errors"` // deprecated: derived from Issues for backward compatibility
+	Errors []string          `json:"errors"`
 }
 
 func NewValidationResult(issues []ValidationIssue) *ValidationResult {
@@ -138,8 +123,4 @@ func NewValidationResult(issues []ValidationIssue) *ValidationResult {
 		}
 	}
 	return result
-}
-
-type PreviewReportResult struct {
-	Message string `json:"message"`
 }

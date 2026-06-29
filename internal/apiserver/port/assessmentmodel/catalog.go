@@ -26,7 +26,9 @@ type RuleSetRef = Ref
 // ListPublishedFilter narrows published-model list queries for C-side catalogs.
 type ListPublishedFilter struct {
 	Kind      domain.Kind
+	SubKind   domain.SubKind
 	Algorithm domain.Algorithm
+	Category  string
 	Page      int
 	PageSize  int
 }

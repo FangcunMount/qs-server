@@ -116,6 +116,8 @@ func personalitySummaryFromSummary(result personalitymodel.PersonalityModelSumma
 	return ModelSummary{
 		Code:                 result.Code,
 		Kind:                 KindPersonality,
+		SubKind:              SubKindTypology,
+		Algorithm:            result.Algorithm,
 		Title:                result.Title,
 		Description:          result.Description,
 		Status:               StatusPublished,

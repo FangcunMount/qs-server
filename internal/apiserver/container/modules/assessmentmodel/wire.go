@@ -78,10 +78,14 @@ func buildPersonalityDeps(mongoDB *mongo.Database, mongoLimiter backpressure.Acq
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: mongoLimiter}
 	v2Repo := mongoassessmentmodel.NewRepository(mongoDB, mongoOpts)
+	draftRepo := mongoassessmentmodel.NewDraftRepository(mongoDB, mongoOpts)
+	publishedRepo := mongoassessmentmodel.NewPublishedModelRepoAdapter(v2Repo)
 	legacyRepo := mongoruleset.NewRepository(mongoDB, mongoOpts)
 	dualStore := aminfra.NewDualStore(v2Repo, legacyRepo)
 	return PersonalityDeps{
 		PublishedLister:          dualStore,
 		PublishedAlgorithmLister: dualStore,
+		ModelRepo:                draftRepo,
+		PublishedRepo:            publishedRepo,
 	}
 }

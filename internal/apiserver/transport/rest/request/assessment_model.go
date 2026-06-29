@@ -5,6 +5,8 @@ import "encoding/json"
 type CreateAssessmentModelRequest struct {
 	Code                 string   `json:"code"`
 	Kind                 string   `json:"kind" valid:"required~模型类型不能为空"`
+	SubKind              string   `json:"sub_kind"`
+	Algorithm            string   `json:"algorithm"`
 	Title                string   `json:"title" valid:"required~模型标题不能为空"`
 	Description          string   `json:"description"`
 	Category             string   `json:"category"`
@@ -16,6 +18,8 @@ type CreateAssessmentModelRequest struct {
 type UpdateAssessmentModelBasicInfoRequest struct {
 	Title       string   `json:"title" valid:"required~模型标题不能为空"`
 	Description string   `json:"description"`
+	SubKind     string   `json:"sub_kind"`
+	Algorithm   string   `json:"algorithm"`
 	Category    string   `json:"category"`
 	Tags        []string `json:"tags"`
 }

@@ -35,12 +35,14 @@ func (h *AssessmentModelHandler) List(c *gin.Context) {
 		return
 	}
 	result, err := h.service.List(c.Request.Context(), assessmentmodel.ListModelsDTO{
-		Kind:     c.Query("kind"),
-		Status:   c.Query("status"),
-		Keyword:  c.Query("keyword"),
-		Category: c.Query("category"),
-		Page:     page,
-		PageSize: pageSize,
+		Kind:      c.Query("kind"),
+		SubKind:   c.Query("sub_kind"),
+		Status:    c.Query("status"),
+		Keyword:   c.Query("keyword"),
+		Category:  c.Query("category"),
+		Algorithm: c.Query("algorithm"),
+		Page:      page,
+		PageSize:  pageSize,
 	})
 	if err != nil {
 		h.Error(c, err)
@@ -58,6 +60,8 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 	result, err := h.service.Create(c.Request.Context(), assessmentmodel.CreateModelDTO{
 		Code:                 req.Code,
 		Kind:                 req.Kind,
+		SubKind:              req.SubKind,
+		Algorithm:            req.Algorithm,
 		Title:                req.Title,
 		Description:          req.Description,
 		Category:             req.Category,
@@ -91,6 +95,8 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		Code:        h.modelCode(c),
 		Title:       req.Title,
 		Description: req.Description,
+		SubKind:     req.SubKind,
+		Algorithm:   req.Algorithm,
 		Category:    req.Category,
 		Tags:        req.Tags,
 	})

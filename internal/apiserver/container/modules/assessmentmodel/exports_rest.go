@@ -2,6 +2,7 @@ package assessmentmodel
 
 import (
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel"
+	assessmentModelAppPersonality "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
@@ -27,12 +28,14 @@ func (m *Module) ExportRESTDeps(
 	}
 	deps.Scale = m.Scale.ExportRESTDeps(qrCodeService)
 	var personalityQuery = m.personalityQuery()
+	var personalityCommand = m.personalityCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
 		ScaleLifecycle:     deps.Scale.LifecycleService,
 		ScaleFactor:        deps.Scale.FactorService,
 		ScaleQuery:         deps.Scale.QueryService,
 		ScaleCategory:      deps.Scale.CategoryService,
 		ScaleQRCode:        deps.Scale.QRCodeService,
+		PersonalityCommand: personalityCommand,
 		PersonalityQuery:   personalityQuery,
 		QuestionnaireQuery: questionnaireQuery,
 		Codes:              codesService,
@@ -60,4 +63,11 @@ func (m *Module) personalityQuery() personalityModelApp.PersonalityModelQuerySer
 		return nil
 	}
 	return m.Personality.QueryService
+}
+
+func (m *Module) personalityCommand() assessmentModelAppPersonality.Service {
+	if m == nil || m.Personality == nil {
+		return nil
+	}
+	return m.Personality.CommandService
 }
