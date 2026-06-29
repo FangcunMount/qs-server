@@ -40,6 +40,13 @@
         "stats": 1,
         "chainProbe": 0
       },
+      "paths": {
+        "questionnaireDetail": [],
+        "questionnaireQuery": [
+          "/api/v1/scales/{scale_code}",
+          "/api/v1/personality-models?page=1&page_size=20"
+        ]
+      },
       "vusers": {
         "query": {
           "preAllocated": 10,

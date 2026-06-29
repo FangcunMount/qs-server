@@ -414,15 +414,57 @@ export const PERSONALITY_QUERY_PATHS = envOrConfigList(
   ['personalityQueryPaths', 'personality_query_paths', 'paths.personalityModelQuery', 'paths.personality_model_query'],
   '/api/v1/personality-models?page=1&page_size=20,/api/v1/personality-models/categories,/api/v1/personality-models/{model_code}'
 );
-export const QUESTIONNAIRE_DETAIL_PATHS = envOrConfigList(
-  'QUESTIONNAIRE_DETAIL_PATHS',
-  ['questionnaireDetailPaths', 'questionnaire_detail_paths', 'paths.questionnaireDetail', 'paths.questionnaire_detail'],
-  '/api/v1/questionnaires/{questionnaire_code}'
+
+const SMOKE_PROFILE_QUERY_PATHS = [
+  '/api/v1/scales/{scale_code}',
+  '/api/v1/personality-models?page=1&page_size=20',
+];
+
+function isSmokeProfile() {
+  const name = String(QPS_PROFILE || '');
+  return name === 'smoke_4' || name === 'smoke';
+}
+
+function profilePathConfigured(keys) {
+  return configFirstValueFrom(QPS_PROFILE_CONFIG, keys) !== undefined;
+}
+
+function applySmokeQuestionnaireDetailOverride(paths) {
+  if (!isSmokeProfile()) {
+    return paths;
+  }
+  if (profilePathConfigured(['paths.questionnaireDetail', 'paths.questionnaire_detail', 'questionnaireDetailPaths', 'questionnaire_detail_paths'])) {
+    return paths;
+  }
+  if (profilePathConfigured(['paths.questionnaireQuery', 'paths.questionnaire_query', 'questionnaireQueryPaths', 'questionnaire_query_paths'])) {
+    return [];
+  }
+  return [];
+}
+
+function applySmokeQueryPathOverride(paths) {
+  if (!isSmokeProfile()) {
+    return paths;
+  }
+  if (profilePathConfigured(['paths.questionnaireQuery', 'paths.questionnaire_query', 'questionnaireQueryPaths', 'questionnaire_query_paths'])) {
+    return paths;
+  }
+  return SMOKE_PROFILE_QUERY_PATHS;
+}
+
+export const QUESTIONNAIRE_DETAIL_PATHS = applySmokeQuestionnaireDetailOverride(
+  envOrConfigList(
+    'QUESTIONNAIRE_DETAIL_PATHS',
+    ['questionnaireDetailPaths', 'questionnaire_detail_paths', 'paths.questionnaireDetail', 'paths.questionnaire_detail'],
+    '/api/v1/questionnaires/{questionnaire_code}'
+  )
 );
-export const QUERY_PATHS = envOrConfigList(
-  'QUESTIONNAIRE_QUERY_PATHS',
-  ['questionnaireQueryPaths', 'questionnaire_query_paths', 'paths.questionnaireQuery', 'paths.questionnaire_query'],
-  MEDICAL_QUERY_PATHS.concat(QUESTIONNAIRE_DETAIL_PATHS).concat(PERSONALITY_QUERY_PATHS).join(',')
+export const QUERY_PATHS = applySmokeQueryPathOverride(
+  envOrConfigList(
+    'QUESTIONNAIRE_QUERY_PATHS',
+    ['questionnaireQueryPaths', 'questionnaire_query_paths', 'paths.questionnaireQuery', 'paths.questionnaire_query'],
+    MEDICAL_QUERY_PATHS.concat(['/api/v1/questionnaires/{questionnaire_code}']).concat(PERSONALITY_QUERY_PATHS).join(',')
+  )
 );
 export const STATS_PATHS = envOrConfigList(
   'STATISTICS_PATHS',

@@ -162,8 +162,11 @@ make perf-preflight
 通过标准：
 
 - `expired=0`
-- `collection scale ...: 200`、`apiserver testees: 200`（或你配置的 limit）
+- collection catalog 探测均为 **2xx**（scales 列表/categories/hot/详情、personality-models 列表/categories/详情；questionnaire 在能解析到 `questionnaire_code` 时探测）
+- `apiserver testees: 200`（或你配置的 limit）
 - `min_ttl_seconds` **大于本轮压测时长**（`mixed_300` 为 10 分钟，建议 TTL > 15 分钟）
+
+`smoke_4` profile 已将 `questionnaire_query` 收窄为 preflight 同款稳定路径（scale 详情 + personality-models 列表），避免 smoke 随机打到未预检的 catalog 接口。
 
 首次 `pretest_60` 若 `expired=99/101`，会得到约 **7% 401**，与网关无关，刷新 token 即可。
 
