@@ -43,7 +43,7 @@ CD_SCRIPT_DIR := scripts/cd
 PERF_DIR := tmp/perf
 PERF_SCRIPT_DIR := scripts/perf
 PERF_CONFIG_FILE := $(CURDIR)/$(PERF_DIR)/qs-perf.config.json
-PERF_K6_SCRIPT := $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+PERF_K6_SCRIPT := $(PERF_SCRIPT_DIR)/k6/mixed.js
 QPS_PROFILE ?= pretest_60
 
 GOSEC_BASE_ARGS := -exclude-generated \
@@ -113,6 +113,7 @@ COLOR_RED := \033[31m
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120
 .PHONY: perf-mixed140 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed240 perf-mixed280 perf-mixed300 perf-mixed300probe
+.PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-verify
 
 # ============================================================================
@@ -219,7 +220,7 @@ perf-preflight: perf-ensure-config ## Token 预检（k6 前必跑）
 perf-check-k6:
 	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
 
-perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|pretest_120|mixed_140|…|mixed_300)
+perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|mixed_300|mixed_300_models|outbox_120|…)
 	$(if $(SUMMARY_EXPORT),@mkdir -p $(dir $(SUMMARY_EXPORT)),)
 	k6 run -e PERF_CONFIG_FILE="$(PERF_CONFIG_FILE)" -e PERF_ROOT_DIR="$(CURDIR)" \
 		-e QPS_PROFILE="$(QPS_PROFILE)" \
@@ -273,6 +274,31 @@ perf-mixed300probe: perf-preflight ## k6 mixed_300_probe 目标档 + chainProbe 
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_probe SUMMARY_EXPORT=$(PERF_DIR)/300qps-probe/k6-summary.json
 	OUT_DIR=$(PERF_DIR)/300qps-probe $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
 
+perf-model-smoke: perf-preflight ## k6 smoke_4 多 model 路径连通 (~30s)
+	$(MAKE) perf-k6 QPS_PROFILE=smoke_4
+
+perf-outbox120: perf-preflight ## k6 outbox_120 专测 outbox 排水 (10min) + 前后 snapshot
+	@mkdir -p $(PERF_DIR)/outbox120
+	OUT_DIR=$(PERF_DIR)/outbox120 $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
+	$(MAKE) perf-k6 QPS_PROFILE=outbox_120 SUMMARY_EXPORT=$(PERF_DIR)/outbox120/k6-summary.json
+	OUT_DIR=$(PERF_DIR)/outbox120 $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
+perf-personality60: perf-preflight ## k6 personality_60 人格 session/submit/wait-report (5min)
+	@mkdir -p $(PERF_DIR)/personality60
+	$(MAKE) perf-k6 QPS_PROFILE=personality_60 SUMMARY_EXPORT=$(PERF_DIR)/personality60/k6-summary.json
+
+perf-mixed300-models: perf-preflight ## k6 mixed_300_models 医学+人格混合 (~290QPS, 10min) + 前后 snapshot
+	@mkdir -p $(PERF_DIR)/300qps-models
+	OUT_DIR=$(PERF_DIR)/300qps-models $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_models SUMMARY_EXPORT=$(PERF_DIR)/300qps-models/k6-summary.json
+	OUT_DIR=$(PERF_DIR)/300qps-models $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
+perf-mixed300-scanner: perf-preflight ## k6 capacity_with_scanner（需先开启 behavior_journey_scan）+ 前后 snapshot
+	@mkdir -p $(PERF_DIR)/300qps-scanner
+	OUT_DIR=$(PERF_DIR)/300qps-scanner $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
+	$(MAKE) perf-k6 QPS_PROFILE=capacity_with_scanner SUMMARY_EXPORT=$(PERF_DIR)/300qps-scanner/k6-summary.json
+	OUT_DIR=$(PERF_DIR)/300qps-scanner $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
 perf-diag-report120: perf-preflight ## 诊断 pretest_120：仅 report_status_query=36QPS
 	QUERY_RPS=0 SUBMIT_RPS=0 REPORT_RPS=36 STATS_RPS=0 \
 		$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/diag-report-only/k6-summary.json
@@ -294,6 +320,8 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	k6 inspect $(PERF_K6_SCRIPT)
+	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
 
 # ============================================================================
 # CD 发布入口

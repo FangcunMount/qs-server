@@ -14,6 +14,14 @@
     "sJFa2R",
     "tssl35"
   ],
+  "personalityModelCodes": [
+    "MBTI_OEJTS",
+    "SBTI_FUN"
+  ],
+  "modelMix": {
+    "medical": 0.8,
+    "personality": 0.2
+  },
   "planIds": [
     "614333603412718126",
     "614187067651404334"
@@ -314,12 +322,19 @@
     "mixed_300": {
       "duration": "10m",
       "qps": {
-        "query": 120,
+        "medicalQuery": 50,
+        "personalityQuery": 25,
+        "questionnaireQuery": 15,
         "submit": 60,
         "report": 90,
         "stats": 30,
-        "chainProbe": 0
+        "chainProbe": 0.5
       },
+      "modelMix": {
+        "medical": 0.8,
+        "personality": 0.2
+      },
+      "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
           "preAllocated": 200,
@@ -346,12 +361,19 @@
     "mixed_300_probe": {
       "duration": "10m",
       "qps": {
-        "query": 120,
+        "medicalQuery": 50,
+        "personalityQuery": 25,
+        "questionnaireQuery": 15,
         "submit": 60,
         "report": 90,
         "stats": 30,
-        "chainProbe": 0.2
+        "chainProbe": 0.5
       },
+      "modelMix": {
+        "medical": 0.8,
+        "personality": 0.2
+      },
+      "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
           "preAllocated": 200,
@@ -374,6 +396,107 @@
           "max": 200
         }
       }
+    },
+    "mixed_300_models": {
+      "duration": "10m",
+      "qps": {
+        "medicalQuery": 70,
+        "personalityQuery": 40,
+        "medicalSubmit": 40,
+        "personalitySubmit": 20,
+        "medicalWaitReport": 60,
+        "personalityWaitReport": 30,
+        "stats": 30,
+        "chainProbe": 0.5
+      },
+      "modelMix": {
+        "medical": 0.67,
+        "personality": 0.33
+      },
+      "chainProbeModelType": "mixed",
+      "vusers": {
+        "query": { "preAllocated": 200, "max": 800 },
+        "submit": { "preAllocated": 300, "max": 1200 },
+        "report": { "preAllocated": 600, "max": 900 },
+        "stats": { "preAllocated": 120, "max": 500 },
+        "chainProbe": { "preAllocated": 20, "max": 200 }
+      }
+    },
+    "outbox_120": {
+      "duration": "10m",
+      "qps": {
+        "medicalQuery": 10,
+        "personalityQuery": 10,
+        "submit": 120,
+        "report": 120,
+        "stats": 10,
+        "chainProbe": 1
+      },
+      "chainProbeModelType": "mixed",
+      "vusers": {
+        "query": { "preAllocated": 80, "max": 400 },
+        "submit": { "preAllocated": 400, "max": 1600 },
+        "report": { "preAllocated": 700, "max": 1200 },
+        "stats": { "preAllocated": 40, "max": 200 },
+        "chainProbe": { "preAllocated": 30, "max": 300 }
+      }
+    },
+    "personality_60": {
+      "duration": "5m",
+      "qps": {
+        "personalityQuery": 20,
+        "personalitySession": 10,
+        "personalitySubmit": 20,
+        "personalityWaitReport": 10,
+        "chainProbe": 0.2
+      },
+      "chainProbeModelType": "personality",
+      "vusers": {
+        "query": { "preAllocated": 80, "max": 400 },
+        "submit": { "preAllocated": 120, "max": 600 },
+        "report": { "preAllocated": 200, "max": 600 },
+        "chainProbe": { "preAllocated": 20, "max": 200 }
+      }
+    },
+    "capacity_no_scanner": {
+      "duration": "10m",
+      "qps": {
+        "medicalQuery": 50,
+        "personalityQuery": 25,
+        "questionnaireQuery": 15,
+        "submit": 60,
+        "report": 90,
+        "stats": 30,
+        "chainProbe": 0.5
+      },
+      "chainProbeModelType": "mixed",
+      "vusers": {
+        "query": { "preAllocated": 200, "max": 800 },
+        "submit": { "preAllocated": 300, "max": 1200 },
+        "report": { "preAllocated": 600, "max": 900 },
+        "stats": { "preAllocated": 120, "max": 500 },
+        "chainProbe": { "preAllocated": 20, "max": 200 }
+      }
+    },
+    "capacity_with_scanner": {
+      "duration": "10m",
+      "qps": {
+        "medicalQuery": 50,
+        "personalityQuery": 25,
+        "questionnaireQuery": 15,
+        "submit": 60,
+        "report": 90,
+        "stats": 30,
+        "chainProbe": 0.5
+      },
+      "chainProbeModelType": "mixed",
+      "vusers": {
+        "query": { "preAllocated": 200, "max": 800 },
+        "submit": { "preAllocated": 300, "max": 1200 },
+        "report": { "preAllocated": 600, "max": 900 },
+        "stats": { "preAllocated": 120, "max": 500 },
+        "chainProbe": { "preAllocated": 20, "max": 200 }
+      }
     }
   },
   "reportTimeout": 5,
@@ -385,11 +508,28 @@
     "assessmentLimit": 100
   },
   "paths": {
+    "medicalQuery": [
+      "/api/v1/scales?page=1&page_size=20&status=published",
+      "/api/v1/scales/categories",
+      "/api/v1/scales/hot?limit=5",
+      "/api/v1/scales/{scale_code}"
+    ],
+    "personalityModelQuery": [
+      "/api/v1/personality-models?page=1&page_size=20",
+      "/api/v1/personality-models/categories",
+      "/api/v1/personality-models/{model_code}"
+    ],
+    "questionnaireDetail": [
+      "/api/v1/questionnaires/{questionnaire_code}"
+    ],
     "questionnaireQuery": [
       "/api/v1/scales?page=1&page_size=20&status=published",
       "/api/v1/scales/categories",
       "/api/v1/scales/hot?limit=5",
       "/api/v1/scales/{scale_code}",
+      "/api/v1/personality-models?page=1&page_size=20",
+      "/api/v1/personality-models/categories",
+      "/api/v1/personality-models/{model_code}",
       "/api/v1/questionnaires/{questionnaire_code}"
     ],
     "statistics": [
@@ -400,6 +540,9 @@
     "submit": "/api/v1/answersheets",
     "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
     "answersheetAssessment": "/api/v1/answersheets/{answersheet_id}/assessment",
-    "reportStatus": "/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}"
+    "reportStatus": "/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}",
+    "personalitySession": "/api/v1/personality-assessment-sessions",
+    "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}",
+    "personalityReport": "/api/v1/personality-assessments/{assessment_id}/report?testee_id={testee_id}"
   }
 }

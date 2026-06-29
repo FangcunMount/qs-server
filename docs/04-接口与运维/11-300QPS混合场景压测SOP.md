@@ -1,6 +1,6 @@
 # 300 QPS 混合场景压测 SOP
 
-**本文回答**：如何在当前生产拓扑下，用 k6 对 qs-server 做分档混合压测（smoke → pretest_60 → pretest_120 → mixed_140…280 → mixed_300），如何准备 token/数据、如何观测、以及我们实际踩过的故障如何快速定位。
+**本文回答**：如何在当前生产拓扑下，用 k6 对 qs-server 做三类压测（前台读写、异步链路 SLA、后台排水观测），分档升压（smoke → pretest → mixed_300 / mixed_300_models），如何准备 token/数据、如何观测、以及常见故障如何快速定位。
 
 ---
 
@@ -9,13 +9,13 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 压测入口 | k6 打公网域名 `collect.fangcunmount.cn` + `qs.fangcunmount.cn` |
+| **脚本入口** | `scripts/perf/k6/mixed.js`（`k6-mixed-300qps.js` 为兼容 shim） |
 | **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
-| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_140` → `mixed_160` → `mixed_180` → `mixed_200` → `mixed_240` → `mixed_280` → `mixed_300`，每档通过再升 |
+| 三类目标 | **前台读写**（model query/submit/wait-report）；**异步 SLA**（`async_chain_probe_*`）；**后台排水**（`perf-outbox120` + DB snapshot） |
+| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_140`…`mixed_280` → `mixed_300` / `mixed_300_models`，每档通过再升 |
 | 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
 | 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
-| 最常见假 5xx | **Nginx `limit_conn` 503**（耗时 0.000s，请求未到应用） |
-| 历史瓶颈 | 跨机 collection → 502；token 过期 → 401；conn_limit 不足 → 503 |
-| 当前拓扑 | serverA（nginx + apiserver + collection）；serverB（IAM）；serverD（worker） |
+| 验收 | K6 HTTP + chain probe SLA **且**（outbox/scanner 场景）压测前后 DB snapshot 不堆积 |
 
 ---
 
@@ -46,15 +46,22 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 
 ## 2. 场景配比与档位
 
-### 2.1 mixed_300 目标配比
+### 2.1 mixed_300 目标配比（多 model）
+
+`mixed_300` / `mixed_300_probe` 使用**拆分场景**（profile 含 `medicalQuery` 等字段时自动启用）：
 
 | 场景 | QPS | 接口 |
 | ---- | ---: | ---- |
-| 问卷/测评配置查询 | 120 | collection `GET /api/v1/scales*`、`/questionnaires/*` |
-| 答卷提交 | 60 | collection `POST /api/v1/answersheets` |
-| 报告状态查询 | 90 | collection `GET .../wait-report` |
+| 医学量表目录查询 | 50 | `GET /api/v1/scales*` |
+| 人格模型目录查询 | 25 | `GET /api/v1/personality-models*` |
+| 问卷详情查询 | 15 | `GET /api/v1/questionnaires/{code}` |
+| 答卷提交（medical 80% + personality 20%） | 60 | `POST /api/v1/answersheets` |
+| 报告 wait（热样本） | 90 | medical `/assessments/.../wait-report`；personality `/personality-assessments/.../wait-report` |
 | 统计查询 | 30 | apiserver `GET /api/v1/statistics/*` |
-| **合计** | **300** | |
+| 异步链路探针（medical + personality 各半） | 0.5 | session → submit → submit-status → assessment → wait-report |
+| **合计** | **~270.5 + probe** | 与 chainProbe 合计约 271 QPS；legacy `qps.query` profile 仍兼容旧四桶 |
+
+**压测三类目标**：① 前台读写（query/submit/report 热样本）② 异步 SLA（`async_chain_probe_*`）③ 后台排水（`outbox_120` + snapshot DB）。
 
 ### 2.2 内置 `QPS_PROFILE`
 
@@ -69,8 +76,30 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `mixed_200` | 200 | 80/40/60/20 | 5m | 接近 prod 保守基线 |
 | `mixed_240` | 240 | 96/48/72/24 | 8m | 同上 |
 | `mixed_280` | 280 | 112/56/84/28 | 8m | 逼近目标档 |
-| `mixed_300` | 300 | 120/60/90/30 | 10m | 目标混合压测 |
-| `mixed_300_probe` | 300+0.2 | 同上 + chainProbe | 10m | 采样 `report_generated_latency` |
+| `mixed_300` | ~271 | 50/25/15 query + 60 submit + 90 report + 30 stats + **0.5 chainProbe** | 10m | 多 model 目标档 |
+| `mixed_300_probe` | 同上 | 同上（显式 probe profile） | 10m | 与 mixed_300 等效 |
+| `mixed_300_models` | ~290 | 医学+人格拆分 submit/report | 10m | 产品真实流量混合 |
+| `outbox_120` | ~271 | submit/report 各 120 + 低 query | 10m | **专测 outbox 排水** |
+| `personality_60` | ~60 | 人格 session/submit/wait | 5m | 人格链路专项 |
+| `capacity_no_scanner` | ~271 | 同 mixed_300 | 10m | 主链路容量（scanner 可关） |
+| `capacity_with_scanner` | ~271 | 同 mixed_300 | 10m | 开启 `behavior_journey_scan` 后跑 |
+
+旧档 `pretest_*` / `mixed_140`…仍用 `qps.query` 单桶，路径已含 personality-models，**向后兼容**。
+
+### 2.3 K6 脚本目录
+
+```
+scripts/perf/k6/
+  mixed.js              # 入口（Makefile PERF_K6_SCRIPT）
+  lib/config.js         # 环境变量、profile、路径、token
+  lib/metrics.js        # 指标、阈值、scenario 注册
+  lib/http.js           # HTTP 封装
+  lib/data.js           # discovery、答卷构造、scenarioData
+  lib/util.js           # 工具函数
+  lib/options.js        # 按 profile 注册 scenarios
+  scenarios/            # model-query / submit / report / statistics / chain-probe
+scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
+```
 
 **原则**：上一档 `http_req_failed < 1%`、无明显 503/502 尖刺后再升档。`pretest_60` 曾出现 p90 ~5s 但 0 失败，可接受；`pretest_120` 在跨机 collection 时大量 502/30s 超时，迁回 serverA 后应复测。
 
@@ -100,7 +129,9 @@ cp scripts/perf/qs-perf.config.example.json tmp/perf/qs-perf.config.json
 | `COLLECTION_BASE_URL` | `https://collect.fangcunmount.cn` |
 | `APISERVER_BASE_URL` | `https://qs.fangcunmount.cn` |
 | `ORG_ID` | `1` |
-| `SCALE_CODES` | `3adyDE,zOO4eG,WFIRSP,bJFKi3,mbdoeV,tuixuu,sJFa2R,tssl35` |
+| `SCALE_CODES` | `3adyDE,…,tssl35`（医学量表） |
+| `PERSONALITY_MODEL_CODES` | `MBTI_OEJTS,SBTI_FUN` |
+| `modelMix` | `{ medical: 0.8, personality: 0.2 }`（legacy submit 桶） |
 | `PLAN_IDS` | `614333603412718126,614187067651404334` |
 | `TESTEE_SOURCE` | `daily_simulation` |
 
@@ -171,10 +202,14 @@ make perf-mixed200          # mixed_200
 make perf-mixed240          # mixed_240
 make perf-mixed280          # mixed_280
 make perf-mixed300          # mixed_300 + 前后 snapshot
-make perf-mixed300probe     # mixed_300_probe + chainProbe + 前后 snapshot
+make perf-mixed300probe     # mixed_300_probe（与 mixed_300 等效）
+make perf-mixed300-models   # 医学+人格拆分 submit/report
+make perf-outbox120         # outbox 排水专测 + snapshot
+make perf-personality60     # 人格 session 链路
+make perf-mixed300-scanner  # 需先开启 behavior_journey_scan
 
-make perf-k6 QPS_PROFILE=pretest_60   # 任意档位
-make perf-verify            # 脚本语法 + k6 inspect
+make perf-k6 QPS_PROFILE=mixed_300_models
+make perf-verify            # bash 语法 + k6 inspect（入口 + shim）
 ```
 
 完整列表：`make help`（**K6 压测** 段）。
@@ -194,7 +229,7 @@ make perf-mixed300
 
 ```bash
 k6 run -e PERF_CONFIG_FILE="$(pwd)/tmp/perf/qs-perf.config.json" \
-  -e QPS_PROFILE=smoke_4 scripts/perf/k6-mixed-300qps.js
+  -e QPS_PROFILE=smoke_4 scripts/perf/k6/mixed.js
 ```
 
 优先级：**命令行 `-e` > `QPS_PROFILE` 档位 > 根配置 > 脚本默认**。
@@ -205,14 +240,14 @@ k6 run -e PERF_CONFIG_FILE="$(pwd)/tmp/perf/qs-perf.config.json" \
 COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
 QUERY_RPS=1 SUBMIT_RPS=0 REPORT_RPS=0 STATS_RPS=0 DURATION=5s \
 QUESTIONNAIRE_QUERY_PATHS='/api/v1/scales?page=1&page_size=20&status=published' \
-k6 run scripts/perf/k6-mixed-300qps.js
+k6 run scripts/perf/k6/mixed.js
 ```
 
 ### 5.4 严格阈值（可选）
 
 ```bash
 STRICT_THRESHOLDS=true k6 run -e PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
-  -e QPS_PROFILE=pretest_60 scripts/perf/k6-mixed-300qps.js
+  -e QPS_PROFILE=pretest_60 scripts/perf/k6/mixed.js
 ```
 
 ---
@@ -244,6 +279,17 @@ export APISERVER_METRICS_URL=http://127.0.0.1:18082/metrics
 ```
 
 worker（serverD）、NSQ 隧道为可选项；snapshot 失败写 `.err`，**不阻断** k6。
+
+**DB 快照（可选，压测前后对比 outbox/scanner）**：
+
+```bash
+export MONGO_URI='mongodb://user:pass@host:27017/db?authSource=admin'
+export MYSQL_CLI_ARGS='-h127.0.0.1 -uuser -ppass dbname'
+export PERF_ORG_ID=1
+OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
+```
+
+生成文件包括：`mongo-outbox.json`、`mysql-outbox.txt`、`analytics-scan-watermarks.txt`、`assessment-episode-status.txt`、`behavior-footprint-events.txt`、`statistics-journey-daily.txt`。
 
 ### 6.2 关键指标
 
@@ -279,6 +325,10 @@ db.domain_event_outbox.aggregate([
 | `http_5xx_total` | 服务端或 **Nginx 503/502** → 按 §8 分流 |
 | `http_transport_error_total` | 没拿到 HTTP 响应，例如客户端 30s 超时 |
 | `http_timeout_total` | `request timeout` 汇总；注意不是 `wait-report?timeout=5` |
+
+| `chain_probe_failed` | 异步探针失败次数（应接近 0） |
+| `medical_report_generated_latency` / `personality_report_generated_latency` | 端到端报告 SLA |
+| `submit_to_assessment_latency` / `assessment_to_report_latency` | 异步分段延迟 |
 
 混合压测脚本会额外输出按场景拆分的失败 counter：
 
@@ -421,12 +471,14 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | mixed_280 | 280 | | | | | | |
 | mixed_300 | 300 | | | | | | |
 
-### 10.3 瓶颈与后续
+### 10.4 验收标准（HTTP + 后台）
 
-- 是否达到目标 QPS：
-- 主要瓶颈（Nginx / 应用 / DB / 跨机）：
-- 已做优化：
-- 待做优化：
+| 维度 | 通过条件 |
+| ---- | -------- |
+| K6 | `http_req_failed < 1%`；submit 202 > 99%；wait-report 200 > 99%；`chain_probe_failed` ≈ 0 |
+| 延迟 | medical report p95 < 60s；personality report p95 < 90s（probe 开启时） |
+| Outbox | Mongo/MySQL pending 不持续增长；`failed` = 0 或可解释 |
+| Scanner | 若启用 `behavior_journey_scan`：`analytics_scan_watermarks` 推进；`statistics_journey_daily` 更新 |
 
 ---
 

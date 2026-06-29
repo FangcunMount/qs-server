@@ -42,4 +42,76 @@ if [[ -n "${REDIS_CLI_ARGS:-}" ]] && command -v redis-cli >/dev/null 2>&1; then
   redis-cli $REDIS_CLI_ARGS INFO commandstats >"$out_dir/${label}-redis-info-commandstats.txt" || true
 fi
 
+snapshot_mongo_outbox() {
+  local output="$out_dir/${label}-mongo-outbox.json"
+  if [[ -z "${MONGO_URI:-}" ]] || ! command -v mongosh >/dev/null 2>&1; then
+    return
+  fi
+  mongosh "$MONGO_URI" --quiet --eval '
+db.domain_event_outbox.aggregate([
+  { $match: { status: { $in: ["pending", "publishing", "failed"] } } },
+  {
+    $group: {
+      _id: { status: "$status", event_type: "$event_type" },
+      count: { $sum: 1 },
+      oldest: { $min: "$created_at" },
+      newest: { $max: "$created_at" }
+    }
+  },
+  { $sort: { count: -1 } }
+]).toArray()
+' >"$output" 2>"$output.err" || true
+}
+
+snapshot_mysql_query() {
+  local name="$1"
+  local sql="$2"
+  local output="$out_dir/${label}-${name}"
+  if [[ -z "${MYSQL_CLI_ARGS:-}" ]] || ! command -v mysql >/dev/null 2>&1; then
+    return
+  fi
+  # shellcheck disable=SC2086
+  mysql $MYSQL_CLI_ARGS -N -B -e "$sql" >"$output" 2>"$output.err" || true
+}
+
+snapshot_mongo_outbox
+
+snapshot_mysql_query "mysql-outbox.txt" "
+SELECT status, event_type, COUNT(*) AS cnt
+FROM domain_event_outbox
+WHERE status IN ('pending', 'publishing', 'failed')
+GROUP BY status, event_type
+ORDER BY cnt DESC;
+"
+
+snapshot_mysql_query "analytics-scan-watermarks.txt" "
+SELECT source_name, org_id, last_seen_id, last_seen_time, status, last_error, updated_at
+FROM analytics_scan_watermarks
+ORDER BY updated_at DESC
+LIMIT 50;
+"
+
+snapshot_mysql_query "assessment-episode-status.txt" "
+SELECT status, COUNT(*) AS cnt
+FROM assessment_episode
+WHERE org_id = ${PERF_ORG_ID:-1}
+GROUP BY status
+ORDER BY cnt DESC;
+"
+
+snapshot_mysql_query "behavior-footprint-events.txt" "
+SELECT event_name, COUNT(*) AS cnt
+FROM behavior_footprint
+WHERE org_id = ${PERF_ORG_ID:-1}
+GROUP BY event_name
+ORDER BY cnt DESC
+LIMIT 50;
+"
+
+snapshot_mysql_query "statistics-journey-daily.txt" "
+SELECT COUNT(*) AS row_count, MAX(updated_at) AS latest_updated_at
+FROM statistics_journey_daily
+WHERE org_id = ${PERF_ORG_ID:-1};
+"
+
 echo "$out_dir"
