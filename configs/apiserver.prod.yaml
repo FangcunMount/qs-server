@@ -326,23 +326,23 @@ behavior_footprint:
     - footprint.assessment_created
     - footprint.report_generated
 
-behavior_journey_scan:
-  enable: false
-  org_ids: [1]
-  initial_delay: "2m"
-  interval: "30m"
-  batch_size: 1000
-  lookback: "2h"
-  lock_key: "qs:behavior-journey-scan:leader"
-  lock_ttl: "25m"
-  dry_run: false
-  window_recalc: true
+behavior_journey_scan:    # 启用行为轨迹扫描
+  enable: true            # 启用行为轨迹扫描
+  org_ids: [1]            # 组织ID列表（从配置读取，默认扫描所有组织）
+  initial_delay: "2m"     # 启动后首次扫描延迟
+  interval: "30m"         # 扫描间隔
+  batch_size: 1000        # 每轮最多扫描的记录数
+  lookback: "2h"          # 扫描时间窗口
+  lock_key: "qs:behavior-journey-scan:leader" # 分布式锁键，确保单实例执行
+  lock_ttl: "25m"         # 锁过期时间，略长于扫描间隔，避免死锁
+  dry_run: false          # 禁用行为轨迹扫描
+  window_recalc: true     # 启用窗口重新计算
   sources:
-    - entry_resolve_log
-    - entry_intake_log
-    - answersheet
-    - assessment
-    - report
+    - entry_resolve_log   # 扫描入口解析日志
+    - entry_intake_log    # 扫描接纳日志
+    - answersheet         # 扫描答卷日志
+    - assessment          # 扫描测评日志
+    - report              # 扫描报告日志
 
 outbox_relay:
   mongo:
