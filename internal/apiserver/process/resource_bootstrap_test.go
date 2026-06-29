@@ -3,6 +3,7 @@ package process
 import (
 	"context"
 	"errors"
+	"reflect"
 	"testing"
 
 	"github.com/FangcunMount/component-base/pkg/messaging"
@@ -10,7 +11,7 @@ import (
 	apiserverconfig "github.com/FangcunMount/qs-server/internal/apiserver/config"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container"
 	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
-	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
+	cacheplanebootstrap "github.com/FangcunMount/qs-server/internal/pkg/cacheplane/bootstrap"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
 	redis "github.com/redis/go-redis/v9"
@@ -99,7 +100,7 @@ func TestPrepareResourcesBuildsStageOutputFromDeps(t *testing.T) {
 	if got.messaging.publishMode != eventruntime.PublishModeMQ {
 		t.Fatalf("publishMode = %q, want %q", got.messaging.publishMode, eventruntime.PublishModeMQ)
 	}
-	if got.containerInput.containerOptions != wantOptions {
+	if !reflect.DeepEqual(got.containerInput.containerOptions, wantOptions) {
 		t.Fatalf("containerOptions = %#v, want %#v", got.containerInput.containerOptions, wantOptions)
 	}
 	if buildOptionsInput.cacheSubsystem != subsystem || buildOptionsInput.mqPublisher != publisher || buildOptionsInput.eventCatalog != catalog || buildOptionsInput.backpressure != backpressureOptions {

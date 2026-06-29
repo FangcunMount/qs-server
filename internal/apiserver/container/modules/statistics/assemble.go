@@ -33,23 +33,25 @@ type Module struct {
 	PeriodicStatsService           statisticsApp.PeriodicStatsService
 	SyncService                    statisticsApp.StatisticsSyncService
 	BehaviorProjectorService       statisticsApp.BehaviorProjectorService
+	BehaviorJourneyScanService     statisticsApp.BehaviorJourneyScanService
 }
 
 // Deps defines explicit constructor dependencies for the statistics module.
 type Deps struct {
-	MySQLDB           *gorm.DB
-	RedisClient       redis.UniversalClient
-	CacheBuilder      *keyspace.Builder
-	AnswerSheetReader surveyreadmodel.AnswerSheetReader
-	RepairWindowDays  int
-	QueryPolicy       cachepolicy.CachePolicy
-	HotsetRecorder    cachetarget.HotsetRecorder
-	LockManager       locklease.Manager
-	VersionStore      cachequery.VersionTokenStore
-	Observer          *observability.ComponentObserver
-	MySQLLimiter      backpressure.Acquirer
-	WarmupCoordinator cachegov.Coordinator
-	StatusService     cachegov.StatusService
+	MySQLDB               *gorm.DB
+	RedisClient           redis.UniversalClient
+	CacheBuilder          *keyspace.Builder
+	AnswerSheetReader     surveyreadmodel.AnswerSheetReader
+	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
+	RepairWindowDays      int
+	QueryPolicy           cachepolicy.CachePolicy
+	HotsetRecorder        cachetarget.HotsetRecorder
+	LockManager           locklease.Manager
+	VersionStore          cachequery.VersionTokenStore
+	Observer              *observability.ComponentObserver
+	MySQLLimiter          backpressure.Acquirer
+	WarmupCoordinator     cachegov.Coordinator
+	StatusService         cachegov.StatusService
 }
 
 // New assembles the statistics module.
@@ -88,6 +90,7 @@ func New(deps Deps) (*Module, error) {
 	)
 	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(repo)
 	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, repo)
+	module.BehaviorJourneyScanService = statisticsApp.NewBehaviorJourneyScanService(txRunner, repo, normalized.AnswerSheetScanSource)
 	module.SyncService = statisticsApp.NewSyncServiceWithTransactionRunner(txRunner, repo, normalized.RepairWindowDays, normalized.LockManager)
 
 	return module, nil

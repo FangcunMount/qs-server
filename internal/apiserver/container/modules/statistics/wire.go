@@ -2,6 +2,7 @@ package statistics
 
 import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
@@ -21,6 +22,7 @@ type WireInput struct {
 	FallbackRedisClient    redis.UniversalClient
 	CacheBuilder           *keyspace.Builder
 	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
+	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
 	RepairWindowDays       int
 	QueryPolicy            cachepolicy.CachePolicy
 	HotsetRecorder         cachetarget.HotsetRecorder
@@ -54,18 +56,19 @@ func Wire(in WireInput) (*Module, error) {
 		}
 	}
 	return Bootstrap(BootstrapInput{
-		MySQLDB:           in.MySQLDB,
-		RedisClient:       redisClient,
-		CacheBuilder:      in.CacheBuilder,
-		AnswerSheetReader: in.AnswerSheetReader,
-		RepairWindowDays:  in.RepairWindowDays,
-		QueryPolicy:       in.QueryPolicy,
-		HotsetRecorder:    in.HotsetRecorder,
-		LockManager:       in.LockManager,
-		VersionStore:      versionStore,
-		Observer:          in.Observer,
-		MySQLLimiter:      in.MySQLLimiter,
-		WarmupCoordinator: in.WarmupCoordinator,
-		StatusService:     in.StatusService,
+		MySQLDB:               in.MySQLDB,
+		RedisClient:           redisClient,
+		CacheBuilder:          in.CacheBuilder,
+		AnswerSheetReader:     in.AnswerSheetReader,
+		AnswerSheetScanSource: in.AnswerSheetScanSource,
+		RepairWindowDays:      in.RepairWindowDays,
+		QueryPolicy:           in.QueryPolicy,
+		HotsetRecorder:        in.HotsetRecorder,
+		LockManager:           in.LockManager,
+		VersionStore:          versionStore,
+		Observer:              in.Observer,
+		MySQLLimiter:          in.MySQLLimiter,
+		WarmupCoordinator:     in.WarmupCoordinator,
+		StatusService:         in.StatusService,
 	})
 }

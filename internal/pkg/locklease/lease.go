@@ -13,12 +13,13 @@ type Manager = base.Manager
 
 // Specs defines qs-server built-in lease-lock workloads.
 var Specs = struct {
-	AnswersheetProcessing    Spec
-	PlanSchedulerLeader      Spec
-	StatisticsSyncLeader     Spec
-	StatisticsSync           Spec
-	BehaviorPendingReconcile Spec
-	CollectionSubmit         Spec
+	AnswersheetProcessing     Spec
+	PlanSchedulerLeader       Spec
+	StatisticsSyncLeader      Spec
+	StatisticsSync            Spec
+	BehaviorPendingReconcile  Spec
+	BehaviorJourneyScanLeader Spec
+	CollectionSubmit          Spec
 }{
 	AnswersheetProcessing: Spec{
 		Name:        "answersheet_processing",
@@ -44,6 +45,11 @@ var Specs = struct {
 		Name:        "behavior_pending_reconcile",
 		Description: "用于 apiserver behavior pending reconcile 多实例串行化执行的分布式锁。",
 		DefaultTTL:  30 * time.Second,
+	},
+	BehaviorJourneyScanLeader: Spec{
+		Name:        "behavior_journey_scan_leader",
+		Description: "用于 apiserver behavior journey scan 多实例抢占 leader 的分布式锁。",
+		DefaultTTL:  25 * time.Minute,
 	},
 	CollectionSubmit: Spec{
 		Name:        "collection_submit",

@@ -1,0 +1,40 @@
+package statistics
+
+import (
+	"testing"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/pkg/event"
+)
+
+func TestFootprintDurableStagingPolicyDisablesHighFrequencyEvents(t *testing.T) {
+	policy := NewFootprintDurableStagingPolicy(DefaultDisabledHighFrequencyFootprintEvents())
+	InstallFootprintDurableStagingPolicy(policy)
+	t.Cleanup(func() { InstallFootprintDurableStagingPolicy(nil) })
+
+	if FootprintEventAllowed(eventcatalog.FootprintAnswerSheetSubmitted) {
+		t.Fatal("answersheet footprint should be disabled")
+	}
+	if FootprintEventAllowed(eventcatalog.FootprintReportGenerated) {
+		t.Fatal("report footprint should be disabled")
+	}
+	if !FootprintEventAllowed(eventcatalog.FootprintEntryOpened) {
+		t.Fatal("entry_opened footprint should remain enabled")
+	}
+}
+
+func TestFilterFootprintStagingEventsRemovesDisabledTypes(t *testing.T) {
+	InstallFootprintDurableStagingPolicy(NewFootprintDurableStagingPolicy([]string{
+		eventcatalog.FootprintReportGenerated,
+	}))
+	t.Cleanup(func() { InstallFootprintDurableStagingPolicy(nil) })
+
+	events := []event.DomainEvent{
+		event.New(eventcatalog.FootprintReportGenerated, "BehaviorFootprint", "1", struct{}{}),
+		event.New(eventcatalog.ReportGeneratedV2, "Report", "1", struct{}{}),
+	}
+	filtered := FilterFootprintStagingEvents(events)
+	if len(filtered) != 1 || filtered[0].EventType() != eventcatalog.ReportGeneratedV2 {
+		t.Fatalf("filtered = %#v, want only report.generated.v2", filtered)
+	}
+}

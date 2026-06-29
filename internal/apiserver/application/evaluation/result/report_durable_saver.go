@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
@@ -58,6 +59,10 @@ func (s transactionalReportDurableSaver) SaveReportDurably(ctx context.Context, 
 		if err := s.writer.SaveReportRecord(txCtx, rpt, testeeID); err != nil {
 			return err
 		}
+		if len(events) == 0 {
+			return nil
+		}
+		events = statisticsApp.FilterFootprintStagingEvents(events)
 		if len(events) == 0 {
 			return nil
 		}

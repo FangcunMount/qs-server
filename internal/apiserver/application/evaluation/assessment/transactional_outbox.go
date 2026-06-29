@@ -5,6 +5,7 @@ import (
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -51,6 +52,7 @@ func saveAssessmentAndStageEvents(
 		eventsToStage := make([]event.DomainEvent, 0, len(a.Events())+len(extra))
 		eventsToStage = append(eventsToStage, a.Events()...)
 		eventsToStage = append(eventsToStage, extra...)
+		eventsToStage = statisticsApp.FilterFootprintStagingEvents(eventsToStage)
 		stagedEvents = eventsToStage
 		if len(eventsToStage) == 0 {
 			return nil

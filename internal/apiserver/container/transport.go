@@ -254,14 +254,15 @@ type ServerGRPCBootstrapDeps struct {
 // ServerRuntimeDeps describes the narrow container-owned dependencies needed by
 // background runtimes started from the apiserver process.
 type ServerRuntimeDeps struct {
-	LockBuilder               *keyspace.Builder
-	LockManager               locklease.Manager
-	WarmupCoordinator         cachegov.Coordinator
-	PlanCommandService        planApp.PlanCommandService
-	StatisticsSyncService     statisticsApp.StatisticsSyncService
-	BehaviorProjectorService  statisticsApp.BehaviorProjectorService
-	AnswerSheetSubmittedRelay answersheetApp.SubmittedEventRelay
-	AssessmentOutboxRelay     appEventing.OutboxRelay
+	LockBuilder                *keyspace.Builder
+	LockManager                locklease.Manager
+	WarmupCoordinator          cachegov.Coordinator
+	PlanCommandService         planApp.PlanCommandService
+	StatisticsSyncService      statisticsApp.StatisticsSyncService
+	BehaviorProjectorService   statisticsApp.BehaviorProjectorService
+	BehaviorJourneyScanService statisticsApp.BehaviorJourneyScanService
+	AnswerSheetSubmittedRelay  answersheetApp.SubmittedEventRelay
+	AssessmentOutboxRelay      appEventing.OutboxRelay
 }
 
 func (c *Container) BuildServerGRPCBootstrapDeps() ServerGRPCBootstrapDeps {
@@ -296,6 +297,7 @@ func (c *Container) BuildServerRuntimeDeps() ServerRuntimeDeps {
 	if c.StatisticsModule != nil {
 		deps.StatisticsSyncService = c.StatisticsModule.SyncService
 		deps.BehaviorProjectorService = c.StatisticsModule.BehaviorProjectorService
+		deps.BehaviorJourneyScanService = c.StatisticsModule.BehaviorJourneyScanService
 	}
 	if c.SurveyModule != nil && c.SurveyModule.AnswerSheet != nil {
 		deps.AnswerSheetSubmittedRelay = c.SurveyModule.AnswerSheet.SubmittedEventRelay

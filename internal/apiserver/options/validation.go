@@ -19,6 +19,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateBackpressureOptions(o.Backpressure)...)
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
 	errs = append(errs, validateBehaviorPendingReconcile(o.BehaviorPendingReconcile)...)
+	errs = append(errs, validateBehaviorJourneyScan(o.BehaviorJourneyScan)...)
 	errs = append(errs, validateOutboxRelay(o.OutboxRelay)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
@@ -143,6 +144,29 @@ func validateBehaviorPendingReconcile(opts *BehaviorPendingReconcileOptions) []e
 	}
 	if opts.LockTTL <= 0 {
 		errs = append(errs, fmt.Errorf("behavior_pending_reconcile.lock_ttl must be greater than 0"))
+	}
+	return errs
+}
+
+func validateBehaviorJourneyScan(opts *BehaviorJourneyScanOptions) []error {
+	if opts == nil || !opts.Enable {
+		return nil
+	}
+	var errs []error
+	if opts.Interval <= 0 {
+		errs = append(errs, fmt.Errorf("behavior_journey_scan.interval must be greater than 0"))
+	}
+	if opts.BatchSize <= 0 {
+		errs = append(errs, fmt.Errorf("behavior_journey_scan.batch_size must be greater than 0"))
+	}
+	if len(opts.OrgIDs) == 0 {
+		errs = append(errs, fmt.Errorf("behavior_journey_scan.org_ids cannot be empty when enabled"))
+	}
+	if opts.LockKey == "" {
+		errs = append(errs, fmt.Errorf("behavior_journey_scan.lock_key cannot be empty when enabled"))
+	}
+	if opts.LockTTL <= 0 {
+		errs = append(errs, fmt.Errorf("behavior_journey_scan.lock_ttl must be greater than 0"))
 	}
 	return errs
 }

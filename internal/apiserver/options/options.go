@@ -30,6 +30,8 @@ type Options struct {
 	Plan                     *PlanOptions                            `json:"plan"      mapstructure:"plan"`
 	PlanScheduler            *PlanSchedulerOptions                   `json:"plan_scheduler" mapstructure:"plan_scheduler"`
 	BehaviorPendingReconcile *BehaviorPendingReconcileOptions        `json:"behavior_pending_reconcile" mapstructure:"behavior_pending_reconcile"`
+	BehaviorJourneyScan      *BehaviorJourneyScanOptions             `json:"behavior_journey_scan" mapstructure:"behavior_journey_scan"`
+	BehaviorFootprint        *BehaviorFootprintOptions               `json:"behavior_footprint" mapstructure:"behavior_footprint"`
 	OutboxRelay              *OutboxRelayOptions                     `json:"outbox_relay" mapstructure:"outbox_relay"`
 	RateLimit                *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	Backpressure             *BackpressureOptions                    `json:"backpressure" mapstructure:"backpressure"`
@@ -60,6 +62,8 @@ func NewOptions() *Options {
 		Plan:                     NewPlanOptions(),
 		PlanScheduler:            NewPlanSchedulerOptions(),
 		BehaviorPendingReconcile: NewBehaviorPendingReconcileOptions(),
+		BehaviorJourneyScan:      NewBehaviorJourneyScanOptions(),
+		BehaviorFootprint:        NewBehaviorFootprintOptions(),
 		OutboxRelay:              NewOutboxRelayOptions(),
 		RateLimit:                NewRateLimitOptions(),
 		Backpressure:             NewBackpressureOptions(),
@@ -248,6 +252,77 @@ func (b *BehaviorPendingReconcileOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&b.LockTTL, "behavior_pending_reconcile.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by the pending behavior reconcile scheduler.")
 }
 
+// BehaviorJourneyScanOptions controls background behavior journey scan projection.
+type BehaviorJourneyScanOptions struct {
+	Enable       bool          `json:"enable" mapstructure:"enable"`
+	OrgIDs       []int64       `json:"org_ids" mapstructure:"org_ids"`
+	InitialDelay time.Duration `json:"initial_delay" mapstructure:"initial_delay"`
+	Interval     time.Duration `json:"interval" mapstructure:"interval"`
+	BatchSize    int           `json:"batch_size" mapstructure:"batch_size"`
+	Lookback     time.Duration `json:"lookback" mapstructure:"lookback"`
+	LockKey      string        `json:"lock_key" mapstructure:"lock_key"`
+	LockTTL      time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
+	Sources      []string      `json:"sources" mapstructure:"sources"`
+	DryRun       bool          `json:"dry_run" mapstructure:"dry_run"`
+}
+
+// NewBehaviorJourneyScanOptions creates default behavior journey scan options.
+func NewBehaviorJourneyScanOptions() *BehaviorJourneyScanOptions {
+	return &BehaviorJourneyScanOptions{
+		Enable:       false,
+		InitialDelay: 2 * time.Minute,
+		Interval:     30 * time.Minute,
+		BatchSize:    1000,
+		Lookback:     2 * time.Hour,
+		LockKey:      "qs:behavior-journey-scan:leader",
+		LockTTL:      25 * time.Minute,
+		Sources: []string{
+			"answersheet",
+			"report",
+		},
+	}
+}
+
+// AddFlags registers behavior journey scan flags.
+func (b *BehaviorJourneyScanOptions) AddFlags(fs *pflag.FlagSet) {
+	if b == nil {
+		return
+	}
+	fs.BoolVar(&b.Enable, "behavior_journey_scan.enable", b.Enable, "Enable background behavior journey scan projection.")
+	fs.Int64SliceVar(&b.OrgIDs, "behavior_journey_scan.org-ids", b.OrgIDs, "Organization IDs included in behavior journey scan.")
+	fs.DurationVar(&b.InitialDelay, "behavior_journey_scan.initial-delay", b.InitialDelay, "Initial delay before starting behavior journey scan.")
+	fs.DurationVar(&b.Interval, "behavior_journey_scan.interval", b.Interval, "Interval for behavior journey scan ticks.")
+	fs.IntVar(&b.BatchSize, "behavior_journey_scan.batch-size", b.BatchSize, "Maximum facts to scan per source in one tick.")
+	fs.DurationVar(&b.Lookback, "behavior_journey_scan.lookback", b.Lookback, "Lookback window when no watermark exists.")
+	fs.StringVar(&b.LockKey, "behavior_journey_scan.lock-key", b.LockKey, "Redis distributed lock key used by behavior journey scan.")
+	fs.DurationVar(&b.LockTTL, "behavior_journey_scan.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by behavior journey scan.")
+	fs.StringSliceVar(&b.Sources, "behavior_journey_scan.sources", b.Sources, "Scan sources in execution order.")
+	fs.BoolVar(&b.DryRun, "behavior_journey_scan.dry-run", b.DryRun, "Scan facts without writing projections.")
+}
+
+// BehaviorFootprintOptions controls durable footprint event staging.
+type BehaviorFootprintOptions struct {
+	DisableDurableEventTypes []string `json:"disable_durable_event_types" mapstructure:"disable_durable_event_types"`
+}
+
+// NewBehaviorFootprintOptions creates default footprint staging options.
+func NewBehaviorFootprintOptions() *BehaviorFootprintOptions {
+	return &BehaviorFootprintOptions{
+		DisableDurableEventTypes: []string{
+			"footprint.answersheet_submitted",
+			"footprint.report_generated",
+		},
+	}
+}
+
+// AddFlags registers footprint staging flags.
+func (b *BehaviorFootprintOptions) AddFlags(fs *pflag.FlagSet) {
+	if b == nil {
+		return
+	}
+	fs.StringSliceVar(&b.DisableDurableEventTypes, "behavior_footprint.disable-durable-event-types", b.DisableDurableEventTypes, "Footprint event types that must not enter durable outbox.")
+}
+
 // OutboxRelayOptions controls durable outbox relay loops inside qs-apiserver.
 type OutboxRelayOptions struct {
 	Mongo      *OutboxRelayStoreOptions `json:"mongo" mapstructure:"mongo"`
@@ -349,6 +424,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Plan.AddFlags(fss.FlagSet("plan"))
 	o.PlanScheduler.AddFlags(fss.FlagSet("plan_scheduler"))
 	o.BehaviorPendingReconcile.AddFlags(fss.FlagSet("behavior_pending_reconcile"))
+	o.BehaviorJourneyScan.AddFlags(fss.FlagSet("behavior_journey_scan"))
+	o.BehaviorFootprint.AddFlags(fss.FlagSet("behavior_footprint"))
 	o.OutboxRelay.AddFlags(fss.FlagSet("outbox_relay"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.Backpressure.AddFlags(fss.FlagSet("backpressure"))

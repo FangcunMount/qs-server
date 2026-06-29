@@ -1,6 +1,7 @@
 package statistics
 
 import (
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -18,8 +19,10 @@ type InstallHost interface {
 // InstallFrom wires and registers the statistics module using composition-root host inputs.
 func InstallFrom(host InstallHost) error {
 	var answerSheetReader surveyreadmodel.AnswerSheetReader
+	var answerSheetScanSource statisticsApp.AnswerSheetScanSource
 	if infra := host.SurveyScaleInfra(); infra != nil {
 		answerSheetReader = infra.AnswerSheetReader
+		answerSheetScanSource = infra.AnswerSheetRepo
 	}
 	module, err := Wire(WireInput{
 		MySQLDB:                host.MySQLDB(),
@@ -27,6 +30,7 @@ func InstallFrom(host InstallHost) error {
 		FallbackRedisClient:    host.CacheClient(cacheplane.FamilyQuery),
 		CacheBuilder:           host.CacheBuilder(cacheplane.FamilyQuery),
 		AnswerSheetReader:      answerSheetReader,
+		AnswerSheetScanSource:  answerSheetScanSource,
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
 		QueryPolicy:            host.CachePolicy(cachepolicy.PolicyStatsQuery),
 		HotsetRecorder:         host.HotsetRecorder(),
