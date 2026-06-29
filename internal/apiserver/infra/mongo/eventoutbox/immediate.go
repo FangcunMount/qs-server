@@ -44,6 +44,7 @@ func (s *Store) MarkEventsPublished(ctx context.Context, eventIDs []string, publ
 			"published_at": transition.PublishedAt,
 			"updated_at":   transition.UpdatedAt,
 		},
+		"$unset": bson.M{"claim_token": ""},
 	})
 	return err
 }
@@ -53,19 +54,28 @@ func (s *Store) MarkEventsFailed(ctx context.Context, failures []outboxport.Fail
 		return nil
 	}
 	now := time.Now()
+	models := make([]mongo.WriteModel, 0, len(failures))
 	for _, failure := range failures {
-		transition := outboxcore.NewFailedTransition(failure.LastError, nextAttemptAt, now)
-		if _, err := s.coll.UpdateOne(ctx, bson.M{"event_id": failure.EventID}, bson.M{
-			"$set": bson.M{
-				"status":          transition.Status,
-				"last_error":      transition.LastError,
-				"next_attempt_at": transition.NextAttemptAt,
-				"updated_at":      transition.UpdatedAt,
-			},
-			"$inc": bson.M{"attempt_count": transition.AttemptIncrement},
-		}); err != nil {
-			return err
+		if failure.EventID == "" {
+			continue
 		}
+		transition := outboxcore.NewFailedTransition(failure.LastError, nextAttemptAt, now)
+		models = append(models, mongo.NewUpdateOneModel().
+			SetFilter(bson.M{"event_id": failure.EventID}).
+			SetUpdate(bson.M{
+				"$set": bson.M{
+					"status":          transition.Status,
+					"last_error":      transition.LastError,
+					"next_attempt_at": transition.NextAttemptAt,
+					"updated_at":      transition.UpdatedAt,
+				},
+				"$inc":   bson.M{"attempt_count": transition.AttemptIncrement},
+				"$unset": bson.M{"claim_token": ""},
+			}))
 	}
-	return nil
+	if len(models) == 0 {
+		return nil
+	}
+	_, err := s.coll.BulkWrite(ctx, models)
+	return err
 }

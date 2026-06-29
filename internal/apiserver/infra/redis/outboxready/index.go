@@ -12,6 +12,24 @@ import (
 
 const keyPrefix = "outbox:ready"
 
+// Atomically ZRANGEBYSCORE due members then ZREM them so concurrent relays do not
+// read the same IDs. Mongo outbox remains the truth source; Reconciler backfills
+// rows that were popped but not durably claimed.
+var claimDueIDsScript = redis.NewScript(`
+local key = KEYS[1]
+local max_score = ARGV[1]
+local limit = tonumber(ARGV[2])
+if limit <= 0 then
+	return {}
+end
+local members = redis.call('ZRANGEBYSCORE', key, '-inf', max_score, 'LIMIT', 0, limit)
+if #members == 0 then
+	return {}
+end
+redis.call('ZREM', key, unpack(members))
+return members
+`)
+
 // Index is a best-effort Redis ZSet scheduler for outbox pending events.
 type Index struct {
 	client redis.UniversalClient
@@ -62,11 +80,14 @@ func (i *Index) ClaimDueIDs(ctx context.Context, bucket string, limit int, now t
 	}
 	key := fmt.Sprintf("%s:%s", keyPrefix, bucket)
 	max := strconv.FormatInt(now.UnixMilli(), 10)
-	return i.client.ZRangeByScore(ctx, key, &redis.ZRangeBy{
-		Min:   "-inf",
-		Max:   max,
-		Count: int64(limit),
-	}).Result()
+	result, err := claimDueIDsScript.Run(ctx, i.client, []string{key}, max, limit).StringSlice()
+	if err == redis.Nil {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return result, nil
 }
 
 func (i *Index) Reconcile(ctx context.Context, bucket string, eventIDs []string, nextAttemptAt time.Time) error {

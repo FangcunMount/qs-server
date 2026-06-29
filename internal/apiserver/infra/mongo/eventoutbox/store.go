@@ -36,6 +36,7 @@ type OutboxPO struct {
 	CreatedAt     time.Time `bson:"created_at"`
 	UpdatedAt     time.Time `bson:"updated_at"`
 	PublishedAt   time.Time `bson:"published_at,omitempty"`
+	ClaimToken    string    `bson:"claim_token,omitempty"`
 }
 
 func (OutboxPO) CollectionName() string {
@@ -171,6 +172,15 @@ func mongoOutboxIndexModels() []mongo.IndexModel {
 			},
 			Options: options.Index().SetName("idx_status_created_at"),
 		},
+		{
+			Keys: bson.D{
+				{Key: "claim_token", Value: 1},
+				{Key: "status", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_claim_token_status").
+				SetPartialFilterExpression(bson.M{"status": outboxcore.StatusPublishing}),
+		},
 	}
 }
 
@@ -267,7 +277,7 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 
 	pendingQuota := limit - len(claimed)
 	if pendingQuota > 0 {
-		items, err := s.claimPending(ctx, pendingQuota, now)
+		items, err := s.claimPendingBatch(ctx, pendingQuota, now)
 		if err != nil {
 			return nil, err
 		}
@@ -292,28 +302,6 @@ func (s *Store) ClaimDueEvents(ctx context.Context, limit int, now time.Time) ([
 			return nil, err
 		}
 		claimed = append(claimed, items...)
-	}
-
-	return claimed, nil
-}
-
-func (s *Store) claimPending(ctx context.Context, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
-	if limit <= 0 {
-		return nil, nil
-	}
-
-	claimed := make([]outboxport.PendingEvent, 0, limit)
-	for _, query := range pendingClaimQueries(now, s.priorityTiers) {
-		for len(claimed) < limit {
-			item, found, err := s.claimOne(ctx, query.filter, query.sort, now)
-			if err != nil {
-				return nil, err
-			}
-			if !found {
-				break
-			}
-			claimed = append(claimed, item)
-		}
 	}
 
 	return claimed, nil
@@ -380,78 +368,17 @@ func normalizePriorityEventTypes(eventTypes []string) []string {
 }
 
 func (s *Store) claimDueByNextAttempt(ctx context.Context, status string, limit int, now time.Time) ([]outboxport.PendingEvent, error) {
-	if limit <= 0 {
-		return nil, nil
-	}
-
-	claimed := make([]outboxport.PendingEvent, 0, limit)
-	for len(claimed) < limit {
-		item, found, err := s.claimOne(ctx, bson.M{
-			"status":          status,
-			"next_attempt_at": bson.M{"$lte": now},
-		}, bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "created_at", Value: 1}}, now)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			break
-		}
-		claimed = append(claimed, item)
-	}
-
-	return claimed, nil
+	return s.claimBatchByFilter(ctx, bson.M{
+		"status":          status,
+		"next_attempt_at": bson.M{"$lte": now},
+	}, bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "created_at", Value: 1}}, limit, now)
 }
 
 func (s *Store) claimStalePublishing(ctx context.Context, limit int, now, staleBefore time.Time) ([]outboxport.PendingEvent, error) {
-	if limit <= 0 {
-		return nil, nil
-	}
-
-	claimed := make([]outboxport.PendingEvent, 0, limit)
-	for len(claimed) < limit {
-		item, found, err := s.claimOne(ctx, bson.M{
-			"status":     outboxcore.StatusPublishing,
-			"updated_at": bson.M{"$lte": staleBefore},
-		}, bson.D{{Key: "updated_at", Value: 1}, {Key: "created_at", Value: 1}}, now)
-		if err != nil {
-			return nil, err
-		}
-		if !found {
-			break
-		}
-		claimed = append(claimed, item)
-	}
-
-	return claimed, nil
-}
-
-func (s *Store) claimOne(ctx context.Context, filter interface{}, sort bson.D, now time.Time) (outboxport.PendingEvent, bool, error) {
-	update := bson.M{
-		"$set": bson.M{
-			"status":     outboxcore.StatusPublishing,
-			"updated_at": now,
-		},
-	}
-	opts := options.FindOneAndUpdate().
-		SetSort(sort).
-		SetReturnDocument(options.After)
-
-	var po OutboxPO
-	if err := s.coll.FindOneAndUpdate(ctx, filter, update, opts).Decode(&po); err != nil {
-		if err == mongo.ErrNoDocuments {
-			return outboxport.PendingEvent{}, false, nil
-		}
-		return outboxport.PendingEvent{}, false, err
-	}
-
-	pending, err := outboxcore.DecodePendingEvent(po.EventID, po.PayloadJSON)
-	if err != nil {
-		transition := outboxcore.NewDecodeFailureTransition(err, time.Now())
-		_ = s.MarkEventFailed(ctx, po.EventID, transition.LastError, transition.NextAttemptAt)
-		return outboxport.PendingEvent{}, false, nil
-	}
-
-	return pending, true, nil
+	return s.claimBatchByFilter(ctx, bson.M{
+		"status":     outboxcore.StatusPublishing,
+		"updated_at": bson.M{"$lte": staleBefore},
+	}, bson.D{{Key: "updated_at", Value: 1}, {Key: "created_at", Value: 1}}, limit, now)
 }
 
 func minInt(a, b int) int {
@@ -469,6 +396,7 @@ func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishe
 			"published_at": transition.PublishedAt,
 			"updated_at":   transition.UpdatedAt,
 		},
+		"$unset": bson.M{"claim_token": ""},
 	})
 	if err != nil {
 		return err
@@ -491,6 +419,7 @@ func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, 
 		"$inc": bson.M{
 			"attempt_count": transition.AttemptIncrement,
 		},
+		"$unset": bson.M{"claim_token": ""},
 	})
 	if err != nil {
 		return err

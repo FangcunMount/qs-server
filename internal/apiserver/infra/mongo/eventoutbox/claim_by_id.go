@@ -13,39 +13,28 @@ func (s *Store) ClaimEventsByIDs(ctx context.Context, eventIDs []string, now tim
 	if s == nil || s.coll == nil || len(eventIDs) == 0 {
 		return nil, nil
 	}
+	eventIDs = compactUniqueEventIDs(eventIDs)
+	if len(eventIDs) == 0 {
+		return nil, nil
+	}
 
 	staleBefore := now.Add(-s.publishingStaleFor)
-	sortDue := bson.D{{Key: "next_attempt_at", Value: 1}, {Key: "created_at", Value: 1}}
-	sortStale := bson.D{{Key: "updated_at", Value: 1}, {Key: "created_at", Value: 1}}
-
-	claimed := make([]outboxport.PendingEvent, 0, len(eventIDs))
-	for _, eventID := range eventIDs {
-		if eventID == "" {
-			continue
-		}
-		item, found, err := s.claimOne(ctx, bson.M{
-			"event_id":        eventID,
-			"status":          bson.M{"$in": []string{outboxcore.StatusPending, outboxcore.StatusFailed}},
-			"next_attempt_at": bson.M{"$lte": now},
-		}, sortDue, now)
-		if err != nil {
-			return nil, err
-		}
-		if found {
-			claimed = append(claimed, item)
-			continue
-		}
-		item, found, err = s.claimOne(ctx, bson.M{
-			"event_id":   eventID,
-			"status":     outboxcore.StatusPublishing,
-			"updated_at": bson.M{"$lte": staleBefore},
-		}, sortStale, now)
-		if err != nil {
-			return nil, err
-		}
-		if found {
-			claimed = append(claimed, item)
-		}
+	dueFilter := bson.M{
+		"event_id": bson.M{"$in": eventIDs},
+		"$or": []bson.M{
+			{
+				"status":          outboxcore.StatusPending,
+				"next_attempt_at": bson.M{"$lte": now},
+			},
+			{
+				"status":          outboxcore.StatusFailed,
+				"next_attempt_at": bson.M{"$lte": now},
+			},
+			{
+				"status":     outboxcore.StatusPublishing,
+				"updated_at": bson.M{"$lte": staleBefore},
+			},
+		},
 	}
-	return claimed, nil
+	return s.claimBatchByFilter(ctx, dueFilter, bson.D{{Key: "created_at", Value: 1}}, len(eventIDs), now)
 }

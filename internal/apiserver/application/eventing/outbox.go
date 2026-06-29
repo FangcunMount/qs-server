@@ -312,7 +312,6 @@ func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]Pend
 					break
 				}
 				claimed = append(claimed, batch...)
-				r.pruneUnclaimedReadyIndexIDs(ctx, ids, batch)
 			}
 		}
 		if len(claimed) > 0 {
@@ -325,27 +324,6 @@ func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]Pend
 		return nil, err
 	}
 	return fallback, nil
-}
-
-func (r *outboxRelay) pruneUnclaimedReadyIndexIDs(ctx context.Context, requested []string, claimed []PendingOutboxEvent) {
-	if r == nil || r.readyIndex == nil || len(requested) == 0 {
-		return
-	}
-	claimedIDs := make(map[string]struct{}, len(claimed))
-	for _, pending := range claimed {
-		if pending.EventID != "" {
-			claimedIDs[pending.EventID] = struct{}{}
-		}
-	}
-	for _, eventID := range requested {
-		if eventID == "" {
-			continue
-		}
-		if _, ok := claimedIDs[eventID]; ok {
-			continue
-		}
-		_ = r.readyIndex.RemoveByEventID(ctx, eventID)
-	}
 }
 
 func pendingEventForFailure(failure outboxport.FailedMark) PendingOutboxEvent {

@@ -130,6 +130,10 @@ func TestMongoOutboxIndexModelsCoverHotRelayAndStatusQueries(t *testing.T) {
 		{Key: "status", Value: 1},
 		{Key: "created_at", Value: 1},
 	})
+	assertMongoIndex(t, indexes, "idx_claim_token_status", bson.D{
+		{Key: "claim_token", Value: 1},
+		{Key: "status", Value: 1},
+	})
 }
 
 func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
