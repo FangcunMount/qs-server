@@ -11,6 +11,7 @@ import (
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	operatorapp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
@@ -47,13 +48,14 @@ type routeSpec struct {
 type Deps struct {
 	RateLimit *options.RateLimitOptions
 
-	Survey     SurveyDeps
-	Scale      ScaleDeps
-	Actor      ActorDeps
-	Evaluation EvaluationDeps
-	Plan       PlanDeps
-	Statistics StatisticsDeps
-	Workbench  WorkbenchDeps
+	Survey          SurveyDeps
+	AssessmentModel AssessmentModelDeps
+	Scale           ScaleDeps
+	Actor           ActorDeps
+	Evaluation      EvaluationDeps
+	Plan            PlanDeps
+	Statistics      StatisticsDeps
+	Workbench       WorkbenchDeps
 
 	CodesService            codesapp.CodesService
 	QRCodeObjectStore       objectstorageport.PublicObjectStore
@@ -79,6 +81,10 @@ type ScaleDeps struct {
 	QueryService     scaleApp.ScaleQueryService
 	CategoryService  scaleApp.ScaleCategoryService
 	QRCodeService    scaleApp.ScaleQRCodeQueryService
+}
+
+type AssessmentModelDeps struct {
+	Service assessmentModelApp.Service
 }
 
 type ActorDeps struct {

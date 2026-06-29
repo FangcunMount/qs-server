@@ -1784,6 +1784,378 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.Response'
+  /assessment-models:
+    get:
+      tags:
+      - AssessmentModel
+      summary: 查询统一测评模型列表
+      operationId: listAssessmentModels
+      parameters:
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum: [personality, behavior_ability]
+      - name: status
+        in: query
+        schema:
+          type: string
+          enum: [draft, published, archived]
+      - name: keyword
+        in: query
+        schema:
+          type: string
+      - name: category
+        in: query
+        schema:
+          type: string
+      - name: page
+        in: query
+        required: true
+        schema:
+          type: integer
+      - name: page_size
+        in: query
+        required: true
+        schema:
+          type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+    post:
+      tags:
+      - AssessmentModel
+      summary: 创建统一测评模型
+      operationId: createAssessmentModel
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/options:
+    get:
+      tags:
+      - AssessmentModel
+      summary: 获取统一测评模型选项
+      operationId: getAssessmentModelOptions
+      parameters:
+      - name: kind
+        in: query
+        schema:
+          type: string
+          enum: [personality, behavior_ability]
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}:
+    get:
+      tags:
+      - AssessmentModel
+      summary: 获取统一测评模型详情
+      operationId: getAssessmentModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+    delete:
+      tags:
+      - AssessmentModel
+      summary: 删除统一测评模型
+      operationId: deleteAssessmentModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/archive:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 归档统一测评模型
+      operationId: archiveAssessmentModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/basic-info:
+    put:
+      tags:
+      - AssessmentModel
+      summary: 更新统一测评模型基础信息
+      operationId: updateAssessmentModelBasicInfo
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/codes/apply:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 申请模型内部稳定编码
+      operationId: applyAssessmentModelCodes
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/definition:
+    get:
+      tags:
+      - AssessmentModel
+      summary: 获取统一测评模型配置定义
+      operationId: getAssessmentModelDefinition
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+    put:
+      tags:
+      - AssessmentModel
+      summary: 更新统一测评模型配置定义
+      operationId: updateAssessmentModelDefinition
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/preview-report:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 预览统一测评模型报告
+      operationId: previewAssessmentModelReport
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/publish:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 发布统一测评模型
+      operationId: publishAssessmentModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/qrcode:
+    get:
+      tags:
+      - AssessmentModel
+      summary: 获取统一测评模型分享二维码
+      operationId: getAssessmentModelQRCode
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/questionnaire:
+    get:
+      tags:
+      - AssessmentModel
+      summary: 获取统一测评模型绑定问卷
+      operationId: getAssessmentModelQuestionnaire
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+    put:
+      tags:
+      - AssessmentModel
+      summary: 绑定统一测评模型问卷版本
+      operationId: bindAssessmentModelQuestionnaire
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/unpublish:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 下架统一测评模型
+      operationId: unpublishAssessmentModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
+  /assessment-models/{code}/validate:
+    post:
+      tags:
+      - AssessmentModel
+      summary: 校验统一测评模型
+      operationId: validateAssessmentModel
+      parameters:
+      - name: code
+        in: path
+        required: true
+        schema:
+          type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/core.Response'
   /questionnaires:
     get:
       tags:

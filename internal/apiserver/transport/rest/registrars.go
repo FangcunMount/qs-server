@@ -78,6 +78,7 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 
 	r.registerUserProtectedRoutes(apiV1)
 	r.registerQuestionnaireProtectedRoutes(apiV1)
+	r.registerAssessmentModelProtectedRoutes(apiV1)
 	r.registerAnswersheetProtectedRoutes(apiV1)
 	r.registerScaleProtectedRoutes(apiV1)
 	r.registerEvaluationProtectedRoutes(apiV1)
