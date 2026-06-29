@@ -116,6 +116,7 @@ func (c *Container) SurveyPorts() compose.SurveyPorts {
 	ports := compose.SurveyPorts{}
 	if c.SurveyModule != nil && c.SurveyModule.Questionnaire != nil {
 		ports.QuestionnairePublisher = c.SurveyModule.Questionnaire.LifecycleService
+		ports.QuestionnaireQuery = c.SurveyModule.Questionnaire.QueryService
 	}
 	return ports
 }

@@ -31,6 +31,8 @@ type ModelRepository interface {
 type PublishedModelRepository interface {
 	Save(ctx context.Context, snapshot *domain.PublishedModelSnapshot) error
 	FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
+	FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
+	FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*domain.PublishedModelSnapshot, error)
 	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error)
 	DeletePublished(ctx context.Context, kind domain.Kind, code string) error
 }

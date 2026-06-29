@@ -24,7 +24,7 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 		return nil, fmt.Errorf("personality model definition is empty")
 	}
 
-	runtime, err := decodeRuntimeSpec(model)
+	runtime, err := RuntimeSpecFromModel(model)
 	if err != nil {
 		return nil, err
 	}
@@ -65,7 +65,8 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	}, nil
 }
 
-func decodeRuntimeSpec(model *domain.AssessmentModel) (*modeltypology.RuntimeSpec, error) {
+// RuntimeSpecFromModel decodes the draft model definition into the runtime execution spec.
+func RuntimeSpecFromModel(model *domain.AssessmentModel) (*modeltypology.RuntimeSpec, error) {
 	var payload modeltypology.Payload
 	if err := json.Unmarshal(model.Definition.Data, &payload); err == nil && (payload.HasExplicitRuntime() || payload.Algorithm != "" || len(payload.Dimensions) > 0) {
 		if payload.Algorithm == "" {
@@ -85,9 +86,6 @@ func decodeRuntimeSpec(model *domain.AssessmentModel) (*modeltypology.RuntimeSpe
 }
 
 func modelVersionString(model *domain.AssessmentModel) string {
-	if model.Binding.QuestionnaireVersion != "" {
-		return model.Binding.QuestionnaireVersion
-	}
 	return "v" + strconv.FormatInt(model.Version, 10)
 }
 

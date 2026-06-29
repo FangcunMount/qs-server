@@ -30,6 +30,7 @@ type WireInput struct {
 	CacheSignalNotifier    scaleLifecycle.CacheSignalNotifier
 	ScaleInfra             *surveymod.ScaleInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
+	QuestionnaireQuery     quesApp.QuestionnaireQueryService
 }
 
 // Wire builds and bootstraps the assessment-model module from composition inputs.
@@ -43,7 +44,7 @@ func Wire(in WireInput) (*Module, error) {
 	}
 	return Bootstrap(BootstrapInput{
 		Scale:       buildScaleDeps(in),
-		Personality: buildPersonalityDeps(in.MongoDB, in.MongoLimiter),
+		Personality: buildPersonalityDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery),
 		Survey:      surveyPorts,
 	})
 }
@@ -72,7 +73,7 @@ func buildScaleDeps(in WireInput) ScaleDeps {
 	return deps
 }
 
-func buildPersonalityDeps(mongoDB *mongo.Database, mongoLimiter backpressure.Acquirer) PersonalityDeps {
+func buildPersonalityDeps(mongoDB *mongo.Database, mongoLimiter backpressure.Acquirer, questionnaireQuery quesApp.QuestionnaireQueryService) PersonalityDeps {
 	if mongoDB == nil {
 		return PersonalityDeps{}
 	}
@@ -87,5 +88,6 @@ func buildPersonalityDeps(mongoDB *mongo.Database, mongoLimiter backpressure.Acq
 		PublishedAlgorithmLister: dualStore,
 		ModelRepo:                draftRepo,
 		PublishedRepo:            publishedRepo,
+		QuestionnaireQuery:       questionnaireQuery,
 	}
 }

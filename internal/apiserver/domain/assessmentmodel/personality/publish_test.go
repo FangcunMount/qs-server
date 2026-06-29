@@ -45,6 +45,12 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 	if snapshot.Model.Algorithm != domain.AlgorithmMBTI {
 		t.Fatalf("algorithm = %s", snapshot.Model.Algorithm)
 	}
+	if snapshot.Model.Version != "v3" {
+		t.Fatalf("model version = %s, want v3", snapshot.Model.Version)
+	}
+	if snapshot.Model.Version == snapshot.Binding.QuestionnaireVersion {
+		t.Fatalf("model version should not reuse questionnaire version %s", snapshot.Binding.QuestionnaireVersion)
+	}
 	legacy := domain.LegacyFromPublished(snapshot)
 	if legacy.Definition.Kind != domain.KindMBTIMigration {
 		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)

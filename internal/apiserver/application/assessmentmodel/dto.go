@@ -5,11 +5,16 @@ import "encoding/json"
 const (
 	KindPersonality                    = "personality"
 	KindBehaviorAbility                = "behavior_ability"
+	KindMedicalScale                   = "medical_scale"
+	KindCognitive                      = "cognitive"
+	KindCustom                         = "custom"
 	SubKindTypology                    = "typology"
+	SubKindScale                       = "scale"
 	StatusDraft                        = "draft"
 	StatusPublished                    = "published"
 	StatusArchived                     = "archived"
 	PayloadFormatScaleV1               = "assessmentmodel.behavior_ability.scale.v1"
+	PayloadFormatMedicalScaleV1        = "assessmentmodel.medical_scale.scale.v1"
 	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
 )
 

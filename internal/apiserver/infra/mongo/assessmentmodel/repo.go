@@ -125,6 +125,29 @@ func (r *Repository) FindPublishedByModelCode(ctx context.Context, kind domain.K
 	return r.findOne(ctx, filter)
 }
 
+func (r *Repository) FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
+	if code == "" {
+		return nil, domain.ErrNotFound
+	}
+	filter := publishedFilter(bson.M{
+		"model_kind": string(kind),
+		"model_code": code,
+	})
+	return r.findLatest(ctx, filter)
+}
+
+func (r *Repository) FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*domain.Snapshot, error) {
+	if code == "" || version == "" {
+		return nil, domain.ErrNotFound
+	}
+	filter := publishedFilter(bson.M{
+		"model_kind":    string(kind),
+		"model_code":    code,
+		"model_version": version,
+	})
+	return r.findOne(ctx, filter)
+}
+
 func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
 	page := filter.Page
 	if page <= 0 {
@@ -279,6 +302,23 @@ func (r *Repository) findOne(ctx context.Context, filter bson.M) (*domain.Snapsh
 	}
 	var po PublishedAssessmentModelPO
 	err = r.FindOne(ctx, filter, &po)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			return nil, domain.ErrNotFound
+		}
+		return nil, err
+	}
+	return r.mapper.ToLegacySnapshot(&po), nil
+}
+
+func (r *Repository) findLatest(ctx context.Context, filter bson.M) (*domain.Snapshot, error) {
+	var po PublishedAssessmentModelPO
+	opts := options.FindOne().SetSort(bson.D{
+		{Key: "published_at", Value: -1},
+		{Key: "updated_at", Value: -1},
+		{Key: "model_version", Value: -1},
+	})
+	err := r.Collection().FindOne(ctx, filter, opts).Decode(&po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, domain.ErrNotFound

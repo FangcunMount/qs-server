@@ -153,9 +153,6 @@ func (m *AssessmentModel) MarkPublished(now time.Time) error {
 	if m.IsArchived() {
 		return fmt.Errorf("%w: archived model cannot be published", ErrInvalidState)
 	}
-	if m.IsPublished() {
-		return fmt.Errorf("%w: model is already published", ErrInvalidState)
-	}
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}

@@ -30,6 +30,7 @@ func InstallFrom(host InstallHost) error {
 		CacheSignalNotifier:    host.CacheSignalNotifier(),
 		ScaleInfra:             infra,
 		QuestionnairePublisher: host.SurveyPorts().QuestionnairePublisher,
+		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
 	})
 	if err != nil {
 		return err

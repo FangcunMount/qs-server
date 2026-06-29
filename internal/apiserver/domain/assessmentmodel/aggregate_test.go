@@ -53,6 +53,35 @@ func TestPersonalityModelLifecycle(t *testing.T) {
 	}
 }
 
+func TestPublishedModelCanBeRepublished(t *testing.T) {
+	now := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code:      "personality_republish",
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmMBTI,
+		Title:     "Republish",
+		Now:       now,
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel() error = %v", err)
+	}
+	if err := model.MarkPublished(now); err != nil {
+		t.Fatalf("first MarkPublished() error = %v", err)
+	}
+	firstVersion := model.Version
+	later := now.Add(time.Hour)
+	if err := model.MarkPublished(later); err != nil {
+		t.Fatalf("second MarkPublished() error = %v", err)
+	}
+	if model.Version != firstVersion+1 {
+		t.Fatalf("version = %d, want %d", model.Version, firstVersion+1)
+	}
+	if model.PublishedAt == nil || !model.PublishedAt.Equal(later) {
+		t.Fatalf("published_at = %v, want %v", model.PublishedAt, later)
+	}
+}
+
 func TestArchiveCannotEdit(t *testing.T) {
 	now := time.Date(2026, 6, 29, 10, 0, 0, 0, time.UTC)
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{

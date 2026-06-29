@@ -40,6 +40,7 @@ type ActorIAMPorts struct {
 // SurveyPorts exposes survey-side outputs needed by downstream modules.
 type SurveyPorts struct {
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
+	QuestionnaireQuery     quesApp.QuestionnaireQueryService
 }
 
 // ActorPorts exposes actor-side outputs needed by downstream modules.

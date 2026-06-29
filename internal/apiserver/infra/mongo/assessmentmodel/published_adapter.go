@@ -29,10 +29,25 @@ func (a *PublishedModelRepoAdapter) Save(ctx context.Context, snapshot *domain.P
 }
 
 func (a *PublishedModelRepoAdapter) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+	return a.FindLatestPublishedByModelCode(ctx, kind, code)
+}
+
+func (a *PublishedModelRepoAdapter) FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
 	if a == nil || a.inner == nil {
 		return nil, domain.ErrNotFound
 	}
-	legacy, err := a.inner.FindPublishedByModelCode(ctx, kind, code)
+	legacy, err := a.inner.FindLatestPublishedByModelCode(ctx, kind, code)
+	if err != nil {
+		return nil, err
+	}
+	return domain.PublishedFromLegacy(legacy), nil
+}
+
+func (a *PublishedModelRepoAdapter) FindPublishedByModelCodeVersion(ctx context.Context, kind domain.Kind, code, version string) (*domain.PublishedModelSnapshot, error) {
+	if a == nil || a.inner == nil {
+		return nil, domain.ErrNotFound
+	}
+	legacy, err := a.inner.FindPublishedByModelCodeVersion(ctx, kind, code, version)
 	if err != nil {
 		return nil, err
 	}

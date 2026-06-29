@@ -63,7 +63,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 	if dto.PageSize <= 0 {
 		dto.PageSize = 20
 	}
-	if dto.Kind != "" && dto.Kind != KindBehaviorAbility && dto.Kind != KindPersonality {
+	if dto.Kind != "" && !IsSupportedAPIKind(dto.Kind) {
 		return nil, invalidArgument("模型类型无效")
 	}
 
@@ -333,16 +333,20 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 		Kinds: []Option{
 			{Label: "人格测评", Value: KindPersonality},
 			{Label: "行为能力测评", Value: KindBehaviorAbility},
+			{Label: "医学量表", Value: KindMedicalScale},
+			{Label: "认知测评", Value: KindCognitive},
+			{Label: "自定义测评", Value: KindCustom},
 		},
 		Algorithms: []Option{
 			{Label: "MBTI", Value: "mbti"},
 			{Label: "SBTI", Value: "sbti"},
 			{Label: "Big Five", Value: "bigfive"},
+			{Label: "自定义类型人格", Value: AlgorithmCustomTypology},
 			{Label: "分数区间解释", Value: "score_range"},
 		},
 		SubKinds: []Option{
 			{Label: "类型人格", Value: "typology"},
-			{Label: "维度评分", Value: "dimension_score"},
+			{Label: "量表评分", Value: SubKindScale},
 		},
 	}
 	if kind == "" || kind == KindBehaviorAbility {
