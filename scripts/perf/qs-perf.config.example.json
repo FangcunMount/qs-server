@@ -322,13 +322,13 @@
     "mixed_300": {
       "duration": "10m",
       "qps": {
-        "medicalQuery": 50,
-        "personalityQuery": 25,
-        "questionnaireQuery": 15,
+        "medicalQuery": 60,
+        "personalityQuery": 30,
+        "questionnaireQuery": 20,
         "submit": 60,
-        "report": 90,
-        "stats": 30,
-        "chainProbe": 0.5
+        "report": 100,
+        "stats": 29,
+        "chainProbe": 1
       },
       "modelMix": {
         "medical": 0.8,
@@ -361,13 +361,13 @@
     "mixed_300_probe": {
       "duration": "10m",
       "qps": {
-        "medicalQuery": 50,
-        "personalityQuery": 25,
-        "questionnaireQuery": 15,
+        "medicalQuery": 60,
+        "personalityQuery": 30,
+        "questionnaireQuery": 20,
         "submit": 60,
-        "report": 90,
-        "stats": 30,
-        "chainProbe": 0.5
+        "report": 100,
+        "stats": 29,
+        "chainProbe": 1
       },
       "modelMix": {
         "medical": 0.8,
@@ -461,13 +461,13 @@
     "capacity_no_scanner": {
       "duration": "10m",
       "qps": {
-        "medicalQuery": 50,
-        "personalityQuery": 25,
-        "questionnaireQuery": 15,
+        "medicalQuery": 60,
+        "personalityQuery": 30,
+        "questionnaireQuery": 20,
         "submit": 60,
-        "report": 90,
-        "stats": 30,
-        "chainProbe": 0.5
+        "report": 100,
+        "stats": 29,
+        "chainProbe": 1
       },
       "chainProbeModelType": "mixed",
       "vusers": {
@@ -481,13 +481,13 @@
     "capacity_with_scanner": {
       "duration": "10m",
       "qps": {
-        "medicalQuery": 50,
-        "personalityQuery": 25,
-        "questionnaireQuery": 15,
+        "medicalQuery": 60,
+        "personalityQuery": 30,
+        "questionnaireQuery": 20,
         "submit": 60,
-        "report": 90,
-        "stats": 30,
-        "chainProbe": 0.5
+        "report": 100,
+        "stats": 29,
+        "chainProbe": 1
       },
       "chainProbeModelType": "mixed",
       "vusers": {

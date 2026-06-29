@@ -228,7 +228,7 @@ export function hasConfigOrEnvQps(keys) {
 }
 
 export function resolveSubmitMix() {
-  const mix = configPathValue(PERF_CONFIG, 'modelMix') || configPathValue(PERF_CONFIG, 'model_mix') || configPathValue(QPS_PROFILE_CONFIG, 'modelMix') || configPathValue(QPS_PROFILE_CONFIG, 'model_mix') || {};
+  const mix = configPathValue(QPS_PROFILE_CONFIG, 'modelMix') || configPathValue(QPS_PROFILE_CONFIG, 'model_mix') || configPathValue(PERF_CONFIG, 'modelMix') || configPathValue(PERF_CONFIG, 'model_mix') || {};
   const medical = Number(mix.medical !== undefined ? mix.medical : mix.medical_scale);
   const personality = Number(mix.personality !== undefined ? mix.personality : mix.personality_model);
   if (Number.isFinite(medical) && Number.isFinite(personality) && medical + personality > 0) {
@@ -482,9 +482,6 @@ export const DISCOVER_TESTEE_LOOKBACK_DAYS = intEnv('DISCOVER_TESTEE_LOOKBACK_DA
 export const DISCOVER_TESTEE_LIMIT = intEnv('DISCOVER_TESTEE_LIMIT', 100);
 export const DISCOVER_ASSESSMENT_LIMIT = intEnv('DISCOVER_ASSESSMENT_LIMIT', 100);
 export const REPORT_TIMEOUT = intEnv('REPORT_TIMEOUT', 20);
-export let STATIC_REPORT_SAMPLES = { medical: [], personality: [] };
-export let STATIC_ANSWER_TEMPLATES = [];
-
 export const RUN_ID = envOrConfigString('RUN_ID', ['runId', 'run_id'], `${Date.now()}`);
 export const IDEMPOTENCY_PREFIX = envOrConfigString('IDEMPOTENCY_PREFIX', ['idempotencyPrefix', 'idempotency_prefix'], `k6-300qps-${RUN_ID}`);
 export const STRICT_THRESHOLDS = boolEnv('STRICT_THRESHOLDS', false);

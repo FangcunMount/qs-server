@@ -1,6 +1,6 @@
-import { sleep } from 'k6';
+import { sleep, check } from 'k6';
 import { scenarioData, buildMedicalSubmitPayload, buildSubmitPayloadFromCase, buildPersonalityCaseFromSession, renderPath } from '../lib/data.js';
-import { timedRequest, authHeaders, jsonHeaders, collectionToken, responseData } from '../lib/http.js';
+import { timedRequest, authHeaders, jsonHeaders, collectionToken, responseData, recordHTTPStatus } from '../lib/http.js';
 import {
   COLLECTION_BASE_URL, SUBMIT_PATH, SUBMIT_STATUS_PATH, ANSWERSHEET_ASSESSMENT_PATH,
   REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, PERSONALITY_REPORT_PATH,
@@ -10,6 +10,7 @@ import {
 import {
   chainProbeFailed, submitToAssessmentLatency, assessmentToReportLatency,
   reportGeneratedLatency, medicalReportGeneratedLatency, personalityReportGeneratedLatency, chainProbeTerminal,
+  personalityReportFetchDuration, personalityReportFetchSuccessRate,
 } from '../lib/metrics.js';
 
 
@@ -60,14 +61,13 @@ export function runAsyncChainProbe(ctx, modelType) {
     chainProbeFailed.add(1, { reason: 'submit_status_timeout', model_type: modelType });
     return;
   }
-  const submitToAssessmentMs = Date.now() - start;
-  submitToAssessmentLatency.add(submitToAssessmentMs, { model_type: modelType });
 
   const assessmentID = lookupAssessmentID(answerSheetID);
   if (!assessmentID) {
     chainProbeFailed.add(1, { reason: 'assessment_lookup_failed', model_type: modelType });
     return;
   }
+  submitToAssessmentLatency.add(Date.now() - start, { model_type: modelType });
 
   const reportPathTemplate = modelType === 'personality' ? PERSONALITY_REPORT_STATUS_PATH : REPORT_STATUS_PATH;
   const assessmentStart = Date.now();
@@ -93,11 +93,19 @@ export function runAsyncChainProbe(ctx, modelType) {
         assessment_id: assessmentID,
         testee_id: payload.testee_id,
       }, ctx);
-      timedRequest('GET', COLLECTION_BASE_URL, reportPath, null, authHeaders(collectionToken()), {
+      const reportRes = timedRequest('GET', COLLECTION_BASE_URL, reportPath, null, authHeaders(collectionToken()), {
         endpoint: 'chain_probe_personality_report',
         service: 'collection-server',
         model_type: modelType,
       });
+      recordHTTPStatus(reportRes, chainProbeFailed, 'chain_probe_personality_report');
+      const reportOk = check(reportRes, { 'personality report fetch status is 200': (r) => r.status === 200 });
+      personalityReportFetchSuccessRate.add(reportOk, { model_type: modelType });
+      personalityReportFetchDuration.add(reportRes.timings.duration, { model_type: modelType });
+      if (!reportOk) {
+        chainProbeFailed.add(1, { reason: 'personality_report_fetch_failed', model_type: modelType });
+        return;
+      }
     }
   } else {
     medicalReportGeneratedLatency.add(totalLatency, latencyTags);

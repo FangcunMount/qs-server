@@ -321,7 +321,6 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
-	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
 
 # ============================================================================
 # CD 发布入口

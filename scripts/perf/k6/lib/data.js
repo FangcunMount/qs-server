@@ -1,6 +1,6 @@
 import { pick, clone, nonEmptyList, uniqueList, uniqueReportSamples, responseItems, dateStringDaysAgo, is2xx, readTextFile, timeSnapshot, addDurationMs } from './util.js';
 import { setupDiscoveryFailed } from './metrics.js';
-import { timedRequest, authHeaders, jsonHeaders, collectionToken, getCollectionData, getApiserverData, recordHTTPStatus } from './http.js';
+import { timedRequest, authHeaders, jsonHeaders, collectionToken, getCollectionData, getApiserverData, recordHTTPStatus, responseData } from './http.js';
 
 import {
   DISCOVER_TESTEE_LOOKBACK_DAYS,
@@ -11,13 +11,11 @@ import {
   PERSONALITY_SESSION_RPS,
   PERSONALITY_MODEL_CODES,
   CHAIN_PROBE_MEDICAL_RPS,
-  STATIC_ANSWER_TEMPLATES,
   AUTO_DISCOVER_SEEDDATA,
   CHAIN_PROBE_MODEL_TYPE,
   PERSONALITY_REPORT_RPS,
   PERSONALITY_SUBMIT_RPS,
   PERSONALITY_QUERY_RPS,
-  STATIC_REPORT_SAMPLES,
   QUESTIONNAIRE_VERSION,
   DISCOVER_TESTEE_LIMIT,
   tokenFileIssueMessage,
@@ -58,12 +56,16 @@ import {
   TOKEN
 } from './config.js';
 
+let staticReportSamples = { medical: [], personality: [] };
+let staticAnswerTemplates = [];
+let staticPersonalityCases = [];
+
 export function scenarioData(data) {
   const fallbackTesteeIDs = TESTEE_IDS;
   const fallbackQuestionnaireCodes = QUESTIONNAIRE_CODES;
-  const fallbackReportSamples = normalizeReportSamples(STATIC_REPORT_SAMPLES);
-  const fallbackMedicalCases = STATIC_ANSWER_TEMPLATES.map((item) => normalizeMedicalCase(item)).filter(Boolean);
-  const fallbackPersonalityCases = [];
+  const fallbackReportSamples = normalizeReportSamples(staticReportSamples);
+  const fallbackMedicalCases = staticAnswerTemplates.map((item) => normalizeMedicalCase(item)).filter(Boolean);
+  const fallbackPersonalityCases = staticPersonalityCases;
   return {
     testeeIDs: nonEmptyList(data && data.testeeIDs, fallbackTesteeIDs),
     questionnaireCodes: nonEmptyList(data && data.questionnaireCodes, fallbackQuestionnaireCodes),
@@ -95,7 +97,7 @@ export function validateScenarioData(data) {
     throw new Error('No medical answer templates found. Set ANSWERS_JSON/ANSWERS_FILE, or provide valid collection tokens and SCALE_CODES for auto discovery. Check setup_discovery_failed plus http_401_total/http_403_total/http_5xx_total in the k6 summary.');
   }
   if (needsPersonalityCases && data.personalityCases.length === 0) {
-    throw new Error('No personality cases found. Set PERSONALITY_MODEL_CODES and ensure collection tokens can POST /personality-assessment-sessions, or provide personality answer templates in config.');
+    throw new Error('No personality cases found. Set PERSONALITY_MODEL_CODES with discoverAnswers=true, or provide personalityCases / personalityCasesFile in config.');
   }
   if ((submitRps > 0 || chainProbeRps > 0) && data.testeeIDs.length === 0) {
     throw new Error(
@@ -494,6 +496,22 @@ export function loadAnswerTemplates() {
   return [];
 }
 
+export function loadPersonalityCases() {
+  const casesFile = envOrConfigString('PERSONALITY_CASES_FILE', ['personalityCasesFile', 'personality_cases_file'], '');
+  if (casesFile) {
+    const parsed = JSON.parse(readTextFile(casesFile, configFileBaseDirs()).content);
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.map((item) => normalizePersonalityCase(item)).filter(Boolean);
+  }
+  const casesJSON = __ENV.PERSONALITY_CASES_JSON || configFirstValue(['personalityCases', 'personality_cases']);
+  if (casesJSON) {
+    const parsed = typeof casesJSON === 'string' ? JSON.parse(casesJSON) : casesJSON;
+    const list = Array.isArray(parsed) ? parsed : [parsed];
+    return list.map((item) => normalizePersonalityCase(item)).filter(Boolean);
+  }
+  return [];
+}
+
 export function loadReportSamples() {
   const reportSamplesFile = envOrConfigString('REPORT_SAMPLES_FILE', ['reportSamplesFile', 'report_samples_file'], '');
   if (reportSamplesFile) {
@@ -518,12 +536,13 @@ export function loadReportSamples() {
 }
 
 export function hydrateStaticFixtures() {
-  STATIC_REPORT_SAMPLES = loadReportSamples();
-  STATIC_ANSWER_TEMPLATES = loadAnswerTemplates();
+  staticReportSamples = loadReportSamples();
+  staticAnswerTemplates = loadAnswerTemplates();
+  staticPersonalityCases = loadPersonalityCases();
 }
 
 export function discoverMedicalCases(testeeIDs) {
-  const fromStatic = STATIC_ANSWER_TEMPLATES.length > 0 ? STATIC_ANSWER_TEMPLATES.map((item) => normalizeMedicalCase(item)).filter(Boolean) : [];
+  const fromStatic = staticAnswerTemplates.length > 0 ? staticAnswerTemplates.map((item) => normalizeMedicalCase(item)).filter(Boolean) : [];
   const questionnaireCodes = uniqueList(QUESTIONNAIRE_CODES.concat(fromStatic.map((item) => String(item.questionnaire_code || ''))));
   if (!DISCOVER_ANSWERS) {
     return { questionnaireCodes, cases: fromStatic };
@@ -706,8 +725,8 @@ export function discoverTesteeIDs() {
 }
 
 export function discoverReportSamples(testeeIDs) {
-  if (STATIC_REPORT_SAMPLES.medical.length > 0 || STATIC_REPORT_SAMPLES.personality.length > 0 || !AUTO_DISCOVER_SEEDDATA || APISERVER_TOKENS.length === 0) {
-    return STATIC_REPORT_SAMPLES;
+  if (staticReportSamples.medical.length > 0 || staticReportSamples.personality.length > 0 || !AUTO_DISCOVER_SEEDDATA || APISERVER_TOKENS.length === 0) {
+    return staticReportSamples;
   }
   return {
     medical: discoverMedicalReportSamples(testeeIDs),

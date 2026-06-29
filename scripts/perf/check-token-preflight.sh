@@ -149,4 +149,5 @@ collection_token="$(first_token "$collection_effective_file")"
 apiserver_token="$(first_token "$apiserver_effective_file")"
 
 http_status "collection scale ${scale_code}" "${collection_base_url%/}/api/v1/scales/${scale_code}" "$collection_token"
+http_status "collection personality models" "${collection_base_url%/}/api/v1/personality-models?page=1&page_size=1" "$collection_token"
 http_status "apiserver testees" "${apiserver_base_url%/}/api/v1/testees?org_id=${org_id}&page=1&page_size=1" "$apiserver_token"

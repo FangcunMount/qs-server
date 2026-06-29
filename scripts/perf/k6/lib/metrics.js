@@ -40,6 +40,7 @@ export const medicalReportGeneratedLatency = new Trend('medical_report_generated
 export const personalityReportGeneratedLatency = new Trend('personality_report_generated_latency', true);
 export const submitToAssessmentLatency = new Trend('submit_to_assessment_latency', true);
 export const assessmentToReportLatency = new Trend('assessment_to_report_latency', true);
+export const personalityReportFetchDuration = new Trend('personality_report_fetch_duration', true);
 
 export const answerSubmitAccepted = new Counter('answer_submit_accepted');
 export const reportStatusPending = new Counter('report_status_pending');
@@ -95,6 +96,7 @@ export const endpointFailureCounters = {
 
 export const answerSubmitSuccessRate = new Rate('answer_submit_success_rate');
 export const reportStatusSuccessRate = new Rate('report_status_success_rate');
+export const personalityReportFetchSuccessRate = new Rate('personality_report_fetch_success_rate');
 
 export const scenarios = {};
 
@@ -119,6 +121,9 @@ export function buildThresholds() {
     thresholds.personality_report_generated_latency = ['p(95)<90000'];
     thresholds.submit_to_assessment_latency = ['p(95)<15000'];
     thresholds.assessment_to_report_latency = ['p(95)<60000'];
+    if (CHAIN_PROBE_PERSONALITY_RPS > 0) {
+      thresholds.personality_report_fetch_success_rate = ['rate>0.99'];
+    }
   }
   if (!STRICT_THRESHOLDS) {
     return thresholds;
