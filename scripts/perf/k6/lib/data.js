@@ -69,6 +69,7 @@ export function scenarioData(data) {
   return {
     testeeIDs: nonEmptyList(data && data.testeeIDs, fallbackTesteeIDs),
     questionnaireCodes: nonEmptyList(data && data.questionnaireCodes, fallbackQuestionnaireCodes),
+    personalityQuestionnaireCodes: nonEmptyList(data && data.personalityQuestionnaireCodes, []),
     scaleCodes: nonEmptyList(data && data.scaleCodes, SCALE_CODES),
     modelCodes: nonEmptyList(data && data.modelCodes, PERSONALITY_MODEL_CODES),
     reportSamples: normalizeReportSamples(data && data.reportSamples, fallbackReportSamples),
@@ -840,4 +841,3 @@ export function renderPath(path, values, data) {
   });
   return rendered;
 }
-

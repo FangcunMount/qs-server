@@ -62,10 +62,9 @@ export function setup() {
     const data = {
       testeeIDs,
       questionnaireCodes: uniqueList(
-        QUESTIONNAIRE_CODES
-          .concat(medicalBundle.questionnaireCodes)
-          .concat(personalityBundle.questionnaireCodes)
+        QUESTIONNAIRE_CODES.concat(medicalBundle.questionnaireCodes)
       ),
+      personalityQuestionnaireCodes: personalityBundle.questionnaireCodes,
       scaleCodes: SCALE_CODES,
       modelCodes: uniqueList(PERSONALITY_MODEL_CODES.concat(personalityBundle.modelCodes)),
       medicalCases: medicalBundle.cases,
