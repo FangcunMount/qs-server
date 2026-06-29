@@ -264,6 +264,7 @@ type BehaviorJourneyScanOptions struct {
 	LockTTL      time.Duration `json:"lock_ttl" mapstructure:"lock_ttl"`
 	Sources      []string      `json:"sources" mapstructure:"sources"`
 	DryRun       bool          `json:"dry_run" mapstructure:"dry_run"`
+	WindowRecalc bool          `json:"window_recalc" mapstructure:"window_recalc"`
 }
 
 // NewBehaviorJourneyScanOptions creates default behavior journey scan options.
@@ -277,9 +278,12 @@ func NewBehaviorJourneyScanOptions() *BehaviorJourneyScanOptions {
 		LockKey:      "qs:behavior-journey-scan:leader",
 		LockTTL:      25 * time.Minute,
 		Sources: []string{
+			"entry_resolve_log",
+			"entry_intake_log",
 			"answersheet",
 			"report",
 		},
+		WindowRecalc: true,
 	}
 }
 
@@ -298,6 +302,7 @@ func (b *BehaviorJourneyScanOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.DurationVar(&b.LockTTL, "behavior_journey_scan.lock-ttl", b.LockTTL, "Redis distributed lock TTL used by behavior journey scan.")
 	fs.StringSliceVar(&b.Sources, "behavior_journey_scan.sources", b.Sources, "Scan sources in execution order.")
 	fs.BoolVar(&b.DryRun, "behavior_journey_scan.dry-run", b.DryRun, "Scan facts without writing projections.")
+	fs.BoolVar(&b.WindowRecalc, "behavior_journey_scan.window-recalc", b.WindowRecalc, "Rebuild statistics_journey_daily for the lookback window after each org scan.")
 }
 
 // BehaviorFootprintOptions controls durable footprint event staging.
@@ -309,6 +314,10 @@ type BehaviorFootprintOptions struct {
 func NewBehaviorFootprintOptions() *BehaviorFootprintOptions {
 	return &BehaviorFootprintOptions{
 		DisableDurableEventTypes: []string{
+			"footprint.entry_opened",
+			"footprint.intake_confirmed",
+			"footprint.testee_profile_created",
+			"footprint.care_relationship_established",
 			"footprint.answersheet_submitted",
 			"footprint.report_generated",
 		},

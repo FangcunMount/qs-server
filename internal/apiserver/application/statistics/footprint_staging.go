@@ -20,6 +20,10 @@ var (
 // DefaultDisabledHighFrequencyFootprintEvents lists footprint events moved to scan projection.
 func DefaultDisabledHighFrequencyFootprintEvents() []string {
 	return []string{
+		eventcatalog.FootprintEntryOpened,
+		eventcatalog.FootprintIntakeConfirmed,
+		eventcatalog.FootprintTesteeProfileCreated,
+		eventcatalog.FootprintCareRelationshipEstablished,
 		eventcatalog.FootprintAnswerSheetSubmitted,
 		eventcatalog.FootprintReportGenerated,
 	}

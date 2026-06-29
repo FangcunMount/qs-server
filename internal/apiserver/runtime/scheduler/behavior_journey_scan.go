@@ -149,12 +149,13 @@ func (r *BehaviorJourneyScanRunner) runOnce(ctx context.Context) error {
 		},
 	}, func(ctx context.Context) error {
 		_, err := r.scanner.ScanDue(ctx, statisticsApp.BehaviorJourneyScanInput{
-			OrgIDs:    r.opts.OrgIDs,
-			Sources:   r.opts.Sources,
-			BatchSize: r.opts.BatchSize,
-			Lookback:  r.opts.Lookback,
-			Now:       time.Now(),
-			DryRun:    r.opts.DryRun,
+			OrgIDs:       r.opts.OrgIDs,
+			Sources:      r.opts.Sources,
+			BatchSize:    r.opts.BatchSize,
+			Lookback:     r.opts.Lookback,
+			Now:          time.Now(),
+			DryRun:       r.opts.DryRun,
+			WindowRecalc: r.opts.WindowRecalc,
 		})
 		return err
 	})

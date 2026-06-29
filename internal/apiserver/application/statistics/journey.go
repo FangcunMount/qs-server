@@ -70,6 +70,9 @@ func (s *behaviorEventStager) stage(ctx context.Context, evt event.DomainEvent) 
 	if s == nil || s.outboxStore == nil || evt == nil {
 		return nil
 	}
+	if !FootprintEventAllowed(evt.EventType()) {
+		return nil
+	}
 	return s.outboxStore.Stage(ctx, evt)
 }
 

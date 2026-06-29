@@ -14,17 +14,27 @@ type BehaviorJourneyScanService interface {
 
 // BehaviorJourneyScanInput controls one scan invocation.
 type BehaviorJourneyScanInput struct {
-	OrgIDs    []int64
-	Sources   []string
-	BatchSize int
-	Lookback  time.Duration
-	Now       time.Time
-	DryRun    bool
+	OrgIDs       []int64
+	Sources      []string
+	BatchSize    int
+	Lookback     time.Duration
+	Now          time.Time
+	DryRun       bool
+	WindowRecalc bool
 }
 
 // BehaviorJourneyScanResult summarizes one scan invocation.
 type BehaviorJourneyScanResult struct {
 	SourceResults []BehaviorJourneyScanSourceResult
+	RecalcResults []BehaviorJourneyScanRecalcResult
+}
+
+// BehaviorJourneyScanRecalcResult summarizes journey daily window recalculation for one org.
+type BehaviorJourneyScanRecalcResult struct {
+	OrgID     int64
+	StartDate time.Time
+	EndDate   time.Time
+	Error     string
 }
 
 // BehaviorJourneyScanSourceResult summarizes one source/org scan batch.
@@ -45,6 +55,9 @@ type BehaviorJourneyScanRepository interface {
 	LoadScanWatermark(ctx context.Context, orgID int64, sourceName string) (*domainStatistics.ScanWatermark, error)
 	SaveScanWatermark(ctx context.Context, watermark *domainStatistics.ScanWatermark) error
 	ListReportGeneratedFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.ReportGeneratedFact, error)
+	ListEntryResolveFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.EntryResolveFact, error)
+	ListEntryIntakeFacts(ctx context.Context, orgID int64, sinceID uint64, sinceTime time.Time, limit int) ([]domainStatistics.EntryIntakeFact, error)
+	RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error
 }
 
 // AnswerSheetScanSource lists submitted answer sheets from Mongo.

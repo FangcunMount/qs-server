@@ -6,8 +6,10 @@ import (
 )
 
 const (
-	ScanSourceAnswerSheet = "answersheet"
-	ScanSourceReport      = "report"
+	ScanSourceEntryResolve = "entry_resolve_log"
+	ScanSourceEntryIntake  = "entry_intake_log"
+	ScanSourceAnswerSheet  = "answersheet"
+	ScanSourceReport       = "report"
 )
 
 const (
@@ -27,6 +29,27 @@ type ScanWatermark struct {
 	ScanWindowEnd   *time.Time
 	Status          string
 	LastError       string
+}
+
+// EntryResolveFact is a scan source row from assessment_entry_resolve_log.
+type EntryResolveFact struct {
+	OrgID       int64
+	ClinicianID uint64
+	EntryID     uint64
+	LogID       uint64
+	OccurredAt  time.Time
+}
+
+// EntryIntakeFact is a scan source row from assessment_entry_intake_log.
+type EntryIntakeFact struct {
+	OrgID             int64
+	ClinicianID       uint64
+	EntryID           uint64
+	TesteeID          uint64
+	LogID             uint64
+	TesteeCreated     bool
+	AssignmentCreated bool
+	OccurredAt        time.Time
 }
 
 // AnswerSheetSubmittedFact is a scan source row for submitted answer sheets.

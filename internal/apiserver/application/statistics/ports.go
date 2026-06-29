@@ -30,6 +30,7 @@ type StatisticsRealtimeReader interface {
 // StatisticsRebuildWriter 定义重建统计数据的接口，提供了重建日常统计、组织快照统计和计划统计的方法。实现该接口的组件负责根据历史数据重新计算统计结果，以修正可能存在的数据错误或更新统计算法后的结果。
 type StatisticsRebuildWriter interface {
 	RebuildDailyStatistics(ctx context.Context, orgID int64, startDate, endDate time.Time) error
+	RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error
 	RebuildOrgSnapshotStatistics(ctx context.Context, orgID int64, todayStart time.Time) error
 	RebuildPlanStatistics(ctx context.Context, orgID int64) error
 }

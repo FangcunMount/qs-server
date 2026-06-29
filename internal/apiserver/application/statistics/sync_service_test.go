@@ -50,6 +50,12 @@ func (s *syncWriterStub) RebuildDailyStatistics(ctx context.Context, _ int64, _,
 	return nil
 }
 
+func (s *syncWriterStub) RebuildJourneyDailyWindow(ctx context.Context, _ int64, _, _ time.Time) error {
+	s.dailyCalled = true
+	s.txCtxSeen = ctx.Value(syncCtxMarker{}) == true
+	return nil
+}
+
 func (s *syncWriterStub) RebuildOrgSnapshotStatistics(ctx context.Context, _ int64, _ time.Time) error {
 	s.orgSnapshotCalled = true
 	s.txCtxSeen = ctx.Value(syncCtxMarker{}) == true

@@ -83,3 +83,74 @@ func (r *StatisticsRepository) ListReportGeneratedFacts(
 	}
 	return facts, nil
 }
+
+// ListEntryResolveFacts scans assessment entry resolve logs.
+func (r *StatisticsRepository) ListEntryResolveFacts(
+	ctx context.Context,
+	orgID int64,
+	sinceID uint64,
+	sinceTime time.Time,
+	limit int,
+) ([]domainStatistics.EntryResolveFact, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	query := r.WithContext(ctx).
+		Model(&AssessmentEntryResolveLogPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
+	if !sinceTime.IsZero() {
+		query = query.Where("(id > ? OR resolved_at > ?)", sinceID, sinceTime)
+	}
+	var rows []AssessmentEntryResolveLogPO
+	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	facts := make([]domainStatistics.EntryResolveFact, 0, len(rows))
+	for _, row := range rows {
+		facts = append(facts, domainStatistics.EntryResolveFact{
+			OrgID:       row.OrgID,
+			ClinicianID: row.ClinicianID,
+			EntryID:     row.EntryID,
+			LogID:       row.ID,
+			OccurredAt:  row.ResolvedAt,
+		})
+	}
+	return facts, nil
+}
+
+// ListEntryIntakeFacts scans assessment entry intake logs.
+func (r *StatisticsRepository) ListEntryIntakeFacts(
+	ctx context.Context,
+	orgID int64,
+	sinceID uint64,
+	sinceTime time.Time,
+	limit int,
+) ([]domainStatistics.EntryIntakeFact, error) {
+	if limit <= 0 {
+		return nil, nil
+	}
+	query := r.WithContext(ctx).
+		Model(&AssessmentEntryIntakeLogPO{}).
+		Where("org_id = ? AND deleted_at IS NULL", orgID)
+	if !sinceTime.IsZero() {
+		query = query.Where("(id > ? OR intake_at > ?)", sinceID, sinceTime)
+	}
+	var rows []AssessmentEntryIntakeLogPO
+	if err := query.Order("id ASC").Limit(limit).Find(&rows).Error; err != nil {
+		return nil, err
+	}
+	facts := make([]domainStatistics.EntryIntakeFact, 0, len(rows))
+	for _, row := range rows {
+		facts = append(facts, domainStatistics.EntryIntakeFact{
+			OrgID:             row.OrgID,
+			ClinicianID:       row.ClinicianID,
+			EntryID:           row.EntryID,
+			TesteeID:          row.TesteeID,
+			LogID:             row.ID,
+			TesteeCreated:     row.TesteeCreated,
+			AssignmentCreated: row.AssignmentCreated,
+			OccurredAt:        row.IntakeAt,
+		})
+	}
+	return facts, nil
+}

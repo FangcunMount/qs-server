@@ -18,8 +18,11 @@ func TestFootprintDurableStagingPolicyDisablesHighFrequencyEvents(t *testing.T) 
 	if FootprintEventAllowed(eventcatalog.FootprintReportGenerated) {
 		t.Fatal("report footprint should be disabled")
 	}
-	if !FootprintEventAllowed(eventcatalog.FootprintEntryOpened) {
-		t.Fatal("entry_opened footprint should remain enabled")
+	if FootprintEventAllowed(eventcatalog.FootprintEntryOpened) {
+		t.Fatal("entry_opened footprint should be disabled")
+	}
+	if FootprintEventAllowed(eventcatalog.FootprintIntakeConfirmed) {
+		t.Fatal("intake_confirmed footprint should be disabled")
 	}
 }
 

@@ -330,6 +330,10 @@ behavior_pending_reconcile:
 
 behavior_footprint:
   disable_durable_event_types:
+    - footprint.entry_opened
+    - footprint.intake_confirmed
+    - footprint.testee_profile_created
+    - footprint.care_relationship_established
     - footprint.answersheet_submitted
     - footprint.report_generated
 
@@ -343,7 +347,10 @@ behavior_journey_scan:
   lock_key: "qs:behavior-journey-scan:leader"
   lock_ttl: "25m"
   dry_run: false
+  window_recalc: true
   sources:
+    - entry_resolve_log
+    - entry_intake_log
     - answersheet
     - report
 

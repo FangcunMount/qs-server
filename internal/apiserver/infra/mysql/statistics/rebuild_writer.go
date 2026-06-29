@@ -31,6 +31,18 @@ func (r *StatisticsRepository) RebuildDailyStatistics(ctx context.Context, orgID
 	return r.rebuildContentDaily(ctx, tx, orgID, startDate, endDate)
 }
 
+// RebuildJourneyDailyWindow rebuilds statistics_journey_daily for a date window.
+func (r *StatisticsRepository) RebuildJourneyDailyWindow(ctx context.Context, orgID int64, startDate, endDate time.Time) error {
+	tx, err := gormuow.RequireTx(ctx)
+	if err != nil {
+		return err
+	}
+	if err := deleteDailyWindow(ctx, tx, "statistics_journey_daily", orgID, startDate, endDate); err != nil {
+		return err
+	}
+	return r.rebuildJourneyDaily(ctx, tx, orgID, startDate, endDate)
+}
+
 func (r *StatisticsRepository) RebuildOrgSnapshotStatistics(ctx context.Context, orgID int64, _ time.Time) error {
 	tx, err := gormuow.RequireTx(ctx)
 	if err != nil {
