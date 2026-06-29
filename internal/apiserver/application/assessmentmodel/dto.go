@@ -3,13 +3,13 @@ package assessmentmodel
 import "encoding/json"
 
 const (
-	KindPersonality      = "personality"
-	KindBehaviorAbility  = "behavior_ability"
-	SubKindTypology      = "typology"
-	StatusDraft          = "draft"
-	StatusPublished      = "published"
-	StatusArchived       = "archived"
-	PayloadFormatScaleV1 = "assessmentmodel.behavior_ability.scale.v1"
+	KindPersonality                    = "personality"
+	KindBehaviorAbility                = "behavior_ability"
+	SubKindTypology                    = "typology"
+	StatusDraft                        = "draft"
+	StatusPublished                    = "published"
+	StatusArchived                     = "archived"
+	PayloadFormatScaleV1               = "assessmentmodel.behavior_ability.scale.v1"
 	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
 )
 

@@ -105,7 +105,7 @@ func TestCreateAndPublishPersonalityModel(t *testing.T) {
 
 	created, err := svc.Create(context.Background(), personality.CreateInput{
 		Code: "personality_mbti_demo", Title: "Demo MBTI", Algorithm: "mbti",
-		SubKind: personality.SubKindTypology,
+		SubKind:           personality.SubKindTypology,
 		QuestionnaireCode: "Q_DEMO", QuestionnaireVersion: "1.0.0",
 	})
 	if err != nil {

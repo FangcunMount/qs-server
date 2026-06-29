@@ -3,11 +3,11 @@ package personality
 import "encoding/json"
 
 const (
-	KindPersonality      = "personality"
-	SubKindTypology      = "typology"
-	StatusDraft          = "draft"
-	StatusPublished      = "published"
-	StatusArchived       = "archived"
+	KindPersonality         = "personality"
+	SubKindTypology         = "typology"
+	StatusDraft             = "draft"
+	StatusPublished         = "published"
+	StatusArchived          = "archived"
 	PayloadFormatTypologyV1 = "assessmentmodel.personality.typology.v1"
 )
 

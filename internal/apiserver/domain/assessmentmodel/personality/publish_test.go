@@ -1,13 +1,13 @@
-package assessmentmodel_test
+package personality_test
 
 import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
 )
 
-func TestBuildPersonalityPublishedSnapshot(t *testing.T) {
+func TestBuildPublishedSnapshot(t *testing.T) {
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 		Code:      "personality_mbti_test",
 		Kind:      domain.KindPersonality,
@@ -35,9 +35,9 @@ func TestBuildPersonalityPublishedSnapshot(t *testing.T) {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 
-	snapshot, err := aminfra.BuildPersonalityPublishedSnapshot(model)
+	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
 	if err != nil {
-		t.Fatalf("BuildPersonalityPublishedSnapshot: %v", err)
+		t.Fatalf("BuildPublishedSnapshot: %v", err)
 	}
 	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
 		t.Fatalf("payload format = %s", snapshot.PayloadFormat)
@@ -45,7 +45,7 @@ func TestBuildPersonalityPublishedSnapshot(t *testing.T) {
 	if snapshot.Model.Algorithm != domain.AlgorithmMBTI {
 		t.Fatalf("algorithm = %s", snapshot.Model.Algorithm)
 	}
-	legacy := aminfra.LegacySnapshotFromPublished(snapshot)
+	legacy := domain.LegacyFromPublished(snapshot)
 	if legacy.Definition.Kind != domain.KindMBTIMigration {
 		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
 	}

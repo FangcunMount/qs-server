@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -236,7 +236,7 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if issues := validateDefinitionPayload(model.Definition.Format, model.Algorithm, model.Definition.Data); len(issues) > 0 {
 		return nil, validationFailed(issues)
 	}
-	snapshot, err := aminfra.BuildPersonalityPublishedSnapshot(model)
+	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}

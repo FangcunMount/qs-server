@@ -13,22 +13,22 @@ import (
 type AssessmentModelPO struct {
 	mongoBase.BaseDocument `bson:",inline"`
 
-	Code                     string     `bson:"code"`
-	Kind                     string     `bson:"kind"`
-	SubKind                  string     `bson:"sub_kind,omitempty"`
-	Algorithm                string     `bson:"algorithm,omitempty"`
-	Title                    string     `bson:"title"`
-	Description              string     `bson:"description,omitempty"`
-	Category                 string     `bson:"category,omitempty"`
-	Tags                     []string   `bson:"tags,omitempty"`
-	Status                   string     `bson:"status"`
-	QuestionnaireCode        string     `bson:"questionnaire_code,omitempty"`
-	QuestionnaireVersion     string     `bson:"questionnaire_version,omitempty"`
-	DefinitionPayloadFormat  string     `bson:"definition_payload_format,omitempty"`
-	DefinitionPayload        []byte     `bson:"definition_payload,omitempty"`
-	Version                  int64      `bson:"version"`
-	PublishedAt              *time.Time `bson:"published_at,omitempty"`
-	ArchivedAt               *time.Time `bson:"archived_at,omitempty"`
+	Code                    string     `bson:"code"`
+	Kind                    string     `bson:"kind"`
+	SubKind                 string     `bson:"sub_kind,omitempty"`
+	Algorithm               string     `bson:"algorithm,omitempty"`
+	Title                   string     `bson:"title"`
+	Description             string     `bson:"description,omitempty"`
+	Category                string     `bson:"category,omitempty"`
+	Tags                    []string   `bson:"tags,omitempty"`
+	Status                  string     `bson:"status"`
+	QuestionnaireCode       string     `bson:"questionnaire_code,omitempty"`
+	QuestionnaireVersion    string     `bson:"questionnaire_version,omitempty"`
+	DefinitionPayloadFormat string     `bson:"definition_payload_format,omitempty"`
+	DefinitionPayload       []byte     `bson:"definition_payload,omitempty"`
+	Version                 int64      `bson:"version"`
+	PublishedAt             *time.Time `bson:"published_at,omitempty"`
+	ArchivedAt              *time.Time `bson:"archived_at,omitempty"`
 }
 
 func (AssessmentModelPO) CollectionName() string {
