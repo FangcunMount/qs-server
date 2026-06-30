@@ -6,6 +6,8 @@ import (
 	"fmt"
 	"time"
 
+	"go.mongodb.org/mongo-driver/bson"
+
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
@@ -45,46 +47,35 @@ func seedAssessmentModel(
 		fmt.Printf("skip model %s (draft exists, pass --force to replace)\n", plan.Code)
 		return nil
 	}
+	if existing != nil && force {
+		if err := purgeDraftForSeed(ctx, draftRepo, plan.Code); err != nil {
+			return fmt.Errorf("purge draft %s: %w", plan.Code, err)
+		}
+		existing = nil
+	}
 
-	var model *domain.AssessmentModel
-	if existing != nil {
-		model = existing
-		if err := model.BindQuestionnaire(binding, now); err != nil {
-			return fmt.Errorf("bind questionnaire %s: %w", plan.Code, err)
-		}
-		if err := model.UpdateDefinition(domain.DefinitionPayload{
-			Format: domain.PayloadFormatPersonalityTypologyV1,
-			Data:   definitionBytes,
-		}, now); err != nil {
-			return fmt.Errorf("update definition %s: %w", plan.Code, err)
-		}
-		if err := draftRepo.Update(ctx, model); err != nil {
-			return fmt.Errorf("persist draft %s: %w", plan.Code, err)
-		}
-	} else {
-		model, err = domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-			Code:      plan.Code,
-			Kind:      domain.KindPersonality,
-			SubKind:   domain.SubKindTypology,
-			Algorithm: plan.Algorithm,
-			Title:     firstNonEmpty(plan.Title, payload.Title),
-			Now:       now,
-		})
-		if err != nil {
-			return fmt.Errorf("new model %s: %w", plan.Code, err)
-		}
-		if err := model.BindQuestionnaire(binding, now); err != nil {
-			return fmt.Errorf("bind questionnaire %s: %w", plan.Code, err)
-		}
-		if err := model.UpdateDefinition(domain.DefinitionPayload{
-			Format: domain.PayloadFormatPersonalityTypologyV1,
-			Data:   definitionBytes,
-		}, now); err != nil {
-			return fmt.Errorf("update definition %s: %w", plan.Code, err)
-		}
-		if err := draftRepo.Create(ctx, model); err != nil {
-			return fmt.Errorf("create draft %s: %w", plan.Code, err)
-		}
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code:      plan.Code,
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: plan.Algorithm,
+		Title:     firstNonEmpty(plan.Title, payload.Title),
+		Now:       now,
+	})
+	if err != nil {
+		return fmt.Errorf("new model %s: %w", plan.Code, err)
+	}
+	if err := model.BindQuestionnaire(binding, now); err != nil {
+		return fmt.Errorf("bind questionnaire %s: %w", plan.Code, err)
+	}
+	if err := model.UpdateDefinition(domain.DefinitionPayload{
+		Format: domain.PayloadFormatPersonalityTypologyV1,
+		Data:   definitionBytes,
+	}, now); err != nil {
+		return fmt.Errorf("update definition %s: %w", plan.Code, err)
+	}
+	if err := draftRepo.Create(ctx, model); err != nil {
+		return fmt.Errorf("create draft %s: %w", plan.Code, err)
 	}
 
 	if force {
@@ -123,4 +114,15 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func purgeDraftForSeed(ctx context.Context, draftRepo *mongoassessmentmodel.DraftRepository, code string) error {
+	if code == "" {
+		return domain.ErrNotFound
+	}
+	if err := draftRepo.Delete(ctx, code); err != nil && !errors.Is(err, domain.ErrNotFound) {
+		return err
+	}
+	_, err := draftRepo.Collection().DeleteMany(ctx, bson.M{"code": code})
+	return err
 }
