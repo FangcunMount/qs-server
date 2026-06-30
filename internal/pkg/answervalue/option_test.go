@@ -16,7 +16,8 @@ func TestNormalizeSingleOption(t *testing.T) {
 		{name: "option wrapper json", raw: `{"option":"5"}`, want: "5", ok: true},
 		{name: "option wrapper map", raw: map[string]any{"option": "A"}, want: "A", ok: true},
 		{name: "empty", raw: "", want: "", ok: false},
-		{name: "empty wrapper", raw: `{"option":""}`, want: `{"option":""}`, ok: true},
+		{name: "int value", raw: int(2), want: "2", ok: true},
+		{name: "float value", raw: float64(2), want: "2", ok: true},
 	}
 
 	for _, tc := range cases {

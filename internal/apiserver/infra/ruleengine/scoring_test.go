@@ -110,6 +110,9 @@ func TestOptionScorerSupportsSelectionAndNumericValues(t *testing.T) {
 	if got := scorer.score(scorableStub{selected: "missing"}, optionScores); got != 0 {
 		t.Fatalf("missing option score = %v, want 0", got)
 	}
+	if got := scorer.score(scorableStub{selected: `{"option":"B"}`}, optionScores); got != 2 {
+		t.Fatalf("wrapped option score = %v, want 2", got)
+	}
 }
 
 func TestScaleFactorScorerScoresConfiguredStrategies(t *testing.T) {

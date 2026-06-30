@@ -4,12 +4,14 @@ import (
 	"context"
 	"fmt"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"google.golang.org/grpc/codes"
@@ -338,10 +340,20 @@ func (s *SubmissionService) convertAnswers(answers []Answer) []grpcclient.Answer
 			QuestionCode: a.QuestionCode,
 			QuestionType: a.QuestionType,
 			Score:        a.Score,
-			Value:        a.Value,
+			Value:        normalizeAnswerValueForGRPC(a.QuestionType, a.Value),
 		}
 	}
 	return result
+}
+
+func normalizeAnswerValueForGRPC(questionType, value string) string {
+	switch strings.TrimSpace(questionType) {
+	case "Radio", "radio":
+		if option, ok := answervalue.NormalizeSingleOption(value); ok {
+			return option
+		}
+	}
+	return value
 }
 
 // callSaveAnswerSheet 调用 gRPC 服务保存答卷

@@ -5,6 +5,7 @@ import (
 	"slices"
 
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
 func collectFactorValues(factor scalesnapshot.FactorSnapshot, sheet *ScaleAnswerSheetSnapshot, qnr *ScaleQuestionnaireSnapshot) ([]float64, error) {
@@ -88,6 +89,9 @@ func factorScoreOptionID(answer ScaleAnswerSnapshot) string {
 	raw := answer.Value
 	if raw == nil {
 		return ""
+	}
+	if option, ok := answervalue.NormalizeSingleOption(raw); ok {
+		return option
 	}
 	if str, ok := raw.(string); ok {
 		return str

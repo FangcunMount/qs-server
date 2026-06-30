@@ -17,6 +17,14 @@ func NormalizeSingleOption(raw any) (string, bool) {
 		return normalizeOptionString(value)
 	case json.Number:
 		return strings.TrimSpace(value.String()), true
+	case int:
+		return fmt.Sprintf("%d", value), true
+	case int32:
+		return fmt.Sprintf("%d", value), true
+	case int64:
+		return fmt.Sprintf("%d", value), true
+	case float64:
+		return strings.TrimSpace(fmt.Sprintf("%g", value)), true
 	case fmt.Stringer:
 		return normalizeOptionString(value.String())
 	case map[string]any:
@@ -74,6 +82,8 @@ func normalizeScalarOption(raw any) (string, bool) {
 		return normalizeScalarOption(value.String())
 	case float64:
 		return strings.TrimSpace(fmt.Sprintf("%g", value)), true
+	case int32:
+		return fmt.Sprintf("%d", value), true
 	case int:
 		return fmt.Sprintf("%d", value), true
 	case int64:

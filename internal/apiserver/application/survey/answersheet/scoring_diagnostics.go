@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
 func logZeroScoreDetails(l *logger.RequestLogger, sheet *answersheet.AnswerSheet, qnr *questionnaire.Questionnaire, scoredSheet *answersheet.ScoredAnswerSheet) {
@@ -18,17 +19,20 @@ func logZeroScoreDetails(l *logger.RequestLogger, sheet *answersheet.AnswerSheet
 		}
 		answerValue := findAnswerRawValue(sheet, scoredAns.QuestionCode)
 		optionScores := findQuestionOptionScores(qnr, scoredAns.QuestionCode)
-		answerValueStr, isString := answerValue.(string)
+		selection, hasSelection := answervalue.NormalizeSingleOption(answerValue)
 		matched := false
-		if isString && answerValueStr != "" {
-			_, matched = optionScores[answerValueStr]
+		if hasSelection {
+			_, matched = optionScores[selection]
 		}
 
-		l.Debugw("答案分数为0的详情",
+		l.Warnw("答案分数为0的详情",
 			"question_code", scoredAns.QuestionCode,
 			"answer_value", answerValue,
+			"normalized_selection", selection,
 			"answer_value_type", fmt.Sprintf("%T", answerValue),
 			"option_scores", optionScores,
+			"option_score_count", len(optionScores),
+			"all_option_scores_zero", allOptionScoresZero(optionScores),
 			"matched", matched,
 			"score", scoredAns.Score,
 		)
@@ -57,4 +61,16 @@ func findQuestionOptionScores(qnr *questionnaire.Questionnaire, questionCode str
 		return optionScores
 	}
 	return nil
+}
+
+func allOptionScoresZero(optionScores map[string]float64) bool {
+	if len(optionScores) == 0 {
+		return true
+	}
+	for _, score := range optionScores {
+		if score != 0 {
+			return false
+		}
+	}
+	return true
 }

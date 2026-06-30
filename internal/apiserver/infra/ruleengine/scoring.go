@@ -3,9 +3,11 @@ package ruleengine
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	ruleengineport "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
 // AnswerScorer executes answer scoring through the infrastructure rule engine.
@@ -43,7 +45,7 @@ func (s *optionScorer) score(value ruleengineport.ScorableValue, optionScores ma
 		return 0
 	}
 	if selected, ok := value.AsSingleSelection(); ok {
-		if score, found := optionScores[selected]; found {
+		if score, found := lookupOptionScore(selected, optionScores); found {
 			return score
 		}
 		return 0
@@ -51,7 +53,7 @@ func (s *optionScorer) score(value ruleengineport.ScorableValue, optionScores ma
 	if selections, ok := value.AsMultipleSelections(); ok {
 		var total float64
 		for _, selection := range selections {
-			if score, found := optionScores[selection]; found {
+			if score, found := lookupOptionScore(selection, optionScores); found {
 				total += score
 			}
 		}
@@ -65,6 +67,17 @@ func (s *optionScorer) score(value ruleengineport.ScorableValue, optionScores ma
 
 func (s *optionScorer) scoreWithMax(value ruleengineport.ScorableValue, optionScores map[string]float64) (float64, float64) {
 	return s.score(value, optionScores), maxOptionScore(optionScores)
+}
+
+func lookupOptionScore(selection string, optionScores map[string]float64) (float64, bool) {
+	if normalized, ok := answervalue.NormalizeSingleOption(selection); ok {
+		selection = normalized
+	}
+	selection = strings.TrimSpace(selection)
+	if score, found := optionScores[selection]; found {
+		return score, true
+	}
+	return 0, false
 }
 
 func maxOptionScore(optionScores map[string]float64) float64 {
