@@ -335,6 +335,11 @@ func newPolicyCatalog(cacheConfig CacheOptions) *cachepolicy.PolicyCatalog {
 			NegativeTTL: cacheConfig.TTL.Negative,
 			Negative:    cachepolicy.PolicySwitchEnabled,
 		},
+		cachepolicy.PolicyPublishedModel: {
+			TTL:         cacheConfig.TTL.Scale,
+			NegativeTTL: cacheConfig.TTL.Negative,
+			Negative:    cachepolicy.PolicySwitchEnabled,
+		},
 		cachepolicy.PolicyAssessmentDetail: {
 			TTL:          cacheConfig.TTL.AssessmentDetail,
 			Singleflight: cachepolicy.PolicySwitchEnabled,

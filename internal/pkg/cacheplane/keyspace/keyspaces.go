@@ -3,6 +3,7 @@ package keyspace
 import (
 	"fmt"
 	"strconv"
+	"strings"
 
 	rediskit "github.com/FangcunMount/component-base/pkg/redis"
 )
@@ -64,6 +65,25 @@ func (k CacheKeyspace) Questionnaire(code, version string) string {
 
 func (k CacheKeyspace) PublishedQuestionnaire(code string) string {
 	return k.keyspace.Prefix("questionnaire:published:" + code)
+}
+
+func (k CacheKeyspace) PublishedAssessmentModelByQuestionnaire(questionnaireCode, questionnaireVersion string) string {
+	code := strings.ToLower(questionnaireCode)
+	if questionnaireVersion == "" {
+		return k.keyspace.Prefix("assessment_model:published:questionnaire:" + code)
+	}
+	return k.keyspace.Prefix("assessment_model:published:questionnaire:" + code + ":" + strings.ToLower(questionnaireVersion))
+}
+
+func (k CacheKeyspace) PublishedAssessmentModelByRef(kind, subKind, algorithm, code, version string) string {
+	return k.keyspace.Prefix(fmt.Sprintf(
+		"assessment_model:published:ref:%s:%s:%s:%s:%s",
+		strings.ToLower(kind),
+		strings.ToLower(subKind),
+		strings.ToLower(algorithm),
+		strings.ToLower(code),
+		strings.ToLower(version),
+	))
 }
 
 func (k CacheKeyspace) AssessmentDetail(id uint64) string {

@@ -36,7 +36,7 @@ func (c *PolicyCatalog) Policy(key CachePolicyKey) CachePolicy {
 // FamilyFor 返回对象策略所属的逻辑 Redis family。
 func FamilyFor(key CachePolicyKey) cachemodel.Family {
 	switch key {
-	case PolicyScale, PolicyScaleList, PolicyQuestionnaire:
+	case PolicyScale, PolicyScaleList, PolicyQuestionnaire, PolicyPublishedModel:
 		return cachemodel.FamilyStatic
 	case PolicyAssessmentDetail, PolicyTestee, PolicyPlan:
 		return cachemodel.FamilyObject

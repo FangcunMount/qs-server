@@ -51,6 +51,9 @@ type WireInput struct {
 	ReportStatusConfig                  reportstatus.Config
 	ScaleInfra                          *surveymod.ScaleInfra
 	RuleSetCatalog                      rulesetport.RuleSetCatalog
+	StaticRedisClient                   redis.UniversalClient
+	StaticCacheBuilder                  *keyspace.Builder
+	PublishedModelPolicy                cachepolicy.CachePolicy
 	ModelDescriptors                    []evaldomain.ModelDescriptor
 	TypologyRegistry                    typologyEvaluation.ModuleRegistry
 	ReportPorts                         compose.ReportIntegrationPorts
@@ -75,15 +78,24 @@ func EnsureRuleSetCatalog(in RuleSetCatalogInput) (rulesetport.RuleSetCatalog, e
 	if in.ScaleInfra != nil && in.ScaleInfra.ScaleRepo != nil {
 		scaleSource = evaluationinputInfra.NewRepositoryScaleBindingSource(in.ScaleInfra.ScaleRepo)
 	}
-	return rulesetInfra.NewCatalog(in.MongoDB, scaleSource, mongoOpts)
+	return rulesetInfra.NewCatalog(in.MongoDB, scaleSource, mongoOpts, rulesetInfra.PublishedModelCacheConfig{
+		Redis:    in.StaticRedisClient,
+		Builder:  in.StaticCacheBuilder,
+		Policy:   in.PublishedModelPolicy,
+		Observer: in.Observer,
+	})
 }
 
 // RuleSetCatalogInput collects dependencies for ruleset catalog construction.
 type RuleSetCatalogInput struct {
-	MongoDB      *mongo.Database
-	MongoLimiter backpressure.Acquirer
-	ScaleInfra   *surveymod.ScaleInfra
-	Existing     rulesetport.RuleSetCatalog
+	MongoDB              *mongo.Database
+	MongoLimiter         backpressure.Acquirer
+	ScaleInfra           *surveymod.ScaleInfra
+	Existing             rulesetport.RuleSetCatalog
+	StaticRedisClient    redis.UniversalClient
+	StaticCacheBuilder   *keyspace.Builder
+	PublishedModelPolicy cachepolicy.CachePolicy
+	Observer             *observability.ComponentObserver
 }
 
 // Wire builds and bootstraps the evaluation module from composition inputs.
@@ -103,9 +115,13 @@ func Wire(in WireInput) (WireResult, error) {
 		var err error
 		if catalog == nil {
 			catalog, err = EnsureRuleSetCatalog(RuleSetCatalogInput{
-				MongoDB:      in.MongoDB,
-				MongoLimiter: in.MongoLimiter,
-				ScaleInfra:   infra,
+				MongoDB:              in.MongoDB,
+				MongoLimiter:         in.MongoLimiter,
+				ScaleInfra:           infra,
+				StaticRedisClient:    in.StaticRedisClient,
+				StaticCacheBuilder:   in.StaticCacheBuilder,
+				PublishedModelPolicy: in.PublishedModelPolicy,
+				Observer:             in.Observer,
 			})
 			if err != nil {
 				return WireResult{}, err

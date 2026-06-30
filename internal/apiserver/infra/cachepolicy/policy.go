@@ -58,6 +58,7 @@ const (
 	PolicyScale            CachePolicyKey = "scale"
 	PolicyScaleList        CachePolicyKey = "scale_list"
 	PolicyQuestionnaire    CachePolicyKey = "questionnaire"
+	PolicyPublishedModel   CachePolicyKey = "published_model"
 	PolicyAssessmentDetail CachePolicyKey = "assessment_detail"
 	PolicyAssessmentList   CachePolicyKey = "assessment_list"
 	PolicyTestee           CachePolicyKey = "testee"

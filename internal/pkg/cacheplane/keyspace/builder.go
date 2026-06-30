@@ -88,6 +88,14 @@ func (b *Builder) BuildPublishedQuestionnaireKey(code string) string {
 	return NewCacheKeyspace(b.namespace()).PublishedQuestionnaire(code)
 }
 
+func (b *Builder) BuildPublishedAssessmentModelByQuestionnaireKey(questionnaireCode, questionnaireVersion string) string {
+	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelByQuestionnaire(questionnaireCode, questionnaireVersion)
+}
+
+func (b *Builder) BuildPublishedAssessmentModelByRefKey(kind, subKind, algorithm, code, version string) string {
+	return NewCacheKeyspace(b.namespace()).PublishedAssessmentModelByRef(kind, subKind, algorithm, code, version)
+}
+
 func (b *Builder) BuildAssessmentDetailKey(id uint64) string {
 	return NewCacheKeyspace(b.namespace()).AssessmentDetail(id)
 }

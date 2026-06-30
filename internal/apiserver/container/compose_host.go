@@ -277,10 +277,14 @@ func (c *Container) ensureRuleSetCatalog() (rulesetport.RuleSetCatalog, error) {
 		return c.ruleSetCatalog, nil
 	}
 	catalog, err := evalmod.EnsureRuleSetCatalog(evalmod.RuleSetCatalogInput{
-		MongoDB:      c.mongoDB,
-		MongoLimiter: c.backpressure.Mongo,
-		ScaleInfra:   c.surveyScaleInfra,
-		Existing:     c.ruleSetCatalog,
+		MongoDB:              c.mongoDB,
+		MongoLimiter:         c.backpressure.Mongo,
+		ScaleInfra:           c.surveyScaleInfra,
+		Existing:             c.ruleSetCatalog,
+		StaticRedisClient:    c.CacheClient(cacheplane.FamilyStatic),
+		StaticCacheBuilder:   c.CacheBuilder(cacheplane.FamilyStatic),
+		PublishedModelPolicy: c.CachePolicy(cachepolicy.PolicyPublishedModel),
+		Observer:             c.cacheObserver(),
 	})
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize ruleset catalog: %w", err)

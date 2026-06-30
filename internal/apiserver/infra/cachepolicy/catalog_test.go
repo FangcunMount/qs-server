@@ -39,6 +39,7 @@ func TestFamilyForReturnsExpectedRedisFamily(t *testing.T) {
 		want cachemodel.Family
 	}{
 		{name: "static scale", key: PolicyScale, want: cachemodel.FamilyStatic},
+		{name: "static published model", key: PolicyPublishedModel, want: cachemodel.FamilyStatic},
 		{name: "object plan", key: PolicyPlan, want: cachemodel.FamilyObject},
 		{name: "query stats", key: PolicyStatsQuery, want: cachemodel.FamilyQuery},
 		{name: "unknown", key: CachePolicyKey("unknown"), want: cachemodel.FamilyDefault},
