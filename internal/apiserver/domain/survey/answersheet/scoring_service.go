@@ -1,5 +1,7 @@
 package answersheet
 
+import "github.com/FangcunMount/qs-server/internal/pkg/answervalue"
+
 // ==================== 答案值适配器 ====================
 
 // answerValueAdapter exposes AnswerValue through the scoring value surface.
@@ -20,11 +22,7 @@ func (a *answerValueAdapter) AsSingleSelection() (string, bool) {
 	if a.value == nil {
 		return "", false
 	}
-	raw := a.value.Raw()
-	if str, ok := raw.(string); ok {
-		return str, true
-	}
-	return "", false
+	return answervalue.NormalizeSingleOption(a.value.Raw())
 }
 
 func (a *answerValueAdapter) AsMultipleSelections() ([]string, bool) {

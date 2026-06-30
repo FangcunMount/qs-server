@@ -6,6 +6,7 @@ import (
 	"slices"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -180,11 +181,11 @@ func CreateAnswerValueFromRaw(qType questionnaire.QuestionType, raw any) (Answer
 
 	switch qType {
 	case questionnaire.TypeRadio:
-		str, ok := raw.(string)
+		option, ok := answervalue.NormalizeSingleOption(raw)
 		if !ok {
-			return nil, fmt.Errorf("radio answer expects string, got %T", raw)
+			return nil, fmt.Errorf("radio answer expects option value, got %T", raw)
 		}
-		return NewOptionValue(str), nil
+		return NewOptionValue(option), nil
 
 	case questionnaire.TypeCheckbox:
 		// 尝试多种类型

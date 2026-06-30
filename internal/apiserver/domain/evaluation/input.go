@@ -3,6 +3,8 @@ package evaluation
 import (
 	"fmt"
 	"strings"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
 type Answer struct {
@@ -38,21 +40,20 @@ type Questionnaire struct {
 
 func AnswerValueKey(raw any) string {
 	switch value := raw.(type) {
-	case string:
-		return strings.TrimSpace(value)
-	case fmt.Stringer:
-		return strings.TrimSpace(value.String())
 	case []string:
 		if len(value) == 0 {
 			return ""
 		}
-		return strings.TrimSpace(value[0])
+		return AnswerValueKey(value[0])
 	case []any:
 		if len(value) == 0 {
 			return ""
 		}
 		return AnswerValueKey(value[0])
 	default:
+		if option, ok := answervalue.NormalizeSingleOption(raw); ok {
+			return option
+		}
 		if raw == nil {
 			return ""
 		}

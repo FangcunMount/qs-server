@@ -14,6 +14,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -274,7 +275,13 @@ func decodeAnswerValue(questionType string, raw string) (interface{}, error) {
 	default:
 		var value string
 		if err := json.Unmarshal([]byte(raw), &value); err == nil {
+			if option, ok := answervalue.NormalizeSingleOption(value); ok {
+				return option, nil
+			}
 			return value, nil
+		}
+		if option, ok := answervalue.NormalizeSingleOption(raw); ok {
+			return option, nil
 		}
 		return raw, nil
 	}

@@ -20,6 +20,7 @@ func TestDecodeAnswerValue(t *testing.T) {
 		{name: "number json", qType: questionTypeNumber, raw: `12`, want: float64(12)},
 		{name: "number string", qType: questionTypeNumber, raw: `"12.5"`, want: float64(12.5)},
 		{name: "text raw", qType: "Text", raw: `hello`, want: "hello"},
+		{name: "radio option wrapper", qType: "Radio", raw: `{"option":"5"}`, want: "5"},
 		{name: "number invalid", qType: questionTypeNumber, raw: `abc`, wantErr: true},
 	}
 
