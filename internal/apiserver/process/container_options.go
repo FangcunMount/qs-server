@@ -51,6 +51,7 @@ func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOut
 	if cfg.OutboxRelay.Mongo != nil {
 		options.MongoBatchSize = cfg.OutboxRelay.Mongo.BatchSize
 		options.MongoPublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
+		options.MongoImmediateMaxConcurrent = cfg.OutboxRelay.Mongo.ImmediateMaxConcurrent
 	}
 	if cfg.OutboxRelay.Assessment != nil {
 		options.AssessmentBatchSize = cfg.OutboxRelay.Assessment.BatchSize

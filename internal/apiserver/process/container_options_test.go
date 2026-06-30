@@ -184,6 +184,7 @@ func TestAPIServerBuildContainerOptionsMapsOutboxRelayOptions(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
 	opts.OutboxRelay.Mongo.BatchSize = 360
 	opts.OutboxRelay.Mongo.PublishWorkers = 64
+	opts.OutboxRelay.Mongo.ImmediateMaxConcurrent = 24
 	opts.OutboxRelay.Assessment.BatchSize = 80
 	opts.OutboxRelay.Assessment.PublishWorkers = 12
 	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
@@ -199,6 +200,9 @@ func TestAPIServerBuildContainerOptionsMapsOutboxRelayOptions(t *testing.T) {
 	}
 	if got.OutboxRelay.MongoPublishWorkers != 64 {
 		t.Fatalf("MongoPublishWorkers = %d, want 64", got.OutboxRelay.MongoPublishWorkers)
+	}
+	if got.OutboxRelay.MongoImmediateMaxConcurrent != 24 {
+		t.Fatalf("MongoImmediateMaxConcurrent = %d, want 24", got.OutboxRelay.MongoImmediateMaxConcurrent)
 	}
 	if got.OutboxRelay.AssessmentBatchSize != 80 {
 		t.Fatalf("AssessmentBatchSize = %d, want 80", got.OutboxRelay.AssessmentBatchSize)

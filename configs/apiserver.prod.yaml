@@ -348,7 +348,8 @@ outbox_relay:
   mongo:
     interval: "500ms"           # Mongo outbox 主链路事件排水频率；300 QPS 压测起步值
     batch_size: 1000            # 每轮最多 claim 的 Mongo outbox 事件数
-    publish_workers: 128        # Mongo outbox 并发发布 worker 数；pretest120 起步值
+    publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；先降到 48 复测
+    immediate_max_concurrent: 16  # post-commit immediate 并发上限；满载时改由 relay P0 排水
   assessment:
     interval: "2s"              # MySQL assessment outbox 当前积压较低，保持保守频率
     batch_size: 50              # 每轮最多 claim 的 assessment outbox 事件数

@@ -341,9 +341,10 @@ type OutboxRelayOptions struct {
 }
 
 type OutboxRelayStoreOptions struct {
-	Interval       time.Duration `json:"interval" mapstructure:"interval"`
-	BatchSize      int           `json:"batch_size" mapstructure:"batch_size"`
-	PublishWorkers int           `json:"publish_workers" mapstructure:"publish_workers"`
+	Interval               time.Duration `json:"interval" mapstructure:"interval"`
+	BatchSize              int           `json:"batch_size" mapstructure:"batch_size"`
+	PublishWorkers         int           `json:"publish_workers" mapstructure:"publish_workers"`
+	ImmediateMaxConcurrent int           `json:"immediate_max_concurrent" mapstructure:"immediate_max_concurrent"`
 }
 
 func NewOutboxRelayOptions() *OutboxRelayOptions {
@@ -369,6 +370,7 @@ func (o *OutboxRelayOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.DurationVar(&o.Mongo.Interval, "outbox_relay.mongo.interval", o.Mongo.Interval, "Interval for dispatching Mongo durable outbox events.")
 		fs.IntVar(&o.Mongo.BatchSize, "outbox_relay.mongo.batch-size", o.Mongo.BatchSize, "Maximum Mongo durable outbox events to claim in one relay tick.")
 		fs.IntVar(&o.Mongo.PublishWorkers, "outbox_relay.mongo.publish-workers", o.Mongo.PublishWorkers, "Maximum concurrent Mongo durable outbox publish workers.")
+		fs.IntVar(&o.Mongo.ImmediateMaxConcurrent, "outbox_relay.mongo.immediate-max-concurrent", o.Mongo.ImmediateMaxConcurrent, "Maximum concurrent post-commit immediate outbox dispatches for Mongo outbox (0 uses default).")
 	}
 	if o.Assessment != nil {
 		fs.DurationVar(&o.Assessment.Interval, "outbox_relay.assessment.interval", o.Assessment.Interval, "Interval for dispatching assessment MySQL durable outbox events.")

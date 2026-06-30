@@ -11,11 +11,15 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-const defaultImmediateDispatchTimeout = 2 * time.Second
+const (
+	defaultImmediateDispatchTimeout = 2 * time.Second
+	defaultImmediateMaxConcurrent   = 16
+)
 
+// immediateDispatchEventTypes 仅 answersheet.submitted 走 post-commit immediate；
+// assessment.submitted 及 P1 事件由 relay P0/P1 排水，避免 unlimited goroutine 与 relay/业务查询抢 Mongo 连接。
 var immediateDispatchEventTypes = map[string]struct{}{
 	eventcatalog.AnswerSheetSubmitted: {},
-	eventcatalog.AssessmentSubmitted:  {},
 }
 
 // ImmediateDispatcher best-effort publishes staged outbox events right after commit.
@@ -27,20 +31,22 @@ type ImmediateDispatcher struct {
 	observer     eventobservability.Observer
 	enabled      bool
 	timeout      time.Duration
+	sem          chan struct{}
 	hooks        []OutboxBeforePublishHook
 	readyIndex   ReadyIndex
 	readyIndexer *PostCommitReadyIndexer
 }
 
 type ImmediateDispatcherOptions struct {
-	Name       string
-	Store      OutboxStore
-	Publisher  event.EventPublisher
-	Observer   eventobservability.Observer
-	Enabled    bool
-	Timeout    time.Duration
-	Hooks      []OutboxBeforePublishHook
-	ReadyIndex ReadyIndex
+	Name          string
+	Store         OutboxStore
+	Publisher     event.EventPublisher
+	Observer      eventobservability.Observer
+	Enabled       bool
+	Timeout       time.Duration
+	MaxConcurrent int
+	Hooks         []OutboxBeforePublishHook
+	ReadyIndex    ReadyIndex
 }
 
 func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatcher {
@@ -51,6 +57,10 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 	if opts.Observer == nil {
 		opts.Observer = eventobservability.DefaultObserver()
 	}
+	maxConcurrent := opts.MaxConcurrent
+	if maxConcurrent <= 0 {
+		maxConcurrent = defaultImmediateMaxConcurrent
+	}
 	return &ImmediateDispatcher{
 		name:         opts.Name,
 		store:        opts.Store,
@@ -59,6 +69,7 @@ func NewImmediateDispatcher(opts ImmediateDispatcherOptions) *ImmediateDispatche
 		observer:     opts.Observer,
 		enabled:      opts.Enabled && reader != nil && opts.Publisher != nil,
 		timeout:      opts.Timeout,
+		sem:          make(chan struct{}, maxConcurrent),
 		hooks:        compactBeforePublishHooks(opts.Hooks),
 		readyIndex:   opts.ReadyIndex,
 		readyIndexer: NewPostCommitReadyIndexer(opts.ReadyIndex),
@@ -85,6 +96,12 @@ func (d *ImmediateDispatcher) TryDispatchAfterCommit(ctx context.Context, events
 		eventID := evt.EventID()
 		eventType := evt.EventType()
 		go func() {
+			select {
+			case d.sem <- struct{}{}:
+				defer func() { <-d.sem }()
+			default:
+				return
+			}
 			ctx, cancel := detachedContext(ctx, d.timeout)
 			defer cancel()
 			d.dispatchOne(ctx, eventID, eventType)

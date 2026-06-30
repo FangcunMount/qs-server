@@ -37,6 +37,7 @@ type Host interface {
 
 	OutboxRelayMongoBatchSize() int
 	OutboxRelayMongoPublishWorkers() int
+	OutboxRelayMongoImmediateMaxConcurrent() int
 	OutboxRelayAssessmentBatchSize() int
 	OutboxRelayAssessmentPublishWorkers() int
 	PlanEntryBaseURL() string

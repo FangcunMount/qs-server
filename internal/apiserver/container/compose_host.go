@@ -57,6 +57,10 @@ func (c *Container) OutboxRelayMongoBatchSize() int { return c.outboxRelay.Mongo
 
 func (c *Container) OutboxRelayMongoPublishWorkers() int { return c.outboxRelay.MongoPublishWorkers }
 
+func (c *Container) OutboxRelayMongoImmediateMaxConcurrent() int {
+	return c.outboxRelay.MongoImmediateMaxConcurrent
+}
+
 func (c *Container) OutboxRelayAssessmentBatchSize() int { return c.outboxRelay.AssessmentBatchSize }
 
 func (c *Container) OutboxRelayAssessmentPublishWorkers() int {

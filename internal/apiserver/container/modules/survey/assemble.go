@@ -38,22 +38,23 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the survey module.
 type Deps struct {
-	MongoDB                   *mongo.Database
-	EventPublisher            event.EventPublisher
-	RankRedisClient           redis.UniversalClient
-	RankCacheBuilder          *keyspace.Builder
-	IdentityService           *iam.IdentityService
-	HotsetRecorder            cachetarget.HotsetRecorder
-	TopicResolver             eventcatalog.TopicResolver
-	ScaleSyncer               quesApp.ScaleQuestionnaireBindingSyncer
-	QuestionnaireRepo         questionnaire.Repository
-	QuestionnaireReader       surveyreadmodel.QuestionnaireReader
-	AnswerSheetRepo           AnswerSheetStore
-	AnswerSheetReader         surveyreadmodel.AnswerSheetReader
-	OutboxRelayBatchSize      int
-	OutboxRelayPublishWorkers int
-	CacheSignalNotifier       quesApp.CacheSignalNotifier
-	OpsHandle                 *cacheplane.Handle
+	MongoDB                           *mongo.Database
+	EventPublisher                    event.EventPublisher
+	RankRedisClient                   redis.UniversalClient
+	RankCacheBuilder                  *keyspace.Builder
+	IdentityService                   *iam.IdentityService
+	HotsetRecorder                    cachetarget.HotsetRecorder
+	TopicResolver                     eventcatalog.TopicResolver
+	ScaleSyncer                       quesApp.ScaleQuestionnaireBindingSyncer
+	QuestionnaireRepo                 questionnaire.Repository
+	QuestionnaireReader               surveyreadmodel.QuestionnaireReader
+	AnswerSheetRepo                   AnswerSheetStore
+	AnswerSheetReader                 surveyreadmodel.AnswerSheetReader
+	OutboxRelayBatchSize              int
+	OutboxRelayPublishWorkers         int
+	OutboxRelayImmediateMaxConcurrent int
+	CacheSignalNotifier               quesApp.CacheSignalNotifier
+	OpsHandle                         *cacheplane.Handle
 }
 
 // AnswerSheetStore combines answer-sheet persistence and outbox ports.
@@ -117,6 +118,7 @@ func New(deps Deps) (*Module, error) {
 		normalized.QuestionnaireRepo,
 		normalized.OutboxRelayBatchSize,
 		normalized.OutboxRelayPublishWorkers,
+		normalized.OutboxRelayImmediateMaxConcurrent,
 		normalized.OpsHandle,
 	); err != nil {
 		return nil, err
@@ -158,7 +160,7 @@ func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, ho
 	return nil
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, opsHandle *cacheplane.Handle) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, outboxRelayImmediateMaxConcurrent int, opsHandle *cacheplane.Handle) error {
 	sub := m.AnswerSheet
 
 	batchValidator := ruleengineInfra.NewAnswerValidator()
@@ -171,11 +173,12 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClie
 	}
 	readyIndex := outboxready.NewIndex(opsClient)
 	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name:       "mongo-domain-events",
-		Store:      repo,
-		Publisher:  m.eventPublisher,
-		Enabled:    true,
-		ReadyIndex: readyIndex,
+		Name:          "mongo-domain-events",
+		Store:         repo,
+		Publisher:     m.eventPublisher,
+		Enabled:       true,
+		MaxConcurrent: outboxRelayImmediateMaxConcurrent,
+		ReadyIndex:    readyIndex,
 	})
 	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo, immediate)
 	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)
