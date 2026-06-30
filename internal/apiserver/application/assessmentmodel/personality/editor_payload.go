@@ -49,6 +49,9 @@ func buildEditorDefinitionPayload(model *domain.AssessmentModel, payload *modelt
 		return nil, nil
 	}
 	outcomes := outcomesFromPayload(payload)
+	algo := resolvePayloadAlgorithm(model, payload, runtime)
+	decision := runtime.Decision
+	decision.Kind = normalizeDecisionKind(decision.Kind, algo)
 	editor := editorDefinitionPayload{
 		FactorGraph: editorFactorGraphSpec{
 			DimensionOrder:   append([]string(nil), runtime.FactorGraph.DimensionOrder...),
@@ -57,7 +60,7 @@ func buildEditorDefinitionPayload(model *domain.AssessmentModel, payload *modelt
 			Factors:          runtime.FactorGraph.Factors,
 			Roots:            append([]string(nil), runtime.FactorGraph.Roots...),
 		},
-		Decision:     runtime.Decision,
+		Decision:     decision,
 		SpecialRules: append([]modeltypology.SpecialRuleSpec(nil), runtime.SpecialRules...),
 		OutcomeMapping: editorOutcomeMappingSpec{
 			DetailKind:       runtime.OutcomeMapping.DetailKind,
@@ -69,6 +72,9 @@ func buildEditorDefinitionPayload(model *domain.AssessmentModel, payload *modelt
 	}
 	if editor.OutcomeMapping.Algorithm == "" && model != nil {
 		editor.OutcomeMapping.Algorithm = model.Algorithm
+	}
+	if editor.OutcomeMapping.Algorithm == "" {
+		editor.OutcomeMapping.Algorithm = algo
 	}
 	return json.Marshal(editor)
 }
@@ -93,6 +99,8 @@ func normalizeDefinitionPayloadForStorage(data []byte, algorithm domain.Algorith
 		return data, nil
 	}
 	payload.Runtime = runtime
+	algo := firstNonEmptyAlgorithm(payload.Algorithm, algorithm)
+	runtime.Decision.Kind = normalizeDecisionKind(runtime.Decision.Kind, algo)
 	envelope := draftDefinitionEnvelope{
 		Algorithm: firstNonEmptyAlgorithm(payload.Algorithm, algorithm),
 		Outcomes:  append([]modeltypology.Outcome(nil), payload.Outcomes...),
@@ -141,6 +149,8 @@ func editorPayloadToDomain(editor *editorDefinitionPayload, algorithm domain.Alg
 	if editor == nil {
 		return &modeltypology.Payload{Algorithm: algorithm}
 	}
+	algo := firstNonEmptyAlgorithm(editor.OutcomeMapping.Algorithm, algorithm)
+	editor.Decision.Kind = normalizeDecisionKind(editor.Decision.Kind, algo)
 	mappings := make([]modeltypology.QuestionMapping, 0, len(editor.FactorGraph.QuestionMappings))
 	for _, mapping := range editor.FactorGraph.QuestionMappings {
 		mappings = append(mappings, modeltypology.QuestionMapping{
@@ -294,4 +304,44 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func resolvePayloadAlgorithm(model *domain.AssessmentModel, payload *modeltypology.Payload, runtime *modeltypology.RuntimeSpec) domain.Algorithm {
+	if payload != nil && payload.Algorithm != "" {
+		return payload.Algorithm
+	}
+	if runtime != nil && runtime.OutcomeMapping.Algorithm != "" {
+		return runtime.OutcomeMapping.Algorithm
+	}
+	if model != nil {
+		return model.Algorithm
+	}
+	return ""
+}
+
+func normalizeDecisionKind(kind domain.DecisionKind, algorithm domain.Algorithm) domain.DecisionKind {
+	if isEditorDecisionKind(kind) {
+		return kind
+	}
+	switch algorithm {
+	case domain.AlgorithmMBTI:
+		return domain.DecisionKindPoleComposition
+	case domain.AlgorithmSBTI:
+		return domain.DecisionKindNearestPattern
+	case domain.AlgorithmBigFive:
+		return domain.DecisionKindTraitProfile
+	default:
+		return kind
+	}
+}
+
+func isEditorDecisionKind(kind domain.DecisionKind) bool {
+	switch kind {
+	case domain.DecisionKindPoleComposition,
+		domain.DecisionKindNearestPattern,
+		domain.DecisionKindTraitProfile:
+		return true
+	default:
+		return false
+	}
 }

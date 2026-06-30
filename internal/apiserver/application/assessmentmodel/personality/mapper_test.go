@@ -152,3 +152,32 @@ func TestNormalizeDefinitionPayloadForStorageRoundTripsEditorPayload(t *testing.
 		t.Fatalf("dimension = %s", envelope.Runtime.FactorGraph.QuestionMappings[0].Dimension)
 	}
 }
+
+func TestNormalizeDecisionKindMapsAlgorithmAlias(t *testing.T) {
+	if got := normalizeDecisionKind("mbti", domain.AlgorithmMBTI); got != domain.DecisionKindPoleComposition {
+		t.Fatalf("normalizeDecisionKind(mbti) = %s, want pole_composition", got)
+	}
+	if got := normalizeDecisionKind("sbti", domain.AlgorithmSBTI); got != domain.DecisionKindNearestPattern {
+		t.Fatalf("normalizeDecisionKind(sbti) = %s, want nearest_pattern", got)
+	}
+}
+
+func TestNormalizeDefinitionPayloadForStorageFixesDecisionKindAlias(t *testing.T) {
+	raw := []byte(`{
+		"factor_graph":{"factors":{"EI":{"id":"EI","kind":"leaf"}},"roots":["EI"]},
+		"decision":{"kind":"mbti"},
+		"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti","outcomes":[{"code":"INTJ","name":"建筑师"}]},
+		"report":{"kind":"personality_type","adapter_key":"mbti"}
+	}`)
+	stored, err := normalizeDefinitionPayloadForStorage(raw, domain.AlgorithmMBTI)
+	if err != nil {
+		t.Fatalf("normalizeDefinitionPayloadForStorage: %v", err)
+	}
+	var envelope draftDefinitionEnvelope
+	if err := json.Unmarshal(stored, &envelope); err != nil {
+		t.Fatalf("unmarshal envelope: %v", err)
+	}
+	if envelope.Runtime == nil || envelope.Runtime.Decision.Kind != domain.DecisionKindPoleComposition {
+		t.Fatalf("decision kind = %s, want pole_composition", envelope.Runtime.Decision.Kind)
+	}
+}
