@@ -124,7 +124,7 @@ func TestBuildCreateAssessmentDTOAddsMBTIModelContext(t *testing.T) {
 		OrgId:                9,
 		TesteeId:             101,
 		QuestionnaireCode:    evaluationinput.DefaultMBTIQuestionnaireCode,
-		QuestionnaireVersion: "1.0.0",
+		QuestionnaireVersion: evaluationinput.DefaultMBTIModelVersion,
 		AnswersheetId:        202,
 	}
 
