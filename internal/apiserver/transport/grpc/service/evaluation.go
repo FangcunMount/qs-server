@@ -111,6 +111,7 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 		Status:    req.Status,
 		ScaleCode: req.ScaleCode,
 		RiskLevel: req.RiskLevel,
+		ModelKind: req.ModelKind,
 	}
 	dateFrom, err := parseAssessmentListDate(req.DateFrom, false)
 	if err != nil {

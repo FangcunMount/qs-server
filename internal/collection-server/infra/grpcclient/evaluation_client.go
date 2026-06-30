@@ -176,6 +176,7 @@ func (c *EvaluationClient) ListMyAssessments(
 	riskLevel string,
 	dateFrom string,
 	dateTo string,
+	modelKind string,
 	page, pageSize int32,
 ) (*ListAssessmentsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
@@ -190,6 +191,7 @@ func (c *EvaluationClient) ListMyAssessments(
 		RiskLevel: riskLevel,
 		DateFrom:  dateFrom,
 		DateTo:    dateTo,
+		ModelKind: modelKind,
 	}
 
 	resp, err := c.grpcClient.ListMyAssessments(ctx, req)

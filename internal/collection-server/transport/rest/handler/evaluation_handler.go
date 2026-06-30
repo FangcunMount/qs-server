@@ -2,6 +2,7 @@ package handler
 
 import (
 	"context"
+	stderrors "errors"
 	"strconv"
 	"time"
 
@@ -152,6 +153,10 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 
 	result, err := h.queryService.ListMyAssessments(c.Request.Context(), testeeID, &req)
 	if err != nil {
+		if stderrors.Is(err, evaluation.ErrInvalidAssessmentKind) {
+			h.BadRequestResponse(c, err.Error(), err)
+			return
+		}
 		h.InternalErrorResponse(c, "list assessments failed", err)
 		return
 	}

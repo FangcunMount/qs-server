@@ -34,6 +34,7 @@ type ListMyAssessmentsDTO struct {
 	Status    string     // 状态筛选（可选）
 	ScaleCode string     // 量表编码筛选（可选）
 	RiskLevel string     // 风险等级筛选（可选）
+	ModelKind string     // 解释模型类型筛选（可选）：scale/personality
 	DateFrom  *time.Time // 开始日期筛选（可选）
 	DateTo    *time.Time // 结束日期筛选（可选）
 }

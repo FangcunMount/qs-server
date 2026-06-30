@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"errors"
 	"strconv"
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -76,6 +77,10 @@ func (h *EvaluationHandler) ListMyAssessmentsV2(c *gin.Context) {
 
 	result, err := h.queryService.ListMyAssessmentsV2(c.Request.Context(), testeeID, &req)
 	if err != nil {
+		if errors.Is(err, evaluationapp.ErrInvalidAssessmentKind) {
+			h.BadRequestResponse(c, err.Error(), err)
+			return
+		}
 		h.InternalErrorResponse(c, "list assessments failed", err)
 		return
 	}

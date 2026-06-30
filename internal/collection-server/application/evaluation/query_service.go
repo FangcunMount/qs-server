@@ -182,6 +182,7 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		"risk_level", req.RiskLevel,
 		"date_from", req.DateFrom,
 		"date_to", req.DateTo,
+		"assessment_kind", req.AssessmentKind,
 	)
 
 	// 默认分页参数
@@ -196,10 +197,16 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		req.PageSize = 100
 	}
 
+	modelKind, err := NormalizeAssessmentKind(req.AssessmentKind)
+	if err != nil {
+		return nil, err
+	}
+
 	l.Debugw("开始从 gRPC 服务查询测评列表",
 		"testee_id", testeeID,
 		"page", req.Page,
 		"page_size", req.PageSize,
+		"model_kind", modelKind,
 	)
 
 	result, err := s.evaluationClient.ListMyAssessments(
@@ -210,6 +217,7 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		req.RiskLevel,
 		req.DateFrom,
 		req.DateTo,
+		modelKind,
 		req.Page,
 		req.PageSize,
 	)
@@ -464,13 +472,17 @@ func (s *QueryService) ListMyAssessmentsV2(ctx context.Context, testeeID uint64,
 	if pageSize > 100 {
 		pageSize = 100
 	}
+	modelKind, err := NormalizeAssessmentKind(req.AssessmentKind)
+	if err != nil {
+		return nil, err
+	}
 	result, err := s.evaluationClient.ListMyAssessmentsV2(
 		ctx,
 		testeeID,
 		req.Status,
 		req.ScaleCode,
 		req.RiskLevel,
-		"",
+		modelKind,
 		"",
 		page,
 		pageSize,

@@ -1153,6 +1153,7 @@ type ListMyAssessmentsRequest struct {
 	RiskLevel     string                 `protobuf:"bytes,6,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"` // 风险等级筛选（可选）
 	DateFrom      string                 `protobuf:"bytes,7,opt,name=date_from,json=dateFrom,proto3" json:"date_from,omitempty"`    // 开始日期（YYYY-MM-DD 或 RFC3339，可选）
 	DateTo        string                 `protobuf:"bytes,8,opt,name=date_to,json=dateTo,proto3" json:"date_to,omitempty"`          // 结束日期（YYYY-MM-DD 或 RFC3339，可选）
+	ModelKind     string                 `protobuf:"bytes,9,opt,name=model_kind,json=modelKind,proto3" json:"model_kind,omitempty"` // 解释模型类型筛选（可选）：scale/personality
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -1239,6 +1240,13 @@ func (x *ListMyAssessmentsRequest) GetDateFrom() string {
 func (x *ListMyAssessmentsRequest) GetDateTo() string {
 	if x != nil {
 		return x.DateTo
+	}
+	return ""
+}
+
+func (x *ListMyAssessmentsRequest) GetModelKind() string {
+	if x != nil {
+		return x.ModelKind
 	}
 	return ""
 }
@@ -3071,7 +3079,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"&GetMyAssessmentByAnswerSheetIDResponse\x12<\n" +
 	"\n" +
 	"assessment\x18\x01 \x01(\v2\x1c.evaluation.AssessmentDetailR\n" +
-	"assessment\"\xf4\x01\n" +
+	"assessment\"\x93\x02\n" +
 	"\x18ListMyAssessmentsRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x12\n" +
@@ -3082,7 +3090,9 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\n" +
 	"risk_level\x18\x06 \x01(\tR\triskLevel\x12\x1b\n" +
 	"\tdate_from\x18\a \x01(\tR\bdateFrom\x12\x17\n" +
-	"\adate_to\x18\b \x01(\tR\x06dateTo\"\xb8\x01\n" +
+	"\adate_to\x18\b \x01(\tR\x06dateTo\x12\x1d\n" +
+	"\n" +
+	"model_kind\x18\t \x01(\tR\tmodelKind\"\xb8\x01\n" +
 	"\x19ListMyAssessmentsResponse\x123\n" +
 	"\x05items\x18\x01 \x03(\v2\x1d.evaluation.AssessmentSummaryR\x05items\x12\x14\n" +
 	"\x05total\x18\x02 \x01(\x05R\x05total\x12\x12\n" +

@@ -112,6 +112,7 @@ func (q myAssessmentQuery) List(
 		Statuses:  normalizeMyAssessmentStatuses(dto.Status),
 		ScaleCode: dto.ScaleCode,
 		RiskLevel: dto.RiskLevel,
+		ModelKind: dto.ModelKind,
 		DateFrom:  dto.DateFrom,
 		DateTo:    dto.DateTo,
 	}, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
