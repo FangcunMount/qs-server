@@ -3,14 +3,13 @@ package assessmentmodel
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	personalitymodel "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -36,11 +35,7 @@ type Service interface {
 }
 
 type Dependencies struct {
-	ScaleLifecycle     scale.ScaleLifecycleService
-	ScaleFactor        scale.ScaleFactorService
-	ScaleQuery         scale.ScaleQueryService
-	ScaleCategory      scale.ScaleCategoryService
-	ScaleQRCode        scale.ScaleQRCodeQueryService
+	BehaviorCommand    behavior.Command
 	PersonalityCommand personality.Service
 	PersonalityQuery   personalitymodel.PersonalityModelQueryService
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
@@ -112,9 +107,9 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 	if modelCode == "" {
 		return nil, invalidArgument("模型编码不能为空")
 	}
-	if s.deps.ScaleQuery != nil {
-		if result, err := s.deps.ScaleQuery.GetByCode(ctx, modelCode); err == nil && result != nil {
-			return behaviorSummaryFromScale(result), nil
+	if s.deps.BehaviorCommand != nil {
+		if result, err := s.deps.BehaviorCommand.Get(ctx, modelCode); err == nil && result != nil {
+			return summaryFromBehavior(result), nil
 		}
 	}
 	if s.deps.PersonalityCommand != nil {
@@ -151,10 +146,10 @@ func (s *service) Delete(ctx context.Context, modelCode string) error {
 		}
 		return s.deps.PersonalityCommand.Delete(ctx, modelCode)
 	}
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return unavailable("行为能力模型服务未配置")
 	}
-	return s.deps.ScaleLifecycle.Delete(ctx, modelCode)
+	return s.deps.BehaviorCommand.Delete(ctx, modelCode)
 }
 
 func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
@@ -168,14 +163,14 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 		}
 		return summaryFromPersonality(result), nil
 	}
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	result, err := s.deps.ScaleLifecycle.Publish(ctx, modelCode)
+	result, err := s.deps.BehaviorCommand.Publish(ctx, modelCode)
 	if err != nil {
 		return nil, err
 	}
-	return behaviorSummaryFromScale(result), nil
+	return summaryFromBehavior(result), nil
 }
 
 func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
@@ -189,14 +184,14 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 		}
 		return summaryFromPersonality(result), nil
 	}
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	result, err := s.deps.ScaleLifecycle.Unpublish(ctx, modelCode)
+	result, err := s.deps.BehaviorCommand.Unpublish(ctx, modelCode)
 	if err != nil {
 		return nil, err
 	}
-	return behaviorSummaryFromScale(result), nil
+	return summaryFromBehavior(result), nil
 }
 
 func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
@@ -210,14 +205,14 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 		}
 		return summaryFromPersonality(result), nil
 	}
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	result, err := s.deps.ScaleLifecycle.Archive(ctx, modelCode)
+	result, err := s.deps.BehaviorCommand.Archive(ctx, modelCode)
 	if err != nil {
 		return nil, err
 	}
-	return behaviorSummaryFromScale(result), nil
+	return summaryFromBehavior(result), nil
 }
 
 func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
@@ -231,10 +226,10 @@ func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDT
 		}
 		return questionnaireFromPersonality(result), nil
 	}
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	result, err := s.deps.ScaleLifecycle.UpdateQuestionnaire(ctx, scale.UpdateScaleQuestionnaireDTO{
+	result, err := s.deps.BehaviorCommand.BindQuestionnaire(ctx, behavior.BindQuestionnaireInput{
 		Code:                 dto.Code,
 		QuestionnaireCode:    dto.QuestionnaireCode,
 		QuestionnaireVersion: dto.QuestionnaireVersion,
@@ -276,16 +271,11 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 	}
 	result, err := s.loadBehaviorAbility(ctx, modelCode)
 	if err == nil {
-		payload, err := json.Marshal(newBehaviorDefinitionPayload(result))
+		definition, err := s.deps.BehaviorCommand.GetDefinition(ctx, result.Code)
 		if err != nil {
 			return nil, err
 		}
-		return &DefinitionDTO{
-			Kind:          KindBehaviorAbility,
-			Algorithm:     "score_range",
-			PayloadFormat: PayloadFormatScaleV1,
-			Payload:       payload,
-		}, nil
+		return definitionFromBehavior(definition), nil
 	}
 	if s.deps.PersonalityQuery == nil {
 		return nil, err
@@ -350,8 +340,8 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 		},
 	}
 	if kind == "" || kind == KindBehaviorAbility {
-		if s.deps.ScaleCategory != nil {
-			categories, err := s.deps.ScaleCategory.GetCategories(ctx)
+		if s.deps.BehaviorCommand != nil {
+			categories, err := s.deps.BehaviorCommand.Options(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -404,22 +394,32 @@ func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationRe
 	return NewValidationResult(issues), nil
 }
 
-func (s *service) PreviewReport(_ context.Context, _ string, _ json.RawMessage) (*PreviewReportResult, error) {
-	return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入统一测评模型后台接口")
+func (s *service) PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error) {
+	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
+		if s.deps.PersonalityCommand == nil {
+			return nil, unavailable("人格模型服务未配置")
+		}
+		result, err := s.deps.PersonalityCommand.PreviewReport(ctx, modelCode, payload)
+		if err != nil {
+			return nil, err
+		}
+		return previewFromPersonality(result), nil
+	}
+	return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
 }
 
 func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, error) {
-	if s.deps.ScaleQRCode == nil {
+	if s.deps.BehaviorCommand == nil {
 		return "", unavailable("模型二维码服务未配置")
 	}
-	return s.deps.ScaleQRCode.GetQRCode(ctx, modelCode)
+	return s.deps.BehaviorCommand.GetQRCode(ctx, modelCode)
 }
 
 func (s *service) createBehaviorAbility(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	result, err := s.deps.ScaleLifecycle.Create(ctx, scale.CreateScaleDTO{
+	result, err := s.deps.BehaviorCommand.Create(ctx, behavior.CreateInput{
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
@@ -431,14 +431,14 @@ func (s *service) createBehaviorAbility(ctx context.Context, dto CreateModelDTO)
 	if err != nil {
 		return nil, err
 	}
-	return behaviorSummaryFromScale(result), nil
+	return summaryFromBehavior(result), nil
 }
 
 func (s *service) updateBehaviorBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
-	if s.deps.ScaleLifecycle == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	result, err := s.deps.ScaleLifecycle.UpdateBasicInfo(ctx, scale.UpdateScaleBasicInfoDTO{
+	result, err := s.deps.BehaviorCommand.UpdateBasicInfo(ctx, behavior.UpdateBasicInfoInput{
 		Code:        dto.Code,
 		Title:       dto.Title,
 		Description: dto.Description,
@@ -448,60 +448,18 @@ func (s *service) updateBehaviorBasicInfo(ctx context.Context, dto UpdateBasicIn
 	if err != nil {
 		return nil, err
 	}
-	return behaviorSummaryFromScale(result), nil
+	return summaryFromBehavior(result), nil
 }
 
 func (s *service) updateBehaviorDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
-	var payload struct {
-		Dimensions     []behaviorDimensionRule `json:"dimensions"`
-		InterpretRules []behaviorInterpretRule `json:"interpret_rules"`
-	}
-	if len(dto.Payload) > 0 {
-		if err := json.Unmarshal(dto.Payload, &payload); err != nil {
-			return nil, invalidArgument("模型定义 payload 格式无效")
-		}
-	}
-	if len(payload.Dimensions) == 0 {
-		return nil, invalidArgument("行为能力模型维度不能为空")
-	}
-	if s.deps.ScaleFactor == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型定义服务未配置")
 	}
-
-	ruleByDimension := make(map[string][]scale.InterpretRuleDTO)
-	for _, group := range payload.InterpretRules {
-		for _, r := range group.Ranges {
-			ruleByDimension[group.DimensionCode] = append(ruleByDimension[group.DimensionCode], scale.InterpretRuleDTO{
-				MinScore:   r.MinScore,
-				MaxScore:   r.MaxScore,
-				RiskLevel:  r.Level,
-				Conclusion: r.Conclusion,
-				Suggestion: r.Suggestion,
-			})
-		}
-	}
-	factors := make([]scale.FactorDTO, 0, len(payload.Dimensions))
-	for _, d := range payload.Dimensions {
-		if d.Code == "" || d.Title == "" {
-			return nil, invalidArgument("维度编码和标题不能为空")
-		}
-		factors = append(factors, scale.FactorDTO{
-			Code:            d.Code,
-			Title:           d.Title,
-			FactorType:      "primary",
-			QuestionCodes:   d.QuestionCodes,
-			ScoringStrategy: d.ScoringStrategy,
-			ScoringParams:   scoringParamsDTO(d.ScoringParams),
-			MaxScore:        d.MaxScore,
-			IsTotalScore:    d.IsTotalScore,
-			IsShow:          d.IsShow,
-			InterpretRules:  ruleByDimension[d.Code],
-		})
-	}
-	if _, err := s.deps.ScaleFactor.ReplaceFactors(ctx, modelCode, factors); err != nil {
+	result, err := s.deps.BehaviorCommand.UpdateDefinition(ctx, modelCode, behavior.DefinitionInput{Payload: dto.Payload})
+	if err != nil {
 		return nil, err
 	}
-	return s.GetDefinition(ctx, modelCode)
+	return definitionFromBehavior(result), nil
 }
 
 func (s *service) resolveModelKind(ctx context.Context, modelCode string) (string, bool) {
@@ -510,8 +468,8 @@ func (s *service) resolveModelKind(ctx context.Context, modelCode string) (strin
 			return KindPersonality, true
 		}
 	}
-	if s.deps.ScaleQuery != nil {
-		if _, err := s.deps.ScaleQuery.GetByCode(ctx, modelCode); err == nil {
+	if s.deps.BehaviorCommand != nil {
+		if _, err := s.deps.BehaviorCommand.Get(ctx, modelCode); err == nil {
 			return KindBehaviorAbility, true
 		}
 	}
@@ -519,17 +477,15 @@ func (s *service) resolveModelKind(ctx context.Context, modelCode string) (strin
 }
 
 func (s *service) listBehaviorAbility(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
-	if s.deps.ScaleQuery == nil {
+	if s.deps.BehaviorCommand == nil {
 		return &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}, nil
 	}
-	result, err := s.deps.ScaleQuery.List(ctx, scale.ListScalesDTO{
+	result, err := s.deps.BehaviorCommand.List(ctx, behavior.ListInput{
 		Page:     dto.Page,
 		PageSize: dto.PageSize,
-		Filter: scale.ScaleListFilter{
-			Status:   dto.Status,
-			Title:    dto.Keyword,
-			Category: dto.Category,
-		},
+		Status:   dto.Status,
+		Keyword:  dto.Keyword,
+		Category: dto.Category,
 	})
 	if err != nil {
 		return nil, err
@@ -540,7 +496,7 @@ func (s *service) listBehaviorAbility(ctx context.Context, dto ListModelsDTO) (*
 	}
 	out.Total = result.Total
 	for _, item := range result.Items {
-		out.Items = append(out.Items, behaviorSummaryFromScaleSummary(item))
+		out.Items = append(out.Items, summaryFromBehaviorValue(item))
 	}
 	return out, nil
 }
@@ -594,14 +550,14 @@ func (s *service) listPersonality(ctx context.Context, dto ListModelsDTO) ([]Mod
 	return items, total, nil
 }
 
-func (s *service) loadBehaviorAbility(ctx context.Context, modelCode string) (*scale.ScaleResult, error) {
+func (s *service) loadBehaviorAbility(ctx context.Context, modelCode string) (*behavior.Model, error) {
 	if modelCode == "" {
 		return nil, invalidArgument("模型编码不能为空")
 	}
-	if s.deps.ScaleQuery == nil {
+	if s.deps.BehaviorCommand == nil {
 		return nil, unavailable("行为能力模型服务未配置")
 	}
-	return s.deps.ScaleQuery.GetByCode(ctx, modelCode)
+	return s.deps.BehaviorCommand.Get(ctx, modelCode)
 }
 
 func (s *service) questionnaireBinding(ctx context.Context, questionnaireCode, questionnaireVersion string) (*QuestionnaireBindingResult, error) {
@@ -648,20 +604,4 @@ func codeKindAndPrefix(target string) (string, string) {
 	default:
 		return "", ""
 	}
-}
-
-func scoringParamsDTO(params map[string]interface{}) *scale.ScoringParamsDTO {
-	if len(params) == 0 {
-		return nil
-	}
-	dto := &scale.ScoringParamsDTO{}
-	if raw, ok := params["cnt_option_contents"].([]interface{}); ok {
-		for _, item := range raw {
-			dto.CntOptionContents = append(dto.CntOptionContents, fmt.Sprint(item))
-		}
-	}
-	if raw, ok := params["cnt_option_contents"].([]string); ok {
-		dto.CntOptionContents = append(dto.CntOptionContents, raw...)
-	}
-	return dto
 }

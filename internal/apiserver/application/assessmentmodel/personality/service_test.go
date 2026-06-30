@@ -2,7 +2,9 @@ package personality_test
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"os"
 	"strconv"
 	"testing"
 	"time"
@@ -179,18 +181,97 @@ func publishedQuestionnaire() *questionnaireapp.QuestionnaireResult {
 	}
 }
 
+func frontendMBTIQuestionnaire() *questionnaireapp.QuestionnaireResult {
+	return &questionnaireapp.QuestionnaireResult{
+		Code:    "Q_FRONTEND_MBTI",
+		Version: "1.0.0",
+		Title:   "Frontend MBTI Questionnaire",
+		Status:  "published",
+		Questions: []questionnaireapp.QuestionResult{
+			{Code: "Q_EI"},
+			{Code: "Q_SN"},
+			{Code: "Q_TF"},
+			{Code: "Q_JP"},
+		},
+	}
+}
+
 func sampleRuntimePayload() []byte {
 	return []byte(`{
-		"factor_graph":{
-			"factors":{
-				"EI":{"id":"EI","code":"EI","name":"EI","kind":"leaf","contributions":[{"question_code":"q1","option_scores":{"A":1,"B":-1}}]}
+		"algorithm":"mbti",
+		"outcomes":[{"code":"INTJ","name":"建筑师","one_liner":"独立战略家"}],
+		"runtime":{
+			"factor_graph":{
+				"factors":{
+					"EI":{"id":"EI","code":"EI","name":"EI","kind":"leaf","contributions":[{"question_code":"q1","option_scores":{"A":1,"B":-1}}]}
+				},
+				"roots":["EI"]
 			},
-			"roots":["EI"]
-		},
-		"decision":{"kind":"pole_composition"},
-		"outcome_mapping":{"detail_kind":"mbti_type"},
-		"report":{"kind":"template","adapter_key":"mbti_default"}
+			"decision":{"kind":"pole_composition"},
+			"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti"},
+			"report":{"kind":"template","adapter_key":"mbti"}
+		}
 	}`)
+}
+
+func TestPreviewReportUsesDraftModelWithoutPublishing(t *testing.T) {
+	payload, err := os.ReadFile("../../../testdata/personality/frontend_payload_mbti.json")
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	svc := personality.NewService(personality.Dependencies{
+		ModelRepo:          modelRepo,
+		PublishedRepo:      publishedRepo,
+		QuestionnaireQuery: questionnaireQueryStub{questionnaire: frontendMBTIQuestionnaire()},
+	})
+	created, err := svc.Create(context.Background(), personality.CreateInput{
+		Code: "personality_preview_mbti", Title: "Preview MBTI", Algorithm: "mbti",
+		SubKind:              personality.SubKindTypology,
+		QuestionnaireCode:    "Q_FRONTEND_MBTI",
+		QuestionnaireVersion: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, personality.DefinitionInput{
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Payload:       payload,
+	}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+	previewPayload, err := json.Marshal(personality.PreviewReportInput{
+		Answers: []personality.PreviewAnswer{
+			{QuestionCode: "Q_EI", Score: 1},
+			{QuestionCode: "Q_SN", Score: 5},
+			{QuestionCode: "Q_TF", Score: 1},
+			{QuestionCode: "Q_JP", Score: 1},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	result, err := svc.PreviewReport(context.Background(), created.Code, previewPayload)
+	if err != nil {
+		t.Fatalf("PreviewReport: %v", err)
+	}
+	if result.Outcome.Code != "INTJ" {
+		t.Fatalf("outcome code = %s, want INTJ", result.Outcome.Code)
+	}
+	if result.Report == nil {
+		t.Fatal("report is nil")
+	}
+	if len(publishedRepo.snapshots) != 0 {
+		t.Fatal("preview should not save published snapshot")
+	}
+	stored, err := modelRepo.FindByCode(context.Background(), created.Code)
+	if err != nil {
+		t.Fatalf("FindByCode: %v", err)
+	}
+	if stored.Status != domain.ModelStatusDraft {
+		t.Fatalf("draft status = %s, want draft", stored.Status)
+	}
 }
 
 func TestCreateAndPublishPersonalityModel(t *testing.T) {
@@ -364,14 +445,51 @@ func TestPublishRequiresQuestionReferencesInBoundQuestionnaire(t *testing.T) {
 		Payload: []byte(`{
 			"factor_graph":{"factors":{"EI":{"id":"EI","code":"EI","kind":"leaf","contributions":[{"question_code":"missing","option_scores":{"A":1}}]}},"roots":["EI"]},
 			"decision":{"kind":"pole_composition"},
-			"outcome_mapping":{"detail_kind":"mbti_type"},
-			"report":{"kind":"template","adapter_key":"mbti_default"}
+			"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti"},
+			"report":{"kind":"template","adapter_key":"mbti"}
 		}`),
 	}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
 	if _, err := svc.Publish(context.Background(), created.Code); err == nil {
 		t.Fatal("Publish should fail when definition references missing question")
+	}
+}
+
+func TestPublishRequiresSupportedRuntimeAdapters(t *testing.T) {
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	svc := personality.NewService(personality.Dependencies{
+		ModelRepo:          modelRepo,
+		PublishedRepo:      publishedRepo,
+		QuestionnaireQuery: questionnaireQueryStub{questionnaire: publishedQuestionnaire()},
+	})
+
+	created, err := svc.Create(context.Background(), personality.CreateInput{
+		Code: "personality_bad_adapter", Title: "Bad Adapter", Algorithm: "mbti",
+		SubKind:           personality.SubKindTypology,
+		QuestionnaireCode: "Q_DEMO", QuestionnaireVersion: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, personality.DefinitionInput{
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Payload: []byte(`{
+			"algorithm":"mbti",
+			"outcomes":[{"code":"INTJ","name":"建筑师"}],
+			"runtime":{
+				"factor_graph":{"factors":{"EI":{"id":"EI","code":"EI","kind":"leaf","contributions":[{"question_code":"q1","option_scores":{"A":1,"B":-1}}]}},"roots":["EI"]},
+				"decision":{"kind":"pole_composition"},
+				"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti_default"},
+				"report":{"kind":"template","adapter_key":"mbti_default"}
+			}
+		}`),
+	}); err != nil {
+		t.Fatalf("UpdateDefinition should allow draft-only invalid adapter config: %v", err)
+	}
+	if _, err := svc.Publish(context.Background(), created.Code); err == nil {
+		t.Fatal("Publish should fail when runtime adapters are unsupported")
 	}
 }
 

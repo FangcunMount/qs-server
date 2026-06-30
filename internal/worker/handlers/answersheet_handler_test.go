@@ -22,6 +22,7 @@ import (
 type fakeWorkerInternalClient struct {
 	calculateCalls                 int
 	createCalls                    int
+	calls                          []string
 	syncAssessmentAttentionCalls   int
 	syncAssessmentAttentionRequest *pb.SyncAssessmentAttentionRequest
 	questionnaireQRCodeCalls       int
@@ -39,6 +40,7 @@ func (f *fakeWorkerInternalClient) CreateAssessmentFromAnswerSheet(
 	_ *pb.CreateAssessmentFromAnswerSheetRequest,
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
 	f.createCalls++
+	f.calls = append(f.calls, "create_assessment")
 	return &pb.CreateAssessmentFromAnswerSheetResponse{
 		AssessmentId:  1001,
 		Created:       true,
@@ -52,6 +54,7 @@ func (f *fakeWorkerInternalClient) CalculateAnswerSheetScore(
 	_ *pb.CalculateAnswerSheetScoreRequest,
 ) (*pb.CalculateAnswerSheetScoreResponse, error) {
 	f.calculateCalls++
+	f.calls = append(f.calls, "calculate_score")
 	return &pb.CalculateAnswerSheetScoreResponse{
 		Success:    true,
 		Message:    "ok",
@@ -160,6 +163,33 @@ func TestHandleAnswerSheetSubmitted_LockedExecutesAndReleases(t *testing.T) {
 	}
 	if !released {
 		t.Fatalf("expected lock release to be called")
+	}
+}
+
+func TestHandleAnswerSheetSubmitted_CalculatesScoreBeforeCreatingAssessment(t *testing.T) {
+	client := &fakeWorkerInternalClient{}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-order"}, true, nil
+		},
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
+			return nil
+		},
+	})
+
+	if err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 124)); err != nil {
+		t.Fatalf("handler returned error: %v", err)
+	}
+
+	want := []string{"calculate_score", "create_assessment"}
+	if len(client.calls) != len(want) {
+		t.Fatalf("calls = %#v, want %#v", client.calls, want)
+	}
+	for i := range want {
+		if client.calls[i] != want[i] {
+			t.Fatalf("calls = %#v, want %#v", client.calls, want)
+		}
 	}
 }
 

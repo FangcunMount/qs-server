@@ -45,6 +45,18 @@ type PublishedLister interface {
 	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.Snapshot, int64, error)
 }
 
+// PublishedModelReader reads v2 published assessment model snapshots.
+type PublishedModelReader interface {
+	GetPublishedModelByRef(ctx context.Context, ref Ref) (*domain.PublishedModelSnapshot, error)
+	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error)
+}
+
+// PublishedModelLister lists v2 published assessment model snapshots for new catalog callers.
+type PublishedModelLister interface {
+	FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
+	ListPublishedModels(ctx context.Context, filter ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error)
+}
+
 // PublishedAlgorithmLister lists distinct published personality typology algorithms.
 type PublishedAlgorithmLister interface {
 	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)

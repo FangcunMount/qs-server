@@ -1,6 +1,10 @@
 package personality
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+)
 
 const (
 	KindPersonality         = "personality"
@@ -123,4 +127,26 @@ func NewValidationResult(issues []ValidationIssue) *ValidationResult {
 		}
 	}
 	return result
+}
+
+type PreviewAnswer struct {
+	QuestionCode string  `json:"question_code"`
+	Value        any     `json:"value,omitempty"`
+	Score        float64 `json:"score,omitempty"`
+}
+
+type PreviewReportInput struct {
+	Answers  []PreviewAnswer `json:"answers"`
+	SampleID string          `json:"sample_id,omitempty"`
+}
+
+type PreviewOutcome struct {
+	Code  string `json:"code,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
+type PreviewReportResult struct {
+	Outcome PreviewOutcome          `json:"outcome"`
+	Scores  map[string]float64      `json:"scores,omitempty"`
+	Report  *report.InterpretReport `json:"report"`
 }

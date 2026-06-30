@@ -34,6 +34,8 @@ type dualStoreLegacyRepository interface {
 var (
 	_ port.PublishedReader          = (*DualStore)(nil)
 	_ port.PublishedLister          = (*DualStore)(nil)
+	_ port.PublishedModelReader     = (*DualStore)(nil)
+	_ port.PublishedModelLister     = (*DualStore)(nil)
 	_ port.PublishedWriter          = (*DualStore)(nil)
 	_ port.PublishedAlgorithmLister = (*DualStore)(nil)
 )
@@ -68,6 +70,14 @@ func (s *DualStore) GetPublishedByRef(ctx context.Context, ref port.Ref) (*domai
 	return s.legacy.GetPublishedByRef(ctx, ref)
 }
 
+func (s *DualStore) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+	snapshot, err := s.GetPublishedByRef(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return domain.PublishedFromLegacy(snapshot), nil
+}
+
 func (s *DualStore) FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error) {
 	if s == nil {
 		return nil, domain.ErrNotFound
@@ -85,6 +95,14 @@ func (s *DualStore) FindPublishedByQuestionnaire(ctx context.Context, questionna
 		return nil, domain.ErrNotFound
 	}
 	return s.legacy.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+}
+
+func (s *DualStore) FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error) {
+	snapshot, err := s.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	if err != nil {
+		return nil, err
+	}
+	return domain.PublishedFromLegacy(snapshot), nil
 }
 
 func (s *DualStore) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
@@ -123,6 +141,14 @@ func (s *DualStore) FindPublishedByModelCode(ctx context.Context, kind domain.Ki
 		}
 	}
 	return nil, domain.ErrNotFound
+}
+
+func (s *DualStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
+	snapshot, err := s.FindPublishedByModelCode(ctx, kind, code)
+	if err != nil {
+		return nil, err
+	}
+	return domain.PublishedFromLegacy(snapshot), nil
 }
 
 func (s *DualStore) ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
@@ -167,6 +193,21 @@ func (s *DualStore) ListPublished(ctx context.Context, filter port.ListPublished
 		end = len(filtered)
 	}
 	return filtered[start:end], total, nil
+}
+
+func (s *DualStore) ListPublishedModels(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error) {
+	snapshots, total, err := s.ListPublished(ctx, filter)
+	if err != nil {
+		return nil, 0, err
+	}
+	out := make([]*domain.PublishedModelSnapshot, 0, len(snapshots))
+	for _, snapshot := range snapshots {
+		if snapshot == nil {
+			continue
+		}
+		out = append(out, domain.PublishedFromLegacy(snapshot))
+	}
+	return out, total, nil
 }
 
 func filterLegacySnapshots(all []*domain.Snapshot, filter port.ListPublishedFilter) []*domain.Snapshot {

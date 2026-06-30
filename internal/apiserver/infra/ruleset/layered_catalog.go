@@ -18,6 +18,7 @@ type LayeredCatalog struct {
 }
 
 var _ port.RuleSetCatalog = (*LayeredCatalog)(nil)
+var _ port.PublishedModelReader = (*LayeredCatalog)(nil)
 
 func NewLayeredCatalog(store publishedStore, fallback port.RuleSetCatalog) *LayeredCatalog {
 	return &LayeredCatalog{store: store, fallback: fallback}
@@ -67,6 +68,28 @@ func (c *LayeredCatalog) GetPublishedByRef(ctx context.Context, ref port.RuleSet
 	return c.fallback.GetPublishedByRef(ctx, ref)
 }
 
+func (c *LayeredCatalog) GetPublishedModelByRef(ctx context.Context, ref port.Ref) (*domain.PublishedModelSnapshot, error) {
+	if c == nil {
+		return nil, domain.ErrNotFound
+	}
+	if c.store != nil {
+		if reader, ok := c.store.(port.PublishedModelReader); ok {
+			snapshot, err := reader.GetPublishedModelByRef(ctx, ref)
+			if err == nil {
+				return snapshot, nil
+			}
+			if !domain.IsNotFound(err) {
+				return nil, err
+			}
+		}
+	}
+	legacy, err := c.GetPublishedByRef(ctx, ref)
+	if err != nil {
+		return nil, err
+	}
+	return domain.PublishedFromLegacy(legacy), nil
+}
+
 func (c *LayeredCatalog) FindPublishedByQuestionnaire(
 	ctx context.Context,
 	questionnaireCode, questionnaireVersion string,
@@ -87,4 +110,29 @@ func (c *LayeredCatalog) FindPublishedByQuestionnaire(
 		return nil, domain.ErrNotFound
 	}
 	return c.fallback.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+}
+
+func (c *LayeredCatalog) FindPublishedModelByQuestionnaire(
+	ctx context.Context,
+	questionnaireCode, questionnaireVersion string,
+) (*domain.PublishedModelSnapshot, error) {
+	if c == nil {
+		return nil, domain.ErrNotFound
+	}
+	if c.store != nil {
+		if reader, ok := c.store.(port.PublishedModelReader); ok {
+			snapshot, err := reader.FindPublishedModelByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+			if err == nil {
+				return snapshot, nil
+			}
+			if !domain.IsNotFound(err) {
+				return nil, err
+			}
+		}
+	}
+	legacy, err := c.FindPublishedByQuestionnaire(ctx, questionnaireCode, questionnaireVersion)
+	if err != nil {
+		return nil, err
+	}
+	return domain.PublishedFromLegacy(legacy), nil
 }

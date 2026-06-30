@@ -1,0 +1,63 @@
+{
+  "algorithm": "sbti",
+  "outcomes": [
+    {
+      "code": "HIGH",
+      "name": "高能者",
+      "one_liner": "活力满满",
+      "pattern": "HH",
+      "summary": "行动能量高"
+    },
+    {
+      "code": "HHHH",
+      "name": "傻乐者",
+      "pattern": "HH",
+      "is_special": true,
+      "trigger": "fallback:best_match<60%"
+    }
+  ],
+  "runtime": {
+    "factor_graph": {
+      "dimensions": {
+        "D1": { "code": "D1", "name": "D1", "model": "M1" },
+        "D2": { "code": "D2", "name": "D2", "model": "M2" }
+      },
+      "factors": {
+        "D1": {
+          "id": "D1",
+          "code": "D1",
+          "name": "D1",
+          "kind": "leaf",
+          "option_scoring": "compat",
+          "contributions": [
+            { "question_code": "Q1", "option_scores": { "A": 1, "B": 2, "C": 3 } },
+            { "question_code": "Q2", "option_scores": { "A": 1, "B": 2, "C": 3 } }
+          ]
+        },
+        "D2": {
+          "id": "D2",
+          "code": "D2",
+          "name": "D2",
+          "kind": "leaf",
+          "option_scoring": "compat",
+          "contributions": [
+            { "question_code": "Q3", "option_scores": { "A": 1, "B": 2, "C": 3 } },
+            { "question_code": "Q4", "option_scores": { "A": 1, "B": 2, "C": 3 } }
+          ]
+        }
+      },
+      "roots": ["D1", "D2"]
+    },
+    "decision": {
+      "kind": "nearest_pattern",
+      "fallback_similarity_threshold": 0.6,
+      "fallback_code": "HHHH",
+      "level_rule": { "low_max": 3, "high_min": 5 }
+    },
+    "special_rules": [
+      { "code": "fallback:HHHH", "kind": "fallback_threshold", "phase": "after_decision", "outcome_code": "HHHH" }
+    ],
+    "outcome_mapping": { "detail_kind": "personality_type", "detail_adapter_key": "sbti" },
+    "report": { "kind": "template", "adapter_key": "sbti", "category_label": "SBTI" }
+  }
+}

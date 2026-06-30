@@ -2,6 +2,7 @@ package personality
 
 import (
 	"context"
+	"encoding/json"
 	stderrors "errors"
 	"time"
 
@@ -25,6 +26,7 @@ type Service interface {
 	GetDefinition(ctx context.Context, modelCode string) (*DefinitionResult, error)
 	UpdateDefinition(ctx context.Context, modelCode string, input DefinitionInput) (*DefinitionResult, error)
 	Validate(ctx context.Context, modelCode string) (*ValidationResult, error)
+	PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error)
 	Publish(ctx context.Context, modelCode string) (*ModelSummary, error)
 	Unpublish(ctx context.Context, modelCode string) (*ModelSummary, error)
 	Archive(ctx context.Context, modelCode string) (*ModelSummary, error)
@@ -304,12 +306,12 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 
 func (s *service) validateModelForPublish(ctx context.Context, model *domain.AssessmentModel) []ValidationIssue {
 	domainIssues := domainIssuesToValidation(model.ValidateForPublish().Issues)
-	runtime, definitionIssues := validateDefinitionPayloadForPublish(model)
+	runtime, validationContext, definitionIssues := validateDefinitionPayloadForPublish(model)
 	questionnaire, questionnaireIssues := s.questionnaireSnapshotForPublish(ctx, model.Binding.QuestionnaireCode, model.Binding.QuestionnaireVersion)
 	if len(definitionIssues) > 0 || len(questionnaireIssues) > 0 || runtime == nil {
 		return mergeValidationIssues(domainIssues, definitionIssues, questionnaireIssues)
 	}
-	runtimeIssues := domainIssuesToValidation(modeltypology.ValidateRuntimeSpecForPublish(runtime, questionnaire))
+	runtimeIssues := domainIssuesToValidation(modeltypology.ValidateRuntimeSpecForPublishWithContext(runtime, questionnaire, validationContext))
 	return mergeValidationIssues(domainIssues, definitionIssues, questionnaireIssues, runtimeIssues)
 }
 

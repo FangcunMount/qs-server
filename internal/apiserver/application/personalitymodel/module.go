@@ -10,13 +10,13 @@ import (
 type PersonalityModelQueryService = query.PersonalityModelQueryService
 
 // NewQueryService creates the personality model query service.
-func NewQueryService(lister port.PublishedLister) PersonalityModelQueryService {
+func NewQueryService(lister port.PublishedModelLister) PersonalityModelQueryService {
 	return query.NewQueryService(lister)
 }
 
 // NewQueryServiceWithAlgorithmLister creates the query service with dynamic category support.
 func NewQueryServiceWithAlgorithmLister(
-	lister port.PublishedLister,
+	lister port.PublishedModelLister,
 	algorithmLister port.PublishedAlgorithmLister,
 ) PersonalityModelQueryService {
 	return query.NewQueryServiceWithAlgorithmLister(lister, algorithmLister)

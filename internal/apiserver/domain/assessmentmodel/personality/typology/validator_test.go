@@ -17,7 +17,7 @@ func TestValidateRuntimeSpecForPublishRequiresExplicitFactorGraph(t *testing.T) 
 		},
 		Decision:       typology.PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
-		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: "mbti_default"},
+		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterMBTI},
 	}
 
 	issues := typology.ValidateRuntimeSpecForPublish(spec, typology.QuestionnaireSnapshot{})
@@ -44,7 +44,7 @@ func TestValidateRuntimeSpecForPublishValidatesQuestionAndOptionRefs(t *testing.
 		},
 		Decision:       typology.PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
-		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: "mbti_default"},
+		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterMBTI},
 	}
 	questionnaire := typology.QuestionnaireSnapshot{
 		Questions: []typology.QuestionSnapshot{{Code: "q1", OptionCodes: []string{"A"}}},
@@ -53,6 +53,127 @@ func TestValidateRuntimeSpecForPublishValidatesQuestionAndOptionRefs(t *testing.
 	issues := typology.ValidateRuntimeSpecForPublish(spec, questionnaire)
 	if !hasIssueCode(issues, "question_mapping.option_not_found") {
 		t.Fatalf("issues = %#v, want question_mapping.option_not_found", issues)
+	}
+}
+
+func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) {
+	spec := validRuntimeSpec()
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Outcomes: []typology.Outcome{
+			{Code: "INTJ", Name: "建筑师"},
+			{Code: "INTJ", Name: "重复建筑师"},
+			{Code: "ENTP"},
+		},
+	})
+
+	if !hasIssueCode(issues, "outcome.code.duplicated") {
+		t.Fatalf("issues = %#v, want outcome.code.duplicated", issues)
+	}
+	if !hasIssueCode(issues, "outcome.title.required") {
+		t.Fatalf("issues = %#v, want outcome.title.required", issues)
+	}
+}
+
+func TestValidateRuntimeSpecForPublishValidatesFallbackAndSpecialOutcomeRefs(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Decision.FallbackCode = "MISSING_FALLBACK"
+	spec.SpecialRules = []typology.SpecialRuleSpec{{
+		Code:        "SPECIAL_MISSING",
+		Kind:        typology.SpecialRuleKindAnswerMatch,
+		Phase:       typology.SpecialRuleBeforeScore,
+		OutcomeCode: "SPECIAL_MISSING",
+		Condition: typology.SpecialRuleCondition{
+			QuestionCodes: []string{"q1"},
+			OptionValues:  []string{"Z"},
+		},
+	}}
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	})
+
+	for _, code := range []string{
+		"decision.fallback_code.not_found",
+		"special_rule.outcome.not_found",
+		"question_mapping.option_not_found",
+	} {
+		if !hasIssueCode(issues, code) {
+			t.Fatalf("issues = %#v, want %s", issues, code)
+		}
+	}
+}
+
+func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Decision.Kind = assessmentmodel.DecisionKindNearestPattern
+	spec.Decision.LevelRule = &typology.LevelRuleSpec{LowMax: 5, HighMin: 3}
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	})
+
+	if !hasIssueCode(issues, "decision.kind.incompatible") {
+		t.Fatalf("issues = %#v, want decision.kind.incompatible", issues)
+	}
+	if !hasIssueCode(issues, "decision.level_rule.invalid") {
+		t.Fatalf("issues = %#v, want decision.level_rule.invalid", issues)
+	}
+}
+
+func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterBigFive
+	spec.Report.AdapterKey = typology.ReportAdapterBigFive
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	})
+
+	if !hasIssueCode(issues, "outcome_mapping.detail_adapter.incompatible") {
+		t.Fatalf("issues = %#v, want outcome_mapping.detail_adapter.incompatible", issues)
+	}
+	if !hasIssueCode(issues, "report.adapter.incompatible") {
+		t.Fatalf("issues = %#v, want report.adapter.incompatible", issues)
+	}
+}
+
+func validRuntimeSpec() *typology.RuntimeSpec {
+	return &typology.RuntimeSpec{
+		FactorGraph: typology.FactorGraphSpec{
+			Factors: map[string]typology.FactorSpec{
+				"EI": {
+					ID:   "EI",
+					Code: "EI",
+					Name: "EI",
+					Kind: typology.FactorSpecKindLeaf,
+					Contributions: []typology.FactorContributionSpec{{
+						QuestionCode: "q1",
+						OptionScores: map[string]float64{"A": 1, "B": -1},
+					}},
+				},
+			},
+			Roots: []string{"EI"},
+		},
+		Decision: typology.PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindPoleComposition},
+		OutcomeMapping: typology.OutcomeMappingSpec{
+			DetailKind:       typology.OutcomeDetailPersonalityType,
+			DetailAdapterKey: typology.DetailAdapterMBTI,
+		},
+		Report: typology.ReportSpec{
+			Kind:       typology.ReportKindTemplate,
+			AdapterKey: typology.ReportAdapterMBTI,
+		},
+	}
+}
+
+func validQuestionnaire() typology.QuestionnaireSnapshot {
+	return typology.QuestionnaireSnapshot{
+		Questions: []typology.QuestionSnapshot{{Code: "q1", OptionCodes: []string{"A", "B"}}},
 	}
 }
 

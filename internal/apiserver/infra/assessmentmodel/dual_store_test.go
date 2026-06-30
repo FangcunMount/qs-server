@@ -12,6 +12,8 @@ type dualStoreV2Stub struct {
 	latestCalled bool
 	latest       *domain.Snapshot
 	latestErr    error
+	list         []*domain.Snapshot
+	total        int64
 }
 
 func (s *dualStoreV2Stub) UpsertPublished(context.Context, *domain.Snapshot) error {
@@ -32,7 +34,7 @@ func (s *dualStoreV2Stub) FindLatestPublishedByModelCode(context.Context, domain
 }
 
 func (s *dualStoreV2Stub) ListPublished(context.Context, port.ListPublishedFilter) ([]*domain.Snapshot, int64, error) {
-	return nil, 0, nil
+	return s.list, s.total, nil
 }
 
 func (s *dualStoreV2Stub) ListPublishedAlgorithms(context.Context) ([]domain.Algorithm, error) {
@@ -78,5 +80,36 @@ func TestDualStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
 	}
 	if got.Definition.Version != "v4" {
 		t.Fatalf("version = %s, want v4", got.Definition.Version)
+	}
+}
+
+func TestDualStorePublishedModelListerReturnsV2Snapshots(t *testing.T) {
+	v2 := &dualStoreV2Stub{
+		latest: &domain.Snapshot{
+			Definition: domain.Definition{Kind: domain.KindPersonality, Code: "personality_demo", Version: "v4"},
+		},
+		list: []*domain.Snapshot{{
+			Definition: domain.Definition{Kind: domain.KindPersonality, Code: "personality_demo", Version: "v4"},
+		}},
+		total: 1,
+	}
+	store := &DualStore{v2: v2}
+
+	byCode, err := store.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "personality_demo")
+	if err != nil {
+		t.Fatalf("FindPublishedModelByCode: %v", err)
+	}
+	if byCode.Model.Code != "personality_demo" || byCode.Model.Version != "v4" {
+		t.Fatalf("published model = %#v", byCode.Model)
+	}
+	list, total, err := store.ListPublishedModels(context.Background(), port.ListPublishedFilter{Kind: domain.KindPersonality})
+	if err != nil {
+		t.Fatalf("ListPublishedModels: %v", err)
+	}
+	if total != 1 || len(list) != 1 {
+		t.Fatalf("list total=%d len=%d, want 1/1", total, len(list))
+	}
+	if list[0].Model.Code != "personality_demo" || list[0].Model.Version != "v4" {
+		t.Fatalf("list model = %#v", list[0].Model)
 	}
 }

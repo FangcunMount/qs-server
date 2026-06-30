@@ -31,24 +31,32 @@ func validateDefinitionPayloadForSave(format string, data []byte) []ValidationIs
 	return nil
 }
 
-func validateDefinitionPayloadForPublish(model *domain.AssessmentModel) (*modeltypology.RuntimeSpec, []ValidationIssue) {
+func validateDefinitionPayloadForPublish(model *domain.AssessmentModel) (*modeltypology.RuntimeSpec, modeltypology.RuntimeSpecValidationContext, []ValidationIssue) {
+	validationContext := modeltypology.RuntimeSpecValidationContext{}
 	if model == nil || model.Definition.IsEmpty() {
-		return nil, []ValidationIssue{{
+		return nil, validationContext, []ValidationIssue{{
 			Field: "definition.payload", Message: "模型定义 payload 不能为空",
 			Code: "definition.payload.required", Level: "error",
 		}}
 	}
+	validationContext.Algorithm = model.Algorithm
 	if issues := validateDefinitionPayloadForSave(model.Definition.Format, model.Definition.Data); len(issues) > 0 {
-		return nil, issues
+		return nil, validationContext, issues
 	}
-	runtime, err := personalitydomain.RuntimeSpecFromModel(model)
+	payload, runtime, err := personalitydomain.PayloadAndRuntimeSpecFromModel(model)
 	if err != nil {
-		return nil, []ValidationIssue{{
+		return nil, validationContext, []ValidationIssue{{
 			Field: "definition.payload", Message: err.Error(),
 			Code: "definition.payload.invalid", Level: "error",
 		}}
 	}
-	return runtime, nil
+	if payload != nil {
+		if payload.Algorithm != "" {
+			validationContext.Algorithm = payload.Algorithm
+		}
+		validationContext.Outcomes = append([]modeltypology.Outcome(nil), payload.Outcomes...)
+	}
+	return runtime, validationContext, nil
 }
 
 func mergeValidationIssues(groups ...[]ValidationIssue) []ValidationIssue {

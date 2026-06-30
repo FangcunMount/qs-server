@@ -47,6 +47,86 @@ func TestRuleSetTypologyCatalogDecodesV2BigFivePayload(t *testing.T) {
 	}
 }
 
+func TestPublishedTypologyCatalogDecodesPublishedModelSnapshot(t *testing.T) {
+	payload := &modeltypology.Payload{
+		Code:      "PUBLISHED_MBTI",
+		Version:   "v4",
+		Algorithm: domain.AlgorithmMBTI,
+		Status:    "published",
+	}
+	payloadBytes, format, err := codec.EncodeTypology(payload)
+	if err != nil {
+		t.Fatalf("EncodeTypology: %v", err)
+	}
+	reader := stubPublishedModelReader{snapshot: &domain.PublishedModelSnapshot{
+		SchemaVersion: domain.SchemaVersionV2,
+		PayloadFormat: format,
+		Model: domain.ModelDefinition{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: domain.AlgorithmMBTI,
+			Code:      payload.Code,
+			Version:   payload.Version,
+			Status:    "published",
+		},
+		Payload: payloadBytes,
+	}}
+	catalog := NewPublishedTypologyCatalog(reader, nil)
+	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
+		Kind:      port.EvaluationModelKindPersonality,
+		SubKind:   string(domain.SubKindTypology),
+		Algorithm: string(domain.AlgorithmMBTI),
+		Code:      payload.Code,
+		Version:   payload.Version,
+	})
+	if err != nil {
+		t.Fatalf("GetTypologyModelByRef: %v", err)
+	}
+	if got.Code != payload.Code || got.Algorithm != domain.AlgorithmMBTI {
+		t.Fatalf("payload = %#v", got)
+	}
+}
+
+func TestPublishedTypologyCatalogFallsBackToLegacyReader(t *testing.T) {
+	model := &modeltypology.MBTILegacyModel{
+		Code:                 port.DefaultMBTIModelCode,
+		Version:              port.DefaultMBTIModelVersion,
+		QuestionnaireCode:    port.DefaultMBTIQuestionnaireCode,
+		QuestionnaireVersion: port.DefaultMBTIModelVersion,
+		Status:               "published",
+		DimensionOrder:       []string{"EI"},
+		Dimensions: map[string]modeltypology.MBTILegacyDimension{
+			"EI": {Code: "EI", Name: "外向-内向", LeftPole: "I", RightPole: "E"},
+		},
+		TypeProfiles: []modeltypology.MBTILegacyTypeProfile{
+			{TypeCode: "INTJ", TypeName: "建筑师"},
+		},
+	}
+	payload, format, err := codec.EncodeMBTI(model)
+	if err != nil {
+		t.Fatalf("EncodeMBTI: %v", err)
+	}
+	legacy := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
+		PayloadFormat: format,
+		Definition: domain.RuleSetDefinition{
+			Kind: domain.KindMBTIMigration, Code: model.Code, Version: model.Version,
+		},
+		Payload: payload,
+	}}
+	catalog := NewPublishedTypologyCatalog(stubPublishedModelReader{err: domain.ErrNotFound}, legacy)
+	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
+		Kind:    port.EvaluationModelKindMBTIMigration,
+		Code:    model.Code,
+		Version: model.Version,
+	})
+	if err != nil {
+		t.Fatalf("GetTypologyModelByRef: %v", err)
+	}
+	if got.Algorithm != domain.AlgorithmMBTI {
+		t.Fatalf("Algorithm = %s", got.Algorithm)
+	}
+}
+
 func TestRuleSetTypologyCatalogLegacyMBTIFallback(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
 		Code:                 port.DefaultMBTIModelCode,
@@ -292,6 +372,31 @@ func (s stubRuleReader) GetPublishedByRef(context.Context, rulesetport.RuleSetRe
 }
 
 func (s stubRuleReader) FindPublishedByQuestionnaire(context.Context, string, string) (*domain.RuleSetSnapshot, error) {
+	if s.snapshot == nil {
+		return nil, domain.ErrNotFound
+	}
+	return s.snapshot, nil
+}
+
+type stubPublishedModelReader struct {
+	snapshot *domain.PublishedModelSnapshot
+	err      error
+}
+
+func (s stubPublishedModelReader) GetPublishedModelByRef(context.Context, rulesetport.Ref) (*domain.PublishedModelSnapshot, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
+	if s.snapshot == nil {
+		return nil, domain.ErrNotFound
+	}
+	return s.snapshot, nil
+}
+
+func (s stubPublishedModelReader) FindPublishedModelByQuestionnaire(context.Context, string, string) (*domain.PublishedModelSnapshot, error) {
+	if s.err != nil {
+		return nil, s.err
+	}
 	if s.snapshot == nil {
 		return nil, domain.ErrNotFound
 	}

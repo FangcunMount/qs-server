@@ -17,16 +17,16 @@ type PersonalityModelQueryService interface {
 }
 
 type queryService struct {
-	lister          port.PublishedLister
+	lister          port.PublishedModelLister
 	algorithmLister port.PublishedAlgorithmLister
 }
 
-func NewQueryService(lister port.PublishedLister) PersonalityModelQueryService {
+func NewQueryService(lister port.PublishedModelLister) PersonalityModelQueryService {
 	return &queryService{lister: lister}
 }
 
 func NewQueryServiceWithAlgorithmLister(
-	lister port.PublishedLister,
+	lister port.PublishedModelLister,
 	algorithmLister port.PublishedAlgorithmLister,
 ) PersonalityModelQueryService {
 	return &queryService{lister: lister, algorithmLister: algorithmLister}
@@ -36,11 +36,11 @@ func (s *queryService) GetPublishedByCode(ctx context.Context, code string) (*sh
 	if s == nil || s.lister == nil {
 		return nil, domain.ErrNotFound
 	}
-	snapshot, err := s.lister.FindPublishedByModelCode(ctx, domain.KindPersonality, code)
+	snapshot, err := s.lister.FindPublishedModelByCode(ctx, domain.KindPersonality, code)
 	if err != nil {
 		return nil, err
 	}
-	return shared.DetailFromSnapshot(snapshot)
+	return shared.DetailFromPublishedModel(snapshot)
 }
 
 func (s *queryService) ListPublished(ctx context.Context, dto shared.ListPersonalityModelsDTO) (*shared.PersonalityModelSummaryListResult, error) {
@@ -63,7 +63,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListPersona
 	if dto.Algorithm != "" {
 		filter.Algorithm = domain.Algorithm(dto.Algorithm)
 	}
-	snapshots, total, err := s.lister.ListPublished(ctx, filter)
+	snapshots, total, err := s.lister.ListPublishedModels(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +72,7 @@ func (s *queryService) ListPublished(ctx context.Context, dto shared.ListPersona
 		if snapshot == nil {
 			continue
 		}
-		summary, err := shared.SummaryFromSnapshotOnly(snapshot)
+		summary, err := shared.SummaryFromPublishedModel(snapshot)
 		if err != nil {
 			continue
 		}

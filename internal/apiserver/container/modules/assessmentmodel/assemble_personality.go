@@ -18,7 +18,7 @@ type Personality struct {
 
 // PersonalityDeps defines explicit construction dependencies.
 type PersonalityDeps struct {
-	PublishedLister          port.PublishedLister
+	PublishedLister          port.PublishedModelLister
 	PublishedAlgorithmLister port.PublishedAlgorithmLister
 	ModelRepo                port.ModelRepository
 	PublishedRepo            port.PublishedModelRepository

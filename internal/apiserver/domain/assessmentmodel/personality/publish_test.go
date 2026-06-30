@@ -1,10 +1,12 @@
 package personality_test
 
 import (
+	"encoding/json"
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 )
 
 func TestBuildPublishedSnapshot(t *testing.T) {
@@ -26,10 +28,14 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 	if err := model.UpdateDefinition(domain.DefinitionPayload{
 		Format: domain.PayloadFormatPersonalityTypologyV1,
 		Data: []byte(`{
-			"factor_graph":{"dimension_order":["EI"],"dimensions":{"EI":{"code":"EI","name":"EI"}},"roots":["EI"]},
-			"decision":{"kind":"pole_composition"},
-			"outcome_mapping":{"detail_kind":"mbti_type"},
-			"report":{"kind":"template","adapter_key":"mbti_default"}
+			"algorithm":"mbti",
+			"outcomes":[{"code":"INTJ","name":"建筑师","summary":"独立战略家"}],
+			"runtime":{
+				"factor_graph":{"dimension_order":["EI"],"dimensions":{"EI":{"code":"EI","name":"EI"}},"roots":["EI"]},
+				"decision":{"kind":"pole_composition"},
+				"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti"},
+				"report":{"kind":"template","adapter_key":"mbti"}
+			}
 		}`),
 	}, model.CreatedAt); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
@@ -50,6 +56,16 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 	}
 	if snapshot.Model.Version == snapshot.Binding.QuestionnaireVersion {
 		t.Fatalf("model version should not reuse questionnaire version %s", snapshot.Binding.QuestionnaireVersion)
+	}
+	var payload modeltypology.Payload
+	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
+		t.Fatalf("decode snapshot payload: %v", err)
+	}
+	if payload.Runtime == nil || payload.Runtime.Decision.Kind != domain.DecisionKindPoleComposition {
+		t.Fatalf("snapshot runtime = %#v, want pole_composition", payload.Runtime)
+	}
+	if len(payload.Outcomes) != 1 || payload.Outcomes[0].Code != "INTJ" {
+		t.Fatalf("snapshot payload outcomes = %#v, want INTJ preserved", payload.Outcomes)
 	}
 	legacy := domain.LegacyFromPublished(snapshot)
 	if legacy.Definition.Kind != domain.KindMBTIMigration {

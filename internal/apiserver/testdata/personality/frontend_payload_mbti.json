@@ -1,0 +1,34 @@
+{
+  "algorithm": "mbti",
+  "outcomes": [
+    {
+      "code": "INTJ",
+      "name": "建筑师",
+      "one_liner": "独立战略家",
+      "summary": "善于长远规划",
+      "strengths": ["系统思考"],
+      "weaknesses": ["表达克制"],
+      "suggestions": ["保留沟通空间"]
+    }
+  ],
+  "runtime": {
+    "factor_graph": {
+      "dimensions": {
+        "EI": { "code": "EI", "name": "外向-内向", "left_pole": "I", "right_pole": "E", "constant": 24, "threshold": 24 },
+        "SN": { "code": "SN", "name": "感觉-直觉", "left_pole": "S", "right_pole": "N", "constant": 24, "threshold": 24 },
+        "TF": { "code": "TF", "name": "思考-情感", "left_pole": "T", "right_pole": "F", "constant": 24, "threshold": 24 },
+        "JP": { "code": "JP", "name": "判断-知觉", "left_pole": "J", "right_pole": "P", "constant": 24, "threshold": 24 }
+      },
+      "factors": {
+        "EI": { "id": "EI", "code": "EI", "name": "外向-内向", "kind": "leaf", "constant": 24, "contributions": [{ "question_code": "Q_EI", "sign": -1 }] },
+        "SN": { "id": "SN", "code": "SN", "name": "感觉-直觉", "kind": "leaf", "constant": 24, "contributions": [{ "question_code": "Q_SN", "sign": 1 }] },
+        "TF": { "id": "TF", "code": "TF", "name": "思考-情感", "kind": "leaf", "constant": 24, "contributions": [{ "question_code": "Q_TF", "sign": -1 }] },
+        "JP": { "id": "JP", "code": "JP", "name": "判断-知觉", "kind": "leaf", "constant": 24, "contributions": [{ "question_code": "Q_JP", "sign": -1 }] }
+      },
+      "roots": ["EI", "SN", "TF", "JP"]
+    },
+    "decision": { "kind": "pole_composition" },
+    "outcome_mapping": { "detail_kind": "personality_type", "detail_adapter_key": "mbti" },
+    "report": { "kind": "template", "adapter_key": "mbti", "category_label": "MBTI" }
+  }
+}

@@ -2,6 +2,7 @@ package assessmentmodel
 
 import (
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel"
+	assessmentModelBehavior "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
 	assessmentModelAppPersonality "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
@@ -30,11 +31,13 @@ func (m *Module) ExportRESTDeps(
 	var personalityQuery = m.personalityQuery()
 	var personalityCommand = m.personalityCommand()
 	deps.AssessmentModel.Service = assessmentModelApp.NewService(assessmentModelApp.Dependencies{
-		ScaleLifecycle:     deps.Scale.LifecycleService,
-		ScaleFactor:        deps.Scale.FactorService,
-		ScaleQuery:         deps.Scale.QueryService,
-		ScaleCategory:      deps.Scale.CategoryService,
-		ScaleQRCode:        deps.Scale.QRCodeService,
+		BehaviorCommand: assessmentModelBehavior.NewLegacyScaleCommand(assessmentModelBehavior.LegacyScaleDeps{
+			Lifecycle: deps.Scale.LifecycleService,
+			Factor:    deps.Scale.FactorService,
+			Query:     deps.Scale.QueryService,
+			Category:  deps.Scale.CategoryService,
+			QRCode:    deps.Scale.QRCodeService,
+		}),
 		PersonalityCommand: personalityCommand,
 		PersonalityQuery:   personalityQuery,
 		QuestionnaireQuery: questionnaireQuery,

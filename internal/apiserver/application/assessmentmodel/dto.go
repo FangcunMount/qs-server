@@ -1,6 +1,10 @@
 package assessmentmodel
 
-import "encoding/json"
+import (
+	"encoding/json"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+)
 
 const (
 	KindPersonality                    = "personality"
@@ -145,6 +149,13 @@ func NewValidationResult(issues []ValidationIssue) *ValidationResult {
 	return result
 }
 
+type PreviewOutcome struct {
+	Code  string `json:"code,omitempty"`
+	Title string `json:"title,omitempty"`
+}
+
 type PreviewReportResult struct {
-	Message string `json:"message"`
+	Outcome PreviewOutcome          `json:"outcome"`
+	Scores  map[string]float64      `json:"scores,omitempty"`
+	Report  *report.InterpretReport `json:"report"`
 }
