@@ -58,14 +58,7 @@ func (r *Repository) upsertPublishedModel(ctx context.Context, snapshot *domain.
 	po.Status = statusPublished
 	po.PublishedAt = &now
 
-	filter := bson.M{
-		"model_kind":      po.ModelKind,
-		"model_sub_kind":  po.ModelSubKind,
-		"model_algorithm": po.ModelAlgorithm,
-		"model_code":      po.ModelCode,
-		"model_version":   po.ModelVersion,
-		"deleted_at":      nil,
-	}
+	filter := publishedModelUpsertFilter(po)
 
 	var existing PublishedAssessmentModelPO
 	findErr := r.FindOne(ctx, filter, &existing)

@@ -249,6 +249,9 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
+	if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode); err != nil {
+		return nil, err
+	}
 	if err := s.deps.PublishedRepo.Save(ctx, snapshot); err != nil {
 		return nil, err
 	}

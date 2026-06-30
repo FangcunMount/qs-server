@@ -329,6 +329,60 @@ func TestCreateAndPublishPersonalityModel(t *testing.T) {
 	}
 }
 
+func TestRepublishPersonalityModelAfterDefinitionChange(t *testing.T) {
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	publishedRepo := &memoryPublishedRepo{snapshots: map[string]*domain.PublishedModelSnapshot{}}
+	svc := personality.NewService(personality.Dependencies{
+		ModelRepo:          modelRepo,
+		PublishedRepo:      publishedRepo,
+		QuestionnaireQuery: questionnaireQueryStub{questionnaire: publishedQuestionnaire()},
+	})
+
+	created, err := svc.Create(context.Background(), personality.CreateInput{
+		Code: "personality_mbti_republish", Title: "Republish MBTI", Algorithm: "mbti",
+		SubKind:           personality.SubKindTypology,
+		QuestionnaireCode: "Q_DEMO", QuestionnaireVersion: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, personality.DefinitionInput{
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Payload:       sampleRuntimePayload(),
+	}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+	if _, err := svc.Publish(context.Background(), created.Code); err != nil {
+		t.Fatalf("first Publish: %v", err)
+	}
+	firstDeleteHits := publishedRepo.deleteHits
+
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, personality.DefinitionInput{
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Payload:       sampleRuntimePayload(),
+	}); err != nil {
+		t.Fatalf("UpdateDefinition after publish: %v", err)
+	}
+	if _, err := svc.Publish(context.Background(), created.Code); err != nil {
+		t.Fatalf("second Publish: %v", err)
+	}
+	if publishedRepo.deleteHits != firstDeleteHits+1 {
+		t.Fatalf("deleteHits = %d, want %d", publishedRepo.deleteHits, firstDeleteHits+1)
+	}
+	if len(publishedRepo.snapshots) != 1 {
+		t.Fatalf("published snapshots = %d, want 1", len(publishedRepo.snapshots))
+	}
+	stored, err := modelRepo.FindByCode(context.Background(), created.Code)
+	if err != nil {
+		t.Fatalf("FindByCode: %v", err)
+	}
+	snapshot := publishedRepo.snapshots[created.Code]
+	wantVersion := "v" + strconv.FormatInt(stored.Version, 10)
+	if snapshot.Model.Version != wantVersion {
+		t.Fatalf("snapshot version = %s, want %s", snapshot.Model.Version, wantVersion)
+	}
+}
+
 func TestCreateWithQuestionnaireRequiresPublishedQuestionnaireWithQuestions(t *testing.T) {
 	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
 	svc := personality.NewService(personality.Dependencies{
