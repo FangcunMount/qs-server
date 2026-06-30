@@ -113,8 +113,8 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 | `pretest_60` | **通过**：submit 100%，p95≈184ms | 脚本结束前后基本消化完 | 稳态 submit≈12/s |
 | `pretest_120_balanced` | **通过**：100%，0×429 | — | 92QPS 混合（32/24/24/12） |
 | `pretest_120` | **通过**：100%，0×429，submit p95≈192ms | 待观测 | 调优后全量 120QPS 混合已过线 |
-| `mixed_140` | **未通过**：submit 90.4%，806×429 | — | submit 28/s 超当前同步吞吐（有效 ~24/s）；读/report 仍稳 |
-| `mixed_140_submit24` | 待测 | — | 验证 56/42/14 读压下 submit 24/s 是否仍 100% |
+| `mixed_140` | **未通过**：worker32 90.4%/806×429；worker40 **97.83%**/182×429 | — | 有效 ~25.5/s；待 worker48 复测 |
+| `mixed_140_submit24` | **通过**：100%，0×429，submit p95≈222ms | — | 56/42/14 读压下 submit 24/s 稳 |
 
 `pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。`mixed_140` 仅 submit 超容量时，先跑 `mixed_140_submit24` 分离读压与 submit 上限。
 
@@ -422,7 +422,7 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size/publish_workers`、主链路事件 pending/publishing 与 Mongo 慢查询 |
 | pretest120 collection 大量 429、`submit queue full`，apiserver Mongo `idle connections: 0` | immediate 无上限 goroutine + `publish_workers=128` 与业务读抢 Mongo 连接池 | 降 `publish_workers`（48）、设 `immediate_max_concurrent`（16）；`backpressure.mongo.max_inflight`≤80；outbox Store 走 limiter；`published_assessment_models` 加 Redis 缓存；immediate 仅 `answersheet.submitted` |
 | 优化后 outbox 3min 内消化，但 pretest120 submit≈96%、`http_429`≈250、questionnaire 读超时 | collection submit 队列背压 + 48/s 问卷读压饱和（apiserver 侧 Mongo 争用已缓解） | 部署 collection `worker_count=32, queue_size=1600`；跑 `pretest_120_balanced`（32/24/24/12）；隔离 submit 见 `pretest_120_submit_only` |
-| `mixed_140` submit≈90%、806×429，questionnaire/report 几乎全绿 | submit 28/s 超过当前同步吞吐（~24/s），非读压或 outbox | 上调 collection `worker_count=40, queue_size=2000` 后复测 `mixed_140`；仍不足则查 apiserver 或再试 `mixed_140_submit24` |
+| `mixed_140` submit≈90%→98%、仍 182×429（worker40） | submit 28/s 超混合稳态吞吐，apiserver 变慢拉高单次耗时 | 上调 `worker_count=48, queue_size=2400` 复测；仍不足则查 apiserver backpressure |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
@@ -490,8 +490,8 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | pretest_60 | 60 | 0% | 0 | 0 | 0 | submit p95≈184ms | **通过**（2026-06-30） |
 | pretest_120_balanced | 92 | 0% | 0 | 0 | 0 | submit p95≈250ms | **通过**（2026-06-30） |
 | pretest_120 | 120 | 0% | 0 | 0 | 0 | submit p95≈192ms | **通过**（2026-06-30，worker32+apiserver优化后） |
-| mixed_140 | 140 | 1.92% | 0 | 0 | 806 | submit p95≈933ms | **未通过**（2026-06-30，submit 28/s 超容量） |
-| mixed_140_submit24 | 136 | | | | | | |
+| mixed_140 | 140 | 0.44% | 0 | 0 | 182 | submit p95≈1.11s | **未通过**（2026-06-30，worker40，有效~25.5/s） |
+| mixed_140_submit24 | 136 | 0% | 0 | 0 | 0 | submit p95≈222ms | **通过**（2026-06-30） |
 | mixed_160 | 160 | | | | | | |
 | mixed_180 | 180 | | | | | | |
 | mixed_200 | 200 | | | | | | |
