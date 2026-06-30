@@ -7,6 +7,7 @@ import {
   CHAIN_PROBE_PERSONALITY_RPS,
   DISCOVER_ASSESSMENT_LIMIT,
   QUESTIONNAIRE_DETAIL_RPS,
+  PERSONALITY_QUESTIONNAIRE_DETAIL_RPS,
   PERSONALITY_SESSION_PATH,
   PERSONALITY_SESSION_RPS,
   PERSONALITY_MODEL_CODES,
@@ -93,7 +94,7 @@ export function validateScenarioData(data) {
     throw new Error(`TOKEN, TOKENS, TOKENS_FILE, COLLECTION_TOKEN, COLLECTION_TOKENS or a valid collectionTokensFile is required for report status query.${tokenFileIssueMessage()}`);
   }
   const needsMedicalCases = LEGACY_SUBMIT_RPS > 0 || MEDICAL_SUBMIT_RPS > 0 || CHAIN_PROBE_MEDICAL_RPS > 0;
-  const needsPersonalityCases = PERSONALITY_SUBMIT_RPS > 0 || CHAIN_PROBE_PERSONALITY_RPS > 0 || PERSONALITY_SESSION_RPS > 0;
+  const needsPersonalityCases = PERSONALITY_SUBMIT_RPS > 0 || CHAIN_PROBE_PERSONALITY_RPS > 0 || PERSONALITY_SESSION_RPS > 0 || PERSONALITY_QUESTIONNAIRE_DETAIL_RPS > 0;
   if (needsMedicalCases && data.medicalCases.length === 0) {
     throw new Error('No medical answer templates found. Set ANSWERS_JSON/ANSWERS_FILE, or provide valid collection tokens and SCALE_CODES for auto discovery. Check setup_discovery_failed plus http_401_total/http_403_total/http_5xx_total in the k6 summary.');
   }
@@ -787,6 +788,7 @@ export function buildRunTiming() {
       medical_model_query: MEDICAL_QUERY_RPS,
       personality_model_query: PERSONALITY_QUERY_RPS,
       questionnaire_query: QUESTIONNAIRE_DETAIL_RPS || LEGACY_QUERY_RPS,
+      personality_questionnaire_query: PERSONALITY_QUESTIONNAIRE_DETAIL_RPS,
       personality_session: PERSONALITY_SESSION_RPS,
       answersheet_submit: LEGACY_SUBMIT_RPS,
       medical_submit: MEDICAL_SUBMIT_RPS,

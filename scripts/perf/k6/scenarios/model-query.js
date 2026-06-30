@@ -3,11 +3,12 @@ import { pick, is2xx } from '../lib/util.js';
 import { timedRequest, authHeaders, jsonHeaders, collectionToken, recordHTTPStatus } from '../lib/http.js';
 import { renderPath, scenarioData } from '../lib/data.js';
 import {
-  QUESTIONNAIRE_DETAIL_PATHS, QUERY_PATHS, MEDICAL_QUERY_PATHS, PERSONALITY_QUERY_PATHS,
+  QUESTIONNAIRE_DETAIL_PATHS, PERSONALITY_QUESTIONNAIRE_DETAIL_PATHS, QUERY_PATHS, MEDICAL_QUERY_PATHS, PERSONALITY_QUERY_PATHS,
   COLLECTION_BASE_URL, PERSONALITY_SESSION_PATH,
 } from '../lib/config.js';
 import {
   questionnaireQueryDuration, questionnaireQueryFailed,
+  personalityQuestionnaireQueryDuration, personalityQuestionnaireQueryFailed,
   medicalModelQueryDuration, medicalModelQueryFailed,
   personalityModelQueryDuration, personalityModelQueryFailed,
   personalitySessionDuration, personalitySessionFailed,
@@ -18,6 +19,20 @@ export function questionnaireDetailQuery(data) {
   const ctx = scenarioData(data);
   const path = renderPath(pick(QUESTIONNAIRE_DETAIL_PATHS.length > 0 ? QUESTIONNAIRE_DETAIL_PATHS : QUERY_PATHS), null, ctx);
   runModelCatalogQuery(path, 'questionnaire_query', questionnaireQueryDuration, questionnaireQueryFailed);
+}
+
+export function personalityQuestionnaireDetailQuery(data) {
+  const ctx = scenarioData(data);
+  const personalityCase = pick(ctx.personalityCases);
+  if (!personalityCase || !personalityCase.questionnaire_code || !personalityCase.questionnaire_version) {
+    personalityQuestionnaireQueryFailed.add(1, { reason: 'missing_personality_questionnaire_case' });
+    return;
+  }
+  const path = renderPath(pick(PERSONALITY_QUESTIONNAIRE_DETAIL_PATHS), {
+    personality_questionnaire_code: encodeURIComponent(personalityCase.questionnaire_code),
+    personality_questionnaire_version: encodeURIComponent(personalityCase.questionnaire_version),
+  }, ctx);
+  runModelCatalogQuery(path, 'personality_questionnaire_query', personalityQuestionnaireQueryDuration, personalityQuestionnaireQueryFailed);
 }
 
 export function medicalModelQuery(data) {
@@ -71,4 +86,3 @@ export function runModelCatalogQuery(path, endpoint, durationTrend, failedCounte
     'model catalog query status is 2xx': (r) => is2xx(r.status),
   });
 }
-

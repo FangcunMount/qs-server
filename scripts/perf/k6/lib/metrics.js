@@ -12,6 +12,7 @@ import {
   MEDICAL_QUERY_RPS,
   PERSONALITY_QUERY_RPS,
   QUESTIONNAIRE_DETAIL_RPS,
+  PERSONALITY_QUESTIONNAIRE_DETAIL_RPS,
   STATS_RPS,
   STRICT_THRESHOLDS,
   DURATION,
@@ -27,6 +28,7 @@ export function buildEndpointFailureCounters(prefix) {
 }
 
 export const questionnaireQueryDuration = new Trend('questionnaire_query_duration', true);
+export const personalityQuestionnaireQueryDuration = new Trend('personality_questionnaire_query_duration', true);
 export const medicalModelQueryDuration = new Trend('medical_model_query_duration', true);
 export const personalityModelQueryDuration = new Trend('personality_model_query_duration', true);
 export const personalitySessionDuration = new Trend('personality_session_duration', true);
@@ -48,6 +50,7 @@ export const reportStatusTerminal = new Counter('report_status_terminal');
 export const chainProbeTerminal = new Counter('chain_probe_terminal');
 export const chainProbeFailed = new Counter('chain_probe_failed');
 export const questionnaireQueryFailed = new Counter('questionnaire_query_failed');
+export const personalityQuestionnaireQueryFailed = new Counter('personality_questionnaire_query_failed');
 export const medicalModelQueryFailed = new Counter('medical_model_query_failed');
 export const personalityModelQueryFailed = new Counter('personality_model_query_failed');
 export const personalitySessionFailed = new Counter('personality_session_failed');
@@ -67,6 +70,7 @@ export const httpTimeoutTotal = new Counter('http_timeout_total');
 
 export const endpointFailureCounters = {
   questionnaire_query: buildEndpointFailureCounters('questionnaire_query'),
+  personality_questionnaire_query: buildEndpointFailureCounters('personality_questionnaire_query'),
   answersheet_submit: buildEndpointFailureCounters('answer_submit'),
   report_status_query: buildEndpointFailureCounters('report_status'),
   statistics_query: buildEndpointFailureCounters('statistics'),
@@ -104,7 +108,7 @@ export function buildThresholds() {
   const submitRps = LEGACY_SUBMIT_RPS + MEDICAL_SUBMIT_RPS + PERSONALITY_SUBMIT_RPS;
   const reportRps = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + PERSONALITY_REPORT_RPS;
   const chainProbeRps = CHAIN_PROBE_MEDICAL_RPS + CHAIN_PROBE_PERSONALITY_RPS;
-  const queryRps = LEGACY_QUERY_RPS + MEDICAL_QUERY_RPS + PERSONALITY_QUERY_RPS + QUESTIONNAIRE_DETAIL_RPS;
+  const queryRps = LEGACY_QUERY_RPS + MEDICAL_QUERY_RPS + PERSONALITY_QUERY_RPS + QUESTIONNAIRE_DETAIL_RPS + PERSONALITY_QUESTIONNAIRE_DETAIL_RPS;
   const thresholds = {
     http_req_failed: ['rate<0.01'],
     checks: ['rate>0.99'],

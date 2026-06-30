@@ -331,7 +331,8 @@
       "qps": {
         "medicalQuery": 60,
         "personalityQuery": 30,
-        "questionnaireQuery": 20,
+        "questionnaireQuery": 10,
+        "personalityQuestionnaireQuery": 10,
         "submit": 60,
         "report": 100,
         "stats": 29,
@@ -370,7 +371,8 @@
       "qps": {
         "medicalQuery": 60,
         "personalityQuery": 30,
-        "questionnaireQuery": 20,
+        "questionnaireQuery": 10,
+        "personalityQuestionnaireQuery": 10,
         "submit": 60,
         "report": 100,
         "stats": 29,
@@ -408,7 +410,8 @@
       "duration": "10m",
       "qps": {
         "medicalQuery": 70,
-        "personalityQuery": 40,
+        "personalityQuery": 30,
+        "personalityQuestionnaireQuery": 10,
         "medicalSubmit": 40,
         "personalitySubmit": 20,
         "medicalWaitReport": 60,
@@ -451,10 +454,12 @@
     "personality_60": {
       "duration": "5m",
       "qps": {
-        "personalityQuery": 20,
+        "personalityQuery": 10,
+        "personalityQuestionnaireQuery": 10,
         "personalitySession": 10,
         "personalitySubmit": 20,
         "personalityWaitReport": 10,
+        "stats": 0,
         "chainProbe": 0.2
       },
       "chainProbeModelType": "personality",
@@ -470,7 +475,8 @@
       "qps": {
         "medicalQuery": 60,
         "personalityQuery": 30,
-        "questionnaireQuery": 20,
+        "questionnaireQuery": 10,
+        "personalityQuestionnaireQuery": 10,
         "submit": 60,
         "report": 100,
         "stats": 29,
@@ -490,7 +496,8 @@
       "qps": {
         "medicalQuery": 60,
         "personalityQuery": 30,
-        "questionnaireQuery": 20,
+        "questionnaireQuery": 10,
+        "personalityQuestionnaireQuery": 10,
         "submit": 60,
         "report": 100,
         "stats": 29,
@@ -528,6 +535,9 @@
     ],
     "questionnaireDetail": [
       "/api/v1/questionnaires/{questionnaire_code}"
+    ],
+    "personalityQuestionnaireDetail": [
+      "/api/v1/questionnaires/{personality_questionnaire_code}?version={personality_questionnaire_version}"
     ],
     "questionnaireQuery": [
       "/api/v1/scales?page=1&page_size=20&status=published",

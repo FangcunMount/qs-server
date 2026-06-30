@@ -114,6 +114,7 @@ export function configAliasesForEnv(name) {
     MEDICAL_QUERY_RPS: ['qps.medicalQuery', 'qps.medical_query', 'medicalQueryRps', 'medical_query_rps'],
     PERSONALITY_QUERY_RPS: ['qps.personalityQuery', 'qps.personality_query', 'personalityQueryRps', 'personality_query_rps'],
     QUESTIONNAIRE_DETAIL_RPS: ['qps.questionnaireQuery', 'qps.questionnaire_query', 'questionnaireQueryRps', 'questionnaire_query_rps'],
+    PERSONALITY_QUESTIONNAIRE_DETAIL_RPS: ['qps.personalityQuestionnaireQuery', 'qps.personality_questionnaire_query', 'personalityQuestionnaireQueryRps', 'personality_questionnaire_query_rps'],
     PERSONALITY_SESSION_RPS: ['qps.personalitySession', 'qps.personality_session', 'personalitySessionRps', 'personality_session_rps'],
     SUBMIT_RPS: ['qps.submit', 'submitRps', 'submit_rps'],
     MEDICAL_SUBMIT_RPS: ['qps.medicalSubmit', 'qps.medical_submit', 'medicalSubmitRps', 'medical_submit_rps'],
@@ -188,9 +189,11 @@ export function hasGranularQueryQps() {
     'MEDICAL_QUERY_RPS',
     'PERSONALITY_QUERY_RPS',
     'QUESTIONNAIRE_DETAIL_RPS',
+    'PERSONALITY_QUESTIONNAIRE_DETAIL_RPS',
     'qps.medicalQuery',
     'qps.personalityQuery',
     'qps.questionnaireQuery',
+    'qps.personalityQuestionnaireQuery',
   ]);
 }
 
@@ -390,6 +393,7 @@ export const USE_SPLIT_SUBMIT_SCENARIOS = hasGranularSubmitQps();
 export const MEDICAL_QUERY_RPS = USE_SPLIT_QUERY_SCENARIOS ? intEnv('MEDICAL_QUERY_RPS', 0) : 0;
 export const PERSONALITY_QUERY_RPS = USE_SPLIT_QUERY_SCENARIOS ? intEnv('PERSONALITY_QUERY_RPS', 0) : 0;
 export const QUESTIONNAIRE_DETAIL_RPS = USE_SPLIT_QUERY_SCENARIOS ? intEnv('QUESTIONNAIRE_DETAIL_RPS', 0) : 0;
+export const PERSONALITY_QUESTIONNAIRE_DETAIL_RPS = USE_SPLIT_QUERY_SCENARIOS ? intEnv('PERSONALITY_QUESTIONNAIRE_DETAIL_RPS', 0) : 0;
 export const LEGACY_QUERY_RPS = USE_SPLIT_QUERY_SCENARIOS ? 0 : QUERY_RPS;
 export const PERSONALITY_SESSION_RPS = intEnv('PERSONALITY_SESSION_RPS', 0);
 
@@ -458,6 +462,16 @@ export const QUESTIONNAIRE_DETAIL_PATHS = applySmokeQuestionnaireDetailOverride(
     ['questionnaireDetailPaths', 'questionnaire_detail_paths', 'paths.questionnaireDetail', 'paths.questionnaire_detail'],
     '/api/v1/questionnaires/{questionnaire_code}'
   )
+);
+export const PERSONALITY_QUESTIONNAIRE_DETAIL_PATHS = envOrConfigList(
+  'PERSONALITY_QUESTIONNAIRE_DETAIL_PATHS',
+  [
+    'personalityQuestionnaireDetailPaths',
+    'personality_questionnaire_detail_paths',
+    'paths.personalityQuestionnaireDetail',
+    'paths.personality_questionnaire_detail',
+  ],
+  '/api/v1/questionnaires/{personality_questionnaire_code}?version={personality_questionnaire_version}'
 );
 export const QUERY_PATHS = applySmokeQueryPathOverride(
   envOrConfigList(

@@ -62,7 +62,7 @@ export function runAsyncChainProbe(ctx, modelType) {
     return;
   }
 
-  const assessmentID = lookupAssessmentID(answerSheetID);
+  const assessmentID = waitAssessmentID(answerSheetID);
   if (!assessmentID) {
     chainProbeFailed.add(1, { reason: 'assessment_lookup_failed', model_type: modelType });
     return;
@@ -135,17 +135,27 @@ export function waitSubmitDone(requestID) {
   return '';
 }
 
-export function lookupAssessmentID(answerSheetID) {
-  const path = renderPath(ANSWERSHEET_ASSESSMENT_PATH, { answersheet_id: answerSheetID });
-  const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
-    endpoint: 'chain_probe_assessment_lookup',
-    service: 'collection-server',
-  });
-  if (res.status !== 200) {
-    return '';
+export function waitAssessmentID(answerSheetID) {
+  const deadline = Date.now() + CHAIN_PROBE_TIMEOUT_SECONDS * 1000;
+  while (Date.now() < deadline) {
+    const path = renderPath(ANSWERSHEET_ASSESSMENT_PATH, { answersheet_id: answerSheetID });
+    const res = timedRequest('GET', COLLECTION_BASE_URL, path, null, authHeaders(collectionToken()), {
+      endpoint: 'chain_probe_assessment_lookup',
+      service: 'collection-server',
+    });
+    if (res.status === 200) {
+      const data = responseData(res);
+      const assessmentID = data.id || data.assessment_id || '';
+      if (assessmentID) {
+        return assessmentID;
+      }
+      if (data.status === 'failed') {
+        return '';
+      }
+    }
+    sleep(CHAIN_PROBE_POLL_SECONDS);
   }
-  const data = responseData(res);
-  return data.id || data.assessment_id || '';
+  return '';
 }
 
 export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, endpoint) {
@@ -170,4 +180,3 @@ export function waitReportTerminal(assessmentID, testeeID, data, pathTemplate, e
   }
   return '';
 }
-
