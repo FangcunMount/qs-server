@@ -21,6 +21,8 @@ type assessmentModelServiceStub struct {
 	publishCalled   bool
 	previewResult   *assessmentmodel.PreviewReportResult
 	previewErr      error
+	qrCodeURL       string
+	qrCodeErr       error
 }
 
 func (s *assessmentModelServiceStub) List(context.Context, assessmentmodel.ListModelsDTO) (*assessmentmodel.ModelListResult, error) {
@@ -89,7 +91,7 @@ func (s *assessmentModelServiceStub) PreviewReport(context.Context, string, json
 }
 
 func (s *assessmentModelServiceStub) GetQRCode(context.Context, string) (string, error) {
-	return "", nil
+	return s.qrCodeURL, s.qrCodeErr
 }
 
 func TestAssessmentModelPublishReturnsValidationResultWhenInvalid(t *testing.T) {
@@ -198,5 +200,35 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 	}
 	if len(body.Data.Issues) != 1 || body.Data.Issues[0].Code != "question_code.not_found" {
 		t.Fatalf("unexpected issues: %+v", body.Data.Issues)
+	}
+}
+
+func TestAssessmentModelGetQRCodeReturnsURL(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	svc := &assessmentModelServiceStub{qrCodeURL: "https://example.com/qrcodes/personality_demo.png"}
+	handler := NewAssessmentModelHandler(svc)
+
+	rec := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(rec)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessment-models/personality_demo/qrcode", nil)
+	c.Params = gin.Params{{Key: "code", Value: "personality_demo"}}
+
+	handler.GetQRCode(c)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected status 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	var body struct {
+		Code int `json:"code"`
+		Data struct {
+			QRCodeURL string `json:"qrcode_url"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if body.Data.QRCodeURL != svc.qrCodeURL {
+		t.Fatalf("qrcode_url = %q, want %q", body.Data.QRCodeURL, svc.qrCodeURL)
 	}
 }

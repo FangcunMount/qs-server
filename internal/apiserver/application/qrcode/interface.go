@@ -27,4 +27,7 @@ type QRCodeService interface {
 
 	// GenerateAssessmentEntryQRCode 生成测评入口小程序码
 	GenerateAssessmentEntryQRCode(ctx context.Context, token string) (string, error)
+
+	// GeneratePersonalityAssessmentQRCode 生成人格测评入口小程序码
+	GeneratePersonalityAssessmentQRCode(ctx context.Context, modelCode string) (string, error)
 }

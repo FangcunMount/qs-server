@@ -3,6 +3,7 @@ package assessmentmodel
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
@@ -84,7 +85,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 
 func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
 	if dto.Kind == "" {
-		dto.Kind = KindBehaviorAbility
+		return nil, invalidArgument("模型类型不能为空")
 	}
 	switch dto.Kind {
 	case KindBehaviorAbility:
@@ -412,10 +413,31 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 }
 
 func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, error) {
-	if s.deps.BehaviorCommand == nil {
-		return "", unavailable("模型二维码服务未配置")
+	if modelCode == "" {
+		return "", invalidArgument("模型编码不能为空")
 	}
-	return s.deps.BehaviorCommand.GetQRCode(ctx, modelCode)
+	kind, ok := s.resolveModelKind(ctx, modelCode)
+	if !ok {
+		return "", errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
+	}
+	switch kind {
+	case KindPersonality:
+		return s.getPersonalityQRCode(ctx, modelCode)
+	case KindBehaviorAbility:
+		if s.deps.BehaviorCommand == nil {
+			return "", unavailable("模型二维码服务未配置")
+		}
+		return s.deps.BehaviorCommand.GetQRCode(ctx, modelCode)
+	default:
+		return "", invalidArgument("模型类型不支持二维码")
+	}
+}
+
+func (s *service) getPersonalityQRCode(ctx context.Context, modelCode string) (string, error) {
+	if s.deps.RawQRCodeGenerator == nil {
+		return fmt.Sprintf("/personality/assessment/%s", modelCode), nil
+	}
+	return s.deps.RawQRCodeGenerator.GeneratePersonalityAssessmentQRCode(ctx, modelCode)
 }
 
 func (s *service) createBehaviorAbility(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {

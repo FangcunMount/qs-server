@@ -31,6 +31,8 @@ type Config struct {
 	ObjectKeyPrefix string
 	// 对外返回的二维码访问前缀；为空时回退默认路由前缀。
 	PublicURLPrefix string
+	// 人格测评小程序页面路径；为空时使用默认页面。
+	PersonalityAssessmentPagePath string
 }
 
 // service 小程序码生成服务实现
@@ -342,6 +344,81 @@ func (s *service) GenerateAssessmentEntryQRCode(ctx context.Context, token strin
 	if err != nil {
 		return "", fmt.Errorf("持久化小程序码失败: %w", err)
 	}
+
+	return qrCodeURL, nil
+}
+
+const defaultPersonalityAssessmentPagePath = "pages/personality/assessment/index"
+
+// GeneratePersonalityAssessmentQRCode 生成人格测评入口小程序码
+func (s *service) GeneratePersonalityAssessmentQRCode(ctx context.Context, modelCode string) (string, error) {
+	l := logger.L(ctx)
+
+	if modelCode == "" {
+		return "", fmt.Errorf("人格模型编码不能为空")
+	}
+	if s.qrCodeGen == nil {
+		return "", fmt.Errorf("小程序码生成器未配置")
+	}
+
+	l.Infow("开始生成人格测评小程序码",
+		"action", "generate_personality_assessment_qrcode",
+		"code", modelCode,
+	)
+
+	appID, appSecret, err := s.getWechatAppConfig(ctx)
+	if err != nil {
+		return "", fmt.Errorf("获取微信应用配置失败: %w", err)
+	}
+
+	scene := fmt.Sprintf("p=%s", modelCode)
+	if len(scene) > 32 {
+		scene = modelCode
+		l.Warnw("scene 参数超过 32 字符，仅使用模型编码",
+			"code", modelCode,
+		)
+	}
+
+	pagePath := defaultPersonalityAssessmentPagePath
+	if s.config != nil && s.config.PersonalityAssessmentPagePath != "" {
+		pagePath = s.config.PersonalityAssessmentPagePath
+	}
+
+	reader, err := s.qrCodeGen.GenerateUnlimitedQRCode(
+		ctx,
+		appID,
+		appSecret,
+		scene,
+		pagePath,
+		430,
+		false,
+		nil,
+		false,
+	)
+	if err != nil {
+		l.Errorw("生成人格测评小程序码失败",
+			"action", "generate_personality_assessment_qrcode",
+			"code", modelCode,
+			"error", err.Error(),
+		)
+		return "", fmt.Errorf("生成小程序码失败: %w", err)
+	}
+
+	qrCodeData, err := io.ReadAll(reader)
+	if err != nil {
+		return "", fmt.Errorf("读取小程序码数据失败: %w", err)
+	}
+
+	qrCodeURL, err := s.persistQRCode(ctx, fmt.Sprintf("personality_%s.png", modelCode), qrCodeData)
+	if err != nil {
+		return "", fmt.Errorf("持久化小程序码失败: %w", err)
+	}
+
+	l.Infow("人格测评小程序码生成成功",
+		"action", "generate_personality_assessment_qrcode",
+		"code", modelCode,
+		"qrcode_url", qrCodeURL,
+	)
 
 	return qrCodeURL, nil
 }
