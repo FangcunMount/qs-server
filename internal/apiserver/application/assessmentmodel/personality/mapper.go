@@ -1,7 +1,6 @@
 package personality
 
 import (
-	"encoding/json"
 	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
@@ -42,19 +41,18 @@ func definitionFromModel(model *domain.AssessmentModel) *DefinitionResult {
 	}
 }
 
-// normalizeDefinitionPayloadForAPI returns RuntimeSpec JSON for the operating editor.
-// Draft definitions may store either RuntimeSpec or the full typology Payload envelope.
+// normalizeDefinitionPayloadForAPI returns the operating editor payload shape.
 func normalizeDefinitionPayloadForAPI(model *domain.AssessmentModel) []byte {
 	raw := append([]byte(nil), model.Definition.Data...)
 	if len(raw) == 0 {
 		return raw
 	}
-	_, runtime, err := personalitydomain.PayloadAndRuntimeSpecFromModel(model)
+	payload, runtime, err := personalitydomain.PayloadAndRuntimeSpecFromModel(model)
 	if err != nil || runtime == nil {
 		return raw
 	}
-	data, err := json.Marshal(runtime)
-	if err != nil {
+	data, err := buildEditorDefinitionPayload(model, payload, runtime)
+	if err != nil || len(data) == 0 {
 		return raw
 	}
 	return data

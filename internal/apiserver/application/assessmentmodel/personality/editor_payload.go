@@ -1,0 +1,297 @@
+package personality
+
+import (
+	"encoding/json"
+
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+)
+
+type editorDefinitionPayload struct {
+	FactorGraph    editorFactorGraphSpec                 `json:"factor_graph"`
+	Decision       modeltypology.PersonalityDecisionSpec `json:"decision"`
+	SpecialRules   []modeltypology.SpecialRuleSpec       `json:"special_rules,omitempty"`
+	OutcomeMapping editorOutcomeMappingSpec              `json:"outcome_mapping"`
+	Report         modeltypology.ReportSpec              `json:"report"`
+}
+
+type editorFactorGraphSpec struct {
+	DimensionOrder   []string                            `json:"dimension_order,omitempty"`
+	Dimensions       map[string]modeltypology.Dimension  `json:"dimensions,omitempty"`
+	QuestionMappings []editorQuestionMapping             `json:"question_mappings,omitempty"`
+	Factors          map[string]modeltypology.FactorSpec `json:"factors,omitempty"`
+	Roots            []string                            `json:"roots,omitempty"`
+}
+
+type editorQuestionMapping struct {
+	QuestionCode string             `json:"question_code"`
+	FactorCode   string             `json:"factor_code"`
+	Sign         float64            `json:"sign,omitempty"`
+	OptionScores map[string]float64 `json:"option_scores,omitempty"`
+}
+
+type editorOutcomeMappingSpec struct {
+	DetailKind       modeltypology.OutcomeDetailKind `json:"detail_kind,omitempty"`
+	DetailAdapterKey modeltypology.DetailAdapterKey  `json:"detail_adapter_key,omitempty"`
+	Algorithm        domain.Algorithm                `json:"algorithm,omitempty"`
+	Outcomes         []modeltypology.Outcome         `json:"outcomes"`
+}
+
+type draftDefinitionEnvelope struct {
+	Algorithm domain.Algorithm           `json:"algorithm,omitempty"`
+	Outcomes  []modeltypology.Outcome    `json:"outcomes,omitempty"`
+	Runtime   *modeltypology.RuntimeSpec `json:"runtime,omitempty"`
+}
+
+func buildEditorDefinitionPayload(model *domain.AssessmentModel, payload *modeltypology.Payload, runtime *modeltypology.RuntimeSpec) ([]byte, error) {
+	if runtime == nil {
+		return nil, nil
+	}
+	outcomes := outcomesFromPayload(payload)
+	editor := editorDefinitionPayload{
+		FactorGraph: editorFactorGraphSpec{
+			DimensionOrder:   append([]string(nil), runtime.FactorGraph.DimensionOrder...),
+			Dimensions:       runtime.FactorGraph.Dimensions,
+			QuestionMappings: buildEditorQuestionMappings(runtime.FactorGraph, payload),
+			Factors:          runtime.FactorGraph.Factors,
+			Roots:            append([]string(nil), runtime.FactorGraph.Roots...),
+		},
+		Decision:     runtime.Decision,
+		SpecialRules: append([]modeltypology.SpecialRuleSpec(nil), runtime.SpecialRules...),
+		OutcomeMapping: editorOutcomeMappingSpec{
+			DetailKind:       runtime.OutcomeMapping.DetailKind,
+			DetailAdapterKey: runtime.OutcomeMapping.DetailAdapterKey,
+			Algorithm:        runtime.OutcomeMapping.Algorithm,
+			Outcomes:         outcomes,
+		},
+		Report: runtime.Report,
+	}
+	if editor.OutcomeMapping.Algorithm == "" && model != nil {
+		editor.OutcomeMapping.Algorithm = model.Algorithm
+	}
+	return json.Marshal(editor)
+}
+
+func normalizeDefinitionPayloadForStorage(data []byte, algorithm domain.Algorithm) ([]byte, error) {
+	if len(data) == 0 {
+		return data, nil
+	}
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, err
+	}
+	if len(raw) == 0 {
+		return data, nil
+	}
+	payload, err := decodeDefinitionPayload(data, algorithm)
+	if err != nil {
+		return data, nil
+	}
+	runtime, err := payload.ToRuntimeSpec()
+	if err != nil {
+		return data, nil
+	}
+	payload.Runtime = runtime
+	envelope := draftDefinitionEnvelope{
+		Algorithm: firstNonEmptyAlgorithm(payload.Algorithm, algorithm),
+		Outcomes:  append([]modeltypology.Outcome(nil), payload.Outcomes...),
+		Runtime:   runtime,
+	}
+	return json.Marshal(envelope)
+}
+
+func decodeDefinitionPayload(data []byte, algorithm domain.Algorithm) (*modeltypology.Payload, error) {
+	var payload modeltypology.Payload
+	if err := json.Unmarshal(data, &payload); err == nil {
+		if payload.HasExplicitRuntime() || payload.Algorithm != "" || len(payload.Dimensions) > 0 || len(payload.Outcomes) > 0 {
+			if payload.Algorithm == "" {
+				payload.Algorithm = algorithm
+			}
+			return &payload, nil
+		}
+	}
+	var editor editorDefinitionPayload
+	if err := json.Unmarshal(data, &editor); err == nil {
+		if editor.Decision.Kind != "" || len(editor.FactorGraph.Factors) > 0 || len(editor.FactorGraph.QuestionMappings) > 0 {
+			return editorPayloadToDomain(&editor, algorithm), nil
+		}
+	}
+	model := &domain.AssessmentModel{
+		Algorithm:  algorithm,
+		Definition: domain.DefinitionPayload{Data: data},
+	}
+	decoded, runtime, err := personalitydomain.PayloadAndRuntimeSpecFromModel(model)
+	if err != nil {
+		return nil, err
+	}
+	if decoded != nil {
+		if decoded.Algorithm == "" {
+			decoded.Algorithm = algorithm
+		}
+		if len(decoded.Outcomes) == 0 {
+			decoded.Outcomes = outcomesFromEditorOutcomeMapping(data)
+		}
+		return decoded, nil
+	}
+	return &modeltypology.Payload{Algorithm: algorithm, Runtime: runtime}, nil
+}
+
+func editorPayloadToDomain(editor *editorDefinitionPayload, algorithm domain.Algorithm) *modeltypology.Payload {
+	if editor == nil {
+		return &modeltypology.Payload{Algorithm: algorithm}
+	}
+	mappings := make([]modeltypology.QuestionMapping, 0, len(editor.FactorGraph.QuestionMappings))
+	for _, mapping := range editor.FactorGraph.QuestionMappings {
+		mappings = append(mappings, modeltypology.QuestionMapping{
+			QuestionCode: mapping.QuestionCode,
+			Dimension:    mapping.FactorCode,
+			Sign:         mapping.Sign,
+			OptionScores: cloneOptionScores(mapping.OptionScores),
+		})
+	}
+	runtime := &modeltypology.RuntimeSpec{
+		FactorGraph: modeltypology.FactorGraphSpec{
+			DimensionOrder:   append([]string(nil), editor.FactorGraph.DimensionOrder...),
+			Dimensions:       editor.FactorGraph.Dimensions,
+			QuestionMappings: mappings,
+			Factors:          editor.FactorGraph.Factors,
+			Roots:            append([]string(nil), editor.FactorGraph.Roots...),
+		},
+		Decision:     editor.Decision,
+		SpecialRules: append([]modeltypology.SpecialRuleSpec(nil), editor.SpecialRules...),
+		OutcomeMapping: modeltypology.OutcomeMappingSpec{
+			DetailKind:       editor.OutcomeMapping.DetailKind,
+			DetailAdapterKey: editor.OutcomeMapping.DetailAdapterKey,
+			Algorithm:        editor.OutcomeMapping.Algorithm,
+		},
+		Report: editor.Report,
+	}
+	return &modeltypology.Payload{
+		Algorithm: firstNonEmptyAlgorithm(editor.OutcomeMapping.Algorithm, algorithm),
+		Outcomes:  append([]modeltypology.Outcome(nil), editor.OutcomeMapping.Outcomes...),
+		Runtime:   runtime,
+	}
+}
+
+func buildEditorQuestionMappings(factorGraph modeltypology.FactorGraphSpec, payload *modeltypology.Payload) []editorQuestionMapping {
+	source := factorGraph.QuestionMappings
+	if len(source) == 0 && payload != nil {
+		source = payload.QuestionMappings
+	}
+	if len(source) == 0 {
+		source = questionMappingsFromContributions(factorGraph)
+	}
+	mappings := make([]editorQuestionMapping, 0, len(source))
+	for _, mapping := range source {
+		factorCode := mapping.Dimension
+		if factorCode == "" {
+			factorCode = factorCodeForQuestion(factorGraph, mapping.QuestionCode)
+		}
+		optionScores := cloneOptionScores(mapping.OptionScores)
+		if len(optionScores) == 0 {
+			optionScores = optionScoresForQuestion(factorGraph, mapping.QuestionCode)
+		}
+		if len(optionScores) == 0 && mapping.Sign != 0 {
+			optionScores = defaultLikertOptionScores()
+		}
+		mappings = append(mappings, editorQuestionMapping{
+			QuestionCode: mapping.QuestionCode,
+			FactorCode:   factorCode,
+			Sign:         mapping.Sign,
+			OptionScores: optionScores,
+		})
+	}
+	return mappings
+}
+
+func questionMappingsFromContributions(factorGraph modeltypology.FactorGraphSpec) []modeltypology.QuestionMapping {
+	if !factorGraph.HasExplicitFactorGraph() {
+		return nil
+	}
+	mappings := make([]modeltypology.QuestionMapping, 0)
+	for factorCode, factor := range factorGraph.Factors {
+		for _, contribution := range factor.Contributions {
+			mappings = append(mappings, modeltypology.QuestionMapping{
+				QuestionCode: contribution.QuestionCode,
+				Dimension:    factorCode,
+				Sign:         contribution.Sign,
+				OptionScores: cloneOptionScores(contribution.OptionScores),
+			})
+		}
+	}
+	return mappings
+}
+
+func factorCodeForQuestion(factorGraph modeltypology.FactorGraphSpec, questionCode string) string {
+	for factorCode, factor := range factorGraph.Factors {
+		for _, contribution := range factor.Contributions {
+			if contribution.QuestionCode == questionCode {
+				return firstNonEmpty(factor.Code, factor.ID, factorCode)
+			}
+		}
+	}
+	return ""
+}
+
+func optionScoresForQuestion(factorGraph modeltypology.FactorGraphSpec, questionCode string) map[string]float64 {
+	for _, factor := range factorGraph.Factors {
+		for _, contribution := range factor.Contributions {
+			if contribution.QuestionCode == questionCode && len(contribution.OptionScores) > 0 {
+				return cloneOptionScores(contribution.OptionScores)
+			}
+		}
+	}
+	return nil
+}
+
+func outcomesFromPayload(payload *modeltypology.Payload) []modeltypology.Outcome {
+	if payload == nil || len(payload.Outcomes) == 0 {
+		return nil
+	}
+	return append([]modeltypology.Outcome(nil), payload.Outcomes...)
+}
+
+func outcomesFromEditorOutcomeMapping(data []byte) []modeltypology.Outcome {
+	var editor editorDefinitionPayload
+	if err := json.Unmarshal(data, &editor); err != nil {
+		return nil
+	}
+	if len(editor.OutcomeMapping.Outcomes) == 0 {
+		return nil
+	}
+	return append([]modeltypology.Outcome(nil), editor.OutcomeMapping.Outcomes...)
+}
+
+func defaultLikertOptionScores() map[string]float64 {
+	return map[string]float64{"1": 1, "2": 2, "3": 3, "4": 4, "5": 5}
+}
+
+func cloneOptionScores(source map[string]float64) map[string]float64 {
+	if len(source) == 0 {
+		return nil
+	}
+	cloned := make(map[string]float64, len(source))
+	for key, value := range source {
+		cloned[key] = value
+	}
+	return cloned
+}
+
+func firstNonEmptyAlgorithm(values ...domain.Algorithm) domain.Algorithm {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
+}

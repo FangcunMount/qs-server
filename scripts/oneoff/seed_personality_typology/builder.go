@@ -204,9 +204,18 @@ func payloadDefinitionBytes(payload *modeltypology.Payload) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("derive runtime spec: %w", err)
 	}
-	data, err := json.Marshal(runtime)
+	envelope := struct {
+		Algorithm string                     `json:"algorithm"`
+		Outcomes  []modeltypology.Outcome    `json:"outcomes"`
+		Runtime   *modeltypology.RuntimeSpec `json:"runtime"`
+	}{
+		Algorithm: string(payload.Algorithm),
+		Outcomes:  payload.Outcomes,
+		Runtime:   runtime,
+	}
+	data, err := json.Marshal(envelope)
 	if err != nil {
-		return nil, fmt.Errorf("marshal runtime spec: %w", err)
+		return nil, fmt.Errorf("marshal draft definition envelope: %w", err)
 	}
 	return data, nil
 }

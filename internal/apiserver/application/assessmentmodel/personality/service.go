@@ -198,10 +198,14 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 	if issues := validateDefinitionPayloadForSave(format, input.Payload); len(issues) > 0 {
 		return nil, validationFailed(issues)
 	}
+	storedPayload, err := normalizeDefinitionPayloadForStorage(input.Payload, model.Algorithm)
+	if err != nil {
+		return nil, invalidArgument("%s", err.Error())
+	}
 	now := time.Now().UTC()
 	if err := model.UpdateDefinition(domain.DefinitionPayload{
 		Format: format,
-		Data:   append([]byte(nil), input.Payload...),
+		Data:   storedPayload,
 	}, now); err != nil {
 		return nil, mapDomainError(err)
 	}

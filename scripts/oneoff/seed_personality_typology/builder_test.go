@@ -218,7 +218,7 @@ func TestQuestionnaireSeedsAlignWithModelVersions(t *testing.T) {
 	}
 }
 
-func TestPayloadDefinitionBytesStoresRuntimeSpec(t *testing.T) {
+func TestPayloadDefinitionBytesStoresDraftEnvelope(t *testing.T) {
 	payload, err := buildMBTIPayload()
 	if err != nil {
 		t.Fatalf("buildMBTIPayload: %v", err)
@@ -227,14 +227,18 @@ func TestPayloadDefinitionBytesStoresRuntimeSpec(t *testing.T) {
 	if err != nil {
 		t.Fatalf("payloadDefinitionBytes: %v", err)
 	}
-	var runtime modeltypology.RuntimeSpec
-	if err := json.Unmarshal(data, &runtime); err != nil {
-		t.Fatalf("unmarshal runtime spec: %v", err)
+	var envelope struct {
+		Algorithm string                     `json:"algorithm"`
+		Outcomes  []modeltypology.Outcome    `json:"outcomes"`
+		Runtime   *modeltypology.RuntimeSpec `json:"runtime"`
 	}
-	if !runtime.FactorGraph.HasExplicitFactorGraph() {
-		t.Fatal("expected explicit factor graph in draft definition bytes")
+	if err := json.Unmarshal(data, &envelope); err != nil {
+		t.Fatalf("unmarshal draft envelope: %v", err)
 	}
-	if runtime.Report.AdapterKey != "mbti" {
-		t.Fatalf("report adapter = %s, want mbti", runtime.Report.AdapterKey)
+	if envelope.Runtime == nil || !envelope.Runtime.FactorGraph.HasExplicitFactorGraph() {
+		t.Fatal("expected explicit factor graph in draft envelope")
+	}
+	if len(envelope.Outcomes) == 0 {
+		t.Fatal("expected outcomes in draft envelope")
 	}
 }
