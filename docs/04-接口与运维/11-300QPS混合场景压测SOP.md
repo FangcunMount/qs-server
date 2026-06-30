@@ -46,20 +46,20 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 
 ## 2. 场景配比与档位
 
-### 2.1 mixed_300 目标配比（多 model）
+### 2.1 mixed_300 目标配比（多 model，产品真实 submit）
 
-`mixed_300` / `mixed_300_probe` 使用**拆分场景**（profile 含 `medicalQuery` 等字段时自动启用）：
+`mixed_300` / `mixed_300_probe` 使用**拆分场景**（profile 含 `medicalQuery` 等字段时自动启用）。**submit 按单机稳态上限 24/s 设定**（2026-06 压测：`mixed_140_submit24` 全绿）；原 60/s 为过度预留，已下调。
 
 | 场景 | QPS | 接口 |
 | ---- | ---: | ---- |
-| 医学量表目录查询 | 50 | `GET /api/v1/scales*` |
-| 人格模型目录查询 | 25 | `GET /api/v1/personality-models*` |
-| 问卷详情查询 | 15 | `GET /api/v1/questionnaires/{code}` |
-| 答卷提交（medical 80% + personality 20%） | 60 | `POST /api/v1/answersheets` |
-| 报告 wait（热样本） | 90 | medical `/assessments/.../wait-report`；personality `/personality-assessments/.../wait-report` |
-| 统计查询 | 30 | apiserver `GET /api/v1/statistics/*` |
-| 异步链路探针（medical + personality 各半） | 0.5 | session → submit → submit-status → assessment → wait-report |
-| **合计** | **~270.5 + probe** | 与 chainProbe 合计约 271 QPS；legacy `qps.query` profile 仍兼容旧四桶 |
+| 医学量表目录查询 | 80 | `GET /api/v1/scales*` |
+| 人格模型目录查询 | 40 | `GET /api/v1/personality-models*` |
+| 问卷详情查询 | 13 + 13 | `GET /api/v1/questionnaires/{code}` |
+| 答卷提交（medical 80% + personality 20%） | **24** | `POST /api/v1/answersheets` |
+| 报告 wait（热样本） | 100 | medical/personality `wait-report` |
+| 统计查询 | 29 | apiserver `GET /api/v1/statistics/*` |
+| 异步链路探针 | 1 | session → submit → … → wait-report |
+| **合计** | **~300** | 读/report 为主，submit 与生产峰值对齐 |
 
 **压测三类目标**：① 前台读写（query/submit/report 热样本）② 异步 SLA（`async_chain_probe_*`）③ 后台排水（`outbox_120` + snapshot DB）。
 
@@ -68,26 +68,26 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | 档位 | 总 QPS | 配比（query/submit/report/stats） | 时长 | 用途 |
 | ---- | ---: | -------------------------------- | ---- | ---- |
 | `smoke_4` | 4 | 1/1/1/1 | 30s | 连通性、setup 自动发现 |
-| `pretest_60` | 60 | 24/12/18/6 | 3m | **第一档正式预压** |
-| `pretest_120` | 120 | 48/24/36/12 | 5m | 观察限流与资源曲线 |
-| `pretest_120_submit_only` | 24 | 0/24/0/0 | 5m | 隔离 submit |
-| `pretest_120_balanced` | 92 | 32/24/24/12 | 5m | 混合降读压验收档 |
-| `mixed_140` | 140 | 56/28/42/14 | 5m | 120→300 细粒度升档 |
-| `mixed_140_submit24` | 136 | 56/24/42/14 | 5m | 读/report 按 140 升档，submit 封顶 24/s |
-| `mixed_160` | 160 | 64/32/48/16 | 5m | 同上 |
-| `mixed_180` | 180 | 72/36/54/18 | 5m | 同上 |
-| `mixed_200` | 200 | 80/40/60/20 | 5m | 接近 prod 保守基线 |
-| `mixed_240` | 240 | 96/48/72/24 | 8m | 同上 |
-| `mixed_280` | 280 | 112/56/84/28 | 8m | 逼近目标档 |
-| `mixed_300` | ~271 | 50/25/15 query + 60 submit + 90 report + 30 stats + **0.5 chainProbe** | 10m | 多 model 目标档 |
-| `mixed_300_probe` | 同上 | 同上（显式 probe profile） | 10m | 与 mixed_300 等效 |
-| `mixed_300_models` | ~290 | 医学+人格拆分 submit/report | 10m | 产品真实流量混合 |
-| `outbox_120` | ~271 | submit/report 各 120 + 低 query | 10m | **专测 outbox 排水** |
+| `pretest_60` | 60 | 25/10/19/6 | 3m | **第一档正式预压** |
+| `pretest_120` | 120 | 51/19/38/12 | 5m | 观察限流与资源曲线 |
+| `pretest_120_submit_only` | 19 | 0/19/0/0 | 5m | 隔离 submit |
+| `pretest_120_balanced` | 92 | 34/19/26/13 | 5m | 混合降读压验收档 |
+| `mixed_140` | 140 | 58/24/44/14 | 5m | 120→300 细粒度升档 |
+| `mixed_140_submit24` | 136 | 59/19/44/14 | 5m | 读/report 升档，submit 隔离 19/s |
+| `mixed_160` | 160 | 68/24/52/16 | 5m | 同上（submit 封顶 24/s） |
+| `mixed_180` | 180 | 80/24/58/18 | 5m | 同上 |
+| `mixed_200` | 200 | 92/24/64/20 | 5m | 接近 prod 保守基线 |
+| `mixed_240` | 240 | 112/24/80/24 | 8m | 同上 |
+| `mixed_280` | 280 | 132/24/96/28 | 8m | 加压读/report |
+| `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + 1 probe | 10m | **验收档** |
+| `mixed_300_probe` | 同上 | 同上 | 10m | 与 mixed_300 等效 |
+| `mixed_300_models` | ~291 | 医学+人格拆分，submit 合计 **20/s** | 10m | 产品真实流量混合 |
+| `outbox_120` | ~235 | submit/report 各 **96** + 低 query | 10m | **专测 outbox 排水** |
 | `personality_60` | ~60 | 人格 session/submit/wait | 5m | 人格链路专项 |
 | `capacity_no_scanner` | ~271 | 同 mixed_300 | 10m | 主链路容量（scanner 可关） |
 | `capacity_with_scanner` | ~271 | 同 mixed_300 | 10m | 开启 `behavior_journey_scan` 后跑 |
 
-旧档 `pretest_*` / `mixed_140`…仍用 `qps.query` 单桶，路径已含 personality-models，**向后兼容**。
+旧档 `pretest_*` / `mixed_140`…仍用 `qps.query` 单桶。**submit 自 2026-06 统一下调**：`pretest` 约 ×0.8，`mixed_140` 及以上封顶 **24/s**，少掉的 QPS 补到 query/report。
 
 ### 2.3 K6 脚本目录
 
@@ -213,10 +213,10 @@ make perf-preflight         # 预检（apiserver testees 须 200）
 make perf-smoke             # smoke_4
 make perf-pretest60         # pretest_60，summary → tmp/perf/pretest60/
 make perf-pretest120        # pretest_120
-make perf-pretest120-submit-only  # 仅 submit=24QPS 隔离复测
-make perf-pretest120-balanced     # 混合降读压 32/24/24/12
+make perf-pretest120-submit-only  # 仅 submit=19QPS 隔离复测
+make perf-pretest120-balanced     # 混合降读压 34/19/26/13
 make perf-mixed140          # mixed_140
-make perf-mixed140-submit24 # mixed_140 读压 + submit=24
+make perf-mixed140-submit24 # mixed_140 读压 + submit=19
 make perf-mixed160          # mixed_160
 make perf-mixed180          # mixed_180
 make perf-mixed200          # mixed_200

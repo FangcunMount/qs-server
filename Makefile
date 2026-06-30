@@ -238,11 +238,11 @@ perf-pretest120: perf-preflight ## k6 pretest_120 中档 (5min)
 	@mkdir -p $(PERF_DIR)/pretest120
 	$(MAKE) perf-k6 QPS_PROFILE=pretest_120 SUMMARY_EXPORT=$(PERF_DIR)/pretest120/k6-summary.json
 
-perf-pretest120-submit-only: perf-preflight ## k6 pretest_120 隔离：仅 submit=24QPS (5min)
+perf-pretest120-submit-only: perf-preflight ## k6 pretest_120 隔离：仅 submit=19QPS (5min)
 	@mkdir -p $(PERF_DIR)/pretest120-submit-only
 	$(MAKE) perf-k6 QPS_PROFILE=pretest_120_submit_only SUMMARY_EXPORT=$(PERF_DIR)/pretest120-submit-only/k6-summary.json
 
-perf-pretest120-balanced: perf-preflight ## k6 pretest_120 混合降读压：32/24/24/12 (5min)
+perf-pretest120-balanced: perf-preflight ## k6 pretest_120 混合降读压：34/19/26/13 (5min)
 	@mkdir -p $(PERF_DIR)/pretest120-balanced
 	$(MAKE) perf-k6 QPS_PROFILE=pretest_120_balanced SUMMARY_EXPORT=$(PERF_DIR)/pretest120-balanced/k6-summary.json
 
@@ -250,7 +250,7 @@ perf-mixed140: perf-preflight ## k6 mixed_140 升档 (5min)
 	@mkdir -p $(PERF_DIR)/mixed140
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_140 SUMMARY_EXPORT=$(PERF_DIR)/mixed140/k6-summary.json
 
-perf-mixed140-submit24: perf-preflight ## k6 mixed_140 读压升档 + submit=24 (5min)
+perf-mixed140-submit24: perf-preflight ## k6 mixed_140 读压升档 + submit=19 (5min)
 	@mkdir -p $(PERF_DIR)/mixed140-submit24
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_140_submit24 SUMMARY_EXPORT=$(PERF_DIR)/mixed140-submit24/k6-summary.json
 

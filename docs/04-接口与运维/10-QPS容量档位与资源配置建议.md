@@ -10,7 +10,7 @@
 | -------- | ------------ | ---- |
 | 100 | 单机单实例 | 小规格可承接，重点保护 DB |
 | 200 | 单机单实例 | 当前 prod 配置接近保守 200 QPS 基线 |
-| 300 | 单机单实例上限附近 | 建议开始拆数据层 |
+| 300 | 单机单实例 | **读/report ~300QPS + submit 24/s** 可验收；submit 60/s 需扩容 |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
@@ -32,9 +32,9 @@
 
 | 位置 | 关键值 | 含义 |
 | ---- | ------ | ---- |
-| collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 前台入口保护 |
+| collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 入口保护（压测配比见 k6 profile，与此无关） |
 | collection grpc_client | max_inflight 360 | 到 apiserver 并发 |
-| collection submit_queue | queue_size 2400，worker_count 48 | 提交削峰（2026-06 40/2000→48/2400，mixed_140 仍 182×429） |
+| collection submit_queue | queue_size 2000，worker_count 40 | 提交削峰 |
 | collection concurrency | max-concurrency 512 | 本进程总并发保护 |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
@@ -100,12 +100,10 @@
 
 `GOMEMLIMIT` 建议设置为容器内存的 65%-75%。
 
-当前 `mixed_300` 生产验收基线采用 serverA 8C/16G 单 apiserver 架构：`qs-apiserver`
-配置为 5 CPU / 8GiB（`GOMAXPROCS=5`、`GOMEMLIMIT=6144MiB`），`qs-collection-server`
-配置为 2 CPU / 4GiB（`GOMAXPROCS=2`、`GOMEMLIMIT=3072MiB`）。collection 侧同时将
-`grpc_client.max_inflight` 调至 360、`concurrency.max-concurrency` 调至 512，以承接
-`wait-report` 长轮询带来的并发占用。这个值高于上表的通用估算，是根据 300QPS 混合场景中
-apiserver 先饱和、collection 侧需保留长轮询余量的实测结果设定。
+当前 `mixed_300` 生产验收基线采用 serverA 8C/16G 单 apiserver 架构，**HTTP 总 QPS ~300、submit 24/s**（非 60/s）。
+`qs-apiserver` 配置为 5 CPU / 8GiB，`qs-collection-server` 为 2 CPU / 4GiB。
+collection 侧 `grpc_client.max_inflight=360`、`concurrency.max-concurrency=512` 主要承接
+`wait-report` 长轮询并发；submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约束。
 
 ---
 
