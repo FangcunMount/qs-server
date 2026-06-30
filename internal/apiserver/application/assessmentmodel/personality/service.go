@@ -451,7 +451,10 @@ func unavailable(message string) error {
 }
 
 func validationFailed(issues []ValidationIssue) error {
-	return errors.WithCode(code.ErrInvalidArgument, "模型校验未通过：%s", firstIssueMessage(issues))
+	if len(issues) == 0 {
+		return nil
+	}
+	return &validationFailedError{issues: issues}
 }
 
 func firstIssueMessage(issues []ValidationIssue) string {

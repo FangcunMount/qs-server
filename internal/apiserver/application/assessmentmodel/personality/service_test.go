@@ -243,10 +243,10 @@ func TestPreviewReportUsesDraftModelWithoutPublishing(t *testing.T) {
 	}
 	previewPayload, err := json.Marshal(personality.PreviewReportInput{
 		Answers: []personality.PreviewAnswer{
-			{QuestionCode: "Q_EI", Score: 1},
-			{QuestionCode: "Q_SN", Score: 5},
-			{QuestionCode: "Q_TF", Score: 1},
-			{QuestionCode: "Q_JP", Score: 1},
+			{QuestionCode: "Q_EI", Score: floatPtr(1)},
+			{QuestionCode: "Q_SN", Score: floatPtr(5)},
+			{QuestionCode: "Q_TF", Score: floatPtr(1)},
+			{QuestionCode: "Q_JP", Score: floatPtr(1)},
 		},
 	})
 	if err != nil {
@@ -259,8 +259,14 @@ func TestPreviewReportUsesDraftModelWithoutPublishing(t *testing.T) {
 	if result.Outcome.Code != "INTJ" {
 		t.Fatalf("outcome code = %s, want INTJ", result.Outcome.Code)
 	}
-	if result.Report == nil {
-		t.Fatal("report is nil")
+	if len(result.ScoreDetail) == 0 {
+		t.Fatal("score_detail is empty")
+	}
+	if len(result.ReportSections) == 0 {
+		t.Fatal("report_sections is empty")
+	}
+	if result.RawReport == nil {
+		t.Fatal("raw_report is nil")
 	}
 	if len(publishedRepo.snapshots) != 0 {
 		t.Fatal("preview should not save published snapshot")
@@ -578,4 +584,108 @@ func TestArchiveDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
 	if stored.Status != domain.ModelStatusPublished {
 		t.Fatalf("draft status = %s, want published", stored.Status)
 	}
+}
+
+func floatPtr(v float64) *float64 {
+	return &v
+}
+
+func TestPreviewReportReturnsValidationIssuesWhenModelInvalid(t *testing.T) {
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	svc := personality.NewService(personality.Dependencies{
+		ModelRepo:          modelRepo,
+		PublishedRepo:      &memoryPublishedRepo{},
+		QuestionnaireQuery: questionnaireQueryStub{questionnaire: frontendMBTIQuestionnaire()},
+	})
+	created, err := svc.Create(context.Background(), personality.CreateInput{
+		Code: "personality_preview_invalid", Title: "Invalid Preview", Algorithm: "mbti",
+		SubKind:              personality.SubKindTypology,
+		QuestionnaireCode:    "Q_FRONTEND_MBTI",
+		QuestionnaireVersion: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	payload, err := json.Marshal(personality.PreviewReportInput{
+		Answers: []personality.PreviewAnswer{{QuestionCode: "Q_EI", Score: floatPtr(1)}},
+	})
+	if err != nil {
+		t.Fatalf("Marshal: %v", err)
+	}
+	_, err = svc.PreviewReport(context.Background(), created.Code, payload)
+	if err == nil {
+		t.Fatal("PreviewReport() error = nil, want validation failed")
+	}
+	issues, ok := personality.AsValidationFailed(err)
+	if !ok {
+		t.Fatalf("PreviewReport() error = %v, want validation failed", err)
+	}
+	if len(issues) == 0 {
+		t.Fatal("validation issues is empty")
+	}
+}
+
+func TestPreviewReportValidatesAnswers(t *testing.T) {
+	payload, err := os.ReadFile("../../../testdata/personality/frontend_payload_mbti.json")
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	svc := personality.NewService(personality.Dependencies{
+		ModelRepo:          modelRepo,
+		PublishedRepo:      &memoryPublishedRepo{},
+		QuestionnaireQuery: questionnaireQueryStub{questionnaire: frontendMBTIQuestionnaire()},
+	})
+	created, err := svc.Create(context.Background(), personality.CreateInput{
+		Code: "personality_preview_answers", Title: "Preview Answers", Algorithm: "mbti",
+		SubKind:              personality.SubKindTypology,
+		QuestionnaireCode:    "Q_FRONTEND_MBTI",
+		QuestionnaireVersion: "1.0.0",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, personality.DefinitionInput{
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Payload:       payload,
+	}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+
+	t.Run("unknown question code", func(t *testing.T) {
+		body, err := json.Marshal(personality.PreviewReportInput{
+			Answers: []personality.PreviewAnswer{{QuestionCode: "UNKNOWN", Score: floatPtr(1)}},
+		})
+		if err != nil {
+			t.Fatalf("Marshal: %v", err)
+		}
+		_, err = svc.PreviewReport(context.Background(), created.Code, body)
+		issues, ok := personality.AsValidationFailed(err)
+		if !ok {
+			t.Fatalf("PreviewReport() error = %v, want validation failed", err)
+		}
+		if len(issues) == 0 || issues[0].Code != "question_code.not_found" {
+			t.Fatalf("issues = %+v, want question_code.not_found", issues)
+		}
+	})
+
+	t.Run("duplicate question code", func(t *testing.T) {
+		body, err := json.Marshal(personality.PreviewReportInput{
+			Answers: []personality.PreviewAnswer{
+				{QuestionCode: "Q_EI", Score: floatPtr(1)},
+				{QuestionCode: "Q_EI", Score: floatPtr(2)},
+			},
+		})
+		if err != nil {
+			t.Fatalf("Marshal: %v", err)
+		}
+		_, err = svc.PreviewReport(context.Background(), created.Code, body)
+		issues, ok := personality.AsValidationFailed(err)
+		if !ok {
+			t.Fatalf("PreviewReport() error = %v, want validation failed", err)
+		}
+		if len(issues) == 0 || issues[0].Code != "question_code.duplicate" {
+			t.Fatalf("issues = %+v, want question_code.duplicate", issues)
+		}
+	})
 }

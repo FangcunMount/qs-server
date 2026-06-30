@@ -121,13 +121,32 @@ func previewFromPersonality(result *personality.PreviewReportResult) *PreviewRep
 	if result == nil {
 		return nil
 	}
+	sections := make([]PreviewReportSection, len(result.ReportSections))
+	for i, section := range result.ReportSections {
+		sections[i] = PreviewReportSection{
+			Title:   section.Title,
+			Content: section.Content,
+			Kind:    section.Kind,
+		}
+	}
+	issues := make([]ValidationIssue, len(result.Issues))
+	for i, issue := range result.Issues {
+		issues[i] = ValidationIssue{
+			Field:   issue.Field,
+			Message: issue.Message,
+			Code:    issue.Code,
+			Level:   issue.Level,
+		}
+	}
 	return &PreviewReportResult{
 		Outcome: PreviewOutcome{
 			Code:  result.Outcome.Code,
 			Title: result.Outcome.Title,
 		},
-		Scores: result.Scores,
-		Report: result.Report,
+		ScoreDetail:    result.ScoreDetail,
+		ReportSections: sections,
+		Issues:         issues,
+		RawReport:      result.RawReport,
 	}
 }
 

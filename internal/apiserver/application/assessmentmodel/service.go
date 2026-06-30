@@ -401,6 +401,9 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 		}
 		result, err := s.deps.PersonalityCommand.PreviewReport(ctx, modelCode, payload)
 		if err != nil {
+			if issues, ok := personality.AsValidationFailed(err); ok {
+				return nil, validationFailedFromPersonalityIssues(issues)
+			}
 			return nil, err
 		}
 		return previewFromPersonality(result), nil

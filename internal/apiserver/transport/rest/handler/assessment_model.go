@@ -243,6 +243,14 @@ func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 	payload, _ := json.Marshal(req)
 	result, err := h.service.PreviewReport(c.Request.Context(), h.modelCode(c), payload)
 	if err != nil {
+		if vf, ok := assessmentmodel.ValidationFailedFrom(err); ok {
+			c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{
+				Code:    code.ErrAssessmentModelValidationFailed,
+				Message: "模型校验失败",
+				Data:    (*response.AssessmentModelValidationResponse)(vf.Result),
+			})
+			return
+		}
 		h.Error(c, err)
 		return
 	}

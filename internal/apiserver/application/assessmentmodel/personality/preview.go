@@ -42,6 +42,9 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 	if questionnaire == nil {
 		return nil, invalidArgument("模型绑定问卷不存在")
 	}
+	if issues := validatePreviewAnswers(input.Answers, questionnaire); len(issues) > 0 {
+		return nil, validationFailed(issues)
+	}
 	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
 	if err != nil {
 		return nil, err
@@ -126,9 +129,13 @@ func previewExecutionInput(
 ) *evaluationinput.InputSnapshot {
 	answerSnapshots := make([]evaluationinput.AnswerSnapshot, 0, len(answers))
 	for _, answer := range answers {
+		score := 0.0
+		if answer.Score != nil {
+			score = *answer.Score
+		}
 		answerSnapshots = append(answerSnapshots, evaluationinput.AnswerSnapshot{
 			QuestionCode: answer.QuestionCode,
-			Score:        answer.Score,
+			Score:        score,
 			Value:        answer.Value,
 		})
 	}
@@ -208,26 +215,83 @@ func previewSubmittedAssessment(model *domain.AssessmentModel, snapshot *domain.
 
 func previewReportResult(outcome *assessment.AssessmentOutcome, report *domainreport.InterpretReport) *PreviewReportResult {
 	result := &PreviewReportResult{
-		Report: report,
-		Scores: map[string]float64{},
+		Outcome:        previewOutcomeFromAssessmentOutcome(outcome),
+		ScoreDetail:    previewScoresFromOutcome(outcome),
+		ReportSections: previewSectionsFromReport(report),
+		RawReport:      report,
 	}
-	if outcome != nil {
-		if outcome.Profile != nil {
-			result.Outcome = PreviewOutcome{Code: outcome.Profile.Code, Title: outcome.Profile.Name}
-		} else if outcome.Level != nil {
-			result.Outcome = PreviewOutcome{Code: outcome.Level.Code, Title: outcome.Level.Label}
-		}
-		if outcome.Primary != nil {
-			result.Scores["primary"] = outcome.Primary.Value
-		}
-		for _, dim := range outcome.Dimensions {
-			if dim.Score != nil && dim.Code != "" {
-				result.Scores[dim.Code] = dim.Score.Value
-			}
-		}
-	}
-	if len(result.Scores) == 0 {
-		result.Scores = nil
+	if len(result.ScoreDetail) == 0 {
+		result.ScoreDetail = nil
 	}
 	return result
+}
+
+func previewOutcomeFromAssessmentOutcome(outcome *assessment.AssessmentOutcome) PreviewOutcome {
+	if outcome == nil {
+		return PreviewOutcome{}
+	}
+	if outcome.Profile != nil {
+		return PreviewOutcome{Code: outcome.Profile.Code, Title: outcome.Profile.Name}
+	}
+	if outcome.Level != nil {
+		return PreviewOutcome{Code: outcome.Level.Code, Title: outcome.Level.Label}
+	}
+	return PreviewOutcome{}
+}
+
+func previewScoresFromOutcome(outcome *assessment.AssessmentOutcome) map[string]float64 {
+	scores := map[string]float64{}
+	if outcome == nil {
+		return scores
+	}
+	if outcome.Primary != nil {
+		scores["primary"] = outcome.Primary.Value
+	}
+	for _, dim := range outcome.Dimensions {
+		if dim.Score != nil && dim.Code != "" {
+			scores[dim.Code] = dim.Score.Value
+		}
+	}
+	return scores
+}
+
+func previewSectionsFromReport(report *domainreport.InterpretReport) []PreviewReportSection {
+	if report == nil {
+		return nil
+	}
+	sections := make([]PreviewReportSection, 0)
+	if conclusion := report.Conclusion(); conclusion != "" {
+		sections = append(sections, PreviewReportSection{
+			Title:   "结论",
+			Content: conclusion,
+			Kind:    "conclusion",
+		})
+	}
+	if extra := report.ModelExtra(); extra != nil && extra.Commentary != "" {
+		sections = append(sections, PreviewReportSection{
+			Title:   "解读",
+			Content: extra.Commentary,
+			Kind:    "commentary",
+		})
+	}
+	for _, dim := range report.Dimensions() {
+		if content := dim.Description(); content != "" {
+			sections = append(sections, PreviewReportSection{
+				Title:   dim.Name(),
+				Content: content,
+				Kind:    "dimension",
+			})
+		}
+	}
+	for _, suggestion := range report.Suggestions() {
+		if suggestion.Content == "" {
+			continue
+		}
+		sections = append(sections, PreviewReportSection{
+			Title:   string(suggestion.Category),
+			Content: suggestion.Content,
+			Kind:    "suggestion",
+		})
+	}
+	return sections
 }

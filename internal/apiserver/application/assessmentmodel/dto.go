@@ -154,8 +154,16 @@ type PreviewOutcome struct {
 	Title string `json:"title,omitempty"`
 }
 
+type PreviewReportSection struct {
+	Title   string `json:"title"`
+	Content string `json:"content,omitempty"`
+	Kind    string `json:"kind,omitempty"`
+}
+
 type PreviewReportResult struct {
-	Outcome PreviewOutcome          `json:"outcome"`
-	Scores  map[string]float64      `json:"scores,omitempty"`
-	Report  *report.InterpretReport `json:"report"`
+	Outcome        PreviewOutcome          `json:"outcome"`
+	ScoreDetail    map[string]float64      `json:"score_detail,omitempty"`
+	ReportSections []PreviewReportSection  `json:"report_sections"`
+	Issues         []ValidationIssue       `json:"issues,omitempty"`
+	RawReport      *report.InterpretReport `json:"raw_report,omitempty"`
 }

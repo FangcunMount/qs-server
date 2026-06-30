@@ -94,6 +94,19 @@ func definitionFromPersonality(result *personality.DefinitionResult) *Definition
 	}
 }
 
+func validationFailedFromPersonalityIssues(issues []personality.ValidationIssue) error {
+	mapped := make([]ValidationIssue, 0, len(issues))
+	for _, issue := range issues {
+		mapped = append(mapped, ValidationIssue{
+			Field:   issue.Field,
+			Message: issue.Message,
+			Code:    issue.Code,
+			Level:   issue.Level,
+		})
+	}
+	return NewValidationFailedError(mapped)
+}
+
 func validationFromPersonality(result *personality.ValidationResult) *ValidationResult {
 	if result == nil {
 		return NewValidationResult(nil)
