@@ -59,18 +59,18 @@ func buildTraitDimensions(factors []traitFactor) map[string]modeltypology.Dimens
 }
 
 type traitProfileSeedInput struct {
-	Code                 string
-	Version              string
-	Title                string
-	Description          string
-	Algorithm            domain.Algorithm
-	FactorOrder          []string
-	Factors              []traitFactor
-	Items                []traitItem
-	Source               modeltypology.Source
-	ReportCategoryLabel  string
-	DetailAdapterKey     modeltypology.DetailAdapterKey
-	ReportAdapterKey     modeltypology.ReportAdapterKey
+	Code                string
+	Version             string
+	Title               string
+	Description         string
+	Algorithm           domain.Algorithm
+	FactorOrder         []string
+	Factors             []traitFactor
+	Items               []traitItem
+	Source              modeltypology.Source
+	ReportCategoryLabel string
+	DetailAdapterKey    modeltypology.DetailAdapterKey
+	ReportAdapterKey    modeltypology.ReportAdapterKey
 }
 
 func buildTraitProfilePayload(input traitProfileSeedInput) (*modeltypology.Payload, error) {

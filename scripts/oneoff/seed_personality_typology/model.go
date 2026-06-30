@@ -51,7 +51,6 @@ func seedAssessmentModel(
 		if err := purgeDraftForSeed(ctx, draftRepo, plan.Code); err != nil {
 			return fmt.Errorf("purge draft %s: %w", plan.Code, err)
 		}
-		existing = nil
 	}
 
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{

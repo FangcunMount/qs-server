@@ -191,9 +191,9 @@ func TestQuestionnaireSeedsAlignWithModelVersions(t *testing.T) {
 	}
 
 	for _, tc := range []struct {
-		name    string
-		path    string
-		build   func() (*modeltypology.Payload, error)
+		name  string
+		path  string
+		build func() (*modeltypology.Payload, error)
 	}{
 		{"mbti93", mbti93QuestionnairePath, buildMBTI93Payload},
 		{"big5", big5QuestionnairePath, buildBig5Payload},

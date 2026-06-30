@@ -10,7 +10,7 @@ import (
 
 func TestDefinitionFromModelNormalizesFullPayloadToRuntimeSpec(t *testing.T) {
 	payload := &modeltypology.Payload{
-		Algorithm: domain.AlgorithmMBTI,
+		Algorithm:      domain.AlgorithmMBTI,
 		DimensionOrder: []string{"EI"},
 		Dimensions: map[string]modeltypology.Dimension{
 			"EI": {Code: "EI", Name: "外向/内向"},

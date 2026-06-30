@@ -18,10 +18,7 @@ func traitItemsFromSeed(seed questionnaireSeedFile) []traitItem {
 func traitFactorsFromSeed(seed questionnaireSeedFile) []traitFactor {
 	factors := make([]traitFactor, 0, len(seed.Factors))
 	for _, factor := range seed.Factors {
-		factors = append(factors, traitFactor{
-			Code: factor.Code,
-			Name: factor.Name,
-		})
+		factors = append(factors, traitFactor(factor))
 	}
 	return factors
 }
