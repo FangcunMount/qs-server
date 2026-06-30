@@ -62,7 +62,12 @@ func New(deps Deps) (*Module, error) {
 	module.reader = mongoEval.NewReportReadModel(deps.MongoDB, mongoOptions)
 	module.QueryService = assessmentApp.NewReportQueryService(module.reader)
 
-	priorityOpts := []mongoEventOutbox.StoreOption{mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil))}
+	priorityOpts := []mongoEventOutbox.StoreOption{
+		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
+	}
+	if deps.MongoLimiter != nil {
+		priorityOpts = append(priorityOpts, mongoEventOutbox.WithLimiter(deps.MongoLimiter))
+	}
 	reportOutboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(deps.MongoDB, deps.TopicResolver, priorityOpts...)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report outbox store: %v", err)

@@ -32,6 +32,12 @@ func (s *Store) OutboxStatusByEventType(ctx context.Context, now time.Time) ([]o
 			"oldest": bson.M{"$min": "$created_at"},
 		}}},
 	}
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	cursor, err := s.coll.Aggregate(ctx, pipeline)
 	if err != nil {
 		return nil, err

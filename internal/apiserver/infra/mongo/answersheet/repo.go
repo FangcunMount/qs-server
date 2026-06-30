@@ -36,10 +36,16 @@ func NewRepositoryWithTopicResolver(db *mongo.Database, resolver eventcatalog.To
 		mapper:          NewAnswerSheetMapper(),
 		idempotencyColl: db.Collection((&AnswerSheetSubmitIdempotencyPO{}).CollectionName()),
 	}
+	outboxOpts := []mongoEventOutbox.StoreOption{
+		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
+	}
+	if len(opts) > 0 && opts[0].Limiter != nil {
+		outboxOpts = append(outboxOpts, mongoEventOutbox.WithLimiter(opts[0].Limiter))
+	}
 	outboxStore, err := mongoEventOutbox.NewStoreWithTopicResolver(
 		db,
 		resolver,
-		mongoEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil)),
+		outboxOpts...,
 	)
 	if err != nil {
 		return nil, err

@@ -163,7 +163,7 @@ func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishe
 	}
 	mongoFilter := publishedFilter(extra)
 
-	total, err := r.Collection().CountDocuments(ctx, mongoFilter)
+	total, err := r.CountDocuments(ctx, mongoFilter)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -173,7 +173,7 @@ func (r *Repository) ListPublished(ctx context.Context, filter port.ListPublishe
 		SetSkip(int64((page - 1) * pageSize)).
 		SetLimit(int64(pageSize))
 
-	cursor, err := r.Collection().Find(ctx, mongoFilter, opts)
+	cursor, err := r.Find(ctx, mongoFilter, opts)
 	if err != nil {
 		return nil, 0, err
 	}
@@ -283,18 +283,8 @@ func (r *Repository) refFilter(ref port.Ref) bson.M {
 }
 
 func (r *Repository) findOne(ctx context.Context, filter bson.M) (*domain.Snapshot, error) {
-	count, err := r.Collection().CountDocuments(ctx, filter)
-	if err != nil {
-		return nil, err
-	}
-	if count == 0 {
-		return nil, domain.ErrNotFound
-	}
-	if count > 1 {
-		return nil, domain.ErrAmbiguousVersion
-	}
 	var po PublishedAssessmentModelPO
-	err = r.FindOne(ctx, filter, &po)
+	err := r.FindOne(ctx, filter, &po)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, domain.ErrNotFound

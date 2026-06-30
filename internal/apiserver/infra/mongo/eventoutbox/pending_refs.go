@@ -14,6 +14,12 @@ func (s *Store) ListPendingEventRefs(ctx context.Context, limit int, now time.Ti
 	if s == nil || s.coll == nil || limit <= 0 {
 		return nil, nil
 	}
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	cursor, err := s.coll.Find(ctx, bson.M{
 		"status":          bson.M{"$in": []string{outboxcore.StatusPending, outboxcore.StatusFailed}},
 		"next_attempt_at": bson.M{"$lte": now},

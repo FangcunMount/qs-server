@@ -14,8 +14,14 @@ func (s *Store) GetPublishableEvent(ctx context.Context, eventID string, now tim
 	if s == nil || s.coll == nil || eventID == "" {
 		return outboxport.PendingEvent{}, false, nil
 	}
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return outboxport.PendingEvent{}, false, err
+	}
+	defer release()
+
 	var po OutboxPO
-	err := s.coll.FindOne(ctx, bson.M{
+	err = s.coll.FindOne(ctx, bson.M{
 		"event_id":        eventID,
 		"status":          bson.M{"$in": []string{outboxcore.StatusPending, outboxcore.StatusFailed}},
 		"next_attempt_at": bson.M{"$lte": now},
@@ -37,8 +43,14 @@ func (s *Store) MarkEventsPublished(ctx context.Context, eventIDs []string, publ
 	if s == nil || s.coll == nil || len(eventIDs) == 0 {
 		return nil
 	}
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	transition := outboxcore.NewPublishedTransition(publishedAt)
-	_, err := s.coll.UpdateMany(ctx, bson.M{"event_id": bson.M{"$in": eventIDs}}, bson.M{
+	_, err = s.coll.UpdateMany(ctx, bson.M{"event_id": bson.M{"$in": eventIDs}}, bson.M{
 		"$set": bson.M{
 			"status":       transition.Status,
 			"published_at": transition.PublishedAt,
@@ -53,6 +65,12 @@ func (s *Store) MarkEventsFailed(ctx context.Context, failures []outboxport.Fail
 	if s == nil || s.coll == nil || len(failures) == 0 {
 		return nil
 	}
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	now := time.Now()
 	models := make([]mongo.WriteModel, 0, len(failures))
 	for _, failure := range failures {
@@ -76,6 +94,6 @@ func (s *Store) MarkEventsFailed(ctx context.Context, failures []outboxport.Fail
 	if len(models) == 0 {
 		return nil
 	}
-	_, err := s.coll.BulkWrite(ctx, models)
+	_, err = s.coll.BulkWrite(ctx, models)
 	return err
 }

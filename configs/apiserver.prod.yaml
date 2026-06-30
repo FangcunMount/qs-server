@@ -395,7 +395,7 @@ backpressure:
     timeout_ms: 3000
   mongo:
     enabled: true
-    max_inflight: 170
+    max_inflight: 80             # 须低于 driver maxPoolSize(100)；为 outbox relay+immediate 预留连接
     timeout_ms: 2500
   iam:
     enabled: true

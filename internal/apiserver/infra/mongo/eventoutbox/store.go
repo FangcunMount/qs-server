@@ -9,6 +9,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/outboxcore"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
+	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/outboxpriority"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -45,6 +46,7 @@ func (OutboxPO) CollectionName() string {
 
 type Store struct {
 	coll               *mongo.Collection
+	limiter            backpressure.Acquirer
 	publishingStaleFor time.Duration
 	topicResolver      eventcatalog.TopicResolver
 	priorityTiers      [][]string
@@ -389,6 +391,12 @@ func minInt(a, b int) int {
 }
 
 func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishedAt time.Time) error {
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	transition := outboxcore.NewPublishedTransition(publishedAt)
 	result, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
 		"$set": bson.M{
@@ -408,6 +416,12 @@ func (s *Store) MarkEventPublished(ctx context.Context, eventID string, publishe
 }
 
 func (s *Store) MarkEventFailed(ctx context.Context, eventID, lastError string, nextAttemptAt time.Time) error {
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return err
+	}
+	defer release()
+
 	transition := outboxcore.NewFailedTransition(lastError, nextAttemptAt, time.Now())
 	result, err := s.coll.UpdateOne(ctx, bson.M{"event_id": eventID}, bson.M{
 		"$set": bson.M{
@@ -453,6 +467,12 @@ func (s *Store) loadStatusObservations(ctx context.Context, statuses []string) (
 	if len(statuses) == 0 {
 		return nil, nil
 	}
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	cur, err := s.coll.Aggregate(
 		ctx,
 		outboxStatusSnapshotPipeline(statuses),

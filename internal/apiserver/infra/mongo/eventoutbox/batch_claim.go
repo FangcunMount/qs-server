@@ -22,6 +22,12 @@ func (s *Store) claimBatchByFilter(
 		return nil, nil
 	}
 
+	ctx, release, err := s.acquire(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer release()
+
 	cursor, err := s.coll.Find(ctx, filter, options.Find().
 		SetProjection(bson.M{"event_id": 1}).
 		SetSort(sort).
