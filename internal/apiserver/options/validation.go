@@ -193,6 +193,9 @@ func validateOutboxRelay(opts *OutboxRelayOptions) []error {
 		if relay.opt.BatchSize <= 0 {
 			errs = append(errs, fmt.Errorf("outbox_relay.%s.batch_size must be greater than 0", relay.name))
 		}
+		if relay.opt.PublishWorkers <= 0 {
+			errs = append(errs, fmt.Errorf("outbox_relay.%s.publish_workers must be greater than 0", relay.name))
+		}
 	}
 	return errs
 }

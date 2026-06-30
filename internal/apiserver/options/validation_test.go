@@ -163,6 +163,13 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 			wantErr: "outbox_relay.mongo.batch_size must be greater than 0",
 		},
 		{
+			name: "mongo relay requires positive publish workers",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay.Mongo.PublishWorkers = 0
+			},
+			wantErr: "outbox_relay.mongo.publish_workers must be greater than 0",
+		},
+		{
 			name: "assessment relay requires positive interval",
 			mutate: func(opts *Options) {
 				opts.OutboxRelay.Assessment.Interval = 0
@@ -175,6 +182,13 @@ func TestOptionsValidateOutboxRelay(t *testing.T) {
 				opts.OutboxRelay.Assessment.BatchSize = 0
 			},
 			wantErr: "outbox_relay.assessment.batch_size must be greater than 0",
+		},
+		{
+			name: "assessment relay requires positive publish workers",
+			mutate: func(opts *Options) {
+				opts.OutboxRelay.Assessment.PublishWorkers = 0
+			},
+			wantErr: "outbox_relay.assessment.publish_workers must be greater than 0",
 		},
 	}
 

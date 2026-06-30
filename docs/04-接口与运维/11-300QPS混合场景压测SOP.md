@@ -399,7 +399,7 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | k6 `http_5xx`，collection **0 条 5xx**，nginx access `503` 0.000s | **Nginx limit_conn** | 白名单压测 IP 或临时调高；`docker restart nginx` |
 | `pretest_120` 大量 502，`upstream prematurely closed` | 跨机 upstream（历史：collection 在 serverB） | collection 迁 serverA；调大 upstream `keepalive` |
 | `wait-report` k6 EOF，但 Nginx access 只有成功数、error log 为空 | k6 report VU 过大导致入口前连接复用异常 | 下调 `REPORT_VUS/REPORT_MAX_VUS`；`pretest_120` 用 `220/500`，`mixed_300` 先用 `600/900` |
-| NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size`、主链路事件 pending 与 Mongo 慢查询 |
+| NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size/publish_workers`、主链路事件 pending/publishing 与 Mongo 慢查询 |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |

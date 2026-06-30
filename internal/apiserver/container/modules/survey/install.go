@@ -19,17 +19,18 @@ func InstallFrom(host InstallHost) error {
 		return err
 	}
 	module, err := Wire(WireInput{
-		MongoDB:              host.MongoDB(),
-		EventPublisher:       host.EventPublisher(),
-		RankRedisClient:      host.CacheClient(cacheplane.FamilyRank),
-		RankCacheBuilder:     host.CacheBuilder(cacheplane.FamilyRank),
-		IdentityService:      host.IdentityService(),
-		HotsetRecorder:       host.HotsetRecorder(),
-		TopicResolver:        host.TopicResolver(),
-		OutboxRelayBatchSize: host.OutboxRelayMongoBatchSize(),
-		CacheSignalNotifier:  host.CacheSignalNotifier(),
-		OpsHandle:            host.CacheHandle(cacheplane.FamilyOps),
-		ScaleInfra:           infra,
+		MongoDB:                   host.MongoDB(),
+		EventPublisher:            host.EventPublisher(),
+		RankRedisClient:           host.CacheClient(cacheplane.FamilyRank),
+		RankCacheBuilder:          host.CacheBuilder(cacheplane.FamilyRank),
+		IdentityService:           host.IdentityService(),
+		HotsetRecorder:            host.HotsetRecorder(),
+		TopicResolver:             host.TopicResolver(),
+		OutboxRelayBatchSize:      host.OutboxRelayMongoBatchSize(),
+		OutboxRelayPublishWorkers: host.OutboxRelayMongoPublishWorkers(),
+		CacheSignalNotifier:       host.CacheSignalNotifier(),
+		OpsHandle:                 host.CacheHandle(cacheplane.FamilyOps),
+		ScaleInfra:                infra,
 	})
 	if err != nil {
 		return err

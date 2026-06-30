@@ -15,33 +15,35 @@ import (
 
 // WireInput carries composition-root inputs for survey module installation.
 type WireInput struct {
-	MongoDB              *mongo.Database
-	EventPublisher       event.EventPublisher
-	RankRedisClient      redis.UniversalClient
-	RankCacheBuilder     *keyspace.Builder
-	IdentityService      *iam.IdentityService
-	HotsetRecorder       cachetarget.HotsetRecorder
-	TopicResolver        eventcatalog.TopicResolver
-	OutboxRelayBatchSize int
-	CacheSignalNotifier  quesApp.CacheSignalNotifier
-	OpsHandle            *cacheplane.Handle
-	ScaleInfra           *ScaleInfra
+	MongoDB                   *mongo.Database
+	EventPublisher            event.EventPublisher
+	RankRedisClient           redis.UniversalClient
+	RankCacheBuilder          *keyspace.Builder
+	IdentityService           *iam.IdentityService
+	HotsetRecorder            cachetarget.HotsetRecorder
+	TopicResolver             eventcatalog.TopicResolver
+	OutboxRelayBatchSize      int
+	OutboxRelayPublishWorkers int
+	CacheSignalNotifier       quesApp.CacheSignalNotifier
+	OpsHandle                 *cacheplane.Handle
+	ScaleInfra                *ScaleInfra
 }
 
 // Wire builds and bootstraps the survey module from composition inputs.
 func Wire(in WireInput) (*Module, error) {
 	bootstrap := BootstrapInput{
-		MongoDB:              in.MongoDB,
-		EventPublisher:       in.EventPublisher,
-		RankRedisClient:      in.RankRedisClient,
-		RankCacheBuilder:     in.RankCacheBuilder,
-		IdentityService:      in.IdentityService,
-		HotsetRecorder:       in.HotsetRecorder,
-		TopicResolver:        in.TopicResolver,
-		ScaleSyncer:          scaleApp.NewQuestionnaireBindingSyncer(nil),
-		OutboxRelayBatchSize: in.OutboxRelayBatchSize,
-		CacheSignalNotifier:  in.CacheSignalNotifier,
-		OpsHandle:            in.OpsHandle,
+		MongoDB:                   in.MongoDB,
+		EventPublisher:            in.EventPublisher,
+		RankRedisClient:           in.RankRedisClient,
+		RankCacheBuilder:          in.RankCacheBuilder,
+		IdentityService:           in.IdentityService,
+		HotsetRecorder:            in.HotsetRecorder,
+		TopicResolver:             in.TopicResolver,
+		ScaleSyncer:               scaleApp.NewQuestionnaireBindingSyncer(nil),
+		OutboxRelayBatchSize:      in.OutboxRelayBatchSize,
+		OutboxRelayPublishWorkers: in.OutboxRelayPublishWorkers,
+		CacheSignalNotifier:       in.CacheSignalNotifier,
+		OpsHandle:                 in.OpsHandle,
 	}
 	if infra := in.ScaleInfra; infra != nil {
 		bootstrap.ScaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(infra.ScaleRepo)

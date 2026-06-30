@@ -519,6 +519,7 @@ OutboxRelay 是通用 relay。
 | Observer | event observability |
 | Status | outbox status reporter |
 | BatchSize | 每次 claim 数量，默认 50 |
+| PublishWorkers | 并发 publish worker 数，默认 8；成功 publish 的事件会按 worker 尺寸分批 mark published |
 | RetryDelay | publish 失败后延迟，默认 outboxcore delay |
 | RequireDurablePublisher | 是否要求 MQ-backed publisher |
 | BeforePublishHooks | 发布前 hook |

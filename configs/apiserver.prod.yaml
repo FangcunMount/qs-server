@@ -348,9 +348,11 @@ outbox_relay:
   mongo:
     interval: "500ms"           # Mongo outbox 主链路事件排水频率；300 QPS 压测起步值
     batch_size: 1000            # 每轮最多 claim 的 Mongo outbox 事件数
+    publish_workers: 128        # Mongo outbox 并发发布 worker 数；pretest120 起步值
   assessment:
     interval: "2s"              # MySQL assessment outbox 当前积压较低，保持保守频率
     batch_size: 50              # 每轮最多 claim 的 assessment outbox 事件数
+    publish_workers: 8          # MySQL assessment outbox 当前积压较低，保持默认并发
 
 statistics_sync:
   enable: true                  # 启用统计数据同步任务

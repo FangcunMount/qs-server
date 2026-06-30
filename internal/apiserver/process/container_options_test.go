@@ -180,10 +180,12 @@ func TestAPIServerBuildContainerOptionsUsesResourceStageCacheSubsystem(t *testin
 	}
 }
 
-func TestAPIServerBuildContainerOptionsMapsOutboxRelayBatchSizes(t *testing.T) {
+func TestAPIServerBuildContainerOptionsMapsOutboxRelayOptions(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
 	opts.OutboxRelay.Mongo.BatchSize = 360
+	opts.OutboxRelay.Mongo.PublishWorkers = 64
 	opts.OutboxRelay.Assessment.BatchSize = 80
+	opts.OutboxRelay.Assessment.PublishWorkers = 12
 	cfg, err := apiserverconfig.CreateConfigFromOptions(opts)
 	if err != nil {
 		t.Fatalf("CreateConfigFromOptions() error = %v", err)
@@ -195,7 +197,13 @@ func TestAPIServerBuildContainerOptionsMapsOutboxRelayBatchSizes(t *testing.T) {
 	if got.OutboxRelay.MongoBatchSize != 360 {
 		t.Fatalf("MongoBatchSize = %d, want 360", got.OutboxRelay.MongoBatchSize)
 	}
+	if got.OutboxRelay.MongoPublishWorkers != 64 {
+		t.Fatalf("MongoPublishWorkers = %d, want 64", got.OutboxRelay.MongoPublishWorkers)
+	}
 	if got.OutboxRelay.AssessmentBatchSize != 80 {
 		t.Fatalf("AssessmentBatchSize = %d, want 80", got.OutboxRelay.AssessmentBatchSize)
+	}
+	if got.OutboxRelay.AssessmentPublishWorkers != 12 {
+		t.Fatalf("AssessmentPublishWorkers = %d, want 12", got.OutboxRelay.AssessmentPublishWorkers)
 	}
 }

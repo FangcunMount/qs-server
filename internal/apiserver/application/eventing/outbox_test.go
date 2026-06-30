@@ -3,6 +3,7 @@ package eventing
 import (
 	"context"
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -214,6 +215,108 @@ func TestOutboxRelayUsesConfiguredBatchSize(t *testing.T) {
 	}
 	if store.lastLimit != 300 {
 		t.Fatalf("claim limit = %d, want 300", store.lastLimit)
+	}
+}
+
+func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{
+			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
+			pendingEvent("evt-2", eventcatalog.ReportGenerated),
+			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
+			pendingEvent("evt-4", eventcatalog.ReportGeneratedV2),
+		},
+	}
+	publisher := &trackingPublisher{}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:           "test-relay",
+		Store:          store,
+		Publisher:      publisher,
+		PublishWorkers: 2,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	if publisher.maxInflight > 2 {
+		t.Fatalf("max inflight publishes = %d, want <= 2", publisher.maxInflight)
+	}
+	if len(store.published) != 4 {
+		t.Fatalf("published markers = %#v, want 4 events", store.published)
+	}
+}
+
+func TestOutboxRelayMarksPublishedBeforeWholeClaimedBatchCompletes(t *testing.T) {
+	store := newBlockingMarkStore([]PendingOutboxEvent{
+		pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
+		pendingEvent("evt-2", eventcatalog.ReportGenerated),
+		pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
+	})
+	publisher := &blockingThirdPublisher{
+		blockEventType: eventcatalog.AnswerSheetSubmitted,
+		blocked:        make(chan struct{}),
+		release:        make(chan struct{}),
+	}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:           "test-relay",
+		Store:          store,
+		Publisher:      publisher,
+		PublishWorkers: 2,
+	})
+
+	done := make(chan error, 1)
+	go func() {
+		done <- relay.DispatchDue(context.Background())
+	}()
+
+	select {
+	case <-publisher.blocked:
+	case <-time.After(time.Second):
+		t.Fatal("third publish did not block")
+	}
+	select {
+	case <-store.marked:
+	case <-time.After(time.Second):
+		t.Fatal("expected first published batch to be marked while later publish is still blocked")
+	}
+
+	store.mu.Lock()
+	batches := append([][]string(nil), store.publishedBatches...)
+	store.mu.Unlock()
+	if len(batches) == 0 || len(batches[0]) != 2 {
+		t.Fatalf("published batches = %#v, want first batch of two", batches)
+	}
+
+	close(publisher.release)
+	select {
+	case err := <-done:
+		if err != nil {
+			t.Fatalf("DispatchDue: %v", err)
+		}
+	case <-time.After(time.Second):
+		t.Fatal("DispatchDue did not finish after releasing blocked publish")
+	}
+}
+
+func TestOutboxRelayObservesBatchMarkPublishedFailed(t *testing.T) {
+	observer := &outboxObserver{}
+	store := newBlockingMarkStore([]PendingOutboxEvent{
+		pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
+	})
+	store.markPublishedErr = errors.New("batch mark failed")
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:      "test-relay",
+		Store:     store,
+		Publisher: &fakePublisher{},
+		Observer:  observer,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	assertOutboxOutcome(t, observer, eventobservability.OutboxOutcomeMarkPublishedFailed)
+	if len(store.failed) != 0 {
+		t.Fatalf("failed markers = %#v, want none", store.failed)
 	}
 }
 
@@ -502,6 +605,104 @@ func TestOutboxRelayFailureReenqueuesCorrectReadyBucket(t *testing.T) {
 	if outboxpriority.Bucket(ready.enqueues[0].eventType) != outboxpriority.BucketP0 {
 		t.Fatalf("bucket = %q, want %q", outboxpriority.Bucket(ready.enqueues[0].eventType), outboxpriority.BucketP0)
 	}
+}
+
+type trackingPublisher struct {
+	mu          sync.Mutex
+	inflight    int
+	maxInflight int
+}
+
+func (p *trackingPublisher) Publish(context.Context, event.DomainEvent) error {
+	p.mu.Lock()
+	p.inflight++
+	if p.inflight > p.maxInflight {
+		p.maxInflight = p.inflight
+	}
+	p.mu.Unlock()
+
+	time.Sleep(10 * time.Millisecond)
+
+	p.mu.Lock()
+	p.inflight--
+	p.mu.Unlock()
+	return nil
+}
+
+func (p *trackingPublisher) PublishAll(ctx context.Context, events []event.DomainEvent) error {
+	for _, evt := range events {
+		if err := p.Publish(ctx, evt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type blockingThirdPublisher struct {
+	mu             sync.Mutex
+	blockEventType string
+	blocked        chan struct{}
+	release        chan struct{}
+	blockedOnce    bool
+}
+
+func (p *blockingThirdPublisher) Publish(ctx context.Context, evt event.DomainEvent) error {
+	p.mu.Lock()
+	shouldBlock := evt.EventType() == p.blockEventType && !p.blockedOnce
+	if shouldBlock {
+		p.blockedOnce = true
+	}
+	p.mu.Unlock()
+	if shouldBlock {
+		close(p.blocked)
+		select {
+		case <-p.release:
+		case <-ctx.Done():
+			return ctx.Err()
+		}
+	}
+	return nil
+}
+
+func (p *blockingThirdPublisher) PublishAll(ctx context.Context, events []event.DomainEvent) error {
+	for _, evt := range events {
+		if err := p.Publish(ctx, evt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+type blockingMarkStore struct {
+	fakeOutboxStore
+	mu               sync.Mutex
+	marked           chan struct{}
+	publishedBatches [][]string
+}
+
+func newBlockingMarkStore(pending []PendingOutboxEvent) *blockingMarkStore {
+	return &blockingMarkStore{
+		fakeOutboxStore: fakeOutboxStore{pending: pending},
+		marked:          make(chan struct{}, 1),
+	}
+}
+
+func (s *blockingMarkStore) MarkEventsPublished(_ context.Context, eventIDs []string, _ time.Time) error {
+	s.mu.Lock()
+	s.publishedBatches = append(s.publishedBatches, append([]string(nil), eventIDs...))
+	s.mu.Unlock()
+	select {
+	case s.marked <- struct{}{}:
+	default:
+	}
+	return s.markPublishedErr
+}
+
+func (s *blockingMarkStore) MarkEventsFailed(_ context.Context, failures []outboxport.FailedMark, _ time.Time) error {
+	for _, failure := range failures {
+		s.failed = append(s.failed, failure.EventID)
+	}
+	return s.markFailedErr
 }
 
 func pendingEvent(eventID, eventType string) PendingOutboxEvent {

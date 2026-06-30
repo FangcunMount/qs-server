@@ -36,7 +36,9 @@ type Host interface {
 	MongoLimiter() backpressure.Acquirer
 
 	OutboxRelayMongoBatchSize() int
+	OutboxRelayMongoPublishWorkers() int
 	OutboxRelayAssessmentBatchSize() int
+	OutboxRelayAssessmentPublishWorkers() int
 	PlanEntryBaseURL() string
 	StatisticsRepairWindowDays() int
 	ReportStatusConfig() reportstatus.Config

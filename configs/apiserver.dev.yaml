@@ -360,9 +360,11 @@ outbox_relay:
   mongo:
     interval: "500ms"
     batch_size: 300
+    publish_workers: 8
   assessment:
     interval: "2s"
     batch_size: 50
+    publish_workers: 8
 
 statistics_sync:
   enable: true

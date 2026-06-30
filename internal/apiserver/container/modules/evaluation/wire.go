@@ -29,30 +29,31 @@ import (
 
 // WireInput carries composition-root inputs for evaluation module installation.
 type WireInput struct {
-	MySQLDB                        *gorm.DB
-	MongoDB                        *mongo.Database
-	EventPublisher                 event.EventPublisher
-	RedisClient                    redis.UniversalClient
-	CacheBuilder                   *keyspace.Builder
-	QueryRedisClient               redis.UniversalClient
-	QueryCacheBuilder              *keyspace.Builder
-	MetaRedisClient                redis.UniversalClient
-	AssessmentPolicy               cachepolicy.CachePolicy
-	AssessmentListPolicy           cachepolicy.CachePolicy
-	DisableEvaluationCache         bool
-	Observer                       *observability.ComponentObserver
-	TopicResolver                  eventcatalog.TopicResolver
-	MySQLLimiter                   backpressure.Acquirer
-	MongoLimiter                   backpressure.Acquirer
-	AssessmentOutboxRelayBatchSize int
-	TesteeAccessChecker            assessment.TesteeAccessChecker
-	OpsHandle                      *cacheplane.Handle
-	ReportStatusConfig             reportstatus.Config
-	ScaleInfra                     *surveymod.ScaleInfra
-	RuleSetCatalog                 rulesetport.RuleSetCatalog
-	ModelDescriptors               []evaldomain.ModelDescriptor
-	TypologyRegistry               typologyEvaluation.ModuleRegistry
-	ReportPorts                    compose.ReportIntegrationPorts
+	MySQLDB                             *gorm.DB
+	MongoDB                             *mongo.Database
+	EventPublisher                      event.EventPublisher
+	RedisClient                         redis.UniversalClient
+	CacheBuilder                        *keyspace.Builder
+	QueryRedisClient                    redis.UniversalClient
+	QueryCacheBuilder                   *keyspace.Builder
+	MetaRedisClient                     redis.UniversalClient
+	AssessmentPolicy                    cachepolicy.CachePolicy
+	AssessmentListPolicy                cachepolicy.CachePolicy
+	DisableEvaluationCache              bool
+	Observer                            *observability.ComponentObserver
+	TopicResolver                       eventcatalog.TopicResolver
+	MySQLLimiter                        backpressure.Acquirer
+	MongoLimiter                        backpressure.Acquirer
+	AssessmentOutboxRelayBatchSize      int
+	AssessmentOutboxRelayPublishWorkers int
+	TesteeAccessChecker                 assessment.TesteeAccessChecker
+	OpsHandle                           *cacheplane.Handle
+	ReportStatusConfig                  reportstatus.Config
+	ScaleInfra                          *surveymod.ScaleInfra
+	RuleSetCatalog                      rulesetport.RuleSetCatalog
+	ModelDescriptors                    []evaldomain.ModelDescriptor
+	TypologyRegistry                    typologyEvaluation.ModuleRegistry
+	ReportPorts                         compose.ReportIntegrationPorts
 }
 
 // WireResult carries evaluation module and shared catalog side effects.
@@ -146,34 +147,35 @@ func Wire(in WireInput) (WireResult, error) {
 	}
 
 	module, err := Bootstrap(BootstrapInput{
-		MySQLDB:                        in.MySQLDB,
-		MongoDB:                        in.MongoDB,
-		InputResolver:                  inputResolver,
-		ScaleCatalog:                   scaleCatalog,
-		EventPublisher:                 in.EventPublisher,
-		RedisClient:                    redisClient,
-		CacheBuilder:                   in.CacheBuilder,
-		AssessmentPolicy:               in.AssessmentPolicy,
-		QueryRedisClient:               queryRedisClient,
-		QueryCacheBuilder:              in.QueryCacheBuilder,
-		AssessmentListPolicy:           in.AssessmentListPolicy,
-		VersionStore:                   versionStore,
-		Observer:                       in.Observer,
-		TopicResolver:                  in.TopicResolver,
-		MySQLLimiter:                   in.MySQLLimiter,
-		MongoLimiter:                   in.MongoLimiter,
-		AssessmentOutboxRelayBatchSize: in.AssessmentOutboxRelayBatchSize,
-		TesteeAccessChecker:            in.TesteeAccessChecker,
-		OpsHandle:                      in.OpsHandle,
-		ReportStatusConfig:             in.ReportStatusConfig,
-		ModelDescriptors:               modelDescriptors,
-		TypologyRegistry:               in.TypologyRegistry,
-		ReportReader:                   in.ReportPorts.Reader,
-		ReportBuilderRegistry:          in.ReportPorts.BuilderRegistry,
-		ReportDurableSaver:             in.ReportPorts.DurableSaver,
-		PostCommitReadyIndexer:         in.ReportPorts.PostCommitReadyIndexer,
-		OutboxReadyIndex:               in.ReportPorts.ReadyIndex,
-		PublishedModelReader:           publishedModelReader,
+		MySQLDB:                             in.MySQLDB,
+		MongoDB:                             in.MongoDB,
+		InputResolver:                       inputResolver,
+		ScaleCatalog:                        scaleCatalog,
+		EventPublisher:                      in.EventPublisher,
+		RedisClient:                         redisClient,
+		CacheBuilder:                        in.CacheBuilder,
+		AssessmentPolicy:                    in.AssessmentPolicy,
+		QueryRedisClient:                    queryRedisClient,
+		QueryCacheBuilder:                   in.QueryCacheBuilder,
+		AssessmentListPolicy:                in.AssessmentListPolicy,
+		VersionStore:                        versionStore,
+		Observer:                            in.Observer,
+		TopicResolver:                       in.TopicResolver,
+		MySQLLimiter:                        in.MySQLLimiter,
+		MongoLimiter:                        in.MongoLimiter,
+		AssessmentOutboxRelayBatchSize:      in.AssessmentOutboxRelayBatchSize,
+		AssessmentOutboxRelayPublishWorkers: in.AssessmentOutboxRelayPublishWorkers,
+		TesteeAccessChecker:                 in.TesteeAccessChecker,
+		OpsHandle:                           in.OpsHandle,
+		ReportStatusConfig:                  in.ReportStatusConfig,
+		ModelDescriptors:                    modelDescriptors,
+		TypologyRegistry:                    in.TypologyRegistry,
+		ReportReader:                        in.ReportPorts.Reader,
+		ReportBuilderRegistry:               in.ReportPorts.BuilderRegistry,
+		ReportDurableSaver:                  in.ReportPorts.DurableSaver,
+		PostCommitReadyIndexer:              in.ReportPorts.PostCommitReadyIndexer,
+		OutboxReadyIndex:                    in.ReportPorts.ReadyIndex,
+		PublishedModelReader:                publishedModelReader,
 	})
 	if err != nil {
 		return WireResult{}, err

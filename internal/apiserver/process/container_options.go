@@ -50,9 +50,11 @@ func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOut
 	options := container.ContainerOutboxRelayOptions{}
 	if cfg.OutboxRelay.Mongo != nil {
 		options.MongoBatchSize = cfg.OutboxRelay.Mongo.BatchSize
+		options.MongoPublishWorkers = cfg.OutboxRelay.Mongo.PublishWorkers
 	}
 	if cfg.OutboxRelay.Assessment != nil {
 		options.AssessmentBatchSize = cfg.OutboxRelay.Assessment.BatchSize
+		options.AssessmentPublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
 	}
 	return options
 }

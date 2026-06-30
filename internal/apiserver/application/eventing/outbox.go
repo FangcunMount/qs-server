@@ -18,6 +18,7 @@ const (
 	defaultOutboxRelayBatchSize  = 50
 	defaultOutboxRelayRetryDelay = outboxcore.DefaultRelayRetryDelay
 	defaultOutboxPublishWorkers  = 8
+	maxPublishedMarkBatchSize    = 100
 )
 
 // PendingOutboxEvent keeps the application-facing alias for the shared outbox contract.
@@ -183,7 +184,48 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 	}
 
 	l := logger.L(ctx)
+	results := r.publishDueEvents(ctx, l, pendingEvents)
+	failures := make([]outboxport.FailedMark, 0)
+	published := newPublishedMarker(ctx, l, r)
 
+	for result := range results {
+		if result.published {
+			if r.readyIndex != nil {
+				_ = r.readyIndex.Remove(ctx, eventTypeOf(result.pending), result.pending.EventID)
+			}
+			published.add(result.pending)
+			continue
+		}
+		if result.err != nil {
+			failures = append(failures, outboxport.FailedMark{
+				EventID:   result.pending.EventID,
+				EventType: eventTypeOf(result.pending),
+				LastError: result.err.Error(),
+			})
+		}
+	}
+	published.flush()
+
+	now = time.Now()
+	retryAt := now.Add(r.retryDelay)
+	if r.batchPublisher != nil && len(failures) > 0 {
+		_ = r.batchPublisher.MarkEventsFailed(ctx, failures, retryAt)
+		for _, failure := range failures {
+			r.observe(ctx, "", "", eventobservability.OutboxOutcomePublishFailed)
+			if r.readyIndex != nil {
+				_ = r.readyIndex.Enqueue(ctx, failure.EventType, failure.EventID, retryAt)
+			}
+		}
+	} else {
+		for _, failure := range failures {
+			r.markEventFailed(ctx, l, pendingEventForFailure(failure), fmt.Errorf("%s", failure.LastError))
+		}
+	}
+
+	return nil
+}
+
+func (r *outboxRelay) publishDueEvents(ctx context.Context, l *logger.RequestLogger, pendingEvents []PendingOutboxEvent) <-chan relayPublishResult {
 	workers := r.publishWorkers
 	if workers <= 0 {
 		workers = 1
@@ -201,80 +243,88 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 			results <- r.publishOne(ctx, l, item)
 		}(pending)
 	}
-	wg.Wait()
-	close(results)
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+	return results
+}
 
-	publishedIDs := make([]string, 0, len(pendingEvents))
-	failures := make([]outboxport.FailedMark, 0)
-	for result := range results {
-		if result.published {
-			publishedIDs = append(publishedIDs, result.pending.EventID)
-			if r.readyIndex != nil {
-				_ = r.readyIndex.Remove(ctx, eventTypeOf(result.pending), result.pending.EventID)
-			}
+type publishedMarker struct {
+	ctx     context.Context
+	log     *logger.RequestLogger
+	relay   *outboxRelay
+	pending []PendingOutboxEvent
+	limit   int
+}
+
+func newPublishedMarker(ctx context.Context, l *logger.RequestLogger, relay *outboxRelay) *publishedMarker {
+	limit := relay.publishWorkers
+	if limit <= 0 {
+		limit = 1
+	}
+	if limit > maxPublishedMarkBatchSize {
+		limit = maxPublishedMarkBatchSize
+	}
+	return &publishedMarker{
+		ctx:   ctx,
+		log:   l,
+		relay: relay,
+		limit: limit,
+	}
+}
+
+func (m *publishedMarker) add(pending PendingOutboxEvent) {
+	m.pending = append(m.pending, pending)
+	if len(m.pending) >= m.limit {
+		m.flush()
+	}
+}
+
+func (m *publishedMarker) flush() {
+	if m == nil || len(m.pending) == 0 {
+		return
+	}
+	batch := m.pending
+	m.pending = nil
+	now := time.Now()
+	if m.relay.batchPublisher != nil {
+		m.markBatch(batch, now)
+		return
+	}
+	m.markOneByOne(batch, now)
+}
+
+func (m *publishedMarker) markBatch(batch []PendingOutboxEvent, now time.Time) {
+	eventIDs := make([]string, 0, len(batch))
+	for _, pending := range batch {
+		eventIDs = append(eventIDs, pending.EventID)
+	}
+	if err := m.relay.batchPublisher.MarkEventsPublished(m.ctx, eventIDs, now); err != nil {
+		for _, pending := range batch {
+			m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomeMarkPublishedFailed)
+			m.log.Errorw("outbox batch mark published failed",
+				"relay", m.relay.name,
+				"event_id", pending.EventID,
+				"error", err.Error(),
+			)
+		}
+		return
+	}
+	for _, pending := range batch {
+		m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomePublished)
+	}
+}
+
+func (m *publishedMarker) markOneByOne(batch []PendingOutboxEvent, now time.Time) {
+	for _, pending := range batch {
+		if err := m.relay.store.MarkEventPublished(m.ctx, pending.EventID, now); err != nil {
+			m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomeMarkPublishedFailed)
+			m.log.Errorw("outbox mark published failed", "relay", m.relay.name, "event_id", pending.EventID, "error", err.Error())
 			continue
 		}
-		if result.err != nil {
-			failures = append(failures, outboxport.FailedMark{
-				EventID:   result.pending.EventID,
-				EventType: eventTypeOf(result.pending),
-				LastError: result.err.Error(),
-			})
-		}
+		m.relay.observe(m.ctx, "", eventTypeOf(pending), eventobservability.OutboxOutcomePublished)
 	}
-
-	now = time.Now()
-	if r.batchPublisher != nil && len(publishedIDs) > 0 {
-		if err := r.batchPublisher.MarkEventsPublished(ctx, publishedIDs, now); err != nil {
-			for _, eventID := range publishedIDs {
-				r.observe(ctx, "", "", eventobservability.OutboxOutcomeMarkPublishedFailed)
-				l.Errorw("outbox batch mark published failed",
-					"relay", r.name,
-					"event_id", eventID,
-					"error", err.Error(),
-				)
-			}
-		} else {
-			for _, pending := range pendingEvents {
-				for _, eventID := range publishedIDs {
-					if pending.EventID == eventID {
-						r.observe(ctx, "", pending.Event.EventType(), eventobservability.OutboxOutcomePublished)
-					}
-				}
-			}
-		}
-	} else {
-		for _, pending := range pendingEvents {
-			for _, eventID := range publishedIDs {
-				if pending.EventID != eventID {
-					continue
-				}
-				if err := r.store.MarkEventPublished(ctx, eventID, now); err != nil {
-					r.observe(ctx, "", pending.Event.EventType(), eventobservability.OutboxOutcomeMarkPublishedFailed)
-					l.Errorw("outbox mark published failed", "relay", r.name, "event_id", eventID, "error", err.Error())
-					continue
-				}
-				r.observe(ctx, "", pending.Event.EventType(), eventobservability.OutboxOutcomePublished)
-			}
-		}
-	}
-
-	retryAt := now.Add(r.retryDelay)
-	if r.batchPublisher != nil && len(failures) > 0 {
-		_ = r.batchPublisher.MarkEventsFailed(ctx, failures, retryAt)
-		for _, failure := range failures {
-			r.observe(ctx, "", "", eventobservability.OutboxOutcomePublishFailed)
-			if r.readyIndex != nil {
-				_ = r.readyIndex.Enqueue(ctx, failure.EventType, failure.EventID, retryAt)
-			}
-		}
-	} else {
-		for _, failure := range failures {
-			r.markEventFailed(ctx, l, pendingEventForFailure(failure), fmt.Errorf("%s", failure.LastError))
-		}
-	}
-
-	return nil
 }
 
 func (r *outboxRelay) claimDueEvents(ctx context.Context, now time.Time) ([]PendingOutboxEvent, error) {

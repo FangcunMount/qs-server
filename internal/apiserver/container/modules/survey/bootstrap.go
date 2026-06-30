@@ -19,21 +19,22 @@ import (
 
 // BootstrapInput carries container integration inputs for survey module bootstrap.
 type BootstrapInput struct {
-	MongoDB              *mongo.Database
-	EventPublisher       event.EventPublisher
-	RankRedisClient      redis.UniversalClient
-	RankCacheBuilder     *keyspace.Builder
-	IdentityService      *iam.IdentityService
-	HotsetRecorder       cachetarget.HotsetRecorder
-	TopicResolver        eventcatalog.TopicResolver
-	ScaleSyncer          quesApp.ScaleQuestionnaireBindingSyncer
-	QuestionnaireRepo    questionnaire.Repository
-	QuestionnaireReader  surveyreadmodel.QuestionnaireReader
-	AnswerSheetRepo      AnswerSheetStore
-	AnswerSheetReader    surveyreadmodel.AnswerSheetReader
-	OutboxRelayBatchSize int
-	CacheSignalNotifier  quesApp.CacheSignalNotifier
-	OpsHandle            *cacheplane.Handle
+	MongoDB                   *mongo.Database
+	EventPublisher            event.EventPublisher
+	RankRedisClient           redis.UniversalClient
+	RankCacheBuilder          *keyspace.Builder
+	IdentityService           *iam.IdentityService
+	HotsetRecorder            cachetarget.HotsetRecorder
+	TopicResolver             eventcatalog.TopicResolver
+	ScaleSyncer               quesApp.ScaleQuestionnaireBindingSyncer
+	QuestionnaireRepo         questionnaire.Repository
+	QuestionnaireReader       surveyreadmodel.QuestionnaireReader
+	AnswerSheetRepo           AnswerSheetStore
+	AnswerSheetReader         surveyreadmodel.AnswerSheetReader
+	OutboxRelayBatchSize      int
+	OutboxRelayPublishWorkers int
+	CacheSignalNotifier       quesApp.CacheSignalNotifier
+	OpsHandle                 *cacheplane.Handle
 }
 
 // Bootstrap assembles the survey module from container integration inputs.
@@ -43,20 +44,21 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 		scaleSyncer = scaleApp.NewQuestionnaireBindingSyncer(nil)
 	}
 	return New(Deps{
-		MongoDB:              in.MongoDB,
-		EventPublisher:       in.EventPublisher,
-		RankRedisClient:      in.RankRedisClient,
-		RankCacheBuilder:     in.RankCacheBuilder,
-		IdentityService:      in.IdentityService,
-		HotsetRecorder:       in.HotsetRecorder,
-		TopicResolver:        in.TopicResolver,
-		ScaleSyncer:          scaleSyncer,
-		QuestionnaireRepo:    in.QuestionnaireRepo,
-		QuestionnaireReader:  in.QuestionnaireReader,
-		AnswerSheetRepo:      in.AnswerSheetRepo,
-		AnswerSheetReader:    in.AnswerSheetReader,
-		OutboxRelayBatchSize: in.OutboxRelayBatchSize,
-		CacheSignalNotifier:  in.CacheSignalNotifier,
-		OpsHandle:            in.OpsHandle,
+		MongoDB:                   in.MongoDB,
+		EventPublisher:            in.EventPublisher,
+		RankRedisClient:           in.RankRedisClient,
+		RankCacheBuilder:          in.RankCacheBuilder,
+		IdentityService:           in.IdentityService,
+		HotsetRecorder:            in.HotsetRecorder,
+		TopicResolver:             in.TopicResolver,
+		ScaleSyncer:               scaleSyncer,
+		QuestionnaireRepo:         in.QuestionnaireRepo,
+		QuestionnaireReader:       in.QuestionnaireReader,
+		AnswerSheetRepo:           in.AnswerSheetRepo,
+		AnswerSheetReader:         in.AnswerSheetReader,
+		OutboxRelayBatchSize:      in.OutboxRelayBatchSize,
+		OutboxRelayPublishWorkers: in.OutboxRelayPublishWorkers,
+		CacheSignalNotifier:       in.CacheSignalNotifier,
+		OpsHandle:                 in.OpsHandle,
 	})
 }

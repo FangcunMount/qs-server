@@ -38,21 +38,22 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the survey module.
 type Deps struct {
-	MongoDB              *mongo.Database
-	EventPublisher       event.EventPublisher
-	RankRedisClient      redis.UniversalClient
-	RankCacheBuilder     *keyspace.Builder
-	IdentityService      *iam.IdentityService
-	HotsetRecorder       cachetarget.HotsetRecorder
-	TopicResolver        eventcatalog.TopicResolver
-	ScaleSyncer          quesApp.ScaleQuestionnaireBindingSyncer
-	QuestionnaireRepo    questionnaire.Repository
-	QuestionnaireReader  surveyreadmodel.QuestionnaireReader
-	AnswerSheetRepo      AnswerSheetStore
-	AnswerSheetReader    surveyreadmodel.AnswerSheetReader
-	OutboxRelayBatchSize int
-	CacheSignalNotifier  quesApp.CacheSignalNotifier
-	OpsHandle            *cacheplane.Handle
+	MongoDB                   *mongo.Database
+	EventPublisher            event.EventPublisher
+	RankRedisClient           redis.UniversalClient
+	RankCacheBuilder          *keyspace.Builder
+	IdentityService           *iam.IdentityService
+	HotsetRecorder            cachetarget.HotsetRecorder
+	TopicResolver             eventcatalog.TopicResolver
+	ScaleSyncer               quesApp.ScaleQuestionnaireBindingSyncer
+	QuestionnaireRepo         questionnaire.Repository
+	QuestionnaireReader       surveyreadmodel.QuestionnaireReader
+	AnswerSheetRepo           AnswerSheetStore
+	AnswerSheetReader         surveyreadmodel.AnswerSheetReader
+	OutboxRelayBatchSize      int
+	OutboxRelayPublishWorkers int
+	CacheSignalNotifier       quesApp.CacheSignalNotifier
+	OpsHandle                 *cacheplane.Handle
 }
 
 // AnswerSheetStore combines answer-sheet persistence and outbox ports.
@@ -115,6 +116,7 @@ func New(deps Deps) (*Module, error) {
 		normalized.AnswerSheetReader,
 		normalized.QuestionnaireRepo,
 		normalized.OutboxRelayBatchSize,
+		normalized.OutboxRelayPublishWorkers,
 		normalized.OpsHandle,
 	); err != nil {
 		return nil, err
@@ -156,7 +158,7 @@ func (m *Module) initQuestionnaireSubModule(identitySvc *iam.IdentityService, ho
 	return nil
 }
 
-func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, opsHandle *cacheplane.Handle) error {
+func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClient redis.UniversalClient, rankCacheBuilder *keyspace.Builder, repo AnswerSheetStore, reader surveyreadmodel.AnswerSheetReader, questionnaireRepo questionnaire.Repository, outboxRelayBatchSize int, outboxRelayPublishWorkers int, opsHandle *cacheplane.Handle) error {
 	sub := m.AnswerSheet
 
 	batchValidator := ruleengineInfra.NewAnswerValidator()
@@ -185,6 +187,7 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClie
 		Store:                   repo,
 		Publisher:               m.eventPublisher,
 		BatchSize:               outboxRelayBatchSize,
+		PublishWorkers:          outboxRelayPublishWorkers,
 		RequireDurablePublisher: true,
 		ReadyIndex:              readyIndex,
 		BeforePublishHooks: []appEventing.OutboxBeforePublishHook{

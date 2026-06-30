@@ -55,7 +55,13 @@ func (c *Container) MongoLimiter() backpressure.Acquirer { return c.backpressure
 
 func (c *Container) OutboxRelayMongoBatchSize() int { return c.outboxRelay.MongoBatchSize }
 
+func (c *Container) OutboxRelayMongoPublishWorkers() int { return c.outboxRelay.MongoPublishWorkers }
+
 func (c *Container) OutboxRelayAssessmentBatchSize() int { return c.outboxRelay.AssessmentBatchSize }
+
+func (c *Container) OutboxRelayAssessmentPublishWorkers() int {
+	return c.outboxRelay.AssessmentPublishWorkers
+}
 
 func (c *Container) PlanEntryBaseURL() string { return c.planEntryURL }
 

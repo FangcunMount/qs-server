@@ -70,34 +70,35 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
-	MySQLDB                        *gorm.DB
-	MongoDB                        *mongo.Database
-	InputResolver                  evaluationinput.Resolver
-	ScaleCatalog                   evaluationinput.ScaleCatalog
-	EventPublisher                 event.EventPublisher
-	RedisClient                    redis.UniversalClient
-	CacheBuilder                   *keyspace.Builder
-	AssessmentPolicy               cachepolicy.CachePolicy
-	QueryRedisClient               redis.UniversalClient
-	QueryCacheBuilder              *keyspace.Builder
-	AssessmentListPolicy           cachepolicy.CachePolicy
-	VersionStore                   cachequery.VersionTokenStore
-	Observer                       *observability.ComponentObserver
-	TopicResolver                  eventcatalog.TopicResolver
-	MySQLLimiter                   backpressure.Acquirer
-	MongoLimiter                   backpressure.Acquirer
-	AssessmentOutboxRelayBatchSize int
-	TesteeAccessChecker            assessmentApp.TesteeAccessChecker
-	OpsHandle                      *cacheplane.Handle
-	ReportStatusConfig             reportstatus.Config
-	ModelDescriptors               []evaldomain.ModelDescriptor
-	TypologyRegistry               typologyEvaluation.ModuleRegistry
-	ReportReader                   evaluationreadmodel.ReportReader
-	ReportBuilderRegistry          evaluationResult.ReportBuilderRegistry
-	ReportDurableSaver             evaluationResult.ReportDurableSaver
-	PostCommitReadyIndexer         *appEventing.PostCommitReadyIndexer
-	OutboxReadyIndex               *outboxready.Index
-	PublishedModelReader           rulesetport.PublishedModelReader
+	MySQLDB                             *gorm.DB
+	MongoDB                             *mongo.Database
+	InputResolver                       evaluationinput.Resolver
+	ScaleCatalog                        evaluationinput.ScaleCatalog
+	EventPublisher                      event.EventPublisher
+	RedisClient                         redis.UniversalClient
+	CacheBuilder                        *keyspace.Builder
+	AssessmentPolicy                    cachepolicy.CachePolicy
+	QueryRedisClient                    redis.UniversalClient
+	QueryCacheBuilder                   *keyspace.Builder
+	AssessmentListPolicy                cachepolicy.CachePolicy
+	VersionStore                        cachequery.VersionTokenStore
+	Observer                            *observability.ComponentObserver
+	TopicResolver                       eventcatalog.TopicResolver
+	MySQLLimiter                        backpressure.Acquirer
+	MongoLimiter                        backpressure.Acquirer
+	AssessmentOutboxRelayBatchSize      int
+	AssessmentOutboxRelayPublishWorkers int
+	TesteeAccessChecker                 assessmentApp.TesteeAccessChecker
+	OpsHandle                           *cacheplane.Handle
+	ReportStatusConfig                  reportstatus.Config
+	ModelDescriptors                    []evaldomain.ModelDescriptor
+	TypologyRegistry                    typologyEvaluation.ModuleRegistry
+	ReportReader                        evaluationreadmodel.ReportReader
+	ReportBuilderRegistry               evaluationResult.ReportBuilderRegistry
+	ReportDurableSaver                  evaluationResult.ReportDurableSaver
+	PostCommitReadyIndexer              *appEventing.PostCommitReadyIndexer
+	OutboxReadyIndex                    *outboxready.Index
+	PublishedModelReader                rulesetport.PublishedModelReader
 }
 
 // New assembles the evaluation module.
@@ -170,6 +171,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 		Store:                   assessmentOutboxStore,
 		Publisher:               normalized.EventPublisher,
 		BatchSize:               normalized.AssessmentOutboxRelayBatchSize,
+		PublishWorkers:          normalized.AssessmentOutboxRelayPublishWorkers,
 		RequireDurablePublisher: true,
 		ReadyIndex:              normalized.OutboxReadyIndex,
 	})
