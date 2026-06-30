@@ -112,7 +112,7 @@ COLOR_RED := \033[31m
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced
-.PHONY: perf-mixed140 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed240 perf-mixed280 perf-mixed300 perf-mixed300probe
+.PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed240 perf-mixed280 perf-mixed300 perf-mixed300probe
 .PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-verify
 
@@ -249,6 +249,10 @@ perf-pretest120-balanced: perf-preflight ## k6 pretest_120 混合降读压：32/
 perf-mixed140: perf-preflight ## k6 mixed_140 升档 (5min)
 	@mkdir -p $(PERF_DIR)/mixed140
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_140 SUMMARY_EXPORT=$(PERF_DIR)/mixed140/k6-summary.json
+
+perf-mixed140-submit24: perf-preflight ## k6 mixed_140 读压升档 + submit=24 (5min)
+	@mkdir -p $(PERF_DIR)/mixed140-submit24
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_140_submit24 SUMMARY_EXPORT=$(PERF_DIR)/mixed140-submit24/k6-summary.json
 
 perf-mixed160: perf-preflight ## k6 mixed_160 升档 (5min)
 	@mkdir -p $(PERF_DIR)/mixed160

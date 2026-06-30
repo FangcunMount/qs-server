@@ -12,7 +12,7 @@
 | **脚本入口** | `scripts/perf/k6/mixed.js`（`k6-mixed-300qps.js` 为兼容 shim） |
 | **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
 | 三类目标 | **前台读写**（model query/submit/wait-report）；**异步 SLA**（`async_chain_probe_*`）；**后台排水**（`perf-outbox120` + DB snapshot） |
-| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_140`…`mixed_280` → `mixed_300` / `mixed_300_models`，每档通过再升 |
+| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_140_submit24`（或 `mixed_140`）→ `mixed_160`…`mixed_280` → `mixed_300` / `mixed_300_models`，每档通过再升 |
 | 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
 | 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
 | 验收 | K6 HTTP + chain probe SLA **且**（outbox/scanner 场景）压测前后 DB snapshot 不堆积；**优化后** outbox 可在压测结束后数分钟内消化，与 HTTP 429 可并存 |
@@ -70,9 +70,10 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `smoke_4` | 4 | 1/1/1/1 | 30s | 连通性、setup 自动发现 |
 | `pretest_60` | 60 | 24/12/18/6 | 3m | **第一档正式预压** |
 | `pretest_120` | 120 | 48/24/36/12 | 5m | 观察限流与资源曲线 |
-| `pretest_120_submit_only` | 24 | 0/24/0/0 | 5m | 隔离 submit；2026-06-30 实测 99.05% |
-| `pretest_120_balanced` | 92 | 32/24/24/12 | 5m | 混合降读压，争用缓解后复测 |
+| `pretest_120_submit_only` | 24 | 0/24/0/0 | 5m | 隔离 submit |
+| `pretest_120_balanced` | 92 | 32/24/24/12 | 5m | 混合降读压验收档 |
 | `mixed_140` | 140 | 56/28/42/14 | 5m | 120→300 细粒度升档 |
+| `mixed_140_submit24` | 136 | 56/24/42/14 | 5m | 读/report 按 140 升档，submit 封顶 24/s |
 | `mixed_160` | 160 | 64/32/48/16 | 5m | 同上 |
 | `mixed_180` | 180 | 72/36/54/18 | 5m | 同上 |
 | `mixed_200` | 200 | 80/40/60/20 | 5m | 接近 prod 保守基线 |
@@ -110,10 +111,12 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 | 档位 | HTTP 结论 | outbox 排水 | 备注 |
 | ---- | --------- | ----------- | ---- |
 | `pretest_60` | **通过**：submit 100%，p95≈184ms | 脚本结束前后基本消化完 | 稳态 submit≈12/s |
-| `pretest_120` | **未过阈值**：submit 96.2%，`http_429`=248 | **3 分钟内消化完** | 瓶颈：混合读压 + collection 429 |
-| `pretest_120_submit_only` | **99.05%**，68×429，p95≈254ms | 待观测 | 争用剥离后 submit 链路基本达标 |
+| `pretest_120_balanced` | **通过**：100%，0×429 | — | 92QPS 混合（32/24/24/12） |
+| `pretest_120` | **通过**：100%，0×429，submit p95≈192ms | 待观测 | 调优后全量 120QPS 混合已过线 |
+| `mixed_140` | **未通过**：submit 90.4%，806×429 | — | submit 28/s 超当前同步吞吐（有效 ~24/s）；读/report 仍稳 |
+| `mixed_140_submit24` | 待测 | — | 验证 56/42/14 读压下 submit 24/s 是否仍 100% |
 
-`pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。
+`pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。`mixed_140` 仅 submit 超容量时，先跑 `mixed_140_submit24` 分离读压与 submit 上限。
 
 **wait-report VU sizing**：`wait-report` 是长轮询接口，`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
 
@@ -213,6 +216,7 @@ make perf-pretest120        # pretest_120
 make perf-pretest120-submit-only  # 仅 submit=24QPS 隔离复测
 make perf-pretest120-balanced     # 混合降读压 32/24/24/12
 make perf-mixed140          # mixed_140
+make perf-mixed140-submit24 # mixed_140 读压 + submit=24
 make perf-mixed160          # mixed_160
 make perf-mixed180          # mixed_180
 make perf-mixed200          # mixed_200
@@ -418,6 +422,7 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size/publish_workers`、主链路事件 pending/publishing 与 Mongo 慢查询 |
 | pretest120 collection 大量 429、`submit queue full`，apiserver Mongo `idle connections: 0` | immediate 无上限 goroutine + `publish_workers=128` 与业务读抢 Mongo 连接池 | 降 `publish_workers`（48）、设 `immediate_max_concurrent`（16）；`backpressure.mongo.max_inflight`≤80；outbox Store 走 limiter；`published_assessment_models` 加 Redis 缓存；immediate 仅 `answersheet.submitted` |
 | 优化后 outbox 3min 内消化，但 pretest120 submit≈96%、`http_429`≈250、questionnaire 读超时 | collection submit 队列背压 + 48/s 问卷读压饱和（apiserver 侧 Mongo 争用已缓解） | 部署 collection `worker_count=32, queue_size=1600`；跑 `pretest_120_balanced`（32/24/24/12）；隔离 submit 见 `pretest_120_submit_only` |
+| `mixed_140` submit≈90%、806×429，questionnaire/report 几乎全绿 | submit 28/s 超过当前同步吞吐（~24/s），非读压或 outbox | 上调 collection `worker_count=40, queue_size=2000` 后复测 `mixed_140`；仍不足则查 apiserver 或再试 `mixed_140_submit24` |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
@@ -482,9 +487,11 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 
 | 档位 | 总 QPS | http_req_failed | http_5xx | http_401 | http_429 | P95 | 结论 |
 | ---- | ---: | ---: | ---: | ---: | ---: | ---: | ---- |
-| pretest_60 | 60 | 0% | 0 | 0 | 0 | submit p95≈184ms | **通过**（2026-06-30）；outbox 随脚本结束 |
-| pretest_120 | 120 | 1.48% | — | — | 248 | submit p95≈6s | **未过**（2026-06-30）；outbox 3min 内消化；主因 429+读超时 |
-| mixed_140 | 140 | | | | | | |
+| pretest_60 | 60 | 0% | 0 | 0 | 0 | submit p95≈184ms | **通过**（2026-06-30） |
+| pretest_120_balanced | 92 | 0% | 0 | 0 | 0 | submit p95≈250ms | **通过**（2026-06-30） |
+| pretest_120 | 120 | 0% | 0 | 0 | 0 | submit p95≈192ms | **通过**（2026-06-30，worker32+apiserver优化后） |
+| mixed_140 | 140 | 1.92% | 0 | 0 | 806 | submit p95≈933ms | **未通过**（2026-06-30，submit 28/s 超容量） |
+| mixed_140_submit24 | 136 | | | | | | |
 | mixed_160 | 160 | | | | | | |
 | mixed_180 | 180 | | | | | | |
 | mixed_200 | 200 | | | | | | |

@@ -212,6 +212,39 @@
         }
       }
     },
+    "mixed_140_submit24": {
+      "duration": "5m",
+      "description": "mixed_140 读/report 升档 + submit 封顶 24/s（总 136QPS），验证高读压下 submit 稳态上限",
+      "qps": {
+        "query": 56,
+        "submit": 24,
+        "report": 42,
+        "stats": 14,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 130,
+          "max": 620
+        },
+        "submit": {
+          "preAllocated": 180,
+          "max": 1000
+        },
+        "report": {
+          "preAllocated": 260,
+          "max": 540
+        },
+        "stats": {
+          "preAllocated": 85,
+          "max": 410
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
     "mixed_160": {
       "duration": "5m",
       "qps": {
