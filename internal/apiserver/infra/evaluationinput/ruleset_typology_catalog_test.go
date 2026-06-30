@@ -11,6 +11,74 @@ import (
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
+func TestRuleSetTypologyCatalogLookupBigFiveWithoutAlgorithm(t *testing.T) {
+	payload := &modeltypology.Payload{
+		Code:      "BIG5_IPIP_50",
+		Version:   "1.0.0",
+		Algorithm: domain.AlgorithmBigFive,
+		Status:    "published",
+	}
+	payloadBytes, format, err := codec.EncodeTypology(payload)
+	if err != nil {
+		t.Fatalf("EncodeTypology: %v", err)
+	}
+	reader := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
+		PayloadFormat: format,
+		Definition: domain.RuleSetDefinition{
+			Kind:    domain.KindPersonality,
+			Code:    payload.Code,
+			Version: payload.Version,
+		},
+		Payload: payloadBytes,
+	}}
+	catalog := NewRuleSetTypologyCatalog(reader)
+	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
+		Kind:    port.EvaluationModelKindPersonality,
+		Code:    payload.Code,
+		Version: payload.Version,
+	})
+	if err != nil {
+		t.Fatalf("GetTypologyModelByRef: %v", err)
+	}
+	if got.Algorithm != domain.AlgorithmBigFive {
+		t.Fatalf("Algorithm = %s, want bigfive", got.Algorithm)
+	}
+}
+
+func TestRuleSetTypologyCatalogLookupWithoutAlgorithm(t *testing.T) {
+	payload := &modeltypology.Payload{
+		Code:      "ENNEAGRAM_45",
+		Version:   "1.0.0",
+		Algorithm: domain.AlgorithmPersonalityTypology,
+		Status:    "published",
+	}
+	payloadBytes, format, err := codec.EncodeTypology(payload)
+	if err != nil {
+		t.Fatalf("EncodeTypology: %v", err)
+	}
+	reader := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
+		PayloadFormat: format,
+		Definition: domain.RuleSetDefinition{
+			Kind:    domain.KindPersonality,
+			Code:    payload.Code,
+			Version: payload.Version,
+		},
+		Payload: payloadBytes,
+	}}
+	catalog := NewRuleSetTypologyCatalog(reader)
+	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
+		Kind:    port.EvaluationModelKindPersonality,
+		Code:    payload.Code,
+		Version: payload.Version,
+	})
+	if err != nil {
+		t.Fatalf("GetTypologyModelByRef: %v", err)
+	}
+	if got.Algorithm != domain.AlgorithmPersonalityTypology {
+		t.Fatalf("Algorithm = %s, want personality_typology", got.Algorithm)
+	}
+}
+
 func TestRuleSetTypologyCatalogDecodesV2BigFivePayload(t *testing.T) {
 	payload := &modeltypology.Payload{
 		Code:      "BIGFIVE_V1",

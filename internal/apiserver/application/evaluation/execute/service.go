@@ -203,11 +203,19 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 
 // resolveEvaluatorKey 解析 v2 评估执行键。
 func resolveEvaluatorKey(a *assessment.Assessment, input *evaluationinput.InputSnapshot) evaluation.EvaluatorKey {
+	if input != nil && input.Model != nil {
+		inputKey := input.Model.ModelRef().EvaluatorKey()
+		if a == nil || a.EvaluationModelRef() == nil || a.EvaluationModelRef().IsEmpty() {
+			return inputKey
+		}
+		assessmentKey := a.EvaluationModelRef().EvaluatorKey()
+		if assessmentKey.Algorithm == "" && inputKey.Algorithm != "" {
+			return inputKey
+		}
+		return assessmentKey
+	}
 	if a != nil && a.EvaluationModelRef() != nil && !a.EvaluationModelRef().IsEmpty() {
 		return a.EvaluationModelRef().EvaluatorKey()
-	}
-	if input != nil && input.Model != nil {
-		return input.Model.ModelRef().EvaluatorKey()
 	}
 	return evaluation.EvaluatorKey{}
 }

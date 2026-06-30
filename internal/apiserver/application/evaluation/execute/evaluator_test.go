@@ -9,8 +9,11 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 type evaluatorStub struct {
@@ -87,6 +90,39 @@ func TestEvaluatorRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
 	}
 	if got.Key() != evaluation.EvaluatorKeyPersonalityTypology {
 		t.Fatalf("resolved key = %s, want configured typology", got.Key())
+	}
+}
+
+func TestResolveEvaluatorKeyPrefersInputAlgorithmWhenAssessmentMissing(t *testing.T) {
+	modelRef := assessment.NewEvaluationModelRefByCode(
+		assessment.EvaluationModelKindPersonality,
+		meta.NewCode("BIG5_IPIP_50"),
+		"1.0.0",
+		"大五人格",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		meta.FromUint64(2001),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("BIG5_IPIP_50"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(5001)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	input := &evaluationinput.InputSnapshot{
+		Model: evaluationinput.NewTypologyModelSnapshot(&modeltypology.Payload{
+			Code:      "BIG5_IPIP_50",
+			Version:   "1.0.0",
+			Algorithm: assessmentmodel.AlgorithmBigFive,
+			Status:    "published",
+		}),
+	}
+	got := resolveEvaluatorKey(a, input)
+	want := evaluation.EvaluatorKeyBigFive
+	if got != want {
+		t.Fatalf("resolveEvaluatorKey() = %s, want %s", got, want)
 	}
 }
 

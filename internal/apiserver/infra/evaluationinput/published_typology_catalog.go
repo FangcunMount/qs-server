@@ -35,20 +35,17 @@ func (c PublishedTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref
 		return nil, domain.ErrVersionRequired
 	}
 	algorithm := resolveTypologyAlgorithm(ref)
-	if algorithm == "" {
-		return nil, fmt.Errorf("typology algorithm is required")
-	}
-	v2Ref := rulesetport.Ref{
-		Kind:      domain.KindPersonality,
-		SubKind:   domain.SubKindTypology,
-		Algorithm: algorithm,
-		Code:      ref.Code,
-		Version:   ref.Version,
-	}
-	if payload, err := c.decodePublishedModelRef(ctx, v2Ref); err == nil {
-		return assertTypologyAlgorithm(payload, algorithm)
-	} else if !domain.IsNotFound(err) {
-		return nil, err
+	for _, v2Ref := range typologyLookupRefs(ref, algorithm) {
+		payload, err := c.decodePublishedModelRef(ctx, v2Ref)
+		if err == nil {
+			if algorithm != "" {
+				return assertTypologyAlgorithm(payload, algorithm)
+			}
+			return payload, nil
+		}
+		if !domain.IsNotFound(err) {
+			return nil, err
+		}
 	}
 	return c.fallback.GetTypologyModelByRef(ctx, ref)
 }

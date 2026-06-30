@@ -27,21 +27,22 @@ func (c RuleSetTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref p
 		return nil, domain.ErrVersionRequired
 	}
 	algorithm := resolveTypologyAlgorithm(ref)
-	if algorithm == "" {
-		return nil, fmt.Errorf("typology algorithm is required")
+
+	for _, v2Ref := range typologyLookupRefs(ref, algorithm) {
+		payload, err := c.decodePublishedRef(ctx, v2Ref)
+		if err == nil {
+			if algorithm != "" {
+				return assertTypologyAlgorithm(payload, algorithm)
+			}
+			return payload, nil
+		}
+		if !domain.IsNotFound(err) {
+			return nil, err
+		}
 	}
 
-	v2Ref := rulesetport.Ref{
-		Kind:      domain.KindPersonality,
-		SubKind:   domain.SubKindTypology,
-		Algorithm: algorithm,
-		Code:      ref.Code,
-		Version:   ref.Version,
-	}
-	if payload, err := c.decodePublishedRef(ctx, v2Ref); err == nil {
-		return assertTypologyAlgorithm(payload, algorithm)
-	} else if !domain.IsNotFound(err) {
-		return nil, err
+	if algorithm == "" {
+		return nil, domain.ErrNotFound
 	}
 
 	if legacyKind := legacyKindForAlgorithm(algorithm); legacyKind != "" {
@@ -86,6 +87,41 @@ func resolveTypologyAlgorithm(ref port.ModelRef) domain.Algorithm {
 		return algorithm
 	}
 	return ""
+}
+
+func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []rulesetport.Ref {
+	if algorithm != "" {
+		return []rulesetport.Ref{{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: algorithm,
+			Code:      ref.Code,
+			Version:   ref.Version,
+		}}
+	}
+	refs := make([]rulesetport.Ref, 0, 3)
+	if ref.SubKind != "" {
+		refs = append(refs, rulesetport.Ref{
+			Kind:    domain.KindPersonality,
+			SubKind: domain.SubKind(ref.SubKind),
+			Code:    ref.Code,
+			Version: ref.Version,
+		})
+	}
+	refs = append(refs,
+		rulesetport.Ref{
+			Kind:    domain.KindPersonality,
+			Code:    ref.Code,
+			Version: ref.Version,
+		},
+		rulesetport.Ref{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Code:      ref.Code,
+			Version:   ref.Version,
+		},
+	)
+	return refs
 }
 
 func legacyKindForAlgorithm(algorithm domain.Algorithm) domain.Kind {

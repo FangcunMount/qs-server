@@ -203,6 +203,12 @@ func applyAssessmentBinding(
 		if !ok {
 			mappedKind = binding.Ref.Kind
 		}
+		if binding.Ref.SubKind != "" {
+			subKind = binding.Ref.SubKind
+		}
+		if binding.Ref.Algorithm != "" {
+			algorithm = binding.Ref.Algorithm
+		}
 		kind := mappedKind.String()
 		dto.ModelKind = &kind
 		if subKind != "" {

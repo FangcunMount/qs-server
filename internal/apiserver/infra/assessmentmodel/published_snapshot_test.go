@@ -28,3 +28,45 @@ func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
 	}
 }
+
+func TestRefFromSnapshotPreservesPersonalityTypologyIdentity(t *testing.T) {
+	legacy := domain.LegacyFromPublished(&domain.PublishedModelSnapshot{
+		SchemaVersion: domain.SchemaVersionV2,
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Model: domain.ModelDefinition{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: domain.AlgorithmPersonalityTypology,
+			Code:      "ENNEAGRAM_45",
+			Version:   "1.0.0",
+			Title:     "九型人格",
+			Status:    "published",
+		},
+		Payload: []byte(`{"algorithm":"personality_typology","code":"ENNEAGRAM_45","version":"1.0.0","status":"published"}`),
+	})
+	ref := RefFromSnapshot(legacy)
+	if ref.Kind != domain.KindPersonality || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmPersonalityTypology {
+		t.Fatalf("ref = %#v, want personality/typology/personality_typology", ref)
+	}
+}
+
+func TestRefFromSnapshotPreservesBigFiveIdentity(t *testing.T) {
+	legacy := domain.LegacyFromPublished(&domain.PublishedModelSnapshot{
+		SchemaVersion: domain.SchemaVersionV2,
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Model: domain.ModelDefinition{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: domain.AlgorithmBigFive,
+			Code:      "BIG5_IPIP_50",
+			Version:   "1.0.0",
+			Title:     "大五人格",
+			Status:    "published",
+		},
+		Payload: []byte(`{"algorithm":"bigfive","code":"BIG5_IPIP_50","version":"1.0.0","status":"published"}`),
+	})
+	ref := RefFromSnapshot(legacy)
+	if ref.Kind != domain.KindPersonality || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmBigFive {
+		t.Fatalf("ref = %#v, want personality/typology/bigfive", ref)
+	}
+}
