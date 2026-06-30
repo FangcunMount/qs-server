@@ -168,6 +168,7 @@ func Wire(in WireInput) (WireResult, error) {
 		ReportDurableSaver:             in.ReportPorts.DurableSaver,
 		PostCommitReadyIndexer:         in.ReportPorts.PostCommitReadyIndexer,
 		OutboxReadyIndex:               in.ReportPorts.ReadyIndex,
+		PublishedModelReader:           catalog,
 	})
 	if err != nil {
 		return WireResult{}, err

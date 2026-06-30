@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
@@ -54,6 +55,7 @@ type BootstrapInput struct {
 	ReportDurableSaver             evaluationResult.ReportDurableSaver
 	PostCommitReadyIndexer         *appEventing.PostCommitReadyIndexer
 	OutboxReadyIndex               *outboxready.Index
+	PublishedModelReader           rulesetport.PublishedModelReader
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

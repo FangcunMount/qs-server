@@ -80,11 +80,25 @@ func decodePublishedTypologyModel(snapshot *domain.PublishedModelSnapshot) (*mod
 		return nil, domain.ErrNotFound
 	}
 	if snapshot.PayloadFormat != domain.PayloadFormatPersonalityTypologyV1 {
-		return modeltypology.DecodeFromSnapshot(domain.LegacyFromPublished(snapshot))
+		payload, err := modeltypology.DecodeFromSnapshot(domain.LegacyFromPublished(snapshot))
+		if err != nil {
+			return nil, err
+		}
+		return ensurePublishedTypologyPayload(payload)
 	}
 	var payload modeltypology.Payload
 	if err := json.Unmarshal(snapshot.Payload, &payload); err != nil {
 		return nil, err
 	}
-	return &payload, nil
+	return ensurePublishedTypologyPayload(&payload)
+}
+
+func ensurePublishedTypologyPayload(payload *modeltypology.Payload) (*modeltypology.Payload, error) {
+	if payload == nil {
+		return nil, domain.ErrNotFound
+	}
+	if !payload.IsPublished() {
+		return nil, fmt.Errorf("typology model is not published: %s", payload.Code)
+	}
+	return payload, nil
 }

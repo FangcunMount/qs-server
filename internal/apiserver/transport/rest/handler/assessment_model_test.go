@@ -14,15 +14,15 @@ import (
 )
 
 type assessmentModelServiceStub struct {
-	validateResult  *assessmentmodel.ValidationResult
-	validateErr     error
-	publishResult   *assessmentmodel.ModelSummary
-	publishErr      error
-	publishCalled   bool
-	previewResult   *assessmentmodel.PreviewReportResult
-	previewErr      error
-	qrCodeURL       string
-	qrCodeErr       error
+	validateResult *assessmentmodel.ValidationResult
+	validateErr    error
+	publishResult  *assessmentmodel.ModelSummary
+	publishErr     error
+	publishCalled  bool
+	previewResult  *assessmentmodel.PreviewReportResult
+	previewErr     error
+	qrCodeURL      string
+	qrCodeErr      error
 }
 
 func (s *assessmentModelServiceStub) List(context.Context, assessmentmodel.ListModelsDTO) (*assessmentmodel.ModelListResult, error) {

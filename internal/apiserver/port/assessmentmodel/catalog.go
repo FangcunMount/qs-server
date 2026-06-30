@@ -45,13 +45,16 @@ type PublishedLister interface {
 	ListPublished(ctx context.Context, filter ListPublishedFilter) ([]*domain.Snapshot, int64, error)
 }
 
-// PublishedModelReader reads v2 published assessment model snapshots.
+// PublishedModelReader reads v2 published assessment model snapshots for runtime execution.
+// Callers must treat this as the only read path for C-side and evaluation flows.
+// Draft models in ModelRepository must never be used for execution.
 type PublishedModelReader interface {
 	GetPublishedModelByRef(ctx context.Context, ref Ref) (*domain.PublishedModelSnapshot, error)
 	FindPublishedModelByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.PublishedModelSnapshot, error)
 }
 
-// PublishedModelLister lists v2 published assessment model snapshots for new catalog callers.
+// PublishedModelLister lists v2 published assessment model snapshots for C-side catalogs.
+// FindPublishedModelByCode returns the latest published snapshot for a model code.
 type PublishedModelLister interface {
 	FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error)
 	ListPublishedModels(ctx context.Context, filter ListPublishedFilter) ([]*domain.PublishedModelSnapshot, int64, error)

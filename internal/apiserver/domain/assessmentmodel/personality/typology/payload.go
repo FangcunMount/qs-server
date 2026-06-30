@@ -1,6 +1,10 @@
 package typology
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+import (
+	"strings"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+)
 
 // Payload is the unified personality typology model payload.
 type Payload struct {
@@ -27,7 +31,15 @@ func (p *Payload) HasExplicitRuntime() bool {
 }
 
 func (p *Payload) IsPublished() bool {
-	return p != nil && (p.Status == "" || p.Status == "published")
+	if p == nil {
+		return false
+	}
+	switch strings.ToLower(strings.TrimSpace(p.Status)) {
+	case "", "published":
+		return true
+	default:
+		return false
+	}
 }
 
 func (p *Payload) MatchesQuestionnaire(code, version string) bool {

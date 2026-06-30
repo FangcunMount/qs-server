@@ -32,6 +32,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -96,6 +97,7 @@ type Deps struct {
 	ReportDurableSaver             evaluationResult.ReportDurableSaver
 	PostCommitReadyIndexer         *appEventing.PostCommitReadyIndexer
 	OutboxReadyIndex               *outboxready.Index
+	PublishedModelReader           rulesetport.PublishedModelReader
 }
 
 // New assembles the evaluation module.
@@ -242,7 +244,15 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 }
 
 func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationInfra) {
-	assessmentCreator := assessment.NewDefaultAssessmentCreator()
+	creatorOpts := make([]assessment.AssessmentCreatorOption, 0, 1)
+	if normalized.PublishedModelReader != nil {
+		creatorOpts = append(creatorOpts, assessment.WithEvaluationModelValidator(
+			assessmentApp.NewCompositeEvaluationModelValidator(
+				assessmentApp.NewPersonalityEvaluationModelValidator(normalized.PublishedModelReader),
+			),
+		))
+	}
+	assessmentCreator := assessment.NewDefaultAssessmentCreator(creatorOpts...)
 	if normalized.QueryRedisClient != nil && normalized.VersionStore != nil {
 		listCache := cachequery.NewMyAssessmentListCacheWithBuilderPolicyAndObserver(
 			cacheentry.NewRedisCache(normalized.QueryRedisClient),

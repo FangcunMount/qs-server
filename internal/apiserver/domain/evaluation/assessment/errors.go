@@ -53,6 +53,12 @@ var (
 	// ErrScaleNotLinked 量表未关联
 	ErrScaleNotLinked = errors.New("medical scale is not linked to questionnaire")
 
+	// ErrEvaluationModelNotPublished 解释模型未发布或不存在
+	ErrEvaluationModelNotPublished = errors.New("evaluation model is not published")
+
+	// ErrEvaluationModelQuestionnaireMismatch 解释模型与问卷不匹配
+	ErrEvaluationModelQuestionnaireMismatch = errors.New("evaluation model is not linked to questionnaire")
+
 	// ErrReportNotFound 报告未找到
 	ErrReportNotFound = errors.New("interpret report not found")
 
