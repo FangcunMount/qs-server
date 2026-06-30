@@ -6,6 +6,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
@@ -110,9 +111,7 @@ func (c *StaticCompositeCatalog) findRuleSetByRef(ref port.RuleSetRef) *domain.R
 		if snapshot == nil {
 			continue
 		}
-		if snapshot.Definition.Kind == ref.Kind &&
-			snapshot.Definition.Code == ref.Code &&
-			snapshot.Definition.Version == ref.Version {
+		if aminfra.RefMatchesSnapshot(ref, snapshot) {
 			return snapshot
 		}
 	}

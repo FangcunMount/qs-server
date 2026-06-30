@@ -5,6 +5,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 )
 
 func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
@@ -47,6 +48,41 @@ func TestRefFromSnapshotPreservesPersonalityTypologyIdentity(t *testing.T) {
 	ref := RefFromSnapshot(legacy)
 	if ref.Kind != domain.KindPersonality || ref.SubKind != domain.SubKindTypology || ref.Algorithm != domain.AlgorithmPersonalityTypology {
 		t.Fatalf("ref = %#v, want personality/typology/personality_typology", ref)
+	}
+}
+
+func TestRefMatchesSnapshotSupportsLegacyAndV2Refs(t *testing.T) {
+	legacy := domain.LegacyFromPublished(&domain.PublishedModelSnapshot{
+		SchemaVersion: domain.SchemaVersionV2,
+		PayloadFormat: domain.PayloadFormatPersonalityTypologyV1,
+		Model: domain.ModelDefinition{
+			Kind:      domain.KindPersonality,
+			SubKind:   domain.SubKindTypology,
+			Algorithm: domain.AlgorithmMBTI,
+			Code:      "MBTI_OEJTS",
+			Version:   "2.0.1",
+			Title:     "MBTI",
+			Status:    "published",
+		},
+		Payload: []byte(`{"algorithm":"mbti","code":"MBTI_OEJTS","version":"2.0.1","status":"published"}`),
+	})
+	v2Ref := port.Ref{
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmMBTI,
+		Code:      "MBTI_OEJTS",
+		Version:   "2.0.1",
+	}
+	legacyRef := port.Ref{
+		Kind:    domain.KindMBTIMigration,
+		Code:    "MBTI_OEJTS",
+		Version: "2.0.1",
+	}
+	if !RefMatchesSnapshot(v2Ref, legacy) {
+		t.Fatal("expected v2 ref to match legacy snapshot")
+	}
+	if !RefMatchesSnapshot(legacyRef, legacy) {
+		t.Fatal("expected legacy ref to match legacy snapshot")
 	}
 }
 

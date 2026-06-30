@@ -27,8 +27,10 @@ func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
 	if !ok {
 		t.Fatal("expected binding")
 	}
-	if binding.Ref.Kind != domain.RuleSetKindSBTI {
-		t.Fatalf("kind = %s, want sbti", binding.Ref.Kind)
+	if binding.Ref.Kind != domain.KindPersonality ||
+		binding.Ref.SubKind != domain.SubKindTypology ||
+		binding.Ref.Algorithm != domain.AlgorithmSBTI {
+		t.Fatalf("ref = %#v, want personality/typology/sbti", binding.Ref)
 	}
 	if binding.MedicalScaleID != nil {
 		t.Fatalf("MedicalScaleID = %#v, want nil", binding.MedicalScaleID)

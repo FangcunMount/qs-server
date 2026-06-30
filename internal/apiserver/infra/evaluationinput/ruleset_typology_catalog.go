@@ -115,10 +115,10 @@ func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []ruleset
 			Version: ref.Version,
 		},
 		rulesetport.Ref{
-			Kind:      domain.KindPersonality,
-			SubKind:   domain.SubKindTypology,
-			Code:      ref.Code,
-			Version:   ref.Version,
+			Kind:    domain.KindPersonality,
+			SubKind: domain.SubKindTypology,
+			Code:    ref.Code,
+			Version: ref.Version,
 		},
 	)
 	return refs

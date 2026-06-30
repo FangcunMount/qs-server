@@ -27,10 +27,12 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 			code:    evaluationinputPort.DefaultSBTIQuestionnaireCode,
 			version: evaluationinputPort.DefaultSBTIModelVersion,
 			want: port.RuleSetRef{
-				Kind:    domain.RuleSetKindSBTI,
-				Code:    evaluationinputPort.DefaultSBTIModelCode,
-				Version: evaluationinputPort.DefaultSBTIModelVersion,
-				Title:   evaluationinputPort.DefaultSBTIModelTitle,
+				Kind:      domain.KindPersonality,
+				SubKind:   domain.SubKindTypology,
+				Algorithm: domain.AlgorithmSBTI,
+				Code:      evaluationinputPort.DefaultSBTIModelCode,
+				Version:   evaluationinputPort.DefaultSBTIModelVersion,
+				Title:     evaluationinputPort.DefaultSBTIModelTitle,
 			},
 		},
 		{
@@ -38,10 +40,12 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 			code:    evaluationinputPort.DefaultMBTIQuestionnaireCode,
 			version: evaluationinputPort.DefaultMBTIModelVersion,
 			want: port.RuleSetRef{
-				Kind:    domain.RuleSetKindMBTI,
-				Code:    evaluationinputPort.DefaultMBTIModelCode,
-				Version: evaluationinputPort.DefaultMBTIModelVersion,
-				Title:   evaluationinputPort.DefaultMBTIModelTitle,
+				Kind:      domain.KindPersonality,
+				SubKind:   domain.SubKindTypology,
+				Algorithm: domain.AlgorithmMBTI,
+				Code:      evaluationinputPort.DefaultMBTIModelCode,
+				Version:   evaluationinputPort.DefaultMBTIModelVersion,
+				Title:     evaluationinputPort.DefaultMBTIModelTitle,
 			},
 		},
 	}

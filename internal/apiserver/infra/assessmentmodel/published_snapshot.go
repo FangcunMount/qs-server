@@ -177,3 +177,27 @@ func RefFromSnapshot(snapshot *domain.Snapshot) port.Ref {
 	}
 	return ref
 }
+
+func canonicalRef(ref port.Ref) port.Ref {
+	if kind, subKind, algorithm, ok := domain.LegacyKindMapping(ref.Kind); ok {
+		ref.Kind = kind
+		ref.SubKind = subKind
+		ref.Algorithm = algorithm
+	}
+	return ref
+}
+
+// RefMatchesSnapshot reports whether ref points at the given legacy snapshot envelope.
+func RefMatchesSnapshot(ref port.Ref, snapshot *domain.Snapshot) bool {
+	if snapshot == nil || ref.Code == "" || ref.Version == "" {
+		return false
+	}
+	if snapshot.Definition.Code != ref.Code || snapshot.Definition.Version != ref.Version {
+		return false
+	}
+	want := canonicalRef(ref)
+	got := RefFromSnapshot(snapshot)
+	return want.Kind == got.Kind &&
+		want.SubKind == got.SubKind &&
+		want.Algorithm == got.Algorithm
+}
