@@ -117,6 +117,10 @@ func (*qrCodeServiceStub) GenerateAssessmentEntryQRCode(context.Context, string)
 	return "", nil
 }
 
+func (*qrCodeServiceStub) GeneratePersonalityAssessmentQRCode(context.Context, string) (string, error) {
+	return "", nil
+}
+
 type miniProgramTaskNotificationServiceStub struct{}
 
 func (*miniProgramTaskNotificationServiceStub) SendTaskOpened(context.Context, notificationApp.TaskOpenedDTO) (*notificationApp.TaskOpenedResult, error) {
