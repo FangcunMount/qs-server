@@ -96,11 +96,12 @@ func (s *service) Create(ctx context.Context, input CreateInput) (*ModelSummary,
 	if err != nil {
 		return nil, mapDomainError(err)
 	}
-	if input.QuestionnaireCode != "" && input.QuestionnaireVersion != "" {
-		if err := model.BindQuestionnaire(domain.QuestionnaireBinding{
-			QuestionnaireCode:    input.QuestionnaireCode,
-			QuestionnaireVersion: input.QuestionnaireVersion,
-		}, now); err != nil {
+	if input.QuestionnaireCode != "" || input.QuestionnaireVersion != "" {
+		binding, err := s.validateQuestionnaireBinding(ctx, input.QuestionnaireCode, input.QuestionnaireVersion)
+		if err != nil {
+			return nil, err
+		}
+		if err := model.BindQuestionnaire(binding, now); err != nil {
 			return nil, mapDomainError(err)
 		}
 	}
@@ -234,17 +235,16 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if issues := s.validateModelForPublish(ctx, model); len(issues) > 0 {
 		return nil, validationFailed(issues)
 	}
+	now := time.Now().UTC()
+	if err := model.MarkPublished(now); err != nil {
+		return nil, mapDomainError(err)
+	}
 	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
 	if err != nil {
 		return nil, invalidArgument("%s", err.Error())
 	}
 	if err := s.deps.PublishedRepo.Save(ctx, snapshot); err != nil {
 		return nil, err
-	}
-	now := time.Now().UTC()
-	if err := model.MarkPublished(now); err != nil {
-		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode)
-		return nil, mapDomainError(err)
 	}
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
 		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode)
@@ -259,16 +259,20 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 		return nil, err
 	}
 	now := time.Now().UTC()
-	if err := model.MarkUnpublished(now); err != nil {
+	candidate := *model
+	if err := candidate.MarkUnpublished(now); err != nil {
 		return nil, mapDomainError(err)
-	}
-	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
 	}
 	if s.deps.PublishedRepo != nil {
 		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode); err != nil {
 			return nil, err
 		}
+	}
+	if err := model.MarkUnpublished(now); err != nil {
+		return nil, mapDomainError(err)
+	}
+	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
+		return nil, err
 	}
 	return summaryFromModel(model), nil
 }
@@ -280,16 +284,20 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 	}
 	wasPublished := model.IsPublished()
 	now := time.Now().UTC()
-	if err := model.MarkArchived(now); err != nil {
+	candidate := *model
+	if err := candidate.MarkArchived(now); err != nil {
 		return nil, mapDomainError(err)
-	}
-	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
-		return nil, err
 	}
 	if wasPublished && s.deps.PublishedRepo != nil {
 		if err := s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode); err != nil {
 			return nil, err
 		}
+	}
+	if err := model.MarkArchived(now); err != nil {
+		return nil, mapDomainError(err)
+	}
+	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
+		return nil, err
 	}
 	return summaryFromModel(model), nil
 }

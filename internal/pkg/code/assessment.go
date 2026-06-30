@@ -90,6 +90,9 @@ const (
 
 	// ErrScoreHighRiskFailed - 500: Failed to get high risk factors.
 	ErrScoreHighRiskFailed
+
+	// ErrAssessmentModelValidationFailed - 400: Assessment model validation failed.
+	ErrAssessmentModelValidationFailed
 )
 
 func init() {
@@ -122,4 +125,5 @@ func init() {
 	register(ErrScoreNotFound, 404, "Score not found")
 	register(ErrScoreTrendFailed, 500, "Failed to get score trend")
 	register(ErrScoreHighRiskFailed, 500, "Failed to get high risk factors")
+	register(ErrAssessmentModelValidationFailed, 400, "Assessment model validation failed")
 }

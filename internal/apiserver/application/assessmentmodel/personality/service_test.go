@@ -3,6 +3,7 @@ package personality_test
 import (
 	"context"
 	"errors"
+	"strconv"
 	"testing"
 	"time"
 
@@ -25,7 +26,7 @@ func (r *memoryModelRepo) Create(_ context.Context, model *domain.AssessmentMode
 	if _, exists := r.models[model.Code]; exists {
 		return domain.ErrInvalidArgument
 	}
-	r.models[model.Code] = model
+	r.models[model.Code] = cloneAssessmentModel(model)
 	return nil
 }
 
@@ -40,7 +41,7 @@ func (r *memoryModelRepo) Update(_ context.Context, model *domain.AssessmentMode
 	if _, exists := r.models[model.Code]; !exists {
 		return domain.ErrNotFound
 	}
-	r.models[model.Code] = model
+	r.models[model.Code] = cloneAssessmentModel(model)
 	return nil
 }
 
@@ -49,7 +50,7 @@ func (r *memoryModelRepo) FindByCode(_ context.Context, code string) (*domain.As
 	if !ok {
 		return nil, domain.ErrNotFound
 	}
-	return model, nil
+	return cloneAssessmentModel(model), nil
 }
 
 func (r *memoryModelRepo) List(_ context.Context, _ port.ListFilter) ([]*domain.AssessmentModel, int64, error) {
@@ -68,6 +69,7 @@ func (r *memoryModelRepo) Delete(_ context.Context, code string) error {
 type memoryPublishedRepo struct {
 	snapshots  map[string]*domain.PublishedModelSnapshot
 	deleteHits int
+	deleteErr  error
 }
 
 func (r *memoryPublishedRepo) Save(_ context.Context, snapshot *domain.PublishedModelSnapshot) error {
@@ -104,8 +106,29 @@ func (r *memoryPublishedRepo) ListPublished(context.Context, port.ListPublishedF
 
 func (r *memoryPublishedRepo) DeletePublished(_ context.Context, _ domain.Kind, code string) error {
 	r.deleteHits++
+	if r.deleteErr != nil {
+		return r.deleteErr
+	}
 	delete(r.snapshots, code)
 	return nil
+}
+
+func cloneAssessmentModel(model *domain.AssessmentModel) *domain.AssessmentModel {
+	if model == nil {
+		return nil
+	}
+	cloned := *model
+	cloned.Tags = append([]string(nil), model.Tags...)
+	cloned.Definition.Data = append([]byte(nil), model.Definition.Data...)
+	if model.PublishedAt != nil {
+		publishedAt := *model.PublishedAt
+		cloned.PublishedAt = &publishedAt
+	}
+	if model.ArchivedAt != nil {
+		archivedAt := *model.ArchivedAt
+		cloned.ArchivedAt = &archivedAt
+	}
+	return &cloned
 }
 
 type questionnaireQueryStub struct {
@@ -207,6 +230,36 @@ func TestCreateAndPublishPersonalityModel(t *testing.T) {
 	}
 	if _, ok := publishedRepo.snapshots[created.Code]; !ok {
 		t.Fatal("published snapshot was not saved")
+	}
+	stored, err := modelRepo.FindByCode(context.Background(), created.Code)
+	if err != nil {
+		t.Fatalf("FindByCode: %v", err)
+	}
+	snapshot := publishedRepo.snapshots[created.Code]
+	wantVersion := "v" + strconv.FormatInt(stored.Version, 10)
+	if snapshot.Model.Version != wantVersion {
+		t.Fatalf("snapshot version = %s, want %s", snapshot.Model.Version, wantVersion)
+	}
+}
+
+func TestCreateWithQuestionnaireRequiresPublishedQuestionnaireWithQuestions(t *testing.T) {
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{}}
+	svc := personality.NewService(personality.Dependencies{
+		ModelRepo:          modelRepo,
+		PublishedRepo:      &memoryPublishedRepo{},
+		QuestionnaireQuery: questionnaireQueryStub{questionnaire: &questionnaireapp.QuestionnaireResult{Code: "Q_DEMO", Version: "1.0.0", Status: "published"}},
+	})
+
+	if _, err := svc.Create(context.Background(), personality.CreateInput{
+		Code: "personality_create_empty_questionnaire", Title: "Empty Questionnaire", Algorithm: "mbti",
+		SubKind:              personality.SubKindTypology,
+		QuestionnaireCode:    "Q_DEMO",
+		QuestionnaireVersion: "1.0.0",
+	}); err == nil {
+		t.Fatal("Create should fail when bound questionnaire has no questions")
+	}
+	if _, err := modelRepo.FindByCode(context.Background(), "personality_create_empty_questionnaire"); err == nil {
+		t.Fatal("invalid model should not be persisted")
 	}
 }
 
@@ -354,5 +407,57 @@ func TestPublishCompensatesWhenDraftUpdateFails(t *testing.T) {
 	}
 	if publishedRepo.deleteHits == 0 {
 		t.Fatal("DeletePublished should be called for compensation")
+	}
+}
+
+func TestUnpublishDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
+	now := time.Now().UTC()
+	model, _ := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "personality_unpublish_delete_failed", Kind: domain.KindPersonality,
+		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Unpublish Delete Failed", Now: now,
+	})
+	_ = model.MarkPublished(now)
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{model.Code: cloneAssessmentModel(model)}}
+	publishedRepo := &memoryPublishedRepo{
+		snapshots: map[string]*domain.PublishedModelSnapshot{model.Code: {Model: domain.ModelDefinition{Code: model.Code}}},
+		deleteErr: errors.New("delete failed"),
+	}
+	svc := personality.NewService(personality.Dependencies{ModelRepo: modelRepo, PublishedRepo: publishedRepo})
+
+	if _, err := svc.Unpublish(context.Background(), model.Code); err == nil {
+		t.Fatal("Unpublish should fail when deleting published snapshot fails")
+	}
+	stored, err := modelRepo.FindByCode(context.Background(), model.Code)
+	if err != nil {
+		t.Fatalf("FindByCode: %v", err)
+	}
+	if stored.Status != domain.ModelStatusPublished {
+		t.Fatalf("draft status = %s, want published", stored.Status)
+	}
+}
+
+func TestArchiveDoesNotChangeDraftWhenPublishedDeleteFails(t *testing.T) {
+	now := time.Now().UTC()
+	model, _ := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code: "personality_archive_delete_failed", Kind: domain.KindPersonality,
+		SubKind: domain.SubKindTypology, Algorithm: domain.AlgorithmMBTI, Title: "Archive Delete Failed", Now: now,
+	})
+	_ = model.MarkPublished(now)
+	modelRepo := &memoryModelRepo{models: map[string]*domain.AssessmentModel{model.Code: cloneAssessmentModel(model)}}
+	publishedRepo := &memoryPublishedRepo{
+		snapshots: map[string]*domain.PublishedModelSnapshot{model.Code: {Model: domain.ModelDefinition{Code: model.Code}}},
+		deleteErr: errors.New("delete failed"),
+	}
+	svc := personality.NewService(personality.Dependencies{ModelRepo: modelRepo, PublishedRepo: publishedRepo})
+
+	if _, err := svc.Archive(context.Background(), model.Code); err == nil {
+		t.Fatal("Archive should fail when deleting published snapshot fails")
+	}
+	stored, err := modelRepo.FindByCode(context.Background(), model.Code)
+	if err != nil {
+		t.Fatalf("FindByCode: %v", err)
+	}
+	if stored.Status != domain.ModelStatusPublished {
+		t.Fatalf("draft status = %s, want published", stored.Status)
 	}
 }

@@ -12,8 +12,23 @@ import (
 
 // DualStore writes v2 published_assessment_models and reads v2 first, then legacy evaluation_rule_sets.
 type DualStore struct {
-	v2     *mongoassessmentmodel.Repository
-	legacy *mongoruleset.Repository
+	v2     dualStoreV2Repository
+	legacy dualStoreLegacyRepository
+}
+
+type dualStoreV2Repository interface {
+	UpsertPublished(ctx context.Context, snapshot *domain.Snapshot) error
+	GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error)
+	FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error)
+	FindLatestPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error)
+	ListPublished(ctx context.Context, filter port.ListPublishedFilter) ([]*domain.Snapshot, int64, error)
+	ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error)
+}
+
+type dualStoreLegacyRepository interface {
+	GetPublishedByRef(ctx context.Context, ref port.Ref) (*domain.Snapshot, error)
+	FindPublishedByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*domain.Snapshot, error)
+	ListPublished(ctx context.Context) ([]*domain.Snapshot, error)
 }
 
 var (
@@ -77,7 +92,7 @@ func (s *DualStore) FindPublishedByModelCode(ctx context.Context, kind domain.Ki
 		return nil, domain.ErrNotFound
 	}
 	if s.v2 != nil {
-		snapshot, err := s.v2.FindPublishedByModelCode(ctx, kind, code)
+		snapshot, err := s.v2.FindLatestPublishedByModelCode(ctx, kind, code)
 		if err == nil {
 			return snapshot, nil
 		}

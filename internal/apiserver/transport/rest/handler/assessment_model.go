@@ -3,6 +3,7 @@ package handler
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
@@ -10,6 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/asaskevich/govalidator"
 	"github.com/gin-gonic/gin"
 )
@@ -116,6 +118,19 @@ func (h *AssessmentModelHandler) Delete(c *gin.Context) {
 }
 
 func (h *AssessmentModelHandler) Publish(c *gin.Context) {
+	result, err := h.service.Validate(c.Request.Context(), h.modelCode(c))
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result != nil && !result.Passed {
+		c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{
+			Code:    code.ErrAssessmentModelValidationFailed,
+			Message: "模型校验失败",
+			Data:    (*response.AssessmentModelValidationResponse)(result),
+		})
+		return
+	}
 	h.transition(c, h.service.Publish)
 }
 
