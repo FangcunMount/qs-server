@@ -5,13 +5,24 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"strconv"
-	"strings"
 	"testing"
 )
 
+type sbtiModelSeedFile struct {
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	QuestionMappings     []struct {
+		QuestionCode string             `json:"question_code"`
+		Dimension    string             `json:"dimension"`
+		OptionScores map[string]float64 `json:"option_scores"`
+	} `json:"question_mappings"`
+	DrinkTrigger struct {
+		QuestionCodes []string `json:"question_codes"`
+		OptionValues  []string `json:"option_values"`
+	} `json:"drink_trigger"`
+}
+
 func TestQuestionnaireSeedAlignsWithSBTIModel(t *testing.T) {
-	seed := loadQuestionnaireSeed(t)
+	seed := loadSBTIQuestionnaireSeed(t)
 	model := loadSBTIModelSeed(t)
 
 	if seed.Code != "SBTI_FUN" {
@@ -29,11 +40,7 @@ func TestQuestionnaireSeedAlignsWithSBTIModel(t *testing.T) {
 	if len(model.QuestionMappings) != 30 {
 		t.Fatalf("model question_mappings = %d, want 30", len(model.QuestionMappings))
 	}
-	for i, mapping := range model.QuestionMappings {
-		wantCode := "SBTI_Q" + strings.TrimLeft(strconv.Itoa(i+1), "0")
-		if i < 9 {
-			wantCode = "SBTI_Q0" + strconv.Itoa(i+1)
-		}
+	for _, mapping := range model.QuestionMappings {
 		q, ok := byCode[mapping.QuestionCode]
 		if !ok {
 			t.Fatalf("missing questionnaire question %s", mapping.QuestionCode)
@@ -46,7 +53,6 @@ func TestQuestionnaireSeedAlignsWithSBTIModel(t *testing.T) {
 				t.Fatalf("%s option code %s not in option_scores", mapping.QuestionCode, opt.Code)
 			}
 		}
-		_ = wantCode
 	}
 
 	drink, ok := byCode["drink_gate_q2"]
@@ -71,10 +77,10 @@ func TestQuestionnaireSeedAlignsWithSBTIModel(t *testing.T) {
 	}
 }
 
-func loadQuestionnaireSeed(t *testing.T) questionnaireSeedFile {
+func loadSBTIQuestionnaireSeed(t *testing.T) questionnaireSeedFile {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(file), "sbti_questionnaire.json")
+	path := filepath.Join(filepath.Dir(file), "data", "sbti_questionnaire.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read questionnaire seed: %v", err)

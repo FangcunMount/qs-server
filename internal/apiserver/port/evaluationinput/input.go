@@ -27,7 +27,7 @@ const (
 	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
 
 	DefaultMBTIModelCode          = "MBTI_OEJTS"
-	DefaultMBTIModelVersion       = "1.0.0"
+	DefaultMBTIModelVersion       = "2.0.1"
 	DefaultMBTIModelTitle         = "MBTI 人格类型测评（OEJTS）"
 	DefaultMBTIQuestionnaireCode  = "MBTI_OEJTS"
 	DefaultMBTIQuestionnaireTitle = "MBTI 人格类型测评（OEJTS 32题）"

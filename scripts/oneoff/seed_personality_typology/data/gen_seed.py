@@ -85,10 +85,15 @@ q_seed = {
 labels = ["非常符合左侧", "比较符合左侧", "中立", "比较符合右侧", "非常符合右侧"]
 for qid, _dim, title, left, right in questions_raw:
     code = f"MBTI_Q{qid:02d}"
-    stem = f"{title}\n（更偏向：{left} ← 1 · 2 · 3 · 4 · 5 → {right}）"
     opts = [{"code": str(v), "content": labels[v - 1], "score": float(v)} for v in range(1, 6)]
-    q_seed["questions"].append({"code": code, "stem": stem, "type": "Radio", "required": True, "options": opts})
-
+    q_seed["questions"].append({
+        "code": code,
+        "stem": title,
+        "placeholder": f"更偏向：{left} ← 1 · 2 · 3 · 4 · 5 → {right}",
+        "type": "Radio",
+        "required": True,
+        "options": opts,
+    })
 mappings = [
     {"question_code": f"MBTI_Q{qid:02d}", "dimension": dim, "sign": signs[qid]}
     for qid, dim, *_ in questions_raw
@@ -142,7 +147,7 @@ model = {
     "type_profiles": type_profiles,
 }
 
-root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", ".."))
+root = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", ".."))
 model_path = os.path.join(root, "internal", "apiserver", "infra", "ruleset", "seed", "mbti_oejts.json")
 q_path = os.path.join(os.path.dirname(__file__), "mbti_questionnaire.json")
 for path, data in [(model_path, model), (q_path, q_seed)]:

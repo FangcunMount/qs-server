@@ -99,9 +99,15 @@ type SectionQuestion struct {
 // RadioQuestion 单选题
 type RadioQuestion struct {
 	QuestionCore
+	placeholder     string
 	options         []Option
 	validationRules []validation.ValidationRule
 	calculationRule *calculation.CalculationRule
+}
+
+// GetPlaceholder 获取占位符（可用于补充说明文案）
+func (q *RadioQuestion) GetPlaceholder() string {
+	return q.placeholder
 }
 
 // GetOptions 获取选项
@@ -123,9 +129,15 @@ func (q *RadioQuestion) GetCalculationRule() *calculation.CalculationRule {
 // CheckboxQuestion 多选题
 type CheckboxQuestion struct {
 	QuestionCore
+	placeholder     string
 	options         []Option
 	validationRules []validation.ValidationRule
 	calculationRule *calculation.CalculationRule
+}
+
+// GetPlaceholder 获取占位符（可用于补充说明文案）
+func (q *CheckboxQuestion) GetPlaceholder() string {
+	return q.placeholder
 }
 
 // GetOptions 获取选项
@@ -239,6 +251,7 @@ func newRadioQuestionFactory(params *QuestionParams) (Question, error) {
 
 	return &RadioQuestion{
 		QuestionCore:    params.GetCore(),
+		placeholder:     params.GetPlaceholder(),
 		options:         params.GetOptions(),
 		validationRules: params.GetValidationRules(),
 		calculationRule: params.GetCalculationRule(),
@@ -254,6 +267,7 @@ func newCheckboxQuestionFactory(params *QuestionParams) (Question, error) {
 
 	return &CheckboxQuestion{
 		QuestionCore:    params.GetCore(),
+		placeholder:     params.GetPlaceholder(),
 		options:         params.GetOptions(),
 		validationRules: params.GetValidationRules(),
 		calculationRule: params.GetCalculationRule(),

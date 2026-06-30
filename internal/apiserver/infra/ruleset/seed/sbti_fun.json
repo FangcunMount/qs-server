@@ -562,14 +562,10 @@
   "fallback_similarity_threshold": 0.6,
   "drink_trigger": {
     "question_codes": [
-      "drink_gate_q2",
-      "SBTI_DRINK_Q2"
+      "drink_gate_q2"
     ],
     "option_values": [
-      "2",
-      "C",
-      "DRUNK",
-      "baijiu_thermos"
+      "2"
     ]
   },
   "normal_outcomes": [

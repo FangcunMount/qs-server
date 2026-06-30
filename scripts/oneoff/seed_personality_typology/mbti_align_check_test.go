@@ -8,8 +8,17 @@ import (
 	"testing"
 )
 
+type mbtiModelSeedFile struct {
+	QuestionnaireVersion string `json:"questionnaire_version"`
+	QuestionMappings     []struct {
+		QuestionCode string  `json:"question_code"`
+		Dimension    string  `json:"dimension"`
+		Sign         float64 `json:"sign"`
+	} `json:"question_mappings"`
+}
+
 func TestQuestionnaireSeedAlignsWithMBTIModel(t *testing.T) {
-	seed := loadQuestionnaireSeed(t)
+	seed := loadMBTIQuestionnaireSeed(t)
 	model := loadMBTIModelSeed(t)
 
 	if seed.Code != "MBTI_OEJTS" {
@@ -44,10 +53,10 @@ func TestQuestionnaireSeedAlignsWithMBTIModel(t *testing.T) {
 	}
 }
 
-func loadQuestionnaireSeed(t *testing.T) questionnaireSeedFile {
+func loadMBTIQuestionnaireSeed(t *testing.T) questionnaireSeedFile {
 	t.Helper()
 	_, file, _, _ := runtime.Caller(0)
-	path := filepath.Join(filepath.Dir(file), "mbti_questionnaire.json")
+	path := filepath.Join(filepath.Dir(file), "data", "mbti_questionnaire.json")
 	raw, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatalf("read questionnaire seed: %v", err)

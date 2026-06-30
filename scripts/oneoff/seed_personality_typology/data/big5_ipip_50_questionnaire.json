@@ -1,0 +1,1754 @@
+{
+  "code": "BIG5_IPIP_50",
+  "version": "1.0.0",
+  "title": "大五人格测评（IPIP-50）",
+  "description": "基于 IPIP public-domain Big Five 五因素结构的大五人格测评，仅用于人格探索与自我了解。",
+  "img_url": "",
+  "type": "Survey",
+  "factors": [
+    {
+      "code": "O",
+      "name": "开放性"
+    },
+    {
+      "code": "C",
+      "name": "尽责性"
+    },
+    {
+      "code": "E",
+      "name": "外向性"
+    },
+    {
+      "code": "A",
+      "name": "宜人性"
+    },
+    {
+      "code": "N",
+      "name": "神经质"
+    }
+  ],
+  "questions": [
+    {
+      "code": "BIG5_Q01",
+      "stem": "我是聚会或群体中的活跃者。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q02",
+      "stem": "我很少关心别人的感受。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q03",
+      "stem": "我总是提前做好准备。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q04",
+      "stem": "我容易感到压力或紧张。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q05",
+      "stem": "我的词汇量比较丰富。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q06",
+      "stem": "我平时话不多。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q07",
+      "stem": "我对别人很感兴趣。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q08",
+      "stem": "我经常把自己的东西弄得到处都是。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q09",
+      "stem": "大多数时候我比较放松。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q10",
+      "stem": "我很难理解抽象的想法。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q11",
+      "stem": "我在人群中感到自在。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q12",
+      "stem": "我有时会冒犯别人。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q13",
+      "stem": "我会注意细节。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q14",
+      "stem": "我经常为事情担心。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q15",
+      "stem": "我有丰富的想象力。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q16",
+      "stem": "我喜欢待在背景中，不太主动表现自己。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q17",
+      "stem": "我能体会他人的情绪。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q18",
+      "stem": "我有时会把事情搞得一团糟。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q19",
+      "stem": "我很少感到沮丧或低落。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q20",
+      "stem": "我对抽象思考不太感兴趣。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q21",
+      "stem": "我喜欢主动与别人交谈。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q22",
+      "stem": "我不太关心别人的问题。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q23",
+      "stem": "我会很快把家务或任务完成。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q24",
+      "stem": "我容易被事情打扰或烦躁。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q25",
+      "stem": "我有很多想法。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q26",
+      "stem": "我没什么话想说。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q27",
+      "stem": "我有一颗柔软、体贴的心。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q28",
+      "stem": "我经常忘记把东西放回原处。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q29",
+      "stem": "我的情绪变化比较大。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q30",
+      "stem": "我的想象力不算好。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q31",
+      "stem": "我常常和不同的人聊天。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q32",
+      "stem": "我对别人不太感兴趣。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q33",
+      "stem": "我喜欢有秩序的环境。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q34",
+      "stem": "我经常有情绪波动。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q35",
+      "stem": "我能很快理解新事物。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q36",
+      "stem": "我不喜欢把注意力集中到自己身上。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q37",
+      "stem": "我愿意花时间帮助别人。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q38",
+      "stem": "我常常逃避或拖延自己的责任。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q39",
+      "stem": "我容易有负面情绪。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q40",
+      "stem": "我喜欢使用或理解比较复杂的表达。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q41",
+      "stem": "我不介意成为别人关注的中心。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q42",
+      "stem": "我能感受到别人的痛苦，但不一定会被影响。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q43",
+      "stem": "我会按照计划做事。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q44",
+      "stem": "我大多数时候情绪稳定。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q45",
+      "stem": "我会花时间思考事情背后的意义。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q46",
+      "stem": "我在陌生人面前比较安静。",
+      "type": "Radio",
+      "required": true,
+      "factor": "E",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q47",
+      "stem": "我会尽量让别人感到舒服。",
+      "type": "Radio",
+      "required": true,
+      "factor": "A",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q48",
+      "stem": "我做事有时比较随意，不太按流程来。",
+      "type": "Radio",
+      "required": true,
+      "factor": "C",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    },
+    {
+      "code": "BIG5_Q49",
+      "stem": "我容易感到焦虑。",
+      "type": "Radio",
+      "required": true,
+      "factor": "N",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ]
+    },
+    {
+      "code": "BIG5_Q50",
+      "stem": "我很少产生新的想法。",
+      "type": "Radio",
+      "required": true,
+      "factor": "O",
+      "options": [
+        {
+          "code": "1",
+          "content": "非常不符合",
+          "score": 1.0
+        },
+        {
+          "code": "2",
+          "content": "比较不符合",
+          "score": 2.0
+        },
+        {
+          "code": "3",
+          "content": "中立 / 说不清",
+          "score": 3.0
+        },
+        {
+          "code": "4",
+          "content": "比较符合",
+          "score": 4.0
+        },
+        {
+          "code": "5",
+          "content": "非常符合",
+          "score": 5.0
+        }
+      ],
+      "reverse": true
+    }
+  ]
+}

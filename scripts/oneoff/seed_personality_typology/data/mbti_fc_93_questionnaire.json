@@ -1,0 +1,2086 @@
+{
+  "code": "MBTI_FC_93",
+  "version": "1.0.0",
+  "title": "MBTI 人格类型探索版（强迫选择 93 题）",
+  "description": "原创强迫选择题库，兼容 MBTI 四维结构与 16 型结果组合；仅供人格探索与自我了解，非官方 MBTI® 评估。",
+  "img_url": "",
+  "type": "Survey",
+  "dimensions": {
+    "EI": {
+      "code": "EI",
+      "name": "外向 / 内向",
+      "left_pole": "E",
+      "right_pole": "I",
+      "threshold": 11.5
+    },
+    "SN": {
+      "code": "SN",
+      "name": "感觉 / 直觉",
+      "left_pole": "S",
+      "right_pole": "N",
+      "threshold": 11.5
+    },
+    "TF": {
+      "code": "TF",
+      "name": "思考 / 情感",
+      "left_pole": "T",
+      "right_pole": "F",
+      "threshold": 11.5
+    },
+    "JP": {
+      "code": "JP",
+      "name": "判断 / 知觉",
+      "left_pole": "J",
+      "right_pole": "P",
+      "threshold": 11.5
+    }
+  },
+  "questions": [
+    {
+      "code": "MBTI93_Q001",
+      "stem": "你通常如何恢复精力？",
+      "placeholder": "维度：外向 / 内向（E/I） · 与人互动 ↔ 独处沉淀",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更容易在与人互动中恢复精力",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更容易在独处中恢复精力",
+          "score": 1.0
+        }
+      ],
+      "left": "我更容易在与人互动中恢复精力",
+      "right": "我更容易在独处中恢复精力"
+    },
+    {
+      "code": "MBTI93_Q002",
+      "stem": "进入新环境时，你通常会怎样？",
+      "placeholder": "维度：外向 / 内向（E/I） · 主动交流 ↔ 先观察等待",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "进入新环境时，我会主动和别人交流",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "进入新环境时，我会先观察一段时间",
+          "score": 1.0
+        }
+      ],
+      "left": "进入新环境时，我会主动和别人交流",
+      "right": "进入新环境时，我会先观察一段时间"
+    },
+    {
+      "code": "MBTI93_Q003",
+      "stem": "你更习惯怎样整理和表达想法？",
+      "placeholder": "维度：外向 / 内向（E/I） · 边说边想 ↔ 先想再说",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我常常边说边整理自己的想法",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我通常先想清楚再表达",
+          "score": 1.0
+        }
+      ],
+      "left": "我常常边说边整理自己的想法",
+      "right": "我通常先想清楚再表达"
+    },
+    {
+      "code": "MBTI93_Q004",
+      "stem": "讨论问题时，你更偏好哪种方式？",
+      "placeholder": "维度：外向 / 内向（E/I） · 多人即时讨论 ↔ 独自想清楚",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢多人讨论带来的即时反馈",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢独自思考后的清晰结论",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢多人讨论带来的即时反馈",
+      "right": "我喜欢独自思考后的清晰结论"
+    },
+    {
+      "code": "MBTI93_Q005",
+      "stem": "聚会结束后，你的感受更接近哪种？",
+      "placeholder": "维度：外向 / 内向（E/I） · 更有活力 ↔ 需要休息",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "聚会后我通常觉得更有活力",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "聚会后我通常需要安静休息",
+          "score": 1.0
+        }
+      ],
+      "left": "聚会后我通常觉得更有活力",
+      "right": "聚会后我通常需要安静休息"
+    },
+    {
+      "code": "MBTI93_Q006",
+      "stem": "有了新想法，你通常会怎么做？",
+      "placeholder": "维度：外向 / 内向（E/I） · 及时分享 ↔ 先在心里沉淀",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我倾向于把想法及时分享出来",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我倾向于把想法先放在心里沉淀",
+          "score": 1.0
+        }
+      ],
+      "left": "我倾向于把想法及时分享出来",
+      "right": "我倾向于把想法先放在心里沉淀"
+    },
+    {
+      "code": "MBTI93_Q007",
+      "stem": "你更偏好的工作方式是？",
+      "placeholder": "维度：外向 / 内向（E/I） · 开放协作 ↔ 独立专注",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更享受开放协作的工作方式",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更享受独立专注的工作方式",
+          "score": 1.0
+        }
+      ],
+      "left": "我更享受开放协作的工作方式",
+      "right": "我更享受独立专注的工作方式"
+    },
+    {
+      "code": "MBTI93_Q008",
+      "stem": "面对陌生人，你通常怎样打开局面？",
+      "placeholder": "维度：外向 / 内向（E/I） · 较快打开话题 ↔ 需要时间熟悉",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "面对陌生人，我较容易打开话题",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "面对陌生人，我需要时间建立熟悉感",
+          "score": 1.0
+        }
+      ],
+      "left": "面对陌生人，我较容易打开话题",
+      "right": "面对陌生人，我需要时间建立熟悉感"
+    },
+    {
+      "code": "MBTI93_Q009",
+      "stem": "你更偏好的环境氛围是？",
+      "placeholder": "维度：外向 / 内向（E/I） · 热闹有变化 ↔ 安静可控",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢热闹、有变化的现场氛围",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢安静、可控的个人空间",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢热闹、有变化的现场氛围",
+      "right": "我喜欢安静、可控的个人空间"
+    },
+    {
+      "code": "MBTI93_Q010",
+      "stem": "感到压力时，你的第一反应更接近？",
+      "placeholder": "维度：外向 / 内向（E/I） · 找人倾诉 ↔ 自己消化",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "压力来临时，我会找人聊出来",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "压力来临时，我会先自己消化",
+          "score": 1.0
+        }
+      ],
+      "left": "压力来临时，我会找人聊出来",
+      "right": "压力来临时，我会先自己消化"
+    },
+    {
+      "code": "MBTI93_Q011",
+      "stem": "你更常通过什么方式理解自己？",
+      "placeholder": "维度：外向 / 内向（E/I） · 外部反馈 ↔ 自我反思",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更常通过外部反馈理解自己",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更常通过自我反思理解自己",
+          "score": 1.0
+        }
+      ],
+      "left": "我更常通过外部反馈理解自己",
+      "right": "我更常通过自我反思理解自己"
+    },
+    {
+      "code": "MBTI93_Q012",
+      "stem": "在团队讨论中，你通常怎样参与？",
+      "placeholder": "维度：外向 / 内向（E/I） · 较快提出观点 ↔ 听完后补充",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我在团队中通常会较快提出观点",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我在团队中通常会听完再补充",
+          "score": 1.0
+        }
+      ],
+      "left": "我在团队中通常会较快提出观点",
+      "right": "我在团队中通常会听完再补充"
+    },
+    {
+      "code": "MBTI93_Q013",
+      "stem": "对于临时社交邀约，你的感受更接近？",
+      "placeholder": "维度：外向 / 内向（E/I） · 感到期待 ↔ 想保留个人时间",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "临时社交邀约通常让我感到期待",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "临时社交邀约通常让我想保留个人时间",
+          "score": 1.0
+        }
+      ],
+      "left": "临时社交邀约通常让我感到期待",
+      "right": "临时社交邀约通常让我想保留个人时间"
+    },
+    {
+      "code": "MBTI93_Q014",
+      "stem": "你更容易被什么吸引？",
+      "placeholder": "维度：外向 / 内向（E/I） · 外部新鲜事物 ↔ 内在想法感受",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更容易被外部世界的新鲜事吸引",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更容易被内在想法和感受吸引",
+          "score": 1.0
+        }
+      ],
+      "left": "我更容易被外部世界的新鲜事吸引",
+      "right": "我更容易被内在想法和感受吸引"
+    },
+    {
+      "code": "MBTI93_Q015",
+      "stem": "公开表达前，你通常需要多少准备？",
+      "placeholder": "维度：外向 / 内向（E/I） · 不算困难 ↔ 需要较多准备",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "公开表达对我来说通常不算困难",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "公开表达前我通常需要较多准备",
+          "score": 1.0
+        }
+      ],
+      "left": "公开表达对我来说通常不算困难",
+      "right": "公开表达前我通常需要较多准备"
+    },
+    {
+      "code": "MBTI93_Q016",
+      "stem": "在社交关系上，你更倾向于？",
+      "placeholder": "维度：外向 / 内向（E/I） · 扩大社交圈 ↔ 维持少量深关系",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我倾向于扩大社交圈",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我倾向于维持少量深度关系",
+          "score": 1.0
+        }
+      ],
+      "left": "我倾向于扩大社交圈",
+      "right": "我倾向于维持少量深度关系"
+    },
+    {
+      "code": "MBTI93_Q017",
+      "stem": "你更偏好的沟通方式是？",
+      "placeholder": "维度：外向 / 内向（E/I） · 即时沟通 ↔ 文字或私下沟通",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢即时沟通",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢文字或私下沟通",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢即时沟通",
+      "right": "我更喜欢文字或私下沟通"
+    },
+    {
+      "code": "MBTI93_Q018",
+      "stem": "别人通常怎样形容你的外在表现？",
+      "placeholder": "维度：外向 / 内向（E/I） · 外露直接 ↔ 内敛克制",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "别人通常觉得我比较外露直接",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "别人通常觉得我比较内敛克制",
+          "score": 1.0
+        }
+      ],
+      "left": "别人通常觉得我比较外露直接",
+      "right": "别人通常觉得我比较内敛克制"
+    },
+    {
+      "code": "MBTI93_Q019",
+      "stem": "感到开心时，你更想怎样处理这份情绪？",
+      "placeholder": "维度：外向 / 内向（E/I） · 马上分享 ↔ 自己慢慢体会",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "开心时我会很想马上分享",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "开心时我更愿意自己慢慢体会",
+          "score": 1.0
+        }
+      ],
+      "left": "开心时我会很想马上分享",
+      "right": "开心时我更愿意自己慢慢体会"
+    },
+    {
+      "code": "MBTI93_Q020",
+      "stem": "你更容易在哪里获得灵感？",
+      "placeholder": "维度：外向 / 内向（E/I） · 互动中获得 ↔ 独处中获得",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更适合在互动中获得灵感",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更适合在独处中获得灵感",
+          "score": 1.0
+        }
+      ],
+      "left": "我更适合在互动中获得灵感",
+      "right": "我更适合在独处中获得灵感"
+    },
+    {
+      "code": "MBTI93_Q021",
+      "stem": "在群体氛围中，你更常扮演的角色是？",
+      "placeholder": "维度：外向 / 内向（E/I） · 把气氛带起来 ↔ 让气氛稳定",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢把气氛带起来",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢让气氛稳定下来",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢把气氛带起来",
+      "right": "我喜欢让气氛稳定下来"
+    },
+    {
+      "code": "MBTI93_Q022",
+      "stem": "你更偏向哪种探索方向？",
+      "placeholder": "维度：外向 / 内向（E/I） · 向外探索 ↔ 向内整理",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更偏向向外探索世界",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更偏向向内整理自我",
+          "score": 1.0
+        }
+      ],
+      "left": "我更偏向向外探索世界",
+      "right": "我更偏向向内整理自我"
+    },
+    {
+      "code": "MBTI93_Q023",
+      "stem": "面对新事情，你通常怎样开始？",
+      "placeholder": "维度：外向 / 内向（E/I） · 先行动再调整 ↔ 先评估再决定",
+      "type": "Radio",
+      "required": true,
+      "factor": "EI",
+      "options": [
+        {
+          "code": "A",
+          "content": "我通常先行动，再根据反馈调整",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我通常先评估，再决定是否行动",
+          "score": 1.0
+        }
+      ],
+      "left": "我通常先行动，再根据反馈调整",
+      "right": "我通常先评估，再决定是否行动"
+    },
+    {
+      "code": "MBTI93_Q024",
+      "stem": "获取信息时，你更关注什么？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 具体事实 ↔ 模式意义",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更关注具体事实和细节",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更关注背后的模式和意义",
+          "score": 1.0
+        }
+      ],
+      "left": "我更关注具体事实和细节",
+      "right": "我更关注背后的模式和意义"
+    },
+    {
+      "code": "MBTI93_Q025",
+      "stem": "做判断时，你更依赖什么？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 实际经验 ↔ 直觉联想",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更相信实际经验",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更相信直觉联想",
+          "score": 1.0
+        }
+      ],
+      "left": "我更相信实际经验",
+      "right": "我更相信直觉联想"
+    },
+    {
+      "code": "MBTI93_Q026",
+      "stem": "处理任务时，你更喜欢？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 清晰步骤 ↔ 整体思路",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢清晰步骤",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢整体思路",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢清晰步骤",
+      "right": "我喜欢整体思路"
+    },
+    {
+      "code": "MBTI93_Q027",
+      "stem": "评价方案时，你更看重？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 可落地 ↔ 有想象空间",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更看重方案是否可落地",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更看重方案是否有想象空间",
+          "score": 1.0
+        }
+      ],
+      "left": "我更看重方案是否可落地",
+      "right": "我更看重方案是否有想象空间"
+    },
+    {
+      "code": "MBTI93_Q028",
+      "stem": "你更容易注意到？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 数字时间地点 ↔ 趋势隐喻关联",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更容易注意数字、时间、地点",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更容易注意趋势、隐喻、关联",
+          "score": 1.0
+        }
+      ],
+      "left": "我更容易注意数字、时间、地点",
+      "right": "我更容易注意趋势、隐喻、关联"
+    },
+    {
+      "code": "MBTI93_Q029",
+      "stem": "你更喜欢哪类内容？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 事实清楚 ↔ 富有启发",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢事实清楚的内容",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢富有启发的内容",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢事实清楚的内容",
+      "right": "我更喜欢富有启发的内容"
+    },
+    {
+      "code": "MBTI93_Q030",
+      "stem": "遇到新方法，你更愿意？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 用验证过的 ↔ 尝试新的",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更愿意使用经过验证的方法",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更愿意尝试尚未验证的新方法",
+          "score": 1.0
+        }
+      ],
+      "left": "我更愿意使用经过验证的方法",
+      "right": "我更愿意尝试尚未验证的新方法"
+    },
+    {
+      "code": "MBTI93_Q031",
+      "stem": "你更擅长发现？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 细节错误 ↔ 潜在方向",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更擅长发现细节错误",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更擅长发现潜在方向",
+          "score": 1.0
+        }
+      ],
+      "left": "我更擅长发现细节错误",
+      "right": "我更擅长发现潜在方向"
+    },
+    {
+      "code": "MBTI93_Q032",
+      "stem": "学习时你更偏好？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 具体案例 ↔ 概念框架",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢具体案例",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢概念框架",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢具体案例",
+      "right": "我更喜欢概念框架"
+    },
+    {
+      "code": "MBTI93_Q033",
+      "stem": "你更常追问什么？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 具体怎么做 ↔ 为什么这样做",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更常问“具体怎么做”",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更常问“为什么这样做”",
+          "score": 1.0
+        }
+      ],
+      "left": "我更常问“具体怎么做”",
+      "right": "我更常问“为什么这样做”"
+    },
+    {
+      "code": "MBTI93_Q034",
+      "stem": "你更重视哪类问题？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 当下可见 ↔ 未来可能",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更重视当下可见的问题",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更重视未来可能的问题",
+          "score": 1.0
+        }
+      ],
+      "left": "我更重视当下可见的问题",
+      "right": "我更重视未来可能的问题"
+    },
+    {
+      "code": "MBTI93_Q035",
+      "stem": "推进事情时，你更喜欢？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 一步步推进 ↔ 先构想大方向",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢把事情一步步推进",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢先构想更大的方向",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢把事情一步步推进",
+      "right": "我喜欢先构想更大的方向"
+    },
+    {
+      "code": "MBTI93_Q036",
+      "stem": "你更容易记住？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 具体场景 ↔ 抽象含义",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更容易记住具体场景",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更容易记住抽象含义",
+          "score": 1.0
+        }
+      ],
+      "left": "我更容易记住具体场景",
+      "right": "我更容易记住抽象含义"
+    },
+    {
+      "code": "MBTI93_Q037",
+      "stem": "你更欣赏哪种特质？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 稳定可靠 ↔ 灵感突破",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更欣赏稳定可靠",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更欣赏灵感突破",
+          "score": 1.0
+        }
+      ],
+      "left": "我更欣赏稳定可靠",
+      "right": "我更欣赏灵感突破"
+    },
+    {
+      "code": "MBTI93_Q038",
+      "stem": "你更偏好哪类材料？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 操作指南 ↔ 思想地图",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更偏好操作指南",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更偏好思想地图",
+          "score": 1.0
+        }
+      ],
+      "left": "我更偏好操作指南",
+      "right": "我更偏好思想地图"
+    },
+    {
+      "code": "MBTI93_Q039",
+      "stem": "看问题时，你更关注？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 现实限制 ↔ 可能性空间",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我看问题更偏现实限制",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我看问题更偏可能性空间",
+          "score": 1.0
+        }
+      ],
+      "left": "我看问题更偏现实限制",
+      "right": "我看问题更偏可能性空间"
+    },
+    {
+      "code": "MBTI93_Q040",
+      "stem": "你更喜欢哪种表达？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 直接具体 ↔ 富有联想",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢直接具体的表达",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢富有联想的表达",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢直接具体的表达",
+      "right": "我更喜欢富有联想的表达"
+    },
+    {
+      "code": "MBTI93_Q041",
+      "stem": "开始行动前，你先确认什么？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 事实是否充分 ↔ 方向是否合理",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我会先确认事实是否充分",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我会先判断方向是否合理",
+          "score": 1.0
+        }
+      ],
+      "left": "我会先确认事实是否充分",
+      "right": "我会先判断方向是否合理"
+    },
+    {
+      "code": "MBTI93_Q042",
+      "stem": "面对流程，你更愿意？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 优化已有 ↔ 重新想象",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更愿意优化已有流程",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更愿意重新想象流程",
+          "score": 1.0
+        }
+      ],
+      "left": "我更愿意优化已有流程",
+      "right": "我更愿意重新想象流程"
+    },
+    {
+      "code": "MBTI93_Q043",
+      "stem": "你更关注事情的哪个时间面？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 现在是什么样 ↔ 未来可能怎样",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更关注事情现在是什么样",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更关注事情未来可能变成什么样",
+          "score": 1.0
+        }
+      ],
+      "left": "我更关注事情现在是什么样",
+      "right": "我更关注事情未来可能变成什么样"
+    },
+    {
+      "code": "MBTI93_Q044",
+      "stem": "你更偏好哪类任务？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 明确标准 ↔ 开放探索",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢明确标准的任务",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢开放探索的任务",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢明确标准的任务",
+      "right": "我更喜欢开放探索的任务"
+    },
+    {
+      "code": "MBTI93_Q045",
+      "stem": "你更相信什么？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 看得见的证据 ↔ 整体直觉",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更相信看得见的证据",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更相信整体直觉",
+          "score": 1.0
+        }
+      ],
+      "left": "我更相信看得见的证据",
+      "right": "我更相信整体直觉"
+    },
+    {
+      "code": "MBTI93_Q046",
+      "stem": "总体而言，你更关注？",
+      "placeholder": "维度：感觉 / 直觉（S/N） · 现实细节 ↔ 抽象可能",
+      "type": "Radio",
+      "required": true,
+      "factor": "SN",
+      "options": [
+        {
+          "code": "A",
+          "content": "总体来说，我更关注现实细节",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "总体来说，我更关注抽象可能",
+          "score": 1.0
+        }
+      ],
+      "left": "总体来说，我更关注现实细节",
+      "right": "总体来说，我更关注抽象可能"
+    },
+    {
+      "code": "MBTI93_Q047",
+      "stem": "做决定时，你更依赖什么？",
+      "placeholder": "维度：思考 / 情感（T/F） · 逻辑原则 ↔ 人的感受",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "做决定时，我更依赖逻辑原则",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "做决定时，我更重视人的感受",
+          "score": 1.0
+        }
+      ],
+      "left": "做决定时，我更依赖逻辑原则",
+      "right": "做决定时，我更重视人的感受"
+    },
+    {
+      "code": "MBTI93_Q048",
+      "stem": "遇到冲突时，你更在意？",
+      "placeholder": "维度：思考 / 情感（T/F） · 问题被解决 ↔ 关系不受伤",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更在意问题是否被解决",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更在意关系是否受伤",
+          "score": 1.0
+        }
+      ],
+      "left": "我更在意问题是否被解决",
+      "right": "我更在意关系是否受伤"
+    },
+    {
+      "code": "MBTI93_Q049",
+      "stem": "你更欣赏哪种品质？",
+      "placeholder": "维度：思考 / 情感（T/F） · 公正理性 ↔ 温暖体贴",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更欣赏公正理性",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更欣赏温暖体贴",
+          "score": 1.0
+        }
+      ],
+      "left": "我更欣赏公正理性",
+      "right": "我更欣赏温暖体贴"
+    },
+    {
+      "code": "MBTI93_Q050",
+      "stem": "朋友遇到问题时，你先做什么？",
+      "placeholder": "维度：思考 / 情感（T/F） · 分析原因 ↔ 共情安慰",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "朋友遇到问题时，我先分析原因",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "朋友遇到问题时，我先共情安慰",
+          "score": 1.0
+        }
+      ],
+      "left": "朋友遇到问题时，我先分析原因",
+      "right": "朋友遇到问题时，我先共情安慰"
+    },
+    {
+      "code": "MBTI93_Q051",
+      "stem": "争论时，你更重视？",
+      "placeholder": "维度：思考 / 情感（T/F） · 论证是否正确 ↔ 彼此是否舒服",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "争论中我更重视论证是否正确",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "争论中我更重视彼此是否舒服",
+          "score": 1.0
+        }
+      ],
+      "left": "争论中我更重视论证是否正确",
+      "right": "争论中我更重视彼此是否舒服"
+    },
+    {
+      "code": "MBTI93_Q052",
+      "stem": "什么更让你难以接受？",
+      "placeholder": "维度：思考 / 情感（T/F） · 不合逻辑 ↔ 冷漠无情",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更难接受不合逻辑",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更难接受冷漠无情",
+          "score": 1.0
+        }
+      ],
+      "left": "我更难接受不合逻辑",
+      "right": "我更难接受冷漠无情"
+    },
+    {
+      "code": "MBTI93_Q053",
+      "stem": "团队决策时，你更看中？",
+      "placeholder": "维度：思考 / 情感（T/F） · 最优方案 ↔ 大家能否接受",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "团队决策中我更看重最优方案",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "团队决策中我更看重大家能否接受",
+          "score": 1.0
+        }
+      ],
+      "left": "团队决策中我更看重最优方案",
+      "right": "团队决策中我更看重大家能否接受"
+    },
+    {
+      "code": "MBTI93_Q054",
+      "stem": "判断对错时，你更常用？",
+      "placeholder": "维度：思考 / 情感（T/F） · 证据和原则 ↔ 价值和关怀",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更常用证据和原则判断对错",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更常用价值和关怀判断对错",
+          "score": 1.0
+        }
+      ],
+      "left": "我更常用证据和原则判断对错",
+      "right": "我更常用价值和关怀判断对错"
+    },
+    {
+      "code": "MBTI93_Q055",
+      "stem": "别人倾诉时，你的第一反应是？",
+      "placeholder": "维度：思考 / 情感（T/F） · 给解决方案 ↔ 陪伴理解",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "别人倾诉时，我会给解决方案",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "别人倾诉时，我会先陪伴理解",
+          "score": 1.0
+        }
+      ],
+      "left": "别人倾诉时，我会给解决方案",
+      "right": "别人倾诉时，我会先陪伴理解"
+    },
+    {
+      "code": "MBTI93_Q056",
+      "stem": "你更容易被什么说服？",
+      "placeholder": "维度：思考 / 情感（T/F） · 逻辑严密 ↔ 真诚动人",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更容易被逻辑严密说服",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更容易被真诚动人说服",
+          "score": 1.0
+        }
+      ],
+      "left": "我更容易被逻辑严密说服",
+      "right": "我更容易被真诚动人说服"
+    },
+    {
+      "code": "MBTI93_Q057",
+      "stem": "规则伤害到人时，你倾向？",
+      "placeholder": "维度：思考 / 情感（T/F） · 保持一致标准 ↔ 适当变通",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "规则伤害到人时，我仍倾向保持一致标准",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "规则伤害到人时，我倾向适当变通",
+          "score": 1.0
+        }
+      ],
+      "left": "规则伤害到人时，我仍倾向保持一致标准",
+      "right": "规则伤害到人时，我倾向适当变通"
+    },
+    {
+      "code": "MBTI93_Q058",
+      "stem": "你希望自己做决定时怎样？",
+      "placeholder": "维度：思考 / 情感（T/F） · 清醒客观 ↔ 善良体贴",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我希望自己做决定时清醒客观",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我希望自己做决定时善良体贴",
+          "score": 1.0
+        }
+      ],
+      "left": "我希望自己做决定时清醒客观",
+      "right": "我希望自己做决定时善良体贴"
+    },
+    {
+      "code": "MBTI93_Q059",
+      "stem": "面对批评，你更关注？",
+      "placeholder": "维度：思考 / 情感（T/F） · 内容是否准确 ↔ 语气是否伤人",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "面对批评，我更关注内容是否准确",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "面对批评，我更关注语气是否伤人",
+          "score": 1.0
+        }
+      ],
+      "left": "面对批评，我更关注内容是否准确",
+      "right": "面对批评，我更关注语气是否伤人"
+    },
+    {
+      "code": "MBTI93_Q060",
+      "stem": "你更认可哪类领导？",
+      "placeholder": "维度：思考 / 情感（T/F） · 清晰果断 ↔ 关心成员状态",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更认可决策清晰果断的领导",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更认可关心成员状态的领导",
+          "score": 1.0
+        }
+      ],
+      "left": "我更认可决策清晰果断的领导",
+      "right": "我更认可关心成员状态的领导"
+    },
+    {
+      "code": "MBTI93_Q061",
+      "stem": "在关系中，你更重视？",
+      "placeholder": "维度：思考 / 情感（T/F） · 边界和原则 ↔ 情感连接",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "在关系中我更重视边界和原则",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "在关系中我更重视情感连接",
+          "score": 1.0
+        }
+      ],
+      "left": "在关系中我更重视边界和原则",
+      "right": "在关系中我更重视情感连接"
+    },
+    {
+      "code": "MBTI93_Q062",
+      "stem": "别人犯错时，你更倾向？",
+      "placeholder": "维度：思考 / 情感（T/F） · 指出问题 ↔ 理解原因",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "别人犯错时，我更倾向指出问题",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "别人犯错时，我更倾向理解原因",
+          "score": 1.0
+        }
+      ],
+      "left": "别人犯错时，我更倾向指出问题",
+      "right": "别人犯错时，我更倾向理解原因"
+    },
+    {
+      "code": "MBTI93_Q063",
+      "stem": "出现分歧时，你更喜欢？",
+      "placeholder": "维度：思考 / 情感（T/F） · 直接指出漏洞 ↔ 先照顾感受",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢直接指出逻辑漏洞",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢先照顾对方感受",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢直接指出逻辑漏洞",
+      "right": "我更喜欢先照顾对方感受"
+    },
+    {
+      "code": "MBTI93_Q064",
+      "stem": "做取舍时，你更看重？",
+      "placeholder": "维度：思考 / 情感（T/F） · 整体效率 ↔ 对人的影响",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "取舍时我更看重整体效率",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "取舍时我更看重对人的影响",
+          "score": 1.0
+        }
+      ],
+      "left": "取舍时我更看重整体效率",
+      "right": "取舍时我更看重对人的影响"
+    },
+    {
+      "code": "MBTI93_Q065",
+      "stem": "与人相处时，你更容易注意到？",
+      "placeholder": "维度：思考 / 情感（T/F） · 结构问题 ↔ 情绪变化",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更容易注意事情结构的问题",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更容易注意别人情绪的变化",
+          "score": 1.0
+        }
+      ],
+      "left": "我更容易注意事情结构的问题",
+      "right": "我更容易注意别人情绪的变化"
+    },
+    {
+      "code": "MBTI93_Q066",
+      "stem": "你更偏好哪类反馈？",
+      "placeholder": "维度：思考 / 情感（T/F） · 直接准确 ↔ 温和鼓励",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢直接准确的反馈",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢温和鼓励的反馈",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢直接准确的反馈",
+      "right": "我更喜欢温和鼓励的反馈"
+    },
+    {
+      "code": "MBTI93_Q067",
+      "stem": "分歧出现时，你先做什么？",
+      "placeholder": "维度：思考 / 情感（T/F） · 厘清事实 ↔ 缓和气氛",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "分歧出现时，我先厘清事实",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "分歧出现时，我先缓和气氛",
+          "score": 1.0
+        }
+      ],
+      "left": "分歧出现时，我先厘清事实",
+      "right": "分歧出现时，我先缓和气氛"
+    },
+    {
+      "code": "MBTI93_Q068",
+      "stem": "做价值判断时，你更看重？",
+      "placeholder": "维度：思考 / 情感（T/F） · 公正 ↔ 善意",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更看重公正",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更看重善意",
+          "score": 1.0
+        }
+      ],
+      "left": "我更看重公正",
+      "right": "我更看重善意"
+    },
+    {
+      "code": "MBTI93_Q069",
+      "stem": "总体而言，你更偏哪种判断方式？",
+      "placeholder": "维度：思考 / 情感（T/F） · 理性原则 ↔ 情感价值",
+      "type": "Radio",
+      "required": true,
+      "factor": "TF",
+      "options": [
+        {
+          "code": "A",
+          "content": "总体来说，我更偏理性原则判断",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "总体来说，我更偏情感价值判断",
+          "score": 1.0
+        }
+      ],
+      "left": "总体来说，我更偏理性原则判断",
+      "right": "总体来说，我更偏情感价值判断"
+    },
+    {
+      "code": "MBTI93_Q070",
+      "stem": "安排事务时，你更喜欢？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 提前规划 ↔ 保持弹性",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢提前规划",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢保持弹性",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢提前规划",
+      "right": "我喜欢保持弹性"
+    },
+    {
+      "code": "MBTI93_Q071",
+      "stem": "面对截止日期，你通常？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 尽早完成 ↔ 临近集中完成",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "面对截止日期，我倾向尽早完成",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "面对截止日期，我倾向临近集中完成",
+          "score": 1.0
+        }
+      ],
+      "left": "面对截止日期，我倾向尽早完成",
+      "right": "面对截止日期，我倾向临近集中完成"
+    },
+    {
+      "code": "MBTI93_Q072",
+      "stem": "你的生活状态更接近？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 有条理 ↔ 随性灵活",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我的生活状态更有条理",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我的生活状态更随性灵活",
+          "score": 1.0
+        }
+      ],
+      "left": "我的生活状态更有条理",
+      "right": "我的生活状态更随性灵活"
+    },
+    {
+      "code": "MBTI93_Q073",
+      "stem": "旅行时，你更偏好？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 提前订好安排 ↔ 到了再看情况",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "旅行前我喜欢订好安排",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "旅行时我喜欢到当地再看情况",
+          "score": 1.0
+        }
+      ],
+      "left": "旅行前我喜欢订好安排",
+      "right": "旅行时我喜欢到当地再看情况"
+    },
+    {
+      "code": "MBTI93_Q074",
+      "stem": "推进任务时，你更喜欢？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 列清单逐项完成 ↔ 按当下状态推进",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢列清单逐项完成",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢根据当下状态推进",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢列清单逐项完成",
+      "right": "我喜欢根据当下状态推进"
+    },
+    {
+      "code": "MBTI93_Q075",
+      "stem": "你更享受哪种状态？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 尘埃落定 ↔ 选择保持开放",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更享受事情尘埃落定",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更享受选择保持开放",
+          "score": 1.0
+        }
+      ],
+      "left": "我更享受事情尘埃落定",
+      "right": "我更享受选择保持开放"
+    },
+    {
+      "code": "MBTI93_Q076",
+      "stem": "你更偏好哪种生活节奏？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 稳定可预期 ↔ 自由可调整",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢稳定可预期的节奏",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢自由可调整的节奏",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢稳定可预期的节奏",
+      "right": "我更喜欢自由可调整的节奏"
+    },
+    {
+      "code": "MBTI93_Q077",
+      "stem": "任务与休息，你通常怎样安排？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 先完成再放松 ↔ 边放松边推进",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我通常先完成任务再放松",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我通常边放松边推进任务",
+          "score": 1.0
+        }
+      ],
+      "left": "我通常先完成任务再放松",
+      "right": "我通常边放松边推进任务"
+    },
+    {
+      "code": "MBTI93_Q078",
+      "stem": "面对选择，你更喜欢？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 明确决定 ↔ 多留可能",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢明确决定",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢多留一些可能",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢明确决定",
+      "right": "我更喜欢多留一些可能"
+    },
+    {
+      "code": "MBTI93_Q079",
+      "stem": "你通常怎样管理计划？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 写下来 ↔ 放在心里随时调整",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我倾向把计划写下来",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我倾向把计划放在心里随机调整",
+          "score": 1.0
+        }
+      ],
+      "left": "我倾向把计划写下来",
+      "right": "我倾向把计划放在心里随机调整"
+    },
+    {
+      "code": "MBTI93_Q080",
+      "stem": "执行时，你更愿意？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 按既定流程 ↔ 现场随机应变",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更愿意按既定流程执行",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更愿意现场随机应变",
+          "score": 1.0
+        }
+      ],
+      "left": "我更愿意按既定流程执行",
+      "right": "我更愿意现场随机应变"
+    },
+    {
+      "code": "MBTI93_Q081",
+      "stem": "对悬而未决的事，你的感受是？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 不太喜欢 ↔ 不必太早定下来",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我不喜欢事情悬而未决",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我不喜欢太早被固定下来",
+          "score": 1.0
+        }
+      ],
+      "left": "我不喜欢事情悬而未决",
+      "right": "我不喜欢太早被固定下来"
+    },
+    {
+      "code": "MBTI93_Q082",
+      "stem": "你更擅长？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 把事情收尾 ↔ 发现新可能",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更擅长把事情收尾",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更擅长发现新的可能",
+          "score": 1.0
+        }
+      ],
+      "left": "我更擅长把事情收尾",
+      "right": "我更擅长发现新的可能"
+    },
+    {
+      "code": "MBTI93_Q083",
+      "stem": "你的工作空间通常？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 比较有秩序 ↔ 按使用习惯摆放",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我的工作空间通常比较有秩序",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我的工作空间通常按使用习惯自然摆放",
+          "score": 1.0
+        }
+      ],
+      "left": "我的工作空间通常比较有秩序",
+      "right": "我的工作空间通常按使用习惯自然摆放"
+    },
+    {
+      "code": "MBTI93_Q084",
+      "stem": "安排任务时，你更依赖？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 优先级 ↔ 当下灵感",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢按照优先级安排任务",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢看当下灵感安排任务",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢按照优先级安排任务",
+      "right": "我喜欢看当下灵感安排任务"
+    },
+    {
+      "code": "MBTI93_Q085",
+      "stem": "面对临时变化，你的感受更接近？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 有些不安 ↔ 觉得有趣",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "临时变化会让我有些不安",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "临时变化常让我觉得有趣",
+          "score": 1.0
+        }
+      ],
+      "left": "临时变化会让我有些不安",
+      "right": "临时变化常让我觉得有趣"
+    },
+    {
+      "code": "MBTI93_Q086",
+      "stem": "行动与决定，你更倾向？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 先决定再行动 ↔ 边行动边决定",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更倾向先做决定再行动",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更倾向边行动边决定",
+          "score": 1.0
+        }
+      ],
+      "left": "我更倾向先做决定再行动",
+      "right": "我更倾向边行动边决定"
+    },
+    {
+      "code": "MBTI93_Q087",
+      "stem": "设定目标时，你更喜欢？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 拆成步骤 ↔ 边探索边形成",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我喜欢把目标拆成步骤",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我喜欢边探索边形成目标",
+          "score": 1.0
+        }
+      ],
+      "left": "我喜欢把目标拆成步骤",
+      "right": "我喜欢边探索边形成目标"
+    },
+    {
+      "code": "MBTI93_Q088",
+      "stem": "你更重视？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 准时和承诺 ↔ 弹性和机会",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更重视准时和承诺",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更重视弹性和机会",
+          "score": 1.0
+        }
+      ],
+      "left": "我更重视准时和承诺",
+      "right": "我更重视弹性和机会"
+    },
+    {
+      "code": "MBTI93_Q089",
+      "stem": "你更喜欢？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 清楚边界规则 ↔ 灵活空间选择",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢清楚的边界和规则",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢灵活的空间和选择",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢清楚的边界和规则",
+      "right": "我更喜欢灵活的空间和选择"
+    },
+    {
+      "code": "MBTI93_Q090",
+      "stem": "面对未知情况，你通常？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 提前准备备用方案 ↔ 出现后再处理",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我通常会提前准备备用方案",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我通常会等情况出现后再处理",
+          "score": 1.0
+        }
+      ],
+      "left": "我通常会提前准备备用方案",
+      "right": "我通常会等情况出现后再处理"
+    },
+    {
+      "code": "MBTI93_Q091",
+      "stem": "你希望生活状态更？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 可控 ↔ 开放",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我倾向于让生活更可控",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我倾向于让生活更开放",
+          "score": 1.0
+        }
+      ],
+      "left": "我倾向于让生活更可控",
+      "right": "我倾向于让生活更开放"
+    },
+    {
+      "code": "MBTI93_Q092",
+      "stem": "完成一件事情后，你更追求？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 完成感 ↔ 探索感",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "我更喜欢完成感",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "我更喜欢探索感",
+          "score": 1.0
+        }
+      ],
+      "left": "我更喜欢完成感",
+      "right": "我更喜欢探索感"
+    },
+    {
+      "code": "MBTI93_Q093",
+      "stem": "总体而言，你更偏哪种生活方式？",
+      "placeholder": "维度：判断 / 知觉（J/P） · 计划判断 ↔ 灵活知觉",
+      "type": "Radio",
+      "required": true,
+      "factor": "JP",
+      "options": [
+        {
+          "code": "A",
+          "content": "总体来说，我更偏计划和判断",
+          "score": 0.0
+        },
+        {
+          "code": "B",
+          "content": "总体来说，我更偏灵活和知觉",
+          "score": 1.0
+        }
+      ],
+      "left": "总体来说，我更偏计划和判断",
+      "right": "总体来说，我更偏灵活和知觉"
+    }
+  ]
+}

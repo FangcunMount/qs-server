@@ -1,9 +1,9 @@
 {
   "code": "MBTI_OEJTS",
-  "version": "1.0.0",
+  "version": "2.0.1",
   "title": "MBTI 人格类型测评（OEJTS）",
   "questionnaire_code": "MBTI_OEJTS",
-  "questionnaire_version": "1.0.0",
+  "questionnaire_version": "2.0.1",
   "status": "published",
   "source": {
     "questions_repo": "https://github.com/openjung/core",
@@ -24,7 +24,6 @@
       "name": "外向 / 内向",
       "left_pole": "I",
       "right_pole": "E",
-      "constant": 30,
       "threshold": 24
     },
     "SN": {
@@ -32,7 +31,6 @@
       "name": "感觉 / 直觉",
       "left_pole": "S",
       "right_pole": "N",
-      "constant": 12,
       "threshold": 24
     },
     "TF": {
@@ -40,7 +38,6 @@
       "name": "情感 / 思考",
       "left_pole": "F",
       "right_pole": "T",
-      "constant": 30,
       "threshold": 24
     },
     "JP": {
@@ -48,7 +45,6 @@
       "name": "判断 / 知觉",
       "left_pole": "J",
       "right_pole": "P",
-      "constant": 18,
       "threshold": 24
     }
   },
@@ -56,162 +52,386 @@
     {
       "question_code": "MBTI_Q01",
       "dimension": "JP",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q02",
       "dimension": "TF",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q03",
       "dimension": "EI",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q04",
       "dimension": "SN",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q05",
       "dimension": "JP",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q06",
       "dimension": "TF",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q07",
       "dimension": "EI",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q08",
       "dimension": "SN",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q09",
       "dimension": "JP",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q10",
       "dimension": "TF",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q11",
       "dimension": "EI",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q12",
       "dimension": "SN",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q13",
       "dimension": "JP",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q14",
       "dimension": "TF",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q15",
       "dimension": "EI",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q16",
       "dimension": "SN",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q17",
       "dimension": "JP",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q18",
       "dimension": "TF",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q19",
       "dimension": "EI",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q20",
       "dimension": "SN",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q21",
       "dimension": "JP",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q22",
       "dimension": "TF",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q23",
       "dimension": "EI",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q24",
       "dimension": "SN",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q25",
       "dimension": "JP",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q26",
       "dimension": "TF",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q27",
       "dimension": "EI",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q28",
       "dimension": "SN",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q29",
       "dimension": "JP",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q30",
       "dimension": "TF",
-      "sign": -1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q31",
       "dimension": "EI",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     },
     {
       "question_code": "MBTI_Q32",
       "dimension": "SN",
-      "sign": 1
+      "sign": 1,
+      "option_scores": {
+        "1": 1,
+        "2": 2,
+        "3": 3,
+        "4": 4,
+        "5": 5
+      }
     }
   ],
   "type_profiles": [

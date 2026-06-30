@@ -42,12 +42,11 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `enroll_testees_after_date.py` | 通过 REST API 将指定日期后创建的受试者批量加入计划 | REST `/plans/enroll` 对应的业务数据 |
 | `backfill_published_assessment_models/main.go` | 从 legacy `evaluation_rule_sets` 回填 `published_assessment_models` | Mongo `published_assessment_models` |
 | `seed_evaluation_rule_sets/main.go` | 写入内置 MBTI/SBTI + 已发布量表到 `published_assessment_models` | Mongo `published_assessment_models` |
-| `seed_mbti_questionnaire/` | 发布 `MBTI_OEJTS` 问卷快照 | Mongo `questionnaires` |
-| `seed_sbti_questionnaire/` | 发布 `SBTI_FUN` 问卷快照 | Mongo `questionnaires` |
+| `seed_personality_typology/` | **统一入口**：重初始化 MBTI@2.0.1、MBTI_FC_93、SBTI、Big5、九型 问卷与解释模型 | Mongo `questionnaires` + `assessment_models` + `published_assessment_models` |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
 
-> **注意**：`seed_*_questionnaire` 是**包目录**，必须用 `go run ./scripts/oneoff/seed_mbti_questionnaire/`（带尾部 `/` 或 `.`），**不要** `go run .../main.go`，否则不会编译同目录的 `types.go` 与 `//go:embed` 资源。
+> **注意**：`seed_personality_typology/` 是包目录，必须用 `go run ./scripts/oneoff/seed_personality_typology/`（带尾部 `/`），**不要** `go run .../main.go`。
 
 ## backfill_published_assessment_models / seed_evaluation_rule_sets
 
@@ -87,31 +86,91 @@ db.published_assessment_models.find(
 )
 ```
 
-## seed_mbti_questionnaire / seed_sbti_questionnaire
+## seed_personality_typology
 
 ### 做什么
 
-将内置 JSON 问卷发布为 `MBTI_OEJTS@1.0.0` / `SBTI_FUN@1.0.0`。若线上已有同 code+version 的已发布问卷，默认 skip；需覆盖时用 `--force`。
+一次性重初始化以下人格测评：
+
+| 模型 | 问卷 | 算法 | 决策 |
+| ---- | ---- | ---- | ---- |
+| `MBTI_OEJTS@2.0.1` | 32题 | mbti | pole_composition |
+| `MBTI_FC_93@1.0.0` | 93题强迫选择 | mbti | pole_composition |
+| `SBTI_FUN@1.0.0` | 30题 | sbti | nearest_pattern |
+| `BIG5_IPIP_50@1.0.0` | 50题 IPIP | bigfive | trait_profile |
+| `ENNEAGRAM_45@1.0.0` | 45题自研 | personality_typology | trait_profile |
+
+1. 发布问卷快照到 `questionnaires`
+2. 写入带 **explicit factor graph** 的解释模型到 `assessment_models`（draft）与 `published_assessment_models`
+
+模型 payload 包含：`question_mappings`、`factor.contributions`、`report.kind=personality_type`、`adapter_key=mbti|sbti`、正确的 `questionnaire_binding`。
 
 ### 如何调用
 
 ```bash
-# 必须用包路径，不要用 main.go
-go run ./scripts/oneoff/seed_mbti_questionnaire/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --apply
+# dry-run
+go run ./scripts/oneoff/seed_personality_typology/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs
 
-go run ./scripts/oneoff/seed_sbti_questionnaire/ \
-  --mongo-uri "$MONGO_URI" --mongo-db qs --apply
+# 覆盖已有脏数据并写入
+go run ./scripts/oneoff/seed_personality_typology/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --force --apply
 ```
 
-上线前可先查是否已存在（存在则不必 seed）：
+仅发布问卷、不写解释模型（替代原 `seed_*_questionnaire`）：
+
+```bash
+go run ./scripts/oneoff/seed_personality_typology/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --skip-models --force --apply
+```
+
+仅重初始化 Big5 / 九型：
+
+```bash
+go run ./scripts/oneoff/seed_personality_typology/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs \
+  --skip-mbti --skip-sbti --force --apply
+```
+
+仅重初始化 MBTI 93 题版：
+
+```bash
+go run ./scripts/oneoff/seed_personality_typology/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs \
+  --skip-mbti --skip-sbti --skip-big5 --skip-enneagram --force --apply
+```
+
+仅重初始化 MBTI 32 题版：
+
+```bash
+go run ./scripts/oneoff/seed_personality_typology/ \
+  --mongo-uri "$MONGO_URI" --mongo-db qs --skip-mbti93 --skip-sbti --skip-big5 --skip-enneagram --force --apply
+```
+
+验收：
 
 ```javascript
 db.questionnaires.find(
-  { code: { $in: ["MBTI_OEJTS", "SBTI_FUN"] }, deleted_at: null },
+  { code: { $in: ["MBTI_OEJTS", "MBTI_FC_93", "SBTI_FUN", "BIG5_IPIP_50", "ENNEAGRAM_45"] }, deleted_at: null },
   { code: 1, version: 1, status: 1, question_count: 1 }
 )
+db.assessment_models.find(
+  { code: { $in: ["MBTI_OEJTS", "MBTI_FC_93", "SBTI_FUN", "BIG5_IPIP_50", "ENNEAGRAM_45"] }, deleted_at: null },
+  { code: 1, questionnaire_code: 1, questionnaire_version: 1, status: 1, version: 1 }
+)
 ```
+
+题库 JSON 位于 `seed_personality_typology/data/`：
+
+| 文件 | 说明 |
+| ---- | ---- |
+| `mbti_questionnaire.json` | MBTI 32 题（OEJTS） |
+| `mbti_fc_93_questionnaire.json` | MBTI 93 题强迫选择（含 stem/placeholder/factor/left/right/options） |
+| `big5_ipip_50_questionnaire.json` | 大五 IPIP-50 |
+| `enneagram_45_questionnaire.json` | 九型 45 题 |
+| `sbti_questionnaire.json` | SBTI 娱乐版 |
+| `gen_seed.py` | 重新生成 MBTI 32 题 JSON |
+| `gen_trait_questionnaires.py` | 重新生成 Big5 / 九型 JSON |
 
 ## cleanup_perf_testee_data/main.go
 
