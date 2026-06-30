@@ -58,6 +58,9 @@ func seedAssessmentModel(
 		}, now); err != nil {
 			return fmt.Errorf("update definition %s: %w", plan.Code, err)
 		}
+		if err := draftRepo.Update(ctx, model); err != nil {
+			return fmt.Errorf("persist draft %s: %w", plan.Code, err)
+		}
 	} else {
 		model, err = domain.NewAssessmentModel(domain.NewAssessmentModelInput{
 			Code:      plan.Code,
