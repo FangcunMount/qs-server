@@ -78,6 +78,30 @@ func TestDefinitionFromModelNormalizesFullPayloadToEditorShape(t *testing.T) {
 	if len(editor.OutcomeMapping.Outcomes) != 1 || editor.OutcomeMapping.Outcomes[0].Code != "INTJ" {
 		t.Fatalf("outcomes = %#v", editor.OutcomeMapping.Outcomes)
 	}
+	if editor.OutcomeMapping.Outcomes[0].Name != "建筑师" {
+		t.Fatalf("outcome name = %q, want 建筑师", editor.OutcomeMapping.Outcomes[0].Name)
+	}
+
+	var rawPayload map[string]json.RawMessage
+	if err := json.Unmarshal(result.Payload, &rawPayload); err != nil {
+		t.Fatalf("unmarshal raw payload: %v", err)
+	}
+	var outcomeMapping struct {
+		Outcomes []struct {
+			Code  string `json:"code"`
+			Title string `json:"title"`
+			Name  string `json:"name"`
+		} `json:"outcomes"`
+	}
+	if err := json.Unmarshal(rawPayload["outcome_mapping"], &outcomeMapping); err != nil {
+		t.Fatalf("unmarshal outcome_mapping: %v", err)
+	}
+	if len(outcomeMapping.Outcomes) != 1 || outcomeMapping.Outcomes[0].Name != "建筑师" {
+		t.Fatalf("serialized outcomes = %#v", outcomeMapping.Outcomes)
+	}
+	if outcomeMapping.Outcomes[0].Title != "" {
+		t.Fatalf("serialized outcome should use name, got title=%q", outcomeMapping.Outcomes[0].Title)
+	}
 }
 
 func TestNormalizeDefinitionPayloadForStorageRoundTripsEditorPayload(t *testing.T) {
@@ -118,7 +142,7 @@ func TestNormalizeDefinitionPayloadForStorageRoundTripsEditorPayload(t *testing.
 	if err := json.Unmarshal(stored, &envelope); err != nil {
 		t.Fatalf("unmarshal envelope: %v", err)
 	}
-	if len(envelope.Outcomes) != 1 || envelope.Outcomes[0].Code != "INTJ" {
+	if len(envelope.Outcomes) != 1 || envelope.Outcomes[0].Code != "INTJ" || envelope.Outcomes[0].Name != "建筑师" {
 		t.Fatalf("outcomes = %#v", envelope.Outcomes)
 	}
 	if envelope.Runtime == nil || len(envelope.Runtime.FactorGraph.QuestionMappings) != 1 {
