@@ -200,6 +200,18 @@ func cloneOptionScores(source map[string]float64) map[string]float64 {
 }
 
 func payloadDefinitionBytes(payload *modeltypology.Payload) ([]byte, error) {
+	runtime, err := payload.ToRuntimeSpec()
+	if err != nil {
+		return nil, fmt.Errorf("derive runtime spec: %w", err)
+	}
+	data, err := json.Marshal(runtime)
+	if err != nil {
+		return nil, fmt.Errorf("marshal runtime spec: %w", err)
+	}
+	return data, nil
+}
+
+func fullPayloadDefinitionBytes(payload *modeltypology.Payload) ([]byte, error) {
 	data, err := json.Marshal(payload)
 	if err != nil {
 		return nil, fmt.Errorf("marshal payload: %w", err)

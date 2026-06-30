@@ -1,9 +1,11 @@
 package personality
 
 import (
+	"encoding/json"
 	"time"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
 )
 
 func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {
@@ -36,8 +38,26 @@ func definitionFromModel(model *domain.AssessmentModel) *DefinitionResult {
 		SubKind:       string(model.SubKind),
 		Algorithm:     string(model.Algorithm),
 		PayloadFormat: model.Definition.Format,
-		Payload:       append([]byte(nil), model.Definition.Data...),
+		Payload:       normalizeDefinitionPayloadForAPI(model),
 	}
+}
+
+// normalizeDefinitionPayloadForAPI returns RuntimeSpec JSON for the operating editor.
+// Draft definitions may store either RuntimeSpec or the full typology Payload envelope.
+func normalizeDefinitionPayloadForAPI(model *domain.AssessmentModel) []byte {
+	raw := append([]byte(nil), model.Definition.Data...)
+	if len(raw) == 0 {
+		return raw
+	}
+	_, runtime, err := personalitydomain.PayloadAndRuntimeSpecFromModel(model)
+	if err != nil || runtime == nil {
+		return raw
+	}
+	data, err := json.Marshal(runtime)
+	if err != nil {
+		return raw
+	}
+	return data
 }
 
 func normalizeCreateInput(input CreateInput) (domain.SubKind, domain.Algorithm, error) {

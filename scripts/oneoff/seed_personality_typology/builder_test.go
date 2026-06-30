@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
@@ -214,5 +215,26 @@ func TestQuestionnaireSeedsAlignWithModelVersions(t *testing.T) {
 				t.Fatalf("questionnaire version = %s, model wants %s", seed.Version, payload.QuestionnaireVersion)
 			}
 		})
+	}
+}
+
+func TestPayloadDefinitionBytesStoresRuntimeSpec(t *testing.T) {
+	payload, err := buildMBTIPayload()
+	if err != nil {
+		t.Fatalf("buildMBTIPayload: %v", err)
+	}
+	data, err := payloadDefinitionBytes(payload)
+	if err != nil {
+		t.Fatalf("payloadDefinitionBytes: %v", err)
+	}
+	var runtime modeltypology.RuntimeSpec
+	if err := json.Unmarshal(data, &runtime); err != nil {
+		t.Fatalf("unmarshal runtime spec: %v", err)
+	}
+	if !runtime.FactorGraph.HasExplicitFactorGraph() {
+		t.Fatal("expected explicit factor graph in draft definition bytes")
+	}
+	if runtime.Report.AdapterKey != "mbti" {
+		t.Fatalf("report adapter = %s, want mbti", runtime.Report.AdapterKey)
 	}
 }

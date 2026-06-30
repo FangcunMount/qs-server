@@ -84,7 +84,16 @@ func seedAssessmentModel(
 		}
 	}
 
-	snapshot, err := aminfra.BuildPersonalityPublishedSnapshot(model)
+	publishPayloadBytes, err := fullPayloadDefinitionBytes(payload)
+	if err != nil {
+		return err
+	}
+	publishModel := *model
+	publishModel.Definition = domain.DefinitionPayload{
+		Format: domain.PayloadFormatPersonalityTypologyV1,
+		Data:   publishPayloadBytes,
+	}
+	snapshot, err := aminfra.BuildPersonalityPublishedSnapshot(&publishModel)
 	if err != nil {
 		return fmt.Errorf("build published snapshot %s: %w", plan.Code, err)
 	}
