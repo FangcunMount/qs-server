@@ -5,8 +5,8 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
