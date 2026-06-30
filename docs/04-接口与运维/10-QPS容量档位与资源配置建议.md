@@ -34,7 +34,7 @@
 | ---- | ------ | ---- |
 | collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 前台入口保护 |
 | collection grpc_client | max_inflight 360 | 到 apiserver 并发 |
-| collection submit_queue | queue_size 1200，worker_count 24 | 提交削峰 |
+| collection submit_queue | queue_size 1600，worker_count 32 | 提交削峰（2026-06 从 1200/24 上调） |
 | collection concurrency | max-concurrency 512 | 本进程总并发保护 |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |

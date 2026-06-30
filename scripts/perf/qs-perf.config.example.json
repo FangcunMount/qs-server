@@ -134,6 +134,52 @@
         }
       }
     },
+    "pretest_120_submit_only": {
+      "duration": "5m",
+      "description": "隔离复测：仅 answersheet_submit=24QPS，用于区分 collection 入口限流与混合读压干扰",
+      "qps": {
+        "query": 0,
+        "submit": 24,
+        "report": 0,
+        "stats": 0,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "submit": {
+          "preAllocated": 180,
+          "max": 1000
+        }
+      }
+    },
+    "pretest_120_balanced": {
+      "duration": "5m",
+      "description": "混合降读压：questionnaire 32 + submit 24 + report 24 + stats 12（总 92QPS），验证争用缓解后 mixed 能否过线",
+      "qps": {
+        "query": 32,
+        "submit": 24,
+        "report": 24,
+        "stats": 12,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 80,
+          "max": 400
+        },
+        "submit": {
+          "preAllocated": 180,
+          "max": 1000
+        },
+        "report": {
+          "preAllocated": 150,
+          "max": 350
+        },
+        "stats": {
+          "preAllocated": 80,
+          "max": 400
+        }
+      }
+    },
     "mixed_140": {
       "duration": "5m",
       "qps": {

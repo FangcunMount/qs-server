@@ -122,8 +122,8 @@ rate_limit:
 # -------------------------------------------------------
 submit_queue:
   enabled: true
-  queue_size: 1200
-  worker_count: 24
+  queue_size: 1600
+  worker_count: 32
   wait_timeout_ms: 200
 
 wait_report:
