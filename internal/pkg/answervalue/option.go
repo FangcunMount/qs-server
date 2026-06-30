@@ -15,10 +15,10 @@ func NormalizeSingleOption(raw any) (string, bool) {
 	switch value := raw.(type) {
 	case string:
 		return normalizeOptionString(value)
-	case fmt.Stringer:
-		return normalizeOptionString(value.String())
 	case json.Number:
 		return strings.TrimSpace(value.String()), true
+	case fmt.Stringer:
+		return normalizeOptionString(value.String())
 	case map[string]any:
 		return normalizeOptionMap(value)
 	case map[string]string:
@@ -67,11 +67,11 @@ func normalizeScalarOption(raw any) (string, bool) {
 	case string:
 		trimmed := strings.TrimSpace(value)
 		return trimmed, trimmed != ""
-	case fmt.Stringer:
-		return normalizeScalarOption(value.String())
 	case json.Number:
 		trimmed := strings.TrimSpace(value.String())
 		return trimmed, trimmed != ""
+	case fmt.Stringer:
+		return normalizeScalarOption(value.String())
 	case float64:
 		return strings.TrimSpace(fmt.Sprintf("%g", value)), true
 	case int:
