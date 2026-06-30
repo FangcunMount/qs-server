@@ -48,7 +48,7 @@ func buildEditorDefinitionPayload(model *domain.AssessmentModel, payload *modelt
 	if runtime == nil {
 		return nil, nil
 	}
-	outcomes := outcomesFromPayload(payload)
+	outcomes := resolveEditorOutcomes(runtime, outcomesFromPayload(payload))
 	algo := resolvePayloadAlgorithm(model, payload, runtime)
 	decision := runtime.Decision
 	decision.Kind = normalizeDecisionKind(decision.Kind, algo)
@@ -103,7 +103,7 @@ func normalizeDefinitionPayloadForStorage(data []byte, algorithm domain.Algorith
 	runtime.Decision.Kind = normalizeDecisionKind(runtime.Decision.Kind, algo)
 	envelope := draftDefinitionEnvelope{
 		Algorithm: firstNonEmptyAlgorithm(payload.Algorithm, algorithm),
-		Outcomes:  append([]modeltypology.Outcome(nil), payload.Outcomes...),
+		Outcomes:  resolveEditorOutcomes(runtime, append([]modeltypology.Outcome(nil), payload.Outcomes...)),
 		Runtime:   runtime,
 	}
 	return json.Marshal(envelope)
@@ -139,6 +139,9 @@ func decodeDefinitionPayload(data []byte, algorithm domain.Algorithm) (*modeltyp
 		}
 		if len(decoded.Outcomes) == 0 {
 			decoded.Outcomes = outcomesFromEditorOutcomeMapping(data)
+		}
+		if len(decoded.Outcomes) == 0 && decoded.Runtime != nil {
+			decoded.Outcomes = resolveEditorOutcomes(decoded.Runtime, nil)
 		}
 		return decoded, nil
 	}
@@ -179,7 +182,7 @@ func editorPayloadToDomain(editor *editorDefinitionPayload, algorithm domain.Alg
 	}
 	return &modeltypology.Payload{
 		Algorithm: firstNonEmptyAlgorithm(editor.OutcomeMapping.Algorithm, algorithm),
-		Outcomes:  append([]modeltypology.Outcome(nil), editor.OutcomeMapping.Outcomes...),
+		Outcomes:  resolveEditorOutcomes(runtime, append([]modeltypology.Outcome(nil), editor.OutcomeMapping.Outcomes...)),
 		Runtime:   runtime,
 	}
 }
@@ -260,6 +263,70 @@ func outcomesFromPayload(payload *modeltypology.Payload) []modeltypology.Outcome
 		return nil
 	}
 	return append([]modeltypology.Outcome(nil), payload.Outcomes...)
+}
+
+func resolveEditorOutcomes(runtime *modeltypology.RuntimeSpec, outcomes []modeltypology.Outcome) []modeltypology.Outcome {
+	if len(outcomes) > 0 {
+		return outcomes
+	}
+	if runtime == nil || !isTraitProfileDecision(runtime.Decision.Kind) {
+		return nil
+	}
+	return synthesizeTraitProfileOutcomes(runtime.FactorGraph)
+}
+
+func synthesizeTraitProfileOutcomes(graph modeltypology.FactorGraphSpec) []modeltypology.Outcome {
+	order := append([]string(nil), graph.DimensionOrder...)
+	if len(order) == 0 {
+		order = append(order, graph.Roots...)
+	}
+	outcomes := make([]modeltypology.Outcome, 0, len(order))
+	seen := make(map[string]struct{}, len(order))
+	for _, code := range order {
+		if code == "" {
+			continue
+		}
+		if _, exists := seen[code]; exists {
+			continue
+		}
+		seen[code] = struct{}{}
+		outcomes = append(outcomes, modeltypology.Outcome{
+			Code: code,
+			Name: traitProfileOutcomeName(code, graph),
+		})
+	}
+	if len(outcomes) > 0 {
+		return outcomes
+	}
+	for code, factor := range graph.Factors {
+		outcomeCode := firstNonEmpty(factor.Code, factor.ID, code)
+		if outcomeCode == "" {
+			continue
+		}
+		if _, exists := seen[outcomeCode]; exists {
+			continue
+		}
+		seen[outcomeCode] = struct{}{}
+		outcomes = append(outcomes, modeltypology.Outcome{
+			Code: outcomeCode,
+			Name: firstNonEmpty(factor.Name, factor.Code, factor.ID, outcomeCode),
+		})
+	}
+	return outcomes
+}
+
+func traitProfileOutcomeName(code string, graph modeltypology.FactorGraphSpec) string {
+	if dim, ok := graph.Dimensions[code]; ok && dim.Name != "" {
+		return dim.Name
+	}
+	if factor, ok := graph.Factors[code]; ok {
+		return firstNonEmpty(factor.Name, factor.Code, factor.ID, code)
+	}
+	return code
+}
+
+func isTraitProfileDecision(kind domain.DecisionKind) bool {
+	return kind == domain.DecisionKindTraitProfile
 }
 
 func outcomesFromEditorOutcomeMapping(data []byte) []modeltypology.Outcome {

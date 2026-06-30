@@ -153,6 +153,127 @@ func TestNormalizeDefinitionPayloadForStorageRoundTripsEditorPayload(t *testing.
 	}
 }
 
+func TestDefinitionFromModelSynthesizesTraitProfileOutcomes(t *testing.T) {
+	payload := &modeltypology.Payload{
+		Algorithm:      domain.AlgorithmBigFive,
+		DimensionOrder: []string{"O", "C", "E", "A", "N"},
+		Dimensions: map[string]modeltypology.Dimension{
+			"O": {Code: "O", Name: "开放性"},
+			"C": {Code: "C", Name: "尽责性"},
+			"E": {Code: "E", Name: "外向性"},
+			"A": {Code: "A", Name: "宜人性"},
+			"N": {Code: "N", Name: "神经质"},
+		},
+		QuestionMappings: []modeltypology.QuestionMapping{{
+			QuestionCode: "BIG5_Q01",
+			Dimension:    "E",
+			OptionScores: defaultLikertOptionScores(),
+		}},
+		MatchingSpec: modeltypology.MatchingSpec{Kind: domain.DecisionKindTraitProfile},
+		Runtime: &modeltypology.RuntimeSpec{
+			Decision: modeltypology.PersonalityDecisionSpec{Kind: domain.DecisionKindTraitProfile},
+			OutcomeMapping: modeltypology.OutcomeMappingSpec{
+				DetailKind:       modeltypology.OutcomeDetailTraitProfile,
+				DetailAdapterKey: modeltypology.DetailAdapterBigFive,
+			},
+			Report: modeltypology.ReportSpec{
+				Kind:       modeltypology.ReportKindTraitProfile,
+				AdapterKey: modeltypology.ReportAdapterBigFive,
+			},
+			FactorGraph: modeltypology.FactorGraphSpec{
+				DimensionOrder: []string{"O", "C", "E", "A", "N"},
+				Dimensions: map[string]modeltypology.Dimension{
+					"O": {Code: "O", Name: "开放性"},
+					"C": {Code: "C", Name: "尽责性"},
+					"E": {Code: "E", Name: "外向性"},
+					"A": {Code: "A", Name: "宜人性"},
+					"N": {Code: "N", Name: "神经质"},
+				},
+				Factors: map[string]modeltypology.FactorSpec{
+					"O": {ID: "O", Code: "O", Name: "开放性", Kind: modeltypology.FactorSpecKindLeaf},
+					"C": {ID: "C", Code: "C", Name: "尽责性", Kind: modeltypology.FactorSpecKindLeaf},
+					"E": {ID: "E", Code: "E", Name: "外向性", Kind: modeltypology.FactorSpecKindLeaf},
+					"A": {ID: "A", Code: "A", Name: "宜人性", Kind: modeltypology.FactorSpecKindLeaf},
+					"N": {ID: "N", Code: "N", Name: "神经质", Kind: modeltypology.FactorSpecKindLeaf},
+				},
+				Roots: []string{"O", "C", "E", "A", "N"},
+			},
+		},
+	}
+	raw, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	model := &domain.AssessmentModel{
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmBigFive,
+		Definition: domain.DefinitionPayload{
+			Format: domain.PayloadFormatPersonalityTypologyV1,
+			Data:   raw,
+		},
+	}
+
+	result := definitionFromModel(model)
+	if result == nil {
+		t.Fatal("definitionFromModel returned nil")
+	}
+	var editor editorDefinitionPayload
+	if err := json.Unmarshal(result.Payload, &editor); err != nil {
+		t.Fatalf("unmarshal editor payload: %v", err)
+	}
+	if len(editor.OutcomeMapping.Outcomes) != 5 {
+		t.Fatalf("outcomes = %#v, want 5 trait factors", editor.OutcomeMapping.Outcomes)
+	}
+	if editor.OutcomeMapping.Outcomes[0].Code != "O" || editor.OutcomeMapping.Outcomes[0].Name != "开放性" {
+		t.Fatalf("first outcome = %#v, want O/开放性", editor.OutcomeMapping.Outcomes[0])
+	}
+}
+
+func TestNormalizeDefinitionPayloadForStorageSynthesizesTraitProfileOutcomes(t *testing.T) {
+	editor := editorDefinitionPayload{
+		FactorGraph: editorFactorGraphSpec{
+			DimensionOrder: []string{"E1", "E2"},
+			Dimensions: map[string]modeltypology.Dimension{
+				"E1": {Code: "E1", Name: "完美型"},
+				"E2": {Code: "E2", Name: "助人型"},
+			},
+			Factors: map[string]modeltypology.FactorSpec{
+				"E1": {ID: "E1", Code: "E1", Name: "完美型", Kind: modeltypology.FactorSpecKindLeaf},
+				"E2": {ID: "E2", Code: "E2", Name: "助人型", Kind: modeltypology.FactorSpecKindLeaf},
+			},
+			Roots: []string{"E1", "E2"},
+		},
+		Decision: modeltypology.PersonalityDecisionSpec{Kind: domain.DecisionKindTraitProfile},
+		OutcomeMapping: editorOutcomeMappingSpec{
+			DetailKind:       modeltypology.OutcomeDetailTraitProfile,
+			DetailAdapterKey: modeltypology.DetailAdapterTraitProfile,
+		},
+		Report: modeltypology.ReportSpec{
+			Kind:       modeltypology.ReportKindTraitProfile,
+			AdapterKey: modeltypology.ReportAdapterTraitProfile,
+		},
+	}
+	raw, err := json.Marshal(editor)
+	if err != nil {
+		t.Fatalf("marshal editor: %v", err)
+	}
+	stored, err := normalizeDefinitionPayloadForStorage(raw, domain.AlgorithmPersonalityTypology)
+	if err != nil {
+		t.Fatalf("normalizeDefinitionPayloadForStorage: %v", err)
+	}
+	var envelope draftDefinitionEnvelope
+	if err := json.Unmarshal(stored, &envelope); err != nil {
+		t.Fatalf("unmarshal envelope: %v", err)
+	}
+	if len(envelope.Outcomes) != 2 {
+		t.Fatalf("outcomes = %#v, want 2 enneagram factors", envelope.Outcomes)
+	}
+	if envelope.Outcomes[0].Code != "E1" || envelope.Outcomes[0].Name != "完美型" {
+		t.Fatalf("first outcome = %#v", envelope.Outcomes[0])
+	}
+}
+
 func TestNormalizeDecisionKindMapsAlgorithmAlias(t *testing.T) {
 	if got := normalizeDecisionKind("mbti", domain.AlgorithmMBTI); got != domain.DecisionKindPoleComposition {
 		t.Fatalf("normalizeDecisionKind(mbti) = %s, want pole_composition", got)
