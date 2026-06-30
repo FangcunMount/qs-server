@@ -140,6 +140,11 @@ func Wire(in WireInput) (WireResult, error) {
 		)
 	}
 
+	var publishedModelReader rulesetport.PublishedModelReader
+	if reader, ok := catalog.(rulesetport.PublishedModelReader); ok {
+		publishedModelReader = reader
+	}
+
 	module, err := Bootstrap(BootstrapInput{
 		MySQLDB:                        in.MySQLDB,
 		MongoDB:                        in.MongoDB,
@@ -168,7 +173,7 @@ func Wire(in WireInput) (WireResult, error) {
 		ReportDurableSaver:             in.ReportPorts.DurableSaver,
 		PostCommitReadyIndexer:         in.ReportPorts.PostCommitReadyIndexer,
 		OutboxReadyIndex:               in.ReportPorts.ReadyIndex,
-		PublishedModelReader:           catalog,
+		PublishedModelReader:           publishedModelReader,
 	})
 	if err != nil {
 		return WireResult{}, err
