@@ -106,3 +106,42 @@ func TestNewSubmissionServiceAlwaysInitializesQueue(t *testing.T) {
 		t.Fatal("expected submit queue to be initialized even when enabled=false")
 	}
 }
+
+func TestNormalizeAnswerValueForGRPCUnwrapsRadioOptionWrapper(t *testing.T) {
+	t.Parallel()
+
+	const optionCode = "ARPkNn2y"
+	got := normalizeAnswerValueForGRPC("Radio", `{"option":"`+optionCode+`"}`)
+	if got != optionCode {
+		t.Fatalf("normalizeAnswerValueForGRPC() = %q, want %q", got, optionCode)
+	}
+}
+
+func TestNormalizeAnswerValueForGRPCLeavesNonRadioUntouched(t *testing.T) {
+	t.Parallel()
+
+	wrapped := `{"option":"ARPkNn2y"}`
+	if got := normalizeAnswerValueForGRPC("Checkbox", wrapped); got != wrapped {
+		t.Fatalf("normalizeAnswerValueForGRPC() = %q, want %q", got, wrapped)
+	}
+}
+
+func TestConvertAnswersNormalizesRadioValuesForGRPC(t *testing.T) {
+	t.Parallel()
+
+	const optionCode = "ARPkNn2y"
+	service := &SubmissionService{}
+	got := service.convertAnswers([]Answer{
+		{
+			QuestionCode: "7osLrRTA",
+			QuestionType: "Radio",
+			Value:        `{"option":"` + optionCode + `"}`,
+		},
+	})
+	if len(got) != 1 {
+		t.Fatalf("convertAnswers() len = %d, want 1", len(got))
+	}
+	if got[0].Value != optionCode {
+		t.Fatalf("convertAnswers() value = %q, want %q", got[0].Value, optionCode)
+	}
+}
