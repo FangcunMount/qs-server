@@ -31,6 +31,7 @@ import './lib/options.js';
 export * from './scenarios/model-query.js';
 export * from './scenarios/submit.js';
 export * from './scenarios/report.js';
+export * from './scenarios/report-ws.js';
 export * from './scenarios/statistics.js';
 export * from './scenarios/chain-probe.js';
 
@@ -50,6 +51,8 @@ export function setup() {
     duration: DURATION,
     http_timeout: HTTP_TIMEOUT,
     report_timeout_seconds: REPORT_TIMEOUT,
+    report_mode: runTiming.report_mode,
+    report_vuser_defaults: runTiming.report_vuser_defaults,
     qps: runTiming.qps,
     base_urls: runTiming.baseUrls,
   });

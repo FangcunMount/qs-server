@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
@@ -25,11 +26,7 @@ type StatusCache interface {
 	SetIfHigherPriority(ctx context.Context, snapshot *reportstatus.Snapshot, ttl time.Duration) error
 }
 
-type WaitHub interface {
-	Register(assessmentID string) (<-chan reportstatus.ChangedSignal, func())
-	Notify(signal reportstatus.ChangedSignal)
-	ActiveWaiters() int
-}
+type Notifier = reportnotify.Notifier
 
 type Config struct {
 	PollInterval       time.Duration
@@ -58,7 +55,7 @@ func DefaultConfig() Config {
 type Service struct {
 	query    QueryService
 	cache    StatusCache
-	waitHub  WaitHub
+	notifier Notifier
 	signaler *signalredis.Signaler[reportstatus.ChangedSignal]
 	cfg      Config
 }
@@ -66,7 +63,7 @@ type Service struct {
 func NewService(
 	query QueryService,
 	cache StatusCache,
-	waitHub WaitHub,
+	notifier Notifier,
 	signaler *signalredis.Signaler[reportstatus.ChangedSignal],
 	cfg Config,
 ) *Service {
@@ -76,7 +73,7 @@ func NewService(
 	return &Service{
 		query:    query,
 		cache:    cache,
-		waitHub:  waitHub,
+		notifier: notifier,
 		signaler: signaler,
 		cfg:      cfg,
 	}
@@ -138,16 +135,16 @@ func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeo
 		return result, nil
 	}
 
-	if s.waitHub == nil || !s.cfg.SignalingEnabled {
+	if s.notifier == nil || !s.cfg.SignalingEnabled {
 		return s.waitByPolling(ctx, testeeID, assessmentID, assessmentKey, timeout)
 	}
-	if s.cfg.MaxActiveWaiters > 0 && s.waitHub.ActiveWaiters() >= s.cfg.MaxActiveWaiters {
+	if s.cfg.MaxActiveWaiters > 0 && s.notifier.ActiveSubscriptions() >= s.cfg.MaxActiveWaiters {
 		reportstatus.IncWaitReportProcessing()
 		return pendingResponse("queued", "系统繁忙，报告生成中", 5000), nil
 	}
 
-	waitCh, unregister := s.waitHub.Register(assessmentKey)
-	defer unregister()
+	waitCh, unsubscribe := s.notifier.Subscribe(assessmentKey)
+	defer unsubscribe()
 
 	if result, done, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey); err != nil {
 		return nil, err
@@ -297,7 +294,7 @@ func (s *Service) StartSignalWatcher(ctx context.Context) {
 	if s == nil || !s.cfg.SignalingEnabled {
 		return
 	}
-	StartSignalWatcher(ctx, s.signaler, s.waitHub)
+	reportnotify.StartSignalWatcher(ctx, s.signaler, s.notifier)
 }
 
 func snapshotToResponse(s *reportstatus.Snapshot) *evaluation.AssessmentStatusResponse {

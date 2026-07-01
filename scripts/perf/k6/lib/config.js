@@ -161,6 +161,9 @@ export function configAliasesForEnv(name) {
     DISCOVER_TESTEE_LIMIT: ['discover.testeeLimit', 'discover.testee_limit', 'discoverTesteeLimit', 'discover_testee_limit'],
     DISCOVER_ASSESSMENT_LIMIT: ['discover.assessmentLimit', 'discover.assessment_limit', 'discoverAssessmentLimit', 'discover_assessment_limit'],
     REPORT_TIMEOUT: ['reportTimeout', 'report_timeout'],
+    REPORT_POLL_INTERVAL_MS: ['reportPollIntervalMs', 'report_poll_interval_ms', 'reportSizing.shortPoll.pollIntervalMs', 'report_sizing.short_poll.poll_interval_ms'],
+    REPORT_WS_HOLD_SECONDS: ['reportWsHoldSeconds', 'report_ws_hold_seconds', 'reportSizing.websocket.holdSeconds', 'report_sizing.websocket.hold_seconds'],
+    REPORT_MODE: ['reportMode', 'report_mode'],
     STRICT_THRESHOLDS: ['strictThresholds', 'strict_thresholds'],
     CHAIN_PROBE_TIMEOUT_SECONDS: ['chainProbeTimeoutSeconds', 'chain_probe_timeout_seconds'],
     CHAIN_PROBE_POLL_SECONDS: ['chainProbePollSeconds', 'chain_probe_poll_seconds'],
@@ -508,20 +511,85 @@ export const STATS_PATHS = envOrConfigList(
 );
 
 export const SUBMIT_PATH = envOrConfigString('SUBMIT_PATH', ['submitPath', 'submit_path', 'paths.submit'], '/api/v1/answersheets');
+
+export const REPORT_TIMEOUT = intEnv('REPORT_TIMEOUT', 20);
+export const REPORT_POLL_INTERVAL_MS = intEnv('REPORT_POLL_INTERVAL_MS', 3000);
+export const REPORT_WS_HOLD_SECONDS = numberEnv('REPORT_WS_HOLD_SECONDS', 5);
+
+const LONG_POLL_MEDICAL_REPORT_PATH =
+  '/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
+const LONG_POLL_PERSONALITY_REPORT_PATH =
+  '/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
+const SHORT_POLL_MEDICAL_REPORT_PATH = '/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}';
+const SHORT_POLL_PERSONALITY_REPORT_PATH =
+  '/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}';
+
+function normalizeReportMode(raw) {
+  const value = String(raw || '')
+    .trim()
+    .toLowerCase()
+    .replace(/-/g, '_');
+  if (value === 'ws' || value === 'websocket') {
+    return 'websocket';
+  }
+  if (value === 'short' || value === 'short_poll' || value === 'report_status') {
+    return 'short_poll';
+  }
+  if (value === 'long' || value === 'long_poll' || value === 'wait_report') {
+    return 'long_poll';
+  }
+  return '';
+}
+
+export function resolveReportMode() {
+  const envMode = __ENV.REPORT_MODE;
+  if (envMode !== undefined && envMode !== '') {
+    const normalized = normalizeReportMode(envMode);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  const configMode = configFirstValue(['reportMode', 'report_mode']);
+  if (configMode) {
+    const normalized = normalizeReportMode(configMode);
+    if (normalized) {
+      return normalized;
+    }
+  }
+  if (envOrConfigBool('REPORT_WEBSOCKET', ['reportWebSocket', 'report_websocket'], false)) {
+    return 'websocket';
+  }
+  if (envOrConfigBool('REPORT_SHORT_POLL', ['reportShortPoll', 'report_short_poll'], false)) {
+    return 'short_poll';
+  }
+  return 'long_poll';
+}
+
+export const REPORT_MODE = resolveReportMode();
+export const REPORT_SHORT_POLL = REPORT_MODE === 'short_poll';
+export const REPORT_WEBSOCKET = REPORT_MODE === 'websocket';
+
+function defaultReportStatusPath(kind) {
+  if (REPORT_MODE === 'short_poll') {
+    return kind === 'personality' ? SHORT_POLL_PERSONALITY_REPORT_PATH : SHORT_POLL_MEDICAL_REPORT_PATH;
+  }
+  return kind === 'personality' ? LONG_POLL_PERSONALITY_REPORT_PATH : LONG_POLL_MEDICAL_REPORT_PATH;
+}
+
 export const REPORT_STATUS_PATH = envOrConfigString(
   'REPORT_STATUS_PATH',
   ['reportStatusPath', 'report_status_path', 'paths.reportStatus', 'paths.report_status'],
-  '/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}'
+  defaultReportStatusPath('medical')
 );
 export const PERSONALITY_REPORT_STATUS_PATH = envOrConfigString(
   'PERSONALITY_REPORT_STATUS_PATH',
   ['personalityReportStatusPath', 'personality_report_status_path', 'paths.personalityReportStatus', 'paths.personality_report_status'],
-  '/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}'
+  defaultReportStatusPath('personality')
 );
-export const REPORT_SHORT_POLL = envOrConfigBool(
-  'REPORT_SHORT_POLL',
-  ['reportShortPoll', 'report_short_poll'],
-  false
+export const REPORT_EVENTS_PATH = envOrConfigString(
+  'REPORT_EVENTS_PATH',
+  ['reportEventsPath', 'report_events_path', 'paths.reportEvents', 'paths.report_events'],
+  '/api/v1/report-events'
 );
 export const PERSONALITY_REPORT_PATH = envOrConfigString(
   'PERSONALITY_REPORT_PATH',
@@ -563,7 +631,6 @@ export const AUTO_DISCOVER_SEEDDATA = boolEnv('AUTO_DISCOVER_SEEDDATA', false);
 export const DISCOVER_TESTEE_LOOKBACK_DAYS = intEnv('DISCOVER_TESTEE_LOOKBACK_DAYS', 7);
 export const DISCOVER_TESTEE_LIMIT = intEnv('DISCOVER_TESTEE_LIMIT', 100);
 export const DISCOVER_ASSESSMENT_LIMIT = intEnv('DISCOVER_ASSESSMENT_LIMIT', 100);
-export const REPORT_TIMEOUT = intEnv('REPORT_TIMEOUT', 20);
 export const RUN_ID = envOrConfigString('RUN_ID', ['runId', 'run_id'], `${Date.now()}`);
 export const IDEMPOTENCY_PREFIX = envOrConfigString('IDEMPOTENCY_PREFIX', ['idempotencyPrefix', 'idempotency_prefix'], `k6-300qps-${RUN_ID}`);
 export const STRICT_THRESHOLDS = boolEnv('STRICT_THRESHOLDS', false);
@@ -571,3 +638,30 @@ export const CHAIN_PROBE_TIMEOUT_SECONDS = intEnv('CHAIN_PROBE_TIMEOUT_SECONDS',
 export const CHAIN_PROBE_POLL_SECONDS = numberEnv('CHAIN_PROBE_POLL_SECONDS', 1);
 export const HTTP_TIMEOUT = envOrConfigString('HTTP_TIMEOUT', ['httpTimeout', 'http_timeout'], '30s');
 export const USER_AGENT = envOrConfigString('USER_AGENT', ['userAgent', 'user_agent'], 'qs-server-k6-300qps/1.0');
+
+export function resolveReportVuserDefaults(reportRps, options = {}) {
+  const rps = Math.max(0, Number(reportRps) || 0);
+  if (rps <= 0) {
+    return { preAllocated: 10, max: 50 };
+  }
+  const timeout = options.timeout !== undefined ? options.timeout : REPORT_TIMEOUT;
+  const pollMs = options.pollIntervalMs !== undefined ? options.pollIntervalMs : REPORT_POLL_INTERVAL_MS;
+  const wsHold = options.wsHoldSeconds !== undefined ? options.wsHoldSeconds : REPORT_WS_HOLD_SECONDS;
+  const latencyS = options.requestLatencySeconds !== undefined ? options.requestLatencySeconds : 0.5;
+  const headroom = 1.1;
+
+  if (REPORT_MODE === 'websocket') {
+    const max = Math.max(20, Math.ceil(rps * wsHold * headroom));
+    return { preAllocated: Math.min(Math.max(20, Math.ceil(max * 0.25)), max), max };
+  }
+  if (REPORT_MODE === 'short_poll') {
+    const cycleS = latencyS + Math.max(pollMs, 500) / 1000;
+    const max = Math.max(20, Math.ceil(rps * cycleS * headroom));
+    return { preAllocated: Math.min(Math.max(20, Math.ceil(max * 0.25)), max), max };
+  }
+  const max = Math.max(20, Math.ceil(rps * timeout * headroom));
+  return { preAllocated: Math.min(Math.max(20, Math.ceil(max * 0.6)), max), max };
+}
+
+export const TOTAL_REPORT_RPS = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + PERSONALITY_REPORT_RPS;
+export const REPORT_VUSER_DEFAULTS = resolveReportVuserDefaults(TOTAL_REPORT_RPS);

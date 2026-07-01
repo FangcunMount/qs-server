@@ -155,6 +155,18 @@ func TestBackpressureIsNotConfiguredThroughPackageGlobals(t *testing.T) {
 	}
 }
 
+func TestCollectionTransportWSDoesNotImportApiserver(t *testing.T) {
+	root := repoRoot(t)
+	scanGoFiles(t, filepath.Join(root, "internal/collection-server/transport/ws"), func(path string, file *ast.File) {
+		for _, imp := range file.Imports {
+			importPath := strings.Trim(imp.Path.Value, `"`)
+			if strings.Contains(importPath, "internal/apiserver") {
+				t.Fatalf("%s imports %s; collection transport/ws must not depend on apiserver", path, importPath)
+			}
+		}
+	})
+}
+
 func TestRateLimitEntrypointsUseDecisionAdapter(t *testing.T) {
 	root := repoRoot(t)
 	paths := []string{

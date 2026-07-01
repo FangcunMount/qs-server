@@ -47,6 +47,7 @@
 目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
 | collection concurrency | max-concurrency **400**（general） | query/submit/report-status 等短请求 |
 | collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
+| collection report_events | enabled **false**（灰度）；max_connections 2000 | WebSocket 报告推送（方案 E） |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
 | apiserver backpressure | mysql 180，mongo 170，iam 80 | 下游保护 |

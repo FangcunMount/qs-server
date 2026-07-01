@@ -601,6 +601,21 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /report-events:
+    get:
+      tags:
+      - 测评
+      summary: WebSocket 报告状态推送
+      description: |
+        升级 WebSocket（`report_events.enabled=true` 时可用）。连接后发送 JSON 订阅帧：
+        `{"op":"subscribe","assessment_id":"123","kind":"medical|personality","testee_id":"456"}`。
+        服务端推送 `status` 帧，字段与 report-status 一致；断连时客户端应降级为 report-status 短轮询。
+      operationId: WebSocket报告状态推送
+      responses:
+        '101':
+          description: Switching Protocols
+        '404':
+          description: Disabled
   /assessments/{id}/report-status:
     get:
       tags:

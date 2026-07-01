@@ -1,4 +1,4 @@
-package reportwait
+package reportnotify
 
 import (
 	"context"
@@ -12,13 +12,13 @@ import (
 
 const watcherService = "collection-server"
 
-// StartSignalWatcher 订阅 report_status_changed 并转发到 WaitHub。
+// StartSignalWatcher 订阅 report_status_changed 并转发到 Notifier。
 func StartSignalWatcher(
 	ctx context.Context,
 	signaler *signalredis.Signaler[reportstatus.ChangedSignal],
-	waitHub WaitHub,
+	notifier Notifier,
 ) {
-	if signaler == nil || waitHub == nil {
+	if signaler == nil || notifier == nil {
 		return
 	}
 	go func() {
@@ -28,8 +28,8 @@ func StartSignalWatcher(
 				if signal.AssessmentID == "" {
 					return
 				}
-				waitHub.Notify(signal)
-				logger.L(msgCtx).Debugw("wait-report signal received",
+				notifier.Notify(signal)
+				logger.L(msgCtx).Debugw("report status signal received",
 					"assessment_id", signal.AssessmentID,
 					"status", signal.Status,
 				)

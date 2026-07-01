@@ -22,6 +22,28 @@
     "medical": 0.8,
     "personality": 0.2
   },
+  "reportSizing": {
+    "note": "qps.report 表示用户侧「查询报告是否就绪」的操作频率，不是裸 HTTP RPS；短轮询会 sleep，长轮询会阻塞至 timeout，WebSocket 为长连接。",
+    "modes": {
+      "long_poll": {
+        "reportMode": "long_poll",
+        "path": "wait-report",
+        "maxVuFormula": "report_rps × report_timeout × 1.1"
+      },
+      "short_poll": {
+        "reportMode": "short_poll",
+        "path": "report-status",
+        "pollIntervalMs": 3000,
+        "maxVuFormula": "report_rps × (request_latency_s + poll_interval_s) × 1.1"
+      },
+      "websocket": {
+        "reportMode": "websocket",
+        "path": "report-events",
+        "holdSeconds": 5,
+        "maxVuFormula": "report_rps × ws_hold_seconds × 1.1"
+      }
+    }
+  },
   "planIds": [
     "614333603412718126",
     "614187067651404334"
@@ -461,6 +483,7 @@
     "mixed_280": {
       "duration": "8m",
       "description": "legacy 单桶 query=问卷 132/s；三域升档请用 mixed_280_models",
+      "reportMode": "long_poll",
       "qps": {
         "query": 132,
         "submit": 24,
@@ -494,6 +517,7 @@
     "mixed_280_models": {
       "duration": "8m",
       "description": "三域 L1 升档：医学 71/s + 人格 36/s + 问卷 25/s（合计 132/s query）；submit/report/stats 同 mixed_280",
+      "reportMode": "long_poll",
       "qps": {
         "medicalQuery": 71,
         "personalityQuery": 36,
@@ -545,6 +569,7 @@
     "mixed_280_models_short_report": {
       "duration": "8m",
       "description": "mixed_280_models + report-status 短轮询（A 方案验收）；report 96/s 走 /report-status + next_poll_after_ms 退避",
+      "reportMode": "short_poll",
       "reportShortPoll": true,
       "qps": {
         "medicalQuery": 71,
@@ -598,9 +623,63 @@
         }
       }
     },
+    "mixed_280_models_ws": {
+      "duration": "8m",
+      "description": "mixed_280_models + WebSocket report-events（E 方案验收）；需 collection report_events.enabled=true",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
+      "qps": {
+        "medicalQuery": 71,
+        "personalityQuery": 36,
+        "questionnaireQuery": 25,
+        "submit": 24,
+        "report": 96,
+        "stats": 28,
+        "chainProbe": 0
+      },
+      "modelMix": {
+        "medical": 0.8,
+        "personality": 0.2
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 330,
+          "max": 1400
+        },
+        "medicalQuery": {
+          "preAllocated": 130,
+          "max": 520
+        },
+        "personalityQuery": {
+          "preAllocated": 70,
+          "max": 280
+        },
+        "questionnaireQuery": {
+          "preAllocated": 40,
+          "max": 200
+        },
+        "submit": {
+          "preAllocated": 290,
+          "max": 1180
+        },
+        "report": {
+          "preAllocated": 40,
+          "max": 320
+        },
+        "stats": {
+          "preAllocated": 120,
+          "max": 600
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
     "mixed_300": {
       "duration": "10m",
       "description": "验收档（含 chainProbe 1/s）；HTTP 隔离复测请用 mixed_300_http",
+      "reportMode": "long_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,

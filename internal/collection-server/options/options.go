@@ -24,6 +24,7 @@ type Options struct {
 	Concurrency             *ConcurrencyOptions                     `json:"concurrency" mapstructure:"concurrency"`
 	RateLimit               *RateLimitOptions                       `json:"rate_limit" mapstructure:"rate_limit"`
 	WaitReport              *WaitReportOptions                      `json:"wait_report" mapstructure:"wait_report"`
+	ReportEvents            *ReportEventsOptions                    `json:"report_events" mapstructure:"report_events"`
 	ReportStatus            *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
 	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
@@ -91,19 +92,23 @@ type SubmitQueueOptions struct {
 
 // RateLimitOptions 限流配置
 type RateLimitOptions struct {
-	Enabled               bool    `json:"enabled" mapstructure:"enabled"`
-	SubmitGlobalQPS       float64 `json:"submit_global_qps" mapstructure:"submit_global_qps"`
-	SubmitGlobalBurst     int     `json:"submit_global_burst" mapstructure:"submit_global_burst"`
-	SubmitUserQPS         float64 `json:"submit_user_qps" mapstructure:"submit_user_qps"`
-	SubmitUserBurst       int     `json:"submit_user_burst" mapstructure:"submit_user_burst"`
-	QueryGlobalQPS        float64 `json:"query_global_qps" mapstructure:"query_global_qps"`
-	QueryGlobalBurst      int     `json:"query_global_burst" mapstructure:"query_global_burst"`
-	QueryUserQPS          float64 `json:"query_user_qps" mapstructure:"query_user_qps"`
-	QueryUserBurst        int     `json:"query_user_burst" mapstructure:"query_user_burst"`
-	WaitReportGlobalQPS   float64 `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
-	WaitReportGlobalBurst int     `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
-	WaitReportUserQPS     float64 `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
-	WaitReportUserBurst   int     `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
+	Enabled                 bool    `json:"enabled" mapstructure:"enabled"`
+	SubmitGlobalQPS         float64 `json:"submit_global_qps" mapstructure:"submit_global_qps"`
+	SubmitGlobalBurst       int     `json:"submit_global_burst" mapstructure:"submit_global_burst"`
+	SubmitUserQPS           float64 `json:"submit_user_qps" mapstructure:"submit_user_qps"`
+	SubmitUserBurst         int     `json:"submit_user_burst" mapstructure:"submit_user_burst"`
+	QueryGlobalQPS          float64 `json:"query_global_qps" mapstructure:"query_global_qps"`
+	QueryGlobalBurst        int     `json:"query_global_burst" mapstructure:"query_global_burst"`
+	QueryUserQPS            float64 `json:"query_user_qps" mapstructure:"query_user_qps"`
+	QueryUserBurst          int     `json:"query_user_burst" mapstructure:"query_user_burst"`
+	WaitReportGlobalQPS     float64 `json:"wait_report_global_qps" mapstructure:"wait_report_global_qps"`
+	WaitReportGlobalBurst   int     `json:"wait_report_global_burst" mapstructure:"wait_report_global_burst"`
+	WaitReportUserQPS       float64 `json:"wait_report_user_qps" mapstructure:"wait_report_user_qps"`
+	WaitReportUserBurst     int     `json:"wait_report_user_burst" mapstructure:"wait_report_user_burst"`
+	ReportEventsGlobalQPS   float64 `json:"report_events_global_qps" mapstructure:"report_events_global_qps"`
+	ReportEventsGlobalBurst int     `json:"report_events_global_burst" mapstructure:"report_events_global_burst"`
+	ReportEventsUserQPS     float64 `json:"report_events_user_qps" mapstructure:"report_events_user_qps"`
+	ReportEventsUserBurst   int     `json:"report_events_user_burst" mapstructure:"report_events_user_burst"`
 }
 
 type WaitReportOptions struct {
@@ -118,6 +123,16 @@ type WaitReportOptions struct {
 	DegradeRetryAfterSeconds int    `json:"degrade_retry_after_seconds" mapstructure:"degrade_retry_after_seconds"`
 	PubSubEnabled            bool   `json:"pubsub_enabled" mapstructure:"pubsub_enabled"`
 	PubSubChannel            string `json:"pubsub_channel" mapstructure:"pubsub_channel"`
+}
+
+// ReportEventsOptions WebSocket 报告事件推送配置。
+type ReportEventsOptions struct {
+	Enabled                  bool   `json:"enabled" mapstructure:"enabled"`
+	Path                     string `json:"path" mapstructure:"path"`
+	MaxConnections           int    `json:"max_connections" mapstructure:"max_connections"`
+	MaxPerTestee             int    `json:"max_per_testee" mapstructure:"max_per_testee"`
+	IdleTimeoutSeconds       int    `json:"idle_timeout_seconds" mapstructure:"idle_timeout_seconds"`
+	HeartbeatIntervalSeconds int    `json:"heartbeat_interval_seconds" mapstructure:"heartbeat_interval_seconds"`
 }
 
 // RuntimeOptions 运行时调优（GC/内存）
@@ -182,6 +197,7 @@ func NewOptions() *Options {
 		},
 		RateLimit:          NewRateLimitOptions(),
 		WaitReport:         NewWaitReportOptions(),
+		ReportEvents:       NewReportEventsOptions(),
 		ReportStatus:       genericoptions.NewReportStatusOptions(),
 		Signaling:          genericoptions.NewSignalingOptions(),
 		SubmitQueue:        NewSubmitQueueOptions(),
@@ -268,19 +284,34 @@ func NewPersonalityCacheOptions() *PersonalityCacheOptions {
 // NewRateLimitOptions 创建默认限流配置
 func NewRateLimitOptions() *RateLimitOptions {
 	return &RateLimitOptions{
-		Enabled:               true,
-		SubmitGlobalQPS:       200,
-		SubmitGlobalBurst:     300,
-		SubmitUserQPS:         5,
-		SubmitUserBurst:       10,
-		QueryGlobalQPS:        200,
-		QueryGlobalBurst:      300,
-		QueryUserQPS:          10,
-		QueryUserBurst:        20,
-		WaitReportGlobalQPS:   80,
-		WaitReportGlobalBurst: 120,
-		WaitReportUserQPS:     2,
-		WaitReportUserBurst:   5,
+		Enabled:                 true,
+		SubmitGlobalQPS:         200,
+		SubmitGlobalBurst:       300,
+		SubmitUserQPS:           5,
+		SubmitUserBurst:         10,
+		QueryGlobalQPS:          200,
+		QueryGlobalBurst:        300,
+		QueryUserQPS:            10,
+		QueryUserBurst:          20,
+		WaitReportGlobalQPS:     80,
+		WaitReportGlobalBurst:   120,
+		WaitReportUserQPS:       2,
+		WaitReportUserBurst:     5,
+		ReportEventsGlobalQPS:   100,
+		ReportEventsGlobalBurst: 150,
+		ReportEventsUserQPS:     10,
+		ReportEventsUserBurst:   20,
+	}
+}
+
+func NewReportEventsOptions() *ReportEventsOptions {
+	return &ReportEventsOptions{
+		Enabled:                  false,
+		Path:                     "/api/v1/report-events",
+		MaxConnections:           2000,
+		MaxPerTestee:             2,
+		IdleTimeoutSeconds:       120,
+		HeartbeatIntervalSeconds: 30,
 	}
 }
 
@@ -313,6 +344,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.Concurrency.AddFlags(fss.FlagSet("concurrency"))
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
+	o.ReportEvents.AddFlags(fss.FlagSet("report_events"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
 	o.QuestionnaireCache.AddFlags(fss.FlagSet("questionnaire_cache"))
 	o.ScaleCache.AddFlags(fss.FlagSet("scale_cache"))
@@ -397,6 +429,10 @@ func (r *RateLimitOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&r.WaitReportGlobalBurst, "rate_limit.wait-report-global-burst", r.WaitReportGlobalBurst, "Global burst for wait-report.")
 	fs.Float64Var(&r.WaitReportUserQPS, "rate_limit.wait-report-user-qps", r.WaitReportUserQPS, "Per-user QPS limit for wait-report.")
 	fs.IntVar(&r.WaitReportUserBurst, "rate_limit.wait-report-user-burst", r.WaitReportUserBurst, "Per-user burst for wait-report.")
+	fs.Float64Var(&r.ReportEventsGlobalQPS, "rate_limit.report-events-global-qps", r.ReportEventsGlobalQPS, "Global QPS limit for report-events WebSocket subscribe.")
+	fs.IntVar(&r.ReportEventsGlobalBurst, "rate_limit.report-events-global-burst", r.ReportEventsGlobalBurst, "Global burst for report-events WebSocket subscribe.")
+	fs.Float64Var(&r.ReportEventsUserQPS, "rate_limit.report-events-user-qps", r.ReportEventsUserQPS, "Per-user QPS limit for report-events WebSocket subscribe.")
+	fs.IntVar(&r.ReportEventsUserBurst, "rate_limit.report-events-user-burst", r.ReportEventsUserBurst, "Per-user burst for report-events WebSocket subscribe.")
 }
 
 func (w *WaitReportOptions) AddFlags(fs *pflag.FlagSet) {
@@ -411,6 +447,15 @@ func (w *WaitReportOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&w.DegradeRetryAfterSeconds, "wait_report.degrade-retry-after-seconds", w.DegradeRetryAfterSeconds, "Retry-After seconds for degraded wait-report responses.")
 	fs.BoolVar(&w.PubSubEnabled, "wait_report.pubsub-enabled", w.PubSubEnabled, "Enable Redis pubsub wakeups for wait-report.")
 	fs.StringVar(&w.PubSubChannel, "wait_report.pubsub-channel", w.PubSubChannel, "Redis pubsub channel for report status change.")
+}
+
+func (r *ReportEventsOptions) AddFlags(fs *pflag.FlagSet) {
+	fs.BoolVar(&r.Enabled, "report_events.enabled", r.Enabled, "Enable WebSocket report-events endpoint.")
+	fs.StringVar(&r.Path, "report_events.path", r.Path, "WebSocket report-events HTTP path.")
+	fs.IntVar(&r.MaxConnections, "report_events.max-connections", r.MaxConnections, "Maximum concurrent WebSocket connections.")
+	fs.IntVar(&r.MaxPerTestee, "report_events.max-per-testee", r.MaxPerTestee, "Maximum concurrent WebSocket connections per testee.")
+	fs.IntVar(&r.IdleTimeoutSeconds, "report_events.idle-timeout-seconds", r.IdleTimeoutSeconds, "Idle timeout seconds before closing WebSocket connections.")
+	fs.IntVar(&r.HeartbeatIntervalSeconds, "report_events.heartbeat-interval-seconds", r.HeartbeatIntervalSeconds, "Server heartbeat interval seconds for WebSocket connections.")
 }
 
 // AddFlags 添加运行时相关参数
@@ -454,6 +499,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validatePersonalityCacheOptions(o.PersonalityCache)...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
+	errs = append(errs, validateReportEventsOptions(o.ReportEvents)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
 
 	return errs
@@ -559,6 +605,12 @@ func validateCollectionRateLimit(opts *RateLimitOptions) []error {
 	if opts.WaitReportUserQPS <= 0 || opts.WaitReportUserBurst <= 0 {
 		errs = append(errs, fmt.Errorf("rate_limit.wait_report_user_* must be greater than 0"))
 	}
+	if opts.ReportEventsGlobalQPS <= 0 || opts.ReportEventsGlobalBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.report_events_* must be greater than 0"))
+	}
+	if opts.ReportEventsUserQPS <= 0 || opts.ReportEventsUserBurst <= 0 {
+		errs = append(errs, fmt.Errorf("rate_limit.report_events_user_* must be greater than 0"))
+	}
 	return errs
 }
 
@@ -608,6 +660,29 @@ func validateWaitReportOptions(opts *WaitReportOptions) []error {
 	}
 	if opts.PubSubEnabled && opts.PubSubChannel == "" {
 		errs = append(errs, fmt.Errorf("wait_report.pubsub_channel cannot be empty when pubsub is enabled"))
+	}
+	return errs
+}
+
+func validateReportEventsOptions(opts *ReportEventsOptions) []error {
+	if opts == nil {
+		return []error{fmt.Errorf("report_events cannot be nil")}
+	}
+	var errs []error
+	if opts.Path == "" {
+		errs = append(errs, fmt.Errorf("report_events.path cannot be empty"))
+	}
+	if opts.MaxConnections <= 0 {
+		errs = append(errs, fmt.Errorf("report_events.max_connections must be greater than 0"))
+	}
+	if opts.MaxPerTestee <= 0 {
+		errs = append(errs, fmt.Errorf("report_events.max_per_testee must be greater than 0"))
+	}
+	if opts.IdleTimeoutSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("report_events.idle_timeout_seconds must be greater than 0"))
+	}
+	if opts.HeartbeatIntervalSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("report_events.heartbeat_interval_seconds must be greater than 0"))
 	}
 	return errs
 }

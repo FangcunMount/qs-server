@@ -114,6 +114,9 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 
 	// 受试者相关路由
 	r.registerTesteeRoutes(api)
+
+	// WebSocket 报告事件推送
+	r.registerReportEventsRoutes(api)
 }
 
 // registerBusinessV2Routes 注册 v2 业务路由。
@@ -696,4 +699,16 @@ func (r *Router) registerTesteeRoutes(api *gin.RouterGroup) {
 		// 更新受试者信息
 		testees.PUT("/:id", testeeHandler.Update)
 	}
+}
+
+func (r *Router) registerReportEventsRoutes(api *gin.RouterGroup) {
+	handler := r.container.ReportEventsHandler()
+	if handler == nil || !handler.Enabled() {
+		return
+	}
+	path := strings.TrimPrefix(handler.Path(), "/api/v1")
+	if path == "" || path == handler.Path() {
+		path = "/report-events"
+	}
+	api.GET(path, handler.ServeHTTP)
 }

@@ -54,7 +54,10 @@ import {
   boolEnv,
   RUN_ID,
   ORG_ID,
-  TOKEN
+  TOKEN,
+  REPORT_MODE,
+  REPORT_WEBSOCKET,
+  REPORT_VUSER_DEFAULTS,
 } from './config.js';
 
 let staticReportSamples = { medical: [], personality: [] };
@@ -777,9 +780,14 @@ export function discoverPersonalityReportSamples(testeeIDs) {
 
 export function buildRunTiming() {
   const setupStartAtMs = Date.now();
+  const reportRps = LEGACY_REPORT_RPS;
+  const medicalReportRps = MEDICAL_REPORT_RPS;
+  const personalityReportRps = PERSONALITY_REPORT_RPS;
   return {
     runId: RUN_ID,
     profile: QPS_PROFILE || '<none>',
+    report_mode: REPORT_MODE,
+    report_vuser_defaults: REPORT_VUSER_DEFAULTS,
     scriptInitAtMs: SCRIPT_INIT_AT_MS,
     setupStartAtMs,
     trafficStartAtMs: null,
@@ -793,9 +801,12 @@ export function buildRunTiming() {
       answersheet_submit: LEGACY_SUBMIT_RPS,
       medical_submit: MEDICAL_SUBMIT_RPS,
       personality_submit: PERSONALITY_SUBMIT_RPS,
-      report_status_query: LEGACY_REPORT_RPS,
-      medical_report_status_query: MEDICAL_REPORT_RPS,
-      personality_report_status_query: PERSONALITY_REPORT_RPS,
+      report_status_query: REPORT_WEBSOCKET ? 0 : reportRps,
+      medical_report_status_query: REPORT_WEBSOCKET ? 0 : medicalReportRps,
+      personality_report_status_query: REPORT_WEBSOCKET ? 0 : personalityReportRps,
+      report_ws_query: REPORT_WEBSOCKET ? reportRps : 0,
+      medical_report_ws_query: REPORT_WEBSOCKET ? medicalReportRps : 0,
+      personality_report_ws_query: REPORT_WEBSOCKET ? personalityReportRps : 0,
       statistics_query: STATS_RPS,
       async_chain_probe_medical: CHAIN_PROBE_MEDICAL_RPS,
       async_chain_probe_personality: CHAIN_PROBE_PERSONALITY_RPS,

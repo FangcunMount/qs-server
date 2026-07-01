@@ -86,6 +86,7 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `mixed_280` | 280 | 132/24/96/28 | 8m | legacy **问卷单桶** query（132/s 读压探顶） |
 | `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | **三域 L1 280 档验收**（**已通过** 2026-07-01；`make perf-mixed280-models`，**wait-report 长轮询**） |
 | `mixed_280_models_short_report` | 280 | 同左，report 走 **`/report-status` 短轮询** | 8m | A 方案验收（`make perf-mixed280-models-short-report`）；`report` VU max≈320 |
+| `mixed_280_models_ws` | 280 | 同左，report 走 **WebSocket `/report-events`**（需 `report_events.enabled=true`） | 8m | E 方案验收（`make perf-mixed280-models-ws`）；连接数≈并发等待用户数 |
 | `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + **1 probe** | 10m | **全量验收档**（2026-07-01 **未通过**，见 §2.2 / §2.4） |
 | `mixed_300_http` | ~281 | **71+36+25** /24/**96**/29 /0 probe | 10m | HTTP 攻关 **Step1**（= `mixed_280_models` 读压 + 10min） |
 | `mixed_300_http_query` | ~295 | 146 query /24/96/29 /0 probe | 10m | HTTP 攻关 **Step2**（满配 query，无 probe） |
@@ -198,9 +199,31 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 
 **压测纪律**：档间冷却 **≥10min**；`mixed_280_models` **连跑**可在 ~20–68s 雪崩（残余负载 + k6 VU 螺旋），勿据此否定已通过结论。
 
+### 2.5 Report 三模式与 `qps.report` 语义
+
+`qps.report` 表示**用户侧「查报告是否就绪」的操作频率**（constant-arrival-rate 的到达率），**不是** Nginx access 里的裸 HTTP RPS：
+
+| `reportMode` | 接口 | k6 行为 | 服务端并发近似 | max VU 公式（k6 自动默认，profile 可覆盖） |
+| ------------ | ---- | ------- | -------------- | ------------------------------------------ |
+| `long_poll`（默认） | `wait-report` | 单次请求阻塞至 timeout 或终态 | HTTP 长连接 ≈ `report_rps × 有效等待秒` | `report_rps × report_timeout × 1.1` |
+| `short_poll` | `report-status` | pending 时 `sleep(next_poll_after_ms)` | 短请求 + 客户端间隔 | `report_rps × (0.5s + poll_interval) × 1.1` |
+| `websocket` | `report-events` | 每迭代 1 条 WS 长连至终态或 `ws_hold_seconds` | 连接数 ≈ 并发等待用户 | `report_rps × ws_hold_seconds × 1.1` |
+
+配置入口（`qs-perf.config.json` → profile）：
+
+- 推荐显式写 **`reportMode`**：`long_poll` / `short_poll` / `websocket`
+- 兼容旧字段：`reportShortPoll: true` → `short_poll`；`reportWebSocket: true` → `websocket`
+- 全局说明见示例 `reportSizing` 块；可调 `reportPollIntervalMs`、`reportWsHoldSeconds`
+
+| Profile | reportMode | report 96/s 时建议 max VU |
+| ------- | ---------- | ------------------------- |
+| `mixed_280_models` | `long_poll` | ~2112（profile 显式 860，按实测占用调低） |
+| `mixed_280_models_short_report` | `short_poll` | ~320 |
+| `mixed_280_models_ws` | `websocket` | ~528（hold=5s） |
+
 **wait-report VU sizing**（长轮询 profile）：`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
 
-**query VU sizing**（`HTTP_TIMEOUT=30s`）：按 `query_rps × 7～8` 设 `max`（92/s→690）。**下游饱和时勿盲目加 VU**（112/s + max 1200 曾致 4.64% 失败）。**短轮询 profile**（`mixed_280_models_short_report`）：report VU 按 `report_rps × (请求耗时 + next_poll_after_ms)`，max≈**320** 即可。
+**query VU sizing**（`HTTP_TIMEOUT=30s`）：按 `query_rps × 7～8` 设 `max`（92/s→690）。**下游饱和时勿盲目加 VU**（112/s + max 1200 曾致 4.64% 失败）。未在 profile 写 `vusers.report` 时，k6 按上表 `reportMode` 自动估算默认值。
 
 ---
 
@@ -313,6 +336,7 @@ make perf-mixed240-models   # mixed_240_models（三域 L1 拆分 query）
 make perf-mixed280          # mixed_280（legacy 问卷单桶）
 make perf-mixed280-models   # mixed_280_models（长轮询 wait-report）
 make perf-mixed280-models-short-report  # report-status 短轮询（A 方案）
+make perf-mixed280-models-ws            # WebSocket report-events（E 方案，需 report_events.enabled=true）
 make perf-mixed300-http         # Step1：280 读压 + 10min
 make perf-mixed300-http-query   # Step2：满配 query，无 probe
 make perf-mixed300              # 全量（含 probe）+ 前后 snapshot

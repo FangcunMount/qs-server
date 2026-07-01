@@ -12,6 +12,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportevents"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
@@ -21,6 +23,7 @@ import (
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
+	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
@@ -61,8 +64,9 @@ type Container struct {
 	personalitySessionService         *personalitysession.Service
 	testeeService                     *testee.Service
 	reportStatusReporter              *reportstatus.Reporter
-	waitHub                           reportwait.WaitHub
+	reportNotifier                    reportnotify.Notifier
 	waitWatcherCancel                 context.CancelFunc
+	reportEventsHandler               *ws.ReportEventsHandler
 	questionnaireCacheWatcherCancel   context.CancelFunc
 	scaleCacheWatcherCancel           context.CancelFunc
 	personalityCacheWatcherCancel     context.CancelFunc
@@ -201,7 +205,7 @@ func (c *Container) initApplicationServices() {
 			cfg.SignalingEnabled = true
 		}
 	}
-	c.waitHub = reportwait.NewInMemoryWaitHub()
+	c.reportNotifier = reportnotify.NewInMemoryNotifier()
 	var signaler *signalredis.Signaler[reportstatus.ChangedSignal]
 	if reporter != nil {
 		signaler = reporter.Signaler()
@@ -209,7 +213,7 @@ func (c *Container) initApplicationServices() {
 	c.waitReportService = reportwait.NewService(
 		c.evaluationQueryService,
 		reportwait.NewStatusCache(reportstatus.NewCache(c.opsHandle)),
-		c.waitHub,
+		c.reportNotifier,
 		signaler,
 		cfg,
 	)
@@ -231,6 +235,17 @@ func (c *Container) initApplicationServices() {
 	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(c.evaluationClient, c.waitReportService)
 	c.personalitySessionService = personalitysession.NewService(c.personalityModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
+	c.reportEventsHandler = ws.NewReportEventsHandler(ws.Dependencies{
+		Notifier: c.reportNotifier,
+		Events: reportevents.NewService(
+			c.waitReportService,
+			c.evaluationQueryService,
+			c.personalityAssessmentQueryService,
+		),
+		Options:      c.opts.ReportEvents,
+		RateLimit:    c.RateLimitBackend(),
+		RateLimitCfg: c.opts.RateLimit,
+	})
 
 	log.Info("✅ Application services initialized")
 }
@@ -359,6 +374,20 @@ func (c *Container) WaitReportOptions() *options.WaitReportOptions {
 		return options.NewWaitReportOptions()
 	}
 	return c.opts.WaitReport
+}
+
+func (c *Container) ReportEventsHandler() *ws.ReportEventsHandler {
+	if c == nil {
+		return nil
+	}
+	return c.reportEventsHandler
+}
+
+func (c *Container) ReportEventsOptions() *options.ReportEventsOptions {
+	if c == nil || c.opts == nil || c.opts.ReportEvents == nil {
+		return options.NewReportEventsOptions()
+	}
+	return c.opts.ReportEvents
 }
 
 func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {

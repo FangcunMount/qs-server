@@ -16,6 +16,10 @@ import {
   STATS_RPS,
   STRICT_THRESHOLDS,
   DURATION,
+  REPORT_MODE,
+  REPORT_TIMEOUT,
+  REPORT_POLL_INTERVAL_MS,
+  REPORT_WS_HOLD_SECONDS,
 } from './config.js';
 
 export function buildEndpointFailureCounters(prefix) {
@@ -104,6 +108,20 @@ export const personalityReportFetchSuccessRate = new Rate('personality_report_fe
 
 export const scenarios = {};
 
+function reportDurationThresholds() {
+  if (REPORT_MODE === 'long_poll') {
+    const p95 = Math.max(1500, Math.floor(REPORT_TIMEOUT * 1000 * 0.95));
+    return [`p(95)<${p95}`, `p(99)<${p95 * 2}`];
+  }
+  if (REPORT_MODE === 'short_poll') {
+    const cycleMs = Math.max(500, REPORT_POLL_INTERVAL_MS) + 500;
+    const p95 = Math.max(1500, cycleMs * 2);
+    return [`p(95)<${p95}`, `p(99)<${p95 * 2}`];
+  }
+  const wsMs = Math.max(1000, Math.floor(REPORT_WS_HOLD_SECONDS * 1000));
+  return [`p(95)<${wsMs + 500}`, `p(99)<${wsMs + 2000}`];
+}
+
 export function buildThresholds() {
   const submitRps = LEGACY_SUBMIT_RPS + MEDICAL_SUBMIT_RPS + PERSONALITY_SUBMIT_RPS;
   const reportRps = LEGACY_REPORT_RPS + MEDICAL_REPORT_RPS + PERSONALITY_REPORT_RPS;
@@ -139,7 +157,7 @@ export function buildThresholds() {
     thresholds.answer_submit_duration = ['p(95)<1000', 'p(99)<2000'];
   }
   if (reportRps > 0 || chainProbeRps > 0) {
-    thresholds.report_status_duration = ['p(95)<1500', 'p(99)<3000'];
+    thresholds.report_status_duration = reportDurationThresholds();
   }
   if (STATS_RPS > 0) {
     thresholds.statistics_duration = ['p(95)<1000', 'p(99)<2000'];
