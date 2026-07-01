@@ -10,14 +10,16 @@
 | -------- | ------------ | ---- |
 | 100 | 单机单实例 | 小规格可承接，重点保护 DB |
 | 200 | 单机单实例 | 保守基线（`mixed_200` 全绿） |
-| 220 | 单机单实例 | **当前单机混合验收基线**（`mixed_220` 全绿，collection 问卷 L1） |
-| 300 | 单机单实例 | **待测**（L1 后升 `mixed_240`→`mixed_300`） |
+| 220 | 单机单实例 | **当前单机混合验收基线**（`mixed_220` 全绿，问卷 L1） |
+| 240 | 单机单实例 | **通过**（`mixed_240_models` 三域 L1 全绿，2026-07-01） |
+| 280 | 单机单实例 | **通过**（`mixed_280_models` 三域 L1 全绿，2026-07-01；legacy `mixed_280` 单桶仅 HTTP 过、读 p95 未过线） |
+| 300 | 单机单实例 | **未通过**；攻关：`perf-mixed300-http` → `perf-mixed300-http-query` → `mixed_300` |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
 | 1000 | 应用多实例 + LB | 必须正式压测验收 |
 
-**单机实测（2026-07-01）**：`mixed_140`～`mixed_200` 全绿；无 L1 时 `mixed_220` 失败；**collection 问卷 L1 缓存上线后 `mixed_220` 全绿**（query p95≈172ms）。详见 [SOP §10.2](./11-300QPS混合场景压测SOP.md)。
+**单机实测（2026-07-01）**：`mixed_140`～`mixed_200` 全绿；问卷 L1 后 `mixed_220` 全绿；三域 L1 后 `mixed_240_models` / **`mixed_280_models`** 全绿（拆分 query，http p95≈114–154ms）。详见 [SOP §10.2](./11-300QPS混合场景压测SOP.md)。
 
 核心原则：
 
@@ -41,6 +43,8 @@
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
 | collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
 | collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
+
+目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
 | collection concurrency | max-concurrency 512 | 本进程总并发保护 |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |

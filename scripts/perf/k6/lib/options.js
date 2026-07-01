@@ -20,7 +20,7 @@ import { addScenario, lowRateArrivalScenario, scenarios } from './metrics.js';
 
 addScenario('medical_model_query', 'medicalModelQuery', MEDICAL_QUERY_RPS, intEnv('MEDICAL_QUERY_VUS', intEnv('QUERY_VUS', 80)), intEnv('MEDICAL_QUERY_MAX_VUS', intEnv('QUERY_MAX_VUS', 400)));
 addScenario('personality_model_query', 'personalityModelQuery', PERSONALITY_QUERY_RPS, intEnv('PERSONALITY_QUERY_VUS', intEnv('QUERY_VUS', 80)), intEnv('PERSONALITY_QUERY_MAX_VUS', intEnv('QUERY_MAX_VUS', 400)));
-addScenario('questionnaire_query', 'questionnaireDetailQuery', QUESTIONNAIRE_DETAIL_RPS || LEGACY_QUERY_RPS, intEnv('QUERY_VUS', 80), intEnv('QUERY_MAX_VUS', 400));
+addScenario('questionnaire_query', 'questionnaireDetailQuery', QUESTIONNAIRE_DETAIL_RPS || LEGACY_QUERY_RPS, intEnv('QUESTIONNAIRE_DETAIL_VUS', intEnv('QUERY_VUS', 80)), intEnv('QUESTIONNAIRE_DETAIL_MAX_VUS', intEnv('QUERY_MAX_VUS', 400)));
 addScenario('personality_questionnaire_query', 'personalityQuestionnaireDetailQuery', PERSONALITY_QUESTIONNAIRE_DETAIL_RPS, intEnv('PERSONALITY_QUESTIONNAIRE_QUERY_VUS', intEnv('QUERY_VUS', 80)), intEnv('PERSONALITY_QUESTIONNAIRE_QUERY_MAX_VUS', intEnv('QUERY_MAX_VUS', 400)));
 addScenario('personality_session', 'personalitySession', PERSONALITY_SESSION_RPS, intEnv('PERSONALITY_SESSION_VUS', 40), intEnv('PERSONALITY_SESSION_MAX_VUS', 200));
 addScenario('answersheet_submit', 'answerSubmit', LEGACY_SUBMIT_RPS, intEnv('SUBMIT_VUS', 120), intEnv('SUBMIT_MAX_VUS', 800));

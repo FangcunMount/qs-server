@@ -12,9 +12,10 @@
 | **脚本入口** | `scripts/perf/k6/mixed.js`（`k6-mixed-300qps.js` 为兼容 shim） |
 | **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
 | 三类目标 | **前台读写**（model query/submit/wait-report）；**异步 SLA**（`async_chain_probe_*`）；**后台排水**（`perf-outbox120` + DB snapshot） |
-| 推荐升档 | `smoke_4` → … → **`mixed_220`（当前单机混合验收基线）** → `mixed_240` → …`mixed_300` |
+| 推荐升档 | `mixed_280_models`（已通过）→ `mixed_300_http` Step1 → `mixed_300_http_query` → `mixed_300` |
 | 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
 | 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
+| 目录缓存 | 三域 L1+L2 见 [Catalog 目录缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)；`mixed_240+` **三域验收**须 **`mixed_240_models`** 等拆分 query profile |
 | 验收 | K6 HTTP + chain probe SLA **且** outbox 压测结束后 **≤3min** 消化（`pending/failed/publishing` 回落至近 0）；HTTP 429 与 outbox 堆积可并存，勿混为一谈 |
 
 ---
@@ -48,7 +49,9 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 
 ### 2.1 mixed_300 目标配比（多 model，产品真实 submit）
 
-`mixed_300` / `mixed_300_probe` 使用**拆分场景**（profile 含 `medicalQuery` 等字段时自动启用）。**submit 按单机稳态上限 24/s 设定**（2026-06 压测：`mixed_140_submit24` 全绿）；原 60/s 为过度预留，已下调。
+`mixed_300` / `mixed_300_probe` / **`mixed_240_models`** 使用**拆分场景**（profile 含 `medicalQuery` 等字段时 `USE_SPLIT_QUERY_SCENARIOS=true`，`LEGACY_QUERY_RPS=0`）。**submit 按单机稳态上限 24/s 设定**（2026-06 压测：`mixed_140_submit24` 全绿）；原 60/s 为过度预留，已下调。
+
+**三域 L1 验收**：`mixed_240`（legacy `qps.query` 单桶）仅打 `questionnaire_query`，不能验量表/人格 L1；须跑 **`mixed_240_models`**（54/27/19/s）或 `mixed_300`。
 
 | 场景 | QPS | 接口 |
 | ---- | ---: | ---- |
@@ -78,10 +81,14 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `mixed_180` | 180 | 80/24/58/18 | 5m | 同上 |
 | `mixed_200` | 200 | 92/24/64/20 | 5m | 保守基线 |
 | `mixed_220` | 220 | 102/24/72/22 | 5m | **当前单机混合验收基线**（L1 缓存后全绿） |
-| `mixed_240` | 240 | 100/24/88/28 | 8m | 三域 L1 后升档验收（**须** `mixed_300_models` 拆分 query） |
-| `mixed_280` | 280 | 132/24/96/28 | 8m | 加压读/report |
-| `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + 1 probe | 10m | **验收档**（query 须拆分医学/人格/问卷） |
-| `mixed_300_probe` | 同上 | 同上 | 10m | 与 mixed_300 等效 |
+| `mixed_240` | 240 | 100/24/88/28 | 8m | legacy **问卷单桶** query（仅验问卷 L1） |
+| `mixed_240_models` | 240 | 54+27+19 /24/88/28 | 8m | **三域 L1 升档验收**（**已通过** 2026-07-01；`make perf-mixed240-models`） |
+| `mixed_280` | 280 | 132/24/96/28 | 8m | legacy **问卷单桶** query（132/s 读压探顶） |
+| `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | **三域 L1 280 档验收**（**已通过** 2026-07-01；`make perf-mixed280-models`） |
+| `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + **1 probe** | 10m | **全量验收档**（2026-07-01 **未通过**，见 §2.2 / §2.4） |
+| `mixed_300_http` | ~281 | **71+36+25** /24/**96**/29 /0 probe | 10m | HTTP 攻关 **Step1**（= `mixed_280_models` 读压 + 10min） |
+| `mixed_300_http_query` | ~295 | 146 query /24/96/29 /0 probe | 10m | HTTP 攻关 **Step2**（满配 query，无 probe） |
+| `mixed_300_probe` | 同上 | 同 `mixed_300` | 10m | 与 mixed_300 等效 |
 | `mixed_300_models` | ~291 | 医学+人格拆分，submit 合计 **20/s** | 10m | 产品真实流量混合 |
 | `outbox_120` | ~235 | submit/report 各 **96** + 低 query | 10m | **专测 outbox 排水** |
 | `personality_60` | ~60 | 人格 session/submit/wait | 5m | 人格链路专项 |
@@ -107,6 +114,24 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 
 **原则**：上一档 `http_req_failed < 1%`、无明显 503/502 尖刺后再升档。`pretest_60` 曾出现 p90 ~5s 但 0 失败，可接受；`pretest_120` 在跨机 collection 时大量 502/30s 超时，迁回 serverA 后应复测。
 
+### 2.4 300 档攻关顺序（`mixed_300` 未过后）
+
+`mixed_280_models` 全绿 **不代表** `mixed_300` 自动过线。2026-07-01 `mixed_300` 失败主因：**report 100/s 长轮询占满 k6 VU（900 触顶）→ 全链路排队**，叠加 chainProbe 导致异步 SLA 阈值失败。
+
+```text
+1. make perf-mixed300-http         # Step1：query=71/36/25（同 280_models），10min
+2. make perf-mixed300-http-query   # Step2：query 升至 80/40/13/13，仍无 probe
+3. make perf-mixed300              # 全量：report=100 + chainProbe=1/s
+4. 仍失败 → collection×2 + LB
+```
+
+| 步骤 | Profile | 验证目标 |
+| ---- | ------- | -------- |
+| ① HTTP 基线 | `mixed_300_http` | 280 读压 + 10min 稳态；`http_req_failed`<1%、读 p95<500ms |
+| ② HTTP 满读 | `mixed_300_http_query` | 146/s query + report 96；无 VU 触顶 |
+| ③ 全量验收 | `mixed_300` | + probe + report 100/s；异步 SLA 阈值 |
+| ④ 扩容 | 双 collection + LB | 300 档单机承诺 |
+
 **2026-06-30 优化后复测**（outbox limiter + immediate 并发 + published model 缓存 + 连接池预算；**配比为调优前旧档**）：
 
 | 档位 | HTTP 结论 | outbox 排水 | 备注 |
@@ -128,8 +153,14 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 | `mixed_240`（112/s，VU 730） | **边际通过**：checks 99.88%，http 0.11%；122×query timeout | **≤3min 消化** | 旧配比 112/24/80/24 |
 | `mixed_240`（112/s，VU 1200） | **未通过**：http 4.64%；4411×query timeout | **≤3min 消化** | 堆 VU 加剧下游过载，非解法 |
 | `mixed_220`（VU 690，无 L1） | **未通过**：http 0.56%～5.61% | **≤3min 消化** | 102/s 读压超 gRPC 路径容量 |
-| `mixed_240`（新 100/s） | **待测** | — | 三域 L1 后升档；须 `mixed_300_models` 拆分 query |
-| `mixed_280`～`mixed_300` | **待测** | — | 须 `mixed_240` 通过后再升 |
+| `mixed_240`（新 100/s，legacy 单桶） | **通过**：100%，0×429，query p95≈58–66ms | **≤3min 消化** | max VU≈243；**仅** `questionnaire_query`，未验量表/人格 |
+| `mixed_240_models` | **通过**：100%，0×429；三场景 54/27/19/s 全绿 | **≤3min 消化**（待压后 snapshot 确认） | http p95≈154ms；medical/personality/questionnaire query p95≈149/125/179ms；max VU≈749；`dropped_iterations`≈121（可忽略） |
+| `mixed_280`（legacy 132/s 单桶） | **HTTP 通过**：100%，0×429；**读 p95 超标** | 待确认 | 仅 `questionnaire_query` 132/s；query p95≈1.36s，http p95≈1.03s；max VU≈771；`dropped_iterations`≈310 |
+| `mixed_280_models` | **通过**：100%，0×429；三场景 71/36/25/s 全绿 | **≤3min 消化**（待压后 snapshot 确认） | http p95≈114ms；三域 query p95≈112/106/127ms；max VU≈479；`dropped_iterations`≈58 |
+| `mixed_300` | **未通过** | 待确认 | k6 exit 99；见上文 |
+| `mixed_300_http`（初版 146/s query） | **中断** | — | ~68s timeout/EOF 雪崩，~79s Ctrl+C |
+| `mixed_300_http`（Step1 71/36/25） | **待测** | — | `make perf-mixed300-http` |
+| `mixed_300_http_query` | **待测** | — | Step1 过后 `make perf-mixed300-http-query` |
 
 **2026-07-01 collection 问卷 L1 缓存上线后复测**（`questionnaire_cache.enabled=true`，TTL 180s，见 `collection-server.prod.yaml`）：
 
@@ -137,6 +168,20 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 | ---- | --------- | ----------- | ---- |
 | `mixed_200` | **通过**：100%，0×429 | **≤3min 消化** | query p95≈322ms；max VU≈1203 |
 | `mixed_220` | **通过**：100%，0×429 | **≤3min 消化** | query p95≈172ms；max VU≈248（L1 命中后 gRPC 压力骤降） |
+
+**2026-07-01 三域 Catalog L1+L2 上线后复测**（`questionnaire_cache` + `scale_cache` + `personality_cache`，TTL 180s；压测 profile **`mixed_240_models`**，拆分 query 54/27/19/s）：
+
+| 档位 | HTTP 结论 | outbox 排水 | 备注 |
+| ---- | --------- | ----------- | ---- |
+| `mixed_240_models` | **通过**：checks 100%，http 0%，submit/report 100% | 待压后 snapshot 确认 | 6 场景：`medical_model_query` 54/s、`personality_model_query` 27/s、`questionnaire_query` 19/s + submit 24 + report 88 + stats 28；http p95≈154ms；max VU≈749 |
+
+对比 legacy `mixed_240`（单桶问卷 100/s）：三域拆分后读压分散到量表/人格/问卷三条场景，**延迟与失败率仍全绿**，说明三域 L1 在 240 混合档有效。
+
+**同读压 132/s 对比（2026-07-01）**：legacy `mixed_280` 单桶 `questionnaire_query` p95≈1.36s（未过线）；**`mixed_280_models` 拆分为 71/36/25/s 后 http p95≈114ms 全绿**——说明 280 档须用拆分 query，勿用 legacy 单桶判断容量。
+
+**`mixed_300` 首次实测（2026-07-01，拆分 query + chainProbe 1/s，10min）**：HTTP **边际通过**（failed 0.02%，checks 99.97%），但 k6 **阈值未过**——`chain_probe_failed`=315（阈<3）、`submit_to_assessment_latency` p95≈**1m42s**（阈<15s）。~101s 出现 `report_status_query` **Insufficient VUs（900 触顶）**；稳态 query p95≈10.7s，第 6min 起 catalog 读 30s timeout 尖刺（medical 37 次）。**结论**：单机 280 档全绿 ≠ 300 档可承诺；瓶颈在 **report 100/s 长轮询占满 VU → 全链路排队**，非 L1 单独失效。
+
+**`mixed_300_http` 初版（query 146/s，2026-07-01）**：~**68s** 起全场景 30s timeout/EOF 雪崩，**~79s 人工中断**；读压比已通过的 `mixed_280_models`（132/s）**高 14/s** 且时长 10min，不能代表「仅去掉 probe」。profile 已改为 **Step1：query=71/36/25**（同 280_models），满配 query 见 `mixed_300_http_query`。
 
 `pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。旧档 `mixed_140` submit28 失败已通过**降 submit + 调 submit_queue worker**解决；**2026-07-01 前** 220 档瓶颈在 collection→apiserver 问卷读 gRPC，**L1 REST DTO 缓存**后 102/s 全绿。
 
@@ -155,7 +200,11 @@ mkdir -p tmp/perf
 cp scripts/perf/qs-perf.config.example.json tmp/perf/qs-perf.config.json
 ```
 
-已有 `tmp/perf/qs-perf.config.json` 时**不要覆盖**其中的 URL/token 路径；只合并示例里新增的 `qpsProfiles` 字段。
+已有 `tmp/perf/qs-perf.config.json` 时**不要覆盖**其中的 URL/token 路径；合并示例里新增的 `qpsProfiles` / `paths`：
+
+```bash
+make perf-sync-profiles   # 或任意 make perf-preflight / perf-mixed240-models 会自动合并
+```
 
 常用字段见 `scripts/perf/qs-perf.config.example.json`：`collectionBaseUrl`、`apiserverBaseUrl`、`tokensFile`、`qpsProfile`、`scaleCodes`、`planIds`、`autoDiscoverSeeddata` 等。相对路径按配置文件所在目录解析。
 
@@ -229,6 +278,7 @@ make perf-preflight
 
 ```bash
 make perf-init              # 首次：初始化 tmp/perf，不覆盖已有配置
+make perf-sync-profiles     # 已有配置时：合并 example 新增档位（如 mixed_240_models）
 # 编辑 tmp/perf/iam-users.json
 
 make perf-tokens            # collection + apiserver 两套 token
@@ -245,9 +295,13 @@ make perf-mixed160          # mixed_160
 make perf-mixed180          # mixed_180
 make perf-mixed200          # mixed_200
 make perf-mixed220          # mixed_220（200→240 阶梯）
-make perf-mixed240          # mixed_240
-make perf-mixed280          # mixed_280
-make perf-mixed300          # mixed_300 + 前后 snapshot
+make perf-mixed240          # mixed_240（legacy 问卷单桶）
+make perf-mixed240-models   # mixed_240_models（三域 L1 拆分 query）
+make perf-mixed280          # mixed_280（legacy 问卷单桶）
+make perf-mixed280-models   # mixed_280_models（三域 L1 拆分 query）
+make perf-mixed300-http         # Step1：280 读压 + 10min
+make perf-mixed300-http-query   # Step2：满配 query，无 probe
+make perf-mixed300              # 全量（含 probe）+ 前后 snapshot
 make perf-mixed300probe     # mixed_300_probe（与 mixed_300 等效）
 make perf-mixed300-models   # 医学+人格拆分 submit/report
 make perf-outbox120         # outbox 排水专测 + snapshot
@@ -449,7 +503,8 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | 优化后 outbox 3min 内消化，但 pretest120 submit≈96%、`http_429`≈250、questionnaire 读超时 | collection submit 队列背压 + 48/s 问卷读压饱和（apiserver 侧 Mongo 争用已缓解） | 部署 collection `worker_count=32, queue_size=1600`；跑 `pretest_120_balanced`（32/24/24/12）；隔离 submit 见 `pretest_120_submit_only` |
 | `mixed_140`（旧 submit28）submit≈90%～98%、182～806×429 | submit 超混合稳态吞吐，非读压主因 | 降压测 submit 至 24/s；`submit_queue` worker 调至 40 |
 | `mixed_220`（102/s，无 L1） | 102/s 读压 gRPC 路径饱和 | collection 未缓存 REST DTO，每请求打 apiserver gRPC | 部署 `questionnaire_cache` L1（TTL 180s）；勿仅靠加 VU |
-| `mixed_240` query 30s timeout / `Insufficient VUs` | 读压超容量或 k6 VU 不足 | L1 前 112/s 即失败；L1 后先测新 profile 100/s | `make perf-mixed240`；仍失败则查 apiserver 问卷读 p95 |
+| `mixed_280` query 30s timeout / `Insufficient VUs` | 读压超容量或 k6 VU 不足 | L1 前 112/s 即失败；legacy 100/s 单桶仅验问卷 | `make perf-mixed240`；三域 L1 用 `make perf-mixed240-models` |
+| `mixed_300` report VU 900 触顶 + query 10s p95 + chain_probe 雪崩 | report 100/s 长轮询占满并发，全链路排队 | 分步：`perf-mixed300-http` → `perf-mixed300-http-query` → `mixed_300` | 勿一次跳到 146/s query；见 §2.4 |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
@@ -529,9 +584,14 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | mixed_220（无 L1，VU770） | 220 | 5.61% | 0 | 0 | 0 | query p95≈30s | **未通过** |
 | mixed_220（无 L1，VU690） | 220 | 0.56% | 0 | 0 | 0 | query p95≈8.8s | **未通过** |
 | mixed_220 | 220 | 0% | 0 | 0 | 0 | query p95≈172ms | **通过**（2026-07-01，L1 后） |
-| mixed_240（新） | 240 | | | | | | **待测**（三域 L1 + 拆分 query 场景） |
-| mixed_280 | 280 | | | | | | 待测 |
-| mixed_300 | ~300 | | | | | | 待测 |
+| mixed_240（legacy 100/s） | 240 | 0% | 0 | 0 | 0 | query p95≈58–66ms | **通过**（2026-06-30，仅问卷 L1） |
+| mixed_240_models | 240 | 0% | 0 | 0 | 0 | http p95≈154ms；三域 query p95≈149/125/179ms | **通过**（2026-07-01，三域 L1 拆分 query） |
+| mixed_280（legacy 132/s） | 280 | 0% | 0 | 0 | 0 | questionnaire query p95≈1.36s | **HTTP 通过 / 读 p95 未过线**（2026-07-01，仅问卷单桶） |
+| mixed_280_models | 280 | 0% | 0 | 0 | 0 | http p95≈114ms；三域 query p95≈112/106/127ms | **通过**（2026-07-01，三域拆分 71/36/25/s） |
+| mixed_300 | ~300 | 0.02% | — | 0 | 0 | http p95≈10.6s；chain_probe_failed=315 | **未通过**（2026-07-01） |
+| mixed_300_http（146/s query） | ~295 | — | — | — | — | ~68s 雪崩后中断 | **中断**（初版 profile 过激） |
+| mixed_300_http（Step1） | ~281 | | | | | | **待测**（71/36/25 + 10min） |
+| mixed_300_http_query | ~295 | | | | | | **待测**（Step2） |
 
 ### 10.4 验收标准（HTTP + 后台）
 

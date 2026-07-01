@@ -112,9 +112,9 @@ COLOR_RED := \033[31m
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced
-.PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed280 perf-mixed300 perf-mixed300probe
+.PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300probe
 .PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
-.PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-verify
+.PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-verify
 
 # ============================================================================
 # 帮助信息
@@ -197,6 +197,12 @@ perf-ensure-config:
 		mv $(PERF_DIR)/qs-perf.config.json.tmp $(PERF_DIR)/qs-perf.config.json; \
 		echo "$(COLOR_GREEN)✅ 已补全 apiserverTokensFile$(COLOR_RESET)"; \
 	fi
+	@$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json 2>/dev/null || true
+
+perf-sync-profiles: ## 从 example 合并缺失的 qpsProfiles/paths（本地已有键保留）
+	@command -v jq >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 jq: brew install jq$(COLOR_RESET)" >&2; exit 1; }
+	@test -f $(PERF_DIR)/qs-perf.config.json || { echo "$(COLOR_RED)❌ 先执行: make perf-init$(COLOR_RESET)" >&2; exit 1; }
+	@$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json
 
 perf-tokens-collection: perf-ensure-config ## 用 collection_users 刷新 tokens.json
 	@test -f $(PERF_DIR)/iam-users.json || { echo "$(COLOR_RED)❌ 缺少 $(PERF_DIR)/iam-users.json$(COLOR_RESET)" >&2; exit 1; }
@@ -220,7 +226,7 @@ perf-preflight: perf-ensure-config ## Token 预检（k6 前必跑）
 perf-check-k6:
 	@command -v k6 >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 k6: brew install k6$(COLOR_RESET)" >&2; exit 1; }
 
-perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|pretest_60|mixed_300|mixed_300_models|outbox_120|…)
+perf-k6: perf-check-k6 ## 运行 k6 混合压测 (QPS_PROFILE=smoke_4|mixed_240_models|mixed_300|mixed_300_models|…)
 	$(if $(SUMMARY_EXPORT),@mkdir -p $(dir $(SUMMARY_EXPORT)),)
 	k6 run -e PERF_CONFIG_FILE="$(PERF_CONFIG_FILE)" -e PERF_ROOT_DIR="$(CURDIR)" \
 		-e QPS_PROFILE="$(QPS_PROFILE)" \
@@ -270,19 +276,35 @@ perf-mixed220: perf-preflight ## k6 mixed_220 升档 (5min)
 	@mkdir -p $(PERF_DIR)/mixed220
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_220 SUMMARY_EXPORT=$(PERF_DIR)/mixed220/k6-summary.json
 
-perf-mixed240: perf-preflight ## k6 mixed_240 升档 (8min)
+perf-mixed240: perf-preflight ## k6 mixed_240 升档 (8min, legacy 问卷单桶 query)
 	@mkdir -p $(PERF_DIR)/mixed240
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_240 SUMMARY_EXPORT=$(PERF_DIR)/mixed240/k6-summary.json
 
-perf-mixed280: perf-preflight ## k6 mixed_280 升档 (8min)
+perf-mixed240-models: perf-preflight ## k6 mixed_240_models 三域 L1 验收 (8min, 拆分 query)
+	@mkdir -p $(PERF_DIR)/mixed240-models
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_240_models SUMMARY_EXPORT=$(PERF_DIR)/mixed240-models/k6-summary.json
+
+perf-mixed280: perf-preflight ## k6 mixed_280 升档 (8min, legacy 问卷单桶 query)
 	@mkdir -p $(PERF_DIR)/mixed280
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_280 SUMMARY_EXPORT=$(PERF_DIR)/mixed280/k6-summary.json
 
-perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min) + 前后 snapshot
+perf-mixed280-models: perf-preflight ## k6 mixed_280_models 三域 L1 升档 (8min, 拆分 query)
+	@mkdir -p $(PERF_DIR)/mixed280-models
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_280_models SUMMARY_EXPORT=$(PERF_DIR)/mixed280-models/k6-summary.json
+
+perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min, 含 chainProbe) + 前后 snapshot
 	@mkdir -p $(PERF_DIR)/300qps
 	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh before
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_300 SUMMARY_EXPORT=$(PERF_DIR)/300qps/k6-summary.json
 	OUT_DIR=$(PERF_DIR)/300qps $(PERF_SCRIPT_DIR)/snapshot-observability.sh after
+
+perf-mixed300-http: perf-preflight ## k6 mixed_300_http Step1 (10min, 280 读压+10m, 无 probe)
+	@mkdir -p $(PERF_DIR)/300qps-http
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_http SUMMARY_EXPORT=$(PERF_DIR)/300qps-http/k6-summary.json
+
+perf-mixed300-http-query: perf-preflight ## k6 mixed_300_http_query Step2 (10min, 300 query+report 96)
+	@mkdir -p $(PERF_DIR)/300qps-http-query
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_300_http_query SUMMARY_EXPORT=$(PERF_DIR)/300qps-http-query/k6-summary.json
 
 perf-mixed300probe: perf-preflight ## k6 mixed_300_probe 目标档 + chainProbe (10min) + 前后 snapshot
 	@mkdir -p $(PERF_DIR)/300qps-probe
@@ -334,8 +356,12 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/check-token-preflight.sh
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
+	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_240_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_280_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300_http $(PERF_K6_SCRIPT) | grep -q report_status_query
 
 # ============================================================================
 # CD 发布入口

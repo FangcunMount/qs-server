@@ -20,7 +20,8 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| apiserver 独有 | 完整 Cache 层主要存在于 apiserver；collection-server/worker 不复用 object/query cache |
+| apiserver 独有 | 完整 Cache 层（ObjectCache / QueryCache / StaticList）主要存在于 apiserver |
+| collection L1 | 目录读另有进程内 L1（`localttlcache`），见 [10-Catalog目录L1-L2缓存](./10-Catalog目录L1-L2缓存.md) |
 | family 分流 | static/object/query/meta/sdk 分别落到不同 Redis family |
 | 策略继承 | CachePolicy 支持 family default + policy override |
 | ObjectCache 主路径 | cache hit -> miss -> singleflight source load -> positive/negative writeback |

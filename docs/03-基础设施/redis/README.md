@@ -100,7 +100,8 @@ redis/
 ├── 06-Redis分布式锁层.md
 ├── 07-缓存治理层.md
 ├── 08-观测降级与排障.md
-└── 09-新增Redis能力SOP.md
+├── 09-新增Redis能力SOP.md
+└── 10-Catalog目录L1-L2缓存.md
 ```
 
 | 顺序 | 文档 | 先回答什么 |
@@ -115,6 +116,7 @@ redis/
 | 8 | [07-缓存治理层.md](./07-缓存治理层.md) | coordinator、manual warmup、repair complete、status |
 | 9 | [08-观测降级与排障.md](./08-观测降级与排障.md) | family status、metrics、degraded、排障路径 |
 | 10 | [09-新增Redis能力SOP.md](./09-新增Redis能力SOP.md) | 新缓存、新锁、新 target、新 governance endpoint 的执行流程 |
+| 11 | [10-Catalog目录L1-L2缓存.md](./10-Catalog目录L1-L2缓存.md) | collection L1 + apiserver L2 目录读分层、信令失效、配置与排障 |
 
 ---
 
@@ -330,9 +332,11 @@ lock_lease
 典型 Redis family：
 
 ```text
-ops_runtime
+ops_runtime    # 信令 Pub/Sub、SubmitGuard、限流
 lock_lease
 ```
+
+另：**目录读 L1** 为进程内 `localttlcache`（非 Redis），见 [10-Catalog目录L1-L2缓存.md](./10-Catalog目录L1-L2缓存.md)。
 
 ### 6.3 worker
 
@@ -515,6 +519,7 @@ raw error
 
 | 现象 | 优先文档 |
 | ---- | -------- |
+| Catalog 目录发布后陈旧 / query 压测 | [10-Catalog目录L1-L2缓存.md](./10-Catalog目录L1-L2缓存.md) |
 | Redis family degraded | [08-观测降级与排障.md](./08-观测降级与排障.md) |
 | profile / namespace / fallback 错 | [01-运行时与Family模型.md](./01-运行时与Family模型.md) |
 | ObjectCache 命中率低 | [03-ObjectCache主路径.md](./03-ObjectCache主路径.md) |
@@ -624,4 +629,5 @@ git diff --check
 | 缓存治理 | [07-缓存治理层.md](./07-缓存治理层.md) |
 | 观测降级排障 | [08-观测降级与排障.md](./08-观测降级与排障.md) |
 | 新增 Redis 能力 | [09-新增Redis能力SOP.md](./09-新增Redis能力SOP.md) |
+| Catalog 目录 L1+L2 | [10-Catalog目录L1-L2缓存.md](./10-Catalog目录L1-L2缓存.md) |
 | 回到基础设施总入口 | [../README.md](../README.md) |
