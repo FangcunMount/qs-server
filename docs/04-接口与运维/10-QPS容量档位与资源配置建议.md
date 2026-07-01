@@ -9,14 +9,15 @@
 | 目标 QPS | 推荐部署形态 | 结论 |
 | -------- | ------------ | ---- |
 | 100 | 单机单实例 | 小规格可承接，重点保护 DB |
-| 200 | 单机单实例 | **当前单机混合验收上限**（`mixed_200` 全绿） |
-| 300 | 单机单实例或读优化后复测 | 压测未过：`mixed_220` 102/s 即 5.61% 失败；**须读路径优化或水平扩展** |
+| 200 | 单机单实例 | 保守基线（`mixed_200` 全绿） |
+| 220 | 单机单实例 | **当前单机混合验收基线**（`mixed_220` 全绿，collection 问卷 L1） |
+| 300 | 单机单实例 | **待测**（L1 后升 `mixed_240`→`mixed_300`） |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
 | 1000 | 应用多实例 + LB | 必须正式压测验收 |
 
-**单机实测（2026-07-01）**：`mixed_140`～`mixed_200` HTTP 全绿；`mixed_220`（102/s）5.61% 失败 → **读天花板约 92/s**。详见 [SOP §10.2](./11-300QPS混合场景压测SOP.md)。
+**单机实测（2026-07-01）**：`mixed_140`～`mixed_200` 全绿；无 L1 时 `mixed_220` 失败；**collection 问卷 L1 缓存上线后 `mixed_220` 全绿**（query p95≈172ms）。详见 [SOP §10.2](./11-300QPS混合场景压测SOP.md)。
 
 核心原则：
 
@@ -37,6 +38,7 @@
 | collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 入口保护（压测配比见 k6 profile，与此无关） |
 | collection grpc_client | max_inflight 360 | 到 apiserver 并发 |
 | collection submit_queue | queue_size 2000，worker_count 40 | 提交削峰 |
+| collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
 | collection concurrency | max-concurrency 512 | 本进程总并发保护 |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
