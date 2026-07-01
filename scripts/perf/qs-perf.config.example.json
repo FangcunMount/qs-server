@@ -809,6 +809,84 @@
         }
       }
     },
+    "mixed_300_http_query_nostats": {
+      "duration": "10m",
+      "description": "线 A 隔离：同 Step2 读压+report，stats=0；验证 146/s collection 读是否独立于 apiserver statistics",
+      "qps": {
+        "medicalQuery": 80,
+        "personalityQuery": 40,
+        "questionnaireQuery": 13,
+        "personalityQuestionnaireQuery": 13,
+        "submit": 24,
+        "report": 96,
+        "stats": 0,
+        "chainProbe": 0
+      },
+      "modelMix": {
+        "medical": 0.8,
+        "personality": 0.2
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 350,
+          "max": 1500
+        },
+        "submit": {
+          "preAllocated": 180,
+          "max": 1000
+        },
+        "report": {
+          "preAllocated": 560,
+          "max": 860
+        }
+      }
+    },
+    "stats_isolate_29": {
+      "duration": "10m",
+      "description": "线 A 隔离：仅 apiserver statistics 29/s（overview+system）；量化 stats 独立容量",
+      "qps": {
+        "query": 0,
+        "submit": 0,
+        "report": 0,
+        "stats": 29,
+        "chainProbe": 0
+      },
+      "paths": {
+        "statistics": [
+          "/api/v1/statistics/overview?preset=7d",
+          "/api/v1/statistics/system"
+        ]
+      },
+      "vusers": {
+        "stats": {
+          "preAllocated": 60,
+          "max": 300
+        }
+      }
+    },
+    "stats_warmup_1m": {
+      "duration": "1m",
+      "description": "线 A 可选：Step2 前 1min stats 预热（overview+system @29/s），降低缓存击穿尖刺",
+      "qps": {
+        "query": 0,
+        "submit": 0,
+        "report": 0,
+        "stats": 29,
+        "chainProbe": 0
+      },
+      "paths": {
+        "statistics": [
+          "/api/v1/statistics/overview?preset=7d",
+          "/api/v1/statistics/system"
+        ]
+      },
+      "vusers": {
+        "stats": {
+          "preAllocated": 40,
+          "max": 120
+        }
+      }
+    },
     "mixed_300_probe": {
       "duration": "10m",
       "description": "同 mixed_300（显式 probe profile）",
