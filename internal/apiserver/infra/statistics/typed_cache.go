@@ -71,6 +71,53 @@ func (c *StatisticsCache) StoreOverview(ctx context.Context, orgID int64, timeRa
 	c.storeJSON(ctx, overviewStatsCacheKey(orgID, timeRange), "统计概览", stats)
 }
 
+func (c *StatisticsCache) LoadSystemStatisticsCoalesced(
+	ctx context.Context,
+	orgID int64,
+	loader func(context.Context) (*domainStatistics.SystemStatistics, error),
+) (*domainStatistics.SystemStatistics, error) {
+	if c == nil {
+		if loader == nil {
+			return nil, nil
+		}
+		return loader(ctx)
+	}
+	if stats, ok := c.LoadSystemStatistics(ctx, orgID); ok {
+		return stats, nil
+	}
+	if loader == nil {
+		return nil, nil
+	}
+
+	load := func() (interface{}, error) {
+		if stats, ok := c.LoadSystemStatistics(ctx, orgID); ok {
+			return stats, nil
+		}
+		stats, err := loader(ctx)
+		if err != nil || stats == nil {
+			return nil, err
+		}
+		c.StoreSystemStatistics(ctx, orgID, stats)
+		return stats, nil
+	}
+
+	if c.policy.SingleflightEnabled(false) {
+		value, err, _ := c.sfGroup.Do(systemStatsCacheKey(orgID), load)
+		if err != nil {
+			return nil, err
+		}
+		stats, _ := value.(*domainStatistics.SystemStatistics)
+		return stats, nil
+	}
+
+	value, err := load()
+	if err != nil {
+		return nil, err
+	}
+	stats, _ := value.(*domainStatistics.SystemStatistics)
+	return stats, nil
+}
+
 func (c *StatisticsCache) loadJSON(ctx context.Context, cacheKey, label string, target interface{}) bool {
 	if c == nil || strings.TrimSpace(cacheKey) == "" {
 		return false

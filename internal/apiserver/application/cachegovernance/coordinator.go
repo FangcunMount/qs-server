@@ -199,7 +199,10 @@ func (c *coordinator) WarmStartup(ctx context.Context) error {
 	if c.cfg.StartupQuery {
 		targets = append(targets, c.mergeQueryTargets(ctx, nil, nil)...)
 	}
-	_, err := c.executeTargets(ctx, "startup", targets)
+	if c.deps.StatisticsSeeds != nil && c.deps.StatisticsSeeds.WarmOnStartup {
+		targets = append(targets, c.querySeedTargets(nil)...)
+	}
+	_, err := c.executeTargets(ctx, "startup", dedupeTargets(targets))
 	return err
 }
 

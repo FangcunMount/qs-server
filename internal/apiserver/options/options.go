@@ -505,6 +505,7 @@ type CacheOptions struct {
 	TTL                    *CacheTTLOptions         `json:"ttl" mapstructure:"ttl"`
 	TTLJitterRatio         float64                  `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
 	StatisticsWarmup       *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
+	StatisticsSystem       *StatisticsSystemOptions `json:"statistics_system" mapstructure:"statistics_system"`
 	Warmup                 *WarmupOptions           `json:"warmup" mapstructure:"warmup"`
 	CompressPayload        bool                     `json:"compress_payload" mapstructure:"compress_payload"`
 	Static                 *CacheFamilyOptions      `json:"static" mapstructure:"static"`
@@ -542,10 +543,17 @@ func NewCacheOptions() *CacheOptions {
 		Lock: &CacheFamilyOptions{},
 		StatisticsWarmup: &StatisticsWarmupOptions{
 			Enable:             false,
+			WarmOnStartup:      true,
 			OrgIDs:             []int64{1},
 			OverviewPresets:    []string{"today", "7d", "30d"},
 			QuestionnaireCodes: []string{},
 			PlanIDs:            []uint64{},
+		},
+		StatisticsSystem: &StatisticsSystemOptions{
+			ServiceSingleflight:     true,
+			DisableRealtimeFallback: true,
+			StaleOnTimeout:          true,
+			LoadTimeout:             25 * time.Second,
 		},
 		Warmup: &WarmupOptions{
 			Enable: true,
@@ -618,10 +626,19 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	if c.StatisticsWarmup == nil {
 		c.StatisticsWarmup = &StatisticsWarmupOptions{
 			Enable:             false,
+			WarmOnStartup:      true,
 			OrgIDs:             []int64{1},
 			OverviewPresets:    []string{"today", "7d", "30d"},
 			QuestionnaireCodes: []string{},
 			PlanIDs:            []uint64{},
+		}
+	}
+	if c.StatisticsSystem == nil {
+		c.StatisticsSystem = &StatisticsSystemOptions{
+			ServiceSingleflight:     true,
+			DisableRealtimeFallback: true,
+			StaleOnTimeout:          true,
+			LoadTimeout:             25 * time.Second,
 		}
 	}
 	if c.Warmup == nil {
@@ -678,10 +695,19 @@ type CacheTTLOptions struct {
 // StatisticsWarmupOptions 统计查询结果缓存预热配置
 type StatisticsWarmupOptions struct {
 	Enable             bool     `json:"enable" mapstructure:"enable"`
+	WarmOnStartup      bool     `json:"warm_on_startup" mapstructure:"warm_on_startup"`
 	OrgIDs             []int64  `json:"org_ids" mapstructure:"org_ids"`
 	OverviewPresets    []string `json:"overview_presets" mapstructure:"overview_presets"`
 	QuestionnaireCodes []string `json:"questionnaire_codes" mapstructure:"questionnaire_codes"`
 	PlanIDs            []uint64 `json:"plan_ids" mapstructure:"plan_ids"`
+}
+
+// StatisticsSystemOptions 系统统计查询保护与降级配置。
+type StatisticsSystemOptions struct {
+	ServiceSingleflight     bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
+	DisableRealtimeFallback bool          `json:"disable_realtime_fallback" mapstructure:"disable_realtime_fallback"`
+	StaleOnTimeout          bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
+	LoadTimeout             time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
 }
 
 type WarmupOptions struct {

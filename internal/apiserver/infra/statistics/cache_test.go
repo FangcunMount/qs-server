@@ -2,6 +2,8 @@ package statistics
 
 import (
 	"context"
+	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -155,6 +157,50 @@ func TestStatisticsTypedCacheOwnsStatisticsQueryKeys(t *testing.T) {
 	}
 	if !mr.Exists("stats-test:query:stats:query:plan:12:1001:v0") {
 		t.Fatalf("expected plan statistics query key")
+	}
+}
+
+func TestStatisticsCacheSystemSingleflightCoalescesConcurrentMiss(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+	})
+
+	cache := NewStatisticsCacheWithBuilderAndPolicy(
+		client,
+		keyspace.NewBuilderWithNamespace("stats-test"),
+		cachepolicy.CachePolicy{Singleflight: cachepolicy.PolicySwitchEnabled},
+	)
+	ctx := context.Background()
+
+	var loads atomic.Int32
+	const workers = 12
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			stats, err := cache.LoadSystemStatisticsCoalesced(ctx, 1, func(context.Context) (*domainStatistics.SystemStatistics, error) {
+				loads.Add(1)
+				time.Sleep(20 * time.Millisecond)
+				return &domainStatistics.SystemStatistics{OrgID: 1, AssessmentCount: 3}, nil
+			})
+			if err != nil {
+				t.Errorf("LoadSystemStatisticsCoalesced() error = %v", err)
+				return
+			}
+			if stats == nil || stats.AssessmentCount != 3 {
+				t.Errorf("LoadSystemStatisticsCoalesced() = %+v, want assessment_count=3", stats)
+			}
+		}()
+	}
+	wg.Wait()
+	if got := loads.Load(); got != 1 {
+		t.Fatalf("loader calls = %d, want 1", got)
+	}
+	if stats, ok := cache.LoadSystemStatistics(ctx, 1); !ok || stats.AssessmentCount != 3 {
+		t.Fatalf("cached stats = %+v, ok=%v, want assessment_count=3", stats, ok)
 	}
 }
 

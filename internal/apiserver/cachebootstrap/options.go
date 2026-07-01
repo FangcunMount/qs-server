@@ -13,6 +13,7 @@ type CacheOptions struct {
 	TTL                    CacheTTLOptions
 	TTLJitterRatio         float64
 	StatisticsWarmup       *cachegov.StatisticsWarmupConfig
+	StatisticsSystem       StatisticsSystemOptions
 	Warmup                 WarmupOptions
 	CompressPayload        bool
 	Static                 CacheFamilyOptions
@@ -21,6 +22,14 @@ type CacheOptions struct {
 	Meta                   CacheFamilyOptions
 	SDK                    CacheFamilyOptions
 	Lock                   CacheFamilyOptions
+}
+
+// StatisticsSystemOptions 控制系统统计查询并发与降级。
+type StatisticsSystemOptions struct {
+	ServiceSingleflight     bool
+	DisableRealtimeFallback bool
+	StaleOnTimeout          bool
+	LoadTimeout             time.Duration
 }
 
 type WarmupOptions struct {

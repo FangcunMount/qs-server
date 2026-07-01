@@ -34,6 +34,7 @@ func InstallFrom(host InstallHost) error {
 		MongoDB:                host.MongoDB(),
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
 		QueryPolicy:            host.CachePolicy(cachepolicy.PolicyStatsQuery),
+		SystemStatisticsOpts:   host.StatisticsSystemOptions(),
 		HotsetRecorder:         host.HotsetRecorder(),
 		LockManager:            host.CacheLockManager(),
 		Observer:               host.CacheObserver(),

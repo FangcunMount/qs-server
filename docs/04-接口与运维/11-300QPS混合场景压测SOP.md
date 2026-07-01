@@ -233,7 +233,36 @@ make perf-stats-isolate29
 
 `stats_isolate_29` / `stats_warmup_1m` 在 profile 内覆盖 `paths.statistics` 为 `overview` + `system`（去掉 questionnaires 明细），与 Step2 失败路径对齐。`nostats` 无需改 paths，`stats: 0` 时 k6 不注册 `statistics_query` 场景。
 
-**profile 同步陷阱**：`make perf-sync-profiles` **只补本地缺失的 profile 名，不覆盖已有 profile 的 qps**。若本地 `mixed_300_http` 仍为初版 146/s，会误跑 Step2 Workload。核对 setup 日志中 `medical_model_query` 应为 **71**（Step1）或 **80**（Step2）；或手动 `jq` 修正后重跑。
+#### 2.4.2 线 B：apiserver 统计防击穿（B1–B4）
+
+Step2 边际通过后，在**线 A 隔离确认 stats 为干扰源**的前提下，部署下列 apiserver 改动并重跑 Step2 / `stats_isolate_29`：
+
+| 项 | 配置/代码 | 作用 |
+| -- | --------- | ---- |
+| **B1** | `cache.query.singleflight: true` + `StatisticsCache.LoadSystemStatisticsCoalesced` | Redis query cache miss 时合并回源 |
+| **B2** | `cache.statistics_system.service_singleflight: true` | `GetSystemStatistics(orgID)` 应用层 singleflight |
+| **B3** | `cache.statistics_warmup.warm_on_startup: true` + `enable: true` | 启动即预热 `overview` + `system`（不依赖 `warmup.startup.query`） |
+| **B4** | `disable_realtime_fallback` + `stale_on_timeout` + `load_timeout: 25s` | 禁止全表实时聚合；回源超时返回进程内陈旧结果 |
+
+```yaml
+# configs/apiserver.prod.yaml（节选）
+cache:
+  query:
+    singleflight: true
+  statistics_warmup:
+    enable: true
+    warm_on_startup: true
+    org_ids: [1]
+  statistics_system:
+    service_singleflight: true
+    disable_realtime_fallback: true
+    stale_on_timeout: true
+    load_timeout: 25s
+```
+
+**验收**：`make perf-mixed300-http-query` 与 `make perf-stats-isolate29` 均 checks≥99.99%、`statistics/system` **0×30s timeout**、读 p95<500ms。
+
+**profile 同步陷阱**：`make perf-sync-profiles` **只补本地缺失的 profile 名，不覆盖已有 profile 的 qps**。
 
 **误跑对照（同机 2026-07-01）**：本地 `mixed_300_http` 仍为 80/40/13/13 时执行 `make perf-mixed300-http`，实质为 Step2 读压；checks 99.93%、109×`statistics/system` timeout（~592s 尾部）。修正 profile 后 Step1 全绿，说明失败来自 **profile 配比错误 + stats 瓶颈**，非 Step1 本身失效。
 

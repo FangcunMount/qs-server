@@ -27,6 +27,7 @@ type WireInput struct {
 	MongoDB                *mongo.Database
 	RepairWindowDays       int
 	QueryPolicy            cachepolicy.CachePolicy
+	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
 	HotsetRecorder         cachetarget.HotsetRecorder
 	LockManager            locklease.Manager
 	Observer               *observability.ComponentObserver
@@ -66,6 +67,7 @@ func Wire(in WireInput) (*Module, error) {
 		MongoDB:               in.MongoDB,
 		RepairWindowDays:      in.RepairWindowDays,
 		QueryPolicy:           in.QueryPolicy,
+		SystemStatisticsOpts:  in.SystemStatisticsOpts,
 		HotsetRecorder:        in.HotsetRecorder,
 		LockManager:           in.LockManager,
 		VersionStore:          versionStore,

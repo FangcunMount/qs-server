@@ -6,4 +6,5 @@ type StatisticsWarmupConfig struct {
 	OverviewPresets    []string
 	QuestionnaireCodes []string
 	PlanIDs            []uint64
+	WarmOnStartup      bool
 }

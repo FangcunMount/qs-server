@@ -86,6 +86,7 @@ func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 		TTL:                    ttl,
 		TTLJitterRatio:         cacheCfg.TTLJitterRatio,
 		StatisticsWarmup:       buildStatisticsWarmupConfig(cacheCfg),
+		StatisticsSystem:       buildStatisticsSystemOptions(cacheCfg),
 		Warmup:                 buildWarmupOptions(cacheCfg),
 		CompressPayload:        cacheCfg.CompressPayload,
 		Static:                 buildCacheFamilyOptions(cacheCfg.Static),
@@ -106,6 +107,28 @@ func buildStatisticsWarmupConfig(cacheCfg *apiserveroptions.CacheOptions) *cache
 		OverviewPresets:    cacheCfg.StatisticsWarmup.OverviewPresets,
 		QuestionnaireCodes: cacheCfg.StatisticsWarmup.QuestionnaireCodes,
 		PlanIDs:            cacheCfg.StatisticsWarmup.PlanIDs,
+		WarmOnStartup:      cacheCfg.StatisticsWarmup.WarmOnStartup,
+	}
+}
+
+func buildStatisticsSystemOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsSystemOptions {
+	defaults := apiserveroptions.NewCacheOptions().StatisticsSystem
+	if cacheCfg == nil || cacheCfg.StatisticsSystem == nil {
+		if defaults == nil {
+			return cachebootstrap.StatisticsSystemOptions{}
+		}
+		return cachebootstrap.StatisticsSystemOptions{
+			ServiceSingleflight:     defaults.ServiceSingleflight,
+			DisableRealtimeFallback: defaults.DisableRealtimeFallback,
+			StaleOnTimeout:          defaults.StaleOnTimeout,
+			LoadTimeout:             defaults.LoadTimeout,
+		}
+	}
+	return cachebootstrap.StatisticsSystemOptions{
+		ServiceSingleflight:     cacheCfg.StatisticsSystem.ServiceSingleflight,
+		DisableRealtimeFallback: cacheCfg.StatisticsSystem.DisableRealtimeFallback,
+		StaleOnTimeout:          cacheCfg.StatisticsSystem.StaleOnTimeout,
+		LoadTimeout:             cacheCfg.StatisticsSystem.LoadTimeout,
 	}
 }
 

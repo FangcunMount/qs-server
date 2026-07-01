@@ -2,6 +2,7 @@ package compose
 
 import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -45,6 +46,7 @@ type Host interface {
 	ReportStatusConfig() reportstatus.Config
 	DisableEvaluationCache() bool
 	DisableStatisticsCache() bool
+	StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions
 
 	CacheClient(family cacheplane.Family) redis.UniversalClient
 	CacheBuilder(family cacheplane.Family) *keyspace.Builder

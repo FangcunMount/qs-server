@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
+	"golang.org/x/sync/singleflight"
 )
 
 const statsQueryCacheKind = "stats:query"
@@ -22,6 +23,7 @@ type StatisticsCache struct {
 	policy       cachepolicy.CachePolicy
 	observer     *observability.ComponentObserver
 	keys         *keyspace.Builder
+	sfGroup      singleflight.Group
 }
 
 // NewStatisticsCacheWithBuilderAndPolicy 创建绑定显式 key builder/policy 的统计缓存。

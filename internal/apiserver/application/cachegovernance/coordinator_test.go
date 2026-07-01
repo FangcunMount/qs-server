@@ -135,6 +135,35 @@ func TestCoordinatorHandleStatisticsSyncWarmsOverviewPresets(t *testing.T) {
 	}
 }
 
+func TestCoordinatorWarmStartupUsesStatisticsSeedsWhenWarmOnStartup(t *testing.T) {
+	var systemCalls []int64
+
+	coord := NewCoordinator(Config{Enable: true, StartupStatic: false, StartupQuery: false}, Dependencies{
+		Runtime: NewFamilyRuntime(map[cachemodel.Family]bool{
+			cachemodel.FamilyQuery: true,
+		}),
+		StatisticsSeeds: &StatisticsWarmupConfig{
+			OrgIDs:          []int64{1},
+			OverviewPresets: []string{"7d"},
+			WarmOnStartup:   true,
+		},
+		WarmStatsOverview: func(_ context.Context, orgID int64, preset string) error {
+			return nil
+		},
+		WarmStatsSystem: func(_ context.Context, orgID int64) error {
+			systemCalls = append(systemCalls, orgID)
+			return nil
+		},
+	})
+
+	if err := coord.WarmStartup(context.Background()); err != nil {
+		t.Fatalf("WarmStartup() error = %v", err)
+	}
+	if len(systemCalls) != 1 || systemCalls[0] != 1 {
+		t.Fatalf("system warmup calls = %v, want [1]", systemCalls)
+	}
+}
+
 func TestCoordinatorHandleRepairCompleteStillUsesStructuredExecutor(t *testing.T) {
 	var questionnaireCalls []string
 

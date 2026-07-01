@@ -28,6 +28,7 @@ type BootstrapInput struct {
 	MongoDB               *mongo.Database
 	RepairWindowDays      int
 	QueryPolicy           cachepolicy.CachePolicy
+	SystemStatisticsOpts  statisticsApp.SystemStatisticsOptions
 	HotsetRecorder        cachetarget.HotsetRecorder
 	LockManager           locklease.Manager
 	VersionStore          cachequery.VersionTokenStore

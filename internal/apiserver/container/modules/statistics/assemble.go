@@ -47,6 +47,7 @@ type Deps struct {
 	MongoDB               *mongo.Database
 	RepairWindowDays      int
 	QueryPolicy           cachepolicy.CachePolicy
+	SystemStatisticsOpts  statisticsApp.SystemStatisticsOptions
 	HotsetRecorder        cachetarget.HotsetRecorder
 	LockManager           locklease.Manager
 	VersionStore          cachequery.VersionTokenStore
@@ -80,7 +81,13 @@ func New(deps Deps) (*Module, error) {
 	}
 	txRunner := modtx.NewMySQLRunner(normalized.MySQLDB)
 
-	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
+	module.SystemStatisticsService = statisticsApp.NewSystemStatisticsService(
+		repo,
+		repo,
+		cache,
+		normalized.HotsetRecorder,
+		statisticsApp.WithSystemStatisticsOptions(normalized.SystemStatisticsOpts),
+	)
 	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
 	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(repo, cache)
 	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(repo, repo, cache, normalized.HotsetRecorder)

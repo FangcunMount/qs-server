@@ -6,6 +6,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -76,6 +77,16 @@ func (c *Container) ReportStatusConfig() reportstatus.Config { return c.reportSt
 func (c *Container) DisableEvaluationCache() bool { return c.cacheOptions.DisableEvaluationCache }
 
 func (c *Container) DisableStatisticsCache() bool { return c.cacheOptions.DisableStatisticsCache }
+
+func (c *Container) StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions {
+	opts := c.cacheOptions.StatisticsSystem
+	return statisticsApp.SystemStatisticsOptions{
+		ServiceSingleflight:     opts.ServiceSingleflight,
+		DisableRealtimeFallback: opts.DisableRealtimeFallback,
+		StaleOnTimeout:          opts.StaleOnTimeout,
+		LoadTimeout:             opts.LoadTimeout,
+	}
+}
 
 func (c *Container) CacheObserver() *observability.ComponentObserver {
 	return c.cacheObserver()
