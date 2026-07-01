@@ -128,6 +128,12 @@ submit_queue:
   worker_count: 8
   wait_timeout_ms: 200
 
+questionnaire_cache:
+  enabled: false
+  ttl_seconds: 180
+  max_entries: 256
+  singleflight: true
+
 wait_report:
   default_timeout_seconds: 20
   min_timeout_seconds: 1

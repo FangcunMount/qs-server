@@ -137,7 +137,11 @@ func (c *Container) initApplicationServices() {
 		c.opts.SubmitQueue,
 		submitGuard,
 	)
-	c.questionnaireQueryService = questionnaire.NewQueryService(c.questionnaireClient)
+	c.questionnaireQueryService = questionnaire.NewQueryService(
+		c.questionnaireClient,
+		newQuestionnaireDetailCache(c.opts),
+		questionnaireCacheSingleflightEnabled(c.opts),
+	)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
 	var reportOpts *genericoptions.ReportStatusOptions
 	var sigOpts *genericoptions.SignalingOptions
@@ -354,4 +358,22 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 // ActorClient 获取 Actor 客户端
 func (c *Container) ActorClient() *grpcclient.ActorClient {
 	return c.actorClient
+}
+
+func newQuestionnaireDetailCache(opts *options.Options) questionnaire.PublishedDetailCache {
+	if opts == nil || opts.QuestionnaireCache == nil || !opts.QuestionnaireCache.Enabled {
+		return nil
+	}
+	cfg := opts.QuestionnaireCache
+	return questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
+		TTL:        time.Duration(cfg.TTLSeconds) * time.Second,
+		MaxEntries: cfg.MaxEntries,
+	})
+}
+
+func questionnaireCacheSingleflightEnabled(opts *options.Options) bool {
+	if opts == nil || opts.QuestionnaireCache == nil {
+		return false
+	}
+	return opts.QuestionnaireCache.Singleflight
 }

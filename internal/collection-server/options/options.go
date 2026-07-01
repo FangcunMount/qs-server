@@ -27,6 +27,7 @@ type Options struct {
 	ReportStatus            *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
 	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
+	QuestionnaireCache      *QuestionnaireCacheOptions              `json:"questionnaire_cache" mapstructure:"questionnaire_cache"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
@@ -49,6 +50,14 @@ type GRPCClientOptions struct {
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
 	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
+}
+
+// QuestionnaireCacheOptions 已发布问卷详情 BFF 进程内 L1 缓存。
+type QuestionnaireCacheOptions struct {
+	Enabled      bool `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds   int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	MaxEntries   int  `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight bool `json:"singleflight" mapstructure:"singleflight"`
 }
 
 // SubmitQueueOptions 提交排队配置
@@ -147,11 +156,12 @@ func NewOptions() *Options {
 		Concurrency: &ConcurrencyOptions{
 			MaxConcurrency: 10, // 默认最大并发数
 		},
-		RateLimit:    NewRateLimitOptions(),
-		WaitReport:   NewWaitReportOptions(),
-		ReportStatus: genericoptions.NewReportStatusOptions(),
-		Signaling:    genericoptions.NewSignalingOptions(),
-		SubmitQueue:  NewSubmitQueueOptions(),
+		RateLimit:          NewRateLimitOptions(),
+		WaitReport:         NewWaitReportOptions(),
+		ReportStatus:       genericoptions.NewReportStatusOptions(),
+		Signaling:          genericoptions.NewSignalingOptions(),
+		SubmitQueue:        NewSubmitQueueOptions(),
+		QuestionnaireCache: NewQuestionnaireCacheOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
@@ -195,6 +205,16 @@ func NewSubmitQueueOptions() *SubmitQueueOptions {
 		QueueSize:     1000,
 		WorkerCount:   8,
 		WaitTimeoutMs: 0,
+	}
+}
+
+// NewQuestionnaireCacheOptions 创建默认问卷详情 L1 缓存配置。
+func NewQuestionnaireCacheOptions() *QuestionnaireCacheOptions {
+	return &QuestionnaireCacheOptions{
+		Enabled:      false,
+		TTLSeconds:   180,
+		MaxEntries:   256,
+		Singleflight: true,
 	}
 }
 
@@ -244,6 +264,7 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.RateLimit.AddFlags(fss.FlagSet("rate_limit"))
 	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
+	o.QuestionnaireCache.AddFlags(fss.FlagSet("questionnaire_cache"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
@@ -274,6 +295,16 @@ func (s *SubmitQueueOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&s.QueueSize, "submit_queue.queue-size", s.QueueSize, "Submit queue size.")
 	fs.IntVar(&s.WorkerCount, "submit_queue.worker-count", s.WorkerCount, "Submit queue worker count.")
 	fs.IntVar(&s.WaitTimeoutMs, "submit_queue.wait-timeout-ms", s.WaitTimeoutMs, "Deprecated: submit no longer waits synchronously for queue results.")
+}
+
+func (q *QuestionnaireCacheOptions) AddFlags(fs *pflag.FlagSet) {
+	if q == nil {
+		return
+	}
+	fs.BoolVar(&q.Enabled, "questionnaire_cache.enabled", q.Enabled, "Enable in-process L1 cache for published questionnaire detail.")
+	fs.IntVar(&q.TTLSeconds, "questionnaire_cache.ttl-seconds", q.TTLSeconds, "TTL for questionnaire detail L1 cache in seconds.")
+	fs.IntVar(&q.MaxEntries, "questionnaire_cache.max-entries", q.MaxEntries, "Maximum questionnaire detail entries in L1 cache.")
+	fs.BoolVar(&q.Singleflight, "questionnaire_cache.singleflight", q.Singleflight, "Coalesce concurrent questionnaire detail cache misses.")
 }
 
 // AddFlags 添加限流相关的命令行参数
@@ -340,6 +371,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionRedis(o.RedisOptions, o.RedisRuntime, o.RedisProfiles)...)
 	errs = append(errs, validateCollectionConcurrency(o.Concurrency)...)
 	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
+	errs = append(errs, validateQuestionnaireCacheOptions(o.QuestionnaireCache)...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
@@ -490,6 +522,24 @@ func validateWaitReportOptions(opts *WaitReportOptions) []error {
 	}
 	if opts.PubSubEnabled && opts.PubSubChannel == "" {
 		errs = append(errs, fmt.Errorf("wait_report.pubsub_channel cannot be empty when pubsub is enabled"))
+	}
+	return errs
+}
+
+func validateQuestionnaireCacheOptions(opts *QuestionnaireCacheOptions) []error {
+	if opts == nil {
+		return nil
+	}
+	if !opts.Enabled {
+		return nil
+	}
+
+	var errs []error
+	if opts.TTLSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("questionnaire_cache.ttl_seconds must be greater than 0 when enabled"))
+	}
+	if opts.MaxEntries <= 0 {
+		errs = append(errs, fmt.Errorf("questionnaire_cache.max_entries must be greater than 0 when enabled"))
 	}
 	return errs
 }

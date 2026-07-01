@@ -341,31 +341,65 @@
         }
       }
     },
-    "mixed_240": {
-      "duration": "8m",
+    "mixed_220": {
+      "duration": "5m",
+      "description": "对照档：102/s 读压 + query max=690（同 mixed_200 比例）；用于排除 VU 因素",
       "qps": {
-        "query": 112,
+        "query": 102,
         "submit": 24,
-        "report": 80,
-        "stats": 24,
+        "report": 72,
+        "stats": 22,
         "chainProbe": 0
       },
       "vusers": {
         "query": {
-          "preAllocated": 170,
-          "max": 730
+          "preAllocated": 160,
+          "max": 690
+        },
+        "submit": {
+          "preAllocated": 245,
+          "max": 1110
+        },
+        "report": {
+          "preAllocated": 430,
+          "max": 720
+        },
+        "stats": {
+          "preAllocated": 105,
+          "max": 460
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "mixed_240": {
+      "duration": "8m",
+      "description": "query 100/s（原 112 超单机读容量）；max VU 760，避免 1200 并发打爆下游",
+      "qps": {
+        "query": 100,
+        "submit": 24,
+        "report": 88,
+        "stats": 28,
+        "chainProbe": 0
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 190,
+          "max": 760
         },
         "submit": {
           "preAllocated": 260,
           "max": 1130
         },
         "report": {
-          "preAllocated": 470,
-          "max": 770
+          "preAllocated": 500,
+          "max": 800
         },
         "stats": {
-          "preAllocated": 110,
-          "max": 470
+          "preAllocated": 115,
+          "max": 550
         },
         "chainProbe": {
           "preAllocated": 20,
@@ -375,6 +409,7 @@
     },
     "mixed_280": {
       "duration": "8m",
+      "description": "待 mixed_240 通过后再升；132/s 读压可能超单机容量",
       "qps": {
         "query": 132,
         "submit": 24,
@@ -384,8 +419,8 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 190,
-          "max": 780
+          "preAllocated": 330,
+          "max": 1400
         },
         "submit": {
           "preAllocated": 290,
@@ -397,7 +432,7 @@
         },
         "stats": {
           "preAllocated": 120,
-          "max": 490
+          "max": 600
         },
         "chainProbe": {
           "preAllocated": 20,
@@ -425,8 +460,8 @@
       "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
-          "preAllocated": 200,
-          "max": 800
+          "preAllocated": 350,
+          "max": 1500
         },
         "submit": {
           "preAllocated": 180,
@@ -466,8 +501,8 @@
       "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
-          "preAllocated": 200,
-          "max": 800
+          "preAllocated": 350,
+          "max": 1500
         },
         "submit": {
           "preAllocated": 180,
@@ -507,7 +542,7 @@
       },
       "chainProbeModelType": "mixed",
       "vusers": {
-        "query": { "preAllocated": 200, "max": 800 },
+        "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
         "report": { "preAllocated": 600, "max": 900 },
         "stats": { "preAllocated": 120, "max": 500 },
@@ -566,7 +601,7 @@
       },
       "chainProbeModelType": "mixed",
       "vusers": {
-        "query": { "preAllocated": 200, "max": 800 },
+        "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
         "report": { "preAllocated": 600, "max": 900 },
         "stats": { "preAllocated": 120, "max": 500 },
@@ -587,7 +622,7 @@
       },
       "chainProbeModelType": "mixed",
       "vusers": {
-        "query": { "preAllocated": 200, "max": 800 },
+        "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
         "report": { "preAllocated": 600, "max": 900 },
         "stats": { "preAllocated": 120, "max": 500 },

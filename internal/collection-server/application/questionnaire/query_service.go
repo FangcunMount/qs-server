@@ -6,40 +6,88 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
+	"golang.org/x/sync/singleflight"
 )
 
-// QueryService 问卷查询服务
-// 作为 BFF 层的薄服务，主要职责：
-// 1. 调用 apiserver 的 gRPC 服务
-// 2. 转换 gRPC 响应到 REST DTO
-// 3. 可选：缓存热点数据
-type QueryService struct {
-	questionnaireClient *grpcclient.QuestionnaireClient
+type questionnaireClient interface {
+	GetQuestionnaire(ctx context.Context, code, version string) (*grpcclient.QuestionnaireOutput, error)
+	ListQuestionnaires(ctx context.Context, page, pageSize int32, status, title string) (*grpcclient.ListQuestionnairesOutput, error)
 }
 
-// NewQueryService 创建问卷查询服务
+// QueryService 问卷查询服务
+type QueryService struct {
+	client            questionnaireClient
+	cache             PublishedDetailCache
+	singleflightGroup singleflight.Group
+	useSingleflight   bool
+}
+
+// NewQueryService 创建问卷查询服务。
 func NewQueryService(
-	questionnaireClient *grpcclient.QuestionnaireClient,
+	client questionnaireClient,
+	cache PublishedDetailCache,
+	useSingleflight bool,
 ) *QueryService {
 	return &QueryService{
-		questionnaireClient: questionnaireClient,
+		client:          client,
+		cache:           cache,
+		useSingleflight: useSingleflight,
 	}
 }
 
 // Get 获取问卷详情
 func (s *QueryService) Get(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
+	if s.cache != nil {
+		if cached, ok := s.cache.Get(code, version); ok {
+			return cached, nil
+		}
+	}
+
+	load := func() (*QuestionnaireResponse, error) {
+		return s.fetchFromGRPC(ctx, code, version)
+	}
+
+	if s.cache != nil && s.useSingleflight {
+		key := cacheKey(code, version)
+		value, err, _ := s.singleflightGroup.Do(key, func() (interface{}, error) {
+			if cached, ok := s.cache.Get(code, version); ok {
+				return cached, nil
+			}
+			resp, loadErr := load()
+			if loadErr != nil || resp == nil {
+				return resp, loadErr
+			}
+			s.cache.Set(code, version, resp)
+			return cloneResponse(resp), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if value == nil {
+			return nil, nil
+		}
+		return value.(*QuestionnaireResponse), nil
+	}
+
+	resp, err := load()
+	if err != nil || resp == nil || s.cache == nil {
+		return resp, err
+	}
+	s.cache.Set(code, version, resp)
+	return cloneResponse(resp), nil
+}
+
+func (s *QueryService) fetchFromGRPC(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
 	log.Infof("Getting questionnaire: code=%s version=%s", code, version)
 
-	result, err := s.questionnaireClient.GetQuestionnaire(ctx, code, version)
+	result, err := s.client.GetQuestionnaire(ctx, code, version)
 	if err != nil {
 		logQuestionnaireGRPCError("Failed to get questionnaire via gRPC", err)
 		return nil, err
 	}
-
 	if result == nil {
 		return nil, nil
 	}
-
 	return s.convertQuestionnaire(result), nil
 }
 
@@ -59,7 +107,7 @@ func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest)
 		req.PageSize = 100
 	}
 
-	result, err := s.questionnaireClient.ListQuestionnaires(ctx, req.Page, req.PageSize, req.Status, req.Title)
+	result, err := s.client.ListQuestionnaires(ctx, req.Page, req.PageSize, req.Status, req.Title)
 	if err != nil {
 		logQuestionnaireGRPCError("Failed to list questionnaires via gRPC", err)
 		return nil, err

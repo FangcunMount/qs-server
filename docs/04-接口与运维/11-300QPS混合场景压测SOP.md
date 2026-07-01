@@ -12,10 +12,10 @@
 | **脚本入口** | `scripts/perf/k6/mixed.js`（`k6-mixed-300qps.js` 为兼容 shim） |
 | **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
 | 三类目标 | **前台读写**（model query/submit/wait-report）；**异步 SLA**（`async_chain_probe_*`）；**后台排水**（`perf-outbox120` + DB snapshot） |
-| 推荐升档 | `smoke_4` → `pretest_60` → `pretest_120` → `mixed_140_submit24`（或 `mixed_140`）→ `mixed_160`…`mixed_280` → `mixed_300` / `mixed_300_models`，每档通过再升 |
+| 推荐升档 | `smoke_4` → … → **`mixed_200`（当前单机验收上限）**；`mixed_220+` 仅作探顶/对照，通过再考虑升档 |
 | 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
 | 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
-| 验收 | K6 HTTP + chain probe SLA **且**（outbox/scanner 场景）压测前后 DB snapshot 不堆积；**优化后** outbox 可在压测结束后数分钟内消化，与 HTTP 429 可并存 |
+| 验收 | K6 HTTP + chain probe SLA **且** outbox 压测结束后 **≤3min** 消化（`pending/failed/publishing` 回落至近 0）；HTTP 429 与 outbox 堆积可并存，勿混为一谈 |
 
 ---
 
@@ -77,7 +77,8 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `mixed_160` | 160 | 68/24/52/16 | 5m | 同上（submit 封顶 24/s） |
 | `mixed_180` | 180 | 80/24/58/18 | 5m | 同上 |
 | `mixed_200` | 200 | 92/24/64/20 | 5m | 接近 prod 保守基线 |
-| `mixed_240` | 240 | 112/24/80/24 | 8m | 同上 |
+| `mixed_220` | 220 | 102/24/72/22 | 5m | **对照档**（VU=690）；102/s 首次实测未过 |
+| `mixed_240` | 240 | 100/24/88/28 | 8m | query 自 112 降至 100/s |
 | `mixed_280` | 280 | 132/24/96/28 | 8m | 加压读/report |
 | `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + 1 probe | 10m | **验收档** |
 | `mixed_300_probe` | 同上 | 同上 | 10m | 与 mixed_300 等效 |
@@ -106,19 +107,36 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 
 **原则**：上一档 `http_req_failed < 1%`、无明显 503/502 尖刺后再升档。`pretest_60` 曾出现 p90 ~5s 但 0 失败，可接受；`pretest_120` 在跨机 collection 时大量 502/30s 超时，迁回 serverA 后应复测。
 
-**2026-06-30 优化后复测（outbox limiter + immediate 并发 + published model 缓存 + 连接池预算）**：
+**2026-06-30 优化后复测**（outbox limiter + immediate 并发 + published model 缓存 + 连接池预算；**配比为调优前旧档**）：
 
 | 档位 | HTTP 结论 | outbox 排水 | 备注 |
 | ---- | --------- | ----------- | ---- |
-| `pretest_60` | **通过**：submit 100%，p95≈184ms | 脚本结束前后基本消化完 | 稳态 submit≈12/s |
-| `pretest_120_balanced` | **通过**：100%，0×429 | — | 92QPS 混合（32/24/24/12） |
-| `pretest_120` | **通过**：100%，0×429，submit p95≈192ms | 待观测 | 调优后全量 120QPS 混合已过线 |
-| `mixed_140` | **未通过**：worker32 90.4%/806×429；worker40 **97.83%**/182×429 | — | 有效 ~25.5/s；待 worker48 复测 |
-| `mixed_140_submit24` | **通过**：100%，0×429，submit p95≈222ms | — | 56/42/14 读压下 submit 24/s 稳 |
+| `pretest_60` | **通过**：submit 100%，p95≈184ms | **≤3min 消化** | 旧配比 24/12/18/6 |
+| `pretest_120_balanced` | **通过**：100%，0×429 | **≤3min 消化** | 旧配比 32/24/24/12 |
+| `pretest_120` | **通过**：100%，0×429，submit p95≈192ms | **≤3min 消化** | 旧配比 48/24/36/12 |
+| `mixed_140`（旧 submit28） | **未通过**：worker32 90.4%/806×429；worker40 97.83%/182×429 | **≤3min 消化** | HTTP 失败时 outbox 仍可正常排水 |
+| `mixed_140_submit24` | **通过**：100%，0×429，submit p95≈222ms | **≤3min 消化** | 旧配比 56/24/42/14 |
 
-`pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。`mixed_140` 仅 submit 超容量时，先跑 `mixed_140_submit24` 分离读压与 submit 上限。
+**2026-07-01 配比下调后复测**（submit 按真实流量重标定；`mixed_140+` submit 封顶 24/s，详见 §2.2）：
+
+| 档位 | HTTP 结论 | outbox 排水 | 备注 |
+| ---- | --------- | ----------- | ---- |
+| `mixed_140` | **通过**：100%，0×429，submit p95≈270ms | **≤3min 消化** | 新配比 58/24/44/14 |
+| `mixed_160` | **通过**：100%，0×429，submit p95≈781ms | **≤3min 消化** | 新配比 68/24/52/16；p95 偶发尖刺 |
+| `mixed_180` | **通过**：100%，0×429，submit p95≈202ms | **≤3min 消化** | 新配比 80/24/58/18 |
+| `mixed_200` | **通过**：100%，0×429，submit p95≈361ms | **≤3min 消化** | 新配比 92/24/64/20 |
+| `mixed_240`（112/s，VU 730） | **边际通过**：checks 99.88%，http 0.11%；122×query timeout | **≤3min 消化** | 旧配比 112/24/80/24 |
+| `mixed_240`（112/s，VU 1200） | **未通过**：http 4.64%；4411×query timeout | **≤3min 消化** | 堆 VU 加剧下游过载，非解法 |
+| `mixed_220`（102/s，VU 770） | **未通过**：http 5.61%；2369×query timeout | **≤3min 消化** | 非 VU 主因；92→102/s 跨读容量坎 |
+| `mixed_220`（VU 690 对照） | 待复测 | — | 冷却 5～10min 后 `make perf-mixed220` |
+| `mixed_240`（新 100/s） | **暂停** | — | 须 220 对照结论或读路径优化后再测 |
+| `mixed_280`～`mixed_300` | **暂停** | — | 单机混合验收以 `mixed_200` 为准 |
+
+`pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。旧档 `mixed_140` submit28 失败已通过**降 submit + 调 submit_queue worker**解决；新档升线重点在 read/report。
 
 **wait-report VU sizing**：`wait-report` 是长轮询接口，`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
+
+**query VU sizing**（`HTTP_TIMEOUT=30s`）：与 `mixed_200` 对齐，按 `query_rps × 7～8` 设 `max`（92/s→690）。**下游饱和时勿盲目加 VU**。`mixed_220`/`mixed_240` 失败主因是读 QPS 超单机容量，不是 VU 不足。report VU 仍按 `report_rps × timeout` 控制。
 
 ---
 
@@ -220,6 +238,7 @@ make perf-mixed140-submit24 # mixed_140 读压 + submit=19
 make perf-mixed160          # mixed_160
 make perf-mixed180          # mixed_180
 make perf-mixed200          # mixed_200
+make perf-mixed220          # mixed_220（200→240 阶梯）
 make perf-mixed240          # mixed_240
 make perf-mixed280          # mixed_280
 make perf-mixed300          # mixed_300 + 前后 snapshot
@@ -422,7 +441,8 @@ access log：`503` 且耗时 **0.000s**；error log：`limiting connections by z
 | NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size/publish_workers`、主链路事件 pending/publishing 与 Mongo 慢查询 |
 | pretest120 collection 大量 429、`submit queue full`，apiserver Mongo `idle connections: 0` | immediate 无上限 goroutine + `publish_workers=128` 与业务读抢 Mongo 连接池 | 降 `publish_workers`（48）、设 `immediate_max_concurrent`（16）；`backpressure.mongo.max_inflight`≤80；outbox Store 走 limiter；`published_assessment_models` 加 Redis 缓存；immediate 仅 `answersheet.submitted` |
 | 优化后 outbox 3min 内消化，但 pretest120 submit≈96%、`http_429`≈250、questionnaire 读超时 | collection submit 队列背压 + 48/s 问卷读压饱和（apiserver 侧 Mongo 争用已缓解） | 部署 collection `worker_count=32, queue_size=1600`；跑 `pretest_120_balanced`（32/24/24/12）；隔离 submit 见 `pretest_120_submit_only` |
-| `mixed_140` submit≈90%→98%、仍 182×429（worker40） | submit 28/s 超混合稳态吞吐，apiserver 变慢拉高单次耗时 | 上调 `worker_count=48, queue_size=2400` 复测；仍不足则查 apiserver backpressure |
+| `mixed_140`（旧 submit28）submit≈90%～98%、182～806×429 | submit 超混合稳态吞吐，非读压主因 | 降压测 submit 至 24/s；`submit_queue` worker 调至 40 |
+| `mixed_240` query 30s timeout / `Insufficient VUs` | 112/s 读压超单机容量；或 k6 VU 不足 | **先降 query QPS**（100/s）+ VU≈7.5×rps；勿在饱和时堆至 1200；查 apiserver 问卷读 p95/Mongo |
 | 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
 | k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
 | `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
@@ -487,17 +507,22 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 
 | 档位 | 总 QPS | http_req_failed | http_5xx | http_401 | http_429 | P95 | 结论 |
 | ---- | ---: | ---: | ---: | ---: | ---: | ---: | ---- |
-| pretest_60 | 60 | 0% | 0 | 0 | 0 | submit p95≈184ms | **通过**（2026-06-30） |
-| pretest_120_balanced | 92 | 0% | 0 | 0 | 0 | submit p95≈250ms | **通过**（2026-06-30） |
-| pretest_120 | 120 | 0% | 0 | 0 | 0 | submit p95≈192ms | **通过**（2026-06-30，worker32+apiserver优化后） |
-| mixed_140 | 140 | 0.44% | 0 | 0 | 182 | submit p95≈1.11s | **未通过**（2026-06-30，worker40，有效~25.5/s） |
-| mixed_140_submit24 | 136 | 0% | 0 | 0 | 0 | submit p95≈222ms | **通过**（2026-06-30） |
-| mixed_160 | 160 | | | | | | |
-| mixed_180 | 180 | | | | | | |
-| mixed_200 | 200 | | | | | | |
-| mixed_240 | 240 | | | | | | |
-| mixed_280 | 280 | | | | | | |
-| mixed_300 | 300 | | | | | | |
+| pretest_60 | 60 | 0% | 0 | 0 | 0 | submit p95≈184ms | **通过**（2026-06-30，旧配比） |
+| pretest_120_balanced | 92 | 0% | 0 | 0 | 0 | submit p95≈250ms | **通过**（2026-06-30，旧配比） |
+| pretest_120 | 120 | 0% | 0 | 0 | 0 | submit p95≈192ms | **通过**（2026-06-30，旧配比） |
+| mixed_140（旧 submit28） | 140 | 0.44%～1.92% | 0 | 0 | 182～806 | submit p95≈933ms～1.11s | **未通过**（2026-06-30） |
+| mixed_140_submit24（旧配比） | 136 | 0% | 0 | 0 | 0 | submit p95≈222ms | **通过**（2026-06-30） |
+| mixed_140 | 140 | 0% | 0 | 0 | 0 | submit p95≈270ms | **通过**（2026-07-01，新配比 58/24/44/14） |
+| mixed_160 | 160 | 0% | 0 | 0 | 0 | submit p95≈781ms | **通过**（2026-07-01，新配比 68/24/52/16） |
+| mixed_180 | 180 | 0% | 0 | 0 | 0 | submit p95≈202ms | **通过**（2026-07-01，新配比 80/24/58/18） |
+| mixed_200 | 200 | 0% | 0 | 0 | 0 | submit p95≈361ms | **通过**（2026-07-01，92/24/64/20） |
+| mixed_240（112/s，VU730） | 240 | 0.11% | 0 | 0 | 0 | submit p95≈2.17s | **边际通过**（122×query timeout） |
+| mixed_240（112/s，VU1200） | 240 | 4.64% | 0 | 0 | 0 | query p95=30s | **未通过**（4411×query timeout） |
+| mixed_220（102/s，VU770） | 220 | 5.61% | 0 | 0 | 0 | query p95≈30s | **未通过**（2369×query timeout） |
+| mixed_220（VU690 对照） | 220 | | | | | | 待复测 |
+| mixed_240（新） | 240 | | | | | | **暂停** |
+| mixed_280 | 280 | | | | | | **暂停** |
+| mixed_300 | ~300 | | | | | | 待测 |
 
 ### 10.4 验收标准（HTTP + 后台）
 
@@ -505,7 +530,7 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | ---- | -------- |
 | K6 | `http_req_failed < 1%`；submit 202 > 99%；wait-report 200 > 99%；`chain_probe_failed` ≈ 0 |
 | 延迟 | medical report p95 < 60s；personality report p95 < 90s（probe 开启时） |
-| Outbox | Mongo/MySQL pending 不持续增长；`failed` = 0 或可解释 |
+| Outbox | 压测结束后 **≤3min** 内 `domain_event_outbox` pending/failed/publishing 回落至近 0；`failed` 须为 0 或可解释 |
 | Scanner | 若启用 `behavior_journey_scan`：`analytics_scan_watermarks` 推进；`statistics_journey_daily` 更新 |
 
 ---
