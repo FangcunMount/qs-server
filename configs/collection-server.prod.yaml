@@ -42,7 +42,7 @@ secure:
 # -------------------------------------------------------
 grpc_client:
   endpoint: "qs-apiserver:9090"     # Docker 容器服务名 apiserver 地址
-  timeout: 30s                      # gRPC 超时时间 30s
+  timeout: 30                       # gRPC 超时时间（秒）
   insecure: false                   # 生产环境启用 TLS（insecure=false 表示启用 TLS）
   max_inflight: 360                 # 最大并发请求数 360
   
