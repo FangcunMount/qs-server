@@ -16,6 +16,7 @@ type personalityAssessmentQueryService interface {
 	List(ctx context.Context, testeeID uint64, req *personalityassessment.ListAssessmentsRequest) (*personalityassessment.ListAssessmentsResponse, error)
 	Get(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentDetailResponse, error)
 	GetReport(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentReportResponse, error)
+	GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*personalityassessment.AssessmentStatusResponse, error)
 	WaitReport(ctx context.Context, testeeID, assessmentID uint64, timeout time.Duration) (*personalityassessment.AssessmentStatusResponse, error)
 }
 
@@ -129,6 +130,31 @@ func (h *PersonalityAssessmentHandler) GetReport(c *gin.Context) {
 	}
 	if result == nil {
 		h.NotFoundResponse(c, "personality assessment report not found", nil)
+		return
+	}
+	h.Success(c, result)
+}
+
+// GetReportStatus 短轮询查询人格测评报告状态（非阻塞）。
+// @Summary 查询人格测评报告状态
+// @Tags 人格测评
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Success 200 {object} core.Response{data=personalityassessment.AssessmentStatusResponse}
+// @Router /api/v1/personality-assessments/{id}/report-status [get]
+func (h *PersonalityAssessmentHandler) GetReportStatus(c *gin.Context) {
+	testeeID, ok := h.parseTesteeID(c)
+	if !ok {
+		return
+	}
+	assessmentID, ok := h.parseAssessmentID(c)
+	if !ok {
+		return
+	}
+	result, err := h.queryService.GetReportStatus(c.Request.Context(), testeeID, assessmentID)
+	if err != nil {
+		h.InternalErrorResponse(c, "get personality assessment report status failed", err)
 		return
 	}
 	h.Success(c, result)

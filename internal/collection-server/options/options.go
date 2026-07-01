@@ -107,14 +107,17 @@ type RateLimitOptions struct {
 }
 
 type WaitReportOptions struct {
-	DefaultTimeoutSeconds int    `json:"default_timeout_seconds" mapstructure:"default_timeout_seconds"`
-	MinTimeoutSeconds     int    `json:"min_timeout_seconds" mapstructure:"min_timeout_seconds"`
-	MaxTimeoutSeconds     int    `json:"max_timeout_seconds" mapstructure:"max_timeout_seconds"`
-	PollIntervalMs        int    `json:"poll_interval_ms" mapstructure:"poll_interval_ms"`
-	StatusTTLSeconds      int    `json:"status_ttl_seconds" mapstructure:"status_ttl_seconds"`
-	MaxActiveWaiters      int    `json:"max_active_waiters" mapstructure:"max_active_waiters"`
-	PubSubEnabled         bool   `json:"pubsub_enabled" mapstructure:"pubsub_enabled"`
-	PubSubChannel         string `json:"pubsub_channel" mapstructure:"pubsub_channel"`
+	DefaultTimeoutSeconds    int    `json:"default_timeout_seconds" mapstructure:"default_timeout_seconds"`
+	MinTimeoutSeconds        int    `json:"min_timeout_seconds" mapstructure:"min_timeout_seconds"`
+	MaxTimeoutSeconds        int    `json:"max_timeout_seconds" mapstructure:"max_timeout_seconds"`
+	PollIntervalMs           int    `json:"poll_interval_ms" mapstructure:"poll_interval_ms"`
+	StatusTTLSeconds         int    `json:"status_ttl_seconds" mapstructure:"status_ttl_seconds"`
+	MaxActiveWaiters         int    `json:"max_active_waiters" mapstructure:"max_active_waiters"`
+	MaxHTTPConcurrency       int    `json:"max_http_concurrency" mapstructure:"max_http_concurrency"`
+	DegradeImmediateEnabled  bool   `json:"degrade_immediate_enabled" mapstructure:"degrade_immediate_enabled"`
+	DegradeRetryAfterSeconds int    `json:"degrade_retry_after_seconds" mapstructure:"degrade_retry_after_seconds"`
+	PubSubEnabled            bool   `json:"pubsub_enabled" mapstructure:"pubsub_enabled"`
+	PubSubChannel            string `json:"pubsub_channel" mapstructure:"pubsub_channel"`
 }
 
 // RuntimeOptions 运行时调优（GC/内存）
@@ -283,14 +286,17 @@ func NewRateLimitOptions() *RateLimitOptions {
 
 func NewWaitReportOptions() *WaitReportOptions {
 	return &WaitReportOptions{
-		DefaultTimeoutSeconds: 20,
-		MinTimeoutSeconds:     1,
-		MaxTimeoutSeconds:     25,
-		PollIntervalMs:        500,
-		StatusTTLSeconds:      172800,
-		MaxActiveWaiters:      3000,
-		PubSubEnabled:         false,
-		PubSubChannel:         "report_status_changed",
+		DefaultTimeoutSeconds:    20,
+		MinTimeoutSeconds:        1,
+		MaxTimeoutSeconds:        25,
+		PollIntervalMs:           500,
+		StatusTTLSeconds:         172800,
+		MaxActiveWaiters:         3000,
+		MaxHTTPConcurrency:       400,
+		DegradeImmediateEnabled:  true,
+		DegradeRetryAfterSeconds: 5,
+		PubSubEnabled:            false,
+		PubSubChannel:            "report_status_changed",
 	}
 }
 
@@ -400,6 +406,9 @@ func (w *WaitReportOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&w.PollIntervalMs, "wait_report.poll-interval-ms", w.PollIntervalMs, "Wait-report polling interval in milliseconds.")
 	fs.IntVar(&w.StatusTTLSeconds, "wait_report.status-ttl-seconds", w.StatusTTLSeconds, "Report status cache TTL in seconds.")
 	fs.IntVar(&w.MaxActiveWaiters, "wait_report.max-active-waiters", w.MaxActiveWaiters, "Maximum active wait-report requests before degradation.")
+	fs.IntVar(&w.MaxHTTPConcurrency, "wait_report.max-http-concurrency", w.MaxHTTPConcurrency, "Maximum concurrent HTTP handlers for wait-report.")
+	fs.BoolVar(&w.DegradeImmediateEnabled, "wait_report.degrade-immediate-enabled", w.DegradeImmediateEnabled, "Return pending immediately when wait-report HTTP slots are exhausted.")
+	fs.IntVar(&w.DegradeRetryAfterSeconds, "wait_report.degrade-retry-after-seconds", w.DegradeRetryAfterSeconds, "Retry-After seconds for degraded wait-report responses.")
 	fs.BoolVar(&w.PubSubEnabled, "wait_report.pubsub-enabled", w.PubSubEnabled, "Enable Redis pubsub wakeups for wait-report.")
 	fs.StringVar(&w.PubSubChannel, "wait_report.pubsub-channel", w.PubSubChannel, "Redis pubsub channel for report status change.")
 }
@@ -590,6 +599,12 @@ func validateWaitReportOptions(opts *WaitReportOptions) []error {
 	}
 	if opts.MaxActiveWaiters <= 0 {
 		errs = append(errs, fmt.Errorf("wait_report.max_active_waiters must be greater than 0"))
+	}
+	if opts.MaxHTTPConcurrency <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.max_http_concurrency must be greater than 0"))
+	}
+	if opts.DegradeRetryAfterSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("wait_report.degrade_retry_after_seconds must be greater than 0"))
 	}
 	if opts.PubSubEnabled && opts.PubSubChannel == "" {
 		errs = append(errs, fmt.Errorf("wait_report.pubsub_channel cannot be empty when pubsub is enabled"))

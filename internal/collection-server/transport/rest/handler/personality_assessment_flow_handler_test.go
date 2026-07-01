@@ -118,6 +118,10 @@ func (s *httpFlowAssessmentQueryService) GetReport(_ context.Context, testeeID, 
 	return s.report, nil
 }
 
+func (s *httpFlowAssessmentQueryService) GetReportStatus(context.Context, uint64, uint64) (*personalityassessment.AssessmentStatusResponse, error) {
+	panic("unexpected GetReportStatus call")
+}
+
 func (s *httpFlowAssessmentQueryService) WaitReport(context.Context, uint64, uint64, time.Duration) (*personalityassessment.AssessmentStatusResponse, error) {
 	panic("unexpected WaitReport call")
 }

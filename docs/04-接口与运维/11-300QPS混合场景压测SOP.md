@@ -84,7 +84,8 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `mixed_240` | 240 | 100/24/88/28 | 8m | legacy **问卷单桶** query（仅验问卷 L1） |
 | `mixed_240_models` | 240 | 54+27+19 /24/88/28 | 8m | **三域 L1 升档验收**（**已通过** 2026-07-01；`make perf-mixed240-models`） |
 | `mixed_280` | 280 | 132/24/96/28 | 8m | legacy **问卷单桶** query（132/s 读压探顶） |
-| `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | **三域 L1 280 档验收**（**已通过** 2026-07-01；`make perf-mixed280-models`） |
+| `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | **三域 L1 280 档验收**（**已通过** 2026-07-01；`make perf-mixed280-models`，**wait-report 长轮询**） |
+| `mixed_280_models_short_report` | 280 | 同左，report 走 **`/report-status` 短轮询** | 8m | A 方案验收（`make perf-mixed280-models-short-report`）；`report` VU max≈320 |
 | `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + **1 probe** | 10m | **全量验收档**（2026-07-01 **未通过**，见 §2.2 / §2.4） |
 | `mixed_300_http` | ~281 | **71+36+25** /24/**96**/29 /0 probe | 10m | HTTP 攻关 **Step1**（= `mixed_280_models` 读压 + 10min） |
 | `mixed_300_http_query` | ~295 | 146 query /24/96/29 /0 probe | 10m | HTTP 攻关 **Step2**（满配 query，无 probe） |
@@ -119,6 +120,7 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 `mixed_280_models` 全绿 **不代表** `mixed_300` 自动过线。2026-07-01 `mixed_300` 失败主因：**report 100/s 长轮询占满 k6 VU（900 触顶）→ 全链路排队**，叠加 chainProbe 导致异步 SLA 阈值失败。
 
 ```text
+0. make perf-mixed280-models-short-report  # report-status 短轮询（A+B+H 验收）
 1. make perf-mixed300-http         # Step1：query=71/36/25（同 280_models），10min
 2. make perf-mixed300-http-query   # Step2：query 升至 80/40/13/13，仍无 probe
 3. make perf-mixed300              # 全量：report=100 + chainProbe=1/s
@@ -127,6 +129,7 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 
 | 步骤 | Profile | 验证目标 |
 | ---- | ------- | -------- |
+| ⓪ A+B+H | `mixed_280_models_short_report` | report 96/s 走 `/report-status`；max VU 显著低于长轮询 |
 | ① HTTP 基线 | `mixed_300_http` | 280 读压 + 10min 稳态；`http_req_failed`<1%、读 p95<500ms |
 | ② HTTP 满读 | `mixed_300_http_query` | 146/s query + report 96；无 VU 触顶 |
 | ③ 全量验收 | `mixed_300` | + probe + report 100/s；异步 SLA 阈值 |
@@ -185,9 +188,19 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 
 `pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。旧档 `mixed_140` submit28 失败已通过**降 submit + 调 submit_queue worker**解决；**2026-07-01 前** 220 档瓶颈在 collection→apiserver 问卷读 gRPC，**L1 REST DTO 缓存**后 102/s 全绿。
 
-**wait-report VU sizing**：`wait-report` 是长轮询接口，`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
+**wait-report A+B+H（collection-server）**：
 
-**query VU sizing**（`HTTP_TIMEOUT=30s`）：按 `query_rps × 7～8` 设 `max`（92/s→690）。**下游饱和时勿盲目加 VU**（112/s + max 1200 曾致 4.64% 失败）。**collection 问卷 L1 启用后**，102/s 稳态 max VU 可低至 ~160，勿为 220 档再堆 VU。report VU 仍按 `report_rps × timeout` 控制。
+| 方案 | 内容 |
+| ---- | ---- |
+| **A** | `GET /assessments/{id}/report-status`（及 personality 对称路径）；scope=**query** |
+| **B** | wait-report HTTP 槽满 → **200 pending** + `Retry-After` + `next_poll_after_ms` |
+| **H** | `concurrency.max-concurrency=400`（general）+ `wait_report.max_http_concurrency=400` |
+
+**压测纪律**：档间冷却 **≥10min**；`mixed_280_models` **连跑**可在 ~20–68s 雪崩（残余负载 + k6 VU 螺旋），勿据此否定已通过结论。
+
+**wait-report VU sizing**（长轮询 profile）：`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
+
+**query VU sizing**（`HTTP_TIMEOUT=30s`）：按 `query_rps × 7～8` 设 `max`（92/s→690）。**下游饱和时勿盲目加 VU**（112/s + max 1200 曾致 4.64% 失败）。**短轮询 profile**（`mixed_280_models_short_report`）：report VU 按 `report_rps × (请求耗时 + next_poll_after_ms)`，max≈**320** 即可。
 
 ---
 
@@ -298,7 +311,8 @@ make perf-mixed220          # mixed_220（200→240 阶梯）
 make perf-mixed240          # mixed_240（legacy 问卷单桶）
 make perf-mixed240-models   # mixed_240_models（三域 L1 拆分 query）
 make perf-mixed280          # mixed_280（legacy 问卷单桶）
-make perf-mixed280-models   # mixed_280_models（三域 L1 拆分 query）
+make perf-mixed280-models   # mixed_280_models（长轮询 wait-report）
+make perf-mixed280-models-short-report  # report-status 短轮询（A 方案）
 make perf-mixed300-http         # Step1：280 读压 + 10min
 make perf-mixed300-http-query   # Step2：满配 query，无 probe
 make perf-mixed300              # 全量（含 probe）+ 前后 snapshot

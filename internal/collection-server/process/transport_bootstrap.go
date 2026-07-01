@@ -4,7 +4,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	resttransport "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
-	"github.com/gin-gonic/gin"
 )
 
 func (s *server) initializeTransports(containerOutput containerOutput) (transportOutput, error) {
@@ -16,20 +15,13 @@ func (s *server) initializeTransports(containerOutput containerOutput) (transpor
 	if err != nil {
 		return transportOutput{}, err
 	}
-	if s.config.Concurrency != nil && s.config.Concurrency.MaxConcurrency > 0 {
-		httpServer.Use(concurrencyLimitMiddleware(s.config.Concurrency.MaxConcurrency))
+	if containerOutput.container != nil {
+		if gate := containerOutput.container.GeneralConcurrencyGate(); gate != nil {
+			httpServer.Use(generalConcurrencyMiddleware(gate))
+		}
 	}
 	resttransport.NewRouter(containerOutput.container).RegisterRoutes(httpServer.Engine)
 	return transportOutput{httpServer: httpServer}, nil
-}
-
-func concurrencyLimitMiddleware(max int) gin.HandlerFunc {
-	sem := make(chan struct{}, max)
-	return func(c *gin.Context) {
-		sem <- struct{}{}
-		defer func() { <-sem }()
-		c.Next()
-	}
 }
 
 func buildGenericServer(cfg *config.Config) (*genericapiserver.GenericAPIServer, error) {

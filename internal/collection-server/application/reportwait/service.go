@@ -103,6 +103,25 @@ func (s *Service) NormalizeTimeout(raw string) time.Duration {
 	return timeout
 }
 
+// GetStatus 非阻塞读取当前报告状态（短轮询 report-status 专用）。
+func (s *Service) GetStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentStatusResponse, error) {
+	if s == nil {
+		return pendingResponse("queued", "报告排队生成中", 3000), nil
+	}
+	assessmentKey := fmt.Sprintf("%d", assessmentID)
+	resp, _, err := s.checkCurrentStatus(ctx, testeeID, assessmentID, assessmentKey)
+	if err != nil {
+		return nil, err
+	}
+	if resp == nil {
+		return pendingResponse("queued", "报告排队生成中", 3000), nil
+	}
+	if resp.NextPollAfterMs == 0 && !isTerminalStatus(resp.Status) {
+		resp.NextPollAfterMs = nextPollAfterMs(resp.Stage, resp.Status)
+	}
+	return resp, nil
+}
+
 func (s *Service) Wait(ctx context.Context, testeeID, assessmentID uint64, timeout time.Duration) (*evaluation.AssessmentStatusResponse, error) {
 	reportstatus.IncWaitReportRequest()
 	if s == nil {

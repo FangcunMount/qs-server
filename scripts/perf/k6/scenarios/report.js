@@ -1,8 +1,8 @@
-import { check } from 'k6';
+import { check, sleep } from 'k6';
 import { scenarioData, pickReportSample, flattenReportSamples, renderPath } from '../lib/data.js';
 import { timedRequest, authHeaders, collectionToken, recordHTTPStatus, responseData } from '../lib/http.js';
 import {
-  COLLECTION_BASE_URL, REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, REPORT_TIMEOUT,
+  COLLECTION_BASE_URL, REPORT_STATUS_PATH, PERSONALITY_REPORT_STATUS_PATH, REPORT_TIMEOUT, REPORT_SHORT_POLL,
 } from '../lib/config.js';
 import {
   reportStatusDuration, reportStatusFailed, medicalReportStatusDuration, medicalReportStatusFailed,
@@ -62,6 +62,10 @@ export function runReportStatusQuery(ctx, sample, pathTemplate, endpoint, durati
       reportStatusTerminal.add(1, Object.assign({}, res.tags, { assessment_status: status }));
     } else {
       reportStatusPending.add(1, Object.assign({}, res.tags, { assessment_status: status || 'unknown' }));
+      if (REPORT_SHORT_POLL) {
+        const pollMs = Number(responseData(res).next_poll_after_ms) || 3000;
+        sleep(Math.max(pollMs, 500) / 1000);
+      }
     }
   }
 

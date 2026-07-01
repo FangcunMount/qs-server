@@ -12,8 +12,8 @@
 | 200 | 单机单实例 | 保守基线（`mixed_200` 全绿） |
 | 220 | 单机单实例 | **当前单机混合验收基线**（`mixed_220` 全绿，问卷 L1） |
 | 240 | 单机单实例 | **通过**（`mixed_240_models` 三域 L1 全绿，2026-07-01） |
-| 280 | 单机单实例 | **通过**（`mixed_280_models` 三域 L1 全绿，2026-07-01；legacy `mixed_280` 单桶仅 HTTP 过、读 p95 未过线） |
-| 300 | 单机单实例 | **未通过**；攻关：`perf-mixed300-http` → `perf-mixed300-http-query` → `mixed_300` |
+| 280 | 单机单实例 | **通过**（`mixed_280_models` 长轮询全绿）；**300 攻关优先** `mixed_280_models_short_report`（report-status） |
+| 300 | 单机单实例 | **未通过**；攻关：short_report → `perf-mixed300-http` → `perf-mixed300-http-query` → `mixed_300` |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
@@ -45,7 +45,8 @@
 | collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
 目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
-| collection concurrency | max-concurrency 512 | 本进程总并发保护 |
+| collection concurrency | max-concurrency **400**（general） | query/submit/report-status 等短请求 |
+| collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
 | apiserver backpressure | mysql 180，mongo 170，iam 80 | 下游保护 |

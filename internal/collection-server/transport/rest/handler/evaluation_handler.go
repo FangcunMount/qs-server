@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
+	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/grpc/codes"
@@ -38,6 +39,7 @@ type answerSheetLookupService interface {
 
 type waitReportService interface {
 	NormalizeTimeout(raw string) time.Duration
+	GetStatus(ctx context.Context, testeeID, assessmentID uint64) (*evaluation.AssessmentStatusResponse, error)
 	Wait(ctx context.Context, testeeID, assessmentID uint64, timeout time.Duration) (*evaluation.AssessmentStatusResponse, error)
 }
 
@@ -243,6 +245,32 @@ func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
 	h.Success(c, result)
 }
 
+// GetReportStatus 短轮询查询报告生成状态（非阻塞）。
+// @Summary 查询报告生成状态
+// @Description 立即返回当前报告状态；非终态时通过 next_poll_after_ms 指引客户端退避重试
+// @Tags 测评
+// @Produce json
+// @Param id path int true "测评ID"
+// @Param testee_id query int true "受试者ID"
+// @Success 200 {object} core.Response{data=evaluation.AssessmentStatusResponse}
+// @Failure 429 {object} core.ErrResponse
+// @Failure 400 {object} core.ErrResponse
+// @Failure 500 {object} core.ErrResponse
+// @Security Bearer
+// @Router /api/v1/assessments/{id}/report-status [get]
+func (h *EvaluationHandler) GetReportStatus(c *gin.Context) {
+	testeeID, assessmentID, ok := h.parseReportStatusRequest(c)
+	if !ok {
+		return
+	}
+	statusResponse, err := h.waitReportService.GetStatus(c.Request.Context(), testeeID, assessmentID)
+	if err != nil {
+		h.InternalErrorResponse(c, "get report status failed", err)
+		return
+	}
+	h.Success(c, reportwait.ToPublicAssessmentStatus(statusResponse))
+}
+
 // WaitReport 长轮询等待报告生成
 // @Summary 长轮询等待报告生成
 // @Description 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
@@ -288,7 +316,39 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 		"timeout_ms", timeout.Milliseconds(),
 		"elapsed_ms", time.Since(start).Milliseconds(),
 	)
-	h.Success(c, statusResponse)
+	publicStatus := reportwait.ToPublicAssessmentStatus(statusResponse)
+	applyReportPollRetryAfter(c, publicStatus)
+	h.Success(c, publicStatus)
+}
+
+func applyReportPollRetryAfter(c *gin.Context, status *evaluation.AssessmentStatusResponse) {
+	if status == nil || status.Status == "interpreted" || status.Status == "completed" || status.Status == "failed" {
+		return
+	}
+	retryAfterSec := (status.NextPollAfterMs + 999) / 1000
+	if retryAfterSec <= 0 {
+		retryAfterSec = 3
+	}
+	ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), retryAfterSec)
+}
+
+func (h *EvaluationHandler) parseReportStatusRequest(c *gin.Context) (uint64, uint64, bool) {
+	testeeIDStr := h.GetQueryParam(c, "testee_id")
+	if testeeIDStr == "" {
+		h.BadRequestResponse(c, "testee_id is required", nil)
+		return 0, 0, false
+	}
+	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid testee_id format", err)
+		return 0, 0, false
+	}
+	assessmentID, err := strconv.ParseUint(h.GetPathParam(c, "id"), 10, 64)
+	if err != nil {
+		h.BadRequestResponse(c, "invalid assessment id", err)
+		return 0, 0, false
+	}
+	return testeeID, assessmentID, true
 }
 
 func (h *EvaluationHandler) parseWaitReportRequest(c *gin.Context) (uint64, uint64, time.Duration, bool) {

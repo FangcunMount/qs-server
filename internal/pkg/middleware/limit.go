@@ -2,12 +2,10 @@ package middleware
 
 import (
 	"errors"
-	"net/http"
-	"strconv"
-
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"github.com/gin-gonic/gin"
+	"net/http"
 )
 
 // ErrLimitExceeded 定义了限制超出错误
@@ -57,7 +55,7 @@ func LimitWithLimiter(limiter ratelimit.RateLimiter, keyFn func(*gin.Context) st
 		}
 
 		_ = c.Error(ErrLimitExceeded)
-		setRetryAfterHeader(c, decision)
+		ratelimit.ApplyRetryAfterHeader(c.Writer.Header(), decision)
 		c.AbortWithStatus(http.StatusTooManyRequests)
 	}
 }
@@ -101,12 +99,4 @@ func defaultLimitObserver(observer resilienceplane.Observer) resilienceplane.Obs
 		return observer
 	}
 	return resilienceplane.DefaultObserver()
-}
-
-func setRetryAfterHeader(c *gin.Context, decision ratelimit.RateLimitDecision) {
-	seconds := decision.RetryAfterSeconds
-	if seconds < 1 {
-		seconds = 1
-	}
-	c.Header("Retry-After", strconv.Itoa(seconds))
 }

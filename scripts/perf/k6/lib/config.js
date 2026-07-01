@@ -47,6 +47,21 @@ export function envOrConfigList(envName, keys, fallback) {
   return listValue(fallback);
 }
 
+export function envOrConfigBool(envName, keys, fallback) {
+  const envValue = __ENV[envName];
+  if (envValue !== undefined && envValue !== '') {
+    return String(envValue).toLowerCase() === 'true';
+  }
+  const configValue = configFirstValue(keys);
+  if (configValue === undefined || configValue === null || configValue === '') {
+    return fallback;
+  }
+  if (typeof configValue === 'boolean') {
+    return configValue;
+  }
+  return String(configValue).toLowerCase() === 'true';
+}
+
 export function configStringValue(keys, fallback) {
   const value = configFirstValue(keys);
   if (value === undefined || value === null || value === '') {
@@ -502,6 +517,11 @@ export const PERSONALITY_REPORT_STATUS_PATH = envOrConfigString(
   'PERSONALITY_REPORT_STATUS_PATH',
   ['personalityReportStatusPath', 'personality_report_status_path', 'paths.personalityReportStatus', 'paths.personality_report_status'],
   '/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}'
+);
+export const REPORT_SHORT_POLL = envOrConfigBool(
+  'REPORT_SHORT_POLL',
+  ['reportShortPoll', 'report_short_poll'],
+  false
 );
 export const PERSONALITY_REPORT_PATH = envOrConfigString(
   'PERSONALITY_REPORT_PATH',

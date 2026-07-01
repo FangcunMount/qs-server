@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
+	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/container"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	collectionmiddleware "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/middleware"
@@ -300,6 +301,27 @@ func rateLimitedHandlers(
 	}
 }
 
+func waitConcurrencyHandlers(
+	gate *concurrency.Gate,
+	waitCfg *options.WaitReportOptions,
+	handlers ...gin.HandlerFunc,
+) []gin.HandlerFunc {
+	if gate == nil {
+		return handlers
+	}
+	if waitCfg == nil {
+		waitCfg = options.NewWaitReportOptions()
+	}
+	retryAfter := waitCfg.DegradeRetryAfterSeconds
+	if waitCfg.DegradeImmediateEnabled {
+		mw := gate.TryMiddleware(func(c *gin.Context) {
+			WriteDegradedWaitReport(c, retryAfter)
+		})
+		return append([]gin.HandlerFunc{mw}, handlers...)
+	}
+	return append([]gin.HandlerFunc{gate.BlockingMiddleware()}, handlers...)
+}
+
 func distributedLimit(
 	limiter ratelimit.RateLimiter,
 	scope string,
@@ -491,15 +513,29 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetAssessmentTrendSummary,
 		)...)
 		// 长轮询等待报告生成
-		assessments.GET("/:id/wait-report", rateLimitedHandlers(
+		assessments.GET("/:id/report-status", rateLimitedHandlers(
 			r.container.RateLimitBackend(),
-			"wait-report",
+			"query",
 			rateCfg,
-			rateCfg.WaitReportGlobalQPS,
-			rateCfg.WaitReportGlobalBurst,
-			rateCfg.WaitReportUserQPS,
-			rateCfg.WaitReportUserBurst,
-			evaluationHandler.WaitReport,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			evaluationHandler.GetReportStatus,
+		)...)
+		assessments.GET("/:id/wait-report", waitConcurrencyHandlers(
+			r.container.WaitReportConcurrencyGate(),
+			r.container.WaitReportOptions(),
+			rateLimitedHandlers(
+				r.container.RateLimitBackend(),
+				"wait-report",
+				rateCfg,
+				rateCfg.WaitReportGlobalQPS,
+				rateCfg.WaitReportGlobalBurst,
+				rateCfg.WaitReportUserQPS,
+				rateCfg.WaitReportUserBurst,
+				evaluationHandler.WaitReport,
+			)...,
 		)...)
 	}
 }
@@ -578,15 +614,29 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.List,
 		)...)
-		assessments.GET("/:id/wait-report", rateLimitedHandlers(
+		assessments.GET("/:id/report-status", rateLimitedHandlers(
 			r.container.RateLimitBackend(),
-			"wait-report",
+			"query",
 			rateCfg,
-			rateCfg.WaitReportGlobalQPS,
-			rateCfg.WaitReportGlobalBurst,
-			rateCfg.WaitReportUserQPS,
-			rateCfg.WaitReportUserBurst,
-			handler.WaitReport,
+			rateCfg.QueryGlobalQPS,
+			rateCfg.QueryGlobalBurst,
+			rateCfg.QueryUserQPS,
+			rateCfg.QueryUserBurst,
+			handler.GetReportStatus,
+		)...)
+		assessments.GET("/:id/wait-report", waitConcurrencyHandlers(
+			r.container.WaitReportConcurrencyGate(),
+			r.container.WaitReportOptions(),
+			rateLimitedHandlers(
+				r.container.RateLimitBackend(),
+				"wait-report",
+				rateCfg,
+				rateCfg.WaitReportGlobalQPS,
+				rateCfg.WaitReportGlobalBurst,
+				rateCfg.WaitReportUserQPS,
+				rateCfg.WaitReportUserBurst,
+				handler.WaitReport,
+			)...,
 		)...)
 		assessments.GET("/:id/report", rateLimitedHandlers(
 			r.container.RateLimitBackend(),

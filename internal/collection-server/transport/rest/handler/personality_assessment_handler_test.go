@@ -33,6 +33,10 @@ func (f *fakePersonalityAssessmentQueryService) GetReport(ctx context.Context, t
 	return f.getReport(ctx, testeeID, assessmentID)
 }
 
+func (f *fakePersonalityAssessmentQueryService) GetReportStatus(context.Context, uint64, uint64) (*personalityassessment.AssessmentStatusResponse, error) {
+	panic("unexpected GetReportStatus call")
+}
+
 func (f *fakePersonalityAssessmentQueryService) WaitReport(context.Context, uint64, uint64, time.Duration) (*personalityassessment.AssessmentStatusResponse, error) {
 	panic("unexpected WaitReport call")
 }

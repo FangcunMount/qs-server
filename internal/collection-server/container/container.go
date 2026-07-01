@@ -15,6 +15,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/testee"
+	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
@@ -76,6 +77,9 @@ type Container struct {
 	personalityAssessmentSessionHandler *handler.PersonalityAssessmentSessionHandler
 	testeeHandler                       *handler.TesteeHandler
 	healthHandler                       *handler.HealthHandler
+
+	generalConcurrencyGate    *concurrency.Gate
+	waitReportConcurrencyGate *concurrency.Gate
 }
 
 // ClientBundle is the collection-server runtime client graph produced by the
@@ -91,12 +95,36 @@ type ClientBundle struct {
 
 // NewContainer 创建新的容器
 func NewContainer(opts *options.Options, opsHandle *cacheplane.Handle, lockManager locklease.Manager, familyStatus *observability.FamilyStatusRegistry) *Container {
-	return &Container{
+	c := &Container{
 		opts:         opts,
 		opsHandle:    opsHandle,
 		lockManager:  lockManager,
 		familyStatus: familyStatus,
 		initialized:  false,
+	}
+	c.initConcurrencyGates()
+	return c
+}
+
+func (c *Container) initConcurrencyGates() {
+	maxGeneral := 0
+	if c.opts != nil && c.opts.Concurrency != nil {
+		maxGeneral = c.opts.Concurrency.MaxConcurrency
+	}
+	maxWait := 0
+	degradeEnabled := true
+	if c.opts != nil && c.opts.WaitReport != nil {
+		maxWait = c.opts.WaitReport.MaxHTTPConcurrency
+		degradeEnabled = c.opts.WaitReport.DegradeImmediateEnabled
+	}
+	if maxWait <= 0 {
+		maxWait = 400
+	}
+	c.generalConcurrencyGate = concurrency.NewGate(maxGeneral)
+	if degradeEnabled {
+		c.waitReportConcurrencyGate = concurrency.NewGate(maxWait)
+	} else {
+		c.waitReportConcurrencyGate = c.generalConcurrencyGate
 	}
 }
 
@@ -310,6 +338,27 @@ func (c *Container) RateLimitBackend() ratelimit.Backend {
 		return nil
 	}
 	return ratelimitredis.NewBackend(c.opsHandle.Client, c.opsHandle.Builder)
+}
+
+func (c *Container) GeneralConcurrencyGate() *concurrency.Gate {
+	if c == nil {
+		return nil
+	}
+	return c.generalConcurrencyGate
+}
+
+func (c *Container) WaitReportConcurrencyGate() *concurrency.Gate {
+	if c == nil {
+		return nil
+	}
+	return c.waitReportConcurrencyGate
+}
+
+func (c *Container) WaitReportOptions() *options.WaitReportOptions {
+	if c == nil || c.opts == nil || c.opts.WaitReport == nil {
+		return options.NewWaitReportOptions()
+	}
+	return c.opts.WaitReport
 }
 
 func (c *Container) ResilienceSnapshot() resilienceplane.RuntimeSnapshot {

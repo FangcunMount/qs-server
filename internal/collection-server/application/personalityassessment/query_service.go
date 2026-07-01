@@ -90,6 +90,17 @@ func (s *QueryService) GetReport(ctx context.Context, testeeID, assessmentID uin
 	return toAssessmentReport(result), nil
 }
 
+func (s *QueryService) GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentStatusResponse, error) {
+	if s.waitReport == nil {
+		return nil, fmt.Errorf("wait report service is not configured")
+	}
+	status, err := s.waitReport.GetStatus(ctx, testeeID, assessmentID)
+	if err != nil {
+		return nil, err
+	}
+	return s.toPublicStatusResponse(ctx, testeeID, assessmentID, status), nil
+}
+
 func (s *QueryService) WaitReport(ctx context.Context, testeeID, assessmentID uint64, timeout time.Duration) (*AssessmentStatusResponse, error) {
 	if s.waitReport == nil {
 		return nil, fmt.Errorf("wait report service is not configured")
@@ -98,22 +109,31 @@ func (s *QueryService) WaitReport(ctx context.Context, testeeID, assessmentID ui
 	if err != nil {
 		return nil, err
 	}
+	return s.toPublicStatusResponse(ctx, testeeID, assessmentID, status), nil
+}
+
+func (s *QueryService) toPublicStatusResponse(
+	ctx context.Context,
+	testeeID, assessmentID uint64,
+	status *evaluationapp.AssessmentStatusResponse,
+) *AssessmentStatusResponse {
+	pub := reportwait.ToPublicAssessmentStatus(status)
 	resp := &AssessmentStatusResponse{
-		Status:          status.Status,
-		Stage:           status.Stage,
-		Message:         status.Message,
-		Reason:          status.Reason,
-		NextPollAfterMs: status.NextPollAfterMs,
-		UpdatedAt:       status.UpdatedAt,
+		Status:          pub.Status,
+		Stage:           pub.Stage,
+		Message:         pub.Message,
+		Reason:          pub.Reason,
+		NextPollAfterMs: pub.NextPollAfterMs,
+		UpdatedAt:       pub.UpdatedAt,
 	}
-	if status.Status == "interpreted" {
+	if pub.Status == "interpreted" {
 		if detail, err := s.Get(ctx, testeeID, assessmentID); err == nil && detail != nil {
 			model := detail.Model
 			resp.Model = &model
 			resp.Level = detail.Level
 		}
 	}
-	return resp, nil
+	return resp
 }
 
 func ensurePersonalityModel(model grpcclient.ModelIdentityOutput) error {

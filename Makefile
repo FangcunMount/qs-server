@@ -112,7 +112,7 @@ COLOR_RED := \033[31m
 .PHONY: cd-image cd-package cd-remote-deploy cd-validate cd-plan cd-export-image
 .PHONY: perf-init perf-ensure-config perf-tokens perf-tokens-collection perf-tokens-apiserver
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced
-.PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300probe
+.PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300probe
 .PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
 .PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-verify
 
@@ -288,9 +288,13 @@ perf-mixed280: perf-preflight ## k6 mixed_280 升档 (8min, legacy 问卷单桶 
 	@mkdir -p $(PERF_DIR)/mixed280
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_280 SUMMARY_EXPORT=$(PERF_DIR)/mixed280/k6-summary.json
 
-perf-mixed280-models: perf-preflight ## k6 mixed_280_models 三域 L1 升档 (8min, 拆分 query)
+perf-mixed280-models: perf-preflight ## k6 mixed_280_models 三域 L1 升档 (8min, 拆分 query, wait-report 长轮询)
 	@mkdir -p $(PERF_DIR)/mixed280-models
 	$(MAKE) perf-k6 QPS_PROFILE=mixed_280_models SUMMARY_EXPORT=$(PERF_DIR)/mixed280-models/k6-summary.json
+
+perf-mixed280-models-short-report: perf-preflight ## k6 mixed_280_models_short_report (8min, report-status 短轮询)
+	@mkdir -p $(PERF_DIR)/mixed280-models-short-report
+	$(MAKE) perf-k6 QPS_PROFILE=mixed_280_models_short_report SUMMARY_EXPORT=$(PERF_DIR)/mixed280-models-short-report/k6-summary.json
 
 perf-mixed300: perf-preflight ## k6 mixed_300 目标档 (10min, 含 chainProbe) + 前后 snapshot
 	@mkdir -p $(PERF_DIR)/300qps

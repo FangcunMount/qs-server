@@ -154,6 +154,9 @@ wait_report:
   poll_interval_ms: 500
   status_ttl_seconds: 172800
   max_active_waiters: 3000
+  max_http_concurrency: 400
+  degrade_immediate_enabled: true
+  degrade_retry_after_seconds: 5
   pubsub_enabled: false
   pubsub_channel: "report_status_changed"
 
@@ -274,4 +277,4 @@ runtime:
 
 # 并发/连接池调优
 concurrency:
-  max-concurrency: 512
+  max-concurrency: 400

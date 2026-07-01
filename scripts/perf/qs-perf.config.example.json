@@ -542,6 +542,62 @@
         }
       }
     },
+    "mixed_280_models_short_report": {
+      "duration": "8m",
+      "description": "mixed_280_models + report-status 短轮询（A 方案验收）；report 96/s 走 /report-status + next_poll_after_ms 退避",
+      "reportShortPoll": true,
+      "qps": {
+        "medicalQuery": 71,
+        "personalityQuery": 36,
+        "questionnaireQuery": 25,
+        "submit": 24,
+        "report": 96,
+        "stats": 28,
+        "chainProbe": 0
+      },
+      "paths": {
+        "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
+        "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}"
+      },
+      "modelMix": {
+        "medical": 0.8,
+        "personality": 0.2
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 330,
+          "max": 1400
+        },
+        "medicalQuery": {
+          "preAllocated": 130,
+          "max": 520
+        },
+        "personalityQuery": {
+          "preAllocated": 70,
+          "max": 280
+        },
+        "questionnaireQuery": {
+          "preAllocated": 40,
+          "max": 200
+        },
+        "submit": {
+          "preAllocated": 290,
+          "max": 1180
+        },
+        "report": {
+          "preAllocated": 40,
+          "max": 320
+        },
+        "stats": {
+          "preAllocated": 120,
+          "max": 600
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
     "mixed_300": {
       "duration": "10m",
       "description": "验收档（含 chainProbe 1/s）；HTTP 隔离复测请用 mixed_300_http",
