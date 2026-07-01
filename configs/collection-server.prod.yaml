@@ -41,10 +41,10 @@ secure:
 # 2.3 gRPC 客户端配置（调用 apiserver）
 # -------------------------------------------------------
 grpc_client:
-  endpoint: "qs-apiserver:9090"  # Docker 容器服务名
-  timeout: 30
-  insecure: false  # 生产环境启用 TLS（insecure=false 表示启用 TLS）
-  max_inflight: 360
+  endpoint: "qs-apiserver:9090"     # Docker 容器服务名 apiserver 地址
+  timeout: 30s                      # gRPC 超时时间 30s
+  insecure: false                   # 生产环境启用 TLS（insecure=false 表示启用 TLS）
+  max_inflight: 360                 # 最大并发请求数 360
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
@@ -65,117 +65,110 @@ grpc_client:
 #   - DB 0: IAM 业务
 #   - DB 1: QS 业务默认 Redis
 redis:
-  host: "127.0.0.1"
-  port: 6379
-  username: ""
-  password: ""
-  database: 1
-  max-idle: 48
-  max-active: 256
-  timeout: 300
-  min-idle-conns: 10
-  pool-timeout: 10
-  dial-timeout: 5
-  read-timeout: 5
-  write-timeout: 5
-  enable-cluster: false
-  use-ssl: false
+  host: "127.0.0.1"                    # Redis 主机地址
+  port: 6379                           # Redis 端口
+  username: ""                         # Redis 用户名
+  password: ""                         # Redis 密码
+  database: 1                          # Redis 数据库
+  max-idle: 48                         # Redis 最大空闲连接数
+  max-active: 256                      # Redis 最大活跃连接数
+  timeout: 300                         # Redis 超时时间
+  min-idle-conns: 10                   # Redis 最小空闲连接数
+  pool-timeout: 10                     # Redis 连接池超时时间
+  dial-timeout: 5                      # Redis 连接超时时间
+  read-timeout: 5                      # Redis 读取超时时间
+  write-timeout: 5                     # Redis 写入超时时间
+  enable-cluster: false                # 启用 Redis 集群
+  use-ssl: false                       # 启用 SSL
 
-redis_profiles:
-  ops_runtime:
-    database: 1
-  lock_cache:
-    database: 6
+redis_profiles:                        # Redis 配置文件
+  ops_runtime:                         # ops_runtime 家族
+    database: 1                        # Redis 数据库 1
+  lock_cache:                          # lock_lease 家族
+    database: 6                        # Redis 数据库 6
 
-redis_runtime:
-  namespace: ""
-  families:
-    ops_runtime:
-      redis_profile: "ops_runtime"
-      namespace_suffix: "ops:runtime"
-      allow_fallback_default: true
-    lock_lease:
-      redis_profile: "lock_cache"
-      namespace_suffix: "cache:lock"
-      allow_fallback_default: true
+redis_runtime:                         # Redis 运行时配置
+  namespace: ""                        # 命名空间
+  families:                            # 家族配置
+    ops_runtime:                       # ops_runtime 家族
+      redis_profile: "ops_runtime"     # Redis 配置文件 ops_runtime
+      namespace_suffix: "ops:runtime"  # 命名空间后缀
+      allow_fallback_default: true     # 允许降级默认值
+    lock_lease:                        # lock_lease 家族
+      redis_profile: "lock_cache"      # Redis 配置文件
+      namespace_suffix: "cache:lock"   # 命名空间后缀
+      allow_fallback_default: true     # 允许降级默认值
 
 # -------------------------------------------------------
 # 3.3 限流配置
 # -------------------------------------------------------
-rate_limit:
-  enabled: true
-  submit_global_qps: 300
-  submit_global_burst: 450
-  submit_user_qps: 120
-  submit_user_burst: 180
-  query_global_qps: 300
-  query_global_burst: 450
-  query_user_qps: 120
-  query_user_burst: 180
-  wait_report_global_qps: 200
-  wait_report_global_burst: 300
-  wait_report_user_qps: 60
-  wait_report_user_burst: 120
-  report_events_global_qps: 100
-  report_events_global_burst: 150
-  report_events_user_qps: 20
-  report_events_user_burst: 40
+rate_limit:                          # 限流配置
+  enabled: true                      # 启用限流
+  submit_global_qps: 300             # 提交全局 QPS 300
+  submit_global_burst: 450           # 提交全局突发 450
+  submit_user_qps: 120               # 提交用户 QPS 120
+  submit_user_burst: 180             # 提交用户突发 180
+  query_global_qps: 300              # 查询全局 QPS 300
+  query_global_burst: 450            # 查询全局突发 450
+  query_user_qps: 120                # 查询用户 QPS 120
+  query_user_burst: 180              # 查询用户突发 180
+  wait_report_global_qps: 200        # 等待报告全局 QPS 200
+  wait_report_global_burst: 300      # 等待报告全局突发 300
+  wait_report_user_qps: 60           # 等待报告用户 QPS 60
+  wait_report_user_burst: 120        # 等待报告用户突发 120
+  report_events_global_qps: 100      # 报告事件全局 QPS 100
+  report_events_global_burst: 150    # 报告事件全局突发 150
+  report_events_user_qps: 20         # 报告事件用户 QPS 20
+  report_events_user_burst: 40       # 报告事件用户突发 40
 
 # -------------------------------------------------------
 # 3.4 提交排队配置
 # -------------------------------------------------------
-submit_queue:
-  enabled: true
-  queue_size: 2400
-  worker_count: 48
-  wait_timeout_ms: 200
+submit_queue:                       # 提交排队配置
+  enabled: true                     # 启用提交排队
+  queue_size: 2400                  # 提交排队队列大小
+  worker_count: 48                  # 提交排队工作线程数
+  wait_timeout_ms: 200              # 提交排队等待超时时间
 
-questionnaire_cache:
-  enabled: true
-  ttl_seconds: 180
-  max_entries: 256
-  singleflight: true
-  signal_evict_enabled: true
+questionnaire_cache:                # 问卷详情 L1 缓存配置
+  enabled: true                     # 启用问卷详情 L1 缓存
+  ttl_seconds: 180                  # 问卷详情 L1 缓存时间
+  max_entries: 256                  # 问卷详情 L1 缓存最大条目数
+  singleflight: true                # 启用 singleflight 避免重复请求
+  signal_evict_enabled: true        # 启用信号驱逐
 
-scale_cache:
-  enabled: true
-  ttl_seconds: 180
-  max_entries: 256
-  singleflight: true
-  signal_evict_enabled: true
+scale_cache:                        # 量表目录 L1 缓存配置
+  enabled: true                     # 启用量表目录 L1 缓存
+  ttl_seconds: 180                  # 量表目录 L1 缓存时间 180s
+  max_entries: 256                  # 量表目录 L1 缓存最大条目数 256
+  singleflight: true                # 启用 singleflight 避免重复请求
+  signal_evict_enabled: true        # 启用信号驱逐
 
-personality_cache:
-  enabled: true
-  ttl_seconds: 180
-  max_entries: 256
-  singleflight: true
-  signal_evict_enabled: true
+wait_report:                        # 报告等待 HTTP 轮询接口配置
+  default_timeout_seconds: 20       # 默认等待超时时间 20s
+  min_timeout_seconds: 1            # 最小等待超时时间
+  max_timeout_seconds: 25           # 最大等待超时时间
+  poll_interval_ms: 500             # 轮询间隔时间 500ms
+  status_ttl_seconds: 172800        # 报告状态缓存时间 172800s
+  max_active_waiters: 3000          # 最大活跃等待请求数 3000
+  max_http_concurrency: 400         # 最大 HTTP 并发数 400
+  degrade_immediate_enabled: true   # 立即降级 true
+  degrade_retry_after_seconds: 5    # 降级重试时间 5s
+  pubsub_enabled: true              # 启用 Redis 发布/订阅机制
+  pubsub_channel: "report_status_changed" # 报告状态变更频道
 
-wait_report:
-  default_timeout_seconds: 20
-  min_timeout_seconds: 1
-  max_timeout_seconds: 25
-  poll_interval_ms: 500
-  status_ttl_seconds: 172800
-  max_active_waiters: 3000
-  max_http_concurrency: 400
-  degrade_immediate_enabled: true
-  degrade_retry_after_seconds: 5
-  pubsub_enabled: false
-  pubsub_channel: "report_status_changed"
+report_events:  # WebSocket 报告事件推送配置
+  enabled: true                 # 启用 WebSocket 报告事件推送
+  path: /api/v1/report-events   # WebSocket 报告事件推送路径
+  max_connections: 2000         # 最大并发 WebSocket 连接数
+  max_per_testee: 2             # 每个测试对象最大并发 WebSocket 连接数
+  idle_timeout_seconds: 120     # WebSocket 连接空闲超时时间
+  heartbeat_interval_seconds: 30 # WebSocket 心跳间隔时间
 
-report_events:
-  enabled: false
-  path: /api/v1/report-events
-  max_connections: 2000
-  max_per_testee: 2
-  idle_timeout_seconds: 120
-  heartbeat_interval_seconds: 30
-
-report_status:
+report_status:  # 报告状态缓存配置
   ttl_seconds: 172800
 
-signaling:
+signaling:  # 报告状态信号配置
   redis:
     enabled: true
     prefix: "qs:signal"
@@ -256,10 +249,10 @@ iam:
 log:
   disable-caller: false      # 生产环境禁用调用者信息
   disable-stacktrace: false  # 生产环境禁用堆栈跟踪
-  level: info               # 生产环境使用 info 级别(debug, info, warn, error, fatal, panic)
-  format: json              # 生产环境使用 json 格式
-  enable-color: false       # 生产环境禁用颜色
-  development: false        # 开发模式: true, false
+  level: info                # 生产环境使用 info 级别(debug, info, warn, error, fatal, panic)
+  format: json               # 生产环境使用 json 格式
+  enable-color: false        # 生产环境禁用颜色
+  development: false         # 生产环境禁用开发模式
   name: "qs-collection-server"  # 日志名称
   max-size: 100                # 单个日志文件最大 100MB
   max-age: 30                   # 保留 30 天
@@ -271,11 +264,11 @@ log:
   level-output-mode: "duplicate"  # 重复输出模式（推荐）
   level-output-paths:
     all:
-      - stdout
-      - /data/logs/qs/qs-collection-server.log
+      - stdout                       # 容器/进程标准输出保留完整日志
+      - /data/logs/qs/qs-collection-server.log  # 完整日志（所有级别）
     error:
-      - stderr                              
-      - /data/logs/qs/qs-collection-server-error.log
+      - stderr                               # ERROR 级别写入标准错误，便于监控采集
+      - /data/logs/qs/qs-collection-server-error.log  # 额外记录 ERROR（快速定位故障）
 
 # ============================================================
 # 6. 调优参数（内存/并发）
