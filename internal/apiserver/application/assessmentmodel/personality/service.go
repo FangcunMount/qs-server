@@ -15,6 +15,11 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
+// CacheSignalNotifier 缓存失效信令发布端口（best-effort，非领域事件）。
+type CacheSignalNotifier interface {
+	NotifyPersonalityModelCacheChanged(ctx context.Context, code, action string)
+}
+
 type Service interface {
 	List(ctx context.Context, input ListInput) (*ModelListResult, error)
 	Create(ctx context.Context, input CreateInput) (*ModelSummary, error)
@@ -33,9 +38,10 @@ type Service interface {
 }
 
 type Dependencies struct {
-	ModelRepo          port.ModelRepository
-	PublishedRepo      port.PublishedModelRepository
-	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
+	ModelRepo           port.ModelRepository
+	PublishedRepo       port.PublishedModelRepository
+	QuestionnaireQuery  questionnaireapp.QuestionnaireQueryService
+	CacheSignalNotifier CacheSignalNotifier
 }
 
 type service struct {
@@ -259,6 +265,7 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 		_ = s.deps.PublishedRepo.DeletePublished(ctx, domain.KindPersonality, modelCode)
 		return nil, err
 	}
+	s.notifyCacheChanged(ctx, modelCode, "publish")
 	return summaryFromModel(model), nil
 }
 
@@ -283,6 +290,7 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
 		return nil, err
 	}
+	s.notifyCacheChanged(ctx, modelCode, "unpublish")
 	return summaryFromModel(model), nil
 }
 
@@ -308,7 +316,17 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
 		return nil, err
 	}
+	if wasPublished {
+		s.notifyCacheChanged(ctx, modelCode, "archive")
+	}
 	return summaryFromModel(model), nil
+}
+
+func (s *service) notifyCacheChanged(ctx context.Context, code, action string) {
+	if s.deps.CacheSignalNotifier == nil || code == "" {
+		return
+	}
+	s.deps.CacheSignalNotifier.NotifyPersonalityModelCacheChanged(ctx, code, action)
 }
 
 func (s *service) validateModelForPublish(ctx context.Context, model *domain.AssessmentModel) []ValidationIssue {

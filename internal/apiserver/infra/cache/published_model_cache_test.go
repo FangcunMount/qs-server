@@ -15,8 +15,10 @@ import (
 type publishedModelStoreStub struct {
 	findByQuestionnaireCalls int
 	getByRefCalls            int
+	findByCodeCalls          int
 	findByQuestionnaire      *domain.Snapshot
 	getByRef                 *domain.Snapshot
+	findByCode               *domain.PublishedModelSnapshot
 	upsertErr                error
 }
 
@@ -61,6 +63,10 @@ func (s *publishedModelStoreStub) FindPublishedByModelCode(context.Context, doma
 }
 
 func (s *publishedModelStoreStub) FindPublishedModelByCode(context.Context, domain.Kind, string) (*domain.PublishedModelSnapshot, error) {
+	s.findByCodeCalls++
+	if s.findByCode != nil {
+		return s.findByCode, nil
+	}
 	return nil, domain.ErrNotFound
 }
 
@@ -163,5 +169,89 @@ func TestCachedPublishedModelStoreUpsertPublishedInvalidatesCache(t *testing.T) 
 	}
 	if hasRedisKey(t, client, cacheKey) {
 		t.Fatal("cache key should be deleted after upsert invalidation")
+	}
+}
+
+func TestCachedPublishedModelStoreFindPublishedModelByCodeCachesHit(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	published := &domain.PublishedModelSnapshot{
+		Model: domain.ModelDefinition{Kind: domain.KindPersonality, Code: "mbti", Version: "1.0.0"},
+	}
+	inner := &publishedModelStoreStub{findByCode: published}
+	cached := NewCachedPublishedModelStore(
+		inner,
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		cachepolicy.CachePolicy{},
+		nil,
+	)
+
+	got, err := cached.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "mbti")
+	if err != nil {
+		t.Fatalf("first FindPublishedModelByCode() error = %v", err)
+	}
+	if got == nil || got.Model.Code != "mbti" {
+		t.Fatalf("first FindPublishedModelByCode() = %#v", got)
+	}
+	if inner.findByCodeCalls != 1 {
+		t.Fatalf("source calls after first read = %d, want 1", inner.findByCodeCalls)
+	}
+	cacheKey := cached.modelByCodeCacheKey(domain.KindPersonality, "mbti")
+	waitFor(t, func() bool {
+		return hasRedisKey(t, client, cacheKey)
+	})
+
+	got, err = cached.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "mbti")
+	if err != nil {
+		t.Fatalf("second FindPublishedModelByCode() error = %v", err)
+	}
+	if got == nil || got.Model.Code != "mbti" {
+		t.Fatalf("second FindPublishedModelByCode() = %#v", got)
+	}
+	if inner.findByCodeCalls != 1 {
+		t.Fatalf("source calls after cache hit = %d, want 1", inner.findByCodeCalls)
+	}
+}
+
+func TestCachedPublishedModelStoreFindPublishedModelByCodeInvalidatesOnUpsert(t *testing.T) {
+	mr := miniredis.RunT(t)
+	client := redis.NewClient(&redis.Options{Addr: mr.Addr()})
+	t.Cleanup(func() {
+		_ = client.Close()
+		mr.Close()
+	})
+
+	snapshot := &domain.Snapshot{
+		Definition: domain.Definition{Kind: domain.KindPersonality, Code: "mbti", Version: "1.0.0"},
+	}
+	published := domain.PublishedFromLegacy(snapshot)
+	inner := &publishedModelStoreStub{findByCode: published}
+	cached := NewCachedPublishedModelStore(
+		inner,
+		client,
+		keyspace.NewBuilderWithNamespace("test-ns"),
+		cachepolicy.CachePolicy{},
+		nil,
+	)
+	cacheKey := cached.modelByCodeCacheKey(domain.KindPersonality, "mbti")
+
+	if _, err := cached.FindPublishedModelByCode(context.Background(), domain.KindPersonality, "mbti"); err != nil {
+		t.Fatalf("warm cache error = %v", err)
+	}
+	waitFor(t, func() bool {
+		return hasRedisKey(t, client, cacheKey)
+	})
+
+	if err := cached.UpsertPublished(context.Background(), snapshot); err != nil {
+		t.Fatalf("UpsertPublished() error = %v", err)
+	}
+	if hasRedisKey(t, client, cacheKey) {
+		t.Fatal("model-by-code cache key should be deleted after upsert invalidation")
 	}
 }

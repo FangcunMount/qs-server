@@ -131,6 +131,21 @@ questionnaire_cache:
   ttl_seconds: 180
   max_entries: 256
   singleflight: true
+  signal_evict_enabled: true
+
+scale_cache:
+  enabled: true
+  ttl_seconds: 180
+  max_entries: 256
+  singleflight: true
+  signal_evict_enabled: true
+
+personality_cache:
+  enabled: true
+  ttl_seconds: 180
+  max_entries: 256
+  singleflight: true
+  signal_evict_enabled: true
 
 wait_report:
   default_timeout_seconds: 20

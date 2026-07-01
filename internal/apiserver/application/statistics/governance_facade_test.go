@@ -21,6 +21,10 @@ func (s *stubGovernanceCoordinator) WarmStartup(context.Context) error { return 
 
 func (s *stubGovernanceCoordinator) HandleScalePublished(context.Context, string) error { return nil }
 
+func (s *stubGovernanceCoordinator) HandlePersonalityModelPublished(context.Context, string) error {
+	return nil
+}
+
 func (s *stubGovernanceCoordinator) HandleQuestionnairePublished(context.Context, string, string) error {
 	return nil
 }

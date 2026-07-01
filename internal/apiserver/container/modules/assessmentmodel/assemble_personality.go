@@ -23,6 +23,7 @@ type PersonalityDeps struct {
 	ModelRepo                port.ModelRepository
 	PublishedRepo            port.PublishedModelRepository
 	QuestionnaireQuery       questionnaireapp.QuestionnaireQueryService
+	CacheSignalNotifier      appPersonalityModel.CacheSignalNotifier
 }
 
 // NewPersonality assembles the personality-model catalog capability.
@@ -39,9 +40,10 @@ func NewPersonality(deps PersonalityDeps) (*Personality, error) {
 	var commandService appPersonalityModel.Service
 	if deps.ModelRepo != nil {
 		commandService = appPersonalityModel.NewService(appPersonalityModel.Dependencies{
-			ModelRepo:          deps.ModelRepo,
-			PublishedRepo:      deps.PublishedRepo,
-			QuestionnaireQuery: deps.QuestionnaireQuery,
+			ModelRepo:           deps.ModelRepo,
+			PublishedRepo:       deps.PublishedRepo,
+			QuestionnaireQuery:  deps.QuestionnaireQuery,
+			CacheSignalNotifier: deps.CacheSignalNotifier,
 		})
 	}
 	return &Personality{

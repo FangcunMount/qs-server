@@ -25,6 +25,10 @@ func (f *fakeManualWarmupCoordinator) WarmStartup(context.Context) error { retur
 
 func (f *fakeManualWarmupCoordinator) HandleScalePublished(context.Context, string) error { return nil }
 
+func (f *fakeManualWarmupCoordinator) HandlePersonalityModelPublished(context.Context, string) error {
+	return nil
+}
+
 func (f *fakeManualWarmupCoordinator) HandleQuestionnairePublished(context.Context, string, string) error {
 	return nil
 }

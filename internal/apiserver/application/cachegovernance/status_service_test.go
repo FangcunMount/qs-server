@@ -19,6 +19,8 @@ func (s stubCoordinator) WarmStartup(context.Context) error { return nil }
 
 func (s stubCoordinator) HandleScalePublished(context.Context, string) error { return nil }
 
+func (s stubCoordinator) HandlePersonalityModelPublished(context.Context, string) error { return nil }
+
 func (s stubCoordinator) HandleQuestionnairePublished(context.Context, string, string) error {
 	return nil
 }

@@ -54,6 +54,14 @@ func NewScaleSignaler(client goredis.UniversalClient, opts SignalingOptions) (*s
 	return signalredis.NewSignaler[ScaleCacheChangedSignal](standalone, opts.RedisOptions()), nil
 }
 
+func NewPersonalityModelSignaler(client goredis.UniversalClient, opts SignalingOptions) (*signalredis.Signaler[PersonalityModelCacheChangedSignal], error) {
+	standalone, err := AsStandaloneClient(client)
+	if err != nil {
+		return nil, err
+	}
+	return signalredis.NewSignaler[PersonalityModelCacheChangedSignal](standalone, opts.RedisOptions()), nil
+}
+
 // AsStandaloneClient signaling/redis 当前仅支持 standalone *Client。
 func AsStandaloneClient(client goredis.UniversalClient) (*goredis.Client, error) {
 	if client == nil {
@@ -66,8 +74,10 @@ func AsStandaloneClient(client goredis.UniversalClient) (*goredis.Client, error)
 }
 
 var (
-	_ signaling.Notifier[QuestionnaireCacheChangedSignal] = (*signalredis.Signaler[QuestionnaireCacheChangedSignal])(nil)
-	_ signaling.Watcher[QuestionnaireCacheChangedSignal]  = (*signalredis.Signaler[QuestionnaireCacheChangedSignal])(nil)
-	_ signaling.Notifier[ScaleCacheChangedSignal]         = (*signalredis.Signaler[ScaleCacheChangedSignal])(nil)
-	_ signaling.Watcher[ScaleCacheChangedSignal]          = (*signalredis.Signaler[ScaleCacheChangedSignal])(nil)
+	_ signaling.Notifier[QuestionnaireCacheChangedSignal]    = (*signalredis.Signaler[QuestionnaireCacheChangedSignal])(nil)
+	_ signaling.Watcher[QuestionnaireCacheChangedSignal]     = (*signalredis.Signaler[QuestionnaireCacheChangedSignal])(nil)
+	_ signaling.Notifier[ScaleCacheChangedSignal]            = (*signalredis.Signaler[ScaleCacheChangedSignal])(nil)
+	_ signaling.Watcher[ScaleCacheChangedSignal]             = (*signalredis.Signaler[ScaleCacheChangedSignal])(nil)
+	_ signaling.Notifier[PersonalityModelCacheChangedSignal] = (*signalredis.Signaler[PersonalityModelCacheChangedSignal])(nil)
+	_ signaling.Watcher[PersonalityModelCacheChangedSignal]  = (*signalredis.Signaler[PersonalityModelCacheChangedSignal])(nil)
 )

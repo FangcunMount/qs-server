@@ -7,7 +7,15 @@ import (
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
+	"golang.org/x/sync/singleflight"
 )
+
+type scaleClient interface {
+	GetScale(ctx context.Context, code string) (*grpcclient.ScaleOutput, error)
+	ListScales(ctx context.Context, page, pageSize int32, status, title, category string, stages, applicableAges, reporters, tags []string) (*grpcclient.ListScalesOutput, error)
+	ListHotScales(ctx context.Context, limit, windowDays int32) (*grpcclient.ListHotScalesOutput, error)
+	GetScaleCategories(ctx context.Context) (*grpcclient.ScaleCategoriesOutput, error)
+}
 
 // QueryService 量表查询服务
 // 作为 BFF 层的薄服务，主要职责：
@@ -15,20 +23,214 @@ import (
 // 2. 转换 gRPC 响应到 REST DTO
 // 3. 可选：缓存热点数据
 type QueryService struct {
-	scaleClient *grpcclient.ScaleClient
+	scaleClient       scaleClient
+	cache             CatalogCache
+	singleflightGroup singleflight.Group
+	useSingleflight   bool
 }
 
 // NewQueryService 创建量表查询服务
 func NewQueryService(
-	scaleClient *grpcclient.ScaleClient,
+	scaleClient scaleClient,
+	cache CatalogCache,
+	useSingleflight bool,
 ) *QueryService {
 	return &QueryService{
-		scaleClient: scaleClient,
+		scaleClient:     scaleClient,
+		cache:           cache,
+		useSingleflight: useSingleflight,
 	}
 }
 
 // Get 获取量表详情
 func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, error) {
+	if s.cache != nil {
+		if cached, ok := s.cache.GetDetail(code); ok {
+			return cached, nil
+		}
+	}
+
+	load := func() (*ScaleResponse, error) {
+		return s.fetchScaleFromGRPC(ctx, code)
+	}
+
+	if s.cache != nil && s.useSingleflight {
+		key := detailCacheKey(code)
+		value, err, _ := s.singleflightGroup.Do(key, func() (interface{}, error) {
+			if cached, ok := s.cache.GetDetail(code); ok {
+				return cached, nil
+			}
+			resp, loadErr := load()
+			if loadErr != nil || resp == nil {
+				return resp, loadErr
+			}
+			s.cache.SetDetail(code, resp)
+			return cloneScaleResponse(resp), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if value == nil {
+			return nil, nil
+		}
+		return value.(*ScaleResponse), nil
+	}
+
+	resp, err := load()
+	if err != nil || resp == nil || s.cache == nil {
+		return resp, err
+	}
+	s.cache.SetDetail(code, resp)
+	return cloneScaleResponse(resp), nil
+}
+
+// List 获取量表列表（返回摘要，不含因子详情）
+func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListScalesResponse, error) {
+	if req == nil {
+		req = &ListScalesRequest{}
+	}
+	s.normalizeListRequest(req)
+
+	if s.cache != nil {
+		if cached, ok := s.cache.GetListByRequest(req); ok {
+			return cached, nil
+		}
+	}
+
+	load := func() (*ListScalesResponse, error) {
+		return s.fetchListFromGRPC(ctx, req)
+	}
+
+	listKey := listCacheKey(req)
+	if s.cache != nil && s.useSingleflight {
+		value, err, _ := s.singleflightGroup.Do(listKey, func() (interface{}, error) {
+			if cached, hit := s.cache.GetListByRequest(req); hit {
+				return cached, nil
+			}
+			resp, loadErr := load()
+			if loadErr != nil || resp == nil {
+				return resp, loadErr
+			}
+			s.cache.SetListByRequest(req, resp)
+			return cloneListScalesResponse(resp), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if value == nil {
+			return nil, nil
+		}
+		return value.(*ListScalesResponse), nil
+	}
+
+	resp, err := load()
+	if err != nil || resp == nil || s.cache == nil {
+		return resp, err
+	}
+	s.cache.SetListByRequest(req, resp)
+	return cloneListScalesResponse(resp), nil
+}
+
+// ListHot 获取热门量表列表。
+func (s *QueryService) ListHot(ctx context.Context, req *ListHotScalesRequest) (*ListHotScalesResponse, error) {
+	if req == nil {
+		req = &ListHotScalesRequest{}
+	}
+
+	if s.cache != nil {
+		if cached, ok := s.cache.GetHotByRequest(req); ok {
+			return cached, nil
+		}
+	}
+
+	load := func() (*ListHotScalesResponse, error) {
+		return s.fetchHotFromGRPC(ctx, req)
+	}
+
+	hotKey := hotCacheKey(req)
+	if s.cache != nil && s.useSingleflight {
+		value, err, _ := s.singleflightGroup.Do(hotKey, func() (interface{}, error) {
+			if cached, hit := s.cache.GetHotByRequest(req); hit {
+				return cached, nil
+			}
+			resp, loadErr := load()
+			if loadErr != nil || resp == nil {
+				return resp, loadErr
+			}
+			s.cache.SetHotByRequest(req, resp)
+			return cloneListHotScalesResponse(resp), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if value == nil {
+			return nil, nil
+		}
+		return value.(*ListHotScalesResponse), nil
+	}
+
+	resp, err := load()
+	if err != nil || resp == nil || s.cache == nil {
+		return resp, err
+	}
+	s.cache.SetHotByRequest(req, resp)
+	return cloneListHotScalesResponse(resp), nil
+}
+
+// GetCategories 获取量表分类列表
+func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesResponse, error) {
+	if s.cache != nil {
+		if cached, ok := s.cache.GetCategories(); ok {
+			return cached, nil
+		}
+	}
+
+	load := func() (*ScaleCategoriesResponse, error) {
+		return s.fetchCategoriesFromGRPC(ctx)
+	}
+
+	if s.cache != nil && s.useSingleflight {
+		value, err, _ := s.singleflightGroup.Do(cacheKeyCategories, func() (interface{}, error) {
+			if cached, ok := s.cache.GetCategories(); ok {
+				return cached, nil
+			}
+			resp, loadErr := load()
+			if loadErr != nil || resp == nil {
+				return resp, loadErr
+			}
+			s.cache.SetCategories(resp)
+			return cloneScaleCategoriesResponse(resp), nil
+		})
+		if err != nil {
+			return nil, err
+		}
+		if value == nil {
+			return nil, nil
+		}
+		return value.(*ScaleCategoriesResponse), nil
+	}
+
+	resp, err := load()
+	if err != nil || resp == nil || s.cache == nil {
+		return resp, err
+	}
+	s.cache.SetCategories(resp)
+	return cloneScaleCategoriesResponse(resp), nil
+}
+
+func (s *QueryService) normalizeListRequest(req *ListScalesRequest) {
+	if req.Page <= 0 {
+		req.Page = 1
+	}
+	if req.PageSize <= 0 {
+		req.PageSize = 50
+	}
+	if req.PageSize > 100 {
+		req.PageSize = 100
+	}
+}
+
+func (s *QueryService) fetchScaleFromGRPC(ctx context.Context, code string) (*ScaleResponse, error) {
 	log.Infof("Getting scale: code=%s", code)
 
 	result, err := s.scaleClient.GetScale(ctx, code)
@@ -36,29 +238,14 @@ func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, er
 		logScaleGRPCError("Failed to get scale via gRPC", err)
 		return nil, err
 	}
-
 	if result == nil {
 		return nil, nil
 	}
-
 	return s.convertScale(result), nil
 }
 
-// List 获取量表列表（返回摘要，不含因子详情）
-func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListScalesResponse, error) {
+func (s *QueryService) fetchListFromGRPC(ctx context.Context, req *ListScalesRequest) (*ListScalesResponse, error) {
 	log.Infof("Listing scales: page=%d, pageSize=%d, category=%s, status=%s", req.Page, req.PageSize, req.Category, req.Status)
-
-	// 默认分页参数
-	if req.Page <= 0 {
-		req.Page = 1
-	}
-	if req.PageSize <= 0 {
-		req.PageSize = 50
-	}
-	// 最大分页限制
-	if req.PageSize > 100 {
-		req.PageSize = 100
-	}
 
 	result, err := s.scaleClient.ListScales(ctx, req.Page, req.PageSize, req.Status, req.Title, req.Category, req.Stages, req.ApplicableAges, req.Reporters, req.Tags)
 	if err != nil {
@@ -66,7 +253,6 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 		return nil, err
 	}
 
-	// 转换摘要列表（仅保留有效分类）
 	scales := make([]ScaleSummaryResponse, 0, len(result.Scales))
 	for _, scale := range result.Scales {
 		if !scaledefinition.NewCategory(scale.Category).IsOpen() {
@@ -96,11 +282,7 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 	}, nil
 }
 
-// ListHot 获取热门量表列表。
-func (s *QueryService) ListHot(ctx context.Context, req *ListHotScalesRequest) (*ListHotScalesResponse, error) {
-	if req == nil {
-		req = &ListHotScalesRequest{}
-	}
+func (s *QueryService) fetchHotFromGRPC(ctx context.Context, req *ListHotScalesRequest) (*ListHotScalesResponse, error) {
 	log.Infof("Listing hot scales: limit=%d, windowDays=%d", req.Limit, req.WindowDays)
 
 	result, err := s.scaleClient.ListHotScales(ctx, req.Limit, req.WindowDays)
@@ -143,8 +325,7 @@ func (s *QueryService) ListHot(ctx context.Context, req *ListHotScalesRequest) (
 	}, nil
 }
 
-// GetCategories 获取量表分类列表
-func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesResponse, error) {
+func (s *QueryService) fetchCategoriesFromGRPC(ctx context.Context) (*ScaleCategoriesResponse, error) {
 	log.Info("Getting scale categories")
 
 	result, err := s.scaleClient.GetScaleCategories(ctx)
@@ -153,7 +334,6 @@ func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesRespo
 		return nil, err
 	}
 
-	// 转换分类列表
 	categories := make([]CategoryResponse, len(result.Categories))
 	for i, cat := range result.Categories {
 		categories[i] = CategoryResponse{
@@ -214,7 +394,6 @@ func logScaleGRPCError(message string, err error) {
 
 // convertScale 转换量表
 func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleResponse {
-	// 转换因子列表
 	factors := make([]FactorResponse, len(scale.Factors))
 	for i, factor := range scale.Factors {
 		factors[i] = s.convertFactor(&factor)
@@ -239,7 +418,6 @@ func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleRespons
 
 // convertFactor 转换因子
 func (s *QueryService) convertFactor(f *grpcclient.FactorOutput) FactorResponse {
-	// 转换解读规则
 	rules := make([]InterpretRuleResponse, len(f.InterpretRules))
 	for i, rule := range f.InterpretRules {
 		rules[i] = InterpretRuleResponse{

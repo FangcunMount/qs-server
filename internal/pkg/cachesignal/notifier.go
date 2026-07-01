@@ -14,6 +14,7 @@ import (
 type Notifier struct {
 	questionnaire signaling.Notifier[QuestionnaireCacheChangedSignal]
 	scale         signaling.Notifier[ScaleCacheChangedSignal]
+	personality   signaling.Notifier[PersonalityModelCacheChangedSignal]
 	service       string
 }
 
@@ -39,8 +40,13 @@ func NewNotifier(opsHandle *cacheplane.Handle, cfg Config) (*Notifier, error) {
 	if err != nil {
 		return nil, err
 	}
+	pSignaler, err := NewPersonalityModelSignaler(standalone, cfg.Signaling)
+	if err != nil {
+		return nil, err
+	}
 	n.questionnaire = qSignaler
 	n.scale = sSignaler
+	n.personality = pSignaler
 	return n, nil
 }
 
@@ -59,6 +65,16 @@ func (n *Notifier) ScaleSignaler() *signalredis.Signaler[ScaleCacheChangedSignal
 		return nil
 	}
 	if s, ok := n.scale.(*signalredis.Signaler[ScaleCacheChangedSignal]); ok {
+		return s
+	}
+	return nil
+}
+
+func (n *Notifier) PersonalityModelSignaler() *signalredis.Signaler[PersonalityModelCacheChangedSignal] {
+	if n == nil {
+		return nil
+	}
+	if s, ok := n.personality.(*signalredis.Signaler[PersonalityModelCacheChangedSignal]); ok {
 		return s
 	}
 	return nil
@@ -98,6 +114,25 @@ func (n *Notifier) NotifyScaleCacheChanged(ctx context.Context, code, action str
 	if err := n.scale.Notify(ctx, signal); err != nil {
 		IncNotifyFailed(signal.SignalName(), n.service)
 		logger.L(ctx).Warnw("scale cache signal notify failed",
+			"code", code,
+			"error", err.Error(),
+		)
+	}
+}
+
+func (n *Notifier) NotifyPersonalityModelCacheChanged(ctx context.Context, code, action string) {
+	if n == nil || n.personality == nil || code == "" {
+		return
+	}
+	signal := PersonalityModelCacheChangedSignal{
+		Code:       code,
+		Action:     action,
+		OccurredAt: time.Now().UTC(),
+	}
+	IncNotify(signal.SignalName(), n.service)
+	if err := n.personality.Notify(ctx, signal); err != nil {
+		IncNotifyFailed(signal.SignalName(), n.service)
+		logger.L(ctx).Warnw("personality model cache signal notify failed",
 			"code", code,
 			"error", err.Error(),
 		)

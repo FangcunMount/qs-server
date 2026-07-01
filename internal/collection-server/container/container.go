@@ -62,6 +62,9 @@ type Container struct {
 	reportStatusReporter              *reportstatus.Reporter
 	waitHub                           reportwait.WaitHub
 	waitWatcherCancel                 context.CancelFunc
+	questionnaireCacheWatcherCancel   context.CancelFunc
+	scaleCacheWatcherCancel           context.CancelFunc
+	personalityCacheWatcherCancel     context.CancelFunc
 
 	// 接口层处理器
 	answerSheetHandler                  *handler.AnswerSheetHandler
@@ -137,9 +140,10 @@ func (c *Container) initApplicationServices() {
 		c.opts.SubmitQueue,
 		submitGuard,
 	)
+	catalogCaches := c.initCatalogCaches()
 	c.questionnaireQueryService = questionnaire.NewQueryService(
 		c.questionnaireClient,
-		newQuestionnaireDetailCache(c.opts),
+		catalogCaches.questionnaire,
 		questionnaireCacheSingleflightEnabled(c.opts),
 	)
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
@@ -186,8 +190,16 @@ func (c *Container) initApplicationServices() {
 		c.waitReportService.StartSignalWatcher(watchCtx)
 		c.waitWatcherCancel = cancel
 	}
-	c.scaleQueryService = scale.NewQueryService(c.scaleClient)
-	c.personalityModelQueryService = personalitymodel.NewQueryService(c.personalityModelClient)
+	c.scaleQueryService = scale.NewQueryService(
+		c.scaleClient,
+		catalogCaches.scale,
+		scaleCacheSingleflightEnabled(c.opts),
+	)
+	c.personalityModelQueryService = personalitymodel.NewQueryService(
+		c.personalityModelClient,
+		catalogCaches.personality,
+		personalityCacheSingleflightEnabled(c.opts),
+	)
 	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(c.evaluationClient, c.waitReportService)
 	c.personalitySessionService = personalitysession.NewService(c.personalityModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
@@ -225,6 +237,7 @@ func (c *Container) Cleanup() {
 		c.waitWatcherCancel()
 		c.waitWatcherCancel = nil
 	}
+	c.cleanupCatalogCaches()
 
 	c.initialized = false
 	log.Info("🏁 Container cleanup completed")
@@ -358,22 +371,4 @@ func (c *Container) InitializeRuntimeClients(bundle ClientBundle) {
 // ActorClient 获取 Actor 客户端
 func (c *Container) ActorClient() *grpcclient.ActorClient {
 	return c.actorClient
-}
-
-func newQuestionnaireDetailCache(opts *options.Options) questionnaire.PublishedDetailCache {
-	if opts == nil || opts.QuestionnaireCache == nil || !opts.QuestionnaireCache.Enabled {
-		return nil
-	}
-	cfg := opts.QuestionnaireCache
-	return questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
-		TTL:        time.Duration(cfg.TTLSeconds) * time.Second,
-		MaxEntries: cfg.MaxEntries,
-	})
-}
-
-func questionnaireCacheSingleflightEnabled(opts *options.Options) bool {
-	if opts == nil || opts.QuestionnaireCache == nil {
-		return false
-	}
-	return opts.QuestionnaireCache.Singleflight
 }

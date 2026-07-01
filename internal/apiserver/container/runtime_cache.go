@@ -127,6 +127,7 @@ func (c *Container) StartCacheSignalWatcher(ctx context.Context) {
 		c.WarmupCoordinator(),
 		notifier.QuestionnaireSignaler(),
 		notifier.ScaleSignaler(),
+		notifier.PersonalityModelSignaler(),
 	)
 }
 
@@ -167,6 +168,7 @@ func (a cacheGovernanceAdapter) bindings() cachebootstrap.GovernanceBindings {
 		WarmScale:                       warmScale,
 		WarmQuestionnaire:               warmQuestionnaire,
 		WarmScaleList:                   warmScaleList,
+		WarmPublishedPersonalityModel:   a.warmPublishedPersonalityModel,
 		WarmStatsOverview:               warmStatsOverview,
 		WarmStatsSystem:                 warmStatsSystem,
 		WarmStatsQuestionnaire:          warmStatsQuestionnaire,
@@ -270,6 +272,19 @@ func (a cacheGovernanceAdapter) warmScaleListTarget(ctx context.Context) error {
 		return nil
 	}
 	return infra.ScaleListCache.Rebuild(ctx)
+}
+
+func (a cacheGovernanceAdapter) warmPublishedPersonalityModel(ctx context.Context, code string) error {
+	c := a.container
+	if c == nil || c.AssessmentModelModule == nil || c.AssessmentModelModule.Personality == nil {
+		return nil
+	}
+	query := c.AssessmentModelModule.Personality.QueryService
+	if query == nil || strings.TrimSpace(code) == "" {
+		return nil
+	}
+	_, err := query.GetPublishedByCode(ctx, code)
+	return err
 }
 
 func (a cacheGovernanceAdapter) containerSurveyScaleInfra() *surveymod.ScaleInfra {

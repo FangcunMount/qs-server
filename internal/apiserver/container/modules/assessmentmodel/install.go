@@ -3,6 +3,7 @@ package assessmentmodel
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 )
 
@@ -31,6 +32,10 @@ func InstallFrom(host InstallHost) error {
 		ScaleInfra:             infra,
 		QuestionnairePublisher: host.SurveyPorts().QuestionnairePublisher,
 		QuestionnaireQuery:     host.SurveyPorts().QuestionnaireQuery,
+		StaticRedisClient:      host.CacheClient(cacheplane.FamilyStatic),
+		StaticCacheBuilder:     host.CacheBuilder(cacheplane.FamilyStatic),
+		PublishedModelPolicy:   host.CachePolicy(cachepolicy.PolicyPublishedModel),
+		CacheObserver:          host.CacheObserver(),
 	})
 	if err != nil {
 		return err

@@ -28,6 +28,8 @@ type Options struct {
 	Signaling               *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
 	SubmitQueue             *SubmitQueueOptions                     `json:"submit_queue" mapstructure:"submit_queue"`
 	QuestionnaireCache      *QuestionnaireCacheOptions              `json:"questionnaire_cache" mapstructure:"questionnaire_cache"`
+	ScaleCache              *ScaleCacheOptions                      `json:"scale_cache" mapstructure:"scale_cache"`
+	PersonalityCache        *PersonalityCacheOptions                `json:"personality_cache" mapstructure:"personality_cache"`
 	JWT                     *JWTOptions                             `json:"jwt" mapstructure:"jwt"`
 	IAMOptions              *genericoptions.IAMOptions              `json:"iam" mapstructure:"iam"`
 	Runtime                 *RuntimeOptions                         `json:"runtime" mapstructure:"runtime"`
@@ -54,10 +56,29 @@ type ConcurrencyOptions struct {
 
 // QuestionnaireCacheOptions 已发布问卷详情 BFF 进程内 L1 缓存。
 type QuestionnaireCacheOptions struct {
-	Enabled      bool `json:"enabled" mapstructure:"enabled"`
-	TTLSeconds   int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
-	MaxEntries   int  `json:"max_entries" mapstructure:"max_entries"`
-	Singleflight bool `json:"singleflight" mapstructure:"singleflight"`
+	Enabled            bool `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds         int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	MaxEntries         int  `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight       bool `json:"singleflight" mapstructure:"singleflight"`
+	SignalEvictEnabled bool `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
+}
+
+// ScaleCacheOptions 量表目录 BFF 进程内 L1 缓存。
+type ScaleCacheOptions struct {
+	Enabled            bool `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds         int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	MaxEntries         int  `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight       bool `json:"singleflight" mapstructure:"singleflight"`
+	SignalEvictEnabled bool `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
+}
+
+// PersonalityCacheOptions 人格模型目录 BFF 进程内 L1 缓存。
+type PersonalityCacheOptions struct {
+	Enabled            bool `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds         int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	MaxEntries         int  `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight       bool `json:"singleflight" mapstructure:"singleflight"`
+	SignalEvictEnabled bool `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
 }
 
 // SubmitQueueOptions 提交排队配置
@@ -162,6 +183,8 @@ func NewOptions() *Options {
 		Signaling:          genericoptions.NewSignalingOptions(),
 		SubmitQueue:        NewSubmitQueueOptions(),
 		QuestionnaireCache: NewQuestionnaireCacheOptions(),
+		ScaleCache:         NewScaleCacheOptions(),
+		PersonalityCache:   NewPersonalityCacheOptions(),
 		JWT: &JWTOptions{
 			SecretKey:     "your-secret-key-change-in-production",
 			TokenDuration: 24 * 7, // 7 天
@@ -211,10 +234,31 @@ func NewSubmitQueueOptions() *SubmitQueueOptions {
 // NewQuestionnaireCacheOptions 创建默认问卷详情 L1 缓存配置。
 func NewQuestionnaireCacheOptions() *QuestionnaireCacheOptions {
 	return &QuestionnaireCacheOptions{
-		Enabled:      false,
-		TTLSeconds:   180,
-		MaxEntries:   256,
-		Singleflight: true,
+		Enabled:            false,
+		TTLSeconds:         180,
+		MaxEntries:         256,
+		Singleflight:       true,
+		SignalEvictEnabled: true,
+	}
+}
+
+func NewScaleCacheOptions() *ScaleCacheOptions {
+	return &ScaleCacheOptions{
+		Enabled:            false,
+		TTLSeconds:         180,
+		MaxEntries:         256,
+		Singleflight:       true,
+		SignalEvictEnabled: true,
+	}
+}
+
+func NewPersonalityCacheOptions() *PersonalityCacheOptions {
+	return &PersonalityCacheOptions{
+		Enabled:            false,
+		TTLSeconds:         180,
+		MaxEntries:         256,
+		Singleflight:       true,
+		SignalEvictEnabled: true,
 	}
 }
 
@@ -265,6 +309,8 @@ func (o *Options) Flags() (fss cliflag.NamedFlagSets) {
 	o.WaitReport.AddFlags(fss.FlagSet("wait_report"))
 	o.SubmitQueue.AddFlags(fss.FlagSet("submit_queue"))
 	o.QuestionnaireCache.AddFlags(fss.FlagSet("questionnaire_cache"))
+	o.ScaleCache.AddFlags(fss.FlagSet("scale_cache"))
+	o.PersonalityCache.AddFlags(fss.FlagSet("personality_cache"))
 	o.Runtime.AddFlags(fss.FlagSet("runtime"))
 	o.JWT.AddFlags(fss.FlagSet("jwt"))
 
@@ -305,6 +351,29 @@ func (q *QuestionnaireCacheOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&q.TTLSeconds, "questionnaire_cache.ttl-seconds", q.TTLSeconds, "TTL for questionnaire detail L1 cache in seconds.")
 	fs.IntVar(&q.MaxEntries, "questionnaire_cache.max-entries", q.MaxEntries, "Maximum questionnaire detail entries in L1 cache.")
 	fs.BoolVar(&q.Singleflight, "questionnaire_cache.singleflight", q.Singleflight, "Coalesce concurrent questionnaire detail cache misses.")
+	fs.BoolVar(&q.SignalEvictEnabled, "questionnaire_cache.signal-evict-enabled", q.SignalEvictEnabled, "Subscribe questionnaire_cache_changed Redis signal to evict L1 entries.")
+}
+
+func (s *ScaleCacheOptions) AddFlags(fs *pflag.FlagSet) {
+	if s == nil {
+		return
+	}
+	fs.BoolVar(&s.Enabled, "scale_cache.enabled", s.Enabled, "Enable in-process L1 cache for scale catalog reads.")
+	fs.IntVar(&s.TTLSeconds, "scale_cache.ttl-seconds", s.TTLSeconds, "TTL for scale catalog L1 cache in seconds.")
+	fs.IntVar(&s.MaxEntries, "scale_cache.max-entries", s.MaxEntries, "Maximum scale catalog entries in L1 cache.")
+	fs.BoolVar(&s.Singleflight, "scale_cache.singleflight", s.Singleflight, "Coalesce concurrent scale catalog cache misses.")
+	fs.BoolVar(&s.SignalEvictEnabled, "scale_cache.signal-evict-enabled", s.SignalEvictEnabled, "Subscribe scale_cache_changed Redis signal to evict L1 entries.")
+}
+
+func (p *PersonalityCacheOptions) AddFlags(fs *pflag.FlagSet) {
+	if p == nil {
+		return
+	}
+	fs.BoolVar(&p.Enabled, "personality_cache.enabled", p.Enabled, "Enable in-process L1 cache for personality model catalog reads.")
+	fs.IntVar(&p.TTLSeconds, "personality_cache.ttl-seconds", p.TTLSeconds, "TTL for personality model catalog L1 cache in seconds.")
+	fs.IntVar(&p.MaxEntries, "personality_cache.max-entries", p.MaxEntries, "Maximum personality model catalog entries in L1 cache.")
+	fs.BoolVar(&p.Singleflight, "personality_cache.singleflight", p.Singleflight, "Coalesce concurrent personality model catalog cache misses.")
+	fs.BoolVar(&p.SignalEvictEnabled, "personality_cache.signal-evict-enabled", p.SignalEvictEnabled, "Subscribe personality_model_cache_changed Redis signal to evict L1 entries.")
 }
 
 // AddFlags 添加限流相关的命令行参数
@@ -372,6 +441,8 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validateCollectionConcurrency(o.Concurrency)...)
 	errs = append(errs, validateCollectionSubmitQueue(o.SubmitQueue)...)
 	errs = append(errs, validateQuestionnaireCacheOptions(o.QuestionnaireCache)...)
+	errs = append(errs, validateScaleCacheOptions(o.ScaleCache)...)
+	errs = append(errs, validatePersonalityCacheOptions(o.PersonalityCache)...)
 	errs = append(errs, validateCollectionRateLimit(o.RateLimit)...)
 	errs = append(errs, validateWaitReportOptions(o.WaitReport)...)
 	errs = append(errs, validateCollectionJWT(o.JWT)...)
@@ -540,6 +611,42 @@ func validateQuestionnaireCacheOptions(opts *QuestionnaireCacheOptions) []error 
 	}
 	if opts.MaxEntries <= 0 {
 		errs = append(errs, fmt.Errorf("questionnaire_cache.max_entries must be greater than 0 when enabled"))
+	}
+	return errs
+}
+
+func validateScaleCacheOptions(opts *ScaleCacheOptions) []error {
+	if opts == nil {
+		return nil
+	}
+	if !opts.Enabled {
+		return nil
+	}
+
+	var errs []error
+	if opts.TTLSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("scale_cache.ttl_seconds must be greater than 0 when enabled"))
+	}
+	if opts.MaxEntries <= 0 {
+		errs = append(errs, fmt.Errorf("scale_cache.max_entries must be greater than 0 when enabled"))
+	}
+	return errs
+}
+
+func validatePersonalityCacheOptions(opts *PersonalityCacheOptions) []error {
+	if opts == nil {
+		return nil
+	}
+	if !opts.Enabled {
+		return nil
+	}
+
+	var errs []error
+	if opts.TTLSeconds <= 0 {
+		errs = append(errs, fmt.Errorf("personality_cache.ttl_seconds must be greater than 0 when enabled"))
+	}
+	if opts.MaxEntries <= 0 {
+		errs = append(errs, fmt.Errorf("personality_cache.max_entries must be greater than 0 when enabled"))
 	}
 	return errs
 }

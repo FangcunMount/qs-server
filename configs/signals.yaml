@@ -40,3 +40,12 @@ signals:
       - apiserver
       - worker
       - collection-server
+
+  personality_model_cache_changed:
+    delivery: ephemeral_signal
+    transport: redis_pubsub
+    description: "人格模型缓存失效/预热唤醒"
+    publisher: apiserver
+    subscribers:
+      - apiserver
+      - collection-server

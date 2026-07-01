@@ -28,6 +28,7 @@ type GovernanceBindings struct {
 	WarmScale                       func(context.Context, string) error
 	WarmQuestionnaire               func(context.Context, string) error
 	WarmScaleList                   func(context.Context) error
+	WarmPublishedPersonalityModel   func(context.Context, string) error
 	WarmStatsOverview               func(context.Context, int64, string) error
 	WarmStatsSystem                 func(context.Context, int64) error
 	WarmStatsQuestionnaire          func(context.Context, int64, string) error
@@ -138,6 +139,7 @@ func (s *Subsystem) BindGovernance(bindings GovernanceBindings) {
 		WarmScale:                       bindings.WarmScale,
 		WarmQuestionnaire:               bindings.WarmQuestionnaire,
 		WarmScaleList:                   bindings.WarmScaleList,
+		WarmPublishedPersonalityModel:   bindings.WarmPublishedPersonalityModel,
 		WarmStatsOverview:               bindings.WarmStatsOverview,
 		WarmStatsSystem:                 bindings.WarmStatsSystem,
 		WarmStatsQuestionnaire:          bindings.WarmStatsQuestionnaire,

@@ -14,6 +14,7 @@ func StartCacheSignalWatcher(
 	coordinator Coordinator,
 	questionnaireSignaler *signalredis.Signaler[cachesignal.QuestionnaireCacheChangedSignal],
 	scaleSignaler *signalredis.Signaler[cachesignal.ScaleCacheChangedSignal],
+	personalitySignaler *signalredis.Signaler[cachesignal.PersonalityModelCacheChangedSignal],
 ) {
 	if coordinator == nil {
 		return
@@ -52,6 +53,24 @@ func StartCacheSignalWatcher(
 			})
 			if err != nil && ctx.Err() == nil {
 				logger.L(ctx).Errorw("scale cache signal watcher stopped", "error", err.Error())
+			}
+		}()
+	}
+	if personalitySignaler != nil {
+		go func() {
+			err := personalitySignaler.Watch(ctx, func(msgCtx context.Context, signal cachesignal.PersonalityModelCacheChangedSignal) {
+				if signal.Code == "" {
+					return
+				}
+				if err := coordinator.HandlePersonalityModelPublished(msgCtx, signal.Code); err != nil {
+					logger.L(msgCtx).Warnw("personality model cache signal warmup failed",
+						"code", signal.Code,
+						"error", err.Error(),
+					)
+				}
+			})
+			if err != nil && ctx.Err() == nil {
+				logger.L(ctx).Errorw("personality model cache signal watcher stopped", "error", err.Error())
 			}
 		}()
 	}

@@ -82,6 +82,10 @@ func (f *fakeStatisticsWarmupCoordinator) HandleScalePublished(context.Context, 
 	return nil
 }
 
+func (f *fakeStatisticsWarmupCoordinator) HandlePersonalityModelPublished(context.Context, string) error {
+	return nil
+}
+
 func (f *fakeStatisticsWarmupCoordinator) HandleQuestionnairePublished(context.Context, string, string) error {
 	return nil
 }

@@ -3,8 +3,9 @@ package cachesignal
 import "time"
 
 const (
-	SignalNameQuestionnaireCacheChanged = "questionnaire_cache_changed"
-	SignalNameScaleCacheChanged         = "scale_cache_changed"
+	SignalNameQuestionnaireCacheChanged    = "questionnaire_cache_changed"
+	SignalNameScaleCacheChanged            = "scale_cache_changed"
+	SignalNamePersonalityModelCacheChanged = "personality_model_cache_changed"
 )
 
 // QuestionnaireCacheChangedSignal 问卷缓存失效唤醒信号（best-effort，非业务事实）。
@@ -35,5 +36,20 @@ func (s ScaleCacheChangedSignal) SignalName() string {
 }
 
 func (s ScaleCacheChangedSignal) SignalKey() string {
+	return s.Code
+}
+
+// PersonalityModelCacheChangedSignal 人格模型缓存失效唤醒信号（best-effort，非业务事实）。
+type PersonalityModelCacheChangedSignal struct {
+	Code       string    `json:"code"`
+	Action     string    `json:"action,omitempty"`
+	OccurredAt time.Time `json:"occurred_at"`
+}
+
+func (s PersonalityModelCacheChangedSignal) SignalName() string {
+	return SignalNamePersonalityModelCacheChanged
+}
+
+func (s PersonalityModelCacheChangedSignal) SignalKey() string {
 	return s.Code
 }

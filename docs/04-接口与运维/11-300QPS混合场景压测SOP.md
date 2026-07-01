@@ -78,9 +78,9 @@ A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **D
 | `mixed_180` | 180 | 80/24/58/18 | 5m | 同上 |
 | `mixed_200` | 200 | 92/24/64/20 | 5m | 保守基线 |
 | `mixed_220` | 220 | 102/24/72/22 | 5m | **当前单机混合验收基线**（L1 缓存后全绿） |
-| `mixed_240` | 240 | 100/24/88/28 | 8m | 下一升档目标 |
+| `mixed_240` | 240 | 100/24/88/28 | 8m | 三域 L1 后升档验收（**须** `mixed_300_models` 拆分 query） |
 | `mixed_280` | 280 | 132/24/96/28 | 8m | 加压读/report |
-| `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + 1 probe | 10m | **验收档** |
+| `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + 1 probe | 10m | **验收档**（query 须拆分医学/人格/问卷） |
 | `mixed_300_probe` | 同上 | 同上 | 10m | 与 mixed_300 等效 |
 | `mixed_300_models` | ~291 | 医学+人格拆分，submit 合计 **20/s** | 10m | 产品真实流量混合 |
 | `outbox_120` | ~235 | submit/report 各 **96** + 低 query | 10m | **专测 outbox 排水** |
@@ -128,7 +128,7 @@ scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
 | `mixed_240`（112/s，VU 730） | **边际通过**：checks 99.88%，http 0.11%；122×query timeout | **≤3min 消化** | 旧配比 112/24/80/24 |
 | `mixed_240`（112/s，VU 1200） | **未通过**：http 4.64%；4411×query timeout | **≤3min 消化** | 堆 VU 加剧下游过载，非解法 |
 | `mixed_220`（VU 690，无 L1） | **未通过**：http 0.56%～5.61% | **≤3min 消化** | 102/s 读压超 gRPC 路径容量 |
-| `mixed_240`（新 100/s） | **待测** | — | L1 上线后升档；profile 100/24/88/28 |
+| `mixed_240`（新 100/s） | **待测** | — | 三域 L1 后升档；须 `mixed_300_models` 拆分 query |
 | `mixed_280`～`mixed_300` | **待测** | — | 须 `mixed_240` 通过后再升 |
 
 **2026-07-01 collection 问卷 L1 缓存上线后复测**（`questionnaire_cache.enabled=true`，TTL 180s，见 `collection-server.prod.yaml`）：
@@ -529,7 +529,7 @@ HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC
 | mixed_220（无 L1，VU770） | 220 | 5.61% | 0 | 0 | 0 | query p95≈30s | **未通过** |
 | mixed_220（无 L1，VU690） | 220 | 0.56% | 0 | 0 | 0 | query p95≈8.8s | **未通过** |
 | mixed_220 | 220 | 0% | 0 | 0 | 0 | query p95≈172ms | **通过**（2026-07-01，L1 后） |
-| mixed_240（新） | 240 | | | | | | **待测**（L1 后升档） |
+| mixed_240（新） | 240 | | | | | | **待测**（三域 L1 + 拆分 query 场景） |
 | mixed_280 | 280 | | | | | | 待测 |
 | mixed_300 | ~300 | | | | | | 待测 |
 

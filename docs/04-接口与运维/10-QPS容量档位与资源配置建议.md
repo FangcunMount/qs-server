@@ -39,6 +39,8 @@
 | collection grpc_client | max_inflight 360 | 到 apiserver 并发 |
 | collection submit_queue | queue_size 2000，worker_count 40 | 提交削峰 |
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
+| collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
+| collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 | collection concurrency | max-concurrency 512 | 本进程总并发保护 |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |

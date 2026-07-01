@@ -1,17 +1,22 @@
 package assessmentmodel
 
 import (
+	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
 	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
+	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/FangcunMount/qs-server/pkg/event"
 	redis "github.com/redis/go-redis/v9"
@@ -31,6 +36,10 @@ type WireInput struct {
 	ScaleInfra             *surveymod.ScaleInfra
 	QuestionnairePublisher quesApp.QuestionnaireLifecycleService
 	QuestionnaireQuery     quesApp.QuestionnaireQueryService
+	StaticRedisClient      redis.UniversalClient
+	StaticCacheBuilder     *keyspace.Builder
+	PublishedModelPolicy   cachepolicy.CachePolicy
+	CacheObserver          *observability.ComponentObserver
 }
 
 // Wire builds and bootstraps the assessment-model module from composition inputs.
@@ -44,7 +53,7 @@ func Wire(in WireInput) (*Module, error) {
 	}
 	return Bootstrap(BootstrapInput{
 		Scale:       buildScaleDeps(in),
-		Personality: buildPersonalityDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery),
+		Personality: buildPersonalityDeps(in.MongoDB, in.MongoLimiter, in.QuestionnaireQuery, personalityCacheConfig(in)),
 		Survey:      surveyPorts,
 	})
 }
@@ -73,7 +82,33 @@ func buildScaleDeps(in WireInput) ScaleDeps {
 	return deps
 }
 
-func buildPersonalityDeps(mongoDB *mongo.Database, mongoLimiter backpressure.Acquirer, questionnaireQuery quesApp.QuestionnaireQueryService) PersonalityDeps {
+type personalityCacheWireConfig struct {
+	rulesetInfra.PublishedModelCacheConfig
+	Notifier appPersonalityModel.CacheSignalNotifier
+}
+
+func personalityCacheConfig(in WireInput) personalityCacheWireConfig {
+	var notifier appPersonalityModel.CacheSignalNotifier
+	if n, ok := in.CacheSignalNotifier.(appPersonalityModel.CacheSignalNotifier); ok {
+		notifier = n
+	}
+	return personalityCacheWireConfig{
+		PublishedModelCacheConfig: rulesetInfra.PublishedModelCacheConfig{
+			Redis:    in.StaticRedisClient,
+			Builder:  in.StaticCacheBuilder,
+			Policy:   in.PublishedModelPolicy,
+			Observer: in.CacheObserver,
+		},
+		Notifier: notifier,
+	}
+}
+
+func buildPersonalityDeps(
+	mongoDB *mongo.Database,
+	mongoLimiter backpressure.Acquirer,
+	questionnaireQuery quesApp.QuestionnaireQueryService,
+	cacheCfg personalityCacheWireConfig,
+) PersonalityDeps {
 	if mongoDB == nil {
 		return PersonalityDeps{}
 	}
@@ -82,12 +117,20 @@ func buildPersonalityDeps(mongoDB *mongo.Database, mongoLimiter backpressure.Acq
 	draftRepo := mongoassessmentmodel.NewDraftRepository(mongoDB, mongoOpts)
 	publishedRepo := mongoassessmentmodel.NewPublishedModelRepoAdapter(v2Repo)
 	legacyRepo := mongoruleset.NewRepository(mongoDB, mongoOpts)
-	dualStore := aminfra.NewDualStore(v2Repo, legacyRepo)
+	dualStore := assessmentmodel.NewDualStore(v2Repo, legacyRepo)
+	publishedLister := port.PublishedModelLister(dualStore)
+	algorithmLister := port.PublishedAlgorithmLister(dualStore)
+	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {
+		cached := cache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
+		publishedLister = cached
+		algorithmLister = cached
+	}
 	return PersonalityDeps{
-		PublishedLister:          dualStore,
-		PublishedAlgorithmLister: dualStore,
+		PublishedLister:          publishedLister,
+		PublishedAlgorithmLister: algorithmLister,
 		ModelRepo:                draftRepo,
 		PublishedRepo:            publishedRepo,
 		QuestionnaireQuery:       questionnaireQuery,
+		CacheSignalNotifier:      cacheCfg.Notifier,
 	}
 }
