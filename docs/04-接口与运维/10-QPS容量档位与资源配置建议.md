@@ -45,7 +45,7 @@
 | collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
 目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
-| collection concurrency | max-concurrency **480**（general） | 4C/8G 榨干档；query/submit/report-status |
+| collection concurrency | query **400** + submit **96**（catalog/report-status Try 503） | 4C/8G 榨干档；读写池隔离 |
 | collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
 | collection report_events | enabled **false**（灰度）；max_connections 2000 | WebSocket 报告推送（方案 E） |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
@@ -122,7 +122,8 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 
 | 位置 | 关键值 | 说明 |
 | ---- | ------ | ---- |
-| collection `concurrency.max-concurrency` | **480** | HTTP 入口槽位（原 400） |
+| collection `concurrency.max-query-concurrency` | **400** | 读路径槽位（catalog/report-status 满槽 Try 503） |
+| collection `concurrency.max-submit-concurrency` | **96** | 写路径槽位（与读池隔离） |
 | collection `grpc_client.max_inflight` | **420** | 对齐 apiserver gRPC 承载 |
 | collection `grpc_client.inflight_wait_ms` | **4000** | 减少 2s 快速失败 |
 | collection `submit_queue.worker_count` | **56** | 对齐 24/s submit |

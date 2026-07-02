@@ -133,7 +133,7 @@ func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/assessments")
 	{
-		assessments.GET("", rateLimitedHandlers(
+		assessments.GET("", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -143,7 +143,7 @@ func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			evaluationHandler.ListMyAssessmentsV2,
 		)...)
-		assessments.GET("/:id", rateLimitedHandlers(
+		assessments.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -153,7 +153,7 @@ func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetMyAssessmentV2,
 		)...)
-		assessments.GET("/:id/report", rateLimitedHandlers(
+		assessments.GET("/:id/report", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -374,8 +374,8 @@ func (r *Router) registerQuestionnaireRoutes(api *gin.RouterGroup) {
 
 	questionnaires := api.Group("/questionnaires")
 	{
-		questionnaires.GET("", questionnaireHandler.List)
-		questionnaires.GET("/:code", questionnaireHandler.Get)
+		questionnaires.GET("", r.catalogHandlers(questionnaireHandler.List)...)
+		questionnaires.GET("/:code", r.catalogHandlers(questionnaireHandler.Get)...)
 	}
 }
 
@@ -387,7 +387,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 
 	answersheets := api.Group("/answersheets")
 	{
-		answersheets.POST("", rateLimitedHandlers(
+		answersheets.POST("", r.rateLimitedSubmitHandlers(
 			r.container.RateLimitBackend(),
 			"submit",
 			rateCfg,
@@ -397,7 +397,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.SubmitUserBurst,
 			answerSheetHandler.Submit,
 		)...)
-		answersheets.GET("/submit-status", rateLimitedHandlers(
+		answersheets.GET("/submit-status", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -407,7 +407,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			answerSheetHandler.SubmitStatus,
 		)...)
-		answersheets.GET("/:id", rateLimitedHandlers(
+		answersheets.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -418,7 +418,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			answerSheetHandler.Get,
 		)...)
 		// 通过答卷ID获取测评详情
-		answersheets.GET("/:id/assessment", rateLimitedHandlers(
+		answersheets.GET("/:id/assessment", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -439,7 +439,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 	assessments := api.Group("/assessments")
 	{
 		// 测评列表
-		assessments.GET("", rateLimitedHandlers(
+		assessments.GET("", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -450,7 +450,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.ListMyAssessments,
 		)...)
 		// 因子趋势（放在 :id 前面避免路由冲突）
-		assessments.GET("/trend", rateLimitedHandlers(
+		assessments.GET("/trend", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -461,7 +461,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetFactorTrend,
 		)...)
 		// 高风险因子
-		assessments.GET("/:id/factors/high-risk", rateLimitedHandlers(
+		assessments.GET("/:id/factors/high-risk", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -472,7 +472,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetHighRiskFactors,
 		)...)
 		// 测评详情
-		assessments.GET("/:id", rateLimitedHandlers(
+		assessments.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -483,7 +483,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetMyAssessment,
 		)...)
 		// 测评得分
-		assessments.GET("/:id/scores", rateLimitedHandlers(
+		assessments.GET("/:id/scores", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -494,7 +494,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetAssessmentScores,
 		)...)
 		// 测评报告
-		assessments.GET("/:id/report", rateLimitedHandlers(
+		assessments.GET("/:id/report", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -505,7 +505,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetAssessmentReport,
 		)...)
 		// 测评趋势摘要
-		assessments.GET("/:id/trend-summary", rateLimitedHandlers(
+		assessments.GET("/:id/trend-summary", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -516,7 +516,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			evaluationHandler.GetAssessmentTrendSummary,
 		)...)
 		// 长轮询等待报告生成
-		assessments.GET("/:id/report-status", rateLimitedHandlers(
+		assessments.GET("/:id/report-status", r.rateLimitedReportStatusHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -550,13 +550,13 @@ func (r *Router) registerScaleRoutes(api *gin.RouterGroup) {
 	scales := api.Group("/scales")
 	{
 		// 获取量表分类列表（放在 :code 前面避免路由冲突）
-		scales.GET("/categories", scaleHandler.GetCategories)
+		scales.GET("/categories", r.catalogHandlers(scaleHandler.GetCategories)...)
 		// 获取热门量表列表（放在 :code 前面避免路由冲突）
-		scales.GET("/hot", scaleHandler.ListHot)
+		scales.GET("/hot", r.catalogHandlers(scaleHandler.ListHot)...)
 		// 获取量表列表
-		scales.GET("", scaleHandler.List)
+		scales.GET("", r.catalogHandlers(scaleHandler.List)...)
 		// 获取量表详情
-		scales.GET("/:code", scaleHandler.Get)
+		scales.GET("/:code", r.catalogHandlers(scaleHandler.Get)...)
 	}
 }
 
@@ -567,7 +567,7 @@ func (r *Router) registerPersonalityModelRoutes(api *gin.RouterGroup) {
 
 	models := api.Group("/personality-models")
 	{
-		models.GET("/categories", rateLimitedHandlers(
+		models.GET("/categories", r.rateLimitedCatalogHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -577,7 +577,7 @@ func (r *Router) registerPersonalityModelRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.GetCategories,
 		)...)
-		models.GET("", rateLimitedHandlers(
+		models.GET("", r.rateLimitedCatalogHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -587,7 +587,7 @@ func (r *Router) registerPersonalityModelRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.List,
 		)...)
-		models.GET("/:code", rateLimitedHandlers(
+		models.GET("/:code", r.rateLimitedCatalogHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -607,7 +607,7 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 
 	assessments := api.Group("/personality-assessments")
 	{
-		assessments.GET("", rateLimitedHandlers(
+		assessments.GET("", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -617,7 +617,7 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.List,
 		)...)
-		assessments.GET("/:id/report-status", rateLimitedHandlers(
+		assessments.GET("/:id/report-status", r.rateLimitedReportStatusHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -641,7 +641,7 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 				handler.WaitReport,
 			)...,
 		)...)
-		assessments.GET("/:id/report", rateLimitedHandlers(
+		assessments.GET("/:id/report", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -651,7 +651,7 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.GetReport,
 		)...)
-		assessments.GET("/:id", rateLimitedHandlers(
+		assessments.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
 			"query",
 			rateCfg,
@@ -668,7 +668,7 @@ func (r *Router) registerPersonalityAssessmentSessionRoutes(api *gin.RouterGroup
 	handler := r.container.PersonalityAssessmentSessionHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
-	api.POST("/personality-assessment-sessions", rateLimitedHandlers(
+	api.POST("/personality-assessment-sessions", r.rateLimitedSubmitHandlers(
 		r.container.RateLimitBackend(),
 		"query",
 		rateCfg,
@@ -687,17 +687,17 @@ func (r *Router) registerTesteeRoutes(api *gin.RouterGroup) {
 	testees := api.Group("/testees")
 	{
 		// 检查受试者是否存在（放在 :id 前面避免路由冲突）
-		testees.GET("/exists", testeeHandler.Exists)
+		testees.GET("/exists", r.queryHandlers(testeeHandler.Exists)...)
 		// 创建受试者
-		testees.POST("", testeeHandler.Create)
+		testees.POST("", r.submitHandlers(testeeHandler.Create)...)
 		// 查询受试者列表
-		testees.GET("", testeeHandler.List)
+		testees.GET("", r.queryHandlers(testeeHandler.List)...)
 		// 获取受试者详情
-		testees.GET("/:id", testeeHandler.Get)
+		testees.GET("/:id", r.queryHandlers(testeeHandler.Get)...)
 		// 获取受试者照护上下文
-		testees.GET("/:id/care-context", testeeHandler.GetCareContext)
+		testees.GET("/:id/care-context", r.queryHandlers(testeeHandler.GetCareContext)...)
 		// 更新受试者信息
-		testees.PUT("/:id", testeeHandler.Update)
+		testees.PUT("/:id", r.submitHandlers(testeeHandler.Update)...)
 	}
 }
 

@@ -82,7 +82,8 @@ type Container struct {
 	testeeHandler                       *handler.TesteeHandler
 	healthHandler                       *handler.HealthHandler
 
-	generalConcurrencyGate    *concurrency.Gate
+	queryConcurrencyGate      *concurrency.Gate
+	submitConcurrencyGate     *concurrency.Gate
 	waitReportConcurrencyGate *concurrency.Gate
 }
 
@@ -111,24 +112,31 @@ func NewContainer(opts *options.Options, opsHandle *cacheplane.Handle, lockManag
 }
 
 func (c *Container) initConcurrencyGates() {
-	maxGeneral := 0
-	if c.opts != nil && c.opts.Concurrency != nil {
-		maxGeneral = c.opts.Concurrency.MaxConcurrency
+	var concurrencyOpts *options.ConcurrencyOptions
+	if c.opts != nil {
+		concurrencyOpts = c.opts.Concurrency
 	}
-	maxWait := 0
+	maxQuery := 0
+	maxSubmit := 0
+	if concurrencyOpts != nil {
+		maxQuery = concurrencyOpts.ResolvedQueryConcurrency()
+		maxSubmit = concurrencyOpts.ResolvedSubmitConcurrency()
+	}
+	maxWaitReport := 0
 	degradeEnabled := true
 	if c.opts != nil && c.opts.WaitReport != nil {
-		maxWait = c.opts.WaitReport.MaxHTTPConcurrency
+		maxWaitReport = c.opts.WaitReport.MaxHTTPConcurrency
 		degradeEnabled = c.opts.WaitReport.DegradeImmediateEnabled
 	}
-	if maxWait <= 0 {
-		maxWait = 400
+	if maxWaitReport <= 0 {
+		maxWaitReport = 400
 	}
-	c.generalConcurrencyGate = concurrency.NewGate(maxGeneral)
+	c.queryConcurrencyGate = concurrency.NewGate(maxQuery)
+	c.submitConcurrencyGate = concurrency.NewGate(maxSubmit)
 	if degradeEnabled {
-		c.waitReportConcurrencyGate = concurrency.NewGate(maxWait)
+		c.waitReportConcurrencyGate = concurrency.NewGate(maxWaitReport)
 	} else {
-		c.waitReportConcurrencyGate = c.generalConcurrencyGate
+		c.waitReportConcurrencyGate = c.queryConcurrencyGate
 	}
 }
 
@@ -355,11 +363,25 @@ func (c *Container) RateLimitBackend() ratelimit.Backend {
 	return ratelimitredis.NewBackend(c.opsHandle.Client, c.opsHandle.Builder)
 }
 
-func (c *Container) GeneralConcurrencyGate() *concurrency.Gate {
+func (c *Container) ConcurrencyOptions() *options.ConcurrencyOptions {
+	if c == nil || c.opts == nil || c.opts.Concurrency == nil {
+		return options.NewOptions().Concurrency
+	}
+	return c.opts.Concurrency
+}
+
+func (c *Container) QueryConcurrencyGate() *concurrency.Gate {
 	if c == nil {
 		return nil
 	}
-	return c.generalConcurrencyGate
+	return c.queryConcurrencyGate
+}
+
+func (c *Container) SubmitConcurrencyGate() *concurrency.Gate {
+	if c == nil {
+		return nil
+	}
+	return c.submitConcurrencyGate
 }
 
 func (c *Container) WaitReportConcurrencyGate() *concurrency.Gate {

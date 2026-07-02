@@ -1,8 +1,6 @@
 package process
 
 import (
-	"time"
-
 	"github.com/FangcunMount/qs-server/internal/collection-server/config"
 	resttransport "github.com/FangcunMount/qs-server/internal/collection-server/transport/rest"
 	genericapiserver "github.com/FangcunMount/qs-server/internal/pkg/server"
@@ -18,15 +16,8 @@ func (s *server) initializeTransports(containerOutput containerOutput) (transpor
 		return transportOutput{}, err
 	}
 	if containerOutput.container != nil {
-		if gate := containerOutput.container.GeneralConcurrencyGate(); gate != nil {
-			maxWait := time.Duration(0)
-			if s.config.Concurrency != nil && s.config.Concurrency.MaxWaitMs > 0 {
-				maxWait = time.Duration(s.config.Concurrency.MaxWaitMs) * time.Millisecond
-			}
-			httpServer.Use(generalConcurrencyMiddleware(gate, maxWait))
-		}
+		resttransport.NewRouter(containerOutput.container).RegisterRoutes(httpServer.Engine)
 	}
-	resttransport.NewRouter(containerOutput.container).RegisterRoutes(httpServer.Engine)
 	return transportOutput{httpServer: httpServer}, nil
 }
 

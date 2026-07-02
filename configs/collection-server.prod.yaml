@@ -162,7 +162,7 @@ wait_report:                        # 报告等待 HTTP 轮询接口配置
   poll_interval_ms: 500             # 轮询间隔时间 500ms
   status_ttl_seconds: 172800        # 报告状态缓存时间 172800s
   max_active_waiters: 3000          # 最大活跃等待请求数 3000
-  max_http_concurrency: 480         # 4C/8G：与 concurrency.max-concurrency 对齐
+  max_http_concurrency: 400         # wait-report 独立池（与 query 读池分离）
   degrade_immediate_enabled: true   # 立即降级 true
   degrade_retry_after_seconds: 5    # 降级重试时间 5s
   pubsub_enabled: true              # 启用 Redis 发布/订阅机制
@@ -293,5 +293,6 @@ runtime:
 
 # 并发/连接池调优
 concurrency:                        # 并发/连接池调优（4C/8G mixed_280+ 榨干档）
-  max-concurrency: 480              # 最大并发 HTTP 连接数（原 400；280/s 混合 + 尾延迟余量）
-  max-wait-ms: 4000                 # HTTP 槽位满时最长排队等待（与 grpc inflight_wait 对齐）
+  max-query-concurrency: 400        # 读路径（catalog/report-status Try 503；其余读 Wait）
+  max-submit-concurrency: 96        # 写路径（submit 等，与读池隔离）
+  max-wait-ms: 4000                 # submit/非 catalog 读 槽位满时最长排队（与 grpc inflight_wait 对齐）

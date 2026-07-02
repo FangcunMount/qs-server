@@ -53,8 +53,40 @@ type GRPCClientOptions struct {
 
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
-	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
-	MaxWaitMs      int `json:"max_wait_ms" mapstructure:"max_wait_ms"`         // HTTP 槽位排队最长等待（毫秒），0 表示无限等待
+	MaxConcurrency       int `json:"max_concurrency" mapstructure:"max_concurrency"`               // 兼容：未配置 max_query_concurrency 时作为读池上限
+	MaxQueryConcurrency  int `json:"max_query_concurrency" mapstructure:"max_query_concurrency"`   // catalog/report-status 与其余读路径
+	MaxSubmitConcurrency int `json:"max_submit_concurrency" mapstructure:"max_submit_concurrency"` // 答卷提交等写路径
+	MaxWaitMs            int `json:"max_wait_ms" mapstructure:"max_wait_ms"`                       // submit/非 catalog 读 槽位排队最长等待（毫秒），0 表示无限等待
+}
+
+// ResolvedQueryConcurrency 返回读路径并发槽位上限。
+func (c *ConcurrencyOptions) ResolvedQueryConcurrency() int {
+	if c == nil {
+		return 0
+	}
+	if c.MaxQueryConcurrency > 0 {
+		return c.MaxQueryConcurrency
+	}
+	return c.MaxConcurrency
+}
+
+// ResolvedSubmitConcurrency 返回写路径并发槽位上限。
+func (c *ConcurrencyOptions) ResolvedSubmitConcurrency() int {
+	if c == nil {
+		return 0
+	}
+	if c.MaxSubmitConcurrency > 0 {
+		return c.MaxSubmitConcurrency
+	}
+	query := c.ResolvedQueryConcurrency()
+	if query > 0 {
+		submit := query / 5
+		if submit < 32 {
+			submit = 32
+		}
+		return submit
+	}
+	return 32
 }
 
 // QuestionnaireCacheOptions 已发布问卷详情 BFF 进程内 L1 缓存。
@@ -377,9 +409,13 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 // AddFlags 添加并发处理相关的命令行参数
 func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
-		"The maximum number of concurrent goroutines for validation.")
+		"Deprecated: use max-query-concurrency; fallback when max-query-concurrency is unset.")
+	fs.IntVar(&c.MaxQueryConcurrency, "concurrency.max-query-concurrency", c.MaxQueryConcurrency,
+		"Maximum concurrent HTTP handlers for catalog/report-status and other read paths.")
+	fs.IntVar(&c.MaxSubmitConcurrency, "concurrency.max-submit-concurrency", c.MaxSubmitConcurrency,
+		"Maximum concurrent HTTP handlers for submit/write paths.")
 	fs.IntVar(&c.MaxWaitMs, "concurrency.max-wait-ms", c.MaxWaitMs,
-		"Maximum wait in milliseconds for HTTP concurrency slots before returning 503 (0 means block).")
+		"Maximum wait in milliseconds for submit/non-catalog read slots before returning 503 (0 means block).")
 }
 
 // AddFlags 添加提交排队相关的命令行参数
@@ -566,11 +602,19 @@ func validateCollectionConcurrency(opts *ConcurrencyOptions) []error {
 	}
 
 	var errs []error
-	if opts.MaxConcurrency <= 0 {
-		errs = append(errs, fmt.Errorf("concurrency.max-concurrency must be greater than 0"))
+	maxQuery := opts.ResolvedQueryConcurrency()
+	if maxQuery <= 0 {
+		errs = append(errs, fmt.Errorf("concurrency.max-query-concurrency (or max-concurrency) must be greater than 0"))
 	}
-	if opts.MaxConcurrency > 512 {
-		errs = append(errs, fmt.Errorf("concurrency.max-concurrency cannot be greater than 512"))
+	if maxQuery > 512 {
+		errs = append(errs, fmt.Errorf("concurrency.max-query-concurrency cannot be greater than 512"))
+	}
+	maxSubmit := opts.ResolvedSubmitConcurrency()
+	if maxSubmit <= 0 {
+		errs = append(errs, fmt.Errorf("concurrency.max-submit-concurrency must be greater than 0"))
+	}
+	if maxSubmit > 512 {
+		errs = append(errs, fmt.Errorf("concurrency.max-submit-concurrency cannot be greater than 512"))
 	}
 	return errs
 }
