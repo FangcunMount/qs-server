@@ -6,7 +6,7 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 入口 | `make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` → 升档；脚本 `scripts/perf/k6/mixed.js` |
+| 入口 | `make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` → 按 **L0～L4** 升档；详见 §K6 分档命令；脚本 `scripts/perf/k6/mixed.js` |
 | 配置 | `tmp/perf/qs-perf.config.json`（`make perf-init` 不覆盖已有文件） |
 | 三类目标 | ① 前台读写 ② 异步 SLA（`chain_probe`）③ 后台排水（`outbox_120` + DB snapshot） |
 | 当前水位 | **4C/8G** 至 **`mixed_240_models` 全绿**；**`mixed_280_models` 边际未过**（k6 阈值过、~7min 超时雪崩）；300 见 8C/16G 历史 |
@@ -110,13 +110,99 @@ jq '.reportMode="short_poll"
 
 **专项（不进升档）**：`special_report_long_poll`（`perf-special-report-long-poll`）、`outbox_120`、`personality_60`、`mixed_280_models_ws`。完整列表：`make help` → K6 压测。
 
-**300 全量验收**（前置：`mixed_280_models` 全绿 + 线 B 已部署 + 本地 `short_poll`）：
+### K6 分档命令
+
+**通用前置**（每轮压测前）：
 
 ```bash
-make perf-mixed300                   # 全量 + 前后 snapshot
-# 分步排查时可选：
-make perf-mixed300-http              # Step1：同 280 读压
-make perf-mixed300-http-query        # Step2：满配 query
+make perf-init && make perf-tokens && make perf-preflight
+```
+
+**裸跑 k6 模板**（`make perf-*` 等价，便于自定义 `SUMMARY_EXPORT`）：
+
+```bash
+export PERF_CONFIG="$(pwd)/tmp/perf/qs-perf.config.json"
+export PERF_ROOT="$(pwd)"
+export K6_SCRIPT="scripts/perf/k6/mixed.js"
+
+k6 run \
+  -e PERF_CONFIG_FILE="$PERF_CONFIG" \
+  -e PERF_ROOT_DIR="$PERF_ROOT" \
+  -e QPS_PROFILE=<profile名> \
+  --summary-export tmp/perf/<输出目录>/k6-summary.json \
+  "$K6_SCRIPT"
+```
+
+**L0 连通（30s）**
+
+```bash
+make perf-smoke
+# 等价：QPS_PROFILE=smoke_4 make perf-k6
+```
+
+**L1 预压（3～5min）**
+
+```bash
+make perf-pretest60              # pretest_60，3min
+make perf-pretest120             # pretest_120，5min
+make perf-pretest120-balanced    # 降读压混合，排查 submit 争用
+make perf-pretest120-submit-only # 仅 submit，隔离读压
+```
+
+**L2 升档 mixed_140～220（5min，submit 封顶 24/s）**
+
+```bash
+make perf-mixed140
+make perf-mixed160
+make perf-mixed180
+make perf-mixed200
+make perf-mixed220
+# 排查 submit 429：make perf-mixed140-submit24
+```
+
+**L3 高水位 mixed_240～280（8min，须三域拆分 + short_poll）**
+
+```bash
+make perf-mixed240-models    # 三域 L1 验收（54/27/19/s），升档必跑
+make perf-mixed280-models    # 280 攻关档；4C/8G 建议冷却 ≥30min 后单独跑
+
+# legacy 单桶问卷（仅对照，不作升档依据）：
+# make perf-mixed240 / make perf-mixed280
+```
+
+**L4 300 攻关与全量验收（10min）**
+
+前置：`mixed_280_models` 全绿 + apiserver 线 B 已部署 + 本地 `reportMode=short_poll`。
+
+```bash
+# 分步排查（推荐顺序）
+make perf-mixed300-http              # Step1：同 280 读压，无 probe
+make perf-mixed300-http-query        # Step2：满配 query 146/s
+make perf-stats-isolate29            # stats 隔离（线 A）
+make perf-mixed300-http-query-nostats # Step2 去 stats 对照
+
+# 全量验收（含 chain_probe + 前后 outbox snapshot）
+make perf-mixed300
+```
+
+**专项 / 诊断（不进常规升档链）**
+
+```bash
+make perf-special-report-long-poll   # 长轮询 report（生产已弃用）
+make perf-mixed280-models-ws         # WebSocket report-events
+make perf-outbox120                  # outbox 排水 + snapshot
+make perf-personality60              # 人格专项
+make perf-diag-query120              # 仅 query 48/s
+make perf-diag-submit120             # 仅 submit 24/s
+make perf-diag-report120             # 仅 report 36/s
+```
+
+**观测 snapshot**（`mixed_300` / `outbox_120` 等含 snapshot 的档位可手动补跑）：
+
+```bash
+OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh before
+# … k6 压测 …
+OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
 ```
 
 ### Report 模式

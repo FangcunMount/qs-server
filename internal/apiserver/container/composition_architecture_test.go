@@ -348,7 +348,6 @@ func TestEvaluationAssemblerDoesNotOwnReportCapabilities(t *testing.T) {
 		"MaterializeReportBuilders(",
 		"NewReportRepositoryWithTopicResolver(",
 		"NewTransactionalReportDurableSaver(",
-		"outboxready.NewIndex(",
 	} {
 		if strings.Contains(content, token) {
 			t.Fatalf("evaluation assemble.go contains %s; report capabilities must be owned by report module", token)

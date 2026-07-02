@@ -69,6 +69,10 @@ func (c *Container) OutboxRelayAssessmentPublishWorkers() int {
 	return c.outboxRelay.AssessmentPublishWorkers
 }
 
+func (c *Container) OutboxRelayAssessmentImmediateMaxConcurrent() int {
+	return c.outboxRelay.AssessmentImmediateMaxConcurrent
+}
+
 func (c *Container) PlanEntryBaseURL() string { return c.planEntryURL }
 
 func (c *Container) StatisticsRepairWindowDays() int { return c.statisticsRepairWindowDays }

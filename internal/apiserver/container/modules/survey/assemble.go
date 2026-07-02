@@ -171,7 +171,7 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClie
 	if opsHandle != nil {
 		opsClient = opsHandle.Client
 	}
-	readyIndex := outboxready.NewIndex(opsClient)
+	readyIndex := outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
 	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
 		Name:          "mongo-domain-events",
 		Store:         repo,

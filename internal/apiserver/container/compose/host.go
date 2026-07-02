@@ -41,6 +41,7 @@ type Host interface {
 	OutboxRelayMongoImmediateMaxConcurrent() int
 	OutboxRelayAssessmentBatchSize() int
 	OutboxRelayAssessmentPublishWorkers() int
+	OutboxRelayAssessmentImmediateMaxConcurrent() int
 	PlanEntryBaseURL() string
 	StatisticsRepairWindowDays() int
 	ReportStatusConfig() reportstatus.Config

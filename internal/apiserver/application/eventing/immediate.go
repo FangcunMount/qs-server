@@ -16,10 +16,11 @@ const (
 	defaultImmediateMaxConcurrent   = 16
 )
 
-// immediateDispatchEventTypes 仅 answersheet.submitted 走 post-commit immediate；
-// assessment.submitted 及 P1 事件由 relay P0/P1 排水，避免 unlimited goroutine 与 relay/业务查询抢 Mongo 连接。
+// immediateDispatchEventTypes 走 post-commit immediate 旁路。
+// answersheet.submitted：Mongo 主链路；assessment.submitted：MySQL assessment outbox（Mongo immediate 查不到则 noop）。
 var immediateDispatchEventTypes = map[string]struct{}{
 	eventcatalog.AnswerSheetSubmitted: {},
+	eventcatalog.AssessmentSubmitted:  {},
 }
 
 // ImmediateDispatcher best-effort publishes staged outbox events right after commit.

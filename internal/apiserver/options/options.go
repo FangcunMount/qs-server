@@ -355,9 +355,10 @@ func NewOutboxRelayOptions() *OutboxRelayOptions {
 			PublishWorkers: 8,
 		},
 		Assessment: &OutboxRelayStoreOptions{
-			Interval:       2 * time.Second,
-			BatchSize:      50,
-			PublishWorkers: 8,
+			Interval:               500 * time.Millisecond,
+			BatchSize:              200,
+			PublishWorkers:         24,
+			ImmediateMaxConcurrent: 16,
 		},
 	}
 }
@@ -376,6 +377,7 @@ func (o *OutboxRelayOptions) AddFlags(fs *pflag.FlagSet) {
 		fs.DurationVar(&o.Assessment.Interval, "outbox_relay.assessment.interval", o.Assessment.Interval, "Interval for dispatching assessment MySQL durable outbox events.")
 		fs.IntVar(&o.Assessment.BatchSize, "outbox_relay.assessment.batch-size", o.Assessment.BatchSize, "Maximum assessment MySQL durable outbox events to claim in one relay tick.")
 		fs.IntVar(&o.Assessment.PublishWorkers, "outbox_relay.assessment.publish-workers", o.Assessment.PublishWorkers, "Maximum concurrent assessment MySQL durable outbox publish workers.")
+		fs.IntVar(&o.Assessment.ImmediateMaxConcurrent, "outbox_relay.assessment.immediate-max-concurrent", o.Assessment.ImmediateMaxConcurrent, "Maximum concurrent post-commit immediate outbox dispatches for assessment MySQL outbox (0 uses default).")
 	}
 }
 

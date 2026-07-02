@@ -24,7 +24,7 @@ func (s *Store) ListPendingEventRefs(ctx context.Context, limit int, now time.Ti
 		"status":          bson.M{"$in": []string{outboxcore.StatusPending, outboxcore.StatusFailed}},
 		"next_attempt_at": bson.M{"$lte": now},
 	}, options.Find().
-		SetProjection(bson.M{"event_id": 1, "event_type": 1, "next_attempt_at": 1}).
+		SetProjection(bson.M{"event_id": 1, "event_type": 1, "next_attempt_at": 1, "created_at": 1}).
 		SetSort(bson.D{{Key: "created_at", Value: 1}}).
 		SetLimit(int64(limit)))
 	if err != nil {
@@ -42,6 +42,7 @@ func (s *Store) ListPendingEventRefs(ctx context.Context, limit int, now time.Ti
 			EventID:       row.EventID,
 			EventType:     row.EventType,
 			NextAttemptAt: row.NextAttemptAt,
+			CreatedAt:     row.CreatedAt,
 		})
 	}
 	return refs, nil

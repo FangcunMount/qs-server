@@ -70,35 +70,34 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the evaluation module.
 type Deps struct {
-	MySQLDB                             *gorm.DB
-	MongoDB                             *mongo.Database
-	InputResolver                       evaluationinput.Resolver
-	ScaleCatalog                        evaluationinput.ScaleCatalog
-	EventPublisher                      event.EventPublisher
-	RedisClient                         redis.UniversalClient
-	CacheBuilder                        *keyspace.Builder
-	AssessmentPolicy                    cachepolicy.CachePolicy
-	QueryRedisClient                    redis.UniversalClient
-	QueryCacheBuilder                   *keyspace.Builder
-	AssessmentListPolicy                cachepolicy.CachePolicy
-	VersionStore                        cachequery.VersionTokenStore
-	Observer                            *observability.ComponentObserver
-	TopicResolver                       eventcatalog.TopicResolver
-	MySQLLimiter                        backpressure.Acquirer
-	MongoLimiter                        backpressure.Acquirer
-	AssessmentOutboxRelayBatchSize      int
-	AssessmentOutboxRelayPublishWorkers int
-	TesteeAccessChecker                 assessmentApp.TesteeAccessChecker
-	OpsHandle                           *cacheplane.Handle
-	ReportStatusConfig                  reportstatus.Config
-	ModelDescriptors                    []evaldomain.ModelDescriptor
-	TypologyRegistry                    typologyEvaluation.ModuleRegistry
-	ReportReader                        evaluationreadmodel.ReportReader
-	ReportBuilderRegistry               evaluationResult.ReportBuilderRegistry
-	ReportDurableSaver                  evaluationResult.ReportDurableSaver
-	PostCommitReadyIndexer              *appEventing.PostCommitReadyIndexer
-	OutboxReadyIndex                    *outboxready.Index
-	PublishedModelReader                rulesetport.PublishedModelReader
+	MySQLDB                                     *gorm.DB
+	MongoDB                                     *mongo.Database
+	InputResolver                               evaluationinput.Resolver
+	ScaleCatalog                                evaluationinput.ScaleCatalog
+	EventPublisher                              event.EventPublisher
+	RedisClient                                 redis.UniversalClient
+	CacheBuilder                                *keyspace.Builder
+	AssessmentPolicy                            cachepolicy.CachePolicy
+	QueryRedisClient                            redis.UniversalClient
+	QueryCacheBuilder                           *keyspace.Builder
+	AssessmentListPolicy                        cachepolicy.CachePolicy
+	VersionStore                                cachequery.VersionTokenStore
+	Observer                                    *observability.ComponentObserver
+	TopicResolver                               eventcatalog.TopicResolver
+	MySQLLimiter                                backpressure.Acquirer
+	MongoLimiter                                backpressure.Acquirer
+	AssessmentOutboxRelayBatchSize              int
+	AssessmentOutboxRelayPublishWorkers         int
+	AssessmentOutboxRelayImmediateMaxConcurrent int
+	TesteeAccessChecker                         assessmentApp.TesteeAccessChecker
+	OpsHandle                                   *cacheplane.Handle
+	ReportStatusConfig                          reportstatus.Config
+	ModelDescriptors                            []evaldomain.ModelDescriptor
+	TypologyRegistry                            typologyEvaluation.ModuleRegistry
+	ReportReader                                evaluationreadmodel.ReportReader
+	ReportBuilderRegistry                       evaluationResult.ReportBuilderRegistry
+	ReportDurableSaver                          evaluationResult.ReportDurableSaver
+	PublishedModelReader                        rulesetport.PublishedModelReader
 }
 
 // New assembles the evaluation module.
@@ -115,7 +114,7 @@ func New(deps Deps) (*Module, error) {
 	module := &Module{
 		AssessmentOutboxRelay:         infra.assessmentOutboxRelay,
 		AssessmentOutboxStatusReader:  infra.assessmentOutboxStatusReader,
-		OutboxReadyIndex:              normalized.OutboxReadyIndex,
+		OutboxReadyIndex:              infra.assessmentReadyIndex,
 		AssessmentOutboxPendingLister: infra.assessmentOutboxStore,
 	}
 	if err := module.wireEvaluationEngine(normalized, infra); err != nil {
@@ -138,6 +137,8 @@ type evaluationInfra struct {
 	assessmentOutboxRelay        appEventing.OutboxRelay
 	assessmentOutboxStatusReader appEventing.NamedOutboxStatusReader
 	assessmentImmediate          *appEventing.ImmediateDispatcher
+	assessmentReadyIndex         *outboxready.Index
+	postCommitReadyIndexer       *appEventing.PostCommitReadyIndexer
 }
 
 func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
@@ -156,15 +157,23 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
+	var opsClient redis.UniversalClient
+	if normalized.OpsHandle != nil {
+		opsClient = normalized.OpsHandle.Client
+	}
+	assessmentReadyIndex := outboxready.NewIndex(opsClient, outboxready.StoreAssessmentMySQLOutbox)
+	infra.assessmentReadyIndex = assessmentReadyIndex
+	infra.postCommitReadyIndexer = appEventing.NewPostCommitReadyIndexer(assessmentReadyIndex)
 	mysqlPriorityOpts := []mysqlEventOutbox.StoreOption{mysqlEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil))}
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlPriorityOpts...)
 	infra.assessmentOutboxStore = assessmentOutboxStore
 	infra.assessmentImmediate = appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name:       "assessment-mysql-outbox",
-		Store:      assessmentOutboxStore,
-		Publisher:  normalized.EventPublisher,
-		Enabled:    true,
-		ReadyIndex: normalized.OutboxReadyIndex,
+		Name:          "assessment-mysql-outbox",
+		Store:         assessmentOutboxStore,
+		Publisher:     normalized.EventPublisher,
+		Enabled:       true,
+		MaxConcurrent: normalized.AssessmentOutboxRelayImmediateMaxConcurrent,
+		ReadyIndex:    assessmentReadyIndex,
 	})
 	infra.assessmentOutboxRelay = appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
 		Name:                    "assessment-mysql-outbox",
@@ -173,7 +182,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 		BatchSize:               normalized.AssessmentOutboxRelayBatchSize,
 		PublishWorkers:          normalized.AssessmentOutboxRelayPublishWorkers,
 		RequireDurablePublisher: true,
-		ReadyIndex:              normalized.OutboxReadyIndex,
+		ReadyIndex:              assessmentReadyIndex,
 	})
 	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
@@ -237,7 +246,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			normalized.InputResolver,
 			resultWriter,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
-			execute.WithPostCommitReadyIndexer(normalized.PostCommitReadyIndexer),
+			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
 			execute.WithReportStatusReporter(reportStatusReporter),
 		)
@@ -334,15 +343,9 @@ func normalizeDeps(deps Deps) (Deps, error) {
 		if deps.ReportDurableSaver == nil {
 			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report durable saver is required when input resolver is configured")
 		}
-		if deps.PostCommitReadyIndexer == nil {
-			return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "post-commit ready indexer is required when input resolver is configured")
-		}
 	}
 	if deps.ReportReader == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report reader is required")
-	}
-	if deps.OutboxReadyIndex == nil {
-		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "outbox ready index is required")
 	}
 	return deps, nil
 }

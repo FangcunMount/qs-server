@@ -213,7 +213,7 @@ func (r *outboxRelay) DispatchDue(ctx context.Context) error {
 		for _, failure := range failures {
 			r.observe(ctx, "", "", eventobservability.OutboxOutcomePublishFailed)
 			if r.readyIndex != nil {
-				_ = r.readyIndex.Enqueue(ctx, failure.EventType, failure.EventID, retryAt)
+				_ = r.readyIndex.Enqueue(ctx, failure.EventType, failure.EventID, retryAt, retryAt)
 			}
 		}
 	} else {
@@ -443,7 +443,11 @@ func (r *outboxRelay) markEventFailed(ctx context.Context, l *logger.RequestLogg
 	}
 	r.observe(ctx, "", eventType, eventobservability.OutboxOutcomePublishFailed)
 	if r.readyIndex != nil {
-		_ = r.readyIndex.Enqueue(ctx, eventType, pending.EventID, time.Now().Add(r.retryDelay))
+		createdAt := time.Now()
+		if pending.Event != nil && !pending.Event.OccurredAt().IsZero() {
+			createdAt = pending.Event.OccurredAt()
+		}
+		_ = r.readyIndex.Enqueue(ctx, eventType, pending.EventID, time.Now().Add(r.retryDelay), createdAt)
 	}
 }
 

@@ -14,7 +14,7 @@ func (s *Store) ListPendingEventRefs(ctx context.Context, limit int, now time.Ti
 	}
 	rows := make([]OutboxPO, 0)
 	err := s.db.WithContext(ctx).
-		Select("event_id", "event_type", "next_attempt_at").
+		Select("event_id", "event_type", "next_attempt_at", "created_at").
 		Where("status IN ? AND next_attempt_at <= ?", []string{outboxcore.StatusPending, outboxcore.StatusFailed}, now).
 		Order("created_at ASC").
 		Limit(limit).
@@ -28,6 +28,7 @@ func (s *Store) ListPendingEventRefs(ctx context.Context, limit int, now time.Ti
 			EventID:       row.EventID,
 			EventType:     row.EventType,
 			NextAttemptAt: row.NextAttemptAt,
+			CreatedAt:     row.CreatedAt,
 		})
 	}
 	return refs, nil

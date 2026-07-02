@@ -48,11 +48,12 @@ type BackpressureOptions struct {
 }
 
 type ContainerOutboxRelayOptions struct {
-	MongoBatchSize              int
-	MongoPublishWorkers         int
-	MongoImmediateMaxConcurrent int
-	AssessmentBatchSize         int
-	AssessmentPublishWorkers    int
+	MongoBatchSize                   int
+	MongoPublishWorkers              int
+	MongoImmediateMaxConcurrent      int
+	AssessmentBatchSize              int
+	AssessmentPublishWorkers         int
+	AssessmentImmediateMaxConcurrent int
 }
 
 type ContainerCacheOptions = cachebootstrap.CacheOptions

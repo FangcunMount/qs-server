@@ -56,6 +56,7 @@ func buildContainerOutboxRelayOptions(cfg *config.Config) container.ContainerOut
 	if cfg.OutboxRelay.Assessment != nil {
 		options.AssessmentBatchSize = cfg.OutboxRelay.Assessment.BatchSize
 		options.AssessmentPublishWorkers = cfg.OutboxRelay.Assessment.PublishWorkers
+		options.AssessmentImmediateMaxConcurrent = cfg.OutboxRelay.Assessment.ImmediateMaxConcurrent
 	}
 	return options
 }

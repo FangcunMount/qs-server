@@ -12,6 +12,12 @@ import (
 
 const keyPrefix = "outbox:ready"
 
+// Ready-index store namespaces isolate relay claim paths across Mongo/MySQL outboxes.
+const (
+	StoreMongoDomainEvents     = "mongo-domain-events"
+	StoreAssessmentMySQLOutbox = "assessment-mysql-outbox"
+)
+
 // Atomically ZRANGEBYSCORE due members then ZREM them so concurrent relays do not
 // read the same IDs. Mongo outbox remains the truth source; Reconciler backfills
 // rows that were popped but not durably claimed.
@@ -33,22 +39,27 @@ return members
 // Index is a best-effort Redis ZSet scheduler for outbox pending events.
 type Index struct {
 	client redis.UniversalClient
+	store  string
 }
 
-func NewIndex(client redis.UniversalClient) *Index {
-	if client == nil {
+func NewIndex(client redis.UniversalClient, store string) *Index {
+	if client == nil || store == "" {
 		return nil
 	}
-	return &Index{client: client}
+	return &Index{client: client, store: store}
 }
 
-func (i *Index) Enqueue(ctx context.Context, eventType, eventID string, nextAttemptAt time.Time) error {
+func (i *Index) bucketKey(bucket string) string {
+	return fmt.Sprintf("%s:%s:%s", keyPrefix, i.store, bucket)
+}
+
+func (i *Index) Enqueue(ctx context.Context, eventType, eventID string, nextAttemptAt, createdAt time.Time) error {
 	if i == nil || i.client == nil || eventID == "" {
 		return nil
 	}
 	bucket := outboxpriority.Bucket(eventType)
-	key := fmt.Sprintf("%s:%s", keyPrefix, bucket)
-	score := float64(nextAttemptAt.UnixMilli())
+	key := i.bucketKey(bucket)
+	score := ReadyScore(nextAttemptAt, createdAt)
 	return i.client.ZAdd(ctx, key, redis.Z{Score: score, Member: eventID}).Err()
 }
 
@@ -56,7 +67,7 @@ func (i *Index) Remove(ctx context.Context, eventType, eventID string) error {
 	if i == nil || i.client == nil || eventID == "" {
 		return nil
 	}
-	key := fmt.Sprintf("%s:%s", keyPrefix, outboxpriority.Bucket(eventType))
+	key := i.bucketKey(outboxpriority.Bucket(eventType))
 	return i.client.ZRem(ctx, key, eventID).Err()
 }
 
@@ -66,7 +77,7 @@ func (i *Index) RemoveByEventID(ctx context.Context, eventID string) error {
 		return nil
 	}
 	for _, bucket := range outboxpriority.ReadyIndexBuckets {
-		key := fmt.Sprintf("%s:%s", keyPrefix, bucket)
+		key := i.bucketKey(bucket)
 		if err := i.client.ZRem(ctx, key, eventID).Err(); err != nil {
 			return err
 		}
@@ -74,12 +85,17 @@ func (i *Index) RemoveByEventID(ctx context.Context, eventID string) error {
 	return nil
 }
 
+// MaxClaimScore is the upper bound for claiming events due at or before now.
+func MaxClaimScore(now time.Time) float64 {
+	return float64(now.UnixMilli())*scoreTieFactor + scoreTieMask
+}
+
 func (i *Index) ClaimDueIDs(ctx context.Context, bucket string, limit int, now time.Time) ([]string, error) {
 	if i == nil || i.client == nil || limit <= 0 {
 		return nil, nil
 	}
-	key := fmt.Sprintf("%s:%s", keyPrefix, bucket)
-	max := strconv.FormatInt(now.UnixMilli(), 10)
+	key := i.bucketKey(bucket)
+	max := strconv.FormatFloat(MaxClaimScore(now), 'f', -1, 64)
 	result, err := claimDueIDsScript.Run(ctx, i.client, []string{key}, max, limit).StringSlice()
 	if err == redis.Nil {
 		return nil, nil
@@ -88,17 +104,4 @@ func (i *Index) ClaimDueIDs(ctx context.Context, bucket string, limit int, now t
 		return nil, err
 	}
 	return result, nil
-}
-
-func (i *Index) Reconcile(ctx context.Context, bucket string, eventIDs []string, nextAttemptAt time.Time) error {
-	if i == nil || i.client == nil || len(eventIDs) == 0 {
-		return nil
-	}
-	key := fmt.Sprintf("%s:%s", keyPrefix, bucket)
-	score := float64(nextAttemptAt.UnixMilli())
-	members := make([]redis.Z, 0, len(eventIDs))
-	for _, eventID := range eventIDs {
-		members = append(members, redis.Z{Score: score, Member: eventID})
-	}
-	return i.client.ZAdd(ctx, key, members...).Err()
 }

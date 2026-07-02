@@ -29,34 +29,35 @@ import (
 
 // WireInput carries composition-root inputs for evaluation module installation.
 type WireInput struct {
-	MySQLDB                             *gorm.DB
-	MongoDB                             *mongo.Database
-	EventPublisher                      event.EventPublisher
-	RedisClient                         redis.UniversalClient
-	CacheBuilder                        *keyspace.Builder
-	QueryRedisClient                    redis.UniversalClient
-	QueryCacheBuilder                   *keyspace.Builder
-	MetaRedisClient                     redis.UniversalClient
-	AssessmentPolicy                    cachepolicy.CachePolicy
-	AssessmentListPolicy                cachepolicy.CachePolicy
-	DisableEvaluationCache              bool
-	Observer                            *observability.ComponentObserver
-	TopicResolver                       eventcatalog.TopicResolver
-	MySQLLimiter                        backpressure.Acquirer
-	MongoLimiter                        backpressure.Acquirer
-	AssessmentOutboxRelayBatchSize      int
-	AssessmentOutboxRelayPublishWorkers int
-	TesteeAccessChecker                 assessment.TesteeAccessChecker
-	OpsHandle                           *cacheplane.Handle
-	ReportStatusConfig                  reportstatus.Config
-	ScaleInfra                          *surveymod.ScaleInfra
-	RuleSetCatalog                      rulesetport.RuleSetCatalog
-	StaticRedisClient                   redis.UniversalClient
-	StaticCacheBuilder                  *keyspace.Builder
-	PublishedModelPolicy                cachepolicy.CachePolicy
-	ModelDescriptors                    []evaldomain.ModelDescriptor
-	TypologyRegistry                    typologyEvaluation.ModuleRegistry
-	ReportPorts                         compose.ReportIntegrationPorts
+	MySQLDB                                     *gorm.DB
+	MongoDB                                     *mongo.Database
+	EventPublisher                              event.EventPublisher
+	RedisClient                                 redis.UniversalClient
+	CacheBuilder                                *keyspace.Builder
+	QueryRedisClient                            redis.UniversalClient
+	QueryCacheBuilder                           *keyspace.Builder
+	MetaRedisClient                             redis.UniversalClient
+	AssessmentPolicy                            cachepolicy.CachePolicy
+	AssessmentListPolicy                        cachepolicy.CachePolicy
+	DisableEvaluationCache                      bool
+	Observer                                    *observability.ComponentObserver
+	TopicResolver                               eventcatalog.TopicResolver
+	MySQLLimiter                                backpressure.Acquirer
+	MongoLimiter                                backpressure.Acquirer
+	AssessmentOutboxRelayBatchSize              int
+	AssessmentOutboxRelayPublishWorkers         int
+	AssessmentOutboxRelayImmediateMaxConcurrent int
+	TesteeAccessChecker                         assessment.TesteeAccessChecker
+	OpsHandle                                   *cacheplane.Handle
+	ReportStatusConfig                          reportstatus.Config
+	ScaleInfra                                  *surveymod.ScaleInfra
+	RuleSetCatalog                              rulesetport.RuleSetCatalog
+	StaticRedisClient                           redis.UniversalClient
+	StaticCacheBuilder                          *keyspace.Builder
+	PublishedModelPolicy                        cachepolicy.CachePolicy
+	ModelDescriptors                            []evaldomain.ModelDescriptor
+	TypologyRegistry                            typologyEvaluation.ModuleRegistry
+	ReportPorts                                 compose.ReportIntegrationPorts
 }
 
 // WireResult carries evaluation module and shared catalog side effects.
@@ -181,17 +182,16 @@ func Wire(in WireInput) (WireResult, error) {
 		MongoLimiter:                        in.MongoLimiter,
 		AssessmentOutboxRelayBatchSize:      in.AssessmentOutboxRelayBatchSize,
 		AssessmentOutboxRelayPublishWorkers: in.AssessmentOutboxRelayPublishWorkers,
-		TesteeAccessChecker:                 in.TesteeAccessChecker,
-		OpsHandle:                           in.OpsHandle,
-		ReportStatusConfig:                  in.ReportStatusConfig,
-		ModelDescriptors:                    modelDescriptors,
-		TypologyRegistry:                    in.TypologyRegistry,
-		ReportReader:                        in.ReportPorts.Reader,
-		ReportBuilderRegistry:               in.ReportPorts.BuilderRegistry,
-		ReportDurableSaver:                  in.ReportPorts.DurableSaver,
-		PostCommitReadyIndexer:              in.ReportPorts.PostCommitReadyIndexer,
-		OutboxReadyIndex:                    in.ReportPorts.ReadyIndex,
-		PublishedModelReader:                publishedModelReader,
+		AssessmentOutboxRelayImmediateMaxConcurrent: in.AssessmentOutboxRelayImmediateMaxConcurrent,
+		TesteeAccessChecker:                         in.TesteeAccessChecker,
+		OpsHandle:                                   in.OpsHandle,
+		ReportStatusConfig:                          in.ReportStatusConfig,
+		ModelDescriptors:                            modelDescriptors,
+		TypologyRegistry:                            in.TypologyRegistry,
+		ReportReader:                                in.ReportPorts.Reader,
+		ReportBuilderRegistry:                       in.ReportPorts.BuilderRegistry,
+		ReportDurableSaver:                          in.ReportPorts.DurableSaver,
+		PublishedModelReader:                        publishedModelReader,
 	})
 	if err != nil {
 		return WireResult{}, err

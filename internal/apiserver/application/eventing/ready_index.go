@@ -9,7 +9,7 @@ import (
 
 // ReadyIndex is a best-effort Redis ZSet scheduler for pending outbox events.
 type ReadyIndex interface {
-	Enqueue(ctx context.Context, eventType, eventID string, nextAttemptAt time.Time) error
+	Enqueue(ctx context.Context, eventType, eventID string, nextAttemptAt, createdAt time.Time) error
 	Remove(ctx context.Context, eventType, eventID string) error
 	RemoveByEventID(ctx context.Context, eventID string) error
 	ClaimDueIDs(ctx context.Context, bucket string, limit int, now time.Time) ([]string, error)
@@ -38,6 +38,10 @@ func (p *PostCommitReadyIndexer) EnqueueAfterCommit(ctx context.Context, events 
 		if evt == nil {
 			continue
 		}
-		_ = p.index.Enqueue(ctx, evt.EventType(), evt.EventID(), nextAttemptAt)
+		createdAt := evt.OccurredAt()
+		if createdAt.IsZero() {
+			createdAt = nextAttemptAt
+		}
+		_ = p.index.Enqueue(ctx, evt.EventType(), evt.EventID(), nextAttemptAt, createdAt)
 	}
 }

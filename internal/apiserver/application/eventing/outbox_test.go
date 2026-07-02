@@ -59,13 +59,15 @@ type readyIndexEnqueue struct {
 	eventType     string
 	eventID       string
 	nextAttemptAt time.Time
+	createdAt     time.Time
 }
 
-func (f *fakeReadyIndex) Enqueue(_ context.Context, eventType, eventID string, nextAttemptAt time.Time) error {
+func (f *fakeReadyIndex) Enqueue(_ context.Context, eventType, eventID string, nextAttemptAt, createdAt time.Time) error {
 	f.enqueues = append(f.enqueues, readyIndexEnqueue{
 		eventType:     eventType,
 		eventID:       eventID,
 		nextAttemptAt: nextAttemptAt,
+		createdAt:     createdAt,
 	})
 	return nil
 }

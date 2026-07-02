@@ -32,12 +32,12 @@ func (s *immediateTestStore) GetPublishableEvent(ctx context.Context, eventID st
 	return pendingEvent(eventID, eventcatalog.AnswerSheetSubmitted), true, nil
 }
 
-func TestIsImmediateDispatchEventTypeOnlyAnswerSheetSubmitted(t *testing.T) {
+func TestIsImmediateDispatchEventTypeIncludesAssessmentSubmitted(t *testing.T) {
 	if !IsImmediateDispatchEventType(eventcatalog.AnswerSheetSubmitted) {
 		t.Fatal("answersheet.submitted should be immediate")
 	}
-	if IsImmediateDispatchEventType(eventcatalog.AssessmentSubmitted) {
-		t.Fatal("assessment.submitted should be relay-only")
+	if !IsImmediateDispatchEventType(eventcatalog.AssessmentSubmitted) {
+		t.Fatal("assessment.submitted should be immediate for MySQL assessment outbox")
 	}
 }
 

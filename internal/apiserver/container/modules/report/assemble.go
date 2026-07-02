@@ -76,7 +76,7 @@ func New(deps Deps) (*Module, error) {
 	if deps.OpsHandle != nil {
 		opsClient = deps.OpsHandle.Client
 	}
-	module.readyIndex = outboxready.NewIndex(opsClient)
+	module.readyIndex = outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
 	module.readyIndexer = appEventing.NewPostCommitReadyIndexer(module.readyIndex)
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
 	module.durableSaver = evaluationResult.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore, module.readyIndexer)
@@ -127,7 +127,7 @@ func (m *Module) PostCommitReadyIndexer() *appEventing.PostCommitReadyIndexer {
 	return m.readyIndexer
 }
 
-// ReadyIndex exposes the shared outbox ready index used by evaluation outbox relay.
+// ReadyIndex exposes the Mongo outbox ready index shared with survey relay.
 func (m *Module) ReadyIndex() *outboxready.Index {
 	if m == nil {
 		return nil

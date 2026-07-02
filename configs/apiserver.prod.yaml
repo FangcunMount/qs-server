@@ -362,61 +362,62 @@ behavior_journey_scan:    # 启用行为轨迹扫描
 
 outbox_relay:
   mongo:
-    interval: "500ms"           # Mongo outbox 主链路事件排水频率；300 QPS 压测起步值
-    batch_size: 1000            # 每轮最多 claim 的 Mongo outbox 事件数
-    publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；先降到 48 复测
-    immediate_max_concurrent: 16  # post-commit immediate 并发上限；满载时改由 relay P0 排水
+    interval: "500ms"             # Mongo outbox 主链路事件排水频率: 500ms (生产环境建议调高)
+    batch_size: 1000              # 每轮最多 claim 的 Mongo outbox 事件数: 1000 (生产环境建议调高)
+    publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；先降到 48 复测: 48 (生产环境建议调高)
+    immediate_max_concurrent: 16  # post-commit immediate 并发上限: 16 (生产环境建议调高)
   assessment:
-    interval: "2s"              # MySQL assessment outbox 当前积压较低，保持保守频率
-    batch_size: 50              # 每轮最多 claim 的 assessment outbox 事件数
-    publish_workers: 8          # MySQL assessment outbox 当前积压较低，保持默认并发
+    interval: "500ms"             # 对齐 Mongo 主链路 tick: 500ms (生产环境建议调高)
+    batch_size: 200               # 每轮最多 claim 的 assessment outbox 事件数: 200 (生产环境建议调高)
+    publish_workers: 24           # MySQL outbox 并发 publish: 24 (生产环境建议调高)
+    immediate_max_concurrent: 16  # assessment.submitted post-commit immediate 上限: 16 (生产环境建议调高)
 
-statistics_sync:
-  enable: true                  # 启用统计数据同步任务
-  org_ids: [1]                  # 组织ID列表（从配置读取，默认同步所有组织）
-  run_at: "00:30"               # 每天凌晨 00:30 执行，避开业务高峰期
-  repair_window_days: 7         # 同步修复数据的时间窗口，默认最近 7 天
-  lock_key: "qs:statistics-sync:leader"   # 分布式锁键，确保单实例执行
+statistics_sync:                # 统计数据同步任务配置
+  enable: true                  # 启用统计数据同步任务: true
+  org_ids: [1]                  # 组织ID列表（从配置读取，默认同步所有组织）: [1]
+  run_at: "00:30"               # 每天凌晨 00:30 执行，避开业务高峰期: 00:30
+  repair_window_days: 7         # 同步修复数据的时间窗口，默认最近 7 天: 7
+  lock_key: "qs:statistics-sync:leader"   # 分布式锁键，确保单实例执行: qs:statistics-sync:leader
   lock_ttl: "30m"               # 锁过期时间，足够覆盖整个同步过程，避免重复执行
 
 # ----------------------------------------------------------------------------
 # 3.7 限流配置
 # ----------------------------------------------------------------------------
 rate_limit:
-  enabled: true
-  submit_global_qps: 300
-  submit_global_burst: 450
-  submit_user_qps: 200
-  submit_user_burst: 300
-  admin_submit_global_qps: 360
-  admin_submit_global_burst: 540
-  admin_submit_user_qps: 320
-  admin_submit_user_burst: 480
-  query_global_qps: 300
-  query_global_burst: 450
-  query_user_qps: 200
-  query_user_burst: 300
-  wait_report_global_qps: 300
-  wait_report_global_burst: 450
-  wait_report_user_qps: 200
-  wait_report_user_burst: 300
+  enabled: true                   # 启用限流: true
+  submit_global_qps: 300          # 全局提交 QPS: 300 
+  submit_global_burst: 450        # 全局提交突发量: 450 
+  submit_user_qps: 200            # 用户提交 QPS: 200
+  submit_user_burst: 300          # 用户提交突发量: 300 
+  admin_submit_global_qps: 360    # 管理员全局提交 QPS: 360 
+  admin_submit_global_burst: 540  # 管理员全局提交突发量: 540 
+  admin_submit_user_qps: 320      # 管理员用户提交 QPS: 320 
+  admin_submit_user_burst: 480    # 管理员用户提交突发量: 480 
+  query_global_qps: 300           # 全局查询 QPS: 300 
+  query_global_burst: 450         # 全局查询突发量: 450 
+  query_user_qps: 200             # 用户查询 QPS: 200 
+  query_user_burst: 300           # 用户查询突发量: 300 
+  wait_report_global_qps: 300     # 全局等待报告 QPS: 300 
+  wait_report_global_burst: 450   # 全局等待报告突发量: 450 
+  wait_report_user_qps: 200       # 用户等待报告 QPS: 200 
+  wait_report_user_burst: 300     # 用户等待报告突发量: 300 
 
 # ----------------------------------------------------------------------------
 # 3.8 下游背压配置
 # ----------------------------------------------------------------------------
 backpressure:
   mysql:
-    enabled: true
-    max_inflight: 180
-    timeout_ms: 3000
+    enabled: true                  # 启用 MySQL 背压: true
+    max_inflight: 180              # 最大并发请求数: 180 (生产环境建议调高)
+    timeout_ms: 3000               # 请求超时时间: 3000ms (生产环境建议调高)
   mongo:
-    enabled: true
-    max_inflight: 80             # 须低于 driver maxPoolSize(100)；为 outbox relay+immediate 预留连接
-    timeout_ms: 2500
+    enabled: true                  # 启用 Mongo 背压: true
+    max_inflight: 80               # 最大并发请求数: 80 (生产环境建议调高)
+    timeout_ms: 2500               # 请求超时时间: 2500ms (生产环境建议调高)
   iam:
-    enabled: true
-    max_inflight: 80
-    timeout_ms: 2500
+    enabled: true                  # 启用 IAM 背压: true
+    max_inflight: 80               # 最大并发请求数: 80 (生产环境建议调高)
+    timeout_ms: 2500               # 请求超时时间: 2500ms (生产环境建议调高)
 
 # ----------------------------------------------------------------------------
 # 3.9 MongoDB 数据库配置
@@ -429,20 +430,20 @@ mongodb:
   # Docker 单节点副本集示例：
   # url: "mongodb://app_user:password@mongo:27017/qs?replicaSet=rs0&directConnection=true"
   url: ""
-  host: "127.0.0.1:27017"
-  username: "app_user"
-  password: ""
-  database: "qs"
-  replica-set: ""                 # 副本集名称（如 rs0）；使用分离字段或完整 url 都会生效
-  direct-connection: false        # 单节点副本集可设为 true；使用分离字段或完整 url 都会生效
-  use-ssl: false
-  ssl-insecure-skip-verify: false
-  ssl-allow-invalid-hostnames: false
-  ssl-ca-file: ""
-  ssl-pem-keyfile: ""
+  host: "127.0.0.1:27017"          # MongoDB 主机地址: 127.0.0.1:27017
+  username: "app_user"             # MongoDB 用户名: app_user
+  password: ""                     # MongoDB 密码: 
+  database: "qs"                   # MongoDB 数据库: qs
+  replica-set: ""                  # 副本集名称（如 rs0）；使用分离字段或完整 url 都会生效
+  direct-connection: false         # 单节点副本集可设为 true；使用分离字段或完整 url 都会生效
+  use-ssl: false                   # 是否启用 SSL: false
+  ssl-insecure-skip-verify: false  # 是否跳过 SSL 证书验证: false
+  ssl-allow-invalid-hostnames: false # 是否允许无效主机名: false
+  ssl-ca-file: ""                  # SSL CA 文件: 
+  ssl-pem-keyfile: ""              # SSL PEM 密钥文件: 
   # MongoDB 日志配置
-  enable-logger: true             # 启用 MongoDB 命令日志
-  slow-threshold: 500ms           # 慢查询阈值（生产环境建议调高）
+  enable-logger: true              # 启用 MongoDB 命令日志
+  slow-threshold: 500ms            # 慢查询阈值（生产环境建议调高）
   
   # 详细日志配置（component-base v0.4.1+ 已支持，查询详情会自动脱敏）
   # 生产环境可以适度启用 log-command-detail 用于问题排查，性能影响很小
@@ -454,12 +455,12 @@ mongodb:
 # 3.10 消息队列配置
 # ----------------------------------------------------------------------------
 messaging:
-  enabled: true                     # 启用消息队列发布
-  provider: nsq                     # 消息队列类型：nsq 或 rabbitmq
+  enabled: true                        # 启用消息队列发布: true
+  provider: nsq                        # 消息队列类型: nsq 或 rabbitmq (生产环境建议使用 nsq, 优先使用 nsq)
   
   # NSQ 配置（生产环境使用 Docker 服务名或实际地址）
-  nsq-addr: "nsqd:4150"             # NSQ 生产者地址（Docker 网络内部）
-  nsq-lookupd-addr: "nsqlookupd:4161"  # NSQ Lookupd 地址（用于服务发现）
+  nsq-addr: "nsqd:4150"                 # NSQ 生产者地址: nsqd:4150 (Docker 网络内部)
+  nsq-lookupd-addr: "nsqlookupd:4161"   # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)
 
 # ============================================================================
 # 4. 外部服务集成配置
@@ -479,18 +480,18 @@ iam:
   enable-metrics: true            # 启用 Prometheus 指标
   
   # authz 规则通知
-  authz-sync:
-    enabled: true
-    provider: "nsq"
-    nsq-lookupd-addr: "nsqlookupd:4161"
-    topic: "iam.authz.version"
-    channel-prefix: "qs-authz-sync"
+  authz-sync:                           # authz 规则同步配置 (authz 规则更新后，通过 NSQ 通知 apiserver 更新规则)
+    enabled: true                       # 是否启用 authz 同步: true
+    provider: "nsq"                     # 消息队列类型: nsq 或 rabbitmq (生产环境建议使用 nsq)
+    nsq-lookupd-addr: "nsqlookupd:4161" # NSQ Lookupd 地址: nsqlookupd:4161 (用于服务发现)  
+    topic: "iam.authz.version"          # 主题: iam.authz.version
+    channel-prefix: "qs-authz-sync"     # 频道前缀: qs-authz-sync
 
   # gRPC 连接配置
   grpc:
-    address: "iam-apiserver:9090"  # IAM 在 serverB；经 Swarm overlay infra-network 解析（勿映射到宿主机 9090）
-    timeout: 5s                   # 请求超时时间
-    retry-max: 3                  # 最大重试次数
+    address: "iam-apiserver:9090"       # IAM 在 serverB；经 Swarm overlay infra-network 解析（勿映射到宿主机 9090）
+    timeout: 5s                         # 请求超时时间: 5s (生产环境建议调高)
+    retry-max: 3                        # 最大重试次数: 3 (生产环境建议调高)
     
     # mTLS 证书配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
     tls:
@@ -510,19 +511,15 @@ iam:
   # JWKS 配置（JWT 公钥管理）
   jwks:
     url: "https://iam.fangcunmount.cn/.well-known/jwks.json"  # JWKS HTTP 端点
-    grpc-endpoint: "iam-apiserver:9090"                    # gRPC 降级端点（HTTP 失败时使用，端口 9090）
-    refresh-interval: 1h                               # 定时刷新间隔
-    cache-ttl: 24h                                     # 缓存有效期
-    fetch-strategies: ["http", "grpc", "cache"]        # 降级策略：HTTP → gRPC → 缓存
-
-  # 用户信息缓存配置
-    ttl: 10m                                           # 缓存时长（ProfileLink 变化较少）
-    max-size: 50000                                    # 最大缓存条目数
+    grpc-endpoint: "iam-apiserver:9090"                       # gRPC 降级端点: iam-apiserver:9090 (HTTP 失败时使用，端口 9090)
+    refresh-interval: 1h                                      # 定时刷新间隔: 1h (生产环境建议调高)
+    cache-ttl: 24h                                            # 缓存有效期: 24h (生产环境建议调高)
+    fetch-strategies: ["http", "grpc", "cache"]               # 降级策略: HTTP → gRPC → 缓存 (生产环境建议调高)
 
   # 用户信息缓存配置
   user-cache:
     enabled: true                                      # 启用用户信息缓存
-    ttl: 5m                                            # 缓存时长
+    ttl: 5m                                            # 缓存时长: 5m (生产环境建议调高)
     max-size: 10000                                    # 最大缓存条目数
   
   # ProfileLink 缓存配置
@@ -549,7 +546,7 @@ wechat:
 # 4.3 阿里云 OSS（二维码对象存储）
 # ----------------------------------------------------------------------------
 oss:
-  enabled: true         # 是否启用 OSS 存储二维码图片
+  enabled: true         # 是否启用 OSS 存储二维码图片: true
   region: "cn-beijing"  # OSS 存储区域（生产环境建议使用与服务器同地域的存储区域）
   # 生产建议优先使用同地域内网 endpoint
   endpoint: "oss-cn-beijing-internal.aliyuncs.com"  # OSS 内网 Endpoint（生产环境建议使用同地域内网地址）

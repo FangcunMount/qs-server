@@ -22,6 +22,7 @@ type PendingEventRef struct {
 	EventID       string
 	EventType     string
 	NextAttemptAt time.Time
+	CreatedAt     time.Time
 }
 type EventTypeStatusBucket struct {
 	EventType       string

@@ -56,7 +56,7 @@ func (r *Reconciler) runOnce(ctx context.Context) {
 		if nextAttemptAt.IsZero() {
 			nextAttemptAt = now
 		}
-		if err := r.index.Enqueue(ctx, ref.EventType, ref.EventID, nextAttemptAt); err != nil {
+		if err := r.index.Enqueue(ctx, ref.EventType, ref.EventID, nextAttemptAt, ref.CreatedAt); err != nil {
 			logger.L(ctx).Warnw("outbox ready index enqueue failed",
 				"event_id", ref.EventID,
 				"event_type", ref.EventType,

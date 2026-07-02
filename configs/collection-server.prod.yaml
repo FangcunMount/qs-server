@@ -168,22 +168,22 @@ wait_report:                        # 报告等待 HTTP 轮询接口配置
   pubsub_enabled: true              # 启用 Redis 发布/订阅机制
   pubsub_channel: "report_status_changed" # 报告状态变更频道
 
-report_events:  # WebSocket 报告事件推送配置
-  enabled: true                 # 启用 WebSocket 报告事件推送
-  path: /api/v1/report-events   # WebSocket 报告事件推送路径
-  max_connections: 2000         # 最大并发 WebSocket 连接数
-  max_per_testee: 2             # 每个测试对象最大并发 WebSocket 连接数
-  idle_timeout_seconds: 120     # WebSocket 连接空闲超时时间
+report_events:                   # WebSocket 报告事件推送配置
+  enabled: true                  # 启用 WebSocket 报告事件推送
+  path: /api/v1/report-events    # WebSocket 报告事件推送路径
+  max_connections: 2000          # 最大并发 WebSocket 连接数
+  max_per_testee: 2              # 每个测试对象最大并发 WebSocket 连接数
+  idle_timeout_seconds: 120      # WebSocket 连接空闲超时时间
   heartbeat_interval_seconds: 30 # WebSocket 心跳间隔时间
 
-report_status:  # 报告状态缓存配置
-  ttl_seconds: 172800
+report_status:                  # 报告状态缓存配置
+  ttl_seconds: 172800           # 报告状态缓存时间: 172800s (2 天)
 
-signaling:  # 报告状态信号配置
-  redis:
-    enabled: true
-    prefix: "qs:signal"
-    buffer_size: 100
+signaling:                      # 报告状态信号配置
+  redis:                        # Redis 配置
+    enabled: true               # 启用 Redis 发布/订阅机制
+    prefix: "qs:signal"         # 信号前缀: qs:signal (默认)
+    buffer_size: 100            # 信号缓冲区大小: 100  
 
 # ============================================================
 # 4. 集成配置
@@ -217,9 +217,9 @@ iam:
     # IAM gRPC 服务端口 9090 启用了 mTLS 保护
     tls:
       enabled: true   # 启用 mTLS 双向认证（与 IAM 9090 端口匹配）
-      ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"           # CA 证书链
-      cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt" # QS 客户端证书（调用 IAM）
-      key-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.key"  # QS 客户端私钥
+      ca-file: "/etc/qs-server/ssl/grpc/ca/ca-chain.crt"                    # CA 证书链
+      cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"  # 客户端证书 (collection-server 调用 IAM)
+      key-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.key"   # 客户端私钥 (collection-server 调用 IAM)
   
   # JWT 验证配置
   jwt:
@@ -289,9 +289,9 @@ runtime:
   # 将 GOMEMLIMIT 设置为容器配额的 75% 以避免 OOM（容器 mem_limit=3072MiB）
   go-mem-limit: "2304MiB"
   # 更积极的 GC，降低峰值内存
-  gogc: 50
+  gogc: 50                           # GC 触发阈值: 50%
 
 # 并发/连接池调优
-concurrency:
-  max-concurrency: 400
-  max-wait-ms: 2000                 # HTTP 槽位满时最长排队等待，超时返回 503
+concurrency:                        # 并发/连接池调优
+  max-concurrency: 400              # 最大并发 HTTP 连接数: 400
+  max-wait-ms: 2000                 # HTTP 槽位满时最长排队等待: 2000ms (超时返回 503)
