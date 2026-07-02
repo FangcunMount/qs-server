@@ -147,6 +147,8 @@ export function configAliasesForEnv(name) {
     PERSONALITY_QUERY_MAX_VUS: ['vusers.personalityQuery.max', 'personalityQueryMaxVus', 'personality_query_max_vus'],
     QUESTIONNAIRE_DETAIL_VUS: ['vusers.questionnaireQuery.preAllocated', 'vusers.questionnaire_query.pre_allocated', 'questionnaireQueryVus', 'questionnaire_query_vus'],
     QUESTIONNAIRE_DETAIL_MAX_VUS: ['vusers.questionnaireQuery.max', 'questionnaireQueryMaxVus', 'questionnaire_query_max_vus'],
+    PERSONALITY_QUESTIONNAIRE_QUERY_VUS: ['vusers.personalityQuestionnaireQuery.preAllocated', 'vusers.personality_questionnaire_query.pre_allocated', 'personalityQuestionnaireQueryVus', 'personality_questionnaire_query_vus'],
+    PERSONALITY_QUESTIONNAIRE_QUERY_MAX_VUS: ['vusers.personalityQuestionnaireQuery.max', 'personalityQuestionnaireQueryMaxVus', 'personality_questionnaire_query_max_vus'],
     SUBMIT_VUS: ['vusers.submit.preAllocated', 'vusers.submit.pre_allocated', 'submitVus', 'submit_vus'],
     SUBMIT_MAX_VUS: ['vusers.submit.max', 'submitMaxVus', 'submit_max_vus'],
     REPORT_VUS: ['vusers.report.preAllocated', 'vusers.report.pre_allocated', 'reportVus', 'report_vus'],

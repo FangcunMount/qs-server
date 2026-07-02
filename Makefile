@@ -114,7 +114,7 @@ COLOR_RED := \033[31m
 .PHONY: perf-preflight perf-check-k6 perf-k6 perf-smoke perf-pretest60 perf-pretest120 perf-pretest120-submit-only perf-pretest120-balanced
 .PHONY: perf-mixed140 perf-mixed140-submit24 perf-mixed160 perf-mixed180 perf-mixed200 perf-mixed220 perf-mixed240 perf-mixed240-models perf-mixed280 perf-mixed280-models perf-mixed280-models-short-report perf-mixed280-models-ws perf-special-report-long-poll perf-mixed300 perf-mixed300-http perf-mixed300-http-query perf-mixed300-http-query-nostats perf-stats-isolate29 perf-stats-warmup perf-mixed300probe
 .PHONY: perf-model-smoke perf-outbox120 perf-personality60 perf-mixed300-models perf-mixed300-scanner
-.PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-verify
+.PHONY: perf-diag-report120 perf-diag-query120 perf-diag-submit120 perf-diag-query-submit120 perf-sync-profiles perf-sync-vusers perf-verify
 
 # ============================================================================
 # 帮助信息
@@ -203,6 +203,11 @@ perf-sync-profiles: ## 从 example 合并缺失的 qpsProfiles/paths（本地已
 	@command -v jq >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 jq: brew install jq$(COLOR_RESET)" >&2; exit 1; }
 	@test -f $(PERF_DIR)/qs-perf.config.json || { echo "$(COLOR_RED)❌ 先执行: make perf-init$(COLOR_RESET)" >&2; exit 1; }
 	@$(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json
+
+perf-sync-vusers: ## 用 example 覆盖本地各 profile 的 vusers（4C/8G VU 收紧后执行）
+	@command -v jq >/dev/null 2>&1 || { echo "$(COLOR_RED)❌ 需要 jq: brew install jq$(COLOR_RESET)" >&2; exit 1; }
+	@test -f $(PERF_DIR)/qs-perf.config.json || { echo "$(COLOR_RED)❌ 先执行: make perf-init$(COLOR_RESET)" >&2; exit 1; }
+	@bash $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh $(PERF_DIR)/qs-perf.config.json $(PERF_SCRIPT_DIR)/qs-perf.config.example.json
 
 perf-tokens-collection: perf-ensure-config ## 用 collection_users 刷新 tokens.json
 	@test -f $(PERF_DIR)/iam-users.json || { echo "$(COLOR_RED)❌ 缺少 $(PERF_DIR)/iam-users.json$(COLOR_RESET)" >&2; exit 1; }
@@ -383,6 +388,7 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/fetch-iam-tokens.sh
 	bash -n $(PERF_SCRIPT_DIR)/snapshot-observability.sh
 	bash -n $(PERF_SCRIPT_DIR)/sync-profiles-from-example.sh
+	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_240_models $(PERF_K6_SCRIPT) | grep -q medical_model_query

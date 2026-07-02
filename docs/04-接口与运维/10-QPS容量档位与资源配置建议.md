@@ -12,14 +12,14 @@
 | 200 | 单机单实例 | **通过**（`mixed_200`；**4C/8G** 2026-07-02） |
 | 220 | 单机单实例 | **通过**（`mixed_220`；**4C/8G** 2026-07-02，http p95≈79ms） |
 | 240 | 单机单实例 | **通过**（`mixed_240_models` 三域 **4C/8G** 2026-07-02，http p95≈100ms） |
-| 280 | 单机单实例 | **通过**（8C/16G）；**4C/8G 边际未过**（2026-07-02，连跑后 7min 雪崩） |
-| 300 | 单机单实例 | **通过**（`mixed_300`；**8C/16G** 验收，4C/8G 待复测） |
+| 280 | 单机单实例 | **通过**（8C/16G）；**4C/8G 榨干档调优后复测**（见 §2.4） |
+| 300 | 单机单实例 | **通过**（`mixed_300`；**8C/16G** 验收）；4C/8G 须 §2.4 + 分步攻关 |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
 | 1000 | 应用多实例 + LB | 必须正式压测验收 |
 
-**单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，**`mixed_280_models` 边际未过**（checks 99.84%，~7min 超时雪崩）。详见 [SOP §3.8](./11-300QPS混合场景压测SOP.md#38-轮次七servera-缩容复测2026-07-024c8g)。
+**单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，280/300 见 §2.4。详见 [SOP §3.8](./11-300QPS混合场景压测SOP.md#38-轮次七servera-缩容复测2026-07-024c8g)。
 
 核心原则：
 
@@ -38,20 +38,20 @@
 | 位置 | 关键值 | 含义 |
 | ---- | ------ | ---- |
 | collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 入口保护（压测配比见 k6 profile，与此无关） |
-| collection grpc_client | max_inflight 360 | 到 apiserver 并发 |
-| collection submit_queue | queue_size 2000，worker_count 40 | 提交削峰 |
+| collection grpc_client | max_inflight **420** | 4C/8G 榨干档 |
+| collection submit_queue | queue_size **2800**，worker_count **56** | 提交削峰 |
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
 | collection scale_cache | enabled，TTL 180s，max_entries 256 | 量表目录 REST DTO 进程内 L1 |
 | collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
 目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
-| collection concurrency | max-concurrency **400**（general） | query/submit/report-status 等短请求 |
+| collection concurrency | max-concurrency **480**（general） | 4C/8G 榨干档；query/submit/report-status |
 | collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
 | collection report_events | enabled **false**（灰度）；max_connections 2000 | WebSocket 报告推送（方案 E） |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
 | apiserver rate_limit | submit/query/wait-report global QPS 300，admin submit global QPS 360 | 后台 REST 入口 |
-| apiserver backpressure | mysql 180，mongo 170，iam 80 | 下游保护 |
-| apiserver mysql pool | max open 180 | DB 连接池 |
+| apiserver backpressure | mysql **150**，mongo **120**，iam **100** | 4C/8G 榨干档；timeout 4～5s |
+| apiserver mysql pool | max open **150** | DB 连接池 |
 | worker concurrency | 48 | 后台消费并发 |
 
 ---
@@ -112,10 +112,28 @@
 
 `GOMEMLIMIT` 建议设置为容器内存的 65%-75%。
 
-当前 `mixed_300` 生产验收基线采用 serverA 8C/16G 单 apiserver 架构，**HTTP 总 QPS ~300、submit 24/s**（非 60/s）。
-`qs-apiserver` 配置为 5 CPU / 8GiB，`qs-collection-server` 为 2 CPU / 4GiB。
-collection 侧 `grpc_client.max_inflight=360`、`concurrency.max-concurrency=512` 主要承接
-`wait-report` 长轮询并发；submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约束。
+当前 **serverA 4C/8G** 部署：`qs-apiserver` 4 CPU / 4GiB，`qs-collection-server` 3 CPU / 3GiB（见 `build/docker/docker-compose.prod.yml`）。
+8C/16G 历史验收：`qs-apiserver` 5 CPU / 8GiB，`qs-collection-server` 2 CPU / 4GiB。
+submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约束。
+
+### 2.4 serverA 4C/8G 榨干档（2026-07）
+
+针对 `mixed_280_models` / `mixed_300` 攻关，在 **不升配机器** 前提下对齐 inflight 与 k6 VU：
+
+| 位置 | 关键值 | 说明 |
+| ---- | ------ | ---- |
+| collection `concurrency.max-concurrency` | **480** | HTTP 入口槽位（原 400） |
+| collection `grpc_client.max_inflight` | **420** | 对齐 apiserver gRPC 承载 |
+| collection `grpc_client.inflight_wait_ms` | **4000** | 减少 2s 快速失败 |
+| collection `submit_queue.worker_count` | **56** | 对齐 24/s submit |
+| apiserver `backpressure.mongo.max_inflight` | **120** | submit+outbox 主瓶颈（原 80） |
+| apiserver `backpressure.mysql.max_inflight` | **150** | 对齐 mysql pool |
+| apiserver backpressure `timeout_ms` | **4000～5000** | 应用内排队，避免 k6 30s 雪崩 |
+| k6 `mixed_280_models` VU max | submit **400** 等 | 见 `qs-perf.config.example.json` |
+
+**部署**：改 `configs/*.prod.yaml` 后 **重启** `qs-apiserver` + `qs-collection-server`；本地 `make perf-sync-vusers` 同步 k6 VU；压测前冷却 ≥30min、网络稳定。
+
+**验收顺序**：`mixed_280_models` 全绿 → `perf-mixed300-http` → `perf-mixed300-http-query` → `perf-mixed300`。
 
 ---
 

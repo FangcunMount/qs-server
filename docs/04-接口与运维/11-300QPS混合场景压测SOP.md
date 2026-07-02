@@ -9,7 +9,7 @@
 | 入口 | `make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` → 按 **L0～L4** 升档；详见 §K6 分档命令；脚本 `scripts/perf/k6/mixed.js` |
 | 配置 | `tmp/perf/qs-perf.config.json`（`make perf-init` 不覆盖已有文件） |
 | 三类目标 | ① 前台读写 ② 异步 SLA（`chain_probe`）③ 后台排水（`outbox_120` + DB snapshot） |
-| 当前水位 | **4C/8G** 至 **`mixed_240_models` 全绿**；**`mixed_280_models` 边际未过**（k6 阈值过、~7min 超时雪崩）；300 见 8C/16G 历史 |
+| 当前水位 | **4C/8G** 至 **`mixed_240_models` 全绿**；**`mixed_280_models` 边际**（0.01% failed、~41s 尖刺，非 7min 雪崩）；300 见 8C/16G 历史 |
 | Report | 常规默认 **`short_poll`**；长轮询仅专项 `special_report_long_poll` |
 | 验收 | `http_req_failed < 1%` + chain probe SLA；压测结束 **≤3min** outbox 回落至近 0 |
 | 必做 | 新鲜 token + `perf-preflight` + Nginx 压测 IP 放宽 `limit_conn` |
@@ -24,7 +24,7 @@ smoke_4 → pretest_60 → pretest_120 → mixed_140…220 → mixed_240_models 
 
 档间冷却 **≥30min**（攻关档 `mixed_280_models` 及以上建议 **≥30min**）。上一档全绿再升档。
 
-部署韧性重构后验收：`make perf-mixed280-models`（确认 `reportMode=short_poll`、`vusers.report.max≈320`）；目标 checks **100%**、无 ~7min 30s timeout 雪崩。
+部署 outbox 调优后验收：`make perf-mixed280-models`（确认 `reportMode=short_poll`、`vusers.report.max≈320`）；4C/8G 目标 **checks 100%**、无 timeout 尖刺；边际过线需**单独重跑**后再升 300。
 
 ---
 
@@ -60,6 +60,7 @@ serverA：**当前 4C/8G**（2026-07-02 由 8C/16G 缩容）。280/300 验收在
 ```bash
 make perf-init && make perf-tokens && make perf-preflight
 make perf-sync-profiles    # 只补缺失 profile，不覆盖已有 qps/vusers/reportMode
+make perf-sync-vusers      # 用 example 覆盖本地各档 vusers（4C/8G 收紧后必跑）
 ```
 
 - **token**：`report≥90/s` 需 **60+** collection token（单用户 wait-report 限 2/s）
@@ -230,6 +231,8 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 | report VU 触顶 / EOF | 确认 `short_poll`、max VU≈320 |
 | mixed_220 无 L1 读超时 | 部署 Catalog L1，勿加 VU |
 | mixed_140 大量 429 | submit 降至 24/s |
+| mixed_280 边际过（0.01% + ~41s 尖刺） | 4C/8G 容量触顶 / 残余负载；冷却 ≥30min **单独**重跑；查 outbox pending |
+| mixed_280 ~428s 全场景雪崩 | 连档升压 + 冷却不足（§3.8）；修正 report VU≈320、`short_poll` |
 
 脚本：`scripts/perf/k6/mixed.js`；配置示例：`scripts/perf/qs-perf.config.example.json`。Catalog 缓存见 [10-Catalog目录L1-L2缓存.md](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
 
@@ -243,12 +246,13 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 
 | 档位 | 结论 | 关键数据 |
 | ---- | ---- | -------- |
-| pretest_60～mixed_280_models | **通过** | 见 §3.2–3.5 |
+| pretest_60～mixed_240_models（8C/16G 历史） | **通过** | 见 §3.2–3.7 |
 | mixed_300_http Step1 | **通过** | 同 280 读压 10min；query p95 284/256/359ms |
 | mixed_300_http_query Step2 | **通过**（线 B 后） | checks 100%；stats 0×timeout |
-| **`mixed_200`～`mixed_240_models`**（4C/8G） | **通过** | 见 §3.8 |
-| **`mixed_280_models`**（4C/8G） | **边际未过** | checks 99.84%；~428s 起 212×timeout；见 §3.8 |
-| `mixed_280_models` / `mixed_300` | **通过**（8C/16G） | 4C/8G 280 待冷却重测或扩容 |
+| **`pretest_120`～`mixed_240_models`**（4C/8G，outbox 调优后） | **通过** | 见 §3.8.1；0% failed |
+| **`mixed_280_models`**（4C/8G，outbox 调优后） | **边际** | 0.01% failed；~41s 20×timeout；见 §3.8.1 |
+| **`mixed_280_models`**（4C/8G，缩容首日连跑） | **边际未过** | checks 99.84%；~428s 雪崩；见 §3.8 |
+| `mixed_280_models` / `mixed_300` | **通过**（8C/16G） | 4C/8G 280 待单独重测全绿或扩容 |
 
 ---
 
@@ -380,7 +384,38 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 | setup 显示 report `maxVUs` **560–860** | 本地 `qs-perf.config.json` 仍为长轮询时代 VU；`perf-sync-profiles` 不覆盖 | `jq` 改 `vusers.report` max≈**320**、`reportMode=short_poll` |
 | k6 阈值过、SOP 读 p95 未过 | 尾段拉高超 500ms 线 | 不以本次作 4C/8G 280 承诺；通过后再升 `mixed_300` |
 
-**4C/8G 结论**：可承诺 **≤240 三域混合**；**280 单机边际不足**（本次），需冷却重测 / 修正 report VU / **2×4C8G LB** 后再验收。
+**4C/8G 结论（缩容首日）**：可承诺 **≤240 三域混合**；**280 单机边际不足**（连跑 + 冷却不足），需冷却重测 / 修正 report VU。
+
+---
+
+### 3.8.1 轮次七续：outbox 排水调优后复测（2026-07-02，4C/8G）
+
+**背景**（同日部署）：`outbox_relay.assessment` interval **500ms**、batch **200**、workers **24**、`immediate_max_concurrent` **16**；`assessment.submitted` 加入 immediate 旁路；ReadyIndex 按 store 隔离（`mongo-domain-events` / `assessment-mysql-outbox`）；score 编码 `created_at` 实现同 due 时刻 FIFO。重启 apiserver 后 reconciler ~30s 回补旧 pending。
+
+**跑次链**：`pretest_120` → `mixed_200` → `mixed_240_models`（档间 1～10min）→ 冷却 **34min** → `mixed_280_models`。
+
+| 档位 | 时长 | 结论 | 关键指标（p95） | 备注 |
+| ---- | ---- | ---- | --------------- | ---- |
+| **`pretest_120`** | 5m | **通过** | http **101ms**；query **160ms**；submit **66ms** | 0% failed |
+| **`mixed_200`** | 5m | **通过** | http **90ms**；query **88ms**；submit **81ms** | 0% failed；较调优前 13×timeout **已恢复** |
+| **`mixed_240_models`** | 8m | **通过** | http **76ms**；三域 **66/76/73ms** | 0% failed；L1 + 三域拆分生效 |
+| **`mixed_280_models`** | 8m | **边际** | http **98ms**；checks **99.98%**；failed **0.01%**（20） | ~**41s** 突发 20×30s timeout；`dropped_iterations=465` |
+
+**`mixed_280_models` 与 §3.8 对比**：
+
+| 维度 | §3.8（连跑 200→280） | §3.8.1（outbox 调优 + 34min 冷却） |
+| ---- | -------------------- | ---------------------------------- |
+| failed | 0.15%（212） | **0.01%**（20） |
+| 超时形态 | ~428s 起全场景雪崩 | ~41s **尖刺**，稳态 p95 <100ms |
+| http p95 | 571ms | **98ms** |
+
+**4C/8G 结论（调优后）**：可承诺 **≤240 三域混合**；280/300 须应用 §2.4 榨干档 + 单独重跑验收。
+
+### 3.8.2 轮次七续：4C/8G 榨干档配置（2026-07-02）
+
+**变更**（`configs/*.prod.yaml` + `qs-perf.config.example.json`）：mongo inflight 80→**120**；collection HTTP/grpc 并发 400/360→**480/420**；背压 wait 2s→**4～5s**；k6 VU max 收紧（submit 1180→**400**）。
+
+**部署**：重启 apiserver + collection；`make perf-sync-vusers`；冷却 ≥30min 后单独跑 `mixed_280_models`。
 
 ---
 
@@ -397,15 +432,18 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 | mixed_160 | 160 | 0% | 0 | 0 | 0 | submit≈781ms | 通过 |
 | mixed_180 | 180 | 0% | 0 | 0 | 0 | submit≈202ms | 通过 |
 | mixed_200（8C/16G，L1 后） | 200 | 0% | 0 | 0 | 0 | query≈322ms | 通过 |
-| **mixed_200（4C/8G）** | 200 | 0% | 0 | 0 | 0 | http≈97ms | 通过（2026-07-02） |
+| **mixed_200（4C/8G，缩容首日）** | 200 | 0% | 0 | 0 | 0 | http≈97ms | 通过（2026-07-02） |
+| **mixed_200（4C/8G，outbox 调优后）** | 200 | **0%** | **0** | **0** | **0** | http≈**90ms** | **通过**（2026-07-02） |
 | mixed_220（无 L1） | 220 | 5.61% | 0 | 0 | 0 | query≈30s | 未通过 |
 | mixed_220（8C/16G，L1 后） | 220 | 0% | 0 | 0 | 0 | query≈172ms | 通过 |
 | **mixed_220（4C/8G）** | 220 | **0%** | **0** | **0** | **0** | http≈**79ms** | **通过**（2026-07-02） |
 | **mixed_240（4C/8G，legacy）** | 240 | **0%** | **0** | **0** | **0** | http≈**85ms**；8min | **通过**（2026-07-02） |
 | mixed_240_models（8C/16G） | 240 | 0% | 0 | 0 | 0 | http≈154ms | 通过（三域） |
-| **mixed_240_models（4C/8G）** | 240 | **0%** | **0** | **0** | **0** | http≈**100ms**；三域 75/118/86ms | **通过**（2026-07-02） |
+| **mixed_240_models（4C/8G，缩容首日）** | 240 | **0%** | **0** | **0** | **0** | http≈**100ms**；三域 75/118/86ms | **通过**（2026-07-02） |
+| **mixed_240_models（4C/8G，outbox 调优后）** | 240 | **0%** | **0** | **0** | **0** | http≈**76ms**；三域 66/76/73ms | **通过**（2026-07-02） |
 | mixed_280_models（8C/16G） | 280 | 0% | 0 | 0 | 0 | http≈114ms | 通过 |
-| **mixed_280_models（4C/8G）** | 280 | **0.15%** | 0 | 0 | 0 | http≈571ms；7min 雪崩 | **边际未过**（2026-07-02） |
+| **mixed_280_models（4C/8G，缩容首日连跑）** | 280 | **0.15%** | 0 | 0 | 0 | http≈571ms；7min 雪崩 | **边际未过**（2026-07-02） |
+| **mixed_280_models（4C/8G，outbox 调优后）** | 280 | **0.01%** | 0 | 0 | 0 | http≈**98ms**；~41s 尖刺 | **边际**（2026-07-02） |
 | mixed_300（长轮询，历史） | ~300 | 0.02% | — | 0 | 0 | http≈10.6s；probe=315 | 未通过 |
 | mixed_300_http Step1 | ~281 | 0% | 0 | 0 | 0 | query 284/256/359ms | 通过 |
 | mixed_300_http_query Step2（B 前） | ~295 | 0.06% | 0 | 0 | 0 | stats timeout×109 | 边际通过 |
@@ -422,6 +460,10 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 | 2026-07-02 | mixed_220 | 通过（4C/8G） | — | 缩容后复测 | 0% | http 79ms | — |
 | 2026-07-02 | mixed_240 | 通过（4C/8G，legacy） | — | 缩容复测 | 0% | http 85ms | — |
 | 2026-07-02 | mixed_240_models | 通过（4C/8G） | — | 缩容复测 | 0% | http 100ms | — |
-| 2026-07-02 | mixed_280_models | 边际未过（4C/8G） | ~428s 超时雪崩；连跑间隔短 | 冷却≥30min 重跑；修正 report VU≈320 | 0.15% | http 571ms | — |
+| 2026-07-02 | mixed_280_models | 边际未过（4C/8G，缩容首日） | ~428s 超时雪崩；连跑间隔短 | 冷却≥30min 重跑；修正 report VU≈320 | 0.15% | http 571ms | — |
+| 2026-07-02 | pretest_120 | 通过（4C/8G，outbox 调优后） | — | assessment relay + ReadyIndex 隔离 | 0% | http 101ms | — |
+| 2026-07-02 | mixed_200 | 通过（4C/8G，outbox 调优后） | 调优前曾有 13×timeout | 同上 | 0% | http 90ms | — |
+| 2026-07-02 | mixed_240_models | 通过（4C/8G，outbox 调优后） | — | 三域 L1 验收 | 0% | http 76ms；三域 66/76/73ms | — |
+| 2026-07-02 | mixed_280_models | 边际（4C/8G，outbox 调优后） | ~41s 20×timeout；dropped=465 | 单独重跑；勿连档升 300 | 0.01% | http 98ms | — |
 
 **相关**：[10-QPS容量档位与资源配置建议.md](./10-QPS容量档位与资源配置建议.md) · [12-小程序报告等待接入指南.md](./12-小程序报告等待接入指南.md)

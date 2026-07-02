@@ -40,6 +40,13 @@
       }
     }
   },
+  "vuserSizing": {
+    "note": "serverA 4C/8G 榨干档：scenario max ≈ rps×迭代秒数×1.1；submit 统一 cap 400；全场景 max 合计建议 <1300，防 constant-arrival-rate VU 螺旋。",
+    "reference": {
+      "mixed_280_models": "med 360 / pers 200 / quest 150 / submit 400 / report 320 / stats 360",
+      "mixed_300": "med 400 / pers 220 / quest+persQuest 各 90 / submit 400 / report 400 / stats 380 / probe 60"
+    }
+  },
   "planIds": [
     "614333603412718126",
     "614187067651404334"
@@ -563,7 +570,7 @@
     },
     "mixed_280_models": {
       "duration": "8m",
-      "description": "三域 L1 280 档：report 走 report-status 短轮询（对齐生产 HTTP 降级路径）",
+      "description": "三域 L1 280 档（serverA 4C/8G 榨干档）；report=short_poll；VU max 收紧防螺旋",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 71,
@@ -581,31 +588,31 @@
       "vusers": {
         "query": {
           "preAllocated": 330,
-          "max": 1400
+          "max": 900
         },
         "medicalQuery": {
           "preAllocated": 130,
-          "max": 520
+          "max": 360
         },
         "personalityQuery": {
           "preAllocated": 70,
-          "max": 280
+          "max": 200
         },
         "questionnaireQuery": {
           "preAllocated": 40,
-          "max": 200
+          "max": 150
         },
         "submit": {
-          "preAllocated": 290,
-          "max": 1180
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 40,
+          "preAllocated": 80,
           "max": 320
         },
         "stats": {
           "preAllocated": 120,
-          "max": 600
+          "max": 360
         },
         "chainProbe": {
           "preAllocated": 20,
@@ -615,7 +622,7 @@
     },
     "mixed_280_models_ws": {
       "duration": "8m",
-      "description": "mixed_280_models + WebSocket report-events（E 方案验收）；需 collection report_events.enabled=true",
+      "description": "mixed_280_models + WS report-events（4C/8G VU 收紧）；需 report_events.enabled=true",
       "reportMode": "websocket",
       "reportWebSocket": true,
       "qps": {
@@ -634,31 +641,31 @@
       "vusers": {
         "query": {
           "preAllocated": 330,
-          "max": 1400
+          "max": 900
         },
         "medicalQuery": {
           "preAllocated": 130,
-          "max": 520
+          "max": 360
         },
         "personalityQuery": {
           "preAllocated": 70,
-          "max": 280
+          "max": 200
         },
         "questionnaireQuery": {
           "preAllocated": 40,
-          "max": 200
+          "max": 150
         },
         "submit": {
-          "preAllocated": 290,
-          "max": 1180
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 40,
-          "max": 320
+          "preAllocated": 120,
+          "max": 530
         },
         "stats": {
           "preAllocated": 120,
-          "max": 600
+          "max": 360
         },
         "chainProbe": {
           "preAllocated": 20,
@@ -668,7 +675,7 @@
     },
     "mixed_300": {
       "duration": "10m",
-      "description": "全量验收档（含 chainProbe 1/s）；short_poll + 拆分 query，对齐 mixed_280_models 增量 +14/s 读 / +4 report",
+      "description": "全量验收档（4C/8G 榨干档）：chainProbe 1/s + short_poll；VU 按 300 读压收紧",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
@@ -687,42 +694,46 @@
       "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
-          "preAllocated": 350,
-          "max": 1500
+          "preAllocated": 90,
+          "max": 90
         },
         "medicalQuery": {
           "preAllocated": 140,
-          "max": 560
+          "max": 400
         },
         "personalityQuery": {
-          "preAllocated": 75,
-          "max": 300
+          "preAllocated": 80,
+          "max": 220
         },
         "questionnaireQuery": {
-          "preAllocated": 42,
-          "max": 210
+          "preAllocated": 45,
+          "max": 90
+        },
+        "personalityQuestionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
         },
         "submit": {
-          "preAllocated": 290,
-          "max": 1180
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 45,
-          "max": 380
+          "preAllocated": 90,
+          "max": 400
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 500
+          "preAllocated": 130,
+          "max": 380
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 15,
+          "max": 60
         }
       }
     },
     "mixed_300_http": {
       "duration": "10m",
-      "description": "300 档 HTTP 攻关 Step1：query 同 mixed_280_models（71/36/25），report=96 短轮询，无 probe",
+      "description": "300 攻关 Step1（4C/8G）：读压同 mixed_280_models，stats=29，无 probe",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 71,
@@ -739,42 +750,46 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 350,
-          "max": 1500
+          "preAllocated": 90,
+          "max": 90
         },
         "medicalQuery": {
           "preAllocated": 130,
-          "max": 520
+          "max": 360
         },
         "personalityQuery": {
           "preAllocated": 70,
-          "max": 280
+          "max": 200
         },
         "questionnaireQuery": {
           "preAllocated": 40,
-          "max": 200
+          "max": 150
+        },
+        "personalityQuestionnaireQuery": {
+          "preAllocated": 40,
+          "max": 150
         },
         "submit": {
-          "preAllocated": 180,
-          "max": 1000
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 40,
+          "preAllocated": 80,
           "max": 320
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 500
+          "preAllocated": 130,
+          "max": 380
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 15,
+          "max": 60
         }
       }
     },
     "mixed_300_http_query": {
       "duration": "10m",
-      "description": "300 档 HTTP 攻关 Step2：满读压 + report=96 短轮询，无 probe",
+      "description": "300 攻关 Step2（4C/8G）：满读压 146/s + report 96 短轮询，无 probe",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
@@ -792,30 +807,46 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 350,
-          "max": 1500
+          "preAllocated": 90,
+          "max": 90
+        },
+        "medicalQuery": {
+          "preAllocated": 140,
+          "max": 400
+        },
+        "personalityQuery": {
+          "preAllocated": 80,
+          "max": 220
+        },
+        "questionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
+        },
+        "personalityQuestionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
         },
         "submit": {
-          "preAllocated": 180,
-          "max": 1000
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 40,
-          "max": 320
+          "preAllocated": 80,
+          "max": 340
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 500
+          "preAllocated": 130,
+          "max": 380
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 15,
+          "max": 60
         }
       }
     },
     "mixed_300_http_query_nostats": {
       "duration": "10m",
-      "description": "线 A 隔离：同 Step2 读压+report 短轮询，stats=0",
+      "description": "线 A 隔离（4C/8G）：同 Step2 读压+report，stats=0",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
@@ -833,16 +864,32 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 350,
-          "max": 1500
+          "preAllocated": 90,
+          "max": 90
+        },
+        "medicalQuery": {
+          "preAllocated": 140,
+          "max": 400
+        },
+        "personalityQuery": {
+          "preAllocated": 80,
+          "max": 220
+        },
+        "questionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
+        },
+        "personalityQuestionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
         },
         "submit": {
-          "preAllocated": 180,
-          "max": 1000
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 40,
-          "max": 320
+          "preAllocated": 80,
+          "max": 340
         }
       }
     },
@@ -865,7 +912,7 @@
       "vusers": {
         "stats": {
           "preAllocated": 60,
-          "max": 300
+          "max": 200
         }
       }
     },
@@ -894,7 +941,7 @@
     },
     "mixed_300_probe": {
       "duration": "10m",
-      "description": "同 mixed_300（显式 probe profile）；report 短轮询",
+      "description": "同 mixed_300（显式 probe profile，4C/8G VU 收紧）",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
@@ -913,30 +960,46 @@
       "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
-          "preAllocated": 350,
-          "max": 1500
+          "preAllocated": 90,
+          "max": 90
+        },
+        "medicalQuery": {
+          "preAllocated": 140,
+          "max": 400
+        },
+        "personalityQuery": {
+          "preAllocated": 80,
+          "max": 220
+        },
+        "questionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
+        },
+        "personalityQuestionnaireQuery": {
+          "preAllocated": 45,
+          "max": 90
         },
         "submit": {
-          "preAllocated": 180,
-          "max": 1000
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 45,
-          "max": 380
+          "preAllocated": 90,
+          "max": 400
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 500
+          "preAllocated": 130,
+          "max": 380
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 15,
+          "max": 60
         }
       }
     },
     "mixed_300_models": {
       "duration": "10m",
-      "description": "医学+人格拆分：submit 合计 20/s；report 短轮询",
+      "description": "医学+人格拆分 submit 20/s（4C/8G VU 收紧）；report 短轮询",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 92,
@@ -955,11 +1018,14 @@
       },
       "chainProbeModelType": "mixed",
       "vusers": {
-        "query": { "preAllocated": 350, "max": 1500 },
-        "submit": { "preAllocated": 180, "max": 1000 },
-        "report": { "preAllocated": 40, "max": 320 },
-        "stats": { "preAllocated": 120, "max": 500 },
-        "chainProbe": { "preAllocated": 20, "max": 200 }
+        "query": { "preAllocated": 90, "max": 90 },
+        "medicalQuery": { "preAllocated": 150, "max": 450 },
+        "personalityQuery": { "preAllocated": 80, "max": 240 },
+        "personalityQuestionnaireQuery": { "preAllocated": 50, "max": 120 },
+        "submit": { "preAllocated": 100, "max": 350 },
+        "report": { "preAllocated": 90, "max": 360 },
+        "stats": { "preAllocated": 130, "max": 380 },
+        "chainProbe": { "preAllocated": 15, "max": 60 }
       }
     },
     "outbox_120": {

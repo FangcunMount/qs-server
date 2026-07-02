@@ -120,8 +120,8 @@ mysql:
   username: "app_user"
   password: ""
   database: "qs"
-  max-idle-connections: 30        # mixed_300 目标：保留更充足的热连接
-  max-open-connections: 180       # 与 backpressure.mysql.max_inflight 对齐
+  max-idle-connections: 40        # 4C/8G mixed_280+：略增热连接，减少池重建
+  max-open-connections: 150       # 与 backpressure.mysql.max_inflight 对齐（4C/8G 榨干档）
   max-connection-life-time: 30m   # 缩短连接生命周期，避免超时
   max-idle-time: 10m              # 添加空闲超时
   log-level: 4 # 生产降低日志级别
@@ -148,7 +148,7 @@ redis:
   password: ""
   database: 1
   max-idle: 48
-  max-active: 320
+  max-active: 384                 # 4C/8G：对齐混合读+缓存并发（≈容器内存 75% 内）
   timeout: 300
   min-idle-conns: 10
   pool-timeout: 10
@@ -406,18 +406,20 @@ rate_limit:
 # 3.8 下游背压配置
 # ----------------------------------------------------------------------------
 backpressure:
+  # 4C/8G 榨干档（serverA）：抬高 inflight、延长槽位等待，减少 k6 30s transport timeout。
+  # mongo max_inflight 与驱动连接池共享预算（outbox+业务经 MongoLimiter 合并计数）。
   mysql:
     enabled: true                  # 启用 MySQL 背压: true
-    max_inflight: 180              # 最大并发请求数: 180 (生产环境建议调高)
-    timeout_ms: 3000               # 请求超时时间: 3000ms (生产环境建议调高)
+    max_inflight: 150              # 4C/8G mixed_280+（原 180；对齐连接池 150）
+    timeout_ms: 5000               # 槽位满时多等一会儿，避免过早失败放大 k6 VU 螺旋
   mongo:
     enabled: true                  # 启用 Mongo 背压: true
-    max_inflight: 80               # 最大并发请求数: 80 (生产环境建议调高)
-    timeout_ms: 2500               # 请求超时时间: 2500ms (生产环境建议调高)
+    max_inflight: 120              # 4C/8G mixed_280+（原 80，submit+outbox 主瓶颈）
+    timeout_ms: 5000               # 与 mysql 对齐，优先在应用内排队
   iam:
     enabled: true                  # 启用 IAM 背压: true
-    max_inflight: 80               # 最大并发请求数: 80 (生产环境建议调高)
-    timeout_ms: 2500               # 请求超时时间: 2500ms (生产环境建议调高)
+    max_inflight: 100              # 4C/8G：略抬跨机 IAM gRPC 并发
+    timeout_ms: 4000               # 请求超时时间: 4000ms
 
 # ----------------------------------------------------------------------------
 # 3.9 MongoDB 数据库配置
