@@ -1,6 +1,10 @@
 package statistics
 
-import "time"
+import (
+	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
+)
 
 // SystemStatisticsOptions 控制系统统计查询的并发合并与降级行为。
 type SystemStatisticsOptions struct {
@@ -12,6 +16,15 @@ type SystemStatisticsOptions struct {
 	StaleOnTimeout bool
 	// LoadTimeout 单次回源超时；0 表示不额外收紧（沿用上游 context）。
 	LoadTimeout time.Duration
+}
+
+// ToLoadGuardPolicy 映射为 loadguard 策略配置。
+func (o SystemStatisticsOptions) ToLoadGuardPolicy() loadguard.Policy {
+	return loadguard.Policy{
+		Singleflight: o.ServiceSingleflight,
+		StaleOnError: o.StaleOnTimeout,
+		LoadTimeout:  o.LoadTimeout,
+	}
 }
 
 func DefaultSystemStatisticsOptions() SystemStatisticsOptions {

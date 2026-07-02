@@ -6,12 +6,13 @@ import (
 	"fmt"
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 type overviewQuery struct {
 	readModel StatisticsReadModel
 	cache     *statisticsCacheHelper
-	guard     *readGuard[*domainStatistics.StatisticsOverview]
+	guard     *loadguard.Guard[string, *domainStatistics.StatisticsOverview]
 }
 
 func newOverviewQuery(
@@ -22,7 +23,7 @@ func newOverviewQuery(
 	return &overviewQuery{
 		readModel: readModel,
 		cache:     cache,
-		guard: newReadGuard(opts, cloneStatisticsOverview, func() {
+		guard: loadguard.New[string, *domainStatistics.StatisticsOverview](opts.ToLoadGuardPolicy(), cloneStatisticsOverview, func() {
 			incStatsOverviewStaleServed()
 		}),
 	}

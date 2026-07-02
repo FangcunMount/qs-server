@@ -194,7 +194,7 @@ func TestSystemStatisticsServiceDisableRealtimeReturnsStale(t *testing.T) {
 		}),
 	).(*systemStatisticsService)
 
-	service.rememberStale(1, &domainStatistics.SystemStatistics{OrgID: 1, AssessmentCount: 42})
+	service.guard.RememberStale(1, &domainStatistics.SystemStatistics{OrgID: 1, AssessmentCount: 42})
 
 	stats, err := service.GetSystemStatistics(context.Background(), 1)
 	if err != nil {

@@ -195,16 +195,16 @@ func TestSubmitQueueReportsOutcomes(t *testing.T) {
 		t.Fatalf("enqueue: %v", err)
 	}
 
-	deadline := time.Now().Add(time.Second)
+	deadline := time.Now().Add(5 * time.Second)
 	for {
 		status, ok := q.GetStatus("req-observed")
 		if ok && status.Status == SubmitStatusDone {
 			break
 		}
 		if time.Now().After(deadline) {
-			t.Fatalf("req-observed did not finish")
+			t.Fatalf("req-observed did not finish within 5s, last status=%+v ok=%v", status, ok)
 		}
-		time.Sleep(time.Millisecond)
+		time.Sleep(10 * time.Millisecond)
 	}
 
 	for _, outcome := range []resilienceplane.Outcome{

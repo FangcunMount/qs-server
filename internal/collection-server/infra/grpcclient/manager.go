@@ -4,28 +4,21 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/pkg/admission"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
 	"google.golang.org/grpc/status"
-
-	"github.com/prometheus/client_golang/prometheus"
-	"github.com/prometheus/client_golang/prometheus/promauto"
 )
-
-var grpcInflightWaitSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
-	Name:    "collection_grpc_inflight_wait_seconds",
-	Help:    "Time spent waiting for collection-server gRPC client inflight slots.",
-	Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
-})
 
 // ManagerConfig gRPC 客户端管理器配置
 type ManagerConfig struct {
@@ -49,11 +42,11 @@ type ManagerConfig struct {
 
 // Manager gRPC 客户端管理器，负责连接池管理和客户端缓存
 type Manager struct {
-	config   *ManagerConfig
-	perRPC   credentials.PerRPCCredentials
-	conn     *grpc.ClientConn
-	mu       sync.RWMutex
-	inflight chan struct{}
+	config      *ManagerConfig
+	perRPC      credentials.PerRPCCredentials
+	conn        *grpc.ClientConn
+	mu          sync.RWMutex
+	inflightSem admission.Semaphore
 
 	// 客户端缓存
 	clients map[string]interface{}
@@ -80,10 +73,10 @@ func NewManager(cfg *ManagerConfig) (*Manager, error) {
 	}
 
 	m := &Manager{
-		config:   cfg,
-		perRPC:   cfg.PerRPCCredentials,
-		clients:  make(map[string]interface{}),
-		inflight: make(chan struct{}, cfg.MaxInflight),
+		config:      cfg,
+		perRPC:      cfg.PerRPCCredentials,
+		clients:     make(map[string]interface{}),
+		inflightSem: admission.NewChannelSemaphore(cfg.MaxInflight),
 	}
 
 	// 初始化连接
@@ -154,32 +147,19 @@ func (m *Manager) unaryInterceptor(
 		defer cancel()
 	}
 
-	if m.inflight != nil {
-		waitBudget := m.config.InflightWait
-		start := time.Now()
-		if waitBudget <= 0 {
-			select {
-			case m.inflight <- struct{}{}:
-				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
-				defer func() { <-m.inflight }()
-			case <-ctx.Done():
-				return ctx.Err()
-			}
-		} else {
-			timer := time.NewTimer(waitBudget)
-			defer timer.Stop()
-			select {
-			case m.inflight <- struct{}{}:
-				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
-				defer func() { <-m.inflight }()
-			case <-timer.C:
-				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
+	if m.inflightSem != nil {
+		strategy := admission.WithWaitObserver(
+			admission.WaitStrategy{Sem: m.inflightSem, MaxWait: m.config.InflightWait},
+			admission.ObserveGRPCInflightWait,
+		)
+		release, _, err := strategy.Acquire(ctx)
+		if err != nil {
+			if errors.Is(err, admission.ErrWaitTimeout) {
 				return status.Error(codes.ResourceExhausted, "grpc client inflight limit exceeded")
-			case <-ctx.Done():
-				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
-				return ctx.Err()
 			}
+			return err
 		}
+		defer release()
 	}
 
 	return invoker(ctx, method, req, reply, cc, opts...)

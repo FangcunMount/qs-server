@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 type questionnaireStatisticsService struct {
@@ -17,14 +18,14 @@ type questionnaireStatisticsService struct {
 	realtime StatisticsRealtimeReader
 	cache    statisticscache.Cache
 	hotset   cachetarget.HotsetRecorder
-	guard    *readGuard[*statistics.QuestionnaireStatistics]
+	guard    *loadguard.Guard[string, *statistics.QuestionnaireStatistics]
 }
 
 type QuestionnaireStatisticsServiceOption func(*questionnaireStatisticsService)
 
 func WithQuestionnaireStatisticsGuard(opts StatisticsReadGuardOptions) QuestionnaireStatisticsServiceOption {
 	return func(s *questionnaireStatisticsService) {
-		s.guard = newReadGuard(opts, cloneQuestionnaireStatistics, func() {
+		s.guard = loadguard.New[string, *statistics.QuestionnaireStatistics](opts.ToLoadGuardPolicy(), cloneQuestionnaireStatistics, func() {
 			incStatsQuestionnaireStaleServed()
 		})
 	}
@@ -42,8 +43,8 @@ func NewQuestionnaireStatisticsService(
 		realtime: realtime,
 		cache:    cache,
 		hotset:   hotset,
-		guard: newReadGuard(
-			DefaultQuestionnaireStatisticsGuardOptions(),
+		guard: loadguard.New[string, *statistics.QuestionnaireStatistics](
+			DefaultQuestionnaireStatisticsGuardOptions().ToLoadGuardPolicy(),
 			cloneQuestionnaireStatistics,
 			func() { incStatsQuestionnaireStaleServed() },
 		),

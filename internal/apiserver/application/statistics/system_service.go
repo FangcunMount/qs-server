@@ -2,8 +2,6 @@ package statistics
 
 import (
 	"context"
-	"fmt"
-	"sync"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -11,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	statisticscache "github.com/FangcunMount/qs-server/internal/apiserver/port/statisticscache"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
-	"golang.org/x/sync/singleflight"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 type systemStatisticsService struct {
@@ -20,9 +18,7 @@ type systemStatisticsService struct {
 	cache    statisticscache.Cache
 	hotset   cachetarget.HotsetRecorder
 	opts     SystemStatisticsOptions
-
-	sfGroup singleflight.Group
-	stale   sync.Map // orgID int64 -> *statistics.SystemStatistics
+	guard    *loadguard.Guard[int64, *statistics.SystemStatistics]
 }
 
 type SystemStatisticsServiceOption func(*systemStatisticsService)
@@ -30,6 +26,11 @@ type SystemStatisticsServiceOption func(*systemStatisticsService)
 func WithSystemStatisticsOptions(opts SystemStatisticsOptions) SystemStatisticsServiceOption {
 	return func(s *systemStatisticsService) {
 		s.opts = opts
+		s.guard = loadguard.New[int64, *statistics.SystemStatistics](
+			opts.ToLoadGuardPolicy(),
+			cloneSystemStatistics,
+			nil,
+		)
 	}
 }
 
@@ -40,12 +41,18 @@ func NewSystemStatisticsService(
 	hotset cachetarget.HotsetRecorder,
 	opts ...SystemStatisticsServiceOption,
 ) SystemStatisticsService {
+	defaultOpts := DefaultSystemStatisticsOptions()
 	service := &systemStatisticsService{
 		query:    query,
 		realtime: realtime,
 		cache:    cache,
 		hotset:   hotset,
-		opts:     DefaultSystemStatisticsOptions(),
+		opts:     defaultOpts,
+		guard: loadguard.New[int64, *statistics.SystemStatistics](
+			defaultOpts.ToLoadGuardPolicy(),
+			cloneSystemStatistics,
+			nil,
+		),
 	}
 	for _, opt := range opts {
 		if opt != nil {
@@ -61,32 +68,18 @@ func (s *systemStatisticsService) GetSystemStatistics(ctx context.Context, orgID
 
 	if stats, ok := s.loadCachedSystemStatistics(ctx, orgID); ok {
 		s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
-		s.rememberStale(orgID, stats)
+		s.guard.RememberStale(orgID, stats)
 		return stats, nil
 	}
 
-	if !s.opts.ServiceSingleflight {
-		stats, err := s.loadSystemStatisticsMiss(ctx, orgID)
-		if err != nil {
-			return nil, err
+	stats, err := s.guard.Load(ctx, orgID, func(loadCtx context.Context) (*statistics.SystemStatistics, error) {
+		if cached, ok := s.loadCachedSystemStatistics(loadCtx, orgID); ok {
+			return cached, nil
 		}
-		s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
-		return stats, nil
-	}
-
-	key := fmt.Sprintf("system-stats:%d", orgID)
-	value, err, _ := s.sfGroup.Do(key, func() (interface{}, error) {
-		if stats, ok := s.loadCachedSystemStatistics(ctx, orgID); ok {
-			return stats, nil
-		}
-		return s.loadSystemStatisticsMiss(ctx, orgID)
+		return s.loadSystemStatisticsMiss(loadCtx, orgID)
 	})
 	if err != nil {
 		return nil, err
-	}
-	stats, ok := value.(*statistics.SystemStatistics)
-	if !ok || stats == nil {
-		return nil, errors.WithCode(code.ErrInternalServerError, "invalid system statistics payload")
 	}
 	s.recordHotset(ctx, cachetarget.NewQueryStatsSystemWarmupTarget(orgID))
 	return stats, nil
@@ -97,64 +90,39 @@ func (s *systemStatisticsService) loadSystemStatisticsMiss(ctx context.Context, 
 		return s.computeSystemStatistics(loadCtx, orgID)
 	}
 	if coalescer, ok := s.cache.(statisticscache.SystemStatisticsLoader); ok && s.cache != nil {
-		stats, err := coalescer.LoadSystemStatisticsCoalesced(ctx, orgID, loader)
-		if err != nil {
-			if stale, ok := s.tryStaleOnError(orgID, err); ok {
-				logger.L(ctx).Warnw("系统统计回源失败，返回进程内陈旧缓存", "org_id", orgID, "error", err)
-				return stale, nil
-			}
-			return nil, err
-		}
-		if stats != nil {
-			s.rememberStale(orgID, stats)
-		}
-		return stats, nil
+		return coalescer.LoadSystemStatisticsCoalesced(ctx, orgID, loader)
 	}
 
 	stats, err := loader(ctx)
 	if err != nil {
-		if stale, ok := s.tryStaleOnError(orgID, err); ok {
-			logger.L(ctx).Warnw("系统统计回源失败，返回进程内陈旧缓存", "org_id", orgID, "error", err)
-			return stale, nil
-		}
 		return nil, err
 	}
 	s.cacheSystemStatistics(ctx, orgID, stats)
-	if stats != nil {
-		s.rememberStale(orgID, stats)
-	}
 	return stats, nil
 }
 
 func (s *systemStatisticsService) computeSystemStatistics(ctx context.Context, orgID int64) (*statistics.SystemStatistics, error) {
-	loadCtx := ctx
-	if s.opts.LoadTimeout > 0 {
-		var cancel context.CancelFunc
-		loadCtx, cancel = context.WithTimeout(ctx, s.opts.LoadTimeout)
-		defer cancel()
-	}
-
 	if s.query != nil {
-		stats, found, err := s.query.LoadSystemStatistics(loadCtx, orgID)
+		stats, found, err := s.query.LoadSystemStatistics(ctx, orgID)
 		if err != nil {
 			return nil, err
 		}
 		if found {
-			logger.L(loadCtx).Debugw("从MySQL统计表获取系统统计")
+			logger.L(ctx).Debugw("从MySQL统计表获取系统统计")
 			return stats, nil
 		}
 	}
 
 	if s.opts.DisableRealtimeFallback {
-		if stale, ok := s.loadStale(orgID); ok {
-			logger.L(loadCtx).Warnw("系统统计快照未就绪，返回进程内陈旧缓存", "org_id", orgID)
+		if stale, ok := s.guard.LoadStale(orgID); ok {
+			logger.L(ctx).Warnw("系统统计快照未就绪，返回进程内陈旧缓存", "org_id", orgID)
 			return stale, nil
 		}
 		return nil, errors.WithCode(code.ErrInternalServerError, "system statistics snapshot is not ready")
 	}
 
-	logger.L(loadCtx).Debugw("从原始表实时聚合系统统计")
-	return s.realtime.BuildRealtimeSystemStatistics(loadCtx, orgID)
+	logger.L(ctx).Debugw("从原始表实时聚合系统统计")
+	return s.realtime.BuildRealtimeSystemStatistics(ctx, orgID)
 }
 
 func (s *systemStatisticsService) loadCachedSystemStatistics(ctx context.Context, orgID int64) (*statistics.SystemStatistics, bool) {
@@ -176,35 +144,6 @@ func (s *systemStatisticsService) recordHotset(ctx context.Context, target cache
 		return
 	}
 	_ = s.hotset.Record(ctx, target)
-}
-
-func (s *systemStatisticsService) rememberStale(orgID int64, stats *statistics.SystemStatistics) {
-	if stats == nil {
-		return
-	}
-	s.stale.Store(orgID, cloneSystemStatistics(stats))
-}
-
-func (s *systemStatisticsService) loadStale(orgID int64) (*statistics.SystemStatistics, bool) {
-	if !s.opts.StaleOnTimeout {
-		return nil, false
-	}
-	value, ok := s.stale.Load(orgID)
-	if !ok {
-		return nil, false
-	}
-	stats, ok := value.(*statistics.SystemStatistics)
-	if !ok || stats == nil {
-		return nil, false
-	}
-	return cloneSystemStatistics(stats), true
-}
-
-func (s *systemStatisticsService) tryStaleOnError(orgID int64, err error) (*statistics.SystemStatistics, bool) {
-	if err == nil || !s.opts.StaleOnTimeout {
-		return nil, false
-	}
-	return s.loadStale(orgID)
 }
 
 func cloneSystemStatistics(stats *statistics.SystemStatistics) *statistics.SystemStatistics {
