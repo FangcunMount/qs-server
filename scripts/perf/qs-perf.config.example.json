@@ -22,9 +22,9 @@
     "medical": 0.8,
     "personality": 0.2
   },
-  "reportMode": "short_poll",
+  "reportMode": "websocket",
   "reportSizing": {
-    "note": "生产默认 report-status 短轮询（WS 主路径 + HTTP 降级）。长轮询仅 special_report_long_poll 专项 profile。",
+    "note": "生产主路径 WebSocket report-events；HTTP report-status 短轮询仅 special_report_short_poll 专项；wait-report 长轮询仅 special_report_long_poll。",
     "modes": {
       "short_poll": {
         "reportMode": "short_poll",
@@ -43,8 +43,9 @@
   "vuserSizing": {
     "note": "serverA 4C/8G 榨干档：scenario max ≈ rps×迭代秒数×1.1；submit 统一 cap 400；全场景 max 合计建议 <1300，防 constant-arrival-rate VU 螺旋。",
     "reference": {
-      "mixed_280_models": "med 360 / pers 200 / quest 150 / submit 400 / report 320 / stats 360",
-      "mixed_300": "med 400 / pers 220 / quest+persQuest 各 90 / submit 400 / report 400 / stats 380 / probe 60"
+      "mixed_280_models": "med 360 / pers 200 / quest 150 / submit 400 / report WS 530 / stats 360",
+      "mixed_300": "med 400 / pers 220 / quest+persQuest 各 90 / submit 400 / report WS 550 / stats 380 / probe 60",
+      "special_report_short_poll": "HTTP 降级路径专项，不进升档链"
     }
   },
   "planIds": [
@@ -434,7 +435,9 @@
     },
     "mixed_240_models": {
       "duration": "8m",
-      "description": "三域 L1 验收：医学 54/s + 人格 27/s + 问卷 19/s（合计 100/s query）；submit/report/stats 同 mixed_240",
+      "description": "三域 L1 验收（WS report-events）：医学 54/s + 人格 27/s + 问卷 19/s",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 54,
         "personalityQuery": 27,
@@ -466,12 +469,12 @@
           "max": 150
         },
         "submit": {
-          "preAllocated": 260,
-          "max": 1130
+          "preAllocated": 120,
+          "max": 400
         },
         "report": {
-          "preAllocated": 500,
-          "max": 800
+          "preAllocated": 100,
+          "max": 490
         },
         "stats": {
           "preAllocated": 115,
@@ -570,7 +573,60 @@
     },
     "mixed_280_models": {
       "duration": "8m",
-      "description": "三域 L1 280 档（serverA 4C/8G 榨干档）；report=short_poll；VU max 收紧防螺旋",
+      "description": "三域 L1 280 档（生产对齐 WS report-events）；serverA 4C/8G 榨干档",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
+      "qps": {
+        "medicalQuery": 71,
+        "personalityQuery": 36,
+        "questionnaireQuery": 25,
+        "submit": 24,
+        "report": 96,
+        "stats": 28,
+        "chainProbe": 0
+      },
+      "modelMix": {
+        "medical": 0.8,
+        "personality": 0.2
+      },
+      "vusers": {
+        "query": {
+          "preAllocated": 330,
+          "max": 900
+        },
+        "medicalQuery": {
+          "preAllocated": 130,
+          "max": 360
+        },
+        "personalityQuery": {
+          "preAllocated": 70,
+          "max": 200
+        },
+        "questionnaireQuery": {
+          "preAllocated": 40,
+          "max": 150
+        },
+        "submit": {
+          "preAllocated": 120,
+          "max": 400
+        },
+        "report": {
+          "preAllocated": 120,
+          "max": 530
+        },
+        "stats": {
+          "preAllocated": 120,
+          "max": 360
+        },
+        "chainProbe": {
+          "preAllocated": 20,
+          "max": 200
+        }
+      }
+    },
+    "special_report_short_poll": {
+      "duration": "8m",
+      "description": "【专项·不进升档】HTTP report-status 降级路径容量（同 mixed_280_models 配比）",
       "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 71,
@@ -622,7 +678,7 @@
     },
     "mixed_280_models_ws": {
       "duration": "8m",
-      "description": "mixed_280_models + WS report-events（4C/8G VU 收紧）；需 report_events.enabled=true",
+      "description": "同 mixed_280_models（兼容旧 Makefile 名 mixed_280_models_ws）",
       "reportMode": "websocket",
       "reportWebSocket": true,
       "qps": {
@@ -675,8 +731,9 @@
     },
     "mixed_300": {
       "duration": "10m",
-      "description": "全量验收档（4C/8G 榨干档）：chainProbe 1/s + short_poll；VU 按 300 读压收紧",
-      "reportMode": "short_poll",
+      "description": "全量验收档（4C/8G）：chainProbe 1/s + WS report-events",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -718,8 +775,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 90,
-          "max": 400
+          "preAllocated": 130,
+          "max": 550
         },
         "stats": {
           "preAllocated": 130,
@@ -733,8 +790,9 @@
     },
     "mixed_300_http": {
       "duration": "10m",
-      "description": "300 攻关 Step1（4C/8G）：读压同 mixed_280_models，stats=29，无 probe",
-      "reportMode": "short_poll",
+      "description": "300 攻关 Step1（4C/8G）：读压同 mixed_280_models，WS report，无 probe",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 71,
         "personalityQuery": 36,
@@ -774,8 +832,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 80,
-          "max": 320
+          "preAllocated": 120,
+          "max": 530
         },
         "stats": {
           "preAllocated": 130,
@@ -789,8 +847,9 @@
     },
     "mixed_300_http_query": {
       "duration": "10m",
-      "description": "300 攻关 Step2（4C/8G）：满读压 146/s + report 96 短轮询，无 probe",
-      "reportMode": "short_poll",
+      "description": "300 攻关 Step2（4C/8G）：满读压 146/s + WS report 96/s，无 probe",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -831,8 +890,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 80,
-          "max": 340
+          "preAllocated": 120,
+          "max": 530
         },
         "stats": {
           "preAllocated": 130,
@@ -846,8 +905,9 @@
     },
     "mixed_300_http_query_nostats": {
       "duration": "10m",
-      "description": "线 A 隔离（4C/8G）：同 Step2 读压+report，stats=0",
-      "reportMode": "short_poll",
+      "description": "线 A 隔离（4C/8G）：同 Step2 满读压 + WS report，stats=0",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -888,8 +948,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 80,
-          "max": 340
+          "preAllocated": 120,
+          "max": 530
         }
       }
     },
@@ -941,8 +1001,9 @@
     },
     "mixed_300_probe": {
       "duration": "10m",
-      "description": "同 mixed_300（显式 probe profile，4C/8G VU 收紧）",
-      "reportMode": "short_poll",
+      "description": "同 mixed_300（显式 probe profile，WS report-events）",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -984,8 +1045,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 90,
-          "max": 400
+          "preAllocated": 130,
+          "max": 550
         },
         "stats": {
           "preAllocated": 130,
@@ -999,8 +1060,9 @@
     },
     "mixed_300_models": {
       "duration": "10m",
-      "description": "医学+人格拆分 submit 20/s（4C/8G VU 收紧）；report 短轮询",
-      "reportMode": "short_poll",
+      "description": "医学+人格拆分 submit 20/s；WS report-events",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 92,
         "personalityQuery": 39,
@@ -1023,14 +1085,15 @@
         "personalityQuery": { "preAllocated": 80, "max": 240 },
         "personalityQuestionnaireQuery": { "preAllocated": 50, "max": 120 },
         "submit": { "preAllocated": 100, "max": 350 },
-        "report": { "preAllocated": 90, "max": 360 },
+        "report": { "preAllocated": 120, "max": 500 },
         "stats": { "preAllocated": 130, "max": 380 },
         "chainProbe": { "preAllocated": 15, "max": 60 }
       }
     },
     "outbox_120": {
       "duration": "10m",
-      "reportMode": "short_poll",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 16,
         "personalityQuery": 16,
@@ -1043,7 +1106,7 @@
       "vusers": {
         "query": { "preAllocated": 80, "max": 400 },
         "submit": { "preAllocated": 400, "max": 1600 },
-        "report": { "preAllocated": 40, "max": 320 },
+        "report": { "preAllocated": 120, "max": 530 },
         "stats": { "preAllocated": 40, "max": 200 },
         "chainProbe": { "preAllocated": 30, "max": 300 }
       }
@@ -1069,7 +1132,8 @@
     },
     "capacity_no_scanner": {
       "duration": "10m",
-      "reportMode": "short_poll",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -1084,14 +1148,15 @@
       "vusers": {
         "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
-        "report": { "preAllocated": 45, "max": 380 },
-        "stats": { "preAllocated": 120, "max": 500 },
-        "chainProbe": { "preAllocated": 20, "max": 200 }
+        "report": { "preAllocated": 130, "max": 550 },
+        "stats": { "preAllocated": 130, "max": 380 },
+        "chainProbe": { "preAllocated": 15, "max": 60 }
       }
     },
     "capacity_with_scanner": {
       "duration": "10m",
-      "reportMode": "short_poll",
+      "reportMode": "websocket",
+      "reportWebSocket": true,
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -1157,6 +1222,7 @@
     "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
     "answersheetAssessment": "/api/v1/answersheets/{answersheet_id}/assessment",
     "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
+    "reportEvents": "/api/v1/report-events",
     "personalitySession": "/api/v1/personality-assessment-sessions",
     "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "personalityReport": "/api/v1/personality-assessments/{assessment_id}/report?testee_id={testee_id}"

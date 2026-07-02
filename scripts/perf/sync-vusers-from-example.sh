@@ -19,12 +19,20 @@ if ! command -v jq >/dev/null 2>&1; then
 fi
 
 next="$(jq -c --slurpfile ex "$EXAMPLE" '
-  .vuserSizing = ($ex[0].vuserSizing // .vuserSizing)
+  .reportMode = ($ex[0].reportMode // .reportMode)
+  | .vuserSizing = ($ex[0].vuserSizing // .vuserSizing)
+  | .paths.reportEvents = ($ex[0].paths.reportEvents // .paths.reportEvents)
   | reduce ($ex[0].qpsProfiles | keys[]) as $k (.;
       if (.qpsProfiles[$k] // null) and ($ex[0].qpsProfiles[$k].vusers // null) then
         .qpsProfiles[$k].vusers = $ex[0].qpsProfiles[$k].vusers
         | if ($ex[0].qpsProfiles[$k].description // null) then
             .qpsProfiles[$k].description = $ex[0].qpsProfiles[$k].description
+          else . end
+        | if ($ex[0].qpsProfiles[$k].reportMode // null) then
+            .qpsProfiles[$k].reportMode = $ex[0].qpsProfiles[$k].reportMode
+          else . end
+        | if ($ex[0].qpsProfiles[$k].reportWebSocket // null) then
+            .qpsProfiles[$k].reportWebSocket = $ex[0].qpsProfiles[$k].reportWebSocket
           else . end
       else . end
     )
@@ -32,4 +40,4 @@ next="$(jq -c --slurpfile ex "$EXAMPLE" '
 
 jq . <<<"$next" > "${LOCAL}.tmp"
 mv "${LOCAL}.tmp" "$LOCAL"
-echo "overlaid vusers from example -> $LOCAL"
+echo "overlaid vusers/reportMode from example -> $LOCAL"
