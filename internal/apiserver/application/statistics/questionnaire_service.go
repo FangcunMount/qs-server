@@ -2,6 +2,8 @@ package statistics
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
@@ -15,6 +17,17 @@ type questionnaireStatisticsService struct {
 	realtime StatisticsRealtimeReader
 	cache    statisticscache.Cache
 	hotset   cachetarget.HotsetRecorder
+	guard    *readGuard[*statistics.QuestionnaireStatistics]
+}
+
+type QuestionnaireStatisticsServiceOption func(*questionnaireStatisticsService)
+
+func WithQuestionnaireStatisticsGuard(opts StatisticsReadGuardOptions) QuestionnaireStatisticsServiceOption {
+	return func(s *questionnaireStatisticsService) {
+		s.guard = newReadGuard(opts, cloneQuestionnaireStatistics, func() {
+			incStatsQuestionnaireStaleServed()
+		})
+	}
 }
 
 func NewQuestionnaireStatisticsService(
@@ -22,13 +35,25 @@ func NewQuestionnaireStatisticsService(
 	realtime StatisticsRealtimeReader,
 	cache statisticscache.Cache,
 	hotset cachetarget.HotsetRecorder,
+	opts ...QuestionnaireStatisticsServiceOption,
 ) QuestionnaireStatisticsService {
-	return &questionnaireStatisticsService{
+	service := &questionnaireStatisticsService{
 		query:    query,
 		realtime: realtime,
 		cache:    cache,
 		hotset:   hotset,
+		guard: newReadGuard(
+			DefaultQuestionnaireStatisticsGuardOptions(),
+			cloneQuestionnaireStatistics,
+			func() { incStatsQuestionnaireStaleServed() },
+		),
 	}
+	for _, opt := range opts {
+		if opt != nil {
+			opt(service)
+		}
+	}
+	return service
 }
 
 func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
@@ -43,27 +68,37 @@ func (s *questionnaireStatisticsService) GetQuestionnaireStatistics(
 		return stats, nil
 	}
 
-	if s.query != nil {
-		stats, found, err := s.query.LoadQuestionnaireStatistics(ctx, orgID, questionnaireCode)
-		if err != nil {
-			return nil, err
-		}
-		if found {
-			s.cacheQuestionnaireStatistics(ctx, orgID, questionnaireCode, stats)
-			l.Debugw("从MySQL统计表获取问卷统计")
-			s.recordHotset(ctx, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
-			return stats, nil
-		}
-	}
-
-	l.Debugw("从原始表实时聚合问卷统计")
-	stats, err := s.realtime.BuildRealtimeQuestionnaireStatistics(ctx, orgID, questionnaireCode)
+	key := fmt.Sprintf("questionnaire-stats:%d:%s", orgID, questionnaireCode)
+	stats, err := s.guard.Load(ctx, key, func(loadCtx context.Context) (*statistics.QuestionnaireStatistics, error) {
+		return s.loadQuestionnaireStatisticsMiss(loadCtx, orgID, questionnaireCode)
+	})
 	if err != nil {
 		return nil, err
 	}
 	s.cacheQuestionnaireStatistics(ctx, orgID, questionnaireCode, stats)
 	s.recordHotset(ctx, cachetarget.NewQueryStatsQuestionnaireWarmupTarget(orgID, questionnaireCode))
 	return stats, nil
+}
+
+func (s *questionnaireStatisticsService) loadQuestionnaireStatisticsMiss(
+	ctx context.Context,
+	orgID int64,
+	questionnaireCode string,
+) (*statistics.QuestionnaireStatistics, error) {
+	l := logger.L(ctx)
+	if s.query != nil {
+		stats, found, err := s.query.LoadQuestionnaireStatistics(ctx, orgID, questionnaireCode)
+		if err != nil {
+			return nil, err
+		}
+		if found {
+			l.Debugw("从MySQL统计表获取问卷统计")
+			return stats, nil
+		}
+	}
+
+	l.Debugw("从原始表实时聚合问卷统计")
+	return s.realtime.BuildRealtimeQuestionnaireStatistics(ctx, orgID, questionnaireCode)
 }
 
 func (s *questionnaireStatisticsService) loadCachedQuestionnaireStatistics(
@@ -99,4 +134,21 @@ func (s *questionnaireStatisticsService) recordHotset(ctx context.Context, targe
 		return
 	}
 	_ = s.hotset.Record(ctx, target)
+}
+
+func cloneQuestionnaireStatistics(stats *statistics.QuestionnaireStatistics) *statistics.QuestionnaireStatistics {
+	if stats == nil {
+		return nil
+	}
+	data, err := json.Marshal(stats)
+	if err != nil {
+		cloned := *stats
+		return &cloned
+	}
+	var out statistics.QuestionnaireStatistics
+	if err := json.Unmarshal(data, &out); err != nil {
+		cloned := *stats
+		return &cloned
+	}
+	return &out
 }

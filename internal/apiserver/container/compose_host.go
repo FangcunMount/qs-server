@@ -7,6 +7,7 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
@@ -85,6 +86,22 @@ func (c *Container) StatisticsSystemOptions() statisticsApp.SystemStatisticsOpti
 		DisableRealtimeFallback: opts.DisableRealtimeFallback,
 		StaleOnTimeout:          opts.StaleOnTimeout,
 		LoadTimeout:             opts.LoadTimeout,
+	}
+}
+
+func (c *Container) StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions {
+	return toStatisticsReadGuardOptions(c.cacheOptions.StatisticsOverview)
+}
+
+func (c *Container) StatisticsQuestionnaireGuardOptions() statisticsApp.StatisticsReadGuardOptions {
+	return toStatisticsReadGuardOptions(c.cacheOptions.StatisticsQuestionnaire)
+}
+
+func toStatisticsReadGuardOptions(opts cachebootstrap.StatisticsReadGuardOptions) statisticsApp.StatisticsReadGuardOptions {
+	return statisticsApp.StatisticsReadGuardOptions{
+		ServiceSingleflight: opts.ServiceSingleflight,
+		StaleOnTimeout:      opts.StaleOnTimeout,
+		LoadTimeout:         opts.LoadTimeout,
 	}
 }
 

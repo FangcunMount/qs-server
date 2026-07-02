@@ -35,6 +35,8 @@ func InstallFrom(host InstallHost) error {
 		RepairWindowDays:       host.StatisticsRepairWindowDays(),
 		QueryPolicy:            host.CachePolicy(cachepolicy.PolicyStatsQuery),
 		SystemStatisticsOpts:   host.StatisticsSystemOptions(),
+		OverviewGuardOpts:      host.StatisticsOverviewGuardOptions(),
+		QuestionnaireGuardOpts: host.StatisticsQuestionnaireGuardOptions(),
 		HotsetRecorder:         host.HotsetRecorder(),
 		LockManager:            host.CacheLockManager(),
 		Observer:               host.CacheObserver(),

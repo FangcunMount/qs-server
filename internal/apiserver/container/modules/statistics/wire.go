@@ -28,6 +28,8 @@ type WireInput struct {
 	RepairWindowDays       int
 	QueryPolicy            cachepolicy.CachePolicy
 	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
+	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
+	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
 	HotsetRecorder         cachetarget.HotsetRecorder
 	LockManager            locklease.Manager
 	Observer               *observability.ComponentObserver
@@ -59,21 +61,23 @@ func Wire(in WireInput) (*Module, error) {
 		}
 	}
 	return Bootstrap(BootstrapInput{
-		MySQLDB:               in.MySQLDB,
-		RedisClient:           redisClient,
-		CacheBuilder:          in.CacheBuilder,
-		AnswerSheetReader:     in.AnswerSheetReader,
-		AnswerSheetScanSource: in.AnswerSheetScanSource,
-		MongoDB:               in.MongoDB,
-		RepairWindowDays:      in.RepairWindowDays,
-		QueryPolicy:           in.QueryPolicy,
-		SystemStatisticsOpts:  in.SystemStatisticsOpts,
-		HotsetRecorder:        in.HotsetRecorder,
-		LockManager:           in.LockManager,
-		VersionStore:          versionStore,
-		Observer:              in.Observer,
-		MySQLLimiter:          in.MySQLLimiter,
-		WarmupCoordinator:     in.WarmupCoordinator,
-		StatusService:         in.StatusService,
+		MySQLDB:                in.MySQLDB,
+		RedisClient:            redisClient,
+		CacheBuilder:           in.CacheBuilder,
+		AnswerSheetReader:      in.AnswerSheetReader,
+		AnswerSheetScanSource:  in.AnswerSheetScanSource,
+		MongoDB:                in.MongoDB,
+		RepairWindowDays:       in.RepairWindowDays,
+		QueryPolicy:            in.QueryPolicy,
+		SystemStatisticsOpts:   in.SystemStatisticsOpts,
+		OverviewGuardOpts:      in.OverviewGuardOpts,
+		QuestionnaireGuardOpts: in.QuestionnaireGuardOpts,
+		HotsetRecorder:         in.HotsetRecorder,
+		LockManager:            in.LockManager,
+		VersionStore:           versionStore,
+		Observer:               in.Observer,
+		MySQLLimiter:           in.MySQLLimiter,
+		WarmupCoordinator:      in.WarmupCoordinator,
+		StatusService:          in.StatusService,
 	})
 }

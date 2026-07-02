@@ -294,7 +294,16 @@ cache:
     stale_on_timeout: true            # 回源失败/超时返回进程内最近成功结果
     load_timeout: 25s
 
-  warmup:                     # 其他缓存预热配置
+  statistics_overview:        # 机构总览读保护与降级（对齐 system）
+    service_singleflight: true
+    stale_on_timeout: true
+    load_timeout: 25s
+
+  statistics_questionnaire:   # 问卷统计读保护与降级
+    stale_on_timeout: true
+    load_timeout: 15s
+
+  warmup:
     enable: true              # 启用缓存预热，生产环境建议开启以提升关键数据的访问性能
     startup:                  # 启动预热，生产环境建议开启以提升服务启动后的访问性能
       static: true            # 预热静态数据（如量表、问卷定义等），生产环境建议开启以提升访问性能

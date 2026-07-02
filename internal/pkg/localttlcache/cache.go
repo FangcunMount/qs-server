@@ -4,12 +4,17 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheutil"
 )
 
 // Options 进程内 TTL 缓存配置。
 type Options struct {
-	TTL        time.Duration
-	MaxEntries int
+	TTL            time.Duration
+	MaxEntries     int
+	TTLJitterRatio float64
+	OnHit          func()
+	OnMiss         func()
 }
 
 type cacheEntry[T any] struct {
@@ -83,7 +88,7 @@ func (c *Cache[T]) Set(key string, value T) {
 
 	entry := cacheEntry[T]{
 		value:     c.clone(value),
-		expiresAt: time.Now().Add(c.opts.TTL),
+		expiresAt: time.Now().Add(cacheutil.JitterTTL(c.opts.TTL, c.opts.TTLJitterRatio)),
 	}
 
 	c.mu.Lock()
@@ -135,12 +140,18 @@ func (c *Cache[T]) Stats() (hits, misses uint64) {
 }
 
 func (c *Cache[T]) recordHit() {
+	if c.opts.OnHit != nil {
+		c.opts.OnHit()
+	}
 	c.mu.Lock()
 	c.hits++
 	c.mu.Unlock()
 }
 
 func (c *Cache[T]) recordMiss() {
+	if c.opts.OnMiss != nil {
+		c.opts.OnMiss()
+	}
 	c.mu.Lock()
 	c.misses++
 	c.mu.Unlock()

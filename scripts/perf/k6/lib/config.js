@@ -562,7 +562,7 @@ export function resolveReportMode() {
   if (envOrConfigBool('REPORT_SHORT_POLL', ['reportShortPoll', 'report_short_poll'], false)) {
     return 'short_poll';
   }
-  return 'long_poll';
+  return 'short_poll';
 }
 
 export const REPORT_MODE = resolveReportMode();

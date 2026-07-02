@@ -102,13 +102,15 @@ func (r *GRPCClientRegistry) personalityModelClient() *grpcclient.PersonalityMod
 
 // CreateGRPCClientManager 创建 gRPC 客户端管理器。
 // perRPC 非 nil 时（通常为 IAM ServiceAuthHelper）对 apiserver 的每次 RPC 附加服务 JWT metadata。
-func CreateGRPCClientManager(endpoint string, timeout int, insecure bool, tlsCertFile, tlsKeyFile, tlsCAFile, tlsServerName string, maxInflight int, perRPC credentials.PerRPCCredentials) (*grpcclient.Manager, error) {
+func CreateGRPCClientManager(endpoint string, timeout int, insecure bool, tlsCertFile, tlsKeyFile, tlsCAFile, tlsServerName string, maxInflight int, inflightWaitMs int, perRPC credentials.PerRPCCredentials) (*grpcclient.Manager, error) {
+	inflightWait := time.Duration(inflightWaitMs) * time.Millisecond
 	manager, err := grpcclient.NewManager(&grpcclient.ManagerConfig{
 		Endpoint:          endpoint,
 		Timeout:           time.Duration(timeout) * time.Second,
 		Insecure:          insecure,
 		PoolSize:          1,
 		MaxInflight:       maxInflight,
+		InflightWait:      inflightWait,
 		TLSCertFile:       tlsCertFile,
 		TLSKeyFile:        tlsKeyFile,
 		TLSCAFile:         tlsCAFile,

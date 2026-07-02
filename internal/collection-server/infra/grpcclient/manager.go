@@ -11,19 +11,31 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
+	"google.golang.org/grpc/status"
+
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 )
+
+var grpcInflightWaitSeconds = promauto.NewHistogram(prometheus.HistogramOpts{
+	Name:    "collection_grpc_inflight_wait_seconds",
+	Help:    "Time spent waiting for collection-server gRPC client inflight slots.",
+	Buckets: prometheus.ExponentialBuckets(0.001, 2, 14),
+})
 
 // ManagerConfig gRPC 客户端管理器配置
 type ManagerConfig struct {
-	Endpoint    string        // apiserver 地址，如 "localhost:9090"
-	Timeout     time.Duration // 请求超时时间
-	Insecure    bool          // 是否使用不安全连接（开发环境）
-	PoolSize    int           // 连接池大小（默认 1）
-	MaxRetries  int           // 最大重试次数
-	MaxInflight int           // 最大并发调用数
+	Endpoint     string        // apiserver 地址，如 "localhost:9090"
+	Timeout      time.Duration // 请求超时时间
+	InflightWait time.Duration // inflight 槽位排队最长等待；0 表示等到 RPC 超时
+	Insecure     bool          // 是否使用不安全连接（开发环境）
+	PoolSize     int           // 连接池大小（默认 1）
+	MaxRetries   int           // 最大重试次数
+	MaxInflight  int           // 最大并发调用数
 
 	// TLS 配置
 	TLSCertFile   string // 客户端证书文件
@@ -143,11 +155,30 @@ func (m *Manager) unaryInterceptor(
 	}
 
 	if m.inflight != nil {
-		select {
-		case m.inflight <- struct{}{}:
-			defer func() { <-m.inflight }()
-		case <-ctx.Done():
-			return ctx.Err()
+		waitBudget := m.config.InflightWait
+		start := time.Now()
+		if waitBudget <= 0 {
+			select {
+			case m.inflight <- struct{}{}:
+				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
+				defer func() { <-m.inflight }()
+			case <-ctx.Done():
+				return ctx.Err()
+			}
+		} else {
+			timer := time.NewTimer(waitBudget)
+			defer timer.Stop()
+			select {
+			case m.inflight <- struct{}{}:
+				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
+				defer func() { <-m.inflight }()
+			case <-timer.C:
+				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
+				return status.Error(codes.ResourceExhausted, "grpc client inflight limit exceeded")
+			case <-ctx.Done():
+				grpcInflightWaitSeconds.Observe(time.Since(start).Seconds())
+				return ctx.Err()
+			}
 		}
 	}
 

@@ -45,6 +45,7 @@ grpc_client:
   timeout: 30                       # gRPC 超时时间（秒）
   insecure: false                   # 生产环境启用 TLS（insecure=false 表示启用 TLS）
   max_inflight: 360                 # 最大并发请求数 360
+  inflight_wait_ms: 2000            # inflight 槽位满时最长排队等待，超时快速失败
   
   # mTLS 客户端配置（宿主机 /data/infra/ssl/grpc → 容器 /etc/qs-server/ssl）
   tls-cert-file: "/etc/qs-server/ssl/grpc/server/qs-collection-server.crt"
@@ -133,6 +134,7 @@ submit_queue:                       # 提交排队配置
 questionnaire_cache:                # 问卷详情 L1 缓存配置
   enabled: true                     # 启用问卷详情 L1 缓存
   ttl_seconds: 180                  # 问卷详情 L1 缓存时间
+  ttl_jitter_ratio: 0.2             # TTL 抖动，避免集体失效
   max_entries: 256                  # 问卷详情 L1 缓存最大条目数
   singleflight: true                # 启用 singleflight 避免重复请求
   signal_evict_enabled: true        # 启用信号驱逐
@@ -140,9 +142,18 @@ questionnaire_cache:                # 问卷详情 L1 缓存配置
 scale_cache:                        # 量表目录 L1 缓存配置
   enabled: true                     # 启用量表目录 L1 缓存
   ttl_seconds: 180                  # 量表目录 L1 缓存时间 180s
+  ttl_jitter_ratio: 0.2             # TTL 抖动，避免集体失效
   max_entries: 256                  # 量表目录 L1 缓存最大条目数 256
   singleflight: true                # 启用 singleflight 避免重复请求
   signal_evict_enabled: true        # 启用信号驱逐
+
+personality_cache:                  # 人格模型目录 L1 缓存配置
+  enabled: true                     # 启用人格模型目录 L1 缓存
+  ttl_seconds: 180
+  ttl_jitter_ratio: 0.2
+  max_entries: 256
+  singleflight: true
+  signal_evict_enabled: true
 
 wait_report:                        # 报告等待 HTTP 轮询接口配置
   default_timeout_seconds: 20       # 默认等待超时时间 20s
@@ -283,3 +294,4 @@ runtime:
 # 并发/连接池调优
 concurrency:
   max-concurrency: 400
+  max-wait-ms: 2000                 # HTTP 槽位满时最长排队等待，超时返回 503

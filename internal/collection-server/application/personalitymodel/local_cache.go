@@ -23,8 +23,11 @@ type LocalCatalogCache struct {
 
 // LocalCatalogCacheOptions 人格模型目录 L1 配置。
 type LocalCatalogCacheOptions struct {
-	TTL        time.Duration
-	MaxEntries int
+	TTL            time.Duration
+	MaxEntries     int
+	TTLJitterRatio float64
+	OnHit          func()
+	OnMiss         func()
 }
 
 // NewLocalCatalogCache 创建人格模型目录 L1 缓存。
@@ -35,7 +38,13 @@ func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
 	if opts.MaxEntries <= 0 {
 		opts.MaxEntries = 256
 	}
-	base := localttlcache.Options{TTL: opts.TTL, MaxEntries: opts.MaxEntries}
+	base := localttlcache.Options{
+		TTL:            opts.TTL,
+		MaxEntries:     opts.MaxEntries,
+		TTLJitterRatio: opts.TTLJitterRatio,
+		OnHit:          opts.OnHit,
+		OnMiss:         opts.OnMiss,
+	}
 	return &LocalCatalogCache{
 		detail:     localttlcache.New(base, clonePersonalityModelResponse),
 		list:       localttlcache.New(base, cloneListPersonalityModelsResponse),

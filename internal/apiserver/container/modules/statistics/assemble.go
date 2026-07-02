@@ -39,22 +39,24 @@ type Module struct {
 
 // Deps defines explicit constructor dependencies for the statistics module.
 type Deps struct {
-	MySQLDB               *gorm.DB
-	RedisClient           redis.UniversalClient
-	CacheBuilder          *keyspace.Builder
-	AnswerSheetReader     surveyreadmodel.AnswerSheetReader
-	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
-	MongoDB               *mongo.Database
-	RepairWindowDays      int
-	QueryPolicy           cachepolicy.CachePolicy
-	SystemStatisticsOpts  statisticsApp.SystemStatisticsOptions
-	HotsetRecorder        cachetarget.HotsetRecorder
-	LockManager           locklease.Manager
-	VersionStore          cachequery.VersionTokenStore
-	Observer              *observability.ComponentObserver
-	MySQLLimiter          backpressure.Acquirer
-	WarmupCoordinator     cachegov.Coordinator
-	StatusService         cachegov.StatusService
+	MySQLDB                *gorm.DB
+	RedisClient            redis.UniversalClient
+	CacheBuilder           *keyspace.Builder
+	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
+	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
+	MongoDB                *mongo.Database
+	RepairWindowDays       int
+	QueryPolicy            cachepolicy.CachePolicy
+	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
+	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
+	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
+	HotsetRecorder         cachetarget.HotsetRecorder
+	LockManager            locklease.Manager
+	VersionStore           cachequery.VersionTokenStore
+	Observer               *observability.ComponentObserver
+	MySQLLimiter           backpressure.Acquirer
+	WarmupCoordinator      cachegov.Coordinator
+	StatusService          cachegov.StatusService
 }
 
 // New assembles the statistics module.
@@ -88,7 +90,10 @@ func New(deps Deps) (*Module, error) {
 		normalized.HotsetRecorder,
 		statisticsApp.WithSystemStatisticsOptions(normalized.SystemStatisticsOpts),
 	)
-	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
+	module.QuestionnaireStatisticsService = statisticsApp.NewQuestionnaireStatisticsService(
+		repo, repo, cache, normalized.HotsetRecorder,
+		statisticsApp.WithQuestionnaireStatisticsGuard(normalized.QuestionnaireGuardOpts),
+	)
 	module.TesteeStatisticsService = statisticsApp.NewTesteeStatisticsService(repo, cache)
 	module.PlanStatisticsService = statisticsApp.NewPlanStatisticsService(repo, repo, cache, normalized.HotsetRecorder)
 	module.ReadService = statisticsApp.NewReadService(
@@ -96,6 +101,7 @@ func New(deps Deps) (*Module, error) {
 		normalized.AnswerSheetReader,
 		statisticsApp.WithReadServiceCache(cache),
 		statisticsApp.WithReadServiceHotset(normalized.HotsetRecorder),
+		statisticsApp.WithReadServiceOverviewGuard(normalized.OverviewGuardOpts),
 	)
 	module.PeriodicStatsService = statisticsApp.NewPeriodicStatsService(repo)
 	module.BehaviorProjectorService = statisticsApp.NewAssessmentEpisodeProjectorWithTransactionRunner(txRunner, repo)

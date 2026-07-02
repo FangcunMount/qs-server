@@ -15,10 +15,11 @@ import (
 )
 
 type readService struct {
-	readModel       StatisticsReadModel
-	answerSheetRead surveyreadmodel.AnswerSheetReader
-	cache           statisticscache.Cache
-	hotset          cachetarget.HotsetRecorder
+	readModel         StatisticsReadModel
+	answerSheetRead   surveyreadmodel.AnswerSheetReader
+	cache             statisticscache.Cache
+	hotset            cachetarget.HotsetRecorder
+	overviewGuardOpts StatisticsReadGuardOptions
 
 	overview           *overviewQuery
 	clinicianStats     *clinicianStatsQuery
@@ -28,6 +29,12 @@ type readService struct {
 }
 
 type ReadServiceOption func(*readService)
+
+func WithReadServiceOverviewGuard(opts StatisticsReadGuardOptions) ReadServiceOption {
+	return func(s *readService) {
+		s.overviewGuardOpts = opts
+	}
+}
 
 func WithReadServiceCache(cache statisticscache.Cache) ReadServiceOption {
 	return func(s *readService) {
@@ -50,7 +57,11 @@ func NewReadService(readModel StatisticsReadModel, answerSheetRead surveyreadmod
 		}
 	}
 	service.cacheHelper = newStatisticsCacheHelper(service.cache, service.hotset)
-	service.overview = &overviewQuery{readModel: readModel, cache: service.cacheHelper}
+	overviewOpts := service.overviewGuardOpts
+	if overviewOpts == (StatisticsReadGuardOptions{}) {
+		overviewOpts = DefaultStatisticsReadGuardOptions()
+	}
+	service.overview = newOverviewQuery(readModel, service.cacheHelper, overviewOpts)
 	service.clinicianStats = &clinicianStatsQuery{readModel: readModel}
 	service.entryStats = &entryStatsQuery{readModel: readModel}
 	service.questionnaireBatch = &questionnaireBatchQuery{readModel: readModel, answerSheetRead: answerSheetRead}

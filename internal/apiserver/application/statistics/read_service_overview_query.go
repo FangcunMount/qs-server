@@ -2,6 +2,8 @@ package statistics
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 )
@@ -9,6 +11,44 @@ import (
 type overviewQuery struct {
 	readModel StatisticsReadModel
 	cache     *statisticsCacheHelper
+	guard     *readGuard[*domainStatistics.StatisticsOverview]
+}
+
+func newOverviewQuery(
+	readModel StatisticsReadModel,
+	cache *statisticsCacheHelper,
+	opts StatisticsReadGuardOptions,
+) *overviewQuery {
+	return &overviewQuery{
+		readModel: readModel,
+		cache:     cache,
+		guard: newReadGuard(opts, cloneStatisticsOverview, func() {
+			incStatsOverviewStaleServed()
+		}),
+	}
+}
+
+func overviewGuardKey(orgID int64, timeRange domainStatistics.StatisticsTimeRange) string {
+	return fmt.Sprintf("overview:%d:%s:%s:%s", orgID, timeRange.Preset, timeRange.From.Format(timeLayout), timeRange.To.Format(timeLayout))
+}
+
+const timeLayout = "2006-01-02T15:04:05Z07:00"
+
+func cloneStatisticsOverview(stats *domainStatistics.StatisticsOverview) *domainStatistics.StatisticsOverview {
+	if stats == nil {
+		return nil
+	}
+	data, err := json.Marshal(stats)
+	if err != nil {
+		cloned := *stats
+		return &cloned
+	}
+	var out domainStatistics.StatisticsOverview
+	if err := json.Unmarshal(data, &out); err != nil {
+		cloned := *stats
+		return &cloned
+	}
+	return &out
 }
 
 func (q *overviewQuery) GetOverview(ctx context.Context, orgID int64, filter QueryFilter) (*domainStatistics.StatisticsOverview, error) {
@@ -22,7 +62,9 @@ func (q *overviewQuery) GetOverview(ctx context.Context, orgID int64, filter Que
 		return stats, nil
 	}
 
-	stats, err := q.buildOverview(ctx, orgID, timeRange)
+	stats, err := q.guard.Load(ctx, overviewGuardKey(orgID, timeRange), func(loadCtx context.Context) (*domainStatistics.StatisticsOverview, error) {
+		return q.buildOverview(loadCtx, orgID, timeRange)
+	})
 	if err != nil {
 		return nil, err
 	}

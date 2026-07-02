@@ -31,6 +31,7 @@ func (s *server) initializeIntegrations(_ resourceOutput, containerOutput contai
 		s.config.GRPCClient.TLSCAFile,
 		s.config.GRPCClient.TLSServerName,
 		s.config.GRPCClient.MaxInflight,
+		s.config.GRPCClient.InflightWaitMs,
 		perRPC,
 	)
 	if err != nil {

@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
@@ -57,9 +58,18 @@ func newQuestionnaireDetailCache(opts *options.Options) questionnaire.PublishedD
 		return nil
 	}
 	cfg := opts.QuestionnaireCache
+	base := catalogcache.LocalTTLCacheOptions(
+		"questionnaire",
+		time.Duration(cfg.TTLSeconds)*time.Second,
+		cfg.MaxEntries,
+		cfg.TTLJitterRatio,
+	)
 	return questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
-		TTL:        time.Duration(cfg.TTLSeconds) * time.Second,
-		MaxEntries: cfg.MaxEntries,
+		TTL:            base.TTL,
+		MaxEntries:     base.MaxEntries,
+		TTLJitterRatio: base.TTLJitterRatio,
+		OnHit:          base.OnHit,
+		OnMiss:         base.OnMiss,
 	})
 }
 
@@ -100,9 +110,18 @@ func newScaleCatalogCache(opts *options.Options) scale.CatalogCache {
 		return nil
 	}
 	cfg := opts.ScaleCache
+	base := catalogcache.LocalTTLCacheOptions(
+		"scale",
+		time.Duration(cfg.TTLSeconds)*time.Second,
+		cfg.MaxEntries,
+		cfg.TTLJitterRatio,
+	)
 	return scale.NewLocalCatalogCache(scale.LocalCatalogCacheOptions{
-		TTL:        time.Duration(cfg.TTLSeconds) * time.Second,
-		MaxEntries: cfg.MaxEntries,
+		TTL:            base.TTL,
+		MaxEntries:     base.MaxEntries,
+		TTLJitterRatio: base.TTLJitterRatio,
+		OnHit:          base.OnHit,
+		OnMiss:         base.OnMiss,
 	})
 }
 
@@ -143,9 +162,18 @@ func newPersonalityCatalogCache(opts *options.Options) personalitymodel.CatalogC
 		return nil
 	}
 	cfg := opts.PersonalityCache
+	base := catalogcache.LocalTTLCacheOptions(
+		"personality",
+		time.Duration(cfg.TTLSeconds)*time.Second,
+		cfg.MaxEntries,
+		cfg.TTLJitterRatio,
+	)
 	return personalitymodel.NewLocalCatalogCache(personalitymodel.LocalCatalogCacheOptions{
-		TTL:        time.Duration(cfg.TTLSeconds) * time.Second,
-		MaxEntries: cfg.MaxEntries,
+		TTL:            base.TTL,
+		MaxEntries:     base.MaxEntries,
+		TTLJitterRatio: base.TTLJitterRatio,
+		OnHit:          base.OnHit,
+		OnMiss:         base.OnMiss,
 	})
 }
 

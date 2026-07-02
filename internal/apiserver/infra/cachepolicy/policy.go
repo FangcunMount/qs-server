@@ -6,7 +6,7 @@ import (
 	"io"
 	"time"
 
-	rediskit "github.com/FangcunMount/component-base/pkg/redis"
+	"github.com/FangcunMount/qs-server/internal/pkg/cacheutil"
 )
 
 // EnableCompression is kept only for temporary compatibility with old callers.
@@ -133,7 +133,7 @@ func (p CachePolicy) JitterTTL(ttl time.Duration) time.Duration {
 	if ratio > 1 {
 		ratio = 1
 	}
-	return rediskit.JitterTTL(ttl, ratio)
+	return cacheutil.JitterTTL(ttl, ratio)
 }
 
 // CompressValue 根据策略决定是否压缩 payload。

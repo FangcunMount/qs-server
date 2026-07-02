@@ -20,22 +20,24 @@ import (
 
 // BootstrapInput carries container integration inputs for statistics module bootstrap.
 type BootstrapInput struct {
-	MySQLDB               *gorm.DB
-	RedisClient           redis.UniversalClient
-	CacheBuilder          *keyspace.Builder
-	AnswerSheetReader     surveyreadmodel.AnswerSheetReader
-	AnswerSheetScanSource statisticsApp.AnswerSheetScanSource
-	MongoDB               *mongo.Database
-	RepairWindowDays      int
-	QueryPolicy           cachepolicy.CachePolicy
-	SystemStatisticsOpts  statisticsApp.SystemStatisticsOptions
-	HotsetRecorder        cachetarget.HotsetRecorder
-	LockManager           locklease.Manager
-	VersionStore          cachequery.VersionTokenStore
-	Observer              *observability.ComponentObserver
-	MySQLLimiter          backpressure.Acquirer
-	WarmupCoordinator     cachegov.Coordinator
-	StatusService         cachegov.StatusService
+	MySQLDB                *gorm.DB
+	RedisClient            redis.UniversalClient
+	CacheBuilder           *keyspace.Builder
+	AnswerSheetReader      surveyreadmodel.AnswerSheetReader
+	AnswerSheetScanSource  statisticsApp.AnswerSheetScanSource
+	MongoDB                *mongo.Database
+	RepairWindowDays       int
+	QueryPolicy            cachepolicy.CachePolicy
+	SystemStatisticsOpts   statisticsApp.SystemStatisticsOptions
+	OverviewGuardOpts      statisticsApp.StatisticsReadGuardOptions
+	QuestionnaireGuardOpts statisticsApp.StatisticsReadGuardOptions
+	HotsetRecorder         cachetarget.HotsetRecorder
+	LockManager            locklease.Manager
+	VersionStore           cachequery.VersionTokenStore
+	Observer               *observability.ComponentObserver
+	MySQLLimiter           backpressure.Acquirer
+	WarmupCoordinator      cachegov.Coordinator
+	StatusService          cachegov.StatusService
 }
 
 // Bootstrap assembles the statistics module from container integration inputs.

@@ -81,20 +81,22 @@ func (s *server) buildContainerCacheOptions() container.ContainerCacheOptions {
 	}
 
 	return container.ContainerCacheOptions{
-		DisableEvaluationCache: cacheCfg.DisableEvaluationCache,
-		DisableStatisticsCache: cacheCfg.DisableStatisticsCache,
-		TTL:                    ttl,
-		TTLJitterRatio:         cacheCfg.TTLJitterRatio,
-		StatisticsWarmup:       buildStatisticsWarmupConfig(cacheCfg),
-		StatisticsSystem:       buildStatisticsSystemOptions(cacheCfg),
-		Warmup:                 buildWarmupOptions(cacheCfg),
-		CompressPayload:        cacheCfg.CompressPayload,
-		Static:                 buildCacheFamilyOptions(cacheCfg.Static),
-		Object:                 buildCacheFamilyOptions(cacheCfg.Object),
-		Query:                  buildQueryFamilyOptions(cacheCfg.Query),
-		Meta:                   container.ContainerCacheFamilyOptions{},
-		SDK:                    buildCacheFamilyOptions(cacheCfg.SDK),
-		Lock:                   buildCacheFamilyOptions(cacheCfg.Lock),
+		DisableEvaluationCache:  cacheCfg.DisableEvaluationCache,
+		DisableStatisticsCache:  cacheCfg.DisableStatisticsCache,
+		TTL:                     ttl,
+		TTLJitterRatio:          cacheCfg.TTLJitterRatio,
+		StatisticsWarmup:        buildStatisticsWarmupConfig(cacheCfg),
+		StatisticsSystem:        buildStatisticsSystemOptions(cacheCfg),
+		StatisticsOverview:      buildStatisticsOverviewOptions(cacheCfg),
+		StatisticsQuestionnaire: buildStatisticsQuestionnaireOptions(cacheCfg),
+		Warmup:                  buildWarmupOptions(cacheCfg),
+		CompressPayload:         cacheCfg.CompressPayload,
+		Static:                  buildCacheFamilyOptions(cacheCfg.Static),
+		Object:                  buildCacheFamilyOptions(cacheCfg.Object),
+		Query:                   buildQueryFamilyOptions(cacheCfg.Query),
+		Meta:                    container.ContainerCacheFamilyOptions{},
+		SDK:                     buildCacheFamilyOptions(cacheCfg.SDK),
+		Lock:                    buildCacheFamilyOptions(cacheCfg.Lock),
 	}
 }
 
@@ -129,6 +131,42 @@ func buildStatisticsSystemOptions(cacheCfg *apiserveroptions.CacheOptions) cache
 		DisableRealtimeFallback: cacheCfg.StatisticsSystem.DisableRealtimeFallback,
 		StaleOnTimeout:          cacheCfg.StatisticsSystem.StaleOnTimeout,
 		LoadTimeout:             cacheCfg.StatisticsSystem.LoadTimeout,
+	}
+}
+
+func buildStatisticsOverviewOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
+	defaults := apiserveroptions.NewCacheOptions().StatisticsOverview
+	if cacheCfg == nil || cacheCfg.StatisticsOverview == nil {
+		if defaults == nil {
+			return cachebootstrap.StatisticsReadGuardOptions{}
+		}
+		return cachebootstrap.StatisticsReadGuardOptions{
+			ServiceSingleflight: defaults.ServiceSingleflight,
+			StaleOnTimeout:      defaults.StaleOnTimeout,
+			LoadTimeout:         defaults.LoadTimeout,
+		}
+	}
+	return cachebootstrap.StatisticsReadGuardOptions{
+		ServiceSingleflight: cacheCfg.StatisticsOverview.ServiceSingleflight,
+		StaleOnTimeout:      cacheCfg.StatisticsOverview.StaleOnTimeout,
+		LoadTimeout:         cacheCfg.StatisticsOverview.LoadTimeout,
+	}
+}
+
+func buildStatisticsQuestionnaireOptions(cacheCfg *apiserveroptions.CacheOptions) cachebootstrap.StatisticsReadGuardOptions {
+	defaults := apiserveroptions.NewCacheOptions().StatisticsQuestionnaire
+	if cacheCfg == nil || cacheCfg.StatisticsQuestionnaire == nil {
+		if defaults == nil {
+			return cachebootstrap.StatisticsReadGuardOptions{}
+		}
+		return cachebootstrap.StatisticsReadGuardOptions{
+			StaleOnTimeout: defaults.StaleOnTimeout,
+			LoadTimeout:    defaults.LoadTimeout,
+		}
+	}
+	return cachebootstrap.StatisticsReadGuardOptions{
+		StaleOnTimeout: cacheCfg.StatisticsQuestionnaire.StaleOnTimeout,
+		LoadTimeout:    cacheCfg.StatisticsQuestionnaire.LoadTimeout,
 	}
 }
 

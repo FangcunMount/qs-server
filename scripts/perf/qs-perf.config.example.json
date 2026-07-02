@@ -22,14 +22,10 @@
     "medical": 0.8,
     "personality": 0.2
   },
+  "reportMode": "short_poll",
   "reportSizing": {
-    "note": "qps.report 表示用户侧「查询报告是否就绪」的操作频率，不是裸 HTTP RPS；短轮询会 sleep，长轮询会阻塞至 timeout，WebSocket 为长连接。",
+    "note": "生产默认 report-status 短轮询（WS 主路径 + HTTP 降级）。长轮询仅 special_report_long_poll 专项 profile。",
     "modes": {
-      "long_poll": {
-        "reportMode": "long_poll",
-        "path": "wait-report",
-        "maxVuFormula": "report_rps × report_timeout × 1.1"
-      },
       "short_poll": {
         "reportMode": "short_poll",
         "path": "report-status",
@@ -483,7 +479,6 @@
     "mixed_280": {
       "duration": "8m",
       "description": "legacy 单桶 query=问卷 132/s；三域升档请用 mixed_280_models",
-      "reportMode": "long_poll",
       "qps": {
         "query": 132,
         "submit": 24,
@@ -501,8 +496,8 @@
           "max": 1180
         },
         "report": {
-          "preAllocated": 560,
-          "max": 860
+          "preAllocated": 40,
+          "max": 320
         },
         "stats": {
           "preAllocated": 120,
@@ -514,9 +509,9 @@
         }
       }
     },
-    "mixed_280_models": {
+    "special_report_long_poll": {
       "duration": "8m",
-      "description": "三域 L1 升档：医学 71/s + 人格 36/s + 问卷 25/s（合计 132/s query）；submit/report/stats 同 mixed_280",
+      "description": "【专项·非升档流程】wait-report 长轮询容量回归；生产已弃用，仅接口兼容验证",
       "reportMode": "long_poll",
       "qps": {
         "medicalQuery": 71,
@@ -566,11 +561,10 @@
         }
       }
     },
-    "mixed_280_models_short_report": {
+    "mixed_280_models": {
       "duration": "8m",
-      "description": "mixed_280_models + report-status 短轮询（A 方案验收）；report 96/s 走 /report-status + next_poll_after_ms 退避",
+      "description": "三域 L1 280 档：report 走 report-status 短轮询（对齐生产 HTTP 降级路径）",
       "reportMode": "short_poll",
-      "reportShortPoll": true,
       "qps": {
         "medicalQuery": 71,
         "personalityQuery": 36,
@@ -579,10 +573,6 @@
         "report": 96,
         "stats": 28,
         "chainProbe": 0
-      },
-      "paths": {
-        "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
-        "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}"
       },
       "modelMix": {
         "medical": 0.8,
@@ -678,8 +668,8 @@
     },
     "mixed_300": {
       "duration": "10m",
-      "description": "验收档（含 chainProbe 1/s）；HTTP 隔离复测请用 mixed_300_http",
-      "reportMode": "long_poll",
+      "description": "全量验收档（含 chainProbe 1/s）；short_poll + 拆分 query，对齐 mixed_280_models 增量 +14/s 读 / +4 report",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -700,13 +690,25 @@
           "preAllocated": 350,
           "max": 1500
         },
+        "medicalQuery": {
+          "preAllocated": 140,
+          "max": 560
+        },
+        "personalityQuery": {
+          "preAllocated": 75,
+          "max": 300
+        },
+        "questionnaireQuery": {
+          "preAllocated": 42,
+          "max": 210
+        },
         "submit": {
-          "preAllocated": 180,
-          "max": 1000
+          "preAllocated": 290,
+          "max": 1180
         },
         "report": {
-          "preAllocated": 600,
-          "max": 900
+          "preAllocated": 45,
+          "max": 380
         },
         "stats": {
           "preAllocated": 120,
@@ -720,7 +722,8 @@
     },
     "mixed_300_http": {
       "duration": "10m",
-      "description": "300 档 HTTP 攻关 Step1：query 同 mixed_280_models（71/36/25），report=96，无 probe；10min 稳态后再升 mixed_300_http_query",
+      "description": "300 档 HTTP 攻关 Step1：query 同 mixed_280_models（71/36/25），report=96 短轮询，无 probe",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 71,
         "personalityQuery": 36,
@@ -756,8 +759,8 @@
           "max": 1000
         },
         "report": {
-          "preAllocated": 560,
-          "max": 860
+          "preAllocated": 40,
+          "max": 320
         },
         "stats": {
           "preAllocated": 120,
@@ -771,7 +774,8 @@
     },
     "mixed_300_http_query": {
       "duration": "10m",
-      "description": "300 档 HTTP 攻关 Step2：query 升至 mixed_300 配比（80/40/13/13），report=96，无 probe",
+      "description": "300 档 HTTP 攻关 Step2：满读压 + report=96 短轮询，无 probe",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -796,8 +800,8 @@
           "max": 1000
         },
         "report": {
-          "preAllocated": 560,
-          "max": 860
+          "preAllocated": 40,
+          "max": 320
         },
         "stats": {
           "preAllocated": 120,
@@ -811,7 +815,8 @@
     },
     "mixed_300_http_query_nostats": {
       "duration": "10m",
-      "description": "线 A 隔离：同 Step2 读压+report，stats=0；验证 146/s collection 读是否独立于 apiserver statistics",
+      "description": "线 A 隔离：同 Step2 读压+report 短轮询，stats=0",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -836,8 +841,8 @@
           "max": 1000
         },
         "report": {
-          "preAllocated": 560,
-          "max": 860
+          "preAllocated": 40,
+          "max": 320
         }
       }
     },
@@ -889,7 +894,8 @@
     },
     "mixed_300_probe": {
       "duration": "10m",
-      "description": "同 mixed_300（显式 probe profile）",
+      "description": "同 mixed_300（显式 probe profile）；report 短轮询",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -915,8 +921,8 @@
           "max": 1000
         },
         "report": {
-          "preAllocated": 600,
-          "max": 900
+          "preAllocated": 45,
+          "max": 380
         },
         "stats": {
           "preAllocated": 120,
@@ -930,7 +936,8 @@
     },
     "mixed_300_models": {
       "duration": "10m",
-      "description": "医学+人格拆分：submit 合计 20/s（medical 14 + personality 6）",
+      "description": "医学+人格拆分：submit 合计 20/s；report 短轮询",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 92,
         "personalityQuery": 39,
@@ -950,13 +957,14 @@
       "vusers": {
         "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
-        "report": { "preAllocated": 600, "max": 900 },
+        "report": { "preAllocated": 40, "max": 320 },
         "stats": { "preAllocated": 120, "max": 500 },
         "chainProbe": { "preAllocated": 20, "max": 200 }
       }
     },
     "outbox_120": {
       "duration": "10m",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 16,
         "personalityQuery": 16,
@@ -969,7 +977,7 @@
       "vusers": {
         "query": { "preAllocated": 80, "max": 400 },
         "submit": { "preAllocated": 400, "max": 1600 },
-        "report": { "preAllocated": 700, "max": 1200 },
+        "report": { "preAllocated": 40, "max": 320 },
         "stats": { "preAllocated": 40, "max": 200 },
         "chainProbe": { "preAllocated": 30, "max": 300 }
       }
@@ -995,6 +1003,7 @@
     },
     "capacity_no_scanner": {
       "duration": "10m",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -1009,13 +1018,14 @@
       "vusers": {
         "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
-        "report": { "preAllocated": 600, "max": 900 },
+        "report": { "preAllocated": 45, "max": 380 },
         "stats": { "preAllocated": 120, "max": 500 },
         "chainProbe": { "preAllocated": 20, "max": 200 }
       }
     },
     "capacity_with_scanner": {
       "duration": "10m",
+      "reportMode": "short_poll",
       "qps": {
         "medicalQuery": 80,
         "personalityQuery": 40,
@@ -1030,7 +1040,7 @@
       "vusers": {
         "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
-        "report": { "preAllocated": 600, "max": 900 },
+        "report": { "preAllocated": 45, "max": 380 },
         "stats": { "preAllocated": 120, "max": 500 },
         "chainProbe": { "preAllocated": 20, "max": 200 }
       }
@@ -1080,9 +1090,9 @@
     "submit": "/api/v1/answersheets",
     "submitStatus": "/api/v1/answersheets/submit-status?request_id={request_id}",
     "answersheetAssessment": "/api/v1/answersheets/{answersheet_id}/assessment",
-    "reportStatus": "/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}",
+    "reportStatus": "/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "personalitySession": "/api/v1/personality-assessment-sessions",
-    "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}",
+    "personalityReportStatus": "/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}",
     "personalityReport": "/api/v1/personality-assessments/{assessment_id}/report?testee_id={testee_id}"
   }
 }

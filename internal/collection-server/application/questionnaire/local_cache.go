@@ -9,8 +9,11 @@ import (
 
 // LocalCacheOptions 进程内 L1 缓存配置。
 type LocalCacheOptions struct {
-	TTL        time.Duration
-	MaxEntries int
+	TTL            time.Duration
+	MaxEntries     int
+	TTLJitterRatio float64
+	OnHit          func()
+	OnMiss         func()
 }
 
 // LocalCache 已发布问卷 REST DTO 的进程内 TTL 缓存。
@@ -26,8 +29,11 @@ func NewLocalCache(opts LocalCacheOptions) *LocalCache {
 	}
 	return &LocalCache{
 		inner: localttlcache.New(localttlcache.Options{
-			TTL:        ttl,
-			MaxEntries: opts.MaxEntries,
+			TTL:            ttl,
+			MaxEntries:     opts.MaxEntries,
+			TTLJitterRatio: opts.TTLJitterRatio,
+			OnHit:          opts.OnHit,
+			OnMiss:         opts.OnMiss,
 		}, cloneResponse),
 	}
 }

@@ -8,20 +8,29 @@ import (
 
 // CacheOptions 描述 apiserver cache 子系统的运行时配置。
 type CacheOptions struct {
-	DisableEvaluationCache bool
-	DisableStatisticsCache bool
-	TTL                    CacheTTLOptions
-	TTLJitterRatio         float64
-	StatisticsWarmup       *cachegov.StatisticsWarmupConfig
-	StatisticsSystem       StatisticsSystemOptions
-	Warmup                 WarmupOptions
-	CompressPayload        bool
-	Static                 CacheFamilyOptions
-	Object                 CacheFamilyOptions
-	Query                  CacheFamilyOptions
-	Meta                   CacheFamilyOptions
-	SDK                    CacheFamilyOptions
-	Lock                   CacheFamilyOptions
+	DisableEvaluationCache  bool
+	DisableStatisticsCache  bool
+	TTL                     CacheTTLOptions
+	TTLJitterRatio          float64
+	StatisticsWarmup        *cachegov.StatisticsWarmupConfig
+	StatisticsSystem        StatisticsSystemOptions
+	StatisticsOverview      StatisticsReadGuardOptions
+	StatisticsQuestionnaire StatisticsReadGuardOptions
+	Warmup                  WarmupOptions
+	CompressPayload         bool
+	Static                  CacheFamilyOptions
+	Object                  CacheFamilyOptions
+	Query                   CacheFamilyOptions
+	Meta                    CacheFamilyOptions
+	SDK                     CacheFamilyOptions
+	Lock                    CacheFamilyOptions
+}
+
+// StatisticsReadGuardOptions 统计读路径并发合并与降级（overview/questionnaire 等）。
+type StatisticsReadGuardOptions struct {
+	ServiceSingleflight bool
+	StaleOnTimeout      bool
+	LoadTimeout         time.Duration
 }
 
 // StatisticsSystemOptions 控制系统统计查询并发与降级。

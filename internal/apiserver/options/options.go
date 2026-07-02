@@ -500,20 +500,22 @@ func (b *BackpressureOptions) AddFlags(fs *pflag.FlagSet) {
 
 // CacheOptions 缓存控制配置
 type CacheOptions struct {
-	DisableEvaluationCache bool                     `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
-	DisableStatisticsCache bool                     `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
-	TTL                    *CacheTTLOptions         `json:"ttl" mapstructure:"ttl"`
-	TTLJitterRatio         float64                  `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
-	StatisticsWarmup       *StatisticsWarmupOptions `json:"statistics_warmup" mapstructure:"statistics_warmup"`
-	StatisticsSystem       *StatisticsSystemOptions `json:"statistics_system" mapstructure:"statistics_system"`
-	Warmup                 *WarmupOptions           `json:"warmup" mapstructure:"warmup"`
-	CompressPayload        bool                     `json:"compress_payload" mapstructure:"compress_payload"`
-	Static                 *CacheFamilyOptions      `json:"static" mapstructure:"static"`
-	Object                 *CacheFamilyOptions      `json:"object" mapstructure:"object"`
-	Query                  *CacheFamilyOptions      `json:"query" mapstructure:"query"`
-	Meta                   *CacheFamilyOptions      `json:"meta" mapstructure:"meta"`
-	SDK                    *CacheFamilyOptions      `json:"sdk" mapstructure:"sdk"`
-	Lock                   *CacheFamilyOptions      `json:"lock" mapstructure:"lock"`
+	DisableEvaluationCache  bool                            `json:"disable_evaluation_cache" mapstructure:"disable_evaluation_cache"`
+	DisableStatisticsCache  bool                            `json:"disable_statistics_cache" mapstructure:"disable_statistics_cache"`
+	TTL                     *CacheTTLOptions                `json:"ttl" mapstructure:"ttl"`
+	TTLJitterRatio          float64                         `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	StatisticsWarmup        *StatisticsWarmupOptions        `json:"statistics_warmup" mapstructure:"statistics_warmup"`
+	StatisticsSystem        *StatisticsSystemOptions        `json:"statistics_system" mapstructure:"statistics_system"`
+	StatisticsOverview      *StatisticsOverviewOptions      `json:"statistics_overview" mapstructure:"statistics_overview"`
+	StatisticsQuestionnaire *StatisticsQuestionnaireOptions `json:"statistics_questionnaire" mapstructure:"statistics_questionnaire"`
+	Warmup                  *WarmupOptions                  `json:"warmup" mapstructure:"warmup"`
+	CompressPayload         bool                            `json:"compress_payload" mapstructure:"compress_payload"`
+	Static                  *CacheFamilyOptions             `json:"static" mapstructure:"static"`
+	Object                  *CacheFamilyOptions             `json:"object" mapstructure:"object"`
+	Query                   *CacheFamilyOptions             `json:"query" mapstructure:"query"`
+	Meta                    *CacheFamilyOptions             `json:"meta" mapstructure:"meta"`
+	SDK                     *CacheFamilyOptions             `json:"sdk" mapstructure:"sdk"`
+	Lock                    *CacheFamilyOptions             `json:"lock" mapstructure:"lock"`
 }
 
 // NewCacheOptions 创建默认缓存配置
@@ -554,6 +556,15 @@ func NewCacheOptions() *CacheOptions {
 			DisableRealtimeFallback: true,
 			StaleOnTimeout:          true,
 			LoadTimeout:             25 * time.Second,
+		},
+		StatisticsOverview: &StatisticsOverviewOptions{
+			ServiceSingleflight: true,
+			StaleOnTimeout:      true,
+			LoadTimeout:         25 * time.Second,
+		},
+		StatisticsQuestionnaire: &StatisticsQuestionnaireOptions{
+			StaleOnTimeout: true,
+			LoadTimeout:    15 * time.Second,
 		},
 		Warmup: &WarmupOptions{
 			Enable: true,
@@ -641,6 +652,19 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 			LoadTimeout:             25 * time.Second,
 		}
 	}
+	if c.StatisticsOverview == nil {
+		c.StatisticsOverview = &StatisticsOverviewOptions{
+			ServiceSingleflight: true,
+			StaleOnTimeout:      true,
+			LoadTimeout:         25 * time.Second,
+		}
+	}
+	if c.StatisticsQuestionnaire == nil {
+		c.StatisticsQuestionnaire = &StatisticsQuestionnaireOptions{
+			StaleOnTimeout: true,
+			LoadTimeout:    15 * time.Second,
+		}
+	}
 	if c.Warmup == nil {
 		c.Warmup = &WarmupOptions{
 			Enable: true,
@@ -708,6 +732,19 @@ type StatisticsSystemOptions struct {
 	DisableRealtimeFallback bool          `json:"disable_realtime_fallback" mapstructure:"disable_realtime_fallback"`
 	StaleOnTimeout          bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
 	LoadTimeout             time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
+}
+
+// StatisticsOverviewOptions 机构统计总览读保护与降级配置。
+type StatisticsOverviewOptions struct {
+	ServiceSingleflight bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
+	StaleOnTimeout      bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
+	LoadTimeout         time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
+}
+
+// StatisticsQuestionnaireOptions 问卷统计读保护与降级配置。
+type StatisticsQuestionnaireOptions struct {
+	StaleOnTimeout bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
+	LoadTimeout    time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
 }
 
 type WarmupOptions struct {

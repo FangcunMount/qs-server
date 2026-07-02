@@ -38,10 +38,11 @@ type Options struct {
 
 // GRPCClientOptions GRPC 客户端配置
 type GRPCClientOptions struct {
-	Endpoint    string `json:"endpoint" mapstructure:"endpoint"`
-	Timeout     int    `json:"timeout"  mapstructure:"timeout"`          // 超时时间（秒）
-	Insecure    bool   `json:"insecure" mapstructure:"insecure"`         // 是否使用不安全连接
-	MaxInflight int    `json:"max_inflight" mapstructure:"max_inflight"` // 最大并发调用数
+	Endpoint       string `json:"endpoint" mapstructure:"endpoint"`
+	Timeout        int    `json:"timeout"  mapstructure:"timeout"`                  // 超时时间（秒）
+	Insecure       bool   `json:"insecure" mapstructure:"insecure"`                 // 是否使用不安全连接
+	MaxInflight    int    `json:"max_inflight" mapstructure:"max_inflight"`         // 最大并发调用数
+	InflightWaitMs int    `json:"inflight_wait_ms" mapstructure:"inflight_wait_ms"` // inflight 槽位排队最长等待（毫秒），0 表示等到 RPC 超时
 
 	// TLS 配置
 	TLSCertFile   string `json:"tls_cert_file"   mapstructure:"tls-cert-file"`   // 客户端证书文件
@@ -53,33 +54,37 @@ type GRPCClientOptions struct {
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
 	MaxConcurrency int `json:"max_concurrency" mapstructure:"max_concurrency"` // 最大并发数
+	MaxWaitMs      int `json:"max_wait_ms" mapstructure:"max_wait_ms"`         // HTTP 槽位排队最长等待（毫秒），0 表示无限等待
 }
 
 // QuestionnaireCacheOptions 已发布问卷详情 BFF 进程内 L1 缓存。
 type QuestionnaireCacheOptions struct {
-	Enabled            bool `json:"enabled" mapstructure:"enabled"`
-	TTLSeconds         int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
-	MaxEntries         int  `json:"max_entries" mapstructure:"max_entries"`
-	Singleflight       bool `json:"singleflight" mapstructure:"singleflight"`
-	SignalEvictEnabled bool `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
+	Enabled            bool    `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds         int     `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	TTLJitterRatio     float64 `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	MaxEntries         int     `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight       bool    `json:"singleflight" mapstructure:"singleflight"`
+	SignalEvictEnabled bool    `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
 }
 
 // ScaleCacheOptions 量表目录 BFF 进程内 L1 缓存。
 type ScaleCacheOptions struct {
-	Enabled            bool `json:"enabled" mapstructure:"enabled"`
-	TTLSeconds         int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
-	MaxEntries         int  `json:"max_entries" mapstructure:"max_entries"`
-	Singleflight       bool `json:"singleflight" mapstructure:"singleflight"`
-	SignalEvictEnabled bool `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
+	Enabled            bool    `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds         int     `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	TTLJitterRatio     float64 `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	MaxEntries         int     `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight       bool    `json:"singleflight" mapstructure:"singleflight"`
+	SignalEvictEnabled bool    `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
 }
 
 // PersonalityCacheOptions 人格模型目录 BFF 进程内 L1 缓存。
 type PersonalityCacheOptions struct {
-	Enabled            bool `json:"enabled" mapstructure:"enabled"`
-	TTLSeconds         int  `json:"ttl_seconds" mapstructure:"ttl_seconds"`
-	MaxEntries         int  `json:"max_entries" mapstructure:"max_entries"`
-	Singleflight       bool `json:"singleflight" mapstructure:"singleflight"`
-	SignalEvictEnabled bool `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
+	Enabled            bool    `json:"enabled" mapstructure:"enabled"`
+	TTLSeconds         int     `json:"ttl_seconds" mapstructure:"ttl_seconds"`
+	TTLJitterRatio     float64 `json:"ttl_jitter_ratio" mapstructure:"ttl_jitter_ratio"`
+	MaxEntries         int     `json:"max_entries" mapstructure:"max_entries"`
+	Singleflight       bool    `json:"singleflight" mapstructure:"singleflight"`
+	SignalEvictEnabled bool    `json:"signal_evict_enabled" mapstructure:"signal_evict_enabled"`
 }
 
 // SubmitQueueOptions 提交排队配置
@@ -365,12 +370,16 @@ func (g *GRPCClientOptions) AddFlags(fs *pflag.FlagSet) {
 		"Whether to use insecure gRPC connection.")
 	fs.IntVar(&g.MaxInflight, "grpc_client.max-inflight", g.MaxInflight,
 		"The maximum number of in-flight gRPC calls.")
+	fs.IntVar(&g.InflightWaitMs, "grpc_client.inflight-wait-ms", g.InflightWaitMs,
+		"Maximum wait time in milliseconds when gRPC inflight slots are full (0 waits until RPC timeout).")
 }
 
 // AddFlags 添加并发处理相关的命令行参数
 func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
 		"The maximum number of concurrent goroutines for validation.")
+	fs.IntVar(&c.MaxWaitMs, "concurrency.max-wait-ms", c.MaxWaitMs,
+		"Maximum wait in milliseconds for HTTP concurrency slots before returning 503 (0 means block).")
 }
 
 // AddFlags 添加提交排队相关的命令行参数
@@ -387,6 +396,7 @@ func (q *QuestionnaireCacheOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.BoolVar(&q.Enabled, "questionnaire_cache.enabled", q.Enabled, "Enable in-process L1 cache for published questionnaire detail.")
 	fs.IntVar(&q.TTLSeconds, "questionnaire_cache.ttl-seconds", q.TTLSeconds, "TTL for questionnaire detail L1 cache in seconds.")
+	fs.Float64Var(&q.TTLJitterRatio, "questionnaire_cache.ttl-jitter-ratio", q.TTLJitterRatio, "TTL jitter ratio (0-1) for questionnaire detail L1 cache.")
 	fs.IntVar(&q.MaxEntries, "questionnaire_cache.max-entries", q.MaxEntries, "Maximum questionnaire detail entries in L1 cache.")
 	fs.BoolVar(&q.Singleflight, "questionnaire_cache.singleflight", q.Singleflight, "Coalesce concurrent questionnaire detail cache misses.")
 	fs.BoolVar(&q.SignalEvictEnabled, "questionnaire_cache.signal-evict-enabled", q.SignalEvictEnabled, "Subscribe questionnaire_cache_changed Redis signal to evict L1 entries.")
@@ -398,6 +408,7 @@ func (s *ScaleCacheOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.BoolVar(&s.Enabled, "scale_cache.enabled", s.Enabled, "Enable in-process L1 cache for scale catalog reads.")
 	fs.IntVar(&s.TTLSeconds, "scale_cache.ttl-seconds", s.TTLSeconds, "TTL for scale catalog L1 cache in seconds.")
+	fs.Float64Var(&s.TTLJitterRatio, "scale_cache.ttl-jitter-ratio", s.TTLJitterRatio, "TTL jitter ratio (0-1) for scale catalog L1 cache.")
 	fs.IntVar(&s.MaxEntries, "scale_cache.max-entries", s.MaxEntries, "Maximum scale catalog entries in L1 cache.")
 	fs.BoolVar(&s.Singleflight, "scale_cache.singleflight", s.Singleflight, "Coalesce concurrent scale catalog cache misses.")
 	fs.BoolVar(&s.SignalEvictEnabled, "scale_cache.signal-evict-enabled", s.SignalEvictEnabled, "Subscribe scale_cache_changed Redis signal to evict L1 entries.")
@@ -409,6 +420,7 @@ func (p *PersonalityCacheOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	fs.BoolVar(&p.Enabled, "personality_cache.enabled", p.Enabled, "Enable in-process L1 cache for personality model catalog reads.")
 	fs.IntVar(&p.TTLSeconds, "personality_cache.ttl-seconds", p.TTLSeconds, "TTL for personality model catalog L1 cache in seconds.")
+	fs.Float64Var(&p.TTLJitterRatio, "personality_cache.ttl-jitter-ratio", p.TTLJitterRatio, "TTL jitter ratio (0-1) for personality model catalog L1 cache.")
 	fs.IntVar(&p.MaxEntries, "personality_cache.max-entries", p.MaxEntries, "Maximum personality model catalog entries in L1 cache.")
 	fs.BoolVar(&p.Singleflight, "personality_cache.singleflight", p.Singleflight, "Coalesce concurrent personality model catalog cache misses.")
 	fs.BoolVar(&p.SignalEvictEnabled, "personality_cache.signal-evict-enabled", p.SignalEvictEnabled, "Subscribe personality_model_cache_changed Redis signal to evict L1 entries.")
@@ -702,6 +714,9 @@ func validateQuestionnaireCacheOptions(opts *QuestionnaireCacheOptions) []error 
 	if opts.MaxEntries <= 0 {
 		errs = append(errs, fmt.Errorf("questionnaire_cache.max_entries must be greater than 0 when enabled"))
 	}
+	if opts.TTLJitterRatio < 0 || opts.TTLJitterRatio > 1 {
+		errs = append(errs, fmt.Errorf("questionnaire_cache.ttl_jitter_ratio must be between 0 and 1"))
+	}
 	return errs
 }
 
@@ -720,6 +735,9 @@ func validateScaleCacheOptions(opts *ScaleCacheOptions) []error {
 	if opts.MaxEntries <= 0 {
 		errs = append(errs, fmt.Errorf("scale_cache.max_entries must be greater than 0 when enabled"))
 	}
+	if opts.TTLJitterRatio < 0 || opts.TTLJitterRatio > 1 {
+		errs = append(errs, fmt.Errorf("scale_cache.ttl_jitter_ratio must be between 0 and 1"))
+	}
 	return errs
 }
 
@@ -737,6 +755,9 @@ func validatePersonalityCacheOptions(opts *PersonalityCacheOptions) []error {
 	}
 	if opts.MaxEntries <= 0 {
 		errs = append(errs, fmt.Errorf("personality_cache.max_entries must be greater than 0 when enabled"))
+	}
+	if opts.TTLJitterRatio < 0 || opts.TTLJitterRatio > 1 {
+		errs = append(errs, fmt.Errorf("personality_cache.ttl_jitter_ratio must be between 0 and 1"))
 	}
 	return errs
 }

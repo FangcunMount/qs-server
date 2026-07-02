@@ -47,6 +47,8 @@ type Host interface {
 	DisableEvaluationCache() bool
 	DisableStatisticsCache() bool
 	StatisticsSystemOptions() statisticsApp.SystemStatisticsOptions
+	StatisticsOverviewGuardOptions() statisticsApp.StatisticsReadGuardOptions
+	StatisticsQuestionnaireGuardOptions() statisticsApp.StatisticsReadGuardOptions
 
 	CacheClient(family cacheplane.Family) redis.UniversalClient
 	CacheBuilder(family cacheplane.Family) *keyspace.Builder

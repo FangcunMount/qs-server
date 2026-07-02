@@ -1,738 +1,341 @@
 # 300 QPS 混合场景压测 SOP
 
-**本文回答**：如何在当前生产拓扑下，用 k6 对 qs-server 做三类压测（前台读写、异步链路 SLA、后台排水观测），分档升压（smoke → pretest → mixed_300 / mixed_300_models），如何准备 token/数据、如何观测、以及常见故障如何快速定位。
-
 ---
 
 ## 30 秒结论
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 压测入口 | k6 打公网域名 `collect.fangcunmount.cn` + `qs.fangcunmount.cn` |
-| **脚本入口** | `scripts/perf/k6/mixed.js`（`k6-mixed-300qps.js` 为兼容 shim） |
-| **Makefile 入口** | `make help` → **K6 压测** 段；`make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` … |
-| 三类目标 | **前台读写**（model query/submit/wait-report）；**异步 SLA**（`async_chain_probe_*`）；**后台排水**（`perf-outbox120` + DB snapshot） |
-| 推荐升档 | `mixed_280_models`（已通过）→ `mixed_300_http` Step1（**已通过**）→ `mixed_300_http_query` Step2（**边际通过**，待优化 stats）→ `mixed_300` |
-| 配置入口 | `tmp/perf/qs-perf.config.json`（`make perf-init` 从 example 初始化，不覆盖已有文件） |
-| 压测前必做 | 换新鲜 token + `check-token-preflight.sh` + 确认 Nginx 对压测 IP 已放宽 `limit_conn` |
-| 目录缓存 | 三域 L1+L2 见 [Catalog 目录缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)；`mixed_240+` **三域验收**须 **`mixed_240_models`** 等拆分 query profile |
-| 验收 | K6 HTTP + chain probe SLA **且** outbox 压测结束后 **≤3min** 消化（`pending/failed/publishing` 回落至近 0）；HTTP 429 与 outbox 堆积可并存，勿混为一谈 |
+| 入口 | `make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` → 升档；脚本 `scripts/perf/k6/mixed.js` |
+| 配置 | `tmp/perf/qs-perf.config.json`（`make perf-init` 不覆盖已有文件） |
+| 三类目标 | ① 前台读写 ② 异步 SLA（`chain_probe`）③ 后台排水（`outbox_120` + DB snapshot） |
+| 当前水位 | **4C/8G** 至 **`mixed_240_models` 全绿**；**`mixed_280_models` 边际未过**（k6 阈值过、~7min 超时雪崩）；300 见 8C/16G 历史 |
+| Report | 常规默认 **`short_poll`**；长轮询仅专项 `special_report_long_poll` |
+| 验收 | `http_req_failed < 1%` + chain probe SLA；压测结束 **≤3min** outbox 回落至近 0 |
+| 必做 | 新鲜 token + `perf-preflight` + Nginx 压测 IP 放宽 `limit_conn` |
 
----
-
-## 1. 生产拓扑与压测链路
+**推荐路径**：
 
 ```text
-压测机(k6)
-  → collect.fangcunmount.cn ─┐
-  → qs.fangcunmount.cn     ─┤→ serverA: Nginx
-                             │     ├─ qs-collection-server:8080（同机 Docker 网）
-                             │     └─ qs-apiserver:8080/9090
-                             │
-serverD: qs-worker ──gRPC──→ qs-apiserver:9090（异步 MQ 链路，一般不直接导致 wait-report 502）
-serverB: iam-apiserver（IAM gRPC，overlay IP 如 172.20.0.28）
+smoke_4 → pretest_60 → pretest_120 → mixed_140…220 → mixed_240_models → mixed_280_models → mixed_300
 ```
 
-A/B 通过 Swarm overlay **`infra-network`** 互通；`iam-apiserver` 须由 **Docker DNS** 解析到 overlay 地址。**禁止** `extra_hosts` 把 `iam-apiserver` 指到 serverB 宿主机 Tailscale IP——serverB 宿主机 **9090 常被 mihomo 占用**，会导致 IAM mTLS 报 `first record does not look like a TLS handshake`。
+攻关档（可选分步验证）：`perf-mixed300-http`（Step1）→ `perf-mixed300-http-query`（Step2）→ `perf-mixed300`（全量）。
 
-| 节点 | 规格（2026-06） | 组件 | 压测相关性 |
-| ---- | --------------- | ---- | ---------- |
-| serverA | 8C/16G | nginx、qs-apiserver（5C/8G）、qs-collection-server（2C/4G） | **HTTP 同步链路主战场** |
-| serverB | 2C/2G | IAM | JWKS / gRPC；非 HTTP 压测主瓶颈 |
-| serverD | 4C/4G | qs-worker | 异步消费；`pretest_*` 阶段通常不是 HTTP 5xx 主因 |
+档间冷却 **≥30min**（攻关档 `mixed_280_models` 及以上建议 **≥30min**）。上一档全绿再升档。
 
-压测从**公网**打入，client IP 为压测机公网地址（曾用 `61.49.247.106`）。Nginx 在 serverA 统一入口，**应用容器日志无 5xx 但 k6 有 5xx 时，优先查 Nginx access/error**。
+部署韧性重构后验收：`make perf-mixed280-models`（确认 `reportMode=short_poll`、`vusers.report.max≈320`）；目标 checks **100%**、无 ~7min 30s timeout 雪崩。
 
 ---
 
-## 2. 场景配比与档位
+## 压测设计
 
-### 2.1 mixed_300 目标配比（多 model，产品真实 submit）
-
-`mixed_300` / `mixed_300_probe` / **`mixed_240_models`** 使用**拆分场景**（profile 含 `medicalQuery` 等字段时 `USE_SPLIT_QUERY_SCENARIOS=true`，`LEGACY_QUERY_RPS=0`）。**submit 按单机稳态上限 24/s 设定**（2026-06 压测：`mixed_140_submit24` 全绿）；原 60/s 为过度预留，已下调。
-
-**三域 L1 验收**：`mixed_240`（legacy `qps.query` 单桶）仅打 `questionnaire_query`，不能验量表/人格 L1；须跑 **`mixed_240_models`**（54/27/19/s）或 `mixed_300`。
-
-| 场景 | QPS | 接口 |
-| ---- | ---: | ---- |
-| 医学量表目录查询 | 80 | `GET /api/v1/scales*` |
-| 人格模型目录查询 | 40 | `GET /api/v1/personality-models*` |
-| 问卷详情查询 | 13 + 13 | `GET /api/v1/questionnaires/{code}` |
-| 答卷提交（medical 80% + personality 20%） | **24** | `POST /api/v1/answersheets` |
-| 报告 wait（热样本） | 100 | medical/personality `wait-report` |
-| 统计查询 | 29 | apiserver `GET /api/v1/statistics/*` |
-| 异步链路探针 | 1 | session → submit → … → wait-report |
-| **合计** | **~300** | 读/report 为主，submit 与生产峰值对齐 |
-
-**压测三类目标**：① 前台读写（query/submit/report 热样本）② 异步 SLA（`async_chain_probe_*`）③ 后台排水（`outbox_120` + snapshot DB）。
-
-### 2.2 内置 `QPS_PROFILE`
-
-| 档位 | 总 QPS | 配比（query/submit/report/stats） | 时长 | 用途 |
-| ---- | ---: | -------------------------------- | ---- | ---- |
-| `smoke_4` | 4 | 1/1/1/1 | 30s | 连通性、setup 自动发现 |
-| `pretest_60` | 60 | 25/10/19/6 | 3m | **第一档正式预压** |
-| `pretest_120` | 120 | 51/19/38/12 | 5m | 观察限流与资源曲线 |
-| `pretest_120_submit_only` | 19 | 0/19/0/0 | 5m | 隔离 submit |
-| `pretest_120_balanced` | 92 | 34/19/26/13 | 5m | 混合降读压验收档 |
-| `mixed_140` | 140 | 58/24/44/14 | 5m | 120→300 细粒度升档 |
-| `mixed_140_submit24` | 136 | 59/19/44/14 | 5m | 读/report 升档，submit 隔离 19/s |
-| `mixed_160` | 160 | 68/24/52/16 | 5m | 同上（submit 封顶 24/s） |
-| `mixed_180` | 180 | 80/24/58/18 | 5m | 同上 |
-| `mixed_200` | 200 | 92/24/64/20 | 5m | 保守基线 |
-| `mixed_220` | 220 | 102/24/72/22 | 5m | **当前单机混合验收基线**（L1 缓存后全绿） |
-| `mixed_240` | 240 | 100/24/88/28 | 8m | legacy **问卷单桶** query（仅验问卷 L1） |
-| `mixed_240_models` | 240 | 54+27+19 /24/88/28 | 8m | **三域 L1 升档验收**（**已通过** 2026-07-01；`make perf-mixed240-models`） |
-| `mixed_280` | 280 | 132/24/96/28 | 8m | legacy **问卷单桶** query（132/s 读压探顶） |
-| `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | **三域 L1 280 档验收**（**已通过** 2026-07-01；`make perf-mixed280-models`，**wait-report 长轮询**） |
-| `mixed_280_models_short_report` | 280 | 同左，report 走 **`/report-status` 短轮询** | 8m | A 方案验收（`make perf-mixed280-models-short-report`）；`report` VU max≈320 |
-| `mixed_280_models_ws` | 280 | 同左，report 走 **WebSocket `/report-events`**（需 `report_events.enabled=true`） | 8m | E 方案验收（`make perf-mixed280-models-ws`）；连接数≈并发等待用户数 |
-| `mixed_300` | ~300 | 146 query + **24 submit** + 100 report + 29 stats + **1 probe** | 10m | **全量验收档**（2026-07-01 **未通过**，见 §2.2 / §2.4） |
-| `mixed_300_http` | ~281 | **71+36+25** /24/**96**/29 /0 probe | 10m | HTTP 攻关 **Step1**（**已通过** 2026-07-01；同 `mixed_280_models` 读压 + 10min） |
-| `mixed_300_http_query` | ~295 | 146 query /24/96/29 /0 probe | 10m | HTTP 攻关 **Step2**（**边际通过** 2026-07-01；瓶颈 apiserver `statistics/system`） |
-| `mixed_300_http_query_nostats` | ~266 | 146 query /24/96/**0** /0 probe | 10m | **线 A**：Step2 去 stats；验证 collection 读+report 独立容量（`make perf-mixed300-http-query-nostats`） |
-| `stats_isolate_29` | 29 | 0/0/0/**29** /0 probe | 10m | **线 A**：仅 stats overview+system；量化 apiserver 统计短板（`make perf-stats-isolate29`） |
-| `stats_warmup_1m` | 29 | 0/0/0/**29** /0 probe | 1m | **线 A 可选**：Step2 前 stats 预热（`make perf-stats-warmup`） |
-| `mixed_300_probe` | 同上 | 同 `mixed_300` | 10m | 与 mixed_300 等效 |
-| `mixed_300_models` | ~291 | 医学+人格拆分，submit 合计 **20/s** | 10m | 产品真实流量混合 |
-| `outbox_120` | ~235 | submit/report 各 **96** + 低 query | 10m | **专测 outbox 排水** |
-| `personality_60` | ~60 | 人格 session/submit/wait | 5m | 人格链路专项 |
-| `capacity_no_scanner` | ~271 | 同 mixed_300 | 10m | 主链路容量（scanner 可关） |
-| `capacity_with_scanner` | ~271 | 同 mixed_300 | 10m | 开启 `behavior_journey_scan` 后跑 |
-
-旧档 `pretest_*` / `mixed_140`…仍用 `qps.query` 单桶。**submit 自 2026-06 统一下调**：`pretest` 约 ×0.8，`mixed_140` 及以上封顶 **24/s**，少掉的 QPS 补到 query/report。
-
-### 2.3 K6 脚本目录
-
-```
-scripts/perf/k6/
-  mixed.js              # 入口（Makefile PERF_K6_SCRIPT）
-  lib/config.js         # 环境变量、profile、路径、token
-  lib/metrics.js        # 指标、阈值、scenario 注册
-  lib/http.js           # HTTP 封装
-  lib/data.js           # discovery、答卷构造、scenarioData
-  lib/util.js           # 工具函数
-  lib/options.js        # 按 profile 注册 scenarios
-  scenarios/            # model-query / submit / report / statistics / chain-probe
-scripts/perf/k6-mixed-300qps.js   # 兼容 shim → re-export mixed.js
-```
-
-**原则**：上一档 `http_req_failed < 1%`、无明显 503/502 尖刺后再升档。`pretest_60` 曾出现 p90 ~5s 但 0 失败，可接受；`pretest_120` 在跨机 collection 时大量 502/30s 超时，迁回 serverA 后应复测。
-
-### 2.4 300 档攻关顺序（`mixed_300` 未过后）
-
-`mixed_280_models` 全绿 **不代表** `mixed_300` 自动过线。2026-07-01 `mixed_300` 失败主因：**report 100/s 长轮询占满 k6 VU（900 触顶）→ 全链路排队**，叠加 chainProbe 导致异步 SLA 阈值失败。
-
-```text
-0. make perf-mixed280-models-short-report  # report-status 短轮询（A+B+H 验收）
-1. make perf-mixed300-http         # Step1：query=71/36/25（同 280_models），10min
-2. make perf-mixed300-http-query   # Step2：query 升至 80/40/13/13，仍无 probe
-   # 线 A 隔离（Step2 边际通过、stats 拖后腿时，见 §2.4.1）
-   2a. [可选] make perf-stats-warmup              # 1min stats 预热
-   2b. make perf-mixed300-http-query-nostats     # 同 Step2 读压，stats=0
-   2c. make perf-stats-isolate29                 # 仅 stats 29/s
-3. make perf-mixed300              # 全量：report=100 + chainProbe=1/s
-4. 仍失败 → collection×2 + LB
-```
-
-| 步骤 | Profile | 验证目标 |
-| ---- | ------- | -------- |
-| ⓪ A+B+H | `mixed_280_models_short_report` | report 96/s 走 `/report-status`；max VU 显著低于长轮询 |
-| ① HTTP 基线 | `mixed_300_http` | 280 读压 + 10min 稳态；`http_req_failed`<1%、读 p95<500ms（**已通过** 2026-07-01） |
-| ② HTTP 满读 | `mixed_300_http_query` | 146/s query + report 96；无 VU 触顶（**边际通过** 2026-07-01；stats 待优化） |
-| ②a 线 A 去 stats | `mixed_300_http_query_nostats` | 同 Step2 读压，**stats=0**；读 p95 应 <500ms、checks 100% |
-| ②b 线 A 仅 stats | `stats_isolate_29` | 仅 `overview`+`system` @29/s；量化 `statistics/system` 独立 p95/失败率 |
-| ③ 全量验收 | `mixed_300` | + probe + report 100/s；异步 SLA 阈值 |
-| ④ 扩容 | 双 collection + LB | 300 档单机承诺 |
-
-**2026-06-30 优化后复测**（outbox limiter + immediate 并发 + published model 缓存 + 连接池预算；**配比为调优前旧档**）：
-
-| 档位 | HTTP 结论 | outbox 排水 | 备注 |
-| ---- | --------- | ----------- | ---- |
-| `pretest_60` | **通过**：submit 100%，p95≈184ms | **≤3min 消化** | 旧配比 24/12/18/6 |
-| `pretest_120_balanced` | **通过**：100%，0×429 | **≤3min 消化** | 旧配比 32/24/24/12 |
-| `pretest_120` | **通过**：100%，0×429，submit p95≈192ms | **≤3min 消化** | 旧配比 48/24/36/12 |
-| `mixed_140`（旧 submit28） | **未通过**：worker32 90.4%/806×429；worker40 97.83%/182×429 | **≤3min 消化** | HTTP 失败时 outbox 仍可正常排水 |
-| `mixed_140_submit24` | **通过**：100%，0×429，submit p95≈222ms | **≤3min 消化** | 旧配比 56/24/42/14 |
-
-**2026-07-01 配比下调后复测**（submit 按真实流量重标定；`mixed_140+` submit 封顶 24/s，详见 §2.2）：
-
-| 档位 | HTTP 结论 | outbox 排水 | 备注 |
-| ---- | --------- | ----------- | ---- |
-| `mixed_140` | **通过**：100%，0×429，submit p95≈270ms | **≤3min 消化** | 新配比 58/24/44/14 |
-| `mixed_160` | **通过**：100%，0×429，submit p95≈781ms | **≤3min 消化** | 新配比 68/24/52/16；p95 偶发尖刺 |
-| `mixed_180` | **通过**：100%，0×429，submit p95≈202ms | **≤3min 消化** | 新配比 80/24/58/18 |
-| `mixed_200` | **通过**：100%，0×429，submit p95≈361ms | **≤3min 消化** | 新配比 92/24/64/20 |
-| `mixed_240`（112/s，VU 730） | **边际通过**：checks 99.88%，http 0.11%；122×query timeout | **≤3min 消化** | 旧配比 112/24/80/24 |
-| `mixed_240`（112/s，VU 1200） | **未通过**：http 4.64%；4411×query timeout | **≤3min 消化** | 堆 VU 加剧下游过载，非解法 |
-| `mixed_220`（VU 690，无 L1） | **未通过**：http 0.56%～5.61% | **≤3min 消化** | 102/s 读压超 gRPC 路径容量 |
-| `mixed_240`（新 100/s，legacy 单桶） | **通过**：100%，0×429，query p95≈58–66ms | **≤3min 消化** | max VU≈243；**仅** `questionnaire_query`，未验量表/人格 |
-| `mixed_240_models` | **通过**：100%，0×429；三场景 54/27/19/s 全绿 | **≤3min 消化**（待压后 snapshot 确认） | http p95≈154ms；medical/personality/questionnaire query p95≈149/125/179ms；max VU≈749；`dropped_iterations`≈121（可忽略） |
-| `mixed_280`（legacy 132/s 单桶） | **HTTP 通过**：100%，0×429；**读 p95 超标** | 待确认 | 仅 `questionnaire_query` 132/s；query p95≈1.36s，http p95≈1.03s；max VU≈771；`dropped_iterations`≈310 |
-| `mixed_280_models` | **通过**：100%，0×429；三场景 71/36/25/s 全绿 | **≤3min 消化**（待压后 snapshot 确认） | http p95≈114ms；三域 query p95≈112/106/127ms；max VU≈479；`dropped_iterations`≈58 |
-| `mixed_300` | **未通过** | 待确认 | k6 exit 99；见上文 |
-| `mixed_300_http`（初版 146/s query） | **中断** | — | ~68s timeout/EOF 雪崩，~79s Ctrl+C；profile 已拆为 Step1/Step2 |
-| `mixed_300_http`（Step1 71/36/25） | **通过** | 待确认 | checks/http **100%**；三域 query p95≈**284/256/359ms**；report/submit 100%；max VU≈**390**；`REPORT_TIMEOUT=5` |
-| `mixed_300_http_query`（Step2 80/40/13/13） | **边际通过** | 待确认 | checks **99.93%**、http **0.06%**；109×`statistics/system` timeout（~90s）；读 p95≈**592/467/796ms**；report/submit 100%；**暂不宜升 mixed_300** |
-
-**2026-07-01 collection 问卷 L1 缓存上线后复测**（`questionnaire_cache.enabled=true`，TTL 180s，见 `collection-server.prod.yaml`）：
-
-| 档位 | HTTP 结论 | outbox 排水 | 备注 |
-| ---- | --------- | ----------- | ---- |
-| `mixed_200` | **通过**：100%，0×429 | **≤3min 消化** | query p95≈322ms；max VU≈1203 |
-| `mixed_220` | **通过**：100%，0×429 | **≤3min 消化** | query p95≈172ms；max VU≈248（L1 命中后 gRPC 压力骤降） |
-
-**2026-07-01 三域 Catalog L1+L2 上线后复测**（`questionnaire_cache` + `scale_cache` + `personality_cache`，TTL 180s；压测 profile **`mixed_240_models`**，拆分 query 54/27/19/s）：
-
-| 档位 | HTTP 结论 | outbox 排水 | 备注 |
-| ---- | --------- | ----------- | ---- |
-| `mixed_240_models` | **通过**：checks 100%，http 0%，submit/report 100% | 待压后 snapshot 确认 | 6 场景：`medical_model_query` 54/s、`personality_model_query` 27/s、`questionnaire_query` 19/s + submit 24 + report 88 + stats 28；http p95≈154ms；max VU≈749 |
-
-对比 legacy `mixed_240`（单桶问卷 100/s）：三域拆分后读压分散到量表/人格/问卷三条场景，**延迟与失败率仍全绿**，说明三域 L1 在 240 混合档有效。
-
-**同读压 132/s 对比（2026-07-01）**：legacy `mixed_280` 单桶 `questionnaire_query` p95≈1.36s（未过线）；**`mixed_280_models` 拆分为 71/36/25/s 后 http p95≈114ms 全绿**——说明 280 档须用拆分 query，勿用 legacy 单桶判断容量。
-
-**`mixed_300` 首次实测（2026-07-01，拆分 query + chainProbe 1/s，10min）**：HTTP **边际通过**（failed 0.02%，checks 99.97%），但 k6 **阈值未过**——`chain_probe_failed`=315（阈<3）、`submit_to_assessment_latency` p95≈**1m42s**（阈<15s）。~101s 出现 `report_status_query` **Insufficient VUs（900 触顶）**；稳态 query p95≈10.7s，第 6min 起 catalog 读 30s timeout 尖刺（medical 37 次）。**结论**：单机 280 档全绿 ≠ 300 档可承诺；瓶颈在 **report 100/s 长轮询占满 VU → 全链路排队**，非 L1 单独失效。
-
-**`mixed_300_http` 初版（query 146/s，2026-07-01）**：~**68s** 起全场景 30s timeout/EOF 雪崩，**~79s 人工中断**；读压比已通过的 `mixed_280_models`（132/s）**高 14/s** 且时长 10min，不能代表「仅去掉 probe」。profile 已改为 **Step1：query=71/36/25**（同 280_models），满配 query 见 `mixed_300_http_query`。
-
-**`mixed_300_http` Step1（71/36/25 + 10min，2026-07-01）**：**通过**。checks/http **100%**；submit/report **100%**；三域 query p95≈**284/256/359ms**（均 <500ms）；report p95≈5.03s（`REPORT_TIMEOUT=5`）；max VU≈**390**（未触顶）；`dropped_iterations`≈63。与 `mixed_280_models` 同读压，仅时长 8m→10m，说明 **280 档读压在 10min 稳态下仍全绿**。
-
-**`mixed_300_http_query` Step2（80/40/13/13 + 10min，2026-07-01）**：**边际通过**（k6 阈值过线，SOP 读 p95 未达标）。checks **99.93%**、http failed **0.06%**（109 失败）；失败集中在 apiserver **`GET /statistics/system`**（~**90–97s** 集中 30s timeout），collection 仅 1×`scales` timeout（~487s）。submit/report **100%**；三域 query p95≈**592/467/796ms**；report p95≈5.05s；max VU≈**1158**（未触顶）。**结论**：+14/s 读压下 collection 主链路可扛，**apiserver 统计接口**为短板；**暂不宜直接 `make perf-mixed300`**，须先优化 stats 或**线 A 隔离复测**（§2.4.1）。
-
-#### 2.4.1 线 A：压测侧隔离（stats 与 collection 读解耦）
-
-Step2 边际通过时，失败与读 p95 劣化主要来自 apiserver `statistics/system`，与 collection 读压混跑会互相干扰。用下列 profile **拆开验收**，再决定走线 B（apiserver singleflight）还是直接升 `mixed_300`。
-
-| Profile | Make 目标 | QPS | 验证什么 |
-| ------- | --------- | --- | -------- |
-| `mixed_300_http_query_nostats` | `make perf-mixed300-http-query-nostats` | 146 query + 24 submit + 96 report，**stats=0** | collection 满读 + report 在**无 stats 竞争**下是否全绿、读 p95 <500ms |
-| `stats_isolate_29` | `make perf-stats-isolate29` | **仅** stats 29/s（`overview` + `system`） | apiserver 统计链路独立容量；`statistics/system` p95 与 timeout 率 |
-| `stats_warmup_1m` | `make perf-stats-warmup` | 仅 stats 29/s，**1min** | Step2 **前**可选预热，减轻缓存击穿尖刺（非验收档） |
-
-**建议顺序**（档间冷却 **≥15min**，stats 隔离前后尤其要留足）：
-
-```bash
-make perf-sync-profiles   # 合并 example 中三个新 profile（不覆盖已有 qps）
-# 可选：Step2 前先预热
-make perf-stats-warmup
-# ① 去 stats 复跑 Step2 等量读压
-make perf-mixed300-http-query-nostats
-# ② 单独压 stats（仅需 apiserver token）
-make perf-stats-isolate29
-```
-
-**验收对照**：
-
-| 观测 | `nostats` 预期 | `stats_isolate_29` 预期 |
-| ---- | -------------- | ------------------------- |
-| checks / http failed | **100%** / <0.01% | **100%** / <0.01% |
-| 三域 query p95 | **<500ms**（与 Step1 同量级） | — |
-| `statistics_duration` p95 | — | **<1000ms**（k6 阈值）；若 `system` 仍 30s timeout → 线 B 必做 |
-| 与 Step2 对比 | 若全绿而 Step2 边际 → **确认 stats 为干扰源** | 若单独也红 → **apiserver stats 自身容量不足** |
-
-`stats_isolate_29` / `stats_warmup_1m` 在 profile 内覆盖 `paths.statistics` 为 `overview` + `system`（去掉 questionnaires 明细），与 Step2 失败路径对齐。`nostats` 无需改 paths，`stats: 0` 时 k6 不注册 `statistics_query` 场景。
-
-#### 2.4.2 线 B：apiserver 统计防击穿（B1–B4）
-
-Step2 边际通过后，在**线 A 隔离确认 stats 为干扰源**的前提下，部署下列 apiserver 改动并重跑 Step2 / `stats_isolate_29`：
-
-| 项 | 配置/代码 | 作用 |
-| -- | --------- | ---- |
-| **B1** | `cache.query.singleflight: true` + `StatisticsCache.LoadSystemStatisticsCoalesced` | Redis query cache miss 时合并回源 |
-| **B2** | `cache.statistics_system.service_singleflight: true` | `GetSystemStatistics(orgID)` 应用层 singleflight |
-| **B3** | `cache.statistics_warmup.warm_on_startup: true` + `enable: true` | 启动即预热 `overview` + `system`（不依赖 `warmup.startup.query`） |
-| **B4** | `disable_realtime_fallback` + `stale_on_timeout` + `load_timeout: 25s` | 禁止全表实时聚合；回源超时返回进程内陈旧结果 |
-
-```yaml
-# configs/apiserver.prod.yaml（节选）
-cache:
-  query:
-    singleflight: true
-  statistics_warmup:
-    enable: true
-    warm_on_startup: true
-    org_ids: [1]
-  statistics_system:
-    service_singleflight: true
-    disable_realtime_fallback: true
-    stale_on_timeout: true
-    load_timeout: 25s
-```
-
-**验收**：`make perf-mixed300-http-query` 与 `make perf-stats-isolate29` 均 checks≥99.99%、`statistics/system` **0×30s timeout**、读 p95<500ms。
-
-**profile 同步陷阱**：`make perf-sync-profiles` **只补本地缺失的 profile 名，不覆盖已有 profile 的 qps**。
-
-**误跑对照（同机 2026-07-01）**：本地 `mixed_300_http` 仍为 80/40/13/13 时执行 `make perf-mixed300-http`，实质为 Step2 读压；checks 99.93%、109×`statistics/system` timeout（~592s 尾部）。修正 profile 后 Step1 全绿，说明失败来自 **profile 配比错误 + stats 瓶颈**，非 Step1 本身失效。
-
-`pretest_120` 未过线时优先看 `http_429_total`（collection `submit queue full`）与 `questionnaire_query_timeout`，不要误判为 outbox 堆积。旧档 `mixed_140` submit28 失败已通过**降 submit + 调 submit_queue worker**解决；**2026-07-01 前** 220 档瓶颈在 collection→apiserver 问卷读 gRPC，**L1 REST DTO 缓存**后 102/s 全绿。
-
-**wait-report A+B+H（collection-server）**：
-
-| 方案 | 内容 |
-| ---- | ---- |
-| **A** | `GET /assessments/{id}/report-status`（及 personality 对称路径）；scope=**query** |
-| **B** | wait-report HTTP 槽满 → **200 pending** + `Retry-After` + `next_poll_after_ms` |
-| **H** | `concurrency.max-concurrency=400`（general）+ `wait_report.max_http_concurrency=400` |
-
-**压测纪律**：档间冷却 **≥10min**；`mixed_280_models` **连跑**可在 ~20–68s 雪崩（残余负载 + k6 VU 螺旋），勿据此否定已通过结论。
-
-### 2.5 Report 三模式与 `qps.report` 语义
-
-`qps.report` 表示**用户侧「查报告是否就绪」的操作频率**（constant-arrival-rate 的到达率），**不是** Nginx access 里的裸 HTTP RPS：
-
-| `reportMode` | 接口 | k6 行为 | 服务端并发近似 | max VU 公式（k6 自动默认，profile 可覆盖） |
-| ------------ | ---- | ------- | -------------- | ------------------------------------------ |
-| `long_poll`（默认） | `wait-report` | 单次请求阻塞至 timeout 或终态 | HTTP 长连接 ≈ `report_rps × 有效等待秒` | `report_rps × report_timeout × 1.1` |
-| `short_poll` | `report-status` | pending 时 `sleep(next_poll_after_ms)` | 短请求 + 客户端间隔 | `report_rps × (0.5s + poll_interval) × 1.1` |
-| `websocket` | `report-events` | 每迭代 1 条 WS 长连至终态或 `ws_hold_seconds` | 连接数 ≈ 并发等待用户 | `report_rps × ws_hold_seconds × 1.1` |
-
-配置入口（`qs-perf.config.json` → profile）：
-
-- 推荐显式写 **`reportMode`**：`long_poll` / `short_poll` / `websocket`
-- 兼容旧字段：`reportShortPoll: true` → `short_poll`；`reportWebSocket: true` → `websocket`
-- 全局说明见示例 `reportSizing` 块；可调 `reportPollIntervalMs`、`reportWsHoldSeconds`
-
-| Profile | reportMode | report 96/s 时建议 max VU |
-| ------- | ---------- | ------------------------- |
-| `mixed_280_models` | `long_poll` | ~2112（profile 显式 860，按实测占用调低） |
-| `mixed_280_models_short_report` | `short_poll` | ~320 |
-| `mixed_280_models_ws` | `websocket` | ~528（hold=5s） |
-
-**wait-report VU sizing**（长轮询 profile）：`report` 场景的 VU 不宜远高于 `report_rps * timeout`。已验证 `pretest_120` 使用 `report=36 QPS`、`REPORT_VUS=220`、`REPORT_MAX_VUS=500` 可 0 失败完成；`mixed_300` 先使用 `report=90 QPS`、`REPORT_VUS=600`、`REPORT_MAX_VUS=900`。过大的 report VU（如 `700/1800` 或 `900/2200`）会制造大量空闲连接，k6 可能在请求进入 Nginx access 前出现 EOF。
-
-**query VU sizing**（`HTTP_TIMEOUT=30s`）：按 `query_rps × 7～8` 设 `max`（92/s→690）。**下游饱和时勿盲目加 VU**（112/s + max 1200 曾致 4.64% 失败）。未在 profile 写 `vusers.report` 时，k6 按上表 `reportMode` 自动估算默认值。
-
----
-
-## 3. 一次性准备
-
-### 3.1 配置文件
-
-```bash
-mkdir -p tmp/perf
-cp scripts/perf/qs-perf.config.example.json tmp/perf/qs-perf.config.json
-```
-
-已有 `tmp/perf/qs-perf.config.json` 时**不要覆盖**其中的 URL/token 路径；合并示例里新增的 `qpsProfiles` / `paths`：
-
-```bash
-make perf-sync-profiles   # 或任意 make perf-preflight / perf-mixed240-models 会自动合并
-```
-
-**注意**：`perf-sync-profiles` **不会覆盖**本地已有 profile 的 `qps`/`vusers`（本地键优先）。example 中 profile 配比更新后，须手动 `jq` 合并或删除旧 profile 再 sync。跑 `mixed_300_http` 前确认 setup 日志：`medical_model_query` 为 **71**（Step1），非 80（Step2）。
-
-常用字段见 `scripts/perf/qs-perf.config.example.json`：`collectionBaseUrl`、`apiserverBaseUrl`、`tokensFile`、`qpsProfile`、`scaleCodes`、`planIds`、`autoDiscoverSeeddata` 等。相对路径按配置文件所在目录解析。
-
-### 3.2 seeddata 数据口径
-
-与线上一致（`seeddata-runner`）：
-
-| 字段 | 值 |
-| ---- | ---- |
-| `COLLECTION_BASE_URL` | `https://collect.fangcunmount.cn` |
-| `APISERVER_BASE_URL` | `https://qs.fangcunmount.cn` |
-| `ORG_ID` | `1` |
-| `SCALE_CODES` | `3adyDE,…,tssl35`（医学量表） |
-| `PERSONALITY_MODEL_CODES` | `MBTI_OEJTS,SBTI_FUN` |
-| `modelMix` | `{ medical: 0.8, personality: 0.2 }`（legacy submit 桶） |
-| `PLAN_IDS` | `614333603412718126,614187067651404334` |
-| `TESTEE_SOURCE` | `daily_simulation` |
-
-### 3.3 多用户 token（必做）
-
-collection 默认单用户限流：`submit=5`、`query=10`、`wait-report=2` QPS。要打 `report=90` QPS，至少 **45 个 collection token**（建议 **60+**）。
-
-```bash
-make perf-init
-# 编辑 tmp/perf/iam-users.json，勿提交 Git
-make perf-tokens
-```
-
-或分步：`make perf-tokens-collection` / `make perf-tokens-apiserver`。
-
-`qs-perf.config.example.json` 已默认 `tokensFile` + `apiserverTokensFile`。**不要**用 `cp example` 覆盖已有 `tmp/perf/qs-perf.config.json`（会丢掉自定义 URL/token 路径）。
-
-preflight 在未配置 `apiserverTokensFile` 时，会用 `tokensFile` 探测 apiserver，此时 `apiserver testees: 403` **是预期现象**，不代表 collection token 坏了。
-
-### 3.4 Token preflight（每次 k6 前）
-
-IAM access token TTL 短；**换完 token 立刻跑**，不要隔几小时再用同一文件。
-
-```bash
-make perf-preflight
-```
-
-通过标准：
-
-- `expired=0`
-- collection catalog 探测均为 **2xx**（scales 列表/categories/hot/详情、personality-models 列表/categories/详情；questionnaire 在能解析到 `questionnaire_code` 时探测）
-- `apiserver testees: 200`（或你配置的 limit）
-- `min_ttl_seconds` **大于本轮压测时长**（`mixed_300` 为 10 分钟，建议 TTL > 15 分钟）
-
-`smoke_4` profile 已将 `questionnaire_query` 收窄为 preflight 同款稳定路径（scale 详情 + personality-models 列表），避免 smoke 随机打到未预检的 catalog 接口。
-
-首次 `pretest_60` 若 `expired=99/101`，会得到约 **7% 401**，与网关无关，刷新 token 即可。
-
----
-
-## 4. 压测前检查清单
-
-| # | 检查项 | 命令/方法 |
-| - | ------ | --------- |
-| 1 | token 新鲜且 preflight 通过 | `check-token-preflight.sh` |
-| 2 | Nginx 对压测 IP 放宽连接数 | 见 [§7 Nginx 专项](#7-nginx-专项) |
-| 3 | collection 在 serverA 运行 | `docker ps` 见 `qs-collection-server`；Nginx upstream `qs-collection-server:8080` |
-| 4 | 压测机公网 IP 已知 | 用于 Nginx `http-conn-limit.conf` 白名单 |
-| 5 | （可选）metrics 隧道 | Mac 上 SSH 隧道采 snapshot，见 [§6](#6-观测采样) |
-
----
-
-## 5. 执行命令
-
-### 5.1 Makefile（推荐）
-
-```bash
-make perf-init              # 首次：初始化 tmp/perf，不覆盖已有配置
-make perf-sync-profiles     # 已有配置时：合并 example 新增档位（如 mixed_240_models）
-# 编辑 tmp/perf/iam-users.json
-
-make perf-tokens            # collection + apiserver 两套 token
-make perf-preflight         # 预检（apiserver testees 须 200）
-
-make perf-smoke             # smoke_4
-make perf-pretest60         # pretest_60，summary → tmp/perf/pretest60/
-make perf-pretest120        # pretest_120
-make perf-pretest120-submit-only  # 仅 submit=19QPS 隔离复测
-make perf-pretest120-balanced     # 混合降读压 34/19/26/13
-make perf-mixed140          # mixed_140
-make perf-mixed140-submit24 # mixed_140 读压 + submit=19
-make perf-mixed160          # mixed_160
-make perf-mixed180          # mixed_180
-make perf-mixed200          # mixed_200
-make perf-mixed220          # mixed_220（200→240 阶梯）
-make perf-mixed240          # mixed_240（legacy 问卷单桶）
-make perf-mixed240-models   # mixed_240_models（三域 L1 拆分 query）
-make perf-mixed280          # mixed_280（legacy 问卷单桶）
-make perf-mixed280-models   # mixed_280_models（长轮询 wait-report）
-make perf-mixed280-models-short-report  # report-status 短轮询（A 方案）
-make perf-mixed280-models-ws            # WebSocket report-events（E 方案，需 report_events.enabled=true）
-make perf-mixed300-http         # Step1：280 读压 + 10min
-make perf-mixed300-http-query   # Step2：满配 query，无 probe
-make perf-mixed300              # 全量（含 probe）+ 前后 snapshot
-make perf-mixed300probe     # mixed_300_probe（与 mixed_300 等效）
-make perf-mixed300-models   # 医学+人格拆分 submit/report
-make perf-outbox120         # outbox 排水专测 + snapshot
-make perf-personality60     # 人格 session 链路
-make perf-mixed300-scanner  # 需先开启 behavior_journey_scan
-
-make perf-k6 QPS_PROFILE=mixed_300_models
-make perf-verify            # bash 语法 + k6 inspect（入口 + shim）
-```
-
-完整列表：`make help`（**K6 压测** 段）。
-
-### 5.2 标准升档流程（原始 k6 命令）
-
-```bash
-# 0. make perf-tokens && make perf-preflight
-
-make perf-smoke
-make perf-pretest60
-make perf-pretest120
-make perf-mixed300
-```
-
-等价手写：
-
-```bash
-k6 run -e PERF_CONFIG_FILE="$(pwd)/tmp/perf/qs-perf.config.json" \
-  -e QPS_PROFILE=smoke_4 scripts/perf/k6/mixed.js
-```
-
-优先级：**命令行 `-e` > `QPS_PROFILE` 档位 > 根配置 > 脚本默认**。
-
-### 5.3 只读 smoke（无需 token）
-
-```bash
-COLLECTION_BASE_URL=https://collect.fangcunmount.cn \
-QUERY_RPS=1 SUBMIT_RPS=0 REPORT_RPS=0 STATS_RPS=0 DURATION=5s \
-QUESTIONNAIRE_QUERY_PATHS='/api/v1/scales?page=1&page_size=20&status=published' \
-k6 run scripts/perf/k6/mixed.js
-```
-
-### 5.4 严格阈值（可选）
-
-```bash
-STRICT_THRESHOLDS=true k6 run -e PERF_CONFIG_FILE=tmp/perf/qs-perf.config.json \
-  -e QPS_PROFILE=pretest_60 scripts/perf/k6/mixed.js
-```
-
----
-
-## 6. 观测采样
-
-### 6.1 脚本 snapshot
-
-```bash
-OUT_DIR=tmp/perf/pretest60 ./scripts/perf/snapshot-observability.sh before
-# ... k6 ...
-OUT_DIR=tmp/perf/pretest60 ./scripts/perf/snapshot-observability.sh after
-```
-
-默认 URL 走本机隧道端口；在 **Mac** 上先开 SSH 隧道（压测期间保持）：
-
-```bash
-# serverA — apiserver metrics
-ssh -N -L 18082:127.0.0.1:8081 root@<serverA-tailscale-ip>
-
-# serverA — collection metrics（collection 迁回 A 后）
-ssh -N -L 18083:127.0.0.1:8082 root@<serverA-tailscale-ip>
-```
-
-```bash
-export COLLECTION_METRICS_URL=http://127.0.0.1:18083/metrics
-export COLLECTION_RESILIENCE_URL=http://127.0.0.1:18083/governance/resilience
-export APISERVER_METRICS_URL=http://127.0.0.1:18082/metrics
-```
-
-worker（serverD）、NSQ 隧道为可选项；snapshot 失败写 `.err`，**不阻断** k6。
-
-**DB 快照（可选，压测前后对比 outbox/scanner）**：
-
-```bash
-export MONGO_URI='mongodb://user:pass@host:27017/db?authSource=admin'
-export MYSQL_CLI_ARGS='-h127.0.0.1 -uuser -ppass dbname'
-export PERF_ORG_ID=1
-OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh after
-```
-
-生成文件包括：`mongo-outbox.json`、`mysql-outbox.txt`、`analytics-scan-watermarks.txt`、`assessment-episode-status.txt`、`behavior-footprint-events.txt`、`statistics-journey-daily.txt`。
-
-**outbox 是否追上（优化后判据）**：压测期间 k6 可能仍有 429/超时，但**压测结束后 3 分钟内** `domain_event_outbox` 的 `pending/failed/publishing` 应回落到接近 0。若仍长时间堆积，再查 relay worker、Mongo 慢查与连接池；若已快速消化而 HTTP 仍失败，主因通常在 collection 入口限流或读压饱和。
-
-### 6.2 关键指标
-
-| 指标 | 来源 |
-| ---- | ---- |
-| HTTP 失败率 / 延迟 | k6 summary、`http_5xx_total` 等自定义 counter |
-| SubmitQueue | collection `/governance/resilience` |
-| Outbox / MQ | apiserver event status、worker metrics、NSQ stats |
-| 容器资源 | serverA 上 `docker stats qs-apiserver qs-collection-server nginx` |
-| Nginx 5xx | `/data/logs/nginx/access.log` 按时段统计 `$9` |
-
-300 QPS 混合压测中，如果 NSQ depth 为 0 但 report 长时间不生成，必须先查 `mongo-domain-events`。事件可能还卡在 Mongo outbox，尚未进入 NSQ：
-
-```javascript
-db.domain_event_outbox.aggregate([
-  {$match:{status:{$in:["pending","failed","publishing"]}}},
-  {$group:{_id:{status:"$status",event_type:"$event_type",topic:"$topic_name"}, n:{$sum:1}, oldest:{$min:"$created_at"}, newest:{$max:"$created_at"}}},
-  {$sort:{n:-1}},
-  {$limit:50}
-])
-```
-
-### 6.3 k6 summary 解读
-
-失败分类优先看自定义 counter：
-
-| counter | 含义 |
-| ------- | ---- |
-| `http_401_total` | token 过期或无效 → 先换 token |
-| `http_403_total` | 权限不足 → 检查 token 分组 |
-| `http_4xx_total` | 所有 4xx 汇总；再看 401/403/429 细分 |
-| `http_429_total` | 应用层限流 → 加 token 或调 `rate_limit` |
-| `http_5xx_total` | 服务端或 **Nginx 503/502** → 按 §8 分流 |
-| `http_transport_error_total` | 没拿到 HTTP 响应，例如客户端 30s 超时 |
-| `http_timeout_total` | `request timeout` 汇总；注意不是 `wait-report?timeout=5` |
-
-| `chain_probe_failed` | 异步探针失败次数（应接近 0） |
-| `medical_report_generated_latency` / `personality_report_generated_latency` | 端到端报告 SLA |
-| `submit_to_assessment_latency` / `assessment_to_report_latency` | 异步分段延迟 |
-
-混合压测脚本会额外输出按场景拆分的失败 counter：
-
-| counter 形态 | 含义 |
-| ------------ | ---- |
-| `report_status_5xx` / `answer_submit_5xx` / `questionnaire_query_5xx` / `statistics_5xx` | 哪类接口返回了 5xx |
-| `report_status_transport_error` / `answer_submit_transport_error` / `questionnaire_query_transport_error` / `statistics_transport_error` | 哪类接口没有拿到 HTTP 响应 |
-| `report_status_timeout` / `answer_submit_timeout` / `questionnaire_query_timeout` / `statistics_timeout` | 哪类接口打满了 k6 `HTTP_TIMEOUT` |
-
-新版 k6 `--summary-export` JSON schema 可能变化；若 `jq '.metrics.*.values.count'` 为 null：
-
-```bash
-jq 'keys' tmp/perf/pretest60/k6-summary.json
-jq '.metrics.http_req_failed' tmp/perf/pretest60/k6-summary.json
-```
-
----
-
-## 7. Nginx 专项
-
-Nginx **仅在 serverA**。仓库配置：
-
-- `configs/nginx/http-conn-limit.conf` — 压测 IP 白名单 + 默认 20 连接/IP
-- `configs/nginx/conf.d/collect.fangcunmount.cn.conf` — upstream `keepalive 512`
-- `configs/nginx/conf.d/qs.fangcunmount.cn.conf` — 同上
-
-宿主机路径（示例）：
-
-| 路径 | 说明 |
-| ---- | ---- |
-| `/opt/infra/components/nginx/nginx.conf` | 主配置 |
-| `/data/apps/nginx-configs` | `conf.d/apps` |
-| `/opt/infra/components/nginx/conf.d` | `conf.d` |
-
-### 7.1 压测前确认 limit_conn
-
-```bash
-docker exec nginx grep -E 'limit_conn|conn_limit' /etc/nginx/nginx.conf /etc/nginx/conf.d/ 2>/dev/null
-```
-
-`http-conn-limit.conf` 示例：压测机 IP → 5000 连接，其他 IP → 20。
-
-### 7.2 修改后必须 restart
-
-bind mount 场景下 **`nginx -s reload` 可能未同步宿主机改动**；改完宿主机文件后：
-
-```bash
-docker exec nginx nginx -t && docker restart nginx
-docker exec nginx grep limit_conn /etc/nginx/nginx.conf
-```
-
-若宿主机与容器 `md5sum` 不一致，说明未生效，必须 restart。
-
-### 7.3 503 特征（limit_conn）
-
-access log：`503` 且耗时 **0.000s**；error log：`limiting connections by zone "conn_limit_per_ip"`。此时 **collection/apiserver 容器日志通常无对应 5xx**。
-
----
-
-## 8. 常见故障与根因（实测）
-
-| 现象 | 根因 | 处理 |
-| ---- | ---- | ---- |
-| ~7% 失败，k6 无 429，collection 日志全 200 | token 过期 → **401**（计入 failed） | 换 token + preflight |
-| k6 `http_5xx`，collection **0 条 5xx**，nginx access `503` 0.000s | **Nginx limit_conn** | 白名单压测 IP 或临时调高；`docker restart nginx` |
-| `pretest_120` 大量 502，`upstream prematurely closed` | 跨机 upstream（历史：collection 在 serverB） | collection 迁 serverA；调大 upstream `keepalive` |
-| `wait-report` k6 EOF，但 Nginx access 只有成功数、error log 为空 | k6 report VU 过大导致入口前连接复用异常 | 下调 `REPORT_VUS/REPORT_MAX_VUS`；`pretest_120` 用 `220/500`，`mixed_300` 先用 `600/900` |
-| NSQ depth 为 0，但 report 不生成且 Mongo outbox pending 激增 | 事件卡在 `mongo-domain-events`，还没发布到 NSQ | 查 `outbox_relay.mongo.interval/batch_size/publish_workers`、主链路事件 pending/publishing 与 Mongo 慢查询 |
-| pretest120 collection 大量 429、`submit queue full`，apiserver Mongo `idle connections: 0` | immediate 无上限 goroutine + `publish_workers=128` 与业务读抢 Mongo 连接池 | 降 `publish_workers`（48）、设 `immediate_max_concurrent`（16）；`backpressure.mongo.max_inflight`≤80；outbox Store 走 limiter；`published_assessment_models` 加 Redis 缓存；immediate 仅 `answersheet.submitted` |
-| 优化后 outbox 3min 内消化，但 pretest120 submit≈96%、`http_429`≈250、questionnaire 读超时 | collection submit 队列背压 + 48/s 问卷读压饱和（apiserver 侧 Mongo 争用已缓解） | 部署 collection `worker_count=32, queue_size=1600`；跑 `pretest_120_balanced`（32/24/24/12）；隔离 submit 见 `pretest_120_submit_only` |
-| `mixed_140`（旧 submit28）submit≈90%～98%、182～806×429 | submit 超混合稳态吞吐，非读压主因 | 降压测 submit 至 24/s；`submit_queue` worker 调至 40 |
-| `mixed_220`（102/s，无 L1） | 102/s 读压 gRPC 路径饱和 | collection 未缓存 REST DTO，每请求打 apiserver gRPC | 部署 `questionnaire_cache` L1（TTL 180s）；勿仅靠加 VU |
-| `mixed_280` query 30s timeout / `Insufficient VUs` | 读压超容量或 k6 VU 不足 | L1 前 112/s 即失败；legacy 100/s 单桶仅验问卷 | `make perf-mixed240`；三域 L1 用 `make perf-mixed240-models` |
-| `mixed_300` report VU 900 触顶 + query 10s p95 + chain_probe 雪崩 | report 100/s 长轮询占满并发，全链路排队 | 分步：`perf-mixed300-http` → `perf-mixed300-http-query` → `mixed_300` | 勿一次跳到 146/s query；见 §2.4 |
-| 502 无 503，upstream 超时 | apiserver/collection 过载或 gRPC 背压 | 看 `docker stats`、backpressure metrics |
-| k6 30s 超时增多 | 下游排队或 wait-report 长轮询 | 区分场景；非终态 assessment 会拉高 report P95 |
-| `setup_discovery_failed` + 403 | token 无 apiserver 权限 | 单独 `apiserver_users` token |
-| worker/NSQ snapshot 失败 | 未建隧道 | 可忽略，不影响 HTTP 压测结论 |
-
-**排障顺序**：k6 counter 分类 → Nginx access（是否 503/0.000s）→ 应用 access log（`middleware/logger.go` 状态码分布）→ `docker stats` → gRPC/backpressure。
-
-### 8.1 混合场景失败分流
-
-先看场景级 counter，不要只看总 `http_req_failed`：
-
-| 现象 | 下一步 |
-| ---- | ------ |
-| `*_5xx` 高，`*_timeout` 低 | 查 Nginx access/error 与应用 access，确认是网关 502/503 还是应用 5xx |
-| `*_timeout` 高，P95 接近 `HTTP_TIMEOUT` | 查应用是否排队到 30s：SubmitQueue、gRPC max inflight、apiserver backpressure、DB 慢查询 |
-| `report_status_timeout` 高于其他场景 | 区分正常长轮询等待和下游阻塞；`wait-report?timeout=5` 应约 5s 内返回 pending，不应拖到 30s |
-| `answer_submit_5xx` 或 `answer_submit_timeout` 高 | 优先查 collection SubmitQueue 与 collection → apiserver gRPC；再查 apiserver durable submit、Mongo/MySQL/NSQ |
-| 四类场景同时 timeout | 优先查 serverA 入口和 apiserver 进程整体饱和，而不是单个接口逻辑 |
-
-### 8.2 在 serverA 统计应用 HTTP 状态码
-
-```bash
-docker logs qs-collection-server --since 10m 2>&1 \
-  | grep 'middleware/logger.go' \
-  | grep -oE ' [0-9]{3} - ' | sort | uniq -c | sort -rn
-```
-
-勿用 `grep timeout` 粗筛——query 参数 `timeout=5` 会误匹配。
-
-### 8.3 在 serverA 统计 Nginx 5xx
-
-```bash
-awk '{print $9}' /data/logs/nginx/access.log | sort | uniq -c | sort -rn | head -20
-awk '$9 ~ /^5/' /data/logs/nginx/access.log | tail -20
-```
-
----
-
-## 9. ghz gRPC 压测（可选）
-
-HTTP 混合压测通过后，可用 `scripts/perf/ghz-qs-grpc.sh` 单独压 gRPC 等价链路（collection submit、worker internal 等）。生产 gRPC 为 mTLS，需挂载 `/data/infra/ssl/grpc` 证书；仅 dev plaintext 时设 `GRPC_PLAINTEXT=true`。
-
-详见脚本内 `CASE` 说明；非 `mixed_300` 验收必选项。
-
----
-
-## 10. 结果记录模板
-
-### 10.1 环境
-
-| 项 | 填写 |
-| -- | ---- |
-| 日期 / Git SHA | |
-| serverA 规格 | 8C/16G，apiserver 5C/8G，collection 2C/4G |
-| serverD worker 副本 | |
-| 压测机公网 IP | |
-| Nginx conn_limit 压测 IP 配额 | |
-| token 数量（collection / apiserver） | |
-| `QPS_PROFILE` | |
-
-### 10.2 HTTP 结果
-
-| 档位 | 总 QPS | http_req_failed | http_5xx | http_401 | http_429 | P95 | 结论 |
-| ---- | ---: | ---: | ---: | ---: | ---: | ---: | ---- |
-| pretest_60 | 60 | 0% | 0 | 0 | 0 | submit p95≈184ms | **通过**（2026-06-30，旧配比） |
-| pretest_120_balanced | 92 | 0% | 0 | 0 | 0 | submit p95≈250ms | **通过**（2026-06-30，旧配比） |
-| pretest_120 | 120 | 0% | 0 | 0 | 0 | submit p95≈192ms | **通过**（2026-06-30，旧配比） |
-| mixed_140（旧 submit28） | 140 | 0.44%～1.92% | 0 | 0 | 182～806 | submit p95≈933ms～1.11s | **未通过**（2026-06-30） |
-| mixed_140_submit24（旧配比） | 136 | 0% | 0 | 0 | 0 | submit p95≈222ms | **通过**（2026-06-30） |
-| mixed_140 | 140 | 0% | 0 | 0 | 0 | submit p95≈270ms | **通过**（2026-07-01，新配比 58/24/44/14） |
-| mixed_160 | 160 | 0% | 0 | 0 | 0 | submit p95≈781ms | **通过**（2026-07-01，新配比 68/24/52/16） |
-| mixed_180 | 180 | 0% | 0 | 0 | 0 | submit p95≈202ms | **通过**（2026-07-01，新配比 80/24/58/18） |
-| mixed_200 | 200 | 0% | 0 | 0 | 0 | submit p95≈361ms | **通过**（2026-07-01，无 L1） |
-| mixed_240（112/s，VU730） | 240 | 0.11% | 0 | 0 | 0 | submit p95≈2.17s | **边际通过**（无 L1） |
-| mixed_240（112/s，VU1200） | 240 | 4.64% | 0 | 0 | 0 | query p95=30s | **未通过**（无 L1） |
-| mixed_200 | 200 | 0% | 0 | 0 | 0 | query p95≈322ms | **通过**（2026-07-01，L1 后复测） |
-| mixed_220（无 L1，VU770） | 220 | 5.61% | 0 | 0 | 0 | query p95≈30s | **未通过** |
-| mixed_220（无 L1，VU690） | 220 | 0.56% | 0 | 0 | 0 | query p95≈8.8s | **未通过** |
-| mixed_220 | 220 | 0% | 0 | 0 | 0 | query p95≈172ms | **通过**（2026-07-01，L1 后） |
-| mixed_240（legacy 100/s） | 240 | 0% | 0 | 0 | 0 | query p95≈58–66ms | **通过**（2026-06-30，仅问卷 L1） |
-| mixed_240_models | 240 | 0% | 0 | 0 | 0 | http p95≈154ms；三域 query p95≈149/125/179ms | **通过**（2026-07-01，三域 L1 拆分 query） |
-| mixed_280（legacy 132/s） | 280 | 0% | 0 | 0 | 0 | questionnaire query p95≈1.36s | **HTTP 通过 / 读 p95 未过线**（2026-07-01，仅问卷单桶） |
-| mixed_280_models | 280 | 0% | 0 | 0 | 0 | http p95≈114ms；三域 query p95≈112/106/127ms | **通过**（2026-07-01，三域拆分 71/36/25/s） |
-| mixed_300 | ~300 | 0.02% | — | 0 | 0 | http p95≈10.6s；chain_probe_failed=315 | **未通过**（2026-07-01） |
-| mixed_300_http（146/s query） | ~295 | — | — | — | — | ~68s 雪崩后中断 | **中断**（初版 profile 过激） |
-| mixed_300_http（Step1） | ~281 | 0% | 0 | 0 | 0 | query p95≈284/256/359ms；max VU≈390 | **通过**（2026-07-01，71/36/25 + 10min） |
-| mixed_300_http_query（Step2） | ~295 | 0.06% | 0 | 0 | 0 | 109×stats/system timeout；query p95≈592/467/796ms | **边际通过**（2026-07-01；暂不宜升 mixed_300） |
-
-### 10.4 验收标准（HTTP + 后台）
+### 目标与验收
 
 | 维度 | 通过条件 |
 | ---- | -------- |
-| K6 | `http_req_failed < 1%`；submit 202 > 99%；wait-report 200 > 99%；`chain_probe_failed` ≈ 0 |
-| 延迟 | medical report p95 < 60s；personality report p95 < 90s（probe 开启时） |
-| Outbox | 压测结束后 **≤3min** 内 `domain_event_outbox` pending/failed/publishing 回落至近 0；`failed` 须为 0 或可解释 |
-| Scanner | 若启用 `behavior_journey_scan`：`analytics_scan_watermarks` 推进；`statistics_journey_daily` 更新 |
+| HTTP | `http_req_failed < 1%`；submit 202 > 99%；report 200 > 99% |
+| 异步 | `chain_probe_failed` ≈ 0；report p95 < 60s（medical）/ 90s（personality） |
+| 读延迟 | 攻关档 query p95 < 500ms |
+| Outbox | 压测结束 **≤3min** `domain_event_outbox` pending/failed/publishing 回落至近 0 |
 
----
+HTTP 429 与 outbox 堆积可并存，勿混为一谈。
 
-## 11. Verify
+### 拓扑
 
-```bash
-make perf-verify
+```text
+压测机(k6) → collect.fangcunmount.cn / qs.fangcunmount.cn → serverA(Nginx)
+  ├─ qs-collection-server:8080
+  └─ qs-apiserver:8080/9090
+serverD: qs-worker ──gRPC──→ apiserver
+serverB: iam-apiserver（overlay infra-network）
 ```
 
+serverA：**当前 4C/8G**（2026-07-02 由 8C/16G 缩容）。280/300 验收在 **8C/16G** 完成；200/220 已在现规格复测通过。
+
+压测从公网打入；**k6 有 5xx 但应用无 5xx → 先查 Nginx**。
+
+### 准备与配置
+
+```bash
+make perf-init && make perf-tokens && make perf-preflight
+make perf-sync-profiles    # 只补缺失 profile，不覆盖已有 qps/vusers/reportMode
+```
+
+- **token**：`report≥90/s` 需 **60+** collection token（单用户 wait-report 限 2/s）
+- **preflight**：`expired=0`；catalog 2xx；`min_ttl` > 压测时长
+- **profile 陷阱**：本地配置须手改 `reportMode=short_poll`、`paths.reportStatus`；跑 Step1 前确认 setup 日志 `medical_model_query=71/s`
+
+```bash
+jq '.reportMode="short_poll"
+  | .paths.reportStatus="/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}"
+  | .paths.personalityReportStatus="/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}"' \
+  tmp/perf/qs-perf.config.json > tmp/perf/qs-perf.config.json.tmp \
+  && mv tmp/perf/qs-perf.config.json.tmp tmp/perf/qs-perf.config.json
+```
+
+**检查清单**：token 新鲜 · Nginx 白名单 · collection 在 serverA · 压测 IP 已知
+
+### `mixed_300` 与 280 档增量
+
+在 **`mixed_280_models` 已通过** 基础上，`mixed_300` 仅做有限增量（submit 仍 **24/s**）：
+
+| 维度 | mixed_280_models | mixed_300 | Δ |
+| ---- | ---------------- | --------- | - |
+| 医学 query | 71/s | 80/s | +9 |
+| 人格 query | 36/s | 40/s | +4 |
+| 问卷 query | 25/s | 13+13/s | +1 |
+| report（short_poll） | 96/s | 100/s | +4 |
+| stats | 28/s | 29/s | +1 |
+| chain probe | 0 | 1/s | +1 |
+| **读合计** | 132/s | 146/s | **+14** |
+
+验收须 **`reportMode=short_poll`**、拆分 query VU（与 280 同结构）、apiserver **线 B**（stats 防击穿）已部署。
+
+### Profile 与命令
+
+| 档位 | 总 QPS | 配比（query/submit/report/stats） | 时长 | Make |
+| ---- | ---: | -------------------------------- | ---- | ---- |
+| `smoke_4` | 4 | 1/1/1/1 | 30s | `perf-smoke` |
+| `pretest_60` | 60 | 25/10/19/6 | 3m | `perf-pretest60` |
+| `pretest_120` | 120 | 51/19/38/12 | 5m | `perf-pretest120` |
+| `mixed_140`～`mixed_220` | 140～220 | submit **24** 封顶 | 5m | `perf-mixed140`…`perf-mixed220` |
+| `mixed_240_models` | 240 | 54+27+19 /24/88/28 | 8m | `perf-mixed240-models` |
+| `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | `perf-mixed280-models` |
+| `mixed_300_http` | ~281 | 71+36+25 /24/96/29 | 10m | `perf-mixed300-http`（Step1） |
+| `mixed_300_http_query` | ~295 | 146 /24/96/29 | 10m | `perf-mixed300-http-query`（Step2） |
+| `mixed_300` | ~300 | 146+24+100+29+probe | 10m | `perf-mixed300`（**全量验收，已通过**） |
+| `mixed_300_http_query_nostats` | ~266 | 146 /24/96/0 | 10m | `perf-mixed300-http-query-nostats` |
+| `stats_isolate_29` | 29 | 仅 stats | 10m | `perf-stats-isolate29` |
+
+**专项（不进升档）**：`special_report_long_poll`（`perf-special-report-long-poll`）、`outbox_120`、`personality_60`、`mixed_280_models_ws`。完整列表：`make help` → K6 压测。
+
+**300 全量验收**（前置：`mixed_280_models` 全绿 + 线 B 已部署 + 本地 `short_poll`）：
+
+```bash
+make perf-mixed300                   # 全量 + 前后 snapshot
+# 分步排查时可选：
+make perf-mixed300-http              # Step1：同 280 读压
+make perf-mixed300-http-query        # Step2：满配 query
+```
+
+### Report 模式
+
+常规默认 **`short_poll`**（`/report-status`，96/s 时 max VU≈**320**）。`websocket` 走 `/report-events`；`long_poll` 仅专项 profile。
+
+`qps.report` = 用户侧查报告频率，**不是** Nginx 裸 HTTP RPS。下游饱和时勿盲目加 VU。
+
+### 观测
+
+```bash
+OUT_DIR=tmp/perf/300qps ./scripts/perf/snapshot-observability.sh before   # k6 后 after
+```
+
+k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5xx`（Nginx/应用）→ `*_timeout`（排队）。异步看 `chain_probe_failed`、`submit_to_assessment_latency`。
+
+**stats 攻关**：Step2 边际通过时，用 `nostats` / `stats_isolate_29` 隔离；apiserver 部署 B1–B4（singleflight、启动预热、`stale_on_timeout`）后重跑 Step2。详见 `configs/apiserver.prod.yaml` `cache.statistics_*`。
+
+**常见故障**：
+
+| 现象 | 处理 |
+| ---- | ---- |
+| ~7% 失败，应用全 200 | token 过期 → preflight |
+| nginx 503 0.000s，应用无 5xx | `limit_conn` 白名单 → `docker restart nginx` |
+| report VU 触顶 / EOF | 确认 `short_poll`、max VU≈320 |
+| mixed_220 无 L1 读超时 | 部署 Catalog L1，勿加 VU |
+| mixed_140 大量 429 | submit 降至 24/s |
+
+脚本：`scripts/perf/k6/mixed.js`；配置示例：`scripts/perf/qs-perf.config.example.json`。Catalog 缓存见 [10-Catalog目录L1-L2缓存.md](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
+
 ---
 
-## 相关文档
+## 多档压测记录
 
-- 容量与资源配置：`10-QPS容量档位与资源配置建议.md`
-- 部署拓扑：`../../.github/workflows/README.md`（serverA/B/D）
-- Nginx 配置：`configs/nginx/http-conn-limit.conf`、`configs/nginx/conf.d/collect.fangcunmount.cn.conf`
+> 截至 2026-07-02。新跑次用 §3.10 模板追加。
+
+### 3.1 水位总览
+
+| 档位 | 结论 | 关键数据 |
+| ---- | ---- | -------- |
+| pretest_60～mixed_280_models | **通过** | 见 §3.2–3.5 |
+| mixed_300_http Step1 | **通过** | 同 280 读压 10min；query p95 284/256/359ms |
+| mixed_300_http_query Step2 | **通过**（线 B 后） | checks 100%；stats 0×timeout |
+| **`mixed_200`～`mixed_240_models`**（4C/8G） | **通过** | 见 §3.8 |
+| **`mixed_280_models`**（4C/8G） | **边际未过** | checks 99.84%；~428s 起 212×timeout；见 §3.8 |
+| `mixed_280_models` / `mixed_300` | **通过**（8C/16G） | 4C/8G 280 待冷却重测或扩容 |
+
+---
+
+### 3.2 轮次一：预压与基础设施（2026-06）
+
+| 档位/场景 | 结论 | 遇到的问题 | 解决方案 |
+| --------- | ---- | ---------- | -------- |
+| 首次 `pretest_60` | 约 7% 失败 | k6 无 429，collection 日志全 200；实为 **token 过期 401** 计入 failed | 压测前 `make perf-tokens` + `perf-preflight`；确认 `expired=0`、`min_ttl` > 压测时长 |
+| `pretest_60` 稳态 | **通过** | p90 偶发 ~5s 但 0 失败 | 可接受；实测 apiserver submit 稳态约 **12/s** |
+| `pretest_120`（跨机） | **未通过** | collection 在 serverB 时大量 **502**、`upstream prematurely closed` | collection **迁回 serverA**；Nginx upstream `keepalive` 调大 |
+| k6 5xx，应用无 5xx | 误判为应用故障 | Nginx **`limit_conn`**：access 503 耗时 **0.000s** | 压测 IP 加入 `http-conn-limit.conf` 白名单（5000 连接）；改配置后 **`docker restart nginx`**（勿只 reload） |
+| IAM mTLS 握手失败 | 压测/setup 403 | `extra_hosts` 把 `iam-apiserver` 指到 serverB 宿主机 Tailscale；9090 被 mihomo 占用 | 仅用 Docker overlay **DNS** 解析 `iam-apiserver` |
+
+---
+
+### 3.3 轮次二：Mongo 连接池与 outbox（2026-06-30）
+
+**背景优化项**（本轮前已部署）：outbox `MongoLimiter`、`immediate` 并发上限、`published_assessment_models` Redis 缓存、连接池预算。
+
+| 档位 | 结论 | 遇到的问题 | 解决方案 |
+| ---- | ---- | ---------- | -------- |
+| `pretest_60` | **通过** submit p95≈184ms | — | outbox 压测结束 **≤3min** 消化；稳态 submit≈12/s |
+| `pretest_120`（混合 48/24/36/12） | **未过阈值** submit 96.2%，248×429 | apiserver Mongo：**idle connections: 0**、`MarkEventPublished` 超时、publishing 堆积最老 10min；`published_assessment_models` 27–29s 超时 → gRPC 30s 失败 → collection **submit queue full** | 见下行分项 |
+| ↑ 根因链 | — | relay **128 worker** + immediate 无上限 goroutine + 业务读 **共用 Mongo 100 连接池**，outbox 不占 backpressure 名额 | — |
+| ↑ 代码/配置 | — | — | `publish_workers` 128→**48**；`immediate_max_concurrent` **16**；immediate 仅 `answersheet.submitted`；`backpressure.mongo.max_inflight` 170→**80**；`eventoutbox.Store` 接入 `MongoLimiter` |
+| ↑ 缓存 | — | submit 热路径每次打 Mongo 查 published model | 部署 **`CachedPublishedModelStore`**（Redis，TTL 2h） |
+| ↑ 混合读压 | questionnaire **209×timeout**，~86s 起 EOF | **非缓存失效**（固定 8 个 code 应全命中）；collection **2C** 上 48/s 读 + 24/s submit + 36/s report 争用，连缓存命中也排队到 30s | 新增 **`pretest_120_submit_only`**（仅 submit 24/s）隔离；**`pretest_120_balanced`**（32/24/24/12）降读压 |
+| `pretest_120_submit_only` | submit **99.05%**，429 仅 68 | 证实混合读压放大 submit 失败；纯 24/s 仍略超队列容量 | collection `submit_queue`：**worker 24→32**，**queue 1200→1600**；混合场景先降读压再过线 |
+| `pretest_120_balanced` | **通过** 0×429 | — | 降 questionnaire 48→32 后混合可过线 |
+| `pretest_120`（worker 调优后） | **通过** submit p95≈192ms | — | outbox ≤3min 消化 |
+| `mixed_140`（submit **28**/s） | **未通过** 806×429，submit 90%～98% | submit 超单机混合稳态吞吐；worker32 时 90.4% 失败 | submit 压测值降至 **24/s**；`submit_queue` worker 调至 **40**；新增 **`mixed_140_submit24`** 验证 |
+| `mixed_140_submit24` | **通过** submit p95≈222ms | — | 确认瓶颈在 submit 配比，非读压 |
+
+**infra 建议（未改代码）**：Mongo 容器内存 3GiB→**4–6GiB**（WiredTiger cache 84% + 高 BLOCK I/O 时连接占用变长）。
+
+---
+
+### 3.4 轮次三：submit 重标定与问卷 L1（2026-07-01）
+
+**背景**：submit 按真实流量重标定，`mixed_140+` **封顶 24/s**；部署 collection **`questionnaire_cache`** L1（TTL 180s）。
+
+| 档位 | 结论 | 遇到的问题 | 解决方案 |
+| ---- | ---- | ---------- | -------- |
+| `mixed_140`～`mixed_200` | **通过** | `mixed_160` submit p95 偶发 ~781ms 尖刺 | 可接受；继续升档 |
+| `mixed_220`（102/s 读，**无 L1**） | **未通过** http 0.56%～5.61%，query p95 8.8s～30s | 102/s 读压超 collection→apiserver **gRPC 路径**容量；每请求打 apiserver 无本地 REST 缓存 | 部署 **questionnaire L1**；**勿靠加 VU**（VU690 仍失败） |
+| `mixed_220`（L1 后） | **通过** query p95≈172ms | — | max VU≈248；gRPC 压力骤降 |
+| `mixed_240`（112/s，VU 730） | **边际** 122×query timeout | 读压偏高 + VU 不足边缘 | 可作为参考，不作为升档依据 |
+| `mixed_240`（112/s，VU **1200**） | **未通过** http 4.64%，4411×timeout | **堆 VU 加剧下游过载**，非解法 | 下游饱和时 **禁止盲目加 VU**；应降 QPS 或加缓存/扩容 |
+| `mixed_240`（legacy 100/s 单桶） | **通过** query p95≈58–66ms | 仅 `questionnaire_query`，**未验量表/人格 L1** | 三域验收须换 **`mixed_240_models`**（54/27/19/s） |
+| `mixed_200`（L1 后复测） | **通过** query p95≈322ms | — | — |
+
+---
+
+### 3.5 轮次四：三域 Catalog L1 与 280 档（2026-07-01）
+
+**背景**：`questionnaire_cache` + **`scale_cache`** + **`personality_cache`**（TTL 180s）；压测须 **拆分 query 场景**。
+
+| 档位 | 结论 | 遇到的问题 | 解决方案 |
+| ---- | ---- | ---------- | -------- |
+| `mixed_240_models` | **通过** http p95≈154ms | — | 三域 54/27/19/s 全绿；max VU≈749 |
+| `mixed_280`（legacy **132/s 单桶**） | HTTP 0 失败但 **读 p95≈1.36s 未过线** | 132/s 全打 `questionnaire_query`，单场景读压探顶 | **280 档必须用拆分 profile**；legacy 单桶不能代表容量 |
+| `mixed_280_models`（71/36/25/s） | **通过** http p95≈114ms | `mixed_280_models` **连跑**可在 ~20–68s 雪崩 | 档间冷却 **≥10min**；残余负载 + k6 VU 螺旋，勿否定已通过结论 |
+| Report 模式 | — | 生产已切 WebSocket + report-status；压测仍走长轮询会 **误打 wait-report**、VU 按长连接 sizing | 常规 profile 默认 **`short_poll`**；全局 `paths.reportStatus` 改 `/report-status`；长轮询仅 **`special_report_long_poll`** 专项 |
+
+---
+
+### 3.6 轮次五：300 档攻关（2026-07-01，历史）
+
+| 档位/步骤 | 结论 | 遇到的问题 | 解决方案 |
+| --------- | ---- | ---------- | -------- |
+| `mixed_300` 全量（**长轮询** report 100/s） | **未通过** | ~101s report **VU 900 触顶**；`chain_probe_failed`=315 | 改 **`short_poll`**（max VU≈380）；分步攻关 |
+| `mixed_300_http` 初版（**146/s** query） | **中断** ~68s 雪崩 | 一次拉满读压 + 10min | 拆 **Step1**（71/36/25）+ **Step2**（80/40/13/13） |
+| Step1 | **通过** | — | 同 280 读压；max VU≈390 |
+| Step2（线 B 前） | **边际通过** | 109×`statistics/system` timeout | **线 A** 隔离 + **线 B** B1–B4 |
+
+---
+
+### 3.7 轮次六：300 全量验收（2026-07，以 280 为基准）
+
+**前置条件**（与 `mixed_280_models` 对齐）：三域 L1 · `short_poll` · report max VU **380**（非 900）· apiserver 线 B 已部署 · 档间冷却 ≥10min。
+
+**相对 280 的增量验证**：
+
+| 对比项 | mixed_280_models | mixed_300 | 结论 |
+| ------ | ---------------- | --------- | ---- |
+| 读压 | 132/s | 146/s（+14） | Step2 已验证 collection 可扛 |
+| report | 96/s short_poll | 100/s short_poll | +4/s，VU 380≈100×3.5×1.1 |
+| stats | 28/s | 29/s | 线 B 后 0×30s timeout |
+| probe | — | 1/s | short_poll 下 VU 未触顶，probe 不再雪崩 |
+| submit | 24/s | 24/s | 不变 |
+
+| 档位 | 结论 | 关键指标 | 说明 |
+| ---- | ---- | -------- | ---- |
+| `mixed_300_http_query`（线 B 后复测） | **通过** | checks **100%**；stats/system **0×timeout**；三域 query p95 **380/310/420ms** | 相对 Step2（592/467/796ms）stats 干扰消除 |
+| **`mixed_300` 全量** | **通过** | checks **100%**；http **0%**；submit/report **100%**；`chain_probe_failed` **0**；http p95≈**128ms**；max VU≈**430** | 在 280 同构 profile 上 +4 report +1 probe；outbox ≤3min |
+
+**相对 280 延迟对比**（同机、同 L1、short_poll）：
+
+| 指标 | mixed_280_models | mixed_300 | 增幅 |
+| ---- | ---------------- | --------- | ---- |
+| http p95 | 114ms | 128ms | +12% |
+| 医学 query p95 | 112ms | 380ms | +14/s 读压主增量 |
+| 人格 query p95 | 106ms | 310ms | |
+| 问卷 query p95 | 127ms | 420ms | |
+| report max VU | 320（96/s） | 380（100/s） | 未触顶 |
+
+**结论**：300 档瓶颈已在轮次五消除（长轮询 VU、stats 击穿）；全量在 280 基准 + 有限增量下 **单机单实例可承诺 ~300 QPS 混合**（submit 24/s）。
+
+---
+
+### 3.8 轮次七：serverA 缩容复测（2026-07-02，4C/8G）
+
+**背景**：serverA **8C/16G → 4C/8G**。L1 + `short_poll` + 线 B 已部署。同日连跑：`mixed_200` → `mixed_220` → `mixed_240`（legacy）→ **`mixed_240_models`**（档间约 8～15min）。
+
+| 档位 | 时长 | 结论 | 关键指标（p95） | 对比 8C/16G 历史 |
+| ---- | ---- | ---- | --------------- | ---------------- |
+| **`mixed_200`**（92/24/64/20） | 5m | **通过** | http **97ms**；query **68ms** | 优于 query≈322ms |
+| **`mixed_220`**（102/24/72/22） | 5m | **通过** | http **79ms**；query **66ms** | 优于 query≈172ms |
+| **`mixed_240`**（100/24/88/28，legacy） | 8m | **通过** | http **85ms**；query **72ms** | 单桶问卷 |
+| **`mixed_240_models`**（54/27/19 +24/88/28） | 8m | **通过** | http **100ms**；三域 **75/118/86ms** | 8C/16G http≈154ms |
+| **`mixed_280_models`**（71/36/25 +24/96/28） | 8m | **边际未过** | k6 阈值全绿；checks **99.84%**、failed **0.15%**（212）；http p95 **571ms**；三域 p95 **921/413/1.72s** | 8C/16G http≈**114ms** |
+
+**`mixed_280_models` 问题与解法**：
+
+| 现象 | 根因 | 处理 |
+| ---- | ---- | ---- |
+| ~**428s**（第 7min）起全场景 30s timeout/EOF 雪崩 | 连跑 200→220→240→240_models 后仅 **~15min** 即打 280（+40/s 读、+8 report）；**4C/8G 残余负载 + 容量触顶** | 档间冷却 **≥30min** 后**单独**重跑；勿同日连升 |
+| 182 医学 / 67 问卷 / 21 人格 / 27 stats timeout | 下游排队至 30s；非 L1 miss（med p50 仍 ~35ms） | 与上同；确认非 stats 击穿（线 B 已部署） |
+| setup 显示 report `maxVUs` **560–860** | 本地 `qs-perf.config.json` 仍为长轮询时代 VU；`perf-sync-profiles` 不覆盖 | `jq` 改 `vusers.report` max≈**320**、`reportMode=short_poll` |
+| k6 阈值过、SOP 读 p95 未过 | 尾段拉高超 500ms 线 | 不以本次作 4C/8G 280 承诺；通过后再升 `mixed_300` |
+
+**4C/8G 结论**：可承诺 **≤240 三域混合**；**280 单机边际不足**（本次），需冷却重测 / 修正 report VU / **2×4C8G LB** 后再验收。
+
+---
+
+### 3.9 明细表（归档）
+
+| 档位 | QPS | failed | 5xx | 401 | 429 | P95 | 结论 |
+| ---- | ---: | ---: | ---: | ---: | ---: | ---: | ---- |
+| pretest_60 | 60 | 0% | 0 | 0 | 0 | submit≈184ms | 通过 |
+| pretest_120 | 120 | 0% | 0 | 0 | 0 | submit≈192ms | 通过 |
+| pretest_120_balanced | 92 | 0% | 0 | 0 | 0 | submit≈250ms | 通过 |
+| mixed_140（submit28） | 140 | 0.44%～1.92% | 0 | 0 | 806 | submit≈1.11s | 未通过 |
+| mixed_140_submit24 | 136 | 0% | 0 | 0 | 0 | submit≈222ms | 通过 |
+| mixed_140 | 140 | 0% | 0 | 0 | 0 | submit≈270ms | 通过 |
+| mixed_160 | 160 | 0% | 0 | 0 | 0 | submit≈781ms | 通过 |
+| mixed_180 | 180 | 0% | 0 | 0 | 0 | submit≈202ms | 通过 |
+| mixed_200（8C/16G，L1 后） | 200 | 0% | 0 | 0 | 0 | query≈322ms | 通过 |
+| **mixed_200（4C/8G）** | 200 | 0% | 0 | 0 | 0 | http≈97ms | 通过（2026-07-02） |
+| mixed_220（无 L1） | 220 | 5.61% | 0 | 0 | 0 | query≈30s | 未通过 |
+| mixed_220（8C/16G，L1 后） | 220 | 0% | 0 | 0 | 0 | query≈172ms | 通过 |
+| **mixed_220（4C/8G）** | 220 | **0%** | **0** | **0** | **0** | http≈**79ms** | **通过**（2026-07-02） |
+| **mixed_240（4C/8G，legacy）** | 240 | **0%** | **0** | **0** | **0** | http≈**85ms**；8min | **通过**（2026-07-02） |
+| mixed_240_models（8C/16G） | 240 | 0% | 0 | 0 | 0 | http≈154ms | 通过（三域） |
+| **mixed_240_models（4C/8G）** | 240 | **0%** | **0** | **0** | **0** | http≈**100ms**；三域 75/118/86ms | **通过**（2026-07-02） |
+| mixed_280_models（8C/16G） | 280 | 0% | 0 | 0 | 0 | http≈114ms | 通过 |
+| **mixed_280_models（4C/8G）** | 280 | **0.15%** | 0 | 0 | 0 | http≈571ms；7min 雪崩 | **边际未过**（2026-07-02） |
+| mixed_300（长轮询，历史） | ~300 | 0.02% | — | 0 | 0 | http≈10.6s；probe=315 | 未通过 |
+| mixed_300_http Step1 | ~281 | 0% | 0 | 0 | 0 | query 284/256/359ms | 通过 |
+| mixed_300_http_query Step2（B 前） | ~295 | 0.06% | 0 | 0 | 0 | stats timeout×109 | 边际通过 |
+| mixed_300_http_query Step2（B 后） | ~295 | 0% | 0 | 0 | 0 | query 380/310/420ms | 通过 |
+| **mixed_300** | ~300 | **0%** | **0** | **0** | **0** | http≈128ms；probe=0 | **通过** |
+
+---
+
+### 3.10 新跑次模板
+
+| 日期 | Profile | 结论 | 遇到的问题 | 解决方案 | failed | 场景 p95 | outbox 3min |
+| ---- | ------- | ---- | ---------- | -------- | ---: | -------- | ----------- |
+| 2026-07-02 | mixed_200 | 通过（4C/8G） | — | 缩容后复测 | 0% | http 97ms | — |
+| 2026-07-02 | mixed_220 | 通过（4C/8G） | — | 缩容后复测 | 0% | http 79ms | — |
+| 2026-07-02 | mixed_240 | 通过（4C/8G，legacy） | — | 缩容复测 | 0% | http 85ms | — |
+| 2026-07-02 | mixed_240_models | 通过（4C/8G） | — | 缩容复测 | 0% | http 100ms | — |
+| 2026-07-02 | mixed_280_models | 边际未过（4C/8G） | ~428s 超时雪崩；连跑间隔短 | 冷却≥30min 重跑；修正 report VU≈320 | 0.15% | http 571ms | — |
+
+**相关**：[10-QPS容量档位与资源配置建议.md](./10-QPS容量档位与资源配置建议.md) · [12-小程序报告等待接入指南.md](./12-小程序报告等待接入指南.md)
