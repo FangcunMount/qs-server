@@ -117,8 +117,8 @@ rate_limit:                          # 限流配置
   wait_report_global_burst: 300      # 等待报告全局突发 300
   wait_report_user_qps: 60           # 等待报告用户 QPS 60
   wait_report_user_burst: 120        # 等待报告用户突发 120
-  report_events_global_qps: 100      # 报告事件全局 QPS 100
-  report_events_global_burst: 150    # 报告事件全局突发 150
+  report_events_global_qps: 120      # 报告事件全局 QPS 120（mixed_280 WS 96/s 留余量）
+  report_events_global_burst: 180    # 报告事件全局突发 180
   report_events_user_qps: 20         # 报告事件用户 QPS 20
   report_events_user_burst: 40       # 报告事件用户突发 40
 
@@ -293,6 +293,6 @@ runtime:
 
 # 并发/连接池调优
 concurrency:                        # 并发/连接池调优（4C/8G mixed_280+ 榨干档）
-  max-query-concurrency: 400        # 读路径（catalog/report-status Try 503；其余读 Wait）
+  max-query-concurrency: 460        # 读路径（catalog Try 503；280 档 169×503 后上调）
   max-submit-concurrency: 96        # 写路径（submit 等，与读池隔离）
   max-wait-ms: 4000                 # submit/非 catalog 读 槽位满时最长排队（与 grpc inflight_wait 对齐）

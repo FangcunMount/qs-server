@@ -37,7 +37,7 @@
 
 | 位置 | 关键值 | 含义 |
 | ---- | ------ | ---- |
-| collection rate_limit | submit/query global QPS 300，wait-report global QPS 200 | 入口保护（压测配比见 k6 profile，与此无关） |
+| collection rate_limit | submit/query global QPS 300；**report_events global 120** | 入口保护（压测配比见 k6 profile） |
 | collection grpc_client | max_inflight **420** | 4C/8G 榨干档 |
 | collection submit_queue | queue_size **2800**，worker_count **56** | 提交削峰 |
 | collection questionnaire_cache | enabled，TTL 180s，max_entries 256 | 已发布问卷 REST DTO 进程内 L1（跳过 gRPC） |
@@ -45,7 +45,7 @@
 | collection personality_cache | enabled，TTL 180s，max_entries 256 | 人格模型目录 REST DTO 进程内 L1 |
 
 目录缓存分层说明见 [Catalog L1+L2 缓存](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
-| collection concurrency | query **400** + submit **96**（catalog/report-status Try 503） | 4C/8G 榨干档；读写池隔离 |
+| collection concurrency | query **460** + submit **96**（catalog Try 503） | 4C/8G；280 档 169×503 后上调读池 |
 | collection wait_report | max_http_concurrency **400**，degrade_immediate_enabled | wait-report 独立池；槽位满立即 pending |
 | collection report_events | enabled **false**（灰度）；max_connections 2000 | WebSocket 报告推送（方案 E） |
 | collection redis pool | max-active 256 | collection 侧 Redis 活跃连接 |
@@ -122,15 +122,15 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 
 | 位置 | 关键值 | 说明 |
 | ---- | ------ | ---- |
-| collection `concurrency.max-query-concurrency` | **400** | 读路径槽位（catalog/report-status 满槽 Try 503） |
-| collection `concurrency.max-submit-concurrency` | **96** | 写路径槽位（与读池隔离） |
+| collection `concurrency.max-query-concurrency` | **460** | 读路径槽位（catalog 满槽 Try 503） |
+| collection `rate_limit.report_events_global_qps` | **120** | WS subscribe 96/s 留余量 |
 | collection `grpc_client.max_inflight` | **420** | 对齐 apiserver gRPC 承载 |
 | collection `grpc_client.inflight_wait_ms` | **4000** | 减少 2s 快速失败 |
 | collection `submit_queue.worker_count` | **56** | 对齐 24/s submit |
 | apiserver `backpressure.mongo.max_inflight` | **120** | submit+outbox 主瓶颈（原 80） |
 | apiserver `backpressure.mysql.max_inflight` | **150** | 对齐 mysql pool |
 | apiserver backpressure `timeout_ms` | **4000～5000** | 应用内排队，避免 k6 30s 雪崩 |
-| k6 `mixed_280_models` VU max | submit **400** 等 | 见 `qs-perf.config.example.json` |
+| k6 `mixed_280_models` | report max **640**，`holdSeconds` **4** | 防 WS VU 打满（530 尖刺） |
 
 **部署**：改 `configs/*.prod.yaml` 后 **重启** `qs-apiserver` + `qs-collection-server`；本地 `make perf-sync-vusers` 同步 k6 VU；压测前冷却 ≥30min、网络稳定。
 

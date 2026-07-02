@@ -9,7 +9,7 @@
 | 入口 | `make perf-init` → `perf-tokens` → `perf-preflight` → `perf-smoke` → 按 **L0～L4** 升档；详见 §K6 分档命令；脚本 `scripts/perf/k6/mixed.js` |
 | 配置 | `tmp/perf/qs-perf.config.json`（`make perf-init` 不覆盖已有文件） |
 | 三类目标 | ① 前台读写 ② 异步 SLA（`chain_probe`）③ 后台排水（`outbox_120` + DB snapshot） |
-| 当前水位 | **4C/8G** `mixed_280_models` **全绿**（HTTP 短轮询跑次，2026-07-02）；主链已切 **WS**，升档前用 `make perf-sync-vusers` 复测 |
+| 当前水位 | **4C/8G** `mixed_280_models` **边际通过**（WS，0.19% catalog 503，2026-07-02）；读池 **460** + report VU **640** 待复测 |
 | Report | 常规默认 **`websocket`**（`/report-events`）；HTTP 短轮询仅专项 `special_report_short_poll` |
 | 验收 | `http_req_failed < 1%` + chain probe SLA；压测结束 **≤3min** outbox 回落至近 0 |
 | 必做 | 新鲜 token + `perf-preflight` + Nginx 压测 IP 放宽 `limit_conn` |
@@ -231,7 +231,9 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 | HTTP 降级专项失败 | 跑 `perf-special-report-short-poll`，非升档依据 |
 | mixed_220 无 L1 读超时 | 部署 Catalog L1，勿加 VU |
 | mixed_140 大量 429 | submit 降至 24/s |
-| mixed_280 边际过（0.01% + ~41s 尖刺） | 4C/8G 容量触顶 / 残余负载；冷却 ≥30min **单独**重跑；查 outbox pending |
+| catalog 读 **503**（非 429） | query 池满槽 Try 503；`http_5xx` 计入 failed | 上调 `max-query-concurrency`（**460**）；勿与 rate_limit 混淆 |
+| report WS `Insufficient VUs` 530 | 会话 p95≈6.8s，VU 被长时间占用 | report max **640**、`holdSeconds` **4**；`report_events_global_qps` **120** |
+| mixed_280 边际过（0.01% + ~41s 尖刺） | 4C/8G 容量触顶 / 残余负载 | 冷却 ≥30min 单独重跑；查 outbox pending |
 | mixed_280 ~428s 全场景雪崩 | 连档升压 + 冷却不足（§3.8）；HTTP 专项见 `special_report_short_poll` |
 
 脚本：`scripts/perf/k6/mixed.js`；配置示例：`scripts/perf/qs-perf.config.example.json`。Catalog 缓存见 [10-Catalog目录L1-L2缓存.md](../03-基础设施/redis/10-Catalog目录L1-L2缓存.md)。
@@ -465,5 +467,6 @@ k6 优先看：`http_401`（换 token）→ `http_429`（加 token）→ `http_5
 | 2026-07-02 | mixed_200 | 通过（4C/8G，outbox 调优后） | 调优前曾有 13×timeout | 同上 | 0% | http 90ms | — |
 | 2026-07-02 | mixed_240_models | 通过（4C/8G，outbox 调优后） | — | 三域 L1 验收 | 0% | http 76ms；三域 66/76/73ms | — |
 | 2026-07-02 | mixed_280_models | 边际（4C/8G，outbox 调优后） | ~41s 20×timeout；dropped=465 | 单独重跑；勿连档升 300 | 0.01% | http 98ms | — |
+| 2026-07-02 | mixed_280_models | 边际通过（4C/8G，WS+分池） | 169×catalog **503**；WS VU 530 打满；dropped=1188 | query **460**；report VU **640**；events QPS **120** | 0.19% | http 808ms p95 | — |
 
 **相关**：[10-QPS容量档位与资源配置建议.md](./10-QPS容量档位与资源配置建议.md) · [12-小程序报告等待接入指南.md](./12-小程序报告等待接入指南.md)

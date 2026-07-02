@@ -35,7 +35,7 @@
       "websocket": {
         "reportMode": "websocket",
         "path": "report-events",
-        "holdSeconds": 5,
+        "holdSeconds": 4,
         "maxVuFormula": "report_rps × ws_hold_seconds × 1.1"
       }
     }
@@ -43,8 +43,8 @@
   "vuserSizing": {
     "note": "serverA 4C/8G 榨干档：scenario max ≈ rps×迭代秒数×1.1；submit 统一 cap 400；全场景 max 合计建议 <1300，防 constant-arrival-rate VU 螺旋。",
     "reference": {
-      "mixed_280_models": "med 360 / pers 200 / quest 150 / submit 400 / report WS 530 / stats 360",
-      "mixed_300": "med 400 / pers 220 / quest+persQuest 各 90 / submit 400 / report WS 550 / stats 380 / probe 60",
+      "mixed_280_models": "med 360 / pers 200 / quest 150 / submit 400 / report WS 640 / stats 360",
+      "mixed_300": "med 400 / pers 220 / quest+persQuest 各 90 / submit 400 / report WS 660 / stats 380 / probe 60",
       "special_report_short_poll": "HTTP 降级路径专项，不进升档链"
     }
   },
@@ -611,8 +611,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 120,
-          "max": 530
+          "preAllocated": 140,
+          "max": 640
         },
         "stats": {
           "preAllocated": 120,
@@ -716,8 +716,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 120,
-          "max": 530
+          "preAllocated": 140,
+          "max": 640
         },
         "stats": {
           "preAllocated": 120,
@@ -775,8 +775,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 130,
-          "max": 550
+          "preAllocated": 140,
+          "max": 660
         },
         "stats": {
           "preAllocated": 130,
@@ -832,8 +832,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 120,
-          "max": 530
+          "preAllocated": 140,
+          "max": 640
         },
         "stats": {
           "preAllocated": 130,
@@ -890,8 +890,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 120,
-          "max": 530
+          "preAllocated": 140,
+          "max": 640
         },
         "stats": {
           "preAllocated": 130,
@@ -948,8 +948,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 120,
-          "max": 530
+          "preAllocated": 140,
+          "max": 640
         }
       }
     },
@@ -1045,8 +1045,8 @@
           "max": 400
         },
         "report": {
-          "preAllocated": 130,
-          "max": 550
+          "preAllocated": 140,
+          "max": 660
         },
         "stats": {
           "preAllocated": 130,
@@ -1106,7 +1106,7 @@
       "vusers": {
         "query": { "preAllocated": 80, "max": 400 },
         "submit": { "preAllocated": 400, "max": 1600 },
-        "report": { "preAllocated": 120, "max": 530 },
+        "report": { "preAllocated": 140, "max": 640 },
         "stats": { "preAllocated": 40, "max": 200 },
         "chainProbe": { "preAllocated": 30, "max": 300 }
       }
@@ -1148,7 +1148,7 @@
       "vusers": {
         "query": { "preAllocated": 350, "max": 1500 },
         "submit": { "preAllocated": 180, "max": 1000 },
-        "report": { "preAllocated": 130, "max": 550 },
+        "report": { "preAllocated": 140, "max": 480 },
         "stats": { "preAllocated": 130, "max": 380 },
         "chainProbe": { "preAllocated": 15, "max": 60 }
       }
