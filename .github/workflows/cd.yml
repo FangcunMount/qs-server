@@ -29,7 +29,7 @@ name: Production Deploy
 #   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
 #
 # 生产拓扑（2026-06）：
-#   serverA（8C/16G）：nginx + qs-apiserver + qs-collection-server
+#   serverA（4C/8G）：nginx + qs-apiserver + qs-collection-server
 #   serverB：IAM（iam-apiserver）；经 Swarm overlay infra-network 跨机 DNS（勿 extra_hosts 到宿主机 9090）
 #   serverD：qs-worker（跨云 gRPC 连 apiserver）
 #   WWW_UID, WWW_GID（与宿主机运行用户一致，部署时 chown TLS 与 configs；镜像 RUN_UID 与之一致）

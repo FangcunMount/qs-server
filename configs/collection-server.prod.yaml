@@ -30,7 +30,7 @@ insecure:
 secure:
   bind-address: "0.0.0.0"
   # serverA Nginx 统一终止公网 HTTPS，并通过 infra-network 访问本服务 HTTP 8080。
-  # collection-server 与 apiserver 同机部署（serverA 8C/16G），不挂载公网 TLS 证书。
+  # collection-server 与 apiserver 同机部署（serverA 4C/8G），不挂载公网 TLS 证书。
   bind-port: 0
   tls:
     # bind-port=0 时不会读取 Web 证书；保留字段便于回滚启用 HTTPS listener。
@@ -286,8 +286,8 @@ log:
 # ============================================================
 # 控制 Go 运行时的 GC/内存行为与并发
 runtime:
-  # 将 GOMEMLIMIT 设置为容器配额的 75% 以避免 OOM（容器 mem_limit=4096MiB）
-  go-mem-limit: "3072MiB"
+  # 将 GOMEMLIMIT 设置为容器配额的 75% 以避免 OOM（容器 mem_limit=3072MiB）
+  go-mem-limit: "2304MiB"
   # 更积极的 GC，降低峰值内存
   gogc: 50
 

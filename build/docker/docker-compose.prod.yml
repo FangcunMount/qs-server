@@ -1,5 +1,5 @@
-# 生产拓扑（2026-06）：
-# - serverA（8C/16G）：qs-apiserver + qs-collection-server（本文件前两段）
+# 生产拓扑（2026-07）：
+# - serverA（4C/8G）：qs-apiserver + qs-collection-server（本文件前两段）
 # - serverB：IAM（iam-apiserver，经 Swarm overlay infra-network 跨机 DNS 解析）
 # - serverD：qs-worker（本文件 qs-worker 段，compose -p qs-worker 独立部署）
 services:
@@ -7,10 +7,9 @@ services:
     image: ${DOCKER_IMAGE_QS_APISERVER:-ghcr.io/fangcunmount/qs-apiserver:latest}
     container_name: qs-apiserver
     restart: unless-stopped
-    # serverA 8C/16G：mixed_300 目标保持单 apiserver 架构，给 apiserver 5C/8G，
-    # 其余 CPU 预留给 collection、Nginx、宿主机与本机数据组件。
-    mem_limit: "8192m"
-    cpus: "5"
+    # apiserver 4C/4G；GOMEMLIMIT 取容器内存 75%。
+    mem_limit: "4096m"
+    cpus: "4"
     networks:
       - qs-network
       - infra-network
@@ -38,17 +37,17 @@ services:
       # 二维码存储目录
       - /data/image/qrcode:/data/image/qrcode:rw
     environment:
-      - GOMEMLIMIT=6144MiB
-      - GOMAXPROCS=5
+      - GOMEMLIMIT=3072MiB
+      - GOMAXPROCS=4
     command: ["--config=/app/configs/apiserver.prod.yaml"]
 
   qs-collection-server:
     image: ${DOCKER_IMAGE_QS_COLLECTION_SERVER:-ghcr.io/fangcunmount/qs-collection-server:latest}
     container_name: qs-collection-server
     restart: unless-stopped
-    # BFF 转发为主；保留 2C/4G 支撑 300QPS 混合入口与长轮询。
-    mem_limit: "4096m"
-    cpus: "2"
+    # collection-server 3C/3G；GOMEMLIMIT 取容器内存 75%。
+    mem_limit: "3072m"
+    cpus: "3"
     networks:
       - qs-network
       - infra-network
@@ -69,8 +68,8 @@ services:
       # gRPC mTLS 证书目录；公网 HTTPS 由 serverA Nginx 终止
       - /data/infra/ssl/grpc:/etc/qs-server/ssl/grpc:ro
     environment:
-      - GOMEMLIMIT=3072MiB
-      - GOMAXPROCS=2
+      - GOMEMLIMIT=2304MiB
+      - GOMAXPROCS=3
     command: ["--config=/app/configs/collection-server.prod.yaml"]
 
   qs-worker:
