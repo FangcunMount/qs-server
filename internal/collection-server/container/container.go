@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
@@ -21,6 +20,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -66,7 +66,7 @@ type Container struct {
 	waitWatcherCancel                 context.CancelFunc
 	reportEventsHandler               *ws.ReportEventsHandler
 	catalogCacheWatcherCancels        []context.CancelFunc
-	l1PeekRegistry                    *catalogl1.PeekRegistry
+	l1PeekRegistry                    *catalogpeek.Registry
 
 	// 接口层处理器
 	answerSheetHandler                  *handler.AnswerSheetHandler
@@ -341,7 +341,7 @@ func (c *Container) QuestionnaireQueryService() *questionnaire.QueryService {
 	return c.questionnaireQueryService
 }
 
-func (c *Container) CatalogL1PeekRegistry() *catalogl1.PeekRegistry {
+func (c *Container) CatalogL1PeekRegistry() *catalogpeek.Registry {
 	if c == nil {
 		return nil
 	}

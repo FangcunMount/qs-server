@@ -1,17 +1,17 @@
-package container
+package catalogpeek
 
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/gin-gonic/gin"
 )
 
-func registerCatalogL1Peek(
-	registry *catalogl1.PeekRegistry,
+// RegisterCatalogL1 注册 catalog 目录读的 L1 peek 规则。
+func RegisterCatalogL1(
+	registry *Registry,
 	scaleSvc *scale.QueryService,
 	personalitySvc *personalitymodel.QueryService,
 	questionnaireSvc *questionnaire.QueryService,
@@ -19,13 +19,13 @@ func registerCatalogL1Peek(
 	if registry == nil {
 		return
 	}
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/scales/:code") },
 		HasCached: func(c *gin.Context) bool {
 			return scaleSvc != nil && scaleSvc.HasCachedDetail(c.Param("code"))
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool {
 			return route == "/api/v1/scales" || strings.HasSuffix(route, "/scales")
 		},
@@ -40,7 +40,7 @@ func registerCatalogL1Peek(
 			return scaleSvc.HasCachedList(&req)
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/scales/hot") },
 		HasCached: func(c *gin.Context) bool {
 			if scaleSvc == nil {
@@ -53,19 +53,19 @@ func registerCatalogL1Peek(
 			return scaleSvc.HasCachedHot(&req)
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/scales/categories") },
 		HasCached: func(c *gin.Context) bool {
 			return scaleSvc != nil && scaleSvc.HasCachedCategories()
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/personality-models/:code") },
 		HasCached: func(c *gin.Context) bool {
 			return personalitySvc != nil && personalitySvc.HasCachedDetail(c.Param("code"))
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool {
 			return route == "/api/v1/personality-models" || strings.HasSuffix(route, "/personality-models")
 		},
@@ -80,13 +80,13 @@ func registerCatalogL1Peek(
 			return personalitySvc.HasCachedList(&req)
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/personality-models/categories") },
 		HasCached: func(c *gin.Context) bool {
 			return personalitySvc != nil && personalitySvc.HasCachedCategories()
 		},
 	})
-	registry.Register(catalogl1.PeekEntry{
+	registry.Register(Entry{
 		RouteMatch: func(route string) bool { return strings.HasSuffix(route, "/questionnaires/:code") },
 		HasCached: func(c *gin.Context) bool {
 			return questionnaireSvc != nil && questionnaireSvc.HasCachedDetail(c.Param("code"), c.Query("version"))

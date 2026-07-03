@@ -7,7 +7,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
@@ -17,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
+	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -78,8 +78,8 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 			personalityCacheSingleflightEnabled(c.opts),
 		),
 	}
-	c.l1PeekRegistry = catalogl1.NewPeekRegistry()
-	registerCatalogL1Peek(c.l1PeekRegistry, rt.scale, rt.personality, rt.questionnaire)
+	c.l1PeekRegistry = catalogpeek.NewRegistry()
+	catalogpeek.RegisterCatalogL1(c.l1PeekRegistry, rt.scale, rt.personality, rt.questionnaire)
 	return rt
 }
 

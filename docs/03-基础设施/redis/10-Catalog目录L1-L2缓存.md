@@ -67,9 +67,9 @@ flowchart LR
 
 | 项 | 说明 |
 | --- | --- |
-| 包 | `application/catalogl1`（泛型多桶 + `PeekRegistry` 声明式 L1 peek） |
+| 包 | `application/catalogl1`（泛型多桶）；L1 peek 在 `transport/rest/catalogpeek` |
 | 底层 | `internal/pkg/localttlcache` + `loadguard.Coalescer`（singleflight 合并 miss） |
-| 读穿透 | `catalogreadthrough`（问卷）/ `catalogl1.ReadThrough`（量表、人格） |
+| 读穿透 | `catalogreadthrough`（算法层）+ `catalogl1.ReadThrough`（统一入口） |
 | 语义 | FIFO + TTL；`Get/Set` 经 `clone` 深拷贝，隔离调用方修改 |
 | 模式 | QueryService **cache-aside** + 可选 singleflight 合并 miss |
 | nil/error | **不入缓存**（typed nil 用 reflect 判定） |

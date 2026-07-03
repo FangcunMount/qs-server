@@ -5,10 +5,10 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
-	"golang.org/x/sync/singleflight"
 )
 
-// ReadThrough 执行 L1 get → optional singleflight → load → set → clone。
+// ReadThrough 执行 L1 get → optional coalescer → load → set → clone。
+// useSingleflight 为 true 时 coalescer 必须非 nil（通常 loadguard.NewCoalescer(true)）。
 func ReadThrough[T any](
 	key string,
 	get func() (T, bool),
@@ -22,14 +22,10 @@ func ReadThrough[T any](
 	if set != nil {
 		setFn = set
 	}
-	var sf *singleflight.Group
-	if useSingleflight && coalescer == nil {
-		sf = &singleflight.Group{}
-	}
-	if coalescer != nil && useSingleflight {
+	if useSingleflight {
 		return readThroughCoalescer(key, get, setFn, load, clone, coalescer)
 	}
-	return catalogreadthrough.ReadThrough(key, get, setFn, load, clone, sf, useSingleflight)
+	return catalogreadthrough.ReadThrough(key, get, setFn, load, clone, nil, false)
 }
 
 func readThroughCoalescer[T any](
@@ -46,6 +42,7 @@ func readThroughCoalescer[T any](
 			return cached, nil
 		}
 	}
+	// Coalescer 合同：ctx 取消不传播；singleflight 合并以 key 为粒度。
 	value, err := coalescer.Do(context.TODO(), key, func() (any, error) {
 		if get != nil {
 			if cached, ok := get(); ok {

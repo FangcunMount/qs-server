@@ -4,20 +4,19 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
 	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
-	"golang.org/x/sync/singleflight"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 type questionnaireClient = grpcbridge.QuestionnaireReader
 
 // QueryService 问卷查询服务
 type QueryService struct {
-	client            questionnaireClient
-	cache             PublishedDetailCache
-	singleflightGroup singleflight.Group
-	useSingleflight   bool
+	client          questionnaireClient
+	cache           PublishedDetailCache
+	coalescer       loadguard.Coalescer
+	useSingleflight bool
 }
 
 // NewQueryService 创建问卷查询服务。
@@ -26,11 +25,15 @@ func NewQueryService(
 	cache PublishedDetailCache,
 	useSingleflight bool,
 ) *QueryService {
-	return &QueryService{
+	svc := &QueryService{
 		client:          client,
 		cache:           cache,
 		useSingleflight: useSingleflight,
 	}
+	if useSingleflight {
+		svc.coalescer = loadguard.NewCoalescer(true)
+	}
+	return svc
 }
 
 // HasCachedDetail 进程内 L1 是否已有已发布问卷详情。
@@ -44,11 +47,7 @@ func (s *QueryService) HasCachedDetail(code, version string) bool {
 
 // Get 获取问卷详情
 func (s *QueryService) Get(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
-	var setFn func(*QuestionnaireResponse)
-	if s.cache != nil {
-		setFn = func(resp *QuestionnaireResponse) { s.cache.Set(code, version, resp) }
-	}
-	return catalogreadthrough.ReadThrough(
+	return s.readThroughDetail(
 		cacheKey(code, version),
 		func() (*QuestionnaireResponse, bool) {
 			if s.cache == nil {
@@ -56,11 +55,8 @@ func (s *QueryService) Get(ctx context.Context, code, version string) (*Question
 			}
 			return s.cache.Get(code, version)
 		},
-		setFn,
+		func(resp *QuestionnaireResponse) { s.cache.Set(code, version, resp) },
 		func() (*QuestionnaireResponse, error) { return s.fetchFromGRPC(ctx, code, version) },
-		cloneResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
 	)
 }
 
