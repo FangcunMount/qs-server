@@ -2,6 +2,7 @@ package catalogcache
 
 import (
 	"context"
+	"sync"
 	"sync/atomic"
 	"testing"
 
@@ -10,17 +11,22 @@ import (
 )
 
 type catalogFixture struct {
+	mu    sync.Mutex
 	cache map[string]string
 	sf    singleflight.Group
 	loads atomic.Int32
 }
 
 func (f *catalogFixture) get(key string) (string, bool) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	v, ok := f.cache[key]
 	return v, ok
 }
 
 func (f *catalogFixture) set(key, value string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.cache == nil {
 		f.cache = make(map[string]string)
 	}
