@@ -244,6 +244,38 @@ func TestOutboxRelayUsesConfiguredBatchSize(t *testing.T) {
 	}
 }
 
+func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
+	store := &fakeOutboxStore{
+		pending: []PendingOutboxEvent{
+			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
+			pendingEvent("evt-2", eventcatalog.ReportGenerated),
+			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
+			pendingEvent("evt-4", eventcatalog.ReportGeneratedV2),
+			pendingEvent("evt-5", eventcatalog.AssessmentSubmitted),
+			pendingEvent("evt-6", eventcatalog.ReportGenerated),
+		},
+	}
+	publisher := &trackingPublisher{}
+	relay := NewOutboxRelayWithOptions(OutboxRelayOptions{
+		Name:           "test-relay",
+		Store:          store,
+		Publisher:      publisher,
+		PublishWorkers: 3,
+	})
+
+	if err := relay.DispatchDue(context.Background()); err != nil {
+		t.Fatalf("DispatchDue: %v", err)
+	}
+	// Characterization baseline (pre worker-pool refactor): one goroutine per pending
+	// event, with semaphore limiting concurrent publishes.
+	if publisher.maxInflight > 3 {
+		t.Fatalf("max inflight publishes = %d, want <= 3", publisher.maxInflight)
+	}
+	if len(store.published) != 6 {
+		t.Fatalf("published markers = %#v, want 6 events", store.published)
+	}
+}
+
 func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
 	store := &fakeOutboxStore{
 		pending: []PendingOutboxEvent{

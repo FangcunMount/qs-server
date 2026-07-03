@@ -180,6 +180,57 @@ func TestAPIServerBuildContainerOptionsUsesResourceStageCacheSubsystem(t *testin
 	}
 }
 
+func TestBuildStatisticsOverviewOptionsMapsServiceSingleflight(t *testing.T) {
+	opts := apiserveroptions.NewOptions()
+	opts.Cache.StatisticsOverview = &apiserveroptions.StatisticsOverviewOptions{
+		ServiceSingleflight: false,
+		StaleOnTimeout:      true,
+		LoadTimeout:         11 * time.Second,
+	}
+
+	got := buildStatisticsOverviewOptions(opts.Cache)
+	if got.ServiceSingleflight {
+		t.Fatal("ServiceSingleflight = true, want false")
+	}
+	if !got.StaleOnTimeout || got.LoadTimeout != 11*time.Second {
+		t.Fatalf("guard options = %+v", got)
+	}
+}
+
+func TestBuildStatisticsOverviewOptionsDefaultsServiceSingleflightTrue(t *testing.T) {
+	got := buildStatisticsOverviewOptions(apiserveroptions.NewOptions().Cache)
+	if !got.ServiceSingleflight {
+		t.Fatal("ServiceSingleflight = false, want true")
+	}
+}
+
+func TestBuildStatisticsQuestionnaireOptionsMapsGuardFields(t *testing.T) {
+	opts := apiserveroptions.NewOptions()
+	opts.Cache.StatisticsQuestionnaire = &apiserveroptions.StatisticsQuestionnaireOptions{
+		ServiceSingleflight: false,
+		StaleOnTimeout:      false,
+		LoadTimeout:         9 * time.Second,
+	}
+
+	got := buildStatisticsQuestionnaireOptions(opts.Cache)
+	if got.ServiceSingleflight {
+		t.Fatal("ServiceSingleflight = true, want false")
+	}
+	if got.StaleOnTimeout {
+		t.Fatal("StaleOnTimeout = true, want false")
+	}
+	if got.LoadTimeout != 9*time.Second {
+		t.Fatalf("LoadTimeout = %v, want 9s", got.LoadTimeout)
+	}
+}
+
+func TestBuildStatisticsQuestionnaireOptionsDefaultsServiceSingleflightTrue(t *testing.T) {
+	got := buildStatisticsQuestionnaireOptions(apiserveroptions.NewOptions().Cache)
+	if !got.ServiceSingleflight {
+		t.Fatal("ServiceSingleflight = false, want true")
+	}
+}
+
 func TestAPIServerBuildContainerOptionsMapsOutboxRelayOptions(t *testing.T) {
 	opts := apiserveroptions.NewOptions()
 	opts.OutboxRelay.Mongo.BatchSize = 360

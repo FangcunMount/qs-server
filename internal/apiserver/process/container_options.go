@@ -161,13 +161,15 @@ func buildStatisticsQuestionnaireOptions(cacheCfg *apiserveroptions.CacheOptions
 			return cachebootstrap.StatisticsReadGuardOptions{}
 		}
 		return cachebootstrap.StatisticsReadGuardOptions{
-			StaleOnTimeout: defaults.StaleOnTimeout,
-			LoadTimeout:    defaults.LoadTimeout,
+			ServiceSingleflight: defaults.ServiceSingleflight,
+			StaleOnTimeout:      defaults.StaleOnTimeout,
+			LoadTimeout:         defaults.LoadTimeout,
 		}
 	}
 	return cachebootstrap.StatisticsReadGuardOptions{
-		StaleOnTimeout: cacheCfg.StatisticsQuestionnaire.StaleOnTimeout,
-		LoadTimeout:    cacheCfg.StatisticsQuestionnaire.LoadTimeout,
+		ServiceSingleflight: cacheCfg.StatisticsQuestionnaire.ServiceSingleflight,
+		StaleOnTimeout:      cacheCfg.StatisticsQuestionnaire.StaleOnTimeout,
+		LoadTimeout:         cacheCfg.StatisticsQuestionnaire.LoadTimeout,
 	}
 }
 

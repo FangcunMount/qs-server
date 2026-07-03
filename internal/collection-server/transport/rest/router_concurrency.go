@@ -56,9 +56,9 @@ func (p AdmissionPolicy) Wrap(route admissionRoute, handlers ...gin.HandlerFunc)
 	case admissionReportStatus:
 		return tryQueryConcurrencyHandlers(p.queryGate, handlers...)
 	case admissionQuery:
-		return waitQueryConcurrencyHandlers(p.queryGate, p.maxWait, handlers...)
+		return waitGateHandlers(p.queryGate, p.maxWait, handlers...)
 	case admissionSubmit:
-		return waitSubmitConcurrencyHandlers(p.submitGate, p.maxWait, handlers...)
+		return waitGateHandlers(p.submitGate, p.maxWait, handlers...)
 	case admissionWaitReport:
 		return waitConcurrencyHandlers(p.waitReportGate, p.waitReport, handlers...)
 	default:
@@ -124,17 +124,7 @@ func tryQueryConcurrencyHandlers(gate *concurrency.Gate, handlers ...gin.Handler
 	return append([]gin.HandlerFunc{mw}, handlers...)
 }
 
-func waitQueryConcurrencyHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	if gate == nil {
-		return handlers
-	}
-	mw := gate.WaitMiddleware(maxWait, func(c *gin.Context) {
-		WriteServiceUnavailable(c, 1)
-	})
-	return append([]gin.HandlerFunc{mw}, handlers...)
-}
-
-func waitSubmitConcurrencyHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+func waitGateHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
 	if gate == nil {
 		return handlers
 	}
