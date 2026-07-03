@@ -87,44 +87,17 @@ func (s *QueryService) HasCachedCategories() bool {
 
 // Get 获取量表详情
 func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, error) {
-	if s.cache != nil {
-		if cached, ok := s.cache.GetDetail(code); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*ScaleResponse, error) {
-		return s.fetchScaleFromGRPC(ctx, code)
-	}
-
-	if s.cache != nil && s.useSingleflight {
-		key := detailCacheKey(code)
-		value, err, _ := s.singleflightGroup.Do(key, func() (interface{}, error) {
-			if cached, ok := s.cache.GetDetail(code); ok {
-				return cached, nil
+	return s.readThroughDetail(
+		detailCacheKey(code),
+		func() (*ScaleResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
-			}
-			s.cache.SetDetail(code, resp)
-			return cloneScaleResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*ScaleResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetDetail(code, resp)
-	return cloneScaleResponse(resp), nil
+			return s.cache.GetDetail(code)
+		},
+		func(resp *ScaleResponse) { s.cache.SetDetail(code, resp) },
+		func() (*ScaleResponse, error) { return s.fetchScaleFromGRPC(ctx, code) },
+	)
 }
 
 // List 获取量表列表（返回摘要，不含因子详情）
@@ -134,44 +107,17 @@ func (s *QueryService) List(ctx context.Context, req *ListScalesRequest) (*ListS
 	}
 	s.normalizeListRequest(req)
 
-	if s.cache != nil {
-		if cached, ok := s.cache.GetListByRequest(req); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*ListScalesResponse, error) {
-		return s.fetchListFromGRPC(ctx, req)
-	}
-
-	listKey := listCacheKey(req)
-	if s.cache != nil && s.useSingleflight {
-		value, err, _ := s.singleflightGroup.Do(listKey, func() (interface{}, error) {
-			if cached, hit := s.cache.GetListByRequest(req); hit {
-				return cached, nil
+	return s.readThroughList(
+		listCacheKey(req),
+		func() (*ListScalesResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
-			}
-			s.cache.SetListByRequest(req, resp)
-			return cloneListScalesResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*ListScalesResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetListByRequest(req, resp)
-	return cloneListScalesResponse(resp), nil
+			return s.cache.GetListByRequest(req)
+		},
+		func(resp *ListScalesResponse) { s.cache.SetListByRequest(req, resp) },
+		func() (*ListScalesResponse, error) { return s.fetchListFromGRPC(ctx, req) },
+	)
 }
 
 // ListHot 获取热门量表列表。
@@ -180,85 +126,32 @@ func (s *QueryService) ListHot(ctx context.Context, req *ListHotScalesRequest) (
 		req = &ListHotScalesRequest{}
 	}
 
-	if s.cache != nil {
-		if cached, ok := s.cache.GetHotByRequest(req); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*ListHotScalesResponse, error) {
-		return s.fetchHotFromGRPC(ctx, req)
-	}
-
-	hotKey := hotCacheKey(req)
-	if s.cache != nil && s.useSingleflight {
-		value, err, _ := s.singleflightGroup.Do(hotKey, func() (interface{}, error) {
-			if cached, hit := s.cache.GetHotByRequest(req); hit {
-				return cached, nil
+	return s.readThroughHot(
+		hotCacheKey(req),
+		func() (*ListHotScalesResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
-			}
-			s.cache.SetHotByRequest(req, resp)
-			return cloneListHotScalesResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*ListHotScalesResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetHotByRequest(req, resp)
-	return cloneListHotScalesResponse(resp), nil
+			return s.cache.GetHotByRequest(req)
+		},
+		func(resp *ListHotScalesResponse) { s.cache.SetHotByRequest(req, resp) },
+		func() (*ListHotScalesResponse, error) { return s.fetchHotFromGRPC(ctx, req) },
+	)
 }
 
 // GetCategories 获取量表分类列表
 func (s *QueryService) GetCategories(ctx context.Context) (*ScaleCategoriesResponse, error) {
-	if s.cache != nil {
-		if cached, ok := s.cache.GetCategories(); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*ScaleCategoriesResponse, error) {
-		return s.fetchCategoriesFromGRPC(ctx)
-	}
-
-	if s.cache != nil && s.useSingleflight {
-		value, err, _ := s.singleflightGroup.Do(cacheKeyCategories, func() (interface{}, error) {
-			if cached, ok := s.cache.GetCategories(); ok {
-				return cached, nil
+	return s.readThroughCategories(
+		cacheKeyCategories,
+		func() (*ScaleCategoriesResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
-			}
-			s.cache.SetCategories(resp)
-			return cloneScaleCategoriesResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*ScaleCategoriesResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetCategories(resp)
-	return cloneScaleCategoriesResponse(resp), nil
+			return s.cache.GetCategories()
+		},
+		func(resp *ScaleCategoriesResponse) { s.cache.SetCategories(resp) },
+		func() (*ScaleCategoriesResponse, error) { return s.fetchCategoriesFromGRPC(ctx) },
+	)
 }
 
 func (s *QueryService) normalizeListRequest(req *ListScalesRequest) {
