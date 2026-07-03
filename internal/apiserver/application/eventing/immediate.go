@@ -101,6 +101,7 @@ func (d *ImmediateDispatcher) TryDispatchAfterCommit(ctx context.Context, events
 			case d.sem <- struct{}{}:
 				defer func() { <-d.sem }()
 			default:
+				d.observeImmediate(ctx, eventType, "immediate_skipped")
 				return
 			}
 			ctx, cancel := detachedContext(ctx, d.timeout)
@@ -175,6 +176,8 @@ func (d *ImmediateDispatcher) observeImmediate(ctx context.Context, eventType, o
 		mapped = eventobservability.OutboxOutcomeMarkPublishedFailed
 	case "hook_failed", "not_found":
 		mapped = eventobservability.OutboxOutcomeClaimFailed
+	case "immediate_skipped":
+		mapped = eventobservability.OutboxOutcomeImmediateSkipped
 	}
 	d.observer.ObserveOutbox(ctx, eventobservability.OutboxEvent{
 		Relay:     d.name + ":immediate",

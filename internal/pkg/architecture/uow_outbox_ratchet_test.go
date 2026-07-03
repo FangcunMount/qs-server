@@ -106,7 +106,7 @@ func TestSurveyAssemblerUsesTransactionalSubmissionDurableStore(t *testing.T) {
 	required := []string{
 		"asApp.NewTransactionalSubmissionDurableStore(",
 		"asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)",
-		"appEventing.NewOutboxRelayWithOptions(",
+		"outboxruntime.Build(",
 		"RequireDurablePublisher: true",
 		"scaleApp.NewScaleHotRankProjectionHook(hotRankProjection)",
 	}

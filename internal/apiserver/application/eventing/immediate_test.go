@@ -8,6 +8,7 @@ import (
 
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventobservability"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -44,10 +45,12 @@ func TestIsImmediateDispatchEventTypeIncludesAssessmentSubmitted(t *testing.T) {
 func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 	store := &immediateTestStore{getBlock: make(chan struct{})}
 	publisher := &fakePublisher{}
+	observer := &outboxObserver{}
 	dispatcher := NewImmediateDispatcher(ImmediateDispatcherOptions{
 		Name:          "test-immediate",
 		Store:         store,
 		Publisher:     publisher,
+		Observer:      observer,
 		Enabled:       true,
 		MaxConcurrent: 1,
 		Timeout:       time.Second,
@@ -73,6 +76,7 @@ func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 	if calls != 1 {
 		t.Fatalf("getCalls = %d, want 1 while first dispatch is in-flight", calls)
 	}
+	assertOutboxContainsOutcome(t, observer, eventobservability.OutboxOutcomeImmediateSkipped)
 
 	close(store.getBlock)
 

@@ -28,6 +28,7 @@ const (
 	OutboxOutcomePublishFailed       OutboxOutcome = "publish_failed"
 	OutboxOutcomeMarkFailedFailed    OutboxOutcome = "mark_failed_failed"
 	OutboxOutcomeMarkPublishedFailed OutboxOutcome = "mark_published_failed"
+	OutboxOutcomeImmediateSkipped    OutboxOutcome = "immediate_skipped"
 )
 
 func (o OutboxOutcome) String() string { return string(o) }

@@ -47,6 +47,7 @@ func TestOutcomeStringValuesAreStable(t *testing.T) {
 		OutboxOutcomePublishFailed.String():       "publish_failed",
 		OutboxOutcomeMarkFailedFailed.String():    "mark_failed_failed",
 		OutboxOutcomeMarkPublishedFailed.String(): "mark_published_failed",
+		OutboxOutcomeImmediateSkipped.String():    "immediate_skipped",
 		OutboxStatusScrapeOutcomeSuccess.String(): "success",
 		OutboxStatusScrapeOutcomeFailure.String(): "failure",
 		ConsumeOutcomePoisonAcked.String():        "poison_acked",

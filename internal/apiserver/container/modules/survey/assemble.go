@@ -11,6 +11,7 @@ import (
 	asApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
@@ -172,31 +173,26 @@ func (m *Module) initAnswerSheetSubModule(mongoDB *mongo.Database, rankRedisClie
 		opsClient = opsHandle.Client
 	}
 	readyIndex := outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
-	immediate := appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name:          "mongo-domain-events",
-		Store:         repo,
-		Publisher:     m.eventPublisher,
-		Enabled:       true,
-		MaxConcurrent: outboxRelayImmediateMaxConcurrent,
-		ReadyIndex:    readyIndex,
-	})
-	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo, immediate)
-	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)
-	sub.ManagementService = asApp.NewManagementService(repo, reader)
-	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
 	hotRankProjection := cacheInfra.NewRedisScaleHotRankProjection(rankRedisClient, rankCacheBuilder)
-	sub.SubmittedEventRelay = appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
+	outboxRuntime := outboxruntime.Build(outboxruntime.Spec{
 		Name:                    "mongo-domain-events",
 		Store:                   repo,
 		Publisher:               m.eventPublisher,
+		ReadyIndex:              readyIndex,
 		BatchSize:               outboxRelayBatchSize,
 		PublishWorkers:          outboxRelayPublishWorkers,
+		ImmediateMaxConcurrent:  outboxRelayImmediateMaxConcurrent,
+		ImmediateEnabled:        true,
 		RequireDurablePublisher: true,
-		ReadyIndex:              readyIndex,
 		BeforePublishHooks: []appEventing.OutboxBeforePublishHook{
 			scaleApp.NewScaleHotRankProjectionHook(hotRankProjection),
 		},
 	})
+	durableStore := asApp.NewTransactionalSubmissionDurableStore(mongoTxRunner, repo, repo, outboxRuntime.Immediate)
+	sub.SubmissionService = asApp.NewSubmissionService(repo, durableStore, questionnaireRepo, batchValidator, reader)
+	sub.ManagementService = asApp.NewManagementService(repo, reader)
+	sub.ScoringService = asApp.NewAnswerSheetScoringService(repo, questionnaireRepo, answerScorer)
+	sub.SubmittedEventRelay = outboxRuntime.Relay
 	sub.SubmittedEventStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "mongo-domain-events",
 		Reader: repo,

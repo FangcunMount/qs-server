@@ -16,6 +16,7 @@ import (
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -163,27 +164,23 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	}
 	assessmentReadyIndex := outboxready.NewIndex(opsClient, outboxready.StoreAssessmentMySQLOutbox)
 	infra.assessmentReadyIndex = assessmentReadyIndex
-	infra.postCommitReadyIndexer = appEventing.NewPostCommitReadyIndexer(assessmentReadyIndex)
 	mysqlPriorityOpts := []mysqlEventOutbox.StoreOption{mysqlEventOutbox.WithPriorityTiers(outboxpriority.ClaimOrder(nil, nil))}
 	assessmentOutboxStore := mysqlEventOutbox.NewStoreWithTopicResolver(normalized.MySQLDB, normalized.TopicResolver, mysqlPriorityOpts...)
 	infra.assessmentOutboxStore = assessmentOutboxStore
-	infra.assessmentImmediate = appEventing.NewImmediateDispatcher(appEventing.ImmediateDispatcherOptions{
-		Name:          "assessment-mysql-outbox",
-		Store:         assessmentOutboxStore,
-		Publisher:     normalized.EventPublisher,
-		Enabled:       true,
-		MaxConcurrent: normalized.AssessmentOutboxRelayImmediateMaxConcurrent,
-		ReadyIndex:    assessmentReadyIndex,
-	})
-	infra.assessmentOutboxRelay = appEventing.NewOutboxRelayWithOptions(appEventing.OutboxRelayOptions{
+	outboxRuntime := outboxruntime.Build(outboxruntime.Spec{
 		Name:                    "assessment-mysql-outbox",
 		Store:                   assessmentOutboxStore,
 		Publisher:               normalized.EventPublisher,
+		ReadyIndex:              assessmentReadyIndex,
 		BatchSize:               normalized.AssessmentOutboxRelayBatchSize,
 		PublishWorkers:          normalized.AssessmentOutboxRelayPublishWorkers,
+		ImmediateMaxConcurrent:  normalized.AssessmentOutboxRelayImmediateMaxConcurrent,
+		ImmediateEnabled:        true,
 		RequireDurablePublisher: true,
-		ReadyIndex:              assessmentReadyIndex,
 	})
+	infra.postCommitReadyIndexer = outboxRuntime.PostCommitReadyIndexer
+	infra.assessmentImmediate = outboxRuntime.Immediate
+	infra.assessmentOutboxRelay = outboxRuntime.Relay
 	infra.assessmentOutboxStatusReader = appEventing.NamedOutboxStatusReader{
 		Name:   "assessment-mysql-outbox",
 		Reader: assessmentOutboxStore,
