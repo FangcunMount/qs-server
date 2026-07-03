@@ -6,10 +6,10 @@ import (
 	"log/slog"
 	"strconv"
 
-	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -22,7 +22,7 @@ import (
 // 3. 调用 InternalClient 执行评估
 func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
-		var data domainAssessment.AssessmentSubmittedData
+		var data eventpayload.AssessmentSubmittedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment submitted event: %w", err)
@@ -116,7 +116,7 @@ func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 }
 
 func handleAssessmentInterpretedV1(deps *Dependencies, payload []byte) error {
-	var data domainAssessment.AssessmentInterpretedData
+	var data eventpayload.AssessmentInterpretedData
 	_, err := ParseEventData(payload, &data)
 	if err != nil {
 		return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
@@ -184,7 +184,7 @@ func assessmentLevelSeverity(level *eventoutcome.ResultLevel) string {
 // handleAssessmentFailed 处理测评失败事件
 func handleAssessmentFailed(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
-		var data domainAssessment.AssessmentFailedData
+		var data eventpayload.AssessmentFailedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse assessment failed event: %w", err)

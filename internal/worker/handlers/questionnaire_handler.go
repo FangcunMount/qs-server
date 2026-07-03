@@ -4,17 +4,17 @@ import (
 	"context"
 	"log/slog"
 
-	domainQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 )
 
 func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
-		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[domainQuestionnaire.QuestionnaireChangedData]{
+		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[eventpayload.QuestionnaireChangedData]{
 			parseErrorLabel: "questionnaire changed event",
-			action: func(data *domainQuestionnaire.QuestionnaireChangedData) string {
+			action: func(data *eventpayload.QuestionnaireChangedData) string {
 				return string(data.Action)
 			},
-			logFields: func(env *EventEnvelope, data *domainQuestionnaire.QuestionnaireChangedData) []any {
+			logFields: func(env *EventEnvelope, data *eventpayload.QuestionnaireChangedData) []any {
 				return []any{
 					slog.String("event_id", env.ID),
 					slog.String("code", data.Code),
@@ -23,7 +23,7 @@ func handleQuestionnaireChanged(deps *Dependencies) HandlerFunc {
 					slog.String("action", string(data.Action)),
 				}
 			},
-			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *domainQuestionnaire.QuestionnaireChangedData) error {
+			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *eventpayload.QuestionnaireChangedData) error {
 				resp, err := deps.InternalClient.HandleQuestionnairePublishedPostActions(ctx, data.Code, data.Version)
 				if err != nil {
 					deps.Logger.Warn("failed to handle questionnaire publish post-actions",

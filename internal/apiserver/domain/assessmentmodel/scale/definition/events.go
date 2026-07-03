@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -17,24 +18,17 @@ const (
 const AggregateType = "MedicalScale"
 
 // ChangeAction 量表生命周期动作
-type ChangeAction string
+type ChangeAction = eventpayload.ScaleChangeAction
 
 const (
-	ChangeActionPublished   ChangeAction = "published"
-	ChangeActionUnpublished ChangeAction = "unpublished"
-	ChangeActionUpdated     ChangeAction = "updated"
-	ChangeActionArchived    ChangeAction = "archived"
+	ChangeActionPublished   = eventpayload.ScaleChangeActionPublished
+	ChangeActionUnpublished = eventpayload.ScaleChangeActionUnpublished
+	ChangeActionUpdated     = eventpayload.ScaleChangeActionUpdated
+	ChangeActionArchived    = eventpayload.ScaleChangeActionArchived
 )
 
 // ScaleChangedData 量表生命周期变化事件数据
-type ScaleChangedData struct {
-	ScaleID   uint64       `json:"scale_id"`
-	Code      string       `json:"code"`
-	Version   string       `json:"version"`
-	Name      string       `json:"name"`
-	Action    ChangeAction `json:"action"`
-	ChangedAt time.Time    `json:"changed_at"`
-}
+type ScaleChangedData = eventpayload.ScaleChangedData
 
 // ScaleChangedEvent 量表生命周期变化事件
 type ScaleChangedEvent = event.Event[ScaleChangedData]

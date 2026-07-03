@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
@@ -20,7 +20,7 @@ func TestHandleBehaviorProjector_MissingInternalClient(t *testing.T) {
 		Logger: slog.New(slog.NewTextHandler(io.Discard, nil)),
 	})
 
-	err := handler(context.Background(), domainStatistics.EventTypeFootprintEntryOpened, mustBuildBehaviorEventPayload(t, "evt-1", domainStatistics.EventTypeFootprintEntryOpened, map[string]any{
+	err := handler(context.Background(), eventcatalog.FootprintEntryOpened, mustBuildBehaviorEventPayload(t, "evt-1", eventcatalog.FootprintEntryOpened, map[string]any{
 		"org_id":       int64(1),
 		"clinician_id": uint64(11),
 		"entry_id":     uint64(21),
@@ -40,7 +40,7 @@ func TestHandleBehaviorProjector_EntryOpenedProjectsBehaviorEvent(t *testing.T) 
 	}
 	handler := handleBehaviorProjector(deps)
 
-	err := handler(context.Background(), domainStatistics.EventTypeFootprintEntryOpened, mustBuildBehaviorEventPayload(t, "evt-entry-opened", domainStatistics.EventTypeFootprintEntryOpened, map[string]any{
+	err := handler(context.Background(), eventcatalog.FootprintEntryOpened, mustBuildBehaviorEventPayload(t, "evt-entry-opened", eventcatalog.FootprintEntryOpened, map[string]any{
 		"org_id":       int64(7),
 		"clinician_id": uint64(101),
 		"entry_id":     uint64(202),
@@ -56,7 +56,7 @@ func TestHandleBehaviorProjector_EntryOpenedProjectsBehaviorEvent(t *testing.T) 
 	if req == nil {
 		t.Fatal("expected projection request to be captured")
 	}
-	if req.GetEventId() != "evt-entry-opened" || req.GetEventType() != domainStatistics.EventTypeFootprintEntryOpened {
+	if req.GetEventId() != "evt-entry-opened" || req.GetEventType() != eventcatalog.FootprintEntryOpened {
 		t.Fatalf("unexpected request identity: %#v", req)
 	}
 	if req.GetOrgId() != 7 || req.GetClinicianId() != 101 || req.GetEntryId() != 202 {
@@ -75,7 +75,7 @@ func TestHandleBehaviorProjector_CareRelationshipTransferredMapsClinicians(t *te
 	}
 	handler := handleBehaviorProjector(deps)
 
-	err := handler(context.Background(), domainStatistics.EventTypeFootprintCareRelationshipTransferred, mustBuildBehaviorEventPayload(t, "evt-transfer", domainStatistics.EventTypeFootprintCareRelationshipTransferred, map[string]any{
+	err := handler(context.Background(), eventcatalog.FootprintCareRelationshipTransferred, mustBuildBehaviorEventPayload(t, "evt-transfer", eventcatalog.FootprintCareRelationshipTransferred, map[string]any{
 		"org_id":            int64(3),
 		"from_clinician_id": uint64(10),
 		"to_clinician_id":   uint64(20),
@@ -125,7 +125,7 @@ func TestProjectBehaviorEvent_NilResponseReturnsError(t *testing.T) {
 	deps := &Dependencies{InternalClient: &nilResponseBehaviorClient{}}
 	req := &pb.ProjectBehaviorEventRequest{
 		EventId:   "evt-nil",
-		EventType: domainStatistics.EventTypeFootprintReportGenerated,
+		EventType: eventcatalog.FootprintReportGenerated,
 		OrgId:     1,
 	}
 
@@ -141,7 +141,7 @@ func TestProjectBehaviorEvent_PropagatesGRPCError(t *testing.T) {
 
 	err := projectBehaviorEvent(context.Background(), slog.New(slog.NewTextHandler(io.Discard, nil)), deps, &pb.ProjectBehaviorEventRequest{
 		EventId:   "evt-grpc",
-		EventType: domainStatistics.EventTypeFootprintAssessmentCreated,
+		EventType: eventcatalog.FootprintAssessmentCreated,
 	})
 	if err == nil || !strings.Contains(err.Error(), "grpc unavailable") {
 		t.Fatalf("expected grpc error, got %v", err)
@@ -159,7 +159,7 @@ func TestBehaviorProjectLogFields_IncludesOptionalFields(t *testing.T) {
 	occurredAt := time.Date(2026, 6, 6, 10, 0, 0, 0, time.UTC)
 	fields := behaviorProjectLogFields(&pb.ProjectBehaviorEventRequest{
 		EventId:       "evt-fields",
-		EventType:     domainStatistics.EventTypeFootprintAssessmentCreated,
+		EventType:     eventcatalog.FootprintAssessmentCreated,
 		OrgId:         9,
 		FailureReason: "timeout",
 		OccurredAt:    timestamppb.New(occurredAt),
@@ -176,7 +176,7 @@ func mustBuildBehaviorEventPayload(t *testing.T, eventID, eventType string, data
 		"id":            eventID,
 		"eventType":     eventType,
 		"occurredAt":    time.Date(2026, 6, 6, 8, 0, 0, 0, time.UTC),
-		"aggregateType": domainStatistics.BehaviorAggregateType,
+		"aggregateType": "BehaviorFootprint",
 		"aggregateID":   "agg-1",
 		"data":          data,
 	})

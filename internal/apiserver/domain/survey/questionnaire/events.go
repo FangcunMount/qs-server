@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -16,22 +17,16 @@ const (
 const AggregateType = "Questionnaire"
 
 // ChangeAction 问卷生命周期动作
-type ChangeAction string
+type ChangeAction = eventpayload.QuestionnaireChangeAction
 
 const (
-	ChangeActionPublished   ChangeAction = "published"
-	ChangeActionUnpublished ChangeAction = "unpublished"
-	ChangeActionArchived    ChangeAction = "archived"
+	ChangeActionPublished   = eventpayload.QuestionnaireChangeActionPublished
+	ChangeActionUnpublished = eventpayload.QuestionnaireChangeActionUnpublished
+	ChangeActionArchived    = eventpayload.QuestionnaireChangeActionArchived
 )
 
 // QuestionnaireChangedData 问卷生命周期变化事件数据
-type QuestionnaireChangedData struct {
-	Code      string       `json:"code"`
-	Version   string       `json:"version"`
-	Title     string       `json:"title"`
-	Action    ChangeAction `json:"action"`
-	ChangedAt time.Time    `json:"changed_at"`
-}
+type QuestionnaireChangedData = eventpayload.QuestionnaireChangedData
 
 // QuestionnaireChangedEvent 问卷生命周期变化事件
 type QuestionnaireChangedEvent = event.Event[QuestionnaireChangedData]

@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"time"
 
-	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/worker/port"
 )
 
@@ -35,7 +35,7 @@ type taskNotificationCallbacks[T any] struct {
 
 func handleTaskOpened(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
-		var data domainPlan.TaskOpenedData
+		var data eventpayload.TaskOpenedData
 		env, err := ParseEventData(payload, &data)
 		if err != nil {
 			return fmt.Errorf("failed to parse task opened event: %w", err)
@@ -91,10 +91,10 @@ func handleTaskOpened(deps *Dependencies) HandlerFunc {
 
 func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
-		return handleTaskNotificationEvent(ctx, deps, payload, taskNotificationCallbacks[domainPlan.TaskCompletedData]{
+		return handleTaskNotificationEvent(ctx, deps, payload, taskNotificationCallbacks[eventpayload.TaskCompletedData]{
 			parseErrorLabel: "task completed event",
 			logMessage:      "processing task completed",
-			logFields: func(env *EventEnvelope, data *domainPlan.TaskCompletedData) []any {
+			logFields: func(env *EventEnvelope, data *eventpayload.TaskCompletedData) []any {
 				return []any{
 					slog.String("event_id", env.ID),
 					slog.String("task_id", data.TaskID),
@@ -104,7 +104,7 @@ func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 					slog.Time("completed_at", data.CompletedAt),
 				}
 			},
-			notify: func(ctx context.Context, notifier port.TaskNotifier, meta port.NotificationMeta, data *domainPlan.TaskCompletedData) error {
+			notify: func(ctx context.Context, notifier port.TaskNotifier, meta port.NotificationMeta, data *eventpayload.TaskCompletedData) error {
 				return notifier.NotifyTaskCompleted(ctx, meta, port.TaskCompletedNotification{
 					TaskID:       data.TaskID,
 					PlanID:       data.PlanID,
@@ -114,7 +114,7 @@ func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 				})
 			},
 			notifyFailureLog: "failed to notify task completed",
-			notifyFailureFields: func(data *domainPlan.TaskCompletedData) []any {
+			notifyFailureFields: func(data *eventpayload.TaskCompletedData) []any {
 				return []any{
 					slog.String("task_id", data.TaskID),
 					slog.String("testee_id", data.TesteeID),
@@ -125,7 +125,7 @@ func handleTaskCompleted(deps *Dependencies) HandlerFunc {
 }
 
 func handleTaskExpired(deps *Dependencies) HandlerFunc {
-	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[domainPlan.TaskExpiredData]{
+	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[eventpayload.TaskExpiredData]{
 		parseErrorLabel:  "task expired event",
 		logMessage:       "processing task expired",
 		timeFieldName:    "expired_at",
@@ -139,7 +139,7 @@ func handleTaskExpired(deps *Dependencies) HandlerFunc {
 }
 
 func handleTaskCanceled(deps *Dependencies) HandlerFunc {
-	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[domainPlan.TaskCanceledData]{
+	return handleTimedTaskNotificationHandler(deps, taskTimedNotificationCallbacks[eventpayload.TaskCanceledData]{
 		parseErrorLabel:  "task canceled event",
 		logMessage:       "processing task canceled",
 		timeFieldName:    "canceled_at",
@@ -152,16 +152,16 @@ func handleTaskCanceled(deps *Dependencies) HandlerFunc {
 	})
 }
 
-func taskExpiredID(data *domainPlan.TaskExpiredData) string       { return data.TaskID }
-func taskExpiredPlanID(data *domainPlan.TaskExpiredData) string   { return data.PlanID }
-func taskExpiredTesteeID(data *domainPlan.TaskExpiredData) string { return data.TesteeID }
-func taskExpiredAt(data *domainPlan.TaskExpiredData) time.Time    { return data.ExpiredAt }
+func taskExpiredID(data *eventpayload.TaskExpiredData) string       { return data.TaskID }
+func taskExpiredPlanID(data *eventpayload.TaskExpiredData) string   { return data.PlanID }
+func taskExpiredTesteeID(data *eventpayload.TaskExpiredData) string { return data.TesteeID }
+func taskExpiredAt(data *eventpayload.TaskExpiredData) time.Time    { return data.ExpiredAt }
 
 func notifyTaskExpired(
 	ctx context.Context,
 	notifier port.TaskNotifier,
 	meta port.NotificationMeta,
-	data *domainPlan.TaskExpiredData,
+	data *eventpayload.TaskExpiredData,
 ) error {
 	return notifier.NotifyTaskExpired(ctx, meta, port.TaskExpiredNotification{
 		TaskID:    data.TaskID,
@@ -171,16 +171,16 @@ func notifyTaskExpired(
 	})
 }
 
-func taskCanceledID(data *domainPlan.TaskCanceledData) string       { return data.TaskID }
-func taskCanceledPlanID(data *domainPlan.TaskCanceledData) string   { return data.PlanID }
-func taskCanceledTesteeID(data *domainPlan.TaskCanceledData) string { return data.TesteeID }
-func taskCanceledAt(data *domainPlan.TaskCanceledData) time.Time    { return data.CanceledAt }
+func taskCanceledID(data *eventpayload.TaskCanceledData) string       { return data.TaskID }
+func taskCanceledPlanID(data *eventpayload.TaskCanceledData) string   { return data.PlanID }
+func taskCanceledTesteeID(data *eventpayload.TaskCanceledData) string { return data.TesteeID }
+func taskCanceledAt(data *eventpayload.TaskCanceledData) time.Time    { return data.CanceledAt }
 
 func notifyTaskCanceled(
 	ctx context.Context,
 	notifier port.TaskNotifier,
 	meta port.NotificationMeta,
-	data *domainPlan.TaskCanceledData,
+	data *eventpayload.TaskCanceledData,
 ) error {
 	return notifier.NotifyTaskCanceled(ctx, meta, port.TaskCanceledNotification{
 		TaskID:     data.TaskID,

@@ -1,42 +1,43 @@
 package handlers
 
 import (
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 )
 
 type behaviorEventMapper func(payload []byte) (*pb.ProjectBehaviorEventRequest, error)
 
 var behaviorEventMappers = map[string]behaviorEventMapper{
-	domainStatistics.EventTypeFootprintEntryOpened:                 mapFootprintEntryOpened,
-	domainStatistics.EventTypeFootprintIntakeConfirmed:             mapFootprintIntakeConfirmed,
-	domainStatistics.EventTypeFootprintTesteeProfileCreated:        mapFootprintTesteeProfileCreated,
-	domainStatistics.EventTypeFootprintCareRelationshipEstablished: mapFootprintCareRelationshipEstablished,
-	domainStatistics.EventTypeFootprintCareRelationshipTransferred: mapFootprintCareRelationshipTransferred,
-	domainStatistics.EventTypeFootprintAnswerSheetSubmitted:        mapFootprintAnswerSheetSubmitted,
-	domainStatistics.EventTypeFootprintAssessmentCreated:           mapFootprintAssessmentCreated,
-	domainStatistics.EventTypeFootprintReportGenerated:             mapFootprintReportGenerated,
+	eventcatalog.FootprintEntryOpened:                 mapFootprintEntryOpened,
+	eventcatalog.FootprintIntakeConfirmed:             mapFootprintIntakeConfirmed,
+	eventcatalog.FootprintTesteeProfileCreated:        mapFootprintTesteeProfileCreated,
+	eventcatalog.FootprintCareRelationshipEstablished: mapFootprintCareRelationshipEstablished,
+	eventcatalog.FootprintCareRelationshipTransferred: mapFootprintCareRelationshipTransferred,
+	eventcatalog.FootprintAnswerSheetSubmitted:        mapFootprintAnswerSheetSubmitted,
+	eventcatalog.FootprintAssessmentCreated:           mapFootprintAssessmentCreated,
+	eventcatalog.FootprintReportGenerated:             mapFootprintReportGenerated,
 }
 
 func mapFootprintEntryOpened(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintEntryOpenedData
+	var data eventpayload.FootprintEntryOpenedData
 	env, data, err := parseFootprintPayload(payload, "entry opened", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintEntryOpened, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintEntryOpened, data.OrgID, data.OccurredAt)
 	req.ClinicianId = data.ClinicianID
 	req.EntryId = data.EntryID
 	return req, nil
 }
 
 func mapFootprintIntakeConfirmed(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintIntakeConfirmedData
+	var data eventpayload.FootprintIntakeConfirmedData
 	env, data, err := parseFootprintPayload(payload, "intake confirmed", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintIntakeConfirmed, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintIntakeConfirmed, data.OrgID, data.OccurredAt)
 	req.ClinicianId = data.ClinicianID
 	req.EntryId = data.EntryID
 	req.TesteeId = data.TesteeID
@@ -44,12 +45,12 @@ func mapFootprintIntakeConfirmed(payload []byte) (*pb.ProjectBehaviorEventReques
 }
 
 func mapFootprintTesteeProfileCreated(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintTesteeProfileCreatedData
+	var data eventpayload.FootprintTesteeProfileCreatedData
 	env, data, err := parseFootprintPayload(payload, "testee profile created", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintTesteeProfileCreated, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintTesteeProfileCreated, data.OrgID, data.OccurredAt)
 	req.ClinicianId = data.ClinicianID
 	req.EntryId = data.EntryID
 	req.TesteeId = data.TesteeID
@@ -57,12 +58,12 @@ func mapFootprintTesteeProfileCreated(payload []byte) (*pb.ProjectBehaviorEventR
 }
 
 func mapFootprintCareRelationshipEstablished(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintCareRelationshipEstablishedData
+	var data eventpayload.FootprintCareRelationshipEstablishedData
 	env, data, err := parseFootprintPayload(payload, "care relationship established", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintCareRelationshipEstablished, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintCareRelationshipEstablished, data.OrgID, data.OccurredAt)
 	req.ClinicianId = data.ClinicianID
 	req.EntryId = data.EntryID
 	req.TesteeId = data.TesteeID
@@ -70,12 +71,12 @@ func mapFootprintCareRelationshipEstablished(payload []byte) (*pb.ProjectBehavio
 }
 
 func mapFootprintCareRelationshipTransferred(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintCareRelationshipTransferredData
+	var data eventpayload.FootprintCareRelationshipTransferredData
 	env, data, err := parseFootprintPayload(payload, "care relationship transferred", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintCareRelationshipTransferred, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintCareRelationshipTransferred, data.OrgID, data.OccurredAt)
 	req.ClinicianId = data.ToClinicianID
 	req.SourceClinicianId = data.FromClinicianID
 	req.TesteeId = data.TesteeID
@@ -83,24 +84,24 @@ func mapFootprintCareRelationshipTransferred(payload []byte) (*pb.ProjectBehavio
 }
 
 func mapFootprintAnswerSheetSubmitted(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintAnswerSheetSubmittedData
+	var data eventpayload.FootprintAnswerSheetSubmittedData
 	env, data, err := parseFootprintPayload(payload, "answersheet submitted", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintAnswerSheetSubmitted, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintAnswerSheetSubmitted, data.OrgID, data.OccurredAt)
 	req.TesteeId = data.TesteeID
 	req.AnswersheetId = data.AnswerSheetID
 	return req, nil
 }
 
 func mapFootprintAssessmentCreated(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintAssessmentCreatedData
+	var data eventpayload.FootprintAssessmentCreatedData
 	env, data, err := parseFootprintPayload(payload, "assessment created", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintAssessmentCreated, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintAssessmentCreated, data.OrgID, data.OccurredAt)
 	req.TesteeId = data.TesteeID
 	req.AnswersheetId = data.AnswerSheetID
 	req.AssessmentId = data.AssessmentID
@@ -108,12 +109,12 @@ func mapFootprintAssessmentCreated(payload []byte) (*pb.ProjectBehaviorEventRequ
 }
 
 func mapFootprintReportGenerated(payload []byte) (*pb.ProjectBehaviorEventRequest, error) {
-	var data domainStatistics.FootprintReportGeneratedData
+	var data eventpayload.FootprintReportGeneratedData
 	env, data, err := parseFootprintPayload(payload, "report generated", &data)
 	if err != nil {
 		return nil, err
 	}
-	req := newBehaviorRequest(env, domainStatistics.EventTypeFootprintReportGenerated, data.OrgID, data.OccurredAt)
+	req := newBehaviorRequest(env, eventcatalog.FootprintReportGenerated, data.OrgID, data.OccurredAt)
 	req.TesteeId = data.TesteeID
 	req.AssessmentId = data.AssessmentID
 	req.ReportId = data.ReportID

@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -32,38 +33,16 @@ const (
 // ==================== 事件 Payload 定义 ====================
 
 // TaskOpenedData 任务开放事件数据
-type TaskOpenedData struct {
-	TaskID   string    `json:"task_id"`
-	PlanID   string    `json:"plan_id"`
-	TesteeID string    `json:"testee_id"`
-	EntryURL string    `json:"entry_url"`
-	OpenAt   time.Time `json:"open_at"`
-}
+type TaskOpenedData = eventpayload.TaskOpenedData
 
 // TaskCompletedData 任务完成事件数据
-type TaskCompletedData struct {
-	TaskID       string    `json:"task_id"`
-	PlanID       string    `json:"plan_id"`
-	TesteeID     string    `json:"testee_id"`
-	AssessmentID string    `json:"assessment_id"`
-	CompletedAt  time.Time `json:"completed_at"`
-}
+type TaskCompletedData = eventpayload.TaskCompletedData
 
 // TaskExpiredData 任务过期事件数据
-type TaskExpiredData struct {
-	TaskID    string    `json:"task_id"`
-	PlanID    string    `json:"plan_id"`
-	TesteeID  string    `json:"testee_id"`
-	ExpiredAt time.Time `json:"expired_at"`
-}
+type TaskExpiredData = eventpayload.TaskExpiredData
 
 // TaskCanceledData 任务取消事件数据
-type TaskCanceledData struct {
-	TaskID     string    `json:"task_id"`
-	PlanID     string    `json:"plan_id"`
-	TesteeID   string    `json:"testee_id"`
-	CanceledAt time.Time `json:"canceled_at"`
-}
+type TaskCanceledData = eventpayload.TaskCanceledData
 
 // ==================== 事件类型别名 ====================
 

@@ -4,20 +4,20 @@ import (
 	"testing"
 	"time"
 
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
 
 func TestBehaviorEventMappers_RegistersAllFootprintEventTypes(t *testing.T) {
 	want := []string{
-		domainStatistics.EventTypeFootprintEntryOpened,
-		domainStatistics.EventTypeFootprintIntakeConfirmed,
-		domainStatistics.EventTypeFootprintTesteeProfileCreated,
-		domainStatistics.EventTypeFootprintCareRelationshipEstablished,
-		domainStatistics.EventTypeFootprintCareRelationshipTransferred,
-		domainStatistics.EventTypeFootprintAnswerSheetSubmitted,
-		domainStatistics.EventTypeFootprintAssessmentCreated,
-		domainStatistics.EventTypeFootprintReportGenerated,
+		eventcatalog.FootprintEntryOpened,
+		eventcatalog.FootprintIntakeConfirmed,
+		eventcatalog.FootprintTesteeProfileCreated,
+		eventcatalog.FootprintCareRelationshipEstablished,
+		eventcatalog.FootprintCareRelationshipTransferred,
+		eventcatalog.FootprintAnswerSheetSubmitted,
+		eventcatalog.FootprintAssessmentCreated,
+		eventcatalog.FootprintReportGenerated,
 	}
 	for _, eventType := range want {
 		if _, ok := behaviorEventMappers[eventType]; !ok {
@@ -41,7 +41,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 	}{
 		{
 			name:      "entry_opened",
-			eventType: domainStatistics.EventTypeFootprintEntryOpened,
+			eventType: eventcatalog.FootprintEntryOpened,
 			data: mergeMaps(base, map[string]any{
 				"clinician_id": uint64(12),
 				"entry_id":     uint64(34),
@@ -54,7 +54,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "intake_confirmed",
-			eventType: domainStatistics.EventTypeFootprintIntakeConfirmed,
+			eventType: eventcatalog.FootprintIntakeConfirmed,
 			data: mergeMaps(base, map[string]any{
 				"clinician_id": uint64(12),
 				"entry_id":     uint64(34),
@@ -68,7 +68,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "testee_profile_created",
-			eventType: domainStatistics.EventTypeFootprintTesteeProfileCreated,
+			eventType: eventcatalog.FootprintTesteeProfileCreated,
 			data: mergeMaps(base, map[string]any{
 				"clinician_id": uint64(1),
 				"entry_id":     uint64(2),
@@ -82,7 +82,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "care_relationship_established",
-			eventType: domainStatistics.EventTypeFootprintCareRelationshipEstablished,
+			eventType: eventcatalog.FootprintCareRelationshipEstablished,
 			data: mergeMaps(base, map[string]any{
 				"clinician_id": uint64(7),
 				"entry_id":     uint64(8),
@@ -96,7 +96,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "care_relationship_transferred",
-			eventType: domainStatistics.EventTypeFootprintCareRelationshipTransferred,
+			eventType: eventcatalog.FootprintCareRelationshipTransferred,
 			data: mergeMaps(base, map[string]any{
 				"from_clinician_id": uint64(10),
 				"to_clinician_id":   uint64(11),
@@ -110,7 +110,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "answersheet_submitted",
-			eventType: domainStatistics.EventTypeFootprintAnswerSheetSubmitted,
+			eventType: eventcatalog.FootprintAnswerSheetSubmitted,
 			data: mergeMaps(base, map[string]any{
 				"testee_id":      uint64(20),
 				"answersheet_id": uint64(21),
@@ -123,7 +123,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "assessment_created",
-			eventType: domainStatistics.EventTypeFootprintAssessmentCreated,
+			eventType: eventcatalog.FootprintAssessmentCreated,
 			data: mergeMaps(base, map[string]any{
 				"testee_id":      uint64(30),
 				"answersheet_id": uint64(31),
@@ -137,7 +137,7 @@ func TestBehaviorEventMappers_FieldMappingMatrix(t *testing.T) {
 		},
 		{
 			name:      "report_generated",
-			eventType: domainStatistics.EventTypeFootprintReportGenerated,
+			eventType: eventcatalog.FootprintReportGenerated,
 			data: mergeMaps(base, map[string]any{
 				"testee_id":     uint64(40),
 				"assessment_id": uint64(41),

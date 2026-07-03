@@ -6,8 +6,8 @@ import (
 	"testing"
 	"time"
 
-	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
 func TestHandleAssessmentSubmittedRejectsNegativeAssessmentID(t *testing.T) {
@@ -95,8 +95,8 @@ func mustBuildAssessmentSubmittedPayload(t *testing.T, assessmentID int64) []byt
 }
 
 func TestAssessmentInterpretedV2Helpers(t *testing.T) {
-	level := &domainAssessment.EventResultLevel{Code: "severe", Severity: "high"}
-	score := &domainAssessment.EventScoreValue{Value: 18.5}
+	level := &eventoutcome.ResultLevel{Code: "severe", Severity: "high"}
+	score := &eventoutcome.ScoreValue{Value: 18.5}
 	if got := assessmentLevelCode(level); got != "severe" {
 		t.Fatalf("level code = %q, want severe", got)
 	}

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -21,16 +22,7 @@ const AggregateType = "Report"
 // ==================== 事件 Payload 定义 ====================
 
 // ReportGeneratedData 报告已生成事件数据
-type ReportGeneratedData struct {
-	ReportID     string    `json:"report_id"`
-	AssessmentID string    `json:"assessment_id"`
-	TesteeID     uint64    `json:"testee_id"`
-	ScaleCode    string    `json:"scale_code"`
-	ScaleVersion string    `json:"scale_version"`
-	TotalScore   float64   `json:"total_score"`
-	RiskLevel    string    `json:"risk_level"`
-	GeneratedAt  time.Time `json:"generated_at"`
-}
+type ReportGeneratedData = eventpayload.ReportGeneratedData
 
 // ==================== 事件类型别名 ====================
 

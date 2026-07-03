@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -21,67 +22,14 @@ const (
 	EventTypeFootprintReportGenerated             = eventcatalog.FootprintReportGenerated
 )
 
-type FootprintEntryOpenedData struct {
-	OrgID       int64     `json:"org_id"`
-	ClinicianID uint64    `json:"clinician_id"`
-	EntryID     uint64    `json:"entry_id"`
-	OccurredAt  time.Time `json:"occurred_at"`
-}
-
-type FootprintIntakeConfirmedData struct {
-	OrgID       int64     `json:"org_id"`
-	ClinicianID uint64    `json:"clinician_id"`
-	EntryID     uint64    `json:"entry_id"`
-	TesteeID    uint64    `json:"testee_id"`
-	OccurredAt  time.Time `json:"occurred_at"`
-}
-
-type FootprintTesteeProfileCreatedData struct {
-	OrgID       int64     `json:"org_id"`
-	ClinicianID uint64    `json:"clinician_id"`
-	EntryID     uint64    `json:"entry_id"`
-	TesteeID    uint64    `json:"testee_id"`
-	OccurredAt  time.Time `json:"occurred_at"`
-}
-
-type FootprintCareRelationshipEstablishedData struct {
-	OrgID       int64     `json:"org_id"`
-	ClinicianID uint64    `json:"clinician_id"`
-	EntryID     uint64    `json:"entry_id"`
-	TesteeID    uint64    `json:"testee_id"`
-	OccurredAt  time.Time `json:"occurred_at"`
-}
-
-type FootprintCareRelationshipTransferredData struct {
-	OrgID           int64     `json:"org_id"`
-	FromClinicianID uint64    `json:"from_clinician_id"`
-	ToClinicianID   uint64    `json:"to_clinician_id"`
-	TesteeID        uint64    `json:"testee_id"`
-	OccurredAt      time.Time `json:"occurred_at"`
-}
-
-type FootprintAnswerSheetSubmittedData struct {
-	OrgID         int64     `json:"org_id"`
-	TesteeID      uint64    `json:"testee_id"`
-	AnswerSheetID uint64    `json:"answersheet_id"`
-	OccurredAt    time.Time `json:"occurred_at"`
-}
-
-type FootprintAssessmentCreatedData struct {
-	OrgID         int64     `json:"org_id"`
-	TesteeID      uint64    `json:"testee_id"`
-	AnswerSheetID uint64    `json:"answersheet_id"`
-	AssessmentID  uint64    `json:"assessment_id"`
-	OccurredAt    time.Time `json:"occurred_at"`
-}
-
-type FootprintReportGeneratedData struct {
-	OrgID        int64     `json:"org_id"`
-	TesteeID     uint64    `json:"testee_id"`
-	AssessmentID uint64    `json:"assessment_id"`
-	ReportID     uint64    `json:"report_id"`
-	OccurredAt   time.Time `json:"occurred_at"`
-}
+type FootprintEntryOpenedData = eventpayload.FootprintEntryOpenedData
+type FootprintIntakeConfirmedData = eventpayload.FootprintIntakeConfirmedData
+type FootprintTesteeProfileCreatedData = eventpayload.FootprintTesteeProfileCreatedData
+type FootprintCareRelationshipEstablishedData = eventpayload.FootprintCareRelationshipEstablishedData
+type FootprintCareRelationshipTransferredData = eventpayload.FootprintCareRelationshipTransferredData
+type FootprintAnswerSheetSubmittedData = eventpayload.FootprintAnswerSheetSubmittedData
+type FootprintAssessmentCreatedData = eventpayload.FootprintAssessmentCreatedData
+type FootprintReportGeneratedData = eventpayload.FootprintReportGeneratedData
 
 type FootprintEntryOpenedEvent = event.Event[FootprintEntryOpenedData]
 type FootprintIntakeConfirmedEvent = event.Event[FootprintIntakeConfirmedData]

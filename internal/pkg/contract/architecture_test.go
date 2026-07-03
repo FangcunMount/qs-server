@@ -10,6 +10,19 @@ import (
 	"testing"
 )
 
+func TestWorkerHandlersDoNotImportAPIServerDomain(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := "github.com/FangcunMount/qs-server/internal/apiserver/domain/"
+	scanImports(t, filepath.Join(root, "internal", "worker", "handlers"), func(path, importPath string) {
+		if strings.HasPrefix(importPath, forbidden) {
+			rel := filepath.ToSlash(mustRel(t, root, path))
+			t.Fatalf("%s imports %s; worker handlers must use internal/pkg/eventpayload or eventoutcome", rel, importPath)
+		}
+	})
+}
+
 func TestCrossServiceConsumersImportSharedGRPCContract(t *testing.T) {
 	t.Parallel()
 

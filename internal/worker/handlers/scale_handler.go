@@ -4,17 +4,17 @@ import (
 	"context"
 	"log/slog"
 
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 )
 
 func handleScaleChanged(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, _ string, payload []byte) error {
-		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[scaledefinition.ScaleChangedData]{
+		return handleLifecycleChangedEvent(ctx, deps, payload, lifecycleChangedCallbacks[eventpayload.ScaleChangedData]{
 			parseErrorLabel: "scale changed event",
-			action: func(data *scaledefinition.ScaleChangedData) string {
+			action: func(data *eventpayload.ScaleChangedData) string {
 				return string(data.Action)
 			},
-			logFields: func(env *EventEnvelope, data *scaledefinition.ScaleChangedData) []any {
+			logFields: func(env *EventEnvelope, data *eventpayload.ScaleChangedData) []any {
 				return []any{
 					slog.String("event_id", env.ID),
 					slog.Uint64("scale_id", data.ScaleID),
@@ -24,7 +24,7 @@ func handleScaleChanged(deps *Dependencies) HandlerFunc {
 					slog.String("action", string(data.Action)),
 				}
 			},
-			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *scaledefinition.ScaleChangedData) error {
+			onPublished: func(ctx context.Context, deps *Dependencies, env *EventEnvelope, data *eventpayload.ScaleChangedData) error {
 				resp, err := deps.InternalClient.HandleScalePublishedPostActions(ctx, data.Code)
 				if err != nil {
 					deps.Logger.Warn("failed to handle scale publish post-actions",

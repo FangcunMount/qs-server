@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"log/slog"
 
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 )
 
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
@@ -23,7 +23,7 @@ func handleReportGenerated(deps *Dependencies) HandlerFunc {
 }
 
 func handleReportGeneratedV1(ctx context.Context, deps *Dependencies, payload []byte) error {
-	var data domainReport.ReportGeneratedData
+	var data eventpayload.ReportGeneratedData
 	env, err := ParseEventData(payload, &data)
 	if err != nil {
 		return fmt.Errorf("failed to parse report generated event: %w", err)
@@ -58,7 +58,7 @@ func handleReportGeneratedV2(ctx context.Context, deps *Dependencies, payload []
 	return nil
 }
 
-func logReportGenerated(deps *Dependencies, env *EventEnvelope, data domainReport.ReportGeneratedData) {
+func logReportGenerated(deps *Dependencies, env *EventEnvelope, data eventpayload.ReportGeneratedData) {
 	deps.Logger.Info("processing report generated",
 		slog.String("event_id", env.ID),
 		slog.String("report_id", data.ReportID),

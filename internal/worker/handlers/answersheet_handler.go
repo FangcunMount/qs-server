@@ -7,9 +7,9 @@ import (
 	"reflect"
 	"strconv"
 
-	domainAnswerSheet "github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/answersheet"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
@@ -98,8 +98,8 @@ func handleAnswerSheetSubmittedWithHooks(
 }
 
 // 解析答卷数据
-func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, uint64, *domainAnswerSheet.AnswerSheetSubmittedData, error) {
-	var data domainAnswerSheet.AnswerSheetSubmittedData
+func parseAnswerSheetData(deps *Dependencies, payload []byte) (*EventEnvelope, uint64, *eventpayload.AnswerSheetSubmittedData, error) {
+	var data eventpayload.AnswerSheetSubmittedData
 	env, err := ParseEventData(payload, &data)
 	if err != nil {
 		return nil, 0, nil, fmt.Errorf("failed to parse answersheet submitted event: %w", err)
@@ -280,7 +280,7 @@ func calculateAnswerSheetScore(ctx context.Context, deps *Dependencies, answerSh
 }
 
 // 创建测评
-func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, answerSheetID uint64, data *domainAnswerSheet.AnswerSheetSubmittedData) error {
+func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, answerSheetID uint64, data *eventpayload.AnswerSheetSubmittedData) error {
 	if deps.InternalClient == nil {
 		return fmt.Errorf("internal client is not available")
 	}

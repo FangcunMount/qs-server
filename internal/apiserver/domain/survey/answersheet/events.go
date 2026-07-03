@@ -2,9 +2,9 @@ package answersheet
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -23,17 +23,7 @@ const AggregateType = "AnswerSheet"
 // ==================== 事件 Payload 定义 ====================
 
 // AnswerSheetSubmittedData 答卷已提交事件数据
-type AnswerSheetSubmittedData struct {
-	AnswerSheetID        string    `json:"answersheet_id"`
-	QuestionnaireCode    string    `json:"questionnaire_code"`
-	QuestionnaireVersion string    `json:"questionnaire_version"`
-	TesteeID             uint64    `json:"testee_id"`   // 受试者ID（传递给测评层）
-	OrgID                uint64    `json:"org_id"`      // 组织ID（传递给测评层）
-	FillerID             uint64    `json:"filler_id"`   // 填写人ID
-	FillerType           string    `json:"filler_type"` // 填写人类型
-	TaskID               string    `json:"task_id,omitempty"`
-	SubmittedAt          time.Time `json:"submitted_at"`
-}
+type AnswerSheetSubmittedData = eventpayload.AnswerSheetSubmittedData
 
 // ==================== 事件类型别名 ====================
 

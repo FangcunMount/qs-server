@@ -6,6 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -30,54 +31,13 @@ type DomainEvent = event.DomainEvent
 // ==================== 事件 Payload 定义 ====================
 
 // AssessmentSubmittedData 测评已提交事件数据
-type AssessmentSubmittedData struct {
-	OrgID             int64     `json:"org_id"`
-	AssessmentID      int64     `json:"assessment_id"`
-	TesteeID          uint64    `json:"testee_id"`
-	QuestionnaireCode string    `json:"questionnaire_code"`
-	QuestionnaireVer  string    `json:"questionnaire_version"`
-	AnswerSheetID     string    `json:"answersheet_id"`
-	ModelKind         string    `json:"model_kind,omitempty"`
-	ModelCode         string    `json:"model_code,omitempty"`
-	ModelVersion      string    `json:"model_version,omitempty"`
-	ScaleCode         string    `json:"scale_code,omitempty"`
-	ScaleVersion      string    `json:"scale_version,omitempty"`
-	SubmittedAt       time.Time `json:"submitted_at"`
-}
-
-// NeedsEvaluation 是否需要评估（有解释模型才需要，兼容旧 scale_code 事件）
-func (d AssessmentSubmittedData) NeedsEvaluation() bool {
-	return d.ModelCode != "" || d.ScaleCode != ""
-}
+type AssessmentSubmittedData = eventpayload.AssessmentSubmittedData
 
 // AssessmentInterpretedData 测评已解读事件数据
-type AssessmentInterpretedData struct {
-	OrgID         int64     `json:"org_id"`
-	AssessmentID  int64     `json:"assessment_id"`
-	TesteeID      uint64    `json:"testee_id"`
-	ModelKind     string    `json:"model_kind,omitempty"`
-	ModelCode     string    `json:"model_code,omitempty"`
-	ModelVersion  string    `json:"model_version,omitempty"`
-	ScaleCode     string    `json:"scale_code,omitempty"`
-	ScaleVersion  string    `json:"scale_version,omitempty"`
-	TotalScore    float64   `json:"total_score"`
-	RiskLevel     string    `json:"risk_level"`
-	InterpretedAt time.Time `json:"interpreted_at"`
-}
-
-// IsHighRisk 是否高风险
-func (d AssessmentInterpretedData) IsHighRisk() bool {
-	return IsHighRisk(RiskLevel(d.RiskLevel))
-}
+type AssessmentInterpretedData = eventpayload.AssessmentInterpretedData
 
 // AssessmentFailedData 测评失败事件数据
-type AssessmentFailedData struct {
-	OrgID        int64     `json:"org_id"`
-	AssessmentID int64     `json:"assessment_id"`
-	TesteeID     uint64    `json:"testee_id"`
-	Reason       string    `json:"reason"`
-	FailedAt     time.Time `json:"failed_at"`
-}
+type AssessmentFailedData = eventpayload.AssessmentFailedData
 
 // ==================== 事件类型别名 ====================
 
