@@ -6,45 +6,45 @@ import (
 	"testing"
 	"time"
 
+	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
 type fakeEvaluationReader struct {
-	detail *grpcbridge.AssessmentDetailV2Output
+	detail *evaluationapp.AssessmentDetailV2Response
 	err    error
 }
 
-func (f *fakeEvaluationReader) GetMyAssessmentV2(context.Context, uint64, uint64) (*grpcbridge.AssessmentDetailV2Output, error) {
+func (f *fakeEvaluationReader) GetMyAssessmentV2(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailV2Response, error) {
 	return f.detail, f.err
 }
 
-func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*grpcbridge.AssessmentDetailOutput, error) {
+func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetMyAssessmentByAnswerSheetID(context.Context, uint64) (*grpcbridge.AssessmentDetailOutput, error) {
+func (f *fakeEvaluationReader) GetMyAssessmentByAnswerSheetID(context.Context, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) ListMyAssessments(context.Context, uint64, string, string, string, string, string, string, int32, int32) (*grpcbridge.ListAssessmentsOutput, error) {
+func (f *fakeEvaluationReader) ListMyAssessments(context.Context, uint64, string, string, string, string, string, string, int32, int32) (*evaluationapp.ListAssessmentsResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetAssessmentScores(context.Context, uint64, uint64) ([]grpcbridge.FactorScoreOutput, error) {
+func (f *fakeEvaluationReader) GetAssessmentScores(context.Context, uint64, uint64) ([]evaluationapp.FactorScoreResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetAssessmentReport(context.Context, uint64) (*grpcbridge.AssessmentReportOutput, error) {
+func (f *fakeEvaluationReader) GetAssessmentReport(context.Context, uint64) (*evaluationapp.AssessmentReportResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetFactorTrend(context.Context, uint64, string, int32) ([]grpcbridge.TrendPointOutput, error) {
+func (f *fakeEvaluationReader) GetFactorTrend(context.Context, uint64, string, int32) ([]evaluationapp.TrendPointResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetHighRiskFactors(context.Context, uint64, uint64) ([]grpcbridge.FactorScoreOutput, error) {
+func (f *fakeEvaluationReader) GetHighRiskFactors(context.Context, uint64, uint64) ([]evaluationapp.FactorScoreResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) ListMyAssessmentsV2(context.Context, uint64, string, string, string, string, string, int32, int32) (*grpcbridge.ListAssessmentsV2Output, error) {
+func (f *fakeEvaluationReader) ListMyAssessmentsV2(context.Context, uint64, string, string, string, string, string, int32, int32) (*evaluationapp.ListAssessmentsV2Response, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetAssessmentReportV2(context.Context, uint64, uint64) (*grpcbridge.AssessmentReportV2Output, error) {
+func (f *fakeEvaluationReader) GetAssessmentReportV2(context.Context, uint64, uint64) (*evaluationapp.AssessmentReportV2Response, error) {
 	return nil, nil
 }
 
@@ -70,8 +70,8 @@ func TestQueryServiceGetRejectsNonPersonalityModel(t *testing.T) {
 	t.Parallel()
 
 	svc := NewQueryService(&fakeEvaluationReader{
-		detail: &grpcbridge.AssessmentDetailV2Output{
-			Model: grpcbridge.ModelIdentityOutput{Kind: "scale"},
+		detail: &evaluationapp.AssessmentDetailV2Response{
+			Model: evaluationapp.ModelIdentityResponse{Kind: "scale"},
 		},
 	}, nil)
 	_, err := svc.Get(context.Background(), 1, 2)
@@ -103,9 +103,9 @@ func TestQueryServiceGetReturnsDetail(t *testing.T) {
 	t.Parallel()
 
 	svc := NewQueryService(&fakeEvaluationReader{
-		detail: &grpcbridge.AssessmentDetailV2Output{
-			ID:    42,
-			Model: grpcbridge.ModelIdentityOutput{Kind: personalityModelKind, Code: "mbti"},
+		detail: &evaluationapp.AssessmentDetailV2Response{
+			ID:    "42",
+			Model: evaluationapp.ModelIdentityResponse{Kind: personalityModelKind, Code: "mbti"},
 		},
 	}, nil)
 	got, err := svc.Get(context.Background(), 1, 42)
@@ -137,10 +137,10 @@ func TestQueryServiceGetReportStatusInterpretedEnrichesModel(t *testing.T) {
 		},
 	}, nil, nil, reportwait.DefaultConfig())
 	svc := NewQueryService(&fakeEvaluationReader{
-		detail: &grpcbridge.AssessmentDetailV2Output{
-			ID:    42,
-			Model: grpcbridge.ModelIdentityOutput{Kind: personalityModelKind, Code: "sbti"},
-			Level: &grpcbridge.ResultLevelOutput{Code: "INTJ"},
+		detail: &evaluationapp.AssessmentDetailV2Response{
+			ID:    "42",
+			Model: evaluationapp.ModelIdentityResponse{Kind: personalityModelKind, Code: "sbti"},
+			Level: &evaluationapp.ResultLevelResponse{Code: "INTJ"},
 		},
 	}, wait)
 

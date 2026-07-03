@@ -40,18 +40,3 @@ func ParseUintID(raw string) (uint64, error) {
 	}
 	return strconv.ParseUint(raw, 10, 64)
 }
-
-func IsTerminalStatus(status string) bool {
-	return reportstatus.IsTerminalStatus(status)
-}
-
-// KindMedical 与 KindPersonality 转发至 reportstatus 单一真值源。
-const (
-	KindMedical     = reportstatus.KindMedical
-	KindPersonality = reportstatus.KindPersonality
-)
-
-var (
-	ErrInvalidKind      = reportstatus.ErrInvalidKind
-	ErrAssessmentAccess = reportstatus.ErrAssessmentAccess
-)

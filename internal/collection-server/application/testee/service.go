@@ -8,7 +8,6 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/collection-server/port/iamport"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -19,13 +18,13 @@ import (
 // 2. 调用 apiserver 的 Actor gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type Service struct {
-	actorClient        grpcbridge.ActorWriter
+	actorClient        ActorPort
 	profileLinkService iamport.OrgDefaults
 	profileService     iamport.ProfileCreator
 }
 
 // NewService 创建受试者服务
-func NewService(actorClient grpcbridge.ActorWriter, profileLinkService iamport.OrgDefaults, profileService iamport.ProfileCreator) *Service {
+func NewService(actorClient ActorPort, profileLinkService iamport.OrgDefaults, profileService iamport.ProfileCreator) *Service {
 	return &Service{
 		actorClient:        actorClient,
 		profileLinkService: profileLinkService,
@@ -81,13 +80,13 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		"iam_profile_id", profile.ProfileID,
 	)
 
-	result, err := s.actorClient.CreateTestee(ctx, &grpcbridge.CreateTesteeRequest{
+	result, err := s.actorClient.CreateTestee(ctx, CreateTesteeInput{
 		OrgID:        orgID,
 		IAMUserID:    iamUserID,
 		IAMProfileID: profile.ProfileID,
 		Name:         req.Name,
 		Gender:       req.Gender,
-		Birthday:     req.Birthday.ToTimePtr(), // 转换 Date 为 *time.Time
+		Birthday:     req.Birthday,
 		Tags:         req.Tags,
 		Source:       req.Source,
 		IsKeyFocus:   req.IsKeyFocus,
@@ -102,8 +101,6 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		)
 		return nil, err
 	}
-	result.IAMUserID = iamUserID
-	result.IAMProfileID = profile.ProfileID
 
 	duration := time.Since(startTime)
 	l.Infow("创建受试者成功",
@@ -114,7 +111,7 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return convertToTesteeResponse(result), nil
+	return result, nil
 }
 
 // GetTestee 获取受试者详情
@@ -148,7 +145,7 @@ func (s *Service) GetTestee(ctx context.Context, testeeID uint64) (*TesteeRespon
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return convertToTesteeResponse(result), nil
+	return result, nil
 }
 
 // GetTesteeCareContext 获取受试者照护上下文
@@ -180,14 +177,7 @@ func (s *Service) GetTesteeCareContext(ctx context.Context, testeeID uint64) (*T
 	if result == nil {
 		return &TesteeCareContextResponse{}, nil
 	}
-
-	return &TesteeCareContextResponse{
-		ClinicianName:   result.ClinicianName,
-		ClinicianRole:   result.ClinicianRole,
-		RelationType:    result.RelationType,
-		EntryTitle:      result.EntryTitle,
-		EntrySourceType: result.EntrySourceType,
-	}, nil
+	return result, nil
 }
 
 // UpdateTestee 更新受试者信息
@@ -203,14 +193,7 @@ func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *Update
 		"name", req.Name,
 	)
 
-	result, err := s.actorClient.UpdateTestee(ctx, &grpcbridge.UpdateTesteeRequest{
-		ID:         testeeID,
-		Name:       req.Name,
-		Gender:     req.Gender,
-		Birthday:   req.Birthday.ToTimePtr(), // 转换 Date 为 *time.Time
-		Tags:       req.Tags,
-		IsKeyFocus: req.IsKeyFocus,
-	})
+	result, err := s.actorClient.UpdateTestee(ctx, testeeID, req)
 	if err != nil {
 		log.Errorf("Failed to update testee via gRPC: %v", err)
 		l.Errorw("更新受试者失败",
@@ -230,7 +213,7 @@ func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *Update
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return convertToTesteeResponse(result), nil
+	return result, nil
 }
 
 // ListMyTestees 查询当前用户的受试者列表
@@ -271,11 +254,6 @@ func (s *Service) ListMyTestees(ctx context.Context, profileIDs []uint64, req *L
 		return nil, err
 	}
 
-	items := make([]*TesteeResponse, 0, len(testees))
-	for _, t := range testees {
-		items = append(items, convertToTesteeResponse(t))
-	}
-
 	duration := time.Since(startTime)
 	l.Debugw("查询受试者列表成功",
 		"action", "list_my_testees",
@@ -286,7 +264,7 @@ func (s *Service) ListMyTestees(ctx context.Context, profileIDs []uint64, req *L
 	)
 
 	return &ListTesteesResponse{
-		Items: items,
+		Items: testees,
 		Total: total,
 	}, nil
 }
@@ -343,39 +321,6 @@ func (s *Service) TesteeExists(ctx context.Context, iamProfileID string) (*Teste
 		Exists:   exists,
 		TesteeID: testeeIDStr,
 	}, nil
-}
-
-// convertToTesteeResponse 转换 gRPC 响应为应用层 DTO
-func convertToTesteeResponse(from *grpcbridge.TesteeResponse) *TesteeResponse {
-	if from == nil {
-		return nil
-	}
-
-	resp := &TesteeResponse{
-		ID:           strconv.FormatUint(from.ID, 10),
-		OrgID:        strconv.FormatUint(from.OrgID, 10),
-		IAMUserID:    from.IAMUserID,
-		IAMProfileID: from.IAMProfileID,
-		Name:         from.Name,
-		Gender:       from.Gender,
-		Birthday:     meta.NewBirthday(from.Birthday.Format("2006-01-02")),
-		Tags:         from.Tags,
-		Source:       from.Source,
-		IsKeyFocus:   from.IsKeyFocus,
-		CreatedAt:    from.CreatedAt,
-		UpdatedAt:    from.UpdatedAt,
-	}
-
-	// 转换测评统计信息
-	if from.AssessmentStats != nil {
-		resp.AssessmentStats = &AssessmentStatsDTO{
-			TotalCount:       from.AssessmentStats.TotalCount,
-			LastAssessmentAt: from.AssessmentStats.LastAssessmentAt,
-			LastRiskLevel:    from.AssessmentStats.LastRiskLevel,
-		}
-	}
-
-	return resp
 }
 
 func birthdayString(birthday *meta.Birthday) string {

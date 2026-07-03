@@ -6,18 +6,17 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
 type actorLookupClientStub struct {
-	getResults map[uint64]*grpcbridge.TesteeResponse
+	getResults map[uint64]*ActorTestee
 	getErrors  map[uint64]error
 	existsIDs  map[uint64]uint64
 }
 
-func (s *actorLookupClientStub) GetTestee(_ context.Context, testeeID uint64) (*grpcbridge.TesteeResponse, error) {
+func (s *actorLookupClientStub) GetTestee(_ context.Context, testeeID uint64) (*ActorTestee, error) {
 	if err, ok := s.getErrors[testeeID]; ok {
 		return nil, err
 	}
@@ -36,22 +35,26 @@ func (s *actorLookupClientStub) TesteeExists(_ context.Context, _ uint64, iamPro
 
 func TestResolveCanonicalTesteeReturnsOriginalID(t *testing.T) {
 	stub := &actorLookupClientStub{
-		getResults: map[uint64]*grpcbridge.TesteeResponse{
-			615001: {ID: 615001, Name: "王小明"},
+		getResults: map[uint64]*ActorTestee{
+			615001: {Name: "王小明"},
 		},
 		getErrors: map[uint64]error{},
 		existsIDs: map[uint64]uint64{},
 	}
-	service := &SubmissionService{actorClient: stub}
+	service := &SubmissionService{
+		actorClient:        stub,
+		profileLinkService: new(iam.ProfileLinkService),
+		profileAccess:      NewProfileAccessResolver(stub, new(iam.ProfileLinkService)),
+	}
 
-	testee, resolvedID, err := service.resolveCanonicalTestee(context.Background(), 615001)
+	testee, resolvedID, err := service.profileAccess.resolveCanonicalTestee(context.Background(), 615001)
 	if err != nil {
 		t.Fatalf("resolve canonical testee: %v", err)
 	}
 	if resolvedID != 615001 {
 		t.Fatalf("expected resolved id 615001, got %d", resolvedID)
 	}
-	if testee == nil || testee.ID != 615001 {
+	if testee == nil || testee.Name != "王小明" {
 		t.Fatalf("unexpected testee: %+v", testee)
 	}
 }
@@ -63,9 +66,8 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 	)
 
 	stub := &actorLookupClientStub{
-		getResults: map[uint64]*grpcbridge.TesteeResponse{
+		getResults: map[uint64]*ActorTestee{
 			canonicalTesteeID: {
-				ID:           canonicalTesteeID,
 				OrgID:        1,
 				IAMProfileID: "615966157324694062",
 				Name:         "宋博文",
@@ -81,22 +83,23 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 	service := &SubmissionService{
 		actorClient:        stub,
 		profileLinkService: new(iam.ProfileLinkService),
+		profileAccess:      NewProfileAccessResolver(stub, new(iam.ProfileLinkService)),
 	}
 
-	testee, resolvedID, err := service.resolveCanonicalTestee(context.Background(), profileID)
+	testee, resolvedID, err := service.profileAccess.resolveCanonicalTestee(context.Background(), profileID)
 	if err != nil {
 		t.Fatalf("resolve canonical testee with profile fallback: %v", err)
 	}
 	if resolvedID != canonicalTesteeID {
 		t.Fatalf("expected canonical id %d, got %d", canonicalTesteeID, resolvedID)
 	}
-	if testee == nil || testee.ID != canonicalTesteeID {
+	if testee == nil || testee.Name != "宋博文" {
 		t.Fatalf("unexpected canonical testee: %+v", testee)
 	}
 }
 
 func TestNewSubmissionServiceAlwaysInitializesQueue(t *testing.T) {
-	service := NewSubmissionService(nil, nil, nil, &options.SubmitQueueOptions{
+	service := NewSubmissionService(nil, nil, nil, nil, &options.SubmitQueueOptions{
 		Enabled:     false,
 		QueueSize:   8,
 		WorkerCount: 1,
@@ -130,8 +133,8 @@ func TestConvertAnswersNormalizesRadioValuesForGRPC(t *testing.T) {
 	t.Parallel()
 
 	const optionCode = "ARPkNn2y"
-	service := &SubmissionService{}
-	got := service.convertAnswers([]Answer{
+	converter := AnswerConverter{}
+	got := converter.Convert([]Answer{
 		{
 			QuestionCode: "7osLrRTA",
 			QuestionType: "Radio",
@@ -139,9 +142,9 @@ func TestConvertAnswersNormalizesRadioValuesForGRPC(t *testing.T) {
 		},
 	})
 	if len(got) != 1 {
-		t.Fatalf("convertAnswers() len = %d, want 1", len(got))
+		t.Fatalf("Convert() len = %d, want 1", len(got))
 	}
 	if got[0].Value != optionCode {
-		t.Fatalf("convertAnswers() value = %q, want %q", got[0].Value, optionCode)
+		t.Fatalf("Convert() value = %q, want %q", got[0].Value, optionCode)
 	}
 }

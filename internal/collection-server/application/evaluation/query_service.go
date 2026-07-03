@@ -2,12 +2,11 @@ package evaluation
 
 import (
 	"context"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 )
 
 // QueryService 测评查询服务
@@ -15,14 +14,14 @@ import (
 // 1. 调用 apiserver 的 gRPC 服务
 // 2. 转换 gRPC 响应到 REST DTO
 type QueryService struct {
-	evaluationClient grpcbridge.EvaluationReader
-	scaleClient      grpcbridge.ScaleReader
+	evaluationClient BFFReader
+	scaleClient      scale.CatalogReader
 }
 
 // NewQueryService 创建测评查询服务
 func NewQueryService(
-	evaluationClient grpcbridge.EvaluationReader,
-	scaleClient grpcbridge.ScaleReader,
+	evaluationClient BFFReader,
+	scaleClient scale.CatalogReader,
 ) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
@@ -70,32 +69,7 @@ func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessment
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	// 转换 AnswerSheetID，如果为 0 则转换为空字符串
-	answerSheetID := ""
-	if result.AnswerSheetID != 0 {
-		answerSheetID = strconv.FormatUint(result.AnswerSheetID, 10)
-	}
-
-	return &AssessmentDetailResponse{
-		ID:                   strconv.FormatUint(result.ID, 10),
-		OrgID:                strconv.FormatUint(result.OrgID, 10),
-		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        answerSheetID,
-		ScaleCode:            result.ScaleCode,
-		ScaleName:            result.ScaleName,
-		OriginType:           result.OriginType,
-		OriginID:             result.OriginID,
-		Status:               result.Status,
-		TotalScore:           result.TotalScore,
-		RiskLevel:            result.RiskLevel,
-		CreatedAt:            result.CreatedAt,
-		SubmittedAt:          result.SubmittedAt,
-		InterpretedAt:        result.InterpretedAt,
-		FailedAt:             result.FailedAt,
-		FailureReason:        result.FailureReason,
-	}, nil
+	return result, nil
 }
 
 // GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
@@ -137,32 +111,7 @@ func (s *QueryService) GetMyAssessmentByAnswerSheetID(ctx context.Context, answe
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	// 转换 AnswerSheetID，如果为 0 则转换为空字符串
-	answerSheetIDStr := ""
-	if result.AnswerSheetID != 0 {
-		answerSheetIDStr = strconv.FormatUint(result.AnswerSheetID, 10)
-	}
-
-	return &AssessmentDetailResponse{
-		ID:                   strconv.FormatUint(result.ID, 10),
-		OrgID:                strconv.FormatUint(result.OrgID, 10),
-		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        answerSheetIDStr,
-		ScaleCode:            result.ScaleCode,
-		ScaleName:            result.ScaleName,
-		OriginType:           result.OriginType,
-		OriginID:             result.OriginID,
-		Status:               result.Status,
-		TotalScore:           result.TotalScore,
-		RiskLevel:            result.RiskLevel,
-		CreatedAt:            result.CreatedAt,
-		SubmittedAt:          result.SubmittedAt,
-		InterpretedAt:        result.InterpretedAt,
-		FailedAt:             result.FailedAt,
-		FailureReason:        result.FailureReason,
-	}, nil
+	return result, nil
 }
 
 // ListMyAssessments 获取我的测评列表
@@ -232,48 +181,17 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		return nil, err
 	}
 
-	items := make([]AssessmentSummaryResponse, len(result.Items))
-	for i, item := range result.Items {
-		// 转换 AnswerSheetID，如果为 0 则转换为空字符串
-		answerSheetID := ""
-		if item.AnswerSheetID != 0 {
-			answerSheetID = strconv.FormatUint(item.AnswerSheetID, 10)
-		}
-
-		items[i] = AssessmentSummaryResponse{
-			ID:                   strconv.FormatUint(item.ID, 10),
-			QuestionnaireCode:    item.QuestionnaireCode,
-			QuestionnaireVersion: item.QuestionnaireVersion,
-			AnswerSheetID:        answerSheetID,
-			ScaleCode:            item.ScaleCode,
-			ScaleName:            item.ScaleName,
-			OriginType:           item.OriginType,
-			Status:               item.Status,
-			TotalScore:           item.TotalScore,
-			RiskLevel:            item.RiskLevel,
-			CreatedAt:            item.CreatedAt,
-			SubmittedAt:          item.SubmittedAt,
-			InterpretedAt:        item.InterpretedAt,
-		}
-	}
-
 	duration := time.Since(startTime)
 	l.Debugw("查询我的测评列表成功",
 		"action", "list_my_assessments",
 		"result", "success",
 		"testee_id", testeeID,
 		"total_count", result.Total,
-		"page_count", len(items),
+		"page_count", len(result.Items),
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	return &ListAssessmentsResponse{
-		Items:      items,
-		Total:      result.Total,
-		Page:       result.Page,
-		PageSize:   result.PageSize,
-		TotalPages: result.TotalPages,
-	}, nil
+	return result, nil
 }
 
 // GetAssessmentScores 获取测评得分详情
@@ -309,20 +227,7 @@ func (s *QueryService) GetAssessmentScores(ctx context.Context, testeeID, assess
 		"duration_ms", duration.Milliseconds(),
 	)
 
-	scores := make([]FactorScoreResponse, len(result))
-	for i, score := range result {
-		scores[i] = FactorScoreResponse{
-			FactorCode:   score.FactorCode,
-			FactorName:   score.FactorName,
-			RawScore:     score.RawScore,
-			RiskLevel:    score.RiskLevel,
-			Conclusion:   score.Conclusion,
-			Suggestion:   score.Suggestion,
-			IsTotalScore: score.IsTotalScore,
-		}
-	}
-
-	return scores, nil
+	return result, nil
 }
 
 // GetAssessmentReport 获取测评报告
@@ -368,32 +273,16 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 	}
 
 	return &AssessmentReportResponse{
-		AssessmentID: strconv.FormatUint(result.AssessmentID, 10),
+		AssessmentID: result.AssessmentID,
 		ScaleCode:    result.ScaleCode,
 		ScaleName:    result.ScaleName,
 		TotalScore:   result.TotalScore,
 		RiskLevel:    result.RiskLevel,
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
-		Suggestions:  toSuggestionResponses(result.Suggestions),
+		Suggestions:  result.Suggestions,
 		CreatedAt:    result.CreatedAt,
 	}, nil
-}
-
-// toSuggestionResponses 转换为建议响应列表
-func toSuggestionResponses(outputs []grpcbridge.SuggestionOutput) []SuggestionResponse {
-	if len(outputs) == 0 {
-		return nil
-	}
-	result := make([]SuggestionResponse, len(outputs))
-	for i, s := range outputs {
-		result[i] = SuggestionResponse{
-			Category:   s.Category,
-			Content:    s.Content,
-			FactorCode: s.FactorCode,
-		}
-	}
-	return result
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -410,17 +299,7 @@ func (s *QueryService) GetFactorTrend(ctx context.Context, testeeID uint64, req 
 		return nil, err
 	}
 
-	points := make([]TrendPointResponse, len(result))
-	for i, point := range result {
-		points[i] = TrendPointResponse{
-			AssessmentID: strconv.FormatUint(point.AssessmentID, 10),
-			Score:        point.Score,
-			RiskLevel:    point.RiskLevel,
-			CreatedAt:    point.CreatedAt,
-		}
-	}
-
-	return points, nil
+	return result, nil
 }
 
 // GetHighRiskFactors 获取高风险因子
@@ -433,20 +312,7 @@ func (s *QueryService) GetHighRiskFactors(ctx context.Context, testeeID, assessm
 		return nil, err
 	}
 
-	factors := make([]FactorScoreResponse, len(result))
-	for i, f := range result {
-		factors[i] = FactorScoreResponse{
-			FactorCode:   f.FactorCode,
-			FactorName:   f.FactorName,
-			RawScore:     f.RawScore,
-			RiskLevel:    f.RiskLevel,
-			Conclusion:   f.Conclusion,
-			Suggestion:   f.Suggestion,
-			IsTotalScore: f.IsTotalScore,
-		}
-	}
-
-	return factors, nil
+	return result, nil
 }
 
 // GetMyAssessmentV2 loads assessment detail via apiserver Evaluation V2 gRPC.
@@ -456,7 +322,7 @@ func (s *QueryService) GetMyAssessmentV2(ctx context.Context, testeeID, assessme
 		log.Errorf("Failed to get assessment v2 via gRPC: %v", err)
 		return nil, err
 	}
-	return AssessmentDetailV2FromOutput(result), nil
+	return result, nil
 }
 
 // ListMyAssessmentsV2 loads assessment list via apiserver Evaluation V2 gRPC.
@@ -491,7 +357,7 @@ func (s *QueryService) ListMyAssessmentsV2(ctx context.Context, testeeID uint64,
 		log.Errorf("Failed to list assessments v2 via gRPC: %v", err)
 		return nil, err
 	}
-	return ListAssessmentsV2FromOutput(result), nil
+	return result, nil
 }
 
 // GetAssessmentReportV2 loads report via apiserver Evaluation V2 gRPC without scale factor filtering.
@@ -501,5 +367,5 @@ func (s *QueryService) GetAssessmentReportV2(ctx context.Context, testeeID, asse
 		log.Errorf("Failed to get assessment report v2 via gRPC: %v", err)
 		return nil, err
 	}
-	return AssessmentReportV2FromOutput(result), nil
+	return result, nil
 }

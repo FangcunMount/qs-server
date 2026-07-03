@@ -7,29 +7,27 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
 
 type stubQuestionnaireClient struct {
 	getCalls int32
-	getFn    func(ctx context.Context, code, version string) (*grpcclient.QuestionnaireOutput, error)
+	getFn    func(ctx context.Context, code, version string) (*QuestionnaireResponse, error)
 }
 
-func (s *stubQuestionnaireClient) GetQuestionnaire(ctx context.Context, code, version string) (*grpcclient.QuestionnaireOutput, error) {
+func (s *stubQuestionnaireClient) GetQuestionnaire(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
 	atomic.AddInt32(&s.getCalls, 1)
 	if s.getFn != nil {
 		return s.getFn(ctx, code, version)
 	}
-	return &grpcclient.QuestionnaireOutput{
+	return &QuestionnaireResponse{
 		Code:    code,
 		Version: version,
 		Title:   "sample",
 	}, nil
 }
 
-func (s *stubQuestionnaireClient) ListQuestionnaires(context.Context, int32, int32, string, string) (*grpcclient.ListQuestionnairesOutput, error) {
-	return &grpcclient.ListQuestionnairesOutput{}, nil
+func (s *stubQuestionnaireClient) ListQuestionnaires(context.Context, int32, int32, string, string) (*ListQuestionnairesResponse, error) {
+	return &ListQuestionnairesResponse{}, nil
 }
 
 func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {
@@ -53,7 +51,7 @@ func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {
 func TestQueryServiceGetDoesNotCacheNilOrError(t *testing.T) {
 	t.Run("nil response", func(t *testing.T) {
 		client := &stubQuestionnaireClient{
-			getFn: func(context.Context, string, string) (*grpcclient.QuestionnaireOutput, error) {
+			getFn: func(context.Context, string, string) (*QuestionnaireResponse, error) {
 				return nil, nil
 			},
 		}
@@ -73,7 +71,7 @@ func TestQueryServiceGetDoesNotCacheNilOrError(t *testing.T) {
 
 	t.Run("grpc error", func(t *testing.T) {
 		client := &stubQuestionnaireClient{
-			getFn: func(context.Context, string, string) (*grpcclient.QuestionnaireOutput, error) {
+			getFn: func(context.Context, string, string) (*QuestionnaireResponse, error) {
 				return nil, errors.New("grpc down")
 			},
 		}
@@ -95,9 +93,9 @@ func TestQueryServiceGetDoesNotCacheNilOrError(t *testing.T) {
 func TestQueryServiceGetSingleflightCoalescesConcurrentMiss(t *testing.T) {
 	client := &stubQuestionnaireClient{}
 	start := make(chan struct{})
-	client.getFn = func(ctx context.Context, code, version string) (*grpcclient.QuestionnaireOutput, error) {
+	client.getFn = func(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
 		<-start
-		return &grpcclient.QuestionnaireOutput{Code: code, Version: version, Title: "once"}, nil
+		return &QuestionnaireResponse{Code: code, Version: version, Title: "once"}, nil
 	}
 
 	cache := NewLocalCache(LocalCacheOptions{TTL: time.Minute, MaxEntries: 8})

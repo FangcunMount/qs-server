@@ -1,4 +1,4 @@
-package reportevents
+package container
 
 import (
 	"context"
@@ -89,8 +89,7 @@ func personalityStatusView(status *personalityassessment.AssessmentStatusRespons
 	}
 }
 
-// NewDefaultResolver 用 collection 应用服务构造默认 Resolver。
-func NewDefaultResolver(
+func newReportStatusResolver(
 	medical interface {
 		GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluationapp.AssessmentDetailResponse, error)
 	},

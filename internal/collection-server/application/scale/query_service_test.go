@@ -5,33 +5,31 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
 
 type stubScaleClient struct {
 	getCalls int32
-	getFn    func(ctx context.Context, code string) (*grpcclient.ScaleOutput, error)
+	getFn    func(ctx context.Context, code string) (*ScaleResponse, error)
 }
 
-func (s *stubScaleClient) GetScale(ctx context.Context, code string) (*grpcclient.ScaleOutput, error) {
+func (s *stubScaleClient) GetScale(ctx context.Context, code string) (*ScaleResponse, error) {
 	atomic.AddInt32(&s.getCalls, 1)
 	if s.getFn != nil {
 		return s.getFn(ctx, code)
 	}
-	return &grpcclient.ScaleOutput{Code: code, Title: "sample"}, nil
+	return &ScaleResponse{Code: code, Title: "sample"}, nil
 }
 
-func (s *stubScaleClient) ListScales(context.Context, int32, int32, string, string, string, []string, []string, []string, []string) (*grpcclient.ListScalesOutput, error) {
-	return &grpcclient.ListScalesOutput{}, nil
+func (s *stubScaleClient) ListScales(context.Context, int32, int32, string, string, string, []string, []string, []string, []string) (*ListScalesResponse, error) {
+	return &ListScalesResponse{}, nil
 }
 
-func (s *stubScaleClient) ListHotScales(context.Context, int32, int32) (*grpcclient.ListHotScalesOutput, error) {
-	return &grpcclient.ListHotScalesOutput{}, nil
+func (s *stubScaleClient) ListHotScales(context.Context, int32, int32) (*ListHotScalesResponse, error) {
+	return &ListHotScalesResponse{}, nil
 }
 
-func (s *stubScaleClient) GetScaleCategories(context.Context) (*grpcclient.ScaleCategoriesOutput, error) {
-	return &grpcclient.ScaleCategoriesOutput{}, nil
+func (s *stubScaleClient) GetScaleCategories(context.Context) (*ScaleCategoriesResponse, error) {
+	return &ScaleCategoriesResponse{}, nil
 }
 
 func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {

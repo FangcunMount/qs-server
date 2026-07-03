@@ -4,24 +4,17 @@ import (
 	"context"
 	"fmt"
 	"strconv"
-	"strings"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
-	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
-
-type actorLookupClient interface {
-	GetTestee(ctx context.Context, testeeID uint64) (*grpcbridge.TesteeResponse, error)
-	TesteeExists(ctx context.Context, orgID, iamProfileID uint64) (exists bool, testeeID uint64, err error)
-}
 
 // IdempotencyGuard protects cross-instance submit idempotency for the same request key.
 type IdempotencyGuard interface {
@@ -48,8 +41,12 @@ type profileLinkChecker interface {
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
 	answerSheetClient  answerSheetGateway
-	actorClient        actorLookupClient
+	answerSheetReader  AnswerSheetReader
+	actorClient        ActorLookup
 	profileLinkService profileLinkChecker
+	profileAccess      *ProfileAccessResolver
+	answerConverter    AnswerConverter
+	committer          *SubmissionCommitter
 	queue              *SubmitQueue
 	submitGuard        IdempotencyGuard
 }
@@ -57,15 +54,20 @@ type SubmissionService struct {
 // NewSubmissionService 创建答卷提交服务
 func NewSubmissionService(
 	answerSheetClient answerSheetGateway,
-	actorClient actorLookupClient,
+	answerSheetReader AnswerSheetReader,
+	actorClient ActorLookup,
 	profileLinkService profileLinkChecker,
 	queueOptions *options.SubmitQueueOptions,
 	submitGuard IdempotencyGuard,
 ) *SubmissionService {
 	service := &SubmissionService{
 		answerSheetClient:  answerSheetClient,
+		answerSheetReader:  answerSheetReader,
 		actorClient:        actorClient,
 		profileLinkService: profileLinkService,
+		profileAccess:      NewProfileAccessResolver(actorClient, profileLinkService),
+		answerConverter:    AnswerConverter{},
+		committer:          NewSubmissionCommitter(answerSheetClient),
 		submitGuard:        submitGuard,
 	}
 
@@ -183,20 +185,19 @@ func (s *SubmissionService) submitSync(ctx context.Context, writerID uint64, req
 	}
 
 	// 2. 校验 active ProfileLink 权限，并获取 testee 信息（用于获取 OrgID）
-	testee, resolvedTesteeID, err := s.validateProfileAccess(ctx, writerID, req.TesteeID)
+	testee, resolvedTesteeID, err := s.profileAccess.Resolve(ctx, writerID, req.TesteeID)
 	if err != nil {
 		return nil, err
 	}
 
-	// 3. 转换答案数据
-	answers := s.convertAnswers(req.Answers)
+	answers := s.answerConverter.Convert(req.Answers)
 
 	// 4. 调用 gRPC 服务提交答卷（传递 OrgID）
 	orgID := uint64(0)
 	if testee != nil {
 		orgID = testee.OrgID
 	}
-	result, err := s.callSaveAnswerSheet(ctx, writerID, orgID, resolvedTesteeID, req, answers)
+	result, err := s.committer.Save(ctx, writerID, orgID, resolvedTesteeID, req, answers)
 	if err != nil {
 		return nil, err
 	}
@@ -224,174 +225,6 @@ func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64)
 	return nil
 }
 
-// validateProfileAccess verifies active ProfileLink access and returns canonical testee data.
-func (s *SubmissionService) validateProfileAccess(ctx context.Context, writerID, testeeID uint64) (*grpcbridge.TesteeResponse, uint64, error) {
-	l := logger.L(ctx)
-
-	// 查询受试者信息（需要获取 OrgID 和 IAMProfileID）。
-	// 兼容某些上游把 profile_id 误传成 testee_id 的情况。
-	testee, resolvedTesteeID, err := s.resolveCanonicalTestee(ctx, testeeID)
-	if err != nil {
-		l.Errorw("查询受试者信息失败",
-			"action", "submit_answersheet",
-			"testee_id", testeeID,
-			"error", err.Error(),
-		)
-		return nil, 0, err
-	}
-
-	// 如果 IAM 服务未启用，直接返回 testee
-	if s.profileLinkService == nil || !s.profileLinkService.IsEnabled() {
-		return testee, resolvedTesteeID, nil
-	}
-
-	// 如果受试者未绑定 IAM Profile，跳过权限校验
-	if testee.IAMProfileID == "" {
-		l.Warnw("受试者未绑定 IAM Profile，跳过权限校验",
-			"testee_id", resolvedTesteeID,
-			"testee_name", testee.Name,
-		)
-		return testee, resolvedTesteeID, nil
-	}
-
-	// 验证 active ProfileLink
-	if err := s.checkProfileLinkAccess(ctx, writerID, resolvedTesteeID, testee.IAMProfileID, testee.Name); err != nil {
-		return nil, 0, err
-	}
-
-	return testee, resolvedTesteeID, nil
-}
-
-func (s *SubmissionService) resolveCanonicalTestee(ctx context.Context, rawTesteeID uint64) (*grpcbridge.TesteeResponse, uint64, error) {
-	testee, err := s.actorClient.GetTestee(ctx, rawTesteeID)
-	if err == nil {
-		return testee, rawTesteeID, nil
-	}
-	if status.Code(err) != codes.NotFound || s.profileLinkService == nil {
-		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
-	}
-
-	orgID := s.profileLinkService.GetDefaultOrgID()
-	exists, canonicalTesteeID, existsErr := s.actorClient.TesteeExists(ctx, orgID, rawTesteeID)
-	if existsErr != nil {
-		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
-	}
-	if !exists || canonicalTesteeID == 0 {
-		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", err)
-	}
-
-	canonicalTestee, canonicalErr := s.actorClient.GetTestee(ctx, canonicalTesteeID)
-	if canonicalErr != nil {
-		return nil, 0, fmt.Errorf("查询受试者信息失败: %w", canonicalErr)
-	}
-
-	logger.L(ctx).Warnw("提交答卷时检测到 profile_id 被误作 testee_id，已自动回退到 canonical testee_id",
-		"action", "submit_answersheet",
-		"submitted_testee_id", rawTesteeID,
-		"canonical_testee_id", canonicalTesteeID,
-		"org_id", orgID,
-	)
-	return canonicalTestee, canonicalTesteeID, nil
-}
-
-// checkProfileLinkAccess checks whether writerID has an active ProfileLink to iamProfileID.
-func (s *SubmissionService) checkProfileLinkAccess(ctx context.Context, writerID, testeeID uint64, iamProfileID, testeeName string) error {
-	l := logger.L(ctx)
-
-	userIDStr := strconv.FormatUint(writerID, 10)
-	hasActiveProfileLink, err := s.profileLinkService.HasActiveProfileLink(ctx, userIDStr, iamProfileID)
-	if err != nil {
-		l.Errorw("校验 ProfileLink 权限失败",
-			"action", "submit_answersheet",
-			"writer_id", writerID,
-			"testee_id", testeeID,
-			"iam_profile_id", iamProfileID,
-			"error", err.Error(),
-		)
-		return fmt.Errorf("校验 ProfileLink 权限失败: %w", err)
-	}
-
-	if !hasActiveProfileLink {
-		l.Warnw("无权为该受试者提交答卷：缺少 active ProfileLink",
-			"action", "submit_answersheet",
-			"writer_id", writerID,
-			"testee_id", testeeID,
-			"iam_profile_id", iamProfileID,
-			"testee_name", testeeName,
-			"result", "forbidden",
-		)
-		return fmt.Errorf("无权为该受试者提交答卷")
-	}
-
-	l.Infow("ProfileLink 权限验证通过",
-		"action", "submit_answersheet",
-		"writer_id", writerID,
-		"testee_id", testeeID,
-		"iam_profile_id", iamProfileID,
-	)
-	return nil
-}
-
-// convertAnswers 转换答案数据
-func (s *SubmissionService) convertAnswers(answers []Answer) []grpcbridge.AnswerInput {
-	result := make([]grpcbridge.AnswerInput, len(answers))
-	for i, a := range answers {
-		result[i] = grpcbridge.AnswerInput{
-			QuestionCode: a.QuestionCode,
-			QuestionType: a.QuestionType,
-			Score:        a.Score,
-			Value:        normalizeAnswerValueForGRPC(a.QuestionType, a.Value),
-		}
-	}
-	return result
-}
-
-func normalizeAnswerValueForGRPC(questionType, value string) string {
-	switch strings.TrimSpace(questionType) {
-	case "Radio", "radio":
-		if option, ok := answervalue.NormalizeSingleOption(value); ok {
-			return option
-		}
-	}
-	return value
-}
-
-// callSaveAnswerSheet 调用 gRPC 服务保存答卷
-func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, orgID, testeeID uint64, req *SubmitAnswerSheetRequest, answers []grpcbridge.AnswerInput) (*grpcbridge.SaveAnswerSheetOutput, error) {
-	l := logger.L(ctx)
-
-	l.Debugw("调用 gRPC 服务提交答卷",
-		"questionnaire_code", req.QuestionnaireCode,
-		"testee_id", testeeID,
-		"org_id", orgID,
-	)
-
-	result, err := s.answerSheetClient.SaveAnswerSheet(ctx, &grpcbridge.SaveAnswerSheetInput{
-		QuestionnaireCode:    req.QuestionnaireCode,
-		QuestionnaireVersion: req.QuestionnaireVersion,
-		IdempotencyKey:       req.IdempotencyKey,
-		Title:                req.Title,
-		WriterID:             writerID,
-		TesteeID:             testeeID,
-		TaskID:               req.TaskID,
-		OrgID:                orgID,
-		Answers:              answers,
-	})
-	if err != nil {
-		log.Errorf("Failed to save answer sheet via gRPC: %v", err)
-		l.Errorw("提交答卷失败",
-			"action", "submit_answersheet",
-			"questionnaire_code", req.QuestionnaireCode,
-			"result", "failed",
-			"error", err.Error(),
-		)
-		return nil, err
-	}
-
-	return result, nil
-}
-
-// Get 获取答卷详情
 func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
@@ -403,7 +236,10 @@ func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetRes
 		"answersheet_id", id,
 	)
 
-	result, err := s.answerSheetClient.GetAnswerSheet(ctx, id)
+	if s.answerSheetReader == nil {
+		return nil, fmt.Errorf("answer sheet reader is not configured")
+	}
+	result, err := s.answerSheetReader.GetAnswerSheet(ctx, id)
 	if err != nil {
 		log.Errorf("Failed to get answer sheet via gRPC: %v", err)
 		l.Errorw("获取答卷失败",
@@ -415,38 +251,15 @@ func (s *SubmissionService) Get(ctx context.Context, id uint64) (*AnswerSheetRes
 		return nil, err
 	}
 
-	// 转换 answers
-	answers := make([]Answer, len(result.Answers))
-	for i, a := range result.Answers {
-		answers[i] = Answer{
-			QuestionCode: a.QuestionCode,
-			QuestionType: a.QuestionType,
-			Score:        a.Score,
-			Value:        a.Value,
-		}
-	}
-
 	duration := time.Since(startTime)
-	l.Debugw("获取答卷成功",
-		"action", "get_answersheet",
-		"answersheet_id", id,
-		"questionnaire_code", result.QuestionnaireCode,
-		"answer_count", len(answers),
-		"duration_ms", duration.Milliseconds(),
-	)
-
-	return &AnswerSheetResponse{
-		ID:                   strconv.FormatUint(result.ID, 10),
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		Title:                result.Title,
-		Score:                result.Score,
-		WriterID:             strconv.FormatUint(result.WriterID, 10),
-		WriterName:           result.WriterName,
-		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
-		TesteeName:           result.TesteeName,
-		Answers:              answers,
-		CreatedAt:            result.CreatedAt,
-		UpdatedAt:            result.UpdatedAt,
-	}, nil
+	if result != nil {
+		l.Debugw("获取答卷成功",
+			"action", "get_answersheet",
+			"answersheet_id", id,
+			"questionnaire_code", result.QuestionnaireCode,
+			"answer_count", len(result.Answers),
+			"duration_ms", duration.Milliseconds(),
+		)
+	}
+	return result, nil
 }

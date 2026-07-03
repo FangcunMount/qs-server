@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 )
 
@@ -43,7 +44,7 @@ func (f *fakeAssessmentQuery) GetMyAssessment(context.Context, uint64, uint64) (
 }
 
 func TestToPublicAssessmentStatusMapsCompletedToInterpreted(t *testing.T) {
-	got := ToPublicAssessmentStatus(&evaluation.AssessmentStatusResponse{Status: "completed"})
+	got := appreportstatus.ToPublicAssessmentStatus(&evaluation.AssessmentStatusResponse{Status: "completed"})
 	if got.Status != "interpreted" {
 		t.Fatalf("expected interpreted, got %s", got.Status)
 	}

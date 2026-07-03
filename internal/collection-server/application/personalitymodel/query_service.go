@@ -4,12 +4,11 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
-type personalityModelClient = grpcbridge.PersonalityModelReader
+type personalityModelClient = CatalogReader
 
 // QueryService is the BFF layer for personality model catalog reads.
 type QueryService struct {
@@ -79,10 +78,7 @@ func (s *QueryService) Get(ctx context.Context, code string) (*PersonalityModelR
 				logPersonalityGRPCError("Failed to get personality model via gRPC", err)
 				return nil, err
 			}
-			if result == nil {
-				return nil, nil
-			}
-			return convertDetail(result), nil
+			return result, nil
 		},
 	)
 }
@@ -108,17 +104,7 @@ func (s *QueryService) List(ctx context.Context, req *ListPersonalityModelsReque
 				logPersonalityGRPCError("Failed to list personality models via gRPC", err)
 				return nil, err
 			}
-			models := make([]PersonalityModelSummaryResponse, 0, len(result.Models))
-			for _, model := range result.Models {
-				models = append(models, convertSummary(model))
-			}
-			return &ListPersonalityModelsResponse{
-				Models:     models,
-				Total:      result.Total,
-				Page:       result.Page,
-				PageSize:   result.PageSize,
-				TotalPages: result.TotalPages,
-			}, nil
+			return result, nil
 		},
 	)
 }
@@ -139,11 +125,7 @@ func (s *QueryService) GetCategories(ctx context.Context) (*PersonalityModelCate
 				logPersonalityGRPCError("Failed to get personality model categories via gRPC", err)
 				return nil, err
 			}
-			categories := make([]CategoryResponse, 0, len(result.Categories))
-			for _, item := range result.Categories {
-				categories = append(categories, CategoryResponse{Value: item.Value, Label: item.Label})
-			}
-			return &PersonalityModelCategoriesResponse{Categories: categories}, nil
+			return result, nil
 		},
 	)
 }
@@ -157,56 +139,6 @@ func (s *QueryService) normalizeListRequest(req *ListPersonalityModelsRequest) {
 	}
 	if req.PageSize > 100 {
 		req.PageSize = 100
-	}
-}
-
-func convertSummary(model grpcbridge.PersonalityModelSummaryOutput) PersonalityModelSummaryResponse {
-	return PersonalityModelSummaryResponse{
-		Code:                 model.Code,
-		Version:              model.Version,
-		Title:                model.Title,
-		Algorithm:            model.Algorithm,
-		Description:          model.Description,
-		QuestionnaireCode:    model.QuestionnaireCode,
-		QuestionnaireVersion: model.QuestionnaireVersion,
-		Status:               model.Status,
-		QuestionCount:        model.QuestionCount,
-	}
-}
-
-func convertDetail(model *grpcbridge.PersonalityModelOutput) *PersonalityModelResponse {
-	dimensions := make([]PersonalityDimensionResponse, 0, len(model.Dimensions))
-	for _, dim := range model.Dimensions {
-		dimensions = append(dimensions, PersonalityDimensionResponse{
-			Code:      dim.Code,
-			Name:      dim.Name,
-			LeftPole:  dim.LeftPole,
-			RightPole: dim.RightPole,
-		})
-	}
-	outcomes := make([]PersonalityOutcomeResponse, 0, len(model.Outcomes))
-	for _, outcome := range model.Outcomes {
-		outcomes = append(outcomes, PersonalityOutcomeResponse{
-			Code:     outcome.Code,
-			Name:     outcome.Name,
-			OneLiner: outcome.OneLiner,
-			ImageURL: outcome.ImageURL,
-		})
-	}
-	summary := convertSummary(model.Summary)
-	return &PersonalityModelResponse{
-		Code:                 summary.Code,
-		Version:              summary.Version,
-		Title:                summary.Title,
-		Algorithm:            summary.Algorithm,
-		Description:          summary.Description,
-		QuestionnaireCode:    summary.QuestionnaireCode,
-		QuestionnaireVersion: summary.QuestionnaireVersion,
-		Status:               summary.Status,
-		QuestionCount:        summary.QuestionCount,
-		DimensionOrder:       append([]string(nil), model.DimensionOrder...),
-		Dimensions:           dimensions,
-		Outcomes:             outcomes,
 	}
 }
 

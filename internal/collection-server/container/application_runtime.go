@@ -16,6 +16,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
@@ -51,7 +53,8 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 	return submitRuntime{
 		submission: answersheet.NewSubmissionService(
 			c.answerSheetClient,
-			c.actorClient,
+			acl.NewAnswerSheetBFFReader(c.answerSheetClient),
+			acl.NewTesteeActorLookup(c.actorClient),
 			profileLinkService,
 			c.opts.SubmitQueue,
 			submitGuard,
@@ -63,17 +66,17 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 	catalogCaches := c.initCatalogCaches()
 	rt := catalogRuntime{
 		questionnaire: questionnaire.NewQueryService(
-			c.questionnaireClient,
+			grpcbridge.NewQuestionnaireCatalogReader(c.questionnaireClient),
 			catalogCaches.questionnaire,
 			questionnaireCacheSingleflightEnabled(c.opts),
 		),
 		scale: scale.NewQueryService(
-			c.scaleClient,
+			grpcbridge.NewScaleCatalogReader(c.scaleClient),
 			catalogCaches.scale,
 			scaleCacheSingleflightEnabled(c.opts),
 		),
 		personality: personalitymodel.NewQueryService(
-			c.personalityModelClient,
+			grpcbridge.NewPersonalityCatalogReader(c.personalityModelClient),
 			catalogCaches.personality,
 			personalityCacheSingleflightEnabled(c.opts),
 		),
@@ -141,7 +144,7 @@ func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService)
 func (c *Container) buildReportEventsHandler() *ws.ReportEventsHandler {
 	return ws.NewReportEventsHandler(ws.Dependencies{
 		Notifier: c.reportNotifier,
-		Events: reportevents.NewService(reportevents.NewDefaultResolver(
+		Events: reportevents.NewService(newReportStatusResolver(
 			c.evaluationQueryService,
 			c.waitReportService,
 			c.personalityAssessmentQueryService,

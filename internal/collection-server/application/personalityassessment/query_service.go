@@ -4,13 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 )
 
@@ -19,11 +18,11 @@ const personalityModelKind = "personality"
 var errNotPersonalityAssessment = errors.New("assessment is not a personality evaluation")
 
 type QueryService struct {
-	evaluationClient grpcbridge.EvaluationReader
+	evaluationClient evaluationapp.BFFReader
 	waitReport       *reportwait.Service
 }
 
-func NewQueryService(evaluationClient grpcbridge.EvaluationReader, waitReport *reportwait.Service) *QueryService {
+func NewQueryService(evaluationClient evaluationapp.BFFReader, waitReport *reportwait.Service) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
 		waitReport:       waitReport,
@@ -117,7 +116,7 @@ func (s *QueryService) toPublicStatusResponse(
 	testeeID, assessmentID uint64,
 	status *evaluationapp.AssessmentStatusResponse,
 ) *AssessmentStatusResponse {
-	pub := reportwait.ToPublicAssessmentStatus(status)
+	pub := reportstatus.ToPublicAssessmentStatus(status)
 	resp := &AssessmentStatusResponse{
 		Status:          pub.Status,
 		Stage:           pub.Stage,
@@ -136,21 +135,21 @@ func (s *QueryService) toPublicStatusResponse(
 	return resp
 }
 
-func ensurePersonalityModel(model grpcbridge.ModelIdentityOutput) error {
+func ensurePersonalityModel(model evaluationapp.ModelIdentityResponse) error {
 	if model.Kind != personalityModelKind {
 		return errNotPersonalityAssessment
 	}
 	return nil
 }
 
-func toAssessmentDetail(result *grpcbridge.AssessmentDetailV2Output) *AssessmentDetailResponse {
+func toAssessmentDetail(result *evaluationapp.AssessmentDetailV2Response) *AssessmentDetailResponse {
 	return &AssessmentDetailResponse{
-		ID:                   strconv.FormatUint(result.ID, 10),
-		OrgID:                strconv.FormatUint(result.OrgID, 10),
-		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
+		ID:                   result.ID,
+		OrgID:                result.OrgID,
+		TesteeID:             result.TesteeID,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        strconv.FormatUint(result.AnswerSheetID, 10),
+		AnswerSheetID:        result.AnswerSheetID,
 		Model:                toModelIdentity(result.Model),
 		PrimaryScore:         toScoreValue(result.PrimaryScore),
 		Level:                toResultLevel(result.Level),
@@ -164,12 +163,12 @@ func toAssessmentDetail(result *grpcbridge.AssessmentDetailV2Output) *Assessment
 	}
 }
 
-func toAssessmentSummary(result grpcbridge.AssessmentSummaryV2Output) AssessmentSummaryResponse {
+func toAssessmentSummary(result evaluationapp.AssessmentSummaryV2Response) AssessmentSummaryResponse {
 	return AssessmentSummaryResponse{
-		ID:                   strconv.FormatUint(result.ID, 10),
+		ID:                   result.ID,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        strconv.FormatUint(result.AnswerSheetID, 10),
+		AnswerSheetID:        result.AnswerSheetID,
 		Model:                toModelIdentity(result.Model),
 		PrimaryScore:         toScoreValue(result.PrimaryScore),
 		Level:                toResultLevel(result.Level),
@@ -180,7 +179,7 @@ func toAssessmentSummary(result grpcbridge.AssessmentSummaryV2Output) Assessment
 	}
 }
 
-func toAssessmentReport(result *grpcbridge.AssessmentReportV2Output) *AssessmentReportResponse {
+func toAssessmentReport(result *evaluationapp.AssessmentReportV2Response) *AssessmentReportResponse {
 	dimensions := make([]evaluationapp.DimensionInterpretResponse, 0, len(result.Dimensions))
 	for _, dim := range result.Dimensions {
 		dimensions = append(dimensions, evaluationapp.DimensionInterpretResponse{
@@ -202,7 +201,7 @@ func toAssessmentReport(result *grpcbridge.AssessmentReportV2Output) *Assessment
 		})
 	}
 	return &AssessmentReportResponse{
-		AssessmentID: strconv.FormatUint(result.AssessmentID, 10),
+		AssessmentID: result.AssessmentID,
 		Model:        toModelIdentity(result.Model),
 		PrimaryScore: toScoreValue(result.PrimaryScore),
 		Level:        toResultLevel(result.Level),
@@ -214,7 +213,7 @@ func toAssessmentReport(result *grpcbridge.AssessmentReportV2Output) *Assessment
 	}
 }
 
-func toModelIdentity(model grpcbridge.ModelIdentityOutput) ModelIdentityResponse {
+func toModelIdentity(model evaluationapp.ModelIdentityResponse) ModelIdentityResponse {
 	return ModelIdentityResponse{
 		Kind:      model.Kind,
 		SubKind:   model.SubKind,
@@ -225,7 +224,7 @@ func toModelIdentity(model grpcbridge.ModelIdentityOutput) ModelIdentityResponse
 	}
 }
 
-func toScoreValue(score *grpcbridge.ScoreValueOutput) *ScoreValueResponse {
+func toScoreValue(score *evaluationapp.ScoreValueResponse) *ScoreValueResponse {
 	if score == nil {
 		return nil
 	}
@@ -237,7 +236,7 @@ func toScoreValue(score *grpcbridge.ScoreValueOutput) *ScoreValueResponse {
 	}
 }
 
-func toResultLevel(level *grpcbridge.ResultLevelOutput) *ResultLevelResponse {
+func toResultLevel(level *evaluationapp.ResultLevelResponse) *ResultLevelResponse {
 	if level == nil {
 		return nil
 	}
@@ -248,7 +247,7 @@ func toResultLevel(level *grpcbridge.ResultLevelOutput) *ResultLevelResponse {
 	}
 }
 
-func toModelExtra(extra *grpcbridge.ModelExtraOutput) *ModelExtraResponse {
+func toModelExtra(extra *evaluationapp.ModelExtraResponse) *ModelExtraResponse {
 	if extra == nil {
 		return nil
 	}

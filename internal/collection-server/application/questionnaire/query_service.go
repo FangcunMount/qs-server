@@ -4,12 +4,11 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
-type questionnaireClient = grpcbridge.QuestionnaireReader
+type questionnaireClient = CatalogReader
 
 // QueryService 问卷查询服务
 type QueryService struct {
@@ -68,10 +67,7 @@ func (s *QueryService) fetchFromGRPC(ctx context.Context, code, version string) 
 		logQuestionnaireGRPCError("Failed to get questionnaire via gRPC", err)
 		return nil, err
 	}
-	if result == nil {
-		return nil, nil
-	}
-	return s.convertQuestionnaire(result), nil
+	return result, nil
 }
 
 // List 获取问卷列表（返回摘要，不含问题详情）
@@ -95,30 +91,7 @@ func (s *QueryService) List(ctx context.Context, req *ListQuestionnairesRequest)
 		logQuestionnaireGRPCError("Failed to list questionnaires via gRPC", err)
 		return nil, err
 	}
-
-	// 直接使用摘要类型，不需要转换完整问卷
-	questionnaires := make([]QuestionnaireSummaryResponse, len(result.Questionnaires))
-	for i, q := range result.Questionnaires {
-		questionnaires[i] = QuestionnaireSummaryResponse{
-			Code:          q.Code,
-			Title:         q.Title,
-			Description:   q.Description,
-			ImgURL:        q.ImgURL,
-			Status:        q.Status,
-			Version:       q.Version,
-			Type:          q.Type,
-			QuestionCount: q.QuestionCount,
-			CreatedAt:     q.CreatedAt,
-			UpdatedAt:     q.UpdatedAt,
-		}
-	}
-
-	return &ListQuestionnairesResponse{
-		Questionnaires: questionnaires,
-		Total:          result.Total,
-		Page:           result.Page,
-		PageSize:       result.PageSize,
-	}, nil
+	return result, nil
 }
 
 func logQuestionnaireGRPCError(message string, err error) {
@@ -127,63 +100,4 @@ func logQuestionnaireGRPCError(message string, err error) {
 		return
 	}
 	log.Errorf("%s: %v", message, err)
-}
-
-// convertQuestionnaire 转换问卷
-func (s *QueryService) convertQuestionnaire(q *grpcbridge.QuestionnaireOutput) *QuestionnaireResponse {
-	questions := make([]QuestionResponse, len(q.Questions))
-	for i, question := range q.Questions {
-		questions[i] = s.convertQuestion(&question)
-	}
-
-	return &QuestionnaireResponse{
-		Code:        q.Code,
-		Title:       q.Title,
-		Description: q.Description,
-		ImgURL:      q.ImgURL,
-		Status:      q.Status,
-		Version:     q.Version,
-		Type:        q.Type,
-		Questions:   questions,
-		CreatedAt:   q.CreatedAt,
-		UpdatedAt:   q.UpdatedAt,
-	}
-}
-
-// convertQuestion 转换问题
-func (s *QueryService) convertQuestion(q *grpcbridge.QuestionOutput) QuestionResponse {
-	options := make([]OptionResponse, len(q.Options))
-	for i, opt := range q.Options {
-		options[i] = OptionResponse{
-			Code:    opt.Code,
-			Content: opt.Content,
-			Score:   opt.Score,
-		}
-	}
-
-	validationRules := make([]ValidationRuleResponse, len(q.ValidationRules))
-	for i, rule := range q.ValidationRules {
-		validationRules[i] = ValidationRuleResponse{
-			RuleType:    rule.RuleType,
-			TargetValue: rule.TargetValue,
-		}
-	}
-
-	var calcRule *CalculationRuleResponse
-	if q.CalculationRule != nil {
-		calcRule = &CalculationRuleResponse{
-			FormulaType: q.CalculationRule.FormulaType,
-		}
-	}
-
-	return QuestionResponse{
-		Code:            q.Code,
-		Type:            q.Type,
-		Title:           q.Title,
-		Tips:            q.Tips,
-		Placeholder:     q.Placeholder,
-		Options:         options,
-		ValidationRules: validationRules,
-		CalculationRule: calcRule,
-	}
 }

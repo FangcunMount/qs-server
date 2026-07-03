@@ -20,6 +20,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/acl"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/catalogpeek"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
@@ -179,16 +181,22 @@ func (c *Container) initApplicationServices() {
 	c.scaleQueryService = catalogRuntime.scale
 	c.personalityModelQueryService = catalogRuntime.personality
 
-	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
+	c.evaluationQueryService = evaluation.NewQueryService(
+		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
+		grpcbridge.NewScaleCatalogReader(c.scaleClient),
+	)
 	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
 	c.reportStatusReporter = reportRuntime.reporter
 	c.reportNotifier = reportRuntime.notifier
 	c.waitReportService = reportRuntime.waitReport
 	c.waitWatcherCancel = reportRuntime.waitWatcherCancel
 
-	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(c.evaluationClient, c.waitReportService)
+	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(
+		grpcbridge.NewEvaluationBFFReader(c.evaluationClient),
+		c.waitReportService,
+	)
 	c.personalitySessionService = personalitysession.NewService(c.personalityModelQueryService, c.questionnaireQueryService)
-	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
+	c.testeeService = testee.NewService(acl.NewTesteeActorAdapter(c.actorClient), profileLinkService, profileService)
 	c.reportEventsHandler = c.buildReportEventsHandler()
 
 	log.Info("✅ Application services initialized")

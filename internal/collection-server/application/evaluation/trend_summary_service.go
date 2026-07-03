@@ -384,7 +384,7 @@ func (s *QueryService) buildFactorTrends(
 
 		trendPoints := make([]AssessmentFactorTrendPointResponse, 0, len(points))
 		for _, point := range points {
-			assessmentID := strconv.FormatUint(point.AssessmentID, 10)
+			assessmentID := point.AssessmentID
 			allowedItem, ok := allowed[assessmentID]
 			if !ok {
 				continue

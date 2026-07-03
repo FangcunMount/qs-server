@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/FangcunMount/qs-server/pkg/core"
 	"github.com/gin-gonic/gin"
@@ -20,7 +20,7 @@ func WriteDegradedWaitReport(c *gin.Context, retryAfterSeconds int) {
 	c.JSON(http.StatusOK, core.Response{
 		Code:    0,
 		Message: "success",
-		Data: reportwait.ToPublicAssessmentStatus(&evaluation.AssessmentStatusResponse{
+		Data: reportstatus.ToPublicAssessmentStatus(&evaluation.AssessmentStatusResponse{
 			Status:          "processing",
 			Stage:           "queued",
 			Message:         "系统繁忙，报告生成中",

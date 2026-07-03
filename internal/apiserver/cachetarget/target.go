@@ -20,6 +20,7 @@ const (
 	WarmupKindStaticScale             WarmupKind = "static.scale"
 	WarmupKindStaticQuestionnaire     WarmupKind = "static.questionnaire"
 	WarmupKindStaticScaleList         WarmupKind = "static.scale_list"
+	WarmupKindStaticPersonalityModel  WarmupKind = "static.personality_model"
 	WarmupKindQueryStatsOverview      WarmupKind = "query.stats_overview"
 	WarmupKindQueryStatsSystem        WarmupKind = "query.stats_system"
 	WarmupKindQueryStatsQuestionnaire WarmupKind = "query.stats_questionnaire"
@@ -77,7 +78,7 @@ func (t WarmupTarget) OrgID() (int64, bool) {
 // FamilyForKind returns the Redis family used by a governance warmup kind.
 func FamilyForKind(kind WarmupKind) cachemodel.Family {
 	switch kind {
-	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticScaleList:
+	case WarmupKindStaticScale, WarmupKindStaticQuestionnaire, WarmupKindStaticScaleList, WarmupKindStaticPersonalityModel:
 		return cachemodel.FamilyStatic
 	case WarmupKindQueryStatsOverview, WarmupKindQueryStatsSystem, WarmupKindQueryStatsQuestionnaire, WarmupKindQueryStatsPlan:
 		return cachemodel.FamilyQuery
@@ -114,6 +115,15 @@ func NewStaticScaleListWarmupTarget() WarmupTarget {
 		Family: cachemodel.FamilyStatic,
 		Kind:   WarmupKindStaticScaleList,
 		Scope:  scaleListWarmupScope,
+	}
+}
+
+// NewStaticPersonalityModelWarmupTarget 创建人格模型静态缓存预热目标。
+func NewStaticPersonalityModelWarmupTarget(code string) WarmupTarget {
+	return WarmupTarget{
+		Family: cachemodel.FamilyStatic,
+		Kind:   WarmupKindStaticPersonalityModel,
+		Scope:  normalizeCodeScope("personality_model", code),
 	}
 }
 
@@ -158,6 +168,7 @@ func ParseWarmupKind(raw string) (WarmupKind, bool) {
 	case WarmupKindStaticScale,
 		WarmupKindStaticQuestionnaire,
 		WarmupKindStaticScaleList,
+		WarmupKindStaticPersonalityModel,
 		WarmupKindQueryStatsOverview,
 		WarmupKindQueryStatsSystem,
 		WarmupKindQueryStatsQuestionnaire,
@@ -190,6 +201,12 @@ func ParseWarmupTarget(kind WarmupKind, scope string) (WarmupTarget, error) {
 			return WarmupTarget{}, fmt.Errorf("invalid static scale list warmup scope: %s", scope)
 		}
 		return expected, nil
+	case WarmupKindStaticPersonalityModel:
+		code, ok := ParseStaticPersonalityModelScope(scope)
+		if !ok {
+			return WarmupTarget{}, fmt.Errorf("invalid static personality model warmup scope: %s", scope)
+		}
+		return NewStaticPersonalityModelWarmupTarget(code), nil
 	case WarmupKindQueryStatsOverview:
 		orgID, preset, ok := ParseQueryStatsOverviewScope(scope)
 		if !ok {
@@ -232,6 +249,14 @@ func ParseStaticQuestionnaireScope(scope string) (string, bool) {
 		return "", false
 	}
 	code := strings.TrimPrefix(scope, "questionnaire:")
+	return code, code != ""
+}
+
+func ParseStaticPersonalityModelScope(scope string) (string, bool) {
+	if !strings.HasPrefix(scope, "personality_model:") {
+		return "", false
+	}
+	code := strings.TrimPrefix(scope, "personality_model:")
 	return code, code != ""
 }
 

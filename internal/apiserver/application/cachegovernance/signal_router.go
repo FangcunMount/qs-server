@@ -44,10 +44,10 @@ func (c *coordinator) HandlePersonalityModelPublished(ctx context.Context, code 
 	if c == nil || !c.cfg.Enable || strings.TrimSpace(code) == "" {
 		return nil
 	}
-	if c.deps.WarmPublishedPersonalityModel == nil {
-		return nil
-	}
-	return c.deps.WarmPublishedPersonalityModel(ctx, code)
+	_, err := c.executeTargets(ctx, "publish", []cachetarget.WarmupTarget{
+		cachetarget.NewStaticPersonalityModelWarmupTarget(code),
+	})
+	return err
 }
 
 func (c *coordinator) HandleStatisticsSync(ctx context.Context, orgID int64) error {

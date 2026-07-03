@@ -139,6 +139,17 @@ L2 沿用既有 Redis Cache 体系（见 [02-Cache层总览](./02-Cache层总览
 
 两层 key **不共享**、**不联动**；一致性靠信令 + TTL。
 
+### 3.3 collection `grpcbridge` 与 ACL 边界
+
+| 包 | 职责 | 说明 |
+|----|------|------|
+| `port/grpcbridge` | import 隔离 | 默认仍是 `grpcclient.*` 类型别名；**不等于** application DTO ACL |
+| `port/grpcbridge/*_catalog_reader` | catalog ACL | questionnaire / scale / personality 读穿透返回 application DTO |
+| `port/grpcbridge/evaluation_bff_reader` | evaluation ACL | BFF 读路径返回 `application/evaluation` DTO |
+| `port/acl` | 跨域 ACL | answersheet 读、testee actor 等（避免与写路径 import 循环） |
+
+application 层应依赖上述端口或 application-owned `CatalogReader` / `BFFReader`，避免直接 import `infra/grpcclient`。
+
 ---
 
 ## 4. 信令：发布后的失效与预热

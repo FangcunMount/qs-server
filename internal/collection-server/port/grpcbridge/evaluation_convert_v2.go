@@ -1,25 +1,25 @@
-package evaluation
+package grpcbridge
 
 import (
 	"strconv"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 )
 
-func AssessmentDetailV2FromOutput(detail *grpcbridge.AssessmentDetailV2Output) *AssessmentDetailV2Response {
+func toAssessmentDetailV2Response(detail *AssessmentDetailV2Output) *evaluation.AssessmentDetailV2Response {
 	if detail == nil {
 		return nil
 	}
-	return &AssessmentDetailV2Response{
+	return &evaluation.AssessmentDetailV2Response{
 		ID:                   strconv.FormatUint(detail.ID, 10),
 		OrgID:                strconv.FormatUint(detail.OrgID, 10),
 		TesteeID:             strconv.FormatUint(detail.TesteeID, 10),
 		QuestionnaireCode:    detail.QuestionnaireCode,
 		QuestionnaireVersion: detail.QuestionnaireVersion,
 		AnswerSheetID:        strconv.FormatUint(detail.AnswerSheetID, 10),
-		Model:                modelIdentityFromOutput(detail.Model),
-		PrimaryScore:         scoreValueFromOutput(detail.PrimaryScore),
-		Level:                resultLevelFromOutput(detail.Level),
+		Model:                toModelIdentityResponse(detail.Model),
+		PrimaryScore:         toScoreValueResponse(detail.PrimaryScore),
+		Level:                toResultLevelResponse(detail.Level),
 		OriginType:           detail.OriginType,
 		OriginID:             detail.OriginID,
 		Status:               detail.Status,
@@ -30,15 +30,15 @@ func AssessmentDetailV2FromOutput(detail *grpcbridge.AssessmentDetailV2Output) *
 	}
 }
 
-func AssessmentSummaryV2FromOutput(summary grpcbridge.AssessmentSummaryV2Output) AssessmentSummaryV2Response {
-	return AssessmentSummaryV2Response{
+func toAssessmentSummaryV2Response(summary AssessmentSummaryV2Output) evaluation.AssessmentSummaryV2Response {
+	return evaluation.AssessmentSummaryV2Response{
 		ID:                   strconv.FormatUint(summary.ID, 10),
 		QuestionnaireCode:    summary.QuestionnaireCode,
 		QuestionnaireVersion: summary.QuestionnaireVersion,
 		AnswerSheetID:        strconv.FormatUint(summary.AnswerSheetID, 10),
-		Model:                modelIdentityFromOutput(summary.Model),
-		PrimaryScore:         scoreValueFromOutput(summary.PrimaryScore),
-		Level:                resultLevelFromOutput(summary.Level),
+		Model:                toModelIdentityResponse(summary.Model),
+		PrimaryScore:         toScoreValueResponse(summary.PrimaryScore),
+		Level:                toResultLevelResponse(summary.Level),
 		OriginType:           summary.OriginType,
 		Status:               summary.Status,
 		SubmittedAt:          summary.SubmittedAt,
@@ -46,15 +46,15 @@ func AssessmentSummaryV2FromOutput(summary grpcbridge.AssessmentSummaryV2Output)
 	}
 }
 
-func ListAssessmentsV2FromOutput(resp *grpcbridge.ListAssessmentsV2Output) *ListAssessmentsV2Response {
+func toListAssessmentsV2Response(resp *ListAssessmentsV2Output) *evaluation.ListAssessmentsV2Response {
 	if resp == nil {
 		return nil
 	}
-	items := make([]AssessmentSummaryV2Response, 0, len(resp.Items))
+	items := make([]evaluation.AssessmentSummaryV2Response, 0, len(resp.Items))
 	for _, item := range resp.Items {
-		items = append(items, AssessmentSummaryV2FromOutput(item))
+		items = append(items, toAssessmentSummaryV2Response(item))
 	}
-	return &ListAssessmentsV2Response{
+	return &evaluation.ListAssessmentsV2Response{
 		Items:      items,
 		Total:      resp.Total,
 		Page:       resp.Page,
@@ -63,13 +63,13 @@ func ListAssessmentsV2FromOutput(resp *grpcbridge.ListAssessmentsV2Output) *List
 	}
 }
 
-func AssessmentReportV2FromOutput(report *grpcbridge.AssessmentReportV2Output) *AssessmentReportV2Response {
+func toAssessmentReportV2Response(report *AssessmentReportV2Output) *evaluation.AssessmentReportV2Response {
 	if report == nil {
 		return nil
 	}
-	dimensions := make([]DimensionInterpretResponse, 0, len(report.Dimensions))
+	dimensions := make([]evaluation.DimensionInterpretResponse, 0, len(report.Dimensions))
 	for _, dim := range report.Dimensions {
-		dimensions = append(dimensions, DimensionInterpretResponse{
+		dimensions = append(dimensions, evaluation.DimensionInterpretResponse{
 			FactorCode:  dim.FactorCode,
 			FactorName:  dim.FactorName,
 			RawScore:    dim.RawScore,
@@ -79,29 +79,29 @@ func AssessmentReportV2FromOutput(report *grpcbridge.AssessmentReportV2Output) *
 			Suggestion:  dim.Suggestion,
 		})
 	}
-	suggestions := make([]SuggestionResponse, 0, len(report.Suggestions))
+	suggestions := make([]evaluation.SuggestionResponse, 0, len(report.Suggestions))
 	for _, item := range report.Suggestions {
-		suggestions = append(suggestions, SuggestionResponse{
+		suggestions = append(suggestions, evaluation.SuggestionResponse{
 			Category:   item.Category,
 			Content:    item.Content,
 			FactorCode: item.FactorCode,
 		})
 	}
-	return &AssessmentReportV2Response{
+	return &evaluation.AssessmentReportV2Response{
 		AssessmentID: strconv.FormatUint(report.AssessmentID, 10),
-		Model:        modelIdentityFromOutput(report.Model),
-		PrimaryScore: scoreValueFromOutput(report.PrimaryScore),
-		Level:        resultLevelFromOutput(report.Level),
+		Model:        toModelIdentityResponse(report.Model),
+		PrimaryScore: toScoreValueResponse(report.PrimaryScore),
+		Level:        toResultLevelResponse(report.Level),
 		Conclusion:   report.Conclusion,
 		Dimensions:   dimensions,
 		Suggestions:  suggestions,
-		ModelExtra:   modelExtraFromOutput(report.ModelExtra),
+		ModelExtra:   toModelExtraResponse(report.ModelExtra),
 		CreatedAt:    report.CreatedAt,
 	}
 }
 
-func modelIdentityFromOutput(model grpcbridge.ModelIdentityOutput) ModelIdentityResponse {
-	return ModelIdentityResponse{
+func toModelIdentityResponse(model ModelIdentityOutput) evaluation.ModelIdentityResponse {
+	return evaluation.ModelIdentityResponse{
 		Kind:      model.Kind,
 		SubKind:   model.SubKind,
 		Algorithm: model.Algorithm,
@@ -111,11 +111,11 @@ func modelIdentityFromOutput(model grpcbridge.ModelIdentityOutput) ModelIdentity
 	}
 }
 
-func scoreValueFromOutput(score *grpcbridge.ScoreValueOutput) *ScoreValueResponse {
+func toScoreValueResponse(score *ScoreValueOutput) *evaluation.ScoreValueResponse {
 	if score == nil {
 		return nil
 	}
-	return &ScoreValueResponse{
+	return &evaluation.ScoreValueResponse{
 		Kind:  score.Kind,
 		Value: score.Value,
 		Label: score.Label,
@@ -123,22 +123,22 @@ func scoreValueFromOutput(score *grpcbridge.ScoreValueOutput) *ScoreValueRespons
 	}
 }
 
-func resultLevelFromOutput(level *grpcbridge.ResultLevelOutput) *ResultLevelResponse {
+func toResultLevelResponse(level *ResultLevelOutput) *evaluation.ResultLevelResponse {
 	if level == nil {
 		return nil
 	}
-	return &ResultLevelResponse{
+	return &evaluation.ResultLevelResponse{
 		Code:     level.Code,
 		Label:    level.Label,
 		Severity: level.Severity,
 	}
 }
 
-func modelExtraFromOutput(extra *grpcbridge.ModelExtraOutput) *ModelExtraResponse {
+func toModelExtraResponse(extra *ModelExtraOutput) *evaluation.ModelExtraResponse {
 	if extra == nil {
 		return nil
 	}
-	resp := &ModelExtraResponse{
+	resp := &evaluation.ModelExtraResponse{
 		Kind:           extra.Kind,
 		TypeCode:       extra.TypeCode,
 		TypeName:       extra.TypeName,
@@ -150,7 +150,7 @@ func modelExtraFromOutput(extra *grpcbridge.ModelExtraOutput) *ModelExtraRespons
 		Commentary:     extra.Commentary,
 	}
 	if extra.Rarity != nil {
-		resp.Rarity = &ModelRarityResponse{
+		resp.Rarity = &evaluation.ModelRarityResponse{
 			Percent: extra.Rarity.Percent,
 			Label:   extra.Rarity.Label,
 			OneInX:  extra.Rarity.OneInX,

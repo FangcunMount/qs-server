@@ -150,10 +150,9 @@ func NewCoordinator(cfg Config, deps Dependencies) Coordinator {
 	c := &coordinator{
 		cfg:      cfg,
 		deps:     deps,
-		registry: NewWarmupRegistry(),
+		registry: ExecutorRegistryBuilder{}.Build(deps),
 		runs:     make(map[string]WarmupRunSnapshot),
 	}
-	c.registerExecutors()
 	return c
 }
 
@@ -213,73 +212,15 @@ func (c *coordinator) HandleManualWarmup(ctx context.Context, req ManualWarmupRe
 	return c.executeTargets(ctx, manualWarmupTrigger, targets)
 }
 
-func (c *coordinator) registerExecutors() {
-	c.registry.Register(cachetarget.WarmupKindStaticScale, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if c.deps.WarmScale == nil {
-			return nil
-		}
-		code, ok := cachetarget.ParseStaticScaleScope(target.Scope)
-		if !ok {
-			return fmt.Errorf("invalid static scale warmup scope: %s", target.Scope)
-		}
-		return c.deps.WarmScale(ctx, code)
-	})
-	c.registry.Register(cachetarget.WarmupKindStaticQuestionnaire, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if c.deps.WarmQuestionnaire == nil {
-			return nil
-		}
-		code, ok := cachetarget.ParseStaticQuestionnaireScope(target.Scope)
-		if !ok {
-			return fmt.Errorf("invalid static questionnaire warmup scope: %s", target.Scope)
-		}
-		return c.deps.WarmQuestionnaire(ctx, code)
-	})
-	c.registry.Register(cachetarget.WarmupKindStaticScaleList, func(ctx context.Context, _ cachetarget.WarmupTarget) error {
-		if c.deps.WarmScaleList == nil {
-			return nil
-		}
-		return c.deps.WarmScaleList(ctx)
-	})
-	c.registry.Register(cachetarget.WarmupKindQueryStatsOverview, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if c.deps.WarmStatsOverview == nil {
-			return nil
-		}
-		orgID, preset, ok := cachetarget.ParseQueryStatsOverviewScope(target.Scope)
-		if !ok {
-			return fmt.Errorf("invalid stats overview warmup scope: %s", target.Scope)
-		}
-		return c.deps.WarmStatsOverview(ctx, orgID, preset)
-	})
-	c.registry.Register(cachetarget.WarmupKindQueryStatsSystem, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if c.deps.WarmStatsSystem == nil {
-			return nil
-		}
-		orgID, ok := cachetarget.ParseQueryStatsSystemScope(target.Scope)
-		if !ok {
-			return fmt.Errorf("invalid stats system warmup scope: %s", target.Scope)
-		}
-		return c.deps.WarmStatsSystem(ctx, orgID)
-	})
-	c.registry.Register(cachetarget.WarmupKindQueryStatsQuestionnaire, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if c.deps.WarmStatsQuestionnaire == nil {
-			return nil
-		}
-		orgID, code, ok := cachetarget.ParseQueryStatsQuestionnaireScope(target.Scope)
-		if !ok {
-			return fmt.Errorf("invalid stats questionnaire warmup scope: %s", target.Scope)
-		}
-		return c.deps.WarmStatsQuestionnaire(ctx, orgID, code)
-	})
-	c.registry.Register(cachetarget.WarmupKindQueryStatsPlan, func(ctx context.Context, target cachetarget.WarmupTarget) error {
-		if c.deps.WarmStatsPlan == nil {
-			return nil
-		}
-		orgID, planID, ok := cachetarget.ParseQueryStatsPlanScope(target.Scope)
-		if !ok {
-			return fmt.Errorf("invalid stats plan warmup scope: %s", target.Scope)
-		}
-		return c.deps.WarmStatsPlan(ctx, orgID, planID)
-	})
+func (c *coordinator) planner() *TargetPlanner {
+	return NewTargetPlanner(c.cfg, c.deps)
+}
+
+func (c *coordinator) mergeQueryTargets(ctx context.Context, orgFilter []int64, repair *RepairCompleteRequest) []cachetarget.WarmupTarget {
+	if c == nil {
+		return nil
+	}
+	return c.planner().MergeQueryTargets(ctx, orgFilter, repair)
 }
 
 func (c *coordinator) executeTargets(ctx context.Context, trigger string, targets []cachetarget.WarmupTarget) (*ManualWarmupResult, error) {

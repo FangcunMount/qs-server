@@ -5,29 +5,27 @@ import (
 	"sync/atomic"
 	"testing"
 	"time"
-
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 )
 
 type stubPersonalityModelClient struct {
 	getCalls int32
-	getFn    func(ctx context.Context, code string) (*grpcclient.PersonalityModelOutput, error)
+	getFn    func(ctx context.Context, code string) (*PersonalityModelResponse, error)
 }
 
-func (s *stubPersonalityModelClient) GetPersonalityModel(ctx context.Context, code string) (*grpcclient.PersonalityModelOutput, error) {
+func (s *stubPersonalityModelClient) GetPersonalityModel(ctx context.Context, code string) (*PersonalityModelResponse, error) {
 	atomic.AddInt32(&s.getCalls, 1)
 	if s.getFn != nil {
 		return s.getFn(ctx, code)
 	}
-	return &grpcclient.PersonalityModelOutput{Summary: grpcclient.PersonalityModelSummaryOutput{Code: code, Title: "sample"}}, nil
+	return &PersonalityModelResponse{Code: code, Title: "sample"}, nil
 }
 
-func (s *stubPersonalityModelClient) ListPersonalityModels(context.Context, int32, int32, string) (*grpcclient.ListPersonalityModelsOutput, error) {
-	return &grpcclient.ListPersonalityModelsOutput{}, nil
+func (s *stubPersonalityModelClient) ListPersonalityModels(context.Context, int32, int32, string) (*ListPersonalityModelsResponse, error) {
+	return &ListPersonalityModelsResponse{}, nil
 }
 
-func (s *stubPersonalityModelClient) GetPersonalityModelCategories(context.Context) (*grpcclient.PersonalityModelCategoriesOutput, error) {
-	return &grpcclient.PersonalityModelCategoriesOutput{}, nil
+func (s *stubPersonalityModelClient) GetPersonalityModelCategories(context.Context) (*PersonalityModelCategoriesResponse, error) {
+	return &PersonalityModelCategoriesResponse{}, nil
 }
 
 func TestQueryServiceGetUsesCacheOnSecondCall(t *testing.T) {

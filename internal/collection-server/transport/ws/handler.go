@@ -201,9 +201,9 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 				h.connMgr.Release(activeTestee)
 				activeTestee = ""
 				code := "forbidden"
-				if errors.Is(err, reportevents.ErrInvalidKind) {
+				if errors.Is(err, appreportstatus.ErrInvalidKind) {
 					code = "invalid_kind"
-				} else if errors.Is(err, reportevents.ErrAssessmentAccess) {
+				} else if errors.Is(err, appreportstatus.ErrAssessmentAccess) {
 					code = "forbidden"
 				}
 				incSubscribeDenied(code)

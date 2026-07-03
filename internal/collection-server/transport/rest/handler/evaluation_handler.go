@@ -10,6 +10,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	answersheetapp "github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
@@ -268,7 +269,7 @@ func (h *EvaluationHandler) GetReportStatus(c *gin.Context) {
 		h.InternalErrorResponse(c, "get report status failed", err)
 		return
 	}
-	h.Success(c, reportwait.ToPublicAssessmentStatus(statusResponse))
+	h.Success(c, reportstatus.ToPublicAssessmentStatus(statusResponse))
 }
 
 // WaitReport 长轮询等待报告生成
@@ -316,7 +317,7 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 		"timeout_ms", timeout.Milliseconds(),
 		"elapsed_ms", time.Since(start).Milliseconds(),
 	)
-	publicStatus := reportwait.ToPublicAssessmentStatus(statusResponse)
+	publicStatus := reportstatus.ToPublicAssessmentStatus(statusResponse)
 	applyReportPollRetryAfter(c, publicStatus)
 	h.Success(c, publicStatus)
 }
