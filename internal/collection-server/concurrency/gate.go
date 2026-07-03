@@ -20,6 +20,14 @@ func NewGate(max int) *Gate {
 	return &Gate{sem: admission.NewChannelSemaphore(max)}
 }
 
+// Semaphore 暴露底层准入槽位，供 gRPC 等路径复用。
+func (g *Gate) Semaphore() admission.Semaphore {
+	if g == nil {
+		return nil
+	}
+	return g.sem
+}
+
 func (g *Gate) TryAcquire() bool {
 	if g == nil || g.sem == nil {
 		return true
@@ -44,33 +52,15 @@ func (g *Gate) AcquireWithWait(ctx context.Context, maxWait time.Duration) (acqu
 
 // WaitMiddleware 在 maxWait 内等待槽位，超时执行 onReject 并中断请求链。
 func (g *Gate) WaitMiddleware(maxWait time.Duration, onReject gin.HandlerFunc) gin.HandlerFunc {
-	if g == nil {
-		return func(c *gin.Context) { c.Next() }
-	}
-	strategy := admission.WithWaitObserver(
-		admission.WaitStrategy{Sem: g.sem, MaxWait: maxWait},
-		admission.ObserveHTTPGateWait,
-	)
-	return admission.NewHTTPMiddleware(strategy, onReject)
+	return admission.HTTPWaitMiddleware(g.Semaphore(), maxWait, onReject, admission.ObserveHTTPGateWait)
 }
 
 // BlockingMiddleware 阻塞等待槽位（用于 general HTTP 池）。
 func (g *Gate) BlockingMiddleware() gin.HandlerFunc {
-	if g == nil {
-		return func(c *gin.Context) { c.Next() }
-	}
-	strategy := admission.WithWaitObserver(
-		admission.BlockingStrategy{Sem: g.sem},
-		admission.ObserveHTTPGateWait,
-	)
-	return admission.NewHTTPMiddleware(strategy, nil)
+	return admission.HTTPBlockingMiddleware(g.Semaphore(), admission.ObserveHTTPGateWait)
 }
 
 // TryMiddleware 槽位满时执行 onReject 并中断请求链（用于 wait-report 过载降级）。
 func (g *Gate) TryMiddleware(onReject gin.HandlerFunc) gin.HandlerFunc {
-	if g == nil {
-		return func(c *gin.Context) { c.Next() }
-	}
-	strategy := admission.TryStrategy{Sem: g.sem}
-	return admission.NewHTTPMiddleware(strategy, onReject)
+	return admission.HTTPTryMiddleware(g.Semaphore(), onReject)
 }
