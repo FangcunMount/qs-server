@@ -134,14 +134,6 @@ func waitGateHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ..
 	return append([]gin.HandlerFunc{mw}, handlers...)
 }
 
-func waitQueryConcurrencyHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return waitGateHandlers(gate, maxWait, handlers...)
-}
-
-func waitSubmitConcurrencyHandlers(gate *concurrency.Gate, maxWait time.Duration, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return waitGateHandlers(gate, maxWait, handlers...)
-}
-
 func (r *Router) reportStatusHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
 	return r.admissionPolicy().Wrap(admissionReportStatus, handlers...)
 }

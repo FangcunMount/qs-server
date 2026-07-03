@@ -70,15 +70,15 @@ func (o *CatalogL1CacheOptions) addFlags(fs *pflag.FlagSet, prefix, label string
 }
 
 func (q *QuestionnaireCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	q.CatalogL1CacheOptions.addFlags(fs, "questionnaire_cache", "published questionnaire detail")
+	q.addFlags(fs, "questionnaire_cache", "published questionnaire detail")
 }
 
 func (s *ScaleCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	s.CatalogL1CacheOptions.addFlags(fs, "scale_cache", "scale catalog reads")
+	s.addFlags(fs, "scale_cache", "scale catalog reads")
 }
 
 func (p *PersonalityCacheOptions) AddFlags(fs *pflag.FlagSet) {
-	p.CatalogL1CacheOptions.addFlags(fs, "personality_cache", "personality model catalog reads")
+	p.addFlags(fs, "personality_cache", "personality model catalog reads")
 }
 
 func validateCatalogL1CacheOptions(opts *CatalogL1CacheOptions, name string) []error {
