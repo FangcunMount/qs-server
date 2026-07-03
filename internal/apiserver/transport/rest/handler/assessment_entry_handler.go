@@ -40,7 +40,6 @@ func NewAssessmentEntryHandler(
 	}
 }
 
-
 // CreateClinicianAssessmentEntry 为从业者创建测评入口。
 // @Summary 为从业者创建测评入口
 // @Tags AssessmentEntry
@@ -91,7 +90,6 @@ func (h *AssessmentEntryHandler) CreateClinicianAssessmentEntry(c *gin.Context) 
 	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
 }
 
-
 // ListClinicianAssessmentEntries 查询从业者测评入口列表。
 // @Summary 查询从业者测评入口列表
 // @Tags AssessmentEntry
@@ -130,7 +128,6 @@ func (h *AssessmentEntryHandler) ListClinicianAssessmentEntries(c *gin.Context) 
 	}
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
-
 
 // CreateMyAssessmentEntry 创建当前从业者测评入口。
 // @Summary 创建当前从业者测评入口
@@ -172,7 +169,6 @@ func (h *AssessmentEntryHandler) CreateMyAssessmentEntry(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
 }
 
-
 // ListMyAssessmentEntries 查询当前从业者测评入口列表。
 // @Summary 查询当前从业者测评入口列表
 // @Tags AssessmentEntry
@@ -202,7 +198,6 @@ func (h *AssessmentEntryHandler) ListMyAssessmentEntries(c *gin.Context) {
 
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
-
 
 // GetMyAssessmentEntry 获取当前从业者测评入口详情。
 // @Summary 获取当前从业者测评入口详情
@@ -239,7 +234,6 @@ func (h *AssessmentEntryHandler) GetMyAssessmentEntry(c *gin.Context) {
 	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
 }
 
-
 // GetAssessmentEntry 获取测评入口详情。
 // @Summary 获取测评入口详情
 // @Tags AssessmentEntry
@@ -271,7 +265,6 @@ func (h *AssessmentEntryHandler) GetAssessmentEntry(c *gin.Context) {
 	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
 }
 
-
 // DeactivateAssessmentEntry 停用测评入口。
 // @Summary 停用测评入口
 // @Tags AssessmentEntry
@@ -284,7 +277,6 @@ func (h *AssessmentEntryHandler) DeactivateAssessmentEntry(c *gin.Context) {
 	h.setAssessmentEntryActive(c, false)
 }
 
-
 // ReactivateAssessmentEntry 重新启用测评入口。
 // @Summary 重新启用测评入口
 // @Tags AssessmentEntry
@@ -296,7 +288,6 @@ func (h *AssessmentEntryHandler) DeactivateAssessmentEntry(c *gin.Context) {
 func (h *AssessmentEntryHandler) ReactivateAssessmentEntry(c *gin.Context) {
 	h.setAssessmentEntryActive(c, true)
 }
-
 
 // DeactivateMyAssessmentEntry 停用当前从业者测评入口。
 // @Summary 停用当前从业者测评入口
@@ -311,7 +302,6 @@ func (h *AssessmentEntryHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
 	h.setMyAssessmentEntryActive(c, false)
 }
 
-
 // ReactivateMyAssessmentEntry 重新启用当前从业者测评入口。
 // @Summary 重新启用当前从业者测评入口
 // @Tags AssessmentEntry
@@ -324,7 +314,6 @@ func (h *AssessmentEntryHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
 func (h *AssessmentEntryHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
 	h.setMyAssessmentEntryActive(c, true)
 }
-
 
 // ResolveAssessmentEntry 解析公开测评入口。
 // @Summary 解析公开测评入口
@@ -342,7 +331,6 @@ func (h *AssessmentEntryHandler) ResolveAssessmentEntry(c *gin.Context) {
 
 	h.Success(c, toAssessmentEntryResolvedResponse(result))
 }
-
 
 // IntakeAssessmentEntry 公开测评入口 intake。
 // @Summary 公开测评入口 intake

@@ -320,7 +320,6 @@ func (h *OperatorClinicianHandler) ListStaff(c *gin.Context) {
 	h.Success(c, toStaffListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
 }
 
-
 // CreateClinician 创建从业者。
 // @Summary 创建从业者
 // @Tags Clinician
@@ -360,7 +359,6 @@ func (h *OperatorClinicianHandler) CreateClinician(c *gin.Context) {
 
 	h.SuccessResponseWithMessage(c, "从业者创建成功", toClinicianResponse(result))
 }
-
 
 // UpdateClinician 更新从业者。
 // @Summary 更新从业者
@@ -411,7 +409,6 @@ func (h *OperatorClinicianHandler) UpdateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者更新成功", toClinicianResponse(result))
 }
 
-
 // ActivateClinician 激活从业者。
 // @Summary 激活从业者
 // @Tags Clinician
@@ -430,7 +427,6 @@ func (h *OperatorClinicianHandler) ActivateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者已激活", toClinicianResponse(result))
 }
 
-
 // DeactivateClinician 停用从业者。
 // @Summary 停用从业者
 // @Tags Clinician
@@ -448,7 +444,6 @@ func (h *OperatorClinicianHandler) DeactivateClinician(c *gin.Context) {
 	}
 	h.SuccessResponseWithMessage(c, "从业者已停用", toClinicianResponse(result))
 }
-
 
 // BindClinicianOperator 绑定操作员。
 // @Summary 绑定操作员
@@ -503,7 +498,6 @@ func (h *OperatorClinicianHandler) BindClinicianOperator(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者绑定员工成功", toClinicianResponse(result))
 }
 
-
 // UnbindClinicianOperator 解绑操作员。
 // @Summary 解绑操作员
 // @Tags Clinician
@@ -536,7 +530,6 @@ func (h *OperatorClinicianHandler) UnbindClinicianOperator(c *gin.Context) {
 	}
 	h.SuccessResponseWithMessage(c, "从业者解绑员工成功", toClinicianResponse(result))
 }
-
 
 // GetClinician 获取从业者详情。
 // @Summary 获取从业者详情
@@ -572,7 +565,6 @@ func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 
 	h.Success(c, toClinicianResponse(result))
 }
-
 
 // ListClinicians 查询从业者列表。
 // @Summary 查询从业者列表
@@ -629,7 +621,6 @@ func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 	h.Success(c, toClinicianListResponse(result, req.Page, req.PageSize))
 }
 
-
 // ListClinicianTestees 查询从业者受试者列表。
 // @Summary 查询从业者受试者列表
 // @Tags Clinician
@@ -684,7 +675,6 @@ func (h *OperatorClinicianHandler) ListClinicianTestees(c *gin.Context) {
 	})
 }
 
-
 // ListClinicianRelations 查询从业者关系列表。
 // @Summary 查询从业者关系列表
 // @Tags Clinician
@@ -713,7 +703,6 @@ func (h *OperatorClinicianHandler) ListClinicianRelations(c *gin.Context) {
 	h.listClinicianRelationsFor(c, orgID, clinicianID)
 }
 
-
 // GetMyClinician 获取当前从业者信息。
 // @Summary 获取当前从业者信息
 // @Tags Clinician
@@ -735,7 +724,6 @@ func (h *OperatorClinicianHandler) GetMyClinician(c *gin.Context) {
 
 	h.Success(c, toClinicianResponse(clinicianItem))
 }
-
 
 // ListMyClinicianTestees 查询当前从业者受试者列表。
 // @Summary 查询当前从业者受试者列表
@@ -779,7 +767,6 @@ func (h *OperatorClinicianHandler) ListMyClinicianTestees(c *gin.Context) {
 	h.Success(c, toTesteeListResponse(result.Items, result.TotalCount, page, pageSize))
 }
 
-
 // ListMyClinicianRelations 查询当前从业者关系列表。
 // @Summary 查询当前从业者关系列表
 // @Tags Clinician
@@ -797,7 +784,6 @@ func (h *OperatorClinicianHandler) ListMyClinicianRelations(c *gin.Context) {
 
 	h.listClinicianRelationsFor(c, clinicianItem.OrgID, clinicianItem.ID)
 }
-
 
 // AssignClinicianTestee 分配受试者。
 // @Summary 分配受试者
@@ -835,7 +821,6 @@ func (h *OperatorClinicianHandler) AssignClinicianTestee(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "分配受试者成功", toRelationResponseFromClinicianResult(result))
 }
 
-
 // AssignPrimaryClinicianTestee 设置主责从业者。
 // @Summary 设置主责从业者
 // @Tags ClinicianRelation
@@ -848,7 +833,6 @@ func (h *OperatorClinicianHandler) AssignClinicianTestee(c *gin.Context) {
 func (h *OperatorClinicianHandler) AssignPrimaryClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypePrimary), "设置主责从业者成功")
 }
-
 
 // AssignAttendingClinicianTestee 设置跟进从业者。
 // @Summary 设置跟进从业者
@@ -863,7 +847,6 @@ func (h *OperatorClinicianHandler) AssignAttendingClinicianTestee(c *gin.Context
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeAttending), "设置跟进从业者成功")
 }
 
-
 // AssignCollaboratorClinicianTestee 设置协作从业者。
 // @Summary 设置协作从业者
 // @Tags ClinicianRelation
@@ -876,7 +859,6 @@ func (h *OperatorClinicianHandler) AssignAttendingClinicianTestee(c *gin.Context
 func (h *OperatorClinicianHandler) AssignCollaboratorClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeCollaborator), "设置协作从业者成功")
 }
-
 
 // TransferPrimaryClinicianTestee 转移主责从业者。
 // @Summary 转移主责从业者
@@ -913,7 +895,6 @@ func (h *OperatorClinicianHandler) TransferPrimaryClinicianTestee(c *gin.Context
 	h.SuccessResponseWithMessage(c, "转移主责从业者成功", toRelationResponseFromClinicianResult(result))
 }
 
-
 // UnbindClinicianTesteeRelation 解绑从业者受试者关系。
 // @Summary 解绑从业者受试者关系
 // @Tags ClinicianRelation
@@ -945,7 +926,6 @@ func (h *OperatorClinicianHandler) UnbindClinicianTesteeRelation(c *gin.Context)
 	h.SuccessResponseWithMessage(c, "解绑成功", toRelationResponseFromClinicianResult(result))
 }
 
-
 // GetTesteeClinicians 获取受试者关联从业者。
 // @Summary 获取受试者关联从业者
 // @Tags 受试者
@@ -970,7 +950,6 @@ func (h *OperatorClinicianHandler) GetTesteeClinicians(c *gin.Context) {
 	}
 	h.Success(c, &response.ClinicianListResponse{Items: items})
 }
-
 
 // ListTesteeClinicianRelations 获取受试者从业者关系。
 // @Summary 获取受试者从业者关系
