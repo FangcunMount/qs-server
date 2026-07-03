@@ -269,8 +269,8 @@ collection REST -> collection SubmitQueue -> apiserver gRPC SaveAnswerSheet
 
 | 类型 | 位置 | 说明 |
 | ---- | ---- | ---- |
-| gRPC proto | `internal/apiserver/interface/grpc/proto/` | 对外和 internal gRPC 契约 |
-| InternalService proto | `internal/apiserver/interface/grpc/proto/internalapi/internal.proto` | worker 调 apiserver 的内部动作契约 |
+| gRPC proto | `api/grpc/gen/` | 对外和 internal gRPC 契约 |
+| InternalService proto | `api/grpc/gen/internalapi/internal.proto` | worker 调 apiserver 的内部动作契约 |
 | apiserver gRPC server 配置 | `configs/apiserver.*.yaml` 的 `grpc` 段 | bind、TLS/mTLS、auth、ACL、audit、reflection、health check |
 | collection gRPC client 配置 | `configs/collection-server.*.yaml` 的 `grpc_client` 段 | endpoint、TLS/mTLS、server name、max inflight |
 | worker gRPC client 配置 | `configs/worker.*.yaml` 的 `grpc` 段 | apiserver address、TLS/insecure 等 |
@@ -356,7 +356,7 @@ collection REST -> collection SubmitQueue -> apiserver gRPC SaveAnswerSheet
 | worker gRPC integration | `internal/worker/process/integration_bootstrap.go` |
 | worker gRPC registry | `internal/worker/integration/grpcclient/registry.go` |
 | worker messaging runtime | `internal/worker/integration/messaging/runtime.go` |
-| internal gRPC proto | `internal/apiserver/interface/grpc/proto/internalapi/internal.proto` |
+| internal gRPC proto | `api/grpc/gen/internalapi/internal.proto` |
 | event catalog | `configs/events.yaml` |
 
 ---

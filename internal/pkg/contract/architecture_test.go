@@ -47,6 +47,34 @@ func TestCrossServiceConsumersImportSharedGRPCContract(t *testing.T) {
 	}
 }
 
+func TestAPIServerTransportDoesNotContainStaleV2SourceFiles(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "transport", "rest"),
+		filepath.Join(root, "internal", "apiserver", "transport", "grpc", "service"),
+	}
+	for _, scanRoot := range scanRoots {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			if strings.Contains(filepath.Base(path), "_v2.go") {
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				t.Fatalf("%s is a stale v2 transport source file; use outcome naming instead", rel)
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
 func TestWorkerOutcomeHandlersUseSharedEventOutcomeContract(t *testing.T) {
 	t.Parallel()
 

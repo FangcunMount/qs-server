@@ -7,7 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-func TestAssessmentRowToV2ResultUsesV2Columns(t *testing.T) {
+func TestAssessmentRowToOutcomeResultUsesOutcomeColumns(t *testing.T) {
 	kind := "scale"
 	algorithm := "scale_default"
 	scoreKind := "raw_total"
@@ -34,9 +34,9 @@ func TestAssessmentRowToV2ResultUsesV2Columns(t *testing.T) {
 		Status:                   "interpreted",
 	}
 
-	result, err := assessmentRowToV2Result(row)
+	result, err := assessmentRowToOutcomeResult(row)
 	if err != nil {
-		t.Fatalf("assessmentRowToV2Result returned error: %v", err)
+		t.Fatalf("assessmentRowToOutcomeResult returned error: %v", err)
 	}
 	if result.Model.Kind != "scale" || result.Model.Algorithm != "scale_default" || result.Model.Code != "SDS" {
 		t.Fatalf("unexpected model identity: %#v", result.Model)
@@ -49,7 +49,7 @@ func TestAssessmentRowToV2ResultUsesV2Columns(t *testing.T) {
 	}
 }
 
-func TestReportRowToV2ResultPrefersExplicitModelProjection(t *testing.T) {
+func TestReportRowToOutcomeResultPrefersExplicitModelProjection(t *testing.T) {
 	row := evaluationreadmodel.ReportRow{
 		AssessmentID: 202,
 		Model: evaluationreadmodel.ModelIdentityRow{
@@ -73,7 +73,7 @@ func TestReportRowToV2ResultPrefersExplicitModelProjection(t *testing.T) {
 		CreatedAt:  time.Date(2026, 1, 2, 3, 4, 5, 0, time.UTC),
 	}
 
-	result := reportRowToV2Result(row)
+	result := reportRowToOutcomeResult(row)
 	if result.Model.Kind != "personality" || result.Model.SubKind != "typology" {
 		t.Fatalf("unexpected model: %#v", result.Model)
 	}

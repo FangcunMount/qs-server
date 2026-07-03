@@ -315,20 +315,20 @@ func (s *protectedReportQueryStub) ListByTesteeID(_ context.Context, dto ListRep
 	return &ReportListResult{Items: []*ReportResult{}, Page: dto.Page, PageSize: dto.PageSize}, nil
 }
 
-func (s *protectedReportQueryStub) GetV2ByAssessmentID(_ context.Context, assessmentID uint64) (*ReportV2Result, error) {
+func (s *protectedReportQueryStub) GetOutcomeByAssessmentID(_ context.Context, assessmentID uint64) (*ReportOutcomeResult, error) {
 	s.lastGetAssessmentID = assessmentID
 	if s.getErr != nil {
 		return nil, s.getErr
 	}
-	return &ReportV2Result{AssessmentID: assessmentID}, nil
+	return &ReportOutcomeResult{AssessmentID: assessmentID}, nil
 }
 
-func (s *protectedReportQueryStub) ListV2ByTesteeID(_ context.Context, dto ListReportsDTO) (*ReportV2ListResult, error) {
+func (s *protectedReportQueryStub) ListOutcomeByTesteeID(_ context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
 	s.lastListDTO = dto
 	if s.listErr != nil {
 		return nil, s.listErr
 	}
-	return &ReportV2ListResult{Items: []*ReportV2Result{}, Page: dto.Page, PageSize: dto.PageSize}, nil
+	return &ReportOutcomeListResult{Items: []*ReportOutcomeResult{}, Page: dto.Page, PageSize: dto.PageSize}, nil
 }
 
 type protectedScoreQueryStub struct {

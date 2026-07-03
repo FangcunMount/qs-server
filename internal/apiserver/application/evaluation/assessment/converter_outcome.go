@@ -6,12 +6,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
-func assessmentRowToV2Result(row evaluationreadmodel.AssessmentRow) (*AssessmentV2Result, error) {
+func assessmentRowToOutcomeResult(row evaluationreadmodel.AssessmentRow) (*AssessmentOutcomeResult, error) {
 	base, err := assessmentRowToResult(row)
 	if err != nil || base == nil {
 		return nil, err
 	}
-	return &AssessmentV2Result{
+	return &AssessmentOutcomeResult{
 		ID:                   base.ID,
 		OrgID:                base.OrgID,
 		TesteeID:             base.TesteeID,
@@ -31,10 +31,10 @@ func assessmentRowToV2Result(row evaluationreadmodel.AssessmentRow) (*Assessment
 	}, nil
 }
 
-func assessmentRowsToV2Results(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentV2Result, error) {
-	results := make([]*AssessmentV2Result, 0, len(rows))
+func assessmentRowsToOutcomeResults(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
+	results := make([]*AssessmentOutcomeResult, 0, len(rows))
 	for _, row := range rows {
-		result, err := assessmentRowToV2Result(row)
+		result, err := assessmentRowToOutcomeResult(row)
 		if err != nil {
 			return nil, err
 		}
@@ -43,12 +43,12 @@ func assessmentRowsToV2Results(rows []evaluationreadmodel.AssessmentRow) ([]*Ass
 	return results, nil
 }
 
-func reportRowToV2Result(row evaluationreadmodel.ReportRow) *ReportV2Result {
+func reportRowToOutcomeResult(row evaluationreadmodel.ReportRow) *ReportOutcomeResult {
 	base := reportRowToResult(row)
 	if base == nil {
 		return nil
 	}
-	return &ReportV2Result{
+	return &ReportOutcomeResult{
 		AssessmentID: base.AssessmentID,
 		Model:        modelIdentityFromReportRow(row),
 		PrimaryScore: primaryScoreFromReportRow(row),
@@ -192,12 +192,22 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-// RowToV2Result exports read-model row conversion for transport layers.
-func RowToV2Result(row evaluationreadmodel.AssessmentRow) (*AssessmentV2Result, error) {
-	return assessmentRowToV2Result(row)
+// RowToOutcomeResult exports read-model row conversion for transport layers.
+func RowToOutcomeResult(row evaluationreadmodel.AssessmentRow) (*AssessmentOutcomeResult, error) {
+	return assessmentRowToOutcomeResult(row)
 }
 
-// RowsToV2Results exports batch read-model row conversion for transport layers.
-func RowsToV2Results(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentV2Result, error) {
-	return assessmentRowsToV2Results(rows)
+// RowsToOutcomeResults exports batch read-model row conversion for transport layers.
+func RowsToOutcomeResults(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
+	return assessmentRowsToOutcomeResults(rows)
+}
+
+// Deprecated: use RowToOutcomeResult.
+func RowToV2Result(row evaluationreadmodel.AssessmentRow) (*AssessmentOutcomeResult, error) {
+	return RowToOutcomeResult(row)
+}
+
+// Deprecated: use RowsToOutcomeResults.
+func RowsToV2Results(rows []evaluationreadmodel.AssessmentRow) ([]*AssessmentOutcomeResult, error) {
+	return RowsToOutcomeResults(rows)
 }

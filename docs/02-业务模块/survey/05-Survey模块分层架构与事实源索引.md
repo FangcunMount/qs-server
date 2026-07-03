@@ -373,7 +373,7 @@ qs-apiserver internal gRPC 面向内部调用。
 | collection-server REST 入口 | `internal/collection-server/transport/rest/handler/answersheet_handler.go` |
 | collection-server application | `internal/collection-server/application/answersheet` |
 | collection-server runtime | `internal/collection-server` |
-| internal gRPC proto | `internal/apiserver/interface/grpc/proto/internalapi/internal.proto` |
+| internal gRPC proto | `api/grpc/gen/internalapi/internal.proto` |
 | internal gRPC handler | `internal/apiserver/interface/grpc` |
 | collection-server 运行时文档 | `docs/01-运行时/02-collection-server运行时.md` |
 

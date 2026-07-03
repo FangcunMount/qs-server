@@ -186,7 +186,7 @@ flowchart TB
 | gRPC server runtime | [`internal/pkg/grpc`](../../internal/pkg/grpc/) |
 | event catalog | [`configs/events.yaml`](../../configs/events.yaml) |
 | REST 契约 | [`api/rest`](../../api/rest/) |
-| gRPC proto | [`internal/apiserver/interface/grpc/proto`](../../internal/apiserver/interface/grpc/proto/) |
+| gRPC proto | [`api/grpc/gen`](../../api/grpc/gen/) |
 | 配置文件 | [`configs`](../../configs/) |
 
 ---

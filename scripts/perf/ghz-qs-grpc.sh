@@ -34,7 +34,7 @@ assessment_id="${ASSESSMENT_ID:-1}"
 
 case "$case_name" in
   collection-submit)
-    proto="internal/apiserver/interface/grpc/proto/answersheet/answersheet.proto"
+    proto="api/grpc/proto/answersheet/answersheet.proto"
     call="answersheet.AnswerSheetService.SaveAnswerSheet"
     data='{
       "questionnaire_code": "'"$questionnaire_code"'",
@@ -48,12 +48,12 @@ case "$case_name" in
     }'
     ;;
   worker-score)
-    proto="internal/apiserver/interface/grpc/proto/internalapi/internal.proto"
+    proto="api/grpc/proto/internalapi/internal.proto"
     call="internalapi.InternalService.CalculateAnswerSheetScore"
     data='{"answersheet_id": '"$answersheet_id"'}'
     ;;
   worker-create-assessment)
-    proto="internal/apiserver/interface/grpc/proto/internalapi/internal.proto"
+    proto="api/grpc/proto/internalapi/internal.proto"
     call="internalapi.InternalService.CreateAssessmentFromAnswerSheet"
     data='{
       "answersheet_id": '"$answersheet_id"',
@@ -67,12 +67,12 @@ case "$case_name" in
     }'
     ;;
   worker-evaluate)
-    proto="internal/apiserver/interface/grpc/proto/internalapi/internal.proto"
+    proto="api/grpc/proto/internalapi/internal.proto"
     call="internalapi.InternalService.EvaluateAssessment"
     data='{"assessment_id": '"$assessment_id"'}'
     ;;
   worker-attention)
-    proto="internal/apiserver/interface/grpc/proto/internalapi/internal.proto"
+    proto="api/grpc/proto/internalapi/internal.proto"
     call="internalapi.InternalService.SyncAssessmentAttention"
     data='{
       "testee_id": '"$testee_id"',
@@ -115,7 +115,7 @@ fi
 echo "Running ghz case=$case_name target=$target rps=$rps duration=$duration concurrency=$concurrency"
 ghz \
   --proto "$proto" \
-  --import-paths "internal/apiserver/interface/grpc/proto" \
+  --import-paths "api/grpc/proto" \
   --call "$call" \
   --data "$data" \
   --metadata "$metadata" \

@@ -94,7 +94,7 @@ func mustBuildAssessmentSubmittedPayload(t *testing.T, assessmentID int64) []byt
 	return payload
 }
 
-func TestAssessmentInterpretedV2Helpers(t *testing.T) {
+func TestAssessmentInterpretedOutcomeHelpers(t *testing.T) {
 	level := &eventoutcome.ResultLevel{Code: "severe", Severity: "high"}
 	score := &eventoutcome.ScoreValue{Value: 18.5}
 	if got := assessmentLevelCode(level); got != "severe" {
@@ -111,15 +111,15 @@ func TestAssessmentInterpretedV2Helpers(t *testing.T) {
 	}
 }
 
-func TestHandleAssessmentInterpretedV2AcksHighSeverityPayload(t *testing.T) {
+func TestHandleAssessmentInterpretedOutcomeAcksHighSeverityPayload(t *testing.T) {
 	deps := newAnswerSheetHandlerTestDeps(&fakeWorkerInternalClient{}, nil)
 	handler := handleAssessmentInterpreted(deps)
-	if err := handler(context.Background(), "assessment.interpreted.v2", mustBuildAssessmentInterpretedV2Payload(t)); err != nil {
+	if err := handler(context.Background(), "assessment.interpreted.v2", mustBuildAssessmentInterpretedOutcomePayload(t)); err != nil {
 		t.Fatalf("handler: %v", err)
 	}
 }
 
-func mustBuildAssessmentInterpretedV2Payload(t *testing.T) []byte {
+func mustBuildAssessmentInterpretedOutcomePayload(t *testing.T) []byte {
 	t.Helper()
 
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)

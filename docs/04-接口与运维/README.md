@@ -83,7 +83,7 @@
 | apiserver REST | `internal/apiserver/transport/rest` |
 | collection REST | `internal/collection-server/transport/rest/router.go` |
 | REST 导出 | `api/rest/apiserver.yaml`、`api/rest/collection.yaml` |
-| gRPC proto | `internal/apiserver/interface/grpc/proto` |
+| gRPC proto | `api/grpc/gen` |
 | gRPC 注册 | `internal/apiserver/transport/grpc/registry.go` |
 | 配置 | `configs/*.yaml` |
 | 端口部署 | `build/docker/*.yml` |

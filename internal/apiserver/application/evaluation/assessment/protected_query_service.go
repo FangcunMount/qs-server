@@ -69,8 +69,8 @@ func (s *protectedQueryService) ListAssessments(ctx context.Context, scope Prote
 	return s.managementService.List(ctx, scopedDTO)
 }
 
-// GetAssessmentV2 获取 v2 测评投影。
-func (s *protectedQueryService) GetAssessmentV2(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentV2Result, error) {
+// GetAssessmentOutcome 获取 outcome 测评投影。
+func (s *protectedQueryService) GetAssessmentOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentOutcomeResult, error) {
 	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
 		return nil, err
 	}
@@ -81,11 +81,11 @@ func (s *protectedQueryService) GetAssessmentV2(ctx context.Context, scope Prote
 	if err != nil {
 		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
 	}
-	return assessmentRowToV2Result(*row)
+	return assessmentRowToOutcomeResult(*row)
 }
 
-// ListAssessmentsV2 查询 v2 测评列表。
-func (s *protectedQueryService) ListAssessmentsV2(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentV2ListResult, error) {
+// ListAssessmentsOutcome 查询 outcome 测评列表。
+func (s *protectedQueryService) ListAssessmentsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentOutcomeListResult, error) {
 	if s.assessmentReader == nil {
 		return nil, evalerrors.ModuleNotConfigured("assessment read model is not configured")
 	}
@@ -112,7 +112,7 @@ func (s *protectedQueryService) ListAssessmentsV2(ctx context.Context, scope Pro
 	if err != nil {
 		return nil, evalerrors.AssessmentNotFound(err, "无效的受试者ID")
 	}
-	items, total, err := assessmentAdminQuery{reader: s.assessmentReader}.ListV2(ctx, scopedDTO, orgID, page, pageSize, listFilter)
+	items, total, err := assessmentAdminQuery{reader: s.assessmentReader}.ListOutcome(ctx, scopedDTO, orgID, page, pageSize, listFilter)
 	if err != nil {
 		return nil, err
 	}
@@ -127,7 +127,7 @@ func (s *protectedQueryService) ListAssessmentsV2(ctx context.Context, scope Pro
 	if err != nil {
 		return nil, evalerrors.DatabaseMessage("测评总数超出安全范围")
 	}
-	return &AssessmentV2ListResult{
+	return &AssessmentOutcomeListResult{
 		Items:      items,
 		Total:      totalInt,
 		Page:       page,
@@ -188,8 +188,8 @@ func (s *protectedQueryService) GetReport(ctx context.Context, scope ProtectedQu
 	return s.reportQueryService.GetByAssessmentID(ctx, assessmentCtx.AssessmentID)
 }
 
-// GetReportV2 获取 v2 测评报告。
-func (s *protectedQueryService) GetReportV2(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportV2Result, error) {
+// GetReportOutcome 获取 outcome 测评报告。
+func (s *protectedQueryService) GetReportOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportOutcomeResult, error) {
 	if s.reportQueryService == nil {
 		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
 	}
@@ -197,7 +197,7 @@ func (s *protectedQueryService) GetReportV2(ctx context.Context, scope Protected
 	if err != nil {
 		return nil, err
 	}
-	return s.reportQueryService.GetV2ByAssessmentID(ctx, assessmentCtx.AssessmentID)
+	return s.reportQueryService.GetOutcomeByAssessmentID(ctx, assessmentCtx.AssessmentID)
 }
 
 // ListReports 查询测评报告列表
@@ -217,8 +217,8 @@ func (s *protectedQueryService) ListReports(ctx context.Context, scope Protected
 	return s.reportQueryService.ListByTesteeID(ctx, scopedDTO)
 }
 
-// ListReportsV2 查询 v2 测评报告列表。
-func (s *protectedQueryService) ListReportsV2(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportV2ListResult, error) {
+// ListReportsOutcome 查询 outcome 测评报告列表。
+func (s *protectedQueryService) ListReportsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
 	if s.reportQueryService == nil {
 		return nil, evalerrors.ModuleNotConfigured("report query service is not configured")
 	}
@@ -231,7 +231,7 @@ func (s *protectedQueryService) ListReportsV2(ctx context.Context, scope Protect
 	if err != nil {
 		return nil, err
 	}
-	return s.reportQueryService.ListV2ByTesteeID(ctx, scopedDTO)
+	return s.reportQueryService.ListOutcomeByTesteeID(ctx, scopedDTO)
 }
 
 // WaitReport 等待测评报告生成

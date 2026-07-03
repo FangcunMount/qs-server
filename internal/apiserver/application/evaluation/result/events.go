@@ -69,8 +69,8 @@ func (GenericEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainRepo
 		return nil
 	}
 	now := time.Now()
-	events := []event.DomainEvent{buildInterpretedV2Event(outcome, rpt, now)}
-	if generated := buildReportGeneratedV2Event(outcome, rpt, now); generated != nil {
+	events := []event.DomainEvent{buildInterpretedOutcomeEvent(outcome, rpt, now)}
+	if generated := buildReportGeneratedOutcomeEvent(outcome, rpt, now); generated != nil {
 		events = append(events, generated)
 	}
 	if footprint := buildFootprintReportGeneratedEvent(outcome, rpt, now); footprint != nil {
@@ -86,7 +86,7 @@ func (ScaleEventAssembler) Key() evaluation.EvaluatorKey {
 	return evaluation.EvaluatorKeyScaleDefault
 }
 
-// BuildSuccessEvents 构建 Scale 成功事件，新写路径只发布 v2 outcome 事件。
+// BuildSuccessEvents 构建 Scale 成功事件，新写路径只发布 outcome 事件。
 func (ScaleEventAssembler) BuildSuccessEvents(outcome Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
 	return (GenericEventAssembler{}).BuildSuccessEvents(outcome, rpt)
 }

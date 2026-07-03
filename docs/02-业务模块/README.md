@@ -301,7 +301,7 @@ survey → scale → evaluation → actor → plan → statistics
 | 应用层 | [`internal/apiserver/application/`](../../internal/apiserver/application/) |
 | 基础设施层 | [`internal/apiserver/infra/`](../../internal/apiserver/infra/) |
 | REST 契约 | [`api/rest/apiserver.yaml`](../../api/rest/apiserver.yaml)、[`api/rest/collection.yaml`](../../api/rest/collection.yaml) |
-| gRPC proto | [`internal/apiserver/interface/grpc/proto/`](../../internal/apiserver/interface/grpc/proto/) |
+| gRPC proto | [`api/grpc/gen/`](../../api/grpc/gen/) |
 | 事件契约 | [`configs/events.yaml`](../../configs/events.yaml) |
 | 运行时组合根 | [`internal/apiserver/process/`](../../internal/apiserver/process/) |
 

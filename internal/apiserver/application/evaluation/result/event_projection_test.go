@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestScaleEventAssemblerPublishesV2Events(t *testing.T) {
+func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(2001),
@@ -41,10 +41,10 @@ func TestScaleEventAssemblerPublishesV2Events(t *testing.T) {
 	if len(events) != 3 {
 		t.Fatalf("events = %d, want 3", len(events))
 	}
-	if events[0].EventType() != assessment.EventTypeInterpretedV2 {
-		t.Fatalf("first event = %s, want %s", events[0].EventType(), assessment.EventTypeInterpretedV2)
+	if events[0].EventType() != assessment.EventTypeInterpretedOutcome {
+		t.Fatalf("first event = %s, want %s", events[0].EventType(), assessment.EventTypeInterpretedOutcome)
 	}
-	if events[1].EventType() != domainreport.EventTypeGeneratedV2 {
-		t.Fatalf("second event = %s, want %s", events[1].EventType(), domainreport.EventTypeGeneratedV2)
+	if events[1].EventType() != domainreport.EventTypeGeneratedOutcome {
+		t.Fatalf("second event = %s, want %s", events[1].EventType(), domainreport.EventTypeGeneratedOutcome)
 	}
 }

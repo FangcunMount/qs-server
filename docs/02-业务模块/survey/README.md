@@ -655,7 +655,7 @@ answersheet.submitted。
 | DurableStore 接口 | `internal/apiserver/application/survey/answersheet/durable_store.go` |
 | durable submit infra | `internal/apiserver/infra/mongo/answersheet/durable_submit.go` |
 | collection 提交入口 | `internal/collection-server/transport/rest/handler/answersheet_handler.go` |
-| internal gRPC 契约 | `internal/apiserver/interface/grpc/proto/internalapi/internal.proto` |
+| internal gRPC 契约 | `api/grpc/gen/internalapi/internal.proto` |
 | 事件契约 | `configs/events.yaml` |
 
 ---

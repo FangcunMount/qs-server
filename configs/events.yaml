@@ -73,7 +73,7 @@ events:
     delivery: durable_outbox
     aggregate: Assessment
     domain: evaluation/assessment
-    description: "测评已解读（v2 outcome 投影）"
+    description: "测评已解读（outcome 投影；wire 名保留 .v2 兼容）"
     handler: assessment_interpreted_handler
 
   assessment.failed:
@@ -97,7 +97,7 @@ events:
     delivery: durable_outbox
     aggregate: Report
     domain: evaluation/report
-    description: "报告已生成（v2 outcome 投影）"
+    description: "报告已生成（outcome 投影；wire 名保留 .v2 兼容）"
     handler: report_generated_handler
 
   footprint.entry_opened:

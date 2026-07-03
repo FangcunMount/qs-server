@@ -65,12 +65,12 @@ func eventLevelFrom(level *domainreport.ResultLevel) *eventoutcome.ResultLevel {
 	}
 }
 
-func buildInterpretedV2Event(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
+func buildInterpretedOutcomeEvent(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil {
 		return nil
 	}
 	model, primary, level := eventOutcomeFromReport(rpt, outcome)
-	return assessment.NewAssessmentInterpretedV2Event(
+	return assessment.NewAssessmentInterpretedOutcomeEvent(
 		outcome.Assessment.OrgID(),
 		outcome.Assessment.ID(),
 		outcome.Assessment.TesteeID(),
@@ -81,14 +81,14 @@ func buildInterpretedV2Event(outcome Outcome, rpt *domainreport.InterpretReport,
 	)
 }
 
-func buildReportGeneratedV2Event(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
+func buildReportGeneratedOutcomeEvent(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil || rpt == nil {
 		return nil
 	}
 	model, primary, level := eventOutcomeFromReport(rpt, outcome)
 	assessmentID := outcome.Assessment.ID().Uint64()
 	reportID := rpt.ID().Uint64()
-	return domainreport.NewReportGeneratedV2Event(
+	return domainreport.NewReportGeneratedOutcomeEvent(
 		strconv.FormatUint(reportID, 10),
 		strconv.FormatUint(assessmentID, 10),
 		outcome.Assessment.TesteeID().Uint64(),

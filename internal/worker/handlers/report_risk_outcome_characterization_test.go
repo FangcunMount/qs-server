@@ -7,9 +7,11 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
-func TestV2ReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
+func TestOutcomeReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
 	tests := []struct {
 		name         string
 		severity     string
@@ -31,7 +33,7 @@ func TestV2ReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
 				InternalClient: client,
 			}
 			handler := handleReportGenerated(deps)
-			if err := handler(context.Background(), "report.generated.v2", mustBuildReportGeneratedV2Payload(t, tc.severity, tc.levelCode)); err != nil {
+			if err := handler(context.Background(), eventcatalog.ReportGeneratedOutcome, mustBuildReportGeneratedOutcomePayload(t, tc.severity, tc.levelCode)); err != nil {
 				t.Fatalf("handler: %v", err)
 			}
 			req := client.syncAssessmentAttentionRequest
@@ -45,12 +47,12 @@ func TestV2ReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
 	}
 }
 
-func mustBuildReportGeneratedV2Payload(t *testing.T, severity, levelCode string) []byte {
+func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode string) []byte {
 	t.Helper()
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
 	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-report-generated-v2",
-		"eventType":     "report.generated.v2",
+		"id":            "evt-report-generated-outcome",
+		"eventType":     eventcatalog.ReportGeneratedOutcome,
 		"occurredAt":    now,
 		"aggregateType": "Report",
 		"aggregateID":   "report-1",

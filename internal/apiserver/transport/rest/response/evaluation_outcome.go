@@ -6,7 +6,7 @@ import (
 	assessment "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 )
 
-// ModelIdentityResponse is the v2 published-model reference on REST responses.
+// ModelIdentityResponse is the outcome published-model reference on REST responses.
 type ModelIdentityResponse struct {
 	Kind      string `json:"kind"`
 	SubKind   string `json:"sub_kind,omitempty"`
@@ -16,7 +16,7 @@ type ModelIdentityResponse struct {
 	Title     string `json:"title,omitempty"`
 }
 
-// ScoreValueResponse is the v2 primary score projection.
+// ScoreValueResponse is the outcome primary score projection.
 type ScoreValueResponse struct {
 	Kind  string   `json:"kind"`
 	Value float64  `json:"value"`
@@ -24,15 +24,15 @@ type ScoreValueResponse struct {
 	Max   *float64 `json:"max,omitempty"`
 }
 
-// ResultLevelResponse is the v2 outcome level projection.
+// ResultLevelResponse is the outcome level projection.
 type ResultLevelResponse struct {
 	Code     string `json:"code"`
 	Label    string `json:"label"`
 	Severity string `json:"severity,omitempty"`
 }
 
-// AssessmentV2Response exposes assessment facts with v2 outcome summary.
-type AssessmentV2Response struct {
+// AssessmentOutcomeResponse exposes assessment facts with outcome summary.
+type AssessmentOutcomeResponse struct {
 	ID                   string                `json:"id"`
 	OrgID                string                `json:"org_id"`
 	TesteeID             string                `json:"testee_id"`
@@ -53,17 +53,17 @@ type AssessmentV2Response struct {
 	FailureReason        *string               `json:"failure_reason,omitempty"`
 }
 
-// AssessmentV2ListResponse is a paginated v2 assessment list.
-type AssessmentV2ListResponse struct {
-	Items      []*AssessmentV2Response `json:"items"`
+// AssessmentOutcomeListResponse is a paginated outcome assessment list.
+type AssessmentOutcomeListResponse struct {
+	Items      []*AssessmentOutcomeResponse `json:"items"`
 	Total      int                     `json:"total"`
 	Page       int                     `json:"page"`
 	PageSize   int                     `json:"page_size"`
 	TotalPages int                     `json:"total_pages"`
 }
 
-// ReportV2Response exposes report facts with v2 outcome summary.
-type ReportV2Response struct {
+// ReportOutcomeResponse exposes report facts with outcome summary.
+type ReportOutcomeResponse struct {
 	AssessmentID string                `json:"assessment_id"`
 	Model        ModelIdentityResponse `json:"model"`
 	PrimaryScore *ScoreValueResponse   `json:"primary_score,omitempty"`
@@ -96,21 +96,21 @@ type ModelRarityResponse struct {
 	OneInX  int     `json:"one_in_x,omitempty"`
 }
 
-// ReportV2ListResponse is a paginated v2 report list.
-type ReportV2ListResponse struct {
-	Items      []*ReportV2Response `json:"items"`
+// ReportOutcomeListResponse is a paginated outcome report list.
+type ReportOutcomeListResponse struct {
+	Items      []*ReportOutcomeResponse `json:"items"`
 	Total      int                 `json:"total"`
 	Page       int                 `json:"page"`
 	PageSize   int                 `json:"page_size"`
 	TotalPages int                 `json:"total_pages"`
 }
 
-// NewAssessmentV2Response maps application v2 result to REST response.
-func NewAssessmentV2Response(result *assessment.AssessmentV2Result) *AssessmentV2Response {
+// NewAssessmentOutcomeResponse maps application outcome result to REST response.
+func NewAssessmentOutcomeResponse(result *assessment.AssessmentOutcomeResult) *AssessmentOutcomeResponse {
 	if result == nil {
 		return nil
 	}
-	resp := &AssessmentV2Response{
+	resp := &AssessmentOutcomeResponse{
 		ID:                   fmt.Sprintf("%d", result.ID),
 		OrgID:                fmt.Sprintf("%d", result.OrgID),
 		TesteeID:             fmt.Sprintf("%d", result.TesteeID),
@@ -139,16 +139,16 @@ func NewAssessmentV2Response(result *assessment.AssessmentV2Result) *AssessmentV
 	return resp
 }
 
-// NewAssessmentV2ListResponse maps application v2 list result to REST response.
-func NewAssessmentV2ListResponse(result *assessment.AssessmentV2ListResult) *AssessmentV2ListResponse {
+// NewAssessmentOutcomeListResponse maps application outcome list result to REST response.
+func NewAssessmentOutcomeListResponse(result *assessment.AssessmentOutcomeListResult) *AssessmentOutcomeListResponse {
 	if result == nil {
 		return nil
 	}
-	items := make([]*AssessmentV2Response, 0, len(result.Items))
+	items := make([]*AssessmentOutcomeResponse, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, NewAssessmentV2Response(item))
+		items = append(items, NewAssessmentOutcomeResponse(item))
 	}
-	return &AssessmentV2ListResponse{
+	return &AssessmentOutcomeListResponse{
 		Items:      items,
 		Total:      result.Total,
 		Page:       result.Page,
@@ -157,8 +157,8 @@ func NewAssessmentV2ListResponse(result *assessment.AssessmentV2ListResult) *Ass
 	}
 }
 
-// NewReportV2Response maps application v2 report result to REST response.
-func NewReportV2Response(result *assessment.ReportV2Result) *ReportV2Response {
+// NewReportOutcomeResponse maps application outcome report result to REST response.
+func NewReportOutcomeResponse(result *assessment.ReportOutcomeResult) *ReportOutcomeResponse {
 	if result == nil {
 		return nil
 	}
@@ -179,7 +179,7 @@ func NewReportV2Response(result *assessment.ReportV2Result) *ReportV2Response {
 	if result.ModelExtra != nil {
 		modelExtra = newModelExtraResponse(result.ModelExtra)
 	}
-	return &ReportV2Response{
+	return &ReportOutcomeResponse{
 		AssessmentID: fmt.Sprintf("%d", result.AssessmentID),
 		Model:        newModelIdentityResponse(result.Model),
 		PrimaryScore: newScoreValueResponse(result.PrimaryScore),
@@ -192,16 +192,16 @@ func NewReportV2Response(result *assessment.ReportV2Result) *ReportV2Response {
 	}
 }
 
-// NewReportV2ListResponse maps application v2 report list to REST response.
-func NewReportV2ListResponse(result *assessment.ReportV2ListResult) *ReportV2ListResponse {
+// NewReportOutcomeListResponse maps application outcome report list to REST response.
+func NewReportOutcomeListResponse(result *assessment.ReportOutcomeListResult) *ReportOutcomeListResponse {
 	if result == nil {
 		return nil
 	}
-	items := make([]*ReportV2Response, 0, len(result.Items))
+	items := make([]*ReportOutcomeResponse, 0, len(result.Items))
 	for _, item := range result.Items {
-		items = append(items, NewReportV2Response(item))
+		items = append(items, NewReportOutcomeResponse(item))
 	}
-	return &ReportV2ListResponse{
+	return &ReportOutcomeListResponse{
 		Items:      items,
 		Total:      result.Total,
 		Page:       result.Page,
@@ -267,4 +267,36 @@ func newModelExtraResponse(extra *assessment.ModelExtraResult) *ModelExtraRespon
 		}
 	}
 	return resp
+}
+
+// Deprecated: use AssessmentOutcomeResponse.
+type AssessmentV2Response = AssessmentOutcomeResponse
+
+// Deprecated: use AssessmentOutcomeListResponse.
+type AssessmentV2ListResponse = AssessmentOutcomeListResponse
+
+// Deprecated: use ReportOutcomeResponse.
+type ReportV2Response = ReportOutcomeResponse
+
+// Deprecated: use ReportOutcomeListResponse.
+type ReportV2ListResponse = ReportOutcomeListResponse
+
+// Deprecated: use NewAssessmentOutcomeResponse.
+func NewAssessmentV2Response(result *assessment.AssessmentV2Result) *AssessmentV2Response {
+	return NewAssessmentOutcomeResponse(result)
+}
+
+// Deprecated: use NewAssessmentOutcomeListResponse.
+func NewAssessmentV2ListResponse(result *assessment.AssessmentV2ListResult) *AssessmentV2ListResponse {
+	return NewAssessmentOutcomeListResponse(result)
+}
+
+// Deprecated: use NewReportOutcomeResponse.
+func NewReportV2Response(result *assessment.ReportV2Result) *ReportV2Response {
+	return NewReportOutcomeResponse(result)
+}
+
+// Deprecated: use NewReportOutcomeListResponse.
+func NewReportV2ListResponse(result *assessment.ReportV2ListResult) *ReportV2ListResponse {
+	return NewReportOutcomeListResponse(result)
 }

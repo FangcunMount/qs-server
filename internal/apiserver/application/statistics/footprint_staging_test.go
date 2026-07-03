@@ -37,10 +37,10 @@ func TestFilterFootprintStagingEventsRemovesDisabledTypes(t *testing.T) {
 
 	events := []event.DomainEvent{
 		event.New(eventcatalog.FootprintReportGenerated, "BehaviorFootprint", "1", struct{}{}),
-		event.New(eventcatalog.ReportGeneratedV2, "Report", "1", struct{}{}),
+		event.New(eventcatalog.ReportGeneratedOutcome, "Report", "1", struct{}{}),
 	}
 	filtered := FilterFootprintStagingEvents(events)
-	if len(filtered) != 1 || filtered[0].EventType() != eventcatalog.ReportGeneratedV2 {
+	if len(filtered) != 1 || filtered[0].EventType() != eventcatalog.ReportGeneratedOutcome {
 		t.Fatalf("filtered = %#v, want only report.generated.v2", filtered)
 	}
 }

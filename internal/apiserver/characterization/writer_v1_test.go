@@ -70,7 +70,7 @@ func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 		}
 	}
 
-	wantEvents := []string{assessment.EventTypeInterpretedV2, domainreport.EventTypeGeneratedV2, "footprint.report_generated"}
+	wantEvents := []string{assessment.EventTypeInterpretedOutcome, domainreport.EventTypeGeneratedOutcome, "footprint.report_generated"}
 	if len(reportSaver.eventTypes) != len(wantEvents) {
 		t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
 	}

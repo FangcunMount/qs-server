@@ -221,7 +221,7 @@ Client / 小程序
 | worker 事件派发 | [../../internal/worker/integration/eventing/dispatcher.go](../../internal/worker/integration/eventing/dispatcher.go)、[../../internal/worker/handlers/registry.go](../../internal/worker/handlers/registry.go) |
 | 事件契约 | [../../configs/events.yaml](../../configs/events.yaml) |
 | REST 契约 | [../../api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[../../api/rest/collection.yaml](../../api/rest/collection.yaml) |
-| gRPC 契约 | [../../internal/apiserver/interface/grpc/proto/](../../internal/apiserver/interface/grpc/proto/) |
+| gRPC 契约 | [../../api/grpc/gen/](../../api/grpc/gen/) |
 | 配置 | [../../configs/apiserver.dev.yaml](../../configs/apiserver.dev.yaml)、[../../configs/collection-server.dev.yaml](../../configs/collection-server.dev.yaml)、[../../configs/worker.dev.yaml](../../configs/worker.dev.yaml) |
 | 构建与运行 | [../../Makefile](../../Makefile) |
 | 文档维护 | [../README.md](../README.md)、[./05-源码事实矩阵.md](./05-源码事实矩阵.md) |

@@ -32,8 +32,8 @@ func (s *reportQueryService) GetByAssessmentID(ctx context.Context, assessmentID
 	return reportRowToResult(*row), nil
 }
 
-// GetV2ByAssessmentID 根据测评ID获取 v2 报告投影。
-func (s *reportQueryService) GetV2ByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportV2Result, error) {
+// GetOutcomeByAssessmentID 根据测评ID获取 outcome 报告投影。
+func (s *reportQueryService) GetOutcomeByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportOutcomeResult, error) {
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
 	}
@@ -41,7 +41,7 @@ func (s *reportQueryService) GetV2ByAssessmentID(ctx context.Context, assessment
 	if err != nil {
 		return nil, evalerrors.InterpretReportNotFound(err, "报告不存在")
 	}
-	return reportRowToV2Result(*row), nil
+	return reportRowToOutcomeResult(*row), nil
 }
 
 // ListByTesteeID 获取受试者的报告列表
@@ -68,8 +68,8 @@ func (s *reportQueryService) ListByTesteeID(ctx context.Context, dto ListReports
 	}, nil
 }
 
-// ListV2ByTesteeID 获取受试者的 v2 报告列表。
-func (s *reportQueryService) ListV2ByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportV2ListResult, error) {
+// ListOutcomeByTesteeID 获取受试者的 outcome 报告列表。
+func (s *reportQueryService) ListOutcomeByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error) {
 	page, pageSize := normalizePagination(dto.Page, dto.PageSize)
 	if s.reader == nil {
 		return nil, evalerrors.ModuleNotConfigured("report read model is not configured")
@@ -78,12 +78,12 @@ func (s *reportQueryService) ListV2ByTesteeID(ctx context.Context, dto ListRepor
 	if err != nil {
 		return nil, evalerrors.Database(err, "查询报告列表失败")
 	}
-	items := make([]*ReportV2Result, 0, len(rows))
+	items := make([]*ReportOutcomeResult, 0, len(rows))
 	for _, row := range rows {
-		items = append(items, reportRowToV2Result(row))
+		items = append(items, reportRowToOutcomeResult(row))
 	}
 	totalInt := int(total)
-	return &ReportV2ListResult{
+	return &ReportOutcomeListResult{
 		Items:      items,
 		Total:      totalInt,
 		Page:       page,

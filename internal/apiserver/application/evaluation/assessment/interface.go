@@ -109,15 +109,15 @@ type ProtectedQueryScope struct {
 type AssessmentProtectedQueryService interface {
 	GetAssessment(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentResult, error)
 	ListAssessments(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentListResult, error)
-	GetAssessmentV2(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentV2Result, error)
-	ListAssessmentsV2(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentV2ListResult, error)
+	GetAssessmentOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentOutcomeResult, error)
+	ListAssessmentsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListAssessmentsDTO) (*AssessmentOutcomeListResult, error)
 	GetScores(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ScoreResult, error)
 	GetHighRiskFactors(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*HighRiskFactorsResult, error)
 	GetFactorTrend(ctx context.Context, scope ProtectedQueryScope, dto GetFactorTrendDTO) (*FactorTrendResult, error)
 	GetReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportResult, error)
 	ListReports(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportListResult, error)
-	GetReportV2(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportV2Result, error)
-	ListReportsV2(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportV2ListResult, error)
+	GetReportOutcome(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*ReportOutcomeResult, error)
+	ListReportsOutcome(ctx context.Context, scope ProtectedQueryScope, dto ListReportsDTO) (*ReportOutcomeListResult, error)
 	WaitReport(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (evaluationwaiter.StatusSummary, error)
 }
 
@@ -145,8 +145,8 @@ type ReportQueryService interface {
 	// 场景：用户查看自己的所有报告
 	ListByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportListResult, error)
 
-	GetV2ByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportV2Result, error)
-	ListV2ByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportV2ListResult, error)
+	GetOutcomeByAssessmentID(ctx context.Context, assessmentID uint64) (*ReportOutcomeResult, error)
+	ListOutcomeByTesteeID(ctx context.Context, dto ListReportsDTO) (*ReportOutcomeListResult, error)
 }
 
 // ==================== 得分查询服务 ====================

@@ -34,7 +34,7 @@ func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *tes
 
 func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *testing.T) {
 	reportSvc := &fakeReportQueryService{
-		report: &assessmentApp.ReportV2Result{AssessmentID: 42},
+		report: &assessmentApp.ReportOutcomeResult{AssessmentID: 42},
 	}
 	svc := &EvaluationService{
 		submissionService: &fakeAssessmentSubmissionService{
@@ -114,12 +114,12 @@ type fakeReportQueryService struct {
 	calls        int
 	legacyCalls  int
 	assessmentID uint64
-	report       *assessmentApp.ReportV2Result
+	report       *assessmentApp.ReportOutcomeResult
 	legacyReport *assessmentApp.ReportResult
 	err          error
 }
 
-func (s *fakeReportQueryService) GetV2ByAssessmentID(_ context.Context, assessmentID uint64) (*assessmentApp.ReportV2Result, error) {
+func (s *fakeReportQueryService) GetOutcomeByAssessmentID(_ context.Context, assessmentID uint64) (*assessmentApp.ReportOutcomeResult, error) {
 	s.calls++
 	s.assessmentID = assessmentID
 	if s.err != nil {
@@ -137,6 +137,6 @@ func (s *fakeReportQueryService) ListByTesteeID(context.Context, assessmentApp.L
 	panic("unexpected ListByTesteeID call")
 }
 
-func (s *fakeReportQueryService) ListV2ByTesteeID(context.Context, assessmentApp.ListReportsDTO) (*assessmentApp.ReportV2ListResult, error) {
-	panic("unexpected ListV2ByTesteeID call")
+func (s *fakeReportQueryService) ListOutcomeByTesteeID(context.Context, assessmentApp.ListReportsDTO) (*assessmentApp.ReportOutcomeListResult, error) {
+	panic("unexpected ListOutcomeByTesteeID call")
 }

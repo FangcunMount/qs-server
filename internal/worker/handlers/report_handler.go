@@ -14,8 +14,8 @@ import (
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
 	return func(ctx context.Context, eventType string, payload []byte) error {
 		switch eventType {
-		case eventcatalog.ReportGeneratedV2:
-			return handleReportGeneratedV2(ctx, deps, payload)
+		case eventcatalog.ReportGeneratedOutcome:
+			return handleReportGeneratedOutcome(ctx, deps, payload)
 		default:
 			return handleReportGeneratedV1(ctx, deps, payload)
 		}
@@ -36,13 +36,13 @@ func handleReportGeneratedV1(ctx context.Context, deps *Dependencies, payload []
 	return nil
 }
 
-func handleReportGeneratedV2(ctx context.Context, deps *Dependencies, payload []byte) error {
+func handleReportGeneratedOutcome(ctx context.Context, deps *Dependencies, payload []byte) error {
 	var data eventoutcome.ReportGeneratedPayload
 	env, err := ParseEventData(payload, &data)
 	if err != nil {
-		return fmt.Errorf("failed to parse report generated v2 event: %w", err)
+		return fmt.Errorf("failed to parse report generated outcome event: %w", err)
 	}
-	deps.Logger.Info("processing report generated v2",
+	deps.Logger.Info("processing report generated outcome",
 		slog.String("event_id", env.ID),
 		slog.String("report_id", data.ReportID),
 		slog.String("assessment_id", data.AssessmentID),
@@ -50,10 +50,10 @@ func handleReportGeneratedV2(ctx context.Context, deps *Dependencies, payload []
 		slog.String("level_code", levelCode(data.Level)),
 		slog.String("severity", levelSeverity(data.Level)),
 	)
-	riskLevel := attentionRiskLevelFromV2(data.Level)
+	riskLevel := attentionRiskLevelFromOutcome(data.Level)
 	handleHighRiskAlert(deps, riskLevel, primaryScoreValue(data.PrimaryScore), data.ReportID, data.TesteeID)
 	if deps.InternalClient != nil {
-		syncAssessmentAttention(ctx, deps, data.TesteeID, riskLevel, isHighRiskV2Level(data.Level))
+		syncAssessmentAttention(ctx, deps, data.TesteeID, riskLevel, isHighRiskOutcomeLevel(data.Level))
 	}
 	return nil
 }

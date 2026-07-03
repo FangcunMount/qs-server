@@ -90,7 +90,7 @@ func (registrar protectedRouteRegistrar) register(engine *gin.Engine) {
 
 	apiV2 := engine.Group("/api/v2")
 	r.applyProtectedGroupMiddlewares(apiV2, "/api/v2")
-	r.registerEvaluationV2ProtectedRoutes(apiV2)
+	r.registerEvaluationOutcomeProtectedRoutes(apiV2)
 }
 
 func (registrar internalRouteRegistrar) register(engine *gin.Engine) {

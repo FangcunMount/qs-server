@@ -4684,9 +4684,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Evaluation-Assessment-V2"
+                    "Evaluation-Assessment-Outcome"
                 ],
-                "summary": "查询 v2 测评列表",
+                "summary": "查询 outcome 测评列表",
                 "parameters": [
                     {
                         "type": "integer",
@@ -4727,7 +4727,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.AssessmentV2ListResponse"
+                                            "$ref": "#/definitions/response.AssessmentOutcomeListResponse"
                                         }
                                     }
                                 }
@@ -4750,9 +4750,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Evaluation-Assessment-V2"
+                    "Evaluation-Assessment-Outcome"
                 ],
-                "summary": "获取 v2 测评详情",
+                "summary": "获取 outcome 测评详情",
                 "parameters": [
                     {
                         "type": "string",
@@ -4774,7 +4774,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.AssessmentV2Response"
+                                            "$ref": "#/definitions/response.AssessmentOutcomeResponse"
                                         }
                                     }
                                 }
@@ -4797,9 +4797,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Evaluation-Report-V2"
+                    "Evaluation-Report-Outcome"
                 ],
-                "summary": "获取 v2 测评报告",
+                "summary": "获取 outcome 测评报告",
                 "parameters": [
                     {
                         "type": "string",
@@ -4821,7 +4821,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.ReportV2Response"
+                                            "$ref": "#/definitions/response.ReportOutcomeResponse"
                                         }
                                     }
                                 }
@@ -4844,9 +4844,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "Evaluation-Report-V2"
+                    "Evaluation-Report-Outcome"
                 ],
-                "summary": "查询 v2 报告列表",
+                "summary": "查询 outcome 报告列表",
                 "parameters": [
                     {
                         "type": "string",
@@ -4882,7 +4882,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/response.ReportV2ListResponse"
+                                            "$ref": "#/definitions/response.ReportOutcomeListResponse"
                                         }
                                     }
                                 }
@@ -5670,6 +5670,7 @@ const docTemplate = `{
                 "static.scale",
                 "static.questionnaire",
                 "static.scale_list",
+                "static.personality_model",
                 "query.stats_overview",
                 "query.stats_system",
                 "query.stats_questionnaire",
@@ -5679,6 +5680,7 @@ const docTemplate = `{
                 "WarmupKindStaticScale",
                 "WarmupKindStaticQuestionnaire",
                 "WarmupKindStaticScaleList",
+                "WarmupKindStaticPersonalityModel",
                 "WarmupKindQueryStatsOverview",
                 "WarmupKindQueryStatsSystem",
                 "WarmupKindQueryStatsQuestionnaire",
@@ -6364,6 +6366,88 @@ const docTemplate = `{
                 }
             }
         },
+        "response.AssessmentOutcomeListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.AssessmentOutcomeResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.AssessmentOutcomeResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "level": {
+                    "$ref": "#/definitions/response.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/response.ModelIdentityResponse"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "origin_type_label": {
+                    "type": "string"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/response.ScoreValueResponse"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "status_label": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                }
+            }
+        },
         "response.AssessmentResponse": {
             "type": "object",
             "properties": {
@@ -6468,88 +6552,6 @@ const docTemplate = `{
                 "total_count": {
                     "description": "总次数",
                     "type": "integer"
-                }
-            }
-        },
-        "response.AssessmentV2ListResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.AssessmentV2Response"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.AssessmentV2Response": {
-            "type": "object",
-            "properties": {
-                "answer_sheet_id": {
-                    "type": "string"
-                },
-                "failed_at": {
-                    "type": "string"
-                },
-                "failure_reason": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interpreted_at": {
-                    "type": "string"
-                },
-                "level": {
-                    "$ref": "#/definitions/response.ResultLevelResponse"
-                },
-                "model": {
-                    "$ref": "#/definitions/response.ModelIdentityResponse"
-                },
-                "org_id": {
-                    "type": "string"
-                },
-                "origin_id": {
-                    "type": "string"
-                },
-                "origin_type": {
-                    "type": "string"
-                },
-                "origin_type_label": {
-                    "type": "string"
-                },
-                "primary_score": {
-                    "$ref": "#/definitions/response.ScoreValueResponse"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "status_label": {
-                    "type": "string"
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "testee_id": {
-                    "type": "string"
                 }
             }
         },
@@ -7313,6 +7315,67 @@ const docTemplate = `{
                 }
             }
         },
+        "response.ReportOutcomeListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.ReportOutcomeResponse"
+                    }
+                },
+                "page": {
+                    "type": "integer"
+                },
+                "page_size": {
+                    "type": "integer"
+                },
+                "total": {
+                    "type": "integer"
+                },
+                "total_pages": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.ReportOutcomeResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.DimensionItem"
+                    }
+                },
+                "level": {
+                    "$ref": "#/definitions/response.ResultLevelResponse"
+                },
+                "model": {
+                    "$ref": "#/definitions/response.ModelIdentityResponse"
+                },
+                "model_extra": {
+                    "$ref": "#/definitions/response.ModelExtraResponse"
+                },
+                "primary_score": {
+                    "$ref": "#/definitions/response.ScoreValueResponse"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.SuggestionItem"
+                    }
+                }
+            }
+        },
         "response.ReportResponse": {
             "type": "object",
             "properties": {
@@ -7361,67 +7424,6 @@ const docTemplate = `{
                 "total_score": {
                     "description": "总分",
                     "type": "number"
-                }
-            }
-        },
-        "response.ReportV2ListResponse": {
-            "type": "object",
-            "properties": {
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.ReportV2Response"
-                    }
-                },
-                "page": {
-                    "type": "integer"
-                },
-                "page_size": {
-                    "type": "integer"
-                },
-                "total": {
-                    "type": "integer"
-                },
-                "total_pages": {
-                    "type": "integer"
-                }
-            }
-        },
-        "response.ReportV2Response": {
-            "type": "object",
-            "properties": {
-                "assessment_id": {
-                    "type": "string"
-                },
-                "conclusion": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "dimensions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.DimensionItem"
-                    }
-                },
-                "level": {
-                    "$ref": "#/definitions/response.ResultLevelResponse"
-                },
-                "model": {
-                    "$ref": "#/definitions/response.ModelIdentityResponse"
-                },
-                "model_extra": {
-                    "$ref": "#/definitions/response.ModelExtraResponse"
-                },
-                "primary_score": {
-                    "$ref": "#/definitions/response.ScoreValueResponse"
-                },
-                "suggestions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/response.SuggestionItem"
-                    }
                 }
             }
         },

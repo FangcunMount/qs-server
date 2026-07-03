@@ -82,6 +82,26 @@ func TestEvaluationRESTTransportDoesNotImportWaiterInfra(t *testing.T) {
 	}
 }
 
+func TestEvaluationRESTTransportDoesNotContainStaleV2SourceFiles(t *testing.T) {
+	t.Parallel()
+
+	err := filepath.WalkDir(".", func(path string, d os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if d.IsDir() || !strings.HasSuffix(path, ".go") {
+			return nil
+		}
+		if strings.Contains(filepath.Base(path), "_v2.go") {
+			t.Fatalf("%s is a stale v2 REST transport source file; use outcome naming instead", path)
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestEvaluationRESTHandlerDoesNotImportActorAccessApplication(t *testing.T) {
 	t.Parallel()
 

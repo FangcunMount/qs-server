@@ -156,7 +156,7 @@ func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *test
 			t.Fatalf("order = %#v, want %#v", order, wantOrder)
 		}
 	}
-	wantEvents := []string{assessment.EventTypeInterpretedV2, domainReport.EventTypeGeneratedV2, "footprint.report_generated"}
+	wantEvents := []string{assessment.EventTypeInterpretedOutcome, domainReport.EventTypeGeneratedOutcome, "footprint.report_generated"}
 	if len(reportSaver.eventTypes) != len(wantEvents) {
 		t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
 	}
@@ -387,7 +387,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 			t.Fatalf("order = %#v, want prefix %#v", order, wantOrder)
 		}
 	}
-	wantEvents := []string{assessment.EventTypeInterpretedV2, domainReport.EventTypeGeneratedV2, "footprint.report_generated"}
+	wantEvents := []string{assessment.EventTypeInterpretedOutcome, domainReport.EventTypeGeneratedOutcome, "footprint.report_generated"}
 	if len(reportSaver.eventTypes) != len(wantEvents) {
 		t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
 	}

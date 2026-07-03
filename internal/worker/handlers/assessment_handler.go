@@ -107,8 +107,8 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
 	return func(_ context.Context, eventType string, payload []byte) error {
 		switch eventType {
-		case eventcatalog.AssessmentInterpretedV2:
-			return handleAssessmentInterpretedV2(deps, payload)
+		case eventcatalog.AssessmentInterpretedOutcome:
+			return handleAssessmentInterpretedOutcome(deps, payload)
 		default:
 			return handleAssessmentInterpretedV1(deps, payload)
 		}
@@ -133,13 +133,13 @@ func handleAssessmentInterpretedV1(deps *Dependencies, payload []byte) error {
 	return nil
 }
 
-func handleAssessmentInterpretedV2(deps *Dependencies, payload []byte) error {
+func handleAssessmentInterpretedOutcome(deps *Dependencies, payload []byte) error {
 	var data eventoutcome.AssessmentInterpretedPayload
 	_, err := ParseEventData(payload, &data)
 	if err != nil {
-		return fmt.Errorf("failed to parse assessment interpreted v2 event: %w", err)
+		return fmt.Errorf("failed to parse assessment interpreted outcome event: %w", err)
 	}
-	deps.Logger.Debug("assessment interpreted v2 detail",
+	deps.Logger.Debug("assessment interpreted outcome detail",
 		"org_id", data.OrgID,
 		"level_code", assessmentLevelCode(data.Level),
 		"severity", assessmentLevelSeverity(data.Level),

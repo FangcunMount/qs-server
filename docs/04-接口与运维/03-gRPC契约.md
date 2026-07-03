@@ -10,7 +10,7 @@
 | ---- | ---- |
 | 服务端 | 只有 qs-apiserver 暴露 gRPC Server |
 | 客户端 | collection-server 和 qs-worker 都是 gRPC client |
-| Proto 真值 | `internal/apiserver/interface/grpc/proto` |
+| Proto 真值 | `api/grpc/gen` |
 | 注册真值 | `internal/apiserver/transport/grpc/registry.go` |
 | 注册方式 | Registry 按依赖是否 nil 决定是否注册服务，缺模块会 skip |
 | collection 调用 | AnswerSheet、Questionnaire、Actor、Evaluation、Scale |
@@ -73,7 +73,7 @@ Registry 里如果依赖缺失，会记录 warning 并 skip 注册，不直接 p
 
 | 层 | 路径 |
 | -- | ---- |
-| proto | `internal/apiserver/interface/grpc/proto` |
+| proto | `api/grpc/gen` |
 | service implementation | `internal/apiserver/transport/grpc/service` |
 | registry | `internal/apiserver/transport/grpc/registry.go` |
 | grpc server config | `internal/pkg/grpc/server.go` |

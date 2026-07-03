@@ -627,7 +627,7 @@ ObjectStorage；
 04-接口与运维/
 api/rest/apiserver.yaml
 api/rest/collection.yaml
-internal/apiserver/interface/grpc/proto
+api/grpc/gen
 ```
 
 需要看运行部署：
@@ -790,7 +790,7 @@ api/rest/collection.yaml
 gRPC Proto：
 
 ```text
-internal/apiserver/interface/grpc/proto
+api/grpc/gen
 ```
 
 事件：

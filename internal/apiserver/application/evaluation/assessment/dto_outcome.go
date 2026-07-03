@@ -2,7 +2,7 @@ package assessment
 
 import "time"
 
-// ModelIdentityResult is the v2 published-model reference on read APIs.
+// ModelIdentityResult is the published-model reference on outcome read APIs.
 type ModelIdentityResult struct {
 	Kind      string `json:"kind"`
 	SubKind   string `json:"sub_kind,omitempty"`
@@ -12,7 +12,7 @@ type ModelIdentityResult struct {
 	Title     string `json:"title,omitempty"`
 }
 
-// ScoreValueResult is the v2 primary score projection.
+// ScoreValueResult is the primary score projection on outcome read APIs.
 type ScoreValueResult struct {
 	Kind  string   `json:"kind"`
 	Value float64  `json:"value"`
@@ -20,15 +20,15 @@ type ScoreValueResult struct {
 	Max   *float64 `json:"max,omitempty"`
 }
 
-// ResultLevelResult is the v2 outcome level projection.
+// ResultLevelResult is the outcome level projection on outcome read APIs.
 type ResultLevelResult struct {
 	Code     string `json:"code"`
 	Label    string `json:"label"`
 	Severity string `json:"severity,omitempty"`
 }
 
-// AssessmentV2Result exposes assessment facts with v2 outcome summary.
-type AssessmentV2Result struct {
+// AssessmentOutcomeResult exposes assessment facts with outcome summary.
+type AssessmentOutcomeResult struct {
 	ID                   uint64              `json:"id"`
 	OrgID                uint64              `json:"org_id"`
 	TesteeID             uint64              `json:"testee_id"`
@@ -47,17 +47,17 @@ type AssessmentV2Result struct {
 	FailureReason        *string             `json:"failure_reason,omitempty"`
 }
 
-// AssessmentV2ListResult is a paginated v2 assessment list.
-type AssessmentV2ListResult struct {
-	Items      []*AssessmentV2Result `json:"items"`
-	Total      int                   `json:"total"`
-	Page       int                   `json:"page"`
-	PageSize   int                   `json:"page_size"`
-	TotalPages int                   `json:"total_pages"`
+// AssessmentOutcomeListResult is a paginated outcome assessment list.
+type AssessmentOutcomeListResult struct {
+	Items      []*AssessmentOutcomeResult `json:"items"`
+	Total      int                        `json:"total"`
+	Page       int                        `json:"page"`
+	PageSize   int                        `json:"page_size"`
+	TotalPages int                        `json:"total_pages"`
 }
 
-// ReportV2Result exposes report facts with v2 outcome summary.
-type ReportV2Result struct {
+// ReportOutcomeResult exposes report facts with outcome summary.
+type ReportOutcomeResult struct {
 	AssessmentID uint64              `json:"assessment_id"`
 	Model        ModelIdentityResult `json:"model"`
 	PrimaryScore *ScoreValueResult   `json:"primary_score,omitempty"`
@@ -69,11 +69,23 @@ type ReportV2Result struct {
 	CreatedAt    time.Time           `json:"created_at"`
 }
 
-// ReportV2ListResult is a paginated v2 report list.
-type ReportV2ListResult struct {
-	Items      []*ReportV2Result `json:"items"`
-	Total      int               `json:"total"`
-	Page       int               `json:"page"`
-	PageSize   int               `json:"page_size"`
-	TotalPages int               `json:"total_pages"`
+// ReportOutcomeListResult is a paginated outcome report list.
+type ReportOutcomeListResult struct {
+	Items      []*ReportOutcomeResult `json:"items"`
+	Total      int                    `json:"total"`
+	Page       int                    `json:"page"`
+	PageSize   int                    `json:"page_size"`
+	TotalPages int                    `json:"total_pages"`
 }
+
+// Deprecated: use AssessmentOutcomeResult.
+type AssessmentV2Result = AssessmentOutcomeResult
+
+// Deprecated: use AssessmentOutcomeListResult.
+type AssessmentV2ListResult = AssessmentOutcomeListResult
+
+// Deprecated: use ReportOutcomeResult.
+type ReportV2Result = ReportOutcomeResult
+
+// Deprecated: use ReportOutcomeListResult.
+type ReportV2ListResult = ReportOutcomeListResult

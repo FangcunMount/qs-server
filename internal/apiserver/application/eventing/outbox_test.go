@@ -250,7 +250,7 @@ func TestOutboxRelayPerEventGoroutineBaseline(t *testing.T) {
 			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
 			pendingEvent("evt-2", eventcatalog.ReportGenerated),
 			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
-			pendingEvent("evt-4", eventcatalog.ReportGeneratedV2),
+			pendingEvent("evt-4", eventcatalog.ReportGeneratedOutcome),
 			pendingEvent("evt-5", eventcatalog.AssessmentSubmitted),
 			pendingEvent("evt-6", eventcatalog.ReportGenerated),
 		},
@@ -282,7 +282,7 @@ func TestOutboxRelayUsesConfiguredPublishWorkers(t *testing.T) {
 			pendingEvent("evt-1", eventcatalog.AssessmentSubmitted),
 			pendingEvent("evt-2", eventcatalog.ReportGenerated),
 			pendingEvent("evt-3", eventcatalog.AnswerSheetSubmitted),
-			pendingEvent("evt-4", eventcatalog.ReportGeneratedV2),
+			pendingEvent("evt-4", eventcatalog.ReportGeneratedOutcome),
 		},
 	}
 	publisher := &trackingPublisher{}

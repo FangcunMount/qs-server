@@ -57,11 +57,11 @@ func (s *EvaluationService) GetMyAssessment(ctx context.Context, req *pb.GetMyAs
 	if _, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId); err != nil {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
-	result, err := s.loadAssessmentV2Row(ctx, req.AssessmentId)
+	result, err := s.loadAssessmentOutcomeRow(ctx, req.AssessmentId)
 	if err != nil {
 		return nil, err
 	}
-	return &pb.GetMyAssessmentResponse{Assessment: toProtoAssessmentDetailFromV2(result)}, nil
+	return &pb.GetMyAssessmentResponse{Assessment: toProtoAssessmentDetailFromOutcome(result)}, nil
 }
 
 // ResolveAssessmentByAnswerSheetID 通过答卷 ID 解析归属键
@@ -97,12 +97,12 @@ func (s *EvaluationService) GetMyAssessmentByAnswerSheetID(ctx context.Context, 
 		return nil, status.Error(codes.NotFound, "测评不存在")
 	}
 
-	v2, err := s.loadAssessmentV2Row(ctx, result.ID)
+	outcome, err := s.loadAssessmentOutcomeRow(ctx, result.ID)
 	if err != nil {
-		v2 = legacyAssessmentV2Result(result)
+		outcome = legacyAssessmentOutcomeResult(result)
 	}
 	return &pb.GetMyAssessmentByAnswerSheetIDResponse{
-		Assessment: toProtoAssessmentDetailFromV2(v2),
+		Assessment: toProtoAssessmentDetailFromOutcome(outcome),
 	}, nil
 }
 
@@ -148,7 +148,7 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 		}
 		items := make([]*pb.AssessmentSummary, 0, len(listResult.Items))
 		for _, item := range listResult.Items {
-			items = append(items, toProtoAssessmentSummaryFromV2(legacyAssessmentV2Result(item)))
+			items = append(items, toProtoAssessmentSummaryFromOutcome(legacyAssessmentOutcomeResult(item)))
 		}
 		total, err := protoInt32FromInt("total", listResult.Total)
 		if err != nil {
@@ -195,13 +195,13 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 	if err != nil {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
-	v2Items, err := assessmentApp.RowsToV2Results(rows)
+	outcomeItems, err := assessmentApp.RowsToOutcomeResults(rows)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	items := make([]*pb.AssessmentSummary, 0, len(v2Items))
-	for _, item := range v2Items {
-		items = append(items, toProtoAssessmentSummaryFromV2(item))
+	items := make([]*pb.AssessmentSummary, 0, len(outcomeItems))
+	for _, item := range outcomeItems {
+		items = append(items, toProtoAssessmentSummaryFromOutcome(item))
 	}
 	totalPages := int32((total + int64(pageSize) - 1) / int64(pageSize))
 	if totalPages == 0 && total > 0 {
@@ -385,14 +385,14 @@ func (s *EvaluationService) GetAssessmentReport(ctx context.Context, req *pb.Get
 		if s.reportQueryService == nil {
 			return nil, status.Error(codes.FailedPrecondition, "report query service is not configured")
 		}
-		result, err := s.reportQueryService.GetV2ByAssessmentID(ctx, req.AssessmentId)
+		result, err := s.reportQueryService.GetOutcomeByAssessmentID(ctx, req.AssessmentId)
 		if err != nil {
 			return nil, toAssessmentQueryGRPCError(err)
 		}
 		if result == nil {
 			return nil, status.Error(codes.NotFound, "报告不存在")
 		}
-		return &pb.GetAssessmentReportResponse{Report: toProtoAssessmentReportFromV2(result)}, nil
+		return &pb.GetAssessmentReportResponse{Report: toProtoAssessmentReportFromOutcome(result)}, nil
 	}
 
 	result, err := s.reportQueryService.GetByAssessmentID(ctx, req.AssessmentId)
@@ -485,7 +485,7 @@ func (s *EvaluationService) validateTesteeAssessmentAccess(ctx context.Context, 
 	return nil
 }
 
-func (s *EvaluationService) loadAssessmentV2Row(ctx context.Context, assessmentID uint64) (*assessmentApp.AssessmentV2Result, error) {
+func (s *EvaluationService) loadAssessmentOutcomeRow(ctx context.Context, assessmentID uint64) (*assessmentApp.AssessmentOutcomeResult, error) {
 	if s.assessmentReader == nil {
 		return nil, status.Error(codes.FailedPrecondition, "assessment read model is not configured")
 	}
@@ -493,7 +493,7 @@ func (s *EvaluationService) loadAssessmentV2Row(ctx context.Context, assessmentI
 	if err != nil {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
-	return assessmentApp.RowToV2Result(*row)
+	return assessmentApp.RowToOutcomeResult(*row)
 }
 
 func normalizeGRPCAssessmentStatuses(raw string) []string {

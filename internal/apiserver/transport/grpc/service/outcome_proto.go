@@ -7,7 +7,7 @@ import (
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
 
-func toInternalOutcomeSummary(result *assessmentApp.AssessmentV2Result) *internalpb.OutcomeSummary {
+func toInternalOutcomeSummary(result *assessmentApp.AssessmentOutcomeResult) *internalpb.OutcomeSummary {
 	if result == nil {
 		return nil
 	}
@@ -59,11 +59,11 @@ func outcomeSummaryFromAssessmentResult(result *assessmentApp.AssessmentResult) 
 	if result == nil {
 		return nil
 	}
-	v2 := legacyAssessmentV2Result(result)
-	return toInternalOutcomeSummary(v2)
+	outcome := legacyAssessmentOutcomeResult(result)
+	return toInternalOutcomeSummary(outcome)
 }
 
-func legacyAssessmentV2Result(result *assessmentApp.AssessmentResult) *assessmentApp.AssessmentV2Result {
+func legacyAssessmentOutcomeResult(result *assessmentApp.AssessmentResult) *assessmentApp.AssessmentOutcomeResult {
 	if result == nil {
 		return nil
 	}
@@ -84,7 +84,7 @@ func legacyAssessmentV2Result(result *assessmentApp.AssessmentResult) *assessmen
 			level = &assessmentApp.ResultLevelResult{Code: lv.Code, Label: lv.Label, Severity: lv.Severity}
 		}
 	}
-	return &assessmentApp.AssessmentV2Result{
+	return &assessmentApp.AssessmentOutcomeResult{
 		ID:                   result.ID,
 		OrgID:                result.OrgID,
 		TesteeID:             result.TesteeID,
@@ -141,7 +141,7 @@ func toEvaluationProtoResultLevel(level *assessmentApp.ResultLevelResult) *evalu
 	}
 }
 
-func toProtoAssessmentDetailFromV2(result *assessmentApp.AssessmentV2Result) *evaluationpb.AssessmentDetail {
+func toProtoAssessmentDetailFromOutcome(result *assessmentApp.AssessmentOutcomeResult) *evaluationpb.AssessmentDetail {
 	if result == nil {
 		return nil
 	}
@@ -177,7 +177,7 @@ func toProtoAssessmentDetailFromV2(result *assessmentApp.AssessmentV2Result) *ev
 	return detail
 }
 
-func toProtoAssessmentSummaryFromV2(result *assessmentApp.AssessmentV2Result) *evaluationpb.AssessmentSummary {
+func toProtoAssessmentSummaryFromOutcome(result *assessmentApp.AssessmentOutcomeResult) *evaluationpb.AssessmentSummary {
 	if result == nil {
 		return nil
 	}
@@ -202,7 +202,7 @@ func toProtoAssessmentSummaryFromV2(result *assessmentApp.AssessmentV2Result) *e
 	return summary
 }
 
-func toProtoAssessmentReportFromV2(result *assessmentApp.ReportV2Result) *evaluationpb.AssessmentReport {
+func toProtoAssessmentReportFromOutcome(result *assessmentApp.ReportOutcomeResult) *evaluationpb.AssessmentReport {
 	if result == nil {
 		return nil
 	}
@@ -250,7 +250,7 @@ func toProtoAssessmentReportFromV2(result *assessmentApp.ReportV2Result) *evalua
 	return report
 }
 
-func fillLegacyAssessmentDetailFields(detail *evaluationpb.AssessmentDetail, result *assessmentApp.AssessmentV2Result) {
+func fillLegacyAssessmentDetailFields(detail *evaluationpb.AssessmentDetail, result *assessmentApp.AssessmentOutcomeResult) {
 	if detail == nil || result == nil {
 		return
 	}
@@ -268,7 +268,7 @@ func fillLegacyAssessmentDetailFields(detail *evaluationpb.AssessmentDetail, res
 	}
 }
 
-func fillLegacyAssessmentSummaryFields(summary *evaluationpb.AssessmentSummary, result *assessmentApp.AssessmentV2Result) {
+func fillLegacyAssessmentSummaryFields(summary *evaluationpb.AssessmentSummary, result *assessmentApp.AssessmentOutcomeResult) {
 	if summary == nil || result == nil {
 		return
 	}

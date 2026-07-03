@@ -491,7 +491,7 @@ make docs-verify
 gRPC proto 位于：
 
 ```text
-internal/apiserver/interface/grpc/proto/
+api/grpc/gen/
 ```
 
 gRPC 服务由 apiserver 暴露，collection-server 和 qs-worker 作为 client 调用 apiserver。

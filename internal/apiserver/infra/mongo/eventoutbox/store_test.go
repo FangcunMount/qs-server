@@ -154,9 +154,9 @@ func TestPendingClaimQueriesPrioritizeMainlineEvents(t *testing.T) {
 		eventcatalog.AssessmentSubmitted,
 		eventcatalog.AssessmentFailed,
 		eventcatalog.ReportGenerated,
-		eventcatalog.ReportGeneratedV2,
+		eventcatalog.ReportGeneratedOutcome,
 		eventcatalog.AssessmentInterpreted,
-		eventcatalog.AssessmentInterpretedV2,
+		eventcatalog.AssessmentInterpretedOutcome,
 	}
 	assertEventTypeOperator(t, queries[1].filter, "$in", wantP1)
 	if _, ok := queries[2].filter["event_type"]; ok {

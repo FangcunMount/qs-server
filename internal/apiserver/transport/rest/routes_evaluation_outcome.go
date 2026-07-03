@@ -5,8 +5,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// registerEvaluationV2ProtectedRoutes 注册评估模块 v2 受保护路由。
-func (r *Router) registerEvaluationV2ProtectedRoutes(apiV2 *gin.RouterGroup) {
+// registerEvaluationOutcomeProtectedRoutes 注册评估模块 outcome 受保护路由。
+func (r *Router) registerEvaluationOutcomeProtectedRoutes(apiV2 *gin.RouterGroup) {
 	if r.deps.Evaluation.ManagementService == nil ||
 		r.deps.Evaluation.ProtectedQueryService == nil {
 		return
@@ -27,7 +27,7 @@ func (r *Router) registerEvaluationV2ProtectedRoutes(apiV2 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.ListAssessmentsV2,
+				evalHandler.ListAssessmentsOutcome,
 			)...)
 			assessments.GET("/:id", r.rateLimitedHandlers(
 				r.rateCfg,
@@ -35,7 +35,7 @@ func (r *Router) registerEvaluationV2ProtectedRoutes(apiV2 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.GetAssessmentV2,
+				evalHandler.GetAssessmentOutcome,
 			)...)
 			assessments.GET("/:id/report", r.rateLimitedHandlers(
 				r.rateCfg,
@@ -43,7 +43,7 @@ func (r *Router) registerEvaluationV2ProtectedRoutes(apiV2 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.GetReportV2,
+				evalHandler.GetReportOutcome,
 			)...)
 		}
 
@@ -55,7 +55,7 @@ func (r *Router) registerEvaluationV2ProtectedRoutes(apiV2 *gin.RouterGroup) {
 				r.rateCfg.QueryGlobalBurst,
 				r.rateCfg.QueryUserQPS,
 				r.rateCfg.QueryUserBurst,
-				evalHandler.ListReportsV2,
+				evalHandler.ListReportsOutcome,
 			)...)
 		}
 	}
