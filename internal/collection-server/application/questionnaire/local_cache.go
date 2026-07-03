@@ -1,10 +1,9 @@
 package questionnaire
 
 import (
-	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/localttlcache"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 )
 
 // LocalCacheOptions 进程内 L1 缓存配置。
@@ -18,23 +17,23 @@ type LocalCacheOptions struct {
 
 // LocalCache 已发布问卷 REST DTO 的进程内 TTL 缓存。
 type LocalCache struct {
-	inner *localttlcache.Cache[*QuestionnaireResponse]
+	inner *catalogl1.DetailCache[*QuestionnaireResponse]
 }
 
 // NewLocalCache 创建进程内问卷详情缓存。
 func NewLocalCache(opts LocalCacheOptions) *LocalCache {
-	ttl := opts.TTL
-	if ttl <= 0 {
-		ttl = defaultLocalCacheTTLSeconds * time.Second
-	}
 	return &LocalCache{
-		inner: localttlcache.New(localttlcache.Options{
-			TTL:            ttl,
+		inner: catalogl1.NewDetailCache(catalogl1.Options{
+			TTL:            opts.TTL,
 			MaxEntries:     opts.MaxEntries,
 			TTLJitterRatio: opts.TTLJitterRatio,
 			OnHit:          opts.OnHit,
 			OnMiss:         opts.OnMiss,
-		}, cloneResponse),
+		}, catalogl1.DetailHooks[*QuestionnaireResponse]{
+			KeyFn:  cacheKey,
+			Clone:  cloneResponse,
+			Prefix: "published:",
+		}),
 	}
 }
 
@@ -42,27 +41,21 @@ func (c *LocalCache) Get(code, version string) (*QuestionnaireResponse, bool) {
 	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.inner.Get(cacheKey(code, version))
+	return c.inner.Get(code, version)
 }
 
 func (c *LocalCache) Set(code, version string, value *QuestionnaireResponse) {
-	if c == nil || c.inner == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.inner.Set(cacheKey(code, version), value)
+	c.inner.Set(code, version, value)
 }
 
 func (c *LocalCache) Delete(code, version string) {
 	if c == nil || c.inner == nil {
 		return
 	}
-	code = strings.ToLower(strings.TrimSpace(code))
-	version = strings.TrimSpace(version)
-	if version == "" {
-		c.inner.DeletePrefix("published:" + code)
-		return
-	}
-	c.inner.Delete(cacheKey(code, version))
+	c.inner.Delete(code, version)
 }
 
 func (c *LocalCache) Stats() (hits, misses uint64) {

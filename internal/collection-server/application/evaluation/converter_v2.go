@@ -3,10 +3,10 @@ package evaluation
 import (
 	"strconv"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 )
 
-func AssessmentDetailV2FromOutput(detail *grpcclient.AssessmentDetailV2Output) *AssessmentDetailV2Response {
+func AssessmentDetailV2FromOutput(detail *grpcbridge.AssessmentDetailV2Output) *AssessmentDetailV2Response {
 	if detail == nil {
 		return nil
 	}
@@ -30,7 +30,7 @@ func AssessmentDetailV2FromOutput(detail *grpcclient.AssessmentDetailV2Output) *
 	}
 }
 
-func AssessmentSummaryV2FromOutput(summary grpcclient.AssessmentSummaryV2Output) AssessmentSummaryV2Response {
+func AssessmentSummaryV2FromOutput(summary grpcbridge.AssessmentSummaryV2Output) AssessmentSummaryV2Response {
 	return AssessmentSummaryV2Response{
 		ID:                   strconv.FormatUint(summary.ID, 10),
 		QuestionnaireCode:    summary.QuestionnaireCode,
@@ -46,7 +46,7 @@ func AssessmentSummaryV2FromOutput(summary grpcclient.AssessmentSummaryV2Output)
 	}
 }
 
-func ListAssessmentsV2FromOutput(resp *grpcclient.ListAssessmentsV2Output) *ListAssessmentsV2Response {
+func ListAssessmentsV2FromOutput(resp *grpcbridge.ListAssessmentsV2Output) *ListAssessmentsV2Response {
 	if resp == nil {
 		return nil
 	}
@@ -63,7 +63,7 @@ func ListAssessmentsV2FromOutput(resp *grpcclient.ListAssessmentsV2Output) *List
 	}
 }
 
-func AssessmentReportV2FromOutput(report *grpcclient.AssessmentReportV2Output) *AssessmentReportV2Response {
+func AssessmentReportV2FromOutput(report *grpcbridge.AssessmentReportV2Output) *AssessmentReportV2Response {
 	if report == nil {
 		return nil
 	}
@@ -100,7 +100,7 @@ func AssessmentReportV2FromOutput(report *grpcclient.AssessmentReportV2Output) *
 	}
 }
 
-func modelIdentityFromOutput(model grpcclient.ModelIdentityOutput) ModelIdentityResponse {
+func modelIdentityFromOutput(model grpcbridge.ModelIdentityOutput) ModelIdentityResponse {
 	return ModelIdentityResponse{
 		Kind:      model.Kind,
 		SubKind:   model.SubKind,
@@ -111,7 +111,7 @@ func modelIdentityFromOutput(model grpcclient.ModelIdentityOutput) ModelIdentity
 	}
 }
 
-func scoreValueFromOutput(score *grpcclient.ScoreValueOutput) *ScoreValueResponse {
+func scoreValueFromOutput(score *grpcbridge.ScoreValueOutput) *ScoreValueResponse {
 	if score == nil {
 		return nil
 	}
@@ -123,7 +123,7 @@ func scoreValueFromOutput(score *grpcclient.ScoreValueOutput) *ScoreValueRespons
 	}
 }
 
-func resultLevelFromOutput(level *grpcclient.ResultLevelOutput) *ResultLevelResponse {
+func resultLevelFromOutput(level *grpcbridge.ResultLevelOutput) *ResultLevelResponse {
 	if level == nil {
 		return nil
 	}
@@ -134,7 +134,7 @@ func resultLevelFromOutput(level *grpcclient.ResultLevelOutput) *ResultLevelResp
 	}
 }
 
-func modelExtraFromOutput(extra *grpcclient.ModelExtraOutput) *ModelExtraResponse {
+func modelExtraFromOutput(extra *grpcbridge.ModelExtraOutput) *ModelExtraResponse {
 	if extra == nil {
 		return nil
 	}

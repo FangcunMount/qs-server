@@ -156,6 +156,9 @@ func (c *Container) Initialize() error {
 		return nil
 	}
 
+	// 确保 cache singleflight coordinator 初始化
+	ensureCacheSingleflightCoordinator()
+
 	// 初始化事件发布器（所有模块共享）
 	c.initEventPublisher()
 	statisticsApp.InstallFootprintDurableStagingPolicy(

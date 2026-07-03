@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
@@ -64,9 +65,8 @@ type Container struct {
 	reportNotifier                    reportnotify.Notifier
 	waitWatcherCancel                 context.CancelFunc
 	reportEventsHandler               *ws.ReportEventsHandler
-	questionnaireCacheWatcherCancel   context.CancelFunc
-	scaleCacheWatcherCancel           context.CancelFunc
-	personalityCacheWatcherCancel     context.CancelFunc
+	catalogCacheWatcherCancels        []context.CancelFunc
+	l1PeekRegistry                    *catalogl1.PeekRegistry
 
 	// 接口层处理器
 	answerSheetHandler                  *handler.AnswerSheetHandler
@@ -339,6 +339,13 @@ func (c *Container) QuestionnaireQueryService() *questionnaire.QueryService {
 		return nil
 	}
 	return c.questionnaireQueryService
+}
+
+func (c *Container) CatalogL1PeekRegistry() *catalogl1.PeekRegistry {
+	if c == nil {
+		return nil
+	}
+	return c.l1PeekRegistry
 }
 
 func (c *Container) SubmitConcurrencyGate() *concurrency.Gate {

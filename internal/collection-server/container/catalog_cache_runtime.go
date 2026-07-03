@@ -39,18 +39,12 @@ func (c *Container) initCatalogCaches() catalogCaches {
 }
 
 func (c *Container) cleanupCatalogCaches() {
-	if c.questionnaireCacheWatcherCancel != nil {
-		c.questionnaireCacheWatcherCancel()
-		c.questionnaireCacheWatcherCancel = nil
+	for _, cancel := range c.catalogCacheWatcherCancels {
+		if cancel != nil {
+			cancel()
+		}
 	}
-	if c.scaleCacheWatcherCancel != nil {
-		c.scaleCacheWatcherCancel()
-		c.scaleCacheWatcherCancel = nil
-	}
-	if c.personalityCacheWatcherCancel != nil {
-		c.personalityCacheWatcherCancel()
-		c.personalityCacheWatcherCancel = nil
-	}
+	c.catalogCacheWatcherCancels = nil
 }
 
 func questionnaireCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
@@ -194,7 +188,7 @@ func (c *Container) startQuestionnaireCacheSignalWatcher(cache questionnaire.Pub
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
 	questionnaire.StartCacheSignalWatcher(watchCtx, signaler, cache)
-	c.questionnaireCacheWatcherCancel = cancel
+	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
 }
 
 func (c *Container) startScaleCacheSignalWatcher(cache scale.CatalogCache) {
@@ -212,7 +206,7 @@ func (c *Container) startScaleCacheSignalWatcher(cache scale.CatalogCache) {
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
 	scale.StartCacheSignalWatcher(watchCtx, signaler, cache)
-	c.scaleCacheWatcherCancel = cancel
+	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
 }
 
 func (c *Container) startPersonalityCacheSignalWatcher(cache personalitymodel.CatalogCache) {
@@ -230,7 +224,7 @@ func (c *Container) startPersonalityCacheSignalWatcher(cache personalitymodel.Ca
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
 	personalitymodel.StartCacheSignalWatcher(watchCtx, signaler, cache)
-	c.personalityCacheWatcherCancel = cancel
+	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
 }
 
 func (c *Container) cacheSignalingStandalone(label string) (*goredis.Client, cachesignal.SignalingOptions, bool) {

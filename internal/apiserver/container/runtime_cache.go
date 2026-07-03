@@ -3,6 +3,7 @@ package container
 import (
 	"context"
 	"strings"
+	"sync"
 
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -21,6 +22,15 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	redis "github.com/redis/go-redis/v9"
 )
+
+var initCacheSingleflight sync.Once
+
+// ensureCacheSingleflightCoordinator 确保 cache singleflight coordinator 初始化
+func ensureCacheSingleflightCoordinator() {
+	initCacheSingleflight.Do(func() {
+		scaleCache.SetDefaultSingleflightCoordinator(scaleCache.NewSingleflightCoordinator())
+	})
+}
 
 func (c *Container) CacheHandle(family cacheplane.Family) *cacheplane.Handle {
 	if c == nil || c.cache == nil {

@@ -66,11 +66,13 @@ flowchart LR
 ### 2.1 公共实现
 
 | 项 | 说明 |
-|----|------|
-| 包 | `internal/pkg/localttlcache` |
+| --- | --- |
+| 包 | `application/catalogl1`（泛型多桶 + `PeekRegistry` 声明式 L1 peek） |
+| 底层 | `internal/pkg/localttlcache` + `loadguard.Coalescer`（singleflight 合并 miss） |
+| 读穿透 | `catalogreadthrough`（问卷）/ `catalogl1.ReadThrough`（量表、人格） |
 | 语义 | FIFO + TTL；`Get/Set` 经 `clone` 深拷贝，隔离调用方修改 |
-| 模式 | QueryService **cache-aside** + 可选 `singleflight` 合并 miss |
-| nil/error | **不入缓存** |
+| 模式 | QueryService **cache-aside** + 可选 singleflight 合并 miss |
+| nil/error | **不入缓存**（typed nil 用 reflect 判定） |
 
 统一接线：`internal/collection-server/container/catalog_cache_runtime.go`
 

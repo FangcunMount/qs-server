@@ -5,17 +5,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
-	"golang.org/x/sync/singleflight"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
-type scaleClient interface {
-	GetScale(ctx context.Context, code string) (*grpcclient.ScaleOutput, error)
-	ListScales(ctx context.Context, page, pageSize int32, status, title, category string, stages, applicableAges, reporters, tags []string) (*grpcclient.ListScalesOutput, error)
-	ListHotScales(ctx context.Context, limit, windowDays int32) (*grpcclient.ListHotScalesOutput, error)
-	GetScaleCategories(ctx context.Context) (*grpcclient.ScaleCategoriesOutput, error)
-}
+type scaleClient = grpcbridge.ScaleReader
 
 // QueryService 量表查询服务
 // 作为 BFF 层的薄服务，主要职责：
@@ -23,10 +18,10 @@ type scaleClient interface {
 // 2. 转换 gRPC 响应到 REST DTO
 // 3. 可选：缓存热点数据
 type QueryService struct {
-	scaleClient       scaleClient
-	cache             CatalogCache
-	singleflightGroup singleflight.Group
-	useSingleflight   bool
+	scaleClient     scaleClient
+	cache           CatalogCache
+	coalescer       loadguard.Coalescer
+	useSingleflight bool
 }
 
 // NewQueryService 创建量表查询服务
@@ -35,11 +30,15 @@ func NewQueryService(
 	cache CatalogCache,
 	useSingleflight bool,
 ) *QueryService {
-	return &QueryService{
+	svc := &QueryService{
 		scaleClient:     scaleClient,
 		cache:           cache,
 		useSingleflight: useSingleflight,
 	}
+	if useSingleflight {
+		svc.coalescer = loadguard.NewCoalescer(true)
+	}
+	return svc
 }
 
 // HasCachedDetail 进程内 L1 是否已有量表详情。
@@ -329,7 +328,7 @@ func logScaleGRPCError(message string, err error) {
 }
 
 // convertScale 转换量表
-func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleResponse {
+func (s *QueryService) convertScale(scale *grpcbridge.ScaleOutput) *ScaleResponse {
 	factors := make([]FactorResponse, len(scale.Factors))
 	for i, factor := range scale.Factors {
 		factors[i] = s.convertFactor(&factor)
@@ -353,7 +352,7 @@ func (s *QueryService) convertScale(scale *grpcclient.ScaleOutput) *ScaleRespons
 }
 
 // convertFactor 转换因子
-func (s *QueryService) convertFactor(f *grpcclient.FactorOutput) FactorResponse {
+func (s *QueryService) convertFactor(f *grpcbridge.FactorOutput) FactorResponse {
 	rules := make([]InterpretRuleResponse, len(f.InterpretRules))
 	for i, rule := range f.InterpretRules {
 		rules[i] = InterpretRuleResponse{

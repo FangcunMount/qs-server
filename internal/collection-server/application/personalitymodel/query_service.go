@@ -4,31 +4,31 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
-	"golang.org/x/sync/singleflight"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
-type personalityModelClient interface {
-	GetPersonalityModel(ctx context.Context, code string) (*grpcclient.PersonalityModelOutput, error)
-	ListPersonalityModels(ctx context.Context, page, pageSize int32, algorithm string) (*grpcclient.ListPersonalityModelsOutput, error)
-	GetPersonalityModelCategories(ctx context.Context) (*grpcclient.PersonalityModelCategoriesOutput, error)
-}
+type personalityModelClient = grpcbridge.PersonalityModelReader
 
 // QueryService is the BFF layer for personality model catalog reads.
 type QueryService struct {
-	client            personalityModelClient
-	cache             CatalogCache
-	singleflightGroup singleflight.Group
-	useSingleflight   bool
+	client          personalityModelClient
+	cache           CatalogCache
+	coalescer       loadguard.Coalescer
+	useSingleflight bool
 }
 
 func NewQueryService(client personalityModelClient, cache CatalogCache, useSingleflight bool) *QueryService {
-	return &QueryService{
+	svc := &QueryService{
 		client:          client,
 		cache:           cache,
 		useSingleflight: useSingleflight,
 	}
+	if useSingleflight {
+		svc.coalescer = loadguard.NewCoalescer(true)
+	}
+	return svc
 }
 
 // HasCachedDetail 进程内 L1 是否已有人格模型详情。
@@ -160,7 +160,7 @@ func (s *QueryService) normalizeListRequest(req *ListPersonalityModelsRequest) {
 	}
 }
 
-func convertSummary(model grpcclient.PersonalityModelSummaryOutput) PersonalityModelSummaryResponse {
+func convertSummary(model grpcbridge.PersonalityModelSummaryOutput) PersonalityModelSummaryResponse {
 	return PersonalityModelSummaryResponse{
 		Code:                 model.Code,
 		Version:              model.Version,
@@ -174,7 +174,7 @@ func convertSummary(model grpcclient.PersonalityModelSummaryOutput) PersonalityM
 	}
 }
 
-func convertDetail(model *grpcclient.PersonalityModelOutput) *PersonalityModelResponse {
+func convertDetail(model *grpcbridge.PersonalityModelOutput) *PersonalityModelResponse {
 	dimensions := make([]PersonalityDimensionResponse, 0, len(model.Dimensions))
 	for _, dim := range model.Dimensions {
 		dimensions = append(dimensions, PersonalityDimensionResponse{

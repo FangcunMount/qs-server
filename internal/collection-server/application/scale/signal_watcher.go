@@ -2,11 +2,9 @@ package scale
 
 import (
 	"context"
-	"time"
 
-	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/component-base/pkg/signaling"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
 )
 
@@ -16,28 +14,11 @@ func StartCacheSignalWatcher(
 	signaler *signalredis.Signaler[cachesignal.ScaleCacheChangedSignal],
 	cache CatalogCache,
 ) {
-	if signaler == nil || cache == nil {
-		return
-	}
-	go func() {
-		for {
-			err := signaler.Watch(ctx, func(msgCtx context.Context, signal cachesignal.ScaleCacheChangedSignal) {
-				if signal.Code == "" {
-					return
-				}
-				EvictCatalogOnSignal(cache, signal.Code)
-				logger.L(msgCtx).Debugw("scale cache signal evicted",
-					"code", signal.Code,
-					"action", signal.Action,
-				)
-			})
-			if ctx.Err() != nil {
-				return
-			}
-			logger.L(ctx).Errorw("scale cache signal watcher stopped", "error", err)
-			time.Sleep(time.Second)
+	catalogl1.StartSignalWatcher(ctx, signaler, func(s cachesignal.ScaleCacheChangedSignal) string {
+		return s.Code
+	}, func(code string) {
+		if cache != nil && code != "" {
+			cache.EvictOnSignal(code)
 		}
-	}()
+	}, "scale cache signal evicted")
 }
-
-var _ signaling.Watcher[cachesignal.ScaleCacheChangedSignal] = (*signalredis.Signaler[cachesignal.ScaleCacheChangedSignal])(nil)

@@ -54,7 +54,7 @@ func TestEvictCatalogOnSignalClearsDetailAndList(t *testing.T) {
 	cache.SetListByRequest(&ListPersonalityModelsRequest{Page: 1, PageSize: 20}, &ListPersonalityModelsResponse{Total: 1})
 	cache.SetCategories(&PersonalityModelCategoriesResponse{})
 
-	EvictCatalogOnSignal(cache, "mbti")
+	cache.EvictOnSignal("mbti")
 	if _, ok := cache.GetDetail("mbti"); ok {
 		t.Fatal("expected detail evicted")
 	}

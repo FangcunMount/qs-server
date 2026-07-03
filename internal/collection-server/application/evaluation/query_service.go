@@ -7,7 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 )
 
 // QueryService 测评查询服务
@@ -15,14 +15,14 @@ import (
 // 1. 调用 apiserver 的 gRPC 服务
 // 2. 转换 gRPC 响应到 REST DTO
 type QueryService struct {
-	evaluationClient *grpcclient.EvaluationClient
-	scaleClient      *grpcclient.ScaleClient
+	evaluationClient grpcbridge.EvaluationReader
+	scaleClient      grpcbridge.ScaleReader
 }
 
 // NewQueryService 创建测评查询服务
 func NewQueryService(
-	evaluationClient *grpcclient.EvaluationClient,
-	scaleClient *grpcclient.ScaleClient,
+	evaluationClient grpcbridge.EvaluationReader,
+	scaleClient grpcbridge.ScaleReader,
 ) *QueryService {
 	return &QueryService{
 		evaluationClient: evaluationClient,
@@ -381,7 +381,7 @@ func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uin
 }
 
 // toSuggestionResponses 转换为建议响应列表
-func toSuggestionResponses(outputs []grpcclient.SuggestionOutput) []SuggestionResponse {
+func toSuggestionResponses(outputs []grpcbridge.SuggestionOutput) []SuggestionResponse {
 	if len(outputs) == 0 {
 		return nil
 	}

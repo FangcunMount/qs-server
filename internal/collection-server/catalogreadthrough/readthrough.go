@@ -1,6 +1,8 @@
 package catalogreadthrough
 
 import (
+	"reflect"
+
 	"golang.org/x/sync/singleflight"
 )
 
@@ -29,15 +31,28 @@ func ReadThrough[T any](
 				}
 			}
 			resp, loadErr := load()
-			return finalizeLoaded(resp, loadErr, set, clone)
+			if loadErr != nil {
+				return nil, loadErr
+			}
+			if isNilValue(resp) {
+				sf.Forget(key)
+				return resp, nil
+			}
+			return finalizeLoaded(resp, nil, set, clone)
 		})
 		if err != nil {
 			return zero, err
 		}
 		if value == nil {
+			sf.Forget(key)
 			return zero, nil
 		}
-		return value.(T), nil
+		typed, ok := value.(T)
+		if !ok || isNilValue(typed) {
+			sf.Forget(key)
+			return zero, nil
+		}
+		return typed, nil
 	}
 
 	resp, err := load()
@@ -65,5 +80,14 @@ func finalizeLoaded[T any](resp T, err error, set func(T), clone func(T) T) (T, 
 }
 
 func isNilValue[T any](v T) bool {
-	return any(v) == nil
+	rv := reflect.ValueOf(v)
+	if !rv.IsValid() {
+		return true
+	}
+	switch rv.Kind() {
+	case reflect.Pointer, reflect.Map, reflect.Interface, reflect.Slice, reflect.Chan, reflect.Func:
+		return rv.IsNil()
+	default:
+		return false
+	}
 }

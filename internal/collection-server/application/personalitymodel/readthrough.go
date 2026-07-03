@@ -1,7 +1,7 @@
 package personalitymodel
 
 import (
-	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 )
 
 func (s *QueryService) readThroughDetail(
@@ -14,15 +14,7 @@ func (s *QueryService) readThroughDetail(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		clonePersonalityModelResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, clonePersonalityModelResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }
 
 func (s *QueryService) readThroughList(
@@ -35,15 +27,7 @@ func (s *QueryService) readThroughList(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		cloneListPersonalityModelsResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, cloneListPersonalityModelsResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }
 
 func (s *QueryService) readThroughCategories(
@@ -56,13 +40,5 @@ func (s *QueryService) readThroughCategories(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		clonePersonalityModelCategoriesResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, clonePersonalityModelCategoriesResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }

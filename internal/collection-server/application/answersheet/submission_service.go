@@ -9,8 +9,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
@@ -19,7 +19,7 @@ import (
 )
 
 type actorLookupClient interface {
-	GetTestee(ctx context.Context, testeeID uint64) (*grpcclient.TesteeResponse, error)
+	GetTestee(ctx context.Context, testeeID uint64) (*grpcbridge.TesteeResponse, error)
 	TesteeExists(ctx context.Context, orgID, iamProfileID uint64) (exists bool, testeeID uint64, err error)
 }
 
@@ -31,8 +31,8 @@ type IdempotencyGuard interface {
 }
 
 type answerSheetGateway interface {
-	SaveAnswerSheet(ctx context.Context, input *grpcclient.SaveAnswerSheetInput) (*grpcclient.SaveAnswerSheetOutput, error)
-	GetAnswerSheet(ctx context.Context, id uint64) (*grpcclient.AnswerSheetOutput, error)
+	SaveAnswerSheet(ctx context.Context, input *grpcbridge.SaveAnswerSheetInput) (*grpcbridge.SaveAnswerSheetOutput, error)
+	GetAnswerSheet(ctx context.Context, id uint64) (*grpcbridge.AnswerSheetOutput, error)
 }
 
 type profileLinkChecker interface {
@@ -225,7 +225,7 @@ func (s *SubmissionService) validateWriter(ctx context.Context, writerID uint64)
 }
 
 // validateProfileAccess verifies active ProfileLink access and returns canonical testee data.
-func (s *SubmissionService) validateProfileAccess(ctx context.Context, writerID, testeeID uint64) (*grpcclient.TesteeResponse, uint64, error) {
+func (s *SubmissionService) validateProfileAccess(ctx context.Context, writerID, testeeID uint64) (*grpcbridge.TesteeResponse, uint64, error) {
 	l := logger.L(ctx)
 
 	// 查询受试者信息（需要获取 OrgID 和 IAMProfileID）。
@@ -262,7 +262,7 @@ func (s *SubmissionService) validateProfileAccess(ctx context.Context, writerID,
 	return testee, resolvedTesteeID, nil
 }
 
-func (s *SubmissionService) resolveCanonicalTestee(ctx context.Context, rawTesteeID uint64) (*grpcclient.TesteeResponse, uint64, error) {
+func (s *SubmissionService) resolveCanonicalTestee(ctx context.Context, rawTesteeID uint64) (*grpcbridge.TesteeResponse, uint64, error) {
 	testee, err := s.actorClient.GetTestee(ctx, rawTesteeID)
 	if err == nil {
 		return testee, rawTesteeID, nil
@@ -333,10 +333,10 @@ func (s *SubmissionService) checkProfileLinkAccess(ctx context.Context, writerID
 }
 
 // convertAnswers 转换答案数据
-func (s *SubmissionService) convertAnswers(answers []Answer) []grpcclient.AnswerInput {
-	result := make([]grpcclient.AnswerInput, len(answers))
+func (s *SubmissionService) convertAnswers(answers []Answer) []grpcbridge.AnswerInput {
+	result := make([]grpcbridge.AnswerInput, len(answers))
 	for i, a := range answers {
-		result[i] = grpcclient.AnswerInput{
+		result[i] = grpcbridge.AnswerInput{
 			QuestionCode: a.QuestionCode,
 			QuestionType: a.QuestionType,
 			Score:        a.Score,
@@ -357,7 +357,7 @@ func normalizeAnswerValueForGRPC(questionType, value string) string {
 }
 
 // callSaveAnswerSheet 调用 gRPC 服务保存答卷
-func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, orgID, testeeID uint64, req *SubmitAnswerSheetRequest, answers []grpcclient.AnswerInput) (*grpcclient.SaveAnswerSheetOutput, error) {
+func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, orgID, testeeID uint64, req *SubmitAnswerSheetRequest, answers []grpcbridge.AnswerInput) (*grpcbridge.SaveAnswerSheetOutput, error) {
 	l := logger.L(ctx)
 
 	l.Debugw("调用 gRPC 服务提交答卷",
@@ -366,7 +366,7 @@ func (s *SubmissionService) callSaveAnswerSheet(ctx context.Context, writerID, o
 		"org_id", orgID,
 	)
 
-	result, err := s.answerSheetClient.SaveAnswerSheet(ctx, &grpcclient.SaveAnswerSheetInput{
+	result, err := s.answerSheetClient.SaveAnswerSheet(ctx, &grpcbridge.SaveAnswerSheetInput{
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		IdempotencyKey:       req.IdempotencyKey,

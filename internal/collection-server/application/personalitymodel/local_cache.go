@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/localttlcache"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 )
 
 const (
@@ -16,9 +16,7 @@ const (
 
 // LocalCatalogCache 人格模型目录进程内 TTL 缓存。
 type LocalCatalogCache struct {
-	detail     *localttlcache.Cache[*PersonalityModelResponse]
-	list       *localttlcache.Cache[*ListPersonalityModelsResponse]
-	categories *localttlcache.Cache[*PersonalityModelCategoriesResponse]
+	inner *catalogl1.MultiCache[*PersonalityModelResponse, *ListPersonalityModelsResponse, *PersonalityModelCategoriesResponse, struct{}]
 }
 
 // LocalCatalogCacheOptions 人格模型目录 L1 配置。
@@ -32,23 +30,23 @@ type LocalCatalogCacheOptions struct {
 
 // NewLocalCatalogCache 创建人格模型目录 L1 缓存。
 func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
-	if opts.TTL <= 0 {
-		opts.TTL = defaultCatalogCacheTTLSeconds * time.Second
-	}
-	if opts.MaxEntries <= 0 {
-		opts.MaxEntries = 256
-	}
-	base := localttlcache.Options{
-		TTL:            opts.TTL,
-		MaxEntries:     opts.MaxEntries,
-		TTLJitterRatio: opts.TTLJitterRatio,
-		OnHit:          opts.OnHit,
-		OnMiss:         opts.OnMiss,
-	}
 	return &LocalCatalogCache{
-		detail:     localttlcache.New(base, clonePersonalityModelResponse),
-		list:       localttlcache.New(base, cloneListPersonalityModelsResponse),
-		categories: localttlcache.New(base, clonePersonalityModelCategoriesResponse),
+		inner: catalogl1.NewMultiCache(catalogl1.Options{
+			TTL:            opts.TTL,
+			MaxEntries:     opts.MaxEntries,
+			TTLJitterRatio: opts.TTLJitterRatio,
+			OnHit:          opts.OnHit,
+			OnMiss:         opts.OnMiss,
+		}, catalogl1.MultiHooks[*PersonalityModelResponse, *ListPersonalityModelsResponse, *PersonalityModelCategoriesResponse, struct{}]{
+			DetailKey:       detailCacheKey,
+			ListKey:         func(req any) string { return listCacheKey(req.(*ListPersonalityModelsRequest)) },
+			CategoriesKey:   cacheKeyCategories,
+			ListPrefix:      cacheKeyPrefixList,
+			CloneDetail:     clonePersonalityModelResponse,
+			CloneList:       cloneListPersonalityModelsResponse,
+			CloneCategories: clonePersonalityModelCategoriesResponse,
+			CloneHot:        nil,
+		}),
 	}
 }
 
@@ -64,81 +62,63 @@ func listCacheKey(req *ListPersonalityModelsRequest) string {
 }
 
 func (c *LocalCatalogCache) GetDetail(code string) (*PersonalityModelResponse, bool) {
-	if c == nil || c.detail == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.detail.Get(detailCacheKey(code))
+	return c.inner.GetDetail(code)
 }
 
 func (c *LocalCatalogCache) SetDetail(code string, value *PersonalityModelResponse) {
-	if c == nil || c.detail == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.detail.Set(detailCacheKey(code), value)
+	c.inner.SetDetail(code, value)
 }
 
 func (c *LocalCatalogCache) GetListByRequest(req *ListPersonalityModelsRequest) (*ListPersonalityModelsResponse, bool) {
-	if c == nil || c.list == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.list.Get(listCacheKey(req))
+	if req == nil {
+		req = &ListPersonalityModelsRequest{}
+	}
+	return c.inner.GetListByRequest(req)
 }
 
 func (c *LocalCatalogCache) SetListByRequest(req *ListPersonalityModelsRequest, value *ListPersonalityModelsResponse) {
-	if c == nil || c.list == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.list.Set(listCacheKey(req), value)
+	if req == nil {
+		req = &ListPersonalityModelsRequest{}
+	}
+	c.inner.SetListByRequest(req, value)
 }
 
 func (c *LocalCatalogCache) GetCategories() (*PersonalityModelCategoriesResponse, bool) {
-	if c == nil || c.categories == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.categories.Get(cacheKeyCategories)
+	return c.inner.GetCategories()
 }
 
 func (c *LocalCatalogCache) SetCategories(value *PersonalityModelCategoriesResponse) {
-	if c == nil || c.categories == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.categories.Set(cacheKeyCategories, value)
+	c.inner.SetCategories(value)
 }
 
 func (c *LocalCatalogCache) EvictOnSignal(code string) {
-	if c == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	code = strings.ToLower(strings.TrimSpace(code))
-	if code != "" && c.detail != nil {
-		c.detail.Delete(detailCacheKey(code))
-	}
-	if c.list != nil {
-		c.list.DeletePrefix(cacheKeyPrefixList)
-	}
-	if c.categories != nil {
-		c.categories.Delete(cacheKeyCategories)
-	}
+	c.inner.EvictOnSignal(code)
 }
 
 func (c *LocalCatalogCache) Stats() (hits, misses uint64) {
-	if c == nil {
+	if c == nil || c.inner == nil {
 		return 0, 0
 	}
-	for _, part := range []*localttlcache.Cache[*PersonalityModelResponse]{c.detail} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	for _, part := range []*localttlcache.Cache[*ListPersonalityModelsResponse]{c.list} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	for _, part := range []*localttlcache.Cache[*PersonalityModelCategoriesResponse]{c.categories} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	return hits, misses
+	return c.inner.Stats()
 }

@@ -1,7 +1,7 @@
 package scale
 
 import (
-	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 )
 
 func (s *QueryService) readThroughDetail(
@@ -14,15 +14,7 @@ func (s *QueryService) readThroughDetail(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		cloneScaleResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, cloneScaleResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }
 
 func (s *QueryService) readThroughList(
@@ -35,15 +27,7 @@ func (s *QueryService) readThroughList(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		cloneListScalesResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, cloneListScalesResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }
 
 func (s *QueryService) readThroughHot(
@@ -56,15 +40,7 @@ func (s *QueryService) readThroughHot(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		cloneListHotScalesResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, cloneListHotScalesResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }
 
 func (s *QueryService) readThroughCategories(
@@ -77,13 +53,5 @@ func (s *QueryService) readThroughCategories(
 	if s.cache != nil {
 		setFn = set
 	}
-	return catalogreadthrough.ReadThrough(
-		key,
-		get,
-		setFn,
-		load,
-		cloneScaleCategoriesResponse,
-		&s.singleflightGroup,
-		s.cache != nil && s.useSingleflight,
-	)
+	return catalogl1.ReadThrough(key, get, setFn, load, cloneScaleCategoriesResponse, s.coalescer, s.cache != nil && s.useSingleflight)
 }

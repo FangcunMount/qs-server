@@ -7,5 +7,3 @@ type PublishedDetailCache interface {
 	Delete(code, version string)
 	Stats() (hits, misses uint64)
 }
-
-const defaultLocalCacheTTLSeconds = 180

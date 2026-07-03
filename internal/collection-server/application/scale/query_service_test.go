@@ -58,7 +58,7 @@ func TestEvictCatalogOnSignalClearsDetailAndList(t *testing.T) {
 	cache.SetListByRequest(&ListScalesRequest{Page: 1, PageSize: 20}, &ListScalesResponse{Total: 1})
 	cache.SetCategories(&ScaleCategoriesResponse{})
 
-	EvictCatalogOnSignal(cache, "s1")
+	cache.EvictOnSignal("s1")
 	if _, ok := cache.GetDetail("s1"); ok {
 		t.Fatal("expected detail evicted")
 	}

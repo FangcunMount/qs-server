@@ -11,6 +11,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportevents"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
+	appreportstatus "github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	"github.com/coder/websocket"
@@ -223,7 +224,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 			if err := h.pushStatus(ctx, writer, status); err != nil {
 				return
 			}
-			if reportevents.IsTerminalStatus(status.Status) {
+			if appreportstatus.IsTerminalStatus(status.Status) {
 				return
 			}
 
@@ -261,7 +262,7 @@ func (h *ReportEventsHandler) forwardSignals(
 			if err := h.pushStatus(ctx, writer, status); err != nil {
 				return
 			}
-			if reportevents.IsTerminalStatus(status.Status) {
+			if appreportstatus.IsTerminalStatus(status.Status) {
 				_ = writer.conn.Close(websocket.StatusNormalClosure, "completed")
 				return
 			}

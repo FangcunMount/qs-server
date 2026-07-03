@@ -17,5 +17,3 @@ type CatalogCache interface {
 	EvictOnSignal(code string)
 	Stats() (hits, misses uint64)
 }
-
-const defaultCatalogCacheTTLSeconds = 180

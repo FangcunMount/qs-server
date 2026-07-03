@@ -20,7 +20,7 @@ func (o *Options) Validate() []error {
 	errs = append(errs, validatePlanScheduler(o.PlanScheduler)...)
 	errs = append(errs, validateBehaviorPendingReconcile(o.BehaviorPendingReconcile)...)
 	errs = append(errs, validateBehaviorJourneyScan(o.BehaviorJourneyScan)...)
-	errs = append(errs, validateOutboxRelay(o.OutboxRelay)...)
+	errs = append(errs, validateOutboxRelay(o.OutboxRelay, o.MySQLOptions.MaxOpenConnections)...)
 	errs = append(errs, validateStatisticsSync(o.StatisticsSync)...)
 	errs = append(errs, validateCacheOptions(o.Cache)...)
 
@@ -171,12 +171,13 @@ func validateBehaviorJourneyScan(opts *BehaviorJourneyScanOptions) []error {
 	return errs
 }
 
-func validateOutboxRelay(opts *OutboxRelayOptions) []error {
+func validateOutboxRelay(opts *OutboxRelayOptions, mysqlMaxOpen int) []error {
 	if opts == nil {
 		return nil
 	}
 
 	var errs []error
+	maxWorkers := maxOutboxPublishWorkers(mysqlMaxOpen, 0.8)
 	for _, relay := range []struct {
 		name string
 		opt  *OutboxRelayStoreOptions
@@ -196,8 +197,21 @@ func validateOutboxRelay(opts *OutboxRelayOptions) []error {
 		if relay.opt.PublishWorkers <= 0 {
 			errs = append(errs, fmt.Errorf("outbox_relay.%s.publish_workers must be greater than 0", relay.name))
 		}
+		if maxWorkers > 0 && relay.opt.PublishWorkers > maxWorkers {
+			errs = append(errs, fmt.Errorf("outbox_relay.%s.publish_workers (%d) must be <= mysql max_open * 0.8 (%d)", relay.name, relay.opt.PublishWorkers, maxWorkers))
+		}
 	}
 	return errs
+}
+
+func maxOutboxPublishWorkers(mysqlMaxOpen int, ratio float64) int {
+	if mysqlMaxOpen <= 0 {
+		return 0
+	}
+	if ratio <= 0 {
+		ratio = 0.8
+	}
+	return int(float64(mysqlMaxOpen) * ratio)
 }
 
 func validateStatisticsSync(opts *StatisticsSyncOptions) []error {

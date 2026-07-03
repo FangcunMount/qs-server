@@ -5,15 +5,12 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	"golang.org/x/sync/singleflight"
 )
 
-type questionnaireClient interface {
-	GetQuestionnaire(ctx context.Context, code, version string) (*grpcclient.QuestionnaireOutput, error)
-	ListQuestionnaires(ctx context.Context, page, pageSize int32, status, title string) (*grpcclient.ListQuestionnairesOutput, error)
-}
+type questionnaireClient = grpcbridge.QuestionnaireReader
 
 // QueryService 问卷查询服务
 type QueryService struct {
@@ -137,7 +134,7 @@ func logQuestionnaireGRPCError(message string, err error) {
 }
 
 // convertQuestionnaire 转换问卷
-func (s *QueryService) convertQuestionnaire(q *grpcclient.QuestionnaireOutput) *QuestionnaireResponse {
+func (s *QueryService) convertQuestionnaire(q *grpcbridge.QuestionnaireOutput) *QuestionnaireResponse {
 	questions := make([]QuestionResponse, len(q.Questions))
 	for i, question := range q.Questions {
 		questions[i] = s.convertQuestion(&question)
@@ -158,7 +155,7 @@ func (s *QueryService) convertQuestionnaire(q *grpcclient.QuestionnaireOutput) *
 }
 
 // convertQuestion 转换问题
-func (s *QueryService) convertQuestion(q *grpcclient.QuestionOutput) QuestionResponse {
+func (s *QueryService) convertQuestion(q *grpcbridge.QuestionOutput) QuestionResponse {
 	options := make([]OptionResponse, len(q.Options))
 	for i, opt := range q.Options {
 		options[i] = OptionResponse{

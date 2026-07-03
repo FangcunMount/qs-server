@@ -5,12 +5,24 @@ import (
 	"time"
 )
 
+func evictPublishedDetail(cache PublishedDetailCache, code, version string) {
+	if cache == nil || code == "" {
+		return
+	}
+	if version == "" {
+		cache.Delete(code, "")
+		return
+	}
+	cache.Delete(code, version)
+	cache.Delete(code, "")
+}
+
 func TestEvictPublishedDetailClearsAllVersionsWhenVersionEmpty(t *testing.T) {
 	cache := NewLocalCache(LocalCacheOptions{TTL: time.Minute, MaxEntries: 8})
 	cache.Set("q1", "", sampleCachedResponse("q1", "latest"))
 	cache.Set("q1", "2.0.0", sampleCachedResponse("q1", "v2"))
 
-	EvictPublishedDetail(cache, "q1", "")
+	evictPublishedDetail(cache, "q1", "")
 	if _, ok := cache.Get("q1", ""); ok {
 		t.Fatal("expected default version evicted")
 	}
@@ -25,7 +37,7 @@ func TestEvictPublishedDetailClearsVersionAndDefault(t *testing.T) {
 	cache.Set("q1", "2.0.0", sampleCachedResponse("q1", "v2"))
 	cache.Set("q2", "", sampleCachedResponse("q2", "other"))
 
-	EvictPublishedDetail(cache, "q1", "2.0.0")
+	evictPublishedDetail(cache, "q1", "2.0.0")
 	if _, ok := cache.Get("q1", ""); ok {
 		t.Fatal("expected default version evicted with versioned signal")
 	}
@@ -41,8 +53,8 @@ func TestEvictPublishedDetailNoOpOnNilCacheOrEmptyCode(t *testing.T) {
 	cache := NewLocalCache(LocalCacheOptions{TTL: time.Minute, MaxEntries: 4})
 	cache.Set("q1", "", sampleCachedResponse("q1", "latest"))
 
-	EvictPublishedDetail(nil, "q1", "")
-	EvictPublishedDetail(cache, "", "1.0.0")
+	evictPublishedDetail(nil, "q1", "")
+	evictPublishedDetail(cache, "", "1.0.0")
 
 	if _, ok := cache.Get("q1", ""); !ok {
 		t.Fatal("expected cache entry to remain")

@@ -6,6 +6,28 @@ import (
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 )
 
+func TestPersonalityTerminalStatusContract(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		status   string
+		terminal bool
+	}{
+		{status: "interpreted", terminal: true},
+		{status: "failed", terminal: true},
+		{status: "processing", terminal: false},
+	}
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.status, func(t *testing.T) {
+			t.Parallel()
+			if got := IsTerminalStatus(tc.status); got != tc.terminal {
+				t.Fatalf("terminal = %v, want %v", got, tc.terminal)
+			}
+		})
+	}
+}
+
 func TestReportStatusHTTPAndWSMappingContract(t *testing.T) {
 	t.Parallel()
 

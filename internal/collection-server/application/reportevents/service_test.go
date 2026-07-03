@@ -26,11 +26,14 @@ func (f *fakeWaitReport) GetStatus(context.Context, uint64, uint64) (*evaluation
 	return f.status, f.err
 }
 
+func newTestService(wait *fakeWaitReport, medical *fakeMedicalReader) *Service {
+	return NewService(NewDefaultResolver(medical, wait, nil))
+}
+
 func TestServiceAuthorizeMedical(t *testing.T) {
-	svc := NewService(
+	svc := newTestService(
 		&fakeWaitReport{status: &evaluationapp.AssessmentStatusResponse{Status: "processing"}},
 		&fakeMedicalReader{result: &evaluationapp.AssessmentDetailResponse{ID: "1"}},
-		nil,
 	)
 	if err := svc.Authorize(context.Background(), KindMedical, 1, 2); err != nil {
 		t.Fatalf("authorize: %v", err)
@@ -38,14 +41,14 @@ func TestServiceAuthorizeMedical(t *testing.T) {
 }
 
 func TestServiceAuthorizeMedicalDenied(t *testing.T) {
-	svc := NewService(nil, &fakeMedicalReader{result: nil}, nil)
+	svc := newTestService(nil, &fakeMedicalReader{result: nil})
 	if err := svc.Authorize(context.Background(), KindMedical, 1, 2); !errors.Is(err, ErrAssessmentAccess) {
 		t.Fatalf("expected access denied, got %v", err)
 	}
 }
 
 func TestServiceCurrentStatusMedical(t *testing.T) {
-	svc := NewService(
+	svc := newTestService(
 		&fakeWaitReport{status: &evaluationapp.AssessmentStatusResponse{
 			Status:          "completed",
 			Stage:           "completed",
@@ -53,7 +56,6 @@ func TestServiceCurrentStatusMedical(t *testing.T) {
 			UpdatedAt:       1,
 		}},
 		&fakeMedicalReader{result: &evaluationapp.AssessmentDetailResponse{ID: "1"}},
-		nil,
 	)
 	payload, err := svc.CurrentStatus(context.Background(), KindMedical, 1, 2)
 	if err != nil {
@@ -65,7 +67,7 @@ func TestServiceCurrentStatusMedical(t *testing.T) {
 }
 
 func TestServiceInvalidKind(t *testing.T) {
-	svc := NewService(&fakeWaitReport{}, &fakeMedicalReader{}, nil)
+	svc := newTestService(&fakeWaitReport{}, &fakeMedicalReader{})
 	if err := svc.Authorize(context.Background(), "unknown", 1, 2); !errors.Is(err, ErrInvalidKind) {
 		t.Fatalf("expected invalid kind, got %v", err)
 	}

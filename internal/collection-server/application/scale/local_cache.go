@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/localttlcache"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 )
 
 const (
@@ -17,10 +17,7 @@ const (
 
 // LocalCatalogCache 量表目录进程内 TTL 缓存。
 type LocalCatalogCache struct {
-	detail     *localttlcache.Cache[*ScaleResponse]
-	list       *localttlcache.Cache[*ListScalesResponse]
-	categories *localttlcache.Cache[*ScaleCategoriesResponse]
-	hot        *localttlcache.Cache[*ListHotScalesResponse]
+	inner *catalogl1.MultiCache[*ScaleResponse, *ListScalesResponse, *ScaleCategoriesResponse, *ListHotScalesResponse]
 }
 
 // LocalCatalogCacheOptions 量表目录 L1 配置。
@@ -34,24 +31,25 @@ type LocalCatalogCacheOptions struct {
 
 // NewLocalCatalogCache 创建量表目录 L1 缓存。
 func NewLocalCatalogCache(opts LocalCatalogCacheOptions) *LocalCatalogCache {
-	if opts.TTL <= 0 {
-		opts.TTL = defaultCatalogCacheTTLSeconds * time.Second
-	}
-	if opts.MaxEntries <= 0 {
-		opts.MaxEntries = 256
-	}
-	base := localttlcache.Options{
-		TTL:            opts.TTL,
-		MaxEntries:     opts.MaxEntries,
-		TTLJitterRatio: opts.TTLJitterRatio,
-		OnHit:          opts.OnHit,
-		OnMiss:         opts.OnMiss,
-	}
 	return &LocalCatalogCache{
-		detail:     localttlcache.New(base, cloneScaleResponse),
-		list:       localttlcache.New(base, cloneListScalesResponse),
-		categories: localttlcache.New(base, cloneScaleCategoriesResponse),
-		hot:        localttlcache.New(base, cloneListHotScalesResponse),
+		inner: catalogl1.NewMultiCache(catalogl1.Options{
+			TTL:            opts.TTL,
+			MaxEntries:     opts.MaxEntries,
+			TTLJitterRatio: opts.TTLJitterRatio,
+			OnHit:          opts.OnHit,
+			OnMiss:         opts.OnMiss,
+		}, catalogl1.MultiHooks[*ScaleResponse, *ListScalesResponse, *ScaleCategoriesResponse, *ListHotScalesResponse]{
+			DetailKey:       detailCacheKey,
+			ListKey:         func(req any) string { return listCacheKey(req.(*ListScalesRequest)) },
+			CategoriesKey:   cacheKeyCategories,
+			HotKey:          func(req any) string { return hotCacheKey(req.(*ListHotScalesRequest)) },
+			ListPrefix:      cacheKeyPrefixList,
+			HotPrefix:       cacheKeyPrefixHot,
+			CloneDetail:     cloneScaleResponse,
+			CloneList:       cloneListScalesResponse,
+			CloneCategories: cloneScaleCategoriesResponse,
+			CloneHot:        cloneListHotScalesResponse,
+		}),
 	}
 }
 
@@ -86,119 +84,111 @@ func joinKeyParts(parts []string) string {
 }
 
 func (c *LocalCatalogCache) GetDetail(code string) (*ScaleResponse, bool) {
-	if c == nil || c.detail == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.detail.Get(detailCacheKey(code))
+	return c.inner.GetDetail(code)
 }
 
 func (c *LocalCatalogCache) SetDetail(code string, value *ScaleResponse) {
-	if c == nil || c.detail == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.detail.Set(detailCacheKey(code), value)
+	c.inner.SetDetail(code, value)
 }
 
 func (c *LocalCatalogCache) GetList(key string) (*ListScalesResponse, bool) {
-	if c == nil || c.list == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.list.Get(key)
+	return c.inner.GetList(key)
 }
 
 func (c *LocalCatalogCache) SetList(key string, value *ListScalesResponse) {
-	if c == nil || c.list == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.list.Set(key, value)
+	c.inner.SetList(key, value)
 }
 
 func (c *LocalCatalogCache) GetListByRequest(req *ListScalesRequest) (*ListScalesResponse, bool) {
-	return c.GetList(listCacheKey(req))
+	if c == nil || c.inner == nil {
+		return nil, false
+	}
+	if req == nil {
+		req = &ListScalesRequest{}
+	}
+	return c.inner.GetListByRequest(req)
 }
 
 func (c *LocalCatalogCache) SetListByRequest(req *ListScalesRequest, value *ListScalesResponse) {
-	c.SetList(listCacheKey(req), value)
+	if c == nil || c.inner == nil {
+		return
+	}
+	if req == nil {
+		req = &ListScalesRequest{}
+	}
+	c.inner.SetListByRequest(req, value)
 }
 
 func (c *LocalCatalogCache) GetCategories() (*ScaleCategoriesResponse, bool) {
-	if c == nil || c.categories == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.categories.Get(cacheKeyCategories)
+	return c.inner.GetCategories()
 }
 
 func (c *LocalCatalogCache) SetCategories(value *ScaleCategoriesResponse) {
-	if c == nil || c.categories == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.categories.Set(cacheKeyCategories, value)
+	c.inner.SetCategories(value)
 }
 
 func (c *LocalCatalogCache) GetHot(key string) (*ListHotScalesResponse, bool) {
-	if c == nil || c.hot == nil {
+	if c == nil || c.inner == nil {
 		return nil, false
 	}
-	return c.hot.Get(key)
+	return c.inner.GetHot(key)
 }
 
 func (c *LocalCatalogCache) SetHot(key string, value *ListHotScalesResponse) {
-	if c == nil || c.hot == nil || value == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	c.hot.Set(key, value)
+	c.inner.SetHot(key, value)
 }
 
 func (c *LocalCatalogCache) GetHotByRequest(req *ListHotScalesRequest) (*ListHotScalesResponse, bool) {
-	return c.GetHot(hotCacheKey(req))
+	if c == nil || c.inner == nil {
+		return nil, false
+	}
+	if req == nil {
+		req = &ListHotScalesRequest{}
+	}
+	return c.inner.GetHotByRequest(req)
 }
 
 func (c *LocalCatalogCache) SetHotByRequest(req *ListHotScalesRequest, value *ListHotScalesResponse) {
-	c.SetHot(hotCacheKey(req), value)
+	if c == nil || c.inner == nil {
+		return
+	}
+	if req == nil {
+		req = &ListHotScalesRequest{}
+	}
+	c.inner.SetHotByRequest(req, value)
 }
 
 func (c *LocalCatalogCache) EvictOnSignal(code string) {
-	if c == nil {
+	if c == nil || c.inner == nil {
 		return
 	}
-	code = strings.ToLower(strings.TrimSpace(code))
-	if code != "" && c.detail != nil {
-		c.detail.Delete(detailCacheKey(code))
-	}
-	if c.list != nil {
-		c.list.DeletePrefix(cacheKeyPrefixList)
-	}
-	if c.categories != nil {
-		c.categories.Delete(cacheKeyCategories)
-	}
-	if c.hot != nil {
-		c.hot.DeletePrefix(cacheKeyPrefixHot)
-	}
+	c.inner.EvictOnSignal(code)
 }
 
 func (c *LocalCatalogCache) Stats() (hits, misses uint64) {
-	if c == nil {
+	if c == nil || c.inner == nil {
 		return 0, 0
 	}
-	for _, part := range []*localttlcache.Cache[*ScaleResponse]{c.detail} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	for _, part := range []*localttlcache.Cache[*ListScalesResponse]{c.list} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	for _, part := range []*localttlcache.Cache[*ScaleCategoriesResponse]{c.categories} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	for _, part := range []*localttlcache.Cache[*ListHotScalesResponse]{c.hot} {
-		h, m := part.Stats()
-		hits += h
-		misses += m
-	}
-	return hits, misses
+	return c.inner.Stats()
 }

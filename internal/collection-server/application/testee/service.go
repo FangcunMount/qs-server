@@ -8,8 +8,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/iamport"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -19,13 +19,13 @@ import (
 // 2. 调用 apiserver 的 Actor gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type Service struct {
-	actorClient        *grpcclient.ActorClient
-	profileLinkService *iam.ProfileLinkService
-	profileService     *iam.ProfileService
+	actorClient        grpcbridge.ActorWriter
+	profileLinkService iamport.OrgDefaults
+	profileService     iamport.ProfileCreator
 }
 
 // NewService 创建受试者服务
-func NewService(actorClient *grpcclient.ActorClient, profileLinkService *iam.ProfileLinkService, profileService *iam.ProfileService) *Service {
+func NewService(actorClient grpcbridge.ActorWriter, profileLinkService iamport.OrgDefaults, profileService iamport.ProfileCreator) *Service {
 	return &Service{
 		actorClient:        actorClient,
 		profileLinkService: profileLinkService,
@@ -55,7 +55,7 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 	// 从 IAM 获取默认机构ID（单租户场景）
 	orgID := s.defaultOrgID()
 	iamUserID := strconv.FormatUint(userID, 10)
-	profile, err := s.profileService.CreateProfile(ctx, iam.CreateProfileInput{
+	profile, err := s.profileService.CreateProfile(ctx, iamport.CreateProfileInput{
 		UserID:       iamUserID,
 		LegalName:    req.Name,
 		Gender:       req.Gender,
@@ -81,7 +81,7 @@ func (s *Service) CreateTestee(ctx context.Context, userID uint64, req *CreateTe
 		"iam_profile_id", profile.ProfileID,
 	)
 
-	result, err := s.actorClient.CreateTestee(ctx, &grpcclient.CreateTesteeRequest{
+	result, err := s.actorClient.CreateTestee(ctx, &grpcbridge.CreateTesteeRequest{
 		OrgID:        orgID,
 		IAMUserID:    iamUserID,
 		IAMProfileID: profile.ProfileID,
@@ -203,7 +203,7 @@ func (s *Service) UpdateTestee(ctx context.Context, testeeID uint64, req *Update
 		"name", req.Name,
 	)
 
-	result, err := s.actorClient.UpdateTestee(ctx, &grpcclient.UpdateTesteeRequest{
+	result, err := s.actorClient.UpdateTestee(ctx, &grpcbridge.UpdateTesteeRequest{
 		ID:         testeeID,
 		Name:       req.Name,
 		Gender:     req.Gender,
@@ -346,7 +346,7 @@ func (s *Service) TesteeExists(ctx context.Context, iamProfileID string) (*Teste
 }
 
 // convertToTesteeResponse 转换 gRPC 响应为应用层 DTO
-func convertToTesteeResponse(from *grpcclient.TesteeResponse) *TesteeResponse {
+func convertToTesteeResponse(from *grpcbridge.TesteeResponse) *TesteeResponse {
 	if from == nil {
 		return nil
 	}

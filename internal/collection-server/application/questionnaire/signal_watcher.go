@@ -25,7 +25,12 @@ func StartCacheSignalWatcher(
 				if signal.Code == "" {
 					return
 				}
-				EvictPublishedDetail(cache, signal.Code, signal.Version)
+				if signal.Version == "" {
+					cache.Delete(signal.Code, "")
+				} else {
+					cache.Delete(signal.Code, signal.Version)
+					cache.Delete(signal.Code, "")
+				}
 				logger.L(msgCtx).Debugw("questionnaire cache signal evicted",
 					"code", signal.Code,
 					"version", signal.Version,

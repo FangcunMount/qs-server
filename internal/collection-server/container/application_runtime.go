@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
@@ -60,7 +61,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 
 func (c *Container) buildCatalogRuntime() catalogRuntime {
 	catalogCaches := c.initCatalogCaches()
-	return catalogRuntime{
+	rt := catalogRuntime{
 		questionnaire: questionnaire.NewQueryService(
 			c.questionnaireClient,
 			catalogCaches.questionnaire,
@@ -77,6 +78,9 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 			personalityCacheSingleflightEnabled(c.opts),
 		),
 	}
+	c.l1PeekRegistry = catalogl1.NewPeekRegistry()
+	registerCatalogL1Peek(c.l1PeekRegistry, rt.scale, rt.personality, rt.questionnaire)
+	return rt
 }
 
 func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService) reportRuntime {
@@ -137,11 +141,11 @@ func (c *Container) buildReportRuntime(evaluationQuery *evaluation.QueryService)
 func (c *Container) buildReportEventsHandler() *ws.ReportEventsHandler {
 	return ws.NewReportEventsHandler(ws.Dependencies{
 		Notifier: c.reportNotifier,
-		Events: reportevents.NewService(
-			c.waitReportService,
+		Events: reportevents.NewService(reportevents.NewDefaultResolver(
 			c.evaluationQueryService,
+			c.waitReportService,
 			c.personalityAssessmentQueryService,
-		),
+		)),
 		Options:      c.opts.ReportEvents,
 		RateLimit:    c.RateLimitBackend(),
 		RateLimitCfg: c.opts.RateLimit,
