@@ -7,8 +7,9 @@ import (
 	"strconv"
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
 	"google.golang.org/protobuf/types/known/timestamppb"
@@ -133,7 +134,7 @@ func handleAssessmentInterpretedV1(deps *Dependencies, payload []byte) error {
 }
 
 func handleAssessmentInterpretedV2(deps *Dependencies, payload []byte) error {
-	var data domainAssessment.AssessmentInterpretedV2Data
+	var data eventoutcome.AssessmentInterpretedPayload
 	_, err := ParseEventData(payload, &data)
 	if err != nil {
 		return fmt.Errorf("failed to parse assessment interpreted v2 event: %w", err)
@@ -159,21 +160,21 @@ func logAssessmentHighRisk(deps *Dependencies, assessmentID int64, testeeID uint
 	)
 }
 
-func assessmentPrimaryScoreValue(score *domainAssessment.EventScoreValue) float64 {
+func assessmentPrimaryScoreValue(score *eventoutcome.ScoreValue) float64 {
 	if score == nil {
 		return 0
 	}
 	return score.Value
 }
 
-func assessmentLevelCode(level *domainAssessment.EventResultLevel) string {
+func assessmentLevelCode(level *eventoutcome.ResultLevel) string {
 	if level == nil {
 		return ""
 	}
 	return level.Code
 }
 
-func assessmentLevelSeverity(level *domainAssessment.EventResultLevel) string {
+func assessmentLevelSeverity(level *eventoutcome.ResultLevel) string {
 	if level == nil {
 		return ""
 	}

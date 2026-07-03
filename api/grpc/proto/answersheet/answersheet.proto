@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package answersheet;
 
-option go_package = "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet";
 
 // 答卷服务 - 对外提供答卷管理功能
 service AnswerSheetService {

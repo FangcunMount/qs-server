@@ -6,7 +6,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/questionnaire"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/questionnaire"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

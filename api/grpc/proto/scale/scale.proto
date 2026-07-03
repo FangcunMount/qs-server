@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package scale;
 
-option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scale";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/scale";
 
 // 量表服务 - 对外提供查询功能
 service ScaleService {

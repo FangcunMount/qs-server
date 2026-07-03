@@ -954,7 +954,7 @@ const file_actor_actor_proto_rawDesc = "" +
 	"\fTesteeExists\x12\x1a.actor.TesteeExistsRequest\x1a\x1b.actor.TesteeExistsResponse\x12M\n" +
 	"\x10ListTesteesByOrg\x12\x1e.actor.ListTesteesByOrgRequest\x1a\x19.actor.TesteeListResponse\x12O\n" +
 	"\x11ListTesteesByUser\x12\x1f.actor.ListTesteesByUserRequest\x1a\x19.actor.TesteeListResponse\x12\\\n" +
-	"\x14GetTesteeCareContext\x12\".actor.GetTesteeCareContextRequest\x1a .actor.TesteeCareContextResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actorb\x06proto3"
+	"\x14GetTesteeCareContext\x12\".actor.GetTesteeCareContextRequest\x1a .actor.TesteeCareContextResponseB6Z4github.com/FangcunMount/qs-server/api/grpc/gen/actorb\x06proto3"
 
 var (
 	file_actor_actor_proto_rawDescOnce sync.Once

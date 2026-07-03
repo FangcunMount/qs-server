@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package internalapi;
 
-option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi";
 
 import "google/protobuf/timestamp.proto";
 

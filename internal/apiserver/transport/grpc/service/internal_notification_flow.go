@@ -10,7 +10,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
 
 type notificationFlow struct {

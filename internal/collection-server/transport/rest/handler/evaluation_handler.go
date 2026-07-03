@@ -47,9 +47,9 @@ type waitReportService interface {
 // EvaluationHandler 测评处理器
 type EvaluationHandler struct {
 	*BaseHandler
-	queryService       evaluationQueryService
-	pendingAssessment  *evaluation.PendingAssessmentResolver
-	waitReportService  waitReportService
+	queryService      evaluationQueryService
+	pendingAssessment *evaluation.PendingAssessmentResolver
+	waitReportService waitReportService
 }
 
 // NewEvaluationHandler 创建测评处理器

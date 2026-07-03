@@ -7,7 +7,7 @@ import (
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -111,12 +111,12 @@ func (s *fakeAssessmentSubmissionService) ListMyAssessments(context.Context, ass
 }
 
 type fakeReportQueryService struct {
-	calls         int
-	legacyCalls   int
-	assessmentID  uint64
-	report        *assessmentApp.ReportV2Result
-	legacyReport  *assessmentApp.ReportResult
-	err           error
+	calls        int
+	legacyCalls  int
+	assessmentID uint64
+	report       *assessmentApp.ReportV2Result
+	legacyReport *assessmentApp.ReportResult
+	err          error
 }
 
 func (s *fakeReportQueryService) GetV2ByAssessmentID(_ context.Context, assessmentID uint64) (*assessmentApp.ReportV2Result, error) {

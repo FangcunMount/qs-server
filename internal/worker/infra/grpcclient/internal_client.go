@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

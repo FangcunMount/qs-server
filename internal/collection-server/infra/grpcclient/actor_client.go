@@ -8,7 +8,7 @@ import (
 
 	"google.golang.org/protobuf/types/known/timestamppb"
 
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
 )
 
 // ActorClient Actor 服务客户端

@@ -2,26 +2,17 @@ package handlers
 
 import (
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
 func isHighRiskRiskLevel(riskLevel string) bool {
 	return domainAssessment.IsHighRisk(domainAssessment.RiskLevel(riskLevel))
 }
 
-func isHighRiskV2Level(level *domainReport.EventResultLevel) bool {
-	if level == nil {
-		return false
-	}
-	if domainReport.IsHighSeverity(level.Severity) {
-		return true
-	}
-	if domainReport.IsRiskLevelCode(level.Code) {
-		return domainAssessment.IsHighRisk(domainAssessment.RiskLevel(level.Code))
-	}
-	return false
+func isHighRiskV2Level(level *eventoutcome.ResultLevel) bool {
+	return eventoutcome.LevelIsHighRisk(level)
 }
 
-func attentionRiskLevelFromV2(level *domainReport.EventResultLevel) string {
-	return domainReport.AttentionRiskLevel(level)
+func attentionRiskLevelFromV2(level *eventoutcome.ResultLevel) string {
+	return eventoutcome.AttentionRiskLevel(level)
 }

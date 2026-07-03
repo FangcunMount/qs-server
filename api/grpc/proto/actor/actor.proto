@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package actor;
 
-option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/actor";
 
 import "google/protobuf/timestamp.proto";
 

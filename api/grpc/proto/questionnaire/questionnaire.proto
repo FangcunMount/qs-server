@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package questionnaire;
 
-option go_package = "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/questionnaire";
 
 // 问卷服务 - 对外提供查询功能
 service QuestionnaireService {

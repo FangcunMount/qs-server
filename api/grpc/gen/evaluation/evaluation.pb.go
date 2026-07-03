@@ -2571,7 +2571,7 @@ const file_evaluation_evaluation_proto_rawDesc = "" +
 	"\x0eGetFactorTrend\x12!.evaluation.GetFactorTrendRequest\x1a\".evaluation.GetFactorTrendResponse\x12c\n" +
 	"\x12GetHighRiskFactors\x12%.evaluation.GetHighRiskFactorsRequest\x1a&.evaluation.GetHighRiskFactorsResponse\x12f\n" +
 	"\x13GetAssessmentReport\x12&.evaluation.GetAssessmentReportRequest\x1a'.evaluation.GetAssessmentReportResponse\x12T\n" +
-	"\rListMyReports\x12 .evaluation.ListMyReportsRequest\x1a!.evaluation.ListMyReportsResponseBVZTgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluationb\x06proto3"
+	"\rListMyReports\x12 .evaluation.ListMyReportsRequest\x1a!.evaluation.ListMyReportsResponseB;Z9github.com/FangcunMount/qs-server/api/grpc/gen/evaluationb\x06proto3"
 
 var (
 	file_evaluation_evaluation_proto_rawDescOnce sync.Once

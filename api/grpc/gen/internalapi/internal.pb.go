@@ -3722,7 +3722,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\n" +
 	"ExpireTask\x12\x1e.internalapi.ExpireTaskRequest\x1a\x1f.internalapi.ExpireTaskResponse\x12M\n" +
 	"\n" +
-	"CancelTask\x12\x1e.internalapi.CancelTaskRequest\x1a\x1f.internalapi.CancelTaskResponseBWZUgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapib\x06proto3"
+	"CancelTask\x12\x1e.internalapi.CancelTaskRequest\x1a\x1f.internalapi.CancelTaskResponseB<Z:github.com/FangcunMount/qs-server/api/grpc/gen/internalapib\x06proto3"
 
 var (
 	file_internalapi_internal_proto_rawDescOnce sync.Once

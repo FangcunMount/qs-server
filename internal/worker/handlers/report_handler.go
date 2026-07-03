@@ -6,8 +6,9 @@ import (
 	"log/slog"
 
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
@@ -36,7 +37,7 @@ func handleReportGeneratedV1(ctx context.Context, deps *Dependencies, payload []
 }
 
 func handleReportGeneratedV2(ctx context.Context, deps *Dependencies, payload []byte) error {
-	var data domainReport.ReportGeneratedV2Data
+	var data eventoutcome.ReportGeneratedPayload
 	env, err := ParseEventData(payload, &data)
 	if err != nil {
 		return fmt.Errorf("failed to parse report generated v2 event: %w", err)
@@ -102,21 +103,21 @@ func syncAssessmentAttention(ctx context.Context, deps *Dependencies, testeeID u
 	)
 }
 
-func primaryScoreValue(score *domainReport.EventScoreValue) float64 {
+func primaryScoreValue(score *eventoutcome.ScoreValue) float64 {
 	if score == nil {
 		return 0
 	}
 	return score.Value
 }
 
-func levelCode(level *domainReport.EventResultLevel) string {
+func levelCode(level *eventoutcome.ResultLevel) string {
 	if level == nil {
 		return ""
 	}
 	return level.Code
 }
 
-func levelSeverity(level *domainReport.EventResultLevel) string {
+func levelSeverity(level *eventoutcome.ResultLevel) string {
 	if level == nil {
 		return ""
 	}

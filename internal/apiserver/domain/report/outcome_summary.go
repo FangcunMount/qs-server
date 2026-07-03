@@ -1,5 +1,7 @@
 package report
 
+import "github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+
 const (
 	ScoreKindRawTotal     = "raw_total"
 	ScoreKindMatchPercent = "match_percent"
@@ -54,25 +56,10 @@ func severityFromRisk(risk RiskLevel) string {
 
 // IsHighSeverity reports whether severity should trigger high-risk workflows.
 func IsHighSeverity(severity string) bool {
-	return severity == "high"
+	return eventoutcome.IsHighSeverity(severity)
 }
 
 // AttentionRiskLevel maps a v2 level projection to the legacy risk_level used by attention sync.
 func AttentionRiskLevel(level *EventResultLevel) string {
-	if level == nil {
-		return string(RiskLevelNone)
-	}
-	if IsRiskLevelCode(level.Code) {
-		return level.Code
-	}
-	switch level.Severity {
-	case "high":
-		return string(RiskLevelHigh)
-	case "medium":
-		return string(RiskLevelMedium)
-	case "low":
-		return string(RiskLevelLow)
-	default:
-		return string(RiskLevelNone)
-	}
+	return eventoutcome.AttentionRiskLevel(level)
 }

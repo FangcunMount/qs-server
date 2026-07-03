@@ -6,7 +6,7 @@ import (
 
 	pkgerrors "github.com/FangcunMount/component-base/pkg/errors"
 	appanswersheet "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"

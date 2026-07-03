@@ -49,7 +49,7 @@ QPS_PROFILE ?= pretest_60
 GOSEC_BASE_ARGS := -exclude-generated \
 	-exclude-dir=internal/apiserver/docs \
 	-exclude-dir=internal/collection-server/docs \
-	-exclude-dir=internal/apiserver/interface/grpc/proto \
+	-exclude-dir=api/grpc/gen \
 	-severity=medium \
 	-confidence=medium
 

@@ -3,7 +3,7 @@ package grpcclient
 import (
 	"context"
 
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 )
 
 // FactorScoreOutput 因子得分输出

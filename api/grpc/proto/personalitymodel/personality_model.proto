@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package personalitymodel;
 
-option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/personalitymodel";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/personalitymodel";
 
 // PersonalityModelService exposes C-side personality model catalog reads.
 service PersonalityModelService {

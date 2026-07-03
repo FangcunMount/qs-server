@@ -30,7 +30,7 @@ linters:
     paths:
       - internal/apiserver/docs
       - internal/collection-server/docs
-      - internal/apiserver/interface/grpc/proto
+      - api/grpc/gen
 
 issues:
   max-issues-per-linter: 0

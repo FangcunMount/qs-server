@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

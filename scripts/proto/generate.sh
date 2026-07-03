@@ -1,66 +1,27 @@
 #!/bin/bash
 
-# 设置工作目录
-PROTO_PATH="internal/apiserver/interface/grpc/proto"
-GO_OUT_PATH="internal/apiserver/interface/grpc/proto"
+# 跨进程 gRPC 契约：源文件与生成代码独立于 apiserver 实现目录。
+PROTO_PATH="api/grpc/proto"
+GO_OUT_PATH="api/grpc/gen"
 
-# 确保输出目录存在
-mkdir -p ${GO_OUT_PATH}
+mkdir -p "${GO_OUT_PATH}"
 
-# 生成 answersheet 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/answersheet/answersheet.proto
+generate() {
+  local proto_file="$1"
+  protoc --proto_path="${PROTO_PATH}" \
+         --go_out="${GO_OUT_PATH}" \
+         --go_opt=paths=source_relative \
+         --go-grpc_out="${GO_OUT_PATH}" \
+         --go-grpc_opt=paths=source_relative \
+         "${proto_file}"
+}
 
-# 生成 questionnaire 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/questionnaire/questionnaire.proto
+generate "${PROTO_PATH}/answersheet/answersheet.proto"
+generate "${PROTO_PATH}/questionnaire/questionnaire.proto"
+generate "${PROTO_PATH}/actor/actor.proto"
+generate "${PROTO_PATH}/evaluation/evaluation.proto"
+generate "${PROTO_PATH}/internalapi/internal.proto"
+generate "${PROTO_PATH}/scale/scale.proto"
+generate "${PROTO_PATH}/personalitymodel/personality_model.proto"
 
-# 生成 actor 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/actor/actor.proto
-
-# 生成 evaluation 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/evaluation/evaluation.proto
-
-# 生成 internal 服务代码（供 Worker 调用）
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/internalapi/internal.proto
-
-# 生成 scale 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/scale/scale.proto
-
-# 生成 personalitymodel 服务代码
-protoc --proto_path=${PROTO_PATH} \
-       --go_out=${GO_OUT_PATH} \
-       --go_opt=paths=source_relative \
-       --go-grpc_out=${GO_OUT_PATH} \
-       --go-grpc_opt=paths=source_relative \
-       ${PROTO_PATH}/personalitymodel/personality_model.proto
-
-echo "Proto files generated successfully!" 
+echo "Proto files generated successfully!"

@@ -8,15 +8,11 @@ import (
 	"testing"
 )
 
-func TestProtoGoPackageContractAllowsOnlyDeclaredLegacyPaths(t *testing.T) {
+func TestProtoGoPackageContractUsesSharedGRPCGenPath(t *testing.T) {
 	t.Parallel()
 
-	protoRoot := filepath.Clean("../../interface/grpc/proto")
-	wantPrefix := "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/"
-	legacyAllowlist := map[string]string{
-		"answersheet/answersheet.proto":     "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/answersheet",
-		"questionnaire/questionnaire.proto": "github.com/yshujie/questionnaire-scale/internal/apiserver/interface/grpc/proto/questionnaire",
-	}
+	protoRoot := filepath.Clean("../../../../api/grpc/proto")
+	wantPrefix := "github.com/FangcunMount/qs-server/api/grpc/gen/"
 	re := regexp.MustCompile(`option go_package = "([^"]+)"`)
 
 	err := filepath.WalkDir(protoRoot, func(path string, d os.DirEntry, err error) error {
@@ -39,12 +35,6 @@ func TestProtoGoPackageContractAllowsOnlyDeclaredLegacyPaths(t *testing.T) {
 			return err
 		}
 		rel = filepath.ToSlash(rel)
-		if legacy, ok := legacyAllowlist[rel]; ok {
-			if match[1] != legacy {
-				t.Fatalf("%s go_package = %q, want legacy allowlist %q", rel, match[1], legacy)
-			}
-			return nil
-		}
 		if !strings.HasPrefix(match[1], wantPrefix) {
 			t.Fatalf("%s go_package = %q, want prefix %q", rel, match[1], wantPrefix)
 		}
@@ -63,7 +53,7 @@ func TestGRPCRegistryHasConstructorForEveryProtoService(t *testing.T) {
 		t.Fatal(err)
 	}
 	registry := string(registryData)
-	protoRoot := filepath.Clean("../../interface/grpc/proto")
+	protoRoot := filepath.Clean("../../../../api/grpc/proto")
 	serviceRe := regexp.MustCompile(`(?m)^service\s+(\w+)`)
 	constructorByService := map[string]string{
 		"ActorService":            "NewActorService",

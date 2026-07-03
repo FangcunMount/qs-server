@@ -748,7 +748,7 @@ const file_personalitymodel_personality_model_proto_rawDesc = "" +
 	"\x17PersonalityModelService\x12r\n" +
 	"\x13GetPersonalityModel\x12,.personalitymodel.GetPersonalityModelRequest\x1a-.personalitymodel.GetPersonalityModelResponse\x12x\n" +
 	"\x15ListPersonalityModels\x12..personalitymodel.ListPersonalityModelsRequest\x1a/.personalitymodel.ListPersonalityModelsResponse\x12\x90\x01\n" +
-	"\x1dGetPersonalityModelCategories\x126.personalitymodel.GetPersonalityModelCategoriesRequest\x1a7.personalitymodel.GetPersonalityModelCategoriesResponseB\\ZZgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/personalitymodelb\x06proto3"
+	"\x1dGetPersonalityModelCategories\x126.personalitymodel.GetPersonalityModelCategoriesRequest\x1a7.personalitymodel.GetPersonalityModelCategoriesResponseBAZ?github.com/FangcunMount/qs-server/api/grpc/gen/personalitymodelb\x06proto3"
 
 var (
 	file_personalitymodel_personality_model_proto_rawDescOnce sync.Once

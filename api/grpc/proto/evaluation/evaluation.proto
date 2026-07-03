@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package evaluation;
 
-option go_package = "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation";
+option go_package = "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation";
 
 // 测评服务 - C端用户接口
 // 提供测评结果查询、报告查看等功能

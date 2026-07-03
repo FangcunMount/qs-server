@@ -7,13 +7,14 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 func eventOutcomeFromReport(rpt *domainreport.InterpretReport, outcome Outcome) (
-	assessment.EventModelIdentity,
-	*assessment.EventScoreValue,
-	*assessment.EventResultLevel,
+	eventoutcome.ModelIdentity,
+	*eventoutcome.ScoreValue,
+	*eventoutcome.ResultLevel,
 ) {
 	model := modelIdentityFromOutcome(outcome)
 	primary := primaryScoreFromOutcome(outcome)
@@ -29,29 +30,22 @@ func eventOutcomeFromReport(rpt *domainreport.InterpretReport, outcome Outcome) 
 			level = lv
 		}
 	}
-	return assessmentEventModelFrom(model),
-		assessmentEventScoreFrom(primary),
-		assessmentEventLevelFrom(level)
+	return eventModelFrom(model),
+		eventScoreFrom(primary),
+		eventLevelFrom(level)
 }
 
-func assessmentEventModelFrom(model domainreport.ModelIdentity) assessment.EventModelIdentity {
+func eventModelFrom(model domainreport.ModelIdentity) eventoutcome.ModelIdentity {
 	wire := domainreport.EventModelIdentityFrom(model)
-	return assessment.EventModelIdentity{
-		Kind:      wire.Kind,
-		SubKind:   wire.SubKind,
-		Algorithm: wire.Algorithm,
-		Code:      wire.Code,
-		Version:   wire.Version,
-		Title:     wire.Title,
-	}
+	return eventoutcome.ModelIdentity(wire)
 }
 
-func assessmentEventScoreFrom(score *domainreport.ScoreValue) *assessment.EventScoreValue {
+func eventScoreFrom(score *domainreport.ScoreValue) *eventoutcome.ScoreValue {
 	wire := domainreport.EventScoreValueFrom(score)
 	if wire == nil {
 		return nil
 	}
-	return &assessment.EventScoreValue{
+	return &eventoutcome.ScoreValue{
 		Kind:  wire.Kind,
 		Value: wire.Value,
 		Label: wire.Label,
@@ -59,12 +53,12 @@ func assessmentEventScoreFrom(score *domainreport.ScoreValue) *assessment.EventS
 	}
 }
 
-func assessmentEventLevelFrom(level *domainreport.ResultLevel) *assessment.EventResultLevel {
+func eventLevelFrom(level *domainreport.ResultLevel) *eventoutcome.ResultLevel {
 	wire := domainreport.EventResultLevelFrom(level)
 	if wire == nil {
 		return nil
 	}
-	return &assessment.EventResultLevel{
+	return &eventoutcome.ResultLevel{
 		Code:     wire.Code,
 		Label:    wire.Label,
 		Severity: wire.Severity,
@@ -98,32 +92,11 @@ func buildReportGeneratedV2Event(outcome Outcome, rpt *domainreport.InterpretRep
 		strconv.FormatUint(reportID, 10),
 		strconv.FormatUint(assessmentID, 10),
 		outcome.Assessment.TesteeID().Uint64(),
-		domainreport.EventModelIdentity{
-			Kind: model.Kind, SubKind: model.SubKind, Algorithm: model.Algorithm,
-			Code: model.Code, Version: model.Version, Title: model.Title,
-		},
-		reportEventScoreFrom(primary),
-		reportEventLevelFrom(level),
+		model,
+		primary,
+		level,
 		at,
 	)
-}
-
-func reportEventScoreFrom(score *assessment.EventScoreValue) *domainreport.EventScoreValue {
-	if score == nil {
-		return nil
-	}
-	return &domainreport.EventScoreValue{
-		Kind: score.Kind, Value: score.Value, Label: score.Label, Max: score.Max,
-	}
-}
-
-func reportEventLevelFrom(level *assessment.EventResultLevel) *domainreport.EventResultLevel {
-	if level == nil {
-		return nil
-	}
-	return &domainreport.EventResultLevel{
-		Code: level.Code, Label: level.Label, Severity: level.Severity,
-	}
 }
 
 func buildFootprintReportGeneratedEvent(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {

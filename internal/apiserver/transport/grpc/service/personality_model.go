@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/personalitymodel"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/personalitymodel"
 )
 
 // PersonalityModelService exposes C-side personality model catalog reads over gRPC.

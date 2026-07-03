@@ -12,7 +12,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/actor"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
 )
 
 // ActorService Actor gRPC 服务 - C 端接口

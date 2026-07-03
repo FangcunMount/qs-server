@@ -244,7 +244,7 @@ func TestTransportPlaneDoesNotUseLegacyInterfaceImplementation(t *testing.T) {
 			return err
 		}
 		if d.IsDir() {
-			if strings.HasSuffix(filepath.ToSlash(path), "/internal/apiserver/interface/grpc/proto") {
+			if strings.HasSuffix(filepath.ToSlash(path), "/api/grpc/gen") {
 				return filepath.SkipDir
 			}
 			return nil

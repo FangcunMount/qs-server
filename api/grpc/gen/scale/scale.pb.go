@@ -1513,7 +1513,7 @@ const file_scale_scale_proto_rawDesc = "" +
 	"\n" +
 	"ListScales\x12\x18.scale.ListScalesRequest\x1a\x19.scale.ListScalesResponse\x12J\n" +
 	"\rListHotScales\x12\x1b.scale.ListHotScalesRequest\x1a\x1c.scale.ListHotScalesResponse\x12Y\n" +
-	"\x12GetScaleCategories\x12 .scale.GetScaleCategoriesRequest\x1a!.scale.GetScaleCategoriesResponseBQZOgithub.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/scaleb\x06proto3"
+	"\x12GetScaleCategories\x12 .scale.GetScaleCategoriesRequest\x1a!.scale.GetScaleCategoriesResponseB6Z4github.com/FangcunMount/qs-server/api/grpc/gen/scaleb\x06proto3"
 
 var (
 	file_scale_scale_proto_rawDescOnce sync.Once

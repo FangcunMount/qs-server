@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 )
 
 // EvaluationClient 测评服务客户端

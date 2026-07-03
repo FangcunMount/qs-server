@@ -3,7 +3,7 @@ package grpcclient
 import (
 	"context"
 
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 )
 
 // ==================== Input/Output Types ====================

@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/answersheet"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/answersheet"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

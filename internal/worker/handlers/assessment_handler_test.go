@@ -7,7 +7,7 @@ import (
 	"time"
 
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
 
 func TestHandleAssessmentSubmittedRejectsNegativeAssessmentID(t *testing.T) {

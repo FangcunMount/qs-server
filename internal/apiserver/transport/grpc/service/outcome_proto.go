@@ -3,8 +3,8 @@ package service
 import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	evaluationpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
-	internalpb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/internalapi"
+	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
+	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 )
 
 func toInternalOutcomeSummary(result *assessmentApp.AssessmentV2Result) *internalpb.OutcomeSummary {
