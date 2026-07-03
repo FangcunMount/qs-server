@@ -54,12 +54,12 @@ type GRPCClientOptions struct {
 
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
-	MaxConcurrency        int `json:"max_concurrency" mapstructure:"max_concurrency"`               // 兼容：未配置 max_query_concurrency 时作为读池上限
+	MaxConcurrency        int `json:"max_concurrency" mapstructure:"max_concurrency"`                 // 兼容：未配置 max_query_concurrency 时作为读池上限
 	MaxCatalogConcurrency int `json:"max_catalog_concurrency" mapstructure:"max_catalog_concurrency"` // catalog L1 读路径（与 heavy query 分池）
-	MaxQueryConcurrency   int `json:"max_query_concurrency" mapstructure:"max_query_concurrency"`   // 非 catalog 读（assessment/stats 等）
+	MaxQueryConcurrency   int `json:"max_query_concurrency" mapstructure:"max_query_concurrency"`     // 非 catalog 读（assessment/stats 等）
 	MaxSubmitConcurrency  int `json:"max_submit_concurrency" mapstructure:"max_submit_concurrency"`   // 答卷提交等写路径
-	MaxWaitMs             int `json:"max_wait_ms" mapstructure:"max_wait_ms"`                       // submit/非 catalog 读 槽位排队最长等待（毫秒），0 表示无限等待
-	CatalogMaxWaitMs      int `json:"catalog_max_wait_ms" mapstructure:"catalog_max_wait_ms"`       // catalog miss 时槽位排队上限（毫秒），0 表示沿用 max_wait_ms
+	MaxWaitMs             int `json:"max_wait_ms" mapstructure:"max_wait_ms"`                         // submit/非 catalog 读 槽位排队最长等待（毫秒），0 表示无限等待
+	CatalogMaxWaitMs      int `json:"catalog_max_wait_ms" mapstructure:"catalog_max_wait_ms"`         // catalog miss 时槽位排队上限（毫秒），0 表示沿用 max_wait_ms
 }
 
 // ResolvedCatalogConcurrency 返回 catalog 读路径并发槽位上限。
