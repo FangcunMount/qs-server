@@ -30,25 +30,47 @@ func NewQueryService(
 	}
 }
 
-// GetMyAssessment 获取我的测评详情
+// GetMyAssessment 获取测评详情（outcome 投影）。
 func (s *QueryService) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailResponse, error) {
 	return queryDetail(ctx, "get_my_assessment", func() (*AssessmentDetailResponse, error) {
 		return s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
 	}, "testee_id", testeeID, "assessment_id", assessmentID)
 }
 
-// GetMyAssessmentByAnswerSheetID 通过答卷ID获取测评详情
-func (s *QueryService) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentDetailResponse, error) {
-	return queryDetail(ctx, "get_assessment_by_answersheet", func() (*AssessmentDetailResponse, error) {
-		return s.evaluationClient.GetMyAssessmentByAnswerSheetID(ctx, answerSheetID)
+// GetLegacyMyAssessment 获取测评详情（deprecated REST v1 量表投影）。
+func (s *QueryService) GetLegacyMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*LegacyAssessmentDetailResponse, error) {
+	return queryDetail(ctx, "get_legacy_my_assessment", func() (*LegacyAssessmentDetailResponse, error) {
+		detail, err := s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
+		if err != nil {
+			return nil, err
+		}
+		return DetailToLegacy(detail), nil
+	}, "testee_id", testeeID, "assessment_id", assessmentID)
+}
+
+// GetLegacyMyAssessmentByAnswerSheetID 通过答卷 ID 获取测评详情（deprecated REST v1 投影）。
+func (s *QueryService) GetLegacyMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*LegacyAssessmentDetailResponse, error) {
+	return queryDetail(ctx, "get_legacy_assessment_by_answersheet", func() (*LegacyAssessmentDetailResponse, error) {
+		testeeID, assessmentID, err := s.evaluationClient.ResolveAssessmentByAnswerSheetID(ctx, answerSheetID)
+		if err != nil {
+			return nil, err
+		}
+		if assessmentID == 0 {
+			return nil, nil
+		}
+		detail, err := s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
+		if err != nil {
+			return nil, err
+		}
+		return DetailToLegacy(detail), nil
 	}, "answer_sheet_id", answerSheetID)
 }
 
-// ListMyAssessments 获取我的测评列表
+// ListMyAssessments 获取测评列表（outcome 投影）。
 func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
 	l := logger.L(ctx)
 	startTime := time.Now()
-	NormalizeAssessmentListRequest(req, AssessmentListPageV1)
+	NormalizeAssessmentListRequest(req, AssessmentListPageDefault)
 
 	modelKind, err := NormalizeAssessmentKind(req.AssessmentKind)
 	if err != nil {
@@ -64,6 +86,7 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 		req.DateFrom,
 		req.DateTo,
 		modelKind,
+		"",
 		req.Page,
 		req.PageSize,
 	)
@@ -82,6 +105,45 @@ func (s *QueryService) ListMyAssessments(ctx context.Context, testeeID uint64, r
 	return result, nil
 }
 
+// ListLegacyMyAssessments 获取测评列表（deprecated REST v1 量表投影）。
+func (s *QueryService) ListLegacyMyAssessments(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*LegacyListAssessmentsResponse, error) {
+	l := logger.L(ctx)
+	startTime := time.Now()
+	NormalizeAssessmentListRequest(req, AssessmentListPageLegacy)
+
+	modelKind, err := NormalizeAssessmentKind(req.AssessmentKind)
+	if err != nil {
+		return nil, err
+	}
+
+	result, err := s.evaluationClient.ListMyAssessments(
+		ctx,
+		testeeID,
+		req.Status,
+		req.ScaleCode,
+		req.RiskLevel,
+		req.DateFrom,
+		req.DateTo,
+		modelKind,
+		"",
+		req.Page,
+		req.PageSize,
+	)
+	if err != nil {
+		log.Errorf("Failed to list legacy assessments via gRPC: %v", err)
+		l.Errorw("查询测评列表失败", "action", "list_legacy_my_assessments", "testee_id", testeeID, "error", err.Error())
+		return nil, err
+	}
+
+	l.Debugw("查询我的测评列表成功",
+		"action", "list_legacy_my_assessments",
+		"testee_id", testeeID,
+		"total_count", result.Total,
+		"duration_ms", time.Since(startTime).Milliseconds(),
+	)
+	return ListToLegacy(result), nil
+}
+
 // GetAssessmentScores 获取测评得分详情
 func (s *QueryService) GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreResponse, error) {
 	result, err := s.evaluationClient.GetAssessmentScores(ctx, testeeID, assessmentID)
@@ -92,14 +154,21 @@ func (s *QueryService) GetAssessmentScores(ctx context.Context, testeeID, assess
 	return result, nil
 }
 
-// GetAssessmentReport 获取测评报告
-func (s *QueryService) GetAssessmentReport(ctx context.Context, assessmentID uint64) (*AssessmentReportResponse, error) {
-	result, err := s.evaluationClient.GetAssessmentReport(ctx, assessmentID)
+// GetAssessmentReport 获取测评报告（outcome 投影，不做量表因子过滤）。
+func (s *QueryService) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error) {
+	return queryDetail(ctx, "get_assessment_report", func() (*AssessmentReportResponse, error) {
+		return s.evaluationClient.GetAssessmentReport(ctx, testeeID, assessmentID)
+	}, "testee_id", testeeID, "assessment_id", assessmentID)
+}
+
+// GetLegacyAssessmentReport 获取测评报告（deprecated REST v1 量表投影 + 可见因子过滤）。
+func (s *QueryService) GetLegacyAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*LegacyAssessmentReportResponse, error) {
+	result, err := s.evaluationClient.GetAssessmentReport(ctx, testeeID, assessmentID)
 	if err != nil {
 		log.Errorf("Failed to get assessment report via gRPC: %v", err)
 		return nil, err
 	}
-	return s.reportFilter.Apply(ctx, result)
+	return s.reportFilter.Apply(ctx, ReportToLegacy(result))
 }
 
 // GetFactorTrend 获取因子得分趋势
@@ -120,51 +189,6 @@ func (s *QueryService) GetHighRiskFactors(ctx context.Context, testeeID, assessm
 	result, err := s.evaluationClient.GetHighRiskFactors(ctx, testeeID, assessmentID)
 	if err != nil {
 		log.Errorf("Failed to get high risk factors via gRPC: %v", err)
-		return nil, err
-	}
-	return result, nil
-}
-
-// GetMyAssessmentV2 loads assessment detail via apiserver Evaluation V2 gRPC.
-func (s *QueryService) GetMyAssessmentV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailV2Response, error) {
-	result, err := s.evaluationClient.GetMyAssessmentV2(ctx, testeeID, assessmentID)
-	if err != nil {
-		log.Errorf("Failed to get assessment v2 via gRPC: %v", err)
-		return nil, err
-	}
-	return result, nil
-}
-
-// ListMyAssessmentsV2 loads assessment list via apiserver Evaluation V2 gRPC.
-func (s *QueryService) ListMyAssessmentsV2(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsV2Response, error) {
-	NormalizeAssessmentListRequest(req, AssessmentListPageV2)
-	modelKind, err := NormalizeAssessmentKind(req.AssessmentKind)
-	if err != nil {
-		return nil, err
-	}
-	result, err := s.evaluationClient.ListMyAssessmentsV2(
-		ctx,
-		testeeID,
-		req.Status,
-		req.ScaleCode,
-		req.RiskLevel,
-		modelKind,
-		"",
-		req.Page,
-		req.PageSize,
-	)
-	if err != nil {
-		log.Errorf("Failed to list assessments v2 via gRPC: %v", err)
-		return nil, err
-	}
-	return result, nil
-}
-
-// GetAssessmentReportV2 loads report via apiserver Evaluation V2 gRPC without scale factor filtering.
-func (s *QueryService) GetAssessmentReportV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportV2Response, error) {
-	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, testeeID, assessmentID)
-	if err != nil {
-		log.Errorf("Failed to get assessment report v2 via gRPC: %v", err)
 		return nil, err
 	}
 	return result, nil

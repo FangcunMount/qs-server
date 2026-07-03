@@ -13,19 +13,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestEvaluationServiceGetAssessmentReportV2RequiresTesteeID(t *testing.T) {
-	svc := &EvaluationService{
-		submissionService:  &fakeAssessmentSubmissionService{},
-		reportQueryService: &fakeReportQueryService{},
-	}
-
-	_, err := svc.GetAssessmentReportV2(context.Background(), &pb.GetAssessmentReportV2Request{AssessmentId: 1})
-	if status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("code = %v, want InvalidArgument", status.Code(err))
-	}
-}
-
-func TestEvaluationServiceGetAssessmentReportV2RejectsWrongTestee(t *testing.T) {
+func TestEvaluationServiceGetAssessmentReportWithTesteeRejectsWrongTestee(t *testing.T) {
 	svc := &EvaluationService{
 		submissionService: &fakeAssessmentSubmissionService{
 			getMyAssessment: func(context.Context, uint64, uint64) (*assessmentApp.AssessmentResult, error) {
@@ -35,7 +23,7 @@ func TestEvaluationServiceGetAssessmentReportV2RejectsWrongTestee(t *testing.T) 
 		reportQueryService: &fakeReportQueryService{},
 	}
 
-	_, err := svc.GetAssessmentReportV2(context.Background(), &pb.GetAssessmentReportV2Request{
+	_, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{
 		TesteeId:     7,
 		AssessmentId: 42,
 	})
@@ -44,7 +32,7 @@ func TestEvaluationServiceGetAssessmentReportV2RejectsWrongTestee(t *testing.T) 
 	}
 }
 
-func TestEvaluationServiceGetAssessmentReportV2ReturnsReportForOwner(t *testing.T) {
+func TestEvaluationServiceGetAssessmentReportWithTesteeReturnsReportForOwner(t *testing.T) {
 	reportSvc := &fakeReportQueryService{
 		report: &assessmentApp.ReportV2Result{AssessmentID: 42},
 	}
@@ -60,18 +48,38 @@ func TestEvaluationServiceGetAssessmentReportV2ReturnsReportForOwner(t *testing.
 		reportQueryService: reportSvc,
 	}
 
-	resp, err := svc.GetAssessmentReportV2(context.Background(), &pb.GetAssessmentReportV2Request{
+	resp, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{
 		TesteeId:     7,
 		AssessmentId: 42,
 	})
 	if err != nil {
-		t.Fatalf("GetAssessmentReportV2() error = %v", err)
+		t.Fatalf("GetAssessmentReport() error = %v", err)
 	}
 	if resp.GetReport().GetAssessmentId() != 42 {
 		t.Fatalf("assessment_id = %d, want 42", resp.GetReport().GetAssessmentId())
 	}
 	if reportSvc.calls != 1 || reportSvc.assessmentID != 42 {
 		t.Fatalf("unexpected report query call: %#v", reportSvc)
+	}
+}
+
+func TestEvaluationServiceGetAssessmentReportWithoutTesteeUsesLegacyPath(t *testing.T) {
+	reportSvc := &fakeReportQueryService{
+		legacyReport: &assessmentApp.ReportResult{AssessmentID: 99},
+	}
+	svc := &EvaluationService{
+		reportQueryService: reportSvc,
+	}
+
+	resp, err := svc.GetAssessmentReport(context.Background(), &pb.GetAssessmentReportRequest{AssessmentId: 99})
+	if err != nil {
+		t.Fatalf("GetAssessmentReport() error = %v", err)
+	}
+	if resp.GetReport().GetAssessmentId() != 99 {
+		t.Fatalf("assessment_id = %d, want 99", resp.GetReport().GetAssessmentId())
+	}
+	if reportSvc.legacyCalls != 1 {
+		t.Fatalf("legacyCalls = %d, want 1", reportSvc.legacyCalls)
 	}
 }
 
@@ -103,10 +111,12 @@ func (s *fakeAssessmentSubmissionService) ListMyAssessments(context.Context, ass
 }
 
 type fakeReportQueryService struct {
-	calls        int
-	assessmentID uint64
-	report       *assessmentApp.ReportV2Result
-	err          error
+	calls         int
+	legacyCalls   int
+	assessmentID  uint64
+	report        *assessmentApp.ReportV2Result
+	legacyReport  *assessmentApp.ReportResult
+	err           error
 }
 
 func (s *fakeReportQueryService) GetV2ByAssessmentID(_ context.Context, assessmentID uint64) (*assessmentApp.ReportV2Result, error) {
@@ -119,7 +129,8 @@ func (s *fakeReportQueryService) GetV2ByAssessmentID(_ context.Context, assessme
 }
 
 func (s *fakeReportQueryService) GetByAssessmentID(context.Context, uint64) (*assessmentApp.ReportResult, error) {
-	panic("unexpected GetByAssessmentID call")
+	s.legacyCalls++
+	return s.legacyReport, nil
 }
 
 func (s *fakeReportQueryService) ListByTesteeID(context.Context, assessmentApp.ListReportsDTO) (*assessmentApp.ReportListResult, error) {

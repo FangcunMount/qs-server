@@ -10,11 +10,21 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-func TestNormalizeAssessmentListRequestV1(t *testing.T) {
+func TestNormalizeAssessmentListRequestDefault(t *testing.T) {
 	t.Parallel()
 
 	req := &ListAssessmentsRequest{}
-	NormalizeAssessmentListRequest(req, AssessmentListPageV1)
+	NormalizeAssessmentListRequest(req, AssessmentListPageDefault)
+	if req.Page != 1 || req.PageSize != 10 {
+		t.Fatalf("page=(%d,%d), want (1,10)", req.Page, req.PageSize)
+	}
+}
+
+func TestNormalizeAssessmentListRequestLegacy(t *testing.T) {
+	t.Parallel()
+
+	req := &ListAssessmentsRequest{}
+	NormalizeAssessmentListRequest(req, AssessmentListPageLegacy)
 	if req.Page != 1 || req.PageSize != 50 {
 		t.Fatalf("page=(%d,%d), want (1,50)", req.Page, req.PageSize)
 	}
@@ -24,7 +34,7 @@ func TestReportDimensionFilterKeepsVisibleFactors(t *testing.T) {
 	t.Parallel()
 
 	filter := NewReportDimensionFilter(stubScaleCatalog{factors: []string{"f1", "f2"}})
-	report := &AssessmentReportResponse{
+	report := &LegacyAssessmentReportResponse{
 		ScaleCode: "scl-1",
 		Dimensions: []DimensionInterpretResponse{
 			{FactorCode: "f1"},

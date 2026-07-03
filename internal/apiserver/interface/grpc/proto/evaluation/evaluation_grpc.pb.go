@@ -19,17 +19,15 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	EvaluationService_GetMyAssessment_FullMethodName                = "/evaluation.EvaluationService/GetMyAssessment"
-	EvaluationService_GetMyAssessmentByAnswerSheetID_FullMethodName = "/evaluation.EvaluationService/GetMyAssessmentByAnswerSheetID"
-	EvaluationService_ListMyAssessments_FullMethodName              = "/evaluation.EvaluationService/ListMyAssessments"
-	EvaluationService_GetAssessmentScores_FullMethodName            = "/evaluation.EvaluationService/GetAssessmentScores"
-	EvaluationService_GetFactorTrend_FullMethodName                 = "/evaluation.EvaluationService/GetFactorTrend"
-	EvaluationService_GetHighRiskFactors_FullMethodName             = "/evaluation.EvaluationService/GetHighRiskFactors"
-	EvaluationService_GetAssessmentReport_FullMethodName            = "/evaluation.EvaluationService/GetAssessmentReport"
-	EvaluationService_ListMyReports_FullMethodName                  = "/evaluation.EvaluationService/ListMyReports"
-	EvaluationService_GetMyAssessmentV2_FullMethodName              = "/evaluation.EvaluationService/GetMyAssessmentV2"
-	EvaluationService_ListMyAssessmentsV2_FullMethodName            = "/evaluation.EvaluationService/ListMyAssessmentsV2"
-	EvaluationService_GetAssessmentReportV2_FullMethodName          = "/evaluation.EvaluationService/GetAssessmentReportV2"
+	EvaluationService_GetMyAssessment_FullMethodName                  = "/evaluation.EvaluationService/GetMyAssessment"
+	EvaluationService_ResolveAssessmentByAnswerSheetID_FullMethodName = "/evaluation.EvaluationService/ResolveAssessmentByAnswerSheetID"
+	EvaluationService_GetMyAssessmentByAnswerSheetID_FullMethodName   = "/evaluation.EvaluationService/GetMyAssessmentByAnswerSheetID"
+	EvaluationService_ListMyAssessments_FullMethodName                = "/evaluation.EvaluationService/ListMyAssessments"
+	EvaluationService_GetAssessmentScores_FullMethodName              = "/evaluation.EvaluationService/GetAssessmentScores"
+	EvaluationService_GetFactorTrend_FullMethodName                   = "/evaluation.EvaluationService/GetFactorTrend"
+	EvaluationService_GetHighRiskFactors_FullMethodName               = "/evaluation.EvaluationService/GetHighRiskFactors"
+	EvaluationService_GetAssessmentReport_FullMethodName              = "/evaluation.EvaluationService/GetAssessmentReport"
+	EvaluationService_ListMyReports_FullMethodName                    = "/evaluation.EvaluationService/ListMyReports"
 )
 
 // EvaluationServiceClient is the client API for EvaluationService service.
@@ -39,25 +37,20 @@ const (
 // 测评服务 - C端用户接口
 // 提供测评结果查询、报告查看等功能
 type EvaluationServiceClient interface {
-	// 获取我的测评详情
+	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(ctx context.Context, in *GetMyAssessmentRequest, opts ...grpc.CallOption) (*GetMyAssessmentResponse, error)
-	// 通过答卷ID获取我的测评详情
+	// 通过答卷 ID 解析 testee_id + assessment_id（供 BFF 薄包装使用）
+	ResolveAssessmentByAnswerSheetID(ctx context.Context, in *ResolveAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*ResolveAssessmentByAnswerSheetIDResponse, error)
+	// Deprecated: 优先使用 ResolveAssessmentByAnswerSheetID + GetMyAssessment
 	GetMyAssessmentByAnswerSheetID(ctx context.Context, in *GetMyAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*GetMyAssessmentByAnswerSheetIDResponse, error)
-	// 获取我的测评列表
+	// 获取我的测评列表（含 outcome 投影）
 	ListMyAssessments(ctx context.Context, in *ListMyAssessmentsRequest, opts ...grpc.CallOption) (*ListMyAssessmentsResponse, error)
-	// 获取测评得分详情
 	GetAssessmentScores(ctx context.Context, in *GetAssessmentScoresRequest, opts ...grpc.CallOption) (*GetAssessmentScoresResponse, error)
-	// 获取因子得分趋势
 	GetFactorTrend(ctx context.Context, in *GetFactorTrendRequest, opts ...grpc.CallOption) (*GetFactorTrendResponse, error)
-	// 获取高风险因子
 	GetHighRiskFactors(ctx context.Context, in *GetHighRiskFactorsRequest, opts ...grpc.CallOption) (*GetHighRiskFactorsResponse, error)
-	// 获取测评报告
+	// testee_id 可选：有值时校验归属并返回 outcome 投影；worker 内部调用可省略
 	GetAssessmentReport(ctx context.Context, in *GetAssessmentReportRequest, opts ...grpc.CallOption) (*GetAssessmentReportResponse, error)
-	// 获取我的报告列表
 	ListMyReports(ctx context.Context, in *ListMyReportsRequest, opts ...grpc.CallOption) (*ListMyReportsResponse, error)
-	GetMyAssessmentV2(ctx context.Context, in *GetMyAssessmentV2Request, opts ...grpc.CallOption) (*GetMyAssessmentV2Response, error)
-	ListMyAssessmentsV2(ctx context.Context, in *ListMyAssessmentsV2Request, opts ...grpc.CallOption) (*ListMyAssessmentsV2Response, error)
-	GetAssessmentReportV2(ctx context.Context, in *GetAssessmentReportV2Request, opts ...grpc.CallOption) (*GetAssessmentReportV2Response, error)
 }
 
 type evaluationServiceClient struct {
@@ -72,6 +65,16 @@ func (c *evaluationServiceClient) GetMyAssessment(ctx context.Context, in *GetMy
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(GetMyAssessmentResponse)
 	err := c.cc.Invoke(ctx, EvaluationService_GetMyAssessment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *evaluationServiceClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, in *ResolveAssessmentByAnswerSheetIDRequest, opts ...grpc.CallOption) (*ResolveAssessmentByAnswerSheetIDResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveAssessmentByAnswerSheetIDResponse)
+	err := c.cc.Invoke(ctx, EvaluationService_ResolveAssessmentByAnswerSheetID_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -148,36 +151,6 @@ func (c *evaluationServiceClient) ListMyReports(ctx context.Context, in *ListMyR
 	return out, nil
 }
 
-func (c *evaluationServiceClient) GetMyAssessmentV2(ctx context.Context, in *GetMyAssessmentV2Request, opts ...grpc.CallOption) (*GetMyAssessmentV2Response, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetMyAssessmentV2Response)
-	err := c.cc.Invoke(ctx, EvaluationService_GetMyAssessmentV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *evaluationServiceClient) ListMyAssessmentsV2(ctx context.Context, in *ListMyAssessmentsV2Request, opts ...grpc.CallOption) (*ListMyAssessmentsV2Response, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(ListMyAssessmentsV2Response)
-	err := c.cc.Invoke(ctx, EvaluationService_ListMyAssessmentsV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *evaluationServiceClient) GetAssessmentReportV2(ctx context.Context, in *GetAssessmentReportV2Request, opts ...grpc.CallOption) (*GetAssessmentReportV2Response, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(GetAssessmentReportV2Response)
-	err := c.cc.Invoke(ctx, EvaluationService_GetAssessmentReportV2_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // EvaluationServiceServer is the server API for EvaluationService service.
 // All implementations must embed UnimplementedEvaluationServiceServer
 // for forward compatibility.
@@ -185,25 +158,20 @@ func (c *evaluationServiceClient) GetAssessmentReportV2(ctx context.Context, in 
 // 测评服务 - C端用户接口
 // 提供测评结果查询、报告查看等功能
 type EvaluationServiceServer interface {
-	// 获取我的测评详情
+	// 获取我的测评详情（含 model/primary_score/level outcome 投影）
 	GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error)
-	// 通过答卷ID获取我的测评详情
+	// 通过答卷 ID 解析 testee_id + assessment_id（供 BFF 薄包装使用）
+	ResolveAssessmentByAnswerSheetID(context.Context, *ResolveAssessmentByAnswerSheetIDRequest) (*ResolveAssessmentByAnswerSheetIDResponse, error)
+	// Deprecated: 优先使用 ResolveAssessmentByAnswerSheetID + GetMyAssessment
 	GetMyAssessmentByAnswerSheetID(context.Context, *GetMyAssessmentByAnswerSheetIDRequest) (*GetMyAssessmentByAnswerSheetIDResponse, error)
-	// 获取我的测评列表
+	// 获取我的测评列表（含 outcome 投影）
 	ListMyAssessments(context.Context, *ListMyAssessmentsRequest) (*ListMyAssessmentsResponse, error)
-	// 获取测评得分详情
 	GetAssessmentScores(context.Context, *GetAssessmentScoresRequest) (*GetAssessmentScoresResponse, error)
-	// 获取因子得分趋势
 	GetFactorTrend(context.Context, *GetFactorTrendRequest) (*GetFactorTrendResponse, error)
-	// 获取高风险因子
 	GetHighRiskFactors(context.Context, *GetHighRiskFactorsRequest) (*GetHighRiskFactorsResponse, error)
-	// 获取测评报告
+	// testee_id 可选：有值时校验归属并返回 outcome 投影；worker 内部调用可省略
 	GetAssessmentReport(context.Context, *GetAssessmentReportRequest) (*GetAssessmentReportResponse, error)
-	// 获取我的报告列表
 	ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error)
-	GetMyAssessmentV2(context.Context, *GetMyAssessmentV2Request) (*GetMyAssessmentV2Response, error)
-	ListMyAssessmentsV2(context.Context, *ListMyAssessmentsV2Request) (*ListMyAssessmentsV2Response, error)
-	GetAssessmentReportV2(context.Context, *GetAssessmentReportV2Request) (*GetAssessmentReportV2Response, error)
 	mustEmbedUnimplementedEvaluationServiceServer()
 }
 
@@ -216,6 +184,9 @@ type UnimplementedEvaluationServiceServer struct{}
 
 func (UnimplementedEvaluationServiceServer) GetMyAssessment(context.Context, *GetMyAssessmentRequest) (*GetMyAssessmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyAssessment not implemented")
+}
+func (UnimplementedEvaluationServiceServer) ResolveAssessmentByAnswerSheetID(context.Context, *ResolveAssessmentByAnswerSheetIDRequest) (*ResolveAssessmentByAnswerSheetIDResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveAssessmentByAnswerSheetID not implemented")
 }
 func (UnimplementedEvaluationServiceServer) GetMyAssessmentByAnswerSheetID(context.Context, *GetMyAssessmentByAnswerSheetIDRequest) (*GetMyAssessmentByAnswerSheetIDResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetMyAssessmentByAnswerSheetID not implemented")
@@ -237,15 +208,6 @@ func (UnimplementedEvaluationServiceServer) GetAssessmentReport(context.Context,
 }
 func (UnimplementedEvaluationServiceServer) ListMyReports(context.Context, *ListMyReportsRequest) (*ListMyReportsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method ListMyReports not implemented")
-}
-func (UnimplementedEvaluationServiceServer) GetMyAssessmentV2(context.Context, *GetMyAssessmentV2Request) (*GetMyAssessmentV2Response, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetMyAssessmentV2 not implemented")
-}
-func (UnimplementedEvaluationServiceServer) ListMyAssessmentsV2(context.Context, *ListMyAssessmentsV2Request) (*ListMyAssessmentsV2Response, error) {
-	return nil, status.Error(codes.Unimplemented, "method ListMyAssessmentsV2 not implemented")
-}
-func (UnimplementedEvaluationServiceServer) GetAssessmentReportV2(context.Context, *GetAssessmentReportV2Request) (*GetAssessmentReportV2Response, error) {
-	return nil, status.Error(codes.Unimplemented, "method GetAssessmentReportV2 not implemented")
 }
 func (UnimplementedEvaluationServiceServer) mustEmbedUnimplementedEvaluationServiceServer() {}
 func (UnimplementedEvaluationServiceServer) testEmbeddedByValue()                           {}
@@ -282,6 +244,24 @@ func _EvaluationService_GetMyAssessment_Handler(srv interface{}, ctx context.Con
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(EvaluationServiceServer).GetMyAssessment(ctx, req.(*GetMyAssessmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _EvaluationService_ResolveAssessmentByAnswerSheetID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveAssessmentByAnswerSheetIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(EvaluationServiceServer).ResolveAssessmentByAnswerSheetID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: EvaluationService_ResolveAssessmentByAnswerSheetID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(EvaluationServiceServer).ResolveAssessmentByAnswerSheetID(ctx, req.(*ResolveAssessmentByAnswerSheetIDRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -412,60 +392,6 @@ func _EvaluationService_ListMyReports_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
-func _EvaluationService_GetMyAssessmentV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetMyAssessmentV2Request)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetMyAssessmentV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: EvaluationService_GetMyAssessmentV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetMyAssessmentV2(ctx, req.(*GetMyAssessmentV2Request))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _EvaluationService_ListMyAssessmentsV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(ListMyAssessmentsV2Request)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EvaluationServiceServer).ListMyAssessmentsV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: EvaluationService_ListMyAssessmentsV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).ListMyAssessmentsV2(ctx, req.(*ListMyAssessmentsV2Request))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _EvaluationService_GetAssessmentReportV2_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(GetAssessmentReportV2Request)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(EvaluationServiceServer).GetAssessmentReportV2(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: EvaluationService_GetAssessmentReportV2_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(EvaluationServiceServer).GetAssessmentReportV2(ctx, req.(*GetAssessmentReportV2Request))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // EvaluationService_ServiceDesc is the grpc.ServiceDesc for EvaluationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -476,6 +402,10 @@ var EvaluationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetMyAssessment",
 			Handler:    _EvaluationService_GetMyAssessment_Handler,
+		},
+		{
+			MethodName: "ResolveAssessmentByAnswerSheetID",
+			Handler:    _EvaluationService_ResolveAssessmentByAnswerSheetID_Handler,
 		},
 		{
 			MethodName: "GetMyAssessmentByAnswerSheetID",
@@ -504,18 +434,6 @@ var EvaluationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ListMyReports",
 			Handler:    _EvaluationService_ListMyReports_Handler,
-		},
-		{
-			MethodName: "GetMyAssessmentV2",
-			Handler:    _EvaluationService_GetMyAssessmentV2_Handler,
-		},
-		{
-			MethodName: "ListMyAssessmentsV2",
-			Handler:    _EvaluationService_ListMyAssessmentsV2_Handler,
-		},
-		{
-			MethodName: "GetAssessmentReportV2",
-			Handler:    _EvaluationService_GetAssessmentReportV2_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

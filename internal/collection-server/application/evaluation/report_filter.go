@@ -16,12 +16,12 @@ func NewReportDimensionFilter(scaleCatalog scale.CatalogReader) *ReportDimension
 }
 
 // Apply 返回只包含可见因子的报告副本；report 为 nil 时返回 nil。
-func (f *ReportDimensionFilter) Apply(ctx context.Context, report *AssessmentReportResponse) (*AssessmentReportResponse, error) {
+func (f *ReportDimensionFilter) Apply(ctx context.Context, report *LegacyAssessmentReportResponse) (*LegacyAssessmentReportResponse, error) {
 	if report == nil {
 		return nil, nil
 	}
 	visible := f.visibleFactorCodes(ctx, report.ScaleCode)
-	return &AssessmentReportResponse{
+	return &LegacyAssessmentReportResponse{
 		AssessmentID: report.AssessmentID,
 		ScaleCode:    report.ScaleCode,
 		ScaleName:    report.ScaleName,

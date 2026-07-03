@@ -111,45 +111,6 @@ definitions:
         type: string
       interpreted_at:
         type: string
-      org_id:
-        type: string
-      origin_id:
-        type: string
-      origin_type:
-        type: string
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      risk_level:
-        type: string
-      scale_code:
-        type: string
-      scale_name:
-        type: string
-      status:
-        type: string
-      submitted_at:
-        type: string
-      testee_id:
-        type: string
-      total_score:
-        type: number
-    type: object
-  evaluation.AssessmentDetailV2Response:
-    properties:
-      answer_sheet_id:
-        type: string
-      created_at:
-        type: string
-      failed_at:
-        type: string
-      failure_reason:
-        type: string
-      id:
-        type: string
-      interpreted_at:
-        type: string
       level:
         $ref: '#/definitions/evaluation.ResultLevelResponse'
       model:
@@ -222,31 +183,6 @@ definitions:
         items:
           $ref: '#/definitions/evaluation.DimensionInterpretResponse'
         type: array
-      risk_level:
-        type: string
-      scale_code:
-        type: string
-      scale_name:
-        type: string
-      suggestions:
-        items:
-          $ref: '#/definitions/evaluation.SuggestionResponse'
-        type: array
-      total_score:
-        type: number
-    type: object
-  evaluation.AssessmentReportV2Response:
-    properties:
-      assessment_id:
-        type: string
-      conclusion:
-        type: string
-      created_at:
-        type: string
-      dimensions:
-        items:
-          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
-        type: array
       level:
         $ref: '#/definitions/evaluation.ResultLevelResponse'
       model:
@@ -282,35 +218,6 @@ definitions:
         type: integer
     type: object
   evaluation.AssessmentSummaryResponse:
-    properties:
-      answer_sheet_id:
-        type: string
-      created_at:
-        type: string
-      id:
-        type: string
-      interpreted_at:
-        type: string
-      origin_type:
-        type: string
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      risk_level:
-        type: string
-      scale_code:
-        type: string
-      scale_name:
-        type: string
-      status:
-        type: string
-      submitted_at:
-        type: string
-      total_score:
-        type: number
-    type: object
-  evaluation.AssessmentSummaryV2Response:
     properties:
       answer_sheet_id:
         type: string
@@ -433,11 +340,104 @@ definitions:
       suggestion:
         type: string
     type: object
-  evaluation.ListAssessmentsResponse:
+  evaluation.LegacyAssessmentDetailResponse:
+    properties:
+      answer_sheet_id:
+        type: string
+      created_at:
+        type: string
+      failed_at:
+        type: string
+      failure_reason:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      org_id:
+        type: string
+      origin_id:
+        type: string
+      origin_type:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      risk_level:
+        type: string
+      scale_code:
+        type: string
+      scale_name:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      testee_id:
+        type: string
+      total_score:
+        type: number
+    type: object
+  evaluation.LegacyAssessmentReportResponse:
+    properties:
+      assessment_id:
+        type: string
+      conclusion:
+        type: string
+      created_at:
+        type: string
+      dimensions:
+        items:
+          $ref: '#/definitions/evaluation.DimensionInterpretResponse'
+        type: array
+      risk_level:
+        type: string
+      scale_code:
+        type: string
+      scale_name:
+        type: string
+      suggestions:
+        items:
+          $ref: '#/definitions/evaluation.SuggestionResponse'
+        type: array
+      total_score:
+        type: number
+    type: object
+  evaluation.LegacyAssessmentSummaryResponse:
+    properties:
+      answer_sheet_id:
+        type: string
+      created_at:
+        type: string
+      id:
+        type: string
+      interpreted_at:
+        type: string
+      origin_type:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      risk_level:
+        type: string
+      scale_code:
+        type: string
+      scale_name:
+        type: string
+      status:
+        type: string
+      submitted_at:
+        type: string
+      total_score:
+        type: number
+    type: object
+  evaluation.LegacyListAssessmentsResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
+          $ref: '#/definitions/evaluation.LegacyAssessmentSummaryResponse'
         type: array
       page:
         type: integer
@@ -448,11 +448,11 @@ definitions:
       total_pages:
         type: integer
     type: object
-  evaluation.ListAssessmentsV2Response:
+  evaluation.ListAssessmentsResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/evaluation.AssessmentSummaryV2Response'
+          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
         type: array
       page:
         type: integer
@@ -626,6 +626,8 @@ definitions:
     properties:
       answer_sheet_id:
         type: string
+      created_at:
+        type: string
       failed_at:
         type: string
       failure_reason:
@@ -635,9 +637,9 @@ definitions:
       interpreted_at:
         type: string
       level:
-        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
       model:
-        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
       org_id:
         type: string
       origin_id:
@@ -645,7 +647,7 @@ definitions:
       origin_type:
         type: string
       primary_score:
-        $ref: '#/definitions/personalityassessment.ScoreValueResponse'
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
       questionnaire_code:
         type: string
       questionnaire_version:
@@ -670,13 +672,13 @@ definitions:
           $ref: '#/definitions/evaluation.DimensionInterpretResponse'
         type: array
       level:
-        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
+        $ref: '#/definitions/evaluation.ResultLevelResponse'
       model:
-        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
+        $ref: '#/definitions/evaluation.ModelIdentityResponse'
       model_extra:
-        $ref: '#/definitions/personalityassessment.ModelExtraResponse'
+        $ref: '#/definitions/evaluation.ModelExtraResponse'
       primary_score:
-        $ref: '#/definitions/personalityassessment.ScoreValueResponse'
+        $ref: '#/definitions/evaluation.ScoreValueResponse'
       suggestions:
         items:
           $ref: '#/definitions/evaluation.SuggestionResponse'
@@ -701,36 +703,11 @@ definitions:
       updated_at:
         type: integer
     type: object
-  personalityassessment.AssessmentSummaryResponse:
-    properties:
-      answer_sheet_id:
-        type: string
-      id:
-        type: string
-      interpreted_at:
-        type: string
-      level:
-        $ref: '#/definitions/personalityassessment.ResultLevelResponse'
-      model:
-        $ref: '#/definitions/personalityassessment.ModelIdentityResponse'
-      origin_type:
-        type: string
-      primary_score:
-        $ref: '#/definitions/personalityassessment.ScoreValueResponse'
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      status:
-        type: string
-      submitted_at:
-        type: string
-    type: object
   personalityassessment.ListAssessmentsResponse:
     properties:
       items:
         items:
-          $ref: '#/definitions/personalityassessment.AssessmentSummaryResponse'
+          $ref: '#/definitions/evaluation.AssessmentSummaryResponse'
         type: array
       page:
         type: integer
@@ -740,29 +717,6 @@ definitions:
         type: integer
       total_pages:
         type: integer
-    type: object
-  personalityassessment.ModelExtraResponse:
-    properties:
-      commentary:
-        type: string
-      image_url:
-        type: string
-      is_special:
-        type: boolean
-      kind:
-        type: string
-      match_percent:
-        type: number
-      one_liner:
-        type: string
-      rarity:
-        $ref: '#/definitions/personalityassessment.ModelRarityResponse'
-      special_trigger:
-        type: string
-      type_code:
-        type: string
-      type_name:
-        type: string
     type: object
   personalityassessment.ModelIdentityResponse:
     properties:
@@ -779,15 +733,6 @@ definitions:
       version:
         type: string
     type: object
-  personalityassessment.ModelRarityResponse:
-    properties:
-      label:
-        type: string
-      one_in_x:
-        type: integer
-      percent:
-        type: number
-    type: object
   personalityassessment.ResultLevelResponse:
     properties:
       code:
@@ -796,17 +741,6 @@ definitions:
         type: string
       severity:
         type: string
-    type: object
-  personalityassessment.ScoreValueResponse:
-    properties:
-      kind:
-        type: string
-      label:
-        type: string
-      max:
-        type: number
-      value:
-        type: number
     type: object
   personalitymodel.CategoryResponse:
     properties:
@@ -1513,7 +1447,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.AssessmentDetailResponse'
+                  $ref: '#/definitions/evaluation.LegacyAssessmentDetailResponse'
               type: object
         "400":
           description: Bad Request
@@ -1611,7 +1545,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.ListAssessmentsResponse'
+                  $ref: '#/definitions/evaluation.LegacyListAssessmentsResponse'
               type: object
         "400":
           description: Bad Request
@@ -1654,7 +1588,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.AssessmentDetailResponse'
+                  $ref: '#/definitions/evaluation.LegacyAssessmentDetailResponse'
               type: object
         "400":
           description: Bad Request
@@ -1729,6 +1663,11 @@ paths:
         - dimensions（维度列表）：只包含 is_show = true 的因子维度，每个维度包含 factor_code（因子编码）、factor_name（因子名称）、raw_score（原始分）、max_score（最大分，可选）、risk_level（风险等级）、description（解读描述）、suggestion（维度建议，字符串）字段
         - suggestions（建议列表）：报告级别的建议列表，每个建议包含 category（分类）、content（内容）、factor_code（关联因子编码，可选）字段
       parameters:
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
       - description: 测评ID
         in: path
         name: id
@@ -1744,7 +1683,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.AssessmentReportResponse'
+                  $ref: '#/definitions/evaluation.LegacyAssessmentReportResponse'
               type: object
         "400":
           description: Bad Request
@@ -1765,6 +1704,49 @@ paths:
       security:
       - Bearer: []
       summary: 获取测评报告
+      tags:
+      - 测评
+  /api/v1/assessments/{id}/report-status:
+    get:
+      description: 立即返回当前报告状态；非终态时通过 next_poll_after_ms 指引客户端退避重试
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/evaluation.AssessmentStatusResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      security:
+      - Bearer: []
+      summary: 查询报告生成状态
       tags:
       - 测评
   /api/v1/assessments/{id}/scores:
@@ -2092,6 +2074,34 @@ paths:
           schema:
             $ref: '#/definitions/core.ErrResponse'
       summary: 获取人格测评报告
+      tags:
+      - 人格测评
+  /api/v1/personality-assessments/{id}/report-status:
+    get:
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 受试者ID
+        in: query
+        name: testee_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/personalityassessment.AssessmentStatusResponse'
+              type: object
+      summary: 查询人格测评报告状态
       tags:
       - 人格测评
   /api/v1/personality-assessments/{id}/wait-report:
@@ -2757,11 +2767,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.ListAssessmentsV2Response'
+                  $ref: '#/definitions/evaluation.ListAssessmentsResponse'
               type: object
-      summary: 查询我的 v2 测评列表
+      summary: 查询测评列表
       tags:
-      - 测评-V2
+      - 测评
   /api/v2/assessments/{id}:
     get:
       description: 根据测评 ID 获取详情，响应使用 model/primary_score/level 投影
@@ -2786,11 +2796,11 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.AssessmentDetailV2Response'
+                  $ref: '#/definitions/evaluation.AssessmentDetailResponse'
               type: object
-      summary: 获取我的 v2 测评详情
+      summary: 获取测评详情
       tags:
-      - 测评-V2
+      - 测评
   /api/v2/assessments/{id}/report:
     get:
       description: 根据测评 ID 获取报告，响应使用 model/primary_score/level 投影。必须传 testee_id 校验归属。
@@ -2815,7 +2825,7 @@ paths:
             - $ref: '#/definitions/core.Response'
             - properties:
                 data:
-                  $ref: '#/definitions/evaluation.AssessmentReportV2Response'
+                  $ref: '#/definitions/evaluation.AssessmentReportResponse'
               type: object
         "400":
           description: Bad Request
@@ -2829,9 +2839,9 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/core.ErrResponse'
-      summary: 获取 v2 测评报告
+      summary: 获取测评报告
       tags:
-      - 测评-V2
+      - 测评
   /health:
     get:
       description: 检查服务健康状态

@@ -30,37 +30,17 @@ func NewQueryService(evaluationClient evaluationapp.BFFReader, waitReport *repor
 }
 
 func (s *QueryService) List(ctx context.Context, testeeID uint64, req *ListAssessmentsRequest) (*ListAssessmentsResponse, error) {
-	page := req.Page
-	if page <= 0 {
-		page = 1
-	}
-	pageSize := req.PageSize
-	if pageSize <= 0 {
-		pageSize = 10
-	}
-	if pageSize > 100 {
-		pageSize = 100
-	}
-	result, err := s.evaluationClient.ListMyAssessmentsV2(ctx, testeeID, req.Status, "", "", personalityModelKind, req.Algorithm, page, pageSize)
+	page, pageSize := evaluationapp.NormalizeListPage(req.Page, req.PageSize, evaluationapp.AssessmentListPageDefault)
+	result, err := s.evaluationClient.ListMyAssessments(ctx, testeeID, req.Status, "", "", personalityModelKind, req.Algorithm, "", "", page, pageSize)
 	if err != nil {
 		logPersonalityAssessmentError("list personality assessments failed", err)
 		return nil, err
 	}
-	items := make([]AssessmentSummaryResponse, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, toAssessmentSummary(item))
-	}
-	return &ListAssessmentsResponse{
-		Items:      items,
-		Total:      result.Total,
-		Page:       result.Page,
-		PageSize:   result.PageSize,
-		TotalPages: result.TotalPages,
-	}, nil
+	return result, nil
 }
 
 func (s *QueryService) Get(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailResponse, error) {
-	result, err := s.evaluationClient.GetMyAssessmentV2(ctx, testeeID, assessmentID)
+	result, err := s.evaluationClient.GetMyAssessment(ctx, testeeID, assessmentID)
 	if err != nil {
 		logPersonalityAssessmentError("get personality assessment failed", err)
 		return nil, err
@@ -71,11 +51,11 @@ func (s *QueryService) Get(ctx context.Context, testeeID, assessmentID uint64) (
 	if err := ensurePersonalityModel(result.Model); err != nil {
 		return nil, err
 	}
-	return toAssessmentDetail(result), nil
+	return result, nil
 }
 
 func (s *QueryService) GetReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportResponse, error) {
-	result, err := s.evaluationClient.GetAssessmentReportV2(ctx, testeeID, assessmentID)
+	result, err := s.evaluationClient.GetAssessmentReport(ctx, testeeID, assessmentID)
 	if err != nil {
 		logPersonalityAssessmentError("get personality assessment report failed", err)
 		return nil, err
@@ -86,7 +66,7 @@ func (s *QueryService) GetReport(ctx context.Context, testeeID, assessmentID uin
 	if err := ensurePersonalityModel(result.Model); err != nil {
 		return nil, err
 	}
-	return toAssessmentReport(result), nil
+	return result, nil
 }
 
 func (s *QueryService) GetReportStatus(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentStatusResponse, error) {
@@ -140,77 +120,6 @@ func ensurePersonalityModel(model evaluationapp.ModelIdentityResponse) error {
 		return errNotPersonalityAssessment
 	}
 	return nil
-}
-
-func toAssessmentDetail(result *evaluationapp.AssessmentDetailV2Response) *AssessmentDetailResponse {
-	return &AssessmentDetailResponse{
-		ID:                   result.ID,
-		OrgID:                result.OrgID,
-		TesteeID:             result.TesteeID,
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        result.AnswerSheetID,
-		Model:                result.Model,
-		PrimaryScore:         result.PrimaryScore,
-		Level:                result.Level,
-		OriginType:           result.OriginType,
-		OriginID:             result.OriginID,
-		Status:               result.Status,
-		SubmittedAt:          result.SubmittedAt,
-		InterpretedAt:        result.InterpretedAt,
-		FailedAt:             result.FailedAt,
-		FailureReason:        result.FailureReason,
-	}
-}
-
-func toAssessmentSummary(result evaluationapp.AssessmentSummaryV2Response) AssessmentSummaryResponse {
-	return AssessmentSummaryResponse{
-		ID:                   result.ID,
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        result.AnswerSheetID,
-		Model:                result.Model,
-		PrimaryScore:         result.PrimaryScore,
-		Level:                result.Level,
-		OriginType:           result.OriginType,
-		Status:               result.Status,
-		SubmittedAt:          result.SubmittedAt,
-		InterpretedAt:        result.InterpretedAt,
-	}
-}
-
-func toAssessmentReport(result *evaluationapp.AssessmentReportV2Response) *AssessmentReportResponse {
-	dimensions := make([]evaluationapp.DimensionInterpretResponse, 0, len(result.Dimensions))
-	for _, dim := range result.Dimensions {
-		dimensions = append(dimensions, evaluationapp.DimensionInterpretResponse{
-			FactorCode:  dim.FactorCode,
-			FactorName:  dim.FactorName,
-			RawScore:    dim.RawScore,
-			MaxScore:    dim.MaxScore,
-			RiskLevel:   dim.RiskLevel,
-			Description: dim.Description,
-			Suggestion:  dim.Suggestion,
-		})
-	}
-	suggestions := make([]evaluationapp.SuggestionResponse, 0, len(result.Suggestions))
-	for _, item := range result.Suggestions {
-		suggestions = append(suggestions, evaluationapp.SuggestionResponse{
-			Category:   item.Category,
-			Content:    item.Content,
-			FactorCode: item.FactorCode,
-		})
-	}
-	return &AssessmentReportResponse{
-		AssessmentID: result.AssessmentID,
-		Model:        result.Model,
-		PrimaryScore: result.PrimaryScore,
-		Level:        result.Level,
-		Conclusion:   result.Conclusion,
-		Dimensions:   dimensions,
-		Suggestions:  suggestions,
-		ModelExtra:   result.ModelExtra,
-		CreatedAt:    result.CreatedAt,
-	}
 }
 
 func logPersonalityAssessmentError(message string, err error) {

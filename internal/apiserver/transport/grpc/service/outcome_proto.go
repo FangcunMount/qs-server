@@ -141,11 +141,11 @@ func toEvaluationProtoResultLevel(level *assessmentApp.ResultLevelResult) *evalu
 	}
 }
 
-func toEvaluationProtoAssessmentDetailV2(result *assessmentApp.AssessmentV2Result) *evaluationpb.AssessmentDetailV2 {
+func toProtoAssessmentDetailFromV2(result *assessmentApp.AssessmentV2Result) *evaluationpb.AssessmentDetail {
 	if result == nil {
 		return nil
 	}
-	detail := &evaluationpb.AssessmentDetailV2{
+	detail := &evaluationpb.AssessmentDetail{
 		Id:                   result.ID,
 		OrgId:                result.OrgID,
 		TesteeId:             result.TesteeID,
@@ -158,6 +158,7 @@ func toEvaluationProtoAssessmentDetailV2(result *assessmentApp.AssessmentV2Resul
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 	}
+	fillLegacyAssessmentDetailFields(detail, result)
 	if result.OriginID != nil {
 		detail.OriginId = *result.OriginID
 	}
@@ -176,11 +177,11 @@ func toEvaluationProtoAssessmentDetailV2(result *assessmentApp.AssessmentV2Resul
 	return detail
 }
 
-func toEvaluationProtoAssessmentSummaryV2(result *assessmentApp.AssessmentV2Result) *evaluationpb.AssessmentSummaryV2 {
+func toProtoAssessmentSummaryFromV2(result *assessmentApp.AssessmentV2Result) *evaluationpb.AssessmentSummary {
 	if result == nil {
 		return nil
 	}
-	summary := &evaluationpb.AssessmentSummaryV2{
+	summary := &evaluationpb.AssessmentSummary{
 		Id:                   result.ID,
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
@@ -191,6 +192,7 @@ func toEvaluationProtoAssessmentSummaryV2(result *assessmentApp.AssessmentV2Resu
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 	}
+	fillLegacyAssessmentSummaryFields(summary, result)
 	if result.SubmittedAt != nil {
 		summary.SubmittedAt = result.SubmittedAt.Format("2006-01-02 15:04:05")
 	}
@@ -200,17 +202,29 @@ func toEvaluationProtoAssessmentSummaryV2(result *assessmentApp.AssessmentV2Resu
 	return summary
 }
 
-func toEvaluationProtoAssessmentReportV2(result *assessmentApp.ReportV2Result) *evaluationpb.AssessmentReportV2 {
+func toProtoAssessmentReportFromV2(result *assessmentApp.ReportV2Result) *evaluationpb.AssessmentReport {
 	if result == nil {
 		return nil
 	}
-	report := &evaluationpb.AssessmentReportV2{
+	report := &evaluationpb.AssessmentReport{
 		AssessmentId: result.AssessmentID,
 		Model:        toEvaluationProtoModelIdentity(result.Model),
 		PrimaryScore: toEvaluationProtoScoreValue(result.PrimaryScore),
 		Level:        toEvaluationProtoResultLevel(result.Level),
 		Conclusion:   result.Conclusion,
 		CreatedAt:    result.CreatedAt.Format("2006-01-02 15:04:05"),
+	}
+	if result.Model.Code != "" {
+		report.ScaleCode = result.Model.Code
+	}
+	if result.Model.Title != "" {
+		report.ScaleName = result.Model.Title
+	}
+	if result.PrimaryScore != nil {
+		report.TotalScore = result.PrimaryScore.Value
+	}
+	if result.Level != nil {
+		report.RiskLevel = resultLevelToRiskLevel(result.Level)
 	}
 	for _, d := range result.Dimensions {
 		report.Dimensions = append(report.Dimensions, &evaluationpb.DimensionInterpret{
@@ -234,6 +248,49 @@ func toEvaluationProtoAssessmentReportV2(result *assessmentApp.ReportV2Result) *
 		report.ModelExtra = toProtoModelExtra(result.ModelExtra)
 	}
 	return report
+}
+
+func fillLegacyAssessmentDetailFields(detail *evaluationpb.AssessmentDetail, result *assessmentApp.AssessmentV2Result) {
+	if detail == nil || result == nil {
+		return
+	}
+	if result.Model.Code != "" {
+		detail.ScaleCode = result.Model.Code
+	}
+	if result.Model.Title != "" {
+		detail.ScaleName = result.Model.Title
+	}
+	if result.PrimaryScore != nil {
+		detail.TotalScore = result.PrimaryScore.Value
+	}
+	if result.Level != nil {
+		detail.RiskLevel = resultLevelToRiskLevel(result.Level)
+	}
+}
+
+func fillLegacyAssessmentSummaryFields(summary *evaluationpb.AssessmentSummary, result *assessmentApp.AssessmentV2Result) {
+	if summary == nil || result == nil {
+		return
+	}
+	if result.Model.Code != "" {
+		summary.ScaleCode = result.Model.Code
+	}
+	if result.Model.Title != "" {
+		summary.ScaleName = result.Model.Title
+	}
+	if result.PrimaryScore != nil {
+		summary.TotalScore = result.PrimaryScore.Value
+	}
+	if result.Level != nil {
+		summary.RiskLevel = resultLevelToRiskLevel(result.Level)
+	}
+}
+
+func resultLevelToRiskLevel(level *assessmentApp.ResultLevelResult) string {
+	if level == nil {
+		return ""
+	}
+	return level.Code
 }
 
 func derefFloat64(v *float64) float64 {

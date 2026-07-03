@@ -1,10 +1,6 @@
 package grpcbridge
 
-import (
-	"context"
-
-	grpcclient "github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
-)
+import "context"
 
 // ScaleReader 量表目录读端口。
 type ScaleReader interface {
@@ -29,16 +25,13 @@ type PersonalityModelReader interface {
 
 // EvaluationReader 测评读端口（collection BFF 使用的方法集合）。
 type EvaluationReader interface {
-	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error)
-	GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*AssessmentDetailOutput, error)
-	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind string, page, pageSize int32) (*ListAssessmentsOutput, error)
 	GetAssessmentScores(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)
-	GetAssessmentReport(ctx context.Context, assessmentID uint64) (*AssessmentReportOutput, error)
 	GetFactorTrend(ctx context.Context, testeeID uint64, factorCode string, limit int32) ([]TrendPointOutput, error)
 	GetHighRiskFactors(ctx context.Context, testeeID, assessmentID uint64) ([]FactorScoreOutput, error)
-	GetMyAssessmentV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailV2Output, error)
-	ListMyAssessmentsV2(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, modelKind, algorithm string, page, pageSize int32) (*ListAssessmentsV2Output, error)
-	GetAssessmentReportV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportV2Output, error)
+	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error)
+	ListMyAssessments(ctx context.Context, testeeID uint64, status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, algorithm string, page, pageSize int32) (*ListAssessmentsOutput, error)
+	GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error)
+	ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error)
 }
 
 // ActorReader 受试者读端口。
@@ -61,5 +54,3 @@ type AnswerSheetWriter interface {
 	SaveAnswerSheet(ctx context.Context, input *SaveAnswerSheetInput) (*SaveAnswerSheetOutput, error)
 	GetAnswerSheet(ctx context.Context, id uint64) (*AnswerSheetOutput, error)
 }
-
-type ListAssessmentsOutput = grpcclient.ListAssessmentsOutput

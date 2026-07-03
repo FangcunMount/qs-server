@@ -8,8 +8,8 @@ type ListPageDefaults struct {
 }
 
 var (
-	AssessmentListPageV1 = ListPageDefaults{Page: 1, PageSize: 50, MaxSize: 100}
-	AssessmentListPageV2 = ListPageDefaults{Page: 1, PageSize: 10, MaxSize: 100}
+	AssessmentListPageLegacy  = ListPageDefaults{Page: 1, PageSize: 50, MaxSize: 100}
+	AssessmentListPageDefault = ListPageDefaults{Page: 1, PageSize: 10, MaxSize: 100}
 )
 
 // NormalizeListPage 规范化分页参数并返回页码与页大小。

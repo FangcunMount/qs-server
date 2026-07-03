@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	pb "github.com/FangcunMount/qs-server/internal/apiserver/interface/grpc/proto/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
@@ -48,23 +49,36 @@ func (s *EvaluationService) RegisterService(server *grpc.Server) {
 
 // ==================== 测评查询接口 ====================
 
-// GetMyAssessment 获取我的测评详情
+// GetMyAssessment 获取我的测评详情（含 outcome 投影）
 func (s *EvaluationService) GetMyAssessment(ctx context.Context, req *pb.GetMyAssessmentRequest) (*pb.GetMyAssessmentResponse, error) {
 	if req.TesteeId == 0 || req.AssessmentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "testee_id 和 assessment_id 不能为空")
 	}
+	if _, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId); err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
+	}
+	result, err := s.loadAssessmentV2Row(ctx, req.AssessmentId)
+	if err != nil {
+		return nil, err
+	}
+	return &pb.GetMyAssessmentResponse{Assessment: toProtoAssessmentDetailFromV2(result)}, nil
+}
 
-	result, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId)
+// ResolveAssessmentByAnswerSheetID 通过答卷 ID 解析归属键
+func (s *EvaluationService) ResolveAssessmentByAnswerSheetID(ctx context.Context, req *pb.ResolveAssessmentByAnswerSheetIDRequest) (*pb.ResolveAssessmentByAnswerSheetIDResponse, error) {
+	if req.AnswerSheetId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "answer_sheet_id 不能为空")
+	}
+	result, err := s.submissionService.GetMyAssessmentByAnswerSheetID(ctx, req.AnswerSheetId)
 	if err != nil {
 		return nil, toAssessmentQueryGRPCError(err)
 	}
-
 	if result == nil {
-		return nil, status.Error(codes.NotFound, "测评不存在或无权访问")
+		return nil, status.Error(codes.NotFound, "测评不存在")
 	}
-
-	return &pb.GetMyAssessmentResponse{
-		Assessment: toProtoAssessmentDetail(result),
+	return &pb.ResolveAssessmentByAnswerSheetIDResponse{
+		TesteeId:     result.TesteeID,
+		AssessmentId: result.ID,
 	}, nil
 }
 
@@ -83,18 +97,21 @@ func (s *EvaluationService) GetMyAssessmentByAnswerSheetID(ctx context.Context, 
 		return nil, status.Error(codes.NotFound, "测评不存在")
 	}
 
+	v2, err := s.loadAssessmentV2Row(ctx, result.ID)
+	if err != nil {
+		v2 = legacyAssessmentV2Result(result)
+	}
 	return &pb.GetMyAssessmentByAnswerSheetIDResponse{
-		Assessment: toProtoAssessmentDetail(result),
+		Assessment: toProtoAssessmentDetailFromV2(v2),
 	}, nil
 }
 
-// ListMyAssessments 获取我的测评列表
+// ListMyAssessments 获取我的测评列表（含 outcome 投影）
 func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListMyAssessmentsRequest) (*pb.ListMyAssessmentsResponse, error) {
 	if req.TesteeId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "testee_id 不能为空")
 	}
 
-	// 设置默认值
 	page := int(req.Page)
 	pageSize := int(req.PageSize)
 	if page <= 0 {
@@ -104,58 +121,94 @@ func (s *EvaluationService) ListMyAssessments(ctx context.Context, req *pb.ListM
 		pageSize = 10
 	}
 
-	dto := assessmentApp.ListMyAssessmentsDTO{
-		TesteeID:  req.TesteeId,
-		Page:      page,
-		PageSize:  pageSize,
-		Status:    req.Status,
-		ScaleCode: req.ScaleCode,
-		RiskLevel: req.RiskLevel,
-		ModelKind: req.ModelKind,
-	}
-	dateFrom, err := parseAssessmentListDate(req.DateFrom, false)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "date_from 格式不正确")
-	}
-	dateTo, err := parseAssessmentListDate(req.DateTo, true)
-	if err != nil {
-		return nil, status.Error(codes.InvalidArgument, "date_to 格式不正确")
-	}
-	dto.DateFrom = dateFrom
-	dto.DateTo = dateTo
+	if s.assessmentReader == nil {
+		dto := assessmentApp.ListMyAssessmentsDTO{
+			TesteeID:  req.TesteeId,
+			Page:      page,
+			PageSize:  pageSize,
+			Status:    req.Status,
+			ScaleCode: req.ScaleCode,
+			RiskLevel: req.RiskLevel,
+			ModelKind: req.ModelKind,
+		}
+		dateFrom, err := parseAssessmentListDate(req.DateFrom, false)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "date_from 格式不正确")
+		}
+		dateTo, err := parseAssessmentListDate(req.DateTo, true)
+		if err != nil {
+			return nil, status.Error(codes.InvalidArgument, "date_to 格式不正确")
+		}
+		dto.DateFrom = dateFrom
+		dto.DateTo = dateTo
 
-	result, err := s.submissionService.ListMyAssessments(ctx, dto)
+		listResult, err := s.submissionService.ListMyAssessments(ctx, dto)
+		if err != nil {
+			return nil, toAssessmentQueryGRPCError(err)
+		}
+		items := make([]*pb.AssessmentSummary, 0, len(listResult.Items))
+		for _, item := range listResult.Items {
+			items = append(items, toProtoAssessmentSummaryFromV2(legacyAssessmentV2Result(item)))
+		}
+		total, err := protoInt32FromInt("total", listResult.Total)
+		if err != nil {
+			return nil, err
+		}
+		pageOut, err := protoInt32FromInt("page", listResult.Page)
+		if err != nil {
+			return nil, err
+		}
+		pageSizeOut, err := protoInt32FromInt("page_size", listResult.PageSize)
+		if err != nil {
+			return nil, err
+		}
+		totalPages, err := protoInt32FromInt("total_pages", listResult.TotalPages)
+		if err != nil {
+			return nil, err
+		}
+		return &pb.ListMyAssessmentsResponse{
+			Items: items, Total: total, Page: pageOut, PageSize: pageSizeOut, TotalPages: totalPages,
+		}, nil
+	}
+
+	testeeID := req.TesteeId
+	filter := evaluationreadmodel.AssessmentFilter{
+		TesteeID:       &testeeID,
+		Statuses:       normalizeGRPCAssessmentStatuses(req.Status),
+		ScaleCode:      req.ScaleCode,
+		RiskLevel:      req.RiskLevel,
+		ModelKind:      req.ModelKind,
+		ModelAlgorithm: req.ModelAlgorithm,
+		ModelCode:      req.ModelCode,
+	}
+	if req.DateFrom != "" {
+		if parsed, err := time.Parse(time.RFC3339, req.DateFrom); err == nil {
+			filter.DateFrom = &parsed
+		}
+	}
+	if req.DateTo != "" {
+		if parsed, err := time.Parse(time.RFC3339, req.DateTo); err == nil {
+			filter.DateTo = &parsed
+		}
+	}
+	rows, total, err := s.assessmentReader.ListAssessments(ctx, filter, evaluationreadmodel.PageRequest{Page: page, PageSize: pageSize})
+	if err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
+	}
+	v2Items, err := assessmentApp.RowsToV2Results(rows)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	items := make([]*pb.AssessmentSummary, 0, len(result.Items))
-	for _, item := range result.Items {
-		items = append(items, toProtoAssessmentSummary(item))
+	items := make([]*pb.AssessmentSummary, 0, len(v2Items))
+	for _, item := range v2Items {
+		items = append(items, toProtoAssessmentSummaryFromV2(item))
 	}
-	total, err := protoInt32FromInt("total", result.Total)
-	if err != nil {
-		return nil, err
+	totalPages := int32((total + int64(pageSize) - 1) / int64(pageSize))
+	if totalPages == 0 && total > 0 {
+		totalPages = 1
 	}
-	pageOut, err := protoInt32FromInt("page", result.Page)
-	if err != nil {
-		return nil, err
-	}
-	pageSizeOut, err := protoInt32FromInt("page_size", result.PageSize)
-	if err != nil {
-		return nil, err
-	}
-	totalPages, err := protoInt32FromInt("total_pages", result.TotalPages)
-	if err != nil {
-		return nil, err
-	}
-
 	return &pb.ListMyAssessmentsResponse{
-		Items:      items,
-		Total:      total,
-		Page:       pageOut,
-		PageSize:   pageSizeOut,
-		TotalPages: totalPages,
+		Items: items, Total: int32(total), Page: int32(page), PageSize: int32(pageSize), TotalPages: totalPages,
 	}, nil
 }
 
@@ -319,10 +372,27 @@ func (s *EvaluationService) GetHighRiskFactors(ctx context.Context, req *pb.GetH
 
 // ==================== 报告查询接口 ====================
 
-// GetAssessmentReport 获取测评报告
+// GetAssessmentReport 获取测评报告；testee_id 有值时校验归属并返回 outcome 投影
 func (s *EvaluationService) GetAssessmentReport(ctx context.Context, req *pb.GetAssessmentReportRequest) (*pb.GetAssessmentReportResponse, error) {
 	if req.AssessmentId == 0 {
 		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	}
+
+	if req.TesteeId > 0 {
+		if _, err := s.submissionService.GetMyAssessment(ctx, req.TesteeId, req.AssessmentId); err != nil {
+			return nil, toAssessmentQueryGRPCError(err)
+		}
+		if s.reportQueryService == nil {
+			return nil, status.Error(codes.FailedPrecondition, "report query service is not configured")
+		}
+		result, err := s.reportQueryService.GetV2ByAssessmentID(ctx, req.AssessmentId)
+		if err != nil {
+			return nil, toAssessmentQueryGRPCError(err)
+		}
+		if result == nil {
+			return nil, status.Error(codes.NotFound, "报告不存在")
+		}
+		return &pb.GetAssessmentReportResponse{Report: toProtoAssessmentReportFromV2(result)}, nil
 	}
 
 	result, err := s.reportQueryService.GetByAssessmentID(ctx, req.AssessmentId)
@@ -415,9 +485,33 @@ func (s *EvaluationService) validateTesteeAssessmentAccess(ctx context.Context, 
 	return nil
 }
 
+func (s *EvaluationService) loadAssessmentV2Row(ctx context.Context, assessmentID uint64) (*assessmentApp.AssessmentV2Result, error) {
+	if s.assessmentReader == nil {
+		return nil, status.Error(codes.FailedPrecondition, "assessment read model is not configured")
+	}
+	row, err := s.assessmentReader.GetAssessment(ctx, assessmentID)
+	if err != nil {
+		return nil, toAssessmentQueryGRPCError(err)
+	}
+	return assessmentApp.RowToV2Result(*row)
+}
+
+func normalizeGRPCAssessmentStatuses(raw string) []string {
+	switch raw {
+	case "":
+		return nil
+	case "pending":
+		return []string{domainAssessment.StatusPending.String(), domainAssessment.StatusSubmitted.String()}
+	case "done":
+		return []string{domainAssessment.StatusInterpreted.String()}
+	default:
+		return []string{raw}
+	}
+}
+
 // ==================== 转换函数 ====================
 
-// toProtoAssessmentDetail 转换为 proto 测评详情
+// toProtoAssessmentDetail 转换为 proto 测评详情（legacy 路径，ListMyReports 等仍可能使用）
 func toProtoAssessmentDetail(result *assessmentApp.AssessmentResult) *pb.AssessmentDetail {
 	if result == nil {
 		return nil

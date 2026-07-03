@@ -6,69 +6,30 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 )
 
-func toAssessmentDetailResponse(result *AssessmentDetailOutput) *evaluation.AssessmentDetailResponse {
-	if result == nil {
-		return nil
+func formatAnswerSheetID(id uint64) string {
+	if id == 0 {
+		return ""
 	}
-	answerSheetID := ""
-	if result.AnswerSheetID != 0 {
-		answerSheetID = strconv.FormatUint(result.AnswerSheetID, 10)
-	}
-	return &evaluation.AssessmentDetailResponse{
-		ID:                   strconv.FormatUint(result.ID, 10),
-		OrgID:                strconv.FormatUint(result.OrgID, 10),
-		TesteeID:             strconv.FormatUint(result.TesteeID, 10),
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetID:        answerSheetID,
-		ScaleCode:            result.ScaleCode,
-		ScaleName:            result.ScaleName,
-		OriginType:           result.OriginType,
-		OriginID:             result.OriginID,
-		Status:               result.Status,
-		TotalScore:           result.TotalScore,
-		RiskLevel:            result.RiskLevel,
-		CreatedAt:            result.CreatedAt,
-		SubmittedAt:          result.SubmittedAt,
-		InterpretedAt:        result.InterpretedAt,
-		FailedAt:             result.FailedAt,
-		FailureReason:        result.FailureReason,
-	}
+	return strconv.FormatUint(id, 10)
 }
 
-func toListAssessmentsResponse(result *ListAssessmentsOutput) *evaluation.ListAssessmentsResponse {
-	if result == nil {
+func toDimensionInterpretResponses(outputs []DimensionInterpretOutput) []evaluation.DimensionInterpretResponse {
+	if len(outputs) == 0 {
 		return nil
 	}
-	items := make([]evaluation.AssessmentSummaryResponse, len(result.Items))
-	for i, item := range result.Items {
-		answerSheetID := ""
-		if item.AnswerSheetID != 0 {
-			answerSheetID = strconv.FormatUint(item.AnswerSheetID, 10)
-		}
-		items[i] = evaluation.AssessmentSummaryResponse{
-			ID:                   strconv.FormatUint(item.ID, 10),
-			QuestionnaireCode:    item.QuestionnaireCode,
-			QuestionnaireVersion: item.QuestionnaireVersion,
-			AnswerSheetID:        answerSheetID,
-			ScaleCode:            item.ScaleCode,
-			ScaleName:            item.ScaleName,
-			OriginType:           item.OriginType,
-			Status:               item.Status,
-			TotalScore:           item.TotalScore,
-			RiskLevel:            item.RiskLevel,
-			CreatedAt:            item.CreatedAt,
-			SubmittedAt:          item.SubmittedAt,
-			InterpretedAt:        item.InterpretedAt,
-		}
+	dimensions := make([]evaluation.DimensionInterpretResponse, 0, len(outputs))
+	for _, dim := range outputs {
+		dimensions = append(dimensions, evaluation.DimensionInterpretResponse{
+			FactorCode:  dim.FactorCode,
+			FactorName:  dim.FactorName,
+			RawScore:    dim.RawScore,
+			MaxScore:    dim.MaxScore,
+			RiskLevel:   dim.RiskLevel,
+			Description: dim.Description,
+			Suggestion:  dim.Suggestion,
+		})
 	}
-	return &evaluation.ListAssessmentsResponse{
-		Items:      items,
-		Total:      result.Total,
-		Page:       result.Page,
-		PageSize:   result.PageSize,
-		TotalPages: result.TotalPages,
-	}
+	return dimensions
 }
 
 func toFactorScoreResponses(result []FactorScoreOutput) []evaluation.FactorScoreResponse {
@@ -85,35 +46,6 @@ func toFactorScoreResponses(result []FactorScoreOutput) []evaluation.FactorScore
 		}
 	}
 	return scores
-}
-
-func toAssessmentReportResponse(result *AssessmentReportOutput) *evaluation.AssessmentReportResponse {
-	if result == nil {
-		return nil
-	}
-	dimensions := make([]evaluation.DimensionInterpretResponse, 0, len(result.Dimensions))
-	for _, dim := range result.Dimensions {
-		dimensions = append(dimensions, evaluation.DimensionInterpretResponse{
-			FactorCode:  dim.FactorCode,
-			FactorName:  dim.FactorName,
-			RawScore:    dim.RawScore,
-			MaxScore:    dim.MaxScore,
-			RiskLevel:   dim.RiskLevel,
-			Description: dim.Description,
-			Suggestion:  dim.Suggestion,
-		})
-	}
-	return &evaluation.AssessmentReportResponse{
-		AssessmentID: strconv.FormatUint(result.AssessmentID, 10),
-		ScaleCode:    result.ScaleCode,
-		ScaleName:    result.ScaleName,
-		TotalScore:   result.TotalScore,
-		RiskLevel:    result.RiskLevel,
-		Conclusion:   result.Conclusion,
-		Dimensions:   dimensions,
-		Suggestions:  toSuggestionResponses(result.Suggestions),
-		CreatedAt:    result.CreatedAt,
-	}
 }
 
 func toSuggestionResponses(outputs []SuggestionOutput) []evaluation.SuggestionResponse {
@@ -142,4 +74,137 @@ func toTrendPointResponses(result []TrendPointOutput) []evaluation.TrendPointRes
 		}
 	}
 	return points
+}
+
+func toAssessmentDetailResponse(detail *AssessmentDetailOutput) *evaluation.AssessmentDetailResponse {
+	if detail == nil {
+		return nil
+	}
+	return &evaluation.AssessmentDetailResponse{
+		ID:                   strconv.FormatUint(detail.ID, 10),
+		OrgID:                strconv.FormatUint(detail.OrgID, 10),
+		TesteeID:             strconv.FormatUint(detail.TesteeID, 10),
+		QuestionnaireCode:    detail.QuestionnaireCode,
+		QuestionnaireVersion: detail.QuestionnaireVersion,
+		AnswerSheetID:        formatAnswerSheetID(detail.AnswerSheetID),
+		Model:                toModelIdentityResponse(detail.Model),
+		PrimaryScore:         toScoreValueResponse(detail.PrimaryScore),
+		Level:                toResultLevelResponse(detail.Level),
+		OriginType:           detail.OriginType,
+		OriginID:             detail.OriginID,
+		Status:               detail.Status,
+		SubmittedAt:          detail.SubmittedAt,
+		InterpretedAt:        detail.InterpretedAt,
+		FailedAt:             detail.FailedAt,
+		FailureReason:        detail.FailureReason,
+	}
+}
+
+func toAssessmentSummaryResponse(summary AssessmentSummaryOutput) evaluation.AssessmentSummaryResponse {
+	return evaluation.AssessmentSummaryResponse{
+		ID:                   strconv.FormatUint(summary.ID, 10),
+		QuestionnaireCode:    summary.QuestionnaireCode,
+		QuestionnaireVersion: summary.QuestionnaireVersion,
+		AnswerSheetID:        formatAnswerSheetID(summary.AnswerSheetID),
+		Model:                toModelIdentityResponse(summary.Model),
+		PrimaryScore:         toScoreValueResponse(summary.PrimaryScore),
+		Level:                toResultLevelResponse(summary.Level),
+		OriginType:           summary.OriginType,
+		Status:               summary.Status,
+		SubmittedAt:          summary.SubmittedAt,
+		InterpretedAt:        summary.InterpretedAt,
+	}
+}
+
+func toListAssessmentsResponse(resp *ListAssessmentsOutput) *evaluation.ListAssessmentsResponse {
+	if resp == nil {
+		return nil
+	}
+	items := make([]evaluation.AssessmentSummaryResponse, 0, len(resp.Items))
+	for _, item := range resp.Items {
+		items = append(items, toAssessmentSummaryResponse(item))
+	}
+	return &evaluation.ListAssessmentsResponse{
+		Items:      items,
+		Total:      resp.Total,
+		Page:       resp.Page,
+		PageSize:   resp.PageSize,
+		TotalPages: resp.TotalPages,
+	}
+}
+
+func toAssessmentReportResponse(report *AssessmentReportOutput) *evaluation.AssessmentReportResponse {
+	if report == nil {
+		return nil
+	}
+	return &evaluation.AssessmentReportResponse{
+		AssessmentID: strconv.FormatUint(report.AssessmentID, 10),
+		Model:        toModelIdentityResponse(report.Model),
+		PrimaryScore: toScoreValueResponse(report.PrimaryScore),
+		Level:        toResultLevelResponse(report.Level),
+		Conclusion:   report.Conclusion,
+		Dimensions:   toDimensionInterpretResponses(report.Dimensions),
+		Suggestions:  toSuggestionResponses(report.Suggestions),
+		ModelExtra:   toModelExtraResponse(report.ModelExtra),
+		CreatedAt:    report.CreatedAt,
+	}
+}
+
+func toModelIdentityResponse(model ModelIdentityOutput) evaluation.ModelIdentityResponse {
+	return evaluation.ModelIdentityResponse{
+		Kind:      model.Kind,
+		SubKind:   model.SubKind,
+		Algorithm: model.Algorithm,
+		Code:      model.Code,
+		Version:   model.Version,
+		Title:     model.Title,
+	}
+}
+
+func toScoreValueResponse(score *ScoreValueOutput) *evaluation.ScoreValueResponse {
+	if score == nil {
+		return nil
+	}
+	return &evaluation.ScoreValueResponse{
+		Kind:  score.Kind,
+		Value: score.Value,
+		Label: score.Label,
+		Max:   score.Max,
+	}
+}
+
+func toResultLevelResponse(level *ResultLevelOutput) *evaluation.ResultLevelResponse {
+	if level == nil {
+		return nil
+	}
+	return &evaluation.ResultLevelResponse{
+		Code:     level.Code,
+		Label:    level.Label,
+		Severity: level.Severity,
+	}
+}
+
+func toModelExtraResponse(extra *ModelExtraOutput) *evaluation.ModelExtraResponse {
+	if extra == nil {
+		return nil
+	}
+	resp := &evaluation.ModelExtraResponse{
+		Kind:           extra.Kind,
+		TypeCode:       extra.TypeCode,
+		TypeName:       extra.TypeName,
+		OneLiner:       extra.OneLiner,
+		ImageURL:       extra.ImageURL,
+		MatchPercent:   extra.MatchPercent,
+		IsSpecial:      extra.IsSpecial,
+		SpecialTrigger: extra.SpecialTrigger,
+		Commentary:     extra.Commentary,
+	}
+	if extra.Rarity != nil {
+		resp.Rarity = &evaluation.ModelRarityResponse{
+			Percent: extra.Rarity.Percent,
+			Label:   extra.Rarity.Label,
+			OneInX:  extra.Rarity.OneInX,
+		}
+	}
+	return resp
 }

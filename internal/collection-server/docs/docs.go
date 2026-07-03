@@ -266,7 +266,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.AssessmentDetailResponse"
+                                            "$ref": "#/definitions/evaluation.LegacyAssessmentDetailResponse"
                                         }
                                     }
                                 }
@@ -356,7 +356,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.ListAssessmentsResponse"
+                                            "$ref": "#/definitions/evaluation.LegacyListAssessmentsResponse"
                                         }
                                     }
                                 }
@@ -508,7 +508,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.AssessmentDetailResponse"
+                                            "$ref": "#/definitions/evaluation.LegacyAssessmentDetailResponse"
                                         }
                                     }
                                 }
@@ -634,6 +634,13 @@ const docTemplate = `{
                 "parameters": [
                     {
                         "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
                         "description": "测评ID",
                         "name": "id",
                         "in": "path",
@@ -652,7 +659,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.AssessmentReportResponse"
+                                            "$ref": "#/definitions/evaluation.LegacyAssessmentReportResponse"
                                         }
                                     }
                                 }
@@ -667,6 +674,77 @@ const docTemplate = `{
                     },
                     "404": {
                         "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/assessments/{id}/report-status": {
+            "get": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
+                "description": "立即返回当前报告状态；非终态时通过 next_poll_after_ms 指引客户端退避重试",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "测评"
+                ],
+                "summary": "查询报告生成状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/evaluation.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
                         }
@@ -1134,6 +1212,53 @@ const docTemplate = `{
                         "description": "Internal Server Error",
                         "schema": {
                             "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/personality-assessments/{id}/report-status": {
+            "get": {
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "人格测评"
+                ],
+                "summary": "查询人格测评报告状态",
+                "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "受试者ID",
+                        "name": "testee_id",
+                        "in": "query",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/personalityassessment.AssessmentStatusResponse"
+                                        }
+                                    }
+                                }
+                            ]
                         }
                     }
                 }
@@ -2161,9 +2286,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "测评-V2"
+                    "测评"
                 ],
-                "summary": "查询我的 v2 测评列表",
+                "summary": "查询测评列表",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2185,7 +2310,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.ListAssessmentsV2Response"
+                                            "$ref": "#/definitions/evaluation.ListAssessmentsResponse"
                                         }
                                     }
                                 }
@@ -2202,9 +2327,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "测评-V2"
+                    "测评"
                 ],
-                "summary": "获取我的 v2 测评详情",
+                "summary": "获取测评详情",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2233,7 +2358,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.AssessmentDetailV2Response"
+                                            "$ref": "#/definitions/evaluation.AssessmentDetailResponse"
                                         }
                                     }
                                 }
@@ -2250,9 +2375,9 @@ const docTemplate = `{
                     "application/json"
                 ],
                 "tags": [
-                    "测评-V2"
+                    "测评"
                 ],
-                "summary": "获取 v2 测评报告",
+                "summary": "获取测评报告",
                 "parameters": [
                     {
                         "type": "integer",
@@ -2281,7 +2406,7 @@ const docTemplate = `{
                                     "type": "object",
                                     "properties": {
                                         "data": {
-                                            "$ref": "#/definitions/evaluation.AssessmentReportV2Response"
+                                            "$ref": "#/definitions/evaluation.AssessmentReportResponse"
                                         }
                                     }
                                 }
@@ -2513,65 +2638,6 @@ const docTemplate = `{
                 "interpreted_at": {
                     "type": "string"
                 },
-                "org_id": {
-                    "type": "string"
-                },
-                "origin_id": {
-                    "type": "string"
-                },
-                "origin_type": {
-                    "type": "string"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "risk_level": {
-                    "type": "string"
-                },
-                "scale_code": {
-                    "type": "string"
-                },
-                "scale_name": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "testee_id": {
-                    "type": "string"
-                },
-                "total_score": {
-                    "type": "number"
-                }
-            }
-        },
-        "evaluation.AssessmentDetailV2Response": {
-            "type": "object",
-            "properties": {
-                "answer_sheet_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "failed_at": {
-                    "type": "string"
-                },
-                "failure_reason": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interpreted_at": {
-                    "type": "string"
-                },
                 "level": {
                     "$ref": "#/definitions/evaluation.ResultLevelResponse"
                 },
@@ -2682,44 +2748,6 @@ const docTemplate = `{
                         "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
                     }
                 },
-                "risk_level": {
-                    "type": "string"
-                },
-                "scale_code": {
-                    "type": "string"
-                },
-                "scale_name": {
-                    "type": "string"
-                },
-                "suggestions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/evaluation.SuggestionResponse"
-                    }
-                },
-                "total_score": {
-                    "type": "number"
-                }
-            }
-        },
-        "evaluation.AssessmentReportV2Response": {
-            "type": "object",
-            "properties": {
-                "assessment_id": {
-                    "type": "string"
-                },
-                "conclusion": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "dimensions": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
-                    }
-                },
                 "level": {
                     "$ref": "#/definitions/evaluation.ResultLevelResponse"
                 },
@@ -2772,50 +2800,6 @@ const docTemplate = `{
             }
         },
         "evaluation.AssessmentSummaryResponse": {
-            "type": "object",
-            "properties": {
-                "answer_sheet_id": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interpreted_at": {
-                    "type": "string"
-                },
-                "origin_type": {
-                    "type": "string"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "risk_level": {
-                    "type": "string"
-                },
-                "scale_code": {
-                    "type": "string"
-                },
-                "scale_name": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "submitted_at": {
-                    "type": "string"
-                },
-                "total_score": {
-                    "type": "number"
-                }
-            }
-        },
-        "evaluation.AssessmentSummaryV2Response": {
             "type": "object",
             "properties": {
                 "answer_sheet_id": {
@@ -3003,13 +2987,154 @@ const docTemplate = `{
                 }
             }
         },
-        "evaluation.ListAssessmentsResponse": {
+        "evaluation.LegacyAssessmentDetailResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "failed_at": {
+                    "type": "string"
+                },
+                "failure_reason": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "string"
+                },
+                "origin_id": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "scale_code": {
+                    "type": "string"
+                },
+                "scale_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "testee_id": {
+                    "type": "string"
+                },
+                "total_score": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.LegacyAssessmentReportResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "string"
+                },
+                "conclusion": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "dimensions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.DimensionInterpretResponse"
+                    }
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "scale_code": {
+                    "type": "string"
+                },
+                "scale_name": {
+                    "type": "string"
+                },
+                "suggestions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/evaluation.SuggestionResponse"
+                    }
+                },
+                "total_score": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.LegacyAssessmentSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "answer_sheet_id": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "interpreted_at": {
+                    "type": "string"
+                },
+                "origin_type": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "risk_level": {
+                    "type": "string"
+                },
+                "scale_code": {
+                    "type": "string"
+                },
+                "scale_name": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "submitted_at": {
+                    "type": "string"
+                },
+                "total_score": {
+                    "type": "number"
+                }
+            }
+        },
+        "evaluation.LegacyListAssessmentsResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
+                        "$ref": "#/definitions/evaluation.LegacyAssessmentSummaryResponse"
                     }
                 },
                 "page": {
@@ -3026,13 +3151,13 @@ const docTemplate = `{
                 }
             }
         },
-        "evaluation.ListAssessmentsV2Response": {
+        "evaluation.ListAssessmentsResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/evaluation.AssessmentSummaryV2Response"
+                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
                     }
                 },
                 "page": {
@@ -3298,6 +3423,9 @@ const docTemplate = `{
                 "answer_sheet_id": {
                     "type": "string"
                 },
+                "created_at": {
+                    "type": "string"
+                },
                 "failed_at": {
                     "type": "string"
                 },
@@ -3311,10 +3439,10 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "level": {
-                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
                 },
                 "model": {
-                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
                 },
                 "org_id": {
                     "type": "string"
@@ -3326,7 +3454,7 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "primary_score": {
-                    "$ref": "#/definitions/personalityassessment.ScoreValueResponse"
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
                 },
                 "questionnaire_code": {
                     "type": "string"
@@ -3364,16 +3492,16 @@ const docTemplate = `{
                     }
                 },
                 "level": {
-                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
+                    "$ref": "#/definitions/evaluation.ResultLevelResponse"
                 },
                 "model": {
-                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
+                    "$ref": "#/definitions/evaluation.ModelIdentityResponse"
                 },
                 "model_extra": {
-                    "$ref": "#/definitions/personalityassessment.ModelExtraResponse"
+                    "$ref": "#/definitions/evaluation.ModelExtraResponse"
                 },
                 "primary_score": {
-                    "$ref": "#/definitions/personalityassessment.ScoreValueResponse"
+                    "$ref": "#/definitions/evaluation.ScoreValueResponse"
                 },
                 "suggestions": {
                     "type": "array",
@@ -3412,51 +3540,13 @@ const docTemplate = `{
                 }
             }
         },
-        "personalityassessment.AssessmentSummaryResponse": {
-            "type": "object",
-            "properties": {
-                "answer_sheet_id": {
-                    "type": "string"
-                },
-                "id": {
-                    "type": "string"
-                },
-                "interpreted_at": {
-                    "type": "string"
-                },
-                "level": {
-                    "$ref": "#/definitions/personalityassessment.ResultLevelResponse"
-                },
-                "model": {
-                    "$ref": "#/definitions/personalityassessment.ModelIdentityResponse"
-                },
-                "origin_type": {
-                    "type": "string"
-                },
-                "primary_score": {
-                    "$ref": "#/definitions/personalityassessment.ScoreValueResponse"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "submitted_at": {
-                    "type": "string"
-                }
-            }
-        },
         "personalityassessment.ListAssessmentsResponse": {
             "type": "object",
             "properties": {
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/personalityassessment.AssessmentSummaryResponse"
+                        "$ref": "#/definitions/evaluation.AssessmentSummaryResponse"
                     }
                 },
                 "page": {
@@ -3470,41 +3560,6 @@ const docTemplate = `{
                 },
                 "total_pages": {
                     "type": "integer"
-                }
-            }
-        },
-        "personalityassessment.ModelExtraResponse": {
-            "type": "object",
-            "properties": {
-                "commentary": {
-                    "type": "string"
-                },
-                "image_url": {
-                    "type": "string"
-                },
-                "is_special": {
-                    "type": "boolean"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "match_percent": {
-                    "type": "number"
-                },
-                "one_liner": {
-                    "type": "string"
-                },
-                "rarity": {
-                    "$ref": "#/definitions/personalityassessment.ModelRarityResponse"
-                },
-                "special_trigger": {
-                    "type": "string"
-                },
-                "type_code": {
-                    "type": "string"
-                },
-                "type_name": {
-                    "type": "string"
                 }
             }
         },
@@ -3531,20 +3586,6 @@ const docTemplate = `{
                 }
             }
         },
-        "personalityassessment.ModelRarityResponse": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "one_in_x": {
-                    "type": "integer"
-                },
-                "percent": {
-                    "type": "number"
-                }
-            }
-        },
         "personalityassessment.ResultLevelResponse": {
             "type": "object",
             "properties": {
@@ -3556,23 +3597,6 @@ const docTemplate = `{
                 },
                 "severity": {
                     "type": "string"
-                }
-            }
-        },
-        "personalityassessment.ScoreValueResponse": {
-            "type": "object",
-            "properties": {
-                "kind": {
-                    "type": "string"
-                },
-                "label": {
-                    "type": "string"
-                },
-                "max": {
-                    "type": "number"
-                },
-                "value": {
-                    "type": "number"
                 }
             }
         },

@@ -12,27 +12,15 @@ import (
 )
 
 type fakeEvaluationReader struct {
-	detail *evaluationapp.AssessmentDetailV2Response
+	detail *evaluationapp.AssessmentDetailResponse
 	err    error
 }
 
-func (f *fakeEvaluationReader) GetMyAssessmentV2(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailV2Response, error) {
+func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
 	return f.detail, f.err
 }
 
-func (f *fakeEvaluationReader) GetMyAssessment(context.Context, uint64, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
-	return nil, nil
-}
-func (f *fakeEvaluationReader) GetMyAssessmentByAnswerSheetID(context.Context, uint64) (*evaluationapp.AssessmentDetailResponse, error) {
-	return nil, nil
-}
-func (f *fakeEvaluationReader) ListMyAssessments(context.Context, uint64, string, string, string, string, string, string, int32, int32) (*evaluationapp.ListAssessmentsResponse, error) {
-	return nil, nil
-}
 func (f *fakeEvaluationReader) GetAssessmentScores(context.Context, uint64, uint64) ([]evaluationapp.FactorScoreResponse, error) {
-	return nil, nil
-}
-func (f *fakeEvaluationReader) GetAssessmentReport(context.Context, uint64) (*evaluationapp.AssessmentReportResponse, error) {
 	return nil, nil
 }
 func (f *fakeEvaluationReader) GetFactorTrend(context.Context, uint64, string, int32) ([]evaluationapp.TrendPointResponse, error) {
@@ -41,11 +29,14 @@ func (f *fakeEvaluationReader) GetFactorTrend(context.Context, uint64, string, i
 func (f *fakeEvaluationReader) GetHighRiskFactors(context.Context, uint64, uint64) ([]evaluationapp.FactorScoreResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) ListMyAssessmentsV2(context.Context, uint64, string, string, string, string, string, int32, int32) (*evaluationapp.ListAssessmentsV2Response, error) {
+func (f *fakeEvaluationReader) ListMyAssessments(context.Context, uint64, string, string, string, string, string, string, string, int32, int32) (*evaluationapp.ListAssessmentsResponse, error) {
 	return nil, nil
 }
-func (f *fakeEvaluationReader) GetAssessmentReportV2(context.Context, uint64, uint64) (*evaluationapp.AssessmentReportV2Response, error) {
+func (f *fakeEvaluationReader) GetAssessmentReport(context.Context, uint64, uint64) (*evaluationapp.AssessmentReportResponse, error) {
 	return nil, nil
+}
+func (f *fakeEvaluationReader) ResolveAssessmentByAnswerSheetID(context.Context, uint64) (uint64, uint64, error) {
+	return 0, 0, nil
 }
 
 type fakeStatusCache struct {
@@ -70,7 +61,7 @@ func TestQueryServiceGetRejectsNonPersonalityModel(t *testing.T) {
 	t.Parallel()
 
 	svc := NewQueryService(&fakeEvaluationReader{
-		detail: &evaluationapp.AssessmentDetailV2Response{
+		detail: &evaluationapp.AssessmentDetailResponse{
 			Model: evaluationapp.ModelIdentityResponse{Kind: "scale"},
 		},
 	}, nil)
@@ -103,7 +94,7 @@ func TestQueryServiceGetReturnsDetail(t *testing.T) {
 	t.Parallel()
 
 	svc := NewQueryService(&fakeEvaluationReader{
-		detail: &evaluationapp.AssessmentDetailV2Response{
+		detail: &evaluationapp.AssessmentDetailResponse{
 			ID:    "42",
 			Model: evaluationapp.ModelIdentityResponse{Kind: personalityModelKind, Code: "mbti"},
 		},
@@ -137,7 +128,7 @@ func TestQueryServiceGetReportStatusInterpretedEnrichesModel(t *testing.T) {
 		},
 	}, nil, nil, reportwait.DefaultConfig())
 	svc := NewQueryService(&fakeEvaluationReader{
-		detail: &evaluationapp.AssessmentDetailV2Response{
+		detail: &evaluationapp.AssessmentDetailResponse{
 			ID:    "42",
 			Model: evaluationapp.ModelIdentityResponse{Kind: personalityModelKind, Code: "sbti"},
 			Level: &evaluationapp.ResultLevelResponse{Code: "INTJ"},

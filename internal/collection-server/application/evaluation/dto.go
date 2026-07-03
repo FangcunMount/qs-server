@@ -1,20 +1,108 @@
 package evaluation
 
-// AssessmentSummaryResponse 测评摘要响应
+// ModelIdentityResponse 已发布模型引用。
+type ModelIdentityResponse struct {
+	Kind      string `json:"kind"`
+	SubKind   string `json:"sub_kind,omitempty"`
+	Algorithm string `json:"algorithm,omitempty"`
+	Code      string `json:"code"`
+	Version   string `json:"version,omitempty"`
+	Title     string `json:"title,omitempty"`
+}
+
+// ScoreValueResponse 主分投影。
+type ScoreValueResponse struct {
+	Kind  string   `json:"kind"`
+	Value float64  `json:"value"`
+	Label string   `json:"label,omitempty"`
+	Max   *float64 `json:"max,omitempty"`
+}
+
+// ResultLevelResponse outcome 等级投影。
+type ResultLevelResponse struct {
+	Code     string `json:"code"`
+	Label    string `json:"label"`
+	Severity string `json:"severity,omitempty"`
+}
+
+// AssessmentSummaryResponse 测评摘要响应（含 model/primary_score/level）。
 type AssessmentSummaryResponse struct {
-	ID                   string  `json:"id"`
-	QuestionnaireCode    string  `json:"questionnaire_code"`
-	QuestionnaireVersion string  `json:"questionnaire_version"`
-	AnswerSheetID        string  `json:"answer_sheet_id,omitempty"`
-	ScaleCode            string  `json:"scale_code,omitempty"`
-	ScaleName            string  `json:"scale_name,omitempty"`
-	OriginType           string  `json:"origin_type"`
-	Status               string  `json:"status"`
-	TotalScore           float64 `json:"total_score,omitempty"`
-	RiskLevel            string  `json:"risk_level,omitempty"`
-	CreatedAt            string  `json:"created_at"`
-	SubmittedAt          string  `json:"submitted_at,omitempty"`
-	InterpretedAt        string  `json:"interpreted_at,omitempty"`
+	ID                   string                `json:"id"`
+	QuestionnaireCode    string                `json:"questionnaire_code"`
+	QuestionnaireVersion string                `json:"questionnaire_version"`
+	AnswerSheetID        string                `json:"answer_sheet_id,omitempty"`
+	Model                ModelIdentityResponse `json:"model"`
+	PrimaryScore         *ScoreValueResponse   `json:"primary_score,omitempty"`
+	Level                *ResultLevelResponse  `json:"level,omitempty"`
+	OriginType           string                `json:"origin_type"`
+	Status               string                `json:"status"`
+	CreatedAt            string                `json:"created_at"`
+	SubmittedAt          string                `json:"submitted_at,omitempty"`
+	InterpretedAt        string                `json:"interpreted_at,omitempty"`
+}
+
+// AssessmentDetailResponse 测评详情响应（含 model/primary_score/level）。
+type AssessmentDetailResponse struct {
+	ID                   string                `json:"id"`
+	OrgID                string                `json:"org_id"`
+	TesteeID             string                `json:"testee_id"`
+	QuestionnaireCode    string                `json:"questionnaire_code"`
+	QuestionnaireVersion string                `json:"questionnaire_version"`
+	AnswerSheetID        string                `json:"answer_sheet_id,omitempty"`
+	Model                ModelIdentityResponse `json:"model"`
+	PrimaryScore         *ScoreValueResponse   `json:"primary_score,omitempty"`
+	Level                *ResultLevelResponse  `json:"level,omitempty"`
+	OriginType           string                `json:"origin_type"`
+	OriginID             string                `json:"origin_id,omitempty"`
+	Status               string                `json:"status"`
+	CreatedAt            string                `json:"created_at"`
+	SubmittedAt          string                `json:"submitted_at,omitempty"`
+	InterpretedAt        string                `json:"interpreted_at,omitempty"`
+	FailedAt             string                `json:"failed_at,omitempty"`
+	FailureReason        string                `json:"failure_reason,omitempty"`
+}
+
+// AssessmentReportResponse 测评报告响应（含 model/primary_score/level）。
+type AssessmentReportResponse struct {
+	AssessmentID string                       `json:"assessment_id"`
+	Model        ModelIdentityResponse        `json:"model"`
+	PrimaryScore *ScoreValueResponse          `json:"primary_score,omitempty"`
+	Level        *ResultLevelResponse         `json:"level,omitempty"`
+	Conclusion   string                       `json:"conclusion"`
+	Dimensions   []DimensionInterpretResponse `json:"dimensions"`
+	Suggestions  []SuggestionResponse         `json:"suggestions"`
+	ModelExtra   *ModelExtraResponse          `json:"model_extra,omitempty"`
+	CreatedAt    string                       `json:"created_at"`
+}
+
+// ModelExtraResponse 人格等模型的报告扩展。
+type ModelExtraResponse struct {
+	Kind           string               `json:"kind,omitempty"`
+	TypeCode       string               `json:"type_code,omitempty"`
+	TypeName       string               `json:"type_name,omitempty"`
+	OneLiner       string               `json:"one_liner,omitempty"`
+	ImageURL       string               `json:"image_url,omitempty"`
+	MatchPercent   float64              `json:"match_percent,omitempty"`
+	IsSpecial      bool                 `json:"is_special,omitempty"`
+	SpecialTrigger string               `json:"special_trigger,omitempty"`
+	Commentary     string               `json:"commentary,omitempty"`
+	Rarity         *ModelRarityResponse `json:"rarity,omitempty"`
+}
+
+// ModelRarityResponse 理论稀有度投影。
+type ModelRarityResponse struct {
+	Percent float64 `json:"percent,omitempty"`
+	Label   string  `json:"label,omitempty"`
+	OneInX  int32   `json:"one_in_x,omitempty"`
+}
+
+// ListAssessmentsResponse 测评列表响应。
+type ListAssessmentsResponse struct {
+	Items      []AssessmentSummaryResponse `json:"items"`
+	Total      int32                       `json:"total"`
+	Page       int32                       `json:"page"`
+	PageSize   int32                       `json:"page_size"`
+	TotalPages int32                       `json:"total_pages"`
 }
 
 // AssessmentStatusResponse 测评状态响应（用于长轮询）
@@ -27,28 +115,6 @@ type AssessmentStatusResponse struct {
 	TotalScore      *float64 `json:"total_score,omitempty"`
 	RiskLevel       *string  `json:"risk_level,omitempty"`
 	UpdatedAt       int64    `json:"updated_at"` // Unix timestamp
-}
-
-// AssessmentDetailResponse 测评详情响应
-type AssessmentDetailResponse struct {
-	ID                   string  `json:"id"`
-	OrgID                string  `json:"org_id"`
-	TesteeID             string  `json:"testee_id"`
-	QuestionnaireCode    string  `json:"questionnaire_code"`
-	QuestionnaireVersion string  `json:"questionnaire_version"`
-	AnswerSheetID        string  `json:"answer_sheet_id,omitempty"`
-	ScaleCode            string  `json:"scale_code,omitempty"`
-	ScaleName            string  `json:"scale_name,omitempty"`
-	OriginType           string  `json:"origin_type"`
-	OriginID             string  `json:"origin_id,omitempty"`
-	Status               string  `json:"status"`
-	TotalScore           float64 `json:"total_score,omitempty"`
-	RiskLevel            string  `json:"risk_level,omitempty"`
-	CreatedAt            string  `json:"created_at"`
-	SubmittedAt          string  `json:"submitted_at,omitempty"`
-	InterpretedAt        string  `json:"interpreted_at,omitempty"`
-	FailedAt             string  `json:"failed_at,omitempty"`
-	FailureReason        string  `json:"failure_reason,omitempty"`
 }
 
 // FactorScoreResponse 因子得分响应
@@ -80,19 +146,6 @@ type DimensionInterpretResponse struct {
 	Suggestion  string   `json:"suggestion,omitempty"`
 }
 
-// AssessmentReportResponse 测评报告响应
-type AssessmentReportResponse struct {
-	AssessmentID string                       `json:"assessment_id"`
-	ScaleCode    string                       `json:"scale_code"`
-	ScaleName    string                       `json:"scale_name"`
-	TotalScore   float64                      `json:"total_score"`
-	RiskLevel    string                       `json:"risk_level"`
-	Conclusion   string                       `json:"conclusion"`
-	Dimensions   []DimensionInterpretResponse `json:"dimensions"`
-	Suggestions  []SuggestionResponse         `json:"suggestions"`
-	CreatedAt    string                       `json:"created_at"`
-}
-
 // ListAssessmentsRequest 测评列表请求
 type ListAssessmentsRequest struct {
 	Status         string `form:"status"`
@@ -103,15 +156,6 @@ type ListAssessmentsRequest struct {
 	DateFrom       string `form:"date_from"`
 	DateTo         string `form:"date_to"`
 	AssessmentKind string `form:"assessment_kind"`
-}
-
-// ListAssessmentsResponse 测评列表响应
-type ListAssessmentsResponse struct {
-	Items      []AssessmentSummaryResponse `json:"items"`
-	Total      int32                       `json:"total"`
-	Page       int32                       `json:"page"`
-	PageSize   int32                       `json:"page_size"`
-	TotalPages int32                       `json:"total_pages"`
 }
 
 // TrendPointResponse 趋势数据点响应

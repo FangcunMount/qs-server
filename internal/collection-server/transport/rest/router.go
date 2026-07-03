@@ -46,7 +46,7 @@ func (r *Router) RegisterRoutes(engine *gin.Engine) {
 
 	// 注册业务路由
 	r.registerBusinessRoutes(engine)
-	r.registerBusinessV2Routes(engine)
+	r.registerAssessmentOutcomeAPIRoutes(engine)
 }
 
 // setupGlobalMiddleware 设置全局中间件
@@ -119,15 +119,15 @@ func (r *Router) registerBusinessRoutes(engine *gin.Engine) {
 	r.registerReportEventsRoutes(api)
 }
 
-// registerBusinessV2Routes 注册 v2 业务路由。
-func (r *Router) registerBusinessV2Routes(engine *gin.Engine) {
+// registerAssessmentOutcomeAPIRoutes 注册 outcome 投影 API（保留 /api/v2 路径兼容）。
+func (r *Router) registerAssessmentOutcomeAPIRoutes(engine *gin.Engine) {
 	api := engine.Group("/api/v2")
 	r.applyIAMAuth(api, isPublicScaleReadOnly)
-	r.registerEvaluationV2Routes(api)
+	r.registerAssessmentOutcomeRoutes(api)
 }
 
-// registerEvaluationV2Routes 注册测评 v2 路由。
-func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
+// registerAssessmentOutcomeRoutes 注册测评 outcome 路由。
+func (r *Router) registerAssessmentOutcomeRoutes(api *gin.RouterGroup) {
 	evaluationHandler := r.container.EvaluationHandler()
 	rateCfg := ensureRateLimitOptions(r.container.RateLimitOptions())
 
@@ -141,7 +141,7 @@ func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.ListMyAssessmentsV2,
+			evaluationHandler.ListMyAssessments,
 		)...)
 		assessments.GET("/:id", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
@@ -151,7 +151,7 @@ func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.GetMyAssessmentV2,
+			evaluationHandler.GetMyAssessment,
 		)...)
 		assessments.GET("/:id/report", r.rateLimitedQueryHandlers(
 			r.container.RateLimitBackend(),
@@ -161,7 +161,7 @@ func (r *Router) registerEvaluationV2Routes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.GetAssessmentReportV2,
+			evaluationHandler.GetAssessmentReport,
 		)...)
 	}
 }
@@ -426,7 +426,7 @@ func (r *Router) registerAnswerSheetRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.GetMyAssessmentByAnswerSheetID,
+			evaluationHandler.GetLegacyMyAssessmentByAnswerSheetID,
 		)...)
 	}
 }
@@ -447,7 +447,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.ListMyAssessments,
+			evaluationHandler.GetLegacyMyAssessmentList,
 		)...)
 		// 因子趋势（放在 :id 前面避免路由冲突）
 		assessments.GET("/trend", r.rateLimitedQueryHandlers(
@@ -480,7 +480,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.GetMyAssessment,
+			evaluationHandler.GetLegacyMyAssessment,
 		)...)
 		// 测评得分
 		assessments.GET("/:id/scores", r.rateLimitedQueryHandlers(
@@ -502,7 +502,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryGlobalBurst,
 			rateCfg.QueryUserQPS,
 			rateCfg.QueryUserBurst,
-			evaluationHandler.GetAssessmentReport,
+			evaluationHandler.GetLegacyAssessmentReport,
 		)...)
 		// 测评趋势摘要
 		assessments.GET("/:id/trend-summary", r.rateLimitedQueryHandlers(

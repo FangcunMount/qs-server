@@ -47,7 +47,7 @@ type ModelRarityOutput struct {
 	OneInX  int32
 }
 
-type AssessmentDetailV2Output struct {
+type AssessmentDetailOutput struct {
 	ID                   uint64
 	OrgID                uint64
 	TesteeID             uint64
@@ -66,7 +66,7 @@ type AssessmentDetailV2Output struct {
 	FailureReason        string
 }
 
-type AssessmentSummaryV2Output struct {
+type AssessmentSummaryOutput struct {
 	ID                   uint64
 	QuestionnaireCode    string
 	QuestionnaireVersion string
@@ -80,7 +80,7 @@ type AssessmentSummaryV2Output struct {
 	InterpretedAt        string
 }
 
-type AssessmentReportV2Output struct {
+type AssessmentReportOutput struct {
 	AssessmentID uint64
 	Model        ModelIdentityOutput
 	PrimaryScore *ScoreValueOutput
@@ -92,55 +92,57 @@ type AssessmentReportV2Output struct {
 	CreatedAt    string
 }
 
-type ListAssessmentsV2Output struct {
-	Items      []AssessmentSummaryV2Output
+type ListAssessmentsOutput struct {
+	Items      []AssessmentSummaryOutput
 	Total      int32
 	Page       int32
 	PageSize   int32
 	TotalPages int32
 }
 
-func (c *EvaluationClient) GetMyAssessmentV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailV2Output, error) {
+func (c *EvaluationClient) GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentDetailOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.GetMyAssessmentV2(ctx, &pb.GetMyAssessmentV2Request{
+	resp, err := c.grpcClient.GetMyAssessment(ctx, &pb.GetMyAssessmentRequest{
 		TesteeId:     testeeID,
 		AssessmentId: assessmentID,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return convertAssessmentDetailV2(resp.GetAssessment()), nil
+	return convertAssessmentDetail(resp.GetAssessment()), nil
 }
 
-func (c *EvaluationClient) ListMyAssessmentsV2(
+func (c *EvaluationClient) ListMyAssessments(
 	ctx context.Context,
 	testeeID uint64,
-	status, scaleCode, riskLevel, modelKind, modelAlgorithm string,
+	status, scaleCode, riskLevel, dateFrom, dateTo, modelKind, modelAlgorithm string,
 	page, pageSize int32,
-) (*ListAssessmentsV2Output, error) {
+) (*ListAssessmentsOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.ListMyAssessmentsV2(ctx, &pb.ListMyAssessmentsV2Request{
+	resp, err := c.grpcClient.ListMyAssessments(ctx, &pb.ListMyAssessmentsRequest{
 		TesteeId:       testeeID,
 		Status:         status,
 		Page:           page,
 		PageSize:       pageSize,
 		ScaleCode:      scaleCode,
 		RiskLevel:      riskLevel,
+		DateFrom:       dateFrom,
+		DateTo:         dateTo,
 		ModelKind:      modelKind,
 		ModelAlgorithm: modelAlgorithm,
 	})
 	if err != nil {
 		return nil, err
 	}
-	items := make([]AssessmentSummaryV2Output, 0, len(resp.GetItems()))
+	items := make([]AssessmentSummaryOutput, 0, len(resp.GetItems()))
 	for _, item := range resp.GetItems() {
-		items = append(items, convertAssessmentSummaryV2(item))
+		items = append(items, convertAssessmentSummary(item))
 	}
-	return &ListAssessmentsV2Output{
+	return &ListAssessmentsOutput{
 		Items:      items,
 		Total:      resp.GetTotal(),
 		Page:       resp.GetPage(),
@@ -149,25 +151,39 @@ func (c *EvaluationClient) ListMyAssessmentsV2(
 	}, nil
 }
 
-func (c *EvaluationClient) GetAssessmentReportV2(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportV2Output, error) {
+func (c *EvaluationClient) GetAssessmentReport(ctx context.Context, testeeID, assessmentID uint64) (*AssessmentReportOutput, error) {
 	ctx, cancel := c.client.ContextWithTimeout(ctx)
 	defer cancel()
 
-	resp, err := c.grpcClient.GetAssessmentReportV2(ctx, &pb.GetAssessmentReportV2Request{
+	resp, err := c.grpcClient.GetAssessmentReport(ctx, &pb.GetAssessmentReportRequest{
 		AssessmentId: assessmentID,
 		TesteeId:     testeeID,
 	})
 	if err != nil {
 		return nil, err
 	}
-	return convertAssessmentReportV2(resp.GetReport()), nil
+	return convertAssessmentReport(resp.GetReport()), nil
 }
 
-func convertAssessmentDetailV2(assessment *pb.AssessmentDetailV2) *AssessmentDetailV2Output {
+// ResolveAssessmentByAnswerSheetID resolves ownership keys for a legacy answer-sheet lookup RPC.
+func (c *EvaluationClient) ResolveAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (testeeID, assessmentID uint64, err error) {
+	ctx, cancel := c.client.ContextWithTimeout(ctx)
+	defer cancel()
+
+	resp, err := c.grpcClient.ResolveAssessmentByAnswerSheetID(ctx, &pb.ResolveAssessmentByAnswerSheetIDRequest{
+		AnswerSheetId: answerSheetID,
+	})
+	if err != nil {
+		return 0, 0, err
+	}
+	return resp.GetTesteeId(), resp.GetAssessmentId(), nil
+}
+
+func convertAssessmentDetail(assessment *pb.AssessmentDetail) *AssessmentDetailOutput {
 	if assessment == nil {
 		return nil
 	}
-	return &AssessmentDetailV2Output{
+	return &AssessmentDetailOutput{
 		ID:                   assessment.GetId(),
 		OrgID:                assessment.GetOrgId(),
 		TesteeID:             assessment.GetTesteeId(),
@@ -187,11 +203,11 @@ func convertAssessmentDetailV2(assessment *pb.AssessmentDetailV2) *AssessmentDet
 	}
 }
 
-func convertAssessmentSummaryV2(summary *pb.AssessmentSummaryV2) AssessmentSummaryV2Output {
+func convertAssessmentSummary(summary *pb.AssessmentSummary) AssessmentSummaryOutput {
 	if summary == nil {
-		return AssessmentSummaryV2Output{}
+		return AssessmentSummaryOutput{}
 	}
-	return AssessmentSummaryV2Output{
+	return AssessmentSummaryOutput{
 		ID:                   summary.GetId(),
 		QuestionnaireCode:    summary.GetQuestionnaireCode(),
 		QuestionnaireVersion: summary.GetQuestionnaireVersion(),
@@ -206,7 +222,7 @@ func convertAssessmentSummaryV2(summary *pb.AssessmentSummaryV2) AssessmentSumma
 	}
 }
 
-func convertAssessmentReportV2(report *pb.AssessmentReportV2) *AssessmentReportV2Output {
+func convertAssessmentReport(report *pb.AssessmentReport) *AssessmentReportOutput {
 	if report == nil {
 		return nil
 	}
@@ -227,7 +243,7 @@ func convertAssessmentReportV2(report *pb.AssessmentReportV2) *AssessmentReportV
 			Suggestion:  dim.GetSuggestion(),
 		})
 	}
-	return &AssessmentReportV2Output{
+	return &AssessmentReportOutput{
 		AssessmentID: report.GetAssessmentId(),
 		Model:        convertModelIdentity(report.GetModel()),
 		PrimaryScore: convertScoreValue(report.GetPrimaryScore()),

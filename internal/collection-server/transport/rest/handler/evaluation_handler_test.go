@@ -16,30 +16,30 @@ import (
 )
 
 type fakeEvaluationQueryService struct {
-	getMyAssessmentByAnswerSheetID func(ctx context.Context, answerSheetID uint64) (*evaluation.AssessmentDetailResponse, error)
+	getLegacyMyAssessmentByAnswerSheetID func(ctx context.Context, answerSheetID uint64) (*evaluation.LegacyAssessmentDetailResponse, error)
 }
 
-func (f *fakeEvaluationQueryService) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
-	panic("unexpected GetMyAssessment call")
+func (f *fakeEvaluationQueryService) GetLegacyMyAssessment(context.Context, uint64, uint64) (*evaluation.LegacyAssessmentDetailResponse, error) {
+	panic("unexpected GetLegacyMyAssessment call")
 }
 
-func (f *fakeEvaluationQueryService) GetMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*evaluation.AssessmentDetailResponse, error) {
-	if f.getMyAssessmentByAnswerSheetID == nil {
-		panic("unexpected GetMyAssessmentByAnswerSheetID call")
+func (f *fakeEvaluationQueryService) GetLegacyMyAssessmentByAnswerSheetID(ctx context.Context, answerSheetID uint64) (*evaluation.LegacyAssessmentDetailResponse, error) {
+	if f.getLegacyMyAssessmentByAnswerSheetID == nil {
+		panic("unexpected GetLegacyMyAssessmentByAnswerSheetID call")
 	}
-	return f.getMyAssessmentByAnswerSheetID(ctx, answerSheetID)
+	return f.getLegacyMyAssessmentByAnswerSheetID(ctx, answerSheetID)
 }
 
-func (f *fakeEvaluationQueryService) ListMyAssessments(context.Context, uint64, *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error) {
-	panic("unexpected ListMyAssessments call")
+func (f *fakeEvaluationQueryService) ListLegacyMyAssessments(context.Context, uint64, *evaluation.ListAssessmentsRequest) (*evaluation.LegacyListAssessmentsResponse, error) {
+	panic("unexpected ListLegacyMyAssessments call")
 }
 
 func (f *fakeEvaluationQueryService) GetAssessmentScores(context.Context, uint64, uint64) ([]evaluation.FactorScoreResponse, error) {
 	panic("unexpected GetAssessmentScores call")
 }
 
-func (f *fakeEvaluationQueryService) GetAssessmentReport(context.Context, uint64) (*evaluation.AssessmentReportResponse, error) {
-	panic("unexpected GetAssessmentReport call")
+func (f *fakeEvaluationQueryService) GetLegacyAssessmentReport(context.Context, uint64, uint64) (*evaluation.LegacyAssessmentReportResponse, error) {
+	panic("unexpected GetLegacyAssessmentReport call")
 }
 
 func (f *fakeEvaluationQueryService) GetFactorTrend(context.Context, uint64, *evaluation.GetFactorTrendRequest) ([]evaluation.TrendPointResponse, error) {
@@ -54,16 +54,16 @@ func (f *fakeEvaluationQueryService) GetHighRiskFactors(context.Context, uint64,
 	panic("unexpected GetHighRiskFactors call")
 }
 
-func (f *fakeEvaluationQueryService) GetMyAssessmentV2(context.Context, uint64, uint64) (*evaluation.AssessmentDetailV2Response, error) {
-	panic("unexpected GetMyAssessmentV2 call")
+func (f *fakeEvaluationQueryService) GetMyAssessment(context.Context, uint64, uint64) (*evaluation.AssessmentDetailResponse, error) {
+	panic("unexpected GetMyAssessment call")
 }
 
-func (f *fakeEvaluationQueryService) ListMyAssessmentsV2(context.Context, uint64, *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsV2Response, error) {
-	panic("unexpected ListMyAssessmentsV2 call")
+func (f *fakeEvaluationQueryService) ListMyAssessments(context.Context, uint64, *evaluation.ListAssessmentsRequest) (*evaluation.ListAssessmentsResponse, error) {
+	panic("unexpected ListMyAssessments call")
 }
 
-func (f *fakeEvaluationQueryService) GetAssessmentReportV2(context.Context, uint64, uint64) (*evaluation.AssessmentReportV2Response, error) {
-	panic("unexpected GetAssessmentReportV2 call")
+func (f *fakeEvaluationQueryService) GetAssessmentReport(context.Context, uint64, uint64) (*evaluation.AssessmentReportResponse, error) {
+	panic("unexpected GetAssessmentReport call")
 }
 
 type fakeAnswerSheetLookupService struct {
@@ -82,7 +82,7 @@ func TestEvaluationHandlerGetMyAssessmentByAnswerSheetIDPending(t *testing.T) {
 
 	handler := NewEvaluationHandler(
 		&fakeEvaluationQueryService{
-			getMyAssessmentByAnswerSheetID: func(context.Context, uint64) (*evaluation.AssessmentDetailResponse, error) {
+			getLegacyMyAssessmentByAnswerSheetID: func(context.Context, uint64) (*evaluation.LegacyAssessmentDetailResponse, error) {
 				return nil, status.Error(codes.NotFound, "assessment not found")
 			},
 		},
@@ -99,7 +99,7 @@ func TestEvaluationHandlerGetMyAssessmentByAnswerSheetIDPending(t *testing.T) {
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/answersheets/123/assessment", nil)
 	c.Params = gin.Params{{Key: "id", Value: "123"}}
 
-	handler.GetMyAssessmentByAnswerSheetID(c)
+	handler.GetLegacyMyAssessmentByAnswerSheetID(c)
 
 	if recorder.Code != http.StatusOK {
 		t.Fatalf("expected status 200, got %d", recorder.Code)
@@ -132,7 +132,7 @@ func TestEvaluationHandlerGetMyAssessmentByAnswerSheetIDAnswerSheetNotFound(t *t
 
 	handler := NewEvaluationHandler(
 		&fakeEvaluationQueryService{
-			getMyAssessmentByAnswerSheetID: func(context.Context, uint64) (*evaluation.AssessmentDetailResponse, error) {
+			getLegacyMyAssessmentByAnswerSheetID: func(context.Context, uint64) (*evaluation.LegacyAssessmentDetailResponse, error) {
 				return nil, status.Error(codes.NotFound, "assessment not found")
 			},
 		},
@@ -149,7 +149,7 @@ func TestEvaluationHandlerGetMyAssessmentByAnswerSheetIDAnswerSheetNotFound(t *t
 	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/answersheets/123/assessment", nil)
 	c.Params = gin.Params{{Key: "id", Value: "123"}}
 
-	handler.GetMyAssessmentByAnswerSheetID(c)
+	handler.GetLegacyMyAssessmentByAnswerSheetID(c)
 
 	if recorder.Code != http.StatusNotFound {
 		t.Fatalf("expected status 404, got %d", recorder.Code)

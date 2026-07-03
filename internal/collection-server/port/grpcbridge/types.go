@@ -13,16 +13,14 @@ import (
 type (
 	AnswerInput                      = grpcclient.AnswerInput
 	AnswerSheetOutput                = grpcclient.AnswerSheetOutput
-	AssessmentDetailOutput           = grpcclient.AssessmentDetailOutput
-	AssessmentDetailV2Output         = grpcclient.AssessmentDetailV2Output
-	AssessmentReportOutput           = grpcclient.AssessmentReportOutput
-	AssessmentReportV2Output         = grpcclient.AssessmentReportV2Output
-	AssessmentSummaryOutput          = grpcclient.AssessmentSummaryOutput
-	AssessmentSummaryV2Output        = grpcclient.AssessmentSummaryV2Output
+	AssessmentDetailOutput         = grpcclient.AssessmentDetailOutput
+	AssessmentReportOutput         = grpcclient.AssessmentReportOutput
+	AssessmentSummaryOutput        = grpcclient.AssessmentSummaryOutput
+	DimensionInterpretOutput         = grpcclient.DimensionInterpretOutput
 	CreateTesteeRequest              = grpcclient.CreateTesteeRequest
 	FactorOutput                     = grpcclient.FactorOutput
 	FactorScoreOutput                = grpcclient.FactorScoreOutput
-	ListAssessmentsV2Output          = grpcclient.ListAssessmentsV2Output
+	ListAssessmentsOutput          = grpcclient.ListAssessmentsOutput
 	ListHotScalesOutput              = grpcclient.ListHotScalesOutput
 	ListPersonalityModelsOutput      = grpcclient.ListPersonalityModelsOutput
 	ListQuestionnairesOutput         = grpcclient.ListQuestionnairesOutput
