@@ -23,7 +23,7 @@ GO := go
 GO_BUILD := $(GO) build
 GO_TEST := $(GO) test
 GO_LDFLAGS := -ldflags "-X main.Version=$(VERSION) -X main.BuildTime=$(BUILD_TIME) -X main.GitCommit=$(GIT_COMMIT)"
-GOLANGCI_LINT_VERSION := v2.1.6
+GOLANGCI_LINT_VERSION := v2.5.0
 GOVULNCHECK_VERSION := v1.1.4
 GOSEC_VERSION := v2.22.3
 GO_VERSION := 1.25.9

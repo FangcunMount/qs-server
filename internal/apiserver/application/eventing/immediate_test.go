@@ -68,14 +68,12 @@ func TestImmediateDispatcherRespectsMaxConcurrent(t *testing.T) {
 	deferred := event.New(eventcatalog.AnswerSheetSubmitted, "Sample", "evt-2", struct{}{})
 	dispatcher.TryDispatchAfterCommit(context.Background(), []event.DomainEvent{deferred})
 
-	time.Sleep(50 * time.Millisecond)
-
-	store.mu.Lock()
-	calls := store.getCalls
-	store.mu.Unlock()
-	if calls != 1 {
-		t.Fatalf("getCalls = %d, want 1 while first dispatch is in-flight", calls)
-	}
+	waitFor(t, func() bool {
+		store.mu.Lock()
+		calls := store.getCalls
+		store.mu.Unlock()
+		return calls == 1 && observer.hasOutcome(eventobservability.OutboxOutcomeImmediateSkipped)
+	})
 	assertOutboxContainsOutcome(t, observer, eventobservability.OutboxOutcomeImmediateSkipped)
 
 	close(store.getBlock)

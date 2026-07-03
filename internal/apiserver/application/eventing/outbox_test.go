@@ -15,6 +15,7 @@ import (
 )
 
 type outboxObserver struct {
+	mu           sync.Mutex
 	events       []eventobservability.OutboxEvent
 	status       []eventobservability.OutboxStatusEvent
 	statusScrape []eventobservability.OutboxStatusScrapeEvent
@@ -24,15 +25,38 @@ func (o *outboxObserver) ObservePublish(context.Context, eventobservability.Publ
 func (o *outboxObserver) ObserveConsume(context.Context, eventobservability.ConsumeEvent) {}
 
 func (o *outboxObserver) ObserveOutbox(_ context.Context, evt eventobservability.OutboxEvent) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	o.events = append(o.events, evt)
 }
 
 func (o *outboxObserver) ObserveOutboxStatus(_ context.Context, evt eventobservability.OutboxStatusEvent) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	o.status = append(o.status, evt)
 }
 
 func (o *outboxObserver) ObserveOutboxStatusScrape(_ context.Context, evt eventobservability.OutboxStatusScrapeEvent) {
+	o.mu.Lock()
+	defer o.mu.Unlock()
 	o.statusScrape = append(o.statusScrape, evt)
+}
+
+func (o *outboxObserver) hasOutcome(outcome eventobservability.OutboxOutcome) bool {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	for _, evt := range o.events {
+		if evt.Outcome == outcome {
+			return true
+		}
+	}
+	return false
+}
+
+func (o *outboxObserver) statusScrapeCount() int {
+	o.mu.Lock()
+	defer o.mu.Unlock()
+	return len(o.statusScrape)
 }
 
 type fakeOutboxStore struct {
@@ -497,8 +521,8 @@ func TestOutboxStatusReporterThrottlesStatusScrapes(t *testing.T) {
 	if store.statusCalls != 1 {
 		t.Fatalf("status calls before interval = %d, want 1", store.statusCalls)
 	}
-	if len(observer.statusScrape) != 1 {
-		t.Fatalf("status scrapes before interval = %d, want 1", len(observer.statusScrape))
+	if observer.statusScrapeCount() != 1 {
+		t.Fatalf("status scrapes before interval = %d, want 1", observer.statusScrapeCount())
 	}
 
 	current = current.Add(31 * time.Second)
@@ -507,8 +531,8 @@ func TestOutboxStatusReporterThrottlesStatusScrapes(t *testing.T) {
 	if store.statusCalls != 2 {
 		t.Fatalf("status calls after interval = %d, want 2", store.statusCalls)
 	}
-	if len(observer.statusScrape) != 2 {
-		t.Fatalf("status scrapes after interval = %d, want 2", len(observer.statusScrape))
+	if observer.statusScrapeCount() != 2 {
+		t.Fatalf("status scrapes after interval = %d, want 2", observer.statusScrapeCount())
 	}
 }
 
@@ -716,6 +740,8 @@ func pendingEvent(eventID, eventType string) PendingOutboxEvent {
 
 func assertOutboxOutcome(t *testing.T, observer *outboxObserver, outcome eventobservability.OutboxOutcome) {
 	t.Helper()
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
 	if len(observer.events) != 1 {
 		t.Fatalf("observed outbox events = %#v, want one", observer.events)
 	}
@@ -726,6 +752,8 @@ func assertOutboxOutcome(t *testing.T, observer *outboxObserver, outcome eventob
 
 func assertOutboxContainsOutcome(t *testing.T, observer *outboxObserver, outcome eventobservability.OutboxOutcome) {
 	t.Helper()
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
 	for _, evt := range observer.events {
 		if evt.Outcome == outcome {
 			return
@@ -736,6 +764,8 @@ func assertOutboxContainsOutcome(t *testing.T, observer *outboxObserver, outcome
 
 func assertOutboxStatusScrape(t *testing.T, observer *outboxObserver, outcome eventobservability.OutboxStatusScrapeOutcome) {
 	t.Helper()
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
 	if len(observer.statusScrape) != 1 {
 		t.Fatalf("observed status scrape events = %#v, want one", observer.statusScrape)
 	}
