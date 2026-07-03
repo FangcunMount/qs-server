@@ -230,18 +230,32 @@ func (r *outboxRelay) publishDueEvents(ctx context.Context, l *logger.RequestLog
 	if workers <= 0 {
 		workers = 1
 	}
-	sem := make(chan struct{}, workers)
 	results := make(chan relayPublishResult, len(pendingEvents))
-	var wg sync.WaitGroup
+	if len(pendingEvents) == 0 {
+		close(results)
+		return results
+	}
 
+	jobs := make(chan PendingOutboxEvent, len(pendingEvents))
 	for _, pending := range pendingEvents {
+		jobs <- pending
+	}
+	close(jobs)
+
+	workerCount := workers
+	if workerCount > len(pendingEvents) {
+		workerCount = len(pendingEvents)
+	}
+
+	var wg sync.WaitGroup
+	for i := 0; i < workerCount; i++ {
 		wg.Add(1)
-		go func(item PendingOutboxEvent) {
+		go func() {
 			defer wg.Done()
-			sem <- struct{}{}
-			defer func() { <-sem }()
-			results <- r.publishOne(ctx, l, item)
-		}(pending)
+			for item := range jobs {
+				results <- r.publishOne(ctx, l, item)
+			}
+		}()
 	}
 	go func() {
 		wg.Wait()
