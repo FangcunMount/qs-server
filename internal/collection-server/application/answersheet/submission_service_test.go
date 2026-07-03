@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"google.golang.org/grpc/codes"
@@ -12,12 +12,12 @@ import (
 )
 
 type actorLookupClientStub struct {
-	getResults map[uint64]*grpcclient.TesteeResponse
+	getResults map[uint64]*grpcbridge.TesteeResponse
 	getErrors  map[uint64]error
 	existsIDs  map[uint64]uint64
 }
 
-func (s *actorLookupClientStub) GetTestee(_ context.Context, testeeID uint64) (*grpcclient.TesteeResponse, error) {
+func (s *actorLookupClientStub) GetTestee(_ context.Context, testeeID uint64) (*grpcbridge.TesteeResponse, error) {
 	if err, ok := s.getErrors[testeeID]; ok {
 		return nil, err
 	}
@@ -36,7 +36,7 @@ func (s *actorLookupClientStub) TesteeExists(_ context.Context, _ uint64, iamPro
 
 func TestResolveCanonicalTesteeReturnsOriginalID(t *testing.T) {
 	stub := &actorLookupClientStub{
-		getResults: map[uint64]*grpcclient.TesteeResponse{
+		getResults: map[uint64]*grpcbridge.TesteeResponse{
 			615001: {ID: 615001, Name: "王小明"},
 		},
 		getErrors: map[uint64]error{},
@@ -63,7 +63,7 @@ func TestResolveCanonicalTesteeFallsBackFromProfileID(t *testing.T) {
 	)
 
 	stub := &actorLookupClientStub{
-		getResults: map[uint64]*grpcclient.TesteeResponse{
+		getResults: map[uint64]*grpcbridge.TesteeResponse{
 			canonicalTesteeID: {
 				ID:           canonicalTesteeID,
 				OrgID:        1,
