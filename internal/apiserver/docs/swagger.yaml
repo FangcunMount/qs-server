@@ -2592,6 +2592,155 @@ definitions:
     - TimeRangePresetToday
     - TimeRangePreset7D
     - TimeRangePreset30D
+  systemgovernance.ActionDescriptor:
+    properties:
+      domain:
+        $ref: '#/definitions/systemgovernance.Domain'
+      enabled:
+        type: boolean
+      id:
+        type: string
+      input_schema:
+        additionalProperties: true
+        type: object
+      label:
+        type: string
+      planned:
+        type: boolean
+      requires_confirmation:
+        type: boolean
+      risk_level:
+        type: string
+    type: object
+  systemgovernance.ActionRunRequest:
+    properties:
+      confirm:
+        type: boolean
+      input:
+        additionalProperties: true
+        type: object
+    type: object
+  systemgovernance.ActionRunResult:
+    properties:
+      action_id:
+        type: string
+      finished_at:
+        type: string
+      message:
+        type: string
+      result:
+        additionalProperties: true
+        type: object
+      started_at:
+        type: string
+      status:
+        type: string
+    type: object
+  systemgovernance.ActionsView:
+    properties:
+      actions:
+        items:
+          $ref: '#/definitions/systemgovernance.ActionDescriptor'
+        type: array
+      generated_at:
+        type: string
+    type: object
+  systemgovernance.Domain:
+    enum:
+    - events
+    - cache
+    - resilience
+    - actions
+    type: string
+    x-enum-varnames:
+    - DomainEvents
+    - DomainCache
+    - DomainResilience
+    - DomainActions
+  systemgovernance.DomainSummary:
+    properties:
+      severity:
+        $ref: '#/definitions/systemgovernance.Severity'
+      signal_count:
+        type: integer
+    type: object
+  systemgovernance.MetricEvidence:
+    properties:
+      available:
+        type: boolean
+      name:
+        type: string
+      reason:
+        type: string
+      unit:
+        type: string
+      value:
+        type: number
+      window:
+        type: string
+    type: object
+  systemgovernance.MetricsSummary:
+    properties:
+      available:
+        type: boolean
+      reason:
+        type: string
+    type: object
+  systemgovernance.OverviewResponse:
+    properties:
+      domains:
+        additionalProperties:
+          $ref: '#/definitions/systemgovernance.DomainSummary'
+        type: object
+      generated_at:
+        type: string
+      metrics:
+        $ref: '#/definitions/systemgovernance.MetricsSummary'
+      overall_severity:
+        $ref: '#/definitions/systemgovernance.Severity'
+      signals:
+        items:
+          $ref: '#/definitions/systemgovernance.Signal'
+        type: array
+      window:
+        type: string
+    type: object
+  systemgovernance.Severity:
+    enum:
+    - healthy
+    - warning
+    - critical
+    type: string
+    x-enum-varnames:
+    - SeverityHealthy
+    - SeverityWarning
+    - SeverityCritical
+  systemgovernance.Signal:
+    properties:
+      action_ids:
+        items:
+          type: string
+        type: array
+      dashboard_key:
+        type: string
+      domain:
+        $ref: '#/definitions/systemgovernance.Domain'
+      evidence:
+        additionalProperties: true
+        type: object
+      id:
+        type: string
+      metric_evidence:
+        items:
+          $ref: '#/definitions/systemgovernance.MetricEvidence'
+        type: array
+      severity:
+        $ref: '#/definitions/systemgovernance.Severity'
+      status:
+        type: string
+      title:
+        type: string
+    type: object
   viewmodel.AnswerDTO:
     properties:
       question_code:
@@ -8018,6 +8167,213 @@ paths:
       summary: 同步计划统计
       tags:
       - Statistics-Sync
+  /internal/v1/system-governance/actions:
+    get:
+      description: 返回可执行与预留治理动作描述符；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.ActionsView'
+              type: object
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-动作目录
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/actions/{action_id}/runs:
+    post:
+      consumes:
+      - application/json
+      description: 执行低风险治理动作（如 cache.manual_warmup、cache.repair_complete）；仅 qs:admin
+        可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 动作 ID
+        in: path
+        name: action_id
+        required: true
+        type: string
+      - description: 动作参数
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/systemgovernance.ActionRunRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.ActionRunResult'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 执行治理动作
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/cache:
+    get:
+      description: 返回缓存 runtime/warmup 快照与诊断信号；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: 5m
+        description: 指标窗口，如 5m、15m、1h
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-缓存预热
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/events:
+    get:
+      description: 返回 outbox 快照、event_type 维度积压与诊断信号；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: 5m
+        description: 指标窗口，如 5m、15m、1h
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-事件排水
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/overview:
+    get:
+      description: 聚合事件、缓存、承压保护诊断信号与近窗口指标可用性；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: 5m
+        description: 指标窗口，如 5m、15m、1h
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/systemgovernance.OverviewResponse'
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理总览
+      tags:
+      - System-Governance
+  /internal/v1/system-governance/resilience:
+    get:
+      description: 聚合 apiserver、collection-server、worker 韧性快照与诊断信号；仅 qs:admin 可访问
+      parameters:
+      - description: Bearer 用户令牌（或内部调用token）
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - default: 5m
+        description: 指标窗口，如 5m、15m、1h
+        in: query
+        name: window
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+        "429":
+          description: Too Many Requests
+          schema:
+            $ref: '#/definitions/core.ErrResponse'
+      summary: 系统治理-承压保护
+      tags:
+      - System-Governance
   /ping:
     get:
       produces:

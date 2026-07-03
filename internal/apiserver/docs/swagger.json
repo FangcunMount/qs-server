@@ -8361,6 +8361,329 @@
                 }
             }
         },
+        "/internal/v1/system-governance/actions": {
+            "get": {
+                "description": "返回可执行与预留治理动作描述符；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-动作目录",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ActionsView"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/actions/{action_id}/runs": {
+            "post": {
+                "description": "执行低风险治理动作（如 cache.manual_warmup、cache.repair_complete）；仅 qs:admin 可访问",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "执行治理动作",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "动作 ID",
+                        "name": "action_id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "动作参数",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/systemgovernance.ActionRunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.ActionRunResult"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/cache": {
+            "get": {
+                "description": "返回缓存 runtime/warmup 快照与诊断信号；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-缓存预热",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "5m",
+                        "description": "指标窗口，如 5m、15m、1h",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/events": {
+            "get": {
+                "description": "返回 outbox 快照、event_type 维度积压与诊断信号；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-事件排水",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "5m",
+                        "description": "指标窗口，如 5m、15m、1h",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/overview": {
+            "get": {
+                "description": "聚合事件、缓存、承压保护诊断信号与近窗口指标可用性；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理总览",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "5m",
+                        "description": "指标窗口，如 5m、15m、1h",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/systemgovernance.OverviewResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/internal/v1/system-governance/resilience": {
+            "get": {
+                "description": "聚合 apiserver、collection-server、worker 韧性快照与诊断信号；仅 qs:admin 可访问",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "System-Governance"
+                ],
+                "summary": "系统治理-承压保护",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Bearer 用户令牌（或内部调用token）",
+                        "name": "Authorization",
+                        "in": "header",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "default": "5m",
+                        "description": "指标窗口，如 5m、15m、1h",
+                        "name": "window",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/core.Response"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    },
+                    "429": {
+                        "description": "Too Many Requests",
+                        "schema": {
+                            "$ref": "#/definitions/core.ErrResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/ping": {
             "get": {
                 "produces": [
@@ -12385,6 +12708,227 @@
                 "TimeRangePreset7D",
                 "TimeRangePreset30D"
             ]
+        },
+        "systemgovernance.ActionDescriptor": {
+            "type": "object",
+            "properties": {
+                "domain": {
+                    "$ref": "#/definitions/systemgovernance.Domain"
+                },
+                "enabled": {
+                    "type": "boolean"
+                },
+                "id": {
+                    "type": "string"
+                },
+                "input_schema": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "label": {
+                    "type": "string"
+                },
+                "planned": {
+                    "type": "boolean"
+                },
+                "requires_confirmation": {
+                    "type": "boolean"
+                },
+                "risk_level": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.ActionRunRequest": {
+            "type": "object",
+            "properties": {
+                "confirm": {
+                    "type": "boolean"
+                },
+                "input": {
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            }
+        },
+        "systemgovernance.ActionRunResult": {
+            "type": "object",
+            "properties": {
+                "action_id": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                },
+                "result": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.ActionsView": {
+            "type": "object",
+            "properties": {
+                "actions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.ActionDescriptor"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.Domain": {
+            "type": "string",
+            "enum": [
+                "events",
+                "cache",
+                "resilience",
+                "actions"
+            ],
+            "x-enum-varnames": [
+                "DomainEvents",
+                "DomainCache",
+                "DomainResilience",
+                "DomainActions"
+            ]
+        },
+        "systemgovernance.DomainSummary": {
+            "type": "object",
+            "properties": {
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "signal_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "systemgovernance.MetricEvidence": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "name": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                },
+                "unit": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number"
+                },
+                "window": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.MetricsSummary": {
+            "type": "object",
+            "properties": {
+                "available": {
+                    "type": "boolean"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.OverviewResponse": {
+            "type": "object",
+            "properties": {
+                "domains": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "$ref": "#/definitions/systemgovernance.DomainSummary"
+                    }
+                },
+                "generated_at": {
+                    "type": "string"
+                },
+                "metrics": {
+                    "$ref": "#/definitions/systemgovernance.MetricsSummary"
+                },
+                "overall_severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "signals": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.Signal"
+                    }
+                },
+                "window": {
+                    "type": "string"
+                }
+            }
+        },
+        "systemgovernance.Severity": {
+            "type": "string",
+            "enum": [
+                "healthy",
+                "warning",
+                "critical"
+            ],
+            "x-enum-varnames": [
+                "SeverityHealthy",
+                "SeverityWarning",
+                "SeverityCritical"
+            ]
+        },
+        "systemgovernance.Signal": {
+            "type": "object",
+            "properties": {
+                "action_ids": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "dashboard_key": {
+                    "type": "string"
+                },
+                "domain": {
+                    "$ref": "#/definitions/systemgovernance.Domain"
+                },
+                "evidence": {
+                    "type": "object",
+                    "additionalProperties": true
+                },
+                "id": {
+                    "type": "string"
+                },
+                "metric_evidence": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/systemgovernance.MetricEvidence"
+                    }
+                },
+                "severity": {
+                    "$ref": "#/definitions/systemgovernance.Severity"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
         },
         "viewmodel.AnswerDTO": {
             "type": "object",

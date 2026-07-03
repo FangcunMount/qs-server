@@ -421,6 +421,21 @@ backpressure:
     timeout_ms: 2000
 
 # -------------------------------------------------------
+# 3.9.1 系统治理聚合（工作台）
+# -------------------------------------------------------
+# Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
+system_governance:
+  prometheus:
+    enabled: false
+    base_url: "http://127.0.0.1:9090"
+    timeout: 3s
+  components:
+    collection-server:
+      resilience_url: "http://127.0.0.1:18083/governance/resilience"
+    worker:
+      resilience_url: "http://127.0.0.1:9092/governance/resilience"
+
+# -------------------------------------------------------
 # 3.10 MongoDB 数据库
 # -------------------------------------------------------
 # 支持两种方式：分离参数（推荐）或直接 URL
