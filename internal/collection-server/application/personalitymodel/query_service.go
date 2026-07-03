@@ -63,53 +63,28 @@ func (s *QueryService) HasCachedCategories() bool {
 }
 
 func (s *QueryService) Get(ctx context.Context, code string) (*PersonalityModelResponse, error) {
-	if s.cache != nil {
-		if cached, ok := s.cache.GetDetail(code); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*PersonalityModelResponse, error) {
-		log.Infof("Getting personality model: code=%s", code)
-		result, err := s.client.GetPersonalityModel(ctx, code)
-		if err != nil {
-			logPersonalityGRPCError("Failed to get personality model via gRPC", err)
-			return nil, err
-		}
-		if result == nil {
-			return nil, nil
-		}
-		return convertDetail(result), nil
-	}
-
-	if s.cache != nil && s.useSingleflight {
-		key := detailCacheKey(code)
-		value, err, _ := s.singleflightGroup.Do(key, func() (interface{}, error) {
-			if cached, ok := s.cache.GetDetail(code); ok {
-				return cached, nil
+	return s.readThroughDetail(
+		detailCacheKey(code),
+		func() (*PersonalityModelResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
+			return s.cache.GetDetail(code)
+		},
+		func(resp *PersonalityModelResponse) { s.cache.SetDetail(code, resp) },
+		func() (*PersonalityModelResponse, error) {
+			log.Infof("Getting personality model: code=%s", code)
+			result, err := s.client.GetPersonalityModel(ctx, code)
+			if err != nil {
+				logPersonalityGRPCError("Failed to get personality model via gRPC", err)
+				return nil, err
 			}
-			s.cache.SetDetail(code, resp)
-			return clonePersonalityModelResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*PersonalityModelResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetDetail(code, resp)
-	return clonePersonalityModelResponse(resp), nil
+			if result == nil {
+				return nil, nil
+			}
+			return convertDetail(result), nil
+		},
+	)
 }
 
 func (s *QueryService) List(ctx context.Context, req *ListPersonalityModelsRequest) (*ListPersonalityModelsResponse, error) {
@@ -118,108 +93,59 @@ func (s *QueryService) List(ctx context.Context, req *ListPersonalityModelsReque
 	}
 	s.normalizeListRequest(req)
 
-	if s.cache != nil {
-		if cached, ok := s.cache.GetListByRequest(req); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*ListPersonalityModelsResponse, error) {
-		result, err := s.client.ListPersonalityModels(ctx, req.Page, req.PageSize, req.Algorithm)
-		if err != nil {
-			logPersonalityGRPCError("Failed to list personality models via gRPC", err)
-			return nil, err
-		}
-		models := make([]PersonalityModelSummaryResponse, 0, len(result.Models))
-		for _, model := range result.Models {
-			models = append(models, convertSummary(model))
-		}
-		return &ListPersonalityModelsResponse{
-			Models:     models,
-			Total:      result.Total,
-			Page:       result.Page,
-			PageSize:   result.PageSize,
-			TotalPages: result.TotalPages,
-		}, nil
-	}
-
-	listKey := listCacheKey(req)
-	if s.cache != nil && s.useSingleflight {
-		value, err, _ := s.singleflightGroup.Do(listKey, func() (interface{}, error) {
-			if cached, hit := s.cache.GetListByRequest(req); hit {
-				return cached, nil
+	return s.readThroughList(
+		listCacheKey(req),
+		func() (*ListPersonalityModelsResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
+			return s.cache.GetListByRequest(req)
+		},
+		func(resp *ListPersonalityModelsResponse) { s.cache.SetListByRequest(req, resp) },
+		func() (*ListPersonalityModelsResponse, error) {
+			result, err := s.client.ListPersonalityModels(ctx, req.Page, req.PageSize, req.Algorithm)
+			if err != nil {
+				logPersonalityGRPCError("Failed to list personality models via gRPC", err)
+				return nil, err
 			}
-			s.cache.SetListByRequest(req, resp)
-			return cloneListPersonalityModelsResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*ListPersonalityModelsResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetListByRequest(req, resp)
-	return cloneListPersonalityModelsResponse(resp), nil
+			models := make([]PersonalityModelSummaryResponse, 0, len(result.Models))
+			for _, model := range result.Models {
+				models = append(models, convertSummary(model))
+			}
+			return &ListPersonalityModelsResponse{
+				Models:     models,
+				Total:      result.Total,
+				Page:       result.Page,
+				PageSize:   result.PageSize,
+				TotalPages: result.TotalPages,
+			}, nil
+		},
+	)
 }
 
 func (s *QueryService) GetCategories(ctx context.Context) (*PersonalityModelCategoriesResponse, error) {
-	if s.cache != nil {
-		if cached, ok := s.cache.GetCategories(); ok {
-			return cached, nil
-		}
-	}
-
-	load := func() (*PersonalityModelCategoriesResponse, error) {
-		result, err := s.client.GetPersonalityModelCategories(ctx)
-		if err != nil {
-			logPersonalityGRPCError("Failed to get personality model categories via gRPC", err)
-			return nil, err
-		}
-		categories := make([]CategoryResponse, 0, len(result.Categories))
-		for _, item := range result.Categories {
-			categories = append(categories, CategoryResponse{Value: item.Value, Label: item.Label})
-		}
-		return &PersonalityModelCategoriesResponse{Categories: categories}, nil
-	}
-
-	if s.cache != nil && s.useSingleflight {
-		value, err, _ := s.singleflightGroup.Do(cacheKeyCategories, func() (interface{}, error) {
-			if cached, ok := s.cache.GetCategories(); ok {
-				return cached, nil
+	return s.readThroughCategories(
+		cacheKeyCategories,
+		func() (*PersonalityModelCategoriesResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
+			return s.cache.GetCategories()
+		},
+		func(resp *PersonalityModelCategoriesResponse) { s.cache.SetCategories(resp) },
+		func() (*PersonalityModelCategoriesResponse, error) {
+			result, err := s.client.GetPersonalityModelCategories(ctx)
+			if err != nil {
+				logPersonalityGRPCError("Failed to get personality model categories via gRPC", err)
+				return nil, err
 			}
-			s.cache.SetCategories(resp)
-			return clonePersonalityModelCategoriesResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*PersonalityModelCategoriesResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.SetCategories(resp)
-	return clonePersonalityModelCategoriesResponse(resp), nil
+			categories := make([]CategoryResponse, 0, len(result.Categories))
+			for _, item := range result.Categories {
+				categories = append(categories, CategoryResponse{Value: item.Value, Label: item.Label})
+			}
+			return &PersonalityModelCategoriesResponse{Categories: categories}, nil
+		},
+	)
 }
 
 func (s *QueryService) normalizeListRequest(req *ListPersonalityModelsRequest) {

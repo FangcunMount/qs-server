@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	"golang.org/x/sync/singleflight"
@@ -46,44 +47,24 @@ func (s *QueryService) HasCachedDetail(code, version string) bool {
 
 // Get 获取问卷详情
 func (s *QueryService) Get(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
+	var setFn func(*QuestionnaireResponse)
 	if s.cache != nil {
-		if cached, ok := s.cache.Get(code, version); ok {
-			return cached, nil
-		}
+		setFn = func(resp *QuestionnaireResponse) { s.cache.Set(code, version, resp) }
 	}
-
-	load := func() (*QuestionnaireResponse, error) {
-		return s.fetchFromGRPC(ctx, code, version)
-	}
-
-	if s.cache != nil && s.useSingleflight {
-		key := cacheKey(code, version)
-		value, err, _ := s.singleflightGroup.Do(key, func() (interface{}, error) {
-			if cached, ok := s.cache.Get(code, version); ok {
-				return cached, nil
+	return catalogreadthrough.ReadThrough(
+		cacheKey(code, version),
+		func() (*QuestionnaireResponse, bool) {
+			if s.cache == nil {
+				return nil, false
 			}
-			resp, loadErr := load()
-			if loadErr != nil || resp == nil {
-				return resp, loadErr
-			}
-			s.cache.Set(code, version, resp)
-			return cloneResponse(resp), nil
-		})
-		if err != nil {
-			return nil, err
-		}
-		if value == nil {
-			return nil, nil
-		}
-		return value.(*QuestionnaireResponse), nil
-	}
-
-	resp, err := load()
-	if err != nil || resp == nil || s.cache == nil {
-		return resp, err
-	}
-	s.cache.Set(code, version, resp)
-	return cloneResponse(resp), nil
+			return s.cache.Get(code, version)
+		},
+		setFn,
+		func() (*QuestionnaireResponse, error) { return s.fetchFromGRPC(ctx, code, version) },
+		cloneResponse,
+		&s.singleflightGroup,
+		s.cache != nil && s.useSingleflight,
+	)
 }
 
 func (s *QueryService) fetchFromGRPC(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
