@@ -54,7 +54,7 @@ func NewNeutralDimensionInterpret(
 	severity := ""
 	if level != nil {
 		severity = level.Severity
-		if isRiskLevelCode(level.Code) {
+		if IsRiskLevelCode(level.Code) {
 			risk = RiskLevel(level.Code)
 		}
 	}

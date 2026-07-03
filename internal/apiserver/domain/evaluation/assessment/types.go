@@ -2,6 +2,7 @@ package assessment
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -159,17 +160,12 @@ func RiskLevelFromString(s string) RiskLevel {
 
 // IsHighRisk 是否高风险（包含 high 和 severe）
 func IsHighRisk(r RiskLevel) bool {
-	return r == RiskLevelHigh || r == RiskLevelSevere
+	return domainreport.IsHighRisk(domainreport.RiskLevel(r))
 }
 
 // IsRiskLevelCode reports whether code is a legacy scale risk-level value.
 func IsRiskLevelCode(code string) bool {
-	switch RiskLevel(code) {
-	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:
-		return true
-	default:
-		return false
-	}
+	return domainreport.IsRiskLevelCode(code)
 }
 
 // ==================== 解释模型引用 ====================

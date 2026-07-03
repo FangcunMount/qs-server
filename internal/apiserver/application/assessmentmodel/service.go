@@ -3,7 +3,6 @@ package assessmentmodel
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
@@ -45,11 +44,17 @@ type Dependencies struct {
 }
 
 type service struct {
-	deps Dependencies
+	deps        Dependencies
+	behavior    behaviorGateway
+	personality personalityGateway
 }
 
 func NewService(deps Dependencies) Service {
-	return &service{deps: deps}
+	return &service{
+		deps:        deps,
+		behavior:    behaviorGateway{cmd: deps.BehaviorCommand},
+		personality: personalityGateway{cmd: deps.PersonalityCommand},
+	}
 }
 
 func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
@@ -91,14 +96,7 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 	case KindBehaviorAbility:
 		return s.createBehaviorAbility(ctx, dto)
 	case KindPersonality:
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.Create(ctx, personalityCreateInput(dto))
-		if err != nil {
-			return nil, err
-		}
-		return summaryFromPersonality(result), nil
+		return s.personality.create(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -108,13 +106,13 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 	if modelCode == "" {
 		return nil, invalidArgument("模型编码不能为空")
 	}
-	if s.deps.BehaviorCommand != nil {
-		if result, err := s.deps.BehaviorCommand.Get(ctx, modelCode); err == nil && result != nil {
+	if s.behavior.cmd != nil {
+		if result, err := s.behavior.cmd.Get(ctx, modelCode); err == nil && result != nil {
 			return summaryFromBehavior(result), nil
 		}
 	}
-	if s.deps.PersonalityCommand != nil {
-		if result, err := s.deps.PersonalityCommand.Get(ctx, modelCode); err == nil && result != nil {
+	if s.personality.cmd != nil {
+		if result, err := s.personality.cmd.Get(ctx, modelCode); err == nil && result != nil {
 			return summaryFromPersonality(result), nil
 		}
 	}
@@ -128,129 +126,53 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 
 func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
 	if kind, ok := s.resolveModelKind(ctx, dto.Code); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.UpdateBasicInfo(ctx, personalityUpdateBasicInfoInput(dto))
-		if err != nil {
-			return nil, err
-		}
-		return summaryFromPersonality(result), nil
+		return s.personality.updateBasicInfo(ctx, dto)
 	}
 	return s.updateBehaviorBasicInfo(ctx, dto)
 }
 
 func (s *service) Delete(ctx context.Context, modelCode string) error {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return unavailable("人格模型服务未配置")
-		}
-		return s.deps.PersonalityCommand.Delete(ctx, modelCode)
+		return s.personality.delete(ctx, modelCode)
 	}
-	if s.deps.BehaviorCommand == nil {
-		return unavailable("行为能力模型服务未配置")
-	}
-	return s.deps.BehaviorCommand.Delete(ctx, modelCode)
+	return s.behavior.delete(ctx, modelCode)
 }
 
 func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.Publish(ctx, modelCode)
-		if err != nil {
-			return nil, err
-		}
-		return summaryFromPersonality(result), nil
+		return s.personality.publish(ctx, modelCode)
 	}
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.Publish(ctx, modelCode)
-	if err != nil {
-		return nil, err
-	}
-	return summaryFromBehavior(result), nil
+	return s.behavior.publish(ctx, modelCode)
 }
 
 func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.Unpublish(ctx, modelCode)
-		if err != nil {
-			return nil, err
-		}
-		return summaryFromPersonality(result), nil
+		return s.personality.unpublish(ctx, modelCode)
 	}
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.Unpublish(ctx, modelCode)
-	if err != nil {
-		return nil, err
-	}
-	return summaryFromBehavior(result), nil
+	return s.behavior.unpublish(ctx, modelCode)
 }
 
 func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.Archive(ctx, modelCode)
-		if err != nil {
-			return nil, err
-		}
-		return summaryFromPersonality(result), nil
+		return s.personality.archive(ctx, modelCode)
 	}
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.Archive(ctx, modelCode)
-	if err != nil {
-		return nil, err
-	}
-	return summaryFromBehavior(result), nil
+	return s.behavior.archive(ctx, modelCode)
 }
 
 func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
 	if kind, ok := s.resolveModelKind(ctx, dto.Code); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.BindQuestionnaire(ctx, personalityBindInput(dto))
-		if err != nil {
-			return nil, err
-		}
-		return questionnaireFromPersonality(result), nil
+		return s.personality.bindQuestionnaire(ctx, dto)
 	}
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.BindQuestionnaire(ctx, behavior.BindQuestionnaireInput{
-		Code:                 dto.Code,
-		QuestionnaireCode:    dto.QuestionnaireCode,
-		QuestionnaireVersion: dto.QuestionnaireVersion,
-	})
+	binding, err := s.behavior.bindQuestionnaire(ctx, dto)
 	if err != nil {
 		return nil, err
 	}
-	return s.questionnaireBinding(ctx, result.QuestionnaireCode, result.QuestionnaireVersion)
+	return s.questionnaireBinding(ctx, binding.QuestionnaireCode, binding.QuestionnaireVersion)
 }
 
 func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*QuestionnaireBindingResult, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.GetQuestionnaire(ctx, modelCode)
-		if err != nil {
-			return nil, err
-		}
-		return questionnaireFromPersonality(result), nil
+		return s.personality.getQuestionnaire(ctx, modelCode)
 	}
 	result, err := s.loadBehaviorAbility(ctx, modelCode)
 	if err != nil {
@@ -261,18 +183,11 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 
 func (s *service) GetDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.GetDefinition(ctx, modelCode)
-		if err != nil {
-			return nil, err
-		}
-		return definitionFromPersonality(result), nil
+		return s.personality.getDefinition(ctx, modelCode)
 	}
 	result, err := s.loadBehaviorAbility(ctx, modelCode)
 	if err == nil {
-		definition, err := s.deps.BehaviorCommand.GetDefinition(ctx, result.Code)
+		definition, err := s.behavior.cmd.GetDefinition(ctx, result.Code)
 		if err != nil {
 			return nil, err
 		}
@@ -307,14 +222,7 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 		}
 	}
 	if dto.Kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.UpdateDefinition(ctx, modelCode, personalityDefinitionInput(dto))
-		if err != nil {
-			return nil, err
-		}
-		return definitionFromPersonality(result), nil
+		return s.personality.updateDefinition(ctx, modelCode, dto)
 	}
 	return s.updateBehaviorDefinition(ctx, modelCode, dto)
 }
@@ -341,8 +249,8 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 		},
 	}
 	if kind == "" || kind == KindBehaviorAbility {
-		if s.deps.BehaviorCommand != nil {
-			categories, err := s.deps.BehaviorCommand.Options(ctx)
+		if s.behavior.cmd != nil {
+			categories, err := s.behavior.cmd.Options(ctx)
 			if err != nil {
 				return nil, err
 			}
@@ -370,14 +278,7 @@ func (s *service) ApplyCodes(ctx context.Context, dto ApplyCodesDTO) ([]string, 
 
 func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationResult, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.Validate(ctx, modelCode)
-		if err != nil {
-			return nil, err
-		}
-		return validationFromPersonality(result), nil
+		return s.personality.validate(ctx, modelCode)
 	}
 	def, err := s.GetDefinition(ctx, modelCode)
 	if err != nil {
@@ -397,17 +298,7 @@ func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationRe
 
 func (s *service) PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		if s.deps.PersonalityCommand == nil {
-			return nil, unavailable("人格模型服务未配置")
-		}
-		result, err := s.deps.PersonalityCommand.PreviewReport(ctx, modelCode, payload)
-		if err != nil {
-			if issues, ok := personality.AsValidationFailed(err); ok {
-				return nil, validationFailedFromPersonalityIssues(issues)
-			}
-			return nil, err
-		}
-		return previewFromPersonality(result), nil
+		return s.personality.previewReport(ctx, modelCode, payload)
 	}
 	return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
 }
@@ -424,190 +315,10 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	case KindPersonality:
 		return s.getPersonalityQRCode(ctx, modelCode)
 	case KindBehaviorAbility:
-		if s.deps.BehaviorCommand == nil {
-			return "", unavailable("模型二维码服务未配置")
-		}
-		return s.deps.BehaviorCommand.GetQRCode(ctx, modelCode)
+		return s.behavior.getQRCode(ctx, modelCode)
 	default:
 		return "", invalidArgument("模型类型不支持二维码")
 	}
-}
-
-func (s *service) getPersonalityQRCode(ctx context.Context, modelCode string) (string, error) {
-	if s.deps.RawQRCodeGenerator == nil {
-		return fmt.Sprintf("/personality/assessment/%s", modelCode), nil
-	}
-	return s.deps.RawQRCodeGenerator.GeneratePersonalityAssessmentQRCode(ctx, modelCode)
-}
-
-func (s *service) createBehaviorAbility(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.Create(ctx, behavior.CreateInput{
-		Code:                 dto.Code,
-		Title:                dto.Title,
-		Description:          dto.Description,
-		Category:             dto.Category,
-		Tags:                 dto.Tags,
-		QuestionnaireCode:    dto.QuestionnaireCode,
-		QuestionnaireVersion: dto.QuestionnaireVersion,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return summaryFromBehavior(result), nil
-}
-
-func (s *service) updateBehaviorBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.UpdateBasicInfo(ctx, behavior.UpdateBasicInfoInput{
-		Code:        dto.Code,
-		Title:       dto.Title,
-		Description: dto.Description,
-		Category:    dto.Category,
-		Tags:        dto.Tags,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return summaryFromBehavior(result), nil
-}
-
-func (s *service) updateBehaviorDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型定义服务未配置")
-	}
-	result, err := s.deps.BehaviorCommand.UpdateDefinition(ctx, modelCode, behavior.DefinitionInput{Payload: dto.Payload})
-	if err != nil {
-		return nil, err
-	}
-	return definitionFromBehavior(result), nil
-}
-
-func (s *service) resolveModelKind(ctx context.Context, modelCode string) (string, bool) {
-	if s.deps.PersonalityCommand != nil {
-		if _, err := s.deps.PersonalityCommand.Get(ctx, modelCode); err == nil {
-			return KindPersonality, true
-		}
-	}
-	if s.deps.BehaviorCommand != nil {
-		if _, err := s.deps.BehaviorCommand.Get(ctx, modelCode); err == nil {
-			return KindBehaviorAbility, true
-		}
-	}
-	return "", false
-}
-
-func (s *service) listBehaviorAbility(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {
-	if s.deps.BehaviorCommand == nil {
-		return &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}, nil
-	}
-	result, err := s.deps.BehaviorCommand.List(ctx, behavior.ListInput{
-		Page:     dto.Page,
-		PageSize: dto.PageSize,
-		Status:   dto.Status,
-		Keyword:  dto.Keyword,
-		Category: dto.Category,
-	})
-	if err != nil {
-		return nil, err
-	}
-	out := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
-	if result == nil {
-		return out, nil
-	}
-	out.Total = result.Total
-	for _, item := range result.Items {
-		out.Items = append(out.Items, summaryFromBehaviorValue(item))
-	}
-	return out, nil
-}
-
-func (s *service) listPersonality(ctx context.Context, dto ListModelsDTO) ([]ModelSummary, int64, error) {
-	seen := make(map[string]struct{})
-	var items []ModelSummary
-	var total int64
-
-	if s.deps.PersonalityCommand != nil && dto.Status != StatusPublished {
-		result, err := s.deps.PersonalityCommand.List(ctx, personalityListInput(dto))
-		if err != nil {
-			return nil, 0, err
-		}
-		if result != nil {
-			total += result.Total
-			for _, item := range summariesFromPersonalityList(result) {
-				items = append(items, item)
-				seen[item.Code] = struct{}{}
-			}
-		}
-	}
-
-	if dto.Status == "" || dto.Status == StatusPublished {
-		if s.deps.PersonalityQuery != nil {
-			result, err := s.deps.PersonalityQuery.ListPublished(ctx, personalitymodel.ListPersonalityModelsDTO{
-				Page:     dto.Page,
-				PageSize: dto.PageSize,
-			})
-			if err != nil {
-				return nil, 0, err
-			}
-			for _, item := range result.Items {
-				if dto.Algorithm != "" && item.Algorithm != dto.Algorithm {
-					continue
-				}
-				if dto.SubKind != "" && dto.SubKind != SubKindTypology {
-					continue
-				}
-				if dto.Keyword != "" && item.Title != "" && !containsFold(item.Title, dto.Keyword) {
-					continue
-				}
-				if _, ok := seen[item.Code]; ok {
-					continue
-				}
-				items = append(items, personalitySummaryFromSummary(item))
-				total++
-			}
-		}
-	}
-	return items, total, nil
-}
-
-func (s *service) loadBehaviorAbility(ctx context.Context, modelCode string) (*behavior.Model, error) {
-	if modelCode == "" {
-		return nil, invalidArgument("模型编码不能为空")
-	}
-	if s.deps.BehaviorCommand == nil {
-		return nil, unavailable("行为能力模型服务未配置")
-	}
-	return s.deps.BehaviorCommand.Get(ctx, modelCode)
-}
-
-func (s *service) questionnaireBinding(ctx context.Context, questionnaireCode, questionnaireVersion string) (*QuestionnaireBindingResult, error) {
-	result := &QuestionnaireBindingResult{
-		QuestionnaireCode:    questionnaireCode,
-		QuestionnaireVersion: questionnaireVersion,
-	}
-	if questionnaireCode == "" || s.deps.QuestionnaireQuery == nil {
-		return result, nil
-	}
-	var q *questionnaireapp.QuestionnaireResult
-	var err error
-	if questionnaireVersion != "" {
-		q, err = s.deps.QuestionnaireQuery.GetPublishedByCodeVersion(ctx, questionnaireCode, questionnaireVersion)
-	} else {
-		q, err = s.deps.QuestionnaireQuery.GetByCode(ctx, questionnaireCode)
-	}
-	if err != nil {
-		return result, nil
-	}
-	if q != nil {
-		result.Title = q.Title
-		result.QuestionCount = len(q.Questions)
-	}
-	return result, nil
 }
 
 func invalidArgument(format string, args ...interface{}) error {

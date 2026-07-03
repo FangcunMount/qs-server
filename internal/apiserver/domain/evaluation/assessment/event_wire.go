@@ -35,10 +35,5 @@ func isHighEventSeverity(severity string) bool {
 }
 
 func isRiskLevelEventCode(code string) bool {
-	switch RiskLevel(code) {
-	case RiskLevelHigh, RiskLevelSevere:
-		return true
-	default:
-		return false
-	}
+	return IsHighRisk(RiskLevel(code))
 }

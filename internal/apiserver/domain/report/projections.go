@@ -1,19 +1,5 @@
 package report
 
-func isRiskLevelCode(code string) bool {
-	return IsRiskLevelCode(code)
-}
-
-// IsRiskLevelCode reports whether code is a legacy risk-level value.
-func IsRiskLevelCode(code string) bool {
-	switch RiskLevel(code) {
-	case RiskLevelNone, RiskLevelLow, RiskLevelMedium, RiskLevelHigh, RiskLevelSevere:
-		return true
-	default:
-		return false
-	}
-}
-
 // FinalizeInterpretReport synchronizes v2 outcome summary fields with legacy report fields.
 func FinalizeInterpretReport(r *InterpretReport) {
 	if r == nil {
@@ -33,7 +19,7 @@ func FinalizeInterpretReport(r *InterpretReport) {
 	if r.primaryScore != nil {
 		r.totalScore = r.primaryScore.Value
 	}
-	if r.level != nil && r.level.Code != "" && isRiskLevelCode(r.level.Code) {
+	if r.level != nil && r.level.Code != "" && IsRiskLevelCode(r.level.Code) {
 		r.riskLevel = RiskLevel(r.level.Code)
 	}
 	if !r.model.IsEmpty() {
