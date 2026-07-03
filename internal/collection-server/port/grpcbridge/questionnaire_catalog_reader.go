@@ -17,24 +17,28 @@ func NewQuestionnaireCatalogReader(inner QuestionnaireReader) *QuestionnaireCata
 }
 
 func (r *QuestionnaireCatalogReader) GetQuestionnaire(ctx context.Context, code, version string) (*questionnaire.QuestionnaireResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	out, err := r.inner.GetQuestionnaire(ctx, code, version)
-	if err != nil || out == nil {
-		return nil, err
-	}
-	return toQuestionnaireResponse(out), nil
+	return callCatalog(r.inner,
+		func() (*QuestionnaireOutput, error) { return r.inner.GetQuestionnaire(ctx, code, version) },
+		toQuestionnaireResponse,
+	)
 }
 
 func (r *QuestionnaireCatalogReader) ListQuestionnaires(ctx context.Context, page, pageSize int32, status, title string) (*questionnaire.ListQuestionnairesResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	out, err := r.inner.ListQuestionnaires(ctx, page, pageSize, status, title)
-	if err != nil || out == nil {
-		return nil, err
-	}
+	return callCatalog(r.inner,
+		func() (*ListQuestionnairesOutput, error) {
+			return r.inner.ListQuestionnaires(ctx, page, pageSize, status, title)
+		},
+		toListQuestionnairesResponse,
+	)
+}
+
+func toListQuestionnairesResponse(out *ListQuestionnairesOutput) *questionnaire.ListQuestionnairesResponse {
 	items := make([]questionnaire.QuestionnaireSummaryResponse, len(out.Questionnaires))
 	for i, q := range out.Questionnaires {
 		items[i] = questionnaire.QuestionnaireSummaryResponse{
@@ -55,7 +59,7 @@ func (r *QuestionnaireCatalogReader) ListQuestionnaires(ctx context.Context, pag
 		Total:          out.Total,
 		Page:           out.Page,
 		PageSize:       out.PageSize,
-	}, nil
+	}
 }
 
 func toQuestionnaireResponse(q *QuestionnaireOutput) *questionnaire.QuestionnaireResponse {

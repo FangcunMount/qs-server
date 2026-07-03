@@ -16,24 +16,48 @@ func NewScaleCatalogReader(inner ScaleReader) *ScaleCatalogReader {
 }
 
 func (r *ScaleCatalogReader) GetScale(ctx context.Context, code string) (*scale.ScaleResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	out, err := r.inner.GetScale(ctx, code)
-	if err != nil || out == nil {
-		return nil, err
-	}
-	return toScaleResponse(out), nil
+	return callCatalog(r.inner,
+		func() (*ScaleOutput, error) { return r.inner.GetScale(ctx, code) },
+		toScaleResponse,
+	)
 }
 
 func (r *ScaleCatalogReader) ListScales(ctx context.Context, page, pageSize int32, status, title, category string, stages, applicableAges, reporters, tags []string) (*scale.ListScalesResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	out, err := r.inner.ListScales(ctx, page, pageSize, status, title, category, stages, applicableAges, reporters, tags)
-	if err != nil || out == nil {
-		return nil, err
+	return callCatalog(r.inner,
+		func() (*ListScalesOutput, error) {
+			return r.inner.ListScales(ctx, page, pageSize, status, title, category, stages, applicableAges, reporters, tags)
+		},
+		toListScalesResponse,
+	)
+}
+
+func (r *ScaleCatalogReader) ListHotScales(ctx context.Context, limit, windowDays int32) (*scale.ListHotScalesResponse, error) {
+	if r == nil {
+		return nil, nil
 	}
+	return callCatalog(r.inner,
+		func() (*ListHotScalesOutput, error) { return r.inner.ListHotScales(ctx, limit, windowDays) },
+		toListHotScalesResponse,
+	)
+}
+
+func (r *ScaleCatalogReader) GetScaleCategories(ctx context.Context) (*scale.ScaleCategoriesResponse, error) {
+	if r == nil {
+		return nil, nil
+	}
+	return callCatalog(r.inner,
+		func() (*ScaleCategoriesOutput, error) { return r.inner.GetScaleCategories(ctx) },
+		toScaleCategoriesResponse,
+	)
+}
+
+func toListScalesResponse(out *ListScalesOutput) *scale.ListScalesResponse {
 	scales := make([]scale.ScaleSummaryResponse, 0, len(out.Scales))
 	for _, item := range out.Scales {
 		scales = append(scales, toScaleSummaryFromOutput(item))
@@ -43,17 +67,10 @@ func (r *ScaleCatalogReader) ListScales(ctx context.Context, page, pageSize int3
 		Total:    out.Total,
 		Page:     out.Page,
 		PageSize: out.PageSize,
-	}, nil
+	}
 }
 
-func (r *ScaleCatalogReader) ListHotScales(ctx context.Context, limit, windowDays int32) (*scale.ListHotScalesResponse, error) {
-	if r == nil || r.inner == nil {
-		return nil, nil
-	}
-	out, err := r.inner.ListHotScales(ctx, limit, windowDays)
-	if err != nil || out == nil {
-		return nil, err
-	}
+func toListHotScalesResponse(out *ListHotScalesOutput) *scale.ListHotScalesResponse {
 	scales := make([]scale.HotScaleSummaryResponse, 0, len(out.Scales))
 	for _, item := range out.Scales {
 		scales = append(scales, scale.HotScaleSummaryResponse{
@@ -68,18 +85,7 @@ func (r *ScaleCatalogReader) ListHotScales(ctx context.Context, limit, windowDay
 		Total:      int64(len(scales)),
 		Limit:      out.Limit,
 		WindowDays: out.WindowDays,
-	}, nil
-}
-
-func (r *ScaleCatalogReader) GetScaleCategories(ctx context.Context) (*scale.ScaleCategoriesResponse, error) {
-	if r == nil || r.inner == nil {
-		return nil, nil
 	}
-	out, err := r.inner.GetScaleCategories(ctx)
-	if err != nil || out == nil {
-		return nil, err
-	}
-	return toScaleCategoriesResponse(out), nil
 }
 
 func toScaleSummaryFromOutput(s ScaleSummaryOutput) scale.ScaleSummaryResponse {

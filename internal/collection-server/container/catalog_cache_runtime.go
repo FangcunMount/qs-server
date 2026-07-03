@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
+	"github.com/FangcunMount/component-base/pkg/signaling"
+	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
@@ -22,20 +24,20 @@ type catalogCaches struct {
 }
 
 func (c *Container) initCatalogCaches() catalogCaches {
-	questionnaireCache := newQuestionnaireDetailCache(c.opts)
-	c.startQuestionnaireCacheSignalWatcher(questionnaireCache)
-
-	scaleCache := newScaleCatalogCache(c.opts)
-	c.startScaleCacheSignalWatcher(scaleCache)
-
-	personalityCache := newPersonalityCatalogCache(c.opts)
-	c.startPersonalityCacheSignalWatcher(personalityCache)
-
-	return catalogCaches{
-		questionnaire: questionnaireCache,
-		scale:         scaleCache,
-		personality:   personalityCache,
+	var caches catalogCaches
+	if cache := newCatalogL1Cache(c.opts, catalogKindQuestionnaire); cache != nil {
+		caches.questionnaire = cache.(questionnaire.PublishedDetailCache)
+		c.startCatalogSignalWatcher(catalogKindQuestionnaire, cache)
 	}
+	if cache := newCatalogL1Cache(c.opts, catalogKindScale); cache != nil {
+		caches.scale = cache.(scale.CatalogCache)
+		c.startCatalogSignalWatcher(catalogKindScale, cache)
+	}
+	if cache := newCatalogL1Cache(c.opts, catalogKindPersonality); cache != nil {
+		caches.personality = cache.(personalitymodel.CatalogCache)
+		c.startCatalogSignalWatcher(catalogKindPersonality, cache)
+	}
+	return caches
 }
 
 func (c *Container) cleanupCatalogCaches() {
@@ -45,93 +47,6 @@ func (c *Container) cleanupCatalogCaches() {
 		}
 	}
 	c.catalogCacheWatcherCancels = nil
-}
-
-func questionnaireCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.QuestionnaireCache == nil {
-		return nil
-	}
-	return &opts.QuestionnaireCache.CatalogL1CacheOptions
-}
-
-func scaleCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.ScaleCache == nil {
-		return nil
-	}
-	return &opts.ScaleCache.CatalogL1CacheOptions
-}
-
-func personalityCatalogCfg(opts *options.Options) *options.CatalogL1CacheOptions {
-	if opts == nil || opts.PersonalityCache == nil {
-		return nil
-	}
-	return &opts.PersonalityCache.CatalogL1CacheOptions
-}
-
-func newQuestionnaireDetailCache(opts *options.Options) questionnaire.PublishedDetailCache {
-	cfg := catalogCacheConfig(questionnaireCatalogCfg(opts))
-	if cfg == nil {
-		return nil
-	}
-	cacheOpts := localCacheOptionsFromCatalog("questionnaire", cfg)
-	return questionnaire.NewLocalCache(questionnaire.LocalCacheOptions{
-		TTL:            cacheOpts.TTL,
-		MaxEntries:     cacheOpts.MaxEntries,
-		TTLJitterRatio: cacheOpts.TTLJitterRatio,
-		OnHit:          cacheOpts.OnHit,
-		OnMiss:         cacheOpts.OnMiss,
-	})
-}
-
-func newScaleCatalogCache(opts *options.Options) scale.CatalogCache {
-	cfg := catalogCacheConfig(scaleCatalogCfg(opts))
-	if cfg == nil {
-		return nil
-	}
-	cacheOpts := localCacheOptionsFromCatalog("scale", cfg)
-	return scale.NewLocalCatalogCache(scale.LocalCatalogCacheOptions{
-		TTL:            cacheOpts.TTL,
-		MaxEntries:     cacheOpts.MaxEntries,
-		TTLJitterRatio: cacheOpts.TTLJitterRatio,
-		OnHit:          cacheOpts.OnHit,
-		OnMiss:         cacheOpts.OnMiss,
-	})
-}
-
-func newPersonalityCatalogCache(opts *options.Options) personalitymodel.CatalogCache {
-	cfg := catalogCacheConfig(personalityCatalogCfg(opts))
-	if cfg == nil {
-		return nil
-	}
-	cacheOpts := localCacheOptionsFromCatalog("personality", cfg)
-	return personalitymodel.NewLocalCatalogCache(personalitymodel.LocalCatalogCacheOptions{
-		TTL:            cacheOpts.TTL,
-		MaxEntries:     cacheOpts.MaxEntries,
-		TTLJitterRatio: cacheOpts.TTLJitterRatio,
-		OnHit:          cacheOpts.OnHit,
-		OnMiss:         cacheOpts.OnMiss,
-	})
-}
-
-func questionnaireCacheSingleflightEnabled(opts *options.Options) bool {
-	if opts == nil {
-		return false
-	}
-	return catalogSingleflightEnabled(questionnaireCatalogCfg(opts))
-}
-
-func scaleCacheSingleflightEnabled(opts *options.Options) bool {
-	if opts == nil {
-		return false
-	}
-	return catalogSingleflightEnabled(scaleCatalogCfg(opts))
-}
-
-func personalityCacheSingleflightEnabled(opts *options.Options) bool {
-	if opts == nil {
-		return false
-	}
-	return catalogSingleflightEnabled(personalityCatalogCfg(opts))
 }
 
 func catalogCacheConfig(cfg *options.CatalogL1CacheOptions) *options.CatalogL1CacheOptions {
@@ -173,6 +88,62 @@ func localCacheOptionsFromCatalog(kind string, cfg *options.CatalogL1CacheOption
 	}
 }
 
+func (c *Container) startCatalogSignalWatcher(kind catalogKind, cache any) {
+	if c == nil || cache == nil {
+		return
+	}
+	spec, ok := catalogSpecs[kind]
+	if !ok || !catalogSignalEvictEnabled(catalogL1Config(c.opts, kind)) {
+		return
+	}
+	switch kind {
+	case catalogKindQuestionnaire:
+		c.startQuestionnaireCacheSignalWatcher(cache.(questionnaire.PublishedDetailCache))
+	case catalogKindScale:
+		startCodeCatalogSignalWatcher(c, spec.watcherLabel, catalogL1Config(c.opts, kind), cache,
+			cachesignal.NewScaleSignaler,
+			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.ScaleCacheChangedSignal], target scale.CatalogCache) {
+				scale.StartCacheSignalWatcher(ctx, signaler, target)
+			},
+			func(v any) scale.CatalogCache { return v.(scale.CatalogCache) },
+		)
+	case catalogKindPersonality:
+		startCodeCatalogSignalWatcher(c, spec.watcherLabel, catalogL1Config(c.opts, kind), cache,
+			cachesignal.NewPersonalityModelSignaler,
+			func(ctx context.Context, signaler *signalredis.Signaler[cachesignal.PersonalityModelCacheChangedSignal], target personalitymodel.CatalogCache) {
+				personalitymodel.StartCacheSignalWatcher(ctx, signaler, target)
+			},
+			func(v any) personalitymodel.CatalogCache { return v.(personalitymodel.CatalogCache) },
+		)
+	}
+}
+
+func startCodeCatalogSignalWatcher[T signaling.Signal, C any](
+	c *Container,
+	label string,
+	cfg *options.CatalogL1CacheOptions,
+	cache any,
+	newSignaler func(goredis.UniversalClient, cachesignal.SignalingOptions) (*signalredis.Signaler[T], error),
+	start func(context.Context, *signalredis.Signaler[T], C),
+	cast func(any) C,
+) {
+	if !catalogSignalEvictEnabled(cfg) {
+		return
+	}
+	standalone, sigCfg, ok := c.cacheSignalingStandalone(label)
+	if !ok {
+		return
+	}
+	signaler, err := newSignaler(standalone, sigCfg)
+	if err != nil {
+		log.Warnf("%s disabled: %v", label, err)
+		return
+	}
+	watchCtx, cancel := context.WithCancel(context.Background())
+	start(watchCtx, signaler, cast(cache))
+	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
+}
+
 func (c *Container) startQuestionnaireCacheSignalWatcher(cache questionnaire.PublishedDetailCache) {
 	if c == nil || cache == nil || !catalogSignalEvictEnabled(questionnaireCatalogCfg(c.opts)) {
 		return
@@ -188,42 +159,6 @@ func (c *Container) startQuestionnaireCacheSignalWatcher(cache questionnaire.Pub
 	}
 	watchCtx, cancel := context.WithCancel(context.Background())
 	questionnaire.StartCacheSignalWatcher(watchCtx, signaler, cache)
-	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
-}
-
-func (c *Container) startScaleCacheSignalWatcher(cache scale.CatalogCache) {
-	if c == nil || cache == nil || !catalogSignalEvictEnabled(scaleCatalogCfg(c.opts)) {
-		return
-	}
-	standalone, cfg, ok := c.cacheSignalingStandalone("scale cache signal watcher")
-	if !ok {
-		return
-	}
-	signaler, err := cachesignal.NewScaleSignaler(standalone, cfg)
-	if err != nil {
-		log.Warnf("scale cache signal watcher disabled: %v", err)
-		return
-	}
-	watchCtx, cancel := context.WithCancel(context.Background())
-	scale.StartCacheSignalWatcher(watchCtx, signaler, cache)
-	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
-}
-
-func (c *Container) startPersonalityCacheSignalWatcher(cache personalitymodel.CatalogCache) {
-	if c == nil || cache == nil || !catalogSignalEvictEnabled(personalityCatalogCfg(c.opts)) {
-		return
-	}
-	standalone, cfg, ok := c.cacheSignalingStandalone("personality model cache signal watcher")
-	if !ok {
-		return
-	}
-	signaler, err := cachesignal.NewPersonalityModelSignaler(standalone, cfg)
-	if err != nil {
-		log.Warnf("personality model cache signal watcher disabled: %v", err)
-		return
-	}
-	watchCtx, cancel := context.WithCancel(context.Background())
-	personalitymodel.StartCacheSignalWatcher(watchCtx, signaler, cache)
 	c.catalogCacheWatcherCancels = append(c.catalogCacheWatcherCancels, cancel)
 }
 

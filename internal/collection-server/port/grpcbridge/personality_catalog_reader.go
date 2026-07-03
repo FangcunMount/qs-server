@@ -16,24 +16,38 @@ func NewPersonalityCatalogReader(inner PersonalityModelReader) *PersonalityCatal
 }
 
 func (r *PersonalityCatalogReader) GetPersonalityModel(ctx context.Context, code string) (*personalitymodel.PersonalityModelResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	out, err := r.inner.GetPersonalityModel(ctx, code)
-	if err != nil || out == nil {
-		return nil, err
-	}
-	return toPersonalityModelResponse(out), nil
+	return callCatalog(r.inner,
+		func() (*PersonalityModelOutput, error) { return r.inner.GetPersonalityModel(ctx, code) },
+		toPersonalityModelResponse,
+	)
 }
 
 func (r *PersonalityCatalogReader) ListPersonalityModels(ctx context.Context, page, pageSize int32, algorithm string) (*personalitymodel.ListPersonalityModelsResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	out, err := r.inner.ListPersonalityModels(ctx, page, pageSize, algorithm)
-	if err != nil || out == nil {
-		return nil, err
+	return callCatalog(r.inner,
+		func() (*ListPersonalityModelsOutput, error) {
+			return r.inner.ListPersonalityModels(ctx, page, pageSize, algorithm)
+		},
+		toListPersonalityModelsResponse,
+	)
+}
+
+func (r *PersonalityCatalogReader) GetPersonalityModelCategories(ctx context.Context) (*personalitymodel.PersonalityModelCategoriesResponse, error) {
+	if r == nil {
+		return nil, nil
 	}
+	return callCatalog(r.inner,
+		func() (*PersonalityModelCategoriesOutput, error) { return r.inner.GetPersonalityModelCategories(ctx) },
+		toPersonalityModelCategoriesResponse,
+	)
+}
+
+func toListPersonalityModelsResponse(out *ListPersonalityModelsOutput) *personalitymodel.ListPersonalityModelsResponse {
 	models := make([]personalitymodel.PersonalityModelSummaryResponse, 0, len(out.Models))
 	for _, model := range out.Models {
 		models = append(models, toPersonalitySummary(model))
@@ -44,22 +58,15 @@ func (r *PersonalityCatalogReader) ListPersonalityModels(ctx context.Context, pa
 		Page:       out.Page,
 		PageSize:   out.PageSize,
 		TotalPages: out.TotalPages,
-	}, nil
+	}
 }
 
-func (r *PersonalityCatalogReader) GetPersonalityModelCategories(ctx context.Context) (*personalitymodel.PersonalityModelCategoriesResponse, error) {
-	if r == nil || r.inner == nil {
-		return nil, nil
-	}
-	out, err := r.inner.GetPersonalityModelCategories(ctx)
-	if err != nil || out == nil {
-		return nil, err
-	}
+func toPersonalityModelCategoriesResponse(out *PersonalityModelCategoriesOutput) *personalitymodel.PersonalityModelCategoriesResponse {
 	categories := make([]personalitymodel.CategoryResponse, 0, len(out.Categories))
 	for _, item := range out.Categories {
 		categories = append(categories, personalitymodel.CategoryResponse{Value: item.Value, Label: item.Label})
 	}
-	return &personalitymodel.PersonalityModelCategoriesResponse{Categories: categories}, nil
+	return &personalitymodel.PersonalityModelCategoriesResponse{Categories: categories}
 }
 
 func toPersonalitySummary(model PersonalityModelSummaryOutput) personalitymodel.PersonalityModelSummaryResponse {

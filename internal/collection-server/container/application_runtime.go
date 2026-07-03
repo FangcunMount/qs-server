@@ -68,17 +68,17 @@ func (c *Container) buildCatalogRuntime() catalogRuntime {
 		questionnaire: questionnaire.NewQueryService(
 			grpcbridge.NewQuestionnaireCatalogReader(c.questionnaireClient),
 			catalogCaches.questionnaire,
-			questionnaireCacheSingleflightEnabled(c.opts),
+			catalogL1SingleflightEnabled(c.opts, catalogKindQuestionnaire),
 		),
 		scale: scale.NewQueryService(
 			grpcbridge.NewScaleCatalogReader(c.scaleClient),
 			catalogCaches.scale,
-			scaleCacheSingleflightEnabled(c.opts),
+			catalogL1SingleflightEnabled(c.opts, catalogKindScale),
 		),
 		personality: personalitymodel.NewQueryService(
 			grpcbridge.NewPersonalityCatalogReader(c.personalityModelClient),
 			catalogCaches.personality,
-			personalityCacheSingleflightEnabled(c.opts),
+			catalogL1SingleflightEnabled(c.opts, catalogKindPersonality),
 		),
 	}
 	c.l1PeekRegistry = catalogpeek.NewRegistry()
