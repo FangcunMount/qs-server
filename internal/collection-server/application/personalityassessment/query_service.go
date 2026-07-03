@@ -150,9 +150,9 @@ func toAssessmentDetail(result *evaluationapp.AssessmentDetailV2Response) *Asses
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		AnswerSheetID:        result.AnswerSheetID,
-		Model:                toModelIdentity(result.Model),
-		PrimaryScore:         toScoreValue(result.PrimaryScore),
-		Level:                toResultLevel(result.Level),
+		Model:                result.Model,
+		PrimaryScore:         result.PrimaryScore,
+		Level:                result.Level,
 		OriginType:           result.OriginType,
 		OriginID:             result.OriginID,
 		Status:               result.Status,
@@ -169,9 +169,9 @@ func toAssessmentSummary(result evaluationapp.AssessmentSummaryV2Response) Asses
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 		AnswerSheetID:        result.AnswerSheetID,
-		Model:                toModelIdentity(result.Model),
-		PrimaryScore:         toScoreValue(result.PrimaryScore),
-		Level:                toResultLevel(result.Level),
+		Model:                result.Model,
+		PrimaryScore:         result.PrimaryScore,
+		Level:                result.Level,
 		OriginType:           result.OriginType,
 		Status:               result.Status,
 		SubmittedAt:          result.SubmittedAt,
@@ -202,74 +202,15 @@ func toAssessmentReport(result *evaluationapp.AssessmentReportV2Response) *Asses
 	}
 	return &AssessmentReportResponse{
 		AssessmentID: result.AssessmentID,
-		Model:        toModelIdentity(result.Model),
-		PrimaryScore: toScoreValue(result.PrimaryScore),
-		Level:        toResultLevel(result.Level),
+		Model:        result.Model,
+		PrimaryScore: result.PrimaryScore,
+		Level:        result.Level,
 		Conclusion:   result.Conclusion,
 		Dimensions:   dimensions,
 		Suggestions:  suggestions,
-		ModelExtra:   toModelExtra(result.ModelExtra),
+		ModelExtra:   result.ModelExtra,
 		CreatedAt:    result.CreatedAt,
 	}
-}
-
-func toModelIdentity(model evaluationapp.ModelIdentityResponse) ModelIdentityResponse {
-	return ModelIdentityResponse{
-		Kind:      model.Kind,
-		SubKind:   model.SubKind,
-		Algorithm: model.Algorithm,
-		Code:      model.Code,
-		Version:   model.Version,
-		Title:     model.Title,
-	}
-}
-
-func toScoreValue(score *evaluationapp.ScoreValueResponse) *ScoreValueResponse {
-	if score == nil {
-		return nil
-	}
-	return &ScoreValueResponse{
-		Kind:  score.Kind,
-		Value: score.Value,
-		Label: score.Label,
-		Max:   score.Max,
-	}
-}
-
-func toResultLevel(level *evaluationapp.ResultLevelResponse) *ResultLevelResponse {
-	if level == nil {
-		return nil
-	}
-	return &ResultLevelResponse{
-		Code:     level.Code,
-		Label:    level.Label,
-		Severity: level.Severity,
-	}
-}
-
-func toModelExtra(extra *evaluationapp.ModelExtraResponse) *ModelExtraResponse {
-	if extra == nil {
-		return nil
-	}
-	resp := &ModelExtraResponse{
-		Kind:           extra.Kind,
-		TypeCode:       extra.TypeCode,
-		TypeName:       extra.TypeName,
-		OneLiner:       extra.OneLiner,
-		ImageURL:       extra.ImageURL,
-		MatchPercent:   extra.MatchPercent,
-		IsSpecial:      extra.IsSpecial,
-		SpecialTrigger: extra.SpecialTrigger,
-		Commentary:     extra.Commentary,
-	}
-	if extra.Rarity != nil {
-		resp.Rarity = &ModelRarityResponse{
-			Percent: extra.Rarity.Percent,
-			Label:   extra.Rarity.Label,
-			OneInX:  extra.Rarity.OneInX,
-		}
-	}
-	return resp
 }
 
 func logPersonalityAssessmentError(message string, err error) {

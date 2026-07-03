@@ -1,49 +1,14 @@
 package personalityassessment
 
-import (
-	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+import evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
+
+type (
+	ModelIdentityResponse = evaluationapp.ModelIdentityResponse
+	ScoreValueResponse    = evaluationapp.ScoreValueResponse
+	ResultLevelResponse   = evaluationapp.ResultLevelResponse
+	ModelExtraResponse    = evaluationapp.ModelExtraResponse
+	ModelRarityResponse   = evaluationapp.ModelRarityResponse
 )
-
-type ModelIdentityResponse struct {
-	Kind      string `json:"kind"`
-	SubKind   string `json:"sub_kind,omitempty"`
-	Algorithm string `json:"algorithm,omitempty"`
-	Code      string `json:"code"`
-	Version   string `json:"version,omitempty"`
-	Title     string `json:"title,omitempty"`
-}
-
-type ScoreValueResponse struct {
-	Kind  string   `json:"kind"`
-	Value float64  `json:"value"`
-	Label string   `json:"label,omitempty"`
-	Max   *float64 `json:"max,omitempty"`
-}
-
-type ResultLevelResponse struct {
-	Code     string `json:"code"`
-	Label    string `json:"label"`
-	Severity string `json:"severity,omitempty"`
-}
-
-type ModelExtraResponse struct {
-	Kind           string               `json:"kind,omitempty"`
-	TypeCode       string               `json:"type_code,omitempty"`
-	TypeName       string               `json:"type_name,omitempty"`
-	OneLiner       string               `json:"one_liner,omitempty"`
-	ImageURL       string               `json:"image_url,omitempty"`
-	MatchPercent   float64              `json:"match_percent,omitempty"`
-	IsSpecial      bool                 `json:"is_special,omitempty"`
-	SpecialTrigger string               `json:"special_trigger,omitempty"`
-	Commentary     string               `json:"commentary,omitempty"`
-	Rarity         *ModelRarityResponse `json:"rarity,omitempty"`
-}
-
-type ModelRarityResponse struct {
-	Percent float64 `json:"percent,omitempty"`
-	Label   string  `json:"label,omitempty"`
-	OneInX  int32   `json:"one_in_x,omitempty"`
-}
 
 type AssessmentDetailResponse struct {
 	ID                   string                `json:"id"`
@@ -100,7 +65,7 @@ type AssessmentReportResponse struct {
 	Level        *ResultLevelResponse                       `json:"level,omitempty"`
 	Conclusion   string                                     `json:"conclusion"`
 	Dimensions   []evaluationapp.DimensionInterpretResponse `json:"dimensions"`
-	Suggestions  []evaluationapp.SuggestionResponse         `json:"suggestions"`
+	Suggestions  []evaluationapp.SuggestionResponse           `json:"suggestions"`
 	ModelExtra   *ModelExtraResponse                        `json:"model_extra,omitempty"`
 	CreatedAt    string                                     `json:"created_at"`
 }

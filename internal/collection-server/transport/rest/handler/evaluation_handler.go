@@ -48,7 +48,7 @@ type waitReportService interface {
 type EvaluationHandler struct {
 	*BaseHandler
 	queryService       evaluationQueryService
-	answerSheetService answerSheetLookupService
+	pendingAssessment  *evaluation.PendingAssessmentResolver
 	waitReportService  waitReportService
 }
 
@@ -62,10 +62,10 @@ func NewEvaluationHandler(
 		waitReportService = reportwait.NewService(queryService, nil, nil, nil, reportwait.DefaultConfig())
 	}
 	return &EvaluationHandler{
-		BaseHandler:        NewBaseHandler(),
-		queryService:       queryService,
-		answerSheetService: answerSheetService,
-		waitReportService:  waitReportService,
+		BaseHandler:       NewBaseHandler(),
+		queryService:      queryService,
+		pendingAssessment: evaluation.NewPendingAssessmentResolver(answerSheetService),
+		waitReportService: waitReportService,
 	}
 }
 
@@ -84,22 +84,12 @@ func NewEvaluationHandler(
 // @Security Bearer
 // @Router /api/v1/assessments/{id} [get]
 func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
-	// 从 query 参数获取 testee_id（ProfileLink 权限验证已在中间件完成，或由业务逻辑验证）
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
+	testeeID, ok := h.parseRequiredTesteeID(c)
+	if !ok {
 		return
 	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return
-	}
-
-	idStr := h.GetPathParam(c, "id")
-	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
+	assessmentID, ok := h.parseRequiredAssessmentID(c)
+	if !ok {
 		return
 	}
 
@@ -112,12 +102,10 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 		h.InternalErrorResponse(c, "get assessment failed", err)
 		return
 	}
-
 	if result == nil {
 		h.NotFoundResponse(c, "assessment not found", nil)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -137,23 +125,14 @@ func (h *EvaluationHandler) GetMyAssessment(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments [get]
 func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
-	// 从 query 参数获取 testee_id
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
+	testeeID, ok := h.parseRequiredTesteeID(c)
+	if !ok {
 		return
 	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return
-	}
-
 	var req evaluation.ListAssessmentsRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
-
 	result, err := h.queryService.ListMyAssessments(c.Request.Context(), testeeID, &req)
 	if err != nil {
 		if stderrors.Is(err, evaluation.ErrInvalidAssessmentKind) {
@@ -163,7 +142,6 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 		h.InternalErrorResponse(c, "list assessments failed", err)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -181,7 +159,6 @@ func (h *EvaluationHandler) ListMyAssessments(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/scores [get]
 func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
-	// 从 query 参数获取 testee_id
 	testeeIDStr := c.Query("testee_id")
 	if testeeIDStr == "" {
 		core.WriteResponse(c, errors.WithCode(code.ErrBind, "testee_id is required"), nil)
@@ -192,20 +169,15 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 		core.WriteResponse(c, errors.WithCode(code.ErrBind, "invalid testee_id format"), nil)
 		return
 	}
-
-	idStr := h.GetPathParam(c, "id")
-	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
+	assessmentID, ok := h.parseRequiredAssessmentID(c)
+	if !ok {
 		return
 	}
-
 	result, err := h.queryService.GetAssessmentScores(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get scores failed", err)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -225,24 +197,19 @@ func (h *EvaluationHandler) GetAssessmentScores(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/report [get]
 func (h *EvaluationHandler) GetAssessmentReport(c *gin.Context) {
-	idStr := h.GetPathParam(c, "id")
-	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
+	assessmentID, ok := h.parseRequiredAssessmentID(c)
+	if !ok {
 		return
 	}
-
 	result, err := h.queryService.GetAssessmentReport(c.Request.Context(), assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get report failed", err)
 		return
 	}
-
 	if result == nil {
 		h.NotFoundResponse(c, "report not found", nil)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -292,7 +259,6 @@ func (h *EvaluationHandler) WaitReport(c *gin.Context) {
 		return
 	}
 	start := time.Now()
-
 	ctx, cancel := context.WithTimeout(c.Request.Context(), timeout)
 	defer cancel()
 
@@ -333,47 +299,6 @@ func applyReportPollRetryAfter(c *gin.Context, status *evaluation.AssessmentStat
 	ratelimit.ApplyRetryAfterSeconds(c.Writer.Header(), retryAfterSec)
 }
 
-func (h *EvaluationHandler) parseReportStatusRequest(c *gin.Context) (uint64, uint64, bool) {
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
-		return 0, 0, false
-	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return 0, 0, false
-	}
-	assessmentID, err := strconv.ParseUint(h.GetPathParam(c, "id"), 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
-		return 0, 0, false
-	}
-	return testeeID, assessmentID, true
-}
-
-func (h *EvaluationHandler) parseWaitReportRequest(c *gin.Context) (uint64, uint64, time.Duration, bool) {
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
-		return 0, 0, 0, false
-	}
-
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return 0, 0, 0, false
-	}
-
-	assessmentID, err := strconv.ParseUint(h.GetPathParam(c, "id"), 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
-		return 0, 0, 0, false
-	}
-
-	return testeeID, assessmentID, h.waitReportService.NormalizeTimeout(c.DefaultQuery("timeout", "20")), true
-}
-
 // GetFactorTrend 获取因子得分趋势
 // @Summary 获取因子得分趋势
 // @Description 获取指定因子的历史得分趋势
@@ -389,29 +314,19 @@ func (h *EvaluationHandler) parseWaitReportRequest(c *gin.Context) (uint64, uint
 // @Security Bearer
 // @Router /api/v1/assessments/trend [get]
 func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
-	// 从 query 参数获取 testee_id
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
+	testeeID, ok := h.parseRequiredTesteeID(c)
+	if !ok {
 		return
 	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
-		return
-	}
-
 	var req evaluation.GetFactorTrendRequest
 	if err := h.BindQuery(c, &req); err != nil {
 		return
 	}
-
 	result, err := h.queryService.GetFactorTrend(c.Request.Context(), testeeID, &req)
 	if err != nil {
 		h.InternalErrorResponse(c, "get trend failed", err)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -430,35 +345,23 @@ func (h *EvaluationHandler) GetFactorTrend(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/trend-summary [get]
 func (h *EvaluationHandler) GetAssessmentTrendSummary(c *gin.Context) {
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
+	testeeID, ok := h.parseRequiredTesteeID(c)
+	if !ok {
 		return
 	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
+	assessmentID, ok := h.parseRequiredAssessmentID(c)
+	if !ok {
 		return
 	}
-
-	idStr := h.GetPathParam(c, "id")
-	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
-		return
-	}
-
 	result, err := h.queryService.GetAssessmentTrendSummary(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get trend summary failed", err)
 		return
 	}
-
 	if result == nil {
 		h.NotFoundResponse(c, "assessment not found", nil)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -476,31 +379,19 @@ func (h *EvaluationHandler) GetAssessmentTrendSummary(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/assessments/{id}/factors/high-risk [get]
 func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
-	// 从 query 参数获取 testee_id
-	testeeIDStr := h.GetQueryParam(c, "testee_id")
-	if testeeIDStr == "" {
-		h.BadRequestResponse(c, "testee_id is required", nil)
+	testeeID, ok := h.parseRequiredTesteeID(c)
+	if !ok {
 		return
 	}
-	testeeID, err := strconv.ParseUint(testeeIDStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid testee_id format", err)
+	assessmentID, ok := h.parseRequiredAssessmentID(c)
+	if !ok {
 		return
 	}
-
-	idStr := h.GetPathParam(c, "id")
-	assessmentID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid assessment id", err)
-		return
-	}
-
 	result, err := h.queryService.GetHighRiskFactors(c.Request.Context(), testeeID, assessmentID)
 	if err != nil {
 		h.InternalErrorResponse(c, "get high risk factors failed", err)
 		return
 	}
-
 	h.Success(c, result)
 }
 
@@ -518,13 +409,10 @@ func (h *EvaluationHandler) GetHighRiskFactors(c *gin.Context) {
 // @Security Bearer
 // @Router /api/v1/answersheets/{id}/assessment [get]
 func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
-	idStr := h.GetPathParam(c, "id")
-	answerSheetID, err := strconv.ParseUint(idStr, 10, 64)
-	if err != nil {
-		h.BadRequestResponse(c, "invalid answer sheet id", err)
+	answerSheetID, ok := h.parseRequiredAnswerSheetID(c)
+	if !ok {
 		return
 	}
-
 	result, err := h.queryService.GetMyAssessmentByAnswerSheetID(c.Request.Context(), answerSheetID)
 	if err != nil {
 		if isGRPCNotFound(err) {
@@ -534,46 +422,24 @@ func (h *EvaluationHandler) GetMyAssessmentByAnswerSheetID(c *gin.Context) {
 		h.InternalErrorResponse(c, "get assessment by answer sheet failed", err)
 		return
 	}
-
 	if result == nil {
 		h.respondPendingAssessmentByAnswerSheet(c, answerSheetID)
 		return
 	}
-
 	h.Success(c, result)
 }
 
 func (h *EvaluationHandler) respondPendingAssessmentByAnswerSheet(c *gin.Context, answerSheetID uint64) {
-	exists, err := h.answerSheetExists(c.Request.Context(), answerSheetID)
+	statusResponse, err := h.pendingAssessment.PendingStatus(c.Request.Context(), answerSheetID)
 	if err != nil {
+		if stderrors.Is(err, evaluation.ErrAnswerSheetNotFound) {
+			h.NotFoundResponse(c, "answer sheet not found", nil)
+			return
+		}
 		h.InternalErrorResponse(c, "check answer sheet before assessment lookup failed", err)
 		return
 	}
-	if !exists {
-		h.NotFoundResponse(c, "answer sheet not found", nil)
-		return
-	}
-
-	h.Success(c, &evaluation.AssessmentStatusResponse{
-		Status:    "pending",
-		UpdatedAt: time.Now().Unix(),
-	})
-}
-
-func (h *EvaluationHandler) answerSheetExists(ctx context.Context, answerSheetID uint64) (bool, error) {
-	if h.answerSheetService == nil {
-		return true, nil
-	}
-
-	result, err := h.answerSheetService.Get(ctx, answerSheetID)
-	if err != nil {
-		if isGRPCNotFound(err) {
-			return false, nil
-		}
-		return false, err
-	}
-
-	return result != nil, nil
+	h.Success(c, statusResponse)
 }
 
 func isGRPCNotFound(err error) bool {
