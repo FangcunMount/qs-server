@@ -565,8 +565,9 @@ func NewCacheOptions() *CacheOptions {
 			LoadTimeout:         25 * time.Second,
 		},
 		StatisticsQuestionnaire: &StatisticsQuestionnaireOptions{
-			StaleOnTimeout: true,
-			LoadTimeout:    15 * time.Second,
+			ServiceSingleflight: true,
+			StaleOnTimeout:      true,
+			LoadTimeout:         15 * time.Second,
 		},
 		Warmup: &WarmupOptions{
 			Enable: true,
@@ -663,8 +664,9 @@ func (c *CacheOptions) AddFlags(fs *pflag.FlagSet) {
 	}
 	if c.StatisticsQuestionnaire == nil {
 		c.StatisticsQuestionnaire = &StatisticsQuestionnaireOptions{
-			StaleOnTimeout: true,
-			LoadTimeout:    15 * time.Second,
+			ServiceSingleflight: true,
+			StaleOnTimeout:      true,
+			LoadTimeout:         15 * time.Second,
 		}
 	}
 	if c.Warmup == nil {
@@ -745,8 +747,9 @@ type StatisticsOverviewOptions struct {
 
 // StatisticsQuestionnaireOptions 问卷统计读保护与降级配置。
 type StatisticsQuestionnaireOptions struct {
-	StaleOnTimeout bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
-	LoadTimeout    time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
+	ServiceSingleflight bool          `json:"service_singleflight" mapstructure:"service_singleflight"`
+	StaleOnTimeout      bool          `json:"stale_on_timeout" mapstructure:"stale_on_timeout"`
+	LoadTimeout         time.Duration `json:"load_timeout" mapstructure:"load_timeout"`
 }
 
 type WarmupOptions struct {

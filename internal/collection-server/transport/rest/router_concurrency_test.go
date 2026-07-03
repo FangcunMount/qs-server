@@ -155,6 +155,83 @@ func TestAdmissionPolicyRoutesWaitReportThroughDegradeGate(t *testing.T) {
 	}
 }
 
+func TestAdmissionPolicyRouteMatrix(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+
+	run := func(t *testing.T, route admissionRoute, gate *concurrency.Gate, occupy bool, want int) {
+		t.Helper()
+		if occupy {
+			if !gate.TryAcquire() {
+				t.Fatal("expected to occupy gate slot")
+			}
+		}
+		policy := AdmissionPolicy{
+			catalogGate:    gate,
+			queryGate:      gate,
+			submitGate:     gate,
+			waitReportGate: gate,
+			maxWait:        time.Second,
+			catalogMaxWait: time.Second,
+			waitReport: &options.WaitReportOptions{
+				DegradeImmediateEnabled:  true,
+				DegradeRetryAfterSeconds: 5,
+			},
+		}
+		recorder := httptest.NewRecorder()
+		c, engine := gin.CreateTestContext(recorder)
+		c.Request = httptest.NewRequest(http.MethodGet, "/test", nil)
+
+		handlers := policy.Wrap(route, func(c *gin.Context) {
+			c.Status(http.StatusTeapot)
+		})
+		engine.GET("/test", handlers...)
+		engine.ServeHTTP(recorder, c.Request)
+		if recorder.Code != want {
+			t.Fatalf("route=%d status=%d want=%d", route, recorder.Code, want)
+		}
+	}
+
+	t.Run("report_status_try_reject", func(t *testing.T) {
+		run(t, admissionReportStatus, concurrency.NewGate(1), true, http.StatusServiceUnavailable)
+	})
+	t.Run("query_wait_pass", func(t *testing.T) {
+		run(t, admissionQuery, concurrency.NewGate(2), false, http.StatusTeapot)
+	})
+	t.Run("submit_wait_pass", func(t *testing.T) {
+		run(t, admissionSubmit, concurrency.NewGate(2), false, http.StatusTeapot)
+	})
+	t.Run("wait_report_degrade", func(t *testing.T) {
+		run(t, admissionWaitReport, concurrency.NewGate(1), true, http.StatusOK)
+	})
+}
+
+func TestAdmissionPolicyCatalogUsesWaitGateOnL1Miss(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	gate := concurrency.NewGate(1)
+	if !gate.TryAcquire() {
+		t.Fatal("expected to occupy catalog slot")
+	}
+	policy := AdmissionPolicy{
+		catalogGate:    gate,
+		catalogMaxWait: time.Second,
+		catalogPeek:    func(*gin.Context) bool { return false },
+	}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/scales/missing", nil)
+
+	handlers := policy.Wrap(admissionCatalog, func(c *gin.Context) {
+		c.Status(http.StatusTeapot)
+	})
+	handlers[0](c)
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", recorder.Code)
+	}
+}
+
 func TestRouterConcurrencyMaxWaitFromOptions(t *testing.T) {
 	t.Parallel()
 
