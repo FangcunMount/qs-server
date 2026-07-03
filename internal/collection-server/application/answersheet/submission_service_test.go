@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
+	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
