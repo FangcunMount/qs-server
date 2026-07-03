@@ -526,9 +526,7 @@ func (r *Router) registerEvaluationRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			evaluationHandler.GetReportStatus,
 		)...)
-		assessments.GET("/:id/wait-report", waitConcurrencyHandlers(
-			r.container.WaitReportConcurrencyGate(),
-			r.container.WaitReportOptions(),
+		assessments.GET("/:id/wait-report", r.waitReportHandlers(
 			rateLimitedHandlers(
 				r.container.RateLimitBackend(),
 				"wait-report",
@@ -627,9 +625,7 @@ func (r *Router) registerPersonalityAssessmentRoutes(api *gin.RouterGroup) {
 			rateCfg.QueryUserBurst,
 			handler.GetReportStatus,
 		)...)
-		assessments.GET("/:id/wait-report", waitConcurrencyHandlers(
-			r.container.WaitReportConcurrencyGate(),
-			r.container.WaitReportOptions(),
+		assessments.GET("/:id/wait-report", r.waitReportHandlers(
 			rateLimitedHandlers(
 				r.container.RateLimitBackend(),
 				"wait-report",

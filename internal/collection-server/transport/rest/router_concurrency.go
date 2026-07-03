@@ -11,6 +11,61 @@ import (
 
 type catalogL1PeekFunc func(*gin.Context) bool
 
+type admissionRoute int
+
+const (
+	admissionCatalog admissionRoute = iota
+	admissionReportStatus
+	admissionQuery
+	admissionSubmit
+	admissionWaitReport
+)
+
+type AdmissionPolicy struct {
+	catalogGate    *concurrency.Gate
+	queryGate      *concurrency.Gate
+	submitGate     *concurrency.Gate
+	waitReportGate *concurrency.Gate
+	waitReport     *options.WaitReportOptions
+	maxWait        time.Duration
+	catalogMaxWait time.Duration
+	catalogPeek    catalogL1PeekFunc
+}
+
+func (r *Router) admissionPolicy() AdmissionPolicy {
+	policy := AdmissionPolicy{
+		maxWait:        r.concurrencyMaxWait(),
+		catalogMaxWait: r.catalogMaxWait(),
+		catalogPeek:    r.catalogL1Peek,
+	}
+	if r == nil || r.container == nil {
+		return policy
+	}
+	policy.catalogGate = r.container.CatalogConcurrencyGate()
+	policy.queryGate = r.container.QueryConcurrencyGate()
+	policy.submitGate = r.container.SubmitConcurrencyGate()
+	policy.waitReportGate = r.container.WaitReportConcurrencyGate()
+	policy.waitReport = r.container.WaitReportOptions()
+	return policy
+}
+
+func (p AdmissionPolicy) Wrap(route admissionRoute, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	switch route {
+	case admissionCatalog:
+		return catalogConcurrencyHandlers(p.catalogGate, p.catalogMaxWait, p.catalogPeek, handlers...)
+	case admissionReportStatus:
+		return tryQueryConcurrencyHandlers(p.queryGate, handlers...)
+	case admissionQuery:
+		return waitQueryConcurrencyHandlers(p.queryGate, p.maxWait, handlers...)
+	case admissionSubmit:
+		return waitSubmitConcurrencyHandlers(p.submitGate, p.maxWait, handlers...)
+	case admissionWaitReport:
+		return waitConcurrencyHandlers(p.waitReportGate, p.waitReport, handlers...)
+	default:
+		return handlers
+	}
+}
+
 func (r *Router) concurrencyMaxWait() time.Duration {
 	if r == nil || r.container == nil {
 		return 0
@@ -56,12 +111,7 @@ func (r *Router) catalogMaxWait() time.Duration {
 }
 
 func (r *Router) catalogHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return catalogConcurrencyHandlers(
-		r.container.CatalogConcurrencyGate(),
-		r.catalogMaxWait(),
-		r.catalogL1Peek,
-		handlers...,
-	)
+	return r.admissionPolicy().Wrap(admissionCatalog, handlers...)
 }
 
 func tryQueryConcurrencyHandlers(gate *concurrency.Gate, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
@@ -95,15 +145,19 @@ func waitSubmitConcurrencyHandlers(gate *concurrency.Gate, maxWait time.Duration
 }
 
 func (r *Router) reportStatusHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return tryQueryConcurrencyHandlers(r.container.QueryConcurrencyGate(), handlers...)
+	return r.admissionPolicy().Wrap(admissionReportStatus, handlers...)
 }
 
 func (r *Router) queryHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return waitQueryConcurrencyHandlers(r.container.QueryConcurrencyGate(), r.concurrencyMaxWait(), handlers...)
+	return r.admissionPolicy().Wrap(admissionQuery, handlers...)
 }
 
 func (r *Router) submitHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return waitSubmitConcurrencyHandlers(r.container.SubmitConcurrencyGate(), r.concurrencyMaxWait(), handlers...)
+	return r.admissionPolicy().Wrap(admissionSubmit, handlers...)
+}
+
+func (r *Router) waitReportHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	return r.admissionPolicy().Wrap(admissionWaitReport, handlers...)
 }
 
 func (r *Router) rateLimitedCatalogHandlers(

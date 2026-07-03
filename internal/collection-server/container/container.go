@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
@@ -13,7 +12,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitysession"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportevents"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportnotify"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/scale"
@@ -21,14 +19,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/collection-server/concurrency"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/grpcclient"
 	"github.com/FangcunMount/qs-server/internal/collection-server/infra/iam"
-	redisops "github.com/FangcunMount/qs-server/internal/collection-server/infra/redisops"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/rest/handler"
 	"github.com/FangcunMount/qs-server/internal/collection-server/transport/ws"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
-	genericoptions "github.com/FangcunMount/qs-server/internal/pkg/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/ratelimit"
 	ratelimitredis "github.com/FangcunMount/qs-server/internal/pkg/ratelimit/redisadapter"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -173,96 +169,27 @@ func (c *Container) Initialize() error {
 func (c *Container) initApplicationServices() {
 	log.Info("🎯 Initializing application services...")
 
-	// 获取 ProfileLinkService（如果 IAM 启用）
-	var profileLinkService *iam.ProfileLinkService
-	var profileService *iam.ProfileService
-	if c.IAMModule != nil && c.IAMModule.IsEnabled() {
-		profileLinkService = c.IAMModule.ProfileLinkService()
-		profileService = c.IAMModule.ProfileService()
-	}
-	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
+	profileLinkService, profileService := c.profileServices()
 
-	c.submissionService = answersheet.NewSubmissionService(
-		c.answerSheetClient,
-		c.actorClient,
-		profileLinkService,
-		c.opts.SubmitQueue,
-		submitGuard,
-	)
-	catalogCaches := c.initCatalogCaches()
-	c.questionnaireQueryService = questionnaire.NewQueryService(
-		c.questionnaireClient,
-		catalogCaches.questionnaire,
-		questionnaireCacheSingleflightEnabled(c.opts),
-	)
+	submitRuntime := c.buildSubmitRuntime(profileLinkService)
+	c.submissionService = submitRuntime.submission
+
+	catalogRuntime := c.buildCatalogRuntime()
+	c.questionnaireQueryService = catalogRuntime.questionnaire
+	c.scaleQueryService = catalogRuntime.scale
+	c.personalityModelQueryService = catalogRuntime.personality
+
 	c.evaluationQueryService = evaluation.NewQueryService(c.evaluationClient, c.scaleClient)
-	var reportOpts *genericoptions.ReportStatusOptions
-	var sigOpts *genericoptions.SignalingOptions
-	if c.opts != nil {
-		reportOpts = c.opts.ReportStatus
-		sigOpts = c.opts.Signaling
-	}
-	reportStatusRuntime := reportstatus.ConfigFromOptions(reportOpts, sigOpts, "collection-server")
-	reporter, err := reportstatus.NewReporter(c.opsHandle, reportStatusRuntime)
-	if err != nil {
-		log.Warnf("report status reporter disabled: %v", err)
-	}
-	c.reportStatusReporter = reporter
+	reportRuntime := c.buildReportRuntime(c.evaluationQueryService)
+	c.reportStatusReporter = reportRuntime.reporter
+	c.reportNotifier = reportRuntime.notifier
+	c.waitReportService = reportRuntime.waitReport
+	c.waitWatcherCancel = reportRuntime.waitWatcherCancel
 
-	cfg := reportwait.DefaultConfig()
-	if c.opts != nil && c.opts.WaitReport != nil {
-		cfg.DefaultTimeout = time.Duration(c.opts.WaitReport.DefaultTimeoutSeconds) * time.Second
-		cfg.MinTimeout = time.Duration(c.opts.WaitReport.MinTimeoutSeconds) * time.Second
-		cfg.MaxTimeout = time.Duration(c.opts.WaitReport.MaxTimeoutSeconds) * time.Second
-		cfg.PollInterval = time.Duration(c.opts.WaitReport.PollIntervalMs) * time.Millisecond
-		cfg.StatusTTL = time.Duration(c.opts.WaitReport.StatusTTLSeconds) * time.Second
-		cfg.MaxActiveWaiters = c.opts.WaitReport.MaxActiveWaiters
-		cfg.SignalingEnabled = reportStatusRuntime.Signaling.Enabled
-		if c.opts.WaitReport.PubSubEnabled {
-			cfg.SignalingEnabled = true
-		}
-	}
-	c.reportNotifier = reportnotify.NewInMemoryNotifier()
-	var signaler *signalredis.Signaler[reportstatus.ChangedSignal]
-	if reporter != nil {
-		signaler = reporter.Signaler()
-	}
-	c.waitReportService = reportwait.NewService(
-		c.evaluationQueryService,
-		reportwait.NewStatusCache(reportstatus.NewCache(c.opsHandle)),
-		c.reportNotifier,
-		signaler,
-		cfg,
-	)
-	if cfg.SignalingEnabled && signaler != nil {
-		watchCtx, cancel := context.WithCancel(context.Background())
-		c.waitReportService.StartSignalWatcher(watchCtx)
-		c.waitWatcherCancel = cancel
-	}
-	c.scaleQueryService = scale.NewQueryService(
-		c.scaleClient,
-		catalogCaches.scale,
-		scaleCacheSingleflightEnabled(c.opts),
-	)
-	c.personalityModelQueryService = personalitymodel.NewQueryService(
-		c.personalityModelClient,
-		catalogCaches.personality,
-		personalityCacheSingleflightEnabled(c.opts),
-	)
 	c.personalityAssessmentQueryService = personalityassessment.NewQueryService(c.evaluationClient, c.waitReportService)
 	c.personalitySessionService = personalitysession.NewService(c.personalityModelQueryService, c.questionnaireQueryService)
 	c.testeeService = testee.NewService(c.actorClient, profileLinkService, profileService)
-	c.reportEventsHandler = ws.NewReportEventsHandler(ws.Dependencies{
-		Notifier: c.reportNotifier,
-		Events: reportevents.NewService(
-			c.waitReportService,
-			c.evaluationQueryService,
-			c.personalityAssessmentQueryService,
-		),
-		Options:      c.opts.ReportEvents,
-		RateLimit:    c.RateLimitBackend(),
-		RateLimitCfg: c.opts.RateLimit,
-	})
+	c.reportEventsHandler = c.buildReportEventsHandler()
 
 	log.Info("✅ Application services initialized")
 }

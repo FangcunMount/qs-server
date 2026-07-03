@@ -98,6 +98,63 @@ func TestTryQueryConcurrencyHandlersRejectWhenSlotsFull(t *testing.T) {
 	}
 }
 
+func TestAdmissionPolicyRoutesReportStatusThroughTryGate(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	gate := concurrency.NewGate(1)
+	if !gate.TryAcquire() {
+		t.Fatal("expected to acquire sole query slot")
+	}
+	policy := AdmissionPolicy{queryGate: gate}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessments/1/report-status", nil)
+
+	handlers := policy.Wrap(admissionReportStatus, func(c *gin.Context) {
+		c.Status(http.StatusOK)
+	})
+	handlers[0](c)
+
+	if recorder.Code != http.StatusServiceUnavailable {
+		t.Fatalf("status = %d, want 503", recorder.Code)
+	}
+}
+
+func TestAdmissionPolicyRoutesWaitReportThroughDegradeGate(t *testing.T) {
+	t.Parallel()
+	gin.SetMode(gin.TestMode)
+
+	gate := concurrency.NewGate(1)
+	if !gate.TryAcquire() {
+		t.Fatal("expected to acquire sole wait-report slot")
+	}
+	policy := AdmissionPolicy{
+		waitReportGate: gate,
+		waitReport: &options.WaitReportOptions{
+			DegradeImmediateEnabled:  true,
+			DegradeRetryAfterSeconds: 7,
+		},
+	}
+
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/api/v1/assessments/1/wait-report", nil)
+
+	handlers := policy.Wrap(admissionWaitReport, func(c *gin.Context) {
+		c.Status(http.StatusTeapot)
+	})
+	handlers[0](c)
+
+	if recorder.Code != http.StatusOK {
+		t.Fatalf("status = %d, want degraded 200", recorder.Code)
+	}
+	if got := recorder.Header().Get("Retry-After"); got != "7" {
+		t.Fatalf("Retry-After = %q, want 7", got)
+	}
+}
+
 func TestRouterConcurrencyMaxWaitFromOptions(t *testing.T) {
 	t.Parallel()
 

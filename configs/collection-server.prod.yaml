@@ -129,7 +129,7 @@ submit_queue:                       # 提交排队配置
   enabled: true                     # 启用提交排队
   queue_size: 2800                  # 4C/8G：略增削峰深度（24/s 压测）
   worker_count: 56                  # 4C/8G mixed_280+（原 48；对齐 apiserver mongo 排水）
-  wait_timeout_ms: 500              # 略增入队等待，减少瞬时 503
+  wait_timeout_ms: 500              # 兼容旧配置；当前非阻塞入队不使用该字段作为削峰等待旋钮
 
 questionnaire_cache:                # 问卷详情 L1 缓存配置
   enabled: true                     # 启用问卷详情 L1 缓存
