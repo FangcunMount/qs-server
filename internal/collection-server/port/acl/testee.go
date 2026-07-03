@@ -12,19 +12,23 @@ import (
 
 // TesteeActorAdapter 将 infra ActorWriter 适配为 testee.ActorPort。
 type TesteeActorAdapter struct {
-	inner grpcbridge.ActorWriter
+	inner  grpcbridge.ActorWriter
+	reader actorReaderBridge
 }
 
 // NewTesteeActorAdapter 构造受试者 BFF ACL 适配器。
 func NewTesteeActorAdapter(inner grpcbridge.ActorWriter) *TesteeActorAdapter {
-	return &TesteeActorAdapter{inner: inner}
+	return &TesteeActorAdapter{
+		inner:  inner,
+		reader: newActorReaderBridge(inner),
+	}
 }
 
 func (a *TesteeActorAdapter) GetTestee(ctx context.Context, testeeID uint64) (*testee.TesteeResponse, error) {
-	if a == nil || a.inner == nil {
+	if a == nil {
 		return nil, nil
 	}
-	out, err := a.inner.GetTestee(ctx, testeeID)
+	out, err := a.reader.getTestee(ctx, testeeID)
 	if err != nil {
 		return nil, err
 	}
@@ -32,10 +36,10 @@ func (a *TesteeActorAdapter) GetTestee(ctx context.Context, testeeID uint64) (*t
 }
 
 func (a *TesteeActorAdapter) TesteeExists(ctx context.Context, orgID, iamProfileID uint64) (bool, uint64, error) {
-	if a == nil || a.inner == nil {
+	if a == nil {
 		return false, 0, nil
 	}
-	return a.inner.TesteeExists(ctx, orgID, iamProfileID)
+	return a.reader.testeeExists(ctx, orgID, iamProfileID)
 }
 
 func (a *TesteeActorAdapter) CreateTestee(ctx context.Context, input testee.CreateTesteeInput) (*testee.TesteeResponse, error) {

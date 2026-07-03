@@ -20,7 +20,7 @@ func (r *QuestionnaireCatalogReader) GetQuestionnaire(ctx context.Context, code,
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*QuestionnaireOutput, error) { return r.inner.GetQuestionnaire(ctx, code, version) },
 		toQuestionnaireResponse,
 	)
@@ -30,7 +30,7 @@ func (r *QuestionnaireCatalogReader) ListQuestionnaires(ctx context.Context, pag
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*ListQuestionnairesOutput, error) {
 			return r.inner.ListQuestionnaires(ctx, page, pageSize, status, title)
 		},

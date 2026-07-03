@@ -2,8 +2,8 @@ package grpcbridge
 
 import "reflect"
 
-// callCatalog 在 inner 就绪时执行 fetch，成功后将 raw 转为 application DTO。
-func callCatalog[I any, Raw any, Out any](inner I, fetch func() (Raw, error), convert func(Raw) Out) (Out, error) {
+// CallBridge 在 inner 就绪时执行 fetch，成功后将 raw 转为 application DTO。
+func CallBridge[I any, Raw any, Out any](inner I, fetch func() (Raw, error), convert func(Raw) Out) (Out, error) {
 	var zero Out
 	if any(inner) == nil {
 		return zero, nil

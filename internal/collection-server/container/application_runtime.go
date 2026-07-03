@@ -49,6 +49,7 @@ func (c *Container) profileServices() (*iam.ProfileLinkService, *iam.ProfileServ
 }
 
 func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkService) submitRuntime {
+	// answersheet / testee 经 acl 适配（REST↔gRPC 字段差异）；catalog / evaluation 经 grpcbridge 直出 application DTO。
 	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
 	return submitRuntime{
 		submission: answersheet.NewSubmissionService(
@@ -63,6 +64,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 }
 
 func (c *Container) buildCatalogRuntime() catalogRuntime {
+	// catalog 读路径不经 acl：grpcbridge catalog reader 直接产出 application DTO。
 	catalogCaches := c.initCatalogCaches()
 	rt := catalogRuntime{
 		questionnaire: questionnaire.NewQueryService(

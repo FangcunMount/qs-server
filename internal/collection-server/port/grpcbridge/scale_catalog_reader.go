@@ -19,7 +19,7 @@ func (r *ScaleCatalogReader) GetScale(ctx context.Context, code string) (*scale.
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*ScaleOutput, error) { return r.inner.GetScale(ctx, code) },
 		toScaleResponse,
 	)
@@ -29,7 +29,7 @@ func (r *ScaleCatalogReader) ListScales(ctx context.Context, page, pageSize int3
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*ListScalesOutput, error) {
 			return r.inner.ListScales(ctx, page, pageSize, status, title, category, stages, applicableAges, reporters, tags)
 		},
@@ -41,7 +41,7 @@ func (r *ScaleCatalogReader) ListHotScales(ctx context.Context, limit, windowDay
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*ListHotScalesOutput, error) { return r.inner.ListHotScales(ctx, limit, windowDays) },
 		toListHotScalesResponse,
 	)
@@ -51,7 +51,7 @@ func (r *ScaleCatalogReader) GetScaleCategories(ctx context.Context) (*scale.Sca
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*ScaleCategoriesOutput, error) { return r.inner.GetScaleCategories(ctx) },
 		toScaleCategoriesResponse,
 	)

@@ -29,17 +29,20 @@ func NewAnswerSheetBFFWriter(inner grpcbridge.AnswerSheetWriter) *AnswerSheetBFF
 }
 
 func (w *AnswerSheetBFFWriter) SaveAnswerSheet(ctx context.Context, input *answersheet.SaveAnswerSheetInput) (*answersheet.SaveAnswerSheetOutput, error) {
-	if w == nil || w.inner == nil {
+	if w == nil {
 		return nil, nil
 	}
-	result, err := w.inner.SaveAnswerSheet(ctx, toGRPCSaveAnswerSheetInput(input))
-	if err != nil || result == nil {
-		return nil, err
-	}
-	return &answersheet.SaveAnswerSheetOutput{
-		ID:      result.ID,
-		Message: result.Message,
-	}, nil
+	return grpcbridge.CallBridge(w.inner,
+		func() (*grpcbridge.SaveAnswerSheetOutput, error) {
+			return w.inner.SaveAnswerSheet(ctx, toGRPCSaveAnswerSheetInput(input))
+		},
+		func(result *grpcbridge.SaveAnswerSheetOutput) *answersheet.SaveAnswerSheetOutput {
+			return &answersheet.SaveAnswerSheetOutput{
+				ID:      result.ID,
+				Message: result.Message,
+			}
+		},
+	)
 }
 
 func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbridge.SaveAnswerSheetInput {
@@ -69,12 +72,18 @@ func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbr
 }
 
 func (r *AnswerSheetBFFReader) GetAnswerSheet(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error) {
-	if r == nil || r.inner == nil {
+	if r == nil {
 		return nil, nil
 	}
-	result, err := r.inner.GetAnswerSheet(ctx, id)
-	if err != nil || result == nil {
-		return nil, err
+	return grpcbridge.CallBridge(r.inner,
+		func() (*grpcbridge.AnswerSheetOutput, error) { return r.inner.GetAnswerSheet(ctx, id) },
+		toAnswerSheetResponse,
+	)
+}
+
+func toAnswerSheetResponse(result *grpcbridge.AnswerSheetOutput) *answersheet.AnswerSheetResponse {
+	if result == nil {
+		return nil
 	}
 	answers := make([]answersheet.Answer, len(result.Answers))
 	for i, a := range result.Answers {
@@ -98,37 +107,5 @@ func (r *AnswerSheetBFFReader) GetAnswerSheet(ctx context.Context, id uint64) (*
 		Answers:              answers,
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
-	}, nil
-}
-
-// TesteeActorLookup 将 ActorReader 适配为 answersheet.ActorLookup。
-type TesteeActorLookup struct {
-	inner grpcbridge.ActorReader
-}
-
-// NewTesteeActorLookup 构造受试者查询 ACL 适配器。
-func NewTesteeActorLookup(inner grpcbridge.ActorReader) *TesteeActorLookup {
-	return &TesteeActorLookup{inner: inner}
-}
-
-func (a *TesteeActorLookup) GetTestee(ctx context.Context, testeeID uint64) (*answersheet.ActorTestee, error) {
-	if a == nil || a.inner == nil {
-		return nil, nil
 	}
-	out, err := a.inner.GetTestee(ctx, testeeID)
-	if err != nil || out == nil {
-		return nil, err
-	}
-	return &answersheet.ActorTestee{
-		OrgID:        out.OrgID,
-		IAMProfileID: out.IAMProfileID,
-		Name:         out.Name,
-	}, nil
-}
-
-func (a *TesteeActorLookup) TesteeExists(ctx context.Context, orgID, iamProfileID uint64) (bool, uint64, error) {
-	if a == nil || a.inner == nil {
-		return false, 0, nil
-	}
-	return a.inner.TesteeExists(ctx, orgID, iamProfileID)
 }

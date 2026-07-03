@@ -86,7 +86,7 @@ func TestCatalogBridgeNilRaw(t *testing.T) {
 			return nil, nil
 		},
 	}
-	out, err := callCatalog(reader, func() (*ScaleOutput, error) { return nil, nil }, toScaleResponse)
+	out, err := CallBridge(reader, func() (*ScaleOutput, error) { return nil, nil }, toScaleResponse)
 	if err != nil || out != nil {
 		t.Fatalf("nil raw: got (%v, %v), want (nil, nil)", out, err)
 	}

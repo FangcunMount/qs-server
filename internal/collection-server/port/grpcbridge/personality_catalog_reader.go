@@ -19,7 +19,7 @@ func (r *PersonalityCatalogReader) GetPersonalityModel(ctx context.Context, code
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*PersonalityModelOutput, error) { return r.inner.GetPersonalityModel(ctx, code) },
 		toPersonalityModelResponse,
 	)
@@ -29,7 +29,7 @@ func (r *PersonalityCatalogReader) ListPersonalityModels(ctx context.Context, pa
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*ListPersonalityModelsOutput, error) {
 			return r.inner.ListPersonalityModels(ctx, page, pageSize, algorithm)
 		},
@@ -41,7 +41,7 @@ func (r *PersonalityCatalogReader) GetPersonalityModelCategories(ctx context.Con
 	if r == nil {
 		return nil, nil
 	}
-	return callCatalog(r.inner,
+	return CallBridge(r.inner,
 		func() (*PersonalityModelCategoriesOutput, error) { return r.inner.GetPersonalityModelCategories(ctx) },
 		toPersonalityModelCategoriesResponse,
 	)
