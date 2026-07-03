@@ -9,8 +9,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 )
 
 type notificationFlow struct {

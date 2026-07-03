@@ -43,8 +43,47 @@ export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?directConnection=tru
 | `backfill_published_assessment_models/main.go` | 从 legacy `evaluation_rule_sets` 回填 `published_assessment_models` | Mongo `published_assessment_models` |
 | `seed_evaluation_rule_sets/main.go` | 写入内置 MBTI/SBTI + 已发布量表到 `published_assessment_models` | Mongo `published_assessment_models` |
 | `seed_personality_typology/` | **统一入口**：重初始化 MBTI@2.0.1、MBTI_FC_93、SBTI、Big5、九型 问卷与解释模型 | Mongo `questionnaires` + `assessment_models` + `published_assessment_models` |
+| `observe_outbox_by_event_type/` | 只读观测 outbox 按 `event_type` 积压与近期写入，输出 legacy 退役 Gate | 无写入 |
 
 `__pycache__/` 是 Python 运行产物，不是脚本入口。
+
+## observe_outbox_by_event_type
+
+### 做什么
+
+只读统计 MySQL / Mongo `domain_event_outbox`：
+
+- **未完成积压**：`status IN (pending, publishing, failed)`，按 `event_type, status` 聚合
+- **近期写入**：`created_at` 在最近 N 天内，按 `event_type` 聚合（含 `published`）
+- **Legacy 高亮**：`assessment.interpreted.v2`、`report.generated.v2`（待排空的旧 outcome wire）
+- **Canonical**：`assessment.interpreted`、`report.generated`（当前 outcome 投影 wire）
+- **Gate**：`PASS` 当 deprecated wire 未完成 = 0 且近期 deprecated wire 写入 = 0；否则 `WARN`
+
+用于 legacy 测评/报告事件退役 Phase 0 观测。
+
+### 如何调用
+
+```bash
+export MYSQL_DSN='app_user:***@tcp(127.0.0.1:3306)/qs?parseTime=true'
+export MONGO_URI='mongodb://app_user:***@127.0.0.1:27017/qs?authSource=admin&directConnection=true'
+
+# 人类可读表格
+go run ./scripts/oneoff/observe_outbox_by_event_type/ \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --mongo-db qs \
+  --recent-days 7
+
+# JSON（便于 CI / 告警采集）
+go run ./scripts/oneoff/observe_outbox_by_event_type/ \
+  --mysql-dsn "$MYSQL_DSN" \
+  --mongo-uri "$MONGO_URI" \
+  --json
+```
+
+至少提供 `--mysql-dsn` 或 `--mongo-uri` 之一；生产建议双查。
+
+> **注意**：包目录，使用 `go run ./scripts/oneoff/observe_outbox_by_event_type/`（带尾部 `/`）。
 
 > **注意**：`seed_personality_typology/` 是包目录，必须用 `go run ./scripts/oneoff/seed_personality_typology/`（带尾部 `/`），**不要** `go run .../main.go`。
 

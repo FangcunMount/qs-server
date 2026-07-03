@@ -10,9 +10,9 @@ import (
 	"google.golang.org/protobuf/types/known/timestamppb"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
 	clinicianApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/clinician"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/actor"
 )
 
 // ActorService Actor gRPC 服务 - C 端接口

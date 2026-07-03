@@ -16,7 +16,7 @@ import (
 const (
 	// EventTypeSubmitted 测评已提交
 	EventTypeSubmitted = eventcatalog.AssessmentSubmitted
-	// EventTypeInterpreted 测评已解读
+	// EventTypeInterpreted 测评已解读（outcome 投影见 events_outcome.go）
 	EventTypeInterpreted = eventcatalog.AssessmentInterpreted
 	// EventTypeFailed 测评失败
 	EventTypeFailed = eventcatalog.AssessmentFailed
@@ -33,9 +33,6 @@ type DomainEvent = event.DomainEvent
 // AssessmentSubmittedData 测评已提交事件数据
 type AssessmentSubmittedData = eventpayload.AssessmentSubmittedData
 
-// AssessmentInterpretedData 测评已解读事件数据
-type AssessmentInterpretedData = eventpayload.AssessmentInterpretedData
-
 // AssessmentFailedData 测评失败事件数据
 type AssessmentFailedData = eventpayload.AssessmentFailedData
 
@@ -43,9 +40,6 @@ type AssessmentFailedData = eventpayload.AssessmentFailedData
 
 // AssessmentSubmittedEvent 测评已提交事件
 type AssessmentSubmittedEvent = event.Event[AssessmentSubmittedData]
-
-// AssessmentInterpretedEvent 测评已解读事件
-type AssessmentInterpretedEvent = event.Event[AssessmentInterpretedData]
 
 // AssessmentFailedEvent 测评失败事件
 type AssessmentFailedEvent = event.Event[AssessmentFailedData]
@@ -88,59 +82,6 @@ func NewAssessmentSubmittedEvent(
 	}
 
 	return event.New(EventTypeSubmitted, AggregateType, strconv.FormatInt(int64(assessmentID), 10), data)
-}
-
-// NewAssessmentInterpretedEvent 创建测评已解读事件
-func NewAssessmentInterpretedEvent(
-	orgID int64,
-	assessmentID ID,
-	testeeID testee.ID,
-	modelRef EvaluationModelRef,
-	medicalScaleRef MedicalScaleRef,
-	totalScore float64,
-	riskLevel RiskLevel,
-	interpretedAt time.Time,
-) AssessmentInterpretedEvent {
-	return event.New(EventTypeInterpreted, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
-		AssessmentInterpretedData{
-			OrgID:         orgID,
-			AssessmentID:  int64(assessmentID),
-			TesteeID:      testeeID.Uint64(),
-			ModelKind:     modelRef.Kind().String(),
-			ModelCode:     modelRef.Code().String(),
-			ModelVersion:  modelRef.Version(),
-			ScaleCode:     string(medicalScaleRef.Code()),
-			ScaleVersion:  medicalScaleRef.Version(),
-			TotalScore:    totalScore,
-			RiskLevel:     string(riskLevel),
-			InterpretedAt: interpretedAt,
-		},
-	)
-}
-
-// NewAssessmentModelInterpretedEvent 创建通用解释模型已解读事件。
-func NewAssessmentModelInterpretedEvent(
-	orgID int64,
-	assessmentID ID,
-	testeeID testee.ID,
-	modelRef EvaluationModelRef,
-	totalScore float64,
-	riskLevel RiskLevel,
-	interpretedAt time.Time,
-) AssessmentInterpretedEvent {
-	return event.New(EventTypeInterpreted, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
-		AssessmentInterpretedData{
-			OrgID:         orgID,
-			AssessmentID:  int64(assessmentID),
-			TesteeID:      testeeID.Uint64(),
-			ModelKind:     modelRef.Kind().String(),
-			ModelCode:     modelRef.Code().String(),
-			ModelVersion:  modelRef.Version(),
-			TotalScore:    totalScore,
-			RiskLevel:     string(riskLevel),
-			InterpretedAt: interpretedAt,
-		},
-	)
 }
 
 // NewAssessmentFailedEvent 创建测评失败事件

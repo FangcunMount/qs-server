@@ -7,6 +7,7 @@ import (
 	"time"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
@@ -114,7 +115,7 @@ func TestAssessmentInterpretedOutcomeHelpers(t *testing.T) {
 func TestHandleAssessmentInterpretedOutcomeAcksHighSeverityPayload(t *testing.T) {
 	deps := newAnswerSheetHandlerTestDeps(&fakeWorkerInternalClient{}, nil)
 	handler := handleAssessmentInterpreted(deps)
-	if err := handler(context.Background(), "assessment.interpreted.v2", mustBuildAssessmentInterpretedOutcomePayload(t)); err != nil {
+	if err := handler(context.Background(), eventcatalog.AssessmentInterpreted, mustBuildAssessmentInterpretedOutcomePayload(t)); err != nil {
 		t.Fatalf("handler: %v", err)
 	}
 }
@@ -125,7 +126,7 @@ func mustBuildAssessmentInterpretedOutcomePayload(t *testing.T) []byte {
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
 	payload, err := json.Marshal(map[string]any{
 		"id":            "evt-assessment-interpreted-v2",
-		"eventType":     "assessment.interpreted.v2",
+		"eventType":     eventcatalog.AssessmentInterpreted,
 		"occurredAt":    now,
 		"aggregateType": "Assessment",
 		"aggregateID":   "agg-3",

@@ -1,10 +1,10 @@
 package service
 
 import (
-	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
 )
 
 func toInternalOutcomeSummary(result *assessmentApp.AssessmentOutcomeResult) *internalpb.OutcomeSummary {

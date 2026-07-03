@@ -9,9 +9,9 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"

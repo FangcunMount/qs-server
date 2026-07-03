@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"google.golang.org/protobuf/types/known/timestamppb"
 )
 

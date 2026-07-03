@@ -9,6 +9,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
+	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
@@ -19,7 +20,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	domainruleset "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"

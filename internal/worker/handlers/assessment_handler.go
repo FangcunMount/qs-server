@@ -7,7 +7,6 @@ import (
 	"strconv"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -103,34 +102,11 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 	}
 }
 
-// handleAssessmentInterpreted 处理测评解读完成事件
+// handleAssessmentInterpreted 处理测评解读完成事件（outcome payload）。
 func handleAssessmentInterpreted(deps *Dependencies) HandlerFunc {
-	return func(_ context.Context, eventType string, payload []byte) error {
-		switch eventType {
-		case eventcatalog.AssessmentInterpretedOutcome:
-			return handleAssessmentInterpretedOutcome(deps, payload)
-		default:
-			return handleAssessmentInterpretedV1(deps, payload)
-		}
+	return func(_ context.Context, _ string, payload []byte) error {
+		return handleAssessmentInterpretedOutcome(deps, payload)
 	}
-}
-
-func handleAssessmentInterpretedV1(deps *Dependencies, payload []byte) error {
-	var data eventpayload.AssessmentInterpretedData
-	_, err := ParseEventData(payload, &data)
-	if err != nil {
-		return fmt.Errorf("failed to parse assessment interpreted event: %w", err)
-	}
-	deps.Logger.Debug("assessment interpreted detail",
-		"org_id", data.OrgID,
-		"total_score", data.TotalScore,
-		"risk_level", data.RiskLevel,
-		"is_high_risk", data.IsHighRisk(),
-	)
-	if data.IsHighRisk() {
-		logAssessmentHighRisk(deps, data.AssessmentID, data.TesteeID, data.RiskLevel, data.TotalScore)
-	}
-	return nil
 }
 
 func handleAssessmentInterpretedOutcome(deps *Dependencies, payload []byte) error {

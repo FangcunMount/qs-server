@@ -8,8 +8,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	operatorApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/operator"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 

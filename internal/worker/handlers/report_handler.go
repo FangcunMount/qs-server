@@ -6,34 +6,13 @@ import (
 	"log/slog"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
 )
 
 func handleReportGenerated(deps *Dependencies) HandlerFunc {
-	return func(ctx context.Context, eventType string, payload []byte) error {
-		switch eventType {
-		case eventcatalog.ReportGeneratedOutcome:
-			return handleReportGeneratedOutcome(ctx, deps, payload)
-		default:
-			return handleReportGeneratedV1(ctx, deps, payload)
-		}
+	return func(ctx context.Context, _ string, payload []byte) error {
+		return handleReportGeneratedOutcome(ctx, deps, payload)
 	}
-}
-
-func handleReportGeneratedV1(ctx context.Context, deps *Dependencies, payload []byte) error {
-	var data eventpayload.ReportGeneratedData
-	env, err := ParseEventData(payload, &data)
-	if err != nil {
-		return fmt.Errorf("failed to parse report generated event: %w", err)
-	}
-	logReportGenerated(deps, env, data)
-	handleHighRiskAlert(deps, data.RiskLevel, data.TotalScore, data.ReportID, data.TesteeID)
-	if deps.InternalClient != nil {
-		syncAssessmentAttention(ctx, deps, data.TesteeID, data.RiskLevel, isHighRiskRiskLevel(data.RiskLevel))
-	}
-	return nil
 }
 
 func handleReportGeneratedOutcome(ctx context.Context, deps *Dependencies, payload []byte) error {
@@ -56,17 +35,6 @@ func handleReportGeneratedOutcome(ctx context.Context, deps *Dependencies, paylo
 		syncAssessmentAttention(ctx, deps, data.TesteeID, riskLevel, isHighRiskOutcomeLevel(data.Level))
 	}
 	return nil
-}
-
-func logReportGenerated(deps *Dependencies, env *EventEnvelope, data eventpayload.ReportGeneratedData) {
-	deps.Logger.Info("processing report generated",
-		slog.String("event_id", env.ID),
-		slog.String("report_id", data.ReportID),
-		slog.String("assessment_id", data.AssessmentID),
-		slog.Uint64("testee_id", data.TesteeID),
-		slog.Float64("total_score", data.TotalScore),
-		slog.String("risk_level", data.RiskLevel),
-	)
 }
 
 func handleHighRiskAlert(deps *Dependencies, riskLevel string, totalScore float64, reportID string, testeeID uint64) {

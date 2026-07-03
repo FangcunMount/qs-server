@@ -7,8 +7,8 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 )
 
 type behaviorProjectionFlow struct {

@@ -5,12 +5,11 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-const EventTypeInterpretedOutcome = eventcatalog.AssessmentInterpretedOutcome
+const EventTypeInterpretedOutcome = EventTypeInterpreted
 
 // AssessmentInterpretedOutcomeData is the outcome-enriched interpreted event payload.
 type AssessmentInterpretedOutcomeData = eventoutcome.AssessmentInterpretedPayload
@@ -37,29 +36,5 @@ func NewAssessmentInterpretedOutcomeEvent(
 			Level:         level,
 			InterpretedAt: interpretedAt,
 		},
-	)
-}
-
-// Deprecated: use EventTypeInterpretedOutcome.
-const EventTypeInterpretedV2 = EventTypeInterpretedOutcome
-
-// Deprecated: use AssessmentInterpretedOutcomeData.
-type AssessmentInterpretedV2Data = AssessmentInterpretedOutcomeData
-
-// Deprecated: use AssessmentInterpretedOutcomeEvent.
-type AssessmentInterpretedV2Event = AssessmentInterpretedOutcomeEvent
-
-// Deprecated: use NewAssessmentInterpretedOutcomeEvent.
-func NewAssessmentInterpretedV2Event(
-	orgID int64,
-	assessmentID ID,
-	testeeID testee.ID,
-	model EventModelIdentity,
-	primary *EventScoreValue,
-	level *EventResultLevel,
-	interpretedAt time.Time,
-) AssessmentInterpretedOutcomeEvent {
-	return NewAssessmentInterpretedOutcomeEvent(
-		orgID, assessmentID, testeeID, model, primary, level, interpretedAt,
 	)
 }

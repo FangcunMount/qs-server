@@ -13,7 +13,7 @@ import (
 // 1. 记录测评元数据（谁做的、用什么问卷/解释模型、来源于哪个业务场景）
 // 2. 管理测评生命周期（创建 → 提交 → 评估 → 完成/失败）
 // 3. 记录评估结果摘要（总分、风险等级等兼容字段）
-// 4. 发布领域事件（AssessmentSubmittedEvent、AssessmentInterpretedEvent）
+// 4. 发布领域事件（AssessmentSubmittedEvent、AssessmentInterpretedOutcomeEvent）
 type Assessment struct {
 	// === 核心标识 ===
 	id    ID

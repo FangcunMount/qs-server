@@ -12,9 +12,7 @@ var P0 = []string{
 var P1 = []string{
 	eventcatalog.AssessmentFailed,
 	eventcatalog.ReportGenerated,
-	eventcatalog.ReportGeneratedOutcome,
 	eventcatalog.AssessmentInterpreted,
-	eventcatalog.AssessmentInterpretedOutcome,
 }
 
 // P2 行为足迹类事件（可靠但不应抢占核心链路）。

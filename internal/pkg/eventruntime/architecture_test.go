@@ -119,11 +119,6 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 		},
 		eventcatalog.AssessmentInterpreted: {
 			eventcatalog.AssessmentInterpreted,
-			"AssessmentInterpreted",
-			"NewAssessmentInterpretedEvent",
-		},
-		eventcatalog.AssessmentInterpretedOutcome: {
-			eventcatalog.AssessmentInterpretedOutcome,
 			"AssessmentInterpretedOutcome",
 			"NewAssessmentInterpretedOutcomeEvent",
 		},
@@ -134,11 +129,6 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 		},
 		eventcatalog.ReportGenerated: {
 			eventcatalog.ReportGenerated,
-			"ReportGenerated",
-			"NewReportGeneratedEvent",
-		},
-		eventcatalog.ReportGeneratedOutcome: {
-			eventcatalog.ReportGeneratedOutcome,
 			"ReportGeneratedOutcome",
 			"NewReportGeneratedOutcomeEvent",
 		},

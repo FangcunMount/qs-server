@@ -56,10 +56,10 @@ type AssessmentOutcomeResponse struct {
 // AssessmentOutcomeListResponse is a paginated outcome assessment list.
 type AssessmentOutcomeListResponse struct {
 	Items      []*AssessmentOutcomeResponse `json:"items"`
-	Total      int                     `json:"total"`
-	Page       int                     `json:"page"`
-	PageSize   int                     `json:"page_size"`
-	TotalPages int                     `json:"total_pages"`
+	Total      int                          `json:"total"`
+	Page       int                          `json:"page"`
+	PageSize   int                          `json:"page_size"`
+	TotalPages int                          `json:"total_pages"`
 }
 
 // ReportOutcomeResponse exposes report facts with outcome summary.
@@ -99,10 +99,10 @@ type ModelRarityResponse struct {
 // ReportOutcomeListResponse is a paginated outcome report list.
 type ReportOutcomeListResponse struct {
 	Items      []*ReportOutcomeResponse `json:"items"`
-	Total      int                 `json:"total"`
-	Page       int                 `json:"page"`
-	PageSize   int                 `json:"page_size"`
-	TotalPages int                 `json:"total_pages"`
+	Total      int                      `json:"total"`
+	Page       int                      `json:"page"`
+	PageSize   int                      `json:"page_size"`
+	TotalPages int                      `json:"total_pages"`
 }
 
 // NewAssessmentOutcomeResponse maps application outcome result to REST response.

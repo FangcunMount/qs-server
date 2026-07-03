@@ -10,7 +10,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
+func TestGenericEventAssemblerStagesCanonicalOutcomeWireTypes(t *testing.T) {
 	a, err := assessment.NewAssessment(
 		1,
 		testee.NewID(2001),
@@ -38,9 +38,20 @@ func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 	)
 	rpt = attachOutcomeSummary(outcome, rpt)
 
-	events := (ScaleEventAssembler{}).BuildSuccessEvents(outcome, rpt)
+	events := (GenericEventAssembler{}).BuildSuccessEvents(outcome, rpt)
 	if len(events) != 3 {
 		t.Fatalf("events = %d, want 3", len(events))
+	}
+
+	deprecatedWire := map[string]struct{}{
+		eventcatalog.AssessmentInterpretedWireV2: {},
+		eventcatalog.ReportGeneratedWireV2:       {},
+	}
+	for i, evt := range events {
+		eventType := evt.EventType()
+		if _, isDeprecated := deprecatedWire[eventType]; isDeprecated {
+			t.Fatalf("event[%d] type = %s; writer must stage canonical wire types", i, eventType)
+		}
 	}
 	if events[0].EventType() != eventcatalog.AssessmentInterpreted {
 		t.Fatalf("first event = %s, want %s", events[0].EventType(), eventcatalog.AssessmentInterpreted)

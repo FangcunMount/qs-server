@@ -9,12 +9,13 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
 // V1 contract: scale result writer persists in order
-// report_build -> report_save -> score -> assessment -> waiter,
-// and stages assessment.interpreted + report.generated + footprint.report_generated.
+// report_build -> report_save -> score -> assessment -> waiter.
+// Staged domain events use canonical outcome wire types (assessment.interpreted / report.generated).
 func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
@@ -70,7 +71,7 @@ func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 		}
 	}
 
-	wantEvents := []string{assessment.EventTypeInterpretedOutcome, domainreport.EventTypeGeneratedOutcome, "footprint.report_generated"}
+	wantEvents := []string{eventcatalog.AssessmentInterpreted, eventcatalog.ReportGenerated, "footprint.report_generated"}
 	if len(reportSaver.eventTypes) != len(wantEvents) {
 		t.Fatalf("event types = %#v, want %#v", reportSaver.eventTypes, wantEvents)
 	}

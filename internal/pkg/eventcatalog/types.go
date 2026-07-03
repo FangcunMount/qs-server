@@ -6,13 +6,17 @@ const (
 
 	AnswerSheetSubmitted = "answersheet.submitted"
 
-	AssessmentSubmitted       = "assessment.submitted"
-	AssessmentInterpreted     = "assessment.interpreted"
-	AssessmentInterpretedOutcome = "assessment.interpreted.v2"
-	AssessmentFailed          = "assessment.failed"
+	AssessmentSubmitted          = "assessment.submitted"
+	AssessmentInterpreted        = "assessment.interpreted"
+	AssessmentInterpretedOutcome = AssessmentInterpreted
+	AssessmentFailed               = "assessment.failed"
 
 	ReportGenerated        = "report.generated"
-	ReportGeneratedOutcome = "report.generated.v2"
+	ReportGeneratedOutcome = ReportGenerated
+
+	// DeprecatedWire names for draining pre-canonical outbox backlog.
+	AssessmentInterpretedWireV2 = "assessment.interpreted.v2"
+	ReportGeneratedWireV2       = "report.generated.v2"
 
 	FootprintEntryOpened                 = "footprint.entry_opened"
 	FootprintIntakeConfirmed             = "footprint.intake_confirmed"
@@ -29,11 +33,6 @@ const (
 	TaskCompleted = "task.completed"
 	TaskExpired   = "task.expired"
 	TaskCanceled  = "task.canceled"
-
-	// Deprecated: use AssessmentInterpretedOutcome.
-	AssessmentInterpretedV2 = AssessmentInterpretedOutcome
-	// Deprecated: use ReportGeneratedOutcome.
-	ReportGeneratedV2 = ReportGeneratedOutcome
 )
 
 // EventTypes returns all event types known by code.
@@ -43,10 +42,8 @@ func EventTypes() []string {
 		AnswerSheetSubmitted,
 		AssessmentSubmitted,
 		AssessmentInterpreted,
-		AssessmentInterpretedOutcome,
 		AssessmentFailed,
 		ReportGenerated,
-		ReportGeneratedOutcome,
 		FootprintEntryOpened,
 		FootprintIntakeConfirmed,
 		FootprintTesteeProfileCreated,

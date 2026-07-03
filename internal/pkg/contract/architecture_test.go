@@ -75,6 +75,84 @@ func TestAPIServerTransportDoesNotContainStaleV2SourceFiles(t *testing.T) {
 	}
 }
 
+func TestEvaluationDomainDoesNotDefineLegacyEventConstructors(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := []string{
+		"NewAssessmentInterpretedEvent(",
+		"NewAssessmentModelInterpretedEvent(",
+		"NewReportGeneratedEvent(",
+		"type AssessmentInterpretedData",
+		"type ReportGeneratedData",
+	}
+	scanRoots := []string{
+		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "assessment"),
+		filepath.Join(root, "internal", "apiserver", "domain", "report"),
+		filepath.Join(root, "internal", "pkg", "eventpayload"),
+	}
+	for _, scanRoot := range scanRoots {
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, token := range forbidden {
+				if strings.Contains(text, token) {
+					rel := filepath.ToSlash(mustRel(t, root, path))
+					t.Fatalf("%s contains %q; legacy v1 event constructors/payloads are retired", rel, token)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func TestEvaluationResultPackageDoesNotStageLegacyEventConstructors(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result")
+	forbidden := []string{
+		"NewAssessmentInterpretedEvent(",
+		"NewAssessmentModelInterpretedEvent(",
+		"NewReportGeneratedEvent(",
+	}
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, token := range forbidden {
+			if strings.Contains(text, token) {
+				rel := filepath.ToSlash(mustRel(t, root, path))
+				t.Fatalf("%s contains %q; evaluation result writer must stage outcome events only", rel, token)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestWorkerOutcomeHandlersUseSharedEventOutcomeContract(t *testing.T) {
 	t.Parallel()
 

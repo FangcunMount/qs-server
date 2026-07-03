@@ -2,11 +2,9 @@ package handlers
 
 import (
 	"context"
-	"encoding/json"
 	"io"
 	"log/slog"
 	"testing"
-	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
@@ -19,6 +17,7 @@ func TestOutcomeReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
 		wantKeyFocus bool
 		wantRisk     string
 	}{
+		{name: "severity severe", severity: "severe", levelCode: "severe", wantKeyFocus: true, wantRisk: "severe"},
 		{name: "severity high", severity: "high", levelCode: "severe", wantKeyFocus: true, wantRisk: "severe"},
 		{name: "severity medium", severity: "medium", levelCode: "medium", wantKeyFocus: false, wantRisk: "medium"},
 		{name: "typology none", severity: "none", levelCode: "INTJ", wantKeyFocus: false, wantRisk: "none"},
@@ -45,33 +44,4 @@ func TestOutcomeReportGeneratedHighSeverityMarksKeyFocus(t *testing.T) {
 			}
 		})
 	}
-}
-
-func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode string) []byte {
-	t.Helper()
-	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
-	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-report-generated-outcome",
-		"eventType":     eventcatalog.ReportGeneratedOutcome,
-		"occurredAt":    now,
-		"aggregateType": "Report",
-		"aggregateID":   "report-1",
-		"data": map[string]any{
-			"report_id":     "report-1",
-			"assessment_id": "123",
-			"testee_id":     99,
-			"model": map[string]any{
-				"kind":      "scale",
-				"algorithm": "scale_default",
-				"code":      "SDS",
-			},
-			"primary_score": map[string]any{"kind": "raw_total", "value": 42.0},
-			"level":         map[string]any{"code": levelCode, "label": levelCode, "severity": severity},
-			"generated_at":  now,
-		},
-	})
-	if err != nil {
-		t.Fatalf("marshal payload: %v", err)
-	}
-	return payload
 }

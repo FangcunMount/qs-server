@@ -7,6 +7,8 @@ import (
 	"log/slog"
 	"testing"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 )
 
 func TestHandleReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) {
@@ -17,7 +19,7 @@ func TestHandleReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) 
 	}
 	handler := handleReportGenerated(deps)
 
-	if err := handler(context.Background(), "report.generated", mustBuildReportGeneratedPayload(t, "severe")); err != nil {
+	if err := handler(context.Background(), eventcatalog.ReportGeneratedOutcome, mustBuildReportGeneratedOutcomePayload(t, "high", "severe")); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
@@ -26,8 +28,7 @@ func TestHandleReportGeneratedSyncsAssessmentAttentionForHighRisk(t *testing.T) 
 	}
 	req := client.syncAssessmentAttentionRequest
 	if req == nil {
-		t.Fatalf("expected attention sync request")
-		return
+		t.Fatal("expected attention sync request")
 	}
 	if req.TesteeId != 99 || req.RiskLevel != "severe" || !req.MarkKeyFocus {
 		t.Fatalf("unexpected attention sync request: %#v", req)
@@ -42,7 +43,7 @@ func TestHandleReportGeneratedDoesNotAutoMarkLowerRisk(t *testing.T) {
 	}
 	handler := handleReportGenerated(deps)
 
-	if err := handler(context.Background(), "report.generated", mustBuildReportGeneratedPayload(t, "low")); err != nil {
+	if err := handler(context.Background(), eventcatalog.ReportGeneratedOutcome, mustBuildReportGeneratedOutcomePayload(t, "low", "low")); err != nil {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
@@ -50,17 +51,17 @@ func TestHandleReportGeneratedDoesNotAutoMarkLowerRisk(t *testing.T) {
 		t.Fatalf("expected one attention sync call, got %d", client.syncAssessmentAttentionCalls)
 	}
 	if client.syncAssessmentAttentionRequest.MarkKeyFocus {
-		t.Fatalf("expected lower risk report not to request key focus mark")
+		t.Fatal("expected lower risk report not to request key focus mark")
 	}
 }
 
-func mustBuildReportGeneratedPayload(t *testing.T, riskLevel string) []byte {
+func mustBuildReportGeneratedOutcomePayload(t *testing.T, severity, levelCode string) []byte {
 	t.Helper()
 
 	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
 	payload, err := json.Marshal(map[string]any{
-		"id":            "evt-report-generated",
-		"eventType":     "report.generated",
+		"id":            "evt-report-generated-outcome",
+		"eventType":     eventcatalog.ReportGeneratedOutcome,
 		"occurredAt":    now,
 		"aggregateType": "Report",
 		"aggregateID":   "report-1",
@@ -68,10 +69,13 @@ func mustBuildReportGeneratedPayload(t *testing.T, riskLevel string) []byte {
 			"report_id":     "report-1",
 			"assessment_id": "123",
 			"testee_id":     99,
-			"scale_code":    "scale-1",
-			"scale_version": "1.0.0",
-			"total_score":   42,
-			"risk_level":    riskLevel,
+			"model": map[string]any{
+				"kind":      "scale",
+				"algorithm": "scale_default",
+				"code":      "SDS",
+			},
+			"primary_score": map[string]any{"kind": "raw_total", "value": 42.0},
+			"level":         map[string]any{"code": levelCode, "label": levelCode, "severity": severity},
 			"generated_at":  now,
 		},
 	})
