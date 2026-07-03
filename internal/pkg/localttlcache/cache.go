@@ -69,11 +69,23 @@ func (c *Cache[T]) Get(key string) (T, bool) {
 	}
 	if !entry.expiresAt.After(now) {
 		c.mu.Lock()
-		delete(c.items, key)
-		c.removeOrderKey(key)
+		entry, ok = c.items[key]
+		if !ok {
+			c.mu.Unlock()
+			c.recordMiss()
+			return zero, false
+		}
+		if !entry.expiresAt.After(now) {
+			delete(c.items, key)
+			c.removeOrderKey(key)
+			c.mu.Unlock()
+			c.recordMiss()
+			return zero, false
+		}
+		cloned := c.clone(entry.value)
 		c.mu.Unlock()
-		c.recordMiss()
-		return zero, false
+		c.recordHit()
+		return cloned, true
 	}
 
 	c.recordHit()
