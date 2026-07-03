@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	signalredis "github.com/FangcunMount/component-base/pkg/signaling/redis"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/answersheet"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogcache"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalitymodel"
@@ -83,6 +84,7 @@ type Container struct {
 	healthHandler                       *handler.HealthHandler
 
 	queryConcurrencyGate      *concurrency.Gate
+	catalogConcurrencyGate    *concurrency.Gate
 	submitConcurrencyGate     *concurrency.Gate
 	waitReportConcurrencyGate *concurrency.Gate
 }
@@ -117,9 +119,11 @@ func (c *Container) initConcurrencyGates() {
 		concurrencyOpts = c.opts.Concurrency
 	}
 	maxQuery := 0
+	maxCatalog := 0
 	maxSubmit := 0
 	if concurrencyOpts != nil {
 		maxQuery = concurrencyOpts.ResolvedQueryConcurrency()
+		maxCatalog = concurrencyOpts.ResolvedCatalogConcurrency()
 		maxSubmit = concurrencyOpts.ResolvedSubmitConcurrency()
 	}
 	maxWaitReport := 0
@@ -132,6 +136,7 @@ func (c *Container) initConcurrencyGates() {
 		maxWaitReport = 400
 	}
 	c.queryConcurrencyGate = concurrency.NewGate(maxQuery)
+	c.catalogConcurrencyGate = concurrency.NewGate(maxCatalog)
 	c.submitConcurrencyGate = concurrency.NewGate(maxSubmit)
 	if degradeEnabled {
 		c.waitReportConcurrencyGate = concurrency.NewGate(maxWaitReport)
@@ -153,6 +158,10 @@ func (c *Container) Initialize() error {
 
 	// 2. 初始化接口层
 	c.initHandlers()
+
+	if c.scaleClient != nil && c.personalityModelClient != nil {
+		catalogcache.WarmCatalogOnStartup(c.scaleQueryService, c.personalityModelQueryService)
+	}
 
 	c.initialized = true
 	log.Info("✅ Collection Server Container initialized successfully")
@@ -375,6 +384,34 @@ func (c *Container) QueryConcurrencyGate() *concurrency.Gate {
 		return nil
 	}
 	return c.queryConcurrencyGate
+}
+
+func (c *Container) CatalogConcurrencyGate() *concurrency.Gate {
+	if c == nil {
+		return nil
+	}
+	return c.catalogConcurrencyGate
+}
+
+func (c *Container) ScaleQueryService() *scale.QueryService {
+	if c == nil {
+		return nil
+	}
+	return c.scaleQueryService
+}
+
+func (c *Container) PersonalityModelQueryService() *personalitymodel.QueryService {
+	if c == nil {
+		return nil
+	}
+	return c.personalityModelQueryService
+}
+
+func (c *Container) QuestionnaireQueryService() *questionnaire.QueryService {
+	if c == nil {
+		return nil
+	}
+	return c.questionnaireQueryService
 }
 
 func (c *Container) SubmitConcurrencyGate() *concurrency.Gate {

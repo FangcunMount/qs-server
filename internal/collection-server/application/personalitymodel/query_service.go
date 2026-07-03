@@ -31,6 +31,37 @@ func NewQueryService(client personalityModelClient, cache CatalogCache, useSingl
 	}
 }
 
+// HasCachedDetail 进程内 L1 是否已有人格模型详情。
+func (s *QueryService) HasCachedDetail(code string) bool {
+	if s == nil || s.cache == nil || code == "" {
+		return false
+	}
+	_, ok := s.cache.GetDetail(code)
+	return ok
+}
+
+// HasCachedList 进程内 L1 是否已有人格模型列表。
+func (s *QueryService) HasCachedList(req *ListPersonalityModelsRequest) bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	if req == nil {
+		req = &ListPersonalityModelsRequest{}
+	}
+	s.normalizeListRequest(req)
+	_, ok := s.cache.GetListByRequest(req)
+	return ok
+}
+
+// HasCachedCategories 进程内 L1 是否已有人格模型分类。
+func (s *QueryService) HasCachedCategories() bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	_, ok := s.cache.GetCategories()
+	return ok
+}
+
 func (s *QueryService) Get(ctx context.Context, code string) (*PersonalityModelResponse, error) {
 	if s.cache != nil {
 		if cached, ok := s.cache.GetDetail(code); ok {

@@ -12,14 +12,14 @@
 | 200 | 单机单实例 | **通过**（`mixed_200`；**4C/8G** 2026-07-02） |
 | 220 | 单机单实例 | **通过**（`mixed_220`；**4C/8G** 2026-07-02，http p95≈79ms） |
 | 240 | 单机单实例 | **通过**（`mixed_240_models` 三域 **4C/8G** 2026-07-02，http p95≈100ms） |
-| 280 | 单机单实例 | **通过**（8C/16G）；**4C/8G 榨干档调优后复测**（见 §2.4） |
-| 300 | 单机单实例 | **通过**（`mixed_300`；**8C/16G** 验收）；4C/8G 须 §2.4 + 分步攻关 |
+| 280 | 单机单实例 | **边际通过**（4C/8G WS+VU 收紧，0.20%；catalog 503）；8C/16G 全绿 |
+| 300 | 单机单实例 | **通过**（8C/16G 全量）；**4C/8G 全量未过**（~9–11%，Step2 0.01% 过） |
 | 500 | 至少应用双实例 | 不建议单点承诺 |
 | 700 | 应用多实例 | Redis/DB/MQ/IAM 应独立 |
 | 900 | 应用多实例 + LB | 不能只调限流数字 |
 | 1000 | 应用多实例 + LB | 必须正式压测验收 |
 
-**单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，280/300 见 §2.4。详见 [SOP §3.8](./11-300QPS混合场景压测SOP.md#38-轮次七servera-缩容复测2026-07-024c8g)。
+**单机实测（2026-07）**：8C/16G 下 `mixed_280_models` / `mixed_300` 全绿；4C/8G 下 **`mixed_200`～`mixed_240_models` 全绿**，**280 边际 + Step2 过、全量 300 未过**（§2.4、SOP §3.8.3）。
 
 核心原则：
 
@@ -130,11 +130,21 @@ submit 稳态由 `submit_queue` worker 与 apiserver 同步处理能力共同约
 | apiserver `backpressure.mongo.max_inflight` | **120** | submit+outbox 主瓶颈（原 80） |
 | apiserver `backpressure.mysql.max_inflight` | **150** | 对齐 mysql pool |
 | apiserver backpressure `timeout_ms` | **4000～5000** | 应用内排队，避免 k6 30s 雪崩 |
-| k6 `mixed_280_models` | report max **640**，`holdSeconds` **4** | 防 WS VU 打满（530 尖刺） |
+| k6 `mixed_280_models` | report max **380**，全场景 max **<700** | `rps×p95×1.05`；压低 VU 防螺旋 |
 
 **部署**：改 `configs/*.prod.yaml` 后 **重启** `qs-apiserver` + `qs-collection-server`；本地 `make perf-sync-vusers` 同步 k6 VU；压测前冷却 ≥30min、网络稳定。
 
-**验收顺序**：`mixed_280_models` 全绿 → `perf-mixed300-http` → `perf-mixed300-http-query` → `perf-mixed300`。
+**验收顺序**：`make perf-sync-vusers` → `mixed_280_models` 边际 → `perf-mixed300-http-query` → `perf-mixed300`（全量）。
+
+**4C/8G 实测结论**（2026-07-02 晚，WS + 分池 + VU 收紧）：
+
+| Profile | failed | 判定 |
+| ------- | ---: | ---- |
+| `mixed_280_models` | 0.20% | **边际通过**（catalog 503×173，阈值全绿） |
+| `mixed_300_http_query` | 0.01% | **通过**（146/s 读 + WS，无 probe） |
+| `mixed_300` 全量（×2） | 8.75%～10.60% | **未过**（catalog 503 + chain_probe 128–137） |
+
+**容量承诺（4C/8G）**：生产可验收 **~280/s 混合（WS）** 或 **~295/s 读+WS（无 probe）**；**不可承诺 300/s 全量 + chain_probe**。瓶颈在 catalog Try 503 与异步 probe，非盲目加 VU。8C/16G 历史已验收全量 300。
 
 ---
 

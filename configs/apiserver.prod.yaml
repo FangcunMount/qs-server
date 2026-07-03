@@ -365,12 +365,12 @@ outbox_relay:
     interval: "500ms"             # Mongo outbox 主链路事件排水频率: 500ms (生产环境建议调高)
     batch_size: 1000              # 每轮最多 claim 的 Mongo outbox 事件数: 1000 (生产环境建议调高)
     publish_workers: 48           # pretest120 实测 128 会把 Mongo 连接池打满；先降到 48 复测: 48 (生产环境建议调高)
-    immediate_max_concurrent: 16  # post-commit immediate 并发上限: 16 (生产环境建议调高)
+    immediate_max_concurrent: 24  # mixed_300 chain_probe：略提 immediate 旁路并发
   assessment:
     interval: "500ms"             # 对齐 Mongo 主链路 tick: 500ms (生产环境建议调高)
     batch_size: 200               # 每轮最多 claim 的 assessment outbox 事件数: 200 (生产环境建议调高)
     publish_workers: 24           # MySQL outbox 并发 publish: 24 (生产环境建议调高)
-    immediate_max_concurrent: 16  # assessment.submitted post-commit immediate 上限: 16 (生产环境建议调高)
+    immediate_max_concurrent: 24  # assessment.submitted immediate 旁路
 
 statistics_sync:                # 统计数据同步任务配置
   enable: true                  # 启用统计数据同步任务: true

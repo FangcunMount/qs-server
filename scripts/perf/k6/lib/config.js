@@ -650,7 +650,7 @@ export function resolveReportVuserDefaults(reportRps, options = {}) {
   const pollMs = options.pollIntervalMs !== undefined ? options.pollIntervalMs : REPORT_POLL_INTERVAL_MS;
   const wsHold = options.wsHoldSeconds !== undefined ? options.wsHoldSeconds : REPORT_WS_HOLD_SECONDS;
   const latencyS = options.requestLatencySeconds !== undefined ? options.requestLatencySeconds : 0.5;
-  const headroom = 1.1;
+  const headroom = 1.05;
 
   if (REPORT_MODE === 'websocket') {
     const max = Math.max(20, Math.ceil(rps * wsHold * headroom));

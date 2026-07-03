@@ -292,7 +292,9 @@ runtime:
   gogc: 50                           # GC 触发阈值: 50%
 
 # 并发/连接池调优
-concurrency:                        # 并发/连接池调优（4C/8G mixed_280+ 榨干档）
-  max-query-concurrency: 460        # 读路径（catalog Try 503；280 档 169×503 后上调）
+concurrency:                        # 并发/连接池调优（4C/8G mixed_300 攻关）
+  max-catalog-concurrency: 512      # catalog L1 独立池（与 heavy query 分池）
+  max-query-concurrency: 280        # 非 catalog 读（assessment/stats/report-status）
   max-submit-concurrency: 96        # 写路径（submit 等，与读池隔离）
-  max-wait-ms: 4000                 # submit/非 catalog 读 槽位满时最长排队（与 grpc inflight_wait 对齐）
+  max-wait-ms: 4000                 # submit/非 catalog 读 槽位满时最长排队
+  catalog-max-wait-ms: 800          # catalog L1 miss 时短排队（替代 Try 503）

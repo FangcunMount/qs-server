@@ -35,6 +35,15 @@ func NewQueryService(
 	}
 }
 
+// HasCachedDetail 进程内 L1 是否已有已发布问卷详情。
+func (s *QueryService) HasCachedDetail(code, version string) bool {
+	if s == nil || s.cache == nil || code == "" {
+		return false
+	}
+	_, ok := s.cache.Get(code, version)
+	return ok
+}
+
 // Get 获取问卷详情
 func (s *QueryService) Get(ctx context.Context, code, version string) (*QuestionnaireResponse, error) {
 	if s.cache != nil {

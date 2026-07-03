@@ -2,6 +2,7 @@ package options
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -53,13 +54,27 @@ type GRPCClientOptions struct {
 
 // ConcurrencyOptions 并发处理配置
 type ConcurrencyOptions struct {
-	MaxConcurrency       int `json:"max_concurrency" mapstructure:"max_concurrency"`               // 兼容：未配置 max_query_concurrency 时作为读池上限
-	MaxQueryConcurrency  int `json:"max_query_concurrency" mapstructure:"max_query_concurrency"`   // catalog/report-status 与其余读路径
-	MaxSubmitConcurrency int `json:"max_submit_concurrency" mapstructure:"max_submit_concurrency"` // 答卷提交等写路径
-	MaxWaitMs            int `json:"max_wait_ms" mapstructure:"max_wait_ms"`                       // submit/非 catalog 读 槽位排队最长等待（毫秒），0 表示无限等待
+	MaxConcurrency        int `json:"max_concurrency" mapstructure:"max_concurrency"`               // 兼容：未配置 max_query_concurrency 时作为读池上限
+	MaxCatalogConcurrency int `json:"max_catalog_concurrency" mapstructure:"max_catalog_concurrency"` // catalog L1 读路径（与 heavy query 分池）
+	MaxQueryConcurrency   int `json:"max_query_concurrency" mapstructure:"max_query_concurrency"`   // 非 catalog 读（assessment/stats 等）
+	MaxSubmitConcurrency  int `json:"max_submit_concurrency" mapstructure:"max_submit_concurrency"`   // 答卷提交等写路径
+	MaxWaitMs             int `json:"max_wait_ms" mapstructure:"max_wait_ms"`                       // submit/非 catalog 读 槽位排队最长等待（毫秒），0 表示无限等待
+	CatalogMaxWaitMs      int `json:"catalog_max_wait_ms" mapstructure:"catalog_max_wait_ms"`       // catalog miss 时槽位排队上限（毫秒），0 表示沿用 max_wait_ms
 }
 
-// ResolvedQueryConcurrency 返回读路径并发槽位上限。
+// ResolvedCatalogConcurrency 返回 catalog 读路径并发槽位上限。
+func (c *ConcurrencyOptions) ResolvedCatalogConcurrency() int {
+	if c == nil {
+		return 0
+	}
+	if c.MaxCatalogConcurrency > 0 {
+		return c.MaxCatalogConcurrency
+	}
+	// 未显式配置时与读池同上限（兼容旧配置）。
+	return c.ResolvedQueryConcurrency()
+}
+
+// ResolvedQueryConcurrency 返回非 catalog 读路径并发槽位上限。
 func (c *ConcurrencyOptions) ResolvedQueryConcurrency() int {
 	if c == nil {
 		return 0
@@ -68,6 +83,21 @@ func (c *ConcurrencyOptions) ResolvedQueryConcurrency() int {
 		return c.MaxQueryConcurrency
 	}
 	return c.MaxConcurrency
+}
+
+// ResolvedCatalogMaxWait 返回 catalog miss 时槽位排队上限。
+func (c *ConcurrencyOptions) ResolvedCatalogMaxWait() time.Duration {
+	if c == nil {
+		return 0
+	}
+	ms := c.CatalogMaxWaitMs
+	if ms <= 0 {
+		ms = c.MaxWaitMs
+	}
+	if ms <= 0 {
+		return 0
+	}
+	return time.Duration(ms) * time.Millisecond
 }
 
 // ResolvedSubmitConcurrency 返回写路径并发槽位上限。
@@ -411,11 +441,15 @@ func (c *ConcurrencyOptions) AddFlags(fs *pflag.FlagSet) {
 	fs.IntVar(&c.MaxConcurrency, "concurrency.max-concurrency", c.MaxConcurrency,
 		"Deprecated: use max-query-concurrency; fallback when max-query-concurrency is unset.")
 	fs.IntVar(&c.MaxQueryConcurrency, "concurrency.max-query-concurrency", c.MaxQueryConcurrency,
-		"Maximum concurrent HTTP handlers for catalog/report-status and other read paths.")
+		"Maximum concurrent HTTP handlers for non-catalog read paths (assessment, stats, etc.).")
+	fs.IntVar(&c.MaxCatalogConcurrency, "concurrency.max-catalog-concurrency", c.MaxCatalogConcurrency,
+		"Maximum concurrent HTTP handlers for catalog read paths (scales, personality-models, questionnaire detail).")
 	fs.IntVar(&c.MaxSubmitConcurrency, "concurrency.max-submit-concurrency", c.MaxSubmitConcurrency,
 		"Maximum concurrent HTTP handlers for submit/write paths.")
 	fs.IntVar(&c.MaxWaitMs, "concurrency.max-wait-ms", c.MaxWaitMs,
 		"Maximum wait in milliseconds for submit/non-catalog read slots before returning 503 (0 means block).")
+	fs.IntVar(&c.CatalogMaxWaitMs, "concurrency.catalog-max-wait-ms", c.CatalogMaxWaitMs,
+		"Maximum wait in milliseconds for catalog slots on L1 cache miss (0 uses max-wait-ms).")
 }
 
 // AddFlags 添加提交排队相关的命令行参数
@@ -608,6 +642,13 @@ func validateCollectionConcurrency(opts *ConcurrencyOptions) []error {
 	}
 	if maxQuery > 512 {
 		errs = append(errs, fmt.Errorf("concurrency.max-query-concurrency cannot be greater than 512"))
+	}
+	maxCatalog := opts.ResolvedCatalogConcurrency()
+	if maxCatalog <= 0 {
+		errs = append(errs, fmt.Errorf("concurrency.max-catalog-concurrency (or max-query-concurrency) must be greater than 0"))
+	}
+	if maxCatalog > 512 {
+		errs = append(errs, fmt.Errorf("concurrency.max-catalog-concurrency cannot be greater than 512"))
 	}
 	maxSubmit := opts.ResolvedSubmitConcurrency()
 	if maxSubmit <= 0 {

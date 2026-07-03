@@ -19,14 +19,23 @@ func TestConcurrencyOptionsResolvedPools(t *testing.T) {
 	t.Run("explicit split", func(t *testing.T) {
 		t.Parallel()
 		opts := &ConcurrencyOptions{
-			MaxQueryConcurrency:  400,
-			MaxSubmitConcurrency: 96,
+			MaxQueryConcurrency:   280,
+			MaxCatalogConcurrency: 512,
+			MaxSubmitConcurrency:  96,
+			MaxWaitMs:             4000,
+			CatalogMaxWaitMs:      800,
 		}
-		if got := opts.ResolvedQueryConcurrency(); got != 400 {
-			t.Fatalf("ResolvedQueryConcurrency() = %d, want 400", got)
+		if got := opts.ResolvedQueryConcurrency(); got != 280 {
+			t.Fatalf("ResolvedQueryConcurrency() = %d, want 280", got)
+		}
+		if got := opts.ResolvedCatalogConcurrency(); got != 512 {
+			t.Fatalf("ResolvedCatalogConcurrency() = %d, want 512", got)
 		}
 		if got := opts.ResolvedSubmitConcurrency(); got != 96 {
 			t.Fatalf("ResolvedSubmitConcurrency() = %d, want 96", got)
+		}
+		if got := opts.ResolvedCatalogMaxWait().Milliseconds(); got != 800 {
+			t.Fatalf("ResolvedCatalogMaxWait() = %dms, want 800ms", got)
 		}
 	})
 }
@@ -41,8 +50,9 @@ func TestValidateCollectionConcurrencyRequiresPools(t *testing.T) {
 		t.Fatal("expected error for empty concurrency")
 	}
 	if errs := validateCollectionConcurrency(&ConcurrencyOptions{
-		MaxQueryConcurrency:  400,
-		MaxSubmitConcurrency: 96,
+		MaxQueryConcurrency:   280,
+		MaxCatalogConcurrency: 512,
+		MaxSubmitConcurrency:  96,
 	}); len(errs) != 0 {
 		t.Fatalf("unexpected errors: %v", errs)
 	}

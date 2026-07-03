@@ -36,15 +36,15 @@
         "reportMode": "websocket",
         "path": "report-events",
         "holdSeconds": 4,
-        "maxVuFormula": "report_rps × ws_hold_seconds × 1.1"
+        "maxVuFormula": "report_rps × ws_hold_seconds × 1.05（刻意压低，避免 VU 螺旋）"
       }
     }
   },
   "vuserSizing": {
-    "note": "serverA 4C/8G 榨干档：scenario max ≈ rps×迭代秒数×1.1；submit 统一 cap 400；全场景 max 合计建议 <1300，防 constant-arrival-rate VU 螺旋。",
+    "note": "4C/8G：scenario max ≈ rps×观察p95秒×1.05；**压低 VU 上限**，宁可 dropped_iterations 也不要 inflight/VU 螺旋；全场景 max 合计 <700。",
     "reference": {
-      "mixed_280_models": "med 360 / pers 200 / quest 150 / submit 400 / report WS 640 / stats 360",
-      "mixed_300": "med 400 / pers 220 / quest+persQuest 各 90 / submit 400 / report WS 660 / stats 380 / probe 60",
+      "mixed_280_models": "med 70 / pers 40 / quest 35 / submit 70 / report WS 380 / stats 50",
+      "mixed_300": "med 85 / pers 45 / quest 35 / submit 70 / report WS 420 / stats 55 / probe 25",
       "special_report_short_poll": "HTTP 降级路径专项，不进升档链"
     }
   },
@@ -453,36 +453,36 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 190,
-          "max": 760
-        },
-        "medicalQuery": {
-          "preAllocated": 100,
-          "max": 400
-        },
-        "personalityQuery": {
           "preAllocated": 50,
           "max": 200
         },
+        "medicalQuery": {
+          "preAllocated": 20,
+          "max": 55
+        },
+        "personalityQuery": {
+          "preAllocated": 12,
+          "max": 30
+        },
         "questionnaireQuery": {
-          "preAllocated": 30,
-          "max": 150
+          "preAllocated": 10,
+          "max": 28
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 28,
+          "max": 65
         },
         "report": {
-          "preAllocated": 100,
-          "max": 490
+          "preAllocated": 85,
+          "max": 370
         },
         "stats": {
-          "preAllocated": 115,
-          "max": 550
+          "preAllocated": 18,
+          "max": 48
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 10,
+          "max": 40
         }
       }
     },
@@ -591,36 +591,36 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 330,
-          "max": 900
+          "preAllocated": 60,
+          "max": 200
         },
         "medicalQuery": {
-          "preAllocated": 130,
-          "max": 360
+          "preAllocated": 25,
+          "max": 70
         },
         "personalityQuery": {
-          "preAllocated": 70,
-          "max": 200
+          "preAllocated": 15,
+          "max": 40
         },
         "questionnaireQuery": {
-          "preAllocated": 40,
-          "max": 150
+          "preAllocated": 12,
+          "max": 35
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 640
+          "preAllocated": 90,
+          "max": 380
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 360
+          "preAllocated": 20,
+          "max": 50
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 10,
+          "max": 40
         }
       }
     },
@@ -643,36 +643,36 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 330,
-          "max": 900
-        },
-        "medicalQuery": {
-          "preAllocated": 130,
-          "max": 360
-        },
-        "personalityQuery": {
-          "preAllocated": 70,
+          "preAllocated": 60,
           "max": 200
         },
+        "medicalQuery": {
+          "preAllocated": 25,
+          "max": 70
+        },
+        "personalityQuery": {
+          "preAllocated": 15,
+          "max": 40
+        },
         "questionnaireQuery": {
-          "preAllocated": 40,
-          "max": 150
+          "preAllocated": 12,
+          "max": 35
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
           "preAllocated": 80,
           "max": 320
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 360
+          "preAllocated": 20,
+          "max": 50
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 10,
+          "max": 40
         }
       }
     },
@@ -696,36 +696,36 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 330,
-          "max": 900
+          "preAllocated": 60,
+          "max": 200
         },
         "medicalQuery": {
-          "preAllocated": 130,
-          "max": 360
+          "preAllocated": 25,
+          "max": 70
         },
         "personalityQuery": {
-          "preAllocated": 70,
-          "max": 200
+          "preAllocated": 15,
+          "max": 40
         },
         "questionnaireQuery": {
-          "preAllocated": 40,
-          "max": 150
+          "preAllocated": 12,
+          "max": 35
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 640
+          "preAllocated": 90,
+          "max": 380
         },
         "stats": {
-          "preAllocated": 120,
-          "max": 360
+          "preAllocated": 20,
+          "max": 50
         },
         "chainProbe": {
-          "preAllocated": 20,
-          "max": 200
+          "preAllocated": 10,
+          "max": 40
         }
       }
     },
@@ -751,40 +751,40 @@
       "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
-          "preAllocated": 90,
-          "max": 90
+          "preAllocated": 60,
+          "max": 200
         },
         "medicalQuery": {
-          "preAllocated": 140,
-          "max": 400
+          "preAllocated": 28,
+          "max": 85
         },
         "personalityQuery": {
-          "preAllocated": 80,
-          "max": 220
+          "preAllocated": 16,
+          "max": 45
         },
         "questionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 10,
+          "max": 35
         },
         "personalityQuestionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 10,
+          "max": 35
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 660
+          "preAllocated": 100,
+          "max": 420
         },
         "stats": {
-          "preAllocated": 130,
-          "max": 380
+          "preAllocated": 22,
+          "max": 55
         },
         "chainProbe": {
-          "preAllocated": 15,
-          "max": 60
+          "preAllocated": 8,
+          "max": 25
         }
       }
     },
@@ -812,36 +812,36 @@
           "max": 90
         },
         "medicalQuery": {
-          "preAllocated": 130,
-          "max": 360
+          "preAllocated": 25,
+          "max": 70
         },
         "personalityQuery": {
-          "preAllocated": 70,
-          "max": 200
+          "preAllocated": 15,
+          "max": 40
         },
         "questionnaireQuery": {
-          "preAllocated": 40,
-          "max": 150
+          "preAllocated": 12,
+          "max": 35
         },
         "personalityQuestionnaireQuery": {
-          "preAllocated": 40,
-          "max": 150
+          "preAllocated": 12,
+          "max": 35
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 640
-        },
-        "stats": {
-          "preAllocated": 130,
+          "preAllocated": 90,
           "max": 380
         },
+        "stats": {
+          "preAllocated": 22,
+          "max": 55
+        },
         "chainProbe": {
-          "preAllocated": 15,
-          "max": 60
+          "preAllocated": 10,
+          "max": 40
         }
       }
     },
@@ -866,40 +866,40 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 90,
-          "max": 90
+          "preAllocated": 60,
+          "max": 200
         },
         "medicalQuery": {
-          "preAllocated": 140,
-          "max": 400
+          "preAllocated": 28,
+          "max": 85
         },
         "personalityQuery": {
-          "preAllocated": 80,
-          "max": 220
+          "preAllocated": 16,
+          "max": 45
         },
         "questionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 8,
+          "max": 20
         },
         "personalityQuestionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 8,
+          "max": 20
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 640
-        },
-        "stats": {
-          "preAllocated": 130,
+          "preAllocated": 90,
           "max": 380
         },
+        "stats": {
+          "preAllocated": 22,
+          "max": 55
+        },
         "chainProbe": {
-          "preAllocated": 15,
-          "max": 60
+          "preAllocated": 10,
+          "max": 40
         }
       }
     },
@@ -924,32 +924,32 @@
       },
       "vusers": {
         "query": {
-          "preAllocated": 90,
-          "max": 90
+          "preAllocated": 60,
+          "max": 200
         },
         "medicalQuery": {
-          "preAllocated": 140,
-          "max": 400
+          "preAllocated": 28,
+          "max": 85
         },
         "personalityQuery": {
-          "preAllocated": 80,
-          "max": 220
+          "preAllocated": 16,
+          "max": 45
         },
         "questionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 8,
+          "max": 20
         },
         "personalityQuestionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 8,
+          "max": 20
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 640
+          "preAllocated": 90,
+          "max": 380
         }
       }
     },
@@ -1021,40 +1021,40 @@
       "chainProbeModelType": "mixed",
       "vusers": {
         "query": {
-          "preAllocated": 90,
-          "max": 90
+          "preAllocated": 60,
+          "max": 200
         },
         "medicalQuery": {
-          "preAllocated": 140,
-          "max": 400
+          "preAllocated": 28,
+          "max": 85
         },
         "personalityQuery": {
-          "preAllocated": 80,
-          "max": 220
+          "preAllocated": 16,
+          "max": 45
         },
         "questionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 10,
+          "max": 35
         },
         "personalityQuestionnaireQuery": {
-          "preAllocated": 45,
-          "max": 90
+          "preAllocated": 10,
+          "max": 35
         },
         "submit": {
-          "preAllocated": 120,
-          "max": 400
+          "preAllocated": 30,
+          "max": 70
         },
         "report": {
-          "preAllocated": 140,
-          "max": 660
+          "preAllocated": 100,
+          "max": 420
         },
         "stats": {
-          "preAllocated": 130,
-          "max": 380
+          "preAllocated": 22,
+          "max": 55
         },
         "chainProbe": {
-          "preAllocated": 15,
-          "max": 60
+          "preAllocated": 8,
+          "max": 25
         }
       }
     },

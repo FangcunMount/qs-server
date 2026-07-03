@@ -42,6 +42,49 @@ func NewQueryService(
 	}
 }
 
+// HasCachedDetail 进程内 L1 是否已有量表详情。
+func (s *QueryService) HasCachedDetail(code string) bool {
+	if s == nil || s.cache == nil || code == "" {
+		return false
+	}
+	_, ok := s.cache.GetDetail(code)
+	return ok
+}
+
+// HasCachedList 进程内 L1 是否已有量表列表（req 会按 List 同样规则归一化）。
+func (s *QueryService) HasCachedList(req *ListScalesRequest) bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	if req == nil {
+		req = &ListScalesRequest{}
+	}
+	s.normalizeListRequest(req)
+	_, ok := s.cache.GetListByRequest(req)
+	return ok
+}
+
+// HasCachedHot 进程内 L1 是否已有热门量表列表。
+func (s *QueryService) HasCachedHot(req *ListHotScalesRequest) bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	if req == nil {
+		req = &ListHotScalesRequest{}
+	}
+	_, ok := s.cache.GetHotByRequest(req)
+	return ok
+}
+
+// HasCachedCategories 进程内 L1 是否已有量表分类。
+func (s *QueryService) HasCachedCategories() bool {
+	if s == nil || s.cache == nil {
+		return false
+	}
+	_, ok := s.cache.GetCategories()
+	return ok
+}
+
 // Get 获取量表详情
 func (s *QueryService) Get(ctx context.Context, code string) (*ScaleResponse, error) {
 	if s.cache != nil {

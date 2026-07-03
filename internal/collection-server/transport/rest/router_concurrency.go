@@ -9,6 +9,8 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+type catalogL1PeekFunc func(*gin.Context) bool
+
 func (r *Router) concurrencyMaxWait() time.Duration {
 	if r == nil || r.container == nil {
 		return 0
@@ -18,6 +20,48 @@ func (r *Router) concurrencyMaxWait() time.Duration {
 		return 0
 	}
 	return time.Duration(opts.MaxWaitMs) * time.Millisecond
+}
+
+func catalogConcurrencyHandlers(
+	gate *concurrency.Gate,
+	maxWait time.Duration,
+	peek catalogL1PeekFunc,
+	handlers ...gin.HandlerFunc,
+) []gin.HandlerFunc {
+	if gate == nil {
+		return handlers
+	}
+	waitMW := gate.WaitMiddleware(maxWait, func(c *gin.Context) {
+		WriteServiceUnavailable(c, 1)
+	})
+	mw := func(c *gin.Context) {
+		if peek != nil && peek(c) {
+			c.Next()
+			return
+		}
+		waitMW(c)
+	}
+	return append([]gin.HandlerFunc{mw}, handlers...)
+}
+
+func (r *Router) catalogMaxWait() time.Duration {
+	if r == nil || r.container == nil {
+		return 0
+	}
+	opts := r.container.ConcurrencyOptions()
+	if opts == nil {
+		return 0
+	}
+	return opts.ResolvedCatalogMaxWait()
+}
+
+func (r *Router) catalogHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
+	return catalogConcurrencyHandlers(
+		r.container.CatalogConcurrencyGate(),
+		r.catalogMaxWait(),
+		r.catalogL1Peek,
+		handlers...,
+	)
 }
 
 func tryQueryConcurrencyHandlers(gate *concurrency.Gate, handlers ...gin.HandlerFunc) []gin.HandlerFunc {
@@ -48,10 +92,6 @@ func waitSubmitConcurrencyHandlers(gate *concurrency.Gate, maxWait time.Duration
 		WriteServiceUnavailable(c, 1)
 	})
 	return append([]gin.HandlerFunc{mw}, handlers...)
-}
-
-func (r *Router) catalogHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
-	return tryQueryConcurrencyHandlers(r.container.QueryConcurrencyGate(), handlers...)
 }
 
 func (r *Router) reportStatusHandlers(handlers ...gin.HandlerFunc) []gin.HandlerFunc {
