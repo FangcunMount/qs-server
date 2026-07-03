@@ -40,7 +40,7 @@ func (m medicalKindReader) CurrentStatus(ctx context.Context, testeeID, assessme
 	if err != nil {
 		return nil, err
 	}
-	return reportstatus.MedicalView(reportstatus.ToPublicAssessmentStatus(status)), nil
+	return reportstatus.MedicalView(status), nil
 }
 
 type personalityKindReader struct {
@@ -72,21 +72,17 @@ func (p personalityKindReader) CurrentStatus(ctx context.Context, testeeID, asse
 	if err != nil {
 		return nil, err
 	}
-	return personalityStatusView(status), nil
-}
-
-func personalityStatusView(status *personalityassessment.AssessmentStatusResponse) *reportstatus.View {
 	if status == nil {
-		return nil
+		return nil, nil
 	}
-	return &reportstatus.View{
+	return reportstatus.PersonalityView(reportstatus.StatusFields{
 		Status:          status.Status,
 		Stage:           status.Stage,
 		Message:         status.Message,
 		Reason:          status.Reason,
 		NextPollAfterMs: status.NextPollAfterMs,
 		UpdatedAt:       status.UpdatedAt,
-	}
+	}), nil
 }
 
 func newReportStatusResolver(

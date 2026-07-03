@@ -63,7 +63,7 @@ func (m medicalKindReaderTest) CurrentStatus(ctx context.Context, testeeID, asse
 	if err != nil {
 		return nil, err
 	}
-	return reportstatus.MedicalView(reportstatus.ToPublicAssessmentStatus(status)), nil
+	return reportstatus.MedicalView(status), nil
 }
 
 func newTestService(wait *fakeWaitReport, medical *fakeMedicalReader) *Service {

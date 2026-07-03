@@ -3,7 +3,6 @@ package catalogl1
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
@@ -18,14 +17,29 @@ func ReadThrough[T any](
 	coalescer loadguard.Coalescer,
 	useSingleflight bool,
 ) (T, error) {
-	var setFn func(T)
-	if set != nil {
-		setFn = set
-	}
 	if useSingleflight {
-		return readThroughCoalescer(key, get, setFn, load, clone, coalescer)
+		return readThroughCoalescer(key, get, set, load, clone, coalescer)
 	}
-	return catalogreadthrough.ReadThrough(key, get, setFn, load, clone, nil, false)
+	return readThroughDirect(key, get, set, load, clone)
+}
+
+func readThroughDirect[T any](
+	_ string,
+	get func() (T, bool),
+	set func(T),
+	load func() (T, error),
+	clone func(T) T,
+) (T, error) {
+	if get != nil {
+		if cached, ok := get(); ok {
+			return cached, nil
+		}
+	}
+	resp, err := load()
+	if err != nil || set == nil {
+		return resp, err
+	}
+	return finalizeLoaded(resp, set, clone), nil
 }
 
 func readThroughCoalescer[T any](
@@ -53,16 +67,7 @@ func readThroughCoalescer[T any](
 		if loadErr != nil {
 			return nil, loadErr
 		}
-		if isNilValue(resp) {
-			return resp, nil
-		}
-		if set != nil {
-			set(resp)
-		}
-		if clone != nil {
-			return clone(resp), nil
-		}
-		return resp, nil
+		return finalizeLoaded(resp, set, clone), nil
 	})
 	if err != nil {
 		return zero, err
@@ -77,4 +82,17 @@ func readThroughCoalescer[T any](
 		return zero, nil
 	}
 	return typed, nil
+}
+
+func finalizeLoaded[T any](resp T, set func(T), clone func(T) T) T {
+	if isNilValue(resp) {
+		return resp
+	}
+	if set != nil {
+		set(resp)
+	}
+	if clone != nil {
+		return clone(resp)
+	}
+	return resp
 }

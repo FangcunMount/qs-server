@@ -16,6 +16,18 @@ type View struct {
 	UpdatedAt       int64    `json:"updated_at"`
 }
 
+// StatusFields 是非 medical 状态源映射为 View 时使用的字段载体。
+type StatusFields struct {
+	Status          string
+	Stage           string
+	Message         string
+	Reason          string
+	NextPollAfterMs int
+	TotalScore      *float64
+	RiskLevel       *string
+	UpdatedAt       int64
+}
+
 // ToPublicAssessmentStatus 将内部状态映射为 HTTP 对外契约（completed → interpreted）。
 func ToPublicAssessmentStatus(resp *evaluationapp.AssessmentStatusResponse) *evaluationapp.AssessmentStatusResponse {
 	if resp == nil {
@@ -34,7 +46,7 @@ func MedicalView(status *evaluationapp.AssessmentStatusResponse) *View {
 	if public == nil {
 		return nil
 	}
-	return &View{
+	return ViewFromFields(StatusFields{
 		Status:          public.Status,
 		Stage:           public.Stage,
 		Message:         public.Message,
@@ -43,6 +55,25 @@ func MedicalView(status *evaluationapp.AssessmentStatusResponse) *View {
 		TotalScore:      public.TotalScore,
 		RiskLevel:       public.RiskLevel,
 		UpdatedAt:       public.UpdatedAt,
+	})
+}
+
+// PersonalityView 将 personality 状态字段映射为 HTTP/WS 共用视图。
+func PersonalityView(fields StatusFields) *View {
+	return ViewFromFields(fields)
+}
+
+// ViewFromFields 统一构造 HTTP report-status 与 WS events 的对外状态视图。
+func ViewFromFields(fields StatusFields) *View {
+	return &View{
+		Status:          fields.Status,
+		Stage:           fields.Stage,
+		Message:         fields.Message,
+		Reason:          fields.Reason,
+		NextPollAfterMs: fields.NextPollAfterMs,
+		TotalScore:      fields.TotalScore,
+		RiskLevel:       fields.RiskLevel,
+		UpdatedAt:       fields.UpdatedAt,
 	}
 }
 

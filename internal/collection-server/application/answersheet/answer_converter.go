@@ -3,17 +3,16 @@ package answersheet
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/answervalue"
 )
 
-// AnswerConverter 将 REST 答案转换为 gRPC 输入。
+// AnswerConverter 将 REST 答案转换为 application 保存输入。
 type AnswerConverter struct{}
 
-func (AnswerConverter) Convert(answers []Answer) []grpcbridge.AnswerInput {
-	result := make([]grpcbridge.AnswerInput, len(answers))
+func (AnswerConverter) Convert(answers []Answer) []AnswerInput {
+	result := make([]AnswerInput, len(answers))
 	for i, a := range answers {
-		result[i] = grpcbridge.AnswerInput{
+		result[i] = AnswerInput{
 			QuestionCode: a.QuestionCode,
 			QuestionType: a.QuestionType,
 			Score:        a.Score,

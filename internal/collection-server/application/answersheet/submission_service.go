@@ -9,7 +9,6 @@ import (
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
 	"github.com/FangcunMount/qs-server/internal/collection-server/options"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 	"github.com/FangcunMount/qs-server/internal/pkg/locklease"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 	"google.golang.org/grpc/codes"
@@ -21,11 +20,6 @@ type IdempotencyGuard interface {
 	Begin(ctx context.Context, key string) (doneAnswerSheetID string, lease *locklease.Lease, acquired bool, err error)
 	Complete(ctx context.Context, key string, lease *locklease.Lease, answerSheetID string) error
 	Abort(ctx context.Context, key string, lease *locklease.Lease) error
-}
-
-type answerSheetGateway interface {
-	SaveAnswerSheet(ctx context.Context, input *grpcbridge.SaveAnswerSheetInput) (*grpcbridge.SaveAnswerSheetOutput, error)
-	GetAnswerSheet(ctx context.Context, id uint64) (*grpcbridge.AnswerSheetOutput, error)
 }
 
 type profileLinkChecker interface {
@@ -40,7 +34,7 @@ type profileLinkChecker interface {
 // 2. 调用 apiserver 的 gRPC 服务
 // 3. 转换 gRPC 响应到 REST DTO
 type SubmissionService struct {
-	answerSheetClient  answerSheetGateway
+	answerSheetWriter  AnswerSheetWriter
 	answerSheetReader  AnswerSheetReader
 	actorClient        ActorLookup
 	profileLinkService profileLinkChecker
@@ -53,7 +47,7 @@ type SubmissionService struct {
 
 // NewSubmissionService 创建答卷提交服务
 func NewSubmissionService(
-	answerSheetClient answerSheetGateway,
+	answerSheetWriter AnswerSheetWriter,
 	answerSheetReader AnswerSheetReader,
 	actorClient ActorLookup,
 	profileLinkService profileLinkChecker,
@@ -61,13 +55,13 @@ func NewSubmissionService(
 	submitGuard IdempotencyGuard,
 ) *SubmissionService {
 	service := &SubmissionService{
-		answerSheetClient:  answerSheetClient,
+		answerSheetWriter:  answerSheetWriter,
 		answerSheetReader:  answerSheetReader,
 		actorClient:        actorClient,
 		profileLinkService: profileLinkService,
 		profileAccess:      NewProfileAccessResolver(actorClient, profileLinkService),
 		answerConverter:    AnswerConverter{},
-		committer:          NewSubmissionCommitter(answerSheetClient),
+		committer:          NewSubmissionCommitter(answerSheetWriter),
 		submitGuard:        submitGuard,
 	}
 

@@ -52,7 +52,7 @@ func (c *Container) buildSubmitRuntime(profileLinkService *iam.ProfileLinkServic
 	submitGuard := redisops.NewSubmitGuard(c.opsHandle, c.lockManager)
 	return submitRuntime{
 		submission: answersheet.NewSubmissionService(
-			c.answerSheetClient,
+			acl.NewAnswerSheetBFFWriter(c.answerSheetClient),
 			acl.NewAnswerSheetBFFReader(c.answerSheetClient),
 			acl.NewTesteeActorLookup(c.actorClient),
 			profileLinkService,

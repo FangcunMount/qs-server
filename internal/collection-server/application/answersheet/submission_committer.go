@@ -5,15 +5,14 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/log"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge"
 )
 
-// SubmissionCommitter 调用 gRPC 保存答卷。
+// SubmissionCommitter 调用答卷写端口保存答卷。
 type SubmissionCommitter struct {
-	gateway answerSheetGateway
+	gateway AnswerSheetWriter
 }
 
-func NewSubmissionCommitter(gateway answerSheetGateway) *SubmissionCommitter {
+func NewSubmissionCommitter(gateway AnswerSheetWriter) *SubmissionCommitter {
 	return &SubmissionCommitter{gateway: gateway}
 }
 
@@ -21,8 +20,8 @@ func (c *SubmissionCommitter) Save(
 	ctx context.Context,
 	writerID, orgID, testeeID uint64,
 	req *SubmitAnswerSheetRequest,
-	answers []grpcbridge.AnswerInput,
-) (*grpcbridge.SaveAnswerSheetOutput, error) {
+	answers []AnswerInput,
+) (*SaveAnswerSheetOutput, error) {
 	if c == nil || c.gateway == nil {
 		return nil, nil
 	}
@@ -34,7 +33,7 @@ func (c *SubmissionCommitter) Save(
 		"org_id", orgID,
 	)
 
-	result, err := c.gateway.SaveAnswerSheet(ctx, &grpcbridge.SaveAnswerSheetInput{
+	result, err := c.gateway.SaveAnswerSheet(ctx, &SaveAnswerSheetInput{
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
 		IdempotencyKey:       req.IdempotencyKey,

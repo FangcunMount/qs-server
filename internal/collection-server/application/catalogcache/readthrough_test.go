@@ -6,15 +6,15 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/collection-server/catalogreadthrough"
-	"golang.org/x/sync/singleflight"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/catalogl1"
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 type catalogFixture struct {
-	mu    sync.Mutex
-	cache map[string]string
-	sf    singleflight.Group
-	loads atomic.Int32
+	mu        sync.Mutex
+	cache     map[string]string
+	coalescer loadguard.Coalescer
+	loads     atomic.Int32
 }
 
 func (f *catalogFixture) get(key string) (string, bool) {
@@ -39,19 +39,19 @@ func (f *catalogFixture) load(_ context.Context, key string) (string, error) {
 }
 
 func (f *catalogFixture) readThrough(ctx context.Context, key string, useSF bool) (string, error) {
-	return catalogreadthrough.ReadThrough(
+	return catalogl1.ReadThrough(
 		key,
 		func() (string, bool) { return f.get(key) },
 		func(v string) { f.set(key, v) },
 		func() (string, error) { return f.load(ctx, key) },
 		func(v string) string { return v },
-		&f.sf,
+		f.coalescer,
 		useSF,
 	)
 }
 
 func TestCatalogReadThroughPatternCacheHitSkipsLoad(t *testing.T) {
-	fix := &catalogFixture{cache: map[string]string{"k": "cached"}}
+	fix := &catalogFixture{cache: map[string]string{"k": "cached"}, coalescer: loadguard.NewCoalescer(true)}
 	got, err := fix.readThrough(context.Background(), "k", true)
 	if err != nil {
 		t.Fatalf("readThrough: %v", err)
@@ -65,7 +65,7 @@ func TestCatalogReadThroughPatternCacheHitSkipsLoad(t *testing.T) {
 }
 
 func TestCatalogReadThroughPatternSingleflightCoalescesMiss(t *testing.T) {
-	fix := &catalogFixture{}
+	fix := &catalogFixture{coalescer: loadguard.NewCoalescer(true)}
 	const workers = 8
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {
@@ -88,7 +88,7 @@ func TestCatalogReadThroughPatternSingleflightCoalescesMiss(t *testing.T) {
 }
 
 func TestCatalogReadThroughPatternWithoutSingleflightLoadsEachMiss(t *testing.T) {
-	fix := &catalogFixture{}
+	fix := &catalogFixture{coalescer: loadguard.NewCoalescer(true)}
 	keys := []string{"a", "b", "c"}
 	for _, key := range keys {
 		if _, err := fix.readThrough(context.Background(), key, false); err != nil {

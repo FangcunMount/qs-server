@@ -15,8 +15,10 @@ func TestCollectionApplicationsDoNotImportInfra(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/collection-server/infra/": "port/grpcbridge or port/iamport, not infrastructure packages",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":         "collection application must not depend on apiserver infrastructure",
+		"github.com/FangcunMount/qs-server/internal/collection-server/infra/":          "port/grpcbridge or port/iamport, not infrastructure packages",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                  "collection application must not depend on apiserver infrastructure",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/":                 "collection-owned policies or ACL adapters, not apiserver domain packages",
+		"github.com/FangcunMount/qs-server/internal/collection-server/port/grpcbridge": "application-owned ports and ACL adapters, not grpcbridge aliases",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "collection-server", "application"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {

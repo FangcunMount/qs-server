@@ -4,7 +4,6 @@ import (
 	"context"
 
 	"github.com/FangcunMount/component-base/pkg/log"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
 	"github.com/FangcunMount/qs-server/internal/pkg/cancelerr"
 	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
@@ -185,7 +184,7 @@ func (s *QueryService) fetchListFromGRPC(ctx context.Context, req *ListScalesReq
 	}
 	scales := make([]ScaleSummaryResponse, 0, len(result.Scales))
 	for _, scaleItem := range result.Scales {
-		if !scaledefinition.NewCategory(scaleItem.Category).IsOpen() {
+		if !isOpenScaleCategory(scaleItem.Category) {
 			continue
 		}
 		scales = append(scales, scaleItem)
@@ -208,7 +207,7 @@ func (s *QueryService) fetchHotFromGRPC(ctx context.Context, req *ListHotScalesR
 	}
 	scales := make([]HotScaleSummaryResponse, 0, len(result.Scales))
 	for _, scaleItem := range result.Scales {
-		if !scaledefinition.NewCategory(scaleItem.Category).IsOpen() {
+		if !isOpenScaleCategory(scaleItem.Category) {
 			continue
 		}
 		scales = append(scales, scaleItem)

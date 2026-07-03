@@ -71,3 +71,61 @@ func TestReportStatusHTTPAndWSMappingContract(t *testing.T) {
 		})
 	}
 }
+
+func TestMedicalViewMapsCompletedAndCopiesPayload(t *testing.T) {
+	t.Parallel()
+
+	total := 90.5
+	risk := "high"
+	got := MedicalView(&evaluationapp.AssessmentStatusResponse{
+		Status:          "completed",
+		Stage:           "scored",
+		Message:         "done",
+		Reason:          "ok",
+		NextPollAfterMs: 100,
+		TotalScore:      &total,
+		RiskLevel:       &risk,
+		UpdatedAt:       123,
+	})
+	if got == nil {
+		t.Fatal("MedicalView() = nil")
+	}
+	if got.Status != "interpreted" ||
+		got.Stage != "scored" ||
+		got.Message != "done" ||
+		got.Reason != "ok" ||
+		got.NextPollAfterMs != 100 ||
+		got.UpdatedAt != 123 {
+		t.Fatalf("unexpected view: %+v", got)
+	}
+	if got.TotalScore == nil || *got.TotalScore != total {
+		t.Fatalf("total score = %v, want %v", got.TotalScore, total)
+	}
+	if got.RiskLevel == nil || *got.RiskLevel != risk {
+		t.Fatalf("risk level = %v, want %v", got.RiskLevel, risk)
+	}
+}
+
+func TestPersonalityViewCopiesStatusFields(t *testing.T) {
+	t.Parallel()
+
+	got := PersonalityView(StatusFields{
+		Status:          "interpreted",
+		Stage:           "interpreted",
+		Message:         "ready",
+		Reason:          "done",
+		NextPollAfterMs: 0,
+		UpdatedAt:       456,
+	})
+	if got == nil {
+		t.Fatal("PersonalityView() = nil")
+	}
+	if got.Status != "interpreted" ||
+		got.Stage != "interpreted" ||
+		got.Message != "ready" ||
+		got.Reason != "done" ||
+		got.NextPollAfterMs != 0 ||
+		got.UpdatedAt != 456 {
+		t.Fatalf("unexpected view: %+v", got)
+	}
+}

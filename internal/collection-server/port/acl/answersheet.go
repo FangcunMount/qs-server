@@ -18,6 +18,56 @@ func NewAnswerSheetBFFReader(inner grpcbridge.AnswerSheetWriter) *AnswerSheetBFF
 	return &AnswerSheetBFFReader{inner: inner}
 }
 
+// AnswerSheetBFFWriter 将 answersheet application DTO 转换为下游 gRPC DTO。
+type AnswerSheetBFFWriter struct {
+	inner grpcbridge.AnswerSheetWriter
+}
+
+// NewAnswerSheetBFFWriter 构造答卷写 ACL 适配器。
+func NewAnswerSheetBFFWriter(inner grpcbridge.AnswerSheetWriter) *AnswerSheetBFFWriter {
+	return &AnswerSheetBFFWriter{inner: inner}
+}
+
+func (w *AnswerSheetBFFWriter) SaveAnswerSheet(ctx context.Context, input *answersheet.SaveAnswerSheetInput) (*answersheet.SaveAnswerSheetOutput, error) {
+	if w == nil || w.inner == nil {
+		return nil, nil
+	}
+	result, err := w.inner.SaveAnswerSheet(ctx, toGRPCSaveAnswerSheetInput(input))
+	if err != nil || result == nil {
+		return nil, err
+	}
+	return &answersheet.SaveAnswerSheetOutput{
+		ID:      result.ID,
+		Message: result.Message,
+	}, nil
+}
+
+func toGRPCSaveAnswerSheetInput(input *answersheet.SaveAnswerSheetInput) *grpcbridge.SaveAnswerSheetInput {
+	if input == nil {
+		return nil
+	}
+	answers := make([]grpcbridge.AnswerInput, len(input.Answers))
+	for i, answer := range input.Answers {
+		answers[i] = grpcbridge.AnswerInput{
+			QuestionCode: answer.QuestionCode,
+			QuestionType: answer.QuestionType,
+			Score:        answer.Score,
+			Value:        answer.Value,
+		}
+	}
+	return &grpcbridge.SaveAnswerSheetInput{
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+		IdempotencyKey:       input.IdempotencyKey,
+		Title:                input.Title,
+		WriterID:             input.WriterID,
+		TesteeID:             input.TesteeID,
+		TaskID:               input.TaskID,
+		OrgID:                input.OrgID,
+		Answers:              answers,
+	}
+}
+
 func (r *AnswerSheetBFFReader) GetAnswerSheet(ctx context.Context, id uint64) (*answersheet.AnswerSheetResponse, error) {
 	if r == nil || r.inner == nil {
 		return nil, nil

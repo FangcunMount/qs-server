@@ -3,12 +3,14 @@ package catalogcache
 import (
 	"context"
 	"testing"
+
+	"github.com/FangcunMount/qs-server/internal/pkg/loadguard"
 )
 
 func TestL1SingleflightCoalescesConcurrentMiss(t *testing.T) {
 	t.Parallel()
 
-	fix := &catalogFixture{}
+	fix := &catalogFixture{coalescer: loadguard.NewCoalescer(true)}
 	const workers = 12
 	errCh := make(chan error, workers)
 	for i := 0; i < workers; i++ {
