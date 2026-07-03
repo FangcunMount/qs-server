@@ -11,6 +11,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachesignal"
@@ -40,6 +41,7 @@ type Container struct {
 	statisticsRepairWindowDays int
 	behaviorFootprintDisabled  []string
 	reportStatusConfig         reportstatus.Config
+	systemGovernanceOptions    *apiserveroptions.SystemGovernanceOptions
 	cacheSignalNotifier        *cachesignal.Notifier
 
 	// 消息队列（可选）
@@ -145,6 +147,7 @@ func NewContainerWithOptions(mysqlDB *gorm.DB, mongoDB *mongo.Database, redisCac
 	c.statisticsRepairWindowDays = opts.StatisticsRepairWindowDays
 	c.behaviorFootprintDisabled = opts.BehaviorFootprintDisableDurableEventTypes
 	c.reportStatusConfig = reportstatus.ConfigFromOptions(opts.ReportStatus, opts.Signaling, "apiserver")
+	c.systemGovernanceOptions = opts.SystemGovernance
 	c.silent = opts.Silent
 
 	return c

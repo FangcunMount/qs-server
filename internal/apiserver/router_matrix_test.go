@@ -154,6 +154,9 @@ func TestRouterRegisterRoutesIncludesKeyPaths(t *testing.T) {
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/cache/governance/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/events/status")
 	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/resilience/status")
+	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/system-governance/overview")
+	assertRoutePresent(t, routes, http.MethodGet, "/internal/v1/system-governance/actions")
+	assertRoutePresent(t, routes, http.MethodPost, "/internal/v1/system-governance/actions/:action_id/runs")
 }
 
 func TestRouterPublicBusinessRoutesAreCoveredByOpenAPI(t *testing.T) {

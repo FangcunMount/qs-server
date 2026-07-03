@@ -4,6 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/messaging"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
+	apiserveroptions "github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventruntime"
@@ -39,6 +40,8 @@ type ContainerOptions struct {
 	BehaviorFootprintDisableDurableEventTypes []string `json:"behavior_footprint_disable_durable_event_types" mapstructure:"behavior_footprint_disable_durable_event_types"`
 	// Silent suppresses container stdout bootstrap/cleanup prints.
 	Silent bool
+	// SystemGovernance unified governance facade configuration.
+	SystemGovernance *apiserveroptions.SystemGovernanceOptions
 }
 
 type BackpressureOptions struct {

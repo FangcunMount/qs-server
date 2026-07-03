@@ -9,6 +9,7 @@ import (
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answersheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
+	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
@@ -88,7 +89,39 @@ func (c *Container) BuildRESTDeps(rateCfg *options.RateLimitOptions) resttranspo
 		deps.Statistics = c.StatisticsModule.ExportRESTDeps(testeeAccess)
 	}
 
+	deps.SystemGovernanceFacade = c.buildRESTSystemGovernanceFacade(rateCfg, deps.Statistics)
+
 	return deps
+}
+
+func (c *Container) buildRESTSystemGovernanceFacade(rateCfg *options.RateLimitOptions, statisticsDeps resttransport.StatisticsDeps) systemgovApp.Facade {
+	if c == nil {
+		return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{})
+	}
+	eventStatus := c.buildRESTEventStatusService()
+	outboxes := make([]appEventing.NamedOutboxStatusReader, 0, 2)
+	if c.SurveyModule != nil {
+		outboxes = append(outboxes, c.SurveyModule.ExportRESTEventStatusOutbox())
+	}
+	if c.EvaluationModule != nil {
+		outboxes = append(outboxes, c.EvaluationModule.ExportRESTEventStatusOutbox())
+	}
+	cacheGovernance := statisticsApp.NewGovernanceFacade(
+		"apiserver",
+		statisticsDeps.WarmupCoordinator,
+		statisticsDeps.CacheGovernanceStatusService,
+	)
+	return platformmod.BuildRESTSystemGovernanceFacade(platformmod.RESTSystemGovernanceInput{
+		Options:            c.systemGovernanceOptions,
+		EventStatusService: eventStatus,
+		EventOutboxes:      outboxes,
+		CacheGovernance:    cacheGovernance,
+		LocalResilienceSnapshot: platformmod.BuildLocalResilienceSnapshot(
+			"apiserver",
+			rateCfg != nil && rateCfg.Enabled,
+			c.buildBackpressureSnapshots(),
+		),
+	})
 }
 
 func (c *Container) buildRESTEventStatusService() appEventing.StatusService {

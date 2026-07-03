@@ -32,6 +32,7 @@ func (s *server) buildContainerOptions(input containerOptionsInput) container.Co
 		StatisticsRepairWindowDays: statisticsRepairWindowDays(s.config),
 		ReportStatus:               s.config.ReportStatus,
 		Signaling:                  s.config.Signaling,
+		SystemGovernance:           s.config.SystemGovernance,
 		BehaviorFootprintDisableDurableEventTypes: behaviorFootprintDisableDurableEventTypes(s.config),
 	}
 }

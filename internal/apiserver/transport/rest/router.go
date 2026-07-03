@@ -23,6 +23,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	systemgovApp "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance"
 	workbenchApp "github.com/FangcunMount/qs-server/internal/apiserver/application/workbench"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
@@ -62,6 +63,7 @@ type Deps struct {
 	QRCodeObjectKeyPrefix   string
 	GovernanceStatusService cachegov.StatusService
 	EventStatusService      appEventing.StatusService
+	SystemGovernanceFacade  systemgovApp.Facade
 	Backpressure            []resilienceplane.BackpressureSnapshot
 	IAM                     IAMDeps
 }

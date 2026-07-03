@@ -39,6 +39,7 @@ type Options struct {
 	StatisticsSync           *StatisticsSyncOptions                  `json:"statistics_sync" mapstructure:"statistics_sync"`
 	ReportStatus             *genericoptions.ReportStatusOptions     `json:"report_status" mapstructure:"report_status"`
 	Signaling                *genericoptions.SignalingOptions        `json:"signaling" mapstructure:"signaling"`
+	SystemGovernance         *SystemGovernanceOptions                `json:"system_governance" mapstructure:"system_governance"`
 }
 
 // NewOptions 创建一个 Options 对象，包含默认参数
@@ -71,6 +72,7 @@ func NewOptions() *Options {
 		StatisticsSync:           NewStatisticsSyncOptions(),
 		ReportStatus:             genericoptions.NewReportStatusOptions(),
 		Signaling:                genericoptions.NewSignalingOptions(),
+		SystemGovernance:         NewSystemGovernanceOptions(),
 	}
 }
 
