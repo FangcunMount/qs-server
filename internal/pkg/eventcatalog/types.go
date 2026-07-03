@@ -9,7 +9,7 @@ const (
 	AssessmentSubmitted          = "assessment.submitted"
 	AssessmentInterpreted        = "assessment.interpreted"
 	AssessmentInterpretedOutcome = AssessmentInterpreted
-	AssessmentFailed               = "assessment.failed"
+	AssessmentFailed             = "assessment.failed"
 
 	ReportGenerated        = "report.generated"
 	ReportGeneratedOutcome = ReportGenerated

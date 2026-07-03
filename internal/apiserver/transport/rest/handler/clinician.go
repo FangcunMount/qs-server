@@ -54,6 +54,15 @@ func NewOperatorClinicianHandler(
 	}
 }
 
+// CreateStaff 创建员工。
+// @Summary 创建员工
+// @Tags Staff
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.CreateStaffRequest true "创建员工请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/staff [post]
 func (h *OperatorClinicianHandler) CreateStaff(c *gin.Context) {
 	var req request.CreateStaffRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -87,6 +96,14 @@ func (h *OperatorClinicianHandler) CreateStaff(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "员工创建成功", toStaffResponse(result))
 }
 
+// GetStaff 获取员工详情。
+// @Summary 获取员工详情
+// @Tags Staff
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "员工ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/staff/{id} [get]
 func (h *OperatorClinicianHandler) GetStaff(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -126,6 +143,16 @@ func (h *OperatorClinicianHandler) GetStaff(c *gin.Context) {
 	h.Success(c, toStaffResponse(result))
 }
 
+// UpdateStaff 更新员工。
+// @Summary 更新员工
+// @Tags Staff
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "员工ID"
+// @Param request body request.UpdateStaffRequest true "更新员工请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/staff/{id} [put]
 func (h *OperatorClinicianHandler) UpdateStaff(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -180,6 +207,14 @@ func (h *OperatorClinicianHandler) UpdateStaff(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "员工更新成功", toStaffResponse(result))
 }
 
+// DeleteStaff 删除员工。
+// @Summary 删除员工
+// @Tags Staff
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "员工ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/staff/{id} [delete]
 func (h *OperatorClinicianHandler) DeleteStaff(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -231,6 +266,13 @@ func (h *OperatorClinicianHandler) DeleteStaff(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "员工删除成功", nil)
 }
 
+// ListStaff 查询员工列表。
+// @Summary 查询员工列表
+// @Tags Staff
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/staff [get]
 func (h *OperatorClinicianHandler) ListStaff(c *gin.Context) {
 	var req request.ListStaffRequest
 	if err := c.ShouldBindQuery(&req); err != nil {
@@ -278,6 +320,17 @@ func (h *OperatorClinicianHandler) ListStaff(c *gin.Context) {
 	h.Success(c, toStaffListResponse(listResult.Items, listResult.TotalCount, req.Page, req.PageSize))
 }
 
+
+// CreateClinician 创建从业者。
+// @Summary 创建从业者
+// @Tags Clinician
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.CreateClinicianRequest true "创建从业者请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians [post]
+// @Router /api/v1/practitioners [post]
 func (h *OperatorClinicianHandler) CreateClinician(c *gin.Context) {
 	var req request.CreateClinicianRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -308,6 +361,18 @@ func (h *OperatorClinicianHandler) CreateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者创建成功", toClinicianResponse(result))
 }
 
+
+// UpdateClinician 更新从业者。
+// @Summary 更新从业者
+// @Tags Clinician
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Param request body request.UpdateClinicianRequest true "更新从业者请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id} [put]
+// @Router /api/v1/practitioners/{id} [put]
 func (h *OperatorClinicianHandler) UpdateClinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -346,6 +411,16 @@ func (h *OperatorClinicianHandler) UpdateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者更新成功", toClinicianResponse(result))
 }
 
+
+// ActivateClinician 激活从业者。
+// @Summary 激活从业者
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/activate [post]
+// @Router /api/v1/practitioners/{id}/activate [post]
 func (h *OperatorClinicianHandler) ActivateClinician(c *gin.Context) {
 	result, err := h.changeClinicianState(c, "activate_clinician", "Clinician activated", h.clinicianLifecycleService.Activate)
 	if err != nil {
@@ -355,6 +430,16 @@ func (h *OperatorClinicianHandler) ActivateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者已激活", toClinicianResponse(result))
 }
 
+
+// DeactivateClinician 停用从业者。
+// @Summary 停用从业者
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/deactivate [post]
+// @Router /api/v1/practitioners/{id}/deactivate [post]
 func (h *OperatorClinicianHandler) DeactivateClinician(c *gin.Context) {
 	result, err := h.changeClinicianState(c, "deactivate_clinician", "Clinician deactivated", h.clinicianLifecycleService.Deactivate)
 	if err != nil {
@@ -364,6 +449,18 @@ func (h *OperatorClinicianHandler) DeactivateClinician(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者已停用", toClinicianResponse(result))
 }
 
+
+// BindClinicianOperator 绑定操作员。
+// @Summary 绑定操作员
+// @Tags Clinician
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Param request body request.BindClinicianOperatorRequest true "绑定操作员请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/bind-operator [post]
+// @Router /api/v1/practitioners/{id}/bind-operator [post]
 func (h *OperatorClinicianHandler) BindClinicianOperator(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -406,6 +503,16 @@ func (h *OperatorClinicianHandler) BindClinicianOperator(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者绑定员工成功", toClinicianResponse(result))
 }
 
+
+// UnbindClinicianOperator 解绑操作员。
+// @Summary 解绑操作员
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/unbind-operator [post]
+// @Router /api/v1/practitioners/{id}/unbind-operator [post]
 func (h *OperatorClinicianHandler) UnbindClinicianOperator(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -430,6 +537,16 @@ func (h *OperatorClinicianHandler) UnbindClinicianOperator(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "从业者解绑员工成功", toClinicianResponse(result))
 }
 
+
+// GetClinician 获取从业者详情。
+// @Summary 获取从业者详情
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id} [get]
+// @Router /api/v1/practitioners/{id} [get]
 func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -456,6 +573,15 @@ func (h *OperatorClinicianHandler) GetClinician(c *gin.Context) {
 	h.Success(c, toClinicianResponse(result))
 }
 
+
+// ListClinicians 查询从业者列表。
+// @Summary 查询从业者列表
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians [get]
+// @Router /api/v1/practitioners [get]
 func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 	req := request.ListClinicianRequest{Page: 1, PageSize: 20}
 	if orgIDParam := c.Query("org_id"); orgIDParam != "" {
@@ -503,6 +629,16 @@ func (h *OperatorClinicianHandler) ListClinicians(c *gin.Context) {
 	h.Success(c, toClinicianListResponse(result, req.Page, req.PageSize))
 }
 
+
+// ListClinicianTestees 查询从业者受试者列表。
+// @Summary 查询从业者受试者列表
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/testees [get]
+// @Router /api/v1/practitioners/{id}/testees [get]
 func (h *OperatorClinicianHandler) ListClinicianTestees(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -548,6 +684,16 @@ func (h *OperatorClinicianHandler) ListClinicianTestees(c *gin.Context) {
 	})
 }
 
+
+// ListClinicianRelations 查询从业者关系列表。
+// @Summary 查询从业者关系列表
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/relations [get]
+// @Router /api/v1/practitioners/{id}/relations [get]
 func (h *OperatorClinicianHandler) ListClinicianRelations(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -567,6 +713,15 @@ func (h *OperatorClinicianHandler) ListClinicianRelations(c *gin.Context) {
 	h.listClinicianRelationsFor(c, orgID, clinicianID)
 }
 
+
+// GetMyClinician 获取当前从业者信息。
+// @Summary 获取当前从业者信息
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me [get]
+// @Router /api/v1/practitioners/me [get]
 func (h *OperatorClinicianHandler) GetMyClinician(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -581,6 +736,15 @@ func (h *OperatorClinicianHandler) GetMyClinician(c *gin.Context) {
 	h.Success(c, toClinicianResponse(clinicianItem))
 }
 
+
+// ListMyClinicianTestees 查询当前从业者受试者列表。
+// @Summary 查询当前从业者受试者列表
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/testees [get]
+// @Router /api/v1/practitioners/me/testees [get]
 func (h *OperatorClinicianHandler) ListMyClinicianTestees(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -615,6 +779,15 @@ func (h *OperatorClinicianHandler) ListMyClinicianTestees(c *gin.Context) {
 	h.Success(c, toTesteeListResponse(result.Items, result.TotalCount, page, pageSize))
 }
 
+
+// ListMyClinicianRelations 查询当前从业者关系列表。
+// @Summary 查询当前从业者关系列表
+// @Tags Clinician
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/relations [get]
+// @Router /api/v1/practitioners/me/relations [get]
 func (h *OperatorClinicianHandler) ListMyClinicianRelations(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -625,6 +798,16 @@ func (h *OperatorClinicianHandler) ListMyClinicianRelations(c *gin.Context) {
 	h.listClinicianRelationsFor(c, clinicianItem.OrgID, clinicianItem.ID)
 }
 
+
+// AssignClinicianTestee 分配受试者。
+// @Summary 分配受试者
+// @Tags ClinicianRelation
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.AssignClinicianTesteeRequest true "分配请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinician-testee-relations/assign [post]
 func (h *OperatorClinicianHandler) AssignClinicianTestee(c *gin.Context) {
 	var req request.AssignClinicianTesteeRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -652,18 +835,58 @@ func (h *OperatorClinicianHandler) AssignClinicianTestee(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "分配受试者成功", toRelationResponseFromClinicianResult(result))
 }
 
+
+// AssignPrimaryClinicianTestee 设置主责从业者。
+// @Summary 设置主责从业者
+// @Tags ClinicianRelation
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.AssignClinicianTesteeRequest true "分配请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinician-testee-relations/assign-primary [post]
 func (h *OperatorClinicianHandler) AssignPrimaryClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypePrimary), "设置主责从业者成功")
 }
 
+
+// AssignAttendingClinicianTestee 设置跟进从业者。
+// @Summary 设置跟进从业者
+// @Tags ClinicianRelation
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.AssignClinicianTesteeRequest true "分配请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinician-testee-relations/assign-attending [post]
 func (h *OperatorClinicianHandler) AssignAttendingClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeAttending), "设置跟进从业者成功")
 }
 
+
+// AssignCollaboratorClinicianTestee 设置协作从业者。
+// @Summary 设置协作从业者
+// @Tags ClinicianRelation
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.AssignClinicianTesteeRequest true "分配请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinician-testee-relations/assign-collaborator [post]
 func (h *OperatorClinicianHandler) AssignCollaboratorClinicianTestee(c *gin.Context) {
 	h.assignClinicianTesteeWithType(c, string(domainRelation.RelationTypeCollaborator), "设置协作从业者成功")
 }
 
+
+// TransferPrimaryClinicianTestee 转移主责从业者。
+// @Summary 转移主责从业者
+// @Tags ClinicianRelation
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.TransferPrimaryClinicianRequest true "转移请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinician-testee-relations/transfer-primary [post]
 func (h *OperatorClinicianHandler) TransferPrimaryClinicianTestee(c *gin.Context) {
 	var req request.TransferPrimaryClinicianRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -690,6 +913,15 @@ func (h *OperatorClinicianHandler) TransferPrimaryClinicianTestee(c *gin.Context
 	h.SuccessResponseWithMessage(c, "转移主责从业者成功", toRelationResponseFromClinicianResult(result))
 }
 
+
+// UnbindClinicianTesteeRelation 解绑从业者受试者关系。
+// @Summary 解绑从业者受试者关系
+// @Tags ClinicianRelation
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "关系ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinician-testee-relations/{id}/unbind [post]
 func (h *OperatorClinicianHandler) UnbindClinicianTesteeRelation(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -713,6 +945,15 @@ func (h *OperatorClinicianHandler) UnbindClinicianTesteeRelation(c *gin.Context)
 	h.SuccessResponseWithMessage(c, "解绑成功", toRelationResponseFromClinicianResult(result))
 }
 
+
+// GetTesteeClinicians 获取受试者关联从业者。
+// @Summary 获取受试者关联从业者
+// @Tags 受试者
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "受试者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/testees/{id}/clinicians [get]
 func (h *OperatorClinicianHandler) GetTesteeClinicians(c *gin.Context) {
 	result, err := h.loadTesteeClinicianRelations(c, true)
 	if err != nil {
@@ -730,6 +971,15 @@ func (h *OperatorClinicianHandler) GetTesteeClinicians(c *gin.Context) {
 	h.Success(c, &response.ClinicianListResponse{Items: items})
 }
 
+
+// ListTesteeClinicianRelations 获取受试者从业者关系。
+// @Summary 获取受试者从业者关系
+// @Tags 受试者
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "受试者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/testees/{id}/clinician-relations [get]
 func (h *OperatorClinicianHandler) ListTesteeClinicianRelations(c *gin.Context) {
 	result, err := h.loadTesteeClinicianRelations(c, false)
 	if err != nil {

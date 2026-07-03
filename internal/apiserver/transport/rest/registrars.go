@@ -2,7 +2,6 @@ package rest
 
 import (
 	"fmt"
-	"net/http"
 
 	auth "github.com/FangcunMount/iam/v2/pkg/sdk/auth/verifier"
 	codesHandler "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/handler"
@@ -53,13 +52,7 @@ func (registrar publicRouteRegistrar) register(engine *gin.Engine) {
 
 	publicAPI := engine.Group("/api/v1/public")
 	{
-		publicAPI.GET("/info", func(c *gin.Context) {
-			c.JSON(http.StatusOK, gin.H{
-				"service":     "questionnaire-scale",
-				"version":     "1.0.0",
-				"description": "问卷量表管理系统",
-			})
-		})
+		publicAPI.GET("/info", codesHandler.PublicInfo)
 		r.registerActorPublicRoutes(publicAPI)
 	}
 

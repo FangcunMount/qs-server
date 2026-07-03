@@ -40,6 +40,18 @@ func NewAssessmentEntryHandler(
 	}
 }
 
+
+// CreateClinicianAssessmentEntry 为从业者创建测评入口。
+// @Summary 为从业者创建测评入口
+// @Tags AssessmentEntry
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/assessment-entries [post]
+// @Router /api/v1/practitioners/{id}/assessment-entries [post]
 func (h *AssessmentEntryHandler) CreateClinicianAssessmentEntry(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -79,6 +91,16 @@ func (h *AssessmentEntryHandler) CreateClinicianAssessmentEntry(c *gin.Context) 
 	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
 }
 
+
+// ListClinicianAssessmentEntries 查询从业者测评入口列表。
+// @Summary 查询从业者测评入口列表
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "从业者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/{id}/assessment-entries [get]
+// @Router /api/v1/practitioners/{id}/assessment-entries [get]
 func (h *AssessmentEntryHandler) ListClinicianAssessmentEntries(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -109,6 +131,17 @@ func (h *AssessmentEntryHandler) ListClinicianAssessmentEntries(c *gin.Context) 
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
 
+
+// CreateMyAssessmentEntry 创建当前从业者测评入口。
+// @Summary 创建当前从业者测评入口
+// @Tags AssessmentEntry
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param request body request.CreateAssessmentEntryRequest true "创建测评入口请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/assessment-entries [post]
+// @Router /api/v1/practitioners/me/assessment-entries [post]
 func (h *AssessmentEntryHandler) CreateMyAssessmentEntry(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -139,6 +172,15 @@ func (h *AssessmentEntryHandler) CreateMyAssessmentEntry(c *gin.Context) {
 	h.SuccessResponseWithMessage(c, "测评入口创建成功", toAssessmentEntryResponse(result, qrCodeURL))
 }
 
+
+// ListMyAssessmentEntries 查询当前从业者测评入口列表。
+// @Summary 查询当前从业者测评入口列表
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/assessment-entries [get]
+// @Router /api/v1/practitioners/me/assessment-entries [get]
 func (h *AssessmentEntryHandler) ListMyAssessmentEntries(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -161,6 +203,16 @@ func (h *AssessmentEntryHandler) ListMyAssessmentEntries(c *gin.Context) {
 	h.Success(c, toAssessmentEntryListResponse(result, page, pageSize))
 }
 
+
+// GetMyAssessmentEntry 获取当前从业者测评入口详情。
+// @Summary 获取当前从业者测评入口详情
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "测评入口ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/assessment-entries/{id} [get]
+// @Router /api/v1/practitioners/me/assessment-entries/{id} [get]
 func (h *AssessmentEntryHandler) GetMyAssessmentEntry(c *gin.Context) {
 	clinicianItem, err := h.currentClinician(c)
 	if err != nil {
@@ -187,6 +239,15 @@ func (h *AssessmentEntryHandler) GetMyAssessmentEntry(c *gin.Context) {
 	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
 }
 
+
+// GetAssessmentEntry 获取测评入口详情。
+// @Summary 获取测评入口详情
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "测评入口ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/assessment-entries/{id} [get]
 func (h *AssessmentEntryHandler) GetAssessmentEntry(c *gin.Context) {
 	orgID, err := h.RequireProtectedOrgID(c)
 	if err != nil {
@@ -210,22 +271,68 @@ func (h *AssessmentEntryHandler) GetAssessmentEntry(c *gin.Context) {
 	h.Success(c, toAssessmentEntryResponse(result, h.generateAssessmentEntryQRCodeURL(c.Request.Context(), result.Token)))
 }
 
+
+// DeactivateAssessmentEntry 停用测评入口。
+// @Summary 停用测评入口
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "测评入口ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/assessment-entries/{id}/deactivate [post]
 func (h *AssessmentEntryHandler) DeactivateAssessmentEntry(c *gin.Context) {
 	h.setAssessmentEntryActive(c, false)
 }
 
+
+// ReactivateAssessmentEntry 重新启用测评入口。
+// @Summary 重新启用测评入口
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "测评入口ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/assessment-entries/{id}/reactivate [post]
 func (h *AssessmentEntryHandler) ReactivateAssessmentEntry(c *gin.Context) {
 	h.setAssessmentEntryActive(c, true)
 }
 
+
+// DeactivateMyAssessmentEntry 停用当前从业者测评入口。
+// @Summary 停用当前从业者测评入口
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "测评入口ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/assessment-entries/{id}/deactivate [post]
+// @Router /api/v1/practitioners/me/assessment-entries/{id}/deactivate [post]
 func (h *AssessmentEntryHandler) DeactivateMyAssessmentEntry(c *gin.Context) {
 	h.setMyAssessmentEntryActive(c, false)
 }
 
+
+// ReactivateMyAssessmentEntry 重新启用当前从业者测评入口。
+// @Summary 重新启用当前从业者测评入口
+// @Tags AssessmentEntry
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "测评入口ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/clinicians/me/assessment-entries/{id}/reactivate [post]
+// @Router /api/v1/practitioners/me/assessment-entries/{id}/reactivate [post]
 func (h *AssessmentEntryHandler) ReactivateMyAssessmentEntry(c *gin.Context) {
 	h.setMyAssessmentEntryActive(c, true)
 }
 
+
+// ResolveAssessmentEntry 解析公开测评入口。
+// @Summary 解析公开测评入口
+// @Tags AssessmentEntry
+// @Produce json
+// @Param token path string true "入口令牌"
+// @Success 200 {object} core.Response
+// @Router /api/v1/public/assessment-entries/{token} [get]
 func (h *AssessmentEntryHandler) ResolveAssessmentEntry(c *gin.Context) {
 	result, err := h.assessmentEntryService.Resolve(c.Request.Context(), c.Param("token"))
 	if err != nil {
@@ -236,6 +343,16 @@ func (h *AssessmentEntryHandler) ResolveAssessmentEntry(c *gin.Context) {
 	h.Success(c, toAssessmentEntryResolvedResponse(result))
 }
 
+
+// IntakeAssessmentEntry 公开测评入口 intake。
+// @Summary 公开测评入口 intake
+// @Tags AssessmentEntry
+// @Accept json
+// @Produce json
+// @Param token path string true "入口令牌"
+// @Param request body request.IntakeByAssessmentEntryRequest true "intake 请求"
+// @Success 200 {object} core.Response
+// @Router /api/v1/public/assessment-entries/{token}/intake [post]
 func (h *AssessmentEntryHandler) IntakeAssessmentEntry(c *gin.Context) {
 	var req request.IntakeByAssessmentEntryRequest
 	if err := c.ShouldBindJSON(&req); err != nil {

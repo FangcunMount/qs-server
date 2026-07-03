@@ -1,5 +1,70 @@
 basePath: /api/v1
 definitions:
+  assessmentmodel.ModelSummary:
+    properties:
+      algorithm:
+        type: string
+      category:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      kind:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      sub_kind:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  assessmentmodel.Option:
+    properties:
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  assessmentmodel.PreviewOutcome:
+    properties:
+      code:
+        type: string
+      title:
+        type: string
+    type: object
+  assessmentmodel.PreviewReportSection:
+    properties:
+      content:
+        type: string
+      kind:
+        type: string
+      title:
+        type: string
+    type: object
+  assessmentmodel.ValidationIssue:
+    properties:
+      code:
+        type: string
+      field:
+        type: string
+      level:
+        type: string
+      message:
+        type: string
+    type: object
   cachegovernance.ManualWarmupItemResult:
     properties:
       family:
@@ -127,6 +192,8 @@ definitions:
     type: integer
     x-enum-varnames:
     - ZeroID
+  report.InterpretReport:
+    type: object
   request.AddQuestionRequest:
     properties:
       code:
@@ -181,6 +248,13 @@ definitions:
     - questionnaire_code
     - testee_id
     type: object
+  request.ApplyAssessmentModelCodesRequest:
+    properties:
+      count:
+        type: integer
+      target:
+        type: string
+    type: object
   request.ApplyCodeRequest:
     properties:
       count:
@@ -192,6 +266,24 @@ definitions:
         type: object
       prefix:
         type: string
+    type: object
+  request.AssignClinicianTesteeRequest:
+    properties:
+      clinician_id:
+        $ref: '#/definitions/meta.ID'
+      org_id:
+        type: integer
+      relation_type:
+        type: string
+      source_id:
+        $ref: '#/definitions/meta.ID'
+      source_type:
+        type: string
+      testee_id:
+        $ref: '#/definitions/meta.ID'
+    required:
+    - clinician_id
+    - testee_id
     type: object
   request.BatchEvaluateRequest:
     properties:
@@ -214,6 +306,81 @@ definitions:
         items:
           $ref: '#/definitions/viewmodel.QuestionDTO'
         type: array
+    type: object
+  request.BindAssessmentModelQuestionnaireRequest:
+    properties:
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+    type: object
+  request.BindClinicianOperatorRequest:
+    properties:
+      operator_id:
+        $ref: '#/definitions/meta.ID'
+    required:
+    - operator_id
+    type: object
+  request.CreateAssessmentEntryRequest:
+    properties:
+      expires_at:
+        $ref: '#/definitions/request.FlexibleTime'
+      target_code:
+        type: string
+      target_type:
+        type: string
+      target_version:
+        type: string
+    required:
+    - target_code
+    - target_type
+    type: object
+  request.CreateAssessmentModelRequest:
+    properties:
+      algorithm:
+        type: string
+      category:
+        type: string
+      code:
+        type: string
+      description:
+        type: string
+      kind:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      sub_kind:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+    type: object
+  request.CreateClinicianRequest:
+    properties:
+      clinician_type:
+        type: string
+      department:
+        type: string
+      employee_code:
+        type: string
+      is_active:
+        type: boolean
+      name:
+        type: string
+      operator_id:
+        $ref: '#/definitions/meta.ID'
+      org_id:
+        type: integer
+      title:
+        type: string
+    required:
+    - clinician_type
+    - name
     type: object
   request.CreatePlanRequest:
     properties:
@@ -281,6 +448,38 @@ definitions:
       title:
         type: string
     type: object
+  request.CreateStaffRequest:
+    properties:
+      email:
+        description: 邮箱
+        type: string
+      is_active:
+        description: 是否激活
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      org_id:
+        description: 兼容字段：机构ID
+        type: integer
+      password:
+        description: 新建 IAM 运营账号时的初始密码
+        type: string
+      phone:
+        description: 电话
+        type: string
+      roles:
+        description: 期望授予的角色列表（IAM 启用时转成 assignment）
+        items:
+          type: string
+        type: array
+      user_id:
+        allOf:
+        - $ref: '#/definitions/meta.ID'
+        description: IAM用户ID（优先使用）
+    required:
+    - name
+    type: object
   request.EnrollTesteeRequest:
     properties:
       plan_id:
@@ -332,6 +531,24 @@ definitions:
       title:
         type: string
     type: object
+  request.FlexibleTime:
+    properties:
+      time.Time:
+        type: string
+    type: object
+  request.IntakeByAssessmentEntryRequest:
+    properties:
+      birthday:
+        type: string
+      gender:
+        type: string
+      name:
+        type: string
+      profile_id:
+        type: integer
+    required:
+    - name
+    type: object
   request.InterpretRuleModel:
     properties:
       conclusion:
@@ -364,6 +581,8 @@ definitions:
           type: string
         type: array
     type: object
+  request.PreviewAssessmentModelReportRequest:
+    type: object
   request.ReorderQuestionsRequest:
     properties:
       question_codes:
@@ -393,6 +612,40 @@ definitions:
         items:
           type: string
         type: array
+    type: object
+  request.TransferPrimaryClinicianRequest:
+    properties:
+      org_id:
+        type: integer
+      source_id:
+        $ref: '#/definitions/meta.ID'
+      source_type:
+        type: string
+      testee_id:
+        $ref: '#/definitions/meta.ID'
+      to_clinician_id:
+        $ref: '#/definitions/meta.ID'
+    required:
+    - testee_id
+    - to_clinician_id
+    type: object
+  request.UpdateAssessmentModelDefinitionRequest:
+    type: object
+  request.UpdateClinicianRequest:
+    properties:
+      clinician_type:
+        type: string
+      department:
+        type: string
+      employee_code:
+        type: string
+      name:
+        type: string
+      title:
+        type: string
+    required:
+    - clinician_type
+    - name
     type: object
   request.UpdateQuestionRequest:
     properties:
@@ -452,6 +705,41 @@ definitions:
       questionnaire_code:
         type: string
       questionnaire_version:
+        type: string
+    type: object
+  request.UpdateStaffRequest:
+    properties:
+      email:
+        description: 邮箱
+        type: string
+      is_active:
+        description: 是否激活
+        type: boolean
+      name:
+        description: 姓名
+        type: string
+      phone:
+        description: 电话
+        type: string
+      roles:
+        description: 角色列表
+        items:
+          type: string
+        type: array
+    type: object
+  request.UpdateTesteeRequest:
+    properties:
+      birthday:
+        description: 出生日期
+        type: string
+      gender:
+        description: 性别
+        type: string
+      is_key_focus:
+        description: 是否重点关注
+        type: boolean
+      name:
+        description: 姓名
         type: string
     type: object
   response.AnswerSheetListResponse:
@@ -538,6 +826,111 @@ definitions:
       total_pages:
         description: 总页数
         type: integer
+    type: object
+  response.AssessmentModelCodesResponse:
+    properties:
+      codes:
+        items:
+          type: string
+        type: array
+    type: object
+  response.AssessmentModelListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/assessmentmodel.ModelSummary'
+        type: array
+      page:
+        type: integer
+      page_size:
+        type: integer
+      total:
+        type: integer
+    type: object
+  response.AssessmentModelOptionsResponse:
+    properties:
+      algorithms:
+        items:
+          $ref: '#/definitions/assessmentmodel.Option'
+        type: array
+      categories:
+        items:
+          $ref: '#/definitions/assessmentmodel.Option'
+        type: array
+      kinds:
+        items:
+          $ref: '#/definitions/assessmentmodel.Option'
+        type: array
+      sub_kinds:
+        items:
+          $ref: '#/definitions/assessmentmodel.Option'
+        type: array
+      tags:
+        items:
+          $ref: '#/definitions/assessmentmodel.Option'
+        type: array
+    type: object
+  response.AssessmentModelPreviewReportResponse:
+    properties:
+      issues:
+        items:
+          $ref: '#/definitions/assessmentmodel.ValidationIssue'
+        type: array
+      outcome:
+        $ref: '#/definitions/assessmentmodel.PreviewOutcome'
+      raw_report:
+        $ref: '#/definitions/report.InterpretReport'
+      report_sections:
+        items:
+          $ref: '#/definitions/assessmentmodel.PreviewReportSection'
+        type: array
+      score_detail:
+        additionalProperties:
+          format: float64
+          type: number
+        type: object
+    type: object
+  response.AssessmentModelQuestionnaireResponse:
+    properties:
+      question_count:
+        type: integer
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      title:
+        type: string
+    type: object
+  response.AssessmentModelResponse:
+    properties:
+      algorithm:
+        type: string
+      category:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      kind:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      sub_kind:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
     type: object
   response.AssessmentOutcomeListResponse:
     properties:
@@ -1523,6 +1916,26 @@ definitions:
           $ref: '#/definitions/response.TaskResponse'
         type: array
     type: object
+  response.TesteeListResponse:
+    properties:
+      items:
+        description: 列表数据
+        items:
+          $ref: '#/definitions/response.TesteeResponse'
+        type: array
+      page:
+        description: 当前页码
+        type: integer
+      page_size:
+        description: 每页数量
+        type: integer
+      total:
+        description: 总数
+        type: integer
+      total_pages:
+        description: 总页数
+        type: integer
+    type: object
   response.TesteeResponse:
     properties:
       assessment_stats:
@@ -2280,6 +2693,45 @@ info:
   title: QS API Server
   version: "1.0"
 paths:
+  /api/v1/admin/logs:
+    get:
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: Not Implemented
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 管理员接口（未实现）
+      tags:
+      - Admin
+  /api/v1/admin/statistics:
+    get:
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: Not Implemented
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 管理员接口（未实现）
+      tags:
+      - Admin
+  /api/v1/admin/users:
+    get:
+      produces:
+      - application/json
+      responses:
+        "501":
+          description: Not Implemented
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 管理员接口（未实现）
+      tags:
+      - Admin
   /api/v1/answersheets:
     get:
       consumes:
@@ -2423,6 +2875,403 @@ paths:
       summary: 管理员提交答卷
       tags:
       - AnswerSheet-Management
+  /api/v1/assessment-entries/{id}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取测评入口详情
+      tags:
+      - AssessmentEntry
+  /api/v1/assessment-entries/{id}/deactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 停用测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/assessment-entries/{id}/reactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 重新启用测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/assessment-models:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型类型
+        in: query
+        name: kind
+        type: string
+      - description: 子类型
+        in: query
+        name: sub_kind
+        type: string
+      - description: 状态
+        in: query
+        name: status
+        type: string
+      - description: 关键词
+        in: query
+        name: keyword
+        type: string
+      - description: 分类
+        in: query
+        name: category
+        type: string
+      - description: 算法
+        in: query
+        name: algorithm
+        type: string
+      - description: 页码
+        in: query
+        name: page
+        type: integer
+      - description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelListResponse'
+              type: object
+      summary: 获取测评模型列表
+      tags:
+      - AssessmentModel
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建测评模型请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateAssessmentModelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 创建测评模型
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelResponse'
+              type: object
+      summary: 获取测评模型详情
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/codes/apply:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 申请编码请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.ApplyAssessmentModelCodesRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelCodesResponse'
+              type: object
+      summary: 申请编码
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/definition:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取测评模型定义
+      tags:
+      - AssessmentModel
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 更新定义请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateAssessmentModelDefinitionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新测评模型定义
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/preview-report:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 预览报告请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.PreviewAssessmentModelReportRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelPreviewReportResponse'
+              type: object
+      summary: 预览报告
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/{code}/questionnaire:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelQuestionnaireResponse'
+              type: object
+      summary: 获取测评模型绑定的问卷
+      tags:
+      - AssessmentModel
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型编码
+        in: path
+        name: code
+        required: true
+        type: string
+      - description: 绑定问卷请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.BindAssessmentModelQuestionnaireRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelQuestionnaireResponse'
+              type: object
+      summary: 绑定问卷
+      tags:
+      - AssessmentModel
+  /api/v1/assessment-models/options:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 模型类型
+        in: query
+        name: kind
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.AssessmentModelOptionsResponse'
+              type: object
+      summary: 获取测评模型选项
+      tags:
+      - AssessmentModel
   /api/v1/assessments/{id}/wait-report:
     get:
       description: 等待测评报告生成，支持长轮询机制。如果报告已生成则立即返回，否则等待最多 timeout 秒
@@ -2453,6 +3302,620 @@ paths:
       summary: 长轮询等待报告生成
       tags:
       - Evaluation-Assessment
+  /api/v1/clinician-testee-relations/{id}/unbind:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 关系ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 解绑从业者受试者关系
+      tags:
+      - ClinicianRelation
+  /api/v1/clinician-testee-relations/assign:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 分配请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignClinicianTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 分配受试者
+      tags:
+      - ClinicianRelation
+  /api/v1/clinician-testee-relations/assign-attending:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 分配请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignClinicianTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 设置跟进从业者
+      tags:
+      - ClinicianRelation
+  /api/v1/clinician-testee-relations/assign-collaborator:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 分配请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignClinicianTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 设置协作从业者
+      tags:
+      - ClinicianRelation
+  /api/v1/clinician-testee-relations/assign-primary:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 分配请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.AssignClinicianTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 设置主责从业者
+      tags:
+      - ClinicianRelation
+  /api/v1/clinician-testee-relations/transfer-primary:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 转移请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.TransferPrimaryClinicianRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 转移主责从业者
+      tags:
+      - ClinicianRelation
+  /api/v1/clinicians:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者列表
+      tags:
+      - Clinician
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建从业者请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateClinicianRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建从业者
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取从业者详情
+      tags:
+      - Clinician
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新从业者请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateClinicianRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新从业者
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}/activate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 激活从业者
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}/assessment-entries:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者测评入口列表
+      tags:
+      - AssessmentEntry
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 创建测评入口请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateAssessmentEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 为从业者创建测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/clinicians/{id}/bind-operator:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 绑定操作员请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.BindClinicianOperatorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 绑定操作员
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}/deactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 停用从业者
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}/relations:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者关系列表
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}/testees:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者受试者列表
+      tags:
+      - Clinician
+  /api/v1/clinicians/{id}/unbind-operator:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 解绑操作员
+      tags:
+      - Clinician
+  /api/v1/clinicians/me:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取当前从业者信息
+      tags:
+      - Clinician
+  /api/v1/clinicians/me/assessment-entries:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前从业者测评入口列表
+      tags:
+      - AssessmentEntry
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建测评入口请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateAssessmentEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建当前从业者测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/clinicians/me/assessment-entries/{id}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取当前从业者测评入口详情
+      tags:
+      - AssessmentEntry
+  /api/v1/clinicians/me/assessment-entries/{id}/deactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 停用当前从业者测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/clinicians/me/assessment-entries/{id}/reactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 重新启用当前从业者测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/clinicians/me/relations:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前从业者关系列表
+      tags:
+      - Clinician
+  /api/v1/clinicians/me/testees:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前从业者受试者列表
+      tags:
+      - Clinician
   /api/v1/codes/apply:
     post:
       consumes:
@@ -3288,6 +4751,524 @@ paths:
       summary: 开放任务
       tags:
       - Task-Management
+  /api/v1/practitioners:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者列表
+      tags:
+      - Clinician
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建从业者请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateClinicianRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建从业者
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取从业者详情
+      tags:
+      - Clinician
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新从业者请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateClinicianRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新从业者
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}/activate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 激活从业者
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}/assessment-entries:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者测评入口列表
+      tags:
+      - AssessmentEntry
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 创建测评入口请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateAssessmentEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 为从业者创建测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/practitioners/{id}/bind-operator:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 绑定操作员请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.BindClinicianOperatorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 绑定操作员
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}/deactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 停用从业者
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}/relations:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者关系列表
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}/testees:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询从业者受试者列表
+      tags:
+      - Clinician
+  /api/v1/practitioners/{id}/unbind-operator:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 从业者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 解绑操作员
+      tags:
+      - Clinician
+  /api/v1/practitioners/me:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取当前从业者信息
+      tags:
+      - Clinician
+  /api/v1/practitioners/me/assessment-entries:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前从业者测评入口列表
+      tags:
+      - AssessmentEntry
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建测评入口请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateAssessmentEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建当前从业者测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/practitioners/me/assessment-entries/{id}:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取当前从业者测评入口详情
+      tags:
+      - AssessmentEntry
+  /api/v1/practitioners/me/assessment-entries/{id}/deactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 停用当前从业者测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/practitioners/me/assessment-entries/{id}/reactivate:
+    post:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 测评入口ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 重新启用当前从业者测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/practitioners/me/relations:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前从业者关系列表
+      tags:
+      - Clinician
+  /api/v1/practitioners/me/testees:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询当前从业者受试者列表
+      tags:
+      - Clinician
+  /api/v1/public/assessment-entries/{token}:
+    get:
+      parameters:
+      - description: 入口令牌
+        in: path
+        name: token
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 解析公开测评入口
+      tags:
+      - AssessmentEntry
+  /api/v1/public/assessment-entries/{token}/intake:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: 入口令牌
+        in: path
+        name: token
+        required: true
+        type: string
+      - description: intake 请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.IntakeByAssessmentEntryRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 公开测评入口 intake
+      tags:
+      - AssessmentEntry
+  /api/v1/public/info:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 获取公开服务信息
+      tags:
+      - Public
   /api/v1/public/questionnaires:
     get:
       consumes:
@@ -3698,7 +5679,7 @@ paths:
       summary: 添加问题
       tags:
       - Questionnaire-Content
-  /api/v1/questionnaires/{code}/questions/{questionCode}:
+  /api/v1/questionnaires/{code}/questions/{qcode}:
     delete:
       consumes:
       - application/json
@@ -3880,6 +5861,63 @@ paths:
       summary: 下架问卷
       tags:
       - Questionnaire-Lifecycle
+  /api/v1/questionnaires/published:
+    get:
+      consumes:
+      - application/json
+      description: 分页查询已发布的问卷列表（C端答题使用）
+      parameters:
+      - default: 1
+        description: 页码
+        in: query
+        name: page
+        type: integer
+      - default: 10
+        description: 每页数量
+        in: query
+        name: page_size
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.QuestionnaireListResponse'
+              type: object
+      summary: 查询已发布问卷列表
+      tags:
+      - Questionnaire-Query
+  /api/v1/questionnaires/published/{code}:
+    get:
+      consumes:
+      - application/json
+      description: 根据编码获取已发布的问卷（C端答题使用）
+      parameters:
+      - description: 问卷编码
+        in: path
+        name: code
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.QuestionnaireResponse'
+              type: object
+      summary: 获取已发布问卷
+      tags:
+      - Questionnaire-Query
   /api/v1/scales:
     get:
       consumes:
@@ -4505,6 +6543,124 @@ paths:
       summary: 获取已发布的量表
       tags:
       - Scale-Query
+  /api/v1/staff:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 查询员工列表
+      tags:
+      - Staff
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 创建员工请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.CreateStaffRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 创建员工
+      tags:
+      - Staff
+  /api/v1/staff/{id}:
+    delete:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 删除员工
+      tags:
+      - Staff
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取员工详情
+      tags:
+      - Staff
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 员工ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新员工请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateStaffRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 更新员工
+      tags:
+      - Staff
   /api/v1/statistics/clinicians:
     get:
       consumes:
@@ -5099,6 +7255,29 @@ paths:
       summary: 查询受试者周期项目统计
       tags:
       - Statistics
+  /api/v1/testees:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeListResponse'
+              type: object
+      summary: 查询受试者列表
+      tags:
+      - 受试者
   /api/v1/testees/{id}:
     get:
       description: 根据受试者 ID 获取受试者详情
@@ -5139,6 +7318,87 @@ paths:
       security:
       - Bearer: []
       summary: 获取受试者详情
+      tags:
+      - 受试者
+    put:
+      consumes:
+      - application/json
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: 更新受试者请求
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/request.UpdateTesteeRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeResponse'
+              type: object
+      summary: 更新受试者
+      tags:
+      - 受试者
+  /api/v1/testees/{id}/clinician-relations:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取受试者从业者关系
+      tags:
+      - 受试者
+  /api/v1/testees/{id}/clinicians:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取受试者关联从业者
       tags:
       - 受试者
   /api/v1/testees/{id}/plans:
@@ -5212,6 +7472,29 @@ paths:
       summary: 查询受试者在某个计划下的所有任务
       tags:
       - Plan-Query
+  /api/v1/testees/{id}/scale-analysis:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: 受试者ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/core.Response'
+      summary: 获取受试者量表分析
+      tags:
+      - 受试者
   /api/v1/testees/{id}/tasks:
     get:
       description: 查看某个受试者的所有任务
@@ -5245,6 +7528,38 @@ paths:
       summary: 查询受试者的所有任务
       tags:
       - Plan-Query
+  /api/v1/testees/by-profile-id:
+    get:
+      parameters:
+      - description: Bearer 用户令牌
+        in: header
+        name: Authorization
+        required: true
+        type: string
+      - description: Profile ID
+        in: query
+        name: profile_id
+        required: true
+        type: string
+      - description: 机构 ID
+        in: query
+        name: org_id
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.TesteeResponse'
+              type: object
+      summary: 根据 profile_id 获取受试者
+      tags:
+      - 受试者
   /api/v2/evaluations/assessments:
     get:
       description: 分页查询测评列表，响应使用 model/primary_score/level 投影
@@ -5703,6 +8018,19 @@ paths:
       summary: 同步计划统计
       tags:
       - Statistics-Sync
+  /ping:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+      summary: 连通性测试
+      tags:
+      - health
   /practitioners/me/workbench/queues/{queue_type}:
     get:
       description: queue_type 取值：high_risk、follow_up、key_focus。high_risk 使用最近一次有效测评风险，follow_up

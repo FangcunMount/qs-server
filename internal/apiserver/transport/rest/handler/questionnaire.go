@@ -317,7 +317,7 @@ func (h *QuestionnaireHandler) AddQuestion(c *gin.Context) {
 // @Param questionCode path string true "问题编码"
 // @Param request body request.UpdateQuestionRequest true "更新问题请求"
 // @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
-// @Router /api/v1/questionnaires/{code}/questions/{questionCode} [put]
+// @Router /api/v1/questionnaires/{code}/questions/{qcode} [put]
 func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 	qCode := c.Param("code")
 	questionCode := c.Param("questionCode")
@@ -371,7 +371,7 @@ func (h *QuestionnaireHandler) UpdateQuestion(c *gin.Context) {
 // @Param code path string true "问卷编码"
 // @Param questionCode path string true "问题编码"
 // @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
-// @Router /api/v1/questionnaires/{code}/questions/{questionCode} [delete]
+// @Router /api/v1/questionnaires/{code}/questions/{qcode} [delete]
 func (h *QuestionnaireHandler) RemoveQuestion(c *gin.Context) {
 	qCode := c.Param("code")
 	questionCode := c.Param("questionCode")
@@ -605,6 +605,7 @@ func (h *QuestionnaireHandler) List(c *gin.Context) {
 // @Param code path string true "问卷编码"
 // @Success 200 {object} core.Response{data=response.QuestionnaireResponse}
 // @Router /api/v1/public/questionnaires/{code} [get]
+// @Router /api/v1/questionnaires/published/{code} [get]
 func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 	qCode := c.Param("code")
 	if qCode == "" {
@@ -631,6 +632,7 @@ func (h *QuestionnaireHandler) GetPublishedByCode(c *gin.Context) {
 // @Param page_size query int false "每页数量" default(10)
 // @Success 200 {object} core.Response{data=response.QuestionnaireListResponse}
 // @Router /api/v1/public/questionnaires [get]
+// @Router /api/v1/questionnaires/published [get]
 func (h *QuestionnaireHandler) ListPublished(c *gin.Context) {
 	page, err := strconv.Atoi(c.DefaultQuery("page", "1"))
 	if err != nil || page <= 0 {

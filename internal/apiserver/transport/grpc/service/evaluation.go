@@ -11,7 +11,6 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/compat"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -501,100 +500,15 @@ func normalizeGRPCAssessmentStatuses(raw string) []string {
 	case "":
 		return nil
 	case "pending":
-		return []string{domainAssessment.StatusPending.String(), domainAssessment.StatusSubmitted.String()}
+		return []string{"pending", "submitted"}
 	case "done":
-		return []string{domainAssessment.StatusInterpreted.String()}
+		return []string{"interpreted"}
 	default:
 		return []string{raw}
 	}
 }
 
 // ==================== 转换函数 ====================
-
-// toProtoAssessmentDetail 转换为 proto 测评详情（legacy 路径，ListMyReports 等仍可能使用）
-func toProtoAssessmentDetail(result *assessmentApp.AssessmentResult) *pb.AssessmentDetail {
-	if result == nil {
-		return nil
-	}
-
-	detail := &pb.AssessmentDetail{
-		Id:                   result.ID,
-		OrgId:                result.OrgID,
-		TesteeId:             result.TesteeID,
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetId:        result.AnswerSheetID,
-		OriginType:           result.OriginType,
-		Status:               result.Status,
-	}
-
-	if result.MedicalScaleCode != nil {
-		detail.ScaleCode = *result.MedicalScaleCode
-	}
-	if result.MedicalScaleName != nil {
-		detail.ScaleName = *result.MedicalScaleName
-	}
-	if result.OriginID != nil {
-		detail.OriginId = *result.OriginID
-	}
-	if result.TotalScore != nil {
-		detail.TotalScore = *result.TotalScore
-	}
-	if result.RiskLevel != nil {
-		detail.RiskLevel = *result.RiskLevel
-	}
-	if result.SubmittedAt != nil {
-		detail.SubmittedAt = result.SubmittedAt.Format("2006-01-02 15:04:05")
-	}
-	if result.InterpretedAt != nil {
-		detail.InterpretedAt = result.InterpretedAt.Format("2006-01-02 15:04:05")
-	}
-	if result.FailedAt != nil {
-		detail.FailedAt = result.FailedAt.Format("2006-01-02 15:04:05")
-	}
-	if result.FailureReason != nil {
-		detail.FailureReason = *result.FailureReason
-	}
-
-	return detail
-}
-
-// toProtoAssessmentSummary 转换为 proto 测评摘要
-func toProtoAssessmentSummary(result *assessmentApp.AssessmentResult) *pb.AssessmentSummary {
-	if result == nil {
-		return nil
-	}
-
-	summary := &pb.AssessmentSummary{
-		Id:                   result.ID,
-		QuestionnaireCode:    result.QuestionnaireCode,
-		QuestionnaireVersion: result.QuestionnaireVersion,
-		AnswerSheetId:        result.AnswerSheetID,
-		OriginType:           result.OriginType,
-		Status:               result.Status,
-	}
-
-	if result.MedicalScaleCode != nil {
-		summary.ScaleCode = *result.MedicalScaleCode
-	}
-	if result.MedicalScaleName != nil {
-		summary.ScaleName = *result.MedicalScaleName
-	}
-	if result.TotalScore != nil {
-		summary.TotalScore = *result.TotalScore
-	}
-	if result.RiskLevel != nil {
-		summary.RiskLevel = *result.RiskLevel
-	}
-	if result.SubmittedAt != nil {
-		summary.SubmittedAt = result.SubmittedAt.Format("2006-01-02 15:04:05")
-	}
-	if result.InterpretedAt != nil {
-		summary.InterpretedAt = result.InterpretedAt.Format("2006-01-02 15:04:05")
-	}
-
-	return summary
-}
 
 // toProtoReport 转换为 proto 报告
 func toProtoReport(result *assessmentApp.ReportResult) *pb.AssessmentReport {

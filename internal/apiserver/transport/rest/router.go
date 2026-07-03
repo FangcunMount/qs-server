@@ -224,6 +224,13 @@ func requestLimitKey(c *gin.Context) string {
 }
 
 // unsupportedFeature 明确标识当前保留但未支持的入口。
+// @Summary 管理员接口（未实现）
+// @Tags Admin
+// @Produce json
+// @Success 501 {object} map[string]interface{}
+// @Router /api/v1/admin/users [get]
+// @Router /api/v1/admin/statistics [get]
+// @Router /api/v1/admin/logs [get]
 func (r *Router) unsupportedFeature(c *gin.Context) {
 	c.JSON(http.StatusNotImplemented, gin.H{
 		"code":    501,
@@ -260,6 +267,11 @@ func (r *Router) healthCheck(c *gin.Context) {
 }
 
 // ping 简单的连通性测试。
+// @Summary 连通性测试
+// @Tags health
+// @Produce json
+// @Success 200 {object} map[string]interface{}
+// @Router /ping [get]
 func (r *Router) ping(c *gin.Context) {
 	c.JSON(200, gin.H{
 		"message": "pong",

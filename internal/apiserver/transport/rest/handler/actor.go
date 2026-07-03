@@ -110,6 +110,14 @@ func (h *TesteeHandler) GetTestee(c *gin.Context) {
 }
 
 // GetTesteeByProfileID 根据 profile_id 获取受试者详情。
+// @Summary 根据 profile_id 获取受试者
+// @Tags 受试者
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param profile_id query string true "Profile ID"
+// @Param org_id query int false "机构 ID"
+// @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Router /api/v1/testees/by-profile-id [get]
 func (h *TesteeHandler) GetTesteeByProfileID(c *gin.Context) {
 	_, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
@@ -162,6 +170,13 @@ func (h *TesteeHandler) GetTesteeByProfileID(c *gin.Context) {
 }
 
 // GetScaleAnalysis 获取受试者量表分析结果。
+// @Summary 获取受试者量表分析
+// @Tags 受试者
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "受试者ID"
+// @Success 200 {object} core.Response
+// @Router /api/v1/testees/{id}/scale-analysis [get]
 func (h *TesteeHandler) GetScaleAnalysis(c *gin.Context) {
 	id, err := h.parseTesteeIDParam(c, "get_scale_analysis")
 	if err != nil {
@@ -224,6 +239,15 @@ func (h *TesteeHandler) GetPeriodicStats(c *gin.Context) {
 }
 
 // UpdateTestee 更新受试者。
+// @Summary 更新受试者
+// @Tags 受试者
+// @Accept json
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Param id path int true "受试者ID"
+// @Param request body request.UpdateTesteeRequest true "更新受试者请求"
+// @Success 200 {object} core.Response{data=response.TesteeResponse}
+// @Router /api/v1/testees/{id} [put]
 func (h *TesteeHandler) UpdateTestee(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -302,6 +326,12 @@ func (h *TesteeHandler) UpdateTestee(c *gin.Context) {
 }
 
 // ListTestees 查询受试者列表。
+// @Summary 查询受试者列表
+// @Tags 受试者
+// @Produce json
+// @Param Authorization header string true "Bearer 用户令牌"
+// @Success 200 {object} core.Response{data=response.TesteeListResponse}
+// @Router /api/v1/testees [get]
 func (h *TesteeHandler) ListTestees(c *gin.Context) {
 	_, operatorUserID, err := h.RequireProtectedScope(c)
 	if err != nil {
