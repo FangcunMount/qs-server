@@ -2,10 +2,18 @@
 
 工作流分工：
 
-1. `CI` (`ci.yml`)：只做代码质量与可构建性验证，运行在 `pull_request -> main` 和 `push -> main`，不读取生产 secrets，不发布镜像。
-2. `Production Deploy` (`cd.yml`)：在 `CI` 的 `main` 成功后通过 `workflow_run` 自动触发，也支持手动 `workflow_dispatch`，并绑定 `production` environment 做人工审批。
-3. `cd.yml` 只负责编排、权限、审批和 secrets 注入；具体发布动作走 Makefile 入口和 `scripts/cd/*`。
-4. 运维类 workflow（健康检查、数据库操作、SSH 测试）独立保留，不作为 CI/CD 主链路的一部分。
+| 文件 | 用途 | 触发 |
+| ---- | ---- | ---- |
+| `ci.yml` | 代码质量与可构建性（test / lint / depguard / security advisory / build） | `pull_request` / `push` → `main` |
+| `cd.yml` | 生产发布（`workflow_run` 或手动） | `CI` 成功后 / `workflow_dispatch` |
+| `ping-runner.yml` | 生产 ServerA + ServerD runner 健康自检 | 每 6 小时 / `workflow_dispatch` |
+| `db-ops.yml` | MongoDB 备份 / 恢复 / 状态 | 每日定时备份 / `workflow_dispatch` |
+
+已移除的 workflow（冗余或失效）：
+
+- `server-check.yml`：与 `ping-runner` 的 ServerA 检查重复，且含自动 restart 容器等高风险逻辑
+- `test-ssh.yml`：手动 SSH 诊断，可由 `ping-runner` `workflow_dispatch` 替代
+- `seeddata-runner.yml`：指向不存在的 `tools/seeddata-runner/`（seeddata 为独立仓库）
 
 本仓库生产部署直接以仓库内配置文件为准，不再额外注入“升配/降配档位”。流程要点：
 
@@ -104,7 +112,7 @@ curl -sS -o /dev/null -w "acr:%{http_code}\n" https://<ALIYUN_ACR_REGISTRY>/v2/
 | `ALIYUN_ACR_USERNAME` | 访问凭证页用户名（如 `clack`） |
 | `ALIYUN_ACR_PASSWORD` | 访问凭证 → **设置固定密码** |
 
-4. 组织 Variable：`QS_DEPLOY_EXPORT_REGISTRY=acr`（或删除该变量，默认已是 `acr`）
+4.组织 Variable：`QS_DEPLOY_EXPORT_REGISTRY=acr`（或删除该变量，默认已是 `acr`）
 
 ServerD 验证：
 
@@ -196,7 +204,7 @@ install_runner serverD-runner3 runner3 <TOKEN3>
 
 ### 6. 流量路径（ServerD 模式）
 
-```
+```text
 GitHub 触发 CD
   → docker job（GitHub-hosted）构建推 GHCR + Docker Hub + 同步 push ACR
   → deploy job（ServerD runner ×3 并行）

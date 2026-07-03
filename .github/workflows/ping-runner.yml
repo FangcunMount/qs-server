@@ -5,20 +5,15 @@ on:
   schedule:
     - cron: '0 */6 * * *'  # 每6小时执行一次
 
-# runs-on 不能用 workflow env，直接读 vars.QS_DEPLOY_RUNNER
-
 jobs:
   ping-production:
-    name: Production Server Quick Check
+    name: Production Server Check (ServerA)
     runs-on: ubuntu-latest
     timeout-minutes: 5
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
       - name: System Health Check
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
@@ -26,7 +21,7 @@ jobs:
           port: ${{ vars.SVRA_SSH_PORT || 22 }}
           script: |
             echo "=========================================="
-            echo "QS-Server - Quick Check (ServerA)"
+            echo "QS-Server - Production Check (ServerA)"
             echo "=========================================="
             echo "Hostname: $(hostname)"
             echo "Uptime: $(uptime)"
@@ -46,7 +41,7 @@ jobs:
             echo "=========================================="
 
       - name: Docker Service Check
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
@@ -67,15 +62,22 @@ jobs:
             sudo docker ps --filter "name=qs-" --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"
             echo ""
 
-            if sudo docker ps --filter "name=qs-apiserver" --format "{{.Names}}" | grep -q "qs-apiserver"; then
-              echo "✅ API Server is running"
-            else
-              echo "❌ API Server is NOT running"
+            missing=0
+            for svc in qs-apiserver qs-collection-server; do
+              if sudo docker ps --filter "name=${svc}" --format "{{.Names}}" | grep -q "${svc}"; then
+                echo "✅ ${svc} is running"
+              else
+                echo "❌ ${svc} is NOT running"
+                missing=1
+              fi
+            done
+            if [ "$missing" -ne 0 ]; then
+              exit 1
             fi
             echo "=========================================="
 
       - name: API Health Check
-        uses: appleboy/ssh-action@v1.0.0
+        uses: appleboy/ssh-action@v1.2.2
         with:
           host: ${{ vars.SVRA_HOST }}
           username: ${{ vars.SVRA_USERNAME }}
@@ -86,11 +88,25 @@ jobs:
             echo "API Health Check (ServerA)"
             echo "=========================================="
 
+            failed=0
+
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8081/healthz 2>/dev/null || echo "000")
             if [ "$HTTP_CODE" = "200" ]; then
-              echo "✅ API Server HTTP (8081): OK"
+              echo "✅ API Server HTTP (8081/healthz): OK"
             else
-              echo "❌ API Server HTTP (8081): Failed ($HTTP_CODE)"
+              echo "❌ API Server HTTP (8081/healthz): Failed ($HTTP_CODE)"
+              failed=1
+            fi
+
+            HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" http://localhost:8082/health 2>/dev/null || echo "000")
+            if [ "$HTTP_CODE" = "200" ]; then
+              echo "✅ Collection Server HTTP (8082/health): OK"
+            else
+              echo "❌ Collection Server HTTP (8082/health): Failed ($HTTP_CODE)"
+              failed=1
+            fi
+
+            if [ "$failed" -ne 0 ]; then
               exit 1
             fi
             echo "=========================================="
@@ -103,12 +119,38 @@ jobs:
     steps:
       - name: Configure runner network (proxy + GitHub SSH)
         env:
-          HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
-          HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY || vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
-          ALL_PROXY: ${{ vars.QS_DEPLOY_ALL_PROXY || 'socks5://127.0.0.1:7891' }}
-          NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY || '127.0.0.1,localhost' }}
+          GH_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
           NETWORK_SCRIPT_REF: ${{ github.sha }}
         run: |
+          org="${GITHUB_REPOSITORY%%/*}"
+          get_var() {
+            gh variable get "$1" --repo "$GITHUB_REPOSITORY" 2>/dev/null \
+              || gh variable get "$1" --org "$org" 2>/dev/null \
+              || true
+          }
+          for env_file in \
+            "${HOME}/.env" \
+            "/opt/actions-runner/runner1/.env" \
+            "/opt/actions-runner/runner2/.env" \
+            "/opt/actions-runner/runner3/.env"; do
+            if [ -f "$env_file" ]; then
+              set -a
+              # shellcheck source=/dev/null
+              . "$env_file"
+              set +a
+              break
+            fi
+          done
+          HTTP_PROXY="${HTTP_PROXY:-$(get_var QS_DEPLOY_HTTP_PROXY)}"
+          HTTP_PROXY="${HTTP_PROXY:-http://127.0.0.1:7890}"
+          HTTPS_PROXY="${HTTPS_PROXY:-$(get_var QS_DEPLOY_HTTPS_PROXY)}"
+          HTTPS_PROXY="${HTTPS_PROXY:-$HTTP_PROXY}"
+          ALL_PROXY="${ALL_PROXY:-$(get_var QS_DEPLOY_ALL_PROXY)}"
+          ALL_PROXY="${ALL_PROXY:-socks5://127.0.0.1:7891}"
+          NO_PROXY="${NO_PROXY:-$(get_var QS_DEPLOY_NO_PROXY)}"
+          NO_PROXY="${NO_PROXY:-127.0.0.1,localhost}"
+          export HTTP_PROXY HTTPS_PROXY ALL_PROXY NO_PROXY
           curl -fsSL --proxy "${HTTP_PROXY}" \
             "https://raw.githubusercontent.com/FangcunMount/qs-server/${NETWORK_SCRIPT_REF}/scripts/cd/setup-runner-network.sh" \
             | bash
@@ -152,7 +194,7 @@ jobs:
           echo "Deploy Tooling"
           echo "=========================================="
           missing=0
-          for cmd in docker git make gzip; do
+          for cmd in docker git make gzip ssh scp; do
             if command -v "$cmd" >/dev/null 2>&1; then
               echo "✅ $cmd: $(command -v "$cmd")"
             else
@@ -248,8 +290,8 @@ jobs:
           echo "=========================================="
           echo "Ping Runner - Status Report"
           echo "=========================================="
-          echo "Production (ServerA via GitHub-hosted): ${{ needs.ping-production.result }}"
-          echo "ServerD deploy runner:                  ${{ needs.ping-serverd.result }}"
+          echo "Production (ServerA):  ${{ needs.ping-production.result }}"
+          echo "ServerD deploy runner: ${{ needs.ping-serverd.result }}"
           echo "Time: $(date)"
           echo ""
 

@@ -25,8 +25,9 @@ name: Production Deploy
 #   MYSQL_USERNAME, MYSQL_PASSWORD, MYSQL_DATABASE (Worker 使用)
 #   REDIS_PORT/DB/USERNAME/PASSWORD/USE_SSL/SSL_INSECURE_SKIP_VERIFY
 #   JWT_SECRET
-#   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET, OSS_SESSION_TOKEN（可选，apiserver 二维码 OSS）
-#   GRPC_APISERVER_ADDR (可选，默认 qs-apiserver:9090)
+#   OSS_ACCESS_KEY_ID, OSS_ACCESS_KEY_SECRET（apiserver 二维码 OSS）
+#   OSS_SESSION_TOKEN（可选 STS）：写入 ServerD runner .env，由 source-runner-env.sh 注入，勿放 workflow env
+#   GRPC_APISERVER_ADDR（可选，worker gRPC 地址，默认 qs-apiserver:9090）
 #
 # 生产拓扑（2026-06）：
 #   serverA（4C/8G）：nginx + qs-apiserver + qs-collection-server
@@ -82,12 +83,6 @@ env:
   DEPLOY_REF: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_branch || github.ref_name }}
   DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
   BUILD_TIME: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.updated_at || github.event.repository.updated_at }}
-  DEPLOY_EXPORT_REGISTRY: ${{ vars.QS_DEPLOY_EXPORT_REGISTRY || 'acr' }}
-  # 自托管 runner（ServerD）网络：走 Mihomo 代理 + GitHub SSH；ACR 走 NO_PROXY 直连国内
-  SELF_HOSTED_HTTP_PROXY: ${{ vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
-  SELF_HOSTED_HTTPS_PROXY: ${{ vars.QS_DEPLOY_HTTPS_PROXY || vars.QS_DEPLOY_HTTP_PROXY || 'http://127.0.0.1:7890' }}
-  SELF_HOSTED_ALL_PROXY: ${{ vars.QS_DEPLOY_ALL_PROXY || 'socks5://127.0.0.1:7891' }}
-  SELF_HOSTED_NO_PROXY: ${{ vars.QS_DEPLOY_NO_PROXY || '127.0.0.1,localhost,100.64.0.0/10,.aliyuncs.com,.personal.cr.aliyuncs.com' }}
 
 jobs:
   plan:
@@ -107,9 +102,14 @@ jobs:
       apiserver: ${{ steps.plan.outputs.apiserver }}
       collection: ${{ steps.plan.outputs.collection }}
       worker: ${{ steps.plan.outputs.worker }}
+      deploy_export_registry: ${{ steps.deploy_config.outputs.deploy_export_registry }}
+      self_hosted_http_proxy: ${{ steps.deploy_config.outputs.self_hosted_http_proxy }}
+      self_hosted_https_proxy: ${{ steps.deploy_config.outputs.self_hosted_https_proxy }}
+      self_hosted_all_proxy: ${{ steps.deploy_config.outputs.self_hosted_all_proxy }}
+      self_hosted_no_proxy: ${{ steps.deploy_config.outputs.self_hosted_no_proxy }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 0
@@ -122,6 +122,12 @@ jobs:
           GITHUB_TOKEN: ${{ github.token }}
         run: |
           make cd-plan
+
+      - name: Resolve deploy runner configuration
+        id: deploy_config
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: bash scripts/cd/resolve-deploy-config.sh
 
   docker:
     name: Build and Push Docker Images
@@ -146,7 +152,7 @@ jobs:
         service: ${{ fromJSON(needs.plan.outputs.services) }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
 
@@ -200,20 +206,37 @@ jobs:
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
-          HTTP_PROXY: ${{ env.SELF_HOSTED_HTTP_PROXY }}
-          HTTPS_PROXY: ${{ env.SELF_HOSTED_HTTPS_PROXY }}
-          ALL_PROXY: ${{ env.SELF_HOSTED_ALL_PROXY }}
-          NO_PROXY: ${{ env.SELF_HOSTED_NO_PROXY }}
+          PLAN_HTTP_PROXY: ${{ needs.plan.outputs.self_hosted_http_proxy }}
+          PLAN_HTTPS_PROXY: ${{ needs.plan.outputs.self_hosted_https_proxy }}
+          PLAN_ALL_PROXY: ${{ needs.plan.outputs.self_hosted_all_proxy }}
+          PLAN_NO_PROXY: ${{ needs.plan.outputs.self_hosted_no_proxy }}
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
         run: |
-          script_ref="${NETWORK_SCRIPT_REF:-${DEPLOY_SHA:-main}}"
+          for env_file in \
+            "${HOME}/.env" \
+            "/opt/actions-runner/runner1/.env" \
+            "/opt/actions-runner/runner2/.env" \
+            "/opt/actions-runner/runner3/.env"; do
+            if [ -f "$env_file" ]; then
+              set -a
+              # shellcheck source=/dev/null
+              . "$env_file"
+              set +a
+              break
+            fi
+          done
+          export HTTP_PROXY="${HTTP_PROXY:-$PLAN_HTTP_PROXY}"
+          export HTTPS_PROXY="${HTTPS_PROXY:-$PLAN_HTTPS_PROXY}"
+          export ALL_PROXY="${ALL_PROXY:-$PLAN_ALL_PROXY}"
+          export NO_PROXY="${NO_PROXY:-$PLAN_NO_PROXY}"
+          script_ref="${DEPLOY_SHA:-main}"
           curl -fsSL --proxy "${HTTP_PROXY}" \
             "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
             | bash
 
       - name: Checkout (self-hosted SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
@@ -221,13 +244,13 @@ jobs:
 
       - name: Checkout (GitHub-hosted HTTPS)
         if: vars.QS_DEPLOY_RUNNER == ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
 
       - name: Login to Aliyun ACR
-        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        if: needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
@@ -235,7 +258,7 @@ jobs:
         run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
 
       - name: Export deployment image tarball
-        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        if: needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           EXPORT_IMAGE_REGISTRY: acr
@@ -267,8 +290,9 @@ jobs:
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
           OSS_ACCESS_KEY_ID: ${{ secrets.OSS_ACCESS_KEY_ID }}
           OSS_ACCESS_KEY_SECRET: ${{ secrets.OSS_ACCESS_KEY_SECRET }}
-          OSS_SESSION_TOKEN: ${{ secrets.OSS_SESSION_TOKEN }}
         run: |
+          # shellcheck source=/dev/null
+          . scripts/cd/source-runner-env.sh
           make cd-package SERVICE=apiserver
 
       - name: Setup deploy SSH
@@ -317,20 +341,37 @@ jobs:
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
-          HTTP_PROXY: ${{ env.SELF_HOSTED_HTTP_PROXY }}
-          HTTPS_PROXY: ${{ env.SELF_HOSTED_HTTPS_PROXY }}
-          ALL_PROXY: ${{ env.SELF_HOSTED_ALL_PROXY }}
-          NO_PROXY: ${{ env.SELF_HOSTED_NO_PROXY }}
+          PLAN_HTTP_PROXY: ${{ needs.plan.outputs.self_hosted_http_proxy }}
+          PLAN_HTTPS_PROXY: ${{ needs.plan.outputs.self_hosted_https_proxy }}
+          PLAN_ALL_PROXY: ${{ needs.plan.outputs.self_hosted_all_proxy }}
+          PLAN_NO_PROXY: ${{ needs.plan.outputs.self_hosted_no_proxy }}
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
         run: |
-          script_ref="${NETWORK_SCRIPT_REF:-${DEPLOY_SHA:-main}}"
+          for env_file in \
+            "${HOME}/.env" \
+            "/opt/actions-runner/runner1/.env" \
+            "/opt/actions-runner/runner2/.env" \
+            "/opt/actions-runner/runner3/.env"; do
+            if [ -f "$env_file" ]; then
+              set -a
+              # shellcheck source=/dev/null
+              . "$env_file"
+              set +a
+              break
+            fi
+          done
+          export HTTP_PROXY="${HTTP_PROXY:-$PLAN_HTTP_PROXY}"
+          export HTTPS_PROXY="${HTTPS_PROXY:-$PLAN_HTTPS_PROXY}"
+          export ALL_PROXY="${ALL_PROXY:-$PLAN_ALL_PROXY}"
+          export NO_PROXY="${NO_PROXY:-$PLAN_NO_PROXY}"
+          script_ref="${DEPLOY_SHA:-main}"
           curl -fsSL --proxy "${HTTP_PROXY}" \
             "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
             | bash
 
       - name: Checkout (self-hosted SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
@@ -338,13 +379,13 @@ jobs:
 
       - name: Checkout (GitHub-hosted HTTPS)
         if: vars.QS_DEPLOY_RUNNER == ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
 
       - name: Login to Aliyun ACR
-        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        if: needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
@@ -352,7 +393,7 @@ jobs:
         run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
 
       - name: Export deployment image tarball
-        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        if: needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           EXPORT_IMAGE_REGISTRY: acr
@@ -420,20 +461,37 @@ jobs:
       - name: Configure runner network (proxy + GitHub SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
         env:
-          HTTP_PROXY: ${{ env.SELF_HOSTED_HTTP_PROXY }}
-          HTTPS_PROXY: ${{ env.SELF_HOSTED_HTTPS_PROXY }}
-          ALL_PROXY: ${{ env.SELF_HOSTED_ALL_PROXY }}
-          NO_PROXY: ${{ env.SELF_HOSTED_NO_PROXY }}
+          PLAN_HTTP_PROXY: ${{ needs.plan.outputs.self_hosted_http_proxy }}
+          PLAN_HTTPS_PROXY: ${{ needs.plan.outputs.self_hosted_https_proxy }}
+          PLAN_ALL_PROXY: ${{ needs.plan.outputs.self_hosted_all_proxy }}
+          PLAN_NO_PROXY: ${{ needs.plan.outputs.self_hosted_no_proxy }}
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
         run: |
-          script_ref="${NETWORK_SCRIPT_REF:-${DEPLOY_SHA:-main}}"
+          for env_file in \
+            "${HOME}/.env" \
+            "/opt/actions-runner/runner1/.env" \
+            "/opt/actions-runner/runner2/.env" \
+            "/opt/actions-runner/runner3/.env"; do
+            if [ -f "$env_file" ]; then
+              set -a
+              # shellcheck source=/dev/null
+              . "$env_file"
+              set +a
+              break
+            fi
+          done
+          export HTTP_PROXY="${HTTP_PROXY:-$PLAN_HTTP_PROXY}"
+          export HTTPS_PROXY="${HTTPS_PROXY:-$PLAN_HTTPS_PROXY}"
+          export ALL_PROXY="${ALL_PROXY:-$PLAN_ALL_PROXY}"
+          export NO_PROXY="${NO_PROXY:-$PLAN_NO_PROXY}"
+          script_ref="${DEPLOY_SHA:-main}"
           curl -fsSL --proxy "${HTTP_PROXY}" \
             "https://raw.githubusercontent.com/FangcunMount/qs-server/${script_ref}/scripts/cd/setup-runner-network.sh" \
             | bash
 
       - name: Checkout (self-hosted SSH)
         if: vars.QS_DEPLOY_RUNNER != ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
@@ -441,13 +499,13 @@ jobs:
 
       - name: Checkout (GitHub-hosted HTTPS)
         if: vars.QS_DEPLOY_RUNNER == ''
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           ref: ${{ env.DEPLOY_SHA }}
           fetch-depth: 1
 
       - name: Login to Aliyun ACR
-        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        if: needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           ALIYUN_ACR_REGISTRY: ${{ secrets.ALIYUN_ACR_REGISTRY }}
           ALIYUN_ACR_USERNAME: ${{ secrets.ALIYUN_ACR_USERNAME }}
@@ -455,7 +513,7 @@ jobs:
         run: echo "$ALIYUN_ACR_PASSWORD" | docker login "$ALIYUN_ACR_REGISTRY" -u "$ALIYUN_ACR_USERNAME" --password-stdin
 
       - name: Export deployment image tarball
-        if: env.DEPLOY_EXPORT_REGISTRY == 'acr'
+        if: needs.plan.outputs.deploy_export_registry == 'acr'
         env:
           DEPLOY_SHA: ${{ env.DEPLOY_SHA }}
           EXPORT_IMAGE_REGISTRY: acr
@@ -479,7 +537,7 @@ jobs:
           NSQ_NSQD_PORT: ${{ secrets.NSQ_NSQD_PORT || 4150 }}
           NSQ_LOOKUPD_HOST: ${{ secrets.NSQ_LOOKUPD_HOST }}
           NSQ_LOOKUPD_PORT: ${{ secrets.NSQ_LOOKUPD_PORT || 4161 }}
-          GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR || 'qs-apiserver:9090' }}
+          GRPC_APISERVER_ADDR: ${{ secrets.GRPC_APISERVER_ADDR }}
           REDIS_HOST: ${{ secrets.REDIS_HOST }}
           REDIS_PORT: ${{ secrets.REDIS_PORT || 6379 }}
           REDIS_DB: ${{ secrets.REDIS_DB || 0 }}
