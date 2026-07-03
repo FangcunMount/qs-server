@@ -22,13 +22,19 @@ type Facade interface {
 	RunAction(ctx context.Context, orgID int64, actionID string, req ActionRunRequest) (*ActionRunResult, error)
 }
 
+// MetricsClient provides Prometheus availability and query evidence.
+type MetricsClient interface {
+	MetricsReader
+	Probe(ctx context.Context, evalAt time.Time) govprom.Summary
+}
+
 // FacadeDeps wires governance data sources.
 type FacadeDeps struct {
 	EventStatusService      appEventing.StatusService
 	EventTypeSources        []EventTypeStatusSource
 	CacheGovernance         statisticsApp.GovernanceFacade
 	LocalResilienceSnapshot func() resilienceplane.RuntimeSnapshot
-	Metrics                 *govprom.Adapter
+	Metrics                 MetricsClient
 	Components              *govcomponent.Adapter
 	Actions                 *ActionExecutor
 }
@@ -38,6 +44,12 @@ type facade struct {
 	evaluator *Evaluator
 	registry  *ActionRegistry
 	now       func() time.Time
+}
+
+type evaluationContext struct {
+	windowLabel string
+	evalAt      time.Time
+	metrics     MetricsSummary
 }
 
 // NewFacade creates the governance facade.
@@ -55,62 +67,72 @@ func NewFacade(deps FacadeDeps) Facade {
 }
 
 func (f *facade) GetOverview(ctx context.Context, window string) (*OverviewResponse, error) {
-	_, windowLabel, evalAt, err := f.resolveWindow(window)
+	evalCtx, err := f.newEvaluationContext(ctx, window)
 	if err != nil {
 		return nil, err
 	}
-	events, err := f.GetEvents(ctx, windowLabel)
+	events, err := f.collectEvents(ctx, evalCtx)
 	if err != nil {
 		return nil, err
 	}
-	cache, err := f.GetCache(ctx, windowLabel)
+	cache, err := f.collectCache(ctx, evalCtx)
 	if err != nil {
 		return nil, err
 	}
-	resilience, err := f.GetResilience(ctx, windowLabel)
+	resilience, err := f.collectResilience(ctx, evalCtx)
 	if err != nil {
 		return nil, err
 	}
 	allSignals := append(append(events.Signals, cache.Signals...), resilience.Signals...)
 	return &OverviewResponse{
-		GeneratedAt:     evalAt,
-		Window:          windowLabel,
+		GeneratedAt:     evalCtx.evalAt,
+		Window:          evalCtx.windowLabel,
 		OverallSeverity: OverallSeverity(allSignals),
-		Metrics:         f.metricsSummary(ctx, windowLabel, evalAt),
+		Metrics:         evalCtx.metrics,
 		Signals:         SortSignals(allSignals),
 		Domains:         DomainSummaries(allSignals),
 	}, nil
 }
 
 func (f *facade) GetEvents(ctx context.Context, window string) (*EventsView, error) {
-	_, windowLabel, evalAt, err := f.resolveWindow(window)
+	evalCtx, err := f.newEvaluationContext(ctx, window)
 	if err != nil {
 		return nil, err
 	}
+	return f.collectEvents(ctx, evalCtx)
+}
+
+func (f *facade) collectEvents(ctx context.Context, evalCtx evaluationContext) (*EventsView, error) {
 	var snapshot *appEventing.StatusSnapshot
+	var err error
 	if f.deps.EventStatusService != nil {
 		snapshot, err = f.deps.EventStatusService.GetStatus(ctx)
 		if err != nil {
 			return nil, err
 		}
 	}
-	eventTypes := ReadEventTypes(ctx, f.deps.EventTypeSources, evalAt)
+	eventTypes := ReadEventTypes(ctx, f.deps.EventTypeSources, evalCtx.evalAt)
 	return &EventsView{
-		GeneratedAt: evalAt,
-		Window:      windowLabel,
-		Metrics:     f.metricsSummary(ctx, windowLabel, evalAt),
-		Signals:     f.evaluator.EvaluateEvents(ctx, snapshot, eventTypes, windowLabel, evalAt),
+		GeneratedAt: evalCtx.evalAt,
+		Window:      evalCtx.windowLabel,
+		Metrics:     evalCtx.metrics,
+		Signals:     f.evaluator.EvaluateEvents(ctx, snapshot, eventTypes, evalCtx.windowLabel, evalCtx.evalAt),
 		Snapshot:    snapshot,
 		EventTypes:  eventTypes,
 	}, nil
 }
 
 func (f *facade) GetCache(ctx context.Context, window string) (*CacheView, error) {
-	_, windowLabel, evalAt, err := f.resolveWindow(window)
+	evalCtx, err := f.newEvaluationContext(ctx, window)
 	if err != nil {
 		return nil, err
 	}
+	return f.collectCache(ctx, evalCtx)
+}
+
+func (f *facade) collectCache(ctx context.Context, evalCtx evaluationContext) (*CacheView, error) {
 	var snapshot *cachegov.StatusSnapshot
+	var err error
 	if f.deps.CacheGovernance != nil {
 		snapshot, err = f.deps.CacheGovernance.GetStatus(ctx)
 		if err != nil {
@@ -118,20 +140,24 @@ func (f *facade) GetCache(ctx context.Context, window string) (*CacheView, error
 		}
 	}
 	return &CacheView{
-		GeneratedAt: evalAt,
-		Window:      windowLabel,
-		Metrics:     f.metricsSummary(ctx, windowLabel, evalAt),
-		Signals:     f.evaluator.EvaluateCache(ctx, snapshot, windowLabel, evalAt),
+		GeneratedAt: evalCtx.evalAt,
+		Window:      evalCtx.windowLabel,
+		Metrics:     evalCtx.metrics,
+		Signals:     f.evaluator.EvaluateCache(ctx, snapshot, evalCtx.windowLabel, evalCtx.evalAt),
 		Snapshot:    snapshot,
 	}, nil
 }
 
 func (f *facade) GetResilience(ctx context.Context, window string) (*ResilienceView, error) {
-	_, windowLabel, evalAt, err := f.resolveWindow(window)
+	evalCtx, err := f.newEvaluationContext(ctx, window)
 	if err != nil {
 		return nil, err
 	}
-	local := resilienceplane.NewRuntimeSnapshot("apiserver", evalAt)
+	return f.collectResilience(ctx, evalCtx)
+}
+
+func (f *facade) collectResilience(ctx context.Context, evalCtx evaluationContext) (*ResilienceView, error) {
+	local := resilienceplane.NewRuntimeSnapshot("apiserver", evalCtx.evalAt)
 	if f.deps.LocalResilienceSnapshot != nil {
 		local = f.deps.LocalResilienceSnapshot()
 	}
@@ -150,10 +176,10 @@ func (f *facade) GetResilience(ctx context.Context, window string) (*ResilienceV
 		components[name] = item
 	}
 	return &ResilienceView{
-		GeneratedAt: evalAt,
-		Window:      windowLabel,
-		Metrics:     f.metricsSummary(ctx, windowLabel, evalAt),
-		Signals:     f.evaluator.EvaluateResilience(ctx, local, remote, windowLabel, evalAt),
+		GeneratedAt: evalCtx.evalAt,
+		Window:      evalCtx.windowLabel,
+		Metrics:     evalCtx.metrics,
+		Signals:     f.evaluator.EvaluateResilience(ctx, local, remote, evalCtx.windowLabel, evalCtx.evalAt),
 		Components:  components,
 	}, nil
 }
@@ -177,6 +203,18 @@ func (f *facade) RunAction(ctx context.Context, orgID int64, actionID string, re
 	return f.deps.Actions.Run(ctx, orgID, actionID, req)
 }
 
+func (f *facade) newEvaluationContext(ctx context.Context, window string) (evaluationContext, error) {
+	_, windowLabel, evalAt, err := f.resolveWindow(window)
+	if err != nil {
+		return evaluationContext{}, err
+	}
+	return evaluationContext{
+		windowLabel: windowLabel,
+		evalAt:      evalAt,
+		metrics:     f.metricsSummary(ctx, evalAt),
+	}, nil
+}
+
 func (f *facade) resolveWindow(window string) (time.Duration, string, time.Time, error) {
 	duration, label, err := ParseWindow(window)
 	if err != nil {
@@ -190,7 +228,7 @@ func (f *facade) resolveWindow(window string) (time.Duration, string, time.Time,
 	return duration, label, now, nil
 }
 
-func (f *facade) metricsSummary(ctx context.Context, window string, evalAt time.Time) MetricsSummary {
+func (f *facade) metricsSummary(ctx context.Context, evalAt time.Time) MetricsSummary {
 	if f == nil || f.deps.Metrics == nil {
 		return MetricsSummary{Available: false, Reason: "prometheus not configured"}
 	}

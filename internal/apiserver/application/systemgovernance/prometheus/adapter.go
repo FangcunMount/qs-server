@@ -3,6 +3,7 @@ package prometheus
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 	"time"
 
@@ -23,6 +24,14 @@ type MetricResult struct {
 	Unit      string
 	Available bool
 	Reason    string
+}
+
+// QuerySpec describes one bounded PromQL query and how to present the result.
+type QuerySpec struct {
+	Name   string
+	Query  string
+	Window string
+	Unit   string
 }
 
 // Adapter loads near-window metrics via PromQL.
@@ -60,20 +69,22 @@ func (a *Adapter) Probe(ctx context.Context, evalAt time.Time) Summary {
 	return Summary{Available: true}
 }
 
-// QueryIncrease returns one counter increase metric.
-func (a *Adapter) QueryIncrease(ctx context.Context, metricName, window string, labels map[string]string, evalAt time.Time) MetricResult {
+// Query executes one explicit PromQL query.
+func (a *Adapter) Query(ctx context.Context, spec QuerySpec, evalAt time.Time) MetricResult {
 	result := MetricResult{
-		Name:   metricName,
-		Window: window,
-		Unit:   "count",
+		Name:   spec.Name,
+		Window: spec.Window,
+		Unit:   spec.Unit,
 	}
 	if a == nil || !a.enabled || a.client == nil {
 		result.Reason = "prometheus not configured"
 		return result
 	}
-	labelExpr := formatLabelSelector(labels)
-	query := fmt.Sprintf(`sum(increase(qs_resilience_decision_total%s[%s]))`, labelExpr, window)
-	value, ok, err := a.client.QueryInstant(ctx, query, evalAt)
+	if strings.TrimSpace(spec.Query) == "" {
+		result.Reason = "prometheus query is empty"
+		return result
+	}
+	value, ok, err := a.client.QueryInstant(ctx, spec.Query, evalAt)
 	if err != nil {
 		result.Reason = err.Error()
 		return result
@@ -85,27 +96,24 @@ func (a *Adapter) QueryIncrease(ctx context.Context, metricName, window string, 
 	return result
 }
 
-// QueryGauge returns one instant gauge metric.
-func (a *Adapter) QueryGauge(ctx context.Context, metricName, promQL, window, unit string, evalAt time.Time) MetricResult {
-	result := MetricResult{
-		Name:   metricName,
+// CounterIncreaseQuery builds a near-window counter increase query.
+func CounterIncreaseQuery(name, metric, window string, labels map[string]string) QuerySpec {
+	return QuerySpec{
+		Name:   name,
+		Query:  fmt.Sprintf(`sum(increase(%s%s[%s]))`, metric, formatLabelSelector(labels), window),
+		Window: window,
+		Unit:   "count",
+	}
+}
+
+// GaugeQuery wraps an instant gauge query.
+func GaugeQuery(name, promQL, window, unit string) QuerySpec {
+	return QuerySpec{
+		Name:   name,
+		Query:  promQL,
 		Window: window,
 		Unit:   unit,
 	}
-	if a == nil || !a.enabled || a.client == nil {
-		result.Reason = "prometheus not configured"
-		return result
-	}
-	value, ok, err := a.client.QueryInstant(ctx, promQL, evalAt)
-	if err != nil {
-		result.Reason = err.Error()
-		return result
-	}
-	result.Available = true
-	if ok {
-		result.Value = &value
-	}
-	return result
 }
 
 func formatLabelSelector(labels map[string]string) string {
@@ -114,7 +122,17 @@ func formatLabelSelector(labels map[string]string) string {
 	}
 	parts := make([]string, 0, len(labels))
 	for key, value := range labels {
-		parts = append(parts, fmt.Sprintf(`%s="%s"`, key, value))
+		parts = append(parts, fmt.Sprintf(`%s="%s"`, key, escapeLabelValue(value)))
 	}
+	sort.Strings(parts)
 	return "{" + strings.Join(parts, ",") + "}"
+}
+
+func escapeLabelValue(value string) string {
+	replacer := strings.NewReplacer(
+		`\`, `\\`,
+		"\n", `\n`,
+		`"`, `\"`,
+	)
+	return replacer.Replace(value)
 }

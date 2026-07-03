@@ -16,8 +16,7 @@ const pendingOldestAgeWarning = 5 * time.Minute
 
 // MetricsReader loads near-window Prometheus metrics.
 type MetricsReader interface {
-	QueryIncrease(ctx context.Context, metricName, window string, labels map[string]string, evalAt time.Time) govprom.MetricResult
-	QueryGauge(ctx context.Context, metricName, promQL, window, unit string, evalAt time.Time) govprom.MetricResult
+	Query(ctx context.Context, spec govprom.QuerySpec, evalAt time.Time) govprom.MetricResult
 }
 
 // Evaluator generates bounded governance signals across domains.
@@ -92,10 +91,11 @@ func (e *Evaluator) EvaluateEvents(
 					}
 					metricEvidence := []MetricEvidence{}
 					if e != nil && e.metrics != nil {
-						metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.QueryGauge(
-							ctx, "outbox_pending_oldest_age_seconds",
-							`max(qs_event_outbox_oldest_age_seconds{status="pending"})`,
-							window, "seconds", evalAt,
+						metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.Query(
+							ctx, govprom.GaugeQuery("outbox_pending_oldest_age_seconds",
+								`max(qs_event_outbox_oldest_age_seconds{status="pending"})`,
+								window, "seconds"),
+							evalAt,
 						)))
 					}
 					signals = append(signals, Signal{
@@ -297,9 +297,15 @@ func evaluateOneResilience(
 		utilization := queueUtilization(queue)
 		metricEvidence := []MetricEvidence{}
 		if e != nil && e.metrics != nil {
-			metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.QueryIncrease(ctx, "queue_full_"+component, window, map[string]string{
-				"outcome": "queue_full",
-			}, evalAt)))
+			metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.Query(ctx,
+				govprom.CounterIncreaseQuery(
+					"queue_full_"+component+"_"+queue.Name,
+					"qs_resilience_decision_total",
+					window,
+					queueDecisionLabels(component, queue, resilienceplane.OutcomeQueueFull),
+				),
+				evalAt,
+			)))
 		}
 		if utilization >= 0.9 {
 			signals = append(signals, Signal{
@@ -343,9 +349,15 @@ func evaluateOneResilience(
 		utilization := backpressureUtilization(bp)
 		metricEvidence := []MetricEvidence{}
 		if e != nil && e.metrics != nil {
-			metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.QueryIncrease(ctx, "backpressure_timeout_"+component+"_"+bp.Name, window, map[string]string{
-				"outcome": "backpressure_timeout",
-			}, evalAt)))
+			metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.Query(ctx,
+				govprom.CounterIncreaseQuery(
+					"backpressure_timeout_"+component+"_"+bp.Name,
+					"qs_resilience_decision_total",
+					window,
+					backpressureDecisionLabels(component, bp, resilienceplane.OutcomeBackpressureTimeout),
+				),
+				evalAt,
+			)))
 		}
 		severity := SeverityWarning
 		if utilization >= 0.9 {
@@ -385,6 +397,46 @@ func backpressureUtilization(bp resilienceplane.BackpressureSnapshot) float64 {
 		return 0
 	}
 	return float64(bp.InFlight) / float64(bp.MaxInflight)
+}
+
+func queueDecisionLabels(component string, queue resilienceplane.QueueSnapshot, outcome resilienceplane.Outcome) map[string]string {
+	return map[string]string{
+		"component": nonEmpty(queue.Component, component, "unknown"),
+		"kind":      resilienceplane.ProtectionQueue.String(),
+		"scope":     nonEmpty(queue.Name, "default"),
+		"resource":  queueResource(queue),
+		"strategy":  nonEmpty(queue.Strategy, "default"),
+		"outcome":   outcome.String(),
+	}
+}
+
+func queueResource(queue resilienceplane.QueueSnapshot) string {
+	switch queue.Name {
+	case "answersheet_submit", "submit":
+		return "submit_queue"
+	default:
+		return "default"
+	}
+}
+
+func backpressureDecisionLabels(component string, bp resilienceplane.BackpressureSnapshot, outcome resilienceplane.Outcome) map[string]string {
+	return map[string]string{
+		"component": nonEmpty(bp.Component, component, "unknown"),
+		"kind":      resilienceplane.ProtectionBackpressure.String(),
+		"scope":     nonEmpty(bp.Dependency, bp.Name, "default"),
+		"resource":  "downstream",
+		"strategy":  nonEmpty(bp.Strategy, "default"),
+		"outcome":   outcome.String(),
+	}
+}
+
+func nonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 // SortSignals orders signals by severity then id.
