@@ -1,0 +1,62 @@
+# 分层边界门禁（阶段 3）：domain / application 禁止直连基础设施。
+# 本地：make lint-boundaries
+# CI：lint-boundaries job
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - depguard
+  settings:
+    depguard:
+      rules:
+        domain-no-infra:
+          list-mode: lax
+          files:
+            - "internal/**/domain/**/*.go"
+          deny:
+            - pkg: "github.com/gin-gonic/gin"
+              desc: "domain 层不能依赖 HTTP 框架"
+            - pkg: "gorm.io/gorm"
+              desc: "domain 层不能依赖 ORM"
+            - pkg: "go.mongodb.org/mongo-driver"
+              desc: "domain 层不能依赖 Mongo driver"
+            - pkg: "github.com/redis/go-redis"
+              desc: "domain 层不能依赖 Redis client"
+            - pkg: "github.com/nsqio/go-nsq"
+              desc: "domain 层不能依赖 NSQ client"
+            - pkg: "google.golang.org/grpc"
+              desc: "domain 层不能依赖 gRPC"
+            - pkg: "net/http"
+              desc: "domain 层不能依赖 HTTP"
+            - pkg: "github.com/golang-jwt/jwt"
+              desc: "domain 层不能依赖 JWT 实现"
+        application-no-framework:
+          list-mode: lax
+          files:
+            - "internal/**/application/**/*.go"
+          deny:
+            - pkg: "github.com/gin-gonic/gin"
+              desc: "application 层不能依赖 gin.Context"
+            - pkg: "gorm.io/gorm"
+              desc: "application 层不能依赖 gorm.DB，应依赖 repository interface"
+            - pkg: "go.mongodb.org/mongo-driver"
+              desc: "application 层不能依赖 Mongo driver，应依赖 repository interface"
+            - pkg: "github.com/redis/go-redis"
+              desc: "application 层不能依赖 Redis client，应依赖 cache/status/signaling interface"
+            - pkg: "github.com/nsqio/go-nsq"
+              desc: "application 层不能依赖 NSQ client，应依赖 messaging interface"
+            - pkg: "github.com/FangcunMount/qs-server/internal/apiserver/infra"
+              desc: "application 层不能依赖 apiserver infra，应依赖 port/interface"
+            - pkg: "github.com/FangcunMount/qs-server/internal/collection-server/infra"
+              desc: "application 层不能依赖 collection-server infra，应依赖 port/interface"
+            - pkg: "github.com/FangcunMount/qs-server/internal/worker/infra"
+              desc: "application 层不能依赖 worker infra，应依赖 port/interface"
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

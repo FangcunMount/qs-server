@@ -102,7 +102,8 @@ COLOR_RED := \033[31m
 .PHONY: dev dev-apiserver dev-collection dev-worker dev-stop dev-status dev-logs
 .PHONY: test test-unit test-coverage test-race test-bench test-all
 .PHONY: test-submit test-message-queue
-.PHONY: lint fmt fmt-check maintainability-lint maintainability-lint-ci tier1-test-policy ensure-golangci-lint
+.PHONY: lint lint-boundaries fmt fmt-check maintainability-lint maintainability-lint-ci tier1-test-policy ensure-golangci-lint
+.PHONY: verify vuln
 .PHONY: security security-govulncheck security-govulncheck-ci security-gosec security-gosec-ci
 .PHONY: deps deps-download deps-tidy deps-verify deps-check
 .PHONY: install-tools install-air install-golangci-lint install-security-tools install-govulncheck install-gosec create-dirs
@@ -391,9 +392,12 @@ perf-verify: perf-check-k6 ## 校验压测脚本与 k6 场景
 	bash -n $(PERF_SCRIPT_DIR)/sync-vusers-from-example.sh
 	k6 inspect $(PERF_K6_SCRIPT)
 	k6 inspect $(PERF_SCRIPT_DIR)/k6-mixed-300qps.js
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300 $(PERF_K6_SCRIPT) | grep -q report_ws_query
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_240_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_280_models $(PERF_K6_SCRIPT) | grep -q medical_model_query
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300_http $(PERF_K6_SCRIPT) | grep -q report_ws_query
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=mixed_300_http_query $(PERF_K6_SCRIPT) | grep -q personality_questionnaire_query
+	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=personality_60 $(PERF_K6_SCRIPT) | grep -q personality_report_ws_query
 	k6 inspect -e PERF_CONFIG_FILE="$(CURDIR)/$(PERF_SCRIPT_DIR)/qs-perf.config.example.json" -e QPS_PROFILE=special_report_short_poll $(PERF_K6_SCRIPT) | grep -q report_status_query
 
 # ============================================================================
@@ -885,6 +889,14 @@ ensure-golangci-lint:
 lint: ensure-golangci-lint ## 运行代码检查
 	@echo "$(COLOR_CYAN)🔍 运行代码检查...$(COLOR_RESET)"
 	@"$(GOLANGCI_LINT_BIN)" run --timeout=5m
+
+lint-boundaries: ensure-golangci-lint ## 运行分层边界检查（depguard: domain/application）
+	@echo "$(COLOR_CYAN)🧱 运行分层边界检查...$(COLOR_RESET)"
+	@"$(GOLANGCI_LINT_BIN)" run -c .golangci-depguard.yml --timeout=5m
+
+vuln: security-govulncheck ## 运行依赖漏洞扫描（govulncheck）
+
+verify: test lint lint-boundaries vuln ## AI 重构前后质量门禁（行为 + 代码质量 + 分层边界 + 依赖安全）
 
 maintainability-lint: ensure-golangci-lint ## 运行 maintainability advisory 检查
 	@echo "$(COLOR_CYAN)🧭 运行 maintainability advisory 检查...$(COLOR_RESET)"
