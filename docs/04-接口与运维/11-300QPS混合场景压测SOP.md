@@ -103,7 +103,7 @@ make perf-special-report-short-poll
 | `mixed_280_models` | 280 | 71+36+25 /24/96/28 | 8m | `perf-mixed280-models` |
 | `mixed_300_http` | ~281 | 71+36+25 /24/96/29 | 10m | `perf-mixed300-http`（Step1） |
 | `mixed_300_http_query` | ~295 | 146 /24/96/29 | 10m | `perf-mixed300-http-query`（Step2） |
-| `mixed_300` | ~300 | 146+24+100+29+probe | 10m | `perf-mixed300`（**全量验收，已通过**） |
+| `mixed_300` | ~300 | 146+24+100+29+probe | 10m | `perf-mixed300`（**8C/16G 全量已通过；4C/8G 未承诺**） |
 | `mixed_300_http_query_nostats` | ~266 | 146 /24/96/0 | 10m | `perf-mixed300-http-query-nostats` |
 | `stats_isolate_29` | 29 | 仅 stats | 10m | `perf-stats-isolate29` |
 

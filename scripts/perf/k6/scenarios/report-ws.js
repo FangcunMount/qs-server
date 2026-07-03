@@ -3,7 +3,7 @@ import { check } from 'k6';
 import { scenarioData, pickReportSample, flattenReportSamples } from '../lib/data.js';
 import { authHeaders, collectionToken } from '../lib/http.js';
 import { COLLECTION_BASE_URL, REPORT_EVENTS_PATH, REPORT_WS_HOLD_SECONDS } from '../lib/config.js';
-import { reportStatusDuration, reportStatusFailed } from '../lib/metrics.js';
+import { reportStatusDuration, reportStatusFailed, reportStatusSuccessRate } from '../lib/metrics.js';
 
 function wsBaseURL(httpBase) {
   if (httpBase.startsWith('https://')) {
@@ -16,8 +16,10 @@ function wsBaseURL(httpBase) {
 }
 
 function runReportWsQuery(ctx, sample, kind, endpoint) {
+  const tags = { endpoint, service: 'collection-server', model_type: kind };
   if (!sample) {
-    reportStatusFailed.add(1, { reason: 'missing_report_sample' });
+    reportStatusSuccessRate.add(false, { ...tags, reason: 'missing_report_sample' });
+    reportStatusFailed.add(1, { ...tags, reason: 'missing_report_sample' });
     return;
   }
   const url = `${wsBaseURL(COLLECTION_BASE_URL)}${REPORT_EVENTS_PATH}`;
@@ -44,11 +46,11 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
           }
         }
         if (frame.op === 'error') {
-          reportStatusFailed.add(1, { reason: frame.code || 'ws_error' });
+          reportStatusFailed.add(1, { ...tags, reason: frame.code || 'ws_error' });
           socket.close();
         }
       } catch (_err) {
-        reportStatusFailed.add(1, { reason: 'ws_decode_error' });
+        reportStatusFailed.add(1, { ...tags, reason: 'ws_decode_error' });
         socket.close();
       }
     });
@@ -58,7 +60,12 @@ function runReportWsQuery(ctx, sample, kind, endpoint) {
       }
     }, Math.max(1000, Math.floor(REPORT_WS_HOLD_SECONDS * 1000)));
   });
-  reportStatusDuration.add(Date.now() - started, { endpoint, service: 'collection-server', model_type: kind });
+  reportStatusDuration.add(Date.now() - started, tags);
+  const ok = !!(res && res.status === 101);
+  reportStatusSuccessRate.add(ok, tags);
+  if (!ok) {
+    reportStatusFailed.add(1, { ...tags, reason: 'ws_connect_status' });
+  }
   check(res, { 'ws connect status 101': (r) => r && r.status === 101 });
 }
 

@@ -11,6 +11,17 @@ import {
   tryReadTextFile,
   normalizeBaseURL,
 } from './util.js';
+import {
+  REPORT_MODE_WEBSOCKET,
+  REPORT_MODE_SHORT_POLL,
+  REPORT_MODE_LONG_POLL,
+  defaultReportStatusPath,
+  isShortPollReportMode,
+  isWebSocketReportMode,
+  resolveReportModeFromInputs,
+} from './report-mode.js';
+
+export { REPORT_MODE_WEBSOCKET, REPORT_MODE_SHORT_POLL, REPORT_MODE_LONG_POLL };
 
 export let PERF_CONFIG_DIR = '';
 
@@ -518,75 +529,28 @@ export const REPORT_TIMEOUT = intEnv('REPORT_TIMEOUT', 20);
 export const REPORT_POLL_INTERVAL_MS = intEnv('REPORT_POLL_INTERVAL_MS', 3000);
 export const REPORT_WS_HOLD_SECONDS = numberEnv('REPORT_WS_HOLD_SECONDS', 5);
 
-const LONG_POLL_MEDICAL_REPORT_PATH =
-  '/api/v1/assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
-const LONG_POLL_PERSONALITY_REPORT_PATH =
-  '/api/v1/personality-assessments/{assessment_id}/wait-report?testee_id={testee_id}&timeout={report_timeout}';
-const SHORT_POLL_MEDICAL_REPORT_PATH = '/api/v1/assessments/{assessment_id}/report-status?testee_id={testee_id}';
-const SHORT_POLL_PERSONALITY_REPORT_PATH =
-  '/api/v1/personality-assessments/{assessment_id}/report-status?testee_id={testee_id}';
-
-function normalizeReportMode(raw) {
-  const value = String(raw || '')
-    .trim()
-    .toLowerCase()
-    .replace(/-/g, '_');
-  if (value === 'ws' || value === 'websocket') {
-    return 'websocket';
-  }
-  if (value === 'short' || value === 'short_poll' || value === 'report_status') {
-    return 'short_poll';
-  }
-  if (value === 'long' || value === 'long_poll' || value === 'wait_report') {
-    return 'long_poll';
-  }
-  return '';
-}
-
 export function resolveReportMode() {
-  const envMode = __ENV.REPORT_MODE;
-  if (envMode !== undefined && envMode !== '') {
-    const normalized = normalizeReportMode(envMode);
-    if (normalized) {
-      return normalized;
-    }
-  }
-  const configMode = configFirstValue(['reportMode', 'report_mode']);
-  if (configMode) {
-    const normalized = normalizeReportMode(configMode);
-    if (normalized) {
-      return normalized;
-    }
-  }
-  if (envOrConfigBool('REPORT_WEBSOCKET', ['reportWebSocket', 'report_websocket'], false)) {
-    return 'websocket';
-  }
-  if (envOrConfigBool('REPORT_SHORT_POLL', ['reportShortPoll', 'report_short_poll'], false)) {
-    return 'short_poll';
-  }
-  return 'short_poll';
+  return resolveReportModeFromInputs({
+    envMode: __ENV.REPORT_MODE,
+    configMode: configFirstValue(['reportMode', 'report_mode']),
+    websocketEnabled: envOrConfigBool('REPORT_WEBSOCKET', ['reportWebSocket', 'report_websocket'], false),
+    shortPollEnabled: envOrConfigBool('REPORT_SHORT_POLL', ['reportShortPoll', 'report_short_poll'], false),
+  });
 }
 
 export const REPORT_MODE = resolveReportMode();
-export const REPORT_SHORT_POLL = REPORT_MODE === 'short_poll';
-export const REPORT_WEBSOCKET = REPORT_MODE === 'websocket';
-
-function defaultReportStatusPath(kind) {
-  if (REPORT_MODE === 'short_poll') {
-    return kind === 'personality' ? SHORT_POLL_PERSONALITY_REPORT_PATH : SHORT_POLL_MEDICAL_REPORT_PATH;
-  }
-  return kind === 'personality' ? LONG_POLL_PERSONALITY_REPORT_PATH : LONG_POLL_MEDICAL_REPORT_PATH;
-}
+export const REPORT_SHORT_POLL = isShortPollReportMode(REPORT_MODE);
+export const REPORT_WEBSOCKET = isWebSocketReportMode(REPORT_MODE);
 
 export const REPORT_STATUS_PATH = envOrConfigString(
   'REPORT_STATUS_PATH',
   ['reportStatusPath', 'report_status_path', 'paths.reportStatus', 'paths.report_status'],
-  defaultReportStatusPath('medical')
+  defaultReportStatusPath(REPORT_MODE, 'medical')
 );
 export const PERSONALITY_REPORT_STATUS_PATH = envOrConfigString(
   'PERSONALITY_REPORT_STATUS_PATH',
   ['personalityReportStatusPath', 'personality_report_status_path', 'paths.personalityReportStatus', 'paths.personality_report_status'],
-  defaultReportStatusPath('personality')
+  defaultReportStatusPath(REPORT_MODE, 'personality')
 );
 export const REPORT_EVENTS_PATH = envOrConfigString(
   'REPORT_EVENTS_PATH',
