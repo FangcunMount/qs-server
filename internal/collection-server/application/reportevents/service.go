@@ -8,6 +8,7 @@ import (
 
 	evaluationapp "github.com/FangcunMount/qs-server/internal/collection-server/application/evaluation"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/personalityassessment"
+	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportstatus"
 	"github.com/FangcunMount/qs-server/internal/collection-server/application/reportwait"
 )
 
@@ -22,16 +23,7 @@ var (
 )
 
 // StatusPayload 是 WebSocket 推送与 HTTP report-status 对齐的公共状态载荷。
-type StatusPayload struct {
-	Status          string   `json:"status"`
-	Stage           string   `json:"stage,omitempty"`
-	Message         string   `json:"message,omitempty"`
-	Reason          string   `json:"reason,omitempty"`
-	NextPollAfterMs int      `json:"next_poll_after_ms,omitempty"`
-	TotalScore      *float64 `json:"total_score,omitempty"`
-	RiskLevel       *string  `json:"risk_level,omitempty"`
-	UpdatedAt       int64    `json:"updated_at"`
-}
+type StatusPayload = reportstatus.View
 
 type medicalReader interface {
 	GetMyAssessment(ctx context.Context, testeeID, assessmentID uint64) (*evaluationapp.AssessmentDetailResponse, error)
@@ -109,13 +101,13 @@ func (s *Service) CurrentStatus(ctx context.Context, kind string, testeeID, asse
 		if err != nil {
 			return nil, err
 		}
-		return fromMedicalStatus(reportwait.ToPublicAssessmentStatus(status)), nil
+		return reportstatus.MedicalView(reportwait.ToPublicAssessmentStatus(status)), nil
 	case KindPersonality:
 		status, err := s.personality.GetReportStatus(ctx, testeeID, assessmentID)
 		if err != nil {
 			return nil, err
 		}
-		return fromPersonalityStatus(status), nil
+		return personalityStatusView(status), nil
 	default:
 		return nil, ErrInvalidKind
 	}
@@ -128,36 +120,20 @@ func ParseUintID(raw string) (uint64, error) {
 	return strconv.ParseUint(raw, 10, 64)
 }
 
-func fromMedicalStatus(status *evaluationapp.AssessmentStatusResponse) *StatusPayload {
-	if status == nil {
-		return nil
-	}
-	return &StatusPayload{
-		Status:          status.Status,
-		Stage:           status.Stage,
-		Message:         status.Message,
-		Reason:          status.Reason,
-		NextPollAfterMs: status.NextPollAfterMs,
-		TotalScore:      status.TotalScore,
-		RiskLevel:       status.RiskLevel,
-		UpdatedAt:       status.UpdatedAt,
-	}
-}
-
-func fromPersonalityStatus(status *personalityassessment.AssessmentStatusResponse) *StatusPayload {
-	if status == nil {
-		return nil
-	}
-	return &StatusPayload{
-		Status:          status.Status,
-		Stage:           status.Stage,
-		Message:         status.Message,
-		Reason:          status.Reason,
-		NextPollAfterMs: status.NextPollAfterMs,
-		UpdatedAt:       status.UpdatedAt,
-	}
-}
-
 func IsTerminalStatus(status string) bool {
-	return status == "interpreted" || status == "failed" || status == "completed"
+	return reportstatus.IsTerminalStatus(status)
+}
+
+func personalityStatusView(status *personalityassessment.AssessmentStatusResponse) *StatusPayload {
+	if status == nil {
+		return nil
+	}
+	return &StatusPayload{
+		Status:          status.Status,
+		Stage:           status.Stage,
+		Message:         status.Message,
+		Reason:          status.Reason,
+		NextPollAfterMs: status.NextPollAfterMs,
+		UpdatedAt:       status.UpdatedAt,
+	}
 }

@@ -119,6 +119,8 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 		mu.Unlock()
 	}
 
+	writer := newFrameWriter(conn)
+
 	go func() {
 		ticker := time.NewTicker(heartbeat)
 		defer ticker.Stop()
@@ -134,7 +136,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 					_ = conn.Close(websocket.StatusPolicyViolation, "idle timeout")
 					return
 				}
-				if err := h.writeFrame(ctx, conn, outboundFrame{Op: OpPong}); err != nil {
+				if err := writer.write(ctx, outboundFrame{Op: OpPong}); err != nil {
 					return
 				}
 			}
@@ -150,30 +152,30 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 
 		frame, err := decodeFrame(payload)
 		if err != nil {
-			_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "bad_request", Message: "invalid frame"})
+			_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "bad_request", Message: "invalid frame"})
 			continue
 		}
 
 		switch frame.Op {
 		case OpPing:
-			if err := h.writeFrame(ctx, conn, outboundFrame{Op: OpPong}); err != nil {
+			if err := writer.write(ctx, outboundFrame{Op: OpPong}); err != nil {
 				return
 			}
 		case OpSubscribe:
 			if subscribed {
-				_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "already_subscribed", Message: "only one active subscription per connection"})
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "already_subscribed", Message: "only one active subscription per connection"})
 				continue
 			}
 			if h.limiter != nil {
 				decision := h.limiter.Decide(ctx, frame.TesteeID)
 				if !decision.Allowed {
 					incSubscribeDenied("rate_limited")
-					_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "rate_limited", Message: "subscribe rate limited"})
+					_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "rate_limited", Message: "subscribe rate limited"})
 					continue
 				}
 			}
 			if !h.connMgr.TryAcquire(frame.TesteeID) {
-				_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "capacity_exhausted", Message: "connection capacity exhausted"})
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "capacity_exhausted", Message: "connection capacity exhausted"})
 				continue
 			}
 			activeTestee = frame.TesteeID
@@ -182,14 +184,14 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 			if err != nil {
 				h.connMgr.Release(activeTestee)
 				activeTestee = ""
-				_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "bad_request", Message: "invalid assessment_id"})
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "bad_request", Message: "invalid assessment_id"})
 				continue
 			}
 			testeeID, err := reportevents.ParseUintID(frame.TesteeID)
 			if err != nil {
 				h.connMgr.Release(activeTestee)
 				activeTestee = ""
-				_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "bad_request", Message: "invalid testee_id"})
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "bad_request", Message: "invalid testee_id"})
 				continue
 			}
 
@@ -204,7 +206,7 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 					code = "forbidden"
 				}
 				incSubscribeDenied(code)
-				_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: code, Message: err.Error()})
+				_ = writer.write(ctx, outboundFrame{Op: OpError, Code: code, Message: err.Error()})
 				continue
 			}
 
@@ -212,29 +214,29 @@ func (h *ReportEventsHandler) ServeHTTP(c *gin.Context) {
 			unsubscribe = cancel
 			subscribed = true
 
-			if err := h.writeFrame(ctx, conn, outboundFrame{
+			if err := writer.write(ctx, outboundFrame{
 				Op:           OpSubscribed,
 				AssessmentID: frame.AssessmentID,
 			}); err != nil {
 				return
 			}
-			if err := h.pushStatus(ctx, conn, status); err != nil {
+			if err := h.pushStatus(ctx, writer, status); err != nil {
 				return
 			}
 			if reportevents.IsTerminalStatus(status.Status) {
 				return
 			}
 
-			go h.forwardSignals(ctx, conn, frame.Kind, testeeID, assessmentID, signalCh, touch)
+			go h.forwardSignals(ctx, writer, frame.Kind, testeeID, assessmentID, signalCh, touch)
 		default:
-			_ = h.writeFrame(ctx, conn, outboundFrame{Op: OpError, Code: "bad_request", Message: fmt.Sprintf("unsupported op %q", frame.Op)})
+			_ = writer.write(ctx, outboundFrame{Op: OpError, Code: "bad_request", Message: fmt.Sprintf("unsupported op %q", frame.Op)})
 		}
 	}
 }
 
 func (h *ReportEventsHandler) forwardSignals(
 	ctx context.Context,
-	conn *websocket.Conn,
+	writer *frameWriter,
 	kind string,
 	testeeID, assessmentID uint64,
 	signalCh <-chan reportnotify.StatusEvent,
@@ -256,26 +258,18 @@ func (h *ReportEventsHandler) forwardSignals(
 				return
 			}
 			touch()
-			if err := h.pushStatus(ctx, conn, status); err != nil {
+			if err := h.pushStatus(ctx, writer, status); err != nil {
 				return
 			}
 			if reportevents.IsTerminalStatus(status.Status) {
-				_ = conn.Close(websocket.StatusNormalClosure, "completed")
+				_ = writer.conn.Close(websocket.StatusNormalClosure, "completed")
 				return
 			}
 		}
 	}
 }
 
-func (h *ReportEventsHandler) pushStatus(ctx context.Context, conn *websocket.Conn, status *reportevents.StatusPayload) error {
+func (h *ReportEventsHandler) pushStatus(ctx context.Context, writer *frameWriter, status *reportevents.StatusPayload) error {
 	incPush()
-	return h.writeFrame(ctx, conn, outboundFrame{Op: OpStatus, Data: status})
-}
-
-func (h *ReportEventsHandler) writeFrame(ctx context.Context, conn *websocket.Conn, frame outboundFrame) error {
-	payload, err := encodeFrame(frame)
-	if err != nil {
-		return err
-	}
-	return conn.Write(ctx, websocket.MessageText, payload)
+	return writer.write(ctx, outboundFrame{Op: OpStatus, Data: status})
 }
