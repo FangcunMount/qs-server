@@ -6,9 +6,10 @@ import (
 	"time"
 
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
-	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 )
+
+const pendingOldestAgeWarning = 5 * time.Minute
 
 // EventDrainProjection is the diagnostic view derived from event/outbox status.
 type EventDrainProjection struct {
@@ -20,11 +21,11 @@ type EventDrainProjection struct {
 
 // EventDrainEvaluator turns raw outbox snapshots into operator-facing signals and rows.
 type EventDrainEvaluator struct {
-	metrics MetricsReader
+	evidence MetricEvidenceReader
 }
 
 func NewEventDrainEvaluator(metrics MetricsReader) *EventDrainEvaluator {
-	return &EventDrainEvaluator{metrics: metrics}
+	return &EventDrainEvaluator{evidence: NewMetricEvidenceReader(metrics)}
 }
 
 func (e *EventDrainEvaluator) Evaluate(
@@ -113,27 +114,20 @@ func (e *EventDrainEvaluator) projectOutboxRow(
 }
 
 func (e *EventDrainEvaluator) outboxMetricEvidence(ctx context.Context, store, window string, evalAt time.Time) []MetricEvidence {
-	if e == nil || e.metrics == nil {
+	if e == nil {
 		return nil
 	}
-	labels := map[string]string{"store": store, "status": "pending"}
-	return []MetricEvidence{
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.InstantGaugeQuery("outbox_pending_backlog_"+store, "qs_event_outbox_backlog", window, "count", labels),
-			evalAt,
-		)),
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.InstantGaugeQuery("outbox_pending_oldest_age_seconds_"+store, "qs_event_outbox_oldest_age_seconds", window, "seconds", labels),
-			evalAt,
-		)),
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.CounterIncreaseQuery("outbox_status_scrape_failure_"+store, "qs_event_outbox_status_scrape_total", window, map[string]string{
-				"store":   store,
-				"outcome": "failure",
-			}),
-			evalAt,
-		)),
+	items := make([]MetricEvidence, 0, 3)
+	if item, ok := e.evidence.EventOutboxPendingBacklog(ctx, store, window, evalAt); ok {
+		items = append(items, item)
 	}
+	if item, ok := e.evidence.EventOutboxPendingOldestAge(ctx, store, window, evalAt); ok {
+		items = append(items, item)
+	}
+	if item, ok := e.evidence.EventOutboxStatusScrapeFailure(ctx, store, window, evalAt); ok {
+		items = append(items, item)
+	}
+	return items
 }
 
 func outboxSignals(row EventOutboxRow) []Signal {
@@ -275,20 +269,17 @@ func (r EventTypeRow) StatusIsStale() bool {
 }
 
 func (e *EventDrainEvaluator) eventTypeMetricEvidence(ctx context.Context, store, eventType, window string, evalAt time.Time) []MetricEvidence {
-	if e == nil || e.metrics == nil || eventType == "" || eventType == "reader_error" {
+	if e == nil || eventType == "" || eventType == "reader_error" {
 		return nil
 	}
-	labels := map[string]string{"store": store, "event_type": eventType, "status": "pending"}
-	return []MetricEvidence{
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.InstantGaugeQuery("outbox_event_type_pending_backlog_"+store+"_"+eventType, "qs_event_outbox_backlog_by_type", window, "count", labels),
-			evalAt,
-		)),
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.InstantGaugeQuery("outbox_event_type_pending_oldest_age_seconds_"+store+"_"+eventType, "qs_event_outbox_oldest_age_by_type_seconds", window, "seconds", labels),
-			evalAt,
-		)),
+	items := make([]MetricEvidence, 0, 2)
+	if item, ok := e.evidence.EventTypePendingBacklog(ctx, store, eventType, window, evalAt); ok {
+		items = append(items, item)
 	}
+	if item, ok := e.evidence.EventTypePendingOldestAge(ctx, store, eventType, window, evalAt); ok {
+		items = append(items, item)
+	}
+	return items
 }
 
 func eventTypeSignals(row EventTypeRow) []Signal {

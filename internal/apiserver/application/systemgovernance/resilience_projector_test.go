@@ -107,3 +107,19 @@ func TestResilienceProjectionKeepsPrometheusFailureAsMetricEvidence(t *testing.T
 		t.Fatalf("signals = %#v, want warning signal carrying unavailable metric evidence", projection.Signals)
 	}
 }
+
+func TestResilienceProjectionFlagsQueueUtilizationWithoutMetrics(t *testing.T) {
+	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
+	snapshot := resilienceplane.NewRuntimeSnapshot("collection-server", now)
+	snapshot.Queues = []resilienceplane.QueueSnapshot{
+		{Name: "submit", Depth: 90, Capacity: 100},
+	}
+
+	projection := NewResilienceProjector(nil).Evaluate(context.Background(), map[string]ComponentResilience{
+		"collection-server": {Available: true, Snapshot: &snapshot},
+	}, "5m", now)
+
+	if len(projection.Signals) != 1 || projection.Signals[0].Severity != SeverityCritical {
+		t.Fatalf("signals = %#v, want one critical queue utilization signal", projection.Signals)
+	}
+}

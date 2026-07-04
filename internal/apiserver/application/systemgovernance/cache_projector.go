@@ -7,7 +7,6 @@ import (
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
-	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 )
@@ -22,11 +21,11 @@ type CacheWarmupProjection struct {
 
 // CacheWarmupEvaluator turns cache runtime snapshots into operator-facing rows and signals.
 type CacheWarmupEvaluator struct {
-	metrics MetricsReader
+	evidence MetricEvidenceReader
 }
 
 func NewCacheWarmupEvaluator(metrics MetricsReader) *CacheWarmupEvaluator {
-	return &CacheWarmupEvaluator{metrics: metrics}
+	return &CacheWarmupEvaluator{evidence: NewMetricEvidenceReader(metrics)}
 }
 
 func (e *CacheWarmupEvaluator) Evaluate(
@@ -147,24 +146,17 @@ func (e *CacheWarmupEvaluator) familyMetricEvidence(
 	window string,
 	evalAt time.Time,
 ) []MetricEvidence {
-	if e == nil || e.metrics == nil {
+	if e == nil {
 		return nil
 	}
-	labels := map[string]string{
-		"component": family.Component,
-		"family":    family.Family,
-		"profile":   family.Profile,
+	items := make([]MetricEvidence, 0, 2)
+	if item, ok := e.evidence.CacheFamilyAvailable(ctx, family.Component, family.Family, family.Profile, window, evalAt); ok {
+		items = append(items, item)
 	}
-	return []MetricEvidence{
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.InstantGaugeQuery("cache_family_available_"+metricNamePart(family.Component)+"_"+metricNamePart(family.Family), "qs_cache_family_available", window, "bool", labels),
-			evalAt,
-		)),
-		toMetricEvidence(e.metrics.Query(ctx,
-			govprom.CounterIncreaseQuery("cache_family_degraded_"+metricNamePart(family.Component)+"_"+metricNamePart(family.Family), "qs_cache_family_degraded_total", window, labels),
-			evalAt,
-		)),
+	if item, ok := e.evidence.CacheFamilyDegraded(ctx, family.Component, family.Family, family.Profile, window, evalAt); ok {
+		items = append(items, item)
 	}
+	return items
 }
 
 func cacheFamilySignals(row CacheFamilyRow) []Signal {
@@ -209,11 +201,10 @@ func (e *CacheWarmupEvaluator) WarmupSignals(ctx context.Context, latest observa
 		return nil
 	}
 	metricEvidence := []MetricEvidence{}
-	if e != nil && e.metrics != nil {
-		metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.Query(ctx,
-			govprom.CounterIncreaseQuery("cache_warmup_runs_error", "qs_cache_warmup_runs_total", window, map[string]string{"result": "error"}),
-			evalAt,
-		)))
+	if e != nil {
+		if item, ok := e.evidence.CacheWarmupRunsError(ctx, window, evalAt); ok {
+			metricEvidence = append(metricEvidence, item)
+		}
 	}
 	return []Signal{{
 		ID:       "cache.warmup.error",
@@ -246,14 +237,10 @@ func (e *CacheWarmupEvaluator) withHotsetMetricEvidence(
 ) []CacheHotsetView {
 	result := make([]CacheHotsetView, 0, len(hotsets))
 	for _, hotset := range hotsets {
-		if e != nil && e.metrics != nil && hotset.Kind != "" {
-			hotset.MetricEvidence = append(hotset.MetricEvidence, toMetricEvidence(e.metrics.Query(ctx,
-				govprom.InstantGaugeQuery("cache_hotset_size_"+metricNamePart(string(hotset.Kind)), "qs_cache_hotset_size", window, "count", map[string]string{
-					"family": string(hotset.Family),
-					"kind":   string(hotset.Kind),
-				}),
-				evalAt,
-			)))
+		if e != nil && hotset.Kind != "" {
+			if item, ok := e.evidence.CacheHotsetSize(ctx, string(hotset.Family), string(hotset.Kind), window, evalAt); ok {
+				hotset.MetricEvidence = append(hotset.MetricEvidence, item)
+			}
 		}
 		result = append(result, hotset)
 	}

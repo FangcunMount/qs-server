@@ -9,7 +9,6 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
-	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -41,10 +40,9 @@ type FacadeDeps struct {
 }
 
 type facade struct {
-	deps      FacadeDeps
-	evaluator *Evaluator
-	registry  *ActionRegistry
-	now       func() time.Time
+	deps     FacadeDeps
+	registry *ActionRegistry
+	now      func() time.Time
 }
 
 type evaluationContext struct {
@@ -60,10 +58,9 @@ func NewFacade(deps FacadeDeps) Facade {
 		deps.Actions = NewActionExecutor(registry, deps.CacheGovernance)
 	}
 	return &facade{
-		deps:      deps,
-		evaluator: NewEvaluator(deps.Metrics),
-		registry:  registry,
-		now:       time.Now,
+		deps:     deps,
+		registry: registry,
+		now:      time.Now,
 	}
 }
 
@@ -192,20 +189,11 @@ func (f *facade) collectCacheHotsets(ctx context.Context) []CacheHotsetView {
 	if f == nil || f.deps.CacheGovernance == nil {
 		return nil
 	}
-	kinds := []cachetarget.WarmupKind{
-		cachetarget.WarmupKindStaticScale,
-		cachetarget.WarmupKindStaticQuestionnaire,
-		cachetarget.WarmupKindStaticScaleList,
-		cachetarget.WarmupKindStaticPersonalityModel,
-		cachetarget.WarmupKindQueryStatsOverview,
-		cachetarget.WarmupKindQueryStatsSystem,
-		cachetarget.WarmupKindQueryStatsQuestionnaire,
-		cachetarget.WarmupKindQueryStatsPlan,
-	}
+	kinds := DefaultCacheWarmupKinds()
 	hotsets := make([]CacheHotsetView, 0, len(kinds))
-	for _, kind := range kinds {
-		result, err := f.deps.CacheGovernance.GetHotset(ctx, string(kind), "5")
-		hotsets = append(hotsets, CacheHotsetViewFromResponse(kind, result, err))
+	for _, descriptor := range kinds {
+		result, err := f.deps.CacheGovernance.GetHotset(ctx, string(descriptor.Kind), "5")
+		hotsets = append(hotsets, CacheHotsetViewFromResponse(descriptor.Kind, result, err))
 	}
 	return hotsets
 }

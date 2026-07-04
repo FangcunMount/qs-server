@@ -75,3 +75,21 @@ func TestEventDrainProjectionMarksEventTypeReaderError(t *testing.T) {
 		t.Fatalf("signals = %#v, want reader error signal", projection.Signals)
 	}
 }
+
+func TestEventDrainProjectionFlagsPendingBacklogWarning(t *testing.T) {
+	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
+	projection := NewEventDrainEvaluator(nil).Evaluate(context.Background(), &appEventing.StatusSnapshot{
+		Outboxes: []appEventing.OutboxSummary{
+			{
+				Name: "mysql",
+				Buckets: []outboxport.StatusBucket{
+					{Status: "pending", Count: 3, OldestAgeSeconds: 400},
+				},
+			},
+		},
+	}, nil, "5m", now)
+
+	if len(projection.Signals) != 1 || projection.Signals[0].Severity != SeverityWarning {
+		t.Fatalf("signals = %#v, want one warning pending_stale signal", projection.Signals)
+	}
+}
