@@ -48,195 +48,29 @@ func (e *Evaluator) EvaluateEvents(
 	window string,
 	evalAt time.Time,
 ) []Signal {
-	signals := make([]Signal, 0)
-	if snapshot == nil {
-		return signals
-	}
-	for _, outbox := range snapshot.Outboxes {
-		if outbox.Degraded {
-			signals = append(signals, Signal{
-				ID:       "events.outbox.degraded." + outbox.Name,
-				Domain:   DomainEvents,
-				Severity: SeverityCritical,
-				Status:   "degraded",
-				Title:    "Outbox status reader degraded: " + outbox.Name,
-				Evidence: map[string]interface{}{
-					"store": outbox.Store,
-					"error": outbox.Error,
-				},
-				DashboardKey: "events_outbox",
-			})
-		}
-		for _, bucket := range outbox.Buckets {
-			switch bucket.Status {
-			case "failed":
-				signals = append(signals, Signal{
-					ID:       "events.outbox.failed." + outbox.Name,
-					Domain:   DomainEvents,
-					Severity: SeverityCritical,
-					Status:   "failed",
-					Title:    "Outbox has failed events",
-					Evidence: map[string]interface{}{
-						"store":  outbox.Store,
-						"status": bucket.Status,
-						"count":  bucket.Count,
-					},
-					DashboardKey: "events_outbox",
-				})
-			case "pending":
-				if bucket.Count > 0 && bucket.OldestAgeSeconds >= pendingOldestAgeWarning.Seconds() {
-					severity := SeverityWarning
-					if bucket.OldestAgeSeconds >= 15*time.Minute.Seconds() {
-						severity = SeverityCritical
-					}
-					metricEvidence := []MetricEvidence{}
-					if e != nil && e.metrics != nil {
-						metricEvidence = append(metricEvidence, toMetricEvidence(e.metrics.Query(
-							ctx, govprom.GaugeQuery("outbox_pending_oldest_age_seconds",
-								`max(qs_event_outbox_oldest_age_seconds{status="pending"})`,
-								window, "seconds"),
-							evalAt,
-						)))
-					}
-					signals = append(signals, Signal{
-						ID:       "events.outbox.pending_stale." + outbox.Name,
-						Domain:   DomainEvents,
-						Severity: severity,
-						Status:   "pending_stale",
-						Title:    "Pending outbox backlog is aging",
-						Evidence: map[string]interface{}{
-							"store":                 outbox.Store,
-							"count":                 bucket.Count,
-							"oldest_age_seconds":    bucket.OldestAgeSeconds,
-							"warning_after_seconds": pendingOldestAgeWarning.Seconds(),
-						},
-						MetricEvidence: metricEvidence,
-						DashboardKey:   "events_outbox",
-					})
-				}
-			}
-		}
-	}
-	for _, group := range eventTypes {
-		for _, bucket := range group.Buckets {
-			if bucket.Status != "pending" || bucket.Count == 0 {
-				continue
-			}
-			age := 0.0
-			if bucket.OldestCreatedAt != nil {
-				age = evalAt.Sub(*bucket.OldestCreatedAt).Seconds()
-			}
-			if age < pendingOldestAgeWarning.Seconds() {
-				continue
-			}
-			signals = append(signals, Signal{
-				ID:       "events.type.pending_stale." + group.Store + "." + bucket.EventType,
-				Domain:   DomainEvents,
-				Severity: SeverityWarning,
-				Status:   "event_type_backlog",
-				Title:    "Event type backlog is aging: " + bucket.EventType,
-				Evidence: map[string]interface{}{
-					"store":              group.Store,
-					"event_type":         bucket.EventType,
-					"count":              bucket.Count,
-					"oldest_age_seconds": age,
-				},
-				DashboardKey: "events_outbox_by_type",
-			})
-		}
-		if group.Error != "" {
-			signals = append(signals, Signal{
-				ID:       "events.type.reader_error." + group.Store,
-				Domain:   DomainEvents,
-				Severity: SeverityWarning,
-				Status:   "event_type_reader_error",
-				Title:    "Event type status unavailable",
-				Evidence: map[string]interface{}{
-					"store": group.Store,
-					"error": group.Error,
-				},
-			})
-		}
-	}
-	return SortSignals(signals)
+	return NewEventDrainEvaluator(e.metrics).Evaluate(ctx, snapshot, eventTypes, window, evalAt).Signals
 }
 
 // EvaluateCache inspects cache runtime and warmup snapshots.
 func (e *Evaluator) EvaluateCache(ctx context.Context, snapshot *cachegov.StatusSnapshot, window string, evalAt time.Time) []Signal {
-	signals := make([]Signal, 0)
 	if snapshot == nil {
-		return signals
+		return nil
 	}
-	if !snapshot.Summary.Ready {
-		signals = append(signals, Signal{
-			ID:       "cache.runtime.not_ready",
-			Domain:   DomainCache,
-			Severity: SeverityCritical,
-			Status:   "not_ready",
-			Title:    "Cache runtime is not ready",
-			Evidence: map[string]interface{}{
-				"degraded_count": snapshot.Summary.DegradedCount,
-			},
-			ActionIDs:    []string{"cache.repair_complete"},
-			DashboardKey: "cache_runtime",
-		})
+	runtimeSnapshot := snapshot.RuntimeSnapshot
+	components := map[string]ComponentCache{
+		nonEmpty(runtimeSnapshot.Component, "apiserver"): {Available: true, Snapshot: &runtimeSnapshot},
 	}
-	for _, family := range snapshot.Families {
-		if !family.Available {
-			signals = append(signals, Signal{
-				ID:       "cache.family.unavailable." + family.Family,
-				Domain:   DomainCache,
-				Severity: SeverityCritical,
-				Status:   "unavailable",
-				Title:    "Cache family unavailable: " + family.Family,
-				Evidence: map[string]interface{}{
-					"family":     family.Family,
-					"component":  family.Component,
-					"last_error": family.LastError,
-				},
-				ActionIDs:    []string{"cache.repair_complete", "cache.manual_warmup"},
-				DashboardKey: "cache_runtime",
-			})
-			continue
-		}
-		if family.Degraded {
-			signals = append(signals, Signal{
-				ID:       "cache.family.degraded." + family.Family,
-				Domain:   DomainCache,
-				Severity: SeverityWarning,
-				Status:   "degraded",
-				Title:    "Cache family degraded: " + family.Family,
-				Evidence: map[string]interface{}{
-					"family":    family.Family,
-					"component": family.Component,
-				},
-				ActionIDs:    []string{"cache.manual_warmup"},
-				DashboardKey: "cache_runtime",
-			})
-		}
-	}
+	evaluator := NewCacheWarmupEvaluator(e.metrics)
+	projection := evaluator.Evaluate(ctx, components, nil, window, evalAt)
 	if len(snapshot.Warmup.LatestRuns) > 0 {
 		latest := snapshot.Warmup.LatestRuns[0]
-		if latest.ErrorCount > 0 {
-			signals = append(signals, Signal{
-				ID:       "cache.warmup.error",
-				Domain:   DomainCache,
-				Severity: SeverityWarning,
-				Status:   "warmup_error",
-				Title:    "Cache warmup reported errors",
-				Evidence: map[string]interface{}{
-					"trigger":      latest.Trigger,
-					"error_count":  latest.ErrorCount,
-					"target_count": latest.TargetCount,
-				},
-				ActionIDs:    []string{"cache.manual_warmup"},
-				DashboardKey: "cache_warmup",
-			})
-		}
+		projection.Signals = append(projection.Signals, evaluator.WarmupSignals(ctx, observabilityWarmupLatestRun{
+			Trigger:     latest.Trigger,
+			ErrorCount:  latest.ErrorCount,
+			TargetCount: latest.TargetCount,
+		}, window, evalAt)...)
 	}
-	_ = window
-	_ = evalAt
-	return SortSignals(signals)
+	return SortSignals(projection.Signals)
 }
 
 // EvaluateResilience inspects local and remote resilience snapshots with metrics.

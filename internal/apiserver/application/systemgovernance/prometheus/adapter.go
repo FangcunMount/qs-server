@@ -116,6 +116,16 @@ func GaugeQuery(name, promQL, window, unit string) QuerySpec {
 	}
 }
 
+// InstantGaugeQuery builds a sum() instant gauge query with a bounded label selector.
+func InstantGaugeQuery(name, metric, window, unit string, labels map[string]string) QuerySpec {
+	return QuerySpec{
+		Name:   name,
+		Query:  fmt.Sprintf(`sum(%s%s)`, metric, formatLabelSelector(labels)),
+		Window: window,
+		Unit:   unit,
+	}
+}
+
 func formatLabelSelector(labels map[string]string) string {
 	if len(labels) == 0 {
 		return ""

@@ -46,3 +46,18 @@ func TestCounterIncreaseQuerySortsAndEscapesLabels(t *testing.T) {
 		t.Fatalf("spec metadata = %#v", spec)
 	}
 }
+
+func TestInstantGaugeQuerySortsAndEscapesLabels(t *testing.T) {
+	spec := InstantGaugeQuery("outbox_pending", "qs_event_outbox_backlog", "15m", "count", map[string]string{
+		"status":     "pending",
+		"event_type": `assessment"submitted`,
+		"store":      "mysql",
+	})
+	want := `sum(qs_event_outbox_backlog{event_type="assessment\"submitted",status="pending",store="mysql"})`
+	if spec.Query != want {
+		t.Fatalf("query = %q, want %q", spec.Query, want)
+	}
+	if spec.Name != "outbox_pending" || spec.Window != "15m" || spec.Unit != "count" {
+		t.Fatalf("spec metadata = %#v", spec)
+	}
+}

@@ -9,6 +9,7 @@ import (
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	govcomponent "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/component"
 	govprom "github.com/FangcunMount/qs-server/internal/apiserver/application/systemgovernance/prometheus"
+	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
@@ -75,7 +76,7 @@ func (f *facade) GetOverview(ctx context.Context, window string) (*OverviewRespo
 	if err != nil {
 		return nil, err
 	}
-	cache, err := f.collectCache(ctx, evalCtx)
+	cache, err := f.collectCache(ctx, evalCtx, false)
 	if err != nil {
 		return nil, err
 	}
@@ -112,13 +113,17 @@ func (f *facade) collectEvents(ctx context.Context, evalCtx evaluationContext) (
 		}
 	}
 	eventTypes := ReadEventTypes(ctx, f.deps.EventTypeSources, evalCtx.evalAt)
+	projection := NewEventDrainEvaluator(f.deps.Metrics).Evaluate(ctx, snapshot, eventTypes, evalCtx.windowLabel, evalCtx.evalAt)
 	return &EventsView{
 		GeneratedAt: evalCtx.evalAt,
 		Window:      evalCtx.windowLabel,
 		Metrics:     evalCtx.metrics,
-		Signals:     f.evaluator.EvaluateEvents(ctx, snapshot, eventTypes, evalCtx.windowLabel, evalCtx.evalAt),
+		Signals:     projection.Signals,
 		Snapshot:    snapshot,
 		EventTypes:  eventTypes,
+		Summary:     projection.Summary,
+		OutboxRows:  projection.OutboxRows,
+		TypeRows:    projection.EventTypeRows,
 	}, nil
 }
 
@@ -127,10 +132,10 @@ func (f *facade) GetCache(ctx context.Context, window string) (*CacheView, error
 	if err != nil {
 		return nil, err
 	}
-	return f.collectCache(ctx, evalCtx)
+	return f.collectCache(ctx, evalCtx, true)
 }
 
-func (f *facade) collectCache(ctx context.Context, evalCtx evaluationContext) (*CacheView, error) {
+func (f *facade) collectCache(ctx context.Context, evalCtx evaluationContext, includeHotsets bool) (*CacheView, error) {
 	var snapshot *cachegov.StatusSnapshot
 	var err error
 	if f.deps.CacheGovernance != nil {
@@ -139,13 +144,70 @@ func (f *facade) collectCache(ctx context.Context, evalCtx evaluationContext) (*
 			return nil, err
 		}
 	}
+	components := f.collectCacheComponents(ctx, snapshot)
+	var hotsets []CacheHotsetView
+	if includeHotsets {
+		hotsets = f.collectCacheHotsets(ctx)
+	}
+	evaluator := NewCacheWarmupEvaluator(f.deps.Metrics)
+	projection := evaluator.Evaluate(ctx, components, hotsets, evalCtx.windowLabel, evalCtx.evalAt)
+	if snapshot != nil && len(snapshot.Warmup.LatestRuns) > 0 {
+		latest := snapshot.Warmup.LatestRuns[0]
+		projection.Signals = append(projection.Signals, evaluator.WarmupSignals(ctx, observabilityWarmupLatestRun{
+			Trigger:     latest.Trigger,
+			ErrorCount:  latest.ErrorCount,
+			TargetCount: latest.TargetCount,
+		}, evalCtx.windowLabel, evalCtx.evalAt)...)
+		projection.Signals = SortSignals(projection.Signals)
+	}
 	return &CacheView{
 		GeneratedAt: evalCtx.evalAt,
 		Window:      evalCtx.windowLabel,
 		Metrics:     evalCtx.metrics,
-		Signals:     f.evaluator.EvaluateCache(ctx, snapshot, evalCtx.windowLabel, evalCtx.evalAt),
+		Signals:     projection.Signals,
 		Snapshot:    snapshot,
+		Components:  components,
+		FamilyRows:  projection.FamilyRows,
+		WarmupKinds: projection.WarmupKinds,
+		Hotsets:     projection.Hotsets,
 	}, nil
+}
+
+func (f *facade) collectCacheComponents(ctx context.Context, snapshot *cachegov.StatusSnapshot) map[string]ComponentCache {
+	components := map[string]ComponentCache{}
+	if snapshot != nil {
+		runtimeSnapshot := snapshot.RuntimeSnapshot
+		name := nonEmpty(runtimeSnapshot.Component, "apiserver")
+		components[name] = ComponentCache{Available: true, Snapshot: &runtimeSnapshot}
+	}
+	if f != nil && f.deps.Components != nil {
+		for name, item := range f.deps.Components.FetchCache(ctx) {
+			components[name] = ComponentCache(item)
+		}
+	}
+	return components
+}
+
+func (f *facade) collectCacheHotsets(ctx context.Context) []CacheHotsetView {
+	if f == nil || f.deps.CacheGovernance == nil {
+		return nil
+	}
+	kinds := []cachetarget.WarmupKind{
+		cachetarget.WarmupKindStaticScale,
+		cachetarget.WarmupKindStaticQuestionnaire,
+		cachetarget.WarmupKindStaticScaleList,
+		cachetarget.WarmupKindStaticPersonalityModel,
+		cachetarget.WarmupKindQueryStatsOverview,
+		cachetarget.WarmupKindQueryStatsSystem,
+		cachetarget.WarmupKindQueryStatsQuestionnaire,
+		cachetarget.WarmupKindQueryStatsPlan,
+	}
+	hotsets := make([]CacheHotsetView, 0, len(kinds))
+	for _, kind := range kinds {
+		result, err := f.deps.CacheGovernance.GetHotset(ctx, string(kind), "5")
+		hotsets = append(hotsets, CacheHotsetViewFromResponse(kind, result, err))
+	}
+	return hotsets
 }
 
 func (f *facade) GetResilience(ctx context.Context, window string) (*ResilienceView, error) {

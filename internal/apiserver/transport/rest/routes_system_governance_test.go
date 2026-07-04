@@ -13,6 +13,8 @@ import (
 
 type stubSystemGovernanceFacade struct {
 	overview *systemgov.OverviewResponse
+	events   *systemgov.EventsView
+	cache    *systemgov.CacheView
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -20,10 +22,16 @@ func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*syste
 }
 
 func (s stubSystemGovernanceFacade) GetEvents(context.Context, string) (*systemgov.EventsView, error) {
+	if s.events != nil {
+		return s.events, nil
+	}
 	return &systemgov.EventsView{}, nil
 }
 
 func (s stubSystemGovernanceFacade) GetCache(context.Context, string) (*systemgov.CacheView, error) {
+	if s.cache != nil {
+		return s.cache, nil
+	}
 	return &systemgov.CacheView{}, nil
 }
 
@@ -80,5 +88,153 @@ func TestSystemGovernanceOverviewRouteReturnsSnapshot(t *testing.T) {
 	}
 	if payload.Data.Metrics.Available {
 		t.Fatal("metrics.available = true, want false when prometheus is unavailable")
+	}
+}
+
+func TestSystemGovernanceEventsRouteReturnsAdditiveDrainFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewRouter(Deps{
+		SystemGovernanceFacade: stubSystemGovernanceFacade{events: &systemgov.EventsView{
+			Window: "5m",
+			Summary: systemgov.EventDrainSummary{
+				OutboxCount:         1,
+				PendingCount:        12,
+				StaleEventTypeCount: 1,
+			},
+			OutboxRows: []systemgov.EventOutboxRow{{
+				Name:         "mysql",
+				Store:        "mysql",
+				PendingCount: 12,
+				Severity:     systemgov.SeverityWarning,
+			}},
+			TypeRows: []systemgov.EventTypeRow{{
+				Store:        "mysql",
+				EventType:    "assessment.submitted",
+				PendingCount: 9,
+				Severity:     systemgov.SeverityWarning,
+			}},
+		}},
+	})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	group := engine.Group("/internal/v1")
+	router.registerSystemGovernanceInternalRoutes(group)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/events?window=5m", nil)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var payload struct {
+		Data struct {
+			Summary struct {
+				PendingCount       int `json:"pending_count"`
+				StaleEventTypeRows int `json:"stale_event_type_count"`
+			} `json:"summary"`
+			OutboxRows []struct {
+				Name         string `json:"name"`
+				PendingCount int    `json:"pending_count"`
+			} `json:"outbox_rows"`
+			EventTypeRows []struct {
+				EventType    string `json:"event_type"`
+				PendingCount int    `json:"pending_count"`
+			} `json:"event_type_rows"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Data.Summary.PendingCount != 12 || payload.Data.Summary.StaleEventTypeRows != 1 {
+		t.Fatalf("summary = %+v, want pending=12 stale_event_type_count=1", payload.Data.Summary)
+	}
+	if len(payload.Data.OutboxRows) != 1 || payload.Data.OutboxRows[0].Name != "mysql" {
+		t.Fatalf("outbox_rows = %+v, want mysql row", payload.Data.OutboxRows)
+	}
+	if len(payload.Data.EventTypeRows) != 1 || payload.Data.EventTypeRows[0].EventType != "assessment.submitted" {
+		t.Fatalf("event_type_rows = %+v, want assessment.submitted row", payload.Data.EventTypeRows)
+	}
+}
+
+func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewRouter(Deps{
+		SystemGovernanceFacade: stubSystemGovernanceFacade{cache: &systemgov.CacheView{
+			Window: "5m",
+			Components: map[string]systemgov.ComponentCache{
+				"collection-server": {Available: false, Reason: "connection refused"},
+			},
+			FamilyRows: []systemgov.CacheFamilyRow{{
+				Component: "apiserver",
+				Family:    "query_result",
+				Severity:  systemgov.SeverityWarning,
+			}},
+			WarmupKinds: []systemgov.CacheWarmupKind{{
+				Kind:                 "query.stats_system",
+				Family:               "query_result",
+				ScopeExample:         "org:7",
+				SupportsManualWarmup: true,
+			}},
+			Hotsets: []systemgov.CacheHotsetView{{
+				Kind:      "query.stats_system",
+				Family:    "query_result",
+				Available: true,
+				Items: []systemgov.CacheHotsetItem{{
+					Kind:  "query.stats_system",
+					Scope: "org:7",
+					Score: 3,
+				}},
+			}},
+		}},
+	})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	group := engine.Group("/internal/v1")
+	router.registerSystemGovernanceInternalRoutes(group)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/cache?window=5m", nil)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var payload struct {
+		Data struct {
+			Components map[string]struct {
+				Available bool   `json:"available"`
+				Reason    string `json:"reason"`
+			} `json:"components"`
+			FamilyRows []struct {
+				Family string `json:"family"`
+			} `json:"family_rows"`
+			WarmupKinds []struct {
+				Kind string `json:"kind"`
+			} `json:"warmup_kinds"`
+			Hotsets []struct {
+				Items []struct {
+					Scope string `json:"scope"`
+				} `json:"items"`
+			} `json:"hotsets"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Data.Components["collection-server"].Available {
+		t.Fatal("collection-server component available = true, want false")
+	}
+	if len(payload.Data.FamilyRows) != 1 || payload.Data.FamilyRows[0].Family != "query_result" {
+		t.Fatalf("family_rows = %+v, want query_result row", payload.Data.FamilyRows)
+	}
+	if len(payload.Data.WarmupKinds) != 1 || payload.Data.WarmupKinds[0].Kind != "query.stats_system" {
+		t.Fatalf("warmup_kinds = %+v, want query.stats_system", payload.Data.WarmupKinds)
+	}
+	if len(payload.Data.Hotsets) != 1 || len(payload.Data.Hotsets[0].Items) != 1 {
+		t.Fatalf("hotsets = %+v, want one recommendation item", payload.Data.Hotsets)
+	}
+	if payload.Data.Hotsets[0].Items[0].Scope != "org:7" {
+		t.Fatalf("hotset scope = %q, want org:7", payload.Data.Hotsets[0].Items[0].Scope)
 	}
 }
