@@ -237,12 +237,17 @@ func (f *facade) collectResilience(ctx context.Context, evalCtx evaluationContex
 	for name, item := range remote {
 		components[name] = item
 	}
+	projection := NewResilienceProjector(f.deps.Metrics).Evaluate(ctx, components, evalCtx.windowLabel, evalCtx.evalAt)
 	return &ResilienceView{
-		GeneratedAt: evalCtx.evalAt,
-		Window:      evalCtx.windowLabel,
-		Metrics:     evalCtx.metrics,
-		Signals:     f.evaluator.EvaluateResilience(ctx, local, remote, evalCtx.windowLabel, evalCtx.evalAt),
-		Components:  components,
+		GeneratedAt:      evalCtx.evalAt,
+		Window:           evalCtx.windowLabel,
+		Metrics:          evalCtx.metrics,
+		Signals:          projection.Signals,
+		Components:       components,
+		Summary:          projection.Summary,
+		QueueRows:        projection.QueueRows,
+		BackpressureRows: projection.BackpressureRows,
+		CapabilityRows:   projection.CapabilityRows,
 	}, nil
 }
 

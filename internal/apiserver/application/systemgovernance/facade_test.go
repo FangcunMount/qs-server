@@ -14,6 +14,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
+	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
 func TestGetOverviewProbesMetricsOnce(t *testing.T) {
@@ -72,6 +73,43 @@ func TestGetCacheIncludesRemoteComponentDegradationAndHotsets(t *testing.T) {
 	}
 	if len(view.Signals) == 0 {
 		t.Fatalf("signals = %#v, want remote component warning signal", view.Signals)
+	}
+}
+
+func TestGetResilienceIncludesSummaryRowsAndRemoteDegradation(t *testing.T) {
+	now := time.Date(2026, 7, 4, 12, 0, 0, 0, time.UTC)
+	remote := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		http.Error(w, "remote unavailable", http.StatusServiceUnavailable)
+	}))
+	defer remote.Close()
+
+	view, err := NewFacade(FacadeDeps{
+		LocalResilienceSnapshot: func() resilienceplane.RuntimeSnapshot {
+			snapshot := resilienceplane.NewRuntimeSnapshot("apiserver", now)
+			snapshot.Queues = []resilienceplane.QueueSnapshot{{
+				Component: "apiserver",
+				Name:      "submit",
+				Strategy:  "memory_channel",
+				Depth:     75,
+				Capacity:  100,
+			}}
+			return snapshot
+		},
+		Components: govcomponent.NewAdapter(map[string]*options.GovernanceComponentOptions{
+			"collection-server": {ResilienceURL: remote.URL},
+		}),
+	}).GetResilience(context.Background(), "5m")
+	if err != nil {
+		t.Fatalf("GetResilience() error = %v", err)
+	}
+	if view.Summary.ComponentCount != 2 || view.Summary.UnavailableComponentCount != 1 || view.Summary.WarningQueueCount != 1 {
+		t.Fatalf("summary = %#v, want local warning queue and remote unavailable component", view.Summary)
+	}
+	if len(view.QueueRows) != 1 || view.QueueRows[0].Name != "submit" {
+		t.Fatalf("queue rows = %#v, want submit row", view.QueueRows)
+	}
+	if view.Components["collection-server"].Available {
+		t.Fatalf("remote component = %#v, want unavailable", view.Components["collection-server"])
 	}
 }
 

@@ -12,9 +12,10 @@ import (
 )
 
 type stubSystemGovernanceFacade struct {
-	overview *systemgov.OverviewResponse
-	events   *systemgov.EventsView
-	cache    *systemgov.CacheView
+	overview   *systemgov.OverviewResponse
+	events     *systemgov.EventsView
+	cache      *systemgov.CacheView
+	resilience *systemgov.ResilienceView
 }
 
 func (s stubSystemGovernanceFacade) GetOverview(context.Context, string) (*systemgov.OverviewResponse, error) {
@@ -36,6 +37,9 @@ func (s stubSystemGovernanceFacade) GetCache(context.Context, string) (*systemgo
 }
 
 func (s stubSystemGovernanceFacade) GetResilience(context.Context, string) (*systemgov.ResilienceView, error) {
+	if s.resilience != nil {
+		return s.resilience, nil
+	}
 	return &systemgov.ResilienceView{}, nil
 }
 
@@ -236,5 +240,93 @@ func TestSystemGovernanceCacheRouteReturnsAdditiveWarmupFields(t *testing.T) {
 	}
 	if payload.Data.Hotsets[0].Items[0].Scope != "org:7" {
 		t.Fatalf("hotset scope = %q, want org:7", payload.Data.Hotsets[0].Items[0].Scope)
+	}
+}
+
+func TestSystemGovernanceResilienceRouteReturnsAdditivePressureFields(t *testing.T) {
+	gin.SetMode(gin.TestMode)
+	router := NewRouter(Deps{
+		SystemGovernanceFacade: stubSystemGovernanceFacade{resilience: &systemgov.ResilienceView{
+			Window: "5m",
+			Summary: systemgov.ResilienceSummary{
+				ComponentCount:      2,
+				CriticalQueueCount:  1,
+				BackpressureCount:   1,
+				MaxQueueUtilization: 0.95,
+			},
+			QueueRows: []systemgov.ResilienceQueueRow{{
+				Component:   "collection-server",
+				Name:        "answersheet_submit",
+				Depth:       95,
+				Capacity:    100,
+				Utilization: 0.95,
+				Severity:    systemgov.SeverityCritical,
+			}},
+			BackpressureRows: []systemgov.ResilienceBackpressureRow{{
+				Component:   "apiserver",
+				Name:        "mysql",
+				Dependency:  "mysql",
+				InFlight:    8,
+				MaxInflight: 10,
+				Utilization: 0.8,
+				Severity:    systemgov.SeverityWarning,
+			}},
+			CapabilityRows: []systemgov.ResilienceCapabilityRow{{
+				Component:  "apiserver",
+				Kind:       "rate_limit",
+				Name:       "api_global",
+				Configured: true,
+				Degraded:   true,
+				Severity:   systemgov.SeverityWarning,
+			}},
+		}},
+	})
+	engine := gin.New()
+	engine.Use(orgAdminSnapshotMiddleware())
+	group := engine.Group("/internal/v1")
+	router.registerSystemGovernanceInternalRoutes(group)
+
+	req := httptest.NewRequest(http.MethodGet, "/internal/v1/system-governance/resilience?window=5m", nil)
+	rec := httptest.NewRecorder()
+	engine.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", rec.Code)
+	}
+	var payload struct {
+		Data struct {
+			Summary struct {
+				ComponentCount      int     `json:"component_count"`
+				CriticalQueueCount  int     `json:"critical_queue_count"`
+				MaxQueueUtilization float64 `json:"max_queue_utilization"`
+			} `json:"summary"`
+			QueueRows []struct {
+				Name        string  `json:"name"`
+				Utilization float64 `json:"utilization"`
+			} `json:"queue_rows"`
+			BackpressureRows []struct {
+				Name       string `json:"name"`
+				Dependency string `json:"dependency"`
+			} `json:"backpressure_rows"`
+			CapabilityRows []struct {
+				Kind string `json:"kind"`
+				Name string `json:"name"`
+			} `json:"capability_rows"`
+		} `json:"data"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &payload); err != nil {
+		t.Fatalf("unmarshal response: %v", err)
+	}
+	if payload.Data.Summary.ComponentCount != 2 || payload.Data.Summary.CriticalQueueCount != 1 || payload.Data.Summary.MaxQueueUtilization != 0.95 {
+		t.Fatalf("summary = %+v, want additive resilience summary", payload.Data.Summary)
+	}
+	if len(payload.Data.QueueRows) != 1 || payload.Data.QueueRows[0].Name != "answersheet_submit" {
+		t.Fatalf("queue_rows = %+v, want answersheet_submit row", payload.Data.QueueRows)
+	}
+	if len(payload.Data.BackpressureRows) != 1 || payload.Data.BackpressureRows[0].Dependency != "mysql" {
+		t.Fatalf("backpressure_rows = %+v, want mysql row", payload.Data.BackpressureRows)
+	}
+	if len(payload.Data.CapabilityRows) != 1 || payload.Data.CapabilityRows[0].Kind != "rate_limit" {
+		t.Fatalf("capability_rows = %+v, want rate_limit row", payload.Data.CapabilityRows)
 	}
 }
