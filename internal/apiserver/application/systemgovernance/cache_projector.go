@@ -3,7 +3,6 @@ package systemgovernance
 import (
 	"context"
 	"sort"
-	"strings"
 	"time"
 
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -32,6 +31,28 @@ func (e *CacheWarmupEvaluator) Evaluate(
 	ctx context.Context,
 	components map[string]ComponentCache,
 	hotsets []CacheHotsetView,
+	window string,
+	evalAt time.Time,
+) CacheWarmupProjection {
+	return e.evaluate(ctx, components, hotsets, nil, window, evalAt)
+}
+
+func (e *CacheWarmupEvaluator) EvaluateWithLatestRun(
+	ctx context.Context,
+	components map[string]ComponentCache,
+	hotsets []CacheHotsetView,
+	latest *observabilityWarmupLatestRun,
+	window string,
+	evalAt time.Time,
+) CacheWarmupProjection {
+	return e.evaluate(ctx, components, hotsets, latest, window, evalAt)
+}
+
+func (e *CacheWarmupEvaluator) evaluate(
+	ctx context.Context,
+	components map[string]ComponentCache,
+	hotsets []CacheHotsetView,
+	latest *observabilityWarmupLatestRun,
 	window string,
 	evalAt time.Time,
 ) CacheWarmupProjection {
@@ -99,6 +120,9 @@ func (e *CacheWarmupEvaluator) Evaluate(
 				DashboardKey:   "cache_hotset",
 			})
 		}
+	}
+	if latest != nil {
+		projection.Signals = append(projection.Signals, e.WarmupSignals(ctx, *latest, window, evalAt)...)
 	}
 	sortCacheFamilyRows(projection.FamilyRows)
 	sortCacheHotsets(projection.Hotsets)
@@ -381,9 +405,4 @@ func cacheFamilySignalID(prefix string, row CacheFamilyRow) string {
 		return prefix + "." + row.Family
 	}
 	return prefix + "." + row.Component + "." + row.Family
-}
-
-func metricNamePart(value string) string {
-	replacer := strings.NewReplacer(".", "_", "-", "_", ":", "_", "/", "_")
-	return replacer.Replace(value)
 }
