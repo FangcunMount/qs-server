@@ -17,8 +17,9 @@ type SystemGovernancePrometheusOptions struct {
 
 // GovernanceComponentOptions configures remote component governance endpoints.
 type GovernanceComponentOptions struct {
-	ResilienceURL string `json:"resilience_url" mapstructure:"resilience_url"`
-	CacheURL      string `json:"cache_url" mapstructure:"cache_url"`
+	ResilienceURL string        `json:"resilience_url" mapstructure:"resilience_url"`
+	CacheURL      string        `json:"cache_url" mapstructure:"cache_url"`
+	Timeout       time.Duration `json:"timeout" mapstructure:"timeout"`
 }
 
 // NewSystemGovernanceOptions returns defaults for governance aggregation.

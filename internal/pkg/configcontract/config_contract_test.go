@@ -54,6 +54,7 @@ func TestAPIServerDevProdConfigContracts(t *testing.T) {
 			if opts.IAMOptions == nil || opts.IAMOptions.ServiceAuth == nil {
 				t.Fatal("apiserver IAM service auth config must be traceable")
 			}
+			assertSystemGovernanceConfig(t, name, opts.SystemGovernance)
 			assertIAMJWKSURLContract(t, "apiserver", name, opts.IAMOptions)
 			assertEventCatalogLoads(t)
 		})
@@ -159,6 +160,53 @@ func assertIAMJWKSURLContract(t *testing.T, service, configName string, opts *ge
 	case "/.well-known/jwks.json", "/api/v2/.well-known/jwks.json":
 	default:
 		t.Fatalf("%s %s iam.jwks.url path = %q, want /.well-known/jwks.json or /api/v2/.well-known/jwks.json", service, configName, parsed.Path)
+	}
+}
+
+func assertSystemGovernanceConfig(t *testing.T, configName string, opts *apiserveroptions.SystemGovernanceOptions) {
+	t.Helper()
+	if opts == nil {
+		t.Fatalf("%s system_governance config must be traceable", configName)
+	}
+	if opts.Prometheus == nil {
+		t.Fatalf("%s system_governance.prometheus must be present", configName)
+	}
+	if strings.TrimSpace(opts.Prometheus.BaseURL) == "" {
+		t.Fatalf("%s system_governance.prometheus.base_url must not be empty", configName)
+	}
+	if opts.Prometheus.Timeout <= 0 {
+		t.Fatalf("%s system_governance.prometheus.timeout must be positive", configName)
+	}
+	if len(opts.Components) == 0 {
+		t.Fatalf("%s system_governance.components must configure remote governance components", configName)
+	}
+	for _, component := range []string{"collection-server", "worker"} {
+		cfg := opts.Components[component]
+		if cfg == nil {
+			t.Fatalf("%s system_governance.components.%s must be present", configName, component)
+		}
+		assertURLPath(t, configName, component, "resilience_url", cfg.ResilienceURL, "/governance/resilience")
+		assertURLPath(t, configName, component, "cache_url", cfg.CacheURL, "/governance/redis")
+		if cfg.Timeout <= 0 {
+			t.Fatalf("%s system_governance.components.%s.timeout must be positive", configName, component)
+		}
+	}
+}
+
+func assertURLPath(t *testing.T, configName, component, key, rawURL, wantPath string) {
+	t.Helper()
+	if strings.TrimSpace(rawURL) == "" {
+		t.Fatalf("%s system_governance.components.%s.%s must not be empty", configName, component, key)
+	}
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		t.Fatalf("%s system_governance.components.%s.%s must be parseable: %v", configName, component, key, err)
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		t.Fatalf("%s system_governance.components.%s.%s must be absolute URL: %s", configName, component, key, rawURL)
+	}
+	if parsed.Path != wantPath {
+		t.Fatalf("%s system_governance.components.%s.%s path = %q, want %q", configName, component, key, parsed.Path, wantPath)
 	}
 }
 

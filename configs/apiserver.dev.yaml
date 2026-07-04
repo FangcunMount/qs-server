@@ -426,14 +426,19 @@ backpressure:
 # Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
 system_governance:
   prometheus:
+    # 如本机 apiserver gRPC 占用 9090，启用前请改为实际 Prometheus Query API 地址。
     enabled: false
     base_url: "http://127.0.0.1:9090"
     timeout: 3s
   components:
     collection-server:
       resilience_url: "http://127.0.0.1:18083/governance/resilience"
+      cache_url: "http://127.0.0.1:18083/governance/redis"
+      timeout: 3s
     worker:
       resilience_url: "http://127.0.0.1:9092/governance/resilience"
+      cache_url: "http://127.0.0.1:9092/governance/redis"
+      timeout: 3s
 
 # -------------------------------------------------------
 # 3.10 MongoDB 数据库

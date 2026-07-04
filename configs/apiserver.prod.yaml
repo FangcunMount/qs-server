@@ -422,6 +422,26 @@ backpressure:
     timeout_ms: 4000               # 请求超时时间: 4000ms
 
 # ----------------------------------------------------------------------------
+# 3.8.1 系统治理聚合（工作台）
+# ----------------------------------------------------------------------------
+# Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
+# prometheus.enabled 默认关闭；接入生产 Prometheus Query API 后再打开。
+system_governance:
+  prometheus:
+    enabled: false
+    base_url: "http://prometheus:9090"
+    timeout: 3s
+  components:
+    collection-server:
+      resilience_url: "http://qs-collection-server:8080/governance/resilience"
+      cache_url: "http://qs-collection-server:8080/governance/redis"
+      timeout: 3s
+    worker:
+      resilience_url: "http://qs-worker:9092/governance/resilience"
+      cache_url: "http://qs-worker:9092/governance/redis"
+      timeout: 3s
+
+# ----------------------------------------------------------------------------
 # 3.9 MongoDB 数据库配置
 # ----------------------------------------------------------------------------
 # 支持两种方式：

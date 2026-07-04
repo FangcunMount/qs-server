@@ -14,6 +14,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/resilienceplane"
 )
 
+const defaultComponentTimeout = 3 * time.Second
+
 // ResilienceResult holds one component resilience payload with fetch metadata.
 type ResilienceResult struct {
 	Available bool                             `json:"available"`
@@ -49,9 +51,7 @@ func NewAdapter(opts map[string]*options.GovernanceComponentOptions) *Adapter {
 	}
 	return &Adapter{
 		components: cloned,
-		http: &http.Client{
-			Timeout: 3 * time.Second,
-		},
+		http:       &http.Client{},
 	}
 }
 
@@ -69,7 +69,7 @@ func (a *Adapter) FetchResilience(ctx context.Context) map[string]ResilienceResu
 			}
 			continue
 		}
-		snapshot, err := a.fetchResilience(ctx, cfg.ResilienceURL)
+		snapshot, err := a.fetchResilience(ctx, cfg.ResilienceURL, componentTimeout(cfg))
 		if err != nil {
 			result[name] = ResilienceResult{
 				Available: false,
@@ -95,7 +95,7 @@ func (a *Adapter) FetchCache(ctx context.Context) map[string]CacheResult {
 		if cfg == nil || strings.TrimSpace(cfg.CacheURL) == "" {
 			continue
 		}
-		snapshot, err := a.fetchCache(ctx, cfg.CacheURL)
+		snapshot, err := a.fetchCache(ctx, cfg.CacheURL, componentTimeout(cfg))
 		if err != nil {
 			result[name] = CacheResult{
 				Available: false,
@@ -111,8 +111,8 @@ func (a *Adapter) FetchCache(ctx context.Context) map[string]CacheResult {
 	return result
 }
 
-func (a *Adapter) fetchResilience(ctx context.Context, endpoint string) (*resilienceplane.RuntimeSnapshot, error) {
-	body, err := a.getJSON(ctx, endpoint)
+func (a *Adapter) fetchResilience(ctx context.Context, endpoint string, timeout time.Duration) (*resilienceplane.RuntimeSnapshot, error) {
+	body, err := a.getJSON(ctx, endpoint, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -132,8 +132,8 @@ func (a *Adapter) fetchResilience(ctx context.Context, endpoint string) (*resili
 	return &wrapped.Data, nil
 }
 
-func (a *Adapter) fetchCache(ctx context.Context, endpoint string) (*observability.RuntimeSnapshot, error) {
-	body, err := a.getJSON(ctx, endpoint)
+func (a *Adapter) fetchCache(ctx context.Context, endpoint string, timeout time.Duration) (*observability.RuntimeSnapshot, error) {
+	body, err := a.getJSON(ctx, endpoint, timeout)
 	if err != nil {
 		return nil, err
 	}
@@ -153,12 +153,21 @@ func (a *Adapter) fetchCache(ctx context.Context, endpoint string) (*observabili
 	return &wrapped.Data, nil
 }
 
-func (a *Adapter) getJSON(ctx context.Context, endpoint string) ([]byte, error) {
+func (a *Adapter) getJSON(ctx context.Context, endpoint string, timeout time.Duration) ([]byte, error) {
+	if timeout <= 0 {
+		timeout = defaultComponentTimeout
+	}
+	ctx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
 	if err != nil {
 		return nil, err
 	}
-	resp, err := a.http.Do(req)
+	client := a.http
+	if client == nil {
+		client = http.DefaultClient
+	}
+	resp, err := client.Do(req)
 	if err != nil {
 		return nil, err
 	}
@@ -171,4 +180,11 @@ func (a *Adapter) getJSON(ctx context.Context, endpoint string) ([]byte, error) 
 		return nil, fmt.Errorf("component governance fetch failed: status=%d body=%s", resp.StatusCode, string(body))
 	}
 	return body, nil
+}
+
+func componentTimeout(cfg *options.GovernanceComponentOptions) time.Duration {
+	if cfg != nil && cfg.Timeout > 0 {
+		return cfg.Timeout
+	}
+	return defaultComponentTimeout
 }
