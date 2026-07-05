@@ -426,9 +426,10 @@ backpressure:
 # Prometheus 与组件端点由 apiserver 聚合，前端不再直连 collection/worker。
 system_governance:
   prometheus:
-    # 如本机 apiserver gRPC 占用 9090，启用前请改为实际 Prometheus Query API 地址。
-    enabled: false
-    base_url: "http://127.0.0.1:9090"
+    # infra/components/prometheus 在 infra-network 内提供 Prometheus Query API。
+    # 本机直跑 apiserver 时，如无法解析 prometheus，请在本地配置中覆盖为可达地址。
+    enabled: true
+    base_url: "http://prometheus:9090"
     timeout: 3s
   components:
     collection-server:
