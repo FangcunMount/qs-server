@@ -1,7 +1,7 @@
-package assessmentmodel
+package modelcatalog
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 )
 
 func personalityListInput(dto ListModelsDTO) personality.ListInput {

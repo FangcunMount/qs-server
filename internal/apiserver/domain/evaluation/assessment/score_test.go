@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -54,8 +54,8 @@ func TestScaleScoreProjectionFromOutcomeRejectsNonScaleOutcome(t *testing.T) {
 	outcome := NewAssessmentOutcome(
 		NewEvaluationModelRefWithIdentity(
 			EvaluationModelKindPersonality,
-			assessmentmodel.SubKindTypology,
-			assessmentmodel.AlgorithmMBTI,
+			modelcatalog.SubKindTypology,
+			modelcatalog.AlgorithmMBTI,
 			meta.ID(0),
 			meta.NewCode("MBTI_TEST"),
 			"1.0.0",
@@ -75,8 +75,8 @@ func TestScaleScoreProjectionFromOutcomeRejectsNonScaleOutcome(t *testing.T) {
 func TestApplyOutcomeDoesNotTreatTypeCodeAsRiskLevel(t *testing.T) {
 	modelRef := NewEvaluationModelRefWithIdentity(
 		EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
 		meta.NewCode("MBTI_TEST"),
 		"1.0.0",

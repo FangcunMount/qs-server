@@ -1,8 +1,8 @@
-package assessmentmodel
+package modelcatalog
 
 import (
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
 )
 
 // BuildPersonalityPublishedSnapshot delegates to the domain publish builder.

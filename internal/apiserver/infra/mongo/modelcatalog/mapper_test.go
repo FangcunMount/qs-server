@@ -1,9 +1,9 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestMapperRoundTripPublishedModel(t *testing.T) {

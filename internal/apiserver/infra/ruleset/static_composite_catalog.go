@@ -4,10 +4,10 @@ import (
 	"context"
 	"fmt"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type StaticCompositeCatalog struct {

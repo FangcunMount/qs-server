@@ -1,13 +1,13 @@
-package assessmentmodel
+package modelcatalog
 
 import (
-	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel"
-	assessmentModelBehavior "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
-	assessmentModelAppPersonality "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
+	assessmentModelBehavior "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	assessmentModelAppPersonality "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )

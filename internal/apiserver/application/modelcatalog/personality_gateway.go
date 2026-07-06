@@ -1,10 +1,10 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 	"encoding/json"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 )
 
 type personalityGateway struct {

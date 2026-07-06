@@ -1,9 +1,9 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 )
 
 type behaviorGateway struct {

@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 type interpretReportDraft struct {
 	assessmentID ID

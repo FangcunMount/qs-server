@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition/hotrank"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"
 )

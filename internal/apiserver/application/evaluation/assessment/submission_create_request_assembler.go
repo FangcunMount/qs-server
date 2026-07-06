@@ -4,7 +4,7 @@ import (
 	"strings"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -74,8 +74,8 @@ func (assessmentCreateRequestAssembler) Assemble(dto CreateAssessmentDTO) (domai
 		if !kind.IsValid() {
 			return domainAssessment.CreateAssessmentRequest{}, evalerrors.InvalidArgument("不支持的解释模型类型: %s", kind)
 		}
-		subKind := assessmentmodel.SubKind(strings.TrimSpace(valueOrEmpty(dto.ModelSubKind)))
-		algorithm := assessmentmodel.Algorithm(strings.TrimSpace(valueOrEmpty(dto.ModelAlgorithm)))
+		subKind := modelcatalog.SubKind(strings.TrimSpace(valueOrEmpty(dto.ModelSubKind)))
+		algorithm := modelcatalog.Algorithm(strings.TrimSpace(valueOrEmpty(dto.ModelAlgorithm)))
 		modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
 			kind,
 			subKind,

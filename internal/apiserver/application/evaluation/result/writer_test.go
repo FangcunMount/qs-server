@@ -6,11 +6,11 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 	"github.com/FangcunMount/qs-server/pkg/event"
@@ -328,8 +328,8 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 	order := make([]string, 0)
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
 		meta.NewCode("MBTI-16P"),
 		"1.0.0",

@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 	"github.com/FangcunMount/qs-server/pkg/event"

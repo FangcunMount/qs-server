@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	"github.com/alicebob/miniredis/v2"
 	redis "github.com/redis/go-redis/v9"

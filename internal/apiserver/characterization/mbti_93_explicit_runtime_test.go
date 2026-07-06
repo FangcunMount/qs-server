@@ -8,8 +8,8 @@ import (
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -20,7 +20,7 @@ import (
 func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 	t.Parallel()
 
-	for _, algorithm := range []assessmentmodel.Algorithm{"", assessmentmodel.AlgorithmPersonalityTypology} {
+	for _, algorithm := range []modelcatalog.Algorithm{"", modelcatalog.AlgorithmPersonalityTypology} {
 		algorithm := algorithm
 		t.Run(string(algorithmOrConfigured(algorithm)), func(t *testing.T) {
 			t.Parallel()
@@ -71,14 +71,14 @@ func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 	}
 }
 
-func algorithmOrConfigured(algorithm assessmentmodel.Algorithm) string {
+func algorithmOrConfigured(algorithm modelcatalog.Algorithm) string {
 	if algorithm == "" {
 		return "empty_algorithm"
 	}
 	return string(algorithm)
 }
 
-func mbti93ExplicitRuntimePayload(algorithm assessmentmodel.Algorithm) *modeltypology.Payload {
+func mbti93ExplicitRuntimePayload(algorithm modelcatalog.Algorithm) *modeltypology.Payload {
 	return &modeltypology.Payload{
 		Code:                 "MBTI_93_V1",
 		Version:              "1.0.0",
@@ -120,7 +120,7 @@ func mbti93ExplicitRuntimePayload(algorithm assessmentmodel.Algorithm) *modeltyp
 				},
 			},
 			Decision: modeltypology.PersonalityDecisionSpec{
-				Kind: assessmentmodel.DecisionKindPoleComposition,
+				Kind: modelcatalog.DecisionKindPoleComposition,
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
 				DetailKind:       modeltypology.OutcomeDetailPersonalityType,
@@ -160,8 +160,8 @@ func submittedMBTI93Assessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmPersonalityTypology,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("MBTI_93_V1"),
 		"1.0.0",

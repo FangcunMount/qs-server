@@ -1,13 +1,13 @@
 package typology
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
 // Module describes a typology algorithm alias exposed to evaluation wiring.
 type Module struct {
-	Algorithm     assessmentmodel.Algorithm
+	Algorithm     modelcatalog.Algorithm
 	CategoryLabel string
 }
 
@@ -37,7 +37,7 @@ func ConfiguredTypologyDescriptor() evaldomain.ModelDescriptor {
 	return evaldomain.ModelDescriptor{
 		Key:       evaldomain.EvaluatorKeyPersonalityTypology,
 		Kind:      evaldomain.ModelKindTypology,
-		Algorithm: assessmentmodel.AlgorithmPersonalityTypology,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}
 }
 

@@ -3,7 +3,7 @@ package typology
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestReportSpecResolvedAdapterKey(t *testing.T) {
@@ -15,44 +15,44 @@ func TestReportSpecResolvedAdapterKey(t *testing.T) {
 
 	t.Run("explicit adapter key", func(t *testing.T) {
 		spec := ReportSpec{Kind: ReportKindPersonalityType, AdapterKey: ReportAdapterSBTI}
-		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindPoleComposition); got != ReportAdapterSBTI {
+		if got := spec.ResolvedAdapterKey(mbtiMapping, modelcatalog.DecisionKindPoleComposition); got != ReportAdapterSBTI {
 			t.Fatalf("ResolvedAdapterKey() = %s, want sbti", got)
 		}
 	})
 
 	t.Run("trait profile kind", func(t *testing.T) {
 		spec := ReportSpec{Kind: ReportKindTraitProfile}
-		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindTraitProfile); got != ReportAdapterTraitProfile {
+		if got := spec.ResolvedAdapterKey(mbtiMapping, modelcatalog.DecisionKindTraitProfile); got != ReportAdapterTraitProfile {
 			t.Fatalf("ResolvedAdapterKey() = %s, want trait_profile", got)
 		}
 	})
 
 	t.Run("personality type kind without explicit adapter", func(t *testing.T) {
 		spec := ReportSpec{Kind: ReportKindPersonalityType}
-		if got := spec.ResolvedAdapterKey(sbtiMapping, assessmentmodel.DecisionKindNearestPattern); got != ReportAdapterPersonalityType {
+		if got := spec.ResolvedAdapterKey(sbtiMapping, modelcatalog.DecisionKindNearestPattern); got != ReportAdapterPersonalityType {
 			t.Fatalf("ResolvedAdapterKey() = %s, want personality_type", got)
 		}
-		if got := spec.ResolvedAdapterKey(mbtiMapping, assessmentmodel.DecisionKindPoleComposition); got != ReportAdapterPersonalityType {
+		if got := spec.ResolvedAdapterKey(mbtiMapping, modelcatalog.DecisionKindPoleComposition); got != ReportAdapterPersonalityType {
 			t.Fatalf("ResolvedAdapterKey() = %s, want personality_type", got)
 		}
 	})
 }
 
 func TestOutcomeMappingResolvedDetailAdapterKeyUsesGenericDefaults(t *testing.T) {
-	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType}).ResolvedDetailAdapterKey(assessmentmodel.DecisionKindNearestPattern); got != DetailAdapterPersonalityType {
+	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType}).ResolvedDetailAdapterKey(modelcatalog.DecisionKindNearestPattern); got != DetailAdapterPersonalityType {
 		t.Fatalf("ResolvedDetailAdapterKey() = %s, want personality_type", got)
 	}
-	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailTraitProfile}).ResolvedDetailAdapterKey(assessmentmodel.DecisionKindTraitProfile); got != DetailAdapterTraitProfile {
+	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailTraitProfile}).ResolvedDetailAdapterKey(modelcatalog.DecisionKindTraitProfile); got != DetailAdapterTraitProfile {
 		t.Fatalf("ResolvedDetailAdapterKey() = %s, want trait_profile", got)
 	}
-	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType, DetailAdapterKey: DetailAdapterSBTI}).ResolvedDetailAdapterKey(assessmentmodel.DecisionKindNearestPattern); got != DetailAdapterSBTI {
+	if got := (OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType, DetailAdapterKey: DetailAdapterSBTI}).ResolvedDetailAdapterKey(modelcatalog.DecisionKindNearestPattern); got != DetailAdapterSBTI {
 		t.Fatalf("ResolvedDetailAdapterKey() = %s, want sbti", got)
 	}
 }
 
 func TestReportSpecTemplateWithoutAdapterHasNoResolvedAdapter(t *testing.T) {
 	spec := ReportSpec{Kind: ReportKindTemplate, TemplateID: "custom"}
-	if got := spec.ResolvedAdapterKey(OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType}, assessmentmodel.DecisionKindPoleComposition); got != "" {
+	if got := spec.ResolvedAdapterKey(OutcomeMappingSpec{DetailKind: OutcomeDetailPersonalityType}, modelcatalog.DecisionKindPoleComposition); got != "" {
 		t.Fatalf("ResolvedAdapterKey() = %s, want empty", got)
 	}
 }

@@ -6,8 +6,8 @@ import (
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality"
 )
 
 func buildPersonalityTypeReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {

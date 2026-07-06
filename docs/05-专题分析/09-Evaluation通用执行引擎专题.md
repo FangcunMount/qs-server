@@ -583,7 +583,7 @@ report.generated
 ### 9.2 规则变化事件不是执行事件
 
 ```text
-interpretation-model.changed
+report.changed
 ```
 
 表示模型规则或目录变化。
@@ -939,8 +939,8 @@ report_save_failed
 
 ### Interpretation Model
 
-- `docs/02-业务模块/40-interpretation-model/README.md`
-- `docs/02-业务模块/20-assessment-model/README.md`
+- `docs/02-业务模块/40-interpretation/README.md`
+- `docs/02-业务模块/20-model-catalog/README.md`
 - `docs/05-专题分析/01-为什么拆分Survey-InterpretationModel-Evaluation.md`
 
 ### Worker / Event
@@ -995,4 +995,4 @@ git diff --check
 | 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
 | Evaluation 模块 README | `../02-业务模块/30-evaluation/README.md` |
 | Evaluation 引擎链路 | `../02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md` |
-| Interpretation Model README | `../02-业务模块/40-interpretation-model/README.md` |
+| Interpretation Model README | `../02-业务模块/40-interpretation/README.md` |

@@ -101,8 +101,8 @@ Outbox 与 MQ 的基础设施实现。
 ```text
 ../survey/README.md
 ../scale/README.md
-../interpretation-model/README.md
-../assessment-model/README.md
+../report/README.md
+../instrument/README.md
 02-Evaluation执行链路--从AnswerSheet提交到Assessment完成.md
 03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 04-Evaluation失败重试链路--幂等-错误状态-补偿处理.md
@@ -634,7 +634,7 @@ AnswerSheetRef.QuestionnaireVersion == ModelContext.QuestionnaireVersion
 
 `InterpretationModelRef` 指向解释模型。
 
-它来自 interpretation-model 抽象层。
+它来自 report 抽象层。
 
 推荐结构：
 

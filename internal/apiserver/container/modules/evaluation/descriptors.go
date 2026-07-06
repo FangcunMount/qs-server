@@ -8,7 +8,7 @@ import (
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	portruleengine "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )

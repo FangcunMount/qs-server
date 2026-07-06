@@ -6,11 +6,11 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
-	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/report"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 )
@@ -24,9 +24,9 @@ func TestModuleDescriptorsExposeCanonicalNames(t *testing.T) {
 		want modules.PackageName
 	}{
 		{"survey", survey.Describe().Name, modules.PackageSurvey},
-		{"assessmentmodel", assessmentmodel.Describe().Name, modules.PackageAssessmentModel},
+		{"modelcatalog", modelcatalog.Describe().Name, modules.PackageModelCatalog},
 		{"evaluation", evaluation.Describe().Name, modules.PackageEvaluation},
-		{"report", report.Describe().Name, modules.PackageReport},
+		{"interpretation", report.Describe().Name, modules.PackageInterpretation},
 		{"actor", actor.Describe().Name, modules.PackageActor},
 		{"plan", plan.Describe().Name, modules.PackagePlan},
 		{"statistics", statistics.Describe().Name, modules.PackageStatistics},
@@ -48,9 +48,9 @@ func TestAllPackagesIncludesEveryBusinessPackageAndPlatform(t *testing.T) {
 
 	want := []modules.PackageName{
 		modules.PackageSurvey,
-		modules.PackageAssessmentModel,
+		modules.PackageModelCatalog,
 		modules.PackageEvaluation,
-		modules.PackageReport,
+		modules.PackageInterpretation,
 		modules.PackageActor,
 		modules.PackagePlan,
 		modules.PackageStatistics,
@@ -65,7 +65,7 @@ func TestAllPackagesIncludesEveryBusinessPackageAndPlatform(t *testing.T) {
 func TestLegacyRegisteredModuleOrderMatchesInitializeSequence(t *testing.T) {
 	t.Parallel()
 
-	want := []string{"survey", "assessmentmodel", "scale", "personalitymodel", "actor", "report", "evaluation", "plan", "statistics"}
+	want := []string{"survey", "modelcatalog", "scale", "personalitymodel", "actor", "interpretation", "evaluation", "plan", "statistics"}
 	if got := modules.LegacyRegisteredModuleOrder(); !reflect.DeepEqual(got, want) {
 		t.Fatalf("LegacyRegisteredModuleOrder() = %v, want %v", got, want)
 	}

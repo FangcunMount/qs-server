@@ -7,7 +7,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 
 	"github.com/FangcunMount/component-base/pkg/util/idutil"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 )
 

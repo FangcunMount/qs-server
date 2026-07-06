@@ -1,8 +1,8 @@
-package report
+package interpretation
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 
-const Name = modules.PackageReport
+const Name = modules.PackageInterpretation
 
 // Report assembly for read/write model, builder registry, and durable saver lives in assemble.go.
 type Descriptor struct {

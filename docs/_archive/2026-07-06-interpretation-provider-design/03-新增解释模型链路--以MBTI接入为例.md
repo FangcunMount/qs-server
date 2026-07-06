@@ -243,7 +243,7 @@ internal/apiserver/application/mbti/
 internal/apiserver/infra/mbti/
 ```
 
-同时在 interpretation-model 和 evaluation 中新增 Provider 集成点。
+同时在 report 和 evaluation 中新增 Provider 集成点。
 
 ---
 
@@ -1027,11 +1027,11 @@ Assessment 能推进 interpreted；
 新增 MBTI 后，需要同步：
 
 ```text
-docs/02-业务模块/interpretation-model/README.md
-docs/02-业务模块/interpretation-model/01-解释模型抽象--ModelRef-Provider-Context模型设计.md
-docs/02-业务模块/interpretation-model/02-解释模型接入链路--注册-加载-执行-结果返回.md
-docs/02-业务模块/interpretation-model/03-新增解释模型链路--以MBTI接入为例.md
-docs/02-业务模块/interpretation-model/04-解释模型分层架构与事实源索引.md
+docs/02-业务模块/report/README.md
+docs/02-业务模块/report/01-解释模型抽象--ModelRef-Provider-Context模型设计.md
+docs/02-业务模块/report/02-解释模型接入链路--注册-加载-执行-结果返回.md
+docs/02-业务模块/report/03-新增解释模型链路--以MBTI接入为例.md
+docs/02-业务模块/report/04-解释模型分层架构与事实源索引.md
 docs/02-业务模块/evaluation/README.md
 docs/02-业务模块/evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 docs/02-业务模块/mbti/README.md

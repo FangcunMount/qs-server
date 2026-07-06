@@ -90,8 +90,8 @@ Evaluation 模块分层事实源索引。
 
 ```text
 ../survey/README.md
-../interpretation-model/README.md
-../assessment-model/README.md
+../report/README.md
+../instrument/README.md
 01-Evaluation模型--Assessment-EvaluationRun-Result-Report模型设计.md
 03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 04-Evaluation失败重试链路--幂等-错误状态-补偿处理.md

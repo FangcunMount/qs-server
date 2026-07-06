@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestReportAdapterRegistryBuildsByAdapterKey(t *testing.T) {
@@ -15,7 +15,7 @@ func TestReportAdapterRegistryBuildsByAdapterKey(t *testing.T) {
 	spec := modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterMBTI}
 	mapping := modeltypology.OutcomeMappingSpec{DetailAdapterKey: modeltypology.DetailAdapterMBTI}
 
-	_, err := registry.build(spec, mapping, assessmentmodel.DecisionKindPoleComposition, evaluationresult.Outcome{})
+	_, err := registry.build(spec, mapping, modelcatalog.DecisionKindPoleComposition, evaluationresult.Outcome{})
 	if err == nil {
 		t.Fatal("expected error without assessment")
 	}
@@ -45,7 +45,7 @@ func TestReportAdapterRegistryRejectsUnknownAdapter(t *testing.T) {
 	_, err := registry.build(
 		modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterKey("custom_unknown")},
 		modeltypology.OutcomeMappingSpec{},
-		assessmentmodel.DecisionKindPoleComposition,
+		modelcatalog.DecisionKindPoleComposition,
 		evaluationresult.Outcome{},
 	)
 	if err == nil || !strings.Contains(err.Error(), "unsupported report adapter key") {

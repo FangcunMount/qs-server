@@ -88,7 +88,7 @@ func TestEvaluationDomainDoesNotDefineLegacyEventConstructors(t *testing.T) {
 	}
 	scanRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "assessment"),
-		filepath.Join(root, "internal", "apiserver", "domain", "report"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation"),
 		filepath.Join(root, "internal", "pkg", "eventpayload"),
 	}
 	for _, scanRoot := range scanRoots {

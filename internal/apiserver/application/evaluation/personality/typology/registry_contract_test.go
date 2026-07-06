@@ -7,12 +7,12 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -167,7 +167,7 @@ func contractInjectedRuntimePayload() *modeltypology.Payload {
 				},
 			},
 			Decision: modeltypology.PersonalityDecisionSpec{
-				Kind: assessmentmodel.DecisionKindPoleComposition,
+				Kind: modelcatalog.DecisionKindPoleComposition,
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
 				DetailKind:       modeltypology.OutcomeDetailPersonalityType,
@@ -186,8 +186,8 @@ func contractInjectedAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmPersonalityTypology,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("CONTRACT_INJECTED_V1"),
 		"1.0.0",

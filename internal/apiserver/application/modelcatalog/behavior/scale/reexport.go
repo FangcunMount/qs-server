@@ -2,9 +2,9 @@
 package scale
 
 import (
-	applifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/lifecycle"
-	appports "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/ports"
-	appshared "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/shared"
+	applifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
+	appports "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/ports"
+	appshared "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
 )
 
 // --- Driving ports（稳定 API 面）---

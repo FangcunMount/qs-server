@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 // ModelStatus is the lifecycle status of a draft assessment model.
 type ModelStatus string

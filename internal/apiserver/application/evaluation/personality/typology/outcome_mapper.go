@@ -3,8 +3,8 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
@@ -34,7 +34,7 @@ func (a OutcomeAssembler) Assemble(
 	return a.registry.Assemble(adapterKey, modelRef, result)
 }
 
-func decisionKindFromResult(result evaluationtypology.ScoringResult) assessmentmodel.DecisionKind {
+func decisionKindFromResult(result evaluationtypology.ScoringResult) modelcatalog.DecisionKind {
 	if result.Runtime != nil {
 		return result.Runtime.Decision.Kind
 	}

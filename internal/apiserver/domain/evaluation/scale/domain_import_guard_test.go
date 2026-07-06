@@ -27,7 +27,7 @@ func TestDomainScaleExecutionDoesNotImportApplicationInfraOrEvaluationPipeline(t
 				strings.Contains(path, "/internal/apiserver/infra/") ||
 				strings.Contains(path, "/internal/apiserver/port/evaluationinput") ||
 				strings.Contains(path, "/application/evaluation/execute") ||
-				strings.Contains(path, "/domain/assessmentmodel/scale/definition") {
+				strings.Contains(path, "/domain/modelcatalog/scale/definition") {
 				t.Fatalf("domain/evaluation/scale must not import %s in %s", path, file)
 			}
 		}

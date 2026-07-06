@@ -58,7 +58,7 @@ Domain / Application / Infra / Binding / Evaluation / Event / Test / Docs 的事
 常见修改场景的同步检查清单；
 架构护栏；
 文档维护规范；
-与 interpretation-model 抽象层的关系。
+与 report 抽象层的关系。
 ```
 
 本文不展开：
@@ -78,7 +78,7 @@ Outbox / MQ / Cache 的具体基础设施实现。
 02-Scale 维护链路--生命周期-因子维护-问卷绑定.md
 03-Scale 查询链路--查询服务与读模型.md
 04-Scale 测评链路--Scale与Evaluation联动详解.md
-../interpretation-model/README.md
+../report/README.md
 ../evaluation/README.md
 ```
 
@@ -182,17 +182,17 @@ Worker 如何重试。
 Domain 层代码应重点关注以下文件或目录。
 
 ```text
-internal/apiserver/domain/assessmentmodel/scale/definition/medical_scale.go
-internal/apiserver/domain/assessmentmodel/scale/definition/lifecycle.go
-internal/apiserver/domain/assessmentmodel/scale/definition/baseinfo.go
-internal/apiserver/domain/assessmentmodel/scale/definition/factor.go
-internal/apiserver/domain/assessmentmodel/scale/definition/scoring_spec.go
-internal/apiserver/domain/assessmentmodel/scale/definition/interpretation_rules.go
-internal/apiserver/domain/assessmentmodel/scale/definition/interpretation_rule.go
-internal/apiserver/domain/assessmentmodel/scale/definition/types.go
-internal/apiserver/domain/assessmentmodel/scale/definition/errors.go
-internal/apiserver/domain/assessmentmodel/scale/definition/events.go
-internal/apiserver/domain/assessmentmodel/scale/definition/validator.go
+internal/apiserver/domain/instrument/scale/definition/medical_scale.go
+internal/apiserver/domain/instrument/scale/definition/lifecycle.go
+internal/apiserver/domain/instrument/scale/definition/baseinfo.go
+internal/apiserver/domain/instrument/scale/definition/factor.go
+internal/apiserver/domain/instrument/scale/definition/scoring_spec.go
+internal/apiserver/domain/instrument/scale/definition/interpretation_rules.go
+internal/apiserver/domain/instrument/scale/definition/interpretation_rule.go
+internal/apiserver/domain/instrument/scale/definition/types.go
+internal/apiserver/domain/instrument/scale/definition/errors.go
+internal/apiserver/domain/instrument/scale/definition/events.go
+internal/apiserver/domain/instrument/scale/definition/validator.go
 ```
 
 如果当前代码文件名与上面不完全一致，应以实际代码为准。
@@ -731,7 +731,7 @@ Scale 测试应覆盖六类。
 建议基础测试命令：
 
 ```bash
-go test ./internal/apiserver/domain/assessmentmodel/scale/definition/...
+go test ./internal/apiserver/domain/instrument/scale/definition/...
 go test ./internal/apiserver/application/scale/...
 go test ./internal/apiserver/application/evaluation/...
 go test ./internal/worker/...
@@ -770,7 +770,7 @@ README.md
 ```text
 docs/02-业务模块/survey/README.md
 docs/02-业务模块/evaluation/README.md
-docs/02-业务模块/interpretation-model/README.md
+docs/02-业务模块/report/README.md
 docs/03-基础设施/concurrency/README.md
 ```
 
@@ -1103,10 +1103,10 @@ ReadModel 是否能从 MedicalScale 重建？
 不允许：
 
 ```text
-domain/assessmentmodel/scale/definition -> infra/mongo
-domain/assessmentmodel/scale/definition -> redis
-domain/assessmentmodel/scale/definition -> mq
-domain/assessmentmodel/scale/definition -> transport dto
+domain/instrument/scale/definition -> infra/mongo
+domain/instrument/scale/definition -> redis
+domain/instrument/scale/definition -> mq
+domain/instrument/scale/definition -> transport dto
 ```
 
 Domain 只能表达规则模型、领域行为、领域错误、领域事件。
@@ -1202,11 +1202,11 @@ Evaluation 通过统一 ModelRef / Provider 接入。
 
 ---
 
-## 35. 与 interpretation-model 文档的关系
+## 35. 与 report 文档的关系
 
 Scale 文档负责解释医学量表模型。
 
-interpretation-model 文档负责解释更高一层抽象：
+report 文档负责解释更高一层抽象：
 
 ```text
 什么是解释模型；
@@ -1220,7 +1220,7 @@ Provider / Registry 如何接入不同模型；
 
 ```text
 Scale 文档不要膨胀成所有解释模型总览；
-interpretation-model 文档不要深入 MedicalScale 内部细节；
+report 文档不要深入 MedicalScale 内部细节；
 Evaluation 文档不要复制 Scale 规则模型；
 三者通过 ModelRef / Provider / Snapshot 建立边界。
 ```
@@ -1228,7 +1228,7 @@ Evaluation 文档不要复制 Scale 规则模型；
 建议关系：
 
 ```text
-interpretation-model
+report
     定义抽象和扩展协议
 
 scale
@@ -1248,7 +1248,7 @@ evaluation
 Scale 模块基础验证：
 
 ```bash
-go test ./internal/apiserver/domain/assessmentmodel/scale/definition/...
+go test ./internal/apiserver/domain/instrument/scale/definition/...
 go test ./internal/apiserver/application/scale/...
 ```
 

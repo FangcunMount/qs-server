@@ -1,4 +1,4 @@
-package assessmentmodel_test
+package modelcatalog_test
 
 import (
 	"os"
@@ -22,7 +22,7 @@ func TestAlgorithmConstantsStayFrozen(t *testing.T) {
 		"AlgorithmSPM":                 "spm",
 	}
 
-	text := readRepoFile(t, "internal/apiserver/domain/assessmentmodel/types.go")
+	text := readRepoFile(t, "internal/apiserver/domain/modelcatalog/types.go")
 	matches := regexp.MustCompile(`Algorithm(\w+)\s+Algorithm\s*=\s*"([^"]+)"`).FindAllStringSubmatch(text, -1)
 	if len(matches) == 0 {
 		t.Fatal("no Algorithm constants found in types.go")

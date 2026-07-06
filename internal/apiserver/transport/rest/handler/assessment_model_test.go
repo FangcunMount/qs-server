@@ -8,36 +8,36 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 	"github.com/gin-gonic/gin"
 )
 
 type assessmentModelServiceStub struct {
-	validateResult *assessmentmodel.ValidationResult
+	validateResult *modelcatalog.ValidationResult
 	validateErr    error
-	publishResult  *assessmentmodel.ModelSummary
+	publishResult  *modelcatalog.ModelSummary
 	publishErr     error
 	publishCalled  bool
-	previewResult  *assessmentmodel.PreviewReportResult
+	previewResult  *modelcatalog.PreviewReportResult
 	previewErr     error
 	qrCodeURL      string
 	qrCodeErr      error
 }
 
-func (s *assessmentModelServiceStub) List(context.Context, assessmentmodel.ListModelsDTO) (*assessmentmodel.ModelListResult, error) {
+func (s *assessmentModelServiceStub) List(context.Context, modelcatalog.ListModelsDTO) (*modelcatalog.ModelListResult, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) Create(context.Context, assessmentmodel.CreateModelDTO) (*assessmentmodel.ModelSummary, error) {
+func (s *assessmentModelServiceStub) Create(context.Context, modelcatalog.CreateModelDTO) (*modelcatalog.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) Get(context.Context, string) (*assessmentmodel.ModelSummary, error) {
+func (s *assessmentModelServiceStub) Get(context.Context, string) (*modelcatalog.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) UpdateBasicInfo(context.Context, assessmentmodel.UpdateBasicInfoDTO) (*assessmentmodel.ModelSummary, error) {
+func (s *assessmentModelServiceStub) UpdateBasicInfo(context.Context, modelcatalog.UpdateBasicInfoDTO) (*modelcatalog.ModelSummary, error) {
 	return nil, nil
 }
 
@@ -45,48 +45,48 @@ func (s *assessmentModelServiceStub) Delete(context.Context, string) error {
 	return nil
 }
 
-func (s *assessmentModelServiceStub) Publish(context.Context, string) (*assessmentmodel.ModelSummary, error) {
+func (s *assessmentModelServiceStub) Publish(context.Context, string) (*modelcatalog.ModelSummary, error) {
 	s.publishCalled = true
 	return s.publishResult, s.publishErr
 }
 
-func (s *assessmentModelServiceStub) Unpublish(context.Context, string) (*assessmentmodel.ModelSummary, error) {
+func (s *assessmentModelServiceStub) Unpublish(context.Context, string) (*modelcatalog.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) Archive(context.Context, string) (*assessmentmodel.ModelSummary, error) {
+func (s *assessmentModelServiceStub) Archive(context.Context, string) (*modelcatalog.ModelSummary, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) BindQuestionnaire(context.Context, assessmentmodel.BindQuestionnaireDTO) (*assessmentmodel.QuestionnaireBindingResult, error) {
+func (s *assessmentModelServiceStub) BindQuestionnaire(context.Context, modelcatalog.BindQuestionnaireDTO) (*modelcatalog.QuestionnaireBindingResult, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) GetQuestionnaire(context.Context, string) (*assessmentmodel.QuestionnaireBindingResult, error) {
+func (s *assessmentModelServiceStub) GetQuestionnaire(context.Context, string) (*modelcatalog.QuestionnaireBindingResult, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) GetDefinition(context.Context, string) (*assessmentmodel.DefinitionDTO, error) {
+func (s *assessmentModelServiceStub) GetDefinition(context.Context, string) (*modelcatalog.DefinitionDTO, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) UpdateDefinition(context.Context, string, assessmentmodel.DefinitionDTO) (*assessmentmodel.DefinitionDTO, error) {
+func (s *assessmentModelServiceStub) UpdateDefinition(context.Context, string, modelcatalog.DefinitionDTO) (*modelcatalog.DefinitionDTO, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) Options(context.Context, string) (*assessmentmodel.OptionsResult, error) {
+func (s *assessmentModelServiceStub) Options(context.Context, string) (*modelcatalog.OptionsResult, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) ApplyCodes(context.Context, assessmentmodel.ApplyCodesDTO) ([]string, error) {
+func (s *assessmentModelServiceStub) ApplyCodes(context.Context, modelcatalog.ApplyCodesDTO) ([]string, error) {
 	return nil, nil
 }
 
-func (s *assessmentModelServiceStub) Validate(context.Context, string) (*assessmentmodel.ValidationResult, error) {
+func (s *assessmentModelServiceStub) Validate(context.Context, string) (*modelcatalog.ValidationResult, error) {
 	return s.validateResult, s.validateErr
 }
 
-func (s *assessmentModelServiceStub) PreviewReport(context.Context, string, json.RawMessage) (*assessmentmodel.PreviewReportResult, error) {
+func (s *assessmentModelServiceStub) PreviewReport(context.Context, string, json.RawMessage) (*modelcatalog.PreviewReportResult, error) {
 	return s.previewResult, s.previewErr
 }
 
@@ -97,7 +97,7 @@ func (s *assessmentModelServiceStub) GetQRCode(context.Context, string) (string,
 func TestAssessmentModelPublishReturnsValidationResultWhenInvalid(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 
-	validation := assessmentmodel.NewValidationResult([]assessmentmodel.ValidationIssue{
+	validation := modelcatalog.NewValidationResult([]modelcatalog.ValidationIssue{
 		{
 			Field:   "definition.payload",
 			Message: "模型定义 payload 不能为空",
@@ -127,7 +127,7 @@ func TestAssessmentModelPublishReturnsValidationResultWhenInvalid(t *testing.T) 
 		Data    struct {
 			Passed bool                              `json:"passed"`
 			Valid  bool                              `json:"valid"`
-			Issues []assessmentmodel.ValidationIssue `json:"issues"`
+			Issues []modelcatalog.ValidationIssue `json:"issues"`
 			Errors []string                          `json:"errors"`
 		} `json:"data"`
 	}
@@ -155,7 +155,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 	gin.SetMode(gin.TestMode)
 
 	svc := &assessmentModelServiceStub{
-		previewErr: assessmentmodel.NewValidationFailedError([]assessmentmodel.ValidationIssue{
+		previewErr: modelcatalog.NewValidationFailedError([]modelcatalog.ValidationIssue{
 			{
 				Field:   "answers[0].question_code",
 				Message: `question_code "UNKNOWN" 不存在于绑定问卷`,
@@ -186,7 +186,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 		Message string `json:"message"`
 		Data    struct {
 			Passed bool                              `json:"passed"`
-			Issues []assessmentmodel.ValidationIssue `json:"issues"`
+			Issues []modelcatalog.ValidationIssue `json:"issues"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {

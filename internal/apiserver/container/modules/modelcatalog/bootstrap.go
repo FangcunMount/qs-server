@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"

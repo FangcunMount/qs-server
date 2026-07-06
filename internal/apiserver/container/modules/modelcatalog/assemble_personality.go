@@ -1,12 +1,12 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
-	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
+	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	appPersonalityCatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 

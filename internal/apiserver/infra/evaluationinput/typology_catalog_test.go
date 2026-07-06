@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -46,7 +46,7 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 		Status:               "published",
 	})
 	provider := NewTypologyModelInputProvider(
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.AlgorithmMBTI,
 		fakeTypologyCatalog{payload: payload},
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
 			QuestionnaireCode:    "MBTI_TEST",
@@ -62,7 +62,7 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 		t.Fatalf("ResolveInput: %v", err)
 	}
 	got, ok := port.TypologyPayload(snapshot)
-	if !ok || got.Algorithm != assessmentmodel.AlgorithmMBTI {
+	if !ok || got.Algorithm != modelcatalog.AlgorithmMBTI {
 		t.Fatalf("payload = %#v, ok=%v", got, ok)
 	}
 }
@@ -76,7 +76,7 @@ func TestTypologyModelInputProviderRejectsAlgorithmMismatch(t *testing.T) {
 		Status:               "published",
 	})
 	provider := NewTypologyModelInputProvider(
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.AlgorithmMBTI,
 		fakeTypologyCatalog{payload: payload},
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{
 			QuestionnaireCode:    "SBTI_FUN",
@@ -94,11 +94,11 @@ func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
 	payload := &modeltypology.Payload{
 		Code:      "BF",
 		Version:   "1.0.0",
-		Algorithm: assessmentmodel.AlgorithmBigFive,
+		Algorithm: modelcatalog.AlgorithmBigFive,
 		Status:    "published",
 	}
 	provider := NewTypologyModelInputProvider(
-		assessmentmodel.AlgorithmBigFive,
+		modelcatalog.AlgorithmBigFive,
 		fakeTypologyCatalog{payload: payload},
 		fakeAnswerSheetReader{sheet: &port.AnswerSheetSnapshot{}},
 		fakeQuestionnaireReader{},
@@ -108,7 +108,7 @@ func TestTypologyProviderResolvesBigFivePayload(t *testing.T) {
 		t.Fatalf("ResolveInput: %v", err)
 	}
 	got, ok := port.TypologyPayload(snapshot)
-	if !ok || got.Algorithm != assessmentmodel.AlgorithmBigFive {
+	if !ok || got.Algorithm != modelcatalog.AlgorithmBigFive {
 		t.Fatalf("payload = %#v, ok=%v", got, ok)
 	}
 }

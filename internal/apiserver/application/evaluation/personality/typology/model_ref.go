@@ -2,8 +2,8 @@ package typology
 
 import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -20,7 +20,7 @@ func modelRefFromExecutionInput(input evaluationexecute.ExecutionInput, payload 
 	}
 	return assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
+		modelcatalog.SubKindTypology,
 		payload.Algorithm,
 		meta.ID(0),
 		meta.NewCode(code),

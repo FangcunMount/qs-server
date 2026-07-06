@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -14,12 +14,12 @@ import (
 type Executor struct {
 	runner          *algorithmRunner
 	key             evaluation.EvaluatorKey
-	legacyAlgorithm assessmentmodel.Algorithm
+	legacyAlgorithm modelcatalog.Algorithm
 }
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
-func NewTypologyExecutor(algorithm assessmentmodel.Algorithm) (*Executor, error) {
+func NewTypologyExecutor(algorithm modelcatalog.Algorithm) (*Executor, error) {
 	return NewTypologyExecutorWithRegistry(mustDefaultModuleRegistry(), algorithm)
 }
 
@@ -38,11 +38,11 @@ func NewConfiguredTypologyExecutorWithRegistry(registry ModuleRegistry) (*Execut
 	}, nil
 }
 
-func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (*Executor, error) {
 	return newLegacyExecutor(registry, algorithm)
 }
 
-func newLegacyExecutor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+func newLegacyExecutor(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (*Executor, error) {
 	runner, err := algorithmRunnerFor(registry, algorithm)
 	if err != nil {
 		return nil, err
@@ -84,7 +84,7 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 }
 
 // NewLegacyTypologyAliasExecutor returns a legacy-key executor that delegates to the configured runtime.
-func NewLegacyTypologyAliasExecutor(configured *Executor, algorithm assessmentmodel.Algorithm) (*Executor, error) {
+func NewLegacyTypologyAliasExecutor(configured *Executor, algorithm modelcatalog.Algorithm) (*Executor, error) {
 	if configured == nil || configured.runner == nil {
 		return nil, fmt.Errorf("configured typology executor is required")
 	}

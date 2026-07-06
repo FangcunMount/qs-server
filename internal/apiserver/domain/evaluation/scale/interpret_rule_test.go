@@ -3,7 +3,7 @@ package scale
 import (
 	"testing"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
 func TestFindInterpretRuleUsesLeftClosedRightOpenIntervals(t *testing.T) {

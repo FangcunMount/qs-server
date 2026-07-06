@@ -3,8 +3,8 @@ package configured
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
@@ -205,7 +205,7 @@ func buildPersonalityDimensions(input DetailInput) ([]evaluationtypology.Persona
 		return buildPolePersonalityDimensions(input)
 	}
 	if input.Decision.Kind == profile.DecisionKindNearestPattern || len(input.Decision.PatternOrder) > 0 ||
-		input.Spec.Decision.Kind == assessmentmodel.DecisionKindNearestPattern {
+		input.Spec.Decision.Kind == modelcatalog.DecisionKindNearestPattern {
 		return buildPatternPersonalityDimensions(input)
 	}
 	return nil, nil

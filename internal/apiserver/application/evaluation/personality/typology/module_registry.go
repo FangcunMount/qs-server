@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
@@ -22,7 +22,7 @@ func NewModuleRegistryWith(opts PersonalityRuntimeOptions, modules ...Module) (M
 	if len(modules) == 0 {
 		return ModuleRegistry{}, fmt.Errorf("typology modules are required")
 	}
-	algorithms := make([]assessmentmodel.Algorithm, 0, len(modules))
+	algorithms := make([]modelcatalog.Algorithm, 0, len(modules))
 	for _, module := range modules {
 		if module.Algorithm == "" {
 			return ModuleRegistry{}, fmt.Errorf("typology module algorithm is required")
@@ -32,7 +32,7 @@ func NewModuleRegistryWith(opts PersonalityRuntimeOptions, modules ...Module) (M
 	return ModuleRegistry{runtime: NewPersonalityRuntimeRegistryWith(opts, algorithms...)}, nil
 }
 
-func (r ModuleRegistry) runnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
+func (r ModuleRegistry) runnerFor(algorithm modelcatalog.Algorithm) (algorithmRunner, error) {
 	return r.runtime.runnerFor(algorithm)
 }
 
@@ -40,7 +40,7 @@ func (r ModuleRegistry) runnerForKey(key evaluation.EvaluatorKey) (algorithmRunn
 	return r.runtime.runnerForKey(key)
 }
 
-func (r ModuleRegistry) Algorithms() []assessmentmodel.Algorithm {
+func (r ModuleRegistry) Algorithms() []modelcatalog.Algorithm {
 	return r.runtime.Algorithms()
 }
 

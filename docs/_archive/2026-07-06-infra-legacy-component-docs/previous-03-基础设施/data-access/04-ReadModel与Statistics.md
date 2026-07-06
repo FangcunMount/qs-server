@@ -950,7 +950,7 @@ ReadModel 不应：
 ### Interpretation / Evaluation
 
 - Evaluation domain：[../../../internal/apiserver/domain/evaluation/](../../../internal/apiserver/domain/evaluation/)
-- Interpretation Model docs：[../../02-业务模块/40-interpretation-model/README.md](../../02-业务模块/40-interpretation-model/README.md)
+- Interpretation Model docs：[../../02-业务模块/40-report/README.md](../../02-业务模块/40-report/README.md)
 - Evaluation docs：[../../02-业务模块/30-evaluation/README.md](../../02-业务模块/30-evaluation/README.md)
 
 ---

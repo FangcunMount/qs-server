@@ -16,10 +16,10 @@
 | 真值层 | `00-05` 是现行真值层，`06-宣讲` 是讲解层；历史材料只作参考，不作为当前事实源 |
 | 事实优先级 | 源码与机器契约优先于 prose 文档 |
 | 业务模块入口 | 统一从 [02-业务模块/README.md](./02-业务模块/README.md) 进入 |
-| 当前业务模块 | 4 个核心模块：`survey / assessment-model / evaluation / interpretation-model`；3 个支撑模块：`actor / plan / statistics` |
-| 代码映射 | 当前注册包是 `survey / assessmentmodel / evaluation / report / actor / plan / statistics` |
+| 当前业务模块 | 4 个核心模块：`survey / model-catalog / evaluation / report`；3 个支撑模块：`actor / plan / statistics` |
+| 代码映射 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
 | 执行主线 | Survey 提供答卷事实，Assessment Model 提供发布模型资产，Evaluation 执行测评并产出结果，Interpretation Model / Report 输出最终解释报告 |
-| 兼容说明 | `scale/personalitymodel` 是 `assessmentmodel` 的旧注册名或具体模型资产入口，不再作为独立核心模块 |
+| 兼容说明 | `scale/personalitymodel` 是 `modelcatalog` 的旧注册名或具体模型资产入口，不再作为独立核心模块 |
 
 ---
 
@@ -136,20 +136,20 @@ Actor / Plan / Statistics
 10-survey
     先理解问卷定义和答卷提交事实
 
-20-assessment-model
+20-model-catalog
     再理解 Kind / Snapshot / Binding / Payload 抽象
 
 30-evaluation
     再理解 Assessment / EvaluationRun / Result / Retry / Events
 
-40-interpretation-model
+40-interpretation
     最后理解 report module 如何产出 InterpretReport
 
 50-actor / 60-plan / 70-statistics
     按参与者、计划编排、读侧统计问题进入
 ```
 
-旧 `scale/` 目录已经退出现行阅读路径。医学量表细节从 `20-assessment-model` 进入，历史材料只在 `docs/_archive/` 中保留。
+旧 `scale/` 目录已经退出现行阅读路径。医学量表细节从 `20-model-catalog` 进入，历史材料只在 `docs/_archive/` 中保留。
 
 ### 5.3 需要看接口与运维
 
@@ -186,9 +186,9 @@ configs/events.yaml
 | 模块 | 当前定位 | 入口 |
 | ---- | -------- | ---- |
 | Survey | 作答事实层，负责问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实沉淀 | [02-业务模块/10-survey/README.md](./02-业务模块/10-survey/README.md) |
-| Assessment Model | 测评模型资产层，负责统一管理医学量表、人格模型等模型资产 | [02-业务模块/20-assessment-model/README.md](./02-业务模块/20-assessment-model/README.md) |
+| Assessment Model | 测评模型资产层，负责统一管理医学量表、人格模型等模型资产 | [02-业务模块/20-model-catalog/README.md](./02-业务模块/20-model-catalog/README.md) |
 | Evaluation | 测评执行层，负责将 `AnswerSheet` 与 Assessment Model 结合，完成一次 `Assessment` 执行并生成结果 | [02-业务模块/30-evaluation/README.md](./02-业务模块/30-evaluation/README.md) |
-| Interpretation Model / Report | 解释模型层，负责报告构建、解释适配、`InterpretReport` 聚合与持久化；当前代码实现仍位于 `report` module | [02-业务模块/40-interpretation-model/README.md](./02-业务模块/40-interpretation-model/README.md) |
+| Interpretation Model / Report | 解释模型层，负责报告构建、解释适配、`InterpretReport` 聚合与持久化；当前代码实现仍位于 `interpretation` module | [02-业务模块/40-interpretation/README.md](./02-业务模块/40-interpretation/README.md) |
 
 支撑模块入口：
 

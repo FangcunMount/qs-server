@@ -13,7 +13,7 @@
 3. 设计问卷绑定：确认 `Questionnaire` 是否复用或新增。
 4. 发布模型快照：保证 Evaluation 执行引用冻结快照。
 5. 接入执行器：让 `evaluation` 能按模型身份加载并执行。
-6. 接入解释模型：让 `interpretation-model` 能生成报告。
+6. 接入解释模型：让 `interpretation` 能生成报告。
 7. 更新统计口径：需要新指标时再调整 `statistics`。
 
 ---

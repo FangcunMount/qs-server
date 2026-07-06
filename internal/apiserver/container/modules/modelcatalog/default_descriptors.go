@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"

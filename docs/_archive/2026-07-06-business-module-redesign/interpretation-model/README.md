@@ -1,6 +1,6 @@
 # Interpretation Model / Report 模块文档
 
-> 文档中的 `interpretation-model`，对应当前代码中的 `report` module。
+> 文档中的 `report`，对应当前代码中的 `report` module。
 >
 > 它是 qs-server 的 **解释模型与报告产出层**：负责把 Evaluation 已经得到的测评结果聚合成最终 `InterpretReport`，并维护报告 builder registry、score-based adapter、personality adapter、解释文案和报告持久化。
 
@@ -10,14 +10,14 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 文档业务名 | `interpretation-model` |
+| 文档业务名 | `report` |
 | 当前代码包名 | `internal/apiserver/container/modules/report`、`internal/apiserver/domain/report` |
 | 一句话职责 | 管解释模型与最终报告产出，不管答卷提交、测评状态机或模型资产发布 |
 | 典型对象 | `InterpretReport`、`ReportBuilder`、`ModelExtra`、score adapter、personality adapter |
 | 上游输入 | Evaluation Result / Assessment Outcome / 模型身份 |
 | 下游输出 | 持久化的 `InterpretReport`、报告生成事件、供查询和统计使用的报告事实 |
 
-当前代码还没有 `interpretationmodel` 包。阅读代码时请搜索 `report`，阅读业务文档时统一使用 `interpretation-model / report`。
+当前代码还没有 `interpretationmodel` 包。阅读代码时请搜索 `report`，阅读业务文档时统一使用 `report / report`。
 
 ---
 
@@ -64,7 +64,7 @@ IAM 登录认证；
 | score adapter | `internal/apiserver/domain/report/score` |
 | personality adapter | `internal/apiserver/domain/report/personality` |
 | builder registry 装配 | `internal/apiserver/container/modules/report/assemble.go` |
-| 模型 descriptor 到 builder 的物化 | `internal/apiserver/container/modules/assessmentmodel/report_builders.go` |
+| 模型 descriptor 到 builder 的物化 | `internal/apiserver/container/modules/instrument/report_builders.go` |
 
 ---
 

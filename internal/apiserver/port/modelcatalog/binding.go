@@ -1,9 +1,9 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // AssessmentBinding 建测评时从问卷解析出的测评模型绑定（含 scale legacy 字段）。

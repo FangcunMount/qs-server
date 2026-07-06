@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
@@ -9,9 +9,9 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type Repository struct {

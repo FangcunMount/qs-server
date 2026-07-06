@@ -32,9 +32,9 @@
 
 ```text
 10-survey
-20-assessment-model
+20-model-catalog
 30-evaluation
-40-interpretation-model
+40-interpretation
 50-actor
 60-plan
 70-statistics
@@ -44,7 +44,7 @@
 
 ```text
 survey
-assessmentmodel
+modelcatalog
 evaluation
 report
 actor
@@ -52,7 +52,7 @@ plan
 statistics
 ```
 
-`scale/personalitymodel` 是 `assessmentmodel` 的兼容注册名或旧能力路径，不再作为独立核心模块维护。
+`scale/personalitymodel` 是 `modelcatalog` 的兼容注册名或旧能力路径，不再作为独立核心模块维护。
 
 `70-statistics` 使用复数目录名，和当前代码包 `statistics` 保持一致。
 

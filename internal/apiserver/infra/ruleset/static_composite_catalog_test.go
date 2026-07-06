@@ -4,9 +4,9 @@ import (
 	"context"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 

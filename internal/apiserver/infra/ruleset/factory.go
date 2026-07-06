@@ -5,13 +5,13 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
+	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"

@@ -1,8 +1,8 @@
 # Scale 模块文档
 
-> 兼容说明：`scale/` 目录保留为医学量表规则细节和旧链接入口。当前文档主轴中，Scale 不再是独立核心模块，而是 `assessment-model` 下的一类具体模型资产；代码注册名 `scale` 也只是 `assessmentmodel` 的 legacy register name。
+> 兼容说明：`scale/` 目录保留为医学量表规则细节和旧链接入口。当前文档主轴中，Scale 不再是独立核心模块，而是 `instrument` 下的一类具体模型资产；代码注册名 `scale` 也只是 `assessmentmodel` 的 legacy register name。
 >
-> 新读者应先读 [assessment-model/README.md](../assessment-model/README.md)，再按需进入本目录。
+> 新读者应先读 [instrument/README.md](../instrument/README.md)，再按需进入本目录。
 
 > Scale 是 qs-server 中的 **医学量表解释模型模块**。
 >
@@ -635,7 +635,7 @@ Evaluator 插件化：Scale evaluator 只是 Evaluation 的一种模型执行器
 Scale 模块基础验证：
 
 ```bash
-go test ./internal/apiserver/domain/assessmentmodel/scale/definition/...
+go test ./internal/apiserver/domain/instrument/scale/definition/...
 go test ./internal/apiserver/domain/evaluation/scale/...
 go test ./internal/apiserver/application/scale/...
 ```

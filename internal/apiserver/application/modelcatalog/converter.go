@@ -1,10 +1,10 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 )
 

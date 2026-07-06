@@ -1,35 +1,35 @@
 package evaluation
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
 // EvaluatorKey routes execution to a concrete evaluator implementation.
 type EvaluatorKey struct {
-	Kind      assessmentmodel.Kind
-	SubKind   assessmentmodel.SubKind
-	Algorithm assessmentmodel.Algorithm
+	Kind      modelcatalog.Kind
+	SubKind   modelcatalog.SubKind
+	Algorithm modelcatalog.Algorithm
 }
 
 var (
 	EvaluatorKeyScaleDefault = EvaluatorKey{
-		Kind:      assessmentmodel.KindScale,
-		SubKind:   assessmentmodel.SubKindEmpty,
-		Algorithm: assessmentmodel.AlgorithmScaleDefault,
+		Kind:      modelcatalog.KindScale,
+		SubKind:   modelcatalog.SubKindEmpty,
+		Algorithm: modelcatalog.AlgorithmScaleDefault,
 	}
-	EvaluatorKeyMBTI                = PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI)
-	EvaluatorKeySBTI                = PersonalityTypologyKey(assessmentmodel.AlgorithmSBTI)
-	EvaluatorKeyBigFive             = PersonalityTypologyKey(assessmentmodel.AlgorithmBigFive)
+	EvaluatorKeyMBTI                = PersonalityTypologyKey(modelcatalog.AlgorithmMBTI)
+	EvaluatorKeySBTI                = PersonalityTypologyKey(modelcatalog.AlgorithmSBTI)
+	EvaluatorKeyBigFive             = PersonalityTypologyKey(modelcatalog.AlgorithmBigFive)
 	EvaluatorKeyPersonalityTypology = EvaluatorKey{
-		Kind:      assessmentmodel.KindPersonality,
-		SubKind:   assessmentmodel.SubKindTypology,
-		Algorithm: assessmentmodel.AlgorithmPersonalityTypology,
+		Kind:      modelcatalog.KindPersonality,
+		SubKind:   modelcatalog.SubKindTypology,
+		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}
 )
 
 // PersonalityTypologyKey builds the execution routing key for a typology algorithm.
-func PersonalityTypologyKey(algorithm assessmentmodel.Algorithm) EvaluatorKey {
+func PersonalityTypologyKey(algorithm modelcatalog.Algorithm) EvaluatorKey {
 	return EvaluatorKey{
-		Kind:      assessmentmodel.KindPersonality,
-		SubKind:   assessmentmodel.SubKindTypology,
+		Kind:      modelcatalog.KindPersonality,
+		SubKind:   modelcatalog.SubKindTypology,
 		Algorithm: algorithm,
 	}
 }
@@ -47,11 +47,11 @@ func (k EvaluatorKey) IsZero() bool {
 
 // IsPersonalityTypologyLegacyKey reports whether key is a built-in typology algorithm alias.
 func (k EvaluatorKey) IsPersonalityTypologyLegacyKey() bool {
-	if k.Kind != assessmentmodel.KindPersonality || k.SubKind != assessmentmodel.SubKindTypology {
+	if k.Kind != modelcatalog.KindPersonality || k.SubKind != modelcatalog.SubKindTypology {
 		return false
 	}
 	switch k.Algorithm {
-	case assessmentmodel.AlgorithmMBTI, assessmentmodel.AlgorithmSBTI, assessmentmodel.AlgorithmBigFive:
+	case modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI, modelcatalog.AlgorithmBigFive:
 		return true
 	default:
 		return false
@@ -75,8 +75,8 @@ func ResolvePersonalityTypologyExecutorKey(key EvaluatorKey) EvaluatorKey {
 	return key
 }
 
-func EvaluatorKeyFromLegacyKind(kind assessmentmodel.Kind) (EvaluatorKey, bool) {
-	mappedKind, subKind, algorithm, ok := assessmentmodel.LegacyKindMapping(kind)
+func EvaluatorKeyFromLegacyKind(kind modelcatalog.Kind) (EvaluatorKey, bool) {
+	mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(kind)
 	if !ok {
 		return EvaluatorKey{}, false
 	}

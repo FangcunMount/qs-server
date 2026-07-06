@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // FromMBTI converts a legacy MBTI payload to unified typology form.
@@ -58,13 +58,13 @@ func FromMBTI(model *MBTILegacyModel) *Payload {
 			Attribution:   model.Source.Attribution,
 			NonCommercial: model.Source.NonCommercial,
 		},
-		Algorithm:        assessmentmodel.AlgorithmMBTI,
+		Algorithm:        modelcatalog.AlgorithmMBTI,
 		DimensionOrder:   append([]string(nil), model.DimensionOrder...),
 		Dimensions:       dimensions,
 		QuestionMappings: mappings,
 		Outcomes:         outcomes,
 		MatchingSpec: MatchingSpec{
-			Kind: assessmentmodel.DecisionKindPoleComposition,
+			Kind: modelcatalog.DecisionKindPoleComposition,
 		},
 	}
 }
@@ -74,7 +74,7 @@ func ToMBTI(payload *Payload) (*MBTILegacyModel, error) {
 	if payload == nil {
 		return nil, fmt.Errorf("typology payload is nil")
 	}
-	if payload.Algorithm != assessmentmodel.AlgorithmMBTI {
+	if payload.Algorithm != modelcatalog.AlgorithmMBTI {
 		return nil, fmt.Errorf("typology algorithm %s is not mbti", payload.Algorithm)
 	}
 	dimensions := make(map[string]MBTILegacyDimension, len(payload.Dimensions))

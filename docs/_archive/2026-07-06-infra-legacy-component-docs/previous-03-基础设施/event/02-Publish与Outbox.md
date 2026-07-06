@@ -37,7 +37,7 @@
 ```text
 questionnaire.changed
 scale.changed
-interpretation-model.changed
+report.changed
 task.opened
 ```
 
@@ -188,7 +188,7 @@ sequenceDiagram
 | ----- | -------- | ---- |
 | `questionnaire.changed` | best_effort | 问卷规则变化通知 |
 | `scale.changed` | best_effort | 医学量表规则变化通知 |
-| `interpretation-model.changed` | best_effort | 解释模型规则变化通知 |
+| `report.changed` | best_effort | 解释模型规则变化通知 |
 | `task.opened` | best_effort | 任务开放通知 |
 | `task.completed` | best_effort | 任务完成通知 |
 | `task.expired` | best_effort | 任务过期通知 |
@@ -810,7 +810,7 @@ stage 只完成第一步。
 
 ```text
 规则变化事件
-    例如 interpretation-model.changed，通常 best_effort，用于 Context cache 失效、读模型刷新、轻量通知。
+    例如 report.changed，通常 best_effort，用于 Context cache 失效、读模型刷新、轻量通知。
 
 一次测评执行事件
     例如 interpretation.completed / interpretation.failed，通常 durable_outbox，用于驱动报告生成、统计投影和失败处理。

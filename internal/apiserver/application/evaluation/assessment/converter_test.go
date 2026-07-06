@@ -6,9 +6,9 @@ import (
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -127,8 +127,8 @@ func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
 		t.Fatal("RuleSetRef is nil")
 	}
 	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality ||
-		req.ModelRef.SubKind() != assessmentmodel.SubKindTypology ||
-		req.ModelRef.Algorithm() != assessmentmodel.AlgorithmSBTI ||
+		req.ModelRef.SubKind() != modelcatalog.SubKindTypology ||
+		req.ModelRef.Algorithm() != modelcatalog.AlgorithmSBTI ||
 		req.ModelRef.Code().String() != "SBTI_FUN" ||
 		req.ModelRef.Version() != "1.0.0" ||
 		req.ModelRef.Title() != title {
@@ -138,8 +138,8 @@ func TestBuildCreateRequestMapsGenericEvaluationModelRef(t *testing.T) {
 
 func TestBuildCreateRequestMapsExplicitTypologyIdentity(t *testing.T) {
 	kind := domainAssessment.EvaluationModelKindPersonality.String()
-	subKind := string(assessmentmodel.SubKindTypology)
-	algorithm := string(assessmentmodel.AlgorithmMBTI)
+	subKind := string(modelcatalog.SubKindTypology)
+	algorithm := string(modelcatalog.AlgorithmMBTI)
 	code := "MBTI_OEJTS"
 	req, err := assessmentCreateRequestAssembler{}.Assemble(CreateAssessmentDTO{
 		OrgID:                1,
@@ -159,8 +159,8 @@ func TestBuildCreateRequestMapsExplicitTypologyIdentity(t *testing.T) {
 		t.Fatal("ModelRef is nil")
 	}
 	if req.ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality ||
-		req.ModelRef.SubKind() != assessmentmodel.SubKindTypology ||
-		req.ModelRef.Algorithm() != assessmentmodel.AlgorithmMBTI {
+		req.ModelRef.SubKind() != modelcatalog.SubKindTypology ||
+		req.ModelRef.Algorithm() != modelcatalog.AlgorithmMBTI {
 		t.Fatalf("ModelRef = %#v, want personality/typology/mbti", req.ModelRef)
 	}
 }

@@ -16,8 +16,8 @@ func TestTopLevelDomainChainPackagesDoNotDependOnOuterLayers(t *testing.T) {
 
 	root := repoRoot(t)
 	scanRoots := []string{
-		filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel"),
-		filepath.Join(root, "internal", "apiserver", "domain", "report"),
+		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation"),
 	}
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/": "application",
@@ -43,7 +43,7 @@ func TestSurveyScaleDomainDoesNotDependOnOuterLayers(t *testing.T) {
 	root := repoRoot(t)
 	scanRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "survey"),
-		filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "scale", "definition"),
+		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale", "definition"),
 		filepath.Join(root, "internal", "apiserver", "domain", "calculation"),
 		filepath.Join(root, "internal", "apiserver", "domain", "validation"),
 	}
@@ -73,7 +73,7 @@ func TestScaleDomainDoesNotExposePersistencePayloadMappers(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "scale", "definition")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale", "definition")
 	err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
 			return err
@@ -107,7 +107,7 @@ func TestScaleDefinitionLivesUnderAssessmentModelScale(t *testing.T) {
 	root := repoRoot(t)
 	oldPath := filepath.Join(root, "internal", "apiserver", "domain", "authoring", "scale")
 	if _, err := os.Stat(oldPath); err == nil {
-		t.Fatalf("%s exists; scale definition belongs under domain/assessmentmodel/scale/definition", filepath.ToSlash(mustRel(t, root, oldPath)))
+		t.Fatalf("%s exists; scale definition belongs under domain/modelcatalog/scale/definition", filepath.ToSlash(mustRel(t, root, oldPath)))
 	} else if !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
@@ -120,7 +120,7 @@ func TestSurveyScaleDomainRepositoriesStayCommandSide(t *testing.T) {
 	for _, rel := range []string{
 		"internal/apiserver/domain/survey/questionnaire/repository.go",
 		"internal/apiserver/domain/survey/answersheet/repository.go",
-		"internal/apiserver/domain/assessmentmodel/scale/definition/repository.go",
+		"internal/apiserver/domain/modelcatalog/scale/definition/repository.go",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		file, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
@@ -171,7 +171,7 @@ func TestEvaluationDomainRepositoriesStayCommandSide(t *testing.T) {
 			interfaces: []string{"Repository", "ScoreRepository"},
 		},
 		{
-			rel:        "internal/apiserver/domain/report/repository.go",
+			rel:        "internal/apiserver/domain/interpretation/repository.go",
 			interfaces: []string{"ReportRepository"},
 		},
 	} {
@@ -220,15 +220,15 @@ func TestEvaluationDomainDoesNotDependOnSurveyScaleOrOuterLayers(t *testing.T) {
 	root := repoRoot(t)
 	scanRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                            "application",
-		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":                             "infrastructure",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                              "transport",
-		"github.com/FangcunMount/qs-server/internal/apiserver/port/":                                   "port",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition": "scale definition domain",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                          "survey domain",
-		"github.com/FangcunMount/component-base/pkg/logger":                                            "technical logging",
-		"github.com/FangcunMount/component-base/pkg/errors":                                            "API error wrappers",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                                          "API error codes",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                         "application",
+		"github.com/FangcunMount/qs-server/internal/apiserver/" + "infra/":                          "infrastructure",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                           "transport",
+		"github.com/FangcunMount/qs-server/internal/apiserver/port/":                                "port",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "scale definition domain",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                       "survey domain",
+		"github.com/FangcunMount/component-base/pkg/logger":                                         "technical logging",
+		"github.com/FangcunMount/component-base/pkg/errors":                                         "API error wrappers",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                                       "API error codes",
 	}
 	scanGoImports(t, scanRoot, func(path, importPath string) {
 		if isEvaluationRootPackageFile(root, path) {
@@ -270,7 +270,7 @@ func TestEvaluationDomainDoesNotBuildReports(t *testing.T) {
 			return nil
 		}
 		if strings.Contains(filepath.Base(path), "report_builder") {
-			t.Fatalf("%s is a report builder file; report construction belongs in domain/report or application orchestration", filepath.ToSlash(mustRel(t, root, path)))
+			t.Fatalf("%s is a report builder file; report construction belongs in domain/interpretation or application orchestration", filepath.ToSlash(mustRel(t, root, path)))
 		}
 		data, err := os.ReadFile(path)
 		if err != nil {
@@ -293,24 +293,12 @@ func TestEvaluationDomainDoesNotImportReportPackage(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	const reportImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	const reportImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
 		if importPath == reportImport || strings.HasPrefix(importPath, reportImport+"/") {
 			t.Fatalf("%s imports %s; evaluation domain must not depend on report aggregate construction", filepath.ToSlash(mustRel(t, root, path)), importPath)
 		}
 	})
-}
-
-func TestScaleExecutionLivesUnderEvaluationDomain(t *testing.T) {
-	t.Parallel()
-
-	root := repoRoot(t)
-	oldPath := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
-	if _, err := os.Stat(oldPath); err == nil {
-		t.Fatalf("%s exists; model execution belongs under domain/evaluation/*", filepath.ToSlash(mustRel(t, root, oldPath)))
-	} else if !os.IsNotExist(err) {
-		t.Fatal(err)
-	}
 }
 
 func TestAssessmentModelReplacesLegacyRulesetPackages(t *testing.T) {
@@ -323,7 +311,7 @@ func TestAssessmentModelReplacesLegacyRulesetPackages(t *testing.T) {
 	} {
 		oldPath := filepath.Join(root, filepath.FromSlash(rel))
 		if _, err := os.Stat(oldPath); err == nil {
-			t.Fatalf("%s exists; assessment model assets belong under domain/assessmentmodel and port/assessmentmodel", filepath.ToSlash(mustRel(t, root, oldPath)))
+			t.Fatalf("%s exists; assessment model assets belong under domain/modelcatalog and port/assessmentmodel", filepath.ToSlash(mustRel(t, root, oldPath)))
 		} else if !os.IsNotExist(err) {
 			t.Fatal(err)
 		}
@@ -334,7 +322,7 @@ func TestReportBuilderEntryPointsLiveInReportDomainOnly(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	reportDomain := filepath.Join(root, "internal", "apiserver", "domain", "report")
+	reportDomain := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
 	entryPoints := []string{
 		"BuildReport",
 		"ResolveReportType",
@@ -357,7 +345,7 @@ func TestReportBuilderEntryPointsLiveInReportDomainOnly(t *testing.T) {
 			}
 			rel, relErr := filepath.Rel(reportDomain, path)
 			if relErr != nil || strings.HasPrefix(rel, "..") {
-				t.Fatalf("%s defines %s(); report builder entry points must live in domain/report", filepath.ToSlash(mustRel(t, root, path)), name)
+				t.Fatalf("%s defines %s(); report builder entry points must live in domain/interpretation", filepath.ToSlash(mustRel(t, root, path)), name)
 			}
 		}
 		return nil
@@ -371,8 +359,8 @@ func TestReportDomainDoesNotImportRulesetPayloads(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	const rulesetImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "report"), func(path, importPath string) {
+	const rulesetImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "interpretation"), func(path, importPath string) {
 		if importPath == rulesetImport || strings.HasPrefix(importPath, rulesetImport+"/") {
 			t.Fatalf("%s imports %s; report domain must use report-local view models instead of assessment model payloads", filepath.ToSlash(mustRel(t, root, path)), importPath)
 		}
@@ -405,15 +393,15 @@ func isEvaluationRootPackageFile(root, path string) bool {
 }
 
 func isEvaluationRulesetPayloadImport(importPath string) bool {
-	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel" {
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog" {
 		return true
 	}
 	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation" {
 		return true
 	}
 	for _, allowed := range []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
 			return true
@@ -426,7 +414,7 @@ func TestEvaluationReportDomainDoesNotContainUnusedExportModel(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "report")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
 	forbiddenTokens := []string{
 		"ReportExporter",
 		"ExportFormat",
@@ -464,7 +452,7 @@ func TestInterpretReportDomainUsesNeutralModelFields(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "report")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "interpretation")
 	forbiddenTokens := []string{
 		"scaleName",
 		"scaleCode",

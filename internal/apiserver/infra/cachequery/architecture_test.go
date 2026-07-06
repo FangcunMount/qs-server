@@ -32,7 +32,7 @@ func TestCacheQueryAdaptersDoNotImportScaleApplication(t *testing.T) {
 		}
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
-			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale") {
+			if strings.HasPrefix(importPath, "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale") {
 				t.Fatalf("%s imports %s; cache query adapters must depend on ports/domain, not scale application DTOs", path, importPath)
 			}
 		}

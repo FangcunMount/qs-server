@@ -1,20 +1,20 @@
-package assessmentmodel
+package modelcatalog
 
 import (
-	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
-	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/lifecycle"
+	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/lifecycle"
+	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cache"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
+	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
+	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
@@ -117,7 +117,7 @@ func buildPersonalityDeps(
 	draftRepo := mongoassessmentmodel.NewDraftRepository(mongoDB, mongoOpts)
 	publishedRepo := mongoassessmentmodel.NewPublishedModelRepoAdapter(v2Repo)
 	legacyRepo := mongoruleset.NewRepository(mongoDB, mongoOpts)
-	dualStore := assessmentmodel.NewDualStore(v2Repo, legacyRepo)
+	dualStore := modelcatalog.NewDualStore(v2Repo, legacyRepo)
 	publishedLister := port.PublishedModelLister(dualStore)
 	algorithmLister := port.PublishedAlgorithmLister(dualStore)
 	if cacheCfg.Redis != nil && cacheCfg.Builder != nil {

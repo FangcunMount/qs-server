@@ -3,7 +3,7 @@ package personality
 import (
 	"encoding/json"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 const (

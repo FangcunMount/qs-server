@@ -245,7 +245,7 @@ func extractRegisterModuleNames(t *testing.T, containerRoot string, step modules
 var installFileByInitMethod = map[string]string{
 	"initSurveyModule":     "modules/survey/install.go",
 	"initActorModule":      "modules/actor/install.go",
-	"initReportModule":     "modules/report/install.go",
+	"initReportModule":     "modules/interpretation/install.go",
 	"initEvaluationModule": "modules/evaluation/install.go",
 	"initPlanModule":       "modules/plan/install.go",
 	"initStatisticsModule": "modules/statistics/install.go",
@@ -334,7 +334,7 @@ func TestAssessmentModelRegistersAggregateName(t *testing.T) {
 			continue
 		}
 		for _, name := range step.RegisterNames {
-			if name == string(modules.PackageAssessmentModel) {
+			if name == string(modules.PackageModelCatalog) {
 				found = true
 				break
 			}
@@ -351,7 +351,7 @@ func TestEvaluationAndReportModulesUseAssessmentModelCatalogPort(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"internal/apiserver/container/modules/evaluation/install.go",
-		"internal/apiserver/container/modules/report/install.go",
+		"internal/apiserver/container/modules/interpretation/install.go",
 	} {
 		data, err := os.ReadFile(filepath.Join(root, rel))
 		if err != nil {

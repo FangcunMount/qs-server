@@ -1,7 +1,7 @@
 package shared
 
 import (
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
 )
 
 // Classification holds domain classification values assembled from DTO string slices.

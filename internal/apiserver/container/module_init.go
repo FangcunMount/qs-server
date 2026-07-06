@@ -4,11 +4,11 @@ import (
 	"fmt"
 
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
-	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
+	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
-	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/report"
+	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/pkg/options"

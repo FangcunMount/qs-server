@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
 type EvaluationModelKind string

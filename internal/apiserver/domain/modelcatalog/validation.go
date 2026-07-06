@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 // ValidationLevel classifies a validation issue severity.
 type ValidationLevel string

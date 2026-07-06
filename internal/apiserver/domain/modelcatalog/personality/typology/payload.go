@@ -3,26 +3,26 @@ package typology
 import (
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // Payload is the unified personality typology model payload.
 type Payload struct {
-	Code                 string                    `json:"code"`
-	Version              string                    `json:"version"`
-	Title                string                    `json:"title"`
-	QuestionnaireCode    string                    `json:"questionnaire_code"`
-	QuestionnaireVersion string                    `json:"questionnaire_version"`
-	Status               string                    `json:"status"`
-	Source               Source                    `json:"source"`
-	Algorithm            assessmentmodel.Algorithm `json:"algorithm"`
-	DimensionOrder       []string                  `json:"dimension_order"`
-	Dimensions           map[string]Dimension      `json:"dimensions"`
-	QuestionMappings     []QuestionMapping         `json:"question_mappings"`
-	Outcomes             []Outcome                 `json:"outcomes"`
-	MatchingSpec         MatchingSpec              `json:"matching_spec"`
-	SpecialTriggers      []SpecialTrigger          `json:"special_triggers"`
-	Runtime              *RuntimeSpec              `json:"runtime,omitempty"`
+	Code                 string                 `json:"code"`
+	Version              string                 `json:"version"`
+	Title                string                 `json:"title"`
+	QuestionnaireCode    string                 `json:"questionnaire_code"`
+	QuestionnaireVersion string                 `json:"questionnaire_version"`
+	Status               string                 `json:"status"`
+	Source               Source                 `json:"source"`
+	Algorithm            modelcatalog.Algorithm `json:"algorithm"`
+	DimensionOrder       []string               `json:"dimension_order"`
+	Dimensions           map[string]Dimension   `json:"dimensions"`
+	QuestionMappings     []QuestionMapping      `json:"question_mappings"`
+	Outcomes             []Outcome              `json:"outcomes"`
+	MatchingSpec         MatchingSpec           `json:"matching_spec"`
+	SpecialTriggers      []SpecialTrigger       `json:"special_triggers"`
+	Runtime              *RuntimeSpec           `json:"runtime,omitempty"`
 }
 
 // HasExplicitRuntime reports whether the payload carries an author-defined runtime spec.
@@ -113,8 +113,8 @@ type Rarity struct {
 }
 
 type MatchingSpec struct {
-	Kind                        assessmentmodel.DecisionKind `json:"kind"`
-	FallbackSimilarityThreshold float64                      `json:"fallback_similarity_threshold,omitempty"`
+	Kind                        modelcatalog.DecisionKind `json:"kind"`
+	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
 }
 
 type SpecialTrigger struct {

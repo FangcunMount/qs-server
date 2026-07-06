@@ -1,8 +1,8 @@
 package assessment
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 
@@ -66,7 +66,7 @@ func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) Model
 	subKind := derefString(row.EvaluationModelSubKind)
 	algorithm := derefString(row.EvaluationModelAlgorithm)
 	if algorithm == "" && kind != "" {
-		if mappedKind, mappedSubKind, mappedAlgorithm, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(kind)); ok {
+		if mappedKind, mappedSubKind, mappedAlgorithm, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(kind)); ok {
 			kind = string(mappedKind)
 			if subKind == "" {
 				subKind = string(mappedSubKind)
@@ -75,8 +75,8 @@ func modelIdentityFromAssessmentRow(row evaluationreadmodel.AssessmentRow) Model
 		}
 	}
 	if kind == "" && row.MedicalScaleCode != nil {
-		kind = string(assessmentmodel.KindScale)
-		algorithm = string(assessmentmodel.AlgorithmScaleDefault)
+		kind = string(modelcatalog.KindScale)
+		algorithm = string(modelcatalog.AlgorithmScaleDefault)
 	}
 	return ModelIdentityResult{
 		Kind:      kind,
@@ -100,7 +100,7 @@ func modelIdentityFromReportRow(row evaluationreadmodel.ReportRow) ModelIdentity
 		}
 	}
 	return ModelIdentityResult{
-		Kind:  string(assessmentmodel.KindScale),
+		Kind:  string(modelcatalog.KindScale),
 		Code:  row.ModelCode,
 		Title: row.ModelName,
 	}

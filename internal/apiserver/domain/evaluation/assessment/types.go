@@ -1,7 +1,7 @@
 package assessment
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
@@ -195,22 +195,22 @@ func IsRiskLevelCode(code string) bool {
 // ==================== 解释模型引用 ====================
 
 // EvaluationModelKind 测评模型类型。
-type EvaluationModelKind = assessmentmodel.Kind
+type EvaluationModelKind = modelcatalog.Kind
 
 const (
 	// EvaluationModelKindScale 医学/心理量表模型。
-	EvaluationModelKindScale EvaluationModelKind = assessmentmodel.KindScale
+	EvaluationModelKindScale EvaluationModelKind = modelcatalog.KindScale
 
 	// EvaluationModelKindPersonality 人格类模型（typology/trait 等子形态由 SubKind/Algorithm 区分）。
-	EvaluationModelKindPersonality EvaluationModelKind = assessmentmodel.KindPersonality
+	EvaluationModelKindPersonality EvaluationModelKind = modelcatalog.KindPersonality
 )
 
 // EvaluationModelRef 表示执行期模型引用（含计分与解读规则快照）。
 type EvaluationModelRef struct {
 	id        meta.ID
 	kind      EvaluationModelKind
-	subKind   assessmentmodel.SubKind
-	algorithm assessmentmodel.Algorithm
+	subKind   modelcatalog.SubKind
+	algorithm modelcatalog.Algorithm
 	code      meta.Code
 	version   string
 	title     string
@@ -218,19 +218,19 @@ type EvaluationModelRef struct {
 
 // NewEvaluationModelRef 创建通用测评模型引用。
 func NewEvaluationModelRef(kind EvaluationModelKind, id meta.ID, code meta.Code, version, title string) EvaluationModelRef {
-	return NewEvaluationModelRefWithIdentity(kind, assessmentmodel.SubKindEmpty, "", id, code, version, title)
+	return NewEvaluationModelRefWithIdentity(kind, modelcatalog.SubKindEmpty, "", id, code, version, title)
 }
 
 // NewEvaluationModelRefByCode 创建不带底层模型 ID 的测评模型引用。
 func NewEvaluationModelRefByCode(kind EvaluationModelKind, code meta.Code, version, title string) EvaluationModelRef {
-	return NewEvaluationModelRefWithIdentity(kind, assessmentmodel.SubKindEmpty, "", meta.ID(0), code, version, title)
+	return NewEvaluationModelRefWithIdentity(kind, modelcatalog.SubKindEmpty, "", meta.ID(0), code, version, title)
 }
 
 // NewEvaluationModelRefWithIdentity 创建带 v2 身份三元组的测评模型引用。
 func NewEvaluationModelRefWithIdentity(
 	kind EvaluationModelKind,
-	subKind assessmentmodel.SubKind,
-	algorithm assessmentmodel.Algorithm,
+	subKind modelcatalog.SubKind,
+	algorithm modelcatalog.Algorithm,
 	id meta.ID,
 	code meta.Code,
 	version, title string,
@@ -271,11 +271,11 @@ func (r EvaluationModelRef) Title() string {
 	return r.title
 }
 
-func (r EvaluationModelRef) SubKind() assessmentmodel.SubKind {
+func (r EvaluationModelRef) SubKind() modelcatalog.SubKind {
 	return r.subKind
 }
 
-func (r EvaluationModelRef) Algorithm() assessmentmodel.Algorithm {
+func (r EvaluationModelRef) Algorithm() modelcatalog.Algorithm {
 	return r.algorithm
 }
 

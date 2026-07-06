@@ -2,7 +2,7 @@
 
 > Assessment Model 是 qs-server 的 **统一测评模型资产层**。
 >
-> 它负责管理医学量表、人格模型等测评模型资产的后台配置、发布快照、模型绑定和执行 payload。旧 `scale/personalitymodel` 不再作为独立核心模块表达，而是归入 `assessment-model` 的具体模型资产与兼容能力。
+> 它负责管理医学量表、人格模型等测评模型资产的后台配置、发布快照、模型绑定和执行 payload。旧 `scale/personalitymodel` 不再作为独立核心模块表达，而是归入 `instrument` 的具体模型资产与兼容能力。
 
 ---
 
@@ -10,8 +10,8 @@
 
 | 维度 | 结论 |
 | ---- | ---- |
-| 文档业务名 | `assessment-model` |
-| 当前代码包名 | `internal/apiserver/container/modules/assessmentmodel` |
+| 文档业务名 | `instrument` |
+| 当前代码包名 | `internal/apiserver/container/modules/instrument` |
 | 注册名 | canonical：`assessmentmodel`；legacy：`scale`、`personalitymodel` |
 | 一句话职责 | 管测评模型资产，不管用户答卷事实，也不管一次测评执行状态 |
 | 典型对象 | `AssessmentKind`、`PublishedModelSnapshot`、`QuestionnaireBinding`、Model Payload、Model Descriptor |
@@ -44,7 +44,7 @@ Scale / MBTI / BigFive 等模型资产抽象；
 读侧统计聚合。
 ```
 
-重点：`scale` 不再是独立核心模块，而是 `assessment-model` 下的一类医学量表模型资产。代码层仍保留 `application/scale`、`infra/mongo/scale`、`scale` 注册名等兼容路径，阅读时要把它们理解为 Assessment Model 的旧能力路径。
+重点：`scale` 不再是独立核心模块，而是 `instrument` 下的一类医学量表模型资产。代码层仍保留 `application/scale`、`infra/mongo/scale`、`scale` 注册名等兼容路径，阅读时要把它们理解为 Assessment Model 的旧能力路径。
 
 ---
 
@@ -52,15 +52,15 @@ Scale / MBTI / BigFive 等模型资产抽象；
 
 | 类型 | 路径 |
 | ---- | ---- |
-| 容器模块 | `internal/apiserver/container/modules/assessmentmodel` |
+| 容器模块 | `internal/apiserver/container/modules/instrument` |
 | canonical 注册 | `internal/apiserver/container/modules/registry.go` 中的 `PackageAssessmentModel` |
-| legacy 注册名 | `internal/apiserver/container/modules/assessmentmodel/module.go` 中的 `scale`、`personalitymodel` |
-| 领域模型 | `internal/apiserver/domain/assessmentmodel` |
-| 医学量表模型资产 | `internal/apiserver/domain/assessmentmodel/scale` |
-| 应用服务 | `internal/apiserver/application/assessmentmodel` |
+| legacy 注册名 | `internal/apiserver/container/modules/instrument/module.go` 中的 `scale`、`personalitymodel` |
+| 领域模型 | `internal/apiserver/domain/instrument` |
+| 医学量表模型资产 | `internal/apiserver/domain/instrument/scale` |
+| 应用服务 | `internal/apiserver/application/instrument` |
 | 旧 Scale 应用路径 | `internal/apiserver/application/scale` |
 | 旧 PersonalityModel 应用路径 | `internal/apiserver/application/personalitymodel` |
-| 端口 | `internal/apiserver/port/assessmentmodel` |
+| 端口 | `internal/apiserver/port/instrument` |
 
 ---
 
@@ -92,9 +92,9 @@ Scale / MBTI / BigFive 等模型资产抽象；
 修改 Assessment Model 代码或文档后，按范围选择：
 
 ```bash
-go test ./internal/apiserver/container/modules/assessmentmodel/...
-go test ./internal/apiserver/application/assessmentmodel/...
-go test ./internal/apiserver/domain/assessmentmodel/...
+go test ./internal/apiserver/container/modules/instrument/...
+go test ./internal/apiserver/application/instrument/...
+go test ./internal/apiserver/domain/instrument/...
 make docs-hygiene
 git diff --check
 ```

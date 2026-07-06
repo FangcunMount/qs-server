@@ -8,8 +8,8 @@ import (
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -348,8 +348,8 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	modelRef := domainAssessment.NewEvaluationModelRefWithIdentity(
 		domainAssessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
 		meta.NewCode("FAKE-MODEL"),
 		"1.0.0",
@@ -377,8 +377,8 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	input := &successfulInputResolver{snapshot: &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
 			Kind:      evaluationinput.EvaluationModelKindPersonality,
-			SubKind:   string(assessmentmodel.SubKindTypology),
-			Algorithm: string(assessmentmodel.AlgorithmMBTI),
+			SubKind:   string(modelcatalog.SubKindTypology),
+			Algorithm: string(modelcatalog.AlgorithmMBTI),
 			Code:      "FAKE-MODEL",
 			Version:   "1.0.0",
 			Title:     "Fake Model",

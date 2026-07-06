@@ -4,20 +4,20 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 type TypologyModelInputProvider struct {
-	algorithm           assessmentmodel.Algorithm
+	algorithm           modelcatalog.Algorithm
 	catalog             port.TypologyModelCatalog
 	answerSheetReader   port.AnswerSheetReader
 	questionnaireReader port.QuestionnaireReader
 }
 
 func NewTypologyModelInputProvider(
-	algorithm assessmentmodel.Algorithm,
+	algorithm modelcatalog.Algorithm,
 	catalog port.TypologyModelCatalog,
 	answerSheetReader port.AnswerSheetReader,
 	questionnaireReader port.QuestionnaireReader,
@@ -59,7 +59,7 @@ func (ConfiguredTypologyModelInputProvider) EvaluatorKey() evaldomain.EvaluatorK
 
 func (p ConfiguredTypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	provider := TypologyModelInputProvider{
-		algorithm:           assessmentmodel.AlgorithmPersonalityTypology,
+		algorithm:           modelcatalog.AlgorithmPersonalityTypology,
 		catalog:             p.catalog,
 		answerSheetReader:   p.answerSheetReader,
 		questionnaireReader: p.questionnaireReader,
@@ -83,7 +83,7 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 		return nil, port.NewResolveError(port.FailureKindModelNotFound, fmt.Errorf("typology model payload is nil"), typologyModelNotFoundMessage(p.algorithm), "加载解释模型失败")
 	}
 	if p.algorithm != "" &&
-		p.algorithm != assessmentmodel.AlgorithmPersonalityTypology &&
+		p.algorithm != modelcatalog.AlgorithmPersonalityTypology &&
 		payload.Algorithm != p.algorithm {
 		err := fmt.Errorf("typology algorithm %s does not match provider %s", payload.Algorithm, p.algorithm)
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
@@ -119,22 +119,22 @@ func (p TypologyModelInputProvider) resolveConfiguredInput(ctx context.Context, 
 	}, nil
 }
 
-func typologyModelNotFoundMessage(algorithm assessmentmodel.Algorithm) string {
+func typologyModelNotFoundMessage(algorithm modelcatalog.Algorithm) string {
 	switch algorithm {
-	case assessmentmodel.AlgorithmSBTI:
+	case modelcatalog.AlgorithmSBTI:
 		return "SBTI 模型不存在"
-	case assessmentmodel.AlgorithmMBTI:
+	case modelcatalog.AlgorithmMBTI:
 		return "MBTI 模型不存在"
 	default:
 		return "人格模型不存在"
 	}
 }
 
-func typologyModelUnavailableMessage(algorithm assessmentmodel.Algorithm) string {
+func typologyModelUnavailableMessage(algorithm modelcatalog.Algorithm) string {
 	switch algorithm {
-	case assessmentmodel.AlgorithmSBTI:
+	case modelcatalog.AlgorithmSBTI:
 		return "SBTI 模型不可用"
-	case assessmentmodel.AlgorithmMBTI:
+	case modelcatalog.AlgorithmMBTI:
 		return "MBTI 模型不可用"
 	default:
 		return "人格模型不可用"

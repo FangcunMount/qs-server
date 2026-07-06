@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 )
 
@@ -24,14 +24,14 @@ func buildGraphAndDecision(payload *modeltypology.Payload, spec *modeltypology.R
 	return graph, decision, nil
 }
 
-func buildFactorGraph(fg modeltypology.FactorGraphSpec, kind assessmentmodel.DecisionKind) (profile.FactorGraph, error) {
+func buildFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalog.DecisionKind) (profile.FactorGraph, error) {
 	if fg.HasExplicitFactorGraph() {
 		return buildExplicitFactorGraph(fg, kind)
 	}
 	return buildLegacyFlatFactorGraph(fg, kind)
 }
 
-func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec, kind assessmentmodel.DecisionKind) (profile.FactorGraph, error) {
+func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalog.DecisionKind) (profile.FactorGraph, error) {
 	factors := make(map[profile.FactorID]profile.PersonalityFactor, len(fg.Factors))
 	leafSpecs := make(map[profile.FactorID]profile.LeafScoringSpec)
 	for id, spec := range fg.Factors {
@@ -94,7 +94,7 @@ func buildExplicitFactorGraph(fg modeltypology.FactorGraphSpec, kind assessmentm
 	return graph, nil
 }
 
-func buildLegacyFlatFactorGraph(fg modeltypology.FactorGraphSpec, kind assessmentmodel.DecisionKind) (profile.FactorGraph, error) {
+func buildLegacyFlatFactorGraph(fg modeltypology.FactorGraphSpec, kind modelcatalog.DecisionKind) (profile.FactorGraph, error) {
 	if len(fg.DimensionOrder) == 0 {
 		return profile.FactorGraph{}, fmt.Errorf("dimension order is required")
 	}
@@ -109,12 +109,12 @@ func buildLegacyFlatFactorGraph(fg modeltypology.FactorGraphSpec, kind assessmen
 			return profile.FactorGraph{}, fmt.Errorf("dimension %s is not defined", dimCode)
 		}
 		mappings := mappingsByDimension[dimCode]
-		if kind == assessmentmodel.DecisionKindNearestPattern && len(mappings) == 0 {
+		if kind == modelcatalog.DecisionKindNearestPattern && len(mappings) == 0 {
 			return profile.FactorGraph{}, fmt.Errorf("dimension %s has no mapped answers", dimCode)
 		}
 		contributions := make([]profile.AnswerContribution, 0, len(mappings))
 		optionScoring := profile.OptionScoringStrict
-		if kind == assessmentmodel.DecisionKindNearestPattern {
+		if kind == modelcatalog.DecisionKindNearestPattern {
 			optionScoring = profile.OptionScoringCompat
 		}
 		for _, mapping := range mappings {
@@ -149,10 +149,10 @@ func buildLegacyFlatFactorGraph(fg modeltypology.FactorGraphSpec, kind assessmen
 	return graph, nil
 }
 
-func leafScoringSpecFromFactorSpec(spec modeltypology.FactorSpec, kind assessmentmodel.DecisionKind) profile.LeafScoringSpec {
+func leafScoringSpecFromFactorSpec(spec modeltypology.FactorSpec, kind modelcatalog.DecisionKind) profile.LeafScoringSpec {
 	optionScoring := profile.OptionScoringStrict
 	if spec.OptionScoring == modeltypology.FactorOptionScoringCompat ||
-		(spec.OptionScoring == "" && kind == assessmentmodel.DecisionKindNearestPattern) {
+		(spec.OptionScoring == "" && kind == modelcatalog.DecisionKindNearestPattern) {
 		optionScoring = profile.OptionScoringCompat
 	}
 	contributions := make([]profile.AnswerContribution, 0, len(spec.Contributions))
@@ -197,11 +197,11 @@ func childFactorIDs(children []string) []profile.FactorID {
 
 func buildDecisionSpec(payload *modeltypology.Payload, spec *modeltypology.RuntimeSpec) (profile.DecisionSpec, error) {
 	switch spec.Decision.Kind {
-	case assessmentmodel.DecisionKindPoleComposition, "":
+	case modelcatalog.DecisionKindPoleComposition, "":
 		return buildPoleDecision(spec.FactorGraph)
-	case assessmentmodel.DecisionKindNearestPattern:
+	case modelcatalog.DecisionKindNearestPattern:
 		return buildPatternDecision(payload, spec)
-	case assessmentmodel.DecisionKindTraitProfile:
+	case modelcatalog.DecisionKindTraitProfile:
 		return profile.DecisionSpec{Kind: profile.DecisionKindTraitProfile}, nil
 	default:
 		return profile.DecisionSpec{}, fmt.Errorf("unsupported decision kind %s", spec.Decision.Kind)

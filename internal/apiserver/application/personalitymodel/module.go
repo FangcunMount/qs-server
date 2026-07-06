@@ -3,7 +3,7 @@ package personalitymodel
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel/query"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel/shared"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // PersonalityModelQueryService is the C-side personality model catalog query port.

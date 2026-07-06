@@ -7,7 +7,7 @@ import (
 	"strconv"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/request"
 	"github.com/FangcunMount/qs-server/internal/apiserver/transport/rest/response"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
@@ -18,10 +18,10 @@ import (
 
 type AssessmentModelHandler struct {
 	BaseHandler
-	service assessmentmodel.Service
+	service modelcatalog.Service
 }
 
-func NewAssessmentModelHandler(service assessmentmodel.Service) *AssessmentModelHandler {
+func NewAssessmentModelHandler(service modelcatalog.Service) *AssessmentModelHandler {
 	return &AssessmentModelHandler{service: service}
 }
 
@@ -51,7 +51,7 @@ func (h *AssessmentModelHandler) List(c *gin.Context) {
 		h.Error(c, errors.WithCode(code.ErrInvalidArgument, "每页数量无效"))
 		return
 	}
-	result, err := h.service.List(c.Request.Context(), assessmentmodel.ListModelsDTO{
+	result, err := h.service.List(c.Request.Context(), modelcatalog.ListModelsDTO{
 		Kind:      c.Query("kind"),
 		SubKind:   c.Query("sub_kind"),
 		Status:    c.Query("status"),
@@ -83,7 +83,7 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.Create(c.Request.Context(), assessmentmodel.CreateModelDTO{
+	result, err := h.service.Create(c.Request.Context(), modelcatalog.CreateModelDTO{
 		Code:                 req.Code,
 		Kind:                 req.Kind,
 		SubKind:              req.SubKind,
@@ -125,7 +125,7 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.UpdateBasicInfo(c.Request.Context(), assessmentmodel.UpdateBasicInfoDTO{
+	result, err := h.service.UpdateBasicInfo(c.Request.Context(), modelcatalog.UpdateBasicInfoDTO{
 		Code:        h.modelCode(c),
 		Title:       req.Title,
 		Description: req.Description,
@@ -190,7 +190,7 @@ func (h *AssessmentModelHandler) BindQuestionnaire(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.BindQuestionnaire(c.Request.Context(), assessmentmodel.BindQuestionnaireDTO{
+	result, err := h.service.BindQuestionnaire(c.Request.Context(), modelcatalog.BindQuestionnaireDTO{
 		Code:                 h.modelCode(c),
 		QuestionnaireCode:    req.QuestionnaireCode,
 		QuestionnaireVersion: req.QuestionnaireVersion,
@@ -252,7 +252,7 @@ func (h *AssessmentModelHandler) UpdateDefinition(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	result, err := h.service.UpdateDefinition(c.Request.Context(), h.modelCode(c), assessmentmodel.DefinitionDTO{
+	result, err := h.service.UpdateDefinition(c.Request.Context(), h.modelCode(c), modelcatalog.DefinitionDTO{
 		Kind:          req.Kind,
 		SubKind:       req.SubKind,
 		Algorithm:     req.Algorithm,
@@ -299,7 +299,7 @@ func (h *AssessmentModelHandler) ApplyCodes(c *gin.Context) {
 		h.Error(c, err)
 		return
 	}
-	codes, err := h.service.ApplyCodes(c.Request.Context(), assessmentmodel.ApplyCodesDTO{
+	codes, err := h.service.ApplyCodes(c.Request.Context(), modelcatalog.ApplyCodesDTO{
 		Code:   h.modelCode(c),
 		Target: req.Target,
 		Count:  req.Count,
@@ -339,7 +339,7 @@ func (h *AssessmentModelHandler) PreviewReport(c *gin.Context) {
 	payload, _ := json.Marshal(req)
 	result, err := h.service.PreviewReport(c.Request.Context(), h.modelCode(c), payload)
 	if err != nil {
-		if vf, ok := assessmentmodel.ValidationFailedFrom(err); ok {
+		if vf, ok := modelcatalog.ValidationFailedFrom(err); ok {
 			c.AbortWithStatusJSON(http.StatusBadRequest, core.Response{
 				Code:    code.ErrAssessmentModelValidationFailed,
 				Message: "模型校验失败",
@@ -362,7 +362,7 @@ func (h *AssessmentModelHandler) GetQRCode(c *gin.Context) {
 	h.Success(c, response.NewQRCodeResponse(qrCodeURL))
 }
 
-func (h *AssessmentModelHandler) transition(c *gin.Context, action func(context.Context, string) (*assessmentmodel.ModelSummary, error)) {
+func (h *AssessmentModelHandler) transition(c *gin.Context, action func(context.Context, string) (*modelcatalog.ModelSummary, error)) {
 	result, err := action(c.Request.Context(), h.modelCode(c))
 	if err != nil {
 		h.Error(c, err)

@@ -237,7 +237,7 @@ last_error_code
 
 排查路径：
 
-1. `interpretation-model.changed` 或具体模型发布/归档事件是否出站。
+1. `report.changed` 或具体模型发布/归档事件是否出站。
 2. list cache `Rebuild` 是否执行。
 3. Redis `static_meta` family 是否 available。
 4. repository / read model 是否能查到 published model summaries。

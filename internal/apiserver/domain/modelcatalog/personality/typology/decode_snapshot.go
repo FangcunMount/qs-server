@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // DecodeFromSnapshot decodes a published snapshot into a typology payload.

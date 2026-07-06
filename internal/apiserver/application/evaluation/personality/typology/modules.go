@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // DefaultModules returns algorithm alias entries for the configured typology runtime.
@@ -25,12 +25,12 @@ func AllModules() []Module {
 }
 
 // DefaultAlgorithms returns algorithms registered by DefaultModules.
-func DefaultAlgorithms() []assessmentmodel.Algorithm {
+func DefaultAlgorithms() []modelcatalog.Algorithm {
 	return typologylegacy.DefaultAlgorithmAliases()
 }
 
 // CategoryLabelFor resolves the display label for a typology algorithm.
-func CategoryLabelFor(algorithm assessmentmodel.Algorithm) string {
+func CategoryLabelFor(algorithm modelcatalog.Algorithm) string {
 	return typologylegacy.CategoryLabelFor(algorithm)
 }
 

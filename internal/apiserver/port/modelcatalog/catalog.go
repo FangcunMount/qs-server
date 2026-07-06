@@ -1,9 +1,9 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // Ref 测评模型引用，供绑定解析与执行路由使用。

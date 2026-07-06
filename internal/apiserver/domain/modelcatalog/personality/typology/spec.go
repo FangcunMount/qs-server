@@ -1,6 +1,6 @@
 package typology
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
 // RuntimeSpec is the configuration-driven execution view of a typology payload.
 type RuntimeSpec struct {
@@ -83,10 +83,10 @@ func (fg FactorGraphSpec) DecisionFactorOrder() []string {
 
 // PersonalityDecisionSpec describes how profile vectors become outcomes.
 type PersonalityDecisionSpec struct {
-	Kind                        assessmentmodel.DecisionKind `json:"kind"`
-	FallbackSimilarityThreshold float64                      `json:"fallback_similarity_threshold,omitempty"`
-	FallbackCode                string                       `json:"fallback_code,omitempty"`
-	LevelRule                   *LevelRuleSpec               `json:"level_rule,omitempty"`
+	Kind                        modelcatalog.DecisionKind `json:"kind"`
+	FallbackSimilarityThreshold float64                   `json:"fallback_similarity_threshold,omitempty"`
+	FallbackCode                string                    `json:"fallback_code,omitempty"`
+	LevelRule                   *LevelRuleSpec            `json:"level_rule,omitempty"`
 }
 
 // LevelRuleSpec maps raw factor scores to discrete levels for pattern matching.
@@ -170,9 +170,9 @@ const (
 
 // OutcomeMappingSpec describes how scoring detail becomes AssessmentOutcome fields.
 type OutcomeMappingSpec struct {
-	DetailKind       OutcomeDetailKind         `json:"detail_kind"`
-	DetailAdapterKey DetailAdapterKey          `json:"detail_adapter_key,omitempty"`
-	Algorithm        assessmentmodel.Algorithm `json:"algorithm,omitempty"`
+	DetailKind       OutcomeDetailKind      `json:"detail_kind"`
+	DetailAdapterKey DetailAdapterKey       `json:"detail_adapter_key,omitempty"`
+	Algorithm        modelcatalog.Algorithm `json:"algorithm,omitempty"`
 }
 
 // DetailAdapterKey selects the detail assembler implementation.
@@ -187,7 +187,7 @@ const (
 )
 
 // ResolvedDetailAdapterKey returns the configured adapter key, deriving from legacy fields when needed.
-func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind assessmentmodel.DecisionKind) DetailAdapterKey {
+func (m OutcomeMappingSpec) ResolvedDetailAdapterKey(decisionKind modelcatalog.DecisionKind) DetailAdapterKey {
 	if m.DetailAdapterKey != "" {
 		return m.DetailAdapterKey
 	}
@@ -227,7 +227,7 @@ const (
 
 // ResolvedAdapterKey returns the configured report adapter from explicit key or generic report kind.
 // Legacy model-specific report adapters must be set on AdapterKey during legacy derivation.
-func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ assessmentmodel.DecisionKind) ReportAdapterKey {
+func (r ReportSpec) ResolvedAdapterKey(_ OutcomeMappingSpec, _ modelcatalog.DecisionKind) ReportAdapterKey {
 	if r.AdapterKey != "" {
 		return r.AdapterKey
 	}

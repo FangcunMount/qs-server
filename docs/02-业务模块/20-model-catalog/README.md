@@ -56,9 +56,9 @@ Assessment Model 负责“用什么模型规则解释答卷”：
 | ---- | ---- | ---- |
 | 上游 | 管理后台 / 模型配置 | 创建、维护和发布模型资产 |
 | 下游 | `evaluation` | 加载快照并执行测评 |
-| 下游 | `interpretation-model` | 使用模型身份和解释绑定生成报告 |
+| 下游 | `interpretation` | 使用模型身份和解释绑定生成报告 |
 
 代码事实入口：
 
-- [`internal/apiserver/domain/assessmentmodel`](../../../internal/apiserver/domain/assessmentmodel/)
-- [`internal/apiserver/container/modules/assessmentmodel`](../../../internal/apiserver/container/modules/assessmentmodel/)
+- [`internal/apiserver/domain/modelcatalog`](../../../internal/apiserver/domain/modelcatalog/)
+- [`internal/apiserver/container/modules/modelcatalog`](../../../internal/apiserver/container/modules/modelcatalog/)

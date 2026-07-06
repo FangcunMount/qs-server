@@ -586,7 +586,7 @@ config file loading 是 TODO。
 | 新 Principal 字段/source | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | 新 OrgScope 规则 | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | 新 Capability | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
-| 新解释模型 capability/scope/service auth | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md)、[03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md)、`../../02-业务模块/40-interpretation-model/` |
+| 新解释模型 capability/scope/service auth | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md)、[03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md)、`../../02-业务模块/40-report/` |
 | SnapshotLoader 变化 | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
 | ServiceAuth / mTLS / ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
 | Operator projection | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) |
@@ -695,7 +695,7 @@ git diff --check
 - HTTP identity：[../../../internal/pkg/httpauth/identity.go](../../../internal/pkg/httpauth/identity.go)
 - gRPC context：[../../../internal/pkg/grpc/context.go](../../../internal/pkg/grpc/context.go)
 - Authz capability：[../../../internal/apiserver/application/authz/capability.go](../../../internal/apiserver/application/authz/capability.go)
-- Interpretation Model docs：[../../02-业务模块/40-interpretation-model/README.md](../../02-业务模块/40-interpretation-model/README.md)
+- Interpretation Model docs：[../../02-业务模块/40-report/README.md](../../02-业务模块/40-report/README.md)
 - Evaluation docs：[../../02-业务模块/30-evaluation/README.md](../../02-业务模块/30-evaluation/README.md)
 - Snapshot loader：[../../../internal/pkg/iamauth/snapshot_loader.go](../../../internal/pkg/iamauth/snapshot_loader.go)
 - Service auth shared：[../../../internal/pkg/serviceauth/bearer.go](../../../internal/pkg/serviceauth/bearer.go)
@@ -711,6 +711,6 @@ git diff --check
 | 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |
 | Principal 与 OrgScope | [01-Principal与OrgScope.md](./01-Principal与OrgScope.md) |
 | AuthzSnapshot 与 CapabilityDecision | [02-AuthzSnapshot与CapabilityDecision.md](./02-AuthzSnapshot与CapabilityDecision.md) |
-| 解释模型抽象 | [../../02-业务模块/40-interpretation-model/README.md](../../02-业务模块/40-interpretation-model/README.md) |
+| 解释模型抽象 | [../../02-业务模块/40-report/README.md](../../02-业务模块/40-report/README.md) |
 | ServiceIdentity 与 mTLS-ACL | [03-ServiceIdentity与mTLS-ACL.md](./03-ServiceIdentity与mTLS-ACL.md) |
 | OperatorRoleProjection | [04-OperatorRoleProjection.md](./04-OperatorRoleProjection.md) |

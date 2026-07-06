@@ -3,8 +3,8 @@ package configured_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
 	mbtiadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/mbti"
@@ -116,7 +116,7 @@ func bigFivePayload() *modeltypology.Payload {
 	return &modeltypology.Payload{
 		Code:           "BIGFIVE_V1",
 		Version:        "1.0.0",
-		Algorithm:      assessmentmodel.AlgorithmBigFive,
+		Algorithm:      modelcatalog.AlgorithmBigFive,
 		DimensionOrder: []string{"O", "C"},
 		Dimensions: map[string]modeltypology.Dimension{
 			"O": {Code: "O", Name: "Openness"},
@@ -128,7 +128,7 @@ func bigFivePayload() *modeltypology.Payload {
 			{QuestionCode: "C1", Dimension: "C", Sign: 1},
 			{QuestionCode: "C2", Dimension: "C", Sign: 1},
 		},
-		MatchingSpec: modeltypology.MatchingSpec{Kind: assessmentmodel.DecisionKindTraitProfile},
+		MatchingSpec: modeltypology.MatchingSpec{Kind: modelcatalog.DecisionKindTraitProfile},
 	}
 }
 

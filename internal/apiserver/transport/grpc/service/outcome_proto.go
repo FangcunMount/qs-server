@@ -4,7 +4,7 @@ import (
 	evaluationpb "github.com/FangcunMount/qs-server/api/grpc/gen/evaluation"
 	internalpb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 func toInternalOutcomeSummary(result *assessmentApp.AssessmentOutcomeResult) *internalpb.OutcomeSummary {

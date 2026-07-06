@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"testing"

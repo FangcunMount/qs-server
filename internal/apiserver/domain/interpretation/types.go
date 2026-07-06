@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 import "github.com/FangcunMount/qs-server/internal/pkg/meta"
 

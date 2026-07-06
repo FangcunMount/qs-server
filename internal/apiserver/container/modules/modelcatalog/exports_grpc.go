@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 

@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 import (
 	redis "github.com/redis/go-redis/v9"
@@ -11,9 +11,9 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
+	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"

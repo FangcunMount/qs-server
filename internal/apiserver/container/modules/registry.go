@@ -23,10 +23,11 @@ type ModuleInfo struct {
 type PackageName string
 
 const (
-	PackageSurvey          PackageName = "survey"
-	PackageAssessmentModel PackageName = "assessmentmodel"
+	PackageSurvey PackageName = "survey"
+	// value matches the modules/ directory (modelcatalog); business display name is "model-catalog".
+	PackageModelCatalog PackageName = "modelcatalog"
 	PackageEvaluation      PackageName = "evaluation"
-	PackageReport          PackageName = "report"
+	PackageInterpretation          PackageName = "interpretation"
 	PackageActor           PackageName = "actor"
 	PackagePlan            PackageName = "plan"
 	PackageStatistics      PackageName = "statistics"
@@ -37,9 +38,9 @@ const (
 // BusinessPackages are core and supporting business modules.
 var BusinessPackages = []PackageName{
 	PackageSurvey,
-	PackageAssessmentModel,
+	PackageModelCatalog,
 	PackageEvaluation,
-	PackageReport,
+	PackageInterpretation,
 	PackageActor,
 	PackagePlan,
 	PackageStatistics,
@@ -57,9 +58,9 @@ type LegacyInitStep struct {
 // LegacyInitializeSequence is the current Container.Initialize business-module order.
 var LegacyInitializeSequence = []LegacyInitStep{
 	{InitMethod: "initSurveyModule", RegisterNames: []string{"survey"}},
-	{InitMethod: "initAssessmentModelModule", RegisterNames: []string{"assessmentmodel", "scale", "personalitymodel"}},
+	{InitMethod: "initAssessmentModelModule", RegisterNames: []string{"modelcatalog", "scale", "personalitymodel"}},
 	{InitMethod: "initActorModule", RegisterNames: []string{"actor"}},
-	{InitMethod: "initReportModule", RegisterNames: []string{"report"}},
+	{InitMethod: "initReportModule", RegisterNames: []string{"interpretation"}},
 	{InitMethod: "initEvaluationModule", RegisterNames: []string{"evaluation"}},
 	{InitMethod: "initPlanModule", RegisterNames: []string{"plan"}},
 	{InitMethod: "initStatisticsModule", RegisterNames: []string{"statistics"}},
@@ -81,9 +82,9 @@ var LegacyBootstrapFiles = []string{}
 // MigratedModulePackages host assembly logic under modules/.
 var MigratedModulePackages = []PackageName{
 	PackageSurvey,
-	PackageAssessmentModel,
+	PackageModelCatalog,
 	PackageEvaluation,
-	PackageReport,
+	PackageInterpretation,
 	PackageActor,
 	PackagePlan,
 	PackageStatistics,
@@ -92,21 +93,21 @@ var MigratedModulePackages = []PackageName{
 // MigratedModuleAssembleFiles lists assembly entry files for migrated packages.
 var MigratedModuleAssembleFiles = map[PackageName][]string{
 	PackageSurvey:          {"assemble.go", "scale_infra.go", "wire.go", "install.go"},
-	PackageAssessmentModel: {"module_aggregate.go", "module_ports.go", "assemble_scale.go", "assemble_personality.go", "default_descriptors.go", "report_builders.go", "wire.go", "install.go"},
+	PackageModelCatalog: {"module_aggregate.go", "module_ports.go", "assemble_scale.go", "assemble_personality.go", "default_descriptors.go", "report_builders.go", "wire.go", "install.go"},
 	PackageActor:           {"assemble.go", "wire.go", "install.go"},
 	PackagePlan:            {"assemble.go", "wire.go", "install.go"},
 	PackageStatistics:      {"assemble.go", "wire.go", "install.go"},
 	PackageEvaluation:      {"assemble.go", "descriptors.go", "wire.go", "install.go"},
-	PackageReport:          {"assemble.go", "wire.go", "install.go"},
+	PackageInterpretation:          {"assemble.go", "wire.go", "install.go"},
 }
 
 // MigratedModuleBootstrapFiles lists bootstrap entry files for migrated packages.
 // Container module_init.go calls Wire() to keep integration inputs separate from module Deps.
 var MigratedModuleBootstrapFiles = map[PackageName]string{
 	PackageSurvey:          "bootstrap.go",
-	PackageAssessmentModel: "bootstrap.go",
+	PackageModelCatalog: "bootstrap.go",
 	PackageEvaluation:      "bootstrap.go",
-	PackageReport:          "bootstrap.go",
+	PackageInterpretation:          "bootstrap.go",
 	PackageActor:           "bootstrap.go",
 	PackagePlan:            "bootstrap.go",
 	PackageStatistics:      "bootstrap.go",
@@ -115,7 +116,7 @@ var MigratedModuleBootstrapFiles = map[PackageName]string{
 // MigratedModuleTransportExportFiles lists transport export entry files per package.
 var MigratedModuleTransportExportFiles = map[PackageName][]string{
 	PackageSurvey:          {"exports_rest.go", "exports_grpc.go"},
-	PackageAssessmentModel: {"exports_rest.go", "exports_grpc.go"},
+	PackageModelCatalog: {"exports_rest.go", "exports_grpc.go"},
 	PackageActor:           {"exports_rest.go", "exports_grpc.go"},
 	PackageEvaluation:      {"exports_rest.go", "exports_grpc.go"},
 	PackagePlan:            {"exports_rest.go", "exports_grpc.go"},

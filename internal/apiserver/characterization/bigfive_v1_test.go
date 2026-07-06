@@ -8,7 +8,7 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
 )
 

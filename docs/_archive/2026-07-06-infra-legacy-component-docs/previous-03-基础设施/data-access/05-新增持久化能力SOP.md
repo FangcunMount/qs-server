@@ -694,7 +694,7 @@ Worker 通常应通过 internal gRPC 回到 apiserver。
 | 新 Mongo collection/repository | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md) |
 | 新 migration/schema | [03-Migration与Schema演进.md](./03-Migration与Schema演进.md) |
 | 新 statistics read model | [04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md) |
-| 新解释模型规则文档 | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md)、[04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md)、`../../02-业务模块/40-interpretation-model/` |
+| 新解释模型规则文档 | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md)、[04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md)、`../../02-业务模块/40-report/` |
 | 新 durable event outbox | `../event/02-Publish与Outbox.md` |
 | 新 Redis cache | `../cache/README.md` |
 | 业务主模型变化 | `../../02-业务模块/...` |
@@ -800,7 +800,7 @@ git diff --check
 - Migration：[../../../internal/pkg/migration/](../../../internal/pkg/migration/)
 - StatisticsReadModel port：[../../../internal/apiserver/port/statisticsreadmodel/read_model.go](../../../internal/apiserver/port/statisticsreadmodel/read_model.go)
 - MySQL read model adapter：[../../../internal/apiserver/infra/mysql/statistics/readmodel/read_model.go](../../../internal/apiserver/infra/mysql/statistics/readmodel/read_model.go)
-- Interpretation Model docs：[../../02-业务模块/40-interpretation-model/README.md](../../02-业务模块/40-interpretation-model/README.md)
+- Interpretation Model docs：[../../02-业务模块/40-report/README.md](../../02-业务模块/40-report/README.md)
 - Evaluation docs：[../../02-业务模块/30-evaluation/README.md](../../02-业务模块/30-evaluation/README.md)
 - MySQL outbox：[../../../internal/apiserver/infra/mysql/eventoutbox/](../../../internal/apiserver/infra/mysql/eventoutbox/)
 - Mongo outbox：[../../../internal/apiserver/infra/mongo/eventoutbox/](../../../internal/apiserver/infra/mongo/eventoutbox/)
@@ -817,4 +817,4 @@ git diff --check
 | Mongo 文档仓储 | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md) |
 | Migration | [03-Migration与Schema演进.md](./03-Migration与Schema演进.md) |
 | ReadModel | [04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md) |
-| 解释模型抽象 | [../../02-业务模块/40-interpretation-model/README.md](../../02-业务模块/40-interpretation-model/README.md) |
+| 解释模型抽象 | [../../02-业务模块/40-report/README.md](../../02-业务模块/40-report/README.md) |

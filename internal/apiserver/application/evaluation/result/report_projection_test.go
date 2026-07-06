@@ -3,18 +3,18 @@ package result
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 func TestModelIdentityFromOutcomeMapsLegacyMBTIToPersonalityTypology(t *testing.T) {
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
 		meta.NewCode("MBTI_TEST"),
 		"1.0.0",

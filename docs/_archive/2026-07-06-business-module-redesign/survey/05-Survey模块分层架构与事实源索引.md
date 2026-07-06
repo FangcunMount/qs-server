@@ -482,7 +482,7 @@ Survey 文档不展开 Evaluation 内部模型，但必须索引消费边界。
 | Worker 消费入口 | `internal/worker` |
 | Evaluation 应用服务 | `internal/apiserver/application/evaluation` |
 | Assessment 领域模型 | `internal/apiserver/domain/evaluation` |
-| Scale 规则输入 | `internal/apiserver/domain/assessmentmodel/scale/definition`（编排）+ `domain/assessmentmodel/scale/snapshot`（运行时 payload） |
+| Scale 规则输入 | `internal/apiserver/domain/instrument/scale/definition`（编排）+ `domain/instrument/scale/snapshot`（运行时 payload） |
 
 消费边界：
 

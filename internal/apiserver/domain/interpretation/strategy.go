@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // ReportType 报告模板类型；v1 仅支持 standard 默认报告。
 type ReportType string

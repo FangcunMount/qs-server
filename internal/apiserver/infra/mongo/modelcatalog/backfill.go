@@ -1,10 +1,10 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 	"fmt"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 )
 

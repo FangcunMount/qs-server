@@ -1,7 +1,7 @@
 package ruleset
 
 import (
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"go.mongodb.org/mongo-driver/bson"
 )
 

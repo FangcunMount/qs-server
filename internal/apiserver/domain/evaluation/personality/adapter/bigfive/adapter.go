@@ -1,8 +1,8 @@
 package bigfive
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 )
@@ -10,8 +10,8 @@ import (
 // Adapter implements the personality typology model adapter for Big Five.
 type Adapter struct{}
 
-func (Adapter) Algorithm() assessmentmodel.Algorithm {
-	return assessmentmodel.AlgorithmBigFive
+func (Adapter) Algorithm() modelcatalog.Algorithm {
+	return modelcatalog.AlgorithmBigFive
 }
 
 func (Adapter) Score(

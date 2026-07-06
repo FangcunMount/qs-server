@@ -3,8 +3,8 @@ package configured
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -12,24 +12,24 @@ import (
 
 // Adapter implements ModelAdapter through the configured personality evaluator.
 type Adapter struct {
-	algorithm assessmentmodel.Algorithm
+	algorithm modelcatalog.Algorithm
 	evaluator personalityconfigured.Evaluator
 }
 
 // NewAdapter returns a configured model adapter for the given algorithm alias.
-func NewAdapter(algorithm assessmentmodel.Algorithm) Adapter {
+func NewAdapter(algorithm modelcatalog.Algorithm) Adapter {
 	return NewAdapterWithEvaluator(algorithm, personalityconfigured.NewEvaluator())
 }
 
 // NewAdapterWithEvaluator returns a configured model adapter bound to a specific evaluator.
-func NewAdapterWithEvaluator(algorithm assessmentmodel.Algorithm, evaluator personalityconfigured.Evaluator) Adapter {
+func NewAdapterWithEvaluator(algorithm modelcatalog.Algorithm, evaluator personalityconfigured.Evaluator) Adapter {
 	return Adapter{
 		algorithm: algorithm,
 		evaluator: evaluator,
 	}
 }
 
-func (a Adapter) Algorithm() assessmentmodel.Algorithm {
+func (a Adapter) Algorithm() modelcatalog.Algorithm {
 	return a.algorithm
 }
 

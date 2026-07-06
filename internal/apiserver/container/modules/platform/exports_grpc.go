@@ -4,7 +4,7 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 )
 

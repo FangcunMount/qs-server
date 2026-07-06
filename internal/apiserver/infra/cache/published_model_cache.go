@@ -8,10 +8,10 @@ import (
 	"time"
 
 	"github.com/FangcunMount/component-base/pkg/logger"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane/keyspace"
 	redis "github.com/redis/go-redis/v9"

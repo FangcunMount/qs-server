@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 // DefinitionPayload is the persisted draft definition envelope.
 type DefinitionPayload struct {

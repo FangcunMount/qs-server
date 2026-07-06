@@ -3,7 +3,7 @@ package characterization_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -13,12 +13,12 @@ import (
 // V1 contract: legacy flat kinds map to stable v2 EvaluatorKey triples.
 func TestV1LegacyKindMapsToEvaluatorKey(t *testing.T) {
 	cases := []struct {
-		legacy assessmentmodel.Kind
+		legacy modelcatalog.Kind
 		want   evaluation.EvaluatorKey
 	}{
-		{assessmentmodel.KindScale, evaluation.EvaluatorKeyScaleDefault},
-		{assessmentmodel.KindMBTIMigration, evaluation.EvaluatorKeyMBTI},
-		{assessmentmodel.KindSBTIMigration, evaluation.EvaluatorKeySBTI},
+		{modelcatalog.KindScale, evaluation.EvaluatorKeyScaleDefault},
+		{modelcatalog.KindMBTIMigration, evaluation.EvaluatorKeyMBTI},
+		{modelcatalog.KindSBTIMigration, evaluation.EvaluatorKeySBTI},
 	}
 	for _, tc := range cases {
 		got, ok := evaluation.EvaluatorKeyFromLegacyKind(tc.legacy)

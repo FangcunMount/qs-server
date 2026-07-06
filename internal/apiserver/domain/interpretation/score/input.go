@@ -1,6 +1,6 @@
 package score
 
-import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 
 type FactorReportScore struct {
 	FactorCode   string

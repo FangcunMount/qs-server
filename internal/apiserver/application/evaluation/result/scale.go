@@ -4,11 +4,11 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/score"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/score"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 

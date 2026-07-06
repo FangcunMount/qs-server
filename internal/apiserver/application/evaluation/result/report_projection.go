@@ -1,9 +1,9 @@
 package result
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 func modelIdentityFromOutcome(outcome Outcome) domainreport.ModelIdentity {
@@ -36,7 +36,7 @@ func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelI
 		Title:     ref.Title(),
 	}
 	if identity.Algorithm == "" {
-		if mappedKind, subKind, algorithm, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(ref.Kind())); ok {
+		if mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(ref.Kind())); ok {
 			identity.Kind = string(mappedKind)
 			identity.SubKind = string(subKind)
 			identity.Algorithm = string(algorithm)

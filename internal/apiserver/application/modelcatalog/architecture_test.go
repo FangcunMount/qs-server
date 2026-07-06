@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"os"
@@ -113,7 +113,7 @@ func TestRuntimePersonalityReadsDoNotUseDraftModelRepository(t *testing.T) {
 			if d.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
 				return nil
 			}
-			if strings.Contains(path, string(filepath.Separator)+"assessmentmodel"+string(filepath.Separator)+"personality"+string(filepath.Separator)) {
+			if strings.Contains(path, string(filepath.Separator)+"modelcatalog"+string(filepath.Separator)+"personality"+string(filepath.Separator)) {
 				return nil
 			}
 			content, err := os.ReadFile(path)

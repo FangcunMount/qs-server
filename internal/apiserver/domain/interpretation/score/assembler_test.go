@@ -3,7 +3,7 @@ package score
 import (
 	"testing"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 func TestBuildReportAssemblesScoreBasedInterpretReport(t *testing.T) {

@@ -1,10 +1,10 @@
-package assessmentmodel_test
+package modelcatalog_test
 
 import (
 	"testing"
 	"time"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestPersonalityModelLifecycle(t *testing.T) {

@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
@@ -29,7 +29,7 @@ func InstallFrom(host InstallHost) error {
 		return err
 	}
 	host.SetReportModule(module)
-	host.RegisterModule("report", module)
-	host.Printf("📦 Report module initialized\n")
+	host.RegisterModule("interpretation", module)
+	host.Printf("📦 Interpretation module initialized\n")
 	return nil
 }

@@ -3,7 +3,7 @@ package typology
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestFactorGraphSpecHasExplicitFactorGraph(t *testing.T) {
@@ -30,7 +30,7 @@ func TestToRuntimeSpecValidatesExplicitFactorRoots(t *testing.T) {
 				},
 				Roots: []string{"missing"},
 			},
-			Decision: PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindTraitProfile},
+			Decision: PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindTraitProfile},
 			OutcomeMapping: OutcomeMappingSpec{
 				DetailKind: OutcomeDetailTraitProfile,
 			},

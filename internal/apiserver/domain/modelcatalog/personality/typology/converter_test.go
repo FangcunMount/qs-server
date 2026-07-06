@@ -3,7 +3,7 @@ package typology
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestFromMBTIPreservesTypeProfilesAsOutcomes(t *testing.T) {
@@ -20,10 +20,10 @@ func TestFromMBTIPreservesTypeProfilesAsOutcomes(t *testing.T) {
 	}
 
 	got := FromMBTI(legacy)
-	if got.Algorithm != assessmentmodel.AlgorithmMBTI {
+	if got.Algorithm != modelcatalog.AlgorithmMBTI {
 		t.Fatalf("Algorithm = %s, want mbti", got.Algorithm)
 	}
-	if got.MatchingSpec.Kind != assessmentmodel.DecisionKindPoleComposition {
+	if got.MatchingSpec.Kind != modelcatalog.DecisionKindPoleComposition {
 		t.Fatalf("MatchingSpec.Kind = %s", got.MatchingSpec.Kind)
 	}
 	if len(got.Outcomes) != 1 || got.Outcomes[0].Code != "INTJ" {
@@ -57,10 +57,10 @@ func TestFromSBTIMergesNormalAndSpecialOutcomes(t *testing.T) {
 	}
 
 	got := FromSBTI(legacy)
-	if got.Algorithm != assessmentmodel.AlgorithmSBTI {
+	if got.Algorithm != modelcatalog.AlgorithmSBTI {
 		t.Fatalf("Algorithm = %s, want sbti", got.Algorithm)
 	}
-	if got.MatchingSpec.Kind != assessmentmodel.DecisionKindNearestPattern {
+	if got.MatchingSpec.Kind != modelcatalog.DecisionKindNearestPattern {
 		t.Fatalf("MatchingSpec.Kind = %s", got.MatchingSpec.Kind)
 	}
 	if len(got.Outcomes) != 2 {

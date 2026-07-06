@@ -92,7 +92,7 @@ EvaluationEngine 内部 Provider 执行细节；
 03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 04-Evaluation失败重试链路--幂等-错误状态-补偿处理.md
 05-Evaluation事件链路--答卷提交-测评完成-报告生成.md
-../interpretation-model/README.md
+../report/README.md
 ../scale/README.md
 ../survey/README.md
 ```
@@ -1018,7 +1018,7 @@ Provider.LoadContext；
 事件 payload；
 Result / Report Snapshot；
 RetryService；
-interpretation-model 文档；
+report 文档；
 evaluation 01 / 03 / 04 / 05 文档；
 测试。
 ```
@@ -1075,7 +1075,7 @@ ScaleProvider；
 MBTIProvider；
 EvaluationEngine；
 Provider 契约测试；
-interpretation-model 文档；
+report 文档；
 evaluation 03 文档；
 新增模型接入文档。
 ```

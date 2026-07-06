@@ -8,7 +8,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	base "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"

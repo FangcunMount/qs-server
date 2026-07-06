@@ -244,7 +244,7 @@ data-access/
   -> 01-MySQL仓储与UnitOfWork
   -> 04-ReadModel与Statistics
   -> 05-新增持久化能力SOP
-  -> ../../02-业务模块/40-interpretation-model/README.md
+  -> ../../02-业务模块/40-report/README.md
   -> ../../02-业务模块/30-evaluation/README.md
 ```
 

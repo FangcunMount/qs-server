@@ -6,8 +6,8 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -28,14 +28,14 @@ func TestExecutorKeys(t *testing.T) {
 		t.Fatalf("configured key = %s, want %s", got, evaluation.EvaluatorKeyPersonalityTypology)
 	}
 
-	mbtiExecutor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	mbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmMBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
 	}
 	if got := mbtiExecutor.Key(); got != evaluation.EvaluatorKeyMBTI {
 		t.Fatalf("mbti key = %s, want %s", got, evaluation.EvaluatorKeyMBTI)
 	}
-	sbtiExecutor, err := NewTypologyExecutor(assessmentmodel.AlgorithmSBTI)
+	sbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmSBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
 	}
@@ -71,7 +71,7 @@ func TestExecutorFillsPrimaryAndLevel(t *testing.T) {
 }
 
 func TestExecutorAlgorithmGuard(t *testing.T) {
-	executor, err := NewTypologyExecutor(assessmentmodel.AlgorithmMBTI)
+	executor, err := NewTypologyExecutor(modelcatalog.AlgorithmMBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor: %v", err)
 	}
@@ -82,7 +82,7 @@ func TestExecutorAlgorithmGuard(t *testing.T) {
 }
 
 func TestNewTypologyExecutorRejectsUnsupportedAlgorithm(t *testing.T) {
-	_, err := NewTypologyExecutor(assessmentmodel.Algorithm("typology_unknown"))
+	_, err := NewTypologyExecutor(modelcatalog.Algorithm("typology_unknown"))
 	if err == nil {
 		t.Fatal("NewTypologyExecutor error = nil, want unsupported algorithm")
 	}
@@ -146,7 +146,7 @@ func bigFiveExecutorInputSnapshot() *port.InputSnapshot {
 		QuestionnaireCode:    "BIGFIVE_V1",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		Algorithm:            assessmentmodel.AlgorithmBigFive,
+		Algorithm:            modelcatalog.AlgorithmBigFive,
 		DimensionOrder:       []string{"O", "C"},
 		Dimensions: map[string]modeltypology.Dimension{
 			"O": {Code: "O", Name: "Openness"},
@@ -159,7 +159,7 @@ func bigFiveExecutorInputSnapshot() *port.InputSnapshot {
 			{QuestionCode: "C2", Dimension: "C", Sign: 1},
 		},
 		MatchingSpec: modeltypology.MatchingSpec{
-			Kind: assessmentmodel.DecisionKindTraitProfile,
+			Kind: modelcatalog.DecisionKindTraitProfile,
 		},
 	}
 	return &port.InputSnapshot{
@@ -183,8 +183,8 @@ func submittedBigFiveAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmBigFive,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmBigFive,
 		meta.ID(0),
 		meta.NewCode("BIGFIVE_V1"),
 		"1.0.0",
@@ -259,8 +259,8 @@ func submittedSBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmSBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmSBTI,
 		meta.ID(0),
 		meta.NewCode("SBTI_FUN"),
 		"1.0.0",
@@ -349,8 +349,8 @@ func submittedMBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
 		meta.NewCode("MBTI_TEST"),
 		"1.0.0",

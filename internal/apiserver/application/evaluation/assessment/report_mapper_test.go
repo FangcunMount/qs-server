@@ -3,7 +3,7 @@ package assessment
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 

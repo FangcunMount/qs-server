@@ -3,7 +3,7 @@ package personality
 import (
 	"strings"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 // Profile 人格类报告展示配置。

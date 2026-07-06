@@ -1,6 +1,6 @@
 package evaluation
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
 // ModelKind distinguishes scale vs personality typology descriptors.
 type ModelKind string
@@ -14,7 +14,7 @@ const (
 type ModelDescriptor struct {
 	Key       EvaluatorKey
 	Kind      ModelKind
-	Algorithm assessmentmodel.Algorithm
+	Algorithm modelcatalog.Algorithm
 }
 
 // ScaleModelDescriptor returns the built-in scale evaluation descriptor.
@@ -29,8 +29,8 @@ func DefaultModelDescriptors() []ModelDescriptor {
 }
 
 // TypologyAlgorithms returns typology algorithms from descriptors.
-func TypologyAlgorithms(descs []ModelDescriptor) []assessmentmodel.Algorithm {
-	out := make([]assessmentmodel.Algorithm, 0, len(descs))
+func TypologyAlgorithms(descs []ModelDescriptor) []modelcatalog.Algorithm {
+	out := make([]modelcatalog.Algorithm, 0, len(descs))
 	for _, desc := range descs {
 		if desc.Kind != ModelKindTypology || desc.Algorithm == "" {
 			continue

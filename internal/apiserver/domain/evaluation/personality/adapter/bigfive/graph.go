@@ -3,8 +3,8 @@ package bigfive
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 )
 
@@ -69,7 +69,7 @@ func validatePayload(payload *modeltypology.Payload) error {
 	if payload == nil {
 		return fmt.Errorf("bigfive payload is required")
 	}
-	if payload.Algorithm != assessmentmodel.AlgorithmBigFive {
+	if payload.Algorithm != modelcatalog.AlgorithmBigFive {
 		return fmt.Errorf("typology algorithm %s is not bigfive", payload.Algorithm)
 	}
 	if len(payload.DimensionOrder) == 0 {
@@ -77,9 +77,9 @@ func validatePayload(payload *modeltypology.Payload) error {
 	}
 	kind := payload.MatchingSpec.Kind
 	if kind == "" {
-		kind = assessmentmodel.DecisionKindTraitProfile
+		kind = modelcatalog.DecisionKindTraitProfile
 	}
-	if kind != assessmentmodel.DecisionKindTraitProfile {
+	if kind != modelcatalog.DecisionKindTraitProfile {
 		return fmt.Errorf("bigfive matching kind %s is not trait_profile", kind)
 	}
 	return nil

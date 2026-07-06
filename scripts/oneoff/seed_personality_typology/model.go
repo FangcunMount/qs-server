@@ -8,10 +8,10 @@ import (
 
 	"go.mongodb.org/mongo-driver/bson"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
-	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/assessmentmodel"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
+	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 )
 
 type modelSeedPlan struct {

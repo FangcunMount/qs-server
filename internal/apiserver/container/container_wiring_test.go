@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
-	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
 	iammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/iam"
+	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
@@ -115,8 +115,8 @@ func TestAssessmentModelModuleRegistersAggregateAndLegacyNames(t *testing.T) {
 	if len(got) != 3 {
 		t.Fatalf("GetLoadedModules() = %v, want 3 entries", got)
 	}
-	if got[0] != "assessmentmodel" || got[1] != "scale" || got[2] != "personalitymodel" {
-		t.Fatalf("GetLoadedModules() = %v, want [assessmentmodel scale personalitymodel]", got)
+	if got[0] != "modelcatalog" || got[1] != "scale" || got[2] != "personalitymodel" {
+		t.Fatalf("GetLoadedModules() = %v, want [modelcatalog scale personalitymodel]", got)
 	}
 }
 

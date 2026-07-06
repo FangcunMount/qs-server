@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // DimensionInterpret 维度解读值对象
 // 记录单个因子/维度的解读信息（含解读与建议）

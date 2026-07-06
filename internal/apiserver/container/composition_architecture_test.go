@@ -77,7 +77,7 @@ func TestBusinessModuleAssemblersDoNotImportRESTHandlers(t *testing.T) {
 		"internal/apiserver/container/modules/plan/assemble.go",
 		"internal/apiserver/container/modules/statistics/assemble.go",
 		"internal/apiserver/container/modules/survey/assemble.go",
-		"internal/apiserver/container/modules/assessmentmodel/assemble_scale.go",
+		"internal/apiserver/container/modules/modelcatalog/assemble_scale.go",
 		"internal/apiserver/container/modules/evaluation/assemble.go",
 	} {
 		path := filepath.Join(root, rel)
@@ -432,7 +432,7 @@ func TestSurveyScaleModulesDoNotExposeInfraAdapters(t *testing.T) {
 		types []string
 	}{
 		{rel: "internal/apiserver/container/modules/survey/assemble.go", types: []string{"QuestionnaireSubModule", "AnswerSheetSubModule"}},
-		{rel: "internal/apiserver/container/modules/assessmentmodel/assemble_scale.go", types: []string{"Scale"}},
+		{rel: "internal/apiserver/container/modules/modelcatalog/assemble_scale.go", types: []string{"Scale"}},
 	} {
 		path := filepath.Join(root, tc.rel)
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)

@@ -96,8 +96,8 @@ Report 持久化；
 04-Evaluation失败重试链路--幂等-错误状态-补偿处理.md
 05-Evaluation事件链路--答卷提交-测评完成-报告生成.md
 06-Evaluation模块分层架构与事实源索引.md
-../interpretation-model/README.md
-../assessment-model/README.md
+../report/README.md
+../instrument/README.md
 ```
 
 ---

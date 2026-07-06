@@ -9,7 +9,7 @@
 ## 2. 步骤
 
 1. 确认上游 `EvaluationResult` 已提供足够结构化结果。
-2. 确认 `assessment-model` 能提供模型身份和必要元数据。
+2. 确认 `model-catalog` 能提供模型身份和必要元数据。
 3. 定义报告 section 和展示结构。
 4. 新增或扩展 ReportBuilder。
 5. 新增 score / personality / custom adapter。

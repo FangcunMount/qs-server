@@ -602,14 +602,14 @@ PublishedAt
 
 ```text
 scale.changed
-interpretation-model.changed
+report.changed
 mbti-model.published
 mbti-model.archived
 bigfive-model.published
 bigfive-model.archived
 ```
 
-其中 `interpretation-model.changed` 只表达规则或模型目录变化，用于列表缓存失效、Context cache 失效和读模型刷新。
+其中 `report.changed` 只表达规则或模型目录变化，用于列表缓存失效、Context cache 失效和读模型刷新。
 
 它不表达某次 Assessment 已完成，也不应默认触发历史测评重算。
 
@@ -702,7 +702,7 @@ Rebuild()
 
 ```text
 模型发布 / 归档 / 规则目录变化
-  -> publish scale.changed / interpretation-model.changed / mbti-model.published
+  -> publish scale.changed / report.changed / mbti-model.published
   -> handler 调用具体模型 list cache Rebuild
   -> repository / read model 拉取 published model summaries
   -> Redis SET full list payload
@@ -945,7 +945,7 @@ StaticList 适合发布态模型列表，不适合保存完整规则详情。
 
 检查：
 
-1. `interpretation-model.changed` 或具体模型发布/归档事件是否出站。
+1. `report.changed` 或具体模型发布/归档事件是否出站。
 2. 对应 handler 是否触发 list cache `Rebuild`。
 3. 具体模型 repository / read model 是否能查到 published model summaries。
 4. Redis `static_meta` family 是否 available。
@@ -1006,7 +1006,7 @@ StaticList 适合发布态模型列表，不适合保存完整规则详情。
 6. 实现 `Rebuild`，从 MBTI model repository 或 read model 拉取 published summaries。
 7. 实现 `GetPage`，从 full list payload 进程内分页。
 8. 定义空列表语义。
-9. 接入 `interpretation-model.changed` 或具体模型发布/归档事件。
+9. 接入 `report.changed` 或具体模型发布/归档事件。
 10. 判断是否需要 startup/warmup target。
 11. 补 tests/docs。
 

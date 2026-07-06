@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 // ReportWiringDeps groups dependencies for materializing report builders from descriptors.

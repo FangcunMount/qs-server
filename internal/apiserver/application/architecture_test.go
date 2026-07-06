@@ -36,7 +36,7 @@ func TestSurveyScaleApplicationsDoNotContainRepoBackedReadModelAdapters(t *testi
 	for _, rel := range []string{
 		"internal/apiserver/application/survey/questionnaire",
 		"internal/apiserver/application/survey/answersheet",
-		"internal/apiserver/application/assessmentmodel/behavior/scale",
+		"internal/apiserver/application/modelcatalog/behavior/scale",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
@@ -78,7 +78,7 @@ func TestSurveyScaleApplicationsDoNotDependOnProceduralManagers(t *testing.T) {
 	for _, rel := range []string{
 		"internal/apiserver/application/survey/questionnaire",
 		"internal/apiserver/application/survey/answersheet",
-		"internal/apiserver/application/assessmentmodel/behavior/scale",
+		"internal/apiserver/application/modelcatalog/behavior/scale",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
@@ -115,8 +115,8 @@ func TestEvaluationExecuteUsesInputSnapshotPort(t *testing.T) {
 	root := repoRoot(t)
 	executeRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute")
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition": "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                           "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                        "evaluationinput snapshots",
 	}
 	err := filepath.WalkDir(executeRoot, func(path string, entry os.DirEntry, err error) error {
 		if err != nil {
@@ -164,7 +164,7 @@ func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result"), func(path, importPath string) {
@@ -183,7 +183,7 @@ func TestScaleDomainDoesNotModelMBTIAsCategory(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "scale", "definition", "types.go")
+	path := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale", "definition", "types.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -362,8 +362,8 @@ func TestEvaluationInputInfraCommandRepoDependenciesStayInCompatibilityAdapter(t
 		"internal/apiserver/infra/evaluationinput/scale_binding_source.go": {},
 	}
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition": "catalog/read-model snapshot adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                          "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "catalog/read-model snapshot adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/":                       "catalog/read-model snapshot adapters",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "infra", "evaluationinput"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
@@ -388,7 +388,7 @@ func TestEvaluationDomainDoesNotKeepReadPaginationValueObjects(t *testing.T) {
 	root := repoRoot(t)
 	for _, rel := range []string{
 		"internal/apiserver/domain/evaluation/assessment",
-		"internal/apiserver/domain/report",
+		"internal/apiserver/domain/interpretation",
 	} {
 		dir := filepath.Join(root, filepath.FromSlash(rel))
 		err := filepath.WalkDir(dir, func(path string, entry os.DirEntry, err error) error {
@@ -418,16 +418,16 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 
 	root := repoRoot(t)
 	forbiddenImports := map[string]string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                            "application error mapping/use cases",
-		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                                  "infrastructure adapters",
-		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                              "transport adapters",
-		"github.com/FangcunMount/component-base/pkg/logger":                                            "application/infra observability",
-		"github.com/FangcunMount/component-base/pkg/errors":                                            "domain-native errors",
-		"github.com/FangcunMount/component-base/pkg/code":                                              "domain-native errors",
-		"github.com/FangcunMount/qs-server/internal/pkg/code":                                          "application API error mapping",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition": "evaluation-local snapshots/value objects",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                           "evaluationinput snapshots",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":            "report-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/":                         "application error mapping/use cases",
+		"github.com/FangcunMount/qs-server/internal/apiserver/infra/":                               "infrastructure adapters",
+		"github.com/FangcunMount/qs-server/internal/apiserver/transport/":                           "transport adapters",
+		"github.com/FangcunMount/component-base/pkg/logger":                                         "application/infra observability",
+		"github.com/FangcunMount/component-base/pkg/errors":                                         "domain-native errors",
+		"github.com/FangcunMount/component-base/pkg/code":                                           "domain-native errors",
+		"github.com/FangcunMount/qs-server/internal/pkg/code":                                       "application API error mapping",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "evaluation-local snapshots/value objects",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                        "evaluationinput snapshots",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment":         "report-local snapshots/value objects",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "evaluation"), func(path, importPath string) {
 		if isEvaluationRootPackageGoFile(root, path) {
@@ -457,15 +457,15 @@ func isEvaluationRootPackageGoFile(root, path string) bool {
 }
 
 func isEvaluationRulesetPayloadImport(importPath string) bool {
-	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel" {
+	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog" {
 		return true
 	}
 	if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation" {
 		return true
 	}
 	for _, allowed := range []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
 			return true
@@ -502,23 +502,23 @@ func TestReportDomainDoesNotUseAlgorithmNamedTopLevelPackages(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenDirs := []string{
-		filepath.Join(root, "internal", "apiserver", "domain", "report", "mbti"),
-		filepath.Join(root, "internal", "apiserver", "domain", "report", "sbti"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "mbti"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "sbti"),
 	}
 	for _, dir := range forbiddenDirs {
 		if _, err := os.Stat(dir); err == nil {
-			t.Fatalf("%s must not exist; typology report assembly belongs in domain/report/personality/typology", filepath.ToSlash(mustRel(t, root, dir)))
+			t.Fatalf("%s must not exist; typology report assembly belongs in domain/interpretation/personality/typology", filepath.ToSlash(mustRel(t, root, dir)))
 		}
 	}
 
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/report/mbti",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/report/sbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/mbti",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/sbti",
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {
 		for _, forbidden := range forbiddenImports {
 			if importPath == forbidden || strings.HasPrefix(importPath, forbidden+"/") {
-				t.Fatalf("%s imports %s; use domain/report/personality/typology instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
+				t.Fatalf("%s imports %s; use domain/interpretation/personality/typology instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
 			}
 		}
 	})
@@ -663,9 +663,9 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 		"SubKindTrait",
 	}
 	scaleRoots := []string{
-		filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "scale"),
+		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
 		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scale"),
-		filepath.Join(root, "internal", "apiserver", "domain", "report", "score"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "score"),
 		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "scale"),
 	}
 	for _, scanRoot := range scaleRoots {

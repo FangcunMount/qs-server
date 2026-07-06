@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 type reportBuilderFunc func(evaluationresult.Outcome) (*domainReport.InterpretReport, error)
@@ -52,7 +52,7 @@ func (r ReportAdapterRegistry) Register(key modeltypology.ReportAdapterKey, buil
 func (r ReportAdapterRegistry) build(
 	spec modeltypology.ReportSpec,
 	mapping modeltypology.OutcomeMappingSpec,
-	decisionKind assessmentmodel.DecisionKind,
+	decisionKind modelcatalog.DecisionKind,
 	outcome evaluationresult.Outcome,
 ) (*domainReport.InterpretReport, error) {
 	adapterKey := spec.ResolvedAdapterKey(mapping, decisionKind)

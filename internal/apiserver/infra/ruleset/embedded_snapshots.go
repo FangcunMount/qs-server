@@ -3,7 +3,7 @@ package ruleset
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // DefaultEmbeddedRuleSets 从内置 SBTI/MBTI seed 构建 RuleSetSnapshot 列表。

@@ -5,8 +5,8 @@ import (
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality/typology"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
 )
 
 func buildBigFiveReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {

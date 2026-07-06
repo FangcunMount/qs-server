@@ -1,6 +1,6 @@
-package assessmentmodel
+package modelcatalog
 
-import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+import domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 
 const (
 	AlgorithmScoreRange     = "score_range"

@@ -3,11 +3,11 @@ package evaluation
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestPersonalityTypologyKey(t *testing.T) {
-	got := PersonalityTypologyKey(assessmentmodel.AlgorithmMBTI)
+	got := PersonalityTypologyKey(modelcatalog.AlgorithmMBTI)
 	if got != EvaluatorKeyMBTI {
 		t.Fatalf("key = %#v, want %#v", got, EvaluatorKeyMBTI)
 	}

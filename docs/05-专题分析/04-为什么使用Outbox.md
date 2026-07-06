@@ -598,7 +598,7 @@ Outbox 不保证：
 - 事件顺序完全全局一致。
 - 下游处理没有副作用。
 - published 后业务一定完成。
-- `interpretation-model.changed` 会自动重算历史 Assessment。
+- `report.changed` 会自动重算历史 Assessment。
 - `interpretation.completed` 一定已经生成 Report。
 - `report.generated` 一定已经完成所有统计投影。
 
@@ -691,7 +691,7 @@ MySQL outbox interpretation.completed
 9. Consumer 必须幂等。
 10. 事件表达阶段事实，不表达具体模型算法。
 11. `assessment.created`、`assessment.completed`、`interpretation.completed`、`report.generated` 不应退回旧的 `assessment.submitted` / `assessment.interpreted` 语义。
-12. `interpretation-model.changed` 是规则变化事件，不是某次测评完成事件。
+12. `report.changed` 是规则变化事件，不是某次测评完成事件。
 13. 规则变化事件不应默认触发历史 Assessment 重算。
 14. Governance endpoint 默认只读，不应随意 mark/skip/delete event。
 
@@ -725,11 +725,11 @@ MySQL outbox interpretation.completed
 
 报告事实应由 `interpretation.completed -> report.generated` 链路推进。
 
-### 21.7 “interpretation-model.changed 应该触发历史重算”
+### 21.7 “report.changed 应该触发历史重算”
 
 不应该默认如此。
 
-`interpretation-model.changed` 表示规则变化，主要用于缓存失效、Context cache 失效、读模型刷新和治理预热。
+`report.changed` 表示规则变化，主要用于缓存失效、Context cache 失效、读模型刷新和治理预热。
 
 历史 Assessment 是否重算，必须由显式 ReEvaluationJob 或补偿任务建模。
 

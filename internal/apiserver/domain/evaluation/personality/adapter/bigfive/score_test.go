@@ -3,8 +3,8 @@ package bigfive_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
 )
@@ -36,7 +36,7 @@ func TestScoreProducesTraitProfile(t *testing.T) {
 
 func TestBuildFromPayloadRejectsNonTraitMatchingKind(t *testing.T) {
 	payload := bigFiveFixturePayload()
-	payload.MatchingSpec.Kind = assessmentmodel.DecisionKindPoleComposition
+	payload.MatchingSpec.Kind = modelcatalog.DecisionKindPoleComposition
 	_, _, err := bigfiveadapter.BuildFromPayload(payload)
 	if err == nil {
 		t.Fatal("BuildFromPayload error = nil, want trait_profile validation error")
@@ -51,7 +51,7 @@ func bigFiveFixturePayload() *modeltypology.Payload {
 		QuestionnaireCode:    "BIGFIVE_V1",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		Algorithm:            assessmentmodel.AlgorithmBigFive,
+		Algorithm:            modelcatalog.AlgorithmBigFive,
 		DimensionOrder:       []string{"O", "C"},
 		Dimensions: map[string]modeltypology.Dimension{
 			"O": {Code: "O", Name: "Openness"},
@@ -64,7 +64,7 @@ func bigFiveFixturePayload() *modeltypology.Payload {
 			{QuestionCode: "C2", Dimension: "C", Sign: 1},
 		},
 		MatchingSpec: modeltypology.MatchingSpec{
-			Kind: assessmentmodel.DecisionKindTraitProfile,
+			Kind: modelcatalog.DecisionKindTraitProfile,
 		},
 	}
 }

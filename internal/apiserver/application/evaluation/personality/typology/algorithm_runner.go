@@ -2,11 +2,11 @@ package typology
 
 import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -16,11 +16,11 @@ type algorithmRunner struct {
 	reportRegistry   ReportAdapterRegistry
 }
 
-func algorithmRunnerFor(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
+func algorithmRunnerFor(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (algorithmRunner, error) {
 	return registry.runnerFor(algorithm)
 }
 
-func (r algorithmRunner) algorithm() assessmentmodel.Algorithm {
+func (r algorithmRunner) algorithm() modelcatalog.Algorithm {
 	if r.adapter == nil {
 		return ""
 	}

@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // GenerateReportInput 生成报告的输入参数。
 // 由应用层从评估结果组装后传入。

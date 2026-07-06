@@ -3,8 +3,8 @@ package typology_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestValidateRuntimeSpecForPublishRequiresExplicitFactorGraph(t *testing.T) {
@@ -15,7 +15,7 @@ func TestValidateRuntimeSpecForPublishRequiresExplicitFactorGraph(t *testing.T) 
 				"EI": {Code: "EI", Name: "EI"},
 			},
 		},
-		Decision:       typology.PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindPoleComposition},
+		Decision:       typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
 		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterMBTI},
 	}
@@ -42,7 +42,7 @@ func TestValidateRuntimeSpecForPublishValidatesQuestionAndOptionRefs(t *testing.
 			},
 			Roots: []string{"EI"},
 		},
-		Decision:       typology.PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindPoleComposition},
+		Decision:       typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
 		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterMBTI},
 	}
@@ -60,7 +60,7 @@ func TestValidateRuntimeSpecForPublishValidatesOutcomeDefinitions(t *testing.T) 
 	spec := validRuntimeSpec()
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmMBTI,
 		Outcomes: []typology.Outcome{
 			{Code: "INTJ", Name: "建筑师"},
 			{Code: "INTJ", Name: "重复建筑师"},
@@ -91,7 +91,7 @@ func TestValidateRuntimeSpecForPublishValidatesFallbackAndSpecialOutcomeRefs(t *
 	}}
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmMBTI,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
@@ -108,11 +108,11 @@ func TestValidateRuntimeSpecForPublishValidatesFallbackAndSpecialOutcomeRefs(t *
 
 func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T) {
 	spec := validRuntimeSpec()
-	spec.Decision.Kind = assessmentmodel.DecisionKindNearestPattern
+	spec.Decision.Kind = modelcatalog.DecisionKindNearestPattern
 	spec.Decision.LevelRule = &typology.LevelRuleSpec{LowMax: 5, HighMin: 3}
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmMBTI,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
@@ -130,7 +130,7 @@ func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T
 	spec.Report.AdapterKey = typology.ReportAdapterBigFive
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
-		Algorithm: assessmentmodel.AlgorithmMBTI,
+		Algorithm: modelcatalog.AlgorithmMBTI,
 		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
 	})
 
@@ -159,7 +159,7 @@ func validRuntimeSpec() *typology.RuntimeSpec {
 			},
 			Roots: []string{"EI"},
 		},
-		Decision: typology.PersonalityDecisionSpec{Kind: assessmentmodel.DecisionKindPoleComposition},
+		Decision: typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{
 			DetailKind:       typology.OutcomeDetailPersonalityType,
 			DetailAdapterKey: typology.DetailAdapterMBTI,
@@ -177,7 +177,7 @@ func validQuestionnaire() typology.QuestionnaireSnapshot {
 	}
 }
 
-func hasIssueCode(issues []assessmentmodel.DomainValidationIssue, code string) bool {
+func hasIssueCode(issues []modelcatalog.DomainValidationIssue, code string) bool {
 	for _, issue := range issues {
 		if issue.Code == code {
 			return true

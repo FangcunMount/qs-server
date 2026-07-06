@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // FinalizeInterpretReport synchronizes v2 outcome summary fields with legacy report fields.
 func FinalizeInterpretReport(r *InterpretReport) {

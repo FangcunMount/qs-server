@@ -1,10 +1,10 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"fmt"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestMergeAlgorithmSetsPreservesMoreThanPageLimit(t *testing.T) {

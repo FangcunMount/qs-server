@@ -218,7 +218,7 @@ func TestProfileCoreDoesNotDependOnLegacyTypologyPayload(t *testing.T) {
 	root := repoRoot(t)
 	profileRoot := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "personality", "profile")
 	forbidden := []string{
-		"assessmentmodel/personality/typology",
+		"modelcatalog/personality/typology",
 		"MBTILegacyModel",
 		"SBTILegacyModel",
 	}
@@ -283,7 +283,7 @@ func TestReportSpecResolvedAdapterKeyStaysGeneric(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "personality", "typology", "spec.go")
+	path := filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "personality", "typology", "spec.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -319,7 +319,7 @@ func TestTypologyLegacyDerivationStaysInLegacyPackages(t *testing.T) {
 	}
 	mainRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "personality", "typology"),
-		filepath.Join(root, "internal", "apiserver", "domain", "assessmentmodel", "personality", "typology"),
+		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "personality", "typology"),
 	}
 	for _, typologyRoot := range mainRoots {
 		err := filepath.WalkDir(typologyRoot, func(path string, entry os.DirEntry, err error) error {

@@ -1,7 +1,7 @@
 package query
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalelistcache"
 )
 

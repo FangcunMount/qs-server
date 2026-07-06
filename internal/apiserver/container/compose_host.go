@@ -4,24 +4,24 @@ import (
 	"fmt"
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachebootstrap"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	actormod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/actor"
-	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/assessmentmodel"
 	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
+	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/interpretation"
+	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	planmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/plan"
 	platformmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/platform"
-	reportmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/report"
 	statmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/statistics"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -190,7 +190,7 @@ func (c *Container) SetAssessmentModelModule(module *ammod.Module) {
 	c.AssessmentModelModule = module
 	c.ScaleModule = module.Scale
 	c.PersonalityModelModule = module.Personality
-	c.registerModule("assessmentmodel", module)
+	c.registerModule("modelcatalog", module)
 	c.registerModule("scale", module.Scale)
 	c.registerModule("personalitymodel", module.Personality)
 }

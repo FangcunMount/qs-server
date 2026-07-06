@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // ReportBuilder 报告构建器接口。
 type ReportBuilder interface {

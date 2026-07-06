@@ -4,9 +4,9 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 type ScoreProjectorRegistry interface {
@@ -112,7 +112,7 @@ func (r *mutableReportBuilderRegistry) Resolve(key evaluation.EvaluatorKey, repo
 			return builder, nil
 		}
 	}
-	if mappedKind, subKind, algorithm, ok := assessmentmodel.LegacyKindMapping(key.Kind); ok {
+	if mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(key.Kind); ok {
 		registryKey.key = evaluation.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}
 		if builder, ok := r.items[registryKey]; ok {
 			return builder, nil

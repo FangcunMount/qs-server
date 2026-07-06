@@ -1,9 +1,9 @@
 package evaluation
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) {
@@ -13,7 +13,7 @@ func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) 
 	if ref := a.EvaluationModelRef(); ref != nil && !ref.IsEmpty() {
 		subKind, algorithm := ref.SubKind(), ref.Algorithm()
 		if algorithm == "" {
-			if _, mappedSubKind, mappedAlgorithm, ok := assessmentmodel.LegacyKindMapping(assessmentmodel.Kind(ref.Kind())); ok {
+			if _, mappedSubKind, mappedAlgorithm, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(ref.Kind())); ok {
 				if subKind == "" {
 					subKind = mappedSubKind
 				}
@@ -75,16 +75,16 @@ func strPtr(v string) *string {
 	return &v
 }
 
-func subKindFromPO(po *AssessmentPO) assessmentmodel.SubKind {
+func subKindFromPO(po *AssessmentPO) modelcatalog.SubKind {
 	if po == nil || po.EvaluationModelSubKind == nil {
-		return assessmentmodel.SubKindEmpty
+		return modelcatalog.SubKindEmpty
 	}
-	return assessmentmodel.SubKind(*po.EvaluationModelSubKind)
+	return modelcatalog.SubKind(*po.EvaluationModelSubKind)
 }
 
-func algorithmFromPO(po *AssessmentPO) assessmentmodel.Algorithm {
+func algorithmFromPO(po *AssessmentPO) modelcatalog.Algorithm {
 	if po == nil || po.EvaluationModelAlgorithm == nil {
 		return ""
 	}
-	return assessmentmodel.Algorithm(*po.EvaluationModelAlgorithm)
+	return modelcatalog.Algorithm(*po.EvaluationModelAlgorithm)
 }

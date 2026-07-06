@@ -1,13 +1,13 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 	"encoding/json"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	personalitymodel "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"

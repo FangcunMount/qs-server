@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
-	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/report/personality"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality"
 )
 
 type BigFiveReportInput struct {

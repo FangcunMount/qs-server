@@ -9,7 +9,7 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 运行时定位 | `collection-server` 是面向小程序 / 收集端的 **REST BFF**，负责入口治理、身份前置、监护校验、提交削峰和 gRPC 转调 |
-| 主状态边界 | collection 不持有 `survey / assessmentmodel / evaluation / report` 的权威写模型；答卷、测评、报告等主业务状态仍由 `qs-apiserver` 落库 |
+| 主状态边界 | collection 不持有 `survey / modelcatalog / evaluation / report` 的权威写模型；答卷、测评、报告等主业务状态仍由 `qs-apiserver` 落库 |
 | 启动主线 | `main -> collection.NewApp -> config.CreateConfigFromOptions -> process.Run -> PrepareRun -> Run` |
 | PrepareRun 阶段 | `prepare resources -> initialize container -> initialize integrations -> initialize transports -> register shutdown callback` |
 | 资源层 | collection 的 `DatabaseManager` 只管理 Redis connectivity；Redis runtime 产出 `ops_runtime`、`lock_lease` 和 lock manager |

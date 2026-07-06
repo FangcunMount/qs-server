@@ -5,9 +5,9 @@ import (
 	"fmt"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 type ReportBuilder struct {
@@ -17,7 +17,7 @@ type ReportBuilder struct {
 
 var _ evaluationresult.ReportBuilder = ReportBuilder{}
 
-func NewReportBuilder(algorithm assessmentmodel.Algorithm) (ReportBuilder, error) {
+func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
 	return NewReportBuilderWithRegistry(mustDefaultModuleRegistry(), algorithm)
 }
 
@@ -36,7 +36,7 @@ func NewConfiguredReportBuilder() (ReportBuilder, error) {
 	return NewConfiguredReportBuilderWithRegistry(mustDefaultModuleRegistry())
 }
 
-func NewReportBuilderWithRegistry(registry ModuleRegistry, algorithm assessmentmodel.Algorithm) (ReportBuilder, error) {
+func NewReportBuilderWithRegistry(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
 	runner, err := algorithmRunnerFor(registry, algorithm)
 	if err != nil {
 		return ReportBuilder{}, err
@@ -47,7 +47,7 @@ func NewReportBuilderWithRegistry(registry ModuleRegistry, algorithm assessmentm
 	}, nil
 }
 
-func NewLegacyTypologyAliasReportBuilder(configured ReportBuilder, algorithm assessmentmodel.Algorithm) (ReportBuilder, error) {
+func NewLegacyTypologyAliasReportBuilder(configured ReportBuilder, algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
 	if configured.runner == nil {
 		return ReportBuilder{}, fmt.Errorf("configured typology report builder is required")
 	}

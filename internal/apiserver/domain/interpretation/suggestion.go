@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // SuggestionCategory 建议分类。
 type SuggestionCategory string

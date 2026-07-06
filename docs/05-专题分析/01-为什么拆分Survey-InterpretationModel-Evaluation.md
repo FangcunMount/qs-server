@@ -11,9 +11,9 @@
 | 边界 | 负责 | 不负责 | 当前代码落点 |
 | ---- | ---- | ------ | ------------ |
 | Survey | 问卷模板、题目结构、提交规格、答案校验、`AnswerSheet` 答卷事实、答卷提交事件 | 不负责模型资产、医学量表规则、人格模型规则、Assessment 状态机、最终报告 | `domain/survey`、`application/survey`、`container/modules/survey` |
-| Assessment Model | `AssessmentKind`、发布快照、模型绑定、模型 payload、Scale / MBTI / SBTI 等模型资产 | 不保存用户答卷事实，不维护一次测评执行状态，不持久化最终报告 | `domain/assessmentmodel`、`application/assessmentmodel`、`container/modules/assessmentmodel` |
+| Assessment Model | `AssessmentKind`、发布快照、模型绑定、模型 payload、Scale / MBTI / SBTI 等模型资产 | 不保存用户答卷事实，不维护一次测评执行状态，不持久化最终报告 | `domain/modelcatalog`、`application/modelcatalog`、`container/modules/modelcatalog` |
 | Evaluation | `Assessment`、`EvaluationRun`、执行状态机、规则加载、模型执行、Evaluation Result、失败重试、执行事件 | 不编辑问卷，不发布模型资产，不维护最终报告模板和聚合 | `domain/evaluation`、`application/evaluation`、`container/modules/evaluation` |
-| Interpretation Model / Report | `InterpretReport`、报告 builder registry、score/personality adapter、解释文案、报告聚合与持久化 | 不负责作答提交、测评执行状态机、模型资产发布、读侧统计 | 当前代码包仍是 `domain/report`、`container/modules/report` |
+| Interpretation Model / Report | `InterpretReport`、报告 builder registry、score/personality adapter、解释文案、报告聚合与持久化 | 不负责作答提交、测评执行状态机、模型资产发布、读侧统计 | 当前代码包仍是 `domain/interpretation`、`container/modules/interpretation` |
 
 一句话概括：
 
@@ -153,7 +153,7 @@ EvaluatorKey
 需要特别注意：
 
 ```text
-scale/personalitymodel 是 assessmentmodel 的 legacy register name；
+scale/personalitymodel 是 modelcatalog 的 legacy register name；
 application/scale 和 application/personalitymodel 是旧能力路径；
 它们不再表示文档层的独立核心模块。
 ```
@@ -190,7 +190,7 @@ Evaluation 的生命周期是过程型 + 结果型。它不是问卷模板，不
 
 ## 6. Interpretation Model / Report：解释模型与报告产出层
 
-文档中的 `interpretation-model`，对应当前代码中的 `report` module。
+文档中的 `interpretation`，对应当前代码中的 `interpretation` module。
 
 它的核心对象是：
 
@@ -415,7 +415,7 @@ Interpretation Model / Report
 当前代码仍有：
 
 ```text
-assessmentmodel
+modelcatalog
 report
 statistics
 application/scale
@@ -425,7 +425,7 @@ application/personalitymodel
 如果马上把它们改成：
 
 ```text
-assessment-model
+model-catalog
 interpretationmodel
 statistic
 ```
@@ -486,9 +486,9 @@ statistic
 
 读取不等于拥有。Evaluation 读取输入和快照，但不修改 Survey 或 Assessment Model 聚合。
 
-### 14.5 “文档叫 interpretation-model，代码就必须马上叫 interpretationmodel”
+### 14.5 “文档叫 report，代码就必须马上叫 interpretationmodel”
 
-不需要。当前代码包仍叫 `report`，文档会显式标注映射关系，避免读者找不到代码。
+不需要。当前代码包仍叫 `interpretation`，文档会显式标注映射关系，避免读者找不到代码。
 
 ---
 
@@ -504,14 +504,14 @@ statistic
 
 ### Assessment Model
 
-- `internal/apiserver/container/modules/assessmentmodel`
-- `internal/apiserver/container/modules/assessmentmodel/module.go`
-- `internal/apiserver/domain/assessmentmodel`
-- `internal/apiserver/domain/assessmentmodel/scale`
-- `internal/apiserver/application/assessmentmodel`
+- `internal/apiserver/container/modules/modelcatalog`
+- `internal/apiserver/container/modules/modelcatalog/module.go`
+- `internal/apiserver/domain/modelcatalog`
+- `internal/apiserver/domain/modelcatalog/scale`
+- `internal/apiserver/application/modelcatalog`
 - `internal/apiserver/application/scale`
 - `internal/apiserver/application/personalitymodel`
-- `internal/apiserver/port/assessmentmodel`
+- `internal/apiserver/port/modelcatalog`
 
 ### Evaluation
 
@@ -523,11 +523,11 @@ statistic
 
 ### Interpretation Model / Report
 
-- `internal/apiserver/container/modules/report`
-- `internal/apiserver/domain/report`
-- `internal/apiserver/domain/report/score`
-- `internal/apiserver/domain/report/personality`
-- `internal/apiserver/container/modules/assessmentmodel/report_builders.go`
+- `internal/apiserver/container/modules/interpretation`
+- `internal/apiserver/domain/interpretation`
+- `internal/apiserver/domain/interpretation/score`
+- `internal/apiserver/domain/interpretation/personality`
+- `internal/apiserver/container/modules/modelcatalog/report_builders.go`
 
 ### Cross-boundary Infrastructure
 
@@ -547,7 +547,7 @@ statistic
 ```bash
 go test ./internal/apiserver/container/modules/...
 go test ./internal/apiserver/application/survey/...
-go test ./internal/apiserver/application/assessmentmodel/...
+go test ./internal/apiserver/application/modelcatalog/...
 go test ./internal/apiserver/application/evaluation/...
 go test ./internal/apiserver/domain/...
 ```
@@ -567,10 +567,10 @@ git diff --check
 | ---- | ---- |
 | 业务模块总览 | `../02-业务模块/README.md` |
 | Survey 模块模型 | `../02-业务模块/10-survey/README.md` |
-| Assessment Model 模块模型 | `../02-业务模块/20-assessment-model/README.md` |
+| Assessment Model 模块模型 | `../02-业务模块/20-model-catalog/README.md` |
 | Evaluation 模块模型 | `../02-业务模块/30-evaluation/README.md` |
-| Interpretation Model / Report 模块模型 | `../02-业务模块/40-interpretation-model/README.md` |
-| 旧 Scale 兼容入口 | `../02-业务模块/20-assessment-model/README.md` |
+| Interpretation Model / Report 模块模型 | `../02-业务模块/40-interpretation/README.md` |
+| 旧 Scale 兼容入口 | `../02-业务模块/20-model-catalog/README.md` |
 | 为什么同步提交但异步测评执行 | `02-为什么同步提交但异步测评执行.md` |
 | 多解释模型扩展专题 | `08-多解释模型扩展专题--从Scale到MBTI.md` |
 | Evaluation 通用执行引擎专题 | `09-Evaluation通用执行引擎专题.md` |

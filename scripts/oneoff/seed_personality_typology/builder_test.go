@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestBuildMBTIPayloadHasExplicitRuntime(t *testing.T) {
@@ -46,7 +46,7 @@ func TestBuildSBTIPayloadHasExplicitRuntime(t *testing.T) {
 	if runtime == nil || !runtime.FactorGraph.HasExplicitFactorGraph() {
 		t.Fatal("expected explicit factor graph")
 	}
-	if runtime.Decision.Kind != assessmentmodel.DecisionKindNearestPattern {
+	if runtime.Decision.Kind != modelcatalog.DecisionKindNearestPattern {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
 	if runtime.Report.AdapterKey != "sbti" {
@@ -73,7 +73,7 @@ func TestBuildMBTI93PayloadHasExplicitRuntime(t *testing.T) {
 	if runtime == nil || !runtime.FactorGraph.HasExplicitFactorGraph() {
 		t.Fatal("expected explicit factor graph")
 	}
-	if runtime.Decision.Kind != assessmentmodel.DecisionKindPoleComposition {
+	if runtime.Decision.Kind != modelcatalog.DecisionKindPoleComposition {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
 	if runtime.Report.AdapterKey != "mbti" {
@@ -109,7 +109,7 @@ func TestBuildBig5PayloadHasExplicitRuntime(t *testing.T) {
 	if runtime == nil || !runtime.FactorGraph.HasExplicitFactorGraph() {
 		t.Fatal("expected explicit factor graph")
 	}
-	if runtime.Decision.Kind != assessmentmodel.DecisionKindTraitProfile {
+	if runtime.Decision.Kind != modelcatalog.DecisionKindTraitProfile {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
 	if runtime.Report.AdapterKey != "bigfive" {
@@ -142,7 +142,7 @@ func TestBuildEnneagramPayloadHasExplicitRuntime(t *testing.T) {
 	if runtime == nil || !runtime.FactorGraph.HasExplicitFactorGraph() {
 		t.Fatal("expected explicit factor graph")
 	}
-	if runtime.Decision.Kind != assessmentmodel.DecisionKindTraitProfile {
+	if runtime.Decision.Kind != modelcatalog.DecisionKindTraitProfile {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
 	if runtime.Report.AdapterKey != "trait_profile" {

@@ -1,6 +1,6 @@
 package personality
 
-import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+import domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 
 // Build 组装人格类解读报告。
 func Build(input Input) *domainreport.InterpretReport {

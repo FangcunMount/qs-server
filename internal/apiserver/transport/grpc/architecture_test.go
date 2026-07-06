@@ -15,7 +15,7 @@ func TestSurveyScaleGRPCServicesUseApplicationDTOs(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/surveyreadmodel":                    "application query DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel":                     "application query DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire":             "application query DTOs",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition": "application query DTOs",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition": "application query DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation":                      "application result DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/validation":                       "application result DTOs",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode":                      "survey/scale application QR-code use cases",
@@ -52,7 +52,7 @@ func TestGRPCTransportDoesNotHoldScaleDomainRepository(t *testing.T) {
 		}
 		for _, imported := range parsed.Imports {
 			importPath := strings.Trim(imported.Path.Value, `"`)
-			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition" {
+			if importPath == "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition" {
 				t.Fatalf("%s imports %s; gRPC transport must use scale application ports, not scale repositories", path, importPath)
 			}
 		}
@@ -64,7 +64,7 @@ func TestEvaluationGRPCTransportDoesNotHoldEvaluationDomainRepository(t *testing
 
 	forbiddenImports := map[string]string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "evaluation application service",
-		"github.com/FangcunMount/qs-server/internal/apiserver/domain/report":                "evaluation application service",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation":                "evaluation application service",
 		"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter":                 "evaluation application wait service",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access":     "evaluation application access query service",
 	}

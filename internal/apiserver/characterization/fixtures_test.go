@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -148,8 +148,8 @@ func submittedMBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmMBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmMBTI,
 		meta.ID(0),
 		meta.NewCode("MBTI_TEST"),
 		"1.0.0",
@@ -226,8 +226,8 @@ func submittedSBTIAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmSBTI,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmSBTI,
 		meta.ID(0),
 		meta.NewCode("SBTI_FUN"),
 		"1.0.0",
@@ -302,7 +302,7 @@ func bigFiveCharacterizationModel() *modeltypology.Payload {
 		QuestionnaireCode:    "BIGFIVE_V1",
 		QuestionnaireVersion: "1.0.0",
 		Status:               "published",
-		Algorithm:            assessmentmodel.AlgorithmBigFive,
+		Algorithm:            modelcatalog.AlgorithmBigFive,
 		DimensionOrder:       []string{"O", "C", "E", "A", "N"},
 		Dimensions: map[string]modeltypology.Dimension{
 			"O": {Code: "O", Name: "Openness"},
@@ -324,7 +324,7 @@ func bigFiveCharacterizationModel() *modeltypology.Payload {
 			{QuestionCode: "N2", Dimension: "N", Sign: 1},
 		},
 		MatchingSpec: modeltypology.MatchingSpec{
-			Kind: assessmentmodel.DecisionKindTraitProfile,
+			Kind: modelcatalog.DecisionKindTraitProfile,
 		},
 		Source: modeltypology.Source{
 			Attribution:   "IPIP",
@@ -355,8 +355,8 @@ func submittedBigFiveAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmBigFive,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmBigFive,
 		meta.ID(0),
 		meta.NewCode("BIGFIVE_V1"),
 		"1.0.0",
@@ -446,7 +446,7 @@ func customExplicitRuntimePayload() *modeltypology.Payload {
 				},
 			},
 			Decision: modeltypology.PersonalityDecisionSpec{
-				Kind: assessmentmodel.DecisionKindPoleComposition,
+				Kind: modelcatalog.DecisionKindPoleComposition,
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
 				DetailKind: modeltypology.OutcomeDetailPersonalityType,
@@ -485,8 +485,8 @@ func submittedCustomRuntimeAssessment(t *testing.T) *assessment.Assessment {
 	t.Helper()
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
-		assessmentmodel.SubKindTypology,
-		assessmentmodel.AlgorithmPersonalityTypology,
+		modelcatalog.SubKindTypology,
+		modelcatalog.AlgorithmPersonalityTypology,
 		meta.ID(0),
 		meta.NewCode("CUSTOM_POLE_V1"),
 		"1.0.0",

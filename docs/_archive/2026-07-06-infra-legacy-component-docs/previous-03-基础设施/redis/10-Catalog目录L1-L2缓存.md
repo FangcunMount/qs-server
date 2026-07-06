@@ -128,7 +128,7 @@ L2 沿用既有 Redis Cache 体系（见 [02-Cache层总览](./02-Cache层总览
 | 人格模型 | `CachedPublishedModelStore` | ObjectCache + catalog list/algorithms 专用 store | `FindPublishedModelByCode` / `ListPublishedModels` / `ListPublishedAlgorithms` |
 | 规则目录 | `CachedPublishedModelStore`（evaluation ruleset） | 同上 | submit 热路径 + 目录读共用 |
 
-人格模型 L2 接线：`internal/apiserver/container/modules/assessmentmodel/wire.go` 在 `static_meta` Redis 可用时用 `NewCachedPublishedModelStore` 包装 `DualStore`。
+人格模型 L2 接线：`internal/apiserver/container/modules/instrument/wire.go` 在 `static_meta` Redis 可用时用 `NewCachedPublishedModelStore` 包装 `DualStore`。
 
 ### 3.2 L1 与 L2 的 payload 差异
 
@@ -315,4 +315,4 @@ go build ./cmd/collection-server/...
 | [07-缓存治理层](./07-缓存治理层.md) | 信令 warmup、manual warmup |
 | [10-QPS容量档位](../../04-接口与运维/10-QPS容量档位与资源配置建议.md) | 生产配置表 |
 | [11-300QPS混合场景压测SOP](../../04-接口与运维/11-300QPS混合场景压测SOP.md) | 压测档位与 L1 收益证据 |
-| [AssessmentModel 发布快照](../../02-业务模块/20-assessment-model/04-模型发布与快照链路.md) | 人格发布与 Mongo 事实源 |
+| [AssessmentModel 发布快照](../../02-业务模块/20-instrument/04-模型发布与快照链路.md) | 人格发布与 Mongo 事实源 |

@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // ModelIdentity is the canonical published-model reference on a report.
 type ModelIdentity struct {

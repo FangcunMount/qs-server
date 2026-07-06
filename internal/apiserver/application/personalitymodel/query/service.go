@@ -5,8 +5,8 @@ import (
 
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel/shared"
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	port "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // PersonalityModelQueryService exposes C-side personality model catalog reads.

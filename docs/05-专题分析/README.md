@@ -115,7 +115,7 @@ Architecture Decision Analysis
 | 想知道 | 应看 |
 | ------ | ---- |
 | 为什么 MBTI 不放进 Scale | `05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
-| MBTI 如何作为模型资产接入 | `02-业务模块/20-assessment-model/README.md`、`05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
+| MBTI 如何作为模型资产接入 | `02-业务模块/20-model-catalog/README.md`、`05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
 | MBTI 规则如何持久化 | `03-基础设施/data-access/README.md` |
 | MBTI 模型列表如何缓存 | `03-基础设施/cache/03-L2-Redis缓存设计.md` |
 | MBTI 报告权限如何控制 | `03-基础设施/security/05-安全边界与降级.md` |
@@ -368,7 +368,7 @@ flowchart TB
 - Consumer 仍然必须幂等。
 - EventCatalog 是 topic 解析真值。
 - `assessment.created / assessment.completed / interpretation.completed / report.generated` 是阶段事实。
-- `interpretation-model.changed` 是规则变化事件，不是某次测评完成事件。
+- `report.changed` 是规则变化事件，不是某次测评完成事件。
 
 ---
 
@@ -513,7 +513,7 @@ qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统
 | MQ 已经可靠，为什么还要 Outbox？ | 04 |
 | 为什么 MBTI 不放进 Scale？ | 08 |
 | Evaluation 为什么是通用执行引擎？ | 09 |
-| interpretation-model.changed 和 interpretation.completed 有什么区别？ | 10 |
+| report.changed 和 interpretation.completed 有什么区别？ | 10 |
 | 统计为什么不用实时 SQL？ | 05 |
 | IAM SDK 嵌入会不会污染业务？ | 06 |
 | 下一步怎么演进？ | 07 |

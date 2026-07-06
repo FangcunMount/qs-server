@@ -7,9 +7,9 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/component-base/pkg/logger"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/shared"
-	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/definition/hotrank"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
+	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition/hotrank"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/scalereadmodel"
 	errorCode "github.com/FangcunMount/qs-server/internal/pkg/code"
 )

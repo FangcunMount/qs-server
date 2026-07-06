@@ -5,9 +5,9 @@
 归档前的 active 目录包括：
 
 - `survey/`
-- `assessment-model/`
+- `instrument/`
 - `evaluation/`
-- `interpretation-model/`
+- `report/`
 - `actor/`
 - `plan/`
 - `statistics/`

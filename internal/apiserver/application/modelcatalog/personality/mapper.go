@@ -3,8 +3,8 @@ package personality
 import (
 	"time"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
 )
 
 func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {

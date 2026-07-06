@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestDecodeFromSnapshotMBTIMigration(t *testing.T) {

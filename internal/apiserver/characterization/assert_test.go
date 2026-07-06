@@ -3,7 +3,7 @@ package characterization_test
 import (
 	"testing"
 
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 func assertSuggestionExists(

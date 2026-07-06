@@ -10,7 +10,7 @@ import (
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // QuestionnaireService 问卷 gRPC 服务 - C端接口

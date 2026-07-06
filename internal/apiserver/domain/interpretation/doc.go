@@ -6,4 +6,4 @@
 // extras for personality-style reports. Model-family builders live in
 // report/score, report/personality/typology, and shared
 // personality assembly lives in report/personality.
-package report
+package interpretation

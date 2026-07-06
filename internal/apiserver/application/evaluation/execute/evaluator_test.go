@@ -8,8 +8,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -115,7 +115,7 @@ func TestResolveEvaluatorKeyPrefersInputAlgorithmWhenAssessmentMissing(t *testin
 		Model: evaluationinput.NewTypologyModelSnapshot(&modeltypology.Payload{
 			Code:      "BIG5_IPIP_50",
 			Version:   "1.0.0",
-			Algorithm: assessmentmodel.AlgorithmBigFive,
+			Algorithm: modelcatalog.AlgorithmBigFive,
 			Status:    "published",
 		}),
 	}
@@ -132,7 +132,7 @@ func TestEvaluatorRegistryRejectsUnknownKey(t *testing.T) {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	_, err = registry.Resolve(evaluation.EvaluatorKey{Kind: assessmentmodel.KindCustom})
+	_, err = registry.Resolve(evaluation.EvaluatorKey{Kind: modelcatalog.KindCustom})
 	if err == nil {
 		t.Fatal("Resolve error = nil, want unsupported model key")
 	}
@@ -153,5 +153,5 @@ func TestEvaluatorContractDoesNotImportLegacyPipeline(t *testing.T) {
 }
 
 func TestEvaluatorStubUsesLegacyKindMappingOnlyInTests(t *testing.T) {
-	_ = assessmentmodel.KindMBTIMigration
+	_ = modelcatalog.KindMBTIMigration
 }

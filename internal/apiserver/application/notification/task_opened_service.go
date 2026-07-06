@@ -14,7 +14,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"

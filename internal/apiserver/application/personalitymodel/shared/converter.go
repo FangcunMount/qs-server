@@ -3,8 +3,8 @@ package shared
 import (
 	"encoding/json"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func SummaryFromSnapshot(snapshot *domain.Snapshot, payload *modeltypology.Payload) PersonalityModelSummaryResult {

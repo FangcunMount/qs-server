@@ -722,7 +722,7 @@ Principal.TenantDomain
 
 - Snapshot：[../../../internal/apiserver/application/authz/snapshot.go](../../../internal/apiserver/application/authz/snapshot.go)
 - Capability：[../../../internal/apiserver/application/authz/capability.go](../../../internal/apiserver/application/authz/capability.go)
-- Interpretation Model docs：[../../02-业务模块/40-interpretation-model/README.md](../../02-业务模块/40-interpretation-model/README.md)
+- Interpretation Model docs：[../../02-业务模块/40-report/README.md](../../02-业务模块/40-report/README.md)
 - Evaluation docs：[../../02-业务模块/30-evaluation/README.md](../../02-业务模块/30-evaluation/README.md)
 - AuthzSnapshotMiddleware：[../../../internal/apiserver/transport/rest/middleware/authz_snapshot_middleware.go](../../../internal/apiserver/transport/rest/middleware/authz_snapshot_middleware.go)
 - Capability middleware：[../../../internal/apiserver/transport/rest/middleware/capability_middleware.go](../../../internal/apiserver/transport/rest/middleware/capability_middleware.go)

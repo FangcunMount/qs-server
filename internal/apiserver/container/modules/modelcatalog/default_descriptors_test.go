@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
@@ -7,11 +7,11 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/scale/snapshot"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -31,7 +31,7 @@ func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T
 		t.Fatalf("configured typology key = %#v", descs[1].Key)
 	}
 	typology := evaldomain.TypologyAlgorithms(descs)
-	if len(typology) != 1 || typology[0] != assessmentmodel.AlgorithmPersonalityTypology {
+	if len(typology) != 1 || typology[0] != modelcatalog.AlgorithmPersonalityTypology {
 		t.Fatalf("typology algorithms = %#v", typology)
 	}
 }

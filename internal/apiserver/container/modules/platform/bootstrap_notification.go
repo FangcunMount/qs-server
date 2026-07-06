@@ -6,7 +6,7 @@ import (
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"
 	wechatmini "github.com/FangcunMount/qs-server/internal/apiserver/port/wechatmini"

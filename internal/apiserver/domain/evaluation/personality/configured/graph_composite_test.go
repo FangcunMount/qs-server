@@ -3,8 +3,8 @@ package configured_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -104,7 +104,7 @@ func compositePolePayload() *modeltypology.Payload {
 				},
 			},
 			Decision: modeltypology.PersonalityDecisionSpec{
-				Kind: assessmentmodel.DecisionKindPoleComposition,
+				Kind: modelcatalog.DecisionKindPoleComposition,
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
 				DetailKind: modeltypology.OutcomeDetailPersonalityType,
@@ -168,7 +168,7 @@ func compositeTraitPayload() *modeltypology.Payload {
 				},
 			},
 			Decision: modeltypology.PersonalityDecisionSpec{
-				Kind: assessmentmodel.DecisionKindTraitProfile,
+				Kind: modelcatalog.DecisionKindTraitProfile,
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
 				DetailKind: modeltypology.OutcomeDetailTraitProfile,
@@ -186,7 +186,7 @@ func flatTraitPayload() *modeltypology.Payload {
 		Code:           "FLAT_TRAIT_V1",
 		Version:        "1.0.0",
 		Status:         "published",
-		Algorithm:      assessmentmodel.AlgorithmBigFive,
+		Algorithm:      modelcatalog.AlgorithmBigFive,
 		DimensionOrder: []string{"O", "C"},
 		Dimensions: map[string]modeltypology.Dimension{
 			"O": {Code: "O", Name: "Openness"},
@@ -198,7 +198,7 @@ func flatTraitPayload() *modeltypology.Payload {
 			{QuestionCode: "C1", Dimension: "C", Sign: 1},
 		},
 		MatchingSpec: modeltypology.MatchingSpec{
-			Kind: assessmentmodel.DecisionKindTraitProfile,
+			Kind: modelcatalog.DecisionKindTraitProfile,
 		},
 	}
 }

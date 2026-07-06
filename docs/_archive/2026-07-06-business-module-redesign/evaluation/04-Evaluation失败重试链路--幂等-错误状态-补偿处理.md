@@ -70,7 +70,7 @@ Outbox relay 的具体实现；
 03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 05-Evaluation事件链路--答卷提交-测评完成-报告生成.md
 06-Evaluation模块分层架构与事实源索引.md
-../interpretation-model/README.md
+../report/README.md
 ```
 
 ---

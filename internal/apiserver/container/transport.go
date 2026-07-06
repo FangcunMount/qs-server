@@ -16,7 +16,7 @@ import (
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	iaminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/options"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/assessmentmodel"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	grpctransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/grpc"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"

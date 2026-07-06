@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // ModelExtra 解释模型扩展信息（可选，SBTI 等人格类测评使用）。
 type ModelExtra struct {

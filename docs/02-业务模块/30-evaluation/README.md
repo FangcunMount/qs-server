@@ -57,8 +57,8 @@ Evaluation 负责“一次测评如何执行”：
 | 方向 | 模块 | 关系 |
 | ---- | ---- | ---- |
 | 上游 | `survey` | 提供 `AnswerSheet` |
-| 上游 | `assessment-model` | 提供模型快照和执行 payload |
-| 下游 | `interpretation-model` | 消费结构化结果生成报告 |
+| 上游 | `model-catalog` | 提供模型快照和执行 payload |
+| 下游 | `interpretation` | 消费结构化结果生成报告 |
 | 下游 | `statistics` | 消费执行事件和服务过程投影 |
 
 代码事实入口：

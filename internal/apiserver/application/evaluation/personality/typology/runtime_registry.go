@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/configured"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
@@ -15,7 +15,7 @@ type PersonalityRuntimeRegistry struct {
 	assembler      OutcomeAssembler
 	reportRegistry ReportAdapterRegistry
 	configured     configuredadapter.Adapter
-	aliases        map[assessmentmodel.Algorithm]configuredadapter.Adapter
+	aliases        map[modelcatalog.Algorithm]configuredadapter.Adapter
 }
 
 // DefaultPersonalityRuntimeRegistry builds the default configured typology runtime.
@@ -26,15 +26,15 @@ func DefaultPersonalityRuntimeRegistry() PersonalityRuntimeRegistry {
 }
 
 // NewPersonalityRuntimeRegistry registers algorithm aliases over the configured runtime.
-func NewPersonalityRuntimeRegistry(algorithms ...assessmentmodel.Algorithm) PersonalityRuntimeRegistry {
+func NewPersonalityRuntimeRegistry(algorithms ...modelcatalog.Algorithm) PersonalityRuntimeRegistry {
 	return NewPersonalityRuntimeRegistryWith(PersonalityRuntimeOptions{}, algorithms...)
 }
 
 // NewPersonalityRuntimeRegistryWith registers algorithm aliases with injectable adapter registries.
-func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithms ...assessmentmodel.Algorithm) PersonalityRuntimeRegistry {
+func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithms ...modelcatalog.Algorithm) PersonalityRuntimeRegistry {
 	opts = resolvePersonalityRuntimeOptions(opts)
 	evaluator := personalityconfigured.NewEvaluatorWithDetails(opts.DetailRegistry)
-	aliases := make(map[assessmentmodel.Algorithm]configuredadapter.Adapter, len(algorithms))
+	aliases := make(map[modelcatalog.Algorithm]configuredadapter.Adapter, len(algorithms))
 	for _, algorithm := range algorithms {
 		if algorithm == "" {
 			continue
@@ -66,7 +66,7 @@ func (r PersonalityRuntimeRegistry) runnerForConfigured() algorithmRunner {
 	}
 }
 
-func (r PersonalityRuntimeRegistry) runnerFor(algorithm assessmentmodel.Algorithm) (algorithmRunner, error) {
+func (r PersonalityRuntimeRegistry) runnerFor(algorithm modelcatalog.Algorithm) (algorithmRunner, error) {
 	adapter, ok := r.aliases[algorithm]
 	if !ok {
 		return algorithmRunner{}, fmt.Errorf("unsupported typology algorithm: %s", algorithm)
@@ -78,8 +78,8 @@ func (r PersonalityRuntimeRegistry) runnerFor(algorithm assessmentmodel.Algorith
 	}, nil
 }
 
-func (r PersonalityRuntimeRegistry) Algorithms() []assessmentmodel.Algorithm {
-	out := make([]assessmentmodel.Algorithm, 0, len(r.aliases))
+func (r PersonalityRuntimeRegistry) Algorithms() []modelcatalog.Algorithm {
+	out := make([]modelcatalog.Algorithm, 0, len(r.aliases))
 	for algorithm := range r.aliases {
 		out = append(out, algorithm)
 	}

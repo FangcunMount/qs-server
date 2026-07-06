@@ -9,7 +9,7 @@ import (
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	testeeDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	domainPlan "github.com/FangcunMount/qs-server/internal/apiserver/domain/plan"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"

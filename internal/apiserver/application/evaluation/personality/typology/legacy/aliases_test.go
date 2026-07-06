@@ -4,17 +4,17 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
 func TestDefaultAlgorithmAliases(t *testing.T) {
 	aliases := legacy.DefaultAlgorithmAliases()
-	want := []assessmentmodel.Algorithm{
-		assessmentmodel.AlgorithmMBTI,
-		assessmentmodel.AlgorithmSBTI,
-		assessmentmodel.AlgorithmBigFive,
+	want := []modelcatalog.Algorithm{
+		modelcatalog.AlgorithmMBTI,
+		modelcatalog.AlgorithmSBTI,
+		modelcatalog.AlgorithmBigFive,
 	}
 	if len(aliases) != len(want) {
 		t.Fatalf("aliases = %#v, want %#v", aliases, want)
@@ -40,7 +40,7 @@ func TestDefaultAlgorithmAliasesMatchEvaluatorLegacyKeys(t *testing.T) {
 }
 
 func TestReportSpecForAlgorithmDelegatesToDomainLegacy(t *testing.T) {
-	spec := legacy.ReportSpecForAlgorithm(assessmentmodel.AlgorithmBigFive)
+	spec := legacy.ReportSpecForAlgorithm(modelcatalog.AlgorithmBigFive)
 	if spec.Kind != modeltypology.ReportKindTraitProfile {
 		t.Fatalf("kind = %s", spec.Kind)
 	}

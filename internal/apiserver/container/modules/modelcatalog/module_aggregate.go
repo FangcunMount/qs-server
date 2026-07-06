@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 

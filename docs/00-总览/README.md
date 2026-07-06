@@ -85,10 +85,10 @@ flowchart LR
 | 要改什么 | 继续读 |
 | -------- | ------ |
 | 问卷、题型、答卷提交 | [02-业务模块/10-survey/README.md](../02-业务模块/10-survey/README.md) |
-| 测评模型资产、发布快照、模型 payload | [02-业务模块/20-assessment-model/README.md](../02-业务模块/20-assessment-model/README.md) |
-| 医学量表、因子、计分与解读规则 | [02-业务模块/20-assessment-model/README.md](../02-业务模块/20-assessment-model/README.md) |
+| 测评模型资产、发布快照、模型 payload | [02-业务模块/20-model-catalog/README.md](../02-业务模块/20-model-catalog/README.md) |
+| 医学量表、因子、计分与解读规则 | [02-业务模块/20-model-catalog/README.md](../02-业务模块/20-model-catalog/README.md) |
 | 测评状态机、评估流水线、失败重试 | [02-业务模块/30-evaluation/README.md](../02-业务模块/30-evaluation/README.md) |
-| 报告 builder、adapter、InterpretReport | [02-业务模块/40-interpretation-model/README.md](../02-业务模块/40-interpretation-model/README.md) |
+| 报告 builder、adapter、InterpretReport | [02-业务模块/40-interpretation/README.md](../02-业务模块/40-interpretation/README.md) |
 | 受试者、从业者、操作者、照护关系 | [02-业务模块/50-actor/README.md](../02-业务模块/50-actor/README.md) |
 | 计划、任务、调度、通知 | [02-业务模块/60-plan/README.md](../02-业务模块/60-plan/README.md) |
 | 统计概览、行为投影、读模型 | [02-业务模块/70-statistics/README.md](../02-业务模块/70-statistics/README.md) |
@@ -135,7 +135,7 @@ flowchart LR
 | 文档组 | 负责什么 | 与 `00-总览` 的关系 |
 | ------ | -------- | ------------------- |
 | [01-运行时](../01-运行时/) | 三进程启动、进程间调用、HTTP/gRPC/MQ runtime、shutdown | 总览只讲拓扑和主方向，运行时讲具体装配和时序 |
-| [02-业务模块](../02-业务模块/) | survey / assessment-model / evaluation / interpretation-model / actor / plan / statistics 的领域对象、状态机、应用服务和模块内规则 | 总览只讲模块位置和主链路，业务模块讲对象模型与业务不变量 |
+| [02-业务模块](../02-业务模块/) | survey / model-catalog / evaluation / report / actor / plan / statistics 的领域对象、状态机、应用服务和模块内规则 | 总览只讲模块位置和主链路，业务模块讲对象模型与业务不变量 |
 | [03-基础设施](../03-基础设施/) | event、data-access、redis、resilience、security、integrations、runtime、observability 等横切能力 | 总览只说明这些能力存在和如何进入，基础设施文档讲机制与配置 |
 | [04-接口与运维](../04-接口与运维/) | REST、gRPC、internal gRPC、events.yaml、配置、部署、健康检查、排障 | 总览只列关键契约入口，接口与运维维护机器契约说明 |
 | [05-专题分析](../05-专题分析/) | 跨模块设计判断，例如为什么拆分 Survey / Assessment Model / Evaluation / Interpretation Model、为什么同步提交但异步评估 | 总览讲现状，专题分析讲取舍与原因 |
@@ -173,9 +173,9 @@ Client / 小程序
 | 答卷事实与校验 | `survey` |
 | durable submit 和 outbox | `data-access`、`event` |
 | 事件消费与回调 | `worker`、`runtime`、`event` |
-| 测评模型资产与发布快照 | `assessment-model` |
+| 测评模型资产与发布快照 | `model-catalog` |
 | Assessment 状态机与评估 | `evaluation` |
-| 解释报告产出 | `interpretation-model / report` |
+| 解释报告产出 | `report / report` |
 | 标签、统计、任务 | `actor`、`statistics`、`plan` |
 
 后续如果这条链路变化，优先更新 [03-核心业务链路.md](./03-核心业务链路.md) 和 [05-源码事实矩阵.md](./05-源码事实矩阵.md)，然后再更新相关模块或基础设施文档。

@@ -1,4 +1,4 @@
-package report
+package interpretation
 
 // IsRiskLevelCode reports whether code is a legacy scale risk-level value.
 func IsRiskLevelCode(code string) bool {

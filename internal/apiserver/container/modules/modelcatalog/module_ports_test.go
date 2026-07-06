@@ -1,4 +1,4 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"testing"
@@ -11,8 +11,8 @@ func TestDescribeExposesAggregateAndLegacyRegisterNames(t *testing.T) {
 	t.Parallel()
 
 	desc := Describe()
-	if desc.Name != modules.PackageAssessmentModel {
-		t.Fatalf("name = %q, want assessmentmodel", desc.Name)
+	if desc.Name != modules.PackageModelCatalog {
+		t.Fatalf("name = %q, want instrument", desc.Name)
 	}
 	want := []string{string(Name), "scale", "personalitymodel"}
 	if len(desc.RegisterNames) != len(want) {

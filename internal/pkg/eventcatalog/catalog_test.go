@@ -114,6 +114,7 @@ func TestCatalogDeliveryClass(t *testing.T) {
 		{TaskCanceled, DeliveryClassBestEffort, false},
 		{AnswerSheetSubmitted, DeliveryClassDurableOutbox, true},
 		{AssessmentSubmitted, DeliveryClassDurableOutbox, true},
+		{AssessmentEvaluated, DeliveryClassDurableOutbox, true},
 		{AssessmentInterpreted, DeliveryClassDurableOutbox, true},
 		{AssessmentFailed, DeliveryClassDurableOutbox, true},
 		{ReportGenerated, DeliveryClassDurableOutbox, true},

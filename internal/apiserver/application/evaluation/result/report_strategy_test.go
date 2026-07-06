@@ -3,7 +3,7 @@ package result
 import (
 	"testing"
 
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/report"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 func TestResolveReportTypeReturnsStandard(t *testing.T) {

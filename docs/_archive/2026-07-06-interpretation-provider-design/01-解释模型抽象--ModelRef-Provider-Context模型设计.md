@@ -1104,7 +1104,7 @@ Interpretation Model 抽象层只定义接入协议。
 
 ### 18.1 不定义 Scale 内部模型
 
-不应该在 interpretation-model 中定义：
+不应该在 report 中定义：
 
 ```text
 Factor；
@@ -1117,7 +1117,7 @@ RiskLevel。
 
 ### 18.2 不定义 MBTI 内部模型
 
-不应该在 interpretation-model 中定义：
+不应该在 report 中定义：
 
 ```text
 Dimension；
@@ -1130,7 +1130,7 @@ TypeProfile。
 
 ### 18.3 不定义 Evaluation 状态机
 
-不应该在 interpretation-model 中定义：
+不应该在 report 中定义：
 
 ```text
 AssessmentStatus；

@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // QuestionnaireSnapshot is the minimal questionnaire shape needed to validate a runtime spec.
@@ -20,18 +20,18 @@ type QuestionSnapshot struct {
 }
 
 // ValidateRuntimeSpecForPublish performs the strong validation gate used before publishing.
-func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot) []assessmentmodel.DomainValidationIssue {
+func ValidateRuntimeSpecForPublish(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot) []modelcatalog.DomainValidationIssue {
 	return ValidateRuntimeSpecForPublishWithContext(spec, questionnaire, RuntimeSpecValidationContext{})
 }
 
 // RuntimeSpecValidationContext carries payload-level metadata needed by publish validation.
 type RuntimeSpecValidationContext struct {
-	Algorithm assessmentmodel.Algorithm
+	Algorithm modelcatalog.Algorithm
 	Outcomes  []Outcome
 }
 
 // ValidateRuntimeSpecForPublishWithContext performs the strong validation gate used before publishing.
-func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []assessmentmodel.DomainValidationIssue {
+func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire QuestionnaireSnapshot, validationContext RuntimeSpecValidationContext) []modelcatalog.DomainValidationIssue {
 	validator := runtimeSpecValidator{
 		questions: map[string]map[string]struct{}{},
 		algorithm: validationContext.Algorithm,
@@ -53,9 +53,9 @@ func ValidateRuntimeSpecForPublishWithContext(spec *RuntimeSpec, questionnaire Q
 
 type runtimeSpecValidator struct {
 	questions map[string]map[string]struct{}
-	algorithm assessmentmodel.Algorithm
+	algorithm modelcatalog.Algorithm
 	outcomes  map[string]Outcome
-	issues    []assessmentmodel.DomainValidationIssue
+	issues    []modelcatalog.DomainValidationIssue
 }
 
 func (v *runtimeSpecValidator) loadOutcomes(outcomes []Outcome) {
@@ -205,7 +205,7 @@ func (v *runtimeSpecValidator) validateDecision(spec RuntimeSpec) {
 	}
 }
 
-func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec, decisionKind assessmentmodel.DecisionKind) {
+func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec, decisionKind modelcatalog.DecisionKind) {
 	if mapping.DetailKind == "" {
 		v.add("outcome_mapping.detail_kind", "outcome_mapping.detail_kind.required", "outcome mapping detail_kind 不能为空")
 	} else if !isSupportedOutcomeDetailKind(mapping.DetailKind) {
@@ -265,7 +265,7 @@ func (v *runtimeSpecValidator) validateSpecialRuleQuestionRefs(rule SpecialRuleS
 	}
 }
 
-func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping OutcomeMappingSpec, decisionKind assessmentmodel.DecisionKind) {
+func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping OutcomeMappingSpec, decisionKind modelcatalog.DecisionKind) {
 	if report.Kind == "" {
 		v.add("report.kind", "report.kind.required", "report kind 不能为空")
 	}
@@ -300,33 +300,33 @@ func (v *runtimeSpecValidator) validateOutcomeCode(field, issueCode, outcomeCode
 }
 
 func (v *runtimeSpecValidator) add(field, code, message string) {
-	v.issues = append(v.issues, assessmentmodel.DomainValidationIssue{
+	v.issues = append(v.issues, modelcatalog.DomainValidationIssue{
 		Field:   field,
 		Code:    code,
 		Message: message,
-		Level:   assessmentmodel.ValidationLevelError,
+		Level:   modelcatalog.ValidationLevelError,
 	})
 }
 
-func isSupportedDecisionKind(kind assessmentmodel.DecisionKind) bool {
+func isSupportedDecisionKind(kind modelcatalog.DecisionKind) bool {
 	switch kind {
-	case assessmentmodel.DecisionKindPoleComposition,
-		assessmentmodel.DecisionKindNearestPattern,
-		assessmentmodel.DecisionKindTraitProfile:
+	case modelcatalog.DecisionKindPoleComposition,
+		modelcatalog.DecisionKindNearestPattern,
+		modelcatalog.DecisionKindTraitProfile:
 		return true
 	default:
 		return false
 	}
 }
 
-func expectedDecisionKindForAlgorithm(algorithm assessmentmodel.Algorithm) (assessmentmodel.DecisionKind, bool) {
+func expectedDecisionKindForAlgorithm(algorithm modelcatalog.Algorithm) (modelcatalog.DecisionKind, bool) {
 	switch algorithm {
-	case assessmentmodel.AlgorithmMBTI:
-		return assessmentmodel.DecisionKindPoleComposition, true
-	case assessmentmodel.AlgorithmSBTI:
-		return assessmentmodel.DecisionKindNearestPattern, true
-	case assessmentmodel.AlgorithmBigFive:
-		return assessmentmodel.DecisionKindTraitProfile, true
+	case modelcatalog.AlgorithmMBTI:
+		return modelcatalog.DecisionKindPoleComposition, true
+	case modelcatalog.AlgorithmSBTI:
+		return modelcatalog.DecisionKindNearestPattern, true
+	case modelcatalog.AlgorithmBigFive:
+		return modelcatalog.DecisionKindTraitProfile, true
 	default:
 		return "", false
 	}
@@ -376,32 +376,32 @@ func isSupportedReportAdapter(adapter ReportAdapterKey) bool {
 	}
 }
 
-func isDetailAdapterCompatible(algorithm assessmentmodel.Algorithm, adapter DetailAdapterKey) bool {
-	if algorithm == "" || algorithm == assessmentmodel.AlgorithmPersonalityTypology {
+func isDetailAdapterCompatible(algorithm modelcatalog.Algorithm, adapter DetailAdapterKey) bool {
+	if algorithm == "" || algorithm == modelcatalog.AlgorithmPersonalityTypology {
 		return true
 	}
 	switch algorithm {
-	case assessmentmodel.AlgorithmMBTI:
+	case modelcatalog.AlgorithmMBTI:
 		return adapter == DetailAdapterMBTI || adapter == DetailAdapterPersonalityType
-	case assessmentmodel.AlgorithmSBTI:
+	case modelcatalog.AlgorithmSBTI:
 		return adapter == DetailAdapterSBTI || adapter == DetailAdapterPersonalityType
-	case assessmentmodel.AlgorithmBigFive:
+	case modelcatalog.AlgorithmBigFive:
 		return adapter == DetailAdapterBigFive || adapter == DetailAdapterTraitProfile
 	default:
 		return true
 	}
 }
 
-func isReportAdapterCompatible(algorithm assessmentmodel.Algorithm, adapter ReportAdapterKey) bool {
-	if algorithm == "" || algorithm == assessmentmodel.AlgorithmPersonalityTypology {
+func isReportAdapterCompatible(algorithm modelcatalog.Algorithm, adapter ReportAdapterKey) bool {
+	if algorithm == "" || algorithm == modelcatalog.AlgorithmPersonalityTypology {
 		return true
 	}
 	switch algorithm {
-	case assessmentmodel.AlgorithmMBTI:
+	case modelcatalog.AlgorithmMBTI:
 		return adapter == ReportAdapterMBTI || adapter == ReportAdapterPersonalityType
-	case assessmentmodel.AlgorithmSBTI:
+	case modelcatalog.AlgorithmSBTI:
 		return adapter == ReportAdapterSBTI || adapter == ReportAdapterPersonalityType
-	case assessmentmodel.AlgorithmBigFive:
+	case modelcatalog.AlgorithmBigFive:
 		return adapter == ReportAdapterBigFive || adapter == ReportAdapterTraitProfile
 	default:
 		return true

@@ -359,7 +359,7 @@ report.generated
 表示模型规则或目录变化：
 
 ```text
-interpretation-model.changed
+report.changed
 scale.changed
 mbti-model.published
 mbti-model.archived
@@ -520,7 +520,7 @@ durable_outbox
 ```text
 questionnaire.changed
 scale.changed
-interpretation-model.changed
+report.changed
 mbti-model.published
 ```
 
@@ -809,7 +809,7 @@ domain event
 典型规则变化事件：
 
 ```text
-interpretation-model.changed
+report.changed
 scale.changed
 mbti-model.published
 ```
@@ -997,11 +997,11 @@ Event Sourcing
 
 ---
 
-### 26.6 问：`interpretation-model.changed` 和 `interpretation.completed` 有什么区别？
+### 26.6 问：`report.changed` 和 `interpretation.completed` 有什么区别？
 
 答：
 
-> **`interpretation-model.changed` 是规则变化事件，主要触发缓存失效、Context warmup、读模型刷新和治理状态更新；`interpretation.completed` 是一次执行事件，表示某个 Assessment 的 Provider 执行完成。前者不应默认触发历史 Assessment 重算。**
+> **`report.changed` 是规则变化事件，主要触发缓存失效、Context warmup、读模型刷新和治理状态更新；`interpretation.completed` 是一次执行事件，表示某个 Assessment 的 Provider 执行完成。前者不应默认触发历史 Assessment 重算。**
 
 ---
 

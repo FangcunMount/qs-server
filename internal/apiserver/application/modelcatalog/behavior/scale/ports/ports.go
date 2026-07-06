@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale/shared"
 )
 
 // ScaleLifecycleService 量表生命周期服务（管理员/设计者）。

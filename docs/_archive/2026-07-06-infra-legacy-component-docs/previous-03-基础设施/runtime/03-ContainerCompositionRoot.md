@@ -116,10 +116,10 @@ initEventPublisher
 | 2 | AssessmentModel | 测评模型资产能力，兼容 scale/personalitymodel |
 | 3 | Actor | testee/operator 等行为者 |
 | 4 | Report | 解释报告、builder registry、durable saver |
-| 5 | Evaluation | 评估依赖 survey/assessmentmodel/actor/report |
-| 6 | Plan | 计划依赖 actor/assessmentmodel/evaluation |
+| 5 | Evaluation | 评估依赖 survey/instrument/actor/report |
+| 6 | Plan | 计划依赖 actor/instrument/evaluation |
 | 7 | Statistics | 统计依赖多个业务模块 |
-| 8 | WarmupCoordinator | 依赖 cache + statistics/assessmentmodel/query callbacks |
+| 8 | WarmupCoordinator | 依赖 cache + statistics/instrument/query callbacks |
 | 9 | Codes | 独立基础应用服务 |
 | 10 | QR | 外部集成支持服务 |
 

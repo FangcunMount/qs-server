@@ -79,7 +79,7 @@ EvaluationEngine 的内部 Provider 执行细节；
 06-Evaluation模块分层架构与事实源索引.md
 ../survey/README.md
 ../scale/README.md
-../interpretation-model/README.md
+../report/README.md
 ```
 
 ---

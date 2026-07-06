@@ -1,6 +1,6 @@
 package typology
 
-import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+import modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 
 type BigFiveTraitResult struct {
 	Code     string  `json:"code"`

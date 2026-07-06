@@ -28,7 +28,7 @@ func TestTypologyDoesNotDependOnOuterLayers(t *testing.T) {
 			if strings.Contains(path, "/internal/apiserver/application/") ||
 				strings.Contains(path, "/internal/apiserver/infra/") ||
 				strings.Contains(path, "/internal/apiserver/port/") {
-				t.Fatalf("domain/assessmentmodel/personality/typology must not import %s in %s", path, file)
+				t.Fatalf("domain/modelcatalog/personality/typology must not import %s in %s", path, file)
 			}
 		}
 	}

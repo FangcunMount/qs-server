@@ -1,9 +1,9 @@
-package assessmentmodel
+package modelcatalog
 
 import (
 	"context"
 
-	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // ListFilter narrows draft-model list queries for admin consoles.

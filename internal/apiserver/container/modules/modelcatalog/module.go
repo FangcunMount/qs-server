@@ -1,8 +1,8 @@
-package assessmentmodel
+package modelcatalog
 
 import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 
-const Name = modules.PackageAssessmentModel
+const Name = modules.PackageModelCatalog
 
 // RegisterNames lists registerModule keys: aggregate plus legacy capability aliases.
 var RegisterNames = []string{string(Name), "scale", "personalitymodel"}

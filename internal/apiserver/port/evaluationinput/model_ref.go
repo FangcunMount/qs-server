@@ -1,23 +1,23 @@
 package evaluationinput
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/assessmentmodel/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
 func (r ModelRef) EvaluatorKey() evaldomain.EvaluatorKey {
 	if r.Algorithm != "" {
 		return evaldomain.EvaluatorKey{
-			Kind:      assessmentmodel.Kind(r.Kind),
-			SubKind:   assessmentmodel.SubKind(r.SubKind),
-			Algorithm: assessmentmodel.Algorithm(r.Algorithm),
+			Kind:      modelcatalog.Kind(r.Kind),
+			SubKind:   modelcatalog.SubKind(r.SubKind),
+			Algorithm: modelcatalog.Algorithm(r.Algorithm),
 		}
 	}
-	if key, ok := evaldomain.EvaluatorKeyFromLegacyKind(assessmentmodel.Kind(r.Kind)); ok {
+	if key, ok := evaldomain.EvaluatorKeyFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
 		return key
 	}
-	return evaldomain.EvaluatorKey{Kind: assessmentmodel.Kind(r.Kind)}
+	return evaldomain.EvaluatorKey{Kind: modelcatalog.Kind(r.Kind)}
 }
 
 func TypologyPayload(input *InputSnapshot) (*typology.Payload, bool) {

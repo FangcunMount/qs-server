@@ -148,7 +148,7 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 		}
 	}
 
-	reportPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "report", "assemble.go")
+	reportPath := filepath.Join(root, "internal", "apiserver", "container", "modules", "interpretation", "assemble.go")
 	reportData, err := os.ReadFile(reportPath)
 	if err != nil {
 		t.Fatalf("read report assembler: %v", err)

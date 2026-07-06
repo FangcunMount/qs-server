@@ -11,11 +11,11 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 组织方式 | 按业务理解路径组织，不按代码包、接口清单或表结构组织 |
-| 核心阅读顺序 | `10-survey -> 20-assessment-model -> 30-evaluation -> 40-interpretation-model` |
+| 核心阅读顺序 | `10-survey -> 20-model-catalog -> 30-evaluation -> 40-interpretation` |
 | 支撑阅读顺序 | `50-actor -> 60-plan -> 70-statistics` |
 | 代码注册事实 | 以 [`internal/apiserver/container/modules/registry.go`](../../internal/apiserver/container/modules/registry.go) 的 `BusinessPackages` 为准 |
-| 代码包名 | 当前注册包是 `survey / assessmentmodel / evaluation / report / actor / plan / statistics` |
-| 兼容注册名 | `assessmentmodel` 兼容注册 `scale`、`personalitymodel`；二者不再作为独立核心模块维护 |
+| 代码包名 | 当前注册包是 `survey / modelcatalog / evaluation / report / actor / plan / statistics` |
+| 兼容注册名 | `modelcatalog` 兼容注册 `scale`、`personalitymodel`；二者不再作为独立核心模块维护 |
 | 旧文档处理 | 旧未编号目录已归档到 [`docs/_archive/2026-07-06-business-module-redesign`](../_archive/2026-07-06-business-module-redesign/) |
 
 一句话概括：**qs-server 的测评业务由作答事实、模型资产、测评执行、解释报告四层核心链路组成，actor、plan、statistics 是围绕这条链路的支撑模块。**
@@ -63,9 +63,9 @@ Survey
 | 顺序 | 模块 | 当前定位 | 入口 |
 | ---- | ---- | -------- | ---- |
 | 10 | Survey | 作答事实层 | [10-survey/README.md](./10-survey/README.md) |
-| 20 | Assessment Model | 测评模型资产层 | [20-assessment-model/README.md](./20-assessment-model/README.md) |
+| 20 | Assessment Model | 测评模型资产层 | [20-model-catalog/README.md](./20-model-catalog/README.md) |
 | 30 | Evaluation | 测评执行层 | [30-evaluation/README.md](./30-evaluation/README.md) |
-| 40 | Interpretation Model / Report | 解释模型与报告产出层 | [40-interpretation-model/README.md](./40-interpretation-model/README.md) |
+| 40 | Interpretation Model / Report | 解释模型与报告产出层 | [40-interpretation/README.md](./40-interpretation/README.md) |
 | 50 | Actor | 业务参与者上下文 | [50-actor/README.md](./50-actor/README.md) |
 | 60 | Plan | 测评计划与任务编排 | [60-plan/README.md](./60-plan/README.md) |
 | 70 | Statistics | 读侧统计与行为投影 | [70-statistics/README.md](./70-statistics/README.md) |
@@ -77,14 +77,14 @@ Survey
 | 文档业务名称 | 当前代码包名 / 注册名 | 说明 |
 | ------------ | --------------------- | ---- |
 | `survey` | `survey` | 问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实 |
-| `assessment-model` | `assessmentmodel`，兼容注册 `scale/personalitymodel` | 统一测评模型资产层，旧 Scale 和 Personality Model 归入这一层 |
+| `model-catalog` | `modelcatalog`，兼容注册 `scale/personalitymodel` | 统一测评模型资产层，旧 Scale 和 Personality Model 归入这一层 |
 | `evaluation` | `evaluation` | 一次测评执行、执行状态、计分和结果生成 |
-| `interpretation-model` | `report` | 解释模型、报告模型、builder、adapter、`InterpretReport` 输出 |
+| `interpretation` | `interpretation` | 解释模型、报告模型、builder、adapter、`InterpretReport` 输出 |
 | `actor` | `actor` | 受试者、从业者、操作者、访问上下文 |
 | `plan` | `plan` | 测评计划、周期任务、任务生命周期 |
 | `statistics` | `statistics` | 读侧统计、行为投影、指标聚合 |
 
-文档中的 `interpretation-model` 对应当前代码中的 `report module`。后续如果代码包重命名，应先调整容器注册、装配、测试和兼容策略，再同步文档。
+文档中的 `interpretation` 对应当前代码中的 `report module`。后续如果代码包重命名，应先调整容器注册、装配、测试和兼容策略，再同步文档。
 
 ---
 

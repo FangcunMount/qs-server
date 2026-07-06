@@ -2,7 +2,7 @@
 
 **本文回答**：为什么 qs-server 不能继续把 Scale 当作所有解释能力的中心；为什么 MBTI 不应该被实现成 MedicalScale 的一个特殊类型；为什么需要把 Scale、MBTI、BigFive 等收敛到 Assessment Model 的统一模型资产层；新增模型资产时，会如何影响 Evaluation、Interpretation Model / Report、事件、持久化、Redis、统计、安全、观测和文档体系。
 
-> 当前口径校准：本文早期版本大量使用 `Interpretation Model / Provider / Context` 作为扩展抽象。当前文档体系已把模型资产层统一命名为 `assessment-model`，最终报告产出层命名为 `interpretation-model / report`。阅读本文后续 Provider 细节时，应以 [`../02-业务模块/20-assessment-model/README.md`](../02-业务模块/20-assessment-model/README.md) 和 [`../02-业务模块/40-interpretation-model/README.md`](../02-业务模块/40-interpretation-model/README.md) 的映射为准。
+> 当前口径校准：本文早期版本大量使用 `Interpretation Model / Provider / Context` 作为扩展抽象。当前文档体系已把模型资产层统一命名为 `model-catalog`，最终报告产出层命名为 `report / report`。阅读本文后续 Provider 细节时，应以 [`../02-业务模块/20-model-catalog/README.md`](../02-业务模块/20-model-catalog/README.md) 和 [`../02-业务模块/40-interpretation/README.md`](../02-业务模块/40-interpretation/README.md) 的映射为准。
 
 ---
 
@@ -202,7 +202,7 @@ Interpretation Model / Report
 
 ## 3. 新模型：Assessment Model 资产层 + 执行/报告协议
 
-本节以下内容保留了早期 `ModelRef / Provider / Context / Registry` 设计语汇，可作为抽象设计参考；当前代码事实需要映射到 `assessmentmodel`、`evaluation` 和 `report` 三个模块。
+本节以下内容保留了早期 `ModelRef / Provider / Context / Registry` 设计语汇，可作为抽象设计参考；当前代码事实需要映射到 `modelcatalog`、`evaluation` 和 `interpretation` 三个模块。
 
 Interpretation Model 不是一个新的“万能业务模块”，而是一组接入协议。
 
@@ -609,7 +609,7 @@ report.generated
 
 ```text
 scale.changed
-interpretation-model.changed
+report.changed
 mbti-model.published
 mbti-model.archived
 ```
@@ -620,7 +620,7 @@ mbti-model.archived
 
 ```text
 interpretation.completed 表示某次解释执行完成；
-interpretation-model.changed 表示规则变化；
+report.changed 表示规则变化；
 二者不能混用。
 ```
 
@@ -1059,16 +1059,16 @@ Worker
 
 ### Interpretation Model 文档
 
-- `docs/02-业务模块/40-interpretation-model/README.md`
-- `docs/02-业务模块/20-assessment-model/README.md`
+- `docs/02-业务模块/40-interpretation/README.md`
+- `docs/02-业务模块/20-model-catalog/README.md`
 - `docs/05-专题分析/01-为什么拆分Survey-InterpretationModel-Evaluation.md`
 
 ### Scale
 
-- `internal/apiserver/container/modules/assessmentmodel/assemble_scale.go`
+- `internal/apiserver/container/modules/modelcatalog/assemble_scale.go`
 - `internal/apiserver/application/scale`
-- `internal/apiserver/domain/assessmentmodel/scale/definition`
-- `docs/02-业务模块/20-assessment-model/README.md`
+- `internal/apiserver/domain/modelcatalog/scale/definition`
+- `docs/02-业务模块/20-model-catalog/README.md`
 
 ### Evaluation
 
@@ -1095,7 +1095,7 @@ Worker
 go test ./internal/apiserver/application/evaluation/...
 go test ./internal/apiserver/domain/evaluation/...
 go test ./internal/apiserver/application/scale/...
-go test ./internal/apiserver/domain/assessmentmodel/scale/definition/...
+go test ./internal/apiserver/domain/modelcatalog/scale/definition/...
 go test ./internal/apiserver/infra/mongo/...
 go test ./internal/apiserver/infra/cachequery
 ```
@@ -1131,6 +1131,6 @@ git diff --check
 | 为什么同步提交但异步测评执行 | `02-为什么同步提交但异步测评执行.md` |
 | Evaluation 通用执行引擎专题 | `09-Evaluation通用执行引擎专题.md` |
 | 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
-| Scale 模块 | `../02-业务模块/20-assessment-model/README.md` |
-| Interpretation Model 模块 | `../02-业务模块/40-interpretation-model/README.md` |
+| Scale 模块 | `../02-业务模块/20-model-catalog/README.md` |
+| Interpretation Model 模块 | `../02-业务模块/40-interpretation/README.md` |
 | Evaluation 模块 | `../02-业务模块/30-evaluation/README.md` |
