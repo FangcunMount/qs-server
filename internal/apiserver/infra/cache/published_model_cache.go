@@ -215,7 +215,20 @@ func (c *CachedPublishedModelStore) FindPublishedModelByQuestionnaire(
 }
 
 func (c *CachedPublishedModelStore) FindPublishedByModelCode(ctx context.Context, kind domain.Kind, code string) (*domain.Snapshot, error) {
-	return c.inner.FindPublishedByModelCode(ctx, kind, code)
+	if c == nil || c.inner == nil {
+		return nil, domain.ErrNotFound
+	}
+	if !c.store.available() {
+		return c.inner.FindPublishedByModelCode(ctx, kind, code)
+	}
+	cacheKey := c.modelByCodeCacheKey(kind, code)
+	return c.readThrough(ctx, cacheKey, func(ctx context.Context) (*domain.Snapshot, error) {
+		snapshot, err := c.inner.FindPublishedByModelCode(ctx, kind, code)
+		if domain.IsNotFound(err) {
+			return nil, nil
+		}
+		return snapshot, err
+	})
 }
 
 func (c *CachedPublishedModelStore) FindPublishedModelByCode(ctx context.Context, kind domain.Kind, code string) (*domain.PublishedModelSnapshot, error) {
@@ -418,6 +431,26 @@ func (c *CachedPublishedModelStore) invalidateSnapshot(ctx context.Context, snap
 	if c.catalogAlgorithms != nil {
 		if err := c.catalogAlgorithms.Delete(ctx, c.algorithmsCatalogCacheKey()); err != nil {
 			logger.L(ctx).Warnw("failed to invalidate published model algorithms cache", "error", err)
+		}
+	}
+	c.invalidateCatalogListCaches(ctx)
+}
+
+func (c *CachedPublishedModelStore) invalidateCatalogListCaches(ctx context.Context) {
+	if c.catalogList == nil || !c.catalogList.available() {
+		return
+	}
+	filters := []port.ListPublishedFilter{
+		{},
+		{Page: 1, PageSize: 20},
+		{Page: 1, PageSize: 50},
+	}
+	for _, filter := range filters {
+		if err := c.catalogList.Delete(ctx, c.listCatalogCacheKey(filter)); err != nil {
+			logger.L(ctx).Warnw("failed to invalidate published model catalog list cache",
+				"key", c.listCatalogCacheKey(filter),
+				"error", err,
+			)
 		}
 	}
 }

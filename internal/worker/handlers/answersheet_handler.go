@@ -271,6 +271,13 @@ func calculateAnswerSheetScore(ctx context.Context, deps *Dependencies, answerSh
 	if err != nil {
 		return fmt.Errorf("failed to calculate answersheet score: %w", err)
 	}
+	if scoreResp == nil || !scoreResp.Success {
+		message := "unknown scoring error"
+		if scoreResp != nil && scoreResp.Message != "" {
+			message = scoreResp.Message
+		}
+		return fmt.Errorf("answersheet scoring failed: %s", message)
+	}
 	deps.Logger.Debug("answersheet scoring detail",
 		"answersheet_id", strconv.FormatUint(answerSheetID, 10),
 		"total_score", scoreResp.TotalScore,
@@ -302,6 +309,13 @@ func createAssessmentFromAnswerSheet(ctx context.Context, deps *Dependencies, an
 	assessmentResp, err := deps.InternalClient.CreateAssessmentFromAnswerSheet(ctx, assessmentReq)
 	if err != nil {
 		return fmt.Errorf("failed to create assessment from answersheet: %w", err)
+	}
+	if assessmentResp == nil || !assessmentResp.Success {
+		message := "unknown assessment creation error"
+		if assessmentResp != nil && assessmentResp.Message != "" {
+			message = assessmentResp.Message
+		}
+		return fmt.Errorf("assessment creation failed: %s", message)
 	}
 	deps.Logger.Debug("assessment creation detail",
 		"answersheet_id", strconv.FormatUint(answerSheetID, 10),

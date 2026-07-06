@@ -4,6 +4,7 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -24,7 +25,7 @@ func (p ScaleScoreProjector) Key() evaluation.EvaluatorKey {
 	return evaluation.EvaluatorKeyScaleDefault
 }
 
-func (p ScaleScoreProjector) Project(ctx context.Context, outcome Outcome) error {
+func (p ScaleScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
 	if p.scoreRepo == nil || outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
@@ -51,7 +52,7 @@ func (ScaleReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domainReport.InterpretReport, error) {
+func (b ScaleReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	if b.composer == nil {
 		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")
 	}
@@ -60,10 +61,10 @@ func (b ScaleReportBuilder) Build(ctx context.Context, outcome Outcome) (*domain
 	if err != nil {
 		return nil, err
 	}
-	return attachOutcomeSummary(outcome, rpt), nil
+	return AttachReportOutcomeSummary(outcome, rpt), nil
 }
 
-func scaleReportInputFromOutcome(outcome Outcome) reportscore.ScaleReportInput {
+func scaleReportInputFromOutcome(outcome evaloutcome.Outcome) reportscore.ScaleReportInput {
 	input := reportscore.ScaleReportInput{}
 	if outcome.Assessment != nil {
 		input.AssessmentID = domainReport.ID(outcome.Assessment.ID())
@@ -99,7 +100,7 @@ func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []repo
 	return scores
 }
 
-func scaleReportModelFromOutcome(outcome Outcome) *reportscore.ReportModel {
+func scaleReportModelFromOutcome(outcome evaloutcome.Outcome) *reportscore.ReportModel {
 	if outcome.Input == nil {
 		return nil
 	}

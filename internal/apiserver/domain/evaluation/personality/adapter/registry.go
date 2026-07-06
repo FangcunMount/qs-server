@@ -34,6 +34,8 @@ func NewRegistry(adapters ...ModelAdapter) Registry {
 	return registry
 }
 
+// DefaultRegistry returns legacy personality adapters for characterization and equivalence tests.
+// Production evaluation uses configured typology runtime, not this registry directly.
 func DefaultRegistry() Registry {
 	return NewRegistry(
 		mbtiAdapter(),

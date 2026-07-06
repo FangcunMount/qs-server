@@ -58,6 +58,20 @@ Assessment Model 负责“用什么模型规则解释答卷”：
 | 下游 | `evaluation` | 加载快照并执行测评 |
 | 下游 | `interpretation` | 使用模型身份和解释绑定生成报告 |
 
+---
+
+## 6. 端到端支持矩阵（以源码为准）
+
+| Kind / 模型族 | 发布 | Input Provider | Evaluator | Report Builder | 说明 |
+| ------------- | ---- | -------------- | --------- | -------------- | ---- |
+| `scale` | 是 | 是 | 是 | 是 | 医学量表主链路 |
+| `personality/typology`（MBTI/SBTI/BigFive/配置化） | 是 | 是 | 是 | 是 | configured runtime 主路径 |
+| `behavioral_rating` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
+| `cognitive` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
+| `custom` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
+
+legacy `adapter/{mbti,sbti,bigfive}` 仅服务表征测试，非生产执行路径。
+
 代码事实入口：
 
 - [`internal/apiserver/domain/modelcatalog`](../../../internal/apiserver/domain/modelcatalog/)

@@ -368,6 +368,7 @@ func (s *InternalService) autoSubmitAssessment(ctx context.Context, l *logger.Re
 
 func existingAssessmentResponse(assessmentID uint64) *pb.CreateAssessmentFromAnswerSheetResponse {
 	return &pb.CreateAssessmentFromAnswerSheetResponse{
+		Success:       true,
 		AssessmentId:  assessmentID,
 		Created:       false,
 		AutoSubmitted: false,
@@ -377,6 +378,7 @@ func existingAssessmentResponse(assessmentID uint64) *pb.CreateAssessmentFromAns
 
 func createdAssessmentResponse(assessmentID uint64, autoSubmitted bool) *pb.CreateAssessmentFromAnswerSheetResponse {
 	return &pb.CreateAssessmentFromAnswerSheetResponse{
+		Success:       true,
 		AssessmentId:  assessmentID,
 		Created:       true,
 		AutoSubmitted: autoSubmitted,

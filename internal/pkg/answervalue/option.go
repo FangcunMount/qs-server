@@ -70,6 +70,34 @@ func normalizeOptionMap(values map[string]any) (string, bool) {
 	return normalizeScalarOption(option)
 }
 
+// NormalizeMultiOptions unwraps checkbox payloads into option code list.
+func NormalizeMultiOptions(raw any) ([]string, bool) {
+	switch value := raw.(type) {
+	case []string:
+		out := make([]string, 0, len(value))
+		for _, item := range value {
+			trimmed := strings.TrimSpace(item)
+			if trimmed == "" {
+				continue
+			}
+			out = append(out, trimmed)
+		}
+		return out, len(out) > 0
+	case []any:
+		out := make([]string, 0, len(value))
+		for _, item := range value {
+			option, ok := NormalizeSingleOption(item)
+			if !ok {
+				return nil, false
+			}
+			out = append(out, option)
+		}
+		return out, len(out) > 0
+	default:
+		return nil, false
+	}
+}
+
 func normalizeScalarOption(raw any) (string, bool) {
 	switch value := raw.(type) {
 	case string:

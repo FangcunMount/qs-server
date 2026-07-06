@@ -1948,6 +1948,7 @@ type CreateAssessmentFromAnswerSheetResponse struct {
 	Created       bool                   `protobuf:"varint,2,opt,name=created,proto3" json:"created,omitempty"`                                  // 是否创建了测评
 	AutoSubmitted bool                   `protobuf:"varint,3,opt,name=auto_submitted,json=autoSubmitted,proto3" json:"auto_submitted,omitempty"` // 是否自动提交（关联量表时）
 	Message       string                 `protobuf:"bytes,4,opt,name=message,proto3" json:"message,omitempty"`                                   // 描述信息
+	Success       bool                   `protobuf:"varint,5,opt,name=success,proto3" json:"success,omitempty"`                                  // 业务是否成功（与 gRPC error 分离）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2008,6 +2009,13 @@ func (x *CreateAssessmentFromAnswerSheetResponse) GetMessage() string {
 		return x.Message
 	}
 	return ""
+}
+
+func (x *CreateAssessmentFromAnswerSheetResponse) GetSuccess() bool {
+	if x != nil {
+		return x.Success
+	}
+	return false
 }
 
 // 执行测评评估请求
@@ -3672,12 +3680,13 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"originType\x12\x1b\n" +
 	"\torigin_id\x18\t \x01(\tR\boriginId\x12\x17\n" +
 	"\atask_id\x18\n" +
-	" \x01(\tR\x06taskId\"\xa9\x01\n" +
+	" \x01(\tR\x06taskId\"\xc3\x01\n" +
 	"'CreateAssessmentFromAnswerSheetResponse\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\x12\x18\n" +
 	"\acreated\x18\x02 \x01(\bR\acreated\x12%\n" +
 	"\x0eauto_submitted\x18\x03 \x01(\bR\rautoSubmitted\x12\x18\n" +
-	"\amessage\x18\x04 \x01(\tR\amessage\"@\n" +
+	"\amessage\x18\x04 \x01(\tR\amessage\x12\x18\n" +
+	"\asuccess\x18\x05 \x01(\bR\asuccess\"@\n" +
 	"\x19EvaluateAssessmentRequest\x12#\n" +
 	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xdf\x01\n" +
 	"\x1aEvaluateAssessmentResponse\x12\x18\n" +

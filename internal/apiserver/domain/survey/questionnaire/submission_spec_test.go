@@ -61,6 +61,88 @@ func TestSubmissionSpecPrepareAnswersRejectsQuestionTypeMismatch(t *testing.T) {
 	}
 }
 
+func TestSubmissionSpecPrepareAnswersRejectsInvalidOptionCode(t *testing.T) {
+	t.Parallel()
+
+	qnr, err := NewQuestionnaire(meta.NewCode("QNR-2"), "Questionnaire", WithVersion(Version("1.0.0")), WithStatus(STATUS_PUBLISHED))
+	if err != nil {
+		t.Fatalf("NewQuestionnaire() error = %v", err)
+	}
+	optionA, err := NewOptionWithStringCode("A", "option A", 1)
+	if err != nil {
+		t.Fatalf("NewOption() error = %v", err)
+	}
+	question, err := NewQuestion(
+		WithCode(meta.NewCode("Q1")),
+		WithStem("Question 1"),
+		WithQuestionType(TypeRadio),
+		WithOptions([]Option{optionA}),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestion() error = %v", err)
+	}
+	if err := qnr.AddQuestion(question); err != nil {
+		t.Fatalf("AddQuestion() error = %v", err)
+	}
+	spec, err := qnr.BuildSubmissionSpec()
+	if err != nil {
+		t.Fatalf("BuildSubmissionSpec() error = %v", err)
+	}
+	if _, err := spec.PrepareAnswers([]RawSubmissionAnswer{
+		{QuestionCode: "Q1", QuestionType: TypeRadio.Value(), Value: "B"},
+	}); err == nil {
+		t.Fatal("PrepareAnswers() error = nil, want invalid option error")
+	}
+}
+
+func TestSubmissionSpecPrepareAnswersRequiresVisibleRequiredQuestion(t *testing.T) {
+	t.Parallel()
+
+	qnr, err := NewQuestionnaire(meta.NewCode("QNR-3"), "Questionnaire", WithVersion(Version("1.0.0")), WithStatus(STATUS_PUBLISHED))
+	if err != nil {
+		t.Fatalf("NewQuestionnaire() error = %v", err)
+	}
+	triggerOption, err := NewOptionWithStringCode("YES", "yes", 1)
+	if err != nil {
+		t.Fatalf("NewOption() error = %v", err)
+	}
+	trigger, err := NewQuestion(
+		WithCode(meta.NewCode("Q_TRIGGER")),
+		WithStem("Trigger"),
+		WithQuestionType(TypeRadio),
+		WithOptions([]Option{triggerOption}),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestion() error = %v", err)
+	}
+	followUp, err := NewQuestion(
+		WithCode(meta.NewCode("Q_FOLLOW")),
+		WithStem("Follow up"),
+		WithQuestionType(TypeText),
+		WithValidationRule(validation.RuleTypeRequired, "true"),
+		WithShowController(NewShowController("and", []ShowControllerCondition{
+			NewShowControllerCondition(meta.NewCode("Q_TRIGGER"), []meta.Code{meta.NewCode("YES")}),
+		})),
+	)
+	if err != nil {
+		t.Fatalf("NewQuestion() error = %v", err)
+	}
+	for _, item := range []Question{trigger, followUp} {
+		if err := qnr.AddQuestion(item); err != nil {
+			t.Fatalf("AddQuestion() error = %v", err)
+		}
+	}
+	spec, err := qnr.BuildSubmissionSpec()
+	if err != nil {
+		t.Fatalf("BuildSubmissionSpec() error = %v", err)
+	}
+	if _, err := spec.PrepareAnswers([]RawSubmissionAnswer{
+		{QuestionCode: "Q_TRIGGER", QuestionType: TypeRadio.Value(), Value: "YES"},
+	}); err == nil {
+		t.Fatal("PrepareAnswers() error = nil, want missing required visible question")
+	}
+}
+
 func mustSubmissionSpec(t *testing.T) SubmissionSpec {
 	t.Helper()
 	qnr := mustSubmissionSpecQuestionnaire(t, WithStatus(STATUS_PUBLISHED))

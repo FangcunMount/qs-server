@@ -31,6 +31,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
+	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
@@ -252,7 +253,11 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation writer: %v", err)
 		}
-		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectors)
+		var scoringSnapshotStore evaluationResult.ScoringSnapshotStore = evaluationResult.NewMemoryScoringSnapshotStore()
+		if normalized.OpsHandle != nil && normalized.OpsHandle.Client != nil {
+			scoringSnapshotStore = rediseval.NewRedisScoringSnapshotStore(normalized.OpsHandle.Client)
+		}
+		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectors, scoringSnapshotStore)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
 
 		m.EvaluationService = execute.NewService(
@@ -265,6 +270,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithScoringWriter(scoringWriter),
 			execute.WithInterpretationService(interpretationService),
+			execute.WithScoringSnapshotStore(scoringSnapshotStore),
 			execute.WithAsyncInterpretation(normalized.AsyncInterpretation),
 		)
 	}

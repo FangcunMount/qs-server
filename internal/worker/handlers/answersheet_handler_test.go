@@ -32,6 +32,10 @@ type fakeWorkerInternalClient struct {
 	projectBehaviorRequest         *pb.ProjectBehaviorEventRequest
 	projectBehaviorErr             error
 	projectBehaviorResp            *pb.ProjectBehaviorEventResponse
+	calculateScoreSuccess          bool
+	calculateScoreMessage          string
+	createSuccess                  bool
+	createMessage                  string
 }
 
 var _ InternalClient = (*fakeWorkerInternalClient)(nil)
@@ -42,11 +46,16 @@ func (f *fakeWorkerInternalClient) CreateAssessmentFromAnswerSheet(
 ) (*pb.CreateAssessmentFromAnswerSheetResponse, error) {
 	f.createCalls++
 	f.calls = append(f.calls, "create_assessment")
+	success := true
+	if f.createMessage != "" {
+		success = f.createSuccess
+	}
 	return &pb.CreateAssessmentFromAnswerSheetResponse{
+		Success:       success,
 		AssessmentId:  1001,
 		Created:       true,
 		AutoSubmitted: false,
-		Message:       "ok",
+		Message:       firstNonEmpty(f.createMessage, "ok"),
 	}, nil
 }
 
@@ -56,11 +65,24 @@ func (f *fakeWorkerInternalClient) CalculateAnswerSheetScore(
 ) (*pb.CalculateAnswerSheetScoreResponse, error) {
 	f.calculateCalls++
 	f.calls = append(f.calls, "calculate_score")
+	success := true
+	if f.calculateScoreMessage != "" {
+		success = f.calculateScoreSuccess
+	}
 	return &pb.CalculateAnswerSheetScoreResponse{
-		Success:    true,
-		Message:    "ok",
+		Success:    success,
+		Message:    firstNonEmpty(f.calculateScoreMessage, "ok"),
 		TotalScore: 42,
 	}, nil
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }
 
 func (f *fakeWorkerInternalClient) EvaluateAssessment(
@@ -356,6 +378,60 @@ func TestHandleAnswerSheetSubmitted_ReleaseErrorDoesNotFail(t *testing.T) {
 		t.Fatalf("handler returned error: %v", err)
 	}
 
+	if client.calculateCalls != 1 {
+		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
+	}
+	if client.createCalls != 1 {
+		t.Fatalf("expected 1 create call, got %d", client.createCalls)
+	}
+}
+
+func TestHandleAnswerSheetSubmitted_ScoringFailureStopsBeforeCreate(t *testing.T) {
+	client := &fakeWorkerInternalClient{
+		calculateScoreSuccess: false,
+		calculateScoreMessage: "invalid answers",
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-score-fail"}, true, nil
+		},
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
+			return nil
+		},
+	})
+
+	err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 1001))
+	if err == nil {
+		t.Fatal("expected scoring failure error")
+	}
+	if client.calculateCalls != 1 {
+		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
+	}
+	if client.createCalls != 0 {
+		t.Fatalf("expected no create call after scoring failure, got %d", client.createCalls)
+	}
+}
+
+func TestHandleAnswerSheetSubmitted_CreateFailureAfterSuccessfulScore(t *testing.T) {
+	client := &fakeWorkerInternalClient{
+		createSuccess: false,
+		createMessage: "binding not found",
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, newAnswerSheetTestRedisClient(t))
+	handler := handleAnswerSheetSubmittedWithHooks(deps, answerSheetProcessingGateHooks{
+		acquire: func(context.Context, *Dependencies, uint64) (*redisadapter.Lease, bool, error) {
+			return &redisadapter.Lease{Key: "k", Token: "token-create-fail"}, true, nil
+		},
+		release: func(context.Context, *Dependencies, uint64, *redisadapter.Lease) error {
+			return nil
+		},
+	})
+
+	err := handler(context.Background(), "answersheet.submitted", mustBuildAnswerSheetSubmittedPayload(t, 1002))
+	if err == nil {
+		t.Fatal("expected assessment creation failure error")
+	}
 	if client.calculateCalls != 1 {
 		t.Fatalf("expected 1 score call, got %d", client.calculateCalls)
 	}

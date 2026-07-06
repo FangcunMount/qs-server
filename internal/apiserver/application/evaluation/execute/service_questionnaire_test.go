@@ -337,7 +337,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
 		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if writer.calls != 1 || writer.outcome.LegacyResult() == nil || writer.outcome.LegacyResult().TotalScore != 7 {
+	if writer.calls != 1 || evaluationresult.LegacyResult(writer.outcome) == nil || evaluationresult.LegacyResult(writer.outcome).TotalScore != 7 {
 		t.Fatalf("unexpected result writer outcome: %#v", writer.outcome)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
@@ -415,7 +415,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if writer.calls != 1 || writer.outcome.LegacyResult() == nil || writer.outcome.LegacyResult().ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
+	if writer.calls != 1 || evaluationresult.LegacyResult(writer.outcome) == nil || evaluationresult.LegacyResult(writer.outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
 		t.Fatalf("unexpected writer outcome: %#v", writer.outcome)
 	}
 	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {

@@ -154,7 +154,7 @@ func TestEvaluationAssemblerWiresTransactionalReportDurableSaver(t *testing.T) {
 		t.Fatalf("read report assembler: %v", err)
 	}
 	reportText := string(reportData)
-	if !strings.Contains(reportText, "evaluationResult.NewTransactionalReportDurableSaver(") {
+	if !strings.Contains(reportText, "NewTransactionalReportDurableSaver(") {
 		t.Fatalf("report module must wire transactional report durable saver")
 	}
 }

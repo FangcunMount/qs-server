@@ -7,8 +7,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
@@ -31,8 +31,8 @@ type Module struct {
 	QueryService assessmentApp.ReportQueryService
 
 	reader          evaluationreadmodel.ReportReader
-	builderRegistry evaluationResult.ReportBuilderRegistry
-	durableSaver    evaluationResult.ReportDurableSaver
+	builderRegistry interpretationreporting.ReportBuilderRegistry
+	durableSaver    interpretationreporting.ReportDurableSaver
 	readyIndexer    *appEventing.PostCommitReadyIndexer
 	readyIndex      *outboxready.Index
 }
@@ -79,7 +79,7 @@ func New(deps Deps) (*Module, error) {
 	module.readyIndex = outboxready.NewIndex(opsClient, outboxready.StoreMongoDomainEvents)
 	module.readyIndexer = appEventing.NewPostCommitReadyIndexer(module.readyIndex)
 	mongoTxRunner := modtx.NewMongoRunner(deps.MongoDB)
-	module.durableSaver = evaluationResult.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore, module.readyIndexer)
+	module.durableSaver = interpretationreporting.NewTransactionalReportDurableSaver(mongoTxRunner, reportRepo, reportOutboxStore, module.readyIndexer)
 
 	if len(deps.ModelDescriptors) > 0 {
 		if deps.TypologyRegistry.Len() == 0 {
@@ -104,7 +104,7 @@ func (m *Module) Reader() evaluationreadmodel.ReportReader {
 }
 
 // BuilderRegistry exposes the evaluation report builder registry.
-func (m *Module) BuilderRegistry() evaluationResult.ReportBuilderRegistry {
+func (m *Module) BuilderRegistry() interpretationreporting.ReportBuilderRegistry {
 	if m == nil {
 		return nil
 	}
@@ -112,7 +112,7 @@ func (m *Module) BuilderRegistry() evaluationResult.ReportBuilderRegistry {
 }
 
 // DurableSaver exposes the transactional report write port.
-func (m *Module) DurableSaver() evaluationResult.ReportDurableSaver {
+func (m *Module) DurableSaver() interpretationreporting.ReportDurableSaver {
 	if m == nil {
 		return nil
 	}
@@ -135,7 +135,7 @@ func (m *Module) ReadyIndex() *outboxready.Index {
 	return m.readyIndex
 }
 
-func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry typologyEvaluation.ModuleRegistry) (evaluationResult.ReportBuilderRegistry, error) {
+func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry typologyEvaluation.ModuleRegistry) (interpretationreporting.ReportBuilderRegistry, error) {
 	wiringDeps := ammod.ReportWiringDeps{
 		ScaleReportBuilder: domainreport.NewDefaultInterpretReportBuilder(nil),
 		TypologyRegistry:   typologyRegistry,
@@ -144,7 +144,7 @@ func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegi
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
 	}
-	registry, err := evaluationResult.NewReportBuilderRegistry(builders...)
+	registry, err := interpretationreporting.NewReportBuilderRegistry(builders...)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize report builder registry: %v", err)
 	}

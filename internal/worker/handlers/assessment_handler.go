@@ -34,6 +34,9 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			"testee_id", data.TesteeID,
 			"questionnaire_code", data.QuestionnaireCode,
 			"answersheet_id", data.AnswerSheetID,
+			"model_kind", data.ModelKind,
+			"model_sub_kind", data.ModelSubKind,
+			"model_algorithm", data.ModelAlgorithm,
 			"scale_code", data.ScaleCode,
 			"needs_evaluation", data.NeedsEvaluation(),
 		)

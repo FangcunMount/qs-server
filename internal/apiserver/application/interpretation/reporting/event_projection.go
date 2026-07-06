@@ -1,9 +1,10 @@
-package result
+package reporting
 
 import (
 	"strconv"
 	"time"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
@@ -11,7 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-func eventOutcomeFromReport(rpt *domainreport.InterpretReport, outcome Outcome) (
+func eventOutcomeFromReport(rpt *domainreport.InterpretReport, outcome evaloutcome.Outcome) (
 	eventoutcome.ModelIdentity,
 	*eventoutcome.ScoreValue,
 	*eventoutcome.ResultLevel,
@@ -65,7 +66,7 @@ func eventLevelFrom(level *domainreport.ResultLevel) *eventoutcome.ResultLevel {
 	}
 }
 
-func buildInterpretedOutcomeEvent(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
+func buildInterpretedOutcomeEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil {
 		return nil
 	}
@@ -81,7 +82,7 @@ func buildInterpretedOutcomeEvent(outcome Outcome, rpt *domainreport.InterpretRe
 	)
 }
 
-func buildReportGeneratedOutcomeEvent(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
+func buildReportGeneratedOutcomeEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil || rpt == nil {
 		return nil
 	}
@@ -99,7 +100,7 @@ func buildReportGeneratedOutcomeEvent(outcome Outcome, rpt *domainreport.Interpr
 	)
 }
 
-func buildFootprintReportGeneratedEvent(outcome Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
+func buildFootprintReportGeneratedEvent(outcome evaloutcome.Outcome, rpt *domainreport.InterpretReport, at time.Time) event.DomainEvent {
 	if outcome.Assessment == nil || rpt == nil {
 		return nil
 	}

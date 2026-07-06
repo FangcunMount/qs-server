@@ -82,15 +82,3 @@ func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionI
 	modelRef := modelRefFromExecutionInput(input, payload)
 	return e.runner.buildOutcome(modelRef, payload, input.Input.AnswerSheet)
 }
-
-// NewLegacyTypologyAliasExecutor returns a legacy-key executor that delegates to the configured runtime.
-func NewLegacyTypologyAliasExecutor(configured *Executor, algorithm modelcatalog.Algorithm) (*Executor, error) {
-	if configured == nil || configured.runner == nil {
-		return nil, fmt.Errorf("configured typology executor is required")
-	}
-	return &Executor{
-		runner:          configured.runner,
-		key:             evaluation.PersonalityTypologyKey(algorithm),
-		legacyAlgorithm: algorithm,
-	}, nil
-}

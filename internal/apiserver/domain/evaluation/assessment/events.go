@@ -76,6 +76,12 @@ func NewAssessmentSubmittedEvent(
 	}
 	if modelRef != nil && !modelRef.IsEmpty() {
 		data.ModelKind = modelRef.Kind().String()
+		if subKind := modelRef.SubKind(); subKind != "" {
+			data.ModelSubKind = string(subKind)
+		}
+		if algorithm := modelRef.Algorithm(); algorithm != "" {
+			data.ModelAlgorithm = string(algorithm)
+		}
 		data.ModelCode = modelRef.Code().String()
 		data.ModelVersion = modelRef.Version()
 	}

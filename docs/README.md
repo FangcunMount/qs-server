@@ -48,7 +48,8 @@ Assessment Model
     Scale / MBTI / BigFive 等都是模型资产或执行插件
 
 Evaluation
-    管一次测评执行：Assessment / EvaluationRun / Result / Retry / Events
+    管一次测评执行：Assessment / Outcome / Retry / Events
+    （EvaluationRun 为演进方向，当前未实现）
 
 Interpretation Model / Report
     管解释模型、报告 builder、adapter、InterpretReport 聚合与持久化

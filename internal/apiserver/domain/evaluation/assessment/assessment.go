@@ -348,10 +348,10 @@ func (a *Assessment) ApplyEvaluation(result *EvaluationResult) error {
 }
 
 // MarkAsFailed 标记评估失败
-// 前置条件：只有 submitted 或 interpreted 状态可以标记失败
+// 前置条件：submitted、evaluated 或 interpreted 状态可以标记失败
 // 后置条件：状态变为 failed，记录失败原因，发布 AssessmentFailedEvent
 func (a *Assessment) MarkAsFailed(reason string) error {
-	if !a.status.IsSubmitted() && !a.status.IsInterpreted() {
+	if !a.status.IsSubmitted() && !a.status.IsEvaluated() && !a.status.IsInterpreted() {
 		return NewInvalidStatusError("mark as failed", a.status)
 	}
 	if reason == "" {

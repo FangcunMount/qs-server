@@ -115,7 +115,7 @@ func buildPersonalityDeps(
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: mongoLimiter}
 	v2Repo := mongoassessmentmodel.NewRepository(mongoDB, mongoOpts)
 	draftRepo := mongoassessmentmodel.NewDraftRepository(mongoDB, mongoOpts)
-	publishedRepo := mongoassessmentmodel.NewPublishedModelRepoAdapter(v2Repo)
+	publishedRepo := port.PublishedModelRepository(mongoassessmentmodel.NewPublishedModelRepoAdapter(v2Repo))
 	legacyRepo := mongoruleset.NewRepository(mongoDB, mongoOpts)
 	dualStore := modelcatalog.NewDualStore(v2Repo, legacyRepo)
 	publishedLister := port.PublishedModelLister(dualStore)
@@ -124,6 +124,7 @@ func buildPersonalityDeps(
 		cached := cache.NewCachedPublishedModelStore(dualStore, cacheCfg.Redis, cacheCfg.Builder, cacheCfg.Policy, cacheCfg.Observer)
 		publishedLister = cached
 		algorithmLister = cached
+		publishedRepo = cache.NewInvalidatingPublishedModelRepository(publishedRepo, cached)
 	}
 	return PersonalityDeps{
 		PublishedLister:          publishedLister,

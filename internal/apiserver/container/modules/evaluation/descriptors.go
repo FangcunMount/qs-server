@@ -53,6 +53,7 @@ func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDe
 }
 
 // AssertRegistryKeyParity verifies descriptor/evaluator/builder/provider key alignment.
+// ModelDescriptor slices are the single source of truth for execute/input/report registries.
 func AssertRegistryKeyParity(
 	descs []evaldomain.ModelDescriptor,
 	evaluators []execute.Evaluator,

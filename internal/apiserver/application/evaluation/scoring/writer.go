@@ -18,16 +18,19 @@ type Writer interface {
 type writer struct {
 	assessmentRepo  assessment.Repository
 	scoreProjectors evaluationresult.ScoreProjectorRegistry
+	snapshotStore   evaluationresult.ScoringSnapshotStore
 }
 
 // NewWriter creates a scoring outcome writer.
 func NewWriter(
 	assessmentRepo assessment.Repository,
 	scoreProjectors evaluationresult.ScoreProjectorRegistry,
+	snapshotStore evaluationresult.ScoringSnapshotStore,
 ) Writer {
 	return &writer{
 		assessmentRepo:  assessmentRepo,
 		scoreProjectors: scoreProjectors,
+		snapshotStore:   snapshotStore,
 	}
 }
 
@@ -54,6 +57,11 @@ func (w *writer) Write(ctx context.Context, outcome evaluationresult.Outcome) er
 			if err := projector.Project(ctx, outcome); err != nil {
 				return err
 			}
+		}
+	}
+	if w.snapshotStore != nil {
+		if err := w.snapshotStore.Save(ctx, outcome.Assessment.ID().Uint64(), outcome.Execution); err != nil {
+			return evalerrors.Database(err, "保存计分快照失败")
 		}
 	}
 	return nil

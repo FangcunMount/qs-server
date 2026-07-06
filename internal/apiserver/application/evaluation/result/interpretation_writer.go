@@ -3,7 +3,7 @@ package result
 import (
 	"context"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 )
 
 // InterpretationWriter persists reports and transitions Assessment to interpreted.
@@ -13,5 +13,5 @@ type InterpretationWriter interface {
 
 // ErrInterpretationWriterNotConfigured reports a missing interpretation writer dependency.
 func ErrInterpretationWriterNotConfigured() error {
-	return apperrors.ModuleNotConfigured("interpretation writer is not configured")
+	return interpretationreporting.ErrWriterNotConfigured()
 }

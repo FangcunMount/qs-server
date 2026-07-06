@@ -585,3 +585,27 @@ func (*grpcQRCodeServiceStub) GeneratePersonalityAssessmentQRCode(context.Contex
 }
 
 var _ surveyScaleQRCodeGenerator = (*grpcQRCodeServiceStub)(nil)
+
+func TestCreatedAssessmentResponseSetsSuccess(t *testing.T) {
+	t.Parallel()
+
+	resp := createdAssessmentResponse(42, true)
+	if resp == nil || !resp.Success {
+		t.Fatalf("createdAssessmentResponse() Success = %v, want true", resp.GetSuccess())
+	}
+	if resp.AssessmentId != 42 || !resp.Created || !resp.AutoSubmitted {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}
+
+func TestExistingAssessmentResponseSetsSuccess(t *testing.T) {
+	t.Parallel()
+
+	resp := existingAssessmentResponse(99)
+	if resp == nil || !resp.Success {
+		t.Fatalf("existingAssessmentResponse() Success = %v, want true", resp.GetSuccess())
+	}
+	if resp.AssessmentId != 99 || resp.Created || resp.AutoSubmitted {
+		t.Fatalf("unexpected response: %+v", resp)
+	}
+}

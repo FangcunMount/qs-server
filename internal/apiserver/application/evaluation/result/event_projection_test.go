@@ -36,7 +36,7 @@ func TestScaleEventAssemblerPublishesOutcomeEvents(t *testing.T) {
 		nil,
 		nil,
 	)
-	rpt = attachOutcomeSummary(outcome, rpt)
+	rpt = AttachReportOutcomeSummary(outcome, rpt)
 
 	events := (ScaleEventAssembler{}).BuildSuccessEvents(outcome, rpt)
 	if len(events) != 3 {

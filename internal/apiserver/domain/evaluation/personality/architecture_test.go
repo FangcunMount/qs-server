@@ -279,6 +279,30 @@ func TestTypologyApplicationMainPathDoesNotReferenceLegacyModules(t *testing.T) 
 	}
 }
 
+func TestContainerEvaluationWiringDoesNotUseLegacyAdapterRegistry(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	roots := []string{
+		filepath.Join(root, "internal", "apiserver", "container", "modules", "evaluation"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "execute"),
+	}
+	forbidden := []string{
+		"DefaultRegistry()",
+		"adapter.DefaultRegistry",
+		"personalityadapter.DefaultRegistry",
+	}
+	for _, dir := range roots {
+		walkGoFiles(t, dir, func(rel, text string) {
+			for _, token := range forbidden {
+				if strings.Contains(text, token) {
+					t.Fatalf("%s contains %q; production wiring must use configured runtime", rel, token)
+				}
+			}
+		})
+	}
+}
+
 func TestReportSpecResolvedAdapterKeyStaysGeneric(t *testing.T) {
 	t.Parallel()
 

@@ -315,6 +315,7 @@ message CreateAssessmentFromAnswerSheetResponse {
   bool created = 2;                  // 是否创建了测评
   bool auto_submitted = 3;           // 是否自动提交（关联量表时）
   string message = 4;                // 描述信息
+  bool success = 5;                  // 业务是否成功（与 gRPC error 分离）
 }
 
 // ==================== EvaluateAssessment ====================

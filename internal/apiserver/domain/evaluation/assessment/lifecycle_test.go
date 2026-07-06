@@ -178,6 +178,48 @@ func TestApplyEvaluationDoesNotEmitInterpretedEventAndAllowsFailover(t *testing.
 	}
 }
 
+func TestMarkAsFailedFromEvaluatedStatus(t *testing.T) {
+	a, err := NewAssessment(
+		1,
+		testee.NewID(1004),
+		NewQuestionnaireRefByCode(meta.NewCode("q-code"), "v4"),
+		NewAnswerSheetRef(meta.FromUint64(2004)),
+		NewAdhocOrigin(),
+		WithID(NewID(5003)),
+		WithMedicalScale(NewMedicalScaleRef(meta.FromUint64(3002), meta.NewCode("s-code"), "scale")),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment returned error: %v", err)
+	}
+	if err := a.Submit(); err != nil {
+		t.Fatalf("Submit returned error: %v", err)
+	}
+	modelRef := *a.EvaluationModelRef()
+	outcome := NewAssessmentOutcome(
+		modelRef,
+		ResultSummary{PrimaryLabel: "scored"},
+		EvaluationDetail{Kind: EvaluationModelKindScale},
+	)
+	outcome.Primary = &OutcomeScoreValue{Kind: OutcomeScoreKindRawTotal, Value: 12}
+	if err := a.ApplyScoringOutcome(outcome); err != nil {
+		t.Fatalf("ApplyScoringOutcome returned error: %v", err)
+	}
+	if !a.Status().IsEvaluated() {
+		t.Fatalf("expected evaluated status, got %s", a.Status())
+	}
+	a.ClearEvents()
+
+	if err := a.MarkAsFailed("report generation failed"); err != nil {
+		t.Fatalf("MarkAsFailed from evaluated returned error: %v", err)
+	}
+	if !a.Status().IsFailed() {
+		t.Fatalf("expected failed status, got %s", a.Status())
+	}
+	if len(a.Events()) != 1 || a.Events()[0].EventType() != EventTypeFailed {
+		t.Fatalf("expected failed event, got %#v", a.Events())
+	}
+}
+
 func TestWithMedicalScaleAlsoBindsScaleEvaluationModel(t *testing.T) {
 	scaleRef := NewMedicalScaleRefWithVersion(meta.FromUint64(3001), meta.NewCode("s-code"), "scale title", "2.1.0")
 	a, err := NewAssessment(

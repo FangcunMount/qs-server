@@ -43,6 +43,8 @@ type submissionQuestionSpec struct {
 	code            meta.Code
 	typ             QuestionType
 	validationRules []validation.ValidationRule
+	optionCodes     map[string]struct{}
+	showController  *ShowController
 }
 
 // SubmissionSpec 描述一个已发布问卷版本可接受的提交规格。
@@ -83,12 +85,18 @@ func (s SubmissionSpec) PrepareAnswers(rawAnswers []RawSubmissionAnswer) ([]Prep
 		if raw.QuestionType != question.typ.Value() {
 			return nil, newError(ErrorKindInvalidQuestion, "question %s type mismatch: got %s, want %s", questionCode, raw.QuestionType, question.typ.Value())
 		}
+		if err := validateOptionSelection(question, raw.Value); err != nil {
+			return nil, err
+		}
 		prepared = append(prepared, PreparedSubmissionAnswer{
 			questionCode:    question.code,
 			questionType:    question.typ,
 			value:           raw.Value,
 			validationRules: slices.Clone(question.validationRules),
 		})
+	}
+	if err := ensureVisibleRequiredQuestionsAnswered(s.questions, rawAnswers); err != nil {
+		return nil, err
 	}
 	return prepared, nil
 }
@@ -125,6 +133,8 @@ func (q *Questionnaire) BuildSubmissionSpec() (SubmissionSpec, error) {
 			code:            code,
 			typ:             question.GetType(),
 			validationRules: slices.Clone(question.GetValidationRules()),
+			optionCodes:     optionCodesFromQuestion(question),
+			showController:  showControllerFromQuestion(question),
 		}
 	}
 	return SubmissionSpec{

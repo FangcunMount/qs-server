@@ -33,6 +33,7 @@ type service struct {
 	resultWriter          evaluationresult.Writer
 	scoringWriter         evaluationscoring.Writer
 	interpretationService interpretationapp.Service
+	scoringSnapshotStore  evaluationresult.ScoringSnapshotStore
 	asyncInterpretation   bool
 	reportStatus          *reportstatus.Reporter
 }
@@ -90,6 +91,13 @@ func WithInterpretationService(svc interpretationapp.Service) ServiceOption {
 func WithAsyncInterpretation(enabled bool) ServiceOption {
 	return func(s *service) {
 		s.asyncInterpretation = enabled
+	}
+}
+
+// WithScoringSnapshotStore configures durable scoring snapshots for async report generation.
+func WithScoringSnapshotStore(store evaluationresult.ScoringSnapshotStore) ServiceOption {
+	return func(s *service) {
+		s.scoringSnapshotStore = store
 	}
 }
 
@@ -256,25 +264,46 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 		return nil
 	}
 	a := loaded.assessment
+	markReportFailed := func(reason string, err error) error {
+		s.failureFinalizer().MarkAsFailed(ctx, a, reason)
+		return err
+	}
 	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
 	if err != nil {
-		return err
+		return markReportFailed("报告生成输入解析失败: "+inputResolveFailureReason(err), err)
 	}
-	evaluatorKey := resolveEvaluatorKey(a, input)
-	evaluator, err := s.evaluators.Resolve(evaluatorKey)
-	if err != nil {
-		return err
-	}
-	evaluationOutcome, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
-	if err != nil {
-		return err
+
+	var execution *assessment.AssessmentOutcome
+	if a.Status().IsEvaluated() && s.scoringSnapshotStore != nil {
+		execution, err = s.scoringSnapshotStore.Load(ctx, assessmentID)
+		if err != nil {
+			return markReportFailed("报告生成计分快照读取失败: "+err.Error(), err)
+		}
+		if execution == nil {
+			err = evalerrors.InvalidArgument("计分快照不存在")
+			return markReportFailed(err.Error(), err)
+		}
+	} else {
+		evaluatorKey := resolveEvaluatorKey(a, input)
+		evaluator, resolveErr := s.evaluators.Resolve(evaluatorKey)
+		if resolveErr != nil {
+			return markReportFailed("报告生成执行器解析失败: "+resolveErr.Error(), resolveErr)
+		}
+		execution, err = evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
+		if err != nil {
+			return markReportFailed("报告生成计分失败: "+err.Error(), err)
+		}
 	}
 	if s.interpretationService == nil {
-		return evalerrors.ModuleNotConfigured("interpretation service is not configured")
+		err = evalerrors.ModuleNotConfigured("interpretation service is not configured")
+		return markReportFailed(err.Error(), err)
 	}
-	outcome := evaluationresult.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}
+	outcome := evaluationresult.Outcome{Assessment: a, Input: input, Execution: execution}
 	if err := s.interpretationService.GenerateAndPersist(ctx, outcome); err != nil {
-		return err
+		return markReportFailed("报告生成持久化失败: "+err.Error(), err)
+	}
+	if s.scoringSnapshotStore != nil {
+		_ = s.scoringSnapshotStore.Delete(ctx, assessmentID)
 	}
 	l.Infow("报告生成完成",
 		"action", "generate_report",

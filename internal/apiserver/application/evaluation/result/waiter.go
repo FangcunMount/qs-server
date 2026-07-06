@@ -9,10 +9,6 @@ import (
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 )
 
-type CompletionNotifier interface {
-	NotifyCompletion(ctx context.Context, outcome Outcome)
-}
-
 type waiterCompletionNotifier struct {
 	waiterRegistry evaluationwaiter.Notifier
 }

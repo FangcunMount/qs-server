@@ -1,8 +1,10 @@
-package result
+package reporting_test
 
 import (
 	"testing"
 
+	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -10,7 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-func TestModelIdentityFromOutcomeMapsLegacyMBTIToPersonalityTypology(t *testing.T) {
+func TestAttachReportOutcomeSummaryMapsLegacyMBTIToPersonalityTypology(t *testing.T) {
 	modelRef := assessment.NewEvaluationModelRefWithIdentity(
 		assessment.EvaluationModelKindPersonality,
 		modelcatalog.SubKindTypology,
@@ -20,7 +22,7 @@ func TestModelIdentityFromOutcomeMapsLegacyMBTIToPersonalityTypology(t *testing.
 		"1.0.0",
 		"MBTI",
 	)
-	outcome := NewOutcomeFromLegacyResult(nil, nil, &assessment.EvaluationResult{
+	o := evaluationresult.NewOutcomeFromLegacyResult(nil, nil, &assessment.EvaluationResult{
 		ModelRef: modelRef,
 		Summary:  assessment.ResultSummary{PrimaryLabel: "INTJ"},
 		Detail: assessment.EvaluationDetail{
@@ -31,25 +33,36 @@ func TestModelIdentityFromOutcomeMapsLegacyMBTIToPersonalityTypology(t *testing.
 			},
 		},
 	})
-	outcome.Execution.Primary = &assessment.OutcomeScoreValue{
+	o.Execution.Primary = &assessment.OutcomeScoreValue{
 		Kind:  assessment.OutcomeScoreKindMatchPercent,
 		Value: 40,
 		Label: "INTJ",
 	}
-	outcome.Execution.Level = &assessment.OutcomeResultLevel{
+	o.Execution.Level = &assessment.OutcomeResultLevel{
 		Code:     "INTJ",
 		Label:    "INTJ",
 		Severity: "none",
 	}
-	identity := modelIdentityFromOutcome(outcome)
-	if identity.Kind != "personality" || identity.SubKind != "typology" || identity.Algorithm != "mbti" {
-		t.Fatalf("identity = %#v", identity)
+	rpt := reporting.AttachReportOutcomeSummary(o, domainreport.NewInterpretReport(
+		domainreport.ID(1),
+		"MBTI",
+		"MBTI_TEST",
+		40,
+		domainreport.RiskLevelNone,
+		"INTJ",
+		nil,
+		nil,
+		nil,
+	))
+	model := rpt.Model()
+	if model.Kind != "personality" || model.SubKind != "typology" || model.Algorithm != "mbti" {
+		t.Fatalf("model = %#v", model)
 	}
-	primary := primaryScoreFromOutcome(outcome)
+	primary := rpt.PrimaryScore()
 	if primary == nil || primary.Kind != domainreport.ScoreKindMatchPercent || primary.Value != 40 {
 		t.Fatalf("primary = %#v", primary)
 	}
-	level := levelFromOutcome(outcome)
+	level := rpt.Level()
 	if level == nil || level.Code != "INTJ" {
 		t.Fatalf("level = %#v", level)
 	}

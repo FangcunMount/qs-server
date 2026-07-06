@@ -147,7 +147,6 @@ sequenceDiagram
     participant MQ as NSQ / MQ
     participant Worker as qs-worker
     participant Eval as Evaluation Engine
-    participant Provider as Interpretation Provider
     participant Report as Report Writer
 
     Client->>Collection: Submit AnswerSheet
@@ -159,39 +158,32 @@ sequenceDiagram
 
     Outbox->>MQ: publish answersheet.submitted
     MQ->>Worker: consume answersheet.submitted
+    Worker->>API: internal gRPC CalculateAnswerSheetScore
     Worker->>API: internal gRPC CreateAssessmentFromAnswerSheet
-    API->>Eval: create Assessment
-    Eval->>API: stage assessment.created
+    API->>Eval: create Assessment + auto submit
+    Eval->>API: stage assessment.submitted
 
-    Outbox->>MQ: publish assessment.created
-    MQ->>Worker: consume assessment.created
-    Worker->>API: internal gRPC CompleteAssessment
-    Eval->>API: stage assessment.completed
+    Outbox->>MQ: publish assessment.submitted
+    MQ->>Worker: consume assessment.submitted
+    Worker->>API: internal gRPC EvaluateAssessment
+    API->>Eval: resolve ModelRef + EvaluatorKey
+    Eval->>Eval: Execute evaluator + build report
+    Eval->>Report: Save InterpretReport
+    Eval->>API: stage assessment.evaluated or assessment.interpreted
+    Eval->>API: stage report.generated
 
-    Outbox->>MQ: publish assessment.completed
-    MQ->>Worker: consume assessment.completed
-    Worker->>API: internal gRPC CompleteInterpretation
-    API->>Eval: resolve ModelRef
-    Eval->>Provider: LoadContext + Evaluate
-    Provider-->>Eval: EvaluationResult
-    Eval->>API: stage interpretation.completed / interpretation.failed
-
-    Outbox->>MQ: publish interpretation.completed
-    MQ->>Worker: consume interpretation.completed
-    Worker->>API: internal gRPC GenerateReportFromInterpretation
-    API->>Report: Save InterpretReport
-    Report->>API: stage report.generated
+    Note over Eval,Report: 异步模式(EVALUATION_ASYNC_INTERPRETATION=1)时<br/>Evaluate 先 stage assessment.evaluated<br/>worker 再调 GenerateReportFromAssessment
 ```
 
 这条链路的设计原则：
 
 ```text
 同步保存 AnswerSheet 作答事实
-异步推进 Assessment / Interpretation / Report
+异步推进 Assessment / Evaluation / Report
 Outbox 保证关键事件可靠出站
 Worker 只做异步驱动
 apiserver 保持主业务状态机和持久化边界
-Evaluation Engine 通过 ModelRef / Provider / Context 支撑多解释模型扩展
+Evaluation Engine 通过 ModelRef / EvaluatorKey / InputResolver 支撑多模型扩展
 ```
 
 ---
@@ -203,9 +195,9 @@ flowchart LR
     Actor["Actor<br/>Testee / Clinician / Operator"]
     Plan["Plan<br/>任务编排"]
     Survey["Survey<br/>Questionnaire / AnswerSheet"]
-    IM["Interpretation Model<br/>ModelRef / Provider / Context / Registry"]
+    IM["Interpretation Model<br/>ModelRef / ReportBuilder / Registry"]
     Models["Concrete Models<br/>Scale / MBTI / BigFive"]
-    Evaluation["Evaluation<br/>Assessment / Run / Result / Report"]
+    Evaluation["Evaluation<br/>Assessment / Outcome / Report"]
     Statistics["Statistics<br/>ReadModel / Projection"]
 
     Actor --> Survey
@@ -221,9 +213,9 @@ flowchart LR
 | 限界上下文 | 负责 |
 | ---------- | ---- |
 | `Survey` | 问卷模板、题目、选项、提交规格、答案校验、答卷提交、答卷事件 |
-| `Interpretation Model` | ModelRef、Provider、Context、Registry、Provider contract、Context loading contract |
+| `Interpretation Model` | ModelRef、ReportBuilder、Registry；报告投影与持久化 |
 | `Concrete Models` | Scale、MBTI、BigFive 等具体解释模型的规则资产和发布版本 |
-| `Evaluation` | Assessment 状态机、EvaluationRun、EvaluationResult、InterpretReport、失败重试、测评事件 |
+| `Evaluation` | Assessment 状态机、Evaluator 路由、AssessmentOutcome、InterpretReport、失败重试、测评事件 |
 | `Actor` | 受试者、医生、操作员、入口、IAM 关系投影 |
 | `Plan` | 测评计划、任务状态机、调度与通知事件 |
 | `Statistics` | 读侧统计聚合、行为投影、同步重建、查询缓存 |
@@ -233,7 +225,7 @@ flowchart LR
 ```text
 AnswerSheet 是用户提交的作答事实；
 Assessment 是系统基于 AnswerSheet 和 ModelRef 创建的一次测评执行实例；
-EvaluationResult 是 Provider 执行后的结构化结果；
+AssessmentOutcome 是 Evaluator 执行后的结构化结果；
 InterpretReport 是最终可交付的报告事实。
 ```
 
@@ -252,15 +244,24 @@ Worker 管消费处理
 业务状态机管幂等
 ```
 
-新版主事件链路：
+新版主事件链路（以 `configs/events.yaml` 为准）：
 
 ```text
 answersheet.submitted
-  -> assessment.created
-  -> assessment.completed
-  -> interpretation.completed / interpretation.failed
+  -> assessment.submitted
+  -> assessment.evaluated（异步解读阶段，可选）
+  -> assessment.interpreted / assessment.failed
   -> report.generated
 ```
+
+历史/目标事件名（演进文档中可能出现，**当前代码未使用**）：
+
+| 历史/目标名 | 当前正式事件 |
+| ----------- | ------------ |
+| `assessment.created` | `assessment.submitted` |
+| `assessment.completed` | （无独立事件） |
+| `interpretation.completed` | `assessment.interpreted` |
+| `interpretation.failed` | `assessment.failed` |
 
 关键边界：
 
@@ -268,8 +269,8 @@ answersheet.submitted
 - Outbox 负责业务数据库与消息出站之间的一致性。
 - Worker 消费不承诺 exactly-once，业务侧必须幂等。
 - `configs/events.yaml` 是事件类型、topic、delivery class 和 handler 的契约入口。
-- `interpretation-model.changed` 是规则变化事件，不等于某次 Assessment 的解释完成事件。
-- `interpretation.completed` 表示 Provider 执行完成，不等于报告已经生成。
+- `scale.changed` / `questionnaire.changed` 是模型/问卷资产变化事件，不等于某次 Assessment 的执行完成。
+- `assessment.interpreted` 表示解读完成且 outcome 已投影；`report.generated` 表示报告已持久化。
 
 ---
 
@@ -580,7 +581,10 @@ make docs-verify       # REST 契约与文档卫生组合校验
 | 完整 ACL | 有 service identity / mTLS / ACL seam，完整策略仍需完善 |
 | 固定 QPS | 没有压测报告前不承诺固定数字 |
 | 微服务 | 当前更准确是三进程协作，不是完整微服务 |
-| MBTIProvider 完整落地 | 以当前源码事实为准；未完整闭环时只能讲成演进方向 |
+| MBTI/SBTI/BigFive 人格模型 | 已通过 configured typology runtime 接入主链路；legacy adapter 仅作表征测试 |
+| EvaluationRun | 演进方向，当前代码未实现执行尝试记录 |
+| Provider(LoadContext+Evaluate) 统一契约 | 演进方向；当前实现为 Evaluator.Execute + InputResolver.Resolve + ReportBuilder.Build |
+| behavior/cognitive/custom 模型族 | 仅 domain enum 与 UI 占位，runtime 未 materialize |
 | AI 解读 | 未来增强方向，不是当前基础报告主链路 |
 
 ---

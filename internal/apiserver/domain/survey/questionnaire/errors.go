@@ -17,6 +17,7 @@ const (
 	ErrorKindQuestionNotFound ErrorKind = "question_not_found"
 	ErrorKindArchived         ErrorKind = "archived"
 	ErrorKindInvalidStatus    ErrorKind = "invalid_status"
+	ErrorKindInvalidAnswer    ErrorKind = "invalid_answer"
 	ErrorKindOptionEmpty      ErrorKind = "option_empty"
 )
 

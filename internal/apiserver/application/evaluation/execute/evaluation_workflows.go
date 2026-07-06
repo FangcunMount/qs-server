@@ -101,7 +101,7 @@ func (l assessmentLoader) LoadForInterpretation(ctx context.Context, assessmentI
 	if !a.Status().IsEvaluated() {
 		return nil, evalerrors.AssessmentInvalidStatus("测评尚未计分，无法生成报告")
 	}
-	if !a.NeedsEvaluation() {
+	if !a.HasEvaluationModel() {
 		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
 	}
 	return &loadedAssessment{assessment: a}, nil

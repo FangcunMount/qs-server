@@ -1,22 +1,16 @@
 package result
 
 import (
-	"context"
-
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-type Outcome struct {
-	Assessment *assessment.Assessment
-	Input      *evaluationinput.InputSnapshot
-	Execution  *assessment.AssessmentOutcome
-}
+type Outcome = evaloutcome.Outcome
 
 // LegacyResult projects the canonical outcome into the legacy write model.
-func (o Outcome) LegacyResult() *assessment.EvaluationResult {
+func LegacyResult(o Outcome) *assessment.EvaluationResult {
 	return legacyResultForPersistence(o)
 }
 
@@ -29,17 +23,24 @@ func NewOutcomeFromLegacyResult(a *assessment.Assessment, input *evaluationinput
 	}
 }
 
-type Writer interface {
-	Write(ctx context.Context, outcome Outcome) error
-}
+type Writer = interpretationreporting.Writer
 
-type ScoreProjector interface {
-	Key() evaluation.EvaluatorKey
-	Project(ctx context.Context, outcome Outcome) error
-}
+type ScoreProjector = interpretationreporting.ScoreProjector
 
-type ReportBuilder interface {
-	Key() evaluation.EvaluatorKey
-	ReportType() domainReport.ReportType
-	Build(ctx context.Context, outcome Outcome) (*domainReport.InterpretReport, error)
-}
+type ScoreProjectorRegistry = interpretationreporting.ScoreProjectorRegistry
+
+type ReportBuilder = interpretationreporting.ReportBuilder
+
+type ReportBuilderRegistry = interpretationreporting.ReportBuilderRegistry
+
+type ReportDurableSaver = interpretationreporting.ReportDurableSaver
+
+type ReportDurableWriter = interpretationreporting.ReportDurableWriter
+
+type ReportEventStager = interpretationreporting.ReportEventStager
+
+type EventAssembler = interpretationreporting.EventAssembler
+
+type EventAssemblerRegistry = interpretationreporting.EventAssemblerRegistry
+
+type CompletionNotifier = interpretationreporting.CompletionNotifier
