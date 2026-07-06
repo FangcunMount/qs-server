@@ -7,6 +7,7 @@ const (
 	AnswerSheetSubmitted = "answersheet.submitted"
 
 	AssessmentSubmitted          = "assessment.submitted"
+	AssessmentEvaluated          = "assessment.evaluated"
 	AssessmentInterpreted        = "assessment.interpreted"
 	AssessmentInterpretedOutcome = AssessmentInterpreted
 	AssessmentFailed             = "assessment.failed"
@@ -41,6 +42,7 @@ func EventTypes() []string {
 		QuestionnaireChanged,
 		AnswerSheetSubmitted,
 		AssessmentSubmitted,
+		AssessmentEvaluated,
 		AssessmentInterpreted,
 		AssessmentFailed,
 		ReportGenerated,

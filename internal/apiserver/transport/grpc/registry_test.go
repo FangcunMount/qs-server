@@ -3,7 +3,7 @@ package grpc
 import (
 	"testing"
 
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 	answerSheetApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/answersheet"
 	appQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 )

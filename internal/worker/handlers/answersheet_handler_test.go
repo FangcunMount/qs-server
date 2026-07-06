@@ -22,6 +22,7 @@ import (
 type fakeWorkerInternalClient struct {
 	calculateCalls                 int
 	createCalls                    int
+	generateReportCalls            int
 	calls                          []string
 	syncAssessmentAttentionCalls   int
 	syncAssessmentAttentionRequest *pb.SyncAssessmentAttentionRequest
@@ -67,6 +68,15 @@ func (f *fakeWorkerInternalClient) EvaluateAssessment(
 	_ uint64,
 ) (*pb.EvaluateAssessmentResponse, error) {
 	return &pb.EvaluateAssessmentResponse{}, nil
+}
+
+func (f *fakeWorkerInternalClient) GenerateReportFromAssessment(
+	_ context.Context,
+	_ uint64,
+) (*pb.GenerateReportFromAssessmentResponse, error) {
+	f.generateReportCalls++
+	f.calls = append(f.calls, "generate_report")
+	return &pb.GenerateReportFromAssessmentResponse{Success: true}, nil
 }
 
 func (f *fakeWorkerInternalClient) SyncAssessmentAttention(

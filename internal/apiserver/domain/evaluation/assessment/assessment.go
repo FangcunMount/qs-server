@@ -256,10 +256,52 @@ func (a *Assessment) Submit() error {
 	return nil
 }
 
+// ApplyScoringOutcome 应用计分结果并将状态迁移为 evaluated。
+func (a *Assessment) ApplyScoringOutcome(outcome *AssessmentOutcome) error {
+	if !a.status.CanApplyScoring() {
+		return NewInvalidStatusError("apply scoring", a.status)
+	}
+	if !a.HasEvaluationModel() {
+		return ErrNoEvaluationModel
+	}
+	if outcome == nil {
+		return ErrInvalidArgument
+	}
+	modelRef := outcome.ModelRef
+	if modelRef.IsEmpty() {
+		modelRef = *a.modelRef
+		outcome.ModelRef = modelRef
+	} else if !a.modelRef.SameIdentity(modelRef) {
+		return ErrEvaluationModelMismatch
+	}
+	if outcome.Primary != nil {
+		score := outcome.Primary.Value
+		a.totalScore = &score
+	}
+	if outcome.Level != nil && IsRiskLevelCode(outcome.Level.Code) {
+		risk := RiskLevel(outcome.Level.Code)
+		a.riskLevel = &risk
+	}
+	summary := outcome.Summary
+	a.summary = &summary
+	a.status = StatusEvaluated
+	return nil
+}
+
+// StageEvaluatedEvent records that scoring completed and report generation should follow.
+func (a *Assessment) StageEvaluatedEvent(evaluatedAt time.Time) {
+	a.addEvent(NewAssessmentEvaluatedEvent(
+		a.orgID,
+		a.id,
+		a.testeeRef,
+		evaluatedAt,
+	))
+}
+
 // ApplyOutcome 应用 canonical 评估结果。
-// 前置条件：只有 submitted 状态可以应用评估结果，且必须绑定了解释模型。
+// 前置条件：submitted 或 evaluated 状态可以应用完整解读结果，且必须绑定了解释模型。
 func (a *Assessment) ApplyOutcome(outcome *AssessmentOutcome) error {
-	if !a.status.IsSubmitted() {
+	if !a.status.CanApplyInterpretation() {
 		return NewInvalidStatusError("apply evaluation", a.status)
 	}
 	if !a.HasEvaluationModel() {

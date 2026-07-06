@@ -46,12 +46,12 @@ func TestV1ExecuteServiceDispatchesScaleByEvaluatorKey(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d, want 1", writer.calls)
 	}
-	result := writer.outcome.LegacyResult()
+	result := writer.outcome.Execution
 	if result == nil {
-		t.Fatal("expected evaluation result")
+		t.Fatal("expected assessment outcome")
 	}
-	if result.TotalScore != 5 || result.RiskLevel != assessment.RiskLevelLow {
-		t.Fatalf("result = score:%.1f risk:%s, want 5/low", result.TotalScore, result.RiskLevel)
+	if result.Primary == nil || result.Primary.Value != 5 || result.Level == nil || result.Level.Code != string(assessment.RiskLevelLow) {
+		t.Fatalf("outcome = primary:%v level:%v, want 5/low", result.Primary, result.Level)
 	}
 	if input.lastRef.ModelRef.Kind != "scale" || input.lastRef.ModelRef.Code != "S-001" {
 		t.Fatalf("input ref = %#v", input.lastRef)
@@ -77,9 +77,9 @@ func TestV1ExecuteServiceDispatchesMBTIByLegacyKind(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d, want 1", writer.calls)
 	}
-	result := writer.outcome.LegacyResult()
+	result := writer.outcome.Execution
 	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("model kind = %s, want mbti", result.ModelRef.Kind())
+		t.Fatalf("model kind = %s, want personality", result.ModelRef.Kind())
 	}
 	if result.Summary.PrimaryLabel != "INTJ" {
 		t.Fatalf("PrimaryLabel = %q, want INTJ", result.Summary.PrimaryLabel)
@@ -105,9 +105,9 @@ func TestV1ExecuteServiceDispatchesSBTIByLegacyKind(t *testing.T) {
 	if writer.calls != 1 {
 		t.Fatalf("writer calls = %d, want 1", writer.calls)
 	}
-	result := writer.outcome.LegacyResult()
+	result := writer.outcome.Execution
 	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
-		t.Fatalf("model kind = %s, want sbti", result.ModelRef.Kind())
+		t.Fatalf("model kind = %s, want personality", result.ModelRef.Kind())
 	}
 	if result.Summary.PrimaryLabel != "HIGH" {
 		t.Fatalf("PrimaryLabel = %q, want HIGH", result.Summary.PrimaryLabel)

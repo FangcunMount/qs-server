@@ -23,6 +23,9 @@ type Service interface {
 	// Evaluate 执行评估
 	Evaluate(ctx context.Context, assessmentID uint64) error
 
+	// GenerateReport 基于已计分结果生成报告（异步解读阶段）
+	GenerateReport(ctx context.Context, assessmentID uint64) error
+
 	// EvaluateBatch 批量评估
 	EvaluateBatch(ctx context.Context, orgID int64, assessmentIDs []uint64) (*BatchResult, error)
 }

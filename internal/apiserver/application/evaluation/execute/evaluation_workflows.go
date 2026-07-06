@@ -84,6 +84,29 @@ func (l assessmentLoader) LoadForEvaluation(ctx context.Context, assessmentID ui
 	return &loadedAssessment{assessment: a}, nil
 }
 
+// LoadForInterpretation loads an assessment ready for report generation.
+func (l assessmentLoader) LoadForInterpretation(ctx context.Context, assessmentID uint64) (*loadedAssessment, error) {
+	log := logger.L(ctx)
+	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))
+	if err != nil {
+		return nil, evalerrors.AssessmentNotFound(err, "测评不存在")
+	}
+	if a.Status().IsInterpreted() {
+		log.Infow("测评已解读，跳过重复报告生成",
+			"assessment_id", assessmentID,
+			"status", a.Status().String(),
+		)
+		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
+	}
+	if !a.Status().IsEvaluated() {
+		return nil, evalerrors.AssessmentInvalidStatus("测评尚未计分，无法生成报告")
+	}
+	if !a.NeedsEvaluation() {
+		return &loadedAssessment{assessment: a, skipEvaluation: true}, nil
+	}
+	return &loadedAssessment{assessment: a}, nil
+}
+
 // EnsureAssessmentInOrg 确保评估数据属于当前机构
 func (l assessmentLoader) EnsureAssessmentInOrg(ctx context.Context, orgID int64, assessmentID uint64) error {
 	a, err := l.repo.FindByID(ctx, meta.FromUint64(assessmentID))

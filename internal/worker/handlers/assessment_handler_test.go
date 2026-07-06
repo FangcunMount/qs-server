@@ -11,6 +11,90 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
 )
 
+func TestHandleAssessmentSubmittedFailsWhenInternalClientMissing(t *testing.T) {
+	deps := newAnswerSheetHandlerTestDeps(nil, nil)
+	handler := handleAssessmentSubmitted(deps)
+
+	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
+	if err == nil {
+		t.Fatal("expected error when internal client is missing")
+	}
+}
+
+func TestHandleAssessmentEvaluatedFailsWhenInternalClientMissing(t *testing.T) {
+	deps := newAnswerSheetHandlerTestDeps(nil, nil)
+	handler := handleAssessmentEvaluated(deps)
+
+	err := handler(context.Background(), "assessment.evaluated", mustBuildAssessmentEvaluatedPayload(t, 42))
+	if err == nil {
+		t.Fatal("expected error when internal client is missing")
+	}
+}
+
+func TestHandleAssessmentEvaluatedCallsGenerateReport(t *testing.T) {
+	client := &assessmentGenerateReportClient{
+		resp: &pb.GenerateReportFromAssessmentResponse{Success: true, Status: "interpreted"},
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentEvaluated(deps)
+
+	if err := handler(context.Background(), "assessment.evaluated", mustBuildAssessmentEvaluatedPayload(t, 42)); err != nil {
+		t.Fatalf("handler: %v", err)
+	}
+	if client.generateReportCalls != 1 {
+		t.Fatalf("generate report calls = %d, want 1", client.generateReportCalls)
+	}
+}
+
+func TestHandleAssessmentEvaluatedRejectsNegativeAssessmentID(t *testing.T) {
+	client := &fakeWorkerInternalClient{}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentEvaluated(deps)
+
+	err := handler(context.Background(), "assessment.evaluated", mustBuildAssessmentEvaluatedPayload(t, -1))
+	if err == nil {
+		t.Fatal("expected negative assessment id to be rejected")
+	}
+}
+
+type assessmentGenerateReportClient struct {
+	fakeWorkerInternalClient
+	resp                *pb.GenerateReportFromAssessmentResponse
+	err                 error
+	generateReportCalls int
+}
+
+func (c *assessmentGenerateReportClient) GenerateReportFromAssessment(
+	_ context.Context,
+	_ uint64,
+) (*pb.GenerateReportFromAssessmentResponse, error) {
+	c.generateReportCalls++
+	return c.resp, c.err
+}
+
+func mustBuildAssessmentEvaluatedPayload(t *testing.T, assessmentID int64) []byte {
+	t.Helper()
+
+	now := time.Date(2026, 4, 15, 10, 0, 0, 0, time.UTC)
+	payload, err := json.Marshal(map[string]any{
+		"id":            "evt-assessment-evaluated",
+		"eventType":     "assessment.evaluated",
+		"occurredAt":    now,
+		"aggregateType": "Assessment",
+		"aggregateID":   "agg-evaluated",
+		"data": map[string]any{
+			"org_id":        18,
+			"assessment_id": assessmentID,
+			"testee_id":     99,
+			"evaluated_at":  now,
+		},
+	})
+	if err != nil {
+		t.Fatalf("marshal payload: %v", err)
+	}
+	return payload
+}
+
 func TestHandleAssessmentSubmittedRejectsNegativeAssessmentID(t *testing.T) {
 	client := &fakeWorkerInternalClient{}
 	deps := newAnswerSheetHandlerTestDeps(client, nil)

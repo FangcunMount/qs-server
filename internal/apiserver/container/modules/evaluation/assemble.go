@@ -2,6 +2,7 @@ package evaluation
 
 import (
 	"context"
+	"os"
 
 	"go.mongodb.org/mongo-driver/mongo"
 	"gorm.io/gorm"
@@ -13,7 +14,9 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+		evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+		evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+		interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
@@ -99,6 +102,7 @@ type Deps struct {
 	ReportBuilderRegistry                       evaluationResult.ReportBuilderRegistry
 	ReportDurableSaver                          evaluationResult.ReportDurableSaver
 	PublishedModelReader                        rulesetport.PublishedModelReader
+	AsyncInterpretation                         bool
 }
 
 // New assembles the evaluation module.
@@ -237,6 +241,19 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation result writer: %v", err)
 		}
+		interpretationWriter, err := evaluationResult.NewInterpretationWriter(
+			infra.assessmentRepo,
+			scoreProjectors,
+			normalized.ReportBuilderRegistry,
+			normalized.ReportDurableSaver,
+			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
+			reportStatusReporter,
+		)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation writer: %v", err)
+		}
+		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectors)
+		interpretationService := interpretationapp.NewService(interpretationWriter)
 
 		m.EvaluationService = execute.NewService(
 			infra.assessmentRepo,
@@ -246,6 +263,9 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
 			execute.WithReportStatusReporter(reportStatusReporter),
+			execute.WithScoringWriter(scoringWriter),
+			execute.WithInterpretationService(interpretationService),
+			execute.WithAsyncInterpretation(normalized.AsyncInterpretation),
 		)
 	}
 	return nil
@@ -344,7 +364,19 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	if deps.ReportReader == nil {
 		return Deps{}, errors.WithCode(code.ErrModuleInitializationFailed, "report reader is required")
 	}
+	if !deps.AsyncInterpretation && asyncInterpretationFromEnv() {
+		deps.AsyncInterpretation = true
+	}
 	return deps, nil
+}
+
+func asyncInterpretationFromEnv() bool {
+	switch os.Getenv("EVALUATION_ASYNC_INTERPRETATION") {
+	case "1", "true", "TRUE", "yes", "YES":
+		return true
+	default:
+		return false
+	}
 }
 
 // Cleanup releases module resources.

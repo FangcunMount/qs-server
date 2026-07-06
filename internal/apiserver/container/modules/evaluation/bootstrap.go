@@ -54,6 +54,7 @@ type BootstrapInput struct {
 	ReportBuilderRegistry                       evaluationResult.ReportBuilderRegistry
 	ReportDurableSaver                          evaluationResult.ReportDurableSaver
 	PublishedModelReader                        rulesetport.PublishedModelReader
+	AsyncInterpretation                         bool
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

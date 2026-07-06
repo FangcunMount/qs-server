@@ -8,7 +8,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/scale"
-	appScale "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	appScale "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 )
 
 // ScaleService 量表 gRPC 服务 - C端接口

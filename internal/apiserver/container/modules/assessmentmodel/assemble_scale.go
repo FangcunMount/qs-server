@@ -6,8 +6,8 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/component-base/pkg/errors"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
-	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
+	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"

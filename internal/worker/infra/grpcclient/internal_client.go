@@ -58,6 +58,23 @@ func (c *InternalClient) EvaluateAssessment(
 	return resp, nil
 }
 
+// GenerateReportFromAssessment 生成测评报告
+func (c *InternalClient) GenerateReportFromAssessment(
+	ctx context.Context,
+	assessmentID uint64,
+) (*pb.GenerateReportFromAssessmentResponse, error) {
+	ctx, cancel := context.WithTimeout(ctx, c.manager.Timeout())
+	defer cancel()
+
+	resp, err := c.client.GenerateReportFromAssessment(ctx, &pb.GenerateReportFromAssessmentRequest{
+		AssessmentId: assessmentID,
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate report from assessment: %w", err)
+	}
+	return resp, nil
+}
+
 // CalculateAnswerSheetScore 计算答卷分数
 func (c *InternalClient) CalculateAnswerSheetScore(
 	ctx context.Context,

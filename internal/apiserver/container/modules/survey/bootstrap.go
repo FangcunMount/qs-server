@@ -5,7 +5,7 @@ import (
 
 	redis "github.com/redis/go-redis/v9"
 
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey/questionnaire"

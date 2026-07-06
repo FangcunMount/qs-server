@@ -8,12 +8,20 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 )
 
-func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleInterpretationInput) (*ScaleInterpretationResult, error) {
+func (e *Evaluator) runScoring(ctx context.Context, input ScaleInterpretationInput) ([]ScaleFactorScore, float64, RiskLevel, error) {
 	factorScores, totalScore, err := e.calculateScores(ctx, input)
+	if err != nil {
+		return nil, 0, "", err
+	}
+	factorScores, riskLevel := e.classifyRisk(input.Scale, factorScores)
+	return factorScores, totalScore, riskLevel, nil
+}
+
+func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleInterpretationInput) (*ScaleInterpretationResult, error) {
+	factorScores, totalScore, riskLevel, err := e.runScoring(ctx, input)
 	if err != nil {
 		return nil, err
 	}
-	factorScores, riskLevel := e.classifyRisk(input.Scale, factorScores)
 	factorScores, conclusion, suggestion := e.interpret(input.Scale, factorScores, totalScore, riskLevel)
 
 	return &ScaleInterpretationResult{

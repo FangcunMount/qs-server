@@ -32,6 +32,9 @@ const (
 	// StatusSubmitted 已提交：答卷已提交，等待评估
 	StatusSubmitted Status = "submitted"
 
+	// StatusEvaluated 已计分：结构化计分完成，等待报告生成
+	StatusEvaluated Status = "evaluated"
+
 	// StatusInterpreted 已解读：评估完成，报告已生成
 	StatusInterpreted Status = "interpreted"
 
@@ -51,6 +54,8 @@ func (s Status) DisplayName() string {
 		return "待处理"
 	case StatusSubmitted:
 		return "已提交"
+	case StatusEvaluated:
+		return "已计分"
 	case StatusInterpreted:
 		return "已解读"
 	case StatusFailed:
@@ -63,7 +68,7 @@ func (s Status) DisplayName() string {
 // IsValid 检查状态是否有效
 func (s Status) IsValid() bool {
 	switch s {
-	case StatusPending, StatusSubmitted, StatusInterpreted, StatusFailed:
+	case StatusPending, StatusSubmitted, StatusEvaluated, StatusInterpreted, StatusFailed:
 		return true
 	default:
 		return false
@@ -80,6 +85,11 @@ func (s Status) IsSubmitted() bool {
 	return s == StatusSubmitted
 }
 
+// IsEvaluated 是否已计分状态
+func (s Status) IsEvaluated() bool {
+	return s == StatusEvaluated
+}
+
 // IsInterpreted 是否已解读状态
 func (s Status) IsInterpreted() bool {
 	return s == StatusInterpreted
@@ -93,6 +103,16 @@ func (s Status) IsFailed() bool {
 // IsTerminal 是否终态（不可再迁移）
 func (s Status) IsTerminal() bool {
 	return s == StatusInterpreted || s == StatusFailed
+}
+
+// CanApplyScoring 是否可应用计分结果
+func (s Status) CanApplyScoring() bool {
+	return s == StatusSubmitted
+}
+
+// CanApplyInterpretation 是否可应用解读结果并生成报告
+func (s Status) CanApplyInterpretation() bool {
+	return s == StatusSubmitted || s == StatusEvaluated
 }
 
 // ==================== 测评来源类型枚举 ====================
@@ -185,7 +205,7 @@ const (
 	EvaluationModelKindPersonality EvaluationModelKind = assessmentmodel.KindPersonality
 )
 
-// EvaluationModelRef 表示本次 Assessment 要使用的测评模型。
+// EvaluationModelRef 表示执行期模型引用（含计分与解读规则快照）。
 type EvaluationModelRef struct {
 	id        meta.ID
 	kind      EvaluationModelKind

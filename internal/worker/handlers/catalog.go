@@ -9,6 +9,9 @@ func NewRegistry() *Registry {
 		"assessment_submitted_handler": func(deps *Dependencies) HandlerFunc {
 			return handleAssessmentSubmitted(deps)
 		},
+		"assessment_evaluated_handler": func(deps *Dependencies) HandlerFunc {
+			return handleAssessmentEvaluated(deps)
+		},
 		"assessment_interpreted_handler": func(deps *Dependencies) HandlerFunc {
 			return handleAssessmentInterpreted(deps)
 		},

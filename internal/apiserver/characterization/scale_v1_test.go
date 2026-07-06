@@ -24,22 +24,21 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	result := execution.ToEvaluationResult()
-	if result.TotalScore != 5 {
-		t.Fatalf("TotalScore = %.1f, want 5", result.TotalScore)
+	if execution.Primary == nil || execution.Primary.Value != 5 {
+		t.Fatalf("Primary score = %v, want 5", execution.Primary)
 	}
-	if result.RiskLevel != "low" {
-		t.Fatalf("RiskLevel = %s, want low", result.RiskLevel)
+	if execution.Level == nil || execution.Level.Code != "low" {
+		t.Fatalf("Level = %v, want low", execution.Level)
 	}
-	if result.Conclusion != "low" {
-		t.Fatalf("Conclusion = %q, want low", result.Conclusion)
+	if execution.Summary.PrimaryLabel != "low" && (execution.Level == nil || execution.Level.Label != "low") {
+		t.Fatalf("conclusion label missing for low risk outcome")
 	}
-	if len(result.FactorScores) != 2 {
-		t.Fatalf("len(FactorScores) = %d, want 2", len(result.FactorScores))
+	if len(execution.Dimensions) != 2 {
+		t.Fatalf("len(Dimensions) = %d, want 2", len(execution.Dimensions))
 	}
 
 	report, err := evaluationresult.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(a, snapshot, result))
+		Build(context.Background(), evaluationresult.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

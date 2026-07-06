@@ -33,6 +33,7 @@ type InternalClient interface {
 		req *pb.CalculateAnswerSheetScoreRequest,
 	) (*pb.CalculateAnswerSheetScoreResponse, error)
 	EvaluateAssessment(ctx context.Context, assessmentID uint64) (*pb.EvaluateAssessmentResponse, error)
+	GenerateReportFromAssessment(ctx context.Context, assessmentID uint64) (*pb.GenerateReportFromAssessmentResponse, error)
 	SyncAssessmentAttention(
 		ctx context.Context,
 		req *pb.SyncAssessmentAttentionRequest,

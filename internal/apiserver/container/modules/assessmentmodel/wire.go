@@ -2,7 +2,7 @@ package assessmentmodel
 
 import (
 	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/personality"
-	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/scale/lifecycle"
+	scaleLifecycle "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale/lifecycle"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/cachetarget"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"

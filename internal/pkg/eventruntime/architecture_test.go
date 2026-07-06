@@ -202,8 +202,8 @@ func bestEffortDirectPublishFiles() map[string]struct{} {
 		"internal/apiserver/application/plan/lifecycle_transition_workflow.go":     {},
 		"internal/apiserver/application/plan/task_management_service.go":           {},
 		"internal/apiserver/application/plan/task_scheduler_service.go":            {},
-		"internal/apiserver/application/scale/factor/service.go":                   {},
-		"internal/apiserver/application/scale/lifecycle/service.go":                {},
+		"internal/apiserver/application/assessmentmodel/behavior/scale/factor/service.go":                   {},
+		"internal/apiserver/application/assessmentmodel/behavior/scale/lifecycle/service.go":                {},
 		"internal/apiserver/application/survey/questionnaire/lifecycle_service.go": {},
 	}
 }

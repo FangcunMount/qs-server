@@ -4,8 +4,8 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-// legacyResultForPersistence projects the canonical outcome into the legacy write model.
-// This is the single application-layer boundary for ToEvaluationResult until characterization migrates off LegacyResult().
+// legacyResultForPersistence projects AssessmentOutcome into EvaluationResult for persistence adapters only.
+// Application write paths must use AssessmentOutcome directly; characterization reads Execution.
 func legacyResultForPersistence(outcome Outcome) *assessment.EvaluationResult {
 	if outcome.Execution == nil {
 		return nil

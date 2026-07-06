@@ -60,6 +60,14 @@ events:
     description: "测评已提交"
     handler: assessment_submitted_handler
 
+  assessment.evaluated:
+    topic: assessment-lifecycle
+    delivery: durable_outbox
+    aggregate: Assessment
+    domain: evaluation/assessment
+    description: "测评计分完成，等待报告生成"
+    handler: assessment_evaluated_handler
+
   assessment.interpreted:
     topic: assessment-lifecycle
     delivery: durable_outbox

@@ -8,6 +8,8 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
+	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
+	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
 )
 
@@ -232,12 +234,61 @@ func (flow assessmentFlow) EvaluateAssessment(
 
 	return &pb.EvaluateAssessmentResponse{
 		Success:    true,
-		Status:     "interpreted",
+		Status:     assessmentResultStatus(result),
 		Message:    "评估完成",
 		TotalScore: totalScore,
 		RiskLevel:  riskLevel,
 		Outcome:    outcomeSummaryFromAssessmentResult(result),
 	}, nil
+}
+
+func (flow assessmentFlow) GenerateReportFromAssessment(
+	ctx context.Context,
+	req *pb.GenerateReportFromAssessmentRequest,
+) (*pb.GenerateReportFromAssessmentResponse, error) {
+	s := flow.service
+	l := logger.L(ctx)
+
+	if req == nil || req.AssessmentId == 0 {
+		return nil, status.Error(codes.InvalidArgument, "assessment_id 不能为空")
+	}
+
+	l.Infow("gRPC: 收到生成报告请求",
+		"action", "generate_report_from_assessment",
+		"assessment_id", req.AssessmentId,
+	)
+
+	if err := s.executeService.GenerateReport(ctx, req.AssessmentId); err != nil {
+		l.Errorw("生成报告失败",
+			"assessment_id", req.AssessmentId,
+			"error", err.Error(),
+		)
+		return &pb.GenerateReportFromAssessmentResponse{
+			Success: false,
+			Status:  "failed",
+			Message: err.Error(),
+		}, nil
+	}
+
+	return &pb.GenerateReportFromAssessmentResponse{
+		Success: true,
+		Status:  "interpreted",
+		Message: "报告生成完成",
+	}, nil
+}
+
+func assessmentResultStatus(result *assessmentApp.AssessmentResult) string {
+	if result == nil {
+		return "interpreted"
+	}
+	switch result.Status {
+	case string(assessmentDomain.StatusEvaluated):
+		return "evaluated"
+	case string(assessmentDomain.StatusFailed):
+		return "failed"
+	default:
+		return "interpreted"
+	}
 }
 
 func (flow assessmentFlow) SyncAssessmentAttention(

@@ -2,6 +2,7 @@ package container
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -99,6 +100,10 @@ func (c *Container) Initialize() error {
 
 	log.Info("🔧 Initializing Worker Container...")
 
+	if err := c.validateRuntimeClients(); err != nil {
+		return err
+	}
+
 	// 初始化事件分发器
 	if err := c.initEventDispatcher(); err != nil {
 		return err
@@ -107,6 +112,13 @@ func (c *Container) Initialize() error {
 	c.initialized = true
 	log.Info("✅ Worker Container initialized successfully")
 
+	return nil
+}
+
+func (c *Container) validateRuntimeClients() error {
+	if c.internalClient == nil {
+		return fmt.Errorf("internal gRPC client is required for assessment evaluation workflow")
+	}
 	return nil
 }
 

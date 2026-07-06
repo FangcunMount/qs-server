@@ -23,8 +23,9 @@ const (
 )
 
 type Option struct {
-	Label string `json:"label"`
-	Value string `json:"value"`
+	Label    string `json:"label"`
+	Value    string `json:"value"`
+	Disabled bool   `json:"disabled,omitempty"`
 }
 
 type ListModelsDTO struct {

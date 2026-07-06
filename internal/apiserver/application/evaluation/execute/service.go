@@ -8,6 +8,8 @@ import (
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
+	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -27,9 +29,12 @@ type service struct {
 	eventStager  EventStager
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
-	evaluators   EvaluatorRegistry
-	resultWriter evaluationresult.Writer
-	reportStatus *reportstatus.Reporter
+	evaluators            EvaluatorRegistry
+	resultWriter          evaluationresult.Writer
+	scoringWriter         evaluationscoring.Writer
+	interpretationService interpretationapp.Service
+	asyncInterpretation   bool
+	reportStatus          *reportstatus.Reporter
 }
 
 // EventStager 事件暂存器
@@ -64,6 +69,27 @@ func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 func WithReportStatusReporter(reporter *reportstatus.Reporter) ServiceOption {
 	return func(s *service) {
 		s.reportStatus = reporter
+	}
+}
+
+// WithScoringWriter configures the scoring outcome writer for split-phase evaluation.
+func WithScoringWriter(writer evaluationscoring.Writer) ServiceOption {
+	return func(s *service) {
+		s.scoringWriter = writer
+	}
+}
+
+// WithInterpretationService configures the interpretation report generation service.
+func WithInterpretationService(svc interpretationapp.Service) ServiceOption {
+	return func(s *service) {
+		s.interpretationService = svc
+	}
+}
+
+// WithAsyncInterpretation enables split-phase evaluation (scoring event + async report).
+func WithAsyncInterpretation(enabled bool) ServiceOption {
+	return func(s *service) {
+		s.asyncInterpretation = enabled
 	}
 }
 
@@ -170,13 +196,8 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return err
 	}
 
-	// 执行评估成功，写入评估结果和报告
-	if s.resultWriter == nil {
-		err := evalerrors.ModuleNotConfigured("evaluation result writer is not configured")
-		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
-		return err
-	}
-	if err := s.resultWriter.Write(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}); err != nil {
+	// 执行评估成功，写入计分结果并生成报告
+	if err := s.persistEvaluationOutcome(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
 			"model_key", evaluatorKey.String(),
@@ -198,6 +219,67 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"duration_ms", time.Since(startTime).Milliseconds(),
 	)
 
+	return nil
+}
+
+func (s *service) persistEvaluationOutcome(ctx context.Context, outcome evaluationresult.Outcome) error {
+	if s.scoringWriter != nil && s.interpretationService != nil {
+		if s.asyncInterpretation {
+			if err := s.scoringWriter.Write(ctx, outcome); err != nil {
+				return err
+			}
+			outcome.Assessment.StageEvaluatedEvent(time.Now())
+			return s.failureFinalizer().SaveAssessmentWithEvents(ctx, outcome.Assessment)
+		}
+		if err := s.scoringWriter.Write(ctx, outcome); err != nil {
+			return err
+		}
+		return s.interpretationService.GenerateAndPersist(ctx, outcome)
+	}
+	if s.resultWriter == nil {
+		return evalerrors.ModuleNotConfigured("evaluation result writer is not configured")
+	}
+	return s.resultWriter.Write(ctx, outcome)
+}
+
+// GenerateReport generates and persists the interpretation report for an evaluated assessment.
+func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error {
+	l := logger.L(ctx)
+	if assessmentID == 0 {
+		return evalerrors.InvalidArgument("评估ID不能为空")
+	}
+	loaded, err := s.assessmentLoader().LoadForInterpretation(ctx, assessmentID)
+	if err != nil {
+		return err
+	}
+	if loaded.skipEvaluation {
+		return nil
+	}
+	a := loaded.assessment
+	input, err := evaluationInputWorkflow{resolver: s.inputResolver}.Resolve(ctx, a, assessmentID)
+	if err != nil {
+		return err
+	}
+	evaluatorKey := resolveEvaluatorKey(a, input)
+	evaluator, err := s.evaluators.Resolve(evaluatorKey)
+	if err != nil {
+		return err
+	}
+	evaluationOutcome, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
+	if err != nil {
+		return err
+	}
+	if s.interpretationService == nil {
+		return evalerrors.ModuleNotConfigured("interpretation service is not configured")
+	}
+	outcome := evaluationresult.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}
+	if err := s.interpretationService.GenerateAndPersist(ctx, outcome); err != nil {
+		return err
+	}
+	l.Infow("报告生成完成",
+		"action", "generate_report",
+		"assessment_id", assessmentID,
+	)
 	return nil
 }
 

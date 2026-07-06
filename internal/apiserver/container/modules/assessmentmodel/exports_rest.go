@@ -7,7 +7,7 @@ import (
 	codesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/scale"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/assessmentmodel/behavior/scale"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
 )

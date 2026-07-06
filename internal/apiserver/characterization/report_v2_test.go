@@ -22,10 +22,8 @@ func TestV2ScaleReportProjectsOutcomeSummaryFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	result := execution.ToEvaluationResult()
-
 	report, err := evaluationresult.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(a, snapshot, result))
+		Build(context.Background(), evaluationresult.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

@@ -21,6 +21,7 @@ const (
 var immediateDispatchEventTypes = map[string]struct{}{
 	eventcatalog.AnswerSheetSubmitted: {},
 	eventcatalog.AssessmentSubmitted:  {},
+	eventcatalog.AssessmentEvaluated:  {},
 }
 
 // ImmediateDispatcher best-effort publishes staged outbox events right after commit.

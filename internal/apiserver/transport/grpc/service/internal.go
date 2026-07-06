@@ -437,6 +437,14 @@ func (s *InternalService) EvaluateAssessment(
 	return newAssessmentFlow(s).EvaluateAssessment(ctx, req)
 }
 
+// GenerateReportFromAssessment 基于已计分结果生成报告
+func (s *InternalService) GenerateReportFromAssessment(
+	ctx context.Context,
+	req *pb.GenerateReportFromAssessmentRequest,
+) (*pb.GenerateReportFromAssessmentResponse, error) {
+	return newAssessmentFlow(s).GenerateReportFromAssessment(ctx, req)
+}
+
 // SyncAssessmentAttention 同步测评后置关注状态
 // 场景：worker 处理 report.generated 事件后调用
 // 职责：协议转换，将 gRPC 请求转换为应用服务调用

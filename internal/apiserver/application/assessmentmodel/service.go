@@ -233,8 +233,8 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 			{Label: "人格测评", Value: KindPersonality},
 			{Label: "行为能力测评", Value: KindBehaviorAbility},
 			{Label: "医学量表", Value: KindMedicalScale},
-			{Label: "认知测评", Value: KindCognitive},
-			{Label: "自定义测评", Value: KindCustom},
+			{Label: "认知测评", Value: KindCognitive, Disabled: true},
+			{Label: "自定义测评", Value: KindCustom, Disabled: true},
 		},
 		Algorithms: []Option{
 			{Label: "MBTI", Value: "mbti"},

@@ -16,6 +16,8 @@ import (
 const (
 	// EventTypeSubmitted 测评已提交
 	EventTypeSubmitted = eventcatalog.AssessmentSubmitted
+	// EventTypeEvaluated 测评已计分
+	EventTypeEvaluated = eventcatalog.AssessmentEvaluated
 	// EventTypeInterpreted 测评已解读（outcome 投影见 events_outcome.go）
 	EventTypeInterpreted = eventcatalog.AssessmentInterpreted
 	// EventTypeFailed 测评失败
@@ -43,6 +45,12 @@ type AssessmentSubmittedEvent = event.Event[AssessmentSubmittedData]
 
 // AssessmentFailedEvent 测评失败事件
 type AssessmentFailedEvent = event.Event[AssessmentFailedData]
+
+// AssessmentEvaluatedData 测评已计分事件数据
+type AssessmentEvaluatedData = eventpayload.AssessmentEvaluatedData
+
+// AssessmentEvaluatedEvent 测评已计分事件
+type AssessmentEvaluatedEvent = event.Event[AssessmentEvaluatedData]
 
 // ==================== 事件构造函数 ====================
 
@@ -99,6 +107,23 @@ func NewAssessmentFailedEvent(
 			TesteeID:     testeeID.Uint64(),
 			Reason:       reason,
 			FailedAt:     failedAt,
+		},
+	)
+}
+
+// NewAssessmentEvaluatedEvent 创建测评已计分事件
+func NewAssessmentEvaluatedEvent(
+	orgID int64,
+	assessmentID ID,
+	testeeID testee.ID,
+	evaluatedAt time.Time,
+) AssessmentEvaluatedEvent {
+	return event.New(EventTypeEvaluated, AggregateType, strconv.FormatInt(int64(assessmentID), 10),
+		AssessmentEvaluatedData{
+			OrgID:        orgID,
+			AssessmentID: int64(assessmentID),
+			TesteeID:     testeeID.Uint64(),
+			EvaluatedAt:  evaluatedAt,
 		},
 	)
 }

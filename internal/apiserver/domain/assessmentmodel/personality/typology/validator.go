@@ -230,7 +230,7 @@ func (v *runtimeSpecValidator) validateSpecialRules(rules []SpecialRuleSpec) {
 		switch rule.Phase {
 		case "", SpecialRuleBeforeScore, SpecialRuleAfterDecision:
 		case SpecialRuleBeforeDecision:
-			v.add("special_rules."+rule.Code+".phase", "special_rule.phase.unimplemented", fmt.Sprintf("special rule phase %s 尚未实现", rule.Phase))
+			v.add("special_rules."+rule.Code+".phase", "special_rule.phase.unsupported", fmt.Sprintf("special rule phase %s 暂不支持", rule.Phase))
 		default:
 			v.add("special_rules."+rule.Code+".phase", "special_rule.phase.unsupported", fmt.Sprintf("special rule phase %s 不支持", rule.Phase))
 		}

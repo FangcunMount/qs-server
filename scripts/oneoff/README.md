@@ -279,12 +279,8 @@ go run scripts/oneoff/cleanup_perf_testee_data/main.go \
 go run scripts/oneoff/rebuild_statistics_aggregates_and_cache/main.go \
   --mysql-dsn "$MYSQL_DSN" \
   --org-id 1 \
-  --start-date 2026-06-15 \
-  --end-date 2026-06-17 \
-  --redis-addr "$REDIS_ADDR" \
-  --redis-query-namespace 'qs:cache:query' \
-  --redis-username "$REDIS_USERNAME" \
-  --redis-password "$REDIS_PASSWORD" \
+  --start-date 2026-06-01 \
+  --end-date 2026-07-06 \
   --apply
 ```
 

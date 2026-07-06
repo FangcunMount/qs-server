@@ -97,7 +97,7 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 		return evalerrors.Database(err, "保存报告失败")
 	}
 
-	if prepared.projector != nil {
+	if prepared.projector != nil && outcome.Assessment.Status().IsSubmitted() {
 		if err := prepared.projector.Project(ctx, outcome); err != nil {
 			return err
 		}
@@ -130,7 +130,7 @@ func (w *writer) Write(ctx context.Context, outcome Outcome) error {
 }
 
 func (w *writer) prepare(ctx context.Context, outcome Outcome) (preparedOutcome, error) {
-	key := resolveOutcomeKey(outcome)
+	key := ResolveOutcomeKey(outcome)
 	if err := ensureOutcomeCanApplyEvaluation(outcome); err != nil {
 		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "应用评估结果失败")
 	}
@@ -164,7 +164,7 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 	if outcome.Execution == nil {
 		return fmt.Errorf("evaluation outcome is required")
 	}
-	if !outcome.Assessment.Status().IsSubmitted() {
+	if !outcome.Assessment.Status().CanApplyInterpretation() {
 		return assessment.NewInvalidStatusError("apply evaluation", outcome.Assessment.Status())
 	}
 	modelRef := outcome.Assessment.EvaluationModelRef()
@@ -179,6 +179,10 @@ func ensureOutcomeCanApplyEvaluation(outcome Outcome) error {
 		return assessment.ErrEvaluationModelMismatch
 	}
 	return nil
+}
+
+func ResolveOutcomeKey(outcome Outcome) evaluation.EvaluatorKey {
+	return resolveOutcomeKey(outcome)
 }
 
 func resolveOutcomeKey(outcome Outcome) evaluation.EvaluatorKey {

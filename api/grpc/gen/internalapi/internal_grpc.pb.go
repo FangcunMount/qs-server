@@ -22,6 +22,7 @@ const (
 	InternalService_CalculateAnswerSheetScore_FullMethodName               = "/internalapi.InternalService/CalculateAnswerSheetScore"
 	InternalService_CreateAssessmentFromAnswerSheet_FullMethodName         = "/internalapi.InternalService/CreateAssessmentFromAnswerSheet"
 	InternalService_EvaluateAssessment_FullMethodName                      = "/internalapi.InternalService/EvaluateAssessment"
+	InternalService_GenerateReportFromAssessment_FullMethodName            = "/internalapi.InternalService/GenerateReportFromAssessment"
 	InternalService_SyncAssessmentAttention_FullMethodName                 = "/internalapi.InternalService/SyncAssessmentAttention"
 	InternalService_TagTestee_FullMethodName                               = "/internalapi.InternalService/TagTestee"
 	InternalService_GenerateQuestionnaireQRCode_FullMethodName             = "/internalapi.InternalService/GenerateQuestionnaireQRCode"
@@ -52,6 +53,10 @@ type InternalServiceClient interface {
 	// 场景：worker 处理 assessment.submitted 事件后调用
 	// 流程：加载测评和量表，执行计分和解读，保存结果
 	EvaluateAssessment(ctx context.Context, in *EvaluateAssessmentRequest, opts ...grpc.CallOption) (*EvaluateAssessmentResponse, error)
+	// 生成测评报告
+	// 场景：worker 处理 assessment.evaluated 事件后调用
+	// 流程：基于已计分结果生成 InterpretReport
+	GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error)
 	// 同步测评后置关注状态
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
@@ -116,6 +121,16 @@ func (c *internalServiceClient) EvaluateAssessment(ctx context.Context, in *Eval
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(EvaluateAssessmentResponse)
 	err := c.cc.Invoke(ctx, InternalService_EvaluateAssessment_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *internalServiceClient) GenerateReportFromAssessment(ctx context.Context, in *GenerateReportFromAssessmentRequest, opts ...grpc.CallOption) (*GenerateReportFromAssessmentResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(GenerateReportFromAssessmentResponse)
+	err := c.cc.Invoke(ctx, InternalService_GenerateReportFromAssessment_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -232,6 +247,10 @@ type InternalServiceServer interface {
 	// 场景：worker 处理 assessment.submitted 事件后调用
 	// 流程：加载测评和量表，执行计分和解读，保存结果
 	EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error)
+	// 生成测评报告
+	// 场景：worker 处理 assessment.evaluated 事件后调用
+	// 流程：基于已计分结果生成 InterpretReport
+	GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error)
 	// 同步测评后置关注状态
 	// 场景：worker 处理 report.generated 事件后调用
 	// 流程：根据风险等级和 mark_key_focus 决定是否自动标记重点关注
@@ -280,6 +299,9 @@ func (UnimplementedInternalServiceServer) CreateAssessmentFromAnswerSheet(contex
 }
 func (UnimplementedInternalServiceServer) EvaluateAssessment(context.Context, *EvaluateAssessmentRequest) (*EvaluateAssessmentResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EvaluateAssessment not implemented")
+}
+func (UnimplementedInternalServiceServer) GenerateReportFromAssessment(context.Context, *GenerateReportFromAssessmentRequest) (*GenerateReportFromAssessmentResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method GenerateReportFromAssessment not implemented")
 }
 func (UnimplementedInternalServiceServer) SyncAssessmentAttention(context.Context, *SyncAssessmentAttentionRequest) (*SyncAssessmentAttentionResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SyncAssessmentAttention not implemented")
@@ -379,6 +401,24 @@ func _InternalService_EvaluateAssessment_Handler(srv interface{}, ctx context.Co
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(InternalServiceServer).EvaluateAssessment(ctx, req.(*EvaluateAssessmentRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _InternalService_GenerateReportFromAssessment_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GenerateReportFromAssessmentRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InternalServiceServer).GenerateReportFromAssessment(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InternalService_GenerateReportFromAssessment_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InternalServiceServer).GenerateReportFromAssessment(ctx, req.(*GenerateReportFromAssessmentRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -563,6 +603,10 @@ var InternalService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EvaluateAssessment",
 			Handler:    _InternalService_EvaluateAssessment_Handler,
+		},
+		{
+			MethodName: "GenerateReportFromAssessment",
+			Handler:    _InternalService_GenerateReportFromAssessment_Handler,
 		},
 		{
 			MethodName: "SyncAssessmentAttention",

@@ -30,6 +30,12 @@ service InternalService {
   // 流程：加载测评和量表，执行计分和解读，保存结果
   rpc EvaluateAssessment(EvaluateAssessmentRequest) 
       returns (EvaluateAssessmentResponse);
+
+  // 生成测评报告
+  // 场景：worker 处理 assessment.evaluated 事件后调用
+  // 流程：基于已计分结果生成 InterpretReport
+  rpc GenerateReportFromAssessment(GenerateReportFromAssessmentRequest)
+      returns (GenerateReportFromAssessmentResponse);
   
   // ==================== Testee 操作 ====================
   
@@ -354,6 +360,18 @@ message ResultLevel {
   string code = 1;
   string label = 2;
   string severity = 3;
+}
+
+// ==================== GenerateReportFromAssessment ====================
+
+message GenerateReportFromAssessmentRequest {
+  uint64 assessment_id = 1;
+}
+
+message GenerateReportFromAssessmentResponse {
+  bool success = 1;
+  string status = 2;
+  string message = 3;
 }
 
 // ==================== Assessment Attention Sync ====================

@@ -26,6 +26,23 @@ func NewDefaultHandler() *Handler {
 	return &Handler{evaluator: NewDefaultEvaluator()}
 }
 
+// Score 执行量表计分与风险分级，不包含解读文案。
+func (h *Handler) Score(ctx context.Context, input EvaluateInput) (*ScaleInterpretationResult, error) {
+	if h == nil || h.evaluator == nil {
+		return nil, fmt.Errorf("scale handler is not configured")
+	}
+	interpInput := assembleInterpretationInput(input)
+	factorScores, totalScore, riskLevel, err := h.evaluator.runScoring(ctx, interpInput)
+	if err != nil {
+		return nil, err
+	}
+	return &ScaleInterpretationResult{
+		TotalScore:   totalScore,
+		RiskLevel:    riskLevel,
+		FactorScores: factorScores,
+	}, nil
+}
+
 func (h *Handler) Evaluate(ctx context.Context, input EvaluateInput) (*ScaleInterpretationResult, error) {
 	if h == nil || h.evaluator == nil {
 		return nil, fmt.Errorf("scale handler is not configured")

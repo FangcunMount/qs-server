@@ -46,12 +46,8 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			return nil
 		}
 
-		// 检查 InternalClient 是否可用
 		if deps.InternalClient == nil {
-			deps.Logger.Warn("InternalClient is not available, skipping evaluation",
-				slog.Int64("assessment_id", data.AssessmentID),
-			)
-			return nil
+			return fmt.Errorf("internal client is not available: cannot evaluate assessment %d", data.AssessmentID)
 		}
 
 		assessmentID, err := safeconv.Int64ToUint64(data.AssessmentID)
