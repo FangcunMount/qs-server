@@ -1,15 +1,17 @@
 package statistics
 
 import (
-	"strconv"
 	"time"
 
 	"github.com/FangcunMount/qs-server/internal/pkg/eventcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventpayload"
+	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
-const BehaviorAggregateType = "BehaviorFootprint"
+// BehaviorAggregateType is re-exported from the neutral footprint integration
+// event kernel; footprint events are shared contracts, not statistics-private.
+const BehaviorAggregateType = footprintevent.AggregateType
 
 const (
 	EventTypeFootprintEntryOpened                 = eventcatalog.FootprintEntryOpened
@@ -40,80 +42,38 @@ type FootprintAnswerSheetSubmittedEvent = event.Event[FootprintAnswerSheetSubmit
 type FootprintAssessmentCreatedEvent = event.Event[FootprintAssessmentCreatedData]
 type FootprintReportGeneratedEvent = event.Event[FootprintReportGeneratedData]
 
+// The constructors below delegate to the neutral footprintevent kernel so that
+// existing statistics consumers keep a stable API while the schema is owned by
+// the shared kernel.
+
 func NewFootprintEntryOpenedEvent(orgID int64, clinicianID, entryID uint64, occurredAt time.Time) FootprintEntryOpenedEvent {
-	return event.New(EventTypeFootprintEntryOpened, BehaviorAggregateType, strconv.FormatUint(entryID, 10), FootprintEntryOpenedData{
-		OrgID:       orgID,
-		ClinicianID: clinicianID,
-		EntryID:     entryID,
-		OccurredAt:  occurredAt,
-	})
+	return footprintevent.NewFootprintEntryOpenedEvent(orgID, clinicianID, entryID, occurredAt)
 }
 
 func NewFootprintIntakeConfirmedEvent(orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) FootprintIntakeConfirmedEvent {
-	return event.New(EventTypeFootprintIntakeConfirmed, BehaviorAggregateType, strconv.FormatUint(testeeID, 10), FootprintIntakeConfirmedData{
-		OrgID:       orgID,
-		ClinicianID: clinicianID,
-		EntryID:     entryID,
-		TesteeID:    testeeID,
-		OccurredAt:  occurredAt,
-	})
+	return footprintevent.NewFootprintIntakeConfirmedEvent(orgID, clinicianID, entryID, testeeID, occurredAt)
 }
 
 func NewFootprintTesteeProfileCreatedEvent(orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) FootprintTesteeProfileCreatedEvent {
-	return event.New(EventTypeFootprintTesteeProfileCreated, BehaviorAggregateType, strconv.FormatUint(testeeID, 10), FootprintTesteeProfileCreatedData{
-		OrgID:       orgID,
-		ClinicianID: clinicianID,
-		EntryID:     entryID,
-		TesteeID:    testeeID,
-		OccurredAt:  occurredAt,
-	})
+	return footprintevent.NewFootprintTesteeProfileCreatedEvent(orgID, clinicianID, entryID, testeeID, occurredAt)
 }
 
 func NewFootprintCareRelationshipEstablishedEvent(orgID int64, clinicianID, entryID, testeeID uint64, occurredAt time.Time) FootprintCareRelationshipEstablishedEvent {
-	return event.New(EventTypeFootprintCareRelationshipEstablished, BehaviorAggregateType, strconv.FormatUint(testeeID, 10), FootprintCareRelationshipEstablishedData{
-		OrgID:       orgID,
-		ClinicianID: clinicianID,
-		EntryID:     entryID,
-		TesteeID:    testeeID,
-		OccurredAt:  occurredAt,
-	})
+	return footprintevent.NewFootprintCareRelationshipEstablishedEvent(orgID, clinicianID, entryID, testeeID, occurredAt)
 }
 
 func NewFootprintCareRelationshipTransferredEvent(orgID int64, fromClinicianID, toClinicianID, testeeID uint64, occurredAt time.Time) FootprintCareRelationshipTransferredEvent {
-	return event.New(EventTypeFootprintCareRelationshipTransferred, BehaviorAggregateType, strconv.FormatUint(testeeID, 10), FootprintCareRelationshipTransferredData{
-		OrgID:           orgID,
-		FromClinicianID: fromClinicianID,
-		ToClinicianID:   toClinicianID,
-		TesteeID:        testeeID,
-		OccurredAt:      occurredAt,
-	})
+	return footprintevent.NewFootprintCareRelationshipTransferredEvent(orgID, fromClinicianID, toClinicianID, testeeID, occurredAt)
 }
 
 func NewFootprintAnswerSheetSubmittedEvent(orgID int64, testeeID, answerSheetID uint64, occurredAt time.Time) FootprintAnswerSheetSubmittedEvent {
-	return event.New(EventTypeFootprintAnswerSheetSubmitted, BehaviorAggregateType, strconv.FormatUint(answerSheetID, 10), FootprintAnswerSheetSubmittedData{
-		OrgID:         orgID,
-		TesteeID:      testeeID,
-		AnswerSheetID: answerSheetID,
-		OccurredAt:    occurredAt,
-	})
+	return footprintevent.NewFootprintAnswerSheetSubmittedEvent(orgID, testeeID, answerSheetID, occurredAt)
 }
 
 func NewFootprintAssessmentCreatedEvent(orgID int64, testeeID, answerSheetID, assessmentID uint64, occurredAt time.Time) FootprintAssessmentCreatedEvent {
-	return event.New(EventTypeFootprintAssessmentCreated, BehaviorAggregateType, strconv.FormatUint(assessmentID, 10), FootprintAssessmentCreatedData{
-		OrgID:         orgID,
-		TesteeID:      testeeID,
-		AnswerSheetID: answerSheetID,
-		AssessmentID:  assessmentID,
-		OccurredAt:    occurredAt,
-	})
+	return footprintevent.NewFootprintAssessmentCreatedEvent(orgID, testeeID, answerSheetID, assessmentID, occurredAt)
 }
 
 func NewFootprintReportGeneratedEvent(orgID int64, testeeID, assessmentID, reportID uint64, occurredAt time.Time) FootprintReportGeneratedEvent {
-	return event.New(EventTypeFootprintReportGenerated, BehaviorAggregateType, strconv.FormatUint(reportID, 10), FootprintReportGeneratedData{
-		OrgID:        orgID,
-		TesteeID:     testeeID,
-		AssessmentID: assessmentID,
-		ReportID:     reportID,
-		OccurredAt:   occurredAt,
-	})
+	return footprintevent.NewFootprintReportGeneratedEvent(orgID, testeeID, assessmentID, reportID, occurredAt)
 }

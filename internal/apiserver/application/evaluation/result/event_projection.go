@@ -6,8 +6,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
 	"github.com/FangcunMount/qs-server/internal/pkg/eventoutcome"
+	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -103,7 +103,7 @@ func buildFootprintReportGeneratedEvent(outcome Outcome, rpt *domainreport.Inter
 	if outcome.Assessment == nil || rpt == nil {
 		return nil
 	}
-	return domainStatistics.NewFootprintReportGeneratedEvent(
+	return footprintevent.NewFootprintReportGeneratedEvent(
 		outcome.Assessment.OrgID(),
 		outcome.Assessment.TesteeID().Uint64(),
 		outcome.Assessment.ID().Uint64(),

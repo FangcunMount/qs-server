@@ -8,7 +8,7 @@ import (
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	domainStatistics "github.com/FangcunMount/qs-server/internal/apiserver/domain/statistics"
+	"github.com/FangcunMount/qs-server/internal/pkg/footprintevent"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
 
@@ -31,7 +31,7 @@ func (f assessmentCreateFinalizer) SaveAndStage(
 	occurredAt := time.Now()
 	if err := saveAssessmentAndStageEvents(ctx, f.repo, f.txRunner, f.eventStager, a, func(saved *domainAssessment.Assessment) []event.DomainEvent {
 		return []event.DomainEvent{
-			domainStatistics.NewFootprintAssessmentCreatedEvent(
+			footprintevent.NewFootprintAssessmentCreatedEvent(
 				req.OrgID,
 				dto.TesteeID,
 				dto.AnswerSheetID,
