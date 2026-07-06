@@ -9,14 +9,15 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
+	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
@@ -34,6 +35,7 @@ func TestPersonalityPreviewPublishExecuteConsistency(t *testing.T) {
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
 		QuestionnaireQuery: questionnaireQueryStub{questionnaire: questionnaire},
+		ReportPreviewer:    previewadapter.NewPreviewer(),
 	})
 
 	created, err := svc.Create(context.Background(), personality.CreateInput{

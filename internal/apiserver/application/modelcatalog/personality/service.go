@@ -12,6 +12,7 @@ import (
 	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -42,6 +43,7 @@ type Dependencies struct {
 	PublishedRepo       port.PublishedModelRepository
 	QuestionnaireQuery  questionnaireapp.QuestionnaireQueryService
 	CacheSignalNotifier CacheSignalNotifier
+	ReportPreviewer     modelpreview.ReportPreviewer
 }
 
 type service struct {

@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"github.com/FangcunMount/component-base/pkg/errors"
+	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	appPersonalityCatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -44,6 +45,7 @@ func NewPersonality(deps PersonalityDeps) (*Personality, error) {
 			PublishedRepo:       deps.PublishedRepo,
 			QuestionnaireQuery:  deps.QuestionnaireQuery,
 			CacheSignalNotifier: deps.CacheSignalNotifier,
+			ReportPreviewer:     previewadapter.NewPreviewer(),
 		})
 	}
 	return &Personality{

@@ -5,18 +5,13 @@ import (
 	"encoding/json"
 	"fmt"
 
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
-	"github.com/FangcunMount/qs-server/internal/pkg/meta"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/modelpreview"
 )
 
 func (s *service) PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error) {
@@ -53,35 +48,31 @@ func (s *service) PreviewReport(ctx context.Context, modelCode string, payload j
 	if err := json.Unmarshal(snapshot.Payload, &typologyPayload); err != nil {
 		return nil, invalidArgument("模型定义 payload 格式无效")
 	}
+	if s.deps.ReportPreviewer == nil {
+		return nil, unavailable("报告预览服务未配置")
+	}
 	executionInput := previewExecutionInput(model, questionnaire, &typologyPayload, input.Answers)
-	submitted, err := previewSubmittedAssessment(model, snapshot)
-	if err != nil {
-		return nil, err
-	}
-	executor, err := typologyevaluation.NewConfiguredTypologyExecutor()
-	if err != nil {
-		return nil, err
-	}
-	outcome, err := executor.Execute(ctx, evaluationexecute.ExecutionInput{
-		Assessment: submitted,
-		Input:      executionInput,
+	result, err := s.deps.ReportPreviewer.PreviewReport(ctx, modelpreview.Request{
+		SubKind:              model.SubKind,
+		Algorithm:            model.Algorithm,
+		Code:                 model.Code,
+		Version:              previewModelVersion(model, snapshot),
+		Title:                model.Title,
+		QuestionnaireCode:    model.Binding.QuestionnaireCode,
+		QuestionnaireVersion: model.Binding.QuestionnaireVersion,
+		Input:                executionInput,
 	})
 	if err != nil {
 		return nil, err
 	}
-	reportBuilder, err := typologyevaluation.NewConfiguredReportBuilder()
-	if err != nil {
-		return nil, err
+	return previewReportResult(result), nil
+}
+
+func previewModelVersion(model *domain.AssessmentModel, snapshot *domain.PublishedModelSnapshot) string {
+	if snapshot != nil && snapshot.Model.Version != "" {
+		return snapshot.Model.Version
 	}
-	report, err := reportBuilder.Build(ctx, evaluationresult.Outcome{
-		Assessment: submitted,
-		Input:      executionInput,
-		Execution:  outcome,
-	})
-	if err != nil {
-		return nil, err
-	}
-	return previewReportResult(outcome, report), nil
+	return fmt.Sprintf("v%d", model.Version)
 }
 
 func (s *service) previewQuestionnaire(ctx context.Context, model *domain.AssessmentModel) (*questionnaireapp.QuestionnaireResult, error) {
@@ -180,79 +171,20 @@ func questionnaireSnapshotForExecution(questionnaire *questionnaireapp.Questionn
 	return snapshot
 }
 
-func previewSubmittedAssessment(model *domain.AssessmentModel, snapshot *domain.PublishedModelSnapshot) (*assessment.Assessment, error) {
-	version := fmt.Sprintf("v%d", model.Version)
-	if snapshot != nil && snapshot.Model.Version != "" {
-		version = snapshot.Model.Version
+func previewReportResult(result *modelpreview.Result) *PreviewReportResult {
+	if result == nil {
+		return &PreviewReportResult{}
 	}
-	modelRef := assessment.NewEvaluationModelRefWithIdentity(
-		assessment.EvaluationModelKindPersonality,
-		model.SubKind,
-		model.Algorithm,
-		meta.ID(0),
-		meta.NewCode(model.Code),
-		version,
-		model.Title,
-	)
-	a, err := assessment.NewAssessment(
-		1,
-		testee.NewID(1),
-		assessment.NewQuestionnaireRefByCode(meta.NewCode(model.Binding.QuestionnaireCode), model.Binding.QuestionnaireVersion),
-		assessment.NewAnswerSheetRef(meta.FromUint64(1)),
-		assessment.NewAdhocOrigin(),
-		assessment.WithID(assessment.NewID(1)),
-		assessment.WithEvaluationModel(modelRef),
-	)
-	if err != nil {
-		return nil, err
+	out := &PreviewReportResult{
+		Outcome:        PreviewOutcome{Code: result.OutcomeCode, Title: result.OutcomeTitle},
+		ScoreDetail:    result.Scores,
+		ReportSections: previewSectionsFromReport(result.Report),
+		RawReport:      result.Report,
 	}
-	if err := a.Submit(); err != nil {
-		return nil, err
+	if len(out.ScoreDetail) == 0 {
+		out.ScoreDetail = nil
 	}
-	a.ClearEvents()
-	return a, nil
-}
-
-func previewReportResult(outcome *assessment.AssessmentOutcome, report *domainreport.InterpretReport) *PreviewReportResult {
-	result := &PreviewReportResult{
-		Outcome:        previewOutcomeFromAssessmentOutcome(outcome),
-		ScoreDetail:    previewScoresFromOutcome(outcome),
-		ReportSections: previewSectionsFromReport(report),
-		RawReport:      report,
-	}
-	if len(result.ScoreDetail) == 0 {
-		result.ScoreDetail = nil
-	}
-	return result
-}
-
-func previewOutcomeFromAssessmentOutcome(outcome *assessment.AssessmentOutcome) PreviewOutcome {
-	if outcome == nil {
-		return PreviewOutcome{}
-	}
-	if outcome.Profile != nil {
-		return PreviewOutcome{Code: outcome.Profile.Code, Title: outcome.Profile.Name}
-	}
-	if outcome.Level != nil {
-		return PreviewOutcome{Code: outcome.Level.Code, Title: outcome.Level.Label}
-	}
-	return PreviewOutcome{}
-}
-
-func previewScoresFromOutcome(outcome *assessment.AssessmentOutcome) map[string]float64 {
-	scores := map[string]float64{}
-	if outcome == nil {
-		return scores
-	}
-	if outcome.Primary != nil {
-		scores["primary"] = outcome.Primary.Value
-	}
-	for _, dim := range outcome.Dimensions {
-		if dim.Score != nil && dim.Code != "" {
-			scores[dim.Code] = dim.Score.Value
-		}
-	}
-	return scores
+	return out
 }
 
 func previewSectionsFromReport(report *domainreport.InterpretReport) []PreviewReportSection {

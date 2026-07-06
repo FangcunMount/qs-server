@@ -9,6 +9,7 @@ import (
 	"testing"
 	"time"
 
+	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -225,6 +226,7 @@ func TestPreviewReportUsesDraftModelWithoutPublishing(t *testing.T) {
 		ModelRepo:          modelRepo,
 		PublishedRepo:      publishedRepo,
 		QuestionnaireQuery: questionnaireQueryStub{questionnaire: frontendMBTIQuestionnaire()},
+		ReportPreviewer:    previewadapter.NewPreviewer(),
 	})
 	created, err := svc.Create(context.Background(), personality.CreateInput{
 		Code: "personality_preview_mbti", Title: "Preview MBTI", Algorithm: "mbti",

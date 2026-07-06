@@ -28,8 +28,7 @@ var forbiddenModuleEdges = []struct{ from, to string }{
 //
 // 当某条目对应的越界已被消除时，测试会报「allowlist 条目已失效」以提醒收紧护栏。
 var forbiddenDepAllowlist = map[string]string{
-	"internal/apiserver/application/modelcatalog/personality/preview.go": "TODO(阶段3): 预览编排上移/走端口，解除 modelcatalog->evaluation",
-	"internal/apiserver/application/statistics/journey_router.go":        "accepted: 仅消费 evaluation 事件类型常量(domain/evaluation/assessment)",
+	"internal/apiserver/application/statistics/journey_router.go": "accepted: 仅消费 evaluation 事件类型常量(domain/evaluation/assessment)",
 }
 
 // TestForbiddenCrossModuleImports 守护模块间禁止的反向依赖方向。
