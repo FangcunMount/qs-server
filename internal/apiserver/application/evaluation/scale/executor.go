@@ -5,10 +5,10 @@ import (
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
@@ -57,7 +57,7 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if err := e.validator.Validate(executionInput); err != nil {
 		return nil, err
 	}
-	result, err := e.handler.Evaluate(ctx, scaleEvaluateInputFromSnapshot(input.Input))
+	result, err := e.handler.Score(ctx, scaleEvaluateInputFromSnapshot(input.Input))
 	if err != nil {
 		return nil, err
 	}

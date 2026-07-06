@@ -12,9 +12,9 @@ import (
 func TestEvaluatorCalculatesSumAvgCntAndUsesTotalScoreFactor(t *testing.T) {
 	input := scaleInterpretationInputForTest()
 
-	result, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+	result, err := NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
-		t.Fatalf("Evaluate returned error: %v", err)
+		t.Fatalf("Score returned error: %v", err)
 	}
 
 	assertFactorScore(t, result.FactorScores, "total", 8)
@@ -31,9 +31,9 @@ func TestEvaluatorSumsFactorsWhenNoTotalScoreFactor(t *testing.T) {
 		input.Scale.Factors[i].IsTotalScore = false
 	}
 
-	result, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+	result, err := NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
-		t.Fatalf("Evaluate returned error: %v", err)
+		t.Fatalf("Score returned error: %v", err)
 	}
 	if result.TotalScore != 13 {
 		t.Fatalf("total score = %.1f, want sum of factors 13.0", result.TotalScore)
@@ -45,9 +45,9 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 	input.AnswerSheet.Answers[0].Score = 40
 	input.AnswerSheet.Answers[1].Score = 50
 
-	result, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+	result, err := NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
-		t.Fatalf("Evaluate returned error: %v", err)
+		t.Fatalf("Score returned error: %v", err)
 	}
 	if result.RiskLevel != RiskLevelSevere {
 		t.Fatalf("overall risk = %s, want severe from total factor rule", result.RiskLevel)
@@ -55,31 +55,12 @@ func TestEvaluatorRiskMatchingAndOverallFallback(t *testing.T) {
 
 	input.Scale.Factors[0].IsTotalScore = false
 	input.Scale.Factors[0].InterpretRules = nil
-	result, err = NewDefaultEvaluator().Evaluate(context.Background(), input)
+	result, err = NewDefaultEvaluator().Score(context.Background(), input)
 	if err != nil {
-		t.Fatalf("Evaluate returned error: %v", err)
+		t.Fatalf("Score returned error: %v", err)
 	}
 	if result.RiskLevel != RiskLevelSevere {
 		t.Fatalf("overall risk = %s, want severe from highest factor default risk", result.RiskLevel)
-	}
-}
-
-func TestEvaluatorInterpretationUsesRulesAndDefaults(t *testing.T) {
-	input := scaleInterpretationInputForTest()
-
-	result, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
-	if err != nil {
-		t.Fatalf("Evaluate returned error: %v", err)
-	}
-	if result.Conclusion != "overall low" || result.Suggestion != "keep" {
-		t.Fatalf("overall interpretation = %q/%q, want rule content", result.Conclusion, result.Suggestion)
-	}
-	got := findFactorScoreForTest(result.FactorScores, "avg")
-	if got.Conclusion != "avg得分4.0分，处于正常水平" {
-		t.Fatalf("factor default conclusion = %q", got.Conclusion)
-	}
-	if got.Suggestion != "状态良好，继续保持" {
-		t.Fatalf("factor default suggestion = %q", got.Suggestion)
 	}
 }
 
@@ -88,9 +69,9 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 		input := scaleInterpretationInputForTest()
 		input.AnswerSheet = nil
 
-		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+		_, err := NewDefaultEvaluator().Score(context.Background(), input)
 		if err == nil || !strings.Contains(err.Error(), "answer sheet is required") {
-			t.Fatalf("Evaluate error = %v, want answer sheet required", err)
+			t.Fatalf("Score error = %v, want answer sheet required", err)
 		}
 	})
 
@@ -98,9 +79,9 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 		input := scaleInterpretationInputForTest()
 		input.Questionnaire = nil
 
-		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+		_, err := NewDefaultEvaluator().Score(context.Background(), input)
 		if err == nil || !strings.Contains(err.Error(), "questionnaire is required") {
-			t.Fatalf("Evaluate error = %v, want questionnaire required", err)
+			t.Fatalf("Score error = %v, want questionnaire required", err)
 		}
 	})
 
@@ -108,9 +89,9 @@ func TestEvaluatorReturnsCollectAndScoringErrors(t *testing.T) {
 		input := scaleInterpretationInputForTest()
 		input.Scale.Factors[0].ScoringStrategy = "unknown"
 
-		_, err := NewDefaultEvaluator().Evaluate(context.Background(), input)
+		_, err := NewDefaultEvaluator().Score(context.Background(), input)
 		if err == nil || !strings.Contains(err.Error(), "unsupported factor scoring strategy") {
-			t.Fatalf("Evaluate error = %v, want unsupported strategy", err)
+			t.Fatalf("Score error = %v, want unsupported strategy", err)
 		}
 	})
 }

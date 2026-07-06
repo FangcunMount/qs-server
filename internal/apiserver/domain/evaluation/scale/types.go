@@ -57,8 +57,6 @@ type ScaleOptionSnapshot struct {
 type ScaleInterpretationResult struct {
 	TotalScore   float64
 	RiskLevel    RiskLevel
-	Conclusion   string
-	Suggestion   string
 	FactorScores []ScaleFactorScore
 }
 
@@ -68,8 +66,6 @@ type ScaleFactorScore struct {
 	RawScore     float64
 	MaxScore     *float64
 	RiskLevel    RiskLevel
-	Conclusion   string
-	Suggestion   string
 	IsTotalScore bool
 }
 

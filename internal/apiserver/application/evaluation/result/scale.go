@@ -4,11 +4,11 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/score"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -78,13 +78,6 @@ func scaleReportInputFromOutcome(outcome Outcome) reportscore.ScaleReportInput {
 		}
 		if scores, ok := execution.Detail.Payload.([]assessment.FactorScoreResult); ok {
 			input.FactorScores = scaleFactorReportScores(scores)
-			for _, fs := range scores {
-				if fs.IsTotalScore {
-					input.Conclusion = fs.Conclusion
-					input.Suggestion = fs.Suggestion
-					break
-				}
-			}
 		}
 	}
 	return input
@@ -121,9 +114,10 @@ func scaleReportModelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) *report
 	factors := make([]reportscore.FactorReportModel, 0, len(snapshot.Factors))
 	for _, factor := range snapshot.Factors {
 		factors = append(factors, reportscore.FactorReportModel{
-			Code:     factor.Code,
-			Title:    factor.Title,
-			MaxScore: factor.MaxScore,
+			Code:           factor.Code,
+			Title:          factor.Title,
+			MaxScore:       factor.MaxScore,
+			InterpretRules: scaleFactorInterpretRules(factor.InterpretRules),
 		})
 	}
 	return &reportscore.ReportModel{
@@ -131,4 +125,21 @@ func scaleReportModelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) *report
 		Title:   snapshot.Title,
 		Factors: factors,
 	}
+}
+
+func scaleFactorInterpretRules(rules []scalesnapshot.InterpretRuleSnapshot) []reportscore.FactorInterpretRule {
+	if len(rules) == 0 {
+		return nil
+	}
+	converted := make([]reportscore.FactorInterpretRule, 0, len(rules))
+	for _, rule := range rules {
+		converted = append(converted, reportscore.FactorInterpretRule{
+			Min:        rule.Min,
+			Max:        rule.Max,
+			RiskLevel:  rule.RiskLevel,
+			Conclusion: rule.Conclusion,
+			Suggestion: rule.Suggestion,
+		})
+	}
+	return converted
 }

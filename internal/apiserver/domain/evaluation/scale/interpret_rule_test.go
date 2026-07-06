@@ -29,17 +29,3 @@ func TestFindInterpretRuleUsesLeftClosedRightOpenIntervals(t *testing.T) {
 		t.Fatalf("score 100 = %#v, want no match on [10,100)", got)
 	}
 }
-
-func TestFindInterpretRuleWithRangeFallbackUsesLastRuleWhenOutOfRange(t *testing.T) {
-	factor := scalesnapshot.FactorSnapshot{
-		InterpretRules: []scalesnapshot.InterpretRuleSnapshot{
-			{Min: 0, Max: 10, RiskLevel: string(RiskLevelLow), Conclusion: "low"},
-			{Min: 10, Max: 20, RiskLevel: string(RiskLevelHigh), Conclusion: "high"},
-		},
-	}
-
-	got := findInterpretRuleWithRangeFallback(factor, 100)
-	if got == nil || got.RiskLevel != string(RiskLevelHigh) {
-		t.Fatalf("fallback = %#v, want last rule high", got)
-	}
-}

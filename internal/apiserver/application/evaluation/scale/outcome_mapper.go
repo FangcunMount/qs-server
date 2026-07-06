@@ -68,8 +68,8 @@ func factorScoreResultsFromInterpretation(result *evaluationscale.ScaleInterpret
 			fs.FactorName,
 			fs.RawScore,
 			assessment.RiskLevel(fs.RiskLevel),
-			fs.Conclusion,
-			fs.Suggestion,
+			"",
+			"",
 			fs.IsTotalScore,
 		))
 	}

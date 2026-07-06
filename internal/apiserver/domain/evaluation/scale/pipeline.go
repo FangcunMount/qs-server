@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
 func (e *Evaluator) runScoring(ctx context.Context, input ScaleInterpretationInput) ([]ScaleFactorScore, float64, RiskLevel, error) {
@@ -15,22 +15,6 @@ func (e *Evaluator) runScoring(ctx context.Context, input ScaleInterpretationInp
 	}
 	factorScores, riskLevel := e.classifyRisk(input.Scale, factorScores)
 	return factorScores, totalScore, riskLevel, nil
-}
-
-func (e *Evaluator) runEvaluation(ctx context.Context, input ScaleInterpretationInput) (*ScaleInterpretationResult, error) {
-	factorScores, totalScore, riskLevel, err := e.runScoring(ctx, input)
-	if err != nil {
-		return nil, err
-	}
-	factorScores, conclusion, suggestion := e.interpret(input.Scale, factorScores, totalScore, riskLevel)
-
-	return &ScaleInterpretationResult{
-		TotalScore:   totalScore,
-		RiskLevel:    riskLevel,
-		Conclusion:   conclusion,
-		Suggestion:   suggestion,
-		FactorScores: factorScores,
-	}, nil
 }
 
 func (e *Evaluator) calculateScores(ctx context.Context, input ScaleInterpretationInput) ([]ScaleFactorScore, float64, error) {

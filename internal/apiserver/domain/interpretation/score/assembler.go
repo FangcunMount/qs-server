@@ -14,15 +14,35 @@ type ScaleReportInput struct {
 }
 
 // BuildScaleReport 组装 scale 家族解读报告。
+// 当因子未携带结论/建议文案时，依据模型解读规则在解读侧生成，
+// 整体结论/建议在未显式给定时取自总分因子。
 func BuildScaleReport(composer domainreport.ReportBuilder, input ScaleReportInput) (*domainreport.InterpretReport, error) {
+	factorScores := make([]FactorReportScore, 0, len(input.FactorScores))
+	for _, fs := range input.FactorScores {
+		if fs.Conclusion == "" && fs.Suggestion == "" {
+			fs.Conclusion, fs.Suggestion = interpretScaleFactor(input.Scale, fs)
+		}
+		factorScores = append(factorScores, fs)
+	}
+
+	conclusion, suggestion := input.Conclusion, input.Suggestion
+	if conclusion == "" && suggestion == "" {
+		for _, fs := range factorScores {
+			if fs.IsTotalScore {
+				conclusion, suggestion = fs.Conclusion, fs.Suggestion
+				break
+			}
+		}
+	}
+
 	return BuildReport(composer, ReportInput{
 		AssessmentID: input.AssessmentID,
 		Model:        input.Scale,
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
-		Conclusion:   input.Conclusion,
-		Suggestion:   input.Suggestion,
-		FactorScores: input.FactorScores,
+		Conclusion:   conclusion,
+		Suggestion:   suggestion,
+		FactorScores: factorScores,
 	})
 }
 
