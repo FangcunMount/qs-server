@@ -1,6 +1,8 @@
 # 08-多解释模型扩展专题--从 Scale 到 MBTI
 
-**本文回答**：为什么 qs-server 不能继续把 Scale 当作所有解释能力的中心；为什么 MBTI 不应该被实现成 MedicalScale 的一个特殊类型；为什么需要抽象 Interpretation Model；ScaleProvider、MBTIProvider、BigFiveProvider 应该如何作为同级 Provider 接入 Evaluation；新增解释模型时，会如何影响事件、持久化、Redis、统计、安全、观测和文档体系。
+**本文回答**：为什么 qs-server 不能继续把 Scale 当作所有解释能力的中心；为什么 MBTI 不应该被实现成 MedicalScale 的一个特殊类型；为什么需要把 Scale、MBTI、BigFive 等收敛到 Assessment Model 的统一模型资产层；新增模型资产时，会如何影响 Evaluation、Interpretation Model / Report、事件、持久化、Redis、统计、安全、观测和文档体系。
+
+> 当前口径校准：本文早期版本大量使用 `Interpretation Model / Provider / Context` 作为扩展抽象。当前文档体系已把模型资产层统一命名为 `assessment-model`，最终报告产出层命名为 `interpretation-model / report`。阅读本文后续 Provider 细节时，应以 [`../02-业务模块/assessment-model/README.md`](../02-业务模块/assessment-model/README.md) 和 [`../02-业务模块/interpretation-model/README.md`](../02-业务模块/interpretation-model/README.md) 的映射为准。
 
 ---
 
@@ -15,7 +17,7 @@ Survey -> Scale -> Evaluation
 升级为：
 
 ```text
-Survey -> Interpretation Model -> Concrete Models -> Evaluation
+Survey -> Assessment Model -> Evaluation -> Interpretation Model / Report
 ```
 
 其中：
@@ -23,13 +25,13 @@ Survey -> Interpretation Model -> Concrete Models -> Evaluation
 | 层次 | 职责 | 示例 |
 | ---- | ---- | ---- |
 | Survey | 作答事实 | Questionnaire、AnswerSheet、AnswerValue |
-| Interpretation Model | 解释模型接入协议 | ModelRef、Provider、Context、Registry |
-| Concrete Models | 具体解释模型规则 | Scale、MBTI、BigFive、职业兴趣测评 |
-| Evaluation | 通用测评执行引擎 | Assessment、EvaluationRun、EvaluationResult、InterpretReport |
+| Assessment Model | 统一测评模型资产 | AssessmentKind、PublishedModelSnapshot、Binding、Payload |
+| Evaluation | 通用测评执行层 | Assessment、EvaluationRun、EvaluationResult、Retry、Events |
+| Interpretation Model / Report | 解释报告产出层 | ReportBuilder、Adapter、InterpretReport、durable saver |
 
 核心判断：
 
-> **Scale 是一个具体解释模型，不是解释模型抽象层。MBTI 与 Scale 同级，应该通过统一 Interpretation Provider 接入 Evaluation，而不是被塞进 MedicalScale。**
+> **Scale 是 Assessment Model 下的一类具体模型资产，不是独立核心模块。MBTI 与 Scale 同级，应该通过统一模型资产、执行 descriptor 和报告 builder 接入，而不是被塞进 MedicalScale。**
 
 如果把 MBTI 塞进 Scale，短期可能少写一些代码，但长期会导致：
 
@@ -44,9 +46,15 @@ Evaluation 继续依赖 Scale 语义；
 正确方向是：
 
 ```text
-ScaleProvider implements InterpretationProvider
-MBTIProvider implements InterpretationProvider
-BigFiveProvider implements InterpretationProvider
+Assessment Model
+  -> Scale / MBTI / BigFive payload
+  -> Model descriptor / EvaluatorKey / Report builder metadata
+
+Evaluation
+  -> 根据发布快照和 descriptor 执行模型
+
+Interpretation Model / Report
+  -> 根据 outcome 选择 builder / adapter 生成 InterpretReport
 ```
 
 ---
@@ -93,7 +101,7 @@ InterpretationRule
 qs-server 到底是“医学量表系统”，还是“支持多种解释模型的测评执行平台”？
 ```
 
-如果目标是后者，Scale 就必须从“解释能力中心”降级为“具体解释模型之一”。
+如果目标是后者，Scale 就必须从“解释能力中心”降级为“Assessment Model 下的具体模型资产之一”。
 
 ---
 
@@ -173,27 +181,28 @@ AIInterpretation
 
 最后 Evaluation 会变成一个巨大的模型分发器，而不是通用执行引擎。
 
-### 2.3 选择三：抽象 Interpretation Model
+### 2.3 选择三：统一 Assessment Model 资产层
 
 也就是：
 
 ```text
+Assessment Model
+  -> PublishedModelSnapshot / Payload / Descriptor
 Evaluation
-  -> ModelRef
-  -> Registry.Resolve(model_type)
-  -> Provider.LoadContext
-  -> Provider.Evaluate
-  -> EvaluationResult
-  -> InterpretReport
+  -> EvaluatorKey / Executor / EvaluationResult
+Interpretation Model / Report
+  -> ReportBuilder / Adapter / InterpretReport
 ```
 
 这是更稳妥的长期方案。
 
-它保留了具体模型的独立性，也让 Evaluation 只关心通用执行生命周期。
+它保留了具体模型资产的独立性，也让 Evaluation 只关心通用执行生命周期，让 Report 只关心最终解释报告聚合。
 
 ---
 
-## 3. 新模型：Interpretation Model 抽象层
+## 3. 新模型：Assessment Model 资产层 + 执行/报告协议
+
+本节以下内容保留了早期 `ModelRef / Provider / Context / Registry` 设计语汇，可作为抽象设计参考；当前代码事实需要映射到 `assessmentmodel`、`evaluation` 和 `report` 三个模块。
 
 Interpretation Model 不是一个新的“万能业务模块”，而是一组接入协议。
 
@@ -1051,10 +1060,8 @@ Worker
 ### Interpretation Model 文档
 
 - `docs/02-业务模块/interpretation-model/README.md`
-- `docs/02-业务模块/interpretation-model/01-解释模型抽象--ModelRef-Provider-Context模型设计.md`
-- `docs/02-业务模块/interpretation-model/02-解释模型接入链路--注册-加载-执行-结果返回.md`
-- `docs/02-业务模块/interpretation-model/03-新增解释模型链路--以MBTI接入为例.md`
-- `docs/02-业务模块/interpretation-model/04-解释模型分层架构与事实源索引.md`
+- `docs/02-业务模块/assessment-model/README.md`
+- `docs/05-专题分析/01-为什么拆分Survey-InterpretationModel-Evaluation.md`
 
 ### Scale
 

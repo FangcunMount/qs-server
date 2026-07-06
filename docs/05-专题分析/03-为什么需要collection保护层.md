@@ -486,7 +486,7 @@ Nginx 或 API Gateway 可以做：
 
 apiserver 是主业务事实服务。它已经负责：
 
-- Survey/Scale/Evaluation/Actor/Plan/Statistics。
+- Survey/Assessment Model/Evaluation/Interpretation Model/Actor/Plan/Statistics。
 - MySQL/Mongo。
 - Event/Outbox。
 - Evaluation pipeline。
@@ -526,7 +526,7 @@ collection 的价值是：
 后续演进应坚持：
 
 1. collection 不直接写主业务数据库。
-2. collection 不拥有 Survey/Scale/Evaluation 聚合。
+2. collection 不拥有 Survey/Assessment Model/Evaluation/Interpretation Model 聚合。
 3. collection 的核心职责是 BFF、保护、适配、削峰、状态查询。
 4. 前台 submit/query/wait-report 必须有独立保护策略。
 5. SubmitQueue 不应被当作 durable MQ。

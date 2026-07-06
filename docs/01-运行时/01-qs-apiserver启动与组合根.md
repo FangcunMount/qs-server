@@ -12,7 +12,7 @@
 | 入口路径 | `cmd/qs-apiserver/apiserver.go -> internal/apiserver/app.go -> internal/apiserver/run.go -> internal/apiserver/process/run.go` |
 | 启动骨架 | `PrepareRun` 分阶段执行：资源准备、容器初始化、外部集成、传输层初始化、后台 runtime、shutdown callback |
 | 组合根职责 | `process` 负责启动编排和生命周期，`container` 负责把业务模块和基础设施接成可运行图 |
-| 业务模块 | `Survey / Scale / Actor / Evaluation / Plan / Statistics / IAM / Codes / QRCode / Notification` 等通过 `Container` 装配 |
+| 业务模块 | `Survey / AssessmentModel / Report / Actor / Evaluation / Plan / Statistics / IAM / Codes / QRCode / Notification` 等通过 `Container` 装配 |
 | 对外接口 | REST 由 `resttransport.NewRouter(...).RegisterRoutes(...)` 注册；gRPC 由 `grpctransport.NewRegistry(...).RegisterServices()` 注册 |
 | 后台 runtime | cache warmup、Plan 调度、Statistics 同步、Behavior pending reconcile、answersheet/assessment outbox relay 在 runtime stage 启动 |
 | 关键边界 | 业务状态仍由 apiserver 内的 application/domain/infra 承担；worker 只通过 internal gRPC 驱动 apiserver，不是第二写模型 |
@@ -46,7 +46,7 @@ flowchart LR
 3. 从 options 创建 `config.Config`；
 4. 交给 `process.Run(cfg)`。
 
-它不应该创建业务 service，也不应该知道 `survey / scale / evaluation` 的装配细节。业务装配应该留在 `container`。
+它不应该创建业务 service，也不应该知道 `survey / assessmentmodel / evaluation / report` 的装配细节。业务装配应该留在 `container`。
 
 ### `process.Run` 的语义
 
@@ -162,7 +162,7 @@ flowchart LR
 
 - `Survey` 和 `Scale` 是主业务前置域；
 - `Actor` 是身份/受试者/操作者等上下文；
-- `Evaluation` 依赖采集事实和量表规则；
+- `Evaluation` 依赖采集事实和测评模型资产；
 - `Plan` 会和 Actor / Evaluation / Survey 交互；
 - `Statistics` 是读侧聚合和同步能力；
 - `WarmupCoordinator` 依赖缓存和部分读侧能力。

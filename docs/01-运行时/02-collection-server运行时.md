@@ -9,7 +9,7 @@
 | 维度 | 结论 |
 | ---- | ---- |
 | 运行时定位 | `collection-server` 是面向小程序 / 收集端的 **REST BFF**，负责入口治理、身份前置、监护校验、提交削峰和 gRPC 转调 |
-| 主状态边界 | collection 不持有 `survey / scale / evaluation` 的权威写模型；答卷、测评、报告等主业务状态仍由 `qs-apiserver` 落库 |
+| 主状态边界 | collection 不持有 `survey / assessmentmodel / evaluation / report` 的权威写模型；答卷、测评、报告等主业务状态仍由 `qs-apiserver` 落库 |
 | 启动主线 | `main -> collection.NewApp -> config.CreateConfigFromOptions -> process.Run -> PrepareRun -> Run` |
 | PrepareRun 阶段 | `prepare resources -> initialize container -> initialize integrations -> initialize transports -> register shutdown callback` |
 | 资源层 | collection 的 `DatabaseManager` 只管理 Redis connectivity；Redis runtime 产出 `ops_runtime`、`lock_lease` 和 lock manager |
@@ -47,7 +47,7 @@ flowchart LR
     Clients -->|gRPC / mTLS / service auth| API[qs-apiserver]
 
     subgraph api[qs-apiserver]
-        Domain[Survey / Scale / Actor / Evaluation / Plan / Statistics]
+        Domain[Survey / AssessmentModel / Report / Actor / Evaluation / Plan / Statistics]
         Store[(MySQL / Mongo / Redis / Outbox)]
     end
 
@@ -625,5 +625,5 @@ make docs-hygiene
 | [04-进程间调用与gRPC.md](./04-进程间调用与gRPC.md) | gRPC / mTLS / service auth 细节 |
 | [05-IAM认证与身份链路.md](./05-IAM认证与身份链路.md) | JWT、Tenant、OrgScope、authz snapshot |
 | [07-优雅关闭与资源释放.md](./07-优雅关闭与资源释放.md) | shutdown hook 与资源释放 |
-| [../03-基础设施/resilience/](../03-基础设施/resilience/) | SubmitQueue、RateLimit、SubmitGuard 深讲 |
+| [../03-基础设施/concurrency/README.md](../03-基础设施/concurrency/README.md) | SubmitQueue、RateLimit、SubmitGuard 深讲 |
 | [../04-接口与运维/02-collection-REST.md](../04-接口与运维/02-collection-REST.md) | REST 契约与 HTTP status |

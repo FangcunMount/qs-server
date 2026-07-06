@@ -771,7 +771,7 @@ README.md
 docs/02-业务模块/survey/README.md
 docs/02-业务模块/evaluation/README.md
 docs/02-业务模块/interpretation-model/README.md
-docs/03-基础设施/resilience/README.md
+docs/03-基础设施/concurrency/README.md
 ```
 
 ---

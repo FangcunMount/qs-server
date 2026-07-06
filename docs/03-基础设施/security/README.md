@@ -76,8 +76,8 @@ mTLS 证书身份和 service token 是否一致？
 | IAM policy / Casbin 真值 | IAM / AuthzSnapshot |
 | 业务主数据权限之外的领域规则 | 业务模块 |
 | 数据库 schema / repository | Data Access |
-| 服务限流、背压、锁 | Resilience |
-| Redis cache / token cache 治理 | Redis Plane |
+| 服务限流、背压、锁 | 高并发保护模块 |
+| Redis cache / token cache 治理 | 缓存模块 |
 | 历史修复和补偿 | Backfill / Repair SOP |
 | 完整服务 ACL 文件加载 | 后续 Service ACL 实现 |
 | 统一大 SecurityService | 当前不做 |

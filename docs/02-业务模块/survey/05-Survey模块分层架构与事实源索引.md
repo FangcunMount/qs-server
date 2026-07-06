@@ -417,7 +417,7 @@ LockLease / SubmitGuard。
 相关事实源：
 
 ```text
-docs/03-基础设施/resilience/README.md
+docs/03-基础设施/concurrency/README.md
 docs/03-基础设施/resilience/01-RateLimit入口限流.md
 docs/03-基础设施/resilience/02-SubmitQueue提交削峰.md
 docs/03-基础设施/resilience/03-Backpressure下游背压.md
@@ -554,7 +554,7 @@ Survey 文档分成六篇。
 
 ```text
 docs/01-运行时/02-collection-server运行时.md
-docs/03-基础设施/resilience/README.md
+docs/03-基础设施/concurrency/README.md
 docs/02-业务模块/scale/README.md
 docs/02-业务模块/evaluation/README.md
 ```

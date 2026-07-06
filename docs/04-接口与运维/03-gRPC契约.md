@@ -62,7 +62,7 @@ flowchart LR
 | ActorService | Testee/Clinician 相关 service 非 nil | collection |
 | EvaluationService | Submission/Report/Score service 非 nil | collection、worker |
 | ScaleService | Scale query/category service 非 nil | collection |
-| InternalService | Survey/Scale/Evaluation/Actor/Plan/Statistics/Warmup/QR/Notification 等依赖满足 | worker |
+| InternalService | Survey/AssessmentModel/Report/Evaluation/Actor/Plan/Statistics/Warmup/QR/Notification 等依赖满足 | worker |
 | PlanCommandService | Plan command service 非 nil | internal usage / client |
 
 Registry 里如果依赖缺失，会记录 warning 并 skip 注册，不直接 panic。

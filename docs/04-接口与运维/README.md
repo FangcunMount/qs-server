@@ -69,7 +69,7 @@
 | 文档组 | 负责 |
 | ------ | ---- |
 | `01-运行时/` | 三进程业务运行时、请求链路、进程间协作 |
-| `02-业务模块/` | Survey / Scale / Evaluation / Actor / Plan / Statistics 的业务语义 |
+| `02-业务模块/` | Survey / Assessment Model / Evaluation / Interpretation Model / Actor / Plan / Statistics 的业务语义 |
 | `03-基础设施/` | Event、DataAccess、Redis、Resilience、Security、Integrations、Runtime、Observability 的机制深讲 |
 | `04-接口与运维/` | REST/gRPC 契约、配置部署、端口、调度、健康检查、排障、容量 |
 | `05-专题分析/` | 事故复盘、质量报告、专项分析、历史专题 |

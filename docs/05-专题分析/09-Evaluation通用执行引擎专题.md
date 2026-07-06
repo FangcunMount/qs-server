@@ -940,8 +940,8 @@ report_save_failed
 ### Interpretation Model
 
 - `docs/02-业务模块/interpretation-model/README.md`
-- `docs/02-业务模块/interpretation-model/01-解释模型抽象--ModelRef-Provider-Context模型设计.md`
-- `docs/02-业务模块/interpretation-model/02-解释模型接入链路--注册-加载-执行-结果返回.md`
+- `docs/02-业务模块/assessment-model/README.md`
+- `docs/05-专题分析/01-为什么拆分Survey-InterpretationModel-Evaluation.md`
 
 ### Worker / Event
 

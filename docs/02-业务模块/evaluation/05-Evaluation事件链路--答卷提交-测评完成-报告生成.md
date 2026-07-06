@@ -47,7 +47,7 @@ InterpretReportGeneratedEvent  Evaluation 事件，表示报告生成完成
 
 ```text
 Evaluation 事件类型；
-Survey / Scale / MBTI / Evaluation 事件边界；
+Survey / Assessment Model / MBTI / Evaluation 事件边界；
 AnswerSheetSubmittedEvent 如何触发 Evaluation；
 AssessmentCreatedEvent / AssessmentStartedEvent / AssessmentInterpretedEvent / AssessmentFailedEvent；
 InterpretReportGeneratedEvent；

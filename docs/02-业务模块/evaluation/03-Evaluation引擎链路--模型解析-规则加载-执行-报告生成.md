@@ -97,7 +97,7 @@ Report 持久化；
 05-Evaluation事件链路--答卷提交-测评完成-报告生成.md
 06-Evaluation模块分层架构与事实源索引.md
 ../interpretation-model/README.md
-../interpretation-model/01-解释模型抽象--ModelRef-Provider-Context模型设计.md
+../assessment-model/README.md
 ```
 
 ---

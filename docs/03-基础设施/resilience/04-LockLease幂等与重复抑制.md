@@ -796,7 +796,7 @@ git diff --check
 | ---- | ---- |
 | 观测降级排障 | [05-观测降级与排障.md](./05-观测降级与排障.md) |
 | 新增高并发治理能力 | [06-新增高并发治理能力SOP.md](./06-新增高并发治理能力SOP.md) |
-| 能力矩阵 | [07-能力矩阵.md](./07-能力矩阵.md) |
+| 能力矩阵 | [../01-能力矩阵.md](../01-能力矩阵.md) |
 | Redis 分布式锁层 | [../redis/06-Redis分布式锁层.md](../redis/06-Redis分布式锁层.md) |
 | SubmitQueue 提交削峰 | [02-SubmitQueue提交削峰.md](./02-SubmitQueue提交削峰.md) |
-| 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |
+| 回看高并发保护入口 | [../concurrency/README.md](../concurrency/README.md) |

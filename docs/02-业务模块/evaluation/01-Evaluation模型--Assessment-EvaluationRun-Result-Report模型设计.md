@@ -80,7 +80,7 @@ InterpretReport；
 FailureReason；
 IdempotencyKey；
 Evaluation 领域事件；
-Evaluation 与 Survey / Scale / MBTI / Interpretation Model 的模型边界。
+Evaluation 与 Survey / Assessment Model / MBTI / Interpretation Model 的模型边界。
 ```
 
 本文不展开：
@@ -102,7 +102,7 @@ Outbox 与 MQ 的基础设施实现。
 ../survey/README.md
 ../scale/README.md
 ../interpretation-model/README.md
-../interpretation-model/01-解释模型抽象--ModelRef-Provider-Context模型设计.md
+../assessment-model/README.md
 02-Evaluation执行链路--从AnswerSheet提交到Assessment完成.md
 03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md
 04-Evaluation失败重试链路--幂等-错误状态-补偿处理.md

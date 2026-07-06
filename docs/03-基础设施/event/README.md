@@ -1,103 +1,96 @@
 # Event System 阅读地图
 
-**本文回答**：`event/` 子目录这一组文档应该如何阅读；qs-server 的事件系统负责什么、不负责什么；事件目录、Publish/Outbox、Worker Ack/Nack、新增事件 SOP、观测排障和 MQ 选型分别应该去哪里看。
+**本文回答**：qs-server 的事件模块如何支撑异步测评链路；Event、Outbox、MQ、Worker 和 Redis signaling 分别负责什么；为什么 Outbox、MQ、一次性信令不是替代关系。
 
 ---
 
 ## 30 秒结论
 
-| 维度 | 结论 |
-| ---- | ---- |
-| 模块定位 | Event System 是 qs-server 的**异步流程驱动核心**，连接 Survey、Evaluation、Actor、Plan、Statistics 等模块 |
-| 契约真值 | `configs/events.yaml` 定义 topic、event type、delivery、aggregate、domain、handler |
-| 当前 Topic | `qs.survey.lifecycle`、`qs.evaluation.lifecycle`、`qs.analytics.behavior`、`qs.plan.task` |
-| 当前 Event | 当前事件目录包含 19 个事件 |
-| 出站模型 | `best_effort` 走 direct publish；`durable_outbox` 先 stage outbox，再由 relay 发布 |
-| 消费模型 | worker 根据 event catalog 订阅 topic，通过显式 handler registry 分发 handler |
-| Ack/Nack | poison message Ack；handler 成功 Ack；handler 失败 Nack |
-| 可靠性边界 | Outbox 解决可靠出站，不解决 exactly-once；consumer 仍必须幂等 |
-| MQ 默认 | 当前默认选择 NSQ，代码支持 NSQ / RabbitMQ provider 分支 |
-| 观测入口 | publish/outbox/consume outcome、outbox backlog、consume duration、只读 event status |
-| 推荐读法 | 先读整体架构，再读事件目录、Publish/Outbox、Worker Ack/Nack、SOP、观测排障，最后读 MQ 选型 |
+事件模块是 qs-server 从同步提交走向异步测评的关键基础设施。
 
-一句话概括：
+答卷提交接口不直接同步完成测评和报告生成，而是先保存 AnswerSheet，再通过 Outbox 记录领域事件。Outbox relay 将事件可靠发布到 MQ，worker 消费事件后执行测评、生成报告，并继续推进报告状态。
 
-> **事件系统负责把“业务事实已经发生”可靠或尽力通知出去；业务事实仍由各业务模块的聚合、仓储和事务边界维护。**
+在报告查询场景中，系统额外引入一次性信令机制。worker 完成报告后写入 report_status，并通过 Redis signaling 唤醒正在等待的 wait-report 请求。这个信令只负责临时唤醒，不承担可靠投递职责；真正的业务事实仍然以数据库状态、Outbox 事件和报告状态为准。
 
 ---
 
-## 1. Event System 负责什么
+## 四层边界
 
-Event System 负责 qs-server 的异步消息机制：
-
-```text
-事件契约
-事件发布
-可靠出站
-MQ 传输
-worker 消费
-Ack/Nack
-行为投影
-主链路异步驱动
-事件观测
-事件排障
-```
-
-它要回答：
-
-```text
-某个业务事实是否应该成为事件？
-这个事件发到哪个 topic？
-它是 best_effort 还是 durable_outbox？
-业务状态和事件出站是否在同一事务边界？
-worker 是否订阅了对应 topic？
-handler 是否注册？
-消息失败时 Ack 还是 Nack？
-outbox 是否堆积？
-handler 是否重复执行？
-```
-
----
-
-## 2. Event System 不负责什么
-
-| 不属于 Event System 的内容 | 应归属 |
-| --------------------------- | ------ |
-| 业务状态机和聚合不变量 | `02-业务模块/*` |
-| AnswerSheet / Assessment / Report 的主事实 | Survey / Evaluation |
-| Task 状态事实 | Plan |
-| Testee 标签和 Actor 主数据 | Actor |
-| Statistics read model 口径 | Statistics |
-| DB 事务和 schema 演进 | Data Access |
-| Redis lock/cache 本身 | Redis / Resilience |
-| 具体 WeChat/OSS/Notification SDK | Integrations |
-| REST/gRPC 接口契约 | 接口与运维文档 |
-| exactly-once 全链路保证 | 当前不承诺，由 outbox + 幂等降低风险 |
+| 层 | 作用 | 当前事实源 |
+| -- | ---- | ---------- |
+| Event | 表达已经发生的业务事实，例如答卷已提交、测评已解读、报告已生成 | `configs/events.yaml`、`internal/apiserver/domain/*/events.go` |
+| Outbox | 解决业务写入与事件发布的一致性，承载不能丢的业务事件 | `internal/apiserver/outboxcore`、`infra/*/eventoutbox` |
+| MQ | 跨进程异步消费，让 worker 执行测评、报告生成、投影等副作用 | `internal/pkg/eventcatalog`、`internal/worker/handlers` |
+| 一次性信令 | 临时唤醒在线等待请求或触发缓存失效/预热，不承担可靠事件职责 | `configs/signals.yaml`、`internal/pkg/cachesignal` |
 
 一句话边界：
 
 ```text
-事件系统传递事实；
-业务模块保存事实；
-worker 执行副作用；
-handler 必须幂等。
+Outbox 解决可靠出站。
+MQ 解决异步解耦。
+Redis signaling 解决临时唤醒。
+三者不是替代关系。
 ```
 
 ---
 
-## 3. 本目录文档地图
+## 为什么不能混用
 
-```text
-event/
-├── README.md
-├── 00-整体架构.md
-├── 01-事件目录与契约.md
-├── 02-Publish与Outbox.md
-├── 03-Worker消费与AckNack.md
-├── 04-新增事件SOP.md
-├── 05-观测与排障.md
-└── 06-MQ 选型与分析.md
+| 常见追问 | 回答 |
+| -------- | ---- |
+| 既然用了 MQ，为什么还要 Outbox？ | MQ 只负责传输。Outbox 把业务状态写入和事件出站放进可恢复的本地事实中，避免“业务写成功但事件丢了”。 |
+| 既然用了 Redis Pub/Sub，为什么还要 MQ？ | Redis Pub/Sub 是 best-effort 临时信令，订阅者不在线就可能错过；MQ 承载跨进程 worker 消费和重试。 |
+| 既然报告完成可以写 Redis，为什么还要事件？ | Redis report_status 服务查询体验；报告生成、测评完成等业务事实仍要通过持久化状态和事件链路追踪。 |
+| Outbox 能不能保证 exactly-once？ | 不能。Outbox 降低丢事件风险，consumer 仍必须幂等，worker 仍要处理重复投递。 |
+
+---
+
+## 当前事件契约
+
+`configs/events.yaml` 是当前事件契约真值：
+
+| 维度 | 当前事实 |
+| ---- | -------- |
+| Topic | `qs.survey.lifecycle`、`qs.evaluation.lifecycle`、`qs.analytics.behavior`、`qs.plan.task` |
+| Delivery | `durable_outbox`、`best_effort` |
+| durable 事件 | `answersheet.submitted`、`assessment.*`、`report.generated`、`footprint.*` 等 |
+| best-effort 事件 | `questionnaire.changed`、`scale.changed`、`task.*` |
+| ephemeral signal | 不在 `events.yaml` 中，单独见 `configs/signals.yaml` |
+
+一次性信令当前包括 `report_status_changed`、`questionnaire_cache_changed`、`scale_cache_changed`、`personality_model_cache_changed`。
+
+---
+
+## 异步测评主链路
+
+```mermaid
+sequenceDiagram
+    participant Client as Client
+    participant Collection as collection-server
+    participant API as qs-apiserver
+    participant Outbox as Outbox
+    participant MQ as MQ
+    participant Worker as qs-worker
+    participant Status as report_status
+    participant Signal as Redis signaling
+
+    Client->>Collection: POST answersheet
+    Collection->>API: Save AnswerSheet / durable submit
+    API->>Outbox: stage answersheet.submitted
+    API-->>Collection: accepted / answerSheetID
+    Outbox->>MQ: relay durable event
+    MQ->>Worker: consume answersheet.submitted
+    Worker->>API: create / run assessment
+    API->>Outbox: stage assessment/report events
+    Worker->>Status: write report status
+    Worker->>Signal: publish report_status_changed
+    Signal-->>Collection: wake wait-report
+    Collection-->>Client: interpreted / next_poll_after_ms
 ```
+
+---
+
+## 当前文档地图
 
 | 顺序 | 文档 | 先回答什么 |
 | ---- | ---- | ---------- |
@@ -109,392 +102,40 @@ event/
 | 6 | [05-观测与排障.md](./05-观测与排障.md) | 事件系统如何观测和逐层排障 |
 | 7 | [06-MQ 选型与分析.md](./06-MQ%20选型与分析.md) | 为什么当前默认选择 NSQ，以及主流 MQ 对比 |
 
-> 如果落库时使用你规划中的长文件名：`06-MQ 选型与分析--讨论市面主流 MQ 的实现方式与优缺点，分析为什么选择 NSQ .md`，请同步调整 README 中的链接。
+---
+
+## 排查入口
+
+| 问题 | 优先阅读 |
+| ---- | -------- |
+| 答卷提交后没有测评结果 | [02-Publish与Outbox.md](./02-Publish与Outbox.md)、[03-Worker消费与AckNack.md](./03-Worker消费与AckNack.md)、[05-观测与排障.md](./05-观测与排障.md) |
+| outbox 堆积 | [02-Publish与Outbox.md](./02-Publish与Outbox.md)、[05-观测与排障.md](./05-观测与排障.md) |
+| worker 重复消费 | [03-Worker消费与AckNack.md](./03-Worker消费与AckNack.md)、[../concurrency/README.md](../concurrency/README.md) |
+| report 查询没有被唤醒 | `configs/signals.yaml`、[../concurrency/README.md](../concurrency/README.md)、[../../04-接口与运维/12-小程序报告等待接入指南.md](../../04-接口与运维/12-小程序报告等待接入指南.md) |
+| 新增事件 | [04-新增事件SOP.md](./04-新增事件SOP.md)、`configs/events.yaml` |
 
 ---
 
-## 4. 推荐阅读路径
+## 幂等与补偿边界
 
-### 4.1 第一次理解事件系统
-
-按顺序读：
-
-```text
-00-整体架构
-  -> 01-事件目录与契约
-  -> 02-Publish与Outbox
-  -> 03-Worker消费与AckNack
-```
-
-读完后应能回答：
-
-1. `configs/events.yaml` 为什么是事件契约真值？
-2. `best_effort` 和 `durable_outbox` 的边界是什么？
-3. 为什么 RoutingPublisher 不直接判断 durable event？
-4. 为什么 worker handler 必须显式注册？
-5. 为什么 handler 失败会 Nack？
-6. 为什么毒消息要 Ack？
-
-### 4.2 要新增事件
-
-读：
-
-```text
-04-新增事件SOP
-  -> 01-事件目录与契约
-  -> 02-Publish与Outbox
-  -> 03-Worker消费与AckNack
-```
-
-重点看：
-
-- 这个需求是不是“已发生的业务事实”。
-- event type 是否是过去式事实。
-- topic 是否复用现有 4 个 topic。
-- delivery 应该是 best_effort 还是 durable_outbox。
-- payload 是否只包含必要字段。
-- worker handler 是否幂等。
-- Ack/Nack 语义是否明确。
-- 测试和文档是否补齐。
-
-### 4.3 要排查“答卷提交后没有报告”
-
-读：
-
-```text
-05-观测与排障
-  -> 02-Publish与Outbox
-  -> 03-Worker消费与AckNack
-```
-
-按链路查：
-
-```text
-answersheet.submitted outbox
-  -> relay published
-  -> worker answersheet_submitted_handler
-  -> CreateAssessmentFromAnswerSheet
-  -> assessment.created outbox
-  -> assessment_created_handler
-  -> CompleteAssessment
-  -> assessment.completed outbox
-  -> assessment_completed_handler
-  -> interpretation.completed outbox
-  -> interpretation_completed_handler
-  -> report.generated / assessment.failed
-```
-
-### 4.4 要排查 outbox 堆积
-
-读：
-
-```text
-02-Publish与Outbox
-  -> 05-观测与排障
-```
-
-重点看：
-
-- pending / failed / publishing 数量。
-- oldest age。
-- relay 是否运行。
-- ClaimDueEvents 是否失败。
-- MQ publisher 是否失败。
-- mark published/failed 是否失败。
-- last_error 和 next_attempt_at。
-
-### 4.5 要排查 worker 重复消费
-
-读：
-
-```text
-03-Worker消费与AckNack
-  -> 05-观测与排障
-```
-
-重点看：
-
-- handler 是否 Nack。
-- Ack 是否失败。
-- MQ 是否重投。
-- handler 是否幂等。
-- 是否使用 locklease / checkpoint / 状态机 / 唯一约束。
-- duplicate suppression 是否 degraded-open。
-
-### 4.6 要理解 MQ 选型
-
-读：
-
-```text
-06-MQ 选型与分析
-  -> 00-整体架构
-```
-
-重点看：
-
-- 当前事件系统是轻量 worker 任务链，不是大数据流平台。
-- NSQ topic/channel 如何匹配 worker serviceName/channel。
-- NSQ 的不足如何由 outbox 和 handler 幂等补偿。
-- RabbitMQ/Kafka/Pulsar/RocketMQ/Redis Streams/NATS/SQS 什么时候重新评估。
+| 层 | 当前要求 |
+| -- | -------- |
+| Producer | durable 事件必须 stage 到 Outbox；业务事实和事件出站不能只靠 direct publish |
+| Relay | 负责 claim、publish、mark published/failed；失败后留待下一轮或补偿治理 |
+| Consumer | handler 必须幂等，能接受 MQ 重投和重复消息 |
+| Worker duplicate suppression | 只降低重复副作用，不替代业务幂等和 DB 约束 |
+| Report signaling | 只唤醒等待请求；错过信令时客户端仍通过 status 查询和 `next_poll_after_ms` 兜底 |
 
 ---
 
-## 5. Event System 主链路
+## 代码事实源
 
-```mermaid
-flowchart LR
-    answer["AnswerSheet<br/>submitted"] --> outbox1["Mongo/MySQL Outbox"]
-    outbox1 --> mq1["qs.evaluation.lifecycle"]
-    mq1 --> worker1["answersheet_submitted_handler"]
-    worker1 --> assessment["Create Assessment"]
-    assessment --> outbox2["Assessment Created Outbox"]
-    outbox2 --> mq2["qs.evaluation.lifecycle"]
-    mq2 --> worker2["assessment_created_handler"]
-    worker2 --> completed["Complete Assessment"]
-    completed --> outbox3["Assessment Completed Outbox"]
-    outbox3 --> mq3["qs.evaluation.lifecycle"]
-    mq3 --> worker3["assessment_completed_handler"]
-    worker3 --> interpretation["Complete Interpretation"]
-    interpretation --> outbox4["Interpretation Completed Outbox"]
-    outbox4 --> mq4["qs.evaluation.lifecycle"]
-    mq4 --> worker4["interpretation_completed_handler"]
-    worker4 --> report["Report generated"]
-    report --> outbox5["Report / Footprint Outbox"]
-    outbox5 --> mq5["assessment + analytics topics"]
-    mq5 --> worker5["report / behavior handlers"]
-```
-
-1. Survey 保存答卷事实。
-2. durable outbox 发布 `answersheet.submitted`。
-3. Worker 创建 Assessment，并发布 `assessment.created`。
-4. Evaluation 执行测评流程，并发布 `assessment.completed`。
-5. Interpretation Provider 完成解释流程，并发布 `interpretation.completed`。
-6. Report 生成成功后发布 `report.generated`、`footprint.report_generated`。
-7. Worker 继续做重点关注同步、行为投影、统计等副作用。
-
-这条链路只表达事件系统的异步驱动顺序，不绑定具体解释模型。Scale、MBTI、BigFive 等解释模型都应通过 Interpretation Provider 接入 Evaluation；事件系统只关心 `assessment.created`、`assessment.completed`、`interpretation.completed`、`report.generated` 这些阶段性事实，而不关心 Provider 内部如何加载规则、计算分数或生成解释。
-
----
-
-## 6. 四类 Topic
-
-| Topic Key | Topic Name | 说明 |
-| --------- | ---------- | ---- |
-| `questionnaire-lifecycle` | `qs.survey.lifecycle` | 问卷和量表生命周期事件 |
-| `assessment-lifecycle` | `qs.evaluation.lifecycle` | 答卷、测评、报告主链路事件 |
-| `analytics-behavior` | `qs.analytics.behavior` | 行为足迹与测评服务过程投影事件 |
-| `task-lifecycle` | `qs.plan.task` | 测评任务生命周期事件 |
-
----
-
-## 7. 两类 Delivery
-
-### 7.1 best_effort
-
-当前 best_effort 事件：
-
-```text
-questionnaire.changed
-scale.changed
-task.opened
-task.completed
-task.expired
-task.canceled
-```
-
-语义：
-
-```text
-业务状态已保存；
-事件尽力发布；
-发布失败一般不回滚主状态；
-不承诺 outbox 级补发。
-```
-
-### 7.2 durable_outbox
-
-当前 durable_outbox 事件：
-
-```text
-answersheet.submitted
-assessment.created
-assessment.completed
-interpretation.completed
-assessment.failed
-report.generated
-footprint.*
-```
-
-语义：
-
-```text
-业务主状态与 outbox record 在同一持久化边界写入；
-relay 异步发布；
-失败可重试；
-consumer 仍需幂等。
-```
-
----
-
-## 8. 事实源与边界
-
-| 事实 | 真值 |
+| 主题 | 路径 |
 | ---- | ---- |
-| event type / topic / delivery / handler | `configs/events.yaml` |
-| 代码侧 event 常量 | `internal/pkg/eventcatalog/types.go` |
-| topic 路由 | `eventcatalog.Catalog` + `RoutingPublisher` |
-| direct publish helper | `application/eventing.PublishCollectedEvents` |
-| durable 出站状态 | MySQL/Mongo outbox store |
-| relay 逻辑 | `application/eventing.OutboxRelay` |
-| worker handler 绑定 | `worker/handlers.NewRegistry()` |
-| worker dispatch | `worker/integration/eventing.Dispatcher` |
-| Ack/Nack | `worker/integration/messaging.MessageSettlementPolicy` |
-| publish/outbox/consume 指标 | `eventobservability` |
-
----
-
-## 9. 维护原则
-
-### 9.1 先定义事实，再定义事件
-
-新增事件前先判断：
-
-```text
-这是业务事实吗？
-它已经发生了吗？
-谁是事实源？
-下游为什么需要它？
-丢失会怎样？
-```
-
-### 9.2 不用事件伪装 RPC
-
-如果需要请求-响应结果，用 REST/gRPC。事件适合广播已发生事实，不适合做同步函数调用。
-
-### 9.3 delivery class 不能随意改
-
-`best_effort -> durable_outbox` 需要新增 outbox stage 边界。
-
-`durable_outbox -> best_effort` 通常风险很大，必须证明事件丢失不会影响主流程。
-
-### 9.4 durable event 不走普通 direct publish
-
-除 OutboxRelay 外，应用服务不应直接 publish durable_outbox event。
-
-### 9.5 worker handler 必须幂等
-
-不要假设消息只会消费一次。Ack failed、Nack retry、worker crash、MQ redelivery 都可能导致重复执行。
-
-### 9.6 事件观测标签必须低基数
-
-metrics label 不放 event_id、assessment_id、answer_sheet_id、task_id、user_id 等高基数字段。
-
----
-
-## 10. 常见误区
-
-### 10.1 “Event System 负责业务状态”
-
-错误。事件系统只传递事实；业务状态由业务模块保存。
-
-### 10.2 “Outbox 保证 exactly-once”
-
-错误。Outbox 保证可靠出站，不保证全链路 exactly-once。
-
-### 10.3 “best_effort 就是不重要”
-
-不准确。best_effort 只是可靠性等级较低，不代表业务完全不关心。
-
-### 10.4 “worker Ack 就代表业务一定成功”
-
-不一定。Ack 只说明 handler 返回 nil。还要看 handler 是否正确完成业务调用。
-
-### 10.5 “poison message 应该 Nack”
-
-通常不应该。无法解析 event type 的消息重试也无法修复，会阻塞队列。
-
-### 10.6 “RabbitMQ/Kafka 一定比 NSQ 好”
-
-不成立。MQ 选型要看当前事件模型、部署复杂度、团队运维能力和可靠性补偿方式。
-
----
-
-## 11. 代码锚点
-
-### Contract / Catalog
-
-- Event config：[../../../configs/events.yaml](../../../configs/events.yaml)
-- Event catalog：[../../../internal/pkg/eventcatalog/](../../../internal/pkg/eventcatalog/)
-- Event constants：[../../../internal/pkg/eventcatalog/types.go](../../../internal/pkg/eventcatalog/types.go)
-
-### Publish / Outbox
-
-- Publish helper：[../../../internal/apiserver/application/eventing/publish.go](../../../internal/apiserver/application/eventing/publish.go)
-- RoutingPublisher：[../../../internal/pkg/eventruntime/publisher.go](../../../internal/pkg/eventruntime/publisher.go)
-- Outbox core：[../../../internal/apiserver/outboxcore/core.go](../../../internal/apiserver/outboxcore/core.go)
-- Outbox relay：[../../../internal/apiserver/application/eventing/outbox.go](../../../internal/apiserver/application/eventing/outbox.go)
-- MySQL outbox：[../../../internal/apiserver/infra/mysql/eventoutbox/](../../../internal/apiserver/infra/mysql/eventoutbox/)
-- Mongo outbox：[../../../internal/apiserver/infra/mongo/eventoutbox/](../../../internal/apiserver/infra/mongo/eventoutbox/)
-
-### Worker
-
-- Worker dispatcher：[../../../internal/worker/integration/eventing/dispatcher.go](../../../internal/worker/integration/eventing/dispatcher.go)
-- Messaging runtime：[../../../internal/worker/integration/messaging/runtime.go](../../../internal/worker/integration/messaging/runtime.go)
-- Worker handlers：[../../../internal/worker/handlers/](../../../internal/worker/handlers/)
-
-### Observability / MQ
-
-- Event observability：[../../../internal/pkg/eventobservability/](../../../internal/pkg/eventobservability/)
-- Messaging options：[../../../internal/pkg/options/messaging_options.go](../../../internal/pkg/options/messaging_options.go)
-
----
-
-## 12. Verify
-
-基础：
-
-```bash
-go test ./internal/pkg/eventcatalog
-go test ./internal/pkg/eventcodec
-go test ./internal/pkg/eventruntime
-go test ./internal/pkg/eventobservability
-```
-
-Outbox：
-
-```bash
-go test ./internal/apiserver/application/eventing
-go test ./internal/apiserver/outboxcore
-go test ./internal/apiserver/infra/mysql/eventoutbox
-go test ./internal/apiserver/infra/mongo/eventoutbox
-```
-
-Worker：
-
-```bash
-go test ./internal/worker/integration/eventing
-go test ./internal/worker/integration/messaging
-go test ./internal/worker/handlers
-```
-
-文档：
-
-```bash
-make docs-hygiene
-git diff --check
-```
-
----
-
-## 13. 下一跳
-
-| 目标 | 文档 |
-| ---- | ---- |
-| 事件系统整体架构 | [00-整体架构.md](./00-整体架构.md) |
-| 事件目录与契约 | [01-事件目录与契约.md](./01-事件目录与契约.md) |
-| Publish 与 Outbox | [02-Publish与Outbox.md](./02-Publish与Outbox.md) |
-| Worker 消费与 Ack/Nack | [03-Worker消费与AckNack.md](./03-Worker消费与AckNack.md) |
-| 新增事件 SOP | [04-新增事件SOP.md](./04-新增事件SOP.md) |
-| 观测与排障 | [05-观测与排障.md](./05-观测与排障.md) |
-| MQ 选型与分析 | [06-MQ 选型与分析.md](./06-MQ%20选型与分析.md) |
-| 回到基础设施总入口 | [../README.md](../README.md) |
+| 事件契约 | `configs/events.yaml` |
+| 一次性信令 | `configs/signals.yaml` |
+| 事件目录加载 | `internal/pkg/eventcatalog` |
+| 发布与 Outbox | `internal/apiserver/application/eventing`、`internal/apiserver/outboxcore` |
+| Outbox store | `internal/apiserver/infra/mongo/eventoutbox`、`internal/apiserver/infra/mysql/eventoutbox` |
+| Worker handler | `internal/worker/handlers` |
+| report signal / cache signal | `internal/pkg/cachesignal`、`internal/collection-server/application/reportwait` |

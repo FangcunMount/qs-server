@@ -500,13 +500,13 @@ answersheet:processing:{answerSheetID}
 | ------ | ------- | -------- |
 | `footprint.*` | `behavior_projector_handler` | 调 internal gRPC ProjectBehaviorEvent，更新 behavior projection |
 
-### 14.4 Survey / Scale / Interpretation Model lifecycle
+### 14.4 Survey / Assessment Model / Report lifecycle
 
 | Event | Handler | 主要动作 |
 | ----- | ------- | -------- |
 | `questionnaire.changed` | `questionnaire_changed_handler` | 问卷发布后动作，例如二维码/缓存刷新 |
-| `scale.changed` | `scale_changed_handler` | 医学量表规则变化后动作，例如二维码/缓存刷新 |
-| `interpretation-model.changed` | `interpretation_model_changed_handler` | 解释模型规则变化后动作，例如 Context cache 失效、读模型刷新 |
+| `scale.changed` | `scale_changed_handler` | 医学量表模型资产变化后动作，例如二维码/缓存刷新 |
+| `interpretation-model.changed` | `interpretation_model_changed_handler` | 解释模型或报告模型变化后动作，例如 Context cache 失效、读模型刷新 |
 
 注意：`interpretation-model.changed` 表示规则变化，不表示某次 Assessment 的解释执行完成；某次测评中的解释结果应由 `interpretation.completed` / `interpretation.failed` 表达。
 

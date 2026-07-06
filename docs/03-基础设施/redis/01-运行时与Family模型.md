@@ -837,4 +837,4 @@ git diff --check
 | QueryCache 与 StaticList | [04-QueryCache与StaticList.md](./04-QueryCache与StaticList.md) |
 | Hotset 与 WarmupTarget | [05-Hotset与WarmupTarget模型.md](./05-Hotset与WarmupTarget模型.md) |
 | Redis 分布式锁 | [06-Redis分布式锁层.md](./06-Redis分布式锁层.md) |
-| 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |
+| 回看缓存模块入口 | [../cache/README.md](../cache/README.md) |

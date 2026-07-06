@@ -113,14 +113,15 @@ initEventPublisher
 | 顺序 | 模块 | 原因 |
 | ---- | ---- | ---- |
 | 1 | Survey | 问卷/答卷基础能力 |
-| 2 | Scale | 量表能力，可能依赖 Survey/Questionnaire |
+| 2 | AssessmentModel | 测评模型资产能力，兼容 scale/personalitymodel |
 | 3 | Actor | testee/operator 等行为者 |
-| 4 | Evaluation | 评估依赖 survey/scale/actor |
-| 5 | Plan | 计划依赖 actor/scale/evaluation |
-| 6 | Statistics | 统计依赖多个业务模块 |
-| 7 | WarmupCoordinator | 依赖 cache + statistics/scale/query callbacks |
-| 8 | Codes | 独立基础应用服务 |
-| 9 | QR | 外部集成支持服务 |
+| 4 | Report | 解释报告、builder registry、durable saver |
+| 5 | Evaluation | 评估依赖 survey/assessmentmodel/actor/report |
+| 6 | Plan | 计划依赖 actor/assessmentmodel/evaluation |
+| 7 | Statistics | 统计依赖多个业务模块 |
+| 8 | WarmupCoordinator | 依赖 cache + statistics/assessmentmodel/query callbacks |
+| 9 | Codes | 独立基础应用服务 |
+| 10 | QR | 外部集成支持服务 |
 
 ---
 

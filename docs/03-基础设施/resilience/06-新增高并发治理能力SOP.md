@@ -1,6 +1,6 @@
 # 新增高并发治理能力 SOP
 
-**本文回答**：在 qs-server 中新增限流、队列、背压、锁、幂等、重复抑制、降级策略或只读治理状态时，应该如何判断能力类型、外部行为、落代码位置、outcome、metrics、degraded 策略、测试和文档；避免 Resilience Plane 变成散点保护逻辑。
+**本文回答**：在 qs-server 中新增限流、队列、背压、锁、幂等、重复抑制、降级策略或只读治理状态时，应该如何判断能力类型、外部行为、落代码位置、outcome、metrics、degraded 策略、测试和文档；避免高并发保护模块变成散点保护逻辑。
 
 ---
 
@@ -545,7 +545,7 @@ strategy
 | 新背压 | [03-Backpressure下游背压.md](./03-Backpressure下游背压.md) |
 | 新锁/幂等/去重 | [04-LockLease幂等与重复抑制.md](./04-LockLease幂等与重复抑制.md) |
 | 新 outcome/metrics/degraded | [05-观测降级与排障.md](./05-观测降级与排障.md) |
-| 新保护点 | [07-能力矩阵.md](./07-能力矩阵.md) |
+| 新保护点 | [../01-能力矩阵.md](../01-能力矩阵.md) |
 | 新 REST 行为 | 接口与运维文档 |
 | 新 Redis lock/family | `../redis/` 对应文档 |
 | 新业务幂等 | 对应业务模块文档 |
@@ -649,7 +649,7 @@ git diff --check
 
 | 目标 | 文档 |
 | ---- | ---- |
-| 能力矩阵 | [07-能力矩阵.md](./07-能力矩阵.md) |
+| 能力矩阵 | [../01-能力矩阵.md](../01-能力矩阵.md) |
 | 观测降级排障 | [05-观测降级与排障.md](./05-观测降级与排障.md) |
 | RateLimit 入口限流 | [01-RateLimit入口限流.md](./01-RateLimit入口限流.md) |
 | SubmitQueue 提交削峰 | [02-SubmitQueue提交削峰.md](./02-SubmitQueue提交削峰.md) |

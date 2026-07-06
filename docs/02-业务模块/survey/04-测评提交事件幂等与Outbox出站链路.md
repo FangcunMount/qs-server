@@ -797,12 +797,12 @@ Evaluation failed。
 
 不要把这些状态都塞进 AnswerSheet。
 
-### 17.5 resilience 文档索引
+### 17.5 高并发保护文档索引
 
 入口侧 RateLimit / SubmitQueue / Backpressure / LockLease 的实现细节，应继续维护在：
 
 ```text
-../../03-基础设施/resilience/README.md
+../../03-基础设施/concurrency/README.md
 ```
 
 Survey 只引用它们在提交链路中的位置。

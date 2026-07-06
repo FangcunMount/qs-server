@@ -71,8 +71,8 @@ read model 能不能反写业务主表？
 | 领域不变量和状态机 | `02-业务模块/*` |
 | REST/gRPC 请求解析 | `04-接口与运维` 或 transport 层 |
 | Worker handler 主流程 | `event/` + worker handlers |
-| Redis cache / lock / hotset | `../redis/` |
-| 限流、队列、背压策略定义 | `../resilience/` |
+| Redis cache / hotset | `../cache/` |
+| 锁、限流、队列、背压策略定义 | `../concurrency/` |
 | 事件契约和 MQ 消费 | `../event/` |
 | 业务历史修复语义 | 单独 Backfill / Repair SOP |
 | 外部 SDK / WeChat / OSS | `../integrations/` |

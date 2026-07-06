@@ -12,15 +12,15 @@
 它重点回答：
 
 ```text
-为什么要拆分 Survey / Interpretation Model / Concrete Models / Evaluation？
-为什么 Scale 不再承担所有解释能力？
-为什么 MBTI 应该和 Scale 同级接入？
+为什么要拆分 Survey / Assessment Model / Evaluation / Interpretation Model？
+为什么 Scale 不再作为独立核心模块？
+为什么 MBTI / SBTI / BigFive 应该作为 Assessment Model 下的同级模型资产？
 为什么 AnswerSheet 要同步提交，但测评执行要异步完成？
 为什么需要 collection-server 保护前台入口？
 为什么需要 Outbox 保证事件可靠出站？
 为什么统计要走读侧聚合？
 为什么 IAM SDK 可以嵌入 runtime，但不能侵入 domain？
-为什么事件、缓存、统计、安全、观测都要围绕 ModelRef / Provider / Context 对齐？
+为什么事件、缓存、统计、安全、观测都要围绕模型快照、执行结果和报告事实对齐？
 系统下一步应该怎么演进？
 ```
 
@@ -33,7 +33,7 @@ Survey -> Scale -> Evaluation
 升级为：
 
 ```text
-Survey -> Interpretation Model -> Concrete Models -> Evaluation
+Survey -> Assessment Model -> Evaluation -> Interpretation Model / Report
 ```
 
 其中：
@@ -42,14 +42,14 @@ Survey -> Interpretation Model -> Concrete Models -> Evaluation
 Survey
     作答事实层，负责 Questionnaire / AnswerSheet / AnswerSheetSubmittedEvent
 
-Interpretation Model
-    解释模型抽象层，负责 ModelRef / Provider / Context / Registry
-
-Concrete Models
-    具体解释模型，当前包括 Scale，未来包括 MBTI / BigFive / 职业兴趣测评等
+Assessment Model
+    测评模型资产层，负责 Kind / Snapshot / Binding / Payload
 
 Evaluation
-    通用测评执行引擎，负责 Assessment / EvaluationRun / EvaluationResult / InterpretReport / Retry / Events
+    测评执行层，负责 Assessment / EvaluationRun / EvaluationResult / Retry / Events
+
+Interpretation Model / Report
+    解释模型与报告产出层，负责 builder / adapter / InterpretReport / durable saver
 ```
 
 一句话概括：
@@ -92,7 +92,7 @@ Architecture Decision Analysis
 | ------ | ---- |
 | `00-总览/` | 系统全局视角、核心链路、源码事实矩阵 |
 | `01-运行时/` | 三进程运行时、进程间调用、事件驱动链路 |
-| `02-业务模块/` | Survey、Scale、Interpretation Model、Evaluation、Actor、Plan、Statistics 的领域模型和模块职责 |
+| `02-业务模块/` | Survey、Assessment Model、Evaluation、Interpretation Model、Actor、Plan、Statistics 的领域模型和模块职责 |
 | `03-基础设施/` | Event、DataAccess、Redis、Resilience、Security、Integrations、Runtime、Observability 的机制深讲 |
 | `04-接口与运维/` | REST/gRPC 契约、配置、部署、调度、健康检查、排障、容量 |
 | `05-专题分析/` | 架构决策、取舍、代价、演进路线 |
@@ -115,7 +115,7 @@ Architecture Decision Analysis
 | 想知道 | 应看 |
 | ------ | ---- |
 | 为什么 MBTI 不放进 Scale | `05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
-| MBTI 如何接入解释模型抽象 | `02-业务模块/interpretation-model/03-新增解释模型链路--以MBTI接入为例.md` |
+| MBTI 如何作为模型资产接入 | `02-业务模块/assessment-model/README.md`、`05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
 | MBTI 规则如何持久化 | `03-基础设施/data-access/05-新增持久化能力SOP.md` |
 | MBTI 模型列表如何缓存 | `03-基础设施/redis/04-QueryCache与StaticList.md` |
 | MBTI 报告权限如何控制 | `03-基础设施/security/05-新增安全能力SOP.md` |
@@ -526,10 +526,10 @@ qs-server 是一个面向心理、医学和人格测评场景的 Go 后端系统
 
 | 旧表达 | 新表达 |
 | ------ | ------ |
-| Scale 管怎么算和怎么解释 | Scale 是医学量表解释模型 |
-| Evaluation 管结果 | Evaluation 管一次测评执行生命周期 |
-| Evaluation Pipeline = FactorScore / RiskLevel / Interpretation | EvaluationEngine + Interpretation Provider |
-| MBTI 是 Scale 的一种 | MBTI 与 Scale 同级，都是解释模型 |
+| Scale 管怎么算和怎么解释 | Scale 是 Assessment Model 下的医学量表模型资产 |
+| Evaluation 管结果和报告 | Evaluation 管一次测评执行生命周期，Interpretation Model / Report 管最终报告 |
+| Evaluation Pipeline = FactorScore / RiskLevel / Interpretation | Evaluation 执行模型，Report builder / adapter 组装 InterpretReport |
+| MBTI 是 Scale 的一种 | MBTI 与 Scale 同级，都是 Assessment Model 下的模型资产 |
 | `assessment.submitted` | `assessment.created` / `assessment.completed` |
 | `assessment.interpreted` | `interpretation.completed` |
 | `CalculateAnswerSheetScore` | `Provider.Evaluate` / `CompleteAssessment` |

@@ -58,8 +58,8 @@ token/cache/credential 在哪里处理？
 | 领域不变量 | Domain |
 | 用例编排 | Application Service |
 | DB/Mongo 持久化 | Data Access |
-| Redis family/cache 治理 | Redis Plane |
-| 限流、背压、锁 | Resilience Plane |
+| Redis family/cache 治理 | 缓存模块 |
+| 限流、背压、锁 | 高并发保护模块 |
 | IAM 用户权限判断 | Security Plane |
 | 事件可靠出站 | Event System |
 | 外部系统生产配置管理 | Deployment / Ops |

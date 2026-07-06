@@ -860,6 +860,6 @@ git diff --check
 | Backpressure 下游背压 | [03-Backpressure下游背压.md](./03-Backpressure下游背压.md) |
 | LockLease 幂等与重复抑制 | [04-LockLease幂等与重复抑制.md](./04-LockLease幂等与重复抑制.md) |
 | 观测降级排障 | [05-观测降级与排障.md](./05-观测降级与排障.md) |
-| 能力矩阵 | [07-能力矩阵.md](./07-能力矩阵.md) |
+| 能力矩阵 | [../01-能力矩阵.md](../01-能力矩阵.md) |
 | RateLimit 入口限流 | [01-RateLimit入口限流.md](./01-RateLimit入口限流.md) |
-| 回看整体架构 | [00-整体架构.md](./00-整体架构.md) |
+| 回看高并发保护入口 | [../concurrency/README.md](../concurrency/README.md) |

@@ -178,7 +178,7 @@ defer release()
 
 如果注入了 limiter，则会在 DB 操作前 acquire；没有 limiter 则直接执行。
 
-这使 MySQL repository 可以被 Resilience Plane 统一保护。
+这使 MySQL repository 可以被高并发保护模块统一保护。
 
 ---
 

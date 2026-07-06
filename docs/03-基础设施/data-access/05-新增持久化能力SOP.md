@@ -77,7 +77,7 @@ flowchart TD
     read -- 否 --> event{"是否保存事件出站状态?"}
     event -- 是 --> outbox["Outbox Store"]
     event -- 否 --> cache{"是否是缓存/锁/热集?"}
-    cache -- 是 --> redis["转 Redis Plane"]
+    cache -- 是 --> redis["转缓存/高并发保护模块"]
     cache -- 否 --> repair{"是否一次性历史修复?"}
     repair -- 是 --> backfill["Backfill / Repair SOP"]
     repair -- 否 --> review["重新定义需求"]
@@ -558,7 +558,8 @@ Statistics ReadModel
 请去：
 
 ```text
-03-基础设施/redis/
+03-基础设施/cache/
+03-基础设施/concurrency/
 ```
 
 Data Access 只负责：
@@ -695,7 +696,7 @@ Worker 通常应通过 internal gRPC 回到 apiserver。
 | 新 statistics read model | [04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md) |
 | 新解释模型规则文档 | [02-Mongo文档仓储.md](./02-Mongo文档仓储.md)、[04-ReadModel与Statistics.md](./04-ReadModel与Statistics.md)、`../../02-业务模块/interpretation-model/` |
 | 新 durable event outbox | `../event/02-Publish与Outbox.md` |
-| 新 Redis cache | `../redis/README.md` |
+| 新 Redis cache | `../cache/README.md` |
 | 业务主模型变化 | `../../02-业务模块/...` |
 | REST/gRPC 契约变化 | `../../04-接口与运维/...` |
 

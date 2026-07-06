@@ -866,4 +866,4 @@ git diff --check
 | 观测降级排障 | [08-观测降级与排障.md](./08-观测降级与排障.md) |
 | 新增 Redis 能力 | [09-新增Redis能力SOP.md](./09-新增Redis能力SOP.md) |
 | 运行时与 Family | [01-运行时与Family模型.md](./01-运行时与Family模型.md) |
-| Redis 整体架构 | [00-整体架构.md](./00-整体架构.md) |
+| 高并发保护入口 | [../concurrency/README.md](../concurrency/README.md) |

@@ -1,5 +1,9 @@
 # Scale 模块文档
 
+> 兼容说明：`scale/` 目录保留为医学量表规则细节和旧链接入口。当前文档主轴中，Scale 不再是独立核心模块，而是 `assessment-model` 下的一类具体模型资产；代码注册名 `scale` 也只是 `assessmentmodel` 的 legacy register name。
+>
+> 新读者应先读 [assessment-model/README.md](../assessment-model/README.md)，再按需进入本目录。
+
 > Scale 是 qs-server 中的 **医学量表解释模型模块**。
 >
 > 它负责维护 `MedicalScale` 规则事实：一份医学量表基于哪份问卷版本、包含哪些因子、每个因子如何计分、分数区间如何解释、规则如何发布和冻结。
@@ -44,22 +48,14 @@ Scale 的核心定位是：
 
 ## 2. Scale 在 qs-server 中的位置
 
-从完整测评链路看，qs-server 可以拆成三段：
-
-```text
-Survey          管“问卷如何定义、用户提交了什么答卷事实”
-AssessmentModel 管“医学量表等模型资产如何定义、发布和冻结”
-Evaluation      管“一次测评如何执行、如何保存结果”
-Report          管“最终解读报告如何组装和保存”
-```
-
-更面向未来的表达是：
+从完整测评链路看，qs-server 当前文档主轴是：
 
 ```text
 Survey            作答事实层
 Assessment Model  测评模型资产层
 Evaluation        通用测评执行层
-Report            最终报告层
+Interpretation Model / Report
+                  解释模型与报告产出层
 ```
 
 在这个体系里：
@@ -85,7 +81,7 @@ flowchart LR
     Eval -->|EvaluationResult| Report
 ```
 
-Scale 只是 `Assessment Model` 的一种具体模型资产，不应该膨胀成所有模型的总包。
+Scale 只是 `Assessment Model` 的一种具体模型资产，不应该膨胀成所有模型的总包，也不应该在文档入口继续替代 Assessment Model。
 
 ---
 
@@ -156,7 +152,7 @@ MedicalScale 是规则聚合，Assessment 是执行聚合。
 
 ## 5. 文档目录
 
-Scale 模块文档重建为五篇。
+Scale 目录文档目前保留为五篇医学量表细节文档。
 
 ```text
 README.md
@@ -178,7 +174,7 @@ README.md
 | `04` | Scale 与 Evaluation 的测评执行协作链路 |
 | `05` | 分层架构、事实源索引、修改检查清单、架构护栏 |
 
-推荐阅读顺序：
+如果已经理解 Assessment Model 的统一资产层，再按下面顺序阅读 Scale 细节：
 
 ```text
 READM -> 01 -> 02 -> 03 -> 04 -> 05

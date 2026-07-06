@@ -10,14 +10,14 @@
 | ---- | ---- |
 | 本组定位 | 先建立 `qs-server` 的系统地图、代码边界、主链路、本地开发入口和源码事实基线 |
 | 最重要认识 | `qs-server` 是三进程协作系统：`qs-apiserver` 收口主业务状态，`collection-server` 是前台 BFF，`qs-worker` 是异步执行器 |
-| 主业务叙事 | 一次问卷作答被稳定转化为可解释、可追踪、可查询的医学量表测评结果 |
+| 主业务叙事 | 一次问卷作答被稳定转化为可解释、可追踪、可查询的测评结果与解释报告 |
 | 阅读顺序 | `系统地图 -> 代码组织与边界 -> 核心业务链路 -> 本地开发与配置约定 -> 源码事实矩阵` |
 | 真值边界 | 本组讲全局骨架；领域对象看 `02-业务模块`，三进程细节看 `01-运行时`，横切机制看 `03-基础设施`，机器契约和运维看 `04-接口与运维` |
 | 维护原则 | 只维护全局共识和主链路摘要；细节只给锚点和回链，不在总览里维护第二份模块事实 |
 
 读完本组后，读者应该能回答三个问题：
 
-1. **这个项目是什么**：它不是单纯问卷 CRUD，而是问卷采集、医学量表规则、异步测评、报告与统计聚合组成的后端系统。
+1. **这个项目是什么**：它不是单纯问卷 CRUD，而是作答事实、测评模型资产、异步测评执行、解释报告与统计聚合组成的后端系统。
 2. **这个项目怎么跑**：三进程分别启动，collection 和 worker 都通过 gRPC 调用 apiserver，事件由 apiserver 发布、worker 消费。
 3. **这个项目怎么继续读**：想看进程细节去 `01-运行时`，想看业务对象去 `02-业务模块`，想看事件、缓存、安全和存储去 `03-基础设施`。
 
@@ -29,7 +29,7 @@
 
 | 顺序 | 文档 | 解决什么问题 | 读完应获得什么 |
 | ---- | ---- | ------------ | -------------- |
-| 1 | [01-系统地图.md](./01-系统地图.md) | 系统由哪些进程、模块和外部依赖组成 | 建立三进程和六个业务模块的全局图谱 |
+| 1 | [01-系统地图.md](./01-系统地图.md) | 系统由哪些进程、模块和外部依赖组成 | 建立三进程和七个业务模块的全局图谱 |
 | 2 | [02-代码组织与边界.md](./02-代码组织与边界.md) | 仓库目录、运行时边界、apiserver 分层、共享包和 component-base 如何区分 | 知道改代码时应该进入哪个目录，不误把 BFF、worker、domain 和基础库混在一起 |
 | 3 | [03-核心业务链路.md](./03-核心业务链路.md) | 一次答卷如何经过 SubmitQueue、durable submit、outbox、worker、internal gRPC、evaluation pipeline 变成报告和统计 | 抓住端到端主链路，后续所有模块和基础设施文档都围绕这条链路定位 |
 | 4 | [04-本地开发与配置约定.md](./04-本地开发与配置约定.md) | 本地如何通过 `Makefile`、`ENV`、三进程 yaml、依赖检查和健康检查跑起来 | 能从零构建、启动、检查和初步排障本地开发环境 |
@@ -85,8 +85,10 @@ flowchart LR
 | 要改什么 | 继续读 |
 | -------- | ------ |
 | 问卷、题型、答卷提交 | [02-业务模块/survey/README.md](../02-业务模块/survey/README.md) |
+| 测评模型资产、发布快照、模型 payload | [02-业务模块/assessment-model/README.md](../02-业务模块/assessment-model/README.md) |
 | 医学量表、因子、计分与解读规则 | [02-业务模块/scale/README.md](../02-业务模块/scale/README.md) |
-| 测评状态机、评估流水线、报告 | [02-业务模块/evaluation/README.md](../02-业务模块/evaluation/README.md) |
+| 测评状态机、评估流水线、失败重试 | [02-业务模块/evaluation/README.md](../02-业务模块/evaluation/README.md) |
+| 报告 builder、adapter、InterpretReport | [02-业务模块/interpretation-model/README.md](../02-业务模块/interpretation-model/README.md) |
 | 受试者、从业者、操作者、照护关系 | [02-业务模块/actor/README.md](../02-业务模块/actor/README.md) |
 | 计划、任务、调度、通知 | [02-业务模块/plan/README.md](../02-业务模块/plan/README.md) |
 | 统计概览、行为投影、读模型 | [02-业务模块/statistics/README.md](../02-业务模块/statistics/README.md) |
@@ -133,10 +135,10 @@ flowchart LR
 | 文档组 | 负责什么 | 与 `00-总览` 的关系 |
 | ------ | -------- | ------------------- |
 | [01-运行时](../01-运行时/) | 三进程启动、进程间调用、HTTP/gRPC/MQ runtime、shutdown | 总览只讲拓扑和主方向，运行时讲具体装配和时序 |
-| [02-业务模块](../02-业务模块/) | survey / scale / evaluation / actor / plan / statistics 的领域对象、状态机、应用服务和模块内规则 | 总览只讲模块位置和主链路，业务模块讲对象模型与业务不变量 |
+| [02-业务模块](../02-业务模块/) | survey / assessment-model / evaluation / interpretation-model / actor / plan / statistics 的领域对象、状态机、应用服务和模块内规则 | 总览只讲模块位置和主链路，业务模块讲对象模型与业务不变量 |
 | [03-基础设施](../03-基础设施/) | event、data-access、redis、resilience、security、integrations、runtime、observability 等横切能力 | 总览只说明这些能力存在和如何进入，基础设施文档讲机制与配置 |
 | [04-接口与运维](../04-接口与运维/) | REST、gRPC、internal gRPC、events.yaml、配置、部署、健康检查、排障 | 总览只列关键契约入口，接口与运维维护机器契约说明 |
-| [05-专题分析](../05-专题分析/) | 跨模块设计判断，例如为什么拆分 survey/scale/evaluation、为什么同步提交但异步评估 | 总览讲现状，专题分析讲取舍与原因 |
+| [05-专题分析](../05-专题分析/) | 跨模块设计判断，例如为什么拆分 Survey / Assessment Model / Evaluation / Interpretation Model、为什么同步提交但异步评估 | 总览讲现状，专题分析讲取舍与原因 |
 | [06-宣讲](../06-宣讲/) | 项目介绍、技术分享、面试追问、图谱素材 | 宣讲层只负责讲法，事实必须回链到 `00-05` |
 
 ---
@@ -171,8 +173,9 @@ Client / 小程序
 | 答卷事实与校验 | `survey` |
 | durable submit 和 outbox | `data-access`、`event` |
 | 事件消费与回调 | `worker`、`runtime`、`event` |
+| 测评模型资产与发布快照 | `assessment-model` |
 | Assessment 状态机与评估 | `evaluation` |
-| 量表规则与因子 | `scale` |
+| 解释报告产出 | `interpretation-model / report` |
 | 标签、统计、任务 | `actor`、`statistics`、`plan` |
 
 后续如果这条链路变化，优先更新 [03-核心业务链路.md](./03-核心业务链路.md) 和 [05-源码事实矩阵.md](./05-源码事实矩阵.md)，然后再更新相关模块或基础设施文档。
@@ -216,7 +219,7 @@ Client / 小程序
 | ---- | ---- |
 | 三进程入口 | [../../cmd/qs-apiserver/apiserver.go](../../cmd/qs-apiserver/apiserver.go)、[../../cmd/collection-server/main.go](../../cmd/collection-server/main.go)、[../../cmd/qs-worker/main.go](../../cmd/qs-worker/main.go) |
 | apiserver 启动编排 | [../../internal/apiserver/process/runner.go](../../internal/apiserver/process/runner.go)、[../../internal/apiserver/process/resource_bootstrap.go](../../internal/apiserver/process/resource_bootstrap.go)、[../../internal/apiserver/process/transport_bootstrap.go](../../internal/apiserver/process/transport_bootstrap.go)、[../../internal/apiserver/process/runtime_bootstrap.go](../../internal/apiserver/process/runtime_bootstrap.go) |
-| apiserver 组合根 | [../../internal/apiserver/container/root.go](../../internal/apiserver/container/root.go)、[../../internal/apiserver/container/modules/.../](../../internal/apiserver/container/modules/.../) |
+| apiserver 组合根 | [../../internal/apiserver/container/root.go](../../internal/apiserver/container/root.go)、[../../internal/apiserver/container/modules/registry.go](../../internal/apiserver/container/modules/registry.go)、[../../internal/apiserver/container/modules/](../../internal/apiserver/container/modules/) |
 | collection 提交入口 | [../../internal/collection-server/transport/rest/handler/answersheet_handler.go](../../internal/collection-server/transport/rest/handler/answersheet_handler.go)、[../../internal/collection-server/application/answersheet/submit_queue.go](../../internal/collection-server/application/answersheet/submit_queue.go) |
 | worker 事件派发 | [../../internal/worker/integration/eventing/dispatcher.go](../../internal/worker/integration/eventing/dispatcher.go)、[../../internal/worker/handlers/registry.go](../../internal/worker/handlers/registry.go) |
 | 事件契约 | [../../configs/events.yaml](../../configs/events.yaml) |
@@ -264,7 +267,7 @@ go test ./internal/collection-server/application/answersheet \
 | 目的 | 下一跳 |
 | ---- | ------ |
 | 继续看三进程怎么启动、怎么协作 | [../01-运行时/README.md](../01-运行时/README.md) |
-| 看六个业务模块的静态设计 | [../02-业务模块/README.md](../02-业务模块/README.md) |
+| 看七个业务模块的静态设计 | [../02-业务模块/README.md](../02-业务模块/README.md) |
 | 看事件、存储、缓存、安全、限流、集成等横切能力 | [../03-基础设施/README.md](../03-基础设施/README.md) |
 | 看 REST、gRPC、事件契约、部署和排障 | [../04-接口与运维/README.md](../04-接口与运维/README.md) |
 | 看设计取舍和跨模块分析 | [../05-专题分析/README.md](../05-专题分析/README.md) |

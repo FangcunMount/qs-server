@@ -13,7 +13,7 @@
 | 主状态位置 | 主业务状态收口在 `qs-apiserver`；collection 是 BFF；worker 是异步执行器 |
 | 同步链路 | 前台通常 `Client -> collection-server REST -> apiserver gRPC`；后台可直连 apiserver REST |
 | 异步链路 | `apiserver outbox -> MQ -> worker -> internal gRPC -> apiserver` |
-| 本组不负责 | 不展开 Survey / Scale / Evaluation / Actor / Plan / Statistics 的领域模型，不维护 REST/OpenAPI 详细契约 |
+| 本组不负责 | 不展开 Survey / Assessment Model / Evaluation / Interpretation Model / Actor / Plan / Statistics 的领域模型，不维护 REST/OpenAPI 详细契约 |
 | 推荐读法 | 先读三进程协作，再按进程读启动文档，最后读 gRPC/IAM/调度/shutdown |
 
 ---
@@ -40,7 +40,7 @@
 | 系统整体是什么 | [00-总览/01-系统地图](../00-总览/01-系统地图.md) | 本组 `00-三进程协作总览` |
 | 一次答卷如何变报告 | [00-总览/03-核心业务链路](../00-总览/03-核心业务链路.md) | 本组 `04-进程间调用与gRPC`、`06-后台任务与调度` |
 | apiserver 怎么装配业务模块 | 本组 `01-qs-apiserver启动与组合根` | [02-业务模块](../02-业务模块/) |
-| collection 为什么不是主服务 | 本组 `02-collection-server运行时` | [03-基础设施/resilience](../03-基础设施/resilience/) |
+| collection 为什么不是主服务 | 本组 `02-collection-server运行时` | [03-基础设施/concurrency](../03-基础设施/concurrency/README.md) |
 | worker 怎么消费事件 | 本组 `03-qs-worker运行时` | [03-基础设施/event](../03-基础设施/event/) |
 | IAM 怎么接入 | 本组 `05-IAM认证与身份链路` | [03-基础设施/security](../03-基础设施/security/) |
 | REST / gRPC 具体接口 | 本组只讲调用方向 | [04-接口与运维](../04-接口与运维/) |
