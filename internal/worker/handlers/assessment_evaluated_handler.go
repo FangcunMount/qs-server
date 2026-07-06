@@ -42,21 +42,20 @@ func handleAssessmentEvaluated(deps *Dependencies) HandlerFunc {
 			return fmt.Errorf("failed to generate report from assessment: %w", err)
 		}
 		if resp != nil && !resp.Success {
-			if resp.Status == "failed" {
+			if isTerminalReportGenerationStatus(resp.Status) {
 				deps.Logger.Warn("report generation failed and assessment marked failed",
 					slog.Int64("assessment_id", data.AssessmentID),
 					slog.String("status", resp.Status),
 					slog.String("message", resp.Message),
 				)
-				return nil
+			} else {
+				deps.Logger.Error("report generation returned unsuccessful response",
+					slog.Int64("assessment_id", data.AssessmentID),
+					slog.String("status", resp.Status),
+					slog.String("message", resp.Message),
+				)
 			}
-			deps.Logger.Error("report generation returned unsuccessful response",
-				slog.Int64("assessment_id", data.AssessmentID),
-				slog.String("status", resp.Status),
-				slog.String("message", resp.Message),
-			)
-			return fmt.Errorf("report generation failed: %s", resp.Message)
 		}
-		return nil
+		return handleGenerateReportResponse(resp)
 	}
 }

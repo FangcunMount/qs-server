@@ -3,7 +3,7 @@ package reporting_test
 import (
 	"testing"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -22,7 +22,7 @@ func TestAttachReportOutcomeSummaryMapsLegacyMBTIToPersonalityTypology(t *testin
 		"1.0.0",
 		"MBTI",
 	)
-	o := evaluationresult.NewOutcomeFromLegacyResult(nil, nil, &assessment.EvaluationResult{
+	o := evaloutcome.NewOutcomeFromLegacyResult(nil, nil, &assessment.EvaluationResult{
 		ModelRef: modelRef,
 		Summary:  assessment.ResultSummary{PrimaryLabel: "INTJ"},
 		Detail: assessment.EvaluationDetail{

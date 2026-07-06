@@ -1,8 +1,8 @@
 package typology
 
 import (
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -10,7 +10,7 @@ import (
 
 func resolveReportBuildContext(
 	runner algorithmRunner,
-	outcome evaluationresult.Outcome,
+	outcome evaloutcome.Outcome,
 ) (modeltypology.ReportSpec, modeltypology.OutcomeMappingSpec, modelcatalog.DecisionKind) {
 	var spec modeltypology.ReportSpec
 	mapping := modeltypology.OutcomeMappingSpec{}
@@ -36,7 +36,7 @@ func resolveReportBuildContext(
 	return spec, mapping, decisionKind
 }
 
-func legacyAlgorithmFromOutcome(outcome evaluationresult.Outcome) modelcatalog.Algorithm {
+func legacyAlgorithmFromOutcome(outcome evaloutcome.Outcome) modelcatalog.Algorithm {
 	if outcome.Assessment != nil {
 		if ref := outcome.Assessment.EvaluationModelRef(); ref != nil {
 			if algorithm := ref.Algorithm(); algorithm != "" && algorithm != modelcatalog.AlgorithmPersonalityTypology {

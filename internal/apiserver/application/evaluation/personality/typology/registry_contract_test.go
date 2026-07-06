@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
@@ -40,7 +40,7 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 	)
 	reportRegistry := DefaultReportAdapterRegistry().Register(
 		contractReportAdapter,
-		func(_ evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+		func(_ evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 			return domainReport.NewInterpretReport(
 				domainReport.ID(1),
 				"Injected",
@@ -92,7 +92,7 @@ func TestInjectedAdapterRegistriesRunThroughConfiguredRuntime(t *testing.T) {
 		t.Fatalf("detail = %#v, want injected marker", detail)
 	}
 
-	report, err := reportBuilder.Build(context.Background(), evaluationresult.Outcome{
+	report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
 		Assessment: assessmentEntity,
 		Input:      snapshot,
 		Execution:  outcome,

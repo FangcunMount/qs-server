@@ -705,7 +705,7 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 	allowedRelPrefixes := []string{
 		"internal/apiserver/characterization/",
 		"internal/apiserver/application/evaluation/scale/outcome_mapper.go",
-		"internal/apiserver/application/evaluation/result/legacy_projection.go",
+		"internal/apiserver/application/evaluation/outcome/legacy.go",
 		"internal/apiserver/application/evaluation/result/types.go",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
@@ -770,8 +770,8 @@ func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
 
 	root := repoRoot(t)
 	allowedRelFiles := map[string]struct{}{
-		"internal/apiserver/application/evaluation/result/legacy_projection.go": {},
-		"internal/apiserver/application/evaluation/result/types.go":             {},
+		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
+		"internal/apiserver/application/evaluation/result/types.go":   {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -804,7 +804,7 @@ func TestApplicationEvaluationToEvaluationResultIsBoundaryOnly(t *testing.T) {
 
 	root := repoRoot(t)
 	allowedRelFiles := map[string]struct{}{
-		"internal/apiserver/application/evaluation/result/legacy_projection.go": {},
+		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -837,7 +837,7 @@ func TestApplicationEvaluationAssessmentOutcomeFromEvaluationResultIsBoundaryOnl
 
 	root := repoRoot(t)
 	allowedRelFiles := map[string]struct{}{
-		"internal/apiserver/application/evaluation/result/legacy_projection.go": {},
+		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {

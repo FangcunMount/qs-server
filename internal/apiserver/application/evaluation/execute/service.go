@@ -7,10 +7,11 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaluationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -30,10 +31,10 @@ type service struct {
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
 	evaluators            EvaluatorRegistry
-	resultWriter          evaluationresult.Writer
+	resultWriter          interpretationreporting.Writer
 	scoringWriter         evaluationscoring.Writer
 	interpretationService interpretationapp.Service
-	scoringSnapshotStore  evaluationresult.ScoringSnapshotStore
+	scoringSnapshotStore  evaluationscoring.ScoringSnapshotStore
 	asyncInterpretation   bool
 	reportStatus          *reportstatus.Reporter
 }
@@ -95,7 +96,7 @@ func WithAsyncInterpretation(enabled bool) ServiceOption {
 }
 
 // WithScoringSnapshotStore configures durable scoring snapshots for async report generation.
-func WithScoringSnapshotStore(store evaluationresult.ScoringSnapshotStore) ServiceOption {
+func WithScoringSnapshotStore(store evaluationscoring.ScoringSnapshotStore) ServiceOption {
 	return func(s *service) {
 		s.scoringSnapshotStore = store
 	}
@@ -105,7 +106,7 @@ func WithScoringSnapshotStore(store evaluationresult.ScoringSnapshotStore) Servi
 func NewService(
 	assessmentRepo assessment.Repository,
 	inputResolver evaluationinput.Resolver,
-	resultWriter evaluationresult.Writer,
+	resultWriter interpretationreporting.Writer,
 	opts ...ServiceOption,
 ) Service {
 	svc := &service{
@@ -205,7 +206,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	// 执行评估成功，写入计分结果并生成报告
-	if err := s.persistEvaluationOutcome(ctx, evaluationresult.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}); err != nil {
+	if err := s.persistEvaluationOutcome(ctx, evaloutcome.Outcome{Assessment: a, Input: input, Execution: evaluationOutcome}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
 			"model_key", evaluatorKey.String(),
@@ -230,7 +231,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	return nil
 }
 
-func (s *service) persistEvaluationOutcome(ctx context.Context, outcome evaluationresult.Outcome) error {
+func (s *service) persistEvaluationOutcome(ctx context.Context, outcome evaloutcome.Outcome) error {
 	if s.scoringWriter != nil && s.interpretationService != nil {
 		if s.asyncInterpretation {
 			if err := s.scoringWriter.Write(ctx, outcome); err != nil {
@@ -298,7 +299,7 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 		err = evalerrors.ModuleNotConfigured("interpretation service is not configured")
 		return markReportFailed(err.Error(), err)
 	}
-	outcome := evaluationresult.Outcome{Assessment: a, Input: input, Execution: execution}
+	outcome := evaloutcome.Outcome{Assessment: a, Input: input, Execution: execution}
 	if err := s.interpretationService.GenerateAndPersist(ctx, outcome); err != nil {
 		return markReportFailed("报告生成持久化失败: "+err.Error(), err)
 	}

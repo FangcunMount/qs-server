@@ -14,10 +14,10 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/internal/outboxruntime"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -31,7 +31,6 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
 	mysqlEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/evaluation"
 	mysqlEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mysql/eventoutbox"
-	rediseval "github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
@@ -100,10 +99,11 @@ type Deps struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            typologyEvaluation.ModuleRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
-	ReportBuilderRegistry                       evaluationResult.ReportBuilderRegistry
-	ReportDurableSaver                          evaluationResult.ReportDurableSaver
+	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
+	ReportDurableSaver                          interpretationreporting.ReportDurableSaver
 	PublishedModelReader                        rulesetport.PublishedModelReader
 	AsyncInterpretation                         bool
+	SingleProcessAsyncInterpretation            bool
 }
 
 // New assembles the evaluation module.
@@ -222,8 +222,8 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
-		scoreProjectors, err := evaluationResult.NewScoreProjectorRegistry(
-			evaluationResult.NewScaleScoreProjector(infra.scoreRepo),
+		scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
+			interpretationreporting.NewScaleScoreProjector(infra.scoreRepo),
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
@@ -231,31 +231,39 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if normalized.ReportBuilderRegistry == nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
 		}
-		resultWriter, err := evaluationResult.NewWriter(
+		resultWriter, err := interpretationreporting.NewWriter(
 			infra.assessmentRepo,
 			scoreProjectors,
 			normalized.ReportBuilderRegistry,
 			normalized.ReportDurableSaver,
-			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
+			interpretationreporting.NewWaiterCompletionNotifier(infra.waiterRegistry),
 			reportStatusReporter,
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation result writer: %v", err)
 		}
-		interpretationWriter, err := evaluationResult.NewInterpretationWriter(
+		interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
 			infra.assessmentRepo,
 			scoreProjectors,
 			normalized.ReportBuilderRegistry,
 			normalized.ReportDurableSaver,
-			evaluationResult.NewWaiterCompletionNotifier(infra.waiterRegistry),
+			interpretationreporting.NewWaiterCompletionNotifier(infra.waiterRegistry),
 			reportStatusReporter,
 		)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize interpretation writer: %v", err)
 		}
-		var scoringSnapshotStore evaluationResult.ScoringSnapshotStore = evaluationResult.NewMemoryScoringSnapshotStore()
-		if normalized.OpsHandle != nil && normalized.OpsHandle.Client != nil {
-			scoringSnapshotStore = rediseval.NewRedisScoringSnapshotStore(normalized.OpsHandle.Client)
+		var opsRedis redis.UniversalClient
+		if normalized.OpsHandle != nil {
+			opsRedis = normalized.OpsHandle.Client
+		}
+		scoringSnapshotStore, err := resolveScoringSnapshotStore(scoringSnapshotStoreConfig{
+			AsyncInterpretation: normalized.AsyncInterpretation,
+			SingleProcessAsync:  normalized.SingleProcessAsyncInterpretation,
+			OpsRedis:            opsRedis,
+		})
+		if err != nil {
+			return err
 		}
 		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectors, scoringSnapshotStore)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
@@ -372,6 +380,9 @@ func normalizeDeps(deps Deps) (Deps, error) {
 	}
 	if !deps.AsyncInterpretation && asyncInterpretationFromEnv() {
 		deps.AsyncInterpretation = true
+	}
+	if !deps.SingleProcessAsyncInterpretation && singleProcessAsyncFromEnv() {
+		deps.SingleProcessAsyncInterpretation = true
 	}
 	return deps, nil
 }

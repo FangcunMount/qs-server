@@ -4,7 +4,8 @@ import (
 	"context"
 	"fmt"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -15,7 +16,7 @@ type ReportBuilder struct {
 	key    evaluation.EvaluatorKey
 }
 
-var _ evaluationresult.ReportBuilder = ReportBuilder{}
+var _ interpretationreporting.ReportBuilder = ReportBuilder{}
 
 func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
 	return NewReportBuilderWithRegistry(mustDefaultModuleRegistry(), algorithm)
@@ -68,7 +69,7 @@ func (ReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+func (b ReportBuilder) Build(_ context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	if b.runner == nil {
 		return nil, fmt.Errorf("personality typology report builder is not configured")
 	}
@@ -76,5 +77,5 @@ func (b ReportBuilder) Build(_ context.Context, outcome evaluationresult.Outcome
 	if err != nil {
 		return nil, err
 	}
-	return evaluationresult.AttachReportOutcomeSummary(outcome, rpt), nil
+	return interpretationreporting.AttachReportOutcomeSummary(outcome, rpt), nil
 }

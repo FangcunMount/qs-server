@@ -3,7 +3,7 @@ package typology
 import (
 	"fmt"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -15,7 +15,7 @@ var (
 	errEvaluationOutcomeRequired = fmt.Errorf("evaluation outcome is required")
 )
 
-func MBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypology.MBTIReportInput, error) {
+func MBTIReportInputFromOutcome(outcome evaloutcome.Outcome) (reporttypology.MBTIReportInput, error) {
 	if outcome.Assessment == nil {
 		return reporttypology.MBTIReportInput{}, errAssessmentRequired
 	}
@@ -35,7 +35,7 @@ func MBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypolog
 	}, nil
 }
 
-func BigFiveReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypology.BigFiveReportInput, error) {
+func BigFiveReportInputFromOutcome(outcome evaloutcome.Outcome) (reporttypology.BigFiveReportInput, error) {
 	if outcome.Assessment == nil {
 		return reporttypology.BigFiveReportInput{}, errAssessmentRequired
 	}
@@ -55,7 +55,7 @@ func BigFiveReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypo
 	}, nil
 }
 
-func SBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypology.SBTIReportInput, error) {
+func SBTIReportInputFromOutcome(outcome evaloutcome.Outcome) (reporttypology.SBTIReportInput, error) {
 	if outcome.Assessment == nil {
 		return reporttypology.SBTIReportInput{}, errAssessmentRequired
 	}
@@ -75,7 +75,7 @@ func SBTIReportInputFromOutcome(outcome evaluationresult.Outcome) (reporttypolog
 	}, nil
 }
 
-func typologyModelCode(outcome evaluationresult.Outcome) string {
+func typologyModelCode(outcome evaloutcome.Outcome) string {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.Code().IsEmpty() {
 		return outcome.Execution.ModelRef.Code().String()
 	}

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
@@ -15,7 +15,7 @@ func TestReportAdapterRegistryBuildsByAdapterKey(t *testing.T) {
 	spec := modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterMBTI}
 	mapping := modeltypology.OutcomeMappingSpec{DetailAdapterKey: modeltypology.DetailAdapterMBTI}
 
-	_, err := registry.build(spec, mapping, modelcatalog.DecisionKindPoleComposition, evaluationresult.Outcome{})
+	_, err := registry.build(spec, mapping, modelcatalog.DecisionKindPoleComposition, evaloutcome.Outcome{})
 	if err == nil {
 		t.Fatal("expected error without assessment")
 	}
@@ -30,7 +30,7 @@ func TestReportAdapterRegistryRejectsTemplateKind(t *testing.T) {
 		modeltypology.ReportSpec{Kind: modeltypology.ReportKindTemplate, TemplateID: "x"},
 		modeltypology.OutcomeMappingSpec{},
 		"",
-		evaluationresult.Outcome{},
+		evaloutcome.Outcome{},
 	)
 	if err == nil {
 		t.Fatal("expected template kind error")
@@ -46,7 +46,7 @@ func TestReportAdapterRegistryRejectsUnknownAdapter(t *testing.T) {
 		modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterKey("custom_unknown")},
 		modeltypology.OutcomeMappingSpec{},
 		modelcatalog.DecisionKindPoleComposition,
-		evaluationresult.Outcome{},
+		evaloutcome.Outcome{},
 	)
 	if err == nil || !strings.Contains(err.Error(), "unsupported report adapter key") {
 		t.Fatalf("build error = %v, want unsupported report adapter key", err)

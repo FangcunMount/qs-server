@@ -8,7 +8,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachequery"
@@ -51,10 +51,11 @@ type BootstrapInput struct {
 	ModelDescriptors                            []evaldomain.ModelDescriptor
 	TypologyRegistry                            typologyEvaluation.ModuleRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
-	ReportBuilderRegistry                       evaluationResult.ReportBuilderRegistry
-	ReportDurableSaver                          evaluationResult.ReportDurableSaver
+	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
+	ReportDurableSaver                          interpretationreporting.ReportDurableSaver
 	PublishedModelReader                        rulesetport.PublishedModelReader
 	AsyncInterpretation                         bool
+	SingleProcessAsyncInterpretation            bool
 }
 
 // Bootstrap assembles the evaluation module from container integration inputs.

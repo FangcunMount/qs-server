@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality"
 )
 
-func buildPersonalityTypeReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+func buildPersonalityTypeReport(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	if outcome.Assessment == nil {
 		return nil, errAssessmentRequired
 	}
@@ -47,7 +47,7 @@ func buildPersonalityTypeReport(outcome evaluationresult.Outcome) (*domainReport
 	}), nil
 }
 
-func buildTraitProfileReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+func buildTraitProfileReport(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	if outcome.Assessment == nil {
 		return nil, errAssessmentRequired
 	}

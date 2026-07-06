@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -28,8 +29,8 @@ func TestV1ScaleDefaultInterpretationTextIsStable(t *testing.T) {
 		t.Fatalf("Execute: %v", err)
 	}
 
-	report, err := evaluationresult.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaluationresult.Outcome{Assessment: a, Input: snapshot, Execution: execution})
+	report, err := interpretationreporting.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
+		Build(context.Background(), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

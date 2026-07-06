@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -124,7 +124,7 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 	if err != nil {
 		t.Fatalf("MaterializeReportBuilders: %v", err)
 	}
-	reportRegistry, err := evaluationresult.NewReportBuilderRegistry(builders...)
+	reportRegistry, err := interpretationreporting.NewReportBuilderRegistry(builders...)
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}

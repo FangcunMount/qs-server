@@ -5,8 +5,9 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
@@ -37,8 +38,8 @@ func TestV1ScalePipelinePreservesScoreRiskDimensionsAndSuggestions(t *testing.T)
 		t.Fatalf("len(Dimensions) = %d, want 2", len(execution.Dimensions))
 	}
 
-	report, err := evaluationresult.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
-		Build(context.Background(), evaluationresult.Outcome{Assessment: a, Input: snapshot, Execution: execution})
+	report, err := interpretationreporting.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
+		Build(context.Background(), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

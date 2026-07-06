@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -163,7 +163,7 @@ func runFrontendPayloadContract(t *testing.T, tc frontendPayloadCase) {
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}
-	report, err := reportBuilder.Build(context.Background(), evaluationresult.Outcome{
+	report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
 		Assessment: frontendSubmittedAssessment(t, tc, publishedPayload.Algorithm),
 		Input:      input,
 		Execution:  outcome,

@@ -1,12 +1,13 @@
 package typology
 
 import (
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
 )
 
-func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+func buildMBTIReport(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	input, err := MBTIReportInputFromOutcome(outcome)
 	if err != nil {
 		return nil, err
@@ -19,7 +20,7 @@ func buildMBTIReport(outcome evaluationresult.Outcome) (*domainReport.InterpretR
 }
 
 // NewMBTIReportBuilder is a characterization helper for typology reports.
-func NewMBTIReportBuilder() evaluationresult.ReportBuilder {
+func NewMBTIReportBuilder() interpretationreporting.ReportBuilder {
 	builder, err := NewConfiguredReportBuilder()
 	if err != nil {
 		panic(err)

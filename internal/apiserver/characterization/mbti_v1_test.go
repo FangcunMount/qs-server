@@ -4,8 +4,8 @@ import (
 	"context"
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -41,7 +41,7 @@ func TestV1MBTIPipelinePreservesTypeCodeAndReportFields(t *testing.T) {
 		assessment.EvaluationDetail{Kind: assessment.EvaluationModelKindPersonality, Payload: detail},
 	)
 
-	report, err := typologyapp.NewMBTIReportBuilder().Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(a, nil, result))
+	report, err := typologyapp.NewMBTIReportBuilder().Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result))
 	if err != nil {
 		t.Fatalf("Build report: %v", err)
 	}

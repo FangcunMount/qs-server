@@ -3,8 +3,8 @@ package compose
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
@@ -15,8 +15,8 @@ import (
 // ReportIntegrationPorts carries report-side integration ports for evaluation wiring.
 type ReportIntegrationPorts struct {
 	Reader                 evaluationreadmodel.ReportReader
-	BuilderRegistry        evaluationResult.ReportBuilderRegistry
-	DurableSaver           evaluationResult.ReportDurableSaver
+	BuilderRegistry        interpretationreporting.ReportBuilderRegistry
+	DurableSaver           interpretationreporting.ReportDurableSaver
 	PostCommitReadyIndexer *eventing.PostCommitReadyIndexer
 	ReadyIndex             *outboxready.Index
 }

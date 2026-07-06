@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
@@ -42,7 +42,7 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want hidden trigger", detail.SpecialTrigger)
 	}
 
-	report, err := typologyapp.NewSBTIReportBuilder().Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(
+	report, err := typologyapp.NewSBTIReportBuilder().Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
 		submittedSBTIAssessment(t), nil,
 		assessment.NewModelEvaluationResult(
 			*submittedSBTIAssessment(t).EvaluationModelRef(),
@@ -95,7 +95,7 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 		t.Fatalf("SpecialTrigger = %q, want fallback trigger", detail.SpecialTrigger)
 	}
 
-	report, err := typologyapp.NewSBTIReportBuilder().Build(context.Background(), evaluationresult.NewOutcomeFromLegacyResult(
+	report, err := typologyapp.NewSBTIReportBuilder().Build(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(
 		submittedSBTIAssessment(t), nil,
 		assessment.NewModelEvaluationResult(
 			*submittedSBTIAssessment(t).EvaluationModelRef(),

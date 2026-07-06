@@ -6,26 +6,27 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 // Writer persists scoring outcomes and transitions Assessment to evaluated.
 type Writer interface {
-	Write(ctx context.Context, outcome evaluationresult.Outcome) error
+	Write(ctx context.Context, outcome evaloutcome.Outcome) error
 }
 
 type writer struct {
 	assessmentRepo  assessment.Repository
-	scoreProjectors evaluationresult.ScoreProjectorRegistry
-	snapshotStore   evaluationresult.ScoringSnapshotStore
+	scoreProjectors interpretationreporting.ScoreProjectorRegistry
+	snapshotStore   ScoringSnapshotStore
 }
 
 // NewWriter creates a scoring outcome writer.
 func NewWriter(
 	assessmentRepo assessment.Repository,
-	scoreProjectors evaluationresult.ScoreProjectorRegistry,
-	snapshotStore evaluationresult.ScoringSnapshotStore,
+	scoreProjectors interpretationreporting.ScoreProjectorRegistry,
+	snapshotStore ScoringSnapshotStore,
 ) Writer {
 	return &writer{
 		assessmentRepo:  assessmentRepo,
@@ -34,7 +35,7 @@ func NewWriter(
 	}
 }
 
-func (w *writer) Write(ctx context.Context, outcome evaluationresult.Outcome) error {
+func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 	l := logger.L(ctx)
 	if err := ensureScoringOutcome(outcome); err != nil {
 		return evalerrors.AssessmentInterpretFailed(err, "应用计分结果失败")
@@ -52,7 +53,7 @@ func (w *writer) Write(ctx context.Context, outcome evaluationresult.Outcome) er
 		return evalerrors.Database(err, "保存计分结果失败")
 	}
 	if w.scoreProjectors != nil {
-		key := evaluationresult.ResolveOutcomeKey(outcome)
+		key := interpretationreporting.ResolveOutcomeKey(outcome)
 		if projector := w.scoreProjectors.Resolve(key); projector != nil {
 			if err := projector.Project(ctx, outcome); err != nil {
 				return err
@@ -67,7 +68,7 @@ func (w *writer) Write(ctx context.Context, outcome evaluationresult.Outcome) er
 	return nil
 }
 
-func ensureScoringOutcome(outcome evaluationresult.Outcome) error {
+func ensureScoringOutcome(outcome evaloutcome.Outcome) error {
 	if outcome.Assessment == nil {
 		return fmt.Errorf("assessment is required")
 	}

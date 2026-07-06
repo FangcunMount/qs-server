@@ -5,7 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -39,7 +40,7 @@ type recordingInterpretationService struct {
 	calls int
 }
 
-func (s *recordingInterpretationService) GenerateAndPersist(_ context.Context, outcome evaluationresult.Outcome) error {
+func (s *recordingInterpretationService) GenerateAndPersist(_ context.Context, outcome evaloutcome.Outcome) error {
 	s.calls++
 	if outcome.Execution == nil || outcome.Execution.Summary.PrimaryLabel != "stored" {
 		return errors.New("unexpected execution outcome")
@@ -76,7 +77,7 @@ func TestGenerateReportUsesStoredScoringSnapshotWithoutReExecute(t *testing.T) {
 	}
 
 	repo := &fakeAssessmentRepo{assessment: assessmentEntity}
-	snapshotStore := evaluationresult.NewMemoryScoringSnapshotStore()
+	snapshotStore := evaluationscoring.NewMemoryScoringSnapshotStore()
 	if err := snapshotStore.Save(context.Background(), assessmentEntity.ID().Uint64(), storedOutcome); err != nil {
 		t.Fatalf("Save snapshot: %v", err)
 	}

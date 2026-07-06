@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
@@ -17,10 +17,10 @@ type ReportWiringDeps struct {
 }
 
 // MaterializeReportBuilders builds report builders from evaluation model descriptors.
-func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps ReportWiringDeps) ([]evaluationResult.ReportBuilder, error) {
+func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps ReportWiringDeps) ([]interpretationreporting.ReportBuilder, error) {
 	var sharedConfigured typologyEvaluation.ReportBuilder
 	deps.sharedTypologyReportBuilder = &sharedConfigured
-	builders := make([]evaluationResult.ReportBuilder, 0, len(descs))
+	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
 	for _, desc := range descs {
 		builder, err := materializeReportBuilder(desc, deps)
 		if err != nil {
@@ -31,10 +31,10 @@ func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps ReportWi
 	return builders, nil
 }
 
-func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps ReportWiringDeps) (evaluationResult.ReportBuilder, error) {
+func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps ReportWiringDeps) (interpretationreporting.ReportBuilder, error) {
 	switch desc.Kind {
 	case evaldomain.ModelKindScale:
-		return evaluationResult.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
+		return interpretationreporting.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
 	case evaldomain.ModelKindTypology:
 		registry, err := requireTypologyRegistry(deps)
 		if err != nil {

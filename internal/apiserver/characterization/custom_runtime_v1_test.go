@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -61,7 +61,7 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 		t.Fatalf("MatchPercent = %.2f, want 40", detail.MatchPercent)
 	}
 
-	report, err := reportBuilder.Build(context.Background(), evaluationresult.Outcome{
+	report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
 		Assessment: assessment,
 		Input:      snapshot,
 		Execution:  outcome,

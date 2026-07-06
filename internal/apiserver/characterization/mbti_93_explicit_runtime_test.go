@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
@@ -53,7 +53,7 @@ func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 				t.Fatalf("detail = %#v, want INTJ@40", detail)
 			}
 
-			report, err := reportBuilder.Build(context.Background(), evaluationresult.Outcome{
+			report, err := reportBuilder.Build(context.Background(), evaloutcome.Outcome{
 				Assessment: assessmentEntity,
 				Input:      snapshot,
 				Execution:  outcome,

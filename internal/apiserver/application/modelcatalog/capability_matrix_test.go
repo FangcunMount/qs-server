@@ -11,79 +11,44 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-// catalogCapability documents the model-catalog API surface. Update this table
-// when enabling or disabling a model family; Batch 2 will promote it to policy.
-type catalogCapability struct {
-	apiKind          string
-	domainKind       domain.Kind
-	optionsEnabled   bool
-	createSupported  bool
-	previewSupported bool
-}
-
-func expectedCatalogCapabilities() []catalogCapability {
-	return []catalogCapability{
-		{
-			apiKind:          KindPersonality,
-			domainKind:       domain.KindPersonality,
-			optionsEnabled:   true,
-			createSupported:  true,
-			previewSupported: true,
-		},
-		{
-			apiKind:          KindBehaviorAbility,
-			domainKind:       domain.KindBehavioralRating,
-			optionsEnabled:   true,
-			createSupported:  true,
-			previewSupported: false,
-		},
-		{
-			apiKind:          KindMedicalScale,
-			domainKind:       domain.KindScale,
-			optionsEnabled:   true,
-			createSupported:  false,
-			previewSupported: false,
-		},
-		{
-			apiKind:          KindCognitive,
-			domainKind:       domain.KindCognitive,
-			optionsEnabled:   false,
-			createSupported:  false,
-			previewSupported: false,
-		},
-		{
-			apiKind:          KindCustom,
-			domainKind:       domain.KindCustom,
-			optionsEnabled:   false,
-			createSupported:  false,
-			previewSupported: false,
-		},
-	}
-}
-
 func TestAPICatalogCapabilityMatrix(t *testing.T) {
 	t.Parallel()
 
-	for _, tc := range expectedCatalogCapabilities() {
-		tc := tc
-		t.Run(tc.apiKind, func(t *testing.T) {
+	for _, cap := range domain.DefaultCapabilities() {
+		cap := cap
+		apiKind := DomainKindToAPIKind(cap.Kind)
+		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
-			mapped, ok := APIKindToDomainKind(tc.apiKind)
+			mapped, ok := APIKindToDomainKind(apiKind)
 			if !ok {
-				t.Fatalf("APIKindToDomainKind(%q) = false, want true", tc.apiKind)
+				t.Fatalf("APIKindToDomainKind(%q) = false, want true", apiKind)
 			}
-			if mapped != tc.domainKind {
-				t.Fatalf("APIKindToDomainKind(%q) = %q, want %q", tc.apiKind, mapped, tc.domainKind)
+			if mapped != cap.Kind {
+				t.Fatalf("APIKindToDomainKind(%q) = %q, want %q", apiKind, mapped, cap.Kind)
 			}
-			if got := DomainKindToAPIKind(tc.domainKind); got != tc.apiKind {
-				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", tc.domainKind, got, tc.apiKind)
+			if got := DomainKindToAPIKind(cap.Kind); got != apiKind {
+				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", cap.Kind, got, apiKind)
+			}
+
+			got, ok := capabilityForAPIKind(apiKind)
+			if !ok {
+				t.Fatalf("capabilityForAPIKind(%q) = false, want true", apiKind)
+			}
+			if got.OptionsEnabled != cap.OptionsEnabled {
+				t.Fatalf("OptionsEnabled = %v, want %v", got.OptionsEnabled, cap.OptionsEnabled)
+			}
+			if got.CreateSupported != cap.CreateSupported {
+				t.Fatalf("CreateSupported = %v, want %v", got.CreateSupported, cap.CreateSupported)
+			}
+			if got.PreviewSupported != cap.PreviewSupported {
+				t.Fatalf("PreviewSupported = %v, want %v", got.PreviewSupported, cap.PreviewSupported)
 			}
 		})
 	}
 }
 
-func TestOptionsReflectsCapabilityMatrix(t *testing.T) {
+func TestOptionsReflectsCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{})
@@ -97,47 +62,49 @@ func TestOptionsReflectsCapabilityMatrix(t *testing.T) {
 		optionByValue[item.Value] = item
 	}
 
-	for _, tc := range expectedCatalogCapabilities() {
-		item, ok := optionByValue[tc.apiKind]
+	for _, cap := range domain.DefaultCapabilities() {
+		apiKind := DomainKindToAPIKind(cap.Kind)
+		item, ok := optionByValue[apiKind]
 		if !ok {
-			t.Fatalf("Options().Kinds missing %q", tc.apiKind)
+			t.Fatalf("Options().Kinds missing %q", apiKind)
 		}
-		wantDisabled := !tc.optionsEnabled
+		if item.Label != cap.DisplayName {
+			t.Fatalf("Options().Kinds[%q].Label = %q, want %q", apiKind, item.Label, cap.DisplayName)
+		}
+		wantDisabled := !cap.OptionsEnabled
 		if item.Disabled != wantDisabled {
-			t.Fatalf("Options().Kinds[%q].Disabled = %v, want %v", tc.apiKind, item.Disabled, wantDisabled)
+			t.Fatalf("Options().Kinds[%q].Disabled = %v, want %v", apiKind, item.Disabled, wantDisabled)
 		}
 	}
 }
 
-func TestCreateCapabilityMatrix(t *testing.T) {
+func TestCreateCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
-	behaviorStub := &behaviorCommandStub{}
-	personalityStub := &personalityCommandStub{}
-	svc := NewService(Dependencies{
-		BehaviorCommand:    behaviorStub,
-		PersonalityCommand: personalityStub,
-	})
-
-	for _, tc := range expectedCatalogCapabilities() {
-		tc := tc
-		t.Run(tc.apiKind, func(t *testing.T) {
+	for _, cap := range domain.DefaultCapabilities() {
+		cap := cap
+		apiKind := DomainKindToAPIKind(cap.Kind)
+		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
-			behaviorStub.createCalled = false
-			personalityStub.createCalled = false
-
-			_, err := svc.Create(context.Background(), CreateModelDTO{
-				Kind:  tc.apiKind,
-				Code:  "capability_" + tc.apiKind,
-				Title: "Capability Matrix",
+			behaviorStub := &behaviorCommandStub{}
+			personalityStub := &personalityCommandStub{}
+			svc := NewService(Dependencies{
+				BehaviorCommand:    behaviorStub,
+				PersonalityCommand: personalityStub,
 			})
 
-			if tc.createSupported {
+			_, err := svc.Create(context.Background(), CreateModelDTO{
+				Kind:  apiKind,
+				Code:  "capability_" + apiKind,
+				Title: "Capability Policy",
+			})
+
+			if cap.CreateSupported {
 				if err != nil {
-					t.Fatalf("Create(%q) error = %v, want success", tc.apiKind, err)
+					t.Fatalf("Create(%q) error = %v, want success", apiKind, err)
 				}
-				switch tc.apiKind {
+				switch apiKind {
 				case KindBehaviorAbility:
 					if !behaviorStub.createCalled {
 						t.Fatal("behavior command Create was not called")
@@ -151,10 +118,10 @@ func TestCreateCapabilityMatrix(t *testing.T) {
 			}
 
 			if err == nil {
-				t.Fatalf("Create(%q) error = nil, want rejection", tc.apiKind)
+				t.Fatalf("Create(%q) error = nil, want rejection", apiKind)
 			}
 			if !cberrors.IsCode(err, code.ErrInvalidArgument) {
-				t.Fatalf("Create(%q) code = %v, want ErrInvalidArgument", tc.apiKind, cberrors.ParseCoder(err))
+				t.Fatalf("Create(%q) code = %v, want ErrInvalidArgument", apiKind, cberrors.ParseCoder(err))
 			}
 		})
 	}
@@ -163,18 +130,18 @@ func TestCreateCapabilityMatrix(t *testing.T) {
 func TestBehaviorAbilityIsLegacyScaleAdapter(t *testing.T) {
 	t.Parallel()
 
-	mapped, ok := APIKindToDomainKind(KindBehaviorAbility)
-	if !ok || mapped != domain.KindBehavioralRating {
-		t.Fatalf("behavior_ability domain kind = %q, want behavioral_rating", mapped)
+	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
+	if !ok || !cap.RuntimeViaScaleLegacy || cap.RuntimeExecutable {
+		t.Fatalf("behavioral_rating capability = %#v", cap)
 	}
-	if behavior.PayloadFormatScale != PayloadFormatScaleV1 {
-		t.Fatalf("behavior payload format drift: behavior=%q dto=%q", behavior.PayloadFormatScale, PayloadFormatScaleV1)
+	if cap.APIKind != domain.APIKindBehaviorAbility {
+		t.Fatalf("APIKind = %q, want %q", cap.APIKind, domain.APIKindBehaviorAbility)
 	}
-	if behavior.PayloadFormatScale != "assessmentmodel.behavior_ability.scale.v1" {
-		t.Fatalf("behavior payload format = %q, want legacy scale adapter envelope", behavior.PayloadFormatScale)
+	if behavior.PayloadFormatScale != domain.PayloadFormatBehaviorAbilityScaleV1 {
+		t.Fatalf("behavior payload format = %q, want %q", behavior.PayloadFormatScale, domain.PayloadFormatBehaviorAbilityScaleV1)
 	}
-	if domain.PayloadFormatBehavioralRatingDefaultV1 == behavior.PayloadFormatScale {
-		t.Fatal("behavior_ability must not use canonical behavioral_rating.default payload format yet")
+	if domain.PayloadFormatBehavioralRatingDefaultV1 == domain.PayloadFormatBehaviorAbilityScaleV1 {
+		t.Fatal("behavior_ability must not use canonical behavioral_rating.default payload format")
 	}
 }
 
@@ -189,7 +156,7 @@ func previewModelCode(apiKind string) string {
 	}
 }
 
-func TestPreviewReportCapabilityMatrix(t *testing.T) {
+func TestPreviewReportCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
 	svc := NewService(Dependencies{
@@ -197,21 +164,35 @@ func TestPreviewReportCapabilityMatrix(t *testing.T) {
 		PersonalityCommand: &personalityCommandStub{},
 	})
 
-	for _, tc := range expectedCatalogCapabilities() {
-		tc := tc
-		t.Run(tc.apiKind, func(t *testing.T) {
+	for _, cap := range domain.DefaultCapabilities() {
+		cap := cap
+		apiKind := DomainKindToAPIKind(cap.Kind)
+		t.Run(apiKind, func(t *testing.T) {
 			t.Parallel()
 
-			_, err := svc.PreviewReport(context.Background(), previewModelCode(tc.apiKind), json.RawMessage(`{}`))
-			if tc.previewSupported {
+			_, err := svc.PreviewReport(context.Background(), previewModelCode(apiKind), json.RawMessage(`{}`))
+			if cap.PreviewSupported {
 				if err != nil {
-					t.Fatalf("PreviewReport(%q) error = %v, want success path", tc.apiKind, err)
+					t.Fatalf("PreviewReport(%q) error = %v, want success path", apiKind, err)
 				}
 				return
 			}
 			if err == nil {
-				t.Fatalf("PreviewReport(%q) error = nil, want rejection", tc.apiKind)
+				t.Fatalf("PreviewReport(%q) error = nil, want rejection", apiKind)
 			}
 		})
+	}
+}
+
+func TestListRejectsNonListableKinds(t *testing.T) {
+	t.Parallel()
+
+	svc := NewService(Dependencies{})
+	_, err := svc.List(context.Background(), ListModelsDTO{Kind: KindMedicalScale, Page: 1, PageSize: 10})
+	if err == nil {
+		t.Fatal("List(medical_scale) error = nil, want rejection")
+	}
+	if !cberrors.IsCode(err, code.ErrInvalidArgument) {
+		t.Fatalf("List(medical_scale) code = %v, want ErrInvalidArgument", cberrors.ParseCoder(err))
 	}
 }

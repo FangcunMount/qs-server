@@ -3,7 +3,7 @@ package characterization_test
 import (
 	"context"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -36,10 +36,10 @@ func (r *charInputResolver) Resolve(_ context.Context, ref evaluationinput.Input
 
 type charResultWriter struct {
 	calls   int
-	outcome evaluationresult.Outcome
+	outcome evaloutcome.Outcome
 }
 
-func (w *charResultWriter) Write(_ context.Context, outcome evaluationresult.Outcome) error {
+func (w *charResultWriter) Write(_ context.Context, outcome evaloutcome.Outcome) error {
 	w.calls++
 	w.outcome = outcome
 	return nil

@@ -5,6 +5,11 @@ import (
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
-func resolveReportType(_ evaloutcome.Outcome) domainReport.ReportType {
+// OutcomeReportType selects the report type for an evaluation outcome.
+func OutcomeReportType(_ evaloutcome.Outcome) domainReport.ReportType {
 	return domainReport.ResolveReportType()
+}
+
+func resolveReportType(outcome evaloutcome.Outcome) domainReport.ReportType {
+	return OutcomeReportType(outcome)
 }

@@ -9,8 +9,11 @@ import (
 type Kind string
 
 const (
-	KindScale            Kind = "scale"
-	KindPersonality      Kind = "personality"
+	KindScale       Kind = "scale"
+	KindPersonality Kind = "personality"
+	// KindBehavioralRating is the domain taxonomy slot for API kind behavior_ability.
+	// Current production models are scale adapters (behavior_ability.scale.v1) and execute
+	// via legacy scale binding, not an independent behavioral_rating runtime.
 	KindBehavioralRating Kind = "behavioral_rating"
 	KindCognitive        Kind = "cognitive"
 	KindCustom           Kind = "custom"

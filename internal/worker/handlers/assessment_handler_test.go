@@ -126,6 +126,51 @@ func TestHandleAssessmentSubmittedAcksWhenEvaluationAlreadyProcessed(t *testing.
 	}
 }
 
+func TestHandleAssessmentSubmittedAcksWhenEvaluationFailed(t *testing.T) {
+	client := &assessmentEvaluateClient{
+		resp: &pb.EvaluateAssessmentResponse{
+			Success: false,
+			Status:  "failed",
+			Message: "evaluation failed",
+		},
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentSubmitted(deps)
+
+	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
+	if err != nil {
+		t.Fatalf("expected terminal evaluation failure to ack, got %v", err)
+	}
+}
+
+func TestHandleAssessmentSubmittedRetriesOnUnsuccessfulResponse(t *testing.T) {
+	client := &assessmentEvaluateClient{
+		resp: &pb.EvaluateAssessmentResponse{
+			Success: false,
+			Status:  "skipped",
+			Message: "temporary unavailable",
+		},
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentSubmitted(deps)
+
+	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
+	if err == nil {
+		t.Fatal("expected retryable evaluation error")
+	}
+}
+
+func TestHandleAssessmentSubmittedRetriesOnNilResponse(t *testing.T) {
+	client := &assessmentEvaluateClient{resp: nil}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentSubmitted(deps)
+
+	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
+	if err == nil {
+		t.Fatal("expected error for nil evaluate response")
+	}
+}
+
 type assessmentEvaluateClient struct {
 	fakeWorkerInternalClient
 	resp          *pb.EvaluateAssessmentResponse

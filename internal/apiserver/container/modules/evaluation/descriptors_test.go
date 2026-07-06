@@ -5,7 +5,8 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evalmodule "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -21,7 +22,7 @@ func TestAssertRegistryKeyParityRejectsMismatchedEvaluatorKey(t *testing.T) {
 	evaluators := []execute.Evaluator{
 		parityStubEvaluator{key: evaldomain.EvaluatorKeyPersonalityTypology},
 	}
-	builders := []evaluationResult.ReportBuilder{
+	builders := []interpretationreporting.ReportBuilder{
 		parityStubReportBuilder{key: evaldomain.EvaluatorKeyScaleDefault},
 	}
 	providers := []evaluationinputInfra.ModelInputProvider{
@@ -64,7 +65,7 @@ func (parityStubReportBuilder) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
 }
 
-func (parityStubReportBuilder) Build(context.Context, evaluationResult.Outcome) (*domainreport.InterpretReport, error) {
+func (parityStubReportBuilder) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
 	return nil, nil
 }
 

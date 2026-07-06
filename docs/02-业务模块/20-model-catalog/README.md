@@ -66,7 +66,8 @@ Assessment Model 负责“用什么模型规则解释答卷”：
 | ------------- | ---- | -------------- | --------- | -------------- | ---- |
 | `scale` | 是 | 是 | 是 | 是 | 医学量表主链路 |
 | `personality/typology`（MBTI/SBTI/BigFive/配置化） | 是 | 是 | 是 | 是 | configured runtime 主路径 |
-| `behavioral_rating` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
+| `behavior_ability`（domain: `behavioral_rating`） | 是 | 否（scale legacy binding） | 否（scale legacy binding） | 否 | API 名 behavior_ability；走医学量表执行链，非独立 behavioral_rating runtime |
+| `behavioral_rating`（预留） | 否 | 否 | 否 | 否 | 未来独立行为评分 runtime，当前未启用 |
 | `cognitive` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
 | `custom` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
 

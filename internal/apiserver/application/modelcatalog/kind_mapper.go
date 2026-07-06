@@ -13,6 +13,7 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	case KindPersonality:
 		return domain.KindPersonality, true
 	case KindBehaviorAbility:
+		// behavior_ability is a scale adapter; domain taxonomy uses KindBehavioralRating.
 		return domain.KindBehavioralRating, true
 	case KindMedicalScale, "scale":
 		return domain.KindScale, true
@@ -27,6 +28,10 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 
 // DomainKindToAPIKind maps canonical domain kinds to the external API contract.
 func DomainKindToAPIKind(kind domain.Kind) string {
+	cap, ok := domain.CapabilityByKind(kind)
+	if ok && cap.APIKind != "" {
+		return cap.APIKind
+	}
 	switch kind {
 	case domain.KindPersonality:
 		return KindPersonality
@@ -43,10 +48,11 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 	}
 }
 
+// APIPayloadFormatToDomain normalizes API payload formats to canonical domain formats.
 func APIPayloadFormatToDomain(format string) string {
 	switch format {
 	case PayloadFormatScaleV1:
-		return domain.PayloadFormatBehavioralRatingDefaultV1
+		return domain.PayloadFormatBehaviorAbilityScaleV1
 	case PayloadFormatMedicalScaleV1:
 		return domain.PayloadFormatAssessmentScaleV1
 	default:
@@ -54,9 +60,10 @@ func APIPayloadFormatToDomain(format string) string {
 	}
 }
 
+// DomainPayloadFormatToAPI maps canonical domain payload formats back to API values.
 func DomainPayloadFormatToAPI(kind string, format string) string {
 	switch format {
-	case domain.PayloadFormatBehavioralRatingDefaultV1:
+	case domain.PayloadFormatBehaviorAbilityScaleV1:
 		return PayloadFormatScaleV1
 	case domain.PayloadFormatAssessmentScaleV1:
 		if kind == KindBehaviorAbility {
@@ -69,6 +76,6 @@ func DomainPayloadFormatToAPI(kind string, format string) string {
 }
 
 func IsSupportedAPIKind(kind string) bool {
-	_, ok := APIKindToDomainKind(kind)
+	_, ok := capabilityForAPIKind(kind)
 	return ok
 }

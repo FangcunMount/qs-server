@@ -3,13 +3,13 @@ package typology
 import (
 	"fmt"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-type reportBuilderFunc func(evaluationresult.Outcome) (*domainReport.InterpretReport, error)
+type reportBuilderFunc func(evaloutcome.Outcome) (*domainReport.InterpretReport, error)
 
 // ReportAdapterRegistry resolves report builders by report adapter key.
 type ReportAdapterRegistry struct {
@@ -53,7 +53,7 @@ func (r ReportAdapterRegistry) build(
 	spec modeltypology.ReportSpec,
 	mapping modeltypology.OutcomeMappingSpec,
 	decisionKind modelcatalog.DecisionKind,
-	outcome evaluationresult.Outcome,
+	outcome evaloutcome.Outcome,
 ) (*domainReport.InterpretReport, error) {
 	adapterKey := spec.ResolvedAdapterKey(mapping, decisionKind)
 	if adapterKey == "" {

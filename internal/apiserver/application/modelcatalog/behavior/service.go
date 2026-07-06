@@ -7,14 +7,15 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
 const (
-	KindBehaviorAbility = "behavior_ability"
+	KindBehaviorAbility = domain.APIKindBehaviorAbility
 	SubKindScale        = "scale"
 	AlgorithmScoreRange = "score_range"
-	PayloadFormatScale  = "assessmentmodel.behavior_ability.scale.v1"
+	PayloadFormatScale  = domain.PayloadFormatBehaviorAbilityScaleV1
 )
 
 type Command interface {

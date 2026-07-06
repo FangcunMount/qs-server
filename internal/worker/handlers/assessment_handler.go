@@ -85,6 +85,15 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 				slog.String("status", resp.Status),
 				slog.String("message", resp.Message),
 			)
+		}
+		if err := handleEvaluateAssessmentResponse(resp); err != nil {
+			deps.Logger.Warn("assessment evaluation returned retryable failure",
+				slog.Int64("assessment_id", data.AssessmentID),
+				slog.String("error", err.Error()),
+			)
+			return err
+		}
+		if resp == nil || !resp.Success {
 			return nil
 		}
 

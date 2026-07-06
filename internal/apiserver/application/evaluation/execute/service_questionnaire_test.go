@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainAssessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -208,10 +208,10 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 
 type recordingResultWriter struct {
 	calls   int
-	outcome evaluationresult.Outcome
+	outcome evaloutcome.Outcome
 }
 
-func (w *recordingResultWriter) Write(_ context.Context, outcome evaluationresult.Outcome) error {
+func (w *recordingResultWriter) Write(_ context.Context, outcome evaloutcome.Outcome) error {
 	w.calls++
 	w.outcome = outcome
 	return nil
@@ -337,7 +337,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
 		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if writer.calls != 1 || evaluationresult.LegacyResult(writer.outcome) == nil || evaluationresult.LegacyResult(writer.outcome).TotalScore != 7 {
+	if writer.calls != 1 || evaloutcome.LegacyResult(writer.outcome) == nil || evaloutcome.LegacyResult(writer.outcome).TotalScore != 7 {
 		t.Fatalf("unexpected result writer outcome: %#v", writer.outcome)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
@@ -415,7 +415,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if writer.calls != 1 || evaluationresult.LegacyResult(writer.outcome) == nil || evaluationresult.LegacyResult(writer.outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
+	if writer.calls != 1 || evaloutcome.LegacyResult(writer.outcome) == nil || evaloutcome.LegacyResult(writer.outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
 		t.Fatalf("unexpected writer outcome: %#v", writer.outcome)
 	}
 	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {

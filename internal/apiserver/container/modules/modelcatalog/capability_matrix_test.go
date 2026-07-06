@@ -7,51 +7,6 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-// runtimeCapability documents which domain kinds the wired evaluation runtime can execute.
-// behavioral_rating is intentionally absent: behavior_ability binds and executes via the
-// legacy scale path (MedicalScaleID), not a dedicated evaluator descriptor.
-type runtimeCapability struct {
-	domainKind        domain.Kind
-	hasDescriptor     bool
-	executionPath     string
-	legacyKindMapping bool
-}
-
-func expectedRuntimeCapabilities() []runtimeCapability {
-	return []runtimeCapability{
-		{
-			domainKind:        domain.KindScale,
-			hasDescriptor:     true,
-			executionPath:     "scale_descriptor",
-			legacyKindMapping: true,
-		},
-		{
-			domainKind:        domain.KindPersonality,
-			hasDescriptor:     true,
-			executionPath:     "typology_descriptor",
-			legacyKindMapping: false,
-		},
-		{
-			domainKind:        domain.KindBehavioralRating,
-			hasDescriptor:     false,
-			executionPath:     "scale_legacy_binding",
-			legacyKindMapping: false,
-		},
-		{
-			domainKind:        domain.KindCognitive,
-			hasDescriptor:     false,
-			executionPath:     "none",
-			legacyKindMapping: false,
-		},
-		{
-			domainKind:        domain.KindCustom,
-			hasDescriptor:     false,
-			executionPath:     "none",
-			legacyKindMapping: false,
-		},
-	}
-}
-
 func descriptorDomainKinds(descs []evaldomain.ModelDescriptor) map[domain.Kind]bool {
 	out := make(map[domain.Kind]bool)
 	for _, desc := range descs {
@@ -91,29 +46,43 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	}
 }
 
-func TestRuntimeCapabilityMatrix(t *testing.T) {
+func TestEvaluationDescriptorsMatchCapabilityPolicy(t *testing.T) {
 	t.Parallel()
 
-	descs := DefaultEvaluationDescriptors()
-	descriptorKinds := descriptorDomainKinds(descs)
+	descKinds := descriptorDomainKinds(DefaultEvaluationDescriptors())
+	for _, cap := range domain.DefaultCapabilities() {
+		if cap.RuntimeExecutable && !descKinds[cap.Kind] {
+			t.Fatalf("missing runtime descriptor for %q (%s)", cap.Kind, cap.ExecutionPath)
+		}
+		if !cap.RuntimeExecutable && descKinds[cap.Kind] {
+			t.Fatalf("unexpected runtime descriptor for %q (%s)", cap.Kind, cap.ExecutionPath)
+		}
+	}
+}
 
-	for _, tc := range expectedRuntimeCapabilities() {
-		tc := tc
-		t.Run(string(tc.domainKind), func(t *testing.T) {
+func TestRuntimeCapabilityPolicy(t *testing.T) {
+	t.Parallel()
+
+	descKinds := descriptorDomainKinds(DefaultEvaluationDescriptors())
+
+	for _, cap := range domain.DefaultCapabilities() {
+		cap := cap
+		t.Run(string(cap.Kind), func(t *testing.T) {
 			t.Parallel()
 
-			if got := descriptorKinds[tc.domainKind]; got != tc.hasDescriptor {
-				t.Fatalf("descriptor presence = %v, want %v (execution path %q)", got, tc.hasDescriptor, tc.executionPath)
+			if got := descKinds[cap.Kind]; got != cap.RuntimeExecutable {
+				t.Fatalf("descriptor presence = %v, want runtime executable %v (%s)", got, cap.RuntimeExecutable, cap.ExecutionPath)
 			}
 
-			_, _, _, legacyMapped := domain.LegacyKindMapping(tc.domainKind)
-			if legacyMapped != tc.legacyKindMapping {
-				t.Fatalf("LegacyKindMapping(%q) = %v, want %v", tc.domainKind, legacyMapped, tc.legacyKindMapping)
+			_, _, _, legacyMapped := domain.LegacyKindMapping(cap.Kind)
+			wantLegacy := cap.Kind == domain.KindScale
+			if legacyMapped != wantLegacy {
+				t.Fatalf("LegacyKindMapping(%q) = %v, want %v", cap.Kind, legacyMapped, wantLegacy)
 			}
 
-			_, evaluatorMapped := evaldomain.EvaluatorKeyFromLegacyKind(tc.domainKind)
-			if evaluatorMapped && !tc.legacyKindMapping {
-				t.Fatalf("EvaluatorKeyFromLegacyKind(%q) unexpectedly succeeded", tc.domainKind)
+			_, evaluatorMapped := evaldomain.EvaluatorKeyFromLegacyKind(cap.Kind)
+			if evaluatorMapped != wantLegacy {
+				t.Fatalf("EvaluatorKeyFromLegacyKind(%q) = %v, want %v", cap.Kind, evaluatorMapped, wantLegacy)
 			}
 		})
 	}
@@ -122,14 +91,14 @@ func TestRuntimeCapabilityMatrix(t *testing.T) {
 func TestBehaviorAbilityDoesNotRegisterDedicatedRuntimeDescriptor(t *testing.T) {
 	t.Parallel()
 
-	descs := DefaultEvaluationDescriptors()
-	for _, desc := range descs {
+	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
+	if !ok || cap.RuntimeExecutable || !cap.RuntimeViaScaleLegacy {
+		t.Fatalf("behavioral_rating capability = %#v", cap)
+	}
+
+	for _, desc := range DefaultEvaluationDescriptors() {
 		if desc.Key.Kind == domain.KindBehavioralRating {
 			t.Fatalf("unexpected behavioral_rating descriptor: %#v", desc.Key)
 		}
-	}
-
-	if _, ok := evaldomain.EvaluatorKeyFromLegacyKind(domain.KindBehavioralRating); ok {
-		t.Fatal("behavioral_rating must not resolve to a legacy evaluator key")
 	}
 }

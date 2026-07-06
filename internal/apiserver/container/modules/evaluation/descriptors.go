@@ -5,8 +5,8 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
@@ -38,10 +38,10 @@ func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) 
 }
 
 // MaterializeReportBuilders builds report builders from descriptors.
-func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]evaluationResult.ReportBuilder, error) {
+func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ReportBuilder, error) {
 	var sharedConfigured typologyEvaluation.ReportBuilder
 	deps.sharedTypologyReportBuilder = &sharedConfigured
-	builders := make([]evaluationResult.ReportBuilder, 0, len(descs))
+	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
 	for _, desc := range descs {
 		builder, err := materializeReportBuilder(desc, deps)
 		if err != nil {
@@ -57,7 +57,7 @@ func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDe
 func AssertRegistryKeyParity(
 	descs []evaldomain.ModelDescriptor,
 	evaluators []execute.Evaluator,
-	builders []evaluationResult.ReportBuilder,
+	builders []interpretationreporting.ReportBuilder,
 	providers []evaluationinputInfra.ModelInputProvider,
 ) error {
 	if len(descs) != len(evaluators) || len(descs) != len(builders) || len(descs) != len(providers) {
@@ -92,10 +92,10 @@ func materializeEvaluator(desc evaldomain.ModelDescriptor, deps WiringDeps) (exe
 	}
 }
 
-func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps) (evaluationResult.ReportBuilder, error) {
+func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps) (interpretationreporting.ReportBuilder, error) {
 	switch desc.Kind {
 	case evaldomain.ModelKindScale:
-		return evaluationResult.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
+		return interpretationreporting.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
 	case evaldomain.ModelKindTypology:
 		registry, err := requireTypologyRegistry(deps)
 		if err != nil {

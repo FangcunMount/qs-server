@@ -2,8 +2,8 @@ package interpretation
 
 import (
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationResult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -38,8 +38,8 @@ func Wire(in WireInput) (*Module, error) {
 // Ports exposes report integration ports for downstream modules.
 type Ports struct {
 	Reader                 evaluationreadmodel.ReportReader
-	BuilderRegistry        evaluationResult.ReportBuilderRegistry
-	DurableSaver           evaluationResult.ReportDurableSaver
+	BuilderRegistry        interpretationreporting.ReportBuilderRegistry
+	DurableSaver           interpretationreporting.ReportDurableSaver
 	PostCommitReadyIndexer *eventing.PostCommitReadyIndexer
 	ReadyIndex             *outboxready.Index
 }

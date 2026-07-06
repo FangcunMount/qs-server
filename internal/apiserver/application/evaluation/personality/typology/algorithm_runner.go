@@ -1,7 +1,7 @@
 package typology
 
 import (
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	personalityadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
@@ -39,7 +39,7 @@ func (r algorithmRunner) buildOutcome(
 	return r.outcomeAssembler.AssembleFromPayload(modelRef, payload, result)
 }
 
-func (r algorithmRunner) buildReport(outcome evaluationresult.Outcome) (*domainReport.InterpretReport, error) {
+func (r algorithmRunner) buildReport(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	spec, mapping, decisionKind := resolveReportBuildContext(r, outcome)
 	return r.reportRegistry.build(spec, mapping, decisionKind, outcome)
 }

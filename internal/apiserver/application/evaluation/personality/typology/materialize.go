@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
@@ -35,7 +35,7 @@ func MaterializeTypologyReportBuilder(
 	desc evaldomain.ModelDescriptor,
 	registry ModuleRegistry,
 	shared *ReportBuilder,
-) (evaluationresult.ReportBuilder, error) {
+) (interpretationreporting.ReportBuilder, error) {
 	if shared == nil {
 		return nil, fmt.Errorf("shared typology report builder holder is required")
 	}

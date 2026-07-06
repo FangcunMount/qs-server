@@ -64,12 +64,15 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 	if dto.PageSize <= 0 {
 		dto.PageSize = 20
 	}
-	if dto.Kind != "" && !IsSupportedAPIKind(dto.Kind) {
-		return nil, invalidArgument("模型类型无效")
+	if dto.Kind != "" {
+		cap, ok := capabilityForAPIKind(dto.Kind)
+		if !ok || !cap.ListSupported {
+			return nil, invalidArgument("模型类型无效")
+		}
 	}
 
 	result := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
-	if dto.Kind == "" || dto.Kind == KindBehaviorAbility {
+	if shouldListModelKind(dto.Kind, KindBehaviorAbility) {
 		scales, err := s.listBehaviorAbility(ctx, dto)
 		if err != nil {
 			return nil, err
@@ -77,7 +80,7 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 		result.Items = append(result.Items, scales.Items...)
 		result.Total += scales.Total
 	}
-	if dto.Kind == "" || dto.Kind == KindPersonality {
+	if shouldListModelKind(dto.Kind, KindPersonality) {
 		items, total, err := s.listPersonality(ctx, dto)
 		if err != nil {
 			return nil, err
@@ -91,6 +94,10 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary, error) {
 	if dto.Kind == "" {
 		return nil, invalidArgument("模型类型不能为空")
+	}
+	cap, ok := capabilityForAPIKind(dto.Kind)
+	if !ok || !cap.CreateSupported {
+		return nil, invalidArgument("模型类型无效")
 	}
 	switch dto.Kind {
 	case KindBehaviorAbility:
@@ -229,13 +236,7 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 
 func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, error) {
 	result := &OptionsResult{
-		Kinds: []Option{
-			{Label: "人格测评", Value: KindPersonality},
-			{Label: "行为能力测评", Value: KindBehaviorAbility},
-			{Label: "医学量表", Value: KindMedicalScale},
-			{Label: "认知测评", Value: KindCognitive, Disabled: true},
-			{Label: "自定义测评", Value: KindCustom, Disabled: true},
-		},
+		Kinds: apiKindOptions(),
 		Algorithms: []Option{
 			{Label: "MBTI", Value: "mbti"},
 			{Label: "SBTI", Value: "sbti"},
@@ -297,10 +298,15 @@ func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationRe
 }
 
 func (s *service) PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.previewReport(ctx, modelCode, payload)
+	kind, ok := s.resolveModelKind(ctx, modelCode)
+	if !ok {
+		return nil, errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
 	}
-	return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
+	cap, capOK := capabilityForAPIKind(kind)
+	if !capOK || !cap.PreviewSupported {
+		return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
+	}
+	return s.personality.previewReport(ctx, modelCode, payload)
 }
 
 func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, error) {
@@ -310,6 +316,10 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	kind, ok := s.resolveModelKind(ctx, modelCode)
 	if !ok {
 		return "", errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
+	}
+	cap, capOK := capabilityForAPIKind(kind)
+	if !capOK || !cap.QRCodeSupported {
+		return "", invalidArgument("模型类型不支持二维码")
 	}
 	switch kind {
 	case KindPersonality:

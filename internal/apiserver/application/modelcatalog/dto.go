@@ -4,11 +4,13 @@ import (
 	"encoding/json"
 
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 const (
-	KindPersonality                    = "personality"
-	KindBehaviorAbility                = "behavior_ability"
+	KindPersonality = "personality"
+	// KindBehaviorAbility is the API kind for behavior-ability models backed by legacy scale adapters.
+	KindBehaviorAbility                = domain.APIKindBehaviorAbility
 	KindMedicalScale                   = "medical_scale"
 	KindCognitive                      = "cognitive"
 	KindCustom                         = "custom"
@@ -17,7 +19,7 @@ const (
 	StatusDraft                        = "draft"
 	StatusPublished                    = "published"
 	StatusArchived                     = "archived"
-	PayloadFormatScaleV1               = "assessmentmodel.behavior_ability.scale.v1"
+	PayloadFormatScaleV1               = domain.PayloadFormatBehaviorAbilityScaleV1
 	PayloadFormatMedicalScaleV1        = "assessmentmodel.medical_scale.scale.v1"
 	PayloadFormatPersonalityTypologyV1 = "assessmentmodel.personality.typology.v1"
 )

@@ -11,16 +11,12 @@ type Outcome = evaloutcome.Outcome
 
 // LegacyResult projects the canonical outcome into the legacy write model.
 func LegacyResult(o Outcome) *assessment.EvaluationResult {
-	return legacyResultForPersistence(o)
+	return evaloutcome.LegacyResult(o)
 }
 
 // NewOutcomeFromLegacyResult adapts a legacy evaluation result for tests and compatibility callers.
 func NewOutcomeFromLegacyResult(a *assessment.Assessment, input *evaluationinput.InputSnapshot, result *assessment.EvaluationResult) Outcome {
-	return Outcome{
-		Assessment: a,
-		Input:      input,
-		Execution:  outcomeFromLegacyEvaluationResult(result),
-	}
+	return evaloutcome.NewOutcomeFromLegacyResult(a, input, result)
 }
 
 type Writer = interpretationreporting.Writer

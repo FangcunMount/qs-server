@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
@@ -167,7 +167,7 @@ func executePublishedPersonalityAssessment(
 	if err != nil {
 		return nil, nil, err
 	}
-	report, err := reportBuilder.Build(ctx, evaluationresult.Outcome{
+	report, err := reportBuilder.Build(ctx, evaloutcome.Outcome{
 		Assessment: submitted,
 		Input:      executionInput,
 		Execution:  outcome,

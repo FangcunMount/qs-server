@@ -4,7 +4,8 @@ import (
 	"context"
 	"testing"
 
-	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
+	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -19,17 +20,17 @@ import (
 func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
-	outcome := evaluationresult.NewOutcomeFromLegacyResult(a, scaleInputSnapshot(), assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "low", "keep", nil).
+	outcome := evaloutcome.NewOutcomeFromLegacyResult(a, scaleInputSnapshot(), assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "low", "keep", nil).
 		WithModelRef(*a.EvaluationModelRef()))
 
-	scoreProjectors, err := evaluationresult.NewScoreProjectorRegistry(
-		evaluationresult.NewScaleScoreProjector(&writerScoreRepoStub{order: &order}),
+	scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
+		interpretationreporting.NewScaleScoreProjector(&writerScoreRepoStub{order: &order}),
 	)
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry: %v", err)
 	}
 	reportSaver := &writerReportSaverStub{order: &order}
-	reportBuilders, err := evaluationresult.NewReportBuilderRegistry(&writerReportBuilderStub{
+	reportBuilders, err := interpretationreporting.NewReportBuilderRegistry(&writerReportBuilderStub{
 		order: &order,
 		rpt: domainreport.NewInterpretReport(
 			domainreport.ID(a.ID()),
@@ -46,7 +47,7 @@ func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}
-	writer, err := evaluationresult.NewWriter(
+	writer, err := interpretationreporting.NewWriter(
 		&writerAssessmentRepoStub{order: &order},
 		scoreProjectors,
 		reportBuilders,
@@ -119,7 +120,7 @@ func (*writerReportBuilderStub) Key() evaluation.EvaluatorKey {
 func (*writerReportBuilderStub) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
 }
-func (b *writerReportBuilderStub) Build(context.Context, evaluationresult.Outcome) (*domainreport.InterpretReport, error) {
+func (b *writerReportBuilderStub) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
 	*b.order = append(*b.order, "report_build")
 	return b.rpt, nil
 }
@@ -144,6 +145,6 @@ type writerNotifierStub struct {
 	order *[]string
 }
 
-func (n *writerNotifierStub) NotifyCompletion(context.Context, evaluationresult.Outcome) {
+func (n *writerNotifierStub) NotifyCompletion(context.Context, evaloutcome.Outcome) {
 	*n.order = append(*n.order, "waiter")
 }
