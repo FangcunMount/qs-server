@@ -11,6 +11,7 @@ import (
 	personalitymodel "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -65,9 +66,8 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 		dto.PageSize = 20
 	}
 	if dto.Kind != "" {
-		cap, ok := capabilityForAPIKind(dto.Kind)
-		if !ok || !cap.ListSupported {
-			return nil, invalidArgument("模型类型无效")
+		if err := requireCatalogOperation(dto.Kind, domain.CatalogOpList); err != nil {
+			return nil, err
 		}
 	}
 
@@ -95,9 +95,8 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 	if dto.Kind == "" {
 		return nil, invalidArgument("模型类型不能为空")
 	}
-	cap, ok := capabilityForAPIKind(dto.Kind)
-	if !ok || !cap.CreateSupported {
-		return nil, invalidArgument("模型类型无效")
+	if err := requireCatalogOperation(dto.Kind, domain.CatalogOpCreate); err != nil {
+		return nil, err
 	}
 	switch dto.Kind {
 	case KindBehaviorAbility:
@@ -132,49 +131,97 @@ func (s *service) Get(ctx context.Context, modelCode string) (*ModelSummary, err
 }
 
 func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (*ModelSummary, error) {
-	if kind, ok := s.resolveModelKind(ctx, dto.Code); ok && kind == KindPersonality {
-		return s.personality.updateBasicInfo(ctx, dto)
-	}
-	return s.updateBehaviorBasicInfo(ctx, dto)
-}
-
-func (s *service) Delete(ctx context.Context, modelCode string) error {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.delete(ctx, modelCode)
-	}
-	return s.behavior.delete(ctx, modelCode)
-}
-
-func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.publish(ctx, modelCode)
-	}
-	return s.behavior.publish(ctx, modelCode)
-}
-
-func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.unpublish(ctx, modelCode)
-	}
-	return s.behavior.unpublish(ctx, modelCode)
-}
-
-func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
-	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
-		return s.personality.archive(ctx, modelCode)
-	}
-	return s.behavior.archive(ctx, modelCode)
-}
-
-func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
-	if kind, ok := s.resolveModelKind(ctx, dto.Code); ok && kind == KindPersonality {
-		return s.personality.bindQuestionnaire(ctx, dto)
-	}
-	binding, err := s.behavior.bindQuestionnaire(ctx, dto)
+	kind, err := s.requireModelOperation(ctx, dto.Code, "", domain.CatalogOpUpdateBasicInfo)
 	if err != nil {
 		return nil, err
 	}
-	return s.questionnaireBinding(ctx, binding.QuestionnaireCode, binding.QuestionnaireVersion)
+	switch kind {
+	case KindPersonality:
+		return s.personality.updateBasicInfo(ctx, dto)
+	case KindBehaviorAbility:
+		return s.updateBehaviorBasicInfo(ctx, dto)
+	default:
+		return nil, invalidArgument("模型类型无效")
+	}
+}
+
+func (s *service) Delete(ctx context.Context, modelCode string) error {
+	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpDelete)
+	if err != nil {
+		return err
+	}
+	switch kind {
+	case KindPersonality:
+		return s.personality.delete(ctx, modelCode)
+	case KindBehaviorAbility:
+		return s.behavior.delete(ctx, modelCode)
+	default:
+		return invalidArgument("模型类型无效")
+	}
+}
+
+func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary, error) {
+	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpPublish)
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case KindPersonality:
+		return s.personality.publish(ctx, modelCode)
+	case KindBehaviorAbility:
+		return s.behavior.publish(ctx, modelCode)
+	default:
+		return nil, invalidArgument("模型类型无效")
+	}
+}
+
+func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummary, error) {
+	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpUnpublish)
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case KindPersonality:
+		return s.personality.unpublish(ctx, modelCode)
+	case KindBehaviorAbility:
+		return s.behavior.unpublish(ctx, modelCode)
+	default:
+		return nil, invalidArgument("模型类型无效")
+	}
+}
+
+func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary, error) {
+	kind, err := s.requireModelOperation(ctx, modelCode, "", domain.CatalogOpArchive)
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case KindPersonality:
+		return s.personality.archive(ctx, modelCode)
+	case KindBehaviorAbility:
+		return s.behavior.archive(ctx, modelCode)
+	default:
+		return nil, invalidArgument("模型类型无效")
+	}
+}
+
+func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDTO) (*QuestionnaireBindingResult, error) {
+	kind, err := s.requireModelOperation(ctx, dto.Code, "", domain.CatalogOpBindQuestionnaire)
+	if err != nil {
+		return nil, err
+	}
+	switch kind {
+	case KindPersonality:
+		return s.personality.bindQuestionnaire(ctx, dto)
+	case KindBehaviorAbility:
+		binding, bindErr := s.behavior.bindQuestionnaire(ctx, dto)
+		if bindErr != nil {
+			return nil, bindErr
+		}
+		return s.questionnaireBinding(ctx, binding.QuestionnaireCode, binding.QuestionnaireVersion)
+	default:
+		return nil, invalidArgument("模型类型无效")
+	}
 }
 
 func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*QuestionnaireBindingResult, error) {
@@ -221,17 +268,18 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 }
 
 func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
-	if dto.Kind == "" {
-		if kind, ok := s.resolveModelKind(ctx, modelCode); ok {
-			dto.Kind = kind
-		} else {
-			dto.Kind = KindBehaviorAbility
-		}
+	kind, err := s.requireModelOperation(ctx, modelCode, dto.Kind, domain.CatalogOpUpdateDefinition)
+	if err != nil {
+		return nil, err
 	}
-	if dto.Kind == KindPersonality {
+	switch kind {
+	case KindPersonality:
 		return s.personality.updateDefinition(ctx, modelCode, dto)
+	case KindBehaviorAbility:
+		return s.updateBehaviorDefinition(ctx, modelCode, dto)
+	default:
+		return nil, invalidArgument("模型类型无效")
 	}
-	return s.updateBehaviorDefinition(ctx, modelCode, dto)
 }
 
 func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, error) {
@@ -298,12 +346,14 @@ func (s *service) Validate(ctx context.Context, modelCode string) (*ValidationRe
 }
 
 func (s *service) PreviewReport(ctx context.Context, modelCode string, payload json.RawMessage) (*PreviewReportResult, error) {
-	kind, ok := s.resolveModelKind(ctx, modelCode)
-	if !ok {
-		return nil, errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
+	kind, err := s.requireModelOperationWithNotFound(ctx, modelCode, "", domain.CatalogOpPreview, modelNotFoundError())
+	if err != nil {
+		if errors.IsCode(err, code.ErrInvalidArgument) {
+			return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
+		}
+		return nil, err
 	}
-	cap, capOK := capabilityForAPIKind(kind)
-	if !capOK || !cap.PreviewSupported {
+	if kind != KindPersonality {
 		return nil, errors.WithCode(code.ErrInvalidArgument, "预览报告生成尚未接入行为能力模型")
 	}
 	return s.personality.previewReport(ctx, modelCode, payload)
@@ -313,13 +363,9 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 	if modelCode == "" {
 		return "", invalidArgument("模型编码不能为空")
 	}
-	kind, ok := s.resolveModelKind(ctx, modelCode)
-	if !ok {
-		return "", errors.WithCode(code.ErrMedicalScaleNotFound, "测评模型不存在")
-	}
-	cap, capOK := capabilityForAPIKind(kind)
-	if !capOK || !cap.QRCodeSupported {
-		return "", invalidArgument("模型类型不支持二维码")
+	kind, err := s.requireModelOperationWithNotFound(ctx, modelCode, "", domain.CatalogOpQRCode, modelNotFoundError())
+	if err != nil {
+		return "", err
 	}
 	switch kind {
 	case KindPersonality:

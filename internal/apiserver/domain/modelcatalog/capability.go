@@ -3,19 +3,20 @@ package modelcatalog
 // KindCapability is the canonical capability matrix for a model family.
 // API options, create/publish guards, and runtime descriptor export should read this table.
 type KindCapability struct {
-	Kind                  Kind
-	APIKind               string
-	DisplayName           string
-	OptionsEnabled        bool
-	CreateSupported       bool
-	ListSupported         bool
-	PublishSupported      bool
-	BindQuestionnaire     bool
-	PreviewSupported      bool
-	QRCodeSupported       bool
-	RuntimeExecutable     bool
-	RuntimeViaScaleLegacy bool
-	ExecutionPath         string
+	Kind                      Kind
+	APIKind                   string
+	DisplayName               string
+	OptionsEnabled            bool
+	CreateSupported           bool
+	ListSupported             bool
+	PublishSupported          bool
+	BindQuestionnaire         bool
+	DefinitionUpdateSupported bool
+	PreviewSupported          bool
+	QRCodeSupported           bool
+	RuntimeExecutable         bool
+	RuntimeViaScaleLegacy     bool
+	ExecutionPath             string
 }
 
 func (c KindCapability) CanExecute() bool {
@@ -24,32 +25,34 @@ func (c KindCapability) CanExecute() bool {
 
 var defaultCapabilities = []KindCapability{
 	{
-		Kind:              KindPersonality,
-		APIKind:           "personality",
-		DisplayName:       "人格测评",
-		OptionsEnabled:    true,
-		CreateSupported:   true,
-		ListSupported:     true,
-		PublishSupported:  true,
-		BindQuestionnaire: true,
-		PreviewSupported:  true,
-		QRCodeSupported:   true,
-		RuntimeExecutable: true,
-		ExecutionPath:     "typology_descriptor",
+		Kind:                      KindPersonality,
+		APIKind:                   "personality",
+		DisplayName:               "人格测评",
+		OptionsEnabled:            true,
+		CreateSupported:           true,
+		ListSupported:             true,
+		PublishSupported:          true,
+		BindQuestionnaire:         true,
+		DefinitionUpdateSupported: true,
+		PreviewSupported:          true,
+		QRCodeSupported:           true,
+		RuntimeExecutable:         true,
+		ExecutionPath:             "typology_descriptor",
 	},
 	{
-		Kind:                  KindBehavioralRating,
-		APIKind:               APIKindBehaviorAbility,
-		DisplayName:           "行为能力测评",
-		OptionsEnabled:        true,
-		CreateSupported:       true,
-		ListSupported:         true,
-		PublishSupported:      true,
-		BindQuestionnaire:     true,
-		PreviewSupported:      false,
-		QRCodeSupported:       true,
-		RuntimeViaScaleLegacy: true,
-		ExecutionPath:         "behavior_ability_scale_adapter",
+		Kind:                      KindBehavioralRating,
+		APIKind:                   APIKindBehaviorAbility,
+		DisplayName:               "行为能力测评",
+		OptionsEnabled:            true,
+		CreateSupported:           true,
+		ListSupported:             true,
+		PublishSupported:          true,
+		BindQuestionnaire:         true,
+		DefinitionUpdateSupported: true,
+		PreviewSupported:          false,
+		QRCodeSupported:           true,
+		RuntimeViaScaleLegacy:     true,
+		ExecutionPath:             "behavior_ability_scale_adapter",
 	},
 	{
 		Kind:              KindScale,

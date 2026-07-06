@@ -55,8 +55,11 @@ func (s *behaviorCommandStub) Archive(context.Context, string) (*behavior.Model,
 	return nil, nil
 }
 
-func (s *behaviorCommandStub) BindQuestionnaire(context.Context, behavior.BindQuestionnaireInput) (*behavior.Binding, error) {
-	return nil, nil
+func (s *behaviorCommandStub) BindQuestionnaire(_ context.Context, input behavior.BindQuestionnaireInput) (*behavior.Binding, error) {
+	return &behavior.Binding{
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+	}, nil
 }
 
 func (s *behaviorCommandStub) GetDefinition(context.Context, string) (*behavior.Definition, error) {
@@ -105,8 +108,11 @@ func (s *personalityCommandStub) UpdateBasicInfo(context.Context, personality.Up
 
 func (s *personalityCommandStub) Delete(context.Context, string) error { return nil }
 
-func (s *personalityCommandStub) BindQuestionnaire(context.Context, personality.BindQuestionnaireInput) (*personality.QuestionnaireBindingResult, error) {
-	return nil, nil
+func (s *personalityCommandStub) BindQuestionnaire(_ context.Context, input personality.BindQuestionnaireInput) (*personality.QuestionnaireBindingResult, error) {
+	return &personality.QuestionnaireBindingResult{
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+	}, nil
 }
 
 func (s *personalityCommandStub) GetQuestionnaire(context.Context, string) (*personality.QuestionnaireBindingResult, error) {

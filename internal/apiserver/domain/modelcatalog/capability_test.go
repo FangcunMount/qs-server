@@ -24,6 +24,9 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 	if !behavioral.CreateSupported || behavioral.PreviewSupported || behavioral.RuntimeExecutable {
 		t.Fatalf("behavioral_rating capability = %#v", behavioral)
 	}
+	if !behavioral.DefinitionUpdateSupported {
+		t.Fatal("behavioral_rating must allow definition update")
+	}
 	if !behavioral.RuntimeViaScaleLegacy || !behavioral.CanExecute() {
 		t.Fatalf("behavioral_rating must execute via scale legacy binding")
 	}
