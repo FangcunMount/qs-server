@@ -44,7 +44,7 @@ func TestOutboxStagingCompatibilityEntrypointsStayContained(t *testing.T) {
 		"internal/apiserver/infra/mysql/eventoutbox/store.go":          {},
 		"internal/apiserver/infra/mongo/eventoutbox/store.go":          {},
 		"internal/apiserver/infra/mongo/answersheet/durable_submit.go": {},
-		"internal/apiserver/infra/mongo/interpretation/repo.go":            {},
+		"internal/apiserver/infra/mongo/interpretation/repo.go":        {},
 	}
 	walkGoFiles(t, filepath.Join(root, "internal/apiserver"), func(path string, text string) {
 		if strings.HasSuffix(path, "_test.go") || !strings.Contains(text, "StageEventsTx(") {
