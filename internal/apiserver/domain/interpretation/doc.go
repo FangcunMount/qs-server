@@ -4,5 +4,5 @@
 // v2 outcome summary fields (model identity, primary_score, level),
 // display dimensions, structured suggestions, and optional model-specific
 // extras for personality-style reports. Model-family builders live in
-// application/evaluation/result and personality typology adapters.
+// application/interpretation/reporting and personality typology adapters.
 package interpretation

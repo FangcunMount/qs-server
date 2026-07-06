@@ -159,7 +159,7 @@ func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	})
 }
 
-func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
+func TestInterpretationReportingDoesNotOwnScaleRules(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
@@ -167,13 +167,13 @@ func TestEvaluationResultLayerDoesNotOwnScaleRules(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition",
 		"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine",
 	}
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "interpretation", "reporting"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
 		for _, forbidden := range forbiddenImports {
 			if strings.HasPrefix(importPath, forbidden) {
-				t.Fatalf("%s imports %s; result writer must orchestrate outputs without owning scale rules", filepath.ToSlash(mustRel(t, root, path)), importPath)
+				t.Fatalf("%s imports %s; report writer must orchestrate outputs without owning scale rules", filepath.ToSlash(mustRel(t, root, path)), importPath)
 			}
 		}
 	})
@@ -706,7 +706,6 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 		"internal/apiserver/characterization/",
 		"internal/apiserver/application/evaluation/scale/outcome_mapper.go",
 		"internal/apiserver/application/evaluation/outcome/legacy.go",
-		"internal/apiserver/application/evaluation/result/types.go",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -771,7 +770,6 @@ func TestApplicationEvaluationLegacyResultAccessIsBoundaryOnly(t *testing.T) {
 	root := repoRoot(t)
 	allowedRelFiles := map[string]struct{}{
 		"internal/apiserver/application/evaluation/outcome/legacy.go": {},
-		"internal/apiserver/application/evaluation/result/types.go":   {},
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
 	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {

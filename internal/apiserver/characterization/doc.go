@@ -6,7 +6,7 @@
 //   - SBTI outcome / similarity / rarity projection
 //   - ruleset codec payload formats and round-trip
 //   - InterpretReport Mongo mapper preservation
-//   - execute service EvaluatorKey dispatch for scale/MBTI/SBTI
+//   - execute service EvaluatorKey dispatch and split-phase persistence for scale/MBTI/SBTI
 //   - typology executor legacy payload scoring parity
 //   - legacy kind -> EvaluatorKey mapping
 //   - report v2 model/primary_score/level projection and Mongo dual-write

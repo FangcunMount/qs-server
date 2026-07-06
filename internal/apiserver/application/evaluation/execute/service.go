@@ -11,7 +11,6 @@ import (
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	apptransaction "github.com/FangcunMount/qs-server/internal/apiserver/application/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -31,7 +30,6 @@ type service struct {
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
 	evaluators            EvaluatorRegistry
-	resultWriter          interpretationreporting.Writer
 	scoringWriter         evaluationscoring.Writer
 	interpretationService interpretationapp.Service
 	scoringSnapshotStore  evaluationscoring.ScoringSnapshotStore
@@ -102,21 +100,18 @@ func WithScoringSnapshotStore(store evaluationscoring.ScoringSnapshotStore) Serv
 	}
 }
 
-// NewService 创建评估引擎服务实例
+// NewService 创建评估引擎服务实例。生产装配必须配置 WithScoringWriter 与 WithInterpretationService。
 func NewService(
 	assessmentRepo assessment.Repository,
 	inputResolver evaluationinput.Resolver,
-	resultWriter interpretationreporting.Writer,
 	opts ...ServiceOption,
 ) Service {
 	svc := &service{
 		assessmentRepo: assessmentRepo,
 		inputResolver:  inputResolver,
 		evaluators:     newEmptyEvaluatorRegistry(),
-		resultWriter:   resultWriter,
 	}
 
-	// 应用选项
 	for _, opt := range opts {
 		opt(svc)
 	}
@@ -232,23 +227,20 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 }
 
 func (s *service) persistEvaluationOutcome(ctx context.Context, outcome evaloutcome.Outcome) error {
-	if s.scoringWriter != nil && s.interpretationService != nil {
-		if s.asyncInterpretation {
-			if err := s.scoringWriter.Write(ctx, outcome); err != nil {
-				return err
-			}
-			outcome.Assessment.StageEvaluatedEvent(time.Now())
-			return s.failureFinalizer().SaveAssessmentWithEvents(ctx, outcome.Assessment)
-		}
+	if s.scoringWriter == nil || s.interpretationService == nil {
+		return evalerrors.ModuleNotConfigured("evaluation split-phase writers are not configured")
+	}
+	if s.asyncInterpretation {
 		if err := s.scoringWriter.Write(ctx, outcome); err != nil {
 			return err
 		}
-		return s.interpretationService.GenerateAndPersist(ctx, outcome)
+		outcome.Assessment.StageEvaluatedEvent(time.Now())
+		return s.failureFinalizer().SaveAssessmentWithEvents(ctx, outcome.Assessment)
 	}
-	if s.resultWriter == nil {
-		return evalerrors.ModuleNotConfigured("evaluation result writer is not configured")
+	if err := s.scoringWriter.Write(ctx, outcome); err != nil {
+		return err
 	}
-	return s.resultWriter.Write(ctx, outcome)
+	return s.interpretationService.GenerateAndPersist(ctx, outcome)
 }
 
 // GenerateReport generates and persists the interpretation report for an evaluated assessment.

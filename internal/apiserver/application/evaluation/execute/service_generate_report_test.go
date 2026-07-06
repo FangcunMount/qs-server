@@ -91,7 +91,6 @@ func TestGenerateReportUsesStoredScoringSnapshotWithoutReExecute(t *testing.T) {
 	svc := NewService(
 		repo,
 		stubInputResolver{},
-		nil,
 		WithEvaluatorRegistry(registry),
 		WithInterpretationService(interp),
 		WithScoringSnapshotStore(snapshotStore),

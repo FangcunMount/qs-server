@@ -1,10 +1,11 @@
-package result
+package reporting
 
 import (
 	"context"
 	"errors"
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -68,7 +69,7 @@ func (*resultReportBuilderStub) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b *resultReportBuilderStub) Build(context.Context, Outcome) (*domainReport.InterpretReport, error) {
+func (b *resultReportBuilderStub) Build(context.Context, evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	*b.order = append(*b.order, "report_build")
 	return b.rpt, b.err
 }
@@ -94,16 +95,11 @@ type resultNotifierStub struct {
 	calls int
 }
 
-func (n *resultNotifierStub) NotifyCompletion(context.Context, Outcome) {
+func (n *resultNotifierStub) NotifyCompletion(context.Context, evaloutcome.Outcome) {
 	*n.order = append(*n.order, "waiter")
 	n.calls++
 }
 
-func TestGenericEventAssemblerIsFallbackOnly(t *testing.T) {
-	if got := (GenericEventAssembler{}).Key(); !got.IsZero() {
-		t.Fatalf("GenericEventAssembler key = %q, want empty fallback key", got)
-	}
-}
 
 func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *testing.T) {
 	order := make([]string, 0)
@@ -377,7 +373,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 		Payload: "INTJ",
 	})
 
-	if err := writer.Write(context.Background(), NewOutcomeFromLegacyResult(a, nil, result)); err != nil {
+	if err := writer.Write(context.Background(), evaloutcome.NewOutcomeFromLegacyResult(a, nil, result)); err != nil {
 		t.Fatalf("Write returned error: %v", err)
 	}
 
@@ -429,10 +425,10 @@ func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 	return a
 }
 
-func scaleOutcomeForWriterTest(a *assessment.Assessment) Outcome {
+func scaleOutcomeForWriterTest(a *assessment.Assessment) evaloutcome.Outcome {
 	result := assessment.NewEvaluationResult(7, assessment.RiskLevelLow, "ok", "keep", nil).
 		WithModelRef(*a.EvaluationModelRef())
-	return NewOutcomeFromLegacyResult(a, &evaluationinput.InputSnapshot{
+	return evaloutcome.NewOutcomeFromLegacyResult(a, &evaluationinput.InputSnapshot{
 		MedicalScale: &scalesnapshot.ScaleSnapshot{
 			Code:                 "S-001",
 			Title:                "Scale",

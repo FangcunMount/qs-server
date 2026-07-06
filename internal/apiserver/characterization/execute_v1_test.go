@@ -30,23 +30,16 @@ func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
 // writer receives total=5 risk=low result.
 func TestV1ExecuteServiceDispatchesScaleByEvaluatorKey(t *testing.T) {
 	a := submittedScaleAssessment(t)
-	repo := &charAssessmentRepo{assessment: a}
 	input := &charInputResolver{snapshot: scaleInputSnapshot()}
-	writer := &charResultWriter{}
+	svc, capture := newV1RecordingExecuteService(t, a, input)
 
-	svc := evaluationexecute.NewService(
-		repo,
-		input,
-		writer,
-		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
-	)
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if writer.calls != 1 {
-		t.Fatalf("writer calls = %d, want 1", writer.calls)
+	if capture.interpretationCalls != 1 {
+		t.Fatalf("interpretation calls = %d, want 1", capture.interpretationCalls)
 	}
-	result := writer.outcome.Execution
+	result := capture.outcome.Execution
 	if result == nil {
 		t.Fatal("expected assessment outcome")
 	}
@@ -61,23 +54,16 @@ func TestV1ExecuteServiceDispatchesScaleByEvaluatorKey(t *testing.T) {
 // V1 contract: execute service dispatches legacy MBTI kind to typology/mbti evaluator.
 func TestV1ExecuteServiceDispatchesMBTIByLegacyKind(t *testing.T) {
 	a := submittedMBTIAssessment(t)
-	repo := &charAssessmentRepo{assessment: a}
 	input := &charInputResolver{snapshot: mbtiInputSnapshot()}
-	writer := &charResultWriter{}
+	svc, capture := newV1RecordingExecuteService(t, a, input)
 
-	svc := evaluationexecute.NewService(
-		repo,
-		input,
-		writer,
-		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
-	)
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if writer.calls != 1 {
-		t.Fatalf("writer calls = %d, want 1", writer.calls)
+	if capture.interpretationCalls != 1 {
+		t.Fatalf("interpretation calls = %d, want 1", capture.interpretationCalls)
 	}
-	result := writer.outcome.Execution
+	result := capture.outcome.Execution
 	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
 		t.Fatalf("model kind = %s, want personality", result.ModelRef.Kind())
 	}
@@ -89,23 +75,16 @@ func TestV1ExecuteServiceDispatchesMBTIByLegacyKind(t *testing.T) {
 // V1 contract: execute service dispatches legacy SBTI kind to typology/sbti evaluator.
 func TestV1ExecuteServiceDispatchesSBTIByLegacyKind(t *testing.T) {
 	a := submittedSBTIAssessment(t)
-	repo := &charAssessmentRepo{assessment: a}
 	input := &charInputResolver{snapshot: sbtiInputSnapshot()}
-	writer := &charResultWriter{}
+	svc, capture := newV1RecordingExecuteService(t, a, input)
 
-	svc := evaluationexecute.NewService(
-		repo,
-		input,
-		writer,
-		evaluationexecute.WithEvaluatorRegistry(newV1EvaluatorRegistry(t)),
-	)
 	if err := svc.Evaluate(context.Background(), a.ID().Uint64()); err != nil {
 		t.Fatalf("Evaluate: %v", err)
 	}
-	if writer.calls != 1 {
-		t.Fatalf("writer calls = %d, want 1", writer.calls)
+	if capture.interpretationCalls != 1 {
+		t.Fatalf("interpretation calls = %d, want 1", capture.interpretationCalls)
 	}
-	result := writer.outcome.Execution
+	result := capture.outcome.Execution
 	if result == nil || result.ModelRef.Kind() != assessment.EvaluationModelKindPersonality {
 		t.Fatalf("model kind = %s, want personality", result.ModelRef.Kind())
 	}
@@ -132,8 +111,9 @@ func TestV1ExecuteServiceRejectsUnknownEvaluatorKey(t *testing.T) {
 	svc := evaluationexecute.NewService(
 		repo,
 		input,
-		&charResultWriter{},
 		evaluationexecute.WithEvaluatorRegistry(registry),
+		evaluationexecute.WithScoringWriter(charRecordingScoring{}),
+		evaluationexecute.WithInterpretationService(&charRecordingInterpretation{cap: &charSplitPhaseCapture{}}),
 	)
 	err = svc.Evaluate(context.Background(), a.ID().Uint64())
 	if err == nil {

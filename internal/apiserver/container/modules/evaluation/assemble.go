@@ -231,17 +231,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if normalized.ReportBuilderRegistry == nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "report builder registry is required when input resolver is configured")
 		}
-		resultWriter, err := interpretationreporting.NewWriter(
-			infra.assessmentRepo,
-			scoreProjectors,
-			normalized.ReportBuilderRegistry,
-			normalized.ReportDurableSaver,
-			interpretationreporting.NewWaiterCompletionNotifier(infra.waiterRegistry),
-			reportStatusReporter,
-		)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation result writer: %v", err)
-		}
 		interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
 			infra.assessmentRepo,
 			scoreProjectors,
@@ -271,7 +260,6 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		m.EvaluationService = execute.NewService(
 			infra.assessmentRepo,
 			normalized.InputResolver,
-			resultWriter,
 			execute.WithTransactionalOutbox(infra.txRunner, infra.assessmentOutboxStore),
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),

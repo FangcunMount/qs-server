@@ -3,7 +3,8 @@
 //
 // 设计说明：
 // execute 只承担通用编排：加载 Assessment、解析输入快照、按 EvaluatorKey 选择执行器、
-// 写入 AssessmentOutcome 并统一收口失败；具体模型解释由 scale / personality typology 等插件实现。
+// 经 scoringWriter + interpretationService 分两阶段写入结果，并统一收口失败；
+// 具体模型解释由 scale / personality typology 等插件实现。
 package execute
 
 import (

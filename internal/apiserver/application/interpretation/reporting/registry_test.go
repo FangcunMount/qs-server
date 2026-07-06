@@ -1,9 +1,10 @@
-package result
+package reporting
 
 import (
 	"context"
 	"testing"
 
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
@@ -16,7 +17,7 @@ func (b registryReportBuilderStub) Key() evaluation.EvaluatorKey { return b.key 
 func (registryReportBuilderStub) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
-func (b registryReportBuilderStub) Build(context.Context, Outcome) (*domainReport.InterpretReport, error) {
+func (b registryReportBuilderStub) Build(context.Context, evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	return nil, nil
 }
 

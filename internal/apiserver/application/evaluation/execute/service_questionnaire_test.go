@@ -253,22 +253,6 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-func TestNewServiceAcceptsResultWriter(t *testing.T) {
-	writer := &recordingResultWriter{}
-	svc := NewService(
-		&fakeAssessmentRepo{},
-		failingInputResolver{},
-		writer,
-	)
-
-	impl, ok := svc.(*service)
-	if !ok {
-		t.Fatalf("expected *service, got %T", svc)
-	}
-	if impl.resultWriter != writer {
-		t.Fatal("expected result writer to be stored on service")
-	}
-}
 
 func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	scaleRef := domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")
@@ -300,7 +284,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 303, QuestionnaireCode: "Q-001", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
 	}}
-	writer := &recordingResultWriter{}
+	capture := &splitPhaseCapture{}
 	var executionInput ExecutionInput
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.EvaluatorKeyScaleDefault,
@@ -329,7 +313,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	svc := NewService(aRepo, input, writer, WithEvaluatorRegistry(registry))
+	svc := newSplitPhaseTestService(aRepo, input, capture, WithEvaluatorRegistry(registry))
 
 	if err := svc.Evaluate(context.Background(), 101); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
@@ -337,8 +321,8 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	if executionInput.Assessment != aRepo.assessment || executionInput.Input != input.snapshot {
 		t.Fatalf("unexpected executor input: %#v", executionInput)
 	}
-	if writer.calls != 1 || evaloutcome.LegacyResult(writer.outcome) == nil || evaloutcome.LegacyResult(writer.outcome).TotalScore != 7 {
-		t.Fatalf("unexpected result writer outcome: %#v", writer.outcome)
+	if capture.InterpretationCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).TotalScore != 7 {
+		t.Fatalf("unexpected interpretation outcome: %#v", capture.Outcome)
 	}
 	if input.calls != 1 || input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindScale || input.lastRef.ModelRef.Code != "S-001" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)
@@ -386,7 +370,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 305, QuestionnaireCode: "Q-FAKE", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-FAKE", Version: "1.0.0"},
 	}}
-	writer := &recordingResultWriter{}
+	capture := &splitPhaseCapture{}
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
 		key: evaluation.EvaluatorKeyMBTI,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
@@ -410,13 +394,13 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	svc := NewService(aRepo, input, writer, WithEvaluatorRegistry(registry))
+	svc := newSplitPhaseTestService(aRepo, input, capture, WithEvaluatorRegistry(registry))
 
 	if err := svc.Evaluate(context.Background(), 103); err != nil {
 		t.Fatalf("Evaluate returned error: %v", err)
 	}
-	if writer.calls != 1 || evaloutcome.LegacyResult(writer.outcome) == nil || evaloutcome.LegacyResult(writer.outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
-		t.Fatalf("unexpected writer outcome: %#v", writer.outcome)
+	if capture.InterpretationCalls != 1 || evaloutcome.LegacyResult(capture.Outcome) == nil || evaloutcome.LegacyResult(capture.Outcome).ModelRef.Kind() != domainAssessment.EvaluationModelKindPersonality {
+		t.Fatalf("unexpected interpretation outcome: %#v", capture.Outcome)
 	}
 	if input.lastRef.ModelRef.Kind != evaluationinput.EvaluationModelKindPersonality || input.lastRef.ModelRef.Code != "FAKE-MODEL" {
 		t.Fatalf("unexpected input ref: %#v", input.lastRef)
@@ -454,16 +438,17 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 		AnswerSheet:   &evaluationinput.AnswerSheetSnapshot{ID: 304, QuestionnaireCode: "Q-MBTI", QuestionnaireVersion: "1.0.0"},
 		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-MBTI", Version: "1.0.0"},
 	}}
+	capture := &splitPhaseCapture{}
 	txRunner := &engineRecordingTxRunner{}
 	stager := &engineRecordingEventStager{}
 	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
 	if registryErr != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", registryErr)
 	}
-	svc := NewService(
+	svc := newSplitPhaseTestService(
 		aRepo,
 		input,
-		&recordingResultWriter{},
+		capture,
 		WithTransactionalOutbox(txRunner, stager),
 		WithEvaluatorRegistry(registry),
 	)
