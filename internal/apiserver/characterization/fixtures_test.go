@@ -7,6 +7,7 @@ import (
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -90,6 +91,31 @@ func submittedScaleAssessment(t *testing.T) *assessment.Assessment {
 		t.Fatalf("Submit: %v", err)
 	}
 	a.ClearEvents()
+	return a
+}
+
+func draftScaleAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	scaleRef := assessment.NewMedicalScaleRef(meta.FromUint64(9001), meta.NewCode("S-001"), "Scale")
+	modelRef := assessment.NewEvaluationModelRefByCode(
+		assessment.EvaluationModelKindScale,
+		meta.NewCode("S-001"),
+		"1.0.0",
+		"Scale",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8001),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6001)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7001)),
+		assessment.WithMedicalScale(scaleRef),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
 	return a
 }
 
@@ -253,6 +279,65 @@ func submittedSBTIAssessment(t *testing.T) *assessment.Assessment {
 }
 
 func ptrFloat64(v float64) *float64 { return &v }
+
+func behavioralRatingInputSnapshot() *evaluationinput.InputSnapshot {
+	snapshot := &behavioralsnapshot.Snapshot{
+		Code:                 "BR-001",
+		Version:              "1.0.0",
+		Title:                "行为评分",
+		QuestionnaireCode:    "Q-001",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		Factors: []behavioralsnapshot.FactorSnapshot{
+			{
+				Code:            "total",
+				Title:           "总分",
+				IsTotalScore:    true,
+				QuestionCodes:   []string{"q1", "q2"},
+				ScoringStrategy: "sum",
+				InterpretRules: []behavioralsnapshot.InterpretRuleSnapshot{
+					{MinScore: 0, MaxScore: 10, Conclusion: "low", Level: "low", Suggestion: "keep"},
+				},
+			},
+		},
+	}
+	return &evaluationinput.InputSnapshot{
+		Model:        evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
+		ModelPayload: evaluationinput.BehavioralRatingModelPayload{Snapshot: snapshot},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []evaluationinput.AnswerSnapshot{
+				{QuestionCode: "q1", Score: 3},
+				{QuestionCode: "q2", Score: 2},
+			},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
+	}
+}
+
+func draftBehavioralRatingAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefByCode(
+		modelcatalog.KindBehavioralRating,
+		meta.NewCode("BR-001"),
+		"1.0.0",
+		"行为评分",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8005),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6005)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7005)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	return a
+}
 
 func mbtiInputSnapshot() *evaluationinput.InputSnapshot {
 	model := mbtiINTJModel()

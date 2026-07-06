@@ -13,13 +13,14 @@ func TestAlgorithmConstantsStayFrozen(t *testing.T) {
 	t.Parallel()
 
 	allowed := map[string]string{
-		"AlgorithmScaleDefault":        "scale_default",
-		"AlgorithmPersonalityTypology": "personality_typology",
-		"AlgorithmBigFive":             "bigfive",
-		"AlgorithmMBTI":                "mbti",
-		"AlgorithmSBTI":                "sbti",
-		"AlgorithmBrief2":              "brief2",
-		"AlgorithmSPM":                 "spm",
+		"AlgorithmScaleDefault":            "scale_default",
+		"AlgorithmPersonalityTypology":     "personality_typology",
+		"AlgorithmBigFive":                 "bigfive",
+		"AlgorithmMBTI":                    "mbti",
+		"AlgorithmSBTI":                    "sbti",
+		"AlgorithmBrief2":                  "brief2",
+		"AlgorithmSPM":                     "spm",
+		"AlgorithmBehavioralRatingDefault": "behavioral_rating_default",
 	}
 
 	text := readRepoFile(t, "internal/apiserver/domain/modelcatalog/types.go")

@@ -253,7 +253,6 @@ func ptr[T any](v T) *T {
 	return &v
 }
 
-
 func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	scaleRef := domainAssessment.NewMedicalScaleRef(meta.FromUint64(404), meta.NewCode("S-001"), "Scale")
 	aRepo := &fakeAssessmentRepo{

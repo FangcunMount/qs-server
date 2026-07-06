@@ -130,9 +130,9 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 func TestBehaviorAbilityIsLegacyScaleAdapter(t *testing.T) {
 	t.Parallel()
 
-	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
+	cap, ok := domain.CapabilityByKind(domain.KindBehaviorAbility)
 	if !ok || !cap.RuntimeViaScaleLegacy || cap.RuntimeExecutable {
-		t.Fatalf("behavioral_rating capability = %#v", cap)
+		t.Fatalf("behavior_ability capability = %#v", cap)
 	}
 	if cap.APIKind != domain.APIKindBehaviorAbility {
 		t.Fatalf("APIKind = %q, want %q", cap.APIKind, domain.APIKindBehaviorAbility)

@@ -23,6 +23,11 @@ var (
 		SubKind:   modelcatalog.SubKindTypology,
 		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}
+	EvaluatorKeyBehavioralRatingDefault = EvaluatorKey{
+		Kind:      modelcatalog.KindBehavioralRating,
+		SubKind:   modelcatalog.SubKindEmpty,
+		Algorithm: modelcatalog.AlgorithmBehavioralRatingDefault,
+	}
 )
 
 // PersonalityTypologyKey builds the execution routing key for a typology algorithm.

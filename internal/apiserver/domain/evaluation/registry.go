@@ -6,8 +6,9 @@ import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog
 type ModelKind string
 
 const (
-	ModelKindScale    ModelKind = "scale"
-	ModelKindTypology ModelKind = "typology"
+	ModelKindScale            ModelKind = "scale"
+	ModelKindTypology         ModelKind = "typology"
+	ModelKindBehavioralRating ModelKind = "behavioral_rating"
 )
 
 // ModelDescriptor is the canonical registration entry for an evaluation model.
@@ -15,6 +16,15 @@ type ModelDescriptor struct {
 	Key       EvaluatorKey
 	Kind      ModelKind
 	Algorithm modelcatalog.Algorithm
+}
+
+// BehavioralRatingModelDescriptor returns the built-in behavioral_rating runtime descriptor.
+func BehavioralRatingModelDescriptor() ModelDescriptor {
+	return ModelDescriptor{
+		Key:       EvaluatorKeyBehavioralRatingDefault,
+		Kind:      ModelKindBehavioralRating,
+		Algorithm: modelcatalog.AlgorithmBehavioralRatingDefault,
+	}
 }
 
 // ScaleModelDescriptor returns the built-in scale evaluation descriptor.

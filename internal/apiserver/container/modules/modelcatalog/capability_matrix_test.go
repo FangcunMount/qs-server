@@ -15,6 +15,8 @@ func descriptorDomainKinds(descs []evaldomain.ModelDescriptor) map[domain.Kind]b
 			out[domain.KindScale] = true
 		case evaldomain.ModelKindTypology:
 			out[domain.KindPersonality] = true
+		case evaldomain.ModelKindBehavioralRating:
+			out[domain.KindBehavioralRating] = true
 		}
 	}
 	return out
@@ -24,8 +26,8 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	if len(descs) != 2 {
-		t.Fatalf("descriptor count = %d, want 2 (scale + typology)", len(descs))
+	if len(descs) != 3 {
+		t.Fatalf("descriptor count = %d, want 3 (scale + typology + behavioral_rating)", len(descs))
 	}
 
 	kinds := make(map[evaldomain.ModelKind]int)
@@ -38,11 +40,17 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	if kinds[evaldomain.ModelKindTypology] != 1 {
 		t.Fatalf("typology descriptor count = %d, want 1", kinds[evaldomain.ModelKindTypology])
 	}
+	if kinds[evaldomain.ModelKindBehavioralRating] != 1 {
+		t.Fatalf("behavioral_rating descriptor count = %d, want 1", kinds[evaldomain.ModelKindBehavioralRating])
+	}
 	if descs[0].Key != evaldomain.EvaluatorKeyScaleDefault {
 		t.Fatalf("first descriptor key = %#v, want scale default", descs[0].Key)
 	}
 	if descs[1].Key != evaldomain.EvaluatorKeyPersonalityTypology {
 		t.Fatalf("second descriptor key = %#v, want configured typology", descs[1].Key)
+	}
+	if descs[2].Key != evaldomain.EvaluatorKeyBehavioralRatingDefault {
+		t.Fatalf("third descriptor key = %#v, want behavioral_rating default", descs[2].Key)
 	}
 }
 
@@ -91,14 +99,34 @@ func TestRuntimeCapabilityPolicy(t *testing.T) {
 func TestBehaviorAbilityDoesNotRegisterDedicatedRuntimeDescriptor(t *testing.T) {
 	t.Parallel()
 
-	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
+	cap, ok := domain.CapabilityByKind(domain.KindBehaviorAbility)
 	if !ok || cap.RuntimeExecutable || !cap.RuntimeViaScaleLegacy {
-		t.Fatalf("behavioral_rating capability = %#v", cap)
+		t.Fatalf("behavior_ability capability = %#v", cap)
 	}
 
 	for _, desc := range DefaultEvaluationDescriptors() {
-		if desc.Key.Kind == domain.KindBehavioralRating {
-			t.Fatalf("unexpected behavioral_rating descriptor: %#v", desc.Key)
+		if desc.Key.Kind == domain.KindBehaviorAbility {
+			t.Fatalf("unexpected behavior_ability descriptor: %#v", desc.Key)
 		}
+	}
+}
+
+func TestBehavioralRatingRegistersDedicatedRuntimeDescriptor(t *testing.T) {
+	t.Parallel()
+
+	cap, ok := domain.CapabilityByKind(domain.KindBehavioralRating)
+	if !ok || !cap.RuntimeExecutable || cap.RuntimeViaScaleLegacy {
+		t.Fatalf("behavioral_rating capability = %#v", cap)
+	}
+
+	found := false
+	for _, desc := range DefaultEvaluationDescriptors() {
+		if desc.Key.Kind == domain.KindBehavioralRating {
+			found = true
+			break
+		}
+	}
+	if !found {
+		t.Fatal("expected behavioral_rating runtime descriptor")
 	}
 }

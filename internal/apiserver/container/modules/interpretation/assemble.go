@@ -11,7 +11,7 @@ import (
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
-	ammod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
+	evalmod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/evaluation"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
@@ -136,11 +136,11 @@ func (m *Module) ReadyIndex() *outboxready.Index {
 }
 
 func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry typologyEvaluation.ModuleRegistry) (interpretationreporting.ReportBuilderRegistry, error) {
-	wiringDeps := ammod.ReportWiringDeps{
+	wiringDeps := evalmod.WiringDeps{
 		ScaleReportBuilder: domainreport.NewDefaultInterpretReportBuilder(nil),
 		TypologyRegistry:   typologyRegistry,
 	}
-	builders, err := ammod.MaterializeReportBuilders(descs, wiringDeps)
+	builders, err := evalmod.MaterializeReportBuilders(descs, wiringDeps)
 	if err != nil {
 		return nil, errors.WithCode(code.ErrModuleInitializationFailed, "failed to build report builders: %v", err)
 	}

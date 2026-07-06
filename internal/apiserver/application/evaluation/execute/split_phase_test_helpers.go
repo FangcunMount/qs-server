@@ -53,6 +53,6 @@ func newSplitPhaseTestService(
 }
 
 var (
-	_ evaluationscoring.Writer = (*recordingSplitPhaseScoringWriter)(nil)
+	_ evaluationscoring.Writer  = (*recordingSplitPhaseScoringWriter)(nil)
 	_ interpretationapp.Service = (*recordingSplitPhaseInterpretationService)(nil)
 )

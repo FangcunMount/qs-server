@@ -9,12 +9,31 @@
 ## 2. 步骤
 
 1. 定义模型业务身份：`AssessmentKind`、子类型和执行算法。
-2. 设计 `ModelPayload`：因子、计分规则、等级、解释所需元数据。
-3. 设计问卷绑定：确认 `Questionnaire` 是否复用或新增。
-4. 发布模型快照：保证 Evaluation 执行引用冻结快照。
-5. 接入执行器：让 `evaluation` 能按模型身份加载并执行。
-6. 接入解释模型：让 `interpretation` 能生成报告。
-7. 更新统计口径：需要新指标时再调整 `statistics`。
+2. 在 `domain/modelcatalog/capability.go` 登记 `KindCapability`（含 `RuntimeExecutable` / `ExecutionPath`）。
+3. 设计 `ModelPayload` 与发布快照解析（`domain/modelcatalog/<kind>/snapshot`）。
+4. 注册 `evaldomain.ModelDescriptor` 并加入 `DefaultEvaluationDescriptors()` 顺序表。
+5. 在 `application/evaluation/runtime/materialize.go` 接入 evaluator / report builder / score projector 分支。
+6. 在 `infra/evaluationinput` 接入 input provider 与 published catalog 解码。
+7. 在 `port/evaluationinput` 定义 payload 与 catalog 接口。
+8. 补 characterization 单模块 + cross-module 测试；跑 `AssertRegistryKeyParity` / `kind_landing_test.go`。
+9. 更新统计口径：需要新指标时再调整 `statistics`。
+
+参考实现：`behavioral_rating`（`behavioral_rating.default.v1` → scale 计分引擎投影）。
+
+---
+
+## 2.1 Runtime 落地检查清单（源码为准）
+
+| 检查项 | 落点 |
+| ------ | ---- |
+| 能力矩阵 | `domain/modelcatalog/capability.go` |
+| 执行路径 | `domain/modelcatalog/execution_path.go` + `domain/evaluation/runtime_path.go` |
+| Descriptor | `domain/evaluation/registry.go` + `container/modules/modelcatalog/default_descriptors.go` |
+| Evaluator | `application/evaluation/runtime/materialize.go` |
+| Report Builder | 同上 + `application/interpretation/reporting/` |
+| Score Projector | `application/evaluation/runtime/materialize.go`（scale-like runtime） |
+| Input Provider | `infra/evaluationinput/providers.go` |
+| 契约测试 | `container/modules/modelcatalog/kind_landing_test.go` |
 
 ---
 

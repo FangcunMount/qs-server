@@ -6,8 +6,8 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 	t.Parallel()
 
 	caps := DefaultCapabilities()
-	if len(caps) != 5 {
-		t.Fatalf("capability count = %d, want 5", len(caps))
+	if len(caps) != 6 {
+		t.Fatalf("capability count = %d, want 6", len(caps))
 	}
 
 	byKind := make(map[Kind]KindCapability, len(caps))
@@ -20,15 +20,20 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 		t.Fatalf("personality capability = %#v", personality)
 	}
 
-	behavioral := byKind[KindBehavioralRating]
-	if !behavioral.CreateSupported || behavioral.PreviewSupported || behavioral.RuntimeExecutable {
-		t.Fatalf("behavioral_rating capability = %#v", behavioral)
+	behaviorAbility := byKind[KindBehaviorAbility]
+	if !behaviorAbility.CreateSupported || behaviorAbility.PreviewSupported || behaviorAbility.RuntimeExecutable {
+		t.Fatalf("behavior_ability capability = %#v", behaviorAbility)
 	}
-	if !behavioral.DefinitionUpdateSupported {
-		t.Fatal("behavioral_rating must allow definition update")
+	if !behaviorAbility.DefinitionUpdateSupported {
+		t.Fatal("behavior_ability must allow definition update")
 	}
-	if !behavioral.RuntimeViaScaleLegacy || !behavioral.CanExecute() {
-		t.Fatalf("behavioral_rating must execute via scale legacy binding")
+	if !behaviorAbility.RuntimeViaScaleLegacy || !behaviorAbility.CanExecute() {
+		t.Fatalf("behavior_ability must execute via scale legacy binding")
+	}
+
+	behavioralRating := byKind[KindBehavioralRating]
+	if behavioralRating.CreateSupported || behavioralRating.RuntimeViaScaleLegacy || !behavioralRating.RuntimeExecutable {
+		t.Fatalf("behavioral_rating capability = %#v", behavioralRating)
 	}
 
 	scale := byKind[KindScale]
@@ -62,11 +67,12 @@ func TestRuntimeExecutableKinds(t *testing.T) {
 
 	got := RuntimeExecutableKinds()
 	want := map[Kind]bool{
-		KindScale:       true,
-		KindPersonality: true,
+		KindScale:            true,
+		KindPersonality:      true,
+		KindBehavioralRating: true,
 	}
 	if len(got) != len(want) {
-		t.Fatalf("RuntimeExecutableKinds() = %#v, want scale + personality", got)
+		t.Fatalf("RuntimeExecutableKinds() = %#v, want scale + personality + behavioral_rating", got)
 	}
 	for _, kind := range got {
 		if !want[kind] {

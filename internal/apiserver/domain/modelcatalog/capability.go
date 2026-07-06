@@ -16,7 +16,7 @@ type KindCapability struct {
 	QRCodeSupported           bool
 	RuntimeExecutable         bool
 	RuntimeViaScaleLegacy     bool
-	ExecutionPath             string
+	ExecutionPath             ExecutionPath
 }
 
 func (c KindCapability) CanExecute() bool {
@@ -37,10 +37,10 @@ var defaultCapabilities = []KindCapability{
 		PreviewSupported:          true,
 		QRCodeSupported:           true,
 		RuntimeExecutable:         true,
-		ExecutionPath:             "typology_descriptor",
+		ExecutionPath:             ExecutionPathTypologyDescriptor,
 	},
 	{
-		Kind:                      KindBehavioralRating,
+		Kind:                      KindBehaviorAbility,
 		APIKind:                   APIKindBehaviorAbility,
 		DisplayName:               "行为能力测评",
 		OptionsEnabled:            true,
@@ -52,7 +52,14 @@ var defaultCapabilities = []KindCapability{
 		PreviewSupported:          false,
 		QRCodeSupported:           true,
 		RuntimeViaScaleLegacy:     true,
-		ExecutionPath:             "behavior_ability_scale_adapter",
+		ExecutionPath:             ExecutionPathBehaviorAbilityScaleAdapter,
+	},
+	{
+		Kind:              KindBehavioralRating,
+		APIKind:           string(KindBehavioralRating),
+		DisplayName:       "行为评分",
+		RuntimeExecutable: true,
+		ExecutionPath:     ExecutionPathBehavioralRatingDescriptor,
 	},
 	{
 		Kind:              KindScale,
@@ -61,21 +68,21 @@ var defaultCapabilities = []KindCapability{
 		OptionsEnabled:    true,
 		ListSupported:     false,
 		RuntimeExecutable: true,
-		ExecutionPath:     "scale_descriptor",
+		ExecutionPath:     ExecutionPathScaleDescriptor,
 	},
 	{
 		Kind:           KindCognitive,
 		APIKind:        "cognitive",
 		DisplayName:    "认知测评",
 		OptionsEnabled: false,
-		ExecutionPath:  "none",
+		ExecutionPath:  ExecutionPathNone,
 	},
 	{
 		Kind:           KindCustom,
 		APIKind:        "custom",
 		DisplayName:    "自定义测评",
 		OptionsEnabled: false,
-		ExecutionPath:  "none",
+		ExecutionPath:  ExecutionPathNone,
 	},
 }
 

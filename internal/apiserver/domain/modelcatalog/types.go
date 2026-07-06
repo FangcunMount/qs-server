@@ -9,11 +9,9 @@ import (
 type Kind string
 
 const (
-	KindScale       Kind = "scale"
-	KindPersonality Kind = "personality"
-	// KindBehavioralRating is the domain taxonomy slot for API kind behavior_ability.
-	// Current production models are scale adapters (behavior_ability.scale.v1) and execute
-	// via legacy scale binding, not an independent behavioral_rating runtime.
+	KindScale            Kind = "scale"
+	KindPersonality      Kind = "personality"
+	KindBehaviorAbility  Kind = "behavior_ability"
 	KindBehavioralRating Kind = "behavioral_rating"
 	KindCognitive        Kind = "cognitive"
 	KindCustom           Kind = "custom"
@@ -45,20 +43,21 @@ const (
 type Algorithm string
 
 const (
-	AlgorithmScaleDefault        Algorithm = "scale_default"
-	AlgorithmPersonalityTypology Algorithm = "personality_typology"
-	AlgorithmBigFive             Algorithm = "bigfive"
-	AlgorithmMBTI                Algorithm = "mbti"
-	AlgorithmSBTI                Algorithm = "sbti"
-	AlgorithmBrief2              Algorithm = "brief2"
-	AlgorithmSPM                 Algorithm = "spm"
+	AlgorithmScaleDefault            Algorithm = "scale_default"
+	AlgorithmPersonalityTypology     Algorithm = "personality_typology"
+	AlgorithmBigFive                 Algorithm = "bigfive"
+	AlgorithmMBTI                    Algorithm = "mbti"
+	AlgorithmSBTI                    Algorithm = "sbti"
+	AlgorithmBrief2                  Algorithm = "brief2"
+	AlgorithmSPM                     Algorithm = "spm"
+	AlgorithmBehavioralRatingDefault Algorithm = "behavioral_rating_default"
 )
 
 func (k Kind) String() string { return string(k) }
 
 func (k Kind) IsValid() bool {
 	switch k {
-	case KindScale, KindPersonality, KindBehavioralRating, KindCognitive, KindCustom,
+	case KindScale, KindPersonality, KindBehaviorAbility, KindBehavioralRating, KindCognitive, KindCustom,
 		KindMBTIMigration, KindSBTIMigration:
 		return true
 	default:

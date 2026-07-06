@@ -13,7 +13,9 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 	case KindPersonality:
 		return domain.KindPersonality, true
 	case KindBehaviorAbility:
-		// behavior_ability is a scale adapter; domain taxonomy uses KindBehavioralRating.
+		// behavior_ability executes via legacy scale binding.
+		return domain.KindBehaviorAbility, true
+	case string(domain.KindBehavioralRating):
 		return domain.KindBehavioralRating, true
 	case KindMedicalScale, "scale":
 		return domain.KindScale, true
@@ -35,8 +37,10 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 	switch kind {
 	case domain.KindPersonality:
 		return KindPersonality
-	case domain.KindBehavioralRating:
+	case domain.KindBehaviorAbility:
 		return KindBehaviorAbility
+	case domain.KindBehavioralRating:
+		return string(domain.KindBehavioralRating)
 	case domain.KindScale:
 		return KindMedicalScale
 	case domain.KindCognitive:

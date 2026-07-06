@@ -17,6 +17,9 @@ func (r ModelRef) EvaluatorKey() evaldomain.EvaluatorKey {
 	if key, ok := evaldomain.EvaluatorKeyFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
 		return key
 	}
+	if modelcatalog.Kind(r.Kind) == modelcatalog.KindBehavioralRating && r.Algorithm == "" {
+		return evaldomain.EvaluatorKeyBehavioralRatingDefault
+	}
 	return evaldomain.EvaluatorKey{Kind: modelcatalog.Kind(r.Kind)}
 }
 

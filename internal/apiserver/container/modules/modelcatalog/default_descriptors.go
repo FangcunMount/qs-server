@@ -3,6 +3,7 @@ package modelcatalog
 import (
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // DefaultTypologyModules returns built-in typology algorithm aliases.
@@ -25,11 +26,40 @@ func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
 	return typologyEvaluation.DefaultTypologyDescriptors()
 }
 
-// DefaultEvaluationDescriptors returns scale + built-in typology descriptors for evaluation/input wiring.
+var defaultRuntimeExecutionPathOrder = []domain.ExecutionPath{
+	domain.ExecutionPathScaleDescriptor,
+	domain.ExecutionPathTypologyDescriptor,
+	domain.ExecutionPathBehavioralRatingDescriptor,
+}
+
+// DefaultEvaluationDescriptors returns runtime descriptors for all capability-backed execution paths.
 func DefaultEvaluationDescriptors() []evaldomain.ModelDescriptor {
-	scale := evaldomain.ModelDescriptor{
-		Key:  evaldomain.EvaluatorKeyScaleDefault,
-		Kind: evaldomain.ModelKindScale,
+	runtimePaths := make(map[domain.ExecutionPath]bool)
+	for _, cap := range domain.DefaultCapabilities() {
+		if cap.RuntimeExecutable {
+			runtimePaths[cap.ExecutionPath] = true
+		}
 	}
-	return append([]evaldomain.ModelDescriptor{scale}, DefaultTypologyDescriptors()...)
+
+	var descs []evaldomain.ModelDescriptor
+	for _, path := range defaultRuntimeExecutionPathOrder {
+		if !runtimePaths[path] {
+			continue
+		}
+		descs = append(descs, descriptorsForExecutionPath(path)...)
+	}
+	return descs
+}
+
+func descriptorsForExecutionPath(path domain.ExecutionPath) []evaldomain.ModelDescriptor {
+	switch path {
+	case domain.ExecutionPathScaleDescriptor:
+		return []evaldomain.ModelDescriptor{evaldomain.ScaleModelDescriptor()}
+	case domain.ExecutionPathTypologyDescriptor:
+		return DefaultTypologyDescriptors()
+	case domain.ExecutionPathBehavioralRatingDescriptor:
+		return []evaldomain.ModelDescriptor{evaldomain.BehavioralRatingModelDescriptor()}
+	default:
+		return nil
+	}
 }

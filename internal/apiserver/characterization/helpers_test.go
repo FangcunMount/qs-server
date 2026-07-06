@@ -23,16 +23,22 @@ type v1SplitPhaseConfig struct {
 	Input         *evaluationinput.InputSnapshot
 	ReportBuilder interpretationreporting.ReportBuilder
 
-	Async           bool
-	SnapshotStore   evaluationscoring.ScoringSnapshotStore
-	StageEvaluated  func(ctx context.Context, events ...event.DomainEvent) error
+	Async          bool
+	SnapshotStore  evaluationscoring.ScoringSnapshotStore
+	StageEvaluated func(ctx context.Context, events ...event.DomainEvent) error
 }
 
 // buildV1SplitPhaseExecuteService mirrors container/modules/evaluation/assemble.go split-phase wiring.
-func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig) (evaluationexecute.Service, *charSplitPhaseReportSaver) {
+// When repos are provided, the first repo is shared with the caller (cross-module harness).
+func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos ...*charAssessmentRepo) (evaluationexecute.Service, *charSplitPhaseReportSaver) {
 	t.Helper()
 
-	repo := &charAssessmentRepo{assessment: cfg.Assessment}
+	var repo *charAssessmentRepo
+	if len(repos) > 0 && repos[0] != nil {
+		repo = repos[0]
+	} else {
+		repo = &charAssessmentRepo{assessment: cfg.Assessment}
+	}
 	reportSaver := &charSplitPhaseReportSaver{}
 	scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
 		interpretationreporting.NewScaleScoreProjector(&charNoopScoreRepo{}),
@@ -88,7 +94,15 @@ type charAssessmentRepo struct {
 	assessment *assessment.Assessment
 }
 
-func (r *charAssessmentRepo) Save(context.Context, *assessment.Assessment) error { return nil }
+func (r *charAssessmentRepo) Save(_ context.Context, a *assessment.Assessment) error {
+	if a != nil {
+		if a.ID().IsZero() {
+			a.AssignID(assessment.NewID(7001))
+		}
+		r.assessment = a
+	}
+	return nil
+}
 func (r *charAssessmentRepo) FindByID(_ context.Context, id assessment.ID) (*assessment.Assessment, error) {
 	if r.assessment != nil && r.assessment.ID() == id {
 		return r.assessment, nil
@@ -96,7 +110,10 @@ func (r *charAssessmentRepo) FindByID(_ context.Context, id assessment.ID) (*ass
 	return nil, nil
 }
 func (*charAssessmentRepo) Delete(context.Context, assessment.ID) error { return nil }
-func (*charAssessmentRepo) FindByAnswerSheetID(context.Context, assessment.AnswerSheetRef) (*assessment.Assessment, error) {
+func (r *charAssessmentRepo) FindByAnswerSheetID(_ context.Context, ref assessment.AnswerSheetRef) (*assessment.Assessment, error) {
+	if r.assessment != nil && r.assessment.AnswerSheetRef() == ref {
+		return r.assessment, nil
+	}
 	return nil, nil
 }
 
@@ -112,7 +129,7 @@ func (r *charInputResolver) Resolve(_ context.Context, ref evaluationinput.Input
 
 type charSplitPhaseCapture struct {
 	interpretationCalls int
-	outcome               evaloutcome.Outcome
+	outcome             evaloutcome.Outcome
 }
 
 type charRecordingInterpretation struct {

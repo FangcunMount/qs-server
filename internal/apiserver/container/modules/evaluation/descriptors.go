@@ -4,52 +4,28 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
-	portruleengine "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
 
 // WiringDeps groups evaluator/report-builder wiring dependencies.
-type WiringDeps struct {
-	ScaleReportBuilder          report.ReportBuilder
-	ScaleScorer                 portruleengine.ScaleFactorScorer
-	TypologyRegistry            typologyEvaluation.ModuleRegistry
-	sharedTypologyExecutor      **typologyEvaluation.Executor
-	sharedTypologyReportBuilder *typologyEvaluation.ReportBuilder
-}
+type WiringDeps = evalruntime.WiringDeps
 
 // MaterializeEvaluators builds evaluators from descriptors.
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
-	var sharedConfigured *typologyEvaluation.Executor
-	deps.sharedTypologyExecutor = &sharedConfigured
-	evaluators := make([]execute.Evaluator, 0, len(descs))
-	for _, desc := range descs {
-		evaluator, err := materializeEvaluator(desc, deps)
-		if err != nil {
-			return nil, err
-		}
-		evaluators = append(evaluators, evaluator)
-	}
-	return evaluators, nil
+	return evalruntime.MaterializeEvaluators(descs, deps)
 }
 
 // MaterializeReportBuilders builds report builders from descriptors.
 func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ReportBuilder, error) {
-	var sharedConfigured typologyEvaluation.ReportBuilder
-	deps.sharedTypologyReportBuilder = &sharedConfigured
-	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
-	for _, desc := range descs {
-		builder, err := materializeReportBuilder(desc, deps)
-		if err != nil {
-			return nil, err
-		}
-		builders = append(builders, builder)
-	}
-	return builders, nil
+	return evalruntime.MaterializeReportBuilders(descs, deps)
+}
+
+// MaterializeScoreProjectors builds score projectors from descriptors.
+func MaterializeScoreProjectors(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ScoreProjector, error) {
+	return evalruntime.MaterializeScoreProjectors(descs, deps)
 }
 
 // AssertRegistryKeyParity verifies descriptor/evaluator/builder/provider key alignment.
@@ -75,41 +51,4 @@ func AssertRegistryKeyParity(
 		}
 	}
 	return nil
-}
-
-func materializeEvaluator(desc evaldomain.ModelDescriptor, deps WiringDeps) (execute.Evaluator, error) {
-	switch desc.Kind {
-	case evaldomain.ModelKindScale:
-		return scaleEvaluation.NewExecutor(deps.ScaleScorer), nil
-	case evaldomain.ModelKindTypology:
-		registry, err := requireTypologyRegistry(deps)
-		if err != nil {
-			return nil, err
-		}
-		return typologyEvaluation.MaterializeTypologyEvaluator(desc, registry, deps.sharedTypologyExecutor)
-	default:
-		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
-	}
-}
-
-func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps) (interpretationreporting.ReportBuilder, error) {
-	switch desc.Kind {
-	case evaldomain.ModelKindScale:
-		return interpretationreporting.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
-	case evaldomain.ModelKindTypology:
-		registry, err := requireTypologyRegistry(deps)
-		if err != nil {
-			return nil, err
-		}
-		return typologyEvaluation.MaterializeTypologyReportBuilder(desc, registry, deps.sharedTypologyReportBuilder)
-	default:
-		return nil, fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
-	}
-}
-
-func requireTypologyRegistry(deps WiringDeps) (typologyEvaluation.ModuleRegistry, error) {
-	if deps.TypologyRegistry.Len() == 0 {
-		return typologyEvaluation.ModuleRegistry{}, fmt.Errorf("typology registry is required")
-	}
-	return deps.TypologyRegistry, nil
 }

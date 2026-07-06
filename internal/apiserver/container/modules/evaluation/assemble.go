@@ -211,6 +211,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		wiringDeps := WiringDeps{
 			ScaleReportBuilder: reportBuilder,
 			ScaleScorer:        ruleengine.NewScaleFactorScorer(),
+			ScoreRepo:          infra.scoreRepo,
 			TypologyRegistry:   normalized.TypologyRegistry,
 		}
 		descs := normalized.ModelDescriptors
@@ -222,9 +223,11 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
-		scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
-			interpretationreporting.NewScaleScoreProjector(infra.scoreRepo),
-		)
+		scoreProjectors, err := MaterializeScoreProjectors(descs, wiringDeps)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation score projectors: %v", err)
+		}
+		scoreProjectorRegistry, err := interpretationreporting.NewScoreProjectorRegistry(scoreProjectors...)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation score projector registry: %v", err)
 		}
@@ -233,7 +236,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		}
 		interpretationWriter, err := interpretationreporting.NewInterpretationWriter(
 			infra.assessmentRepo,
-			scoreProjectors,
+			scoreProjectorRegistry,
 			normalized.ReportBuilderRegistry,
 			normalized.ReportDurableSaver,
 			interpretationreporting.NewWaiterCompletionNotifier(infra.waiterRegistry),
@@ -254,7 +257,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return err
 		}
-		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectors, scoringSnapshotStore)
+		scoringWriter := evaluationscoring.NewWriter(infra.assessmentRepo, scoreProjectorRegistry, scoringSnapshotStore)
 		interpretationService := interpretationapp.NewService(interpretationWriter)
 
 		m.EvaluationService = execute.NewService(

@@ -15,10 +15,10 @@ func TestBehaviorAbilityNamingBoundary(t *testing.T) {
 		t.Fatal("behavior_ability scale payload must not alias behavioral_rating.default format")
 	}
 
-	if !IsBehaviorAbilityScaleAdapter(KindBehavioralRating) {
-		t.Fatal("KindBehavioralRating should be the behavior_ability scale adapter taxonomy slot")
+	if !IsBehaviorAbilityScaleAdapter(KindBehaviorAbility) {
+		t.Fatal("KindBehaviorAbility should be the behavior_ability scale adapter taxonomy slot")
 	}
-	for _, kind := range []Kind{KindScale, KindPersonality, KindCognitive, KindCustom} {
+	for _, kind := range []Kind{KindScale, KindPersonality, KindBehavioralRating, KindCognitive, KindCustom} {
 		if IsBehaviorAbilityScaleAdapter(kind) {
 			t.Fatalf("IsBehaviorAbilityScaleAdapter(%q) = true, want false", kind)
 		}
@@ -34,7 +34,7 @@ func TestBehaviorAbilityNamingBoundary(t *testing.T) {
 	if cap.RuntimeExecutable || !cap.RuntimeViaScaleLegacy {
 		t.Fatalf("capability = %#v, want scale adapter routing only", cap)
 	}
-	if cap.ExecutionPath != "behavior_ability_scale_adapter" {
+	if cap.ExecutionPath != ExecutionPathBehaviorAbilityScaleAdapter {
 		t.Fatalf("ExecutionPath = %q, want behavior_ability_scale_adapter", cap.ExecutionPath)
 	}
 }

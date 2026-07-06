@@ -42,19 +42,24 @@ func NewRepositoryResolver(
 		return nil, fmt.Errorf("ruleset catalog is required")
 	}
 	interpretationScaleCatalog := NewRuleSetScaleCatalog(modelCatalog, scaleCatalog)
-	var typologyCatalog port.TypologyModelCatalog
+	var (
+		typologyCatalog         port.TypologyModelCatalog
+		behavioralRatingCatalog port.BehavioralRatingModelCatalog
+	)
 	if publishedReader, ok := modelCatalog.(rulesetport.PublishedModelReader); ok {
 		typologyCatalog = NewPublishedTypologyCatalog(publishedReader, modelCatalog)
+		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader)
 	} else {
 		typologyCatalog = NewRuleSetTypologyCatalog(modelCatalog)
 	}
 	answerSheetReader := NewRepositoryAnswerSheetSnapshotReader(answerSheetRepo)
 	questionnaireReader := NewRepositoryQuestionnaireSnapshotReader(questionnaireRepo)
 	providers, err := MaterializeInputProviders(descs, InputProviderDeps{
-		ScaleCatalog:    interpretationScaleCatalog,
-		TypologyCatalog: typologyCatalog,
-		AnswerSheets:    answerSheetReader,
-		Questionnaires:  questionnaireReader,
+		ScaleCatalog:            interpretationScaleCatalog,
+		TypologyCatalog:         typologyCatalog,
+		BehavioralRatingCatalog: behavioralRatingCatalog,
+		AnswerSheets:            answerSheetReader,
+		Questionnaires:          questionnaireReader,
 	})
 	if err != nil {
 		return nil, err

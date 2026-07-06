@@ -27,9 +27,9 @@ func TestKindCapabilityAllowsOperations(t *testing.T) {
 		}
 	}
 
-	behavior, ok := CapabilityByKind(KindBehavioralRating)
+	behavior, ok := CapabilityByKind(KindBehaviorAbility)
 	if !ok {
-		t.Fatal("behavioral_rating capability missing")
+		t.Fatal("behavior_ability capability missing")
 	}
 	if !behavior.Allows(CatalogOpUpdateDefinition) {
 		t.Fatal("behavior_ability must allow definition update")

@@ -10,14 +10,26 @@ func TestBehaviorAbilityKindMapperBoundary(t *testing.T) {
 	t.Parallel()
 
 	domainKind, ok := APIKindToDomainKind(KindBehaviorAbility)
-	if !ok || domainKind != domain.KindBehavioralRating {
+	if !ok || domainKind != domain.KindBehaviorAbility {
 		t.Fatalf("APIKindToDomainKind(behavior_ability) = %q, %v", domainKind, ok)
 	}
-	if got := DomainKindToAPIKind(domain.KindBehavioralRating); got != KindBehaviorAbility {
-		t.Fatalf("DomainKindToAPIKind(behavioral_rating) = %q, want %q", got, KindBehaviorAbility)
+	if got := DomainKindToAPIKind(domain.KindBehaviorAbility); got != KindBehaviorAbility {
+		t.Fatalf("DomainKindToAPIKind(behavior_ability) = %q, want %q", got, KindBehaviorAbility)
 	}
 	if !domain.IsBehaviorAbilityScaleAdapter(domainKind) {
 		t.Fatal("behavior_ability must resolve to scale adapter taxonomy slot")
+	}
+}
+
+func TestBehavioralRatingKindMapperBoundary(t *testing.T) {
+	t.Parallel()
+
+	domainKind, ok := APIKindToDomainKind(string(domain.KindBehavioralRating))
+	if !ok || domainKind != domain.KindBehavioralRating {
+		t.Fatalf("APIKindToDomainKind(behavioral_rating) = %q, %v", domainKind, ok)
+	}
+	if got := DomainKindToAPIKind(domain.KindBehavioralRating); got != string(domain.KindBehavioralRating) {
+		t.Fatalf("DomainKindToAPIKind(behavioral_rating) = %q, want behavioral_rating", got)
 	}
 }
 
@@ -45,10 +57,10 @@ func TestCapabilityPolicyUsesBehaviorAbilityAPIKind(t *testing.T) {
 	if !ok {
 		t.Fatal("CapabilityByAPIKind(behavior_ability) = false, want true")
 	}
-	if cap.Kind != domain.KindBehavioralRating {
-		t.Fatalf("capability kind = %q, want behavioral_rating", cap.Kind)
+	if cap.Kind != domain.KindBehaviorAbility {
+		t.Fatalf("capability kind = %q, want behavior_ability", cap.Kind)
 	}
-	if cap.ExecutionPath != "behavior_ability_scale_adapter" {
+	if cap.ExecutionPath != domain.ExecutionPathBehaviorAbilityScaleAdapter {
 		t.Fatalf("execution path = %q", cap.ExecutionPath)
 	}
 }

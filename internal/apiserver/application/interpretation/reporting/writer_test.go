@@ -100,7 +100,6 @@ func (n *resultNotifierStub) NotifyCompletion(context.Context, evaloutcome.Outco
 	n.calls++
 }
 
-
 func TestWriterPersistsScaleOutcomeAfterReportDurableSaveAndStagesEvents(t *testing.T) {
 	order := make([]string, 0)
 	a := submittedScaleAssessment(t)
