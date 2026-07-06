@@ -43,8 +43,14 @@ func TestDefaultCapabilitiesMatrix(t *testing.T) {
 
 	for _, kind := range []Kind{KindCognitive, KindCustom} {
 		cap := byKind[kind]
-		if cap.OptionsEnabled || cap.CreateSupported || cap.CanExecute() {
-			t.Fatalf("%s capability = %#v, want catalog-only disabled family", kind, cap)
+		if kind == KindCustom {
+			if cap.OptionsEnabled || cap.CreateSupported || cap.CanExecute() {
+				t.Fatalf("%s capability = %#v, want catalog-only disabled family", kind, cap)
+			}
+			continue
+		}
+		if !cap.OptionsEnabled || !cap.CreateSupported || !cap.CanExecute() {
+			t.Fatalf("%s capability = %#v, want enabled cognitive family", kind, cap)
 		}
 	}
 }
@@ -62,6 +68,25 @@ func TestCapabilityByKind(t *testing.T) {
 	}
 }
 
+func TestReservedKindsAreNotRuntimeExecutable(t *testing.T) {
+	t.Parallel()
+
+	executable := make(map[Kind]bool, len(RuntimeExecutableKinds()))
+	for _, kind := range RuntimeExecutableKinds() {
+		executable[kind] = true
+	}
+	if executable[KindCustom] {
+		t.Fatal("custom must not be runtime executable")
+	}
+	cap, ok := CapabilityByKind(KindCustom)
+	if !ok {
+		t.Fatal("CapabilityByKind(custom) = false")
+	}
+	if cap.ExecutionPath != ExecutionPathNone {
+		t.Fatalf("custom execution path = %q, want none", cap.ExecutionPath)
+	}
+}
+
 func TestRuntimeExecutableKinds(t *testing.T) {
 	t.Parallel()
 
@@ -70,9 +95,10 @@ func TestRuntimeExecutableKinds(t *testing.T) {
 		KindScale:            true,
 		KindPersonality:      true,
 		KindBehavioralRating: true,
+		KindCognitive:        true,
 	}
 	if len(got) != len(want) {
-		t.Fatalf("RuntimeExecutableKinds() = %#v, want scale + personality + behavioral_rating", got)
+		t.Fatalf("RuntimeExecutableKinds() = %#v, want scale + personality + behavioral_rating + cognitive", got)
 	}
 	for _, kind := range got {
 		if !want[kind] {

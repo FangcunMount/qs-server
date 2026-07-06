@@ -3,9 +3,9 @@ package query
 import (
 	"context"
 
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel/shared"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer/shared"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -116,9 +116,17 @@ func (s *queryService) listPublishedAlgorithms(ctx context.Context) ([]domain.Al
 			return algorithms, nil
 		}
 	}
-	return typologyeval.DefaultAlgorithms(), nil
+	return defaultPublishedAlgorithms(), nil
 }
 
 func algorithmCategoryLabel(algorithm domain.Algorithm) string {
-	return typologyeval.CategoryLabelFor(algorithm)
+	return modeltypology.LegacyReportSpecFromAlgorithm(algorithm).CategoryLabel
+}
+
+func defaultPublishedAlgorithms() []domain.Algorithm {
+	return []domain.Algorithm{
+		domain.AlgorithmMBTI,
+		domain.AlgorithmSBTI,
+		domain.AlgorithmBigFive,
+	}
 }

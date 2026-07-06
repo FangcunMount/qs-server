@@ -12,6 +12,7 @@ type InputProviderDeps struct {
 	ScaleCatalog            port.ScaleModelCatalog
 	TypologyCatalog         port.TypologyModelCatalog
 	BehavioralRatingCatalog port.BehavioralRatingModelCatalog
+	CognitiveCatalog        port.CognitiveModelCatalog
 	AnswerSheets            port.AnswerSheetReader
 	Questionnaires          port.QuestionnaireReader
 }
@@ -55,6 +56,15 @@ func materializeInputProvider(desc evaldomain.ModelDescriptor, deps InputProvide
 		}
 		return NewBehavioralRatingModelInputProvider(
 			deps.BehavioralRatingCatalog,
+			deps.AnswerSheets,
+			deps.Questionnaires,
+		), nil
+	case modelcatalog.ExecutionPathCognitiveDescriptor:
+		if deps.CognitiveCatalog == nil {
+			return nil, fmt.Errorf("cognitive catalog is required")
+		}
+		return NewCognitiveModelInputProvider(
+			deps.CognitiveCatalog,
 			deps.AnswerSheets,
 			deps.Questionnaires,
 		), nil

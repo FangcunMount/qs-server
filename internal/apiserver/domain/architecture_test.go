@@ -311,7 +311,7 @@ func TestAssessmentModelReplacesLegacyRulesetPackages(t *testing.T) {
 	} {
 		oldPath := filepath.Join(root, filepath.FromSlash(rel))
 		if _, err := os.Stat(oldPath); err == nil {
-			t.Fatalf("%s exists; assessment model assets belong under domain/modelcatalog and port/assessmentmodel", filepath.ToSlash(mustRel(t, root, oldPath)))
+			t.Fatalf("%s exists; model catalog assets belong under domain/modelcatalog and port/modelcatalog", filepath.ToSlash(mustRel(t, root, oldPath)))
 		} else if !os.IsNotExist(err) {
 			t.Fatal(err)
 		}

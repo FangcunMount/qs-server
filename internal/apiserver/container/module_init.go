@@ -21,9 +21,9 @@ func (c *Container) initSurveyModule() error {
 	return nil
 }
 
-func (c *Container) initAssessmentModelModule() error {
+func (c *Container) initModelCatalogModule() error {
 	if err := ammod.InstallFrom(c); err != nil {
-		return fmt.Errorf("failed to initialize assessment model module: %w", err)
+		return fmt.Errorf("failed to initialize model catalog module: %w", err)
 	}
 	return nil
 }

@@ -45,6 +45,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 		ScaleCatalog:            evalFakeScaleCatalog{},
 		TypologyCatalog:         evalFakeTypologyCatalogPort{},
 		BehavioralRatingCatalog: evalFakeBehavioralRatingCatalog{},
+		CognitiveCatalog:        evalFakeCognitiveCatalog{},
 		AnswerSheets:            evalFakeAnswerSheetReader{},
 		Questionnaires:          evalFakeQuestionnaireReader{},
 	})
@@ -82,7 +83,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 			t.Fatalf("ExecutionPathForDescriptor: %v", err)
 		}
 		switch path {
-		case domain.ExecutionPathScaleDescriptor, domain.ExecutionPathBehavioralRatingDescriptor:
+		case domain.ExecutionPathScaleDescriptor, domain.ExecutionPathBehavioralRatingDescriptor, domain.ExecutionPathCognitiveDescriptor:
 			if !projectorKeys[desc.Key] {
 				t.Fatalf("missing score projector for %s", desc.Key)
 			}

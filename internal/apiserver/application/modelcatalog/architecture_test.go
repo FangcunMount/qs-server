@@ -35,7 +35,7 @@ func TestAssessmentModelServiceDoesNotDependOnLegacyScalePorts(t *testing.T) {
 			"ScaleQRCodeQueryService",
 		} {
 			if strings.Contains(text, forbidden) {
-				t.Fatalf("%s must not depend on legacy scale port %s; put scale adaptation behind assessmentmodel/behavior", path, forbidden)
+				t.Fatalf("%s must not depend on legacy scale port %s; put scale adaptation behind modelcatalog/behavior", path, forbidden)
 			}
 		}
 		return nil
@@ -92,7 +92,7 @@ func TestPersonalityCommandDoesNotWriteLegacyRuleSet(t *testing.T) {
 
 func TestRuntimePersonalityReadsDoNotUseDraftModelRepository(t *testing.T) {
 	scanRoots := []string{
-		"../personalitymodel",
+		"personality/consumer",
 		"../evaluation",
 		"../../collection-server/application",
 		"../../infra/evaluationinput",

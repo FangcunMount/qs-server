@@ -15,7 +15,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 )
 
@@ -75,8 +75,8 @@ func run(cfg config) error {
 	defer func() { _ = client.Disconnect(context.Background()) }()
 
 	db := client.Database(cfg.mongoDB)
-	draftRepo := mongoassessmentmodel.NewDraftRepository(db)
-	publishedRepo := mongoassessmentmodel.NewPublishedModelRepoAdapter(mongoassessmentmodel.NewRepository(db))
+	draftRepo := mongomodelcatalog.NewDraftRepository(db)
+	publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(mongomodelcatalog.NewRepository(db))
 
 	for _, model := range models {
 		if err := draftRepo.Create(applyCtx, model); err != nil {

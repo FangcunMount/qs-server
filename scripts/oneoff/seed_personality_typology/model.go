@@ -11,7 +11,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 )
 
 type modelSeedPlan struct {
@@ -23,8 +23,8 @@ type modelSeedPlan struct {
 
 func seedAssessmentModel(
 	ctx context.Context,
-	draftRepo *mongoassessmentmodel.DraftRepository,
-	publishedRepo *mongoassessmentmodel.PublishedModelRepoAdapter,
+	draftRepo *mongomodelcatalog.DraftRepository,
+	publishedRepo *mongomodelcatalog.PublishedModelRepoAdapter,
 	plan modelSeedPlan,
 	payload *modeltypology.Payload,
 	force bool,
@@ -124,7 +124,7 @@ func firstNonEmpty(values ...string) string {
 	return ""
 }
 
-func purgeDraftForSeed(ctx context.Context, draftRepo *mongoassessmentmodel.DraftRepository, code string) error {
+func purgeDraftForSeed(ctx context.Context, draftRepo *mongomodelcatalog.DraftRepository, code string) error {
 	if code == "" {
 		return domain.ErrNotFound
 	}

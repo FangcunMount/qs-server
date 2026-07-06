@@ -9,4 +9,5 @@ const (
 	ExecutionPathTypologyDescriptor          ExecutionPath = "typology_descriptor"
 	ExecutionPathBehaviorAbilityScaleAdapter ExecutionPath = "behavior_ability_scale_adapter"
 	ExecutionPathBehavioralRatingDescriptor  ExecutionPath = "behavioral_rating_descriptor"
+	ExecutionPathCognitiveDescriptor         ExecutionPath = "cognitive_descriptor"
 )

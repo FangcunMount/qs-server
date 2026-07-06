@@ -38,5 +38,9 @@ func Bootstrap(in BootstrapInput) (*Module, error) {
 	return New(Deps{
 		Scale:       scaleDeps,
 		Personality: in.Personality,
+		Cognitive: CognitiveDeps{
+			ModelRepo:     in.Personality.ModelRepo,
+			PublishedRepo: in.Personality.PublishedRepo,
+		},
 	})
 }

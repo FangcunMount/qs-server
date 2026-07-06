@@ -7,4 +7,8 @@
 // API kind behavior_ability maps to domain KindBehaviorAbility and executes as a
 // scale adapter (assessmentmodel.behavior_ability.scale.v1). Domain KindBehavioralRating
 // is the standalone behavioral_rating runtime (assessmentmodel.behavioral_rating.default.v1).
+//
+// KindCustom is a reserved catalog kind (API options disabled); it is unrelated to
+// typology AlgorithmCustomTypology or plan scheduleType=custom.
+// KindCognitive executes via ExecutionPathCognitiveDescriptor (assessmentmodel.cognitive.default.v1).
 package modelcatalog

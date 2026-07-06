@@ -15,6 +15,8 @@ func ExecutionPathForDescriptor(desc ModelDescriptor) (modelcatalog.ExecutionPat
 		return modelcatalog.ExecutionPathTypologyDescriptor, nil
 	case ModelKindBehavioralRating:
 		return modelcatalog.ExecutionPathBehavioralRatingDescriptor, nil
+	case ModelKindCognitive:
+		return modelcatalog.ExecutionPathCognitiveDescriptor, nil
 	default:
 		return "", fmt.Errorf("unsupported evaluation model kind: %s", desc.Kind)
 	}

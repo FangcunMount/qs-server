@@ -18,7 +18,10 @@
 8. 补 characterization 单模块 + cross-module 测试；跑 `AssertRegistryKeyParity` / `kind_landing_test.go`。
 9. 更新统计口径：需要新指标时再调整 `statistics`。
 
-参考实现：`behavioral_rating`（`behavioral_rating.default.v1` → scale 计分引擎投影）。
+参考实现：
+
+- `behavioral_rating`（`behavioral_rating.default.v1` → scale 计分引擎投影）
+- `cognitive`（`cognitive.default.v1` → scale 计分引擎投影，AlgorithmSPM）
 
 ---
 

@@ -5,7 +5,7 @@ import (
 	"sort"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -40,7 +40,7 @@ var (
 	_ port.PublishedAlgorithmLister = (*DualStore)(nil)
 )
 
-func NewDualStore(v2 *mongoassessmentmodel.Repository, legacy *mongoruleset.Repository) *DualStore {
+func NewDualStore(v2 *mongomodelcatalog.Repository, legacy *mongoruleset.Repository) *DualStore {
 	return &DualStore{v2: v2, legacy: legacy}
 }
 

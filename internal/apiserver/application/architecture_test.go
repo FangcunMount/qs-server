@@ -466,6 +466,8 @@ func isEvaluationRulesetPayloadImport(importPath string) bool {
 	for _, allowed := range []string{
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology",
 		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot",
 	} {
 		if importPath == allowed || strings.HasPrefix(importPath, allowed+"/") {
 			return true

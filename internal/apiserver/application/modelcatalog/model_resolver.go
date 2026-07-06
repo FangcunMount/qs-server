@@ -13,5 +13,10 @@ func (s *service) resolveModelKind(ctx context.Context, modelCode string) (strin
 			return KindBehaviorAbility, true
 		}
 	}
+	if s.cognitive.cmd != nil {
+		if _, err := s.cognitive.cmd.Get(ctx, modelCode); err == nil {
+			return KindCognitive, true
+		}
+	}
 	return "", false
 }

@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
 	aminfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/cachegovernance/observability"
@@ -52,7 +52,7 @@ func NewCatalog(
 	if db == nil {
 		return static, nil
 	}
-	v2 := mongoassessmentmodel.NewRepository(db, mongoOpts)
+	v2 := mongomodelcatalog.NewRepository(db, mongoOpts)
 	legacy := mongoruleset.NewRepository(db, mongoOpts)
 	dual := aminfra.NewDualStore(v2, legacy)
 	var store publishedStore = dual

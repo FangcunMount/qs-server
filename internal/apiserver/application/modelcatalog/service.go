@@ -7,8 +7,9 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	personalitymodel "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
+	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
@@ -38,7 +39,8 @@ type Service interface {
 type Dependencies struct {
 	BehaviorCommand    behavior.Command
 	PersonalityCommand personality.Service
-	PersonalityQuery   personalitymodel.PersonalityModelQueryService
+	CognitiveCommand   cognitive.Service
+	PersonalityQuery   personalityconsumer.PersonalityModelQueryService
 	QuestionnaireQuery questionnaireapp.QuestionnaireQueryService
 	Codes              codes.CodesService
 	RawQRCodeGenerator qrcode.QRCodeService
@@ -48,6 +50,7 @@ type service struct {
 	deps        Dependencies
 	behavior    behaviorGateway
 	personality personalityGateway
+	cognitive   cognitiveGateway
 }
 
 func NewService(deps Dependencies) Service {
@@ -55,6 +58,7 @@ func NewService(deps Dependencies) Service {
 		deps:        deps,
 		behavior:    behaviorGateway{cmd: deps.BehaviorCommand},
 		personality: personalityGateway{cmd: deps.PersonalityCommand},
+		cognitive:   cognitiveGateway{cmd: deps.CognitiveCommand},
 	}
 }
 
@@ -88,6 +92,14 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 		result.Items = append(result.Items, items...)
 		result.Total += total
 	}
+	if shouldListModelKind(dto.Kind, KindCognitive) {
+		items, err := s.listCognitive(ctx, dto)
+		if err != nil {
+			return nil, err
+		}
+		result.Items = append(result.Items, items.Items...)
+		result.Total += items.Total
+	}
 	return result, nil
 }
 
@@ -103,6 +115,8 @@ func (s *service) Create(ctx context.Context, dto CreateModelDTO) (*ModelSummary
 		return s.createBehaviorAbility(ctx, dto)
 	case KindPersonality:
 		return s.personality.create(ctx, dto)
+	case KindCognitive:
+		return s.createCognitive(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -140,6 +154,8 @@ func (s *service) UpdateBasicInfo(ctx context.Context, dto UpdateBasicInfoDTO) (
 		return s.personality.updateBasicInfo(ctx, dto)
 	case KindBehaviorAbility:
 		return s.updateBehaviorBasicInfo(ctx, dto)
+	case KindCognitive:
+		return s.cognitive.updateBasicInfo(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -155,6 +171,8 @@ func (s *service) Delete(ctx context.Context, modelCode string) error {
 		return s.personality.delete(ctx, modelCode)
 	case KindBehaviorAbility:
 		return s.behavior.delete(ctx, modelCode)
+	case KindCognitive:
+		return s.cognitive.delete(ctx, modelCode)
 	default:
 		return invalidArgument("模型类型无效")
 	}
@@ -170,6 +188,8 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 		return s.personality.publish(ctx, modelCode)
 	case KindBehaviorAbility:
 		return s.behavior.publish(ctx, modelCode)
+	case KindCognitive:
+		return s.cognitive.publish(ctx, modelCode)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -185,6 +205,8 @@ func (s *service) Unpublish(ctx context.Context, modelCode string) (*ModelSummar
 		return s.personality.unpublish(ctx, modelCode)
 	case KindBehaviorAbility:
 		return s.behavior.unpublish(ctx, modelCode)
+	case KindCognitive:
+		return s.cognitive.unpublish(ctx, modelCode)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -200,6 +222,8 @@ func (s *service) Archive(ctx context.Context, modelCode string) (*ModelSummary,
 		return s.personality.archive(ctx, modelCode)
 	case KindBehaviorAbility:
 		return s.behavior.archive(ctx, modelCode)
+	case KindCognitive:
+		return s.cognitive.archive(ctx, modelCode)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -219,6 +243,8 @@ func (s *service) BindQuestionnaire(ctx context.Context, dto BindQuestionnaireDT
 			return nil, bindErr
 		}
 		return s.questionnaireBinding(ctx, binding.QuestionnaireCode, binding.QuestionnaireVersion)
+	case KindCognitive:
+		return s.cognitive.bindQuestionnaire(ctx, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}
@@ -238,6 +264,9 @@ func (s *service) GetQuestionnaire(ctx context.Context, modelCode string) (*Ques
 func (s *service) GetDefinition(ctx context.Context, modelCode string) (*DefinitionDTO, error) {
 	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindPersonality {
 		return s.personality.getDefinition(ctx, modelCode)
+	}
+	if kind, ok := s.resolveModelKind(ctx, modelCode); ok && kind == KindCognitive {
+		return s.cognitive.getDefinition(ctx, modelCode)
 	}
 	result, err := s.loadBehaviorAbility(ctx, modelCode)
 	if err == nil {
@@ -277,6 +306,8 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 		return s.personality.updateDefinition(ctx, modelCode, dto)
 	case KindBehaviorAbility:
 		return s.updateBehaviorDefinition(ctx, modelCode, dto)
+	case KindCognitive:
+		return s.cognitive.updateDefinition(ctx, modelCode, dto)
 	default:
 		return nil, invalidArgument("模型类型无效")
 	}

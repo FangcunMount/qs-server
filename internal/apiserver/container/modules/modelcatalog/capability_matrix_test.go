@@ -17,6 +17,8 @@ func descriptorDomainKinds(descs []evaldomain.ModelDescriptor) map[domain.Kind]b
 			out[domain.KindPersonality] = true
 		case evaldomain.ModelKindBehavioralRating:
 			out[domain.KindBehavioralRating] = true
+		case evaldomain.ModelKindCognitive:
+			out[domain.KindCognitive] = true
 		}
 	}
 	return out
@@ -26,8 +28,8 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	if len(descs) != 3 {
-		t.Fatalf("descriptor count = %d, want 3 (scale + typology + behavioral_rating)", len(descs))
+	if len(descs) != 4 {
+		t.Fatalf("descriptor count = %d, want 4 (scale + typology + behavioral_rating + cognitive)", len(descs))
 	}
 
 	kinds := make(map[evaldomain.ModelKind]int)
@@ -43,6 +45,9 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	if kinds[evaldomain.ModelKindBehavioralRating] != 1 {
 		t.Fatalf("behavioral_rating descriptor count = %d, want 1", kinds[evaldomain.ModelKindBehavioralRating])
 	}
+	if kinds[evaldomain.ModelKindCognitive] != 1 {
+		t.Fatalf("cognitive descriptor count = %d, want 1", kinds[evaldomain.ModelKindCognitive])
+	}
 	if descs[0].Key != evaldomain.EvaluatorKeyScaleDefault {
 		t.Fatalf("first descriptor key = %#v, want scale default", descs[0].Key)
 	}
@@ -51,6 +56,9 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	}
 	if descs[2].Key != evaldomain.EvaluatorKeyBehavioralRatingDefault {
 		t.Fatalf("third descriptor key = %#v, want behavioral_rating default", descs[2].Key)
+	}
+	if descs[3].Key != evaldomain.EvaluatorKeyCognitiveDefault {
+		t.Fatalf("fourth descriptor key = %#v, want cognitive default", descs[3].Key)
 	}
 }
 

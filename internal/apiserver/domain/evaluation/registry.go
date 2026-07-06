@@ -9,6 +9,7 @@ const (
 	ModelKindScale            ModelKind = "scale"
 	ModelKindTypology         ModelKind = "typology"
 	ModelKindBehavioralRating ModelKind = "behavioral_rating"
+	ModelKindCognitive        ModelKind = "cognitive"
 )
 
 // ModelDescriptor is the canonical registration entry for an evaluation model.
@@ -16,6 +17,15 @@ type ModelDescriptor struct {
 	Key       EvaluatorKey
 	Kind      ModelKind
 	Algorithm modelcatalog.Algorithm
+}
+
+// CognitiveModelDescriptor returns the built-in cognitive runtime descriptor.
+func CognitiveModelDescriptor() ModelDescriptor {
+	return ModelDescriptor{
+		Key:       EvaluatorKeyCognitiveDefault,
+		Kind:      ModelKindCognitive,
+		Algorithm: modelcatalog.AlgorithmSPM,
+	}
 }
 
 // BehavioralRatingModelDescriptor returns the built-in behavioral_rating runtime descriptor.

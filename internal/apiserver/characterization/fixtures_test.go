@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -331,6 +332,65 @@ func draftBehavioralRatingAssessment(t *testing.T) *assessment.Assessment {
 		assessment.NewAnswerSheetRef(meta.FromUint64(6005)),
 		assessment.NewAdhocOrigin(),
 		assessment.WithID(assessment.NewID(7005)),
+		assessment.WithEvaluationModel(modelRef),
+	)
+	if err != nil {
+		t.Fatalf("NewAssessment: %v", err)
+	}
+	return a
+}
+
+func cognitiveInputSnapshot() *evaluationinput.InputSnapshot {
+	snapshot := &cognitivesnapshot.Snapshot{
+		Code:                 "COG-001",
+		Version:              "1.0.0",
+		Title:                "认知测评",
+		QuestionnaireCode:    "Q-001",
+		QuestionnaireVersion: "1.0.0",
+		Status:               "published",
+		Factors: []cognitivesnapshot.FactorSnapshot{
+			{
+				Code:            "total",
+				Title:           "总分",
+				IsTotalScore:    true,
+				QuestionCodes:   []string{"q1", "q2"},
+				ScoringStrategy: "sum",
+				InterpretRules: []cognitivesnapshot.InterpretRuleSnapshot{
+					{MinScore: 0, MaxScore: 10, Conclusion: "low", Level: "low", Suggestion: "keep"},
+				},
+			},
+		},
+	}
+	return &evaluationinput.InputSnapshot{
+		Model:        evaluationinput.NewCognitiveModelSnapshot(snapshot),
+		ModelPayload: evaluationinput.CognitiveModelPayload{Snapshot: snapshot},
+		AnswerSheet: &evaluationinput.AnswerSheetSnapshot{
+			QuestionnaireCode:    "Q-001",
+			QuestionnaireVersion: "1.0.0",
+			Answers: []evaluationinput.AnswerSnapshot{
+				{QuestionCode: "q1", Score: 3},
+				{QuestionCode: "q2", Score: 2},
+			},
+		},
+		Questionnaire: &evaluationinput.QuestionnaireSnapshot{Code: "Q-001", Version: "1.0.0"},
+	}
+}
+
+func draftCognitiveAssessment(t *testing.T) *assessment.Assessment {
+	t.Helper()
+	modelRef := assessment.NewEvaluationModelRefByCode(
+		modelcatalog.KindCognitive,
+		meta.NewCode("COG-001"),
+		"1.0.0",
+		"认知测评",
+	)
+	a, err := assessment.NewAssessment(
+		1,
+		testee.NewID(8006),
+		assessment.NewQuestionnaireRefByCode(meta.NewCode("Q-001"), "1.0.0"),
+		assessment.NewAnswerSheetRef(meta.FromUint64(6006)),
+		assessment.NewAdhocOrigin(),
+		assessment.WithID(assessment.NewID(7006)),
 		assessment.WithEvaluationModel(modelRef),
 	)
 	if err != nil {

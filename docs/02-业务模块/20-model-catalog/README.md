@@ -68,8 +68,12 @@ Assessment Model 负责“用什么模型规则解释答卷”：
 | `personality/typology`（MBTI/SBTI/BigFive/配置化） | 是 | 是 | 是 | 是 | configured runtime 主路径 |
 | `behavior_ability`（domain: `behavior_ability`） | 是 | 否（scale legacy binding） | 否（scale legacy binding） | 否 | API 名 behavior_ability；走医学量表执行链 |
 | `behavioral_rating` | 是 | 是 | 是 | 是 | 独立 runtime；`behavioral_rating.default.v1` 投影为 scale 计分引擎 |
-| `cognitive` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
-| `custom` | 部分（enum） | 否 | 否 | 否 | 预留，UI 禁用 |
+| `cognitive` | 是 | 是 | 是 | 是 | 独立 runtime；`cognitive.default.v1` 投影为 scale 计分引擎（AlgorithmSPM） |
+| `custom` | 部分（enum） | 否 | 否 | 否 | **Reserved Kind**：仅占位，与 typology `custom_typology`、plan `scheduleType=custom` 无关 |
+
+### Reserved Kind 说明
+
+- `custom`：catalog enum 占位，不可创建/发布/执行；无 payload format 与 runtime descriptor。
 
 legacy `adapter/{mbti,sbti,bigfive}` 仅服务表征测试，非生产执行路径。
 

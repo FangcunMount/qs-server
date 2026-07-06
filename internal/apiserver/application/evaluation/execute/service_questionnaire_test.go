@@ -206,17 +206,6 @@ func engineAssessmentForOutboxTest(t *testing.T) *domainAssessment.Assessment {
 	)
 }
 
-type recordingResultWriter struct {
-	calls   int
-	outcome evaloutcome.Outcome
-}
-
-func (w *recordingResultWriter) Write(_ context.Context, outcome evaloutcome.Outcome) error {
-	w.calls++
-	w.outcome = outcome
-	return nil
-}
-
 type failingInputResolver struct {
 	err error
 }

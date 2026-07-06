@@ -183,7 +183,7 @@ func (c *Container) Initialize() error {
 	}
 
 	// 初始化 Assessment model 模块（scale + personality catalog）
-	if err := c.initAssessmentModelModule(); err != nil {
+	if err := c.initModelCatalogModule(); err != nil {
 		return fmt.Errorf("failed to initialize assessment model module: %w", err)
 	}
 

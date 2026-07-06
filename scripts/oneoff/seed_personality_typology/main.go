@@ -13,7 +13,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoQuestionnaire "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/questionnaire"
 )
 
@@ -98,8 +98,8 @@ func run(cfg config) error {
 	}
 
 	if !cfg.skipModel {
-		draftRepo := mongoassessmentmodel.NewDraftRepository(db)
-		publishedRepo := mongoassessmentmodel.NewPublishedModelRepoAdapter(mongoassessmentmodel.NewRepository(db))
+		draftRepo := mongomodelcatalog.NewDraftRepository(db)
+		publishedRepo := mongomodelcatalog.NewPublishedModelRepoAdapter(mongomodelcatalog.NewRepository(db))
 		for _, plan := range plans {
 			payload, err := plan.modelPlan.Build()
 			if err != nil {

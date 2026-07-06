@@ -36,7 +36,7 @@ func TestEvaluationContainerWiresInterpretationReportingWriters(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(data)
-	if !strings.Contains(text, "interpretationreporting.NewWriter") {
+	if !strings.Contains(text, "interpretationreporting.NewInterpretationWriter") {
 		t.Fatal("evaluation assemble must wire interpretation/reporting writer")
 	}
 	if strings.Contains(text, "evaluationResult.NewWriter") {

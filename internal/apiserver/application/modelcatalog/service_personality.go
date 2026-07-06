@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	personalitymodel "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
+	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 )
 
@@ -29,7 +29,7 @@ func (s *service) listPersonality(ctx context.Context, dto ListModelsDTO) ([]Mod
 
 	if dto.Status == "" || dto.Status == StatusPublished {
 		if s.deps.PersonalityQuery != nil {
-			result, err := s.deps.PersonalityQuery.ListPublished(ctx, personalitymodel.ListPersonalityModelsDTO{
+			result, err := s.deps.PersonalityQuery.ListPublished(ctx, personalityconsumer.ListPersonalityModelsDTO{
 				Page:     dto.Page,
 				PageSize: dto.PageSize,
 			})

@@ -5,8 +5,9 @@ import (
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	assessmentModelBehavior "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
+	appCognitive "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	assessmentModelAppPersonality "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
+	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
 	questionnaireApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	resttransport "github.com/FangcunMount/qs-server/internal/apiserver/transport/rest"
@@ -39,6 +40,7 @@ func (m *Module) ExportRESTDeps(
 			QRCode:    deps.Scale.QRCodeService,
 		}),
 		PersonalityCommand: personalityCommand,
+		CognitiveCommand:   m.cognitiveCommand(),
 		PersonalityQuery:   personalityQuery,
 		QuestionnaireQuery: questionnaireQuery,
 		Codes:              codesService,
@@ -66,6 +68,13 @@ func (m *Module) personalityQuery() personalityModelApp.PersonalityModelQuerySer
 		return nil
 	}
 	return m.Personality.QueryService
+}
+
+func (m *Module) cognitiveCommand() appCognitive.Service {
+	if m == nil || m.Cognitive == nil {
+		return nil
+	}
+	return m.Cognitive.CommandService
 }
 
 func (m *Module) personalityCommand() assessmentModelAppPersonality.Service {

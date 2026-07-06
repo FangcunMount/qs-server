@@ -11,6 +11,7 @@ import (
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
@@ -22,8 +23,8 @@ func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T
 	t.Parallel()
 
 	descs := DefaultEvaluationDescriptors()
-	if len(descs) != 3 {
-		t.Fatalf("descriptor count = %d, want 3 (scale + configured typology + behavioral_rating)", len(descs))
+	if len(descs) != 4 {
+		t.Fatalf("descriptor count = %d, want 4 (scale + configured typology + behavioral_rating + cognitive)", len(descs))
 	}
 	if descs[0].Kind != evaldomain.ModelKindScale {
 		t.Fatalf("first descriptor kind = %s, want scale", descs[0].Kind)
@@ -33,6 +34,9 @@ func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T
 	}
 	if descs[2].Key != evaldomain.EvaluatorKeyBehavioralRatingDefault {
 		t.Fatalf("behavioral_rating key = %#v", descs[2].Key)
+	}
+	if descs[3].Key != evaldomain.EvaluatorKeyCognitiveDefault {
+		t.Fatalf("cognitive key = %#v", descs[3].Key)
 	}
 	typology := evaldomain.TypologyAlgorithms(descs)
 	if len(typology) != 1 || typology[0] != modelcatalog.AlgorithmPersonalityTypology {
@@ -77,6 +81,7 @@ func TestMaterializeRegistryKeyParity(t *testing.T) {
 		ScaleCatalog:            evalFakeScaleCatalog{},
 		TypologyCatalog:         evalFakeTypologyCatalogPort{},
 		BehavioralRatingCatalog: evalFakeBehavioralRatingCatalog{},
+		CognitiveCatalog:        evalFakeCognitiveCatalog{},
 		AnswerSheets:            evalFakeAnswerSheetReader{},
 		Questionnaires:          evalFakeQuestionnaireReader{},
 	})
@@ -137,6 +142,7 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 		ScaleCatalog:            evalFakeScaleCatalog{},
 		TypologyCatalog:         evalFakeTypologyCatalogPort{},
 		BehavioralRatingCatalog: evalFakeBehavioralRatingCatalog{},
+		CognitiveCatalog:        evalFakeCognitiveCatalog{},
 		AnswerSheets:            evalFakeAnswerSheetReader{},
 		Questionnaires:          evalFakeQuestionnaireReader{},
 	})
@@ -182,6 +188,16 @@ func (evalFakeBehavioralRatingCatalog) GetBehavioralRatingByRef(context.Context,
 
 func (evalFakeBehavioralRatingCatalog) FindBehavioralRatingByQuestionnaire(context.Context, string, string) (*behavioralsnapshot.Snapshot, error) {
 	return &behavioralsnapshot.Snapshot{}, nil
+}
+
+type evalFakeCognitiveCatalog struct{}
+
+func (evalFakeCognitiveCatalog) GetCognitiveByRef(context.Context, port.ModelRef) (*cognitivesnapshot.Snapshot, error) {
+	return &cognitivesnapshot.Snapshot{}, nil
+}
+
+func (evalFakeCognitiveCatalog) FindCognitiveByQuestionnaire(context.Context, string, string) (*cognitivesnapshot.Snapshot, error) {
+	return &cognitivesnapshot.Snapshot{}, nil
 }
 
 type evalFakeAnswerSheetReader struct{}

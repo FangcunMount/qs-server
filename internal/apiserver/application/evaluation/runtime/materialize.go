@@ -4,6 +4,7 @@ import (
 	"fmt"
 
 	behavioralratingEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/behavioral_rating"
+	cognitiveEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
@@ -71,6 +72,8 @@ func materializeScoreProjector(desc evaldomain.ModelDescriptor, deps WiringDeps)
 		return interpretationreporting.NewScaleScoreProjector(deps.ScoreRepo), nil
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
 		return interpretationreporting.NewBehavioralRatingScoreProjector(deps.ScoreRepo), nil
+	case modelcatalog.ExecutionPathCognitiveDescriptor:
+		return interpretationreporting.NewCognitiveScoreProjector(deps.ScoreRepo), nil
 	case modelcatalog.ExecutionPathTypologyDescriptor:
 		return nil, nil
 	default:
@@ -109,6 +112,8 @@ func materializeEvaluator(desc evaldomain.ModelDescriptor, deps WiringDeps, sess
 		return typologyEvaluation.MaterializeTypologyEvaluator(desc, registry, session.typologyExecutor)
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
 		return behavioralratingEvaluation.NewExecutor(deps.ScaleScorer), nil
+	case modelcatalog.ExecutionPathCognitiveDescriptor:
+		return cognitiveEvaluation.NewExecutor(deps.ScaleScorer), nil
 	default:
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
 	}
@@ -130,6 +135,8 @@ func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps, 
 		return typologyEvaluation.MaterializeTypologyReportBuilder(desc, registry, session.typologyReportBuilder)
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
 		return interpretationreporting.NewBehavioralRatingReportBuilder(deps.ScaleReportBuilder), nil
+	case modelcatalog.ExecutionPathCognitiveDescriptor:
+		return interpretationreporting.NewCognitiveReportBuilder(deps.ScaleReportBuilder), nil
 	default:
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
 	}

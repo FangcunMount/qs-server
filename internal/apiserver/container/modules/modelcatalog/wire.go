@@ -11,7 +11,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
@@ -76,7 +76,7 @@ func buildScaleDeps(in WireInput) ScaleDeps {
 	}
 	if in.MongoDB != nil {
 		mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: in.MongoLimiter}
-		v2Repo := mongoassessmentmodel.NewRepository(in.MongoDB, mongoOpts)
+		v2Repo := mongomodelcatalog.NewRepository(in.MongoDB, mongoOpts)
 		deps.RuleSetPublisher = rulesetInfra.NewScaleRuleSetPublisher(v2Repo)
 	}
 	return deps
@@ -113,9 +113,9 @@ func buildPersonalityDeps(
 		return PersonalityDeps{}
 	}
 	mongoOpts := mongoBase.BaseRepositoryOptions{Limiter: mongoLimiter}
-	v2Repo := mongoassessmentmodel.NewRepository(mongoDB, mongoOpts)
-	draftRepo := mongoassessmentmodel.NewDraftRepository(mongoDB, mongoOpts)
-	publishedRepo := port.PublishedModelRepository(mongoassessmentmodel.NewPublishedModelRepoAdapter(v2Repo))
+	v2Repo := mongomodelcatalog.NewRepository(mongoDB, mongoOpts)
+	draftRepo := mongomodelcatalog.NewDraftRepository(mongoDB, mongoOpts)
+	publishedRepo := port.PublishedModelRepository(mongomodelcatalog.NewPublishedModelRepoAdapter(v2Repo))
 	legacyRepo := mongoruleset.NewRepository(mongoDB, mongoOpts)
 	dualStore := modelcatalog.NewDualStore(v2Repo, legacyRepo)
 	publishedLister := port.PublishedModelLister(dualStore)

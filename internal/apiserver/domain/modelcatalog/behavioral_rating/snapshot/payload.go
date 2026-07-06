@@ -73,13 +73,7 @@ func ParseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	for _, rule := range body.InterpretRules {
 		converted := make([]InterpretRuleSnapshot, 0, len(rule.Ranges))
 		for _, item := range rule.Ranges {
-			converted = append(converted, InterpretRuleSnapshot{
-				MinScore:   item.MinScore,
-				MaxScore:   item.MaxScore,
-				Conclusion: item.Conclusion,
-				Suggestion: item.Suggestion,
-				Level:      item.Level,
-			})
+			converted = append(converted, InterpretRuleSnapshot(item))
 		}
 		rulesByDimension[rule.DimensionCode] = converted
 	}

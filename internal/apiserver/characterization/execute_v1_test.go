@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	behavioralratingeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/behavioral_rating"
+	cognitiveeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/cognitive"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
@@ -20,6 +21,7 @@ func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
 	registry, err := evaluationexecute.NewEvaluatorRegistry(
 		evaluationscale.NewExecutor(nil),
 		behavioralratingeval.NewExecutor(nil),
+		cognitiveeval.NewExecutor(nil),
 		configured,
 	)
 	if err != nil {

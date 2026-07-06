@@ -5,7 +5,7 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
+	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
 )
 
 type personalityDefinitionPayload struct {
@@ -57,7 +57,7 @@ func summaryFromBehaviorValue(result behavior.Model) ModelSummary {
 	}
 }
 
-func personalitySummaryFromSummary(result personalitymodel.PersonalityModelSummaryResult) ModelSummary {
+func personalitySummaryFromSummary(result personalityconsumer.PersonalityModelSummaryResult) ModelSummary {
 	return ModelSummary{
 		Code:                 result.Code,
 		Kind:                 KindPersonality,
@@ -72,7 +72,7 @@ func personalitySummaryFromSummary(result personalitymodel.PersonalityModelSumma
 	}
 }
 
-func personalitySummaryFromDetail(result *personalitymodel.PersonalityModelResult) *ModelSummary {
+func personalitySummaryFromDetail(result *personalityconsumer.PersonalityModelResult) *ModelSummary {
 	if result == nil {
 		return nil
 	}
@@ -80,7 +80,7 @@ func personalitySummaryFromDetail(result *personalitymodel.PersonalityModelResul
 	return &summary
 }
 
-func newPersonalityDefinitionPayload(result *personalitymodel.PersonalityModelResult) personalityDefinitionPayload {
+func newPersonalityDefinitionPayload(result *personalityconsumer.PersonalityModelResult) personalityDefinitionPayload {
 	payload := personalityDefinitionPayload{
 		Dimensions:   make([]personalityDimensionDefinition, 0, len(result.Dimensions)),
 		Outcomes:     make([]personalityOutcomeDefinition, 0, len(result.Outcomes)),

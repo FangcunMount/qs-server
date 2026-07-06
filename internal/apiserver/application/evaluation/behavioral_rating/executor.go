@@ -49,7 +49,6 @@ func cloneInputWithScaleSnapshot(input *portevaluationinput.InputSnapshot, scale
 	cloned := *input
 	if scaleSnapshot != nil {
 		cloned.ModelPayload = portevaluationinput.ScaleModelPayload{Scale: scaleSnapshot}
-		cloned.MedicalScale = scaleSnapshot
 		if cloned.Model != nil {
 			model := *cloned.Model
 			model.Payload = portevaluationinput.ScaleModelPayload{Scale: scaleSnapshot}

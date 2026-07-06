@@ -30,6 +30,7 @@ var defaultRuntimeExecutionPathOrder = []domain.ExecutionPath{
 	domain.ExecutionPathScaleDescriptor,
 	domain.ExecutionPathTypologyDescriptor,
 	domain.ExecutionPathBehavioralRatingDescriptor,
+	domain.ExecutionPathCognitiveDescriptor,
 }
 
 // DefaultEvaluationDescriptors returns runtime descriptors for all capability-backed execution paths.
@@ -59,6 +60,8 @@ func descriptorsForExecutionPath(path domain.ExecutionPath) []evaldomain.ModelDe
 		return DefaultTypologyDescriptors()
 	case domain.ExecutionPathBehavioralRatingDescriptor:
 		return []evaldomain.ModelDescriptor{evaldomain.BehavioralRatingModelDescriptor()}
+	case domain.ExecutionPathCognitiveDescriptor:
+		return []evaldomain.ModelDescriptor{evaldomain.CognitiveModelDescriptor()}
 	default:
 		return nil
 	}

@@ -4,10 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	stderrors "errors"
+	"strings"
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
@@ -144,6 +146,59 @@ func (s *personalityCommandStub) Unpublish(context.Context, string) (*personalit
 }
 
 func (s *personalityCommandStub) Archive(context.Context, string) (*personality.ModelSummary, error) {
+	return nil, nil
+}
+
+type cognitiveCommandStub struct {
+	createCalled bool
+}
+
+func (s *cognitiveCommandStub) List(context.Context, cognitive.ListInput) (*cognitive.ModelListResult, error) {
+	return nil, nil
+}
+
+func (s *cognitiveCommandStub) Create(_ context.Context, input cognitive.CreateInput) (*cognitive.ModelSummary, error) {
+	s.createCalled = true
+	return &cognitive.ModelSummary{Code: input.Code, Kind: cognitive.KindCognitive, Title: input.Title, Status: "draft"}, nil
+}
+
+func (s *cognitiveCommandStub) Get(_ context.Context, modelCode string) (*cognitive.ModelSummary, error) {
+	if strings.Contains(modelCode, "cognitive") || strings.Contains(modelCode, "COG") {
+		return &cognitive.ModelSummary{Code: modelCode, Kind: cognitive.KindCognitive}, nil
+	}
+	return nil, stderrors.New("not found")
+}
+
+func (s *cognitiveCommandStub) UpdateBasicInfo(context.Context, cognitive.UpdateBasicInfoInput) (*cognitive.ModelSummary, error) {
+	return nil, nil
+}
+
+func (s *cognitiveCommandStub) Delete(context.Context, string) error { return nil }
+
+func (s *cognitiveCommandStub) BindQuestionnaire(_ context.Context, input cognitive.BindQuestionnaireInput) (*cognitive.QuestionnaireBindingResult, error) {
+	return &cognitive.QuestionnaireBindingResult{
+		QuestionnaireCode:    input.QuestionnaireCode,
+		QuestionnaireVersion: input.QuestionnaireVersion,
+	}, nil
+}
+
+func (s *cognitiveCommandStub) GetDefinition(context.Context, string) (*cognitive.DefinitionResult, error) {
+	return nil, nil
+}
+
+func (s *cognitiveCommandStub) UpdateDefinition(_ context.Context, modelCode string, input cognitive.DefinitionInput) (*cognitive.DefinitionResult, error) {
+	return &cognitive.DefinitionResult{Payload: input.Payload}, nil
+}
+
+func (s *cognitiveCommandStub) Publish(_ context.Context, modelCode string) (*cognitive.ModelSummary, error) {
+	return &cognitive.ModelSummary{Code: modelCode, Kind: cognitive.KindCognitive, Status: "published"}, nil
+}
+
+func (s *cognitiveCommandStub) Unpublish(context.Context, string) (*cognitive.ModelSummary, error) {
+	return nil, nil
+}
+
+func (s *cognitiveCommandStub) Archive(context.Context, string) (*cognitive.ModelSummary, error) {
 	return nil, nil
 }
 

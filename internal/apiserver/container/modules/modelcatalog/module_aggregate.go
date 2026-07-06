@@ -6,12 +6,14 @@ import "github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 type Module struct {
 	Scale       *Scale
 	Personality *Personality
+	Cognitive   *Cognitive
 }
 
 // Deps groups constructor dependencies for both assessment-model capabilities.
 type Deps struct {
 	Scale       ScaleDeps
 	Personality PersonalityDeps
+	Cognitive   CognitiveDeps
 }
 
 // New assembles scale and personality catalog capabilities.
@@ -24,9 +26,14 @@ func New(deps Deps) (*Module, error) {
 	if err != nil {
 		return nil, err
 	}
+	cognitive, err := NewCognitive(deps.Cognitive)
+	if err != nil {
+		return nil, err
+	}
 	return &Module{
 		Scale:       scale,
 		Personality: personality,
+		Cognitive:   cognitive,
 	}, nil
 }
 
@@ -41,7 +48,12 @@ func (m *Module) Cleanup() error {
 		}
 	}
 	if m.Personality != nil {
-		return m.Personality.Cleanup()
+		if err := m.Personality.Cleanup(); err != nil {
+			return err
+		}
+	}
+	if m.Cognitive != nil {
+		return m.Cognitive.Cleanup()
 	}
 	return nil
 }
@@ -57,7 +69,12 @@ func (m *Module) CheckHealth() error {
 		}
 	}
 	if m.Personality != nil {
-		return m.Personality.CheckHealth()
+		if err := m.Personality.CheckHealth(); err != nil {
+			return err
+		}
+	}
+	if m.Cognitive != nil {
+		return m.Cognitive.CheckHealth()
 	}
 	return nil
 }

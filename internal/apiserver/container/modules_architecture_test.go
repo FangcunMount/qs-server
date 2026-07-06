@@ -231,7 +231,7 @@ func extractRegisterModuleNames(t *testing.T, containerRoot string, step modules
 	t.Helper()
 
 	switch step.InitMethod {
-	case "initAssessmentModelModule":
+	case "initModelCatalogModule":
 		return extractRegisterModuleNamesFromFunc(t, filepath.Join(containerRoot, "compose_host.go"), "SetAssessmentModelModule")
 	default:
 		installRel, ok := installFileByInitMethod[step.InitMethod]
@@ -325,12 +325,12 @@ func TestAssessmentModelLegacyRegisterNamesCoverScaleAndPersonalityModel(t *test
 	}
 }
 
-func TestAssessmentModelRegistersAggregateName(t *testing.T) {
+func TestModelCatalogRegistersAggregateName(t *testing.T) {
 	t.Parallel()
 
 	found := false
 	for _, step := range modules.LegacyInitializeSequence {
-		if step.InitMethod != "initAssessmentModelModule" {
+		if step.InitMethod != "initModelCatalogModule" {
 			continue
 		}
 		for _, name := range step.RegisterNames {
@@ -341,7 +341,7 @@ func TestAssessmentModelRegistersAggregateName(t *testing.T) {
 		}
 	}
 	if !found {
-		t.Fatal("initAssessmentModelModule must register assessmentmodel aggregate module name")
+		t.Fatal("initModelCatalogModule must register modelcatalog aggregate module name")
 	}
 }
 

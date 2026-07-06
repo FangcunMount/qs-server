@@ -24,6 +24,7 @@ func TestUpdateDefinitionCapabilityPolicy(t *testing.T) {
 			svc := NewService(Dependencies{
 				BehaviorCommand:    behaviorStub,
 				PersonalityCommand: personalityStub,
+				CognitiveCommand:   &cognitiveCommandStub{},
 			})
 
 			_, err := svc.UpdateDefinition(context.Background(), "capability_"+apiKind, DefinitionDTO{
@@ -53,6 +54,7 @@ func TestUpdateDefinitionDoesNotDefaultToBehaviorAbility(t *testing.T) {
 	svc := NewService(Dependencies{
 		BehaviorCommand:    &behaviorCommandStub{},
 		PersonalityCommand: &personalityCommandStub{},
+		CognitiveCommand:   &cognitiveCommandStub{},
 	})
 
 	_, err := svc.UpdateDefinition(context.Background(), "missing_model", DefinitionDTO{
@@ -78,6 +80,7 @@ func TestPublishCapabilityPolicy(t *testing.T) {
 			svc := NewService(Dependencies{
 				BehaviorCommand:    &behaviorCommandStub{},
 				PersonalityCommand: &personalityCommandStub{},
+				CognitiveCommand:   &cognitiveCommandStub{},
 			})
 
 			_, err := svc.Publish(context.Background(), previewModelCode(apiKind))
@@ -109,6 +112,7 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 			svc := NewService(Dependencies{
 				BehaviorCommand:    &behaviorCommandStub{},
 				PersonalityCommand: &personalityCommandStub{},
+				CognitiveCommand:   &cognitiveCommandStub{},
 			})
 
 			_, err := svc.BindQuestionnaire(context.Background(), BindQuestionnaireDTO{
@@ -135,8 +139,11 @@ func TestBindQuestionnaireCapabilityPolicy(t *testing.T) {
 func TestRequireCatalogOperationRejectsUnknownKind(t *testing.T) {
 	t.Parallel()
 
-	if err := requireCatalogOperation("cognitive", domain.CatalogOpCreate); err == nil {
-		t.Fatal("expected cognitive create to be rejected")
+	if err := requireCatalogOperation("cognitive", domain.CatalogOpCreate); err != nil {
+		t.Fatal("expected cognitive create to be allowed")
+	}
+	if err := requireCatalogOperation("custom", domain.CatalogOpCreate); err == nil {
+		t.Fatal("expected custom create to be rejected")
 	}
 	if err := requireCatalogOperation(KindMedicalScale, domain.CatalogOpUpdateDefinition); err == nil {
 		t.Fatal("expected medical_scale definition update to be rejected")

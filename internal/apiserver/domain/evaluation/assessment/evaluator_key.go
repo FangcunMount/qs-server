@@ -23,6 +23,9 @@ func (r EvaluationModelRef) EvaluatorKey() evaldomain.EvaluatorKey {
 	if modelcatalog.Kind(r.kind) == modelcatalog.KindBehavioralRating && r.algorithm == "" {
 		return evaldomain.EvaluatorKeyBehavioralRatingDefault
 	}
+	if modelcatalog.Kind(r.kind) == modelcatalog.KindCognitive && r.algorithm == "" {
+		return evaldomain.EvaluatorKeyCognitiveDefault
+	}
 	return evaldomain.EvaluatorKey{
 		Kind:      modelcatalog.Kind(r.kind),
 		SubKind:   r.subKind,

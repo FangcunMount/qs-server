@@ -123,6 +123,9 @@ func TestEvaluationResultPackageDoesNotStageLegacyEventConstructors(t *testing.T
 
 	root := repoRoot(t)
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "result")
+	if _, err := os.Stat(scanRoot); os.IsNotExist(err) {
+		return
+	}
 	forbidden := []string{
 		"NewAssessmentInterpretedEvent(",
 		"NewAssessmentModelInterpretedEvent(",

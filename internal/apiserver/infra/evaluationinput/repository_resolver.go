@@ -45,10 +45,12 @@ func NewRepositoryResolver(
 	var (
 		typologyCatalog         port.TypologyModelCatalog
 		behavioralRatingCatalog port.BehavioralRatingModelCatalog
+		cognitiveCatalog        port.CognitiveModelCatalog
 	)
 	if publishedReader, ok := modelCatalog.(rulesetport.PublishedModelReader); ok {
 		typologyCatalog = NewPublishedTypologyCatalog(publishedReader, modelCatalog)
 		behavioralRatingCatalog = NewPublishedBehavioralRatingCatalog(publishedReader)
+		cognitiveCatalog = NewPublishedCognitiveCatalog(publishedReader)
 	} else {
 		typologyCatalog = NewRuleSetTypologyCatalog(modelCatalog)
 	}
@@ -58,6 +60,7 @@ func NewRepositoryResolver(
 		ScaleCatalog:            interpretationScaleCatalog,
 		TypologyCatalog:         typologyCatalog,
 		BehavioralRatingCatalog: behavioralRatingCatalog,
+		CognitiveCatalog:        cognitiveCatalog,
 		AnswerSheets:            answerSheetReader,
 		Questionnaires:          questionnaireReader,
 	})

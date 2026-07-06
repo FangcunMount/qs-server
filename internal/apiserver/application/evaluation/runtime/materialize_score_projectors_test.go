@@ -4,12 +4,11 @@ import (
 	"context"
 	"testing"
 
-	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	modelcatalogwire "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	modelcatalogwire "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleengine"
 )
 
 func TestMaterializeScoreProjectorsRegistersScaleLikeRuntimes(t *testing.T) {
@@ -21,7 +20,6 @@ func TestMaterializeScoreProjectorsRegistersScaleLikeRuntimes(t *testing.T) {
 	}
 	descs := modelcatalogwire.DefaultEvaluationDescriptors()
 	projectors, err := evalruntime.MaterializeScoreProjectors(descs, evalruntime.WiringDeps{
-		ScaleScorer:      ruleengine.NewScaleFactorScorer(),
 		ScoreRepo:        noopScoreRepo{},
 		TypologyRegistry: registry,
 	})
@@ -38,8 +36,11 @@ func TestMaterializeScoreProjectorsRegistersScaleLikeRuntimes(t *testing.T) {
 	if !keys[evaldomain.EvaluatorKeyBehavioralRatingDefault] {
 		t.Fatal("behavioral_rating score projector not materialized")
 	}
-	if len(projectors) != 2 {
-		t.Fatalf("projector count = %d, want 2", len(projectors))
+	if !keys[evaldomain.EvaluatorKeyCognitiveDefault] {
+		t.Fatal("cognitive score projector not materialized")
+	}
+	if len(projectors) != 3 {
+		t.Fatalf("projector count = %d, want 3", len(projectors))
 	}
 	_ = typologyeval.DefaultModules()
 }

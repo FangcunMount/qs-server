@@ -4,7 +4,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	appPersonalityModel "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
-	appPersonalityCatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/personalitymodel"
+	appPersonalityCatalog "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/modules"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"

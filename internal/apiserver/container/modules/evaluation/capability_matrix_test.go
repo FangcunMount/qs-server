@@ -46,9 +46,11 @@ func TestEvaluationModuleMaterializesOnlyDeclaredDescriptors(t *testing.T) {
 	if !keys[evaldomain.EvaluatorKeyBehavioralRatingDefault] {
 		t.Fatal("behavioral_rating evaluator not materialized")
 	}
+	if !keys[evaldomain.EvaluatorKeyCognitiveDefault] {
+		t.Fatal("cognitive evaluator not materialized")
+	}
 	for _, forbidden := range []domain.Kind{
 		domain.KindBehaviorAbility,
-		domain.KindCognitive,
 		domain.KindCustom,
 	} {
 		for key := range keys {

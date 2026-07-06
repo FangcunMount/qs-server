@@ -12,7 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoScale "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/scale"
 	rulesetInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset"
 )
@@ -75,7 +75,7 @@ func run(cfg config) error {
 	}
 	defer func() { _ = client.Disconnect(context.Background()) }()
 
-	repo := mongoassessmentmodel.NewRepository(client.Database(cfg.mongoDB))
+	repo := mongomodelcatalog.NewRepository(client.Database(cfg.mongoDB))
 	for _, snapshot := range snapshots {
 		if err := repo.UpsertPublished(applyCtx, snapshot); err != nil {
 			return fmt.Errorf("upsert %s@%s: %w", snapshot.Definition.Code, snapshot.Definition.Version, err)

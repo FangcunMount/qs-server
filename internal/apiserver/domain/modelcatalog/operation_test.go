@@ -38,7 +38,7 @@ func TestKindCapabilityAllowsOperations(t *testing.T) {
 		t.Fatal("behavior_ability must not allow preview")
 	}
 
-	for _, kind := range []Kind{KindScale, KindCognitive, KindCustom} {
+	for _, kind := range []Kind{KindScale, KindCustom} {
 		cap, ok := CapabilityByKind(kind)
 		if !ok {
 			t.Fatalf("capability missing for %q", kind)

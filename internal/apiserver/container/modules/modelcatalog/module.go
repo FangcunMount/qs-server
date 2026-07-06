@@ -8,17 +8,17 @@ const Name = modules.PackageModelCatalog
 var RegisterNames = []string{string(Name), "scale", "personalitymodel"}
 
 // LegacyRegisterNames are legacy registerModule keys kept for GetLoadedModules compatibility
-// after scale and personality catalog merged under assessmentmodel.
+// after scale and personality catalog merged under modelcatalog.
 var LegacyRegisterNames = []string{"scale", "personalitymodel"}
 
-// Descriptor identifies the assessment-model module in container composition.
+// Descriptor identifies the model-catalog module in container composition.
 type Descriptor struct {
 	Name                modules.PackageName
 	RegisterNames       []string
 	LegacyRegisterNames []string
 }
 
-// Describe returns the assessment-model module descriptor.
+// Describe returns the model-catalog module descriptor.
 func Describe() Descriptor {
 	return Descriptor{
 		Name:                Name,

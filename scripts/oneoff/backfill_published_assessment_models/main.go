@@ -11,7 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 
-	mongoassessmentmodel "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
+	mongomodelcatalog "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/modelcatalog"
 	mongoruleset "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/ruleset"
 )
 
@@ -36,7 +36,7 @@ func main() {
 
 	db := client.Database(*mongoDB)
 	legacy := mongoruleset.NewRepository(db)
-	target := mongoassessmentmodel.NewRepository(db)
+	target := mongomodelcatalog.NewRepository(db)
 
 	rows, err := legacy.ListPublished(ctx)
 	if err != nil {
@@ -48,7 +48,7 @@ func main() {
 		return
 	}
 
-	written, err := mongoassessmentmodel.BackfillFromLegacy(ctx, legacy, target)
+	written, err := mongomodelcatalog.BackfillFromLegacy(ctx, legacy, target)
 	if err != nil {
 		log.Fatalf("backfill failed after %d row(s): %v", written, err)
 	}
