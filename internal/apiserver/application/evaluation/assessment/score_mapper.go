@@ -1,8 +1,8 @@
 package assessment
 
 import (
-	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 

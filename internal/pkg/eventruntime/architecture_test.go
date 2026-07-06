@@ -202,14 +202,14 @@ func durableOutboxEventTokens(t *testing.T, catalog *eventcatalog.Catalog) map[s
 
 func bestEffortDirectPublishFiles() map[string]struct{} {
 	return map[string]struct{}{
-		"internal/apiserver/application/plan/enrollment_service.go":                {},
-		"internal/apiserver/application/plan/lifecycle_service.go":                 {},
-		"internal/apiserver/application/plan/lifecycle_transition_workflow.go":     {},
-		"internal/apiserver/application/plan/task_management_service.go":           {},
-		"internal/apiserver/application/plan/task_scheduler_service.go":            {},
-		"internal/apiserver/application/modelcatalog/behavior/scale/factor/service.go":                   {},
-		"internal/apiserver/application/modelcatalog/behavior/scale/lifecycle/service.go":                {},
-		"internal/apiserver/application/survey/questionnaire/lifecycle_service.go": {},
+		"internal/apiserver/application/plan/enrollment_service.go":                       {},
+		"internal/apiserver/application/plan/lifecycle_service.go":                        {},
+		"internal/apiserver/application/plan/lifecycle_transition_workflow.go":            {},
+		"internal/apiserver/application/plan/task_management_service.go":                  {},
+		"internal/apiserver/application/plan/task_scheduler_service.go":                   {},
+		"internal/apiserver/application/modelcatalog/behavior/scale/factor/service.go":    {},
+		"internal/apiserver/application/modelcatalog/behavior/scale/lifecycle/service.go": {},
+		"internal/apiserver/application/survey/questionnaire/lifecycle_service.go":        {},
 	}
 }
 

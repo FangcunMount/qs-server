@@ -1,8 +1,8 @@
 package assessment
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 )
 

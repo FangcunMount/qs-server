@@ -4,9 +4,9 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
 func TestDefaultAlgorithmAliases(t *testing.T) {

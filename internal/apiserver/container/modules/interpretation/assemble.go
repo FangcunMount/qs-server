@@ -15,7 +15,7 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoBase "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo"
-	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
+	mongoEval "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 	mongoEventOutbox "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/eventoutbox"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"

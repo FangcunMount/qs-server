@@ -7,9 +7,9 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 

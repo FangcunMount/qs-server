@@ -3,9 +3,9 @@ package typology
 import (
 	"fmt"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 type outcomeAdapterFunc func(assessment.EvaluationModelRef, evaluationtypology.ScoringResult) (*assessment.AssessmentOutcome, error)

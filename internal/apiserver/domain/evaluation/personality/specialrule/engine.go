@@ -1,8 +1,8 @@
 package specialrule
 
 import (
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // MatchResult is returned when a special rule fires.

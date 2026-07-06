@@ -3,8 +3,8 @@ package mbti
 import (
 	"fmt"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // BuildFromLegacy converts an MBTI legacy model into a factor graph and pole decision spec.

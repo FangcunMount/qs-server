@@ -5,10 +5,10 @@ import (
 
 	testeeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/testee"
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
+	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	qrcodeApp "github.com/FangcunMount/qs-server/internal/apiserver/application/qrcode"
-	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	objectstorageport "github.com/FangcunMount/qs-server/internal/apiserver/infra/objectstorage/port"
 	iambridge "github.com/FangcunMount/qs-server/internal/apiserver/port/iambridge"

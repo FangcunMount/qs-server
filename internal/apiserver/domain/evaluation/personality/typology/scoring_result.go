@@ -1,8 +1,8 @@
 package typology
 
 import (
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // ScoringResult is the domain-local output of a personality model adapter.

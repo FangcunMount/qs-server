@@ -3,8 +3,8 @@ package adapter_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestDefaultRegistryMatchesBuiltInTypologyAlgorithms(t *testing.T) {

@@ -3,10 +3,10 @@ package bigfive_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestScoreProducesTraitProfile(t *testing.T) {

@@ -60,7 +60,9 @@ type parityStubReportBuilder struct {
 
 func (s parityStubReportBuilder) Key() evaldomain.EvaluatorKey { return s.key }
 
-func (parityStubReportBuilder) ReportType() domainreport.ReportType { return domainreport.ReportTypeStandard }
+func (parityStubReportBuilder) ReportType() domainreport.ReportType {
+	return domainreport.ReportTypeStandard
+}
 
 func (parityStubReportBuilder) Build(context.Context, evaluationResult.Outcome) (*domainreport.InterpretReport, error) {
 	return nil, nil

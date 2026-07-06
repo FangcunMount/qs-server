@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 )
 
 func buildGraphAndDecision(payload *modeltypology.Payload, spec *modeltypology.RuntimeSpec) (profile.FactorGraph, profile.DecisionSpec, error) {

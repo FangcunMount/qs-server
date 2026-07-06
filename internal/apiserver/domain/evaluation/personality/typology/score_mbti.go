@@ -5,8 +5,8 @@ import (
 	"math"
 	"strings"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // Deprecated: use mbti adapter Score via profile.ScoreGraph instead. Kept for characterization equivalence tests.

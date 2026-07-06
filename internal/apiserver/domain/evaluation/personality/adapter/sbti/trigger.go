@@ -1,8 +1,8 @@
 package sbti
 
 import (
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func triggeredDrinkOutcome(model *modeltypology.SBTILegacyModel, answers []evaluationinput.Answer) (modeltypology.SBTILegacyOutcome, bool) {

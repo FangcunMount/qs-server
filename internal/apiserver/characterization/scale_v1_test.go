@@ -8,7 +8,7 @@ import (
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
+	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: scale executor produces total=7 risk=low; report preserves

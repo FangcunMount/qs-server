@@ -3,8 +3,8 @@ package typology
 import (
 	"testing"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestResolveMBTIPreference_tieAtThresholdPrefersLeftPole(t *testing.T) {

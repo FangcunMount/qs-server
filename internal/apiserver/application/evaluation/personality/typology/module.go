@@ -1,8 +1,8 @@
 package typology
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // Module describes a typology algorithm alias exposed to evaluation wiring.

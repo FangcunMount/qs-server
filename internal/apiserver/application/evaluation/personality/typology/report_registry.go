@@ -4,9 +4,9 @@ import (
 	"fmt"
 
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
+	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
 type reportBuilderFunc func(evaluationresult.Outcome) (*domainReport.InterpretReport, error)

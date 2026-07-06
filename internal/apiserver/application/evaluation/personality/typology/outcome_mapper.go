@@ -3,10 +3,10 @@ package typology
 import (
 	"fmt"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // OutcomeAssembler maps scoring results to assessment outcomes using outcome mapping spec.

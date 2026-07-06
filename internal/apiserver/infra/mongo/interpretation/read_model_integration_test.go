@@ -1,4 +1,4 @@
-package evaluation
+package interpretation
 
 import (
 	"context"
@@ -51,7 +51,7 @@ func skipEvaluationMongoContract(t *testing.T) {
 	message := "QS_SERVER_TEST_MONGO_URI is not set; skipping Mongo evaluation report read model contract tests. " +
 		"Coverage: testee/testeeIDs, high-risk/risk/scale filters, pagination/sort, not-found and legacy nil field mapping. " +
 		"Run: QS_SERVER_TEST_MONGO_URI='mongodb://127.0.0.1:27017' QS_SERVER_TEST_MONGO_DB='qs_server_contract_test' " +
-		"go test ./internal/apiserver/infra/mongo/evaluation -run 'Integration|AgainstMongo' -v"
+		"go test ./internal/apiserver/infra/mongo/interpretation -run 'Integration|AgainstMongo' -v"
 	fmt.Fprintln(os.Stderr, message)
 	t.Skip(message)
 }

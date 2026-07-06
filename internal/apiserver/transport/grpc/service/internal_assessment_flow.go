@@ -9,8 +9,8 @@ import (
 	"github.com/FangcunMount/component-base/pkg/logger"
 	pb "github.com/FangcunMount/qs-server/api/grpc/gen/internalapi"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
+	assessmentDomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 type behaviorProjectionFlow struct {

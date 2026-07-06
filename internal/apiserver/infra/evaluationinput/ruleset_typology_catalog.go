@@ -6,8 +6,8 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // RuleSetTypologyCatalog loads unified typology payloads from the ruleset catalog.

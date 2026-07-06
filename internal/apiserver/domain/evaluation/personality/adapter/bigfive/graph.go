@@ -3,9 +3,9 @@ package bigfive
 import (
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
 )
 
 // BuildFromPayload converts a v2 typology payload into a trait-profile factor graph.

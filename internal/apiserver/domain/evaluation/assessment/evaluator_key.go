@@ -1,8 +1,8 @@
 package assessment
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // EvaluatorKey returns the v2 execution routing key for this model reference.

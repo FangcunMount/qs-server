@@ -9,10 +9,10 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaluationresult "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/result"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	personalitydomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )

@@ -7,8 +7,8 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 type stubScaleRuleReader struct {

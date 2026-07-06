@@ -9,7 +9,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
+	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: Big Five scorer resolves trait-profile raw scores; report exposes

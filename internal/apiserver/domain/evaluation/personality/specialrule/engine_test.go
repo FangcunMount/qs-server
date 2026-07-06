@@ -3,8 +3,8 @@ package specialrule
 import (
 	"testing"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestEngineApplyBeforeScoreMatchesDrinkTrigger(t *testing.T) {

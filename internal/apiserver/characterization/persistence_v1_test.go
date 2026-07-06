@@ -5,7 +5,7 @@ import (
 	"time"
 
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/evaluation"
+	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
 
 // V1 contract: Mongo report mapper preserves scale summary, factor dimensions,

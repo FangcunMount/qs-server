@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"strings"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/profile"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // BuildFromLegacy converts an SBTI legacy model into a factor graph and pattern decision spec.

@@ -18,7 +18,7 @@ func TestEvaluationCommandRepositoriesDoNotExposeReadModelHelpers(t *testing.T) 
 	for _, rel := range []string{
 		"internal/apiserver/infra/mysql/evaluation/assessment_repository.go",
 		"internal/apiserver/infra/mysql/evaluation/score_repository.go",
-		"internal/apiserver/infra/mongo/evaluation/repo.go",
+		"internal/apiserver/infra/mongo/interpretation/repo.go",
 	} {
 		path := filepath.Join(root, filepath.FromSlash(rel))
 		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)

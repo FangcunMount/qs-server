@@ -8,8 +8,8 @@ import (
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 // RepositoryScaleBindingSource 从量表 command repo 提供 scale 规则绑定回退。

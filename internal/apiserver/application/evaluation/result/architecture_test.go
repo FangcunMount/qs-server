@@ -12,7 +12,7 @@ func TestMongoReportRepositoryDoesNotExposeDurableSaverEntry(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "infra", "mongo", "evaluation", "repo.go")
+	path := filepath.Join(root, "internal", "apiserver", "infra", "mongo", "interpretation", "repo.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)

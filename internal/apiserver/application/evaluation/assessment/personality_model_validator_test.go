@@ -5,8 +5,8 @@ import (
 	"errors"
 	"testing"
 
-	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evalassessment "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	domainmodel "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )

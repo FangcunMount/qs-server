@@ -125,10 +125,10 @@ func TestAssessmentModelPublishReturnsValidationResultWhenInvalid(t *testing.T) 
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 		Data    struct {
-			Passed bool                              `json:"passed"`
-			Valid  bool                              `json:"valid"`
+			Passed bool                           `json:"passed"`
+			Valid  bool                           `json:"valid"`
 			Issues []modelcatalog.ValidationIssue `json:"issues"`
-			Errors []string                          `json:"errors"`
+			Errors []string                       `json:"errors"`
 		} `json:"data"`
 	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &body); err != nil {
@@ -185,7 +185,7 @@ func TestAssessmentModelPreviewReportReturnsValidationResultWhenInvalid(t *testi
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 		Data    struct {
-			Passed bool                              `json:"passed"`
+			Passed bool                           `json:"passed"`
 			Issues []modelcatalog.ValidationIssue `json:"issues"`
 		} `json:"data"`
 	}

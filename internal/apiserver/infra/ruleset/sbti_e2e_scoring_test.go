@@ -3,9 +3,9 @@ package ruleset
 import (
 	"testing"
 
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestE2EScoreWithEmbeddedSBTIModel(t *testing.T) {

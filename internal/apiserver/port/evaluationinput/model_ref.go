@@ -1,9 +1,9 @@
 package evaluationinput
 
 import (
+	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 )
 
 func (r ModelRef) EvaluatorKey() evaldomain.EvaluatorKey {

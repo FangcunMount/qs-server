@@ -18,6 +18,9 @@ type Repository struct {
 	mapper *ScaleMapper
 }
 
+// 确保实现了领域仓储接口
+var _ scaledefinition.Repository = (*Repository)(nil)
+
 // NewRepository 创建 Scale MongoDB 存储库
 func NewRepository(db *mongo.Database, opts ...mongoBase.BaseRepositoryOptions) *Repository {
 	po := &ScalePO{}

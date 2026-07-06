@@ -1,8 +1,8 @@
 package typology
 
 import (
-	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	evaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 // ScoreMBTIReference exposes the legacy MBTI scorer baseline for equivalence and characterization tests.

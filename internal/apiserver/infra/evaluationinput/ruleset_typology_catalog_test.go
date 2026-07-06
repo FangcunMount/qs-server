@@ -7,8 +7,8 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
-	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
 func TestRuleSetTypologyCatalogLookupBigFiveWithoutAlgorithm(t *testing.T) {

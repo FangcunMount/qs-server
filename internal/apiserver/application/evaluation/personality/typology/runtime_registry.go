@@ -4,10 +4,10 @@ import (
 	"fmt"
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology/legacy"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/configured"
 	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // PersonalityRuntimeRegistry resolves typology execution capabilities by evaluator key and algorithm alias.
