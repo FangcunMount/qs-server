@@ -111,8 +111,8 @@ gRPC server 支持：
 
 安全细节归属：
 
-- `03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md`
-- `03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md`
+- `03-基础设施/security/03-服务间认证链路.md`
+- `03-基础设施/security/04-访问上下文与权限快照.md`
 
 ---
 

@@ -1109,9 +1109,9 @@ apiserver 内部由 Evaluation Engine 推进 Assessment、Interpretation 和 Rep
 | 判断 | 证据 |
 | ---- | ---- |
 | Event System 由 EventCatalog、RoutingPublisher、Outbox、Worker Dispatcher、Messaging Runtime、Ack/Nack、observability 协作 | `docs/03-基础设施/event/README.md` |
-| EventCatalog / events.yaml 是事件契约入口 | `docs/03-基础设施/event/01-事件目录与契约.md` |
-| Publish / Outbox 负责可靠出站 | `docs/03-基础设施/event/02-Publish与Outbox.md` |
-| Worker dispatcher / Ack/Nack 是消费边界 | `docs/03-基础设施/event/03-Worker消费与AckNack.md` |
+| EventCatalog / events.yaml 是事件契约入口 | `docs/03-基础设施/event/02-领域事件设计.md` |
+| Publish / Outbox 负责可靠出站 | `docs/03-基础设施/event/03-Outbox可靠出站链路.md` |
+| Worker dispatcher / Ack/Nack 是消费边界 | `docs/03-基础设施/event/04-MQ发布与消费链路.md` |
 | Outbox 是专题决策 | `docs/05-专题分析/04-为什么使用Outbox.md` |
 | 新事件语义 | `docs/05-专题分析/10-解释模型事件与缓存治理专题.md` |
 | Evaluation 通用执行引擎 | `docs/05-专题分析/09-Evaluation通用执行引擎专题.md` |

@@ -1,105 +1,51 @@
 # 03-基础设施
 
-**本文回答**：qs-server 的基础设施层应该按什么主线阅读；缓存、事件、高并发保护分别解决什么系统问题；现有 `redis/`、`resilience/` 细文档如何归入新的主线。
+qs-server 的基础设施文档围绕高并发测评链路阅读，不再按 Redis、MQ、限流等组件平均展开。核心问题只有三个：
 
----
+1. 高频读请求如何不打穿 MongoDB / MySQL。
+2. 答卷提交后的异步测评、报告生成和状态通知如何可靠推进。
+3. 突发提交、重复提交、下游积压和报告查询风暴如何被治理。
 
-## 30 秒结论
+因此本目录的主线是：
 
-qs-server 的基础设施不是按 Redis、MQ、Outbox、限流这些技术点平均展开，而是围绕**高并发测评链路**做三层治理：
+| 主线 | 定位 | 优先阅读 |
+| --- | --- | --- |
+| cache | 读侧治理层，承接目录、模型、报告状态等高频查询 | [cache/README.md](cache/README.md) |
+| event | 异步一致性治理层，承接领域事件、Outbox、MQ、一次性信令 | [event/README.md](event/README.md) |
+| concurrency | 高并发保护层，承接入口限流、提交削峰、重复提交抑制、背压和 report 查询治理 | [concurrency/README.md](concurrency/README.md) |
 
-1. **缓存模块**：治理读侧高频查询，降低问卷目录、测评模型、报告状态等读流量对 MongoDB / MySQL 的压力。
-2. **事件模块**：治理异步测评链路，把答卷提交、测评执行、报告生成、状态通知拆成可追踪、可重试、可补偿的异步流程。
-3. **高并发保护模块**：治理突发入口、重复提交、下游处理能力有限和报告查询风暴。
+observability、data-access、security、runtime 是支撑能力，服务于前三条主线，不抢阅读入口。
 
-`data-access / security / integrations / runtime / observability` 是支撑层：它们提供持久化、身份权限、外部适配、运行时装配和观测能力，但不是本目录的叙事主角。
+## 1. 怎么读
 
----
+先读 [00-基础设施总览.md](00-基础设施总览.md) 建立系统位置，再读 [01-基础设施能力地图.md](01-基础设施能力地图.md) 看能力域边界，随后读 [02-基础设施设计原则.md](02-基础设施设计原则.md) 理解工程取舍，最后用 [03-核心链路全景.md](03-核心链路全景.md) 把答卷提交和报告查询两条链路串起来。
 
-## 主线入口
+如果只关心面试或架构讲解，优先读 `cache / event / concurrency` 三个 README，再读 7 篇重点链路：
 
-| 主线 | 解决的问题 | 入口 |
-| ---- | ---------- | ---- |
-| 基础设施总览 | 三条主线如何共同保护高并发测评链路 | [00-基础设施总览.md](./00-基础设施总览.md) |
-| 能力矩阵 | 每个能力域解决什么问题、用什么机制、支撑哪条业务链路 | [01-能力矩阵.md](./01-能力矩阵.md) |
-| 缓存模块 | 高频读、目录查询、模型查询、报告状态查询带来的 DB 压力 | [cache/README.md](./cache/README.md) |
-| 事件模块 | 异步测评、可靠出站、worker 消费、一次性唤醒 | [event/README.md](./event/README.md) |
-| 高并发保护模块 | 入口限流、提交削峰、重复提交、下游背压、report 查询治理 | [concurrency/README.md](./concurrency/README.md) |
+| 文档 | 价值 |
+| --- | --- |
+| [cache/01-缓存模块整体架构.md](cache/01-缓存模块整体架构.md) | 说明缓存是读侧治理，不是 Redis 封装 |
+| [event/03-Outbox可靠出站链路.md](event/03-Outbox可靠出站链路.md) | 说明业务写入和事件发布的一致性边界 |
+| [event/05-一次性信令链路.md](event/05-一次性信令链路.md) | 说明 Redis Pub/Sub 只做临时唤醒 |
+| [concurrency/03-SubmitQueue提交削峰链路.md](concurrency/03-SubmitQueue提交削峰链路.md) | 说明提交洪峰如何变成有界处理能力 |
+| [concurrency/04-SubmitGuard重复提交抑制链路.md](concurrency/04-SubmitGuard重复提交抑制链路.md) | 说明重复点击和客户端重试如何按业务幂等处理 |
+| [concurrency/07-Report长轮询查询链路.md](concurrency/07-Report长轮询查询链路.md) | 说明 report 查询风暴如何被 wait + signal 治理 |
+| [concurrency/09-容量边界与压测验证.md](concurrency/09-容量边界与压测验证.md) | 说明高并发保护如何用指标验证 |
 
----
+## 2. 当前事实源
 
-## 当前目录结构
+本目录只把现行源码、配置、OpenAPI 和运维文档作为事实源。旧组件目录已经归档到 [../_archive/2026-07-06-infra-legacy-component-docs/](../_archive/2026-07-06-infra-legacy-component-docs/)，只作历史参考，不参与 active truth layer。
 
-```text
-03-基础设施/
-├── README.md
-├── 00-基础设施总览.md
-├── 01-能力矩阵.md
-├── cache/                 # 新主线入口：读侧治理
-├── event/                 # 新主线入口：事件驱动治理
-├── concurrency/           # 新主线入口：高并发保护
-├── data-access/           # 支撑层：持久化、仓储、UoW、Outbox store
-├── security/              # 支撑层：Principal、AuthzSnapshot、ServiceIdentity
-├── integrations/          # 支撑层：WeChat、OSS、Notification
-├── runtime/               # 支撑层：启动装配、资源注入、生命周期
-└── observability/         # 支撑层：metrics、healthz、logging、governance endpoint
-```
+关键事实源包括：
 
-旧 `redis/` / `resilience/` 的总入口、总览和旧矩阵已归档到 `docs/_archive/`。仍有证据价值的细节文档会在后续逐篇迁移到 `cache/` 和 `concurrency/`，迁移前只作为实现细节参考，不作为新的阅读入口。
+| 类型 | 事实源 |
+| --- | --- |
+| 事件契约 | [../../configs/events.yaml](../../configs/events.yaml)、[../../configs/signals.yaml](../../configs/signals.yaml) |
+| 接口契约 | [../../api/rest/apiserver.yaml](../../api/rest/apiserver.yaml)、[../../api/rest/collection.yaml](../../api/rest/collection.yaml) |
+| 运维验证 | [../04-接口与运维/11-300QPS混合场景压测SOP.md](../04-接口与运维/11-300QPS混合场景压测SOP.md)、[../04-接口与运维/12-小程序报告等待接入指南.md](../04-接口与运维/12-小程序报告等待接入指南.md) |
 
----
+## 3. 维护规则
 
-## 阅读顺序
+新增基础设施文档时先选择能力域，再选择链路文档。不要新增组件名目录；确实需要讲 Redis、MQ、DB、IAM、Nginx 时，必须放在对应能力域中解释它解决的系统问题。
 
-第一次理解基础设施，按下面顺序读：
-
-```text
-README.md
-00-基础设施总览.md
-01-能力矩阵.md
-cache/README.md
-event/README.md
-concurrency/README.md
-```
-
-然后按问题进入支撑层：
-
-| 你要解决的问题 | 继续读 |
-| -------------- | ------ |
-| 仓储、事务、migration、read model | [data-access/README.md](./data-access/README.md) |
-| IAM、权限快照、内部服务身份 | [security/README.md](./security/README.md) |
-| 微信、对象存储、通知适配 | [integrations/README.md](./integrations/README.md) |
-| 启动流水线、资源装配、container wiring | [runtime/README.md](./runtime/README.md) |
-| 指标、健康检查、日志、治理端点 | [observability/README.md](./observability/README.md) |
-
----
-
-## 边界原则
-
-| 能力 | 必须讲清的边界 |
-| ---- | -------------- |
-| 缓存 | 缓存是读侧治理层，不是业务事实源；Redis 异常时可以回源，但必须有并发保护 |
-| 事件 | Outbox 解决可靠出站，MQ 解决异步解耦，Redis signaling 只做临时唤醒 |
-| 高并发保护 | 限流、队列、背压、重复抑制只保护系统边界，业务正确性仍由状态机、幂等键、DB 约束和 Outbox 兜底 |
-| 数据访问 | Repository / UnitOfWork 保存事实，不反向定义领域模型 |
-| 安全 | IAM / AuthzSnapshot / CapabilityDecision 是权限事实来源，JWT claim 不是业务权限真值 |
-| 外部集成 | 第三方 SDK 通过 adapter/port 接入，不泄露到领域模型 |
-| Runtime | Runtime 负责装配和生命周期，不承载业务规则 |
-
----
-
-## 事实来源
-
-维护本目录时，优先核对下面事实源：
-
-| 事实类型 | 主要来源 |
-| -------- | -------- |
-| 事件契约 | `configs/events.yaml`、`configs/signals.yaml` |
-| 缓存与信令 | `internal/pkg/cacheplane`、`internal/apiserver/infra/cache`、`internal/pkg/cachesignal`、`internal/collection-server/application/catalogl1` |
-| Outbox | `internal/apiserver/outboxcore`、`internal/apiserver/infra/mongo/eventoutbox`、`internal/apiserver/infra/mysql/eventoutbox` |
-| Worker 消费 | `internal/worker/handlers`、`internal/pkg/eventcatalog` |
-| 高并发保护 | `internal/pkg/resilienceplane`、`internal/collection-server/application/answersheet/submit_queue.go`、`internal/collection-server/infra/redisops`、`internal/pkg/locklease` |
-| report 查询 | `api/rest/collection.yaml`、`docs/04-接口与运维/12-小程序报告等待接入指南.md` |
-| 压测验收 | `docs/04-接口与运维/11-300QPS混合场景压测SOP.md`、`Makefile` |
-
-如果 prose 文档与源码、配置或机器契约冲突，以源码、配置和机器契约为准。
+关键链路文档统一包含：解决什么问题、所在位置、设计目标、整体流程、核心数据结构、正常流程、异常流程、幂等 / 降级 / 背压、可选方案、当前方案取舍、观测指标、代码事实源。

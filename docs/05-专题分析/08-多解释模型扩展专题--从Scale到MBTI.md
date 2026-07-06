@@ -2,7 +2,7 @@
 
 **本文回答**：为什么 qs-server 不能继续把 Scale 当作所有解释能力的中心；为什么 MBTI 不应该被实现成 MedicalScale 的一个特殊类型；为什么需要把 Scale、MBTI、BigFive 等收敛到 Assessment Model 的统一模型资产层；新增模型资产时，会如何影响 Evaluation、Interpretation Model / Report、事件、持久化、Redis、统计、安全、观测和文档体系。
 
-> 当前口径校准：本文早期版本大量使用 `Interpretation Model / Provider / Context` 作为扩展抽象。当前文档体系已把模型资产层统一命名为 `assessment-model`，最终报告产出层命名为 `interpretation-model / report`。阅读本文后续 Provider 细节时，应以 [`../02-业务模块/assessment-model/README.md`](../02-业务模块/assessment-model/README.md) 和 [`../02-业务模块/interpretation-model/README.md`](../02-业务模块/interpretation-model/README.md) 的映射为准。
+> 当前口径校准：本文早期版本大量使用 `Interpretation Model / Provider / Context` 作为扩展抽象。当前文档体系已把模型资产层统一命名为 `assessment-model`，最终报告产出层命名为 `interpretation-model / report`。阅读本文后续 Provider 细节时，应以 [`../02-业务模块/20-assessment-model/README.md`](../02-业务模块/20-assessment-model/README.md) 和 [`../02-业务模块/40-interpretation-model/README.md`](../02-业务模块/40-interpretation-model/README.md) 的映射为准。
 
 ---
 
@@ -1059,8 +1059,8 @@ Worker
 
 ### Interpretation Model 文档
 
-- `docs/02-业务模块/interpretation-model/README.md`
-- `docs/02-业务模块/assessment-model/README.md`
+- `docs/02-业务模块/40-interpretation-model/README.md`
+- `docs/02-业务模块/20-assessment-model/README.md`
 - `docs/05-专题分析/01-为什么拆分Survey-InterpretationModel-Evaluation.md`
 
 ### Scale
@@ -1068,24 +1068,24 @@ Worker
 - `internal/apiserver/container/modules/assessmentmodel/assemble_scale.go`
 - `internal/apiserver/application/scale`
 - `internal/apiserver/domain/assessmentmodel/scale/definition`
-- `docs/02-业务模块/scale/README.md`
+- `docs/02-业务模块/20-assessment-model/README.md`
 
 ### Evaluation
 
 - `internal/apiserver/container/modules/evaluation/assemble.go`
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
-- `docs/02-业务模块/evaluation/README.md`
-- `docs/02-业务模块/evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md`
+- `docs/02-业务模块/30-evaluation/README.md`
+- `docs/02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md`
 
 ### Cross-cutting
 
-- `docs/03-基础设施/event/01-事件目录与契约.md`
-- `docs/03-基础设施/data-access/05-新增持久化能力SOP.md`
-- `docs/03-基础设施/redis/04-QueryCache与StaticList.md`
-- `docs/03-基础设施/security/05-新增安全能力SOP.md`
-- `docs/03-基础设施/observability/01-Metrics指标体系.md`
-- `docs/03-基础设施/observability/04-GovernanceEndpoint与排障SOP.md`
+- `docs/03-基础设施/event/02-领域事件设计.md`
+- `docs/03-基础设施/data-access/README.md`
+- `docs/03-基础设施/cache/03-L2-Redis缓存设计.md`
+- `docs/03-基础设施/security/05-安全边界与降级.md`
+- `docs/03-基础设施/observability/03-指标设计.md`
+- `docs/03-基础设施/observability/06-告警与故障定位.md`
 
 ---
 
@@ -1131,6 +1131,6 @@ git diff --check
 | 为什么同步提交但异步测评执行 | `02-为什么同步提交但异步测评执行.md` |
 | Evaluation 通用执行引擎专题 | `09-Evaluation通用执行引擎专题.md` |
 | 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
-| Scale 模块 | `../02-业务模块/scale/README.md` |
-| Interpretation Model 模块 | `../02-业务模块/interpretation-model/README.md` |
-| Evaluation 模块 | `../02-业务模块/evaluation/README.md` |
+| Scale 模块 | `../02-业务模块/20-assessment-model/README.md` |
+| Interpretation Model 模块 | `../02-业务模块/40-interpretation-model/README.md` |
+| Evaluation 模块 | `../02-业务模块/30-evaluation/README.md` |

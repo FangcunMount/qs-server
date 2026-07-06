@@ -933,14 +933,14 @@ report_save_failed
 - `internal/apiserver/container/modules/evaluation/assemble.go`
 - `internal/apiserver/application/evaluation`
 - `internal/apiserver/domain/evaluation`
-- `docs/02-业务模块/evaluation/README.md`
-- `docs/02-业务模块/evaluation/01-Evaluation模型--Assessment-EvaluationRun-Result-Report模型设计.md`
-- `docs/02-业务模块/evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md`
+- `docs/02-业务模块/30-evaluation/README.md`
+- `docs/02-业务模块/30-evaluation/01-Evaluation模型--Assessment-EvaluationRun-Result-Report模型设计.md`
+- `docs/02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md`
 
 ### Interpretation Model
 
-- `docs/02-业务模块/interpretation-model/README.md`
-- `docs/02-业务模块/assessment-model/README.md`
+- `docs/02-业务模块/40-interpretation-model/README.md`
+- `docs/02-业务模块/20-assessment-model/README.md`
 - `docs/05-专题分析/01-为什么拆分Survey-InterpretationModel-Evaluation.md`
 
 ### Worker / Event
@@ -948,15 +948,15 @@ report_save_failed
 - `internal/worker/handlers/answersheet_handler.go`
 - `internal/worker/handlers/assessment_handler.go`
 - `internal/worker/handlers/interpretation_handler.go`
-- `docs/03-基础设施/event/02-Publish与Outbox.md`
-- `docs/03-基础设施/event/03-Worker消费与AckNack.md`
+- `docs/03-基础设施/event/03-Outbox可靠出站链路.md`
+- `docs/03-基础设施/event/04-MQ发布与消费链路.md`
 
 ### Cross-cutting
 
-- `docs/03-基础设施/data-access/04-ReadModel与Statistics.md`
-- `docs/03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md`
-- `docs/03-基础设施/observability/01-Metrics指标体系.md`
-- `docs/03-基础设施/observability/04-GovernanceEndpoint与排障SOP.md`
+- `docs/03-基础设施/data-access/04-读写模型分离.md`
+- `docs/03-基础设施/security/04-访问上下文与权限快照.md`
+- `docs/03-基础设施/observability/03-指标设计.md`
+- `docs/03-基础设施/observability/06-告警与故障定位.md`
 
 ---
 
@@ -993,6 +993,6 @@ git diff --check
 | ---- | ---- |
 | 多解释模型扩展专题 | `08-多解释模型扩展专题--从Scale到MBTI.md` |
 | 解释模型事件与缓存治理专题 | `10-解释模型事件与缓存治理专题.md` |
-| Evaluation 模块 README | `../02-业务模块/evaluation/README.md` |
-| Evaluation 引擎链路 | `../02-业务模块/evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md` |
-| Interpretation Model README | `../02-业务模块/interpretation-model/README.md` |
+| Evaluation 模块 README | `../02-业务模块/30-evaluation/README.md` |
+| Evaluation 引擎链路 | `../02-业务模块/30-evaluation/03-Evaluation引擎链路--模型解析-规则加载-执行-报告生成.md` |
+| Interpretation Model README | `../02-业务模块/40-interpretation-model/README.md` |

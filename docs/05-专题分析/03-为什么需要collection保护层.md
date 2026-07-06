@@ -688,5 +688,5 @@ git diff --check
 | 为什么使用 Outbox | `04-为什么使用Outbox.md` |
 | 为什么同步提交但异步评估 | `02-为什么同步提交但异步评估.md` |
 | collection REST | `../04-接口与运维/02-collection-REST.md` |
-| SubmitQueue | `../03-基础设施/resilience/02-SubmitQueue提交削峰.md` |
-| RateLimit | `../03-基础设施/resilience/01-RateLimit入口限流.md` |
+| SubmitQueue | `../03-基础设施/concurrency/03-SubmitQueue提交削峰链路.md` |
+| RateLimit | `../03-基础设施/concurrency/02-入口限流链路.md` |

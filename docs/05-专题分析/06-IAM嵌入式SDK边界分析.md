@@ -865,6 +865,6 @@ git diff --check
 | ---- | ---- |
 | 系统演进路线 | `07-系统演进路线.md` |
 | Security Control Plane | `../03-基础设施/security/README.md` |
-| ServiceIdentity 与 mTLS-ACL | `../03-基础设施/security/03-ServiceIdentity与mTLS-ACL.md` |
-| AuthzSnapshot 与 CapabilityDecision | `../03-基础设施/security/02-AuthzSnapshot与CapabilityDecision.md` |
-| Integrations 外部适配 | `../03-基础设施/integrations/README.md` |
+| ServiceIdentity 与 mTLS-ACL | `../03-基础设施/security/03-服务间认证链路.md` |
+| AuthzSnapshot 与 CapabilityDecision | `../03-基础设施/security/04-访问上下文与权限快照.md` |
+| Integrations 外部适配 | `../04-接口与运维/README.md` |

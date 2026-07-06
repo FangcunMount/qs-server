@@ -532,11 +532,11 @@ statistic
 ### Cross-boundary Infrastructure
 
 - `configs/events.yaml`
-- `docs/03-基础设施/event/01-事件目录与契约.md`
-- `docs/03-基础设施/data-access/05-新增持久化能力SOP.md`
-- `docs/03-基础设施/redis/04-QueryCache与StaticList.md`
-- `docs/03-基础设施/security/05-新增安全能力SOP.md`
-- `docs/03-基础设施/observability/04-GovernanceEndpoint与排障SOP.md`
+- `docs/03-基础设施/event/02-领域事件设计.md`
+- `docs/03-基础设施/data-access/README.md`
+- `docs/03-基础设施/cache/03-L2-Redis缓存设计.md`
+- `docs/03-基础设施/security/05-安全边界与降级.md`
+- `docs/03-基础设施/observability/06-告警与故障定位.md`
 
 ---
 
@@ -566,11 +566,11 @@ git diff --check
 | 目标 | 文档 |
 | ---- | ---- |
 | 业务模块总览 | `../02-业务模块/README.md` |
-| Survey 模块模型 | `../02-业务模块/survey/README.md` |
-| Assessment Model 模块模型 | `../02-业务模块/assessment-model/README.md` |
-| Evaluation 模块模型 | `../02-业务模块/evaluation/README.md` |
-| Interpretation Model / Report 模块模型 | `../02-业务模块/interpretation-model/README.md` |
-| 旧 Scale 兼容入口 | `../02-业务模块/scale/README.md` |
+| Survey 模块模型 | `../02-业务模块/10-survey/README.md` |
+| Assessment Model 模块模型 | `../02-业务模块/20-assessment-model/README.md` |
+| Evaluation 模块模型 | `../02-业务模块/30-evaluation/README.md` |
+| Interpretation Model / Report 模块模型 | `../02-业务模块/40-interpretation-model/README.md` |
+| 旧 Scale 兼容入口 | `../02-业务模块/20-assessment-model/README.md` |
 | 为什么同步提交但异步测评执行 | `02-为什么同步提交但异步测评执行.md` |
 | 多解释模型扩展专题 | `08-多解释模型扩展专题--从Scale到MBTI.md` |
 | Evaluation 通用执行引擎专题 | `09-Evaluation通用执行引擎专题.md` |

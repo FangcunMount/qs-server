@@ -104,10 +104,10 @@ Architecture Decision Analysis
 
 | 想知道 | 应看 |
 | ------ | ---- |
-| 答卷聚合是什么 | `02-业务模块/survey/` |
+| 答卷聚合是什么 | `02-业务模块/10-survey/` |
 | 提交 REST 怎么调 | `04-接口与运维/02-collection-REST.md` |
-| SubmitQueue 怎么实现 | `03-基础设施/resilience/02-SubmitQueue提交削峰.md` |
-| Outbox 怎么发布事件 | `03-基础设施/event/02-Publish与Outbox.md` |
+| SubmitQueue 怎么实现 | `03-基础设施/concurrency/03-SubmitQueue提交削峰链路.md` |
+| Outbox 怎么发布事件 | `03-基础设施/event/03-Outbox可靠出站链路.md` |
 | 为什么要同步提交但异步测评执行 | `05-专题分析/02-为什么同步提交但异步测评执行.md` |
 
 如果想了解新增 MBTI：
@@ -115,11 +115,11 @@ Architecture Decision Analysis
 | 想知道 | 应看 |
 | ------ | ---- |
 | 为什么 MBTI 不放进 Scale | `05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
-| MBTI 如何作为模型资产接入 | `02-业务模块/assessment-model/README.md`、`05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
-| MBTI 规则如何持久化 | `03-基础设施/data-access/05-新增持久化能力SOP.md` |
-| MBTI 模型列表如何缓存 | `03-基础设施/redis/04-QueryCache与StaticList.md` |
-| MBTI 报告权限如何控制 | `03-基础设施/security/05-新增安全能力SOP.md` |
-| MBTI 执行慢如何观测 | `03-基础设施/observability/04-GovernanceEndpoint与排障SOP.md` |
+| MBTI 如何作为模型资产接入 | `02-业务模块/20-assessment-model/README.md`、`05-专题分析/08-多解释模型扩展专题--从Scale到MBTI.md` |
+| MBTI 规则如何持久化 | `03-基础设施/data-access/README.md` |
+| MBTI 模型列表如何缓存 | `03-基础设施/cache/03-L2-Redis缓存设计.md` |
+| MBTI 报告权限如何控制 | `03-基础设施/security/05-安全边界与降级.md` |
+| MBTI 执行慢如何观测 | `03-基础设施/observability/06-告警与故障定位.md` |
 
 ---
 

@@ -30,7 +30,7 @@ qs-server 当前文档的主线是：
 ```text
 00-总览        先理解系统地图、代码边界和核心链路
 01-运行时      再理解 qs-apiserver / collection-server / qs-worker 如何协作
-02-业务模块    再深入 4 个核心模块 + 3 个支撑模块
+02-业务模块    再按编号路径理解 4 个核心模块 + 3 个支撑模块
 03-基础设施    再理解缓存、事件、高并发保护，以及数据访问、安全、外部集成等支撑能力
 04-接口与运维  再查看 REST / gRPC / 部署 / 运维入口
 05-专题分析    最后理解关键设计判断和系统级权衡
@@ -133,23 +133,23 @@ Actor / Plan / Statistics
 建议顺序：
 
 ```text
-survey
+10-survey
     先理解问卷定义和答卷提交事实
 
-assessment-model
+20-assessment-model
     再理解 Kind / Snapshot / Binding / Payload 抽象
 
-evaluation
+30-evaluation
     再理解 Assessment / EvaluationRun / Result / Retry / Events
 
-interpretation-model
+40-interpretation-model
     最后理解 report module 如何产出 InterpretReport
 
-actor / plan / statistics
+50-actor / 60-plan / 70-statistics
     按参与者、计划编排、读侧统计问题进入
 ```
 
-旧 `scale/` 目录仍可用于医学量表细节阅读，但它是 `assessment-model` 下的具体模型资产和兼容入口，不是当前主阅读轴。
+旧 `scale/` 目录已经退出现行阅读路径。医学量表细节从 `20-assessment-model` 进入，历史材料只在 `docs/_archive/` 中保留。
 
 ### 5.3 需要看接口与运维
 
@@ -185,18 +185,18 @@ configs/events.yaml
 
 | 模块 | 当前定位 | 入口 |
 | ---- | -------- | ---- |
-| Survey | 作答事实层，负责问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实沉淀 | [02-业务模块/survey/README.md](./02-业务模块/survey/README.md) |
-| Assessment Model | 测评模型资产层，负责统一管理医学量表、人格模型等模型资产 | [02-业务模块/assessment-model/README.md](./02-业务模块/assessment-model/README.md) |
-| Evaluation | 测评执行层，负责将 `AnswerSheet` 与 Assessment Model 结合，完成一次 `Assessment` 执行并生成结果 | [02-业务模块/evaluation/README.md](./02-业务模块/evaluation/README.md) |
-| Interpretation Model / Report | 解释模型层，负责报告构建、解释适配、`InterpretReport` 聚合与持久化；当前代码实现仍位于 `report` module | [02-业务模块/interpretation-model/README.md](./02-业务模块/interpretation-model/README.md) |
+| Survey | 作答事实层，负责问卷定义、题目结构、答卷提交和 `AnswerSheet` 事实沉淀 | [02-业务模块/10-survey/README.md](./02-业务模块/10-survey/README.md) |
+| Assessment Model | 测评模型资产层，负责统一管理医学量表、人格模型等模型资产 | [02-业务模块/20-assessment-model/README.md](./02-业务模块/20-assessment-model/README.md) |
+| Evaluation | 测评执行层，负责将 `AnswerSheet` 与 Assessment Model 结合，完成一次 `Assessment` 执行并生成结果 | [02-业务模块/30-evaluation/README.md](./02-业务模块/30-evaluation/README.md) |
+| Interpretation Model / Report | 解释模型层，负责报告构建、解释适配、`InterpretReport` 聚合与持久化；当前代码实现仍位于 `report` module | [02-业务模块/40-interpretation-model/README.md](./02-业务模块/40-interpretation-model/README.md) |
 
 支撑模块入口：
 
 | 模块 | 当前定位 | 入口 |
 | ---- | -------- | ---- |
-| Actor | 参与者与访问上下文 | [02-业务模块/actor/README.md](./02-业务模块/actor/README.md) |
-| Plan | 测评计划与周期任务编排 | [02-业务模块/plan/README.md](./02-业务模块/plan/README.md) |
-| Statistics | 读侧统计、行为投影与指标聚合；文档名与代码包名保持 `statistics` | [02-业务模块/statistics/README.md](./02-业务模块/statistics/README.md) |
+| Actor | 参与者与访问上下文 | [02-业务模块/50-actor/README.md](./02-业务模块/50-actor/README.md) |
+| Plan | 测评计划与周期任务编排 | [02-业务模块/60-plan/README.md](./02-业务模块/60-plan/README.md) |
+| Statistics | 读侧统计、行为投影与指标聚合；文档名与代码包名保持 `statistics` | [02-业务模块/70-statistics/README.md](./02-业务模块/70-statistics/README.md) |
 
 ---
 
@@ -205,13 +205,14 @@ configs/events.yaml
 | 能力 | 入口 |
 | ---- | ---- |
 | 基础设施总览 | [03-基础设施/README.md](./03-基础设施/README.md)、[03-基础设施/00-基础设施总览.md](./03-基础设施/00-基础设施总览.md) |
-| 能力矩阵 | [03-基础设施/01-能力矩阵.md](./03-基础设施/01-能力矩阵.md) |
+| 能力地图 | [03-基础设施/01-基础设施能力地图.md](./03-基础设施/01-基础设施能力地图.md) |
 | 缓存模块 | [03-基础设施/cache/README.md](./03-基础设施/cache/README.md) |
 | 事件模块 | [03-基础设施/event/README.md](./03-基础设施/event/README.md)、`configs/events.yaml`、`configs/signals.yaml` |
 | 高并发保护模块 | [03-基础设施/concurrency/README.md](./03-基础设施/concurrency/README.md) |
+| Observability 支撑层 | [03-基础设施/observability/README.md](./03-基础设施/observability/README.md) |
 | Data Access 支撑层 | [03-基础设施/data-access/README.md](./03-基础设施/data-access/README.md) |
 | Security 支撑层 | [03-基础设施/security/README.md](./03-基础设施/security/README.md) |
-| Integrations 支撑层 | [03-基础设施/integrations/README.md](./03-基础设施/integrations/README.md) |
+| Runtime 支撑层 | [03-基础设施/runtime/README.md](./03-基础设施/runtime/README.md) |
 
 ---
 

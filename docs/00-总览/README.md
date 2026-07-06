@@ -84,14 +84,14 @@ flowchart LR
 
 | 要改什么 | 继续读 |
 | -------- | ------ |
-| 问卷、题型、答卷提交 | [02-业务模块/survey/README.md](../02-业务模块/survey/README.md) |
-| 测评模型资产、发布快照、模型 payload | [02-业务模块/assessment-model/README.md](../02-业务模块/assessment-model/README.md) |
-| 医学量表、因子、计分与解读规则 | [02-业务模块/scale/README.md](../02-业务模块/scale/README.md) |
-| 测评状态机、评估流水线、失败重试 | [02-业务模块/evaluation/README.md](../02-业务模块/evaluation/README.md) |
-| 报告 builder、adapter、InterpretReport | [02-业务模块/interpretation-model/README.md](../02-业务模块/interpretation-model/README.md) |
-| 受试者、从业者、操作者、照护关系 | [02-业务模块/actor/README.md](../02-业务模块/actor/README.md) |
-| 计划、任务、调度、通知 | [02-业务模块/plan/README.md](../02-业务模块/plan/README.md) |
-| 统计概览、行为投影、读模型 | [02-业务模块/statistics/README.md](../02-业务模块/statistics/README.md) |
+| 问卷、题型、答卷提交 | [02-业务模块/10-survey/README.md](../02-业务模块/10-survey/README.md) |
+| 测评模型资产、发布快照、模型 payload | [02-业务模块/20-assessment-model/README.md](../02-业务模块/20-assessment-model/README.md) |
+| 医学量表、因子、计分与解读规则 | [02-业务模块/20-assessment-model/README.md](../02-业务模块/20-assessment-model/README.md) |
+| 测评状态机、评估流水线、失败重试 | [02-业务模块/30-evaluation/README.md](../02-业务模块/30-evaluation/README.md) |
+| 报告 builder、adapter、InterpretReport | [02-业务模块/40-interpretation-model/README.md](../02-业务模块/40-interpretation-model/README.md) |
+| 受试者、从业者、操作者、照护关系 | [02-业务模块/50-actor/README.md](../02-业务模块/50-actor/README.md) |
+| 计划、任务、调度、通知 | [02-业务模块/60-plan/README.md](../02-业务模块/60-plan/README.md) |
+| 统计概览、行为投影、读模型 | [02-业务模块/70-statistics/README.md](../02-业务模块/70-statistics/README.md) |
 
 ### 想排障链路问题
 

@@ -490,7 +490,7 @@ collection 的保护层包括：
 | HTTP concurrency | transport stage | 对整个 HTTP server 做并发限制 |
 | Governance endpoint | HealthHandler | `/governance/redis`、`/governance/resilience` |
 
-这些能力都应该归入 `03-基础设施/resilience` 或 `03-基础设施/runtime` 深讲。collection runtime 文档只说明它们在哪里挂载、如何影响进程行为。
+这些能力都应该归入 `03-基础设施/concurrency` 或 `03-基础设施/runtime` 深讲。collection runtime 文档只说明它们在哪里挂载、如何影响进程行为。
 
 ---
 
