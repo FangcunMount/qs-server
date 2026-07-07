@@ -7,6 +7,7 @@ type CreateAssessmentModelRequest struct {
 	Kind                 string   `json:"kind" valid:"required~模型类型不能为空"`
 	SubKind              string   `json:"sub_kind"`
 	Algorithm            string   `json:"algorithm"`
+	ProductChannel       string   `json:"product_channel"`
 	Title                string   `json:"title" valid:"required~模型标题不能为空"`
 	Description          string   `json:"description"`
 	Category             string   `json:"category"`
@@ -16,12 +17,13 @@ type CreateAssessmentModelRequest struct {
 }
 
 type UpdateAssessmentModelBasicInfoRequest struct {
-	Title       string   `json:"title" valid:"required~模型标题不能为空"`
-	Description string   `json:"description"`
-	SubKind     string   `json:"sub_kind"`
-	Algorithm   string   `json:"algorithm"`
-	Category    string   `json:"category"`
-	Tags        []string `json:"tags"`
+	Title          string   `json:"title" valid:"required~模型标题不能为空"`
+	Description    string   `json:"description"`
+	SubKind        string   `json:"sub_kind"`
+	Algorithm      string   `json:"algorithm"`
+	ProductChannel string   `json:"product_channel"`
+	Category       string   `json:"category"`
+	Tags           []string `json:"tags"`
 }
 
 type BindAssessmentModelQuestionnaireRequest struct {

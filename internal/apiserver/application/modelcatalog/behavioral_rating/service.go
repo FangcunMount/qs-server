@@ -71,14 +71,15 @@ func (s *service) Create(ctx context.Context, input CreateInput) (*ModelSummary,
 	}
 	now := time.Now().UTC()
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:        input.Code,
-		Kind:        domain.KindBehavioralRating,
-		Algorithm:   domain.AlgorithmBrief2,
-		Title:       input.Title,
-		Description: input.Description,
-		Category:    input.Category,
-		Tags:        input.Tags,
-		Now:         now,
+		Code:           input.Code,
+		Kind:           domain.KindBehavioralRating,
+		Algorithm:      domain.AlgorithmBrief2,
+		ProductChannel: domain.ProductChannel(input.ProductChannel),
+		Title:          input.Title,
+		Description:    input.Description,
+		Category:       input.Category,
+		Tags:           input.Tags,
+		Now:            now,
 	})
 	if err != nil {
 		return nil, mapDomainError(err)
@@ -116,6 +117,7 @@ func (s *service) UpdateBasicInfo(ctx context.Context, input UpdateBasicInfoInpu
 		input.Description,
 		"",
 		"",
+		domain.ProductChannel(input.ProductChannel),
 		input.Category,
 		input.Tags,
 		now,
@@ -161,10 +163,7 @@ func (s *service) GetDefinition(ctx context.Context, modelCode string) (*Definit
 	if err != nil {
 		return nil, err
 	}
-	return &DefinitionResult{
-		PayloadFormat: draftPayloadFormat(model),
-		Payload:       append([]byte(nil), model.Definition.Data...),
-	}, nil
+	return definitionResultFromModel(model), nil
 }
 
 func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input DefinitionInput) (*DefinitionResult, error) {
@@ -179,10 +178,20 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, input 
 	if err := s.deps.ModelRepo.Update(ctx, model); err != nil {
 		return nil, err
 	}
+	return definitionResultFromModel(model), nil
+}
+
+func definitionResultFromModel(model *domain.AssessmentModel) *DefinitionResult {
+	if model == nil {
+		return nil
+	}
 	return &DefinitionResult{
-		PayloadFormat: draftPayloadFormat(model),
-		Payload:       append([]byte(nil), model.Definition.Data...),
-	}, nil
+		Kind:           KindBehavioralRating,
+		Algorithm:      string(model.Algorithm),
+		ProductChannel: string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
+		PayloadFormat:  draftPayloadFormat(model),
+		Payload:        append([]byte(nil), model.Definition.Data...),
+	}
 }
 
 func draftPayloadFormat(model *domain.AssessmentModel) string {

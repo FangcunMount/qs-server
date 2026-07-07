@@ -4,6 +4,7 @@ import (
 	"context"
 
 	appCognitive "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type cognitiveGateway struct {
@@ -26,6 +27,7 @@ func (s *service) createCognitive(ctx context.Context, dto CreateModelDTO) (*Mod
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
+		ProductChannel:       dto.ProductChannel,
 		Category:             dto.Category,
 		Tags:                 dto.Tags,
 		QuestionnaireCode:    dto.QuestionnaireCode,
@@ -43,11 +45,12 @@ func (g cognitiveGateway) updateBasicInfo(ctx context.Context, dto UpdateBasicIn
 		return nil, err
 	}
 	result, err := cmd.UpdateBasicInfo(ctx, appCognitive.UpdateBasicInfoInput{
-		Code:        dto.Code,
-		Title:       dto.Title,
-		Description: dto.Description,
-		Category:    dto.Category,
-		Tags:        dto.Tags,
+		Code:           dto.Code,
+		Title:          dto.Title,
+		Description:    dto.Description,
+		ProductChannel: dto.ProductChannel,
+		Category:       dto.Category,
+		Tags:           dto.Tags,
 	})
 	if err != nil {
 		return nil, err
@@ -127,10 +130,15 @@ func (g cognitiveGateway) getDefinition(ctx context.Context, modelCode string) (
 	if err != nil {
 		return nil, err
 	}
-	return &DefinitionDTO{
-		PayloadFormat: result.PayloadFormat,
-		Payload:       result.Payload,
-	}, nil
+	dto := &DefinitionDTO{
+		Kind:           result.Kind,
+		Algorithm:      result.Algorithm,
+		ProductChannel: result.ProductChannel,
+		PayloadFormat:  result.PayloadFormat,
+		Payload:        result.Payload,
+	}
+	populateDefinitionIdentity(dto, domain.KindCognitive, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return dto, nil
 }
 
 func (g cognitiveGateway) updateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
@@ -142,20 +150,26 @@ func (g cognitiveGateway) updateDefinition(ctx context.Context, modelCode string
 	if err != nil {
 		return nil, err
 	}
-	return &DefinitionDTO{
-		PayloadFormat: result.PayloadFormat,
-		Payload:       result.Payload,
-	}, nil
+	out := &DefinitionDTO{
+		Kind:           result.Kind,
+		Algorithm:      result.Algorithm,
+		ProductChannel: result.ProductChannel,
+		PayloadFormat:  result.PayloadFormat,
+		Payload:        result.Payload,
+	}
+	populateDefinitionIdentity(out, domain.KindCognitive, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return out, nil
 }
 
 func cognitiveSummaryFromResult(result *appCognitive.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
-	return &ModelSummary{
+	summary := &ModelSummary{
 		Code:                 result.Code,
 		Kind:                 result.Kind,
 		Algorithm:            result.Algorithm,
+		ProductChannel:       result.ProductChannel,
 		Title:                result.Title,
 		Description:          result.Description,
 		Status:               result.Status,
@@ -166,6 +180,8 @@ func cognitiveSummaryFromResult(result *appCognitive.ModelSummary) *ModelSummary
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
+	populateModelSummaryIdentity(summary, domain.KindCognitive, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return summary
 }
 
 func (s *service) listCognitive(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {

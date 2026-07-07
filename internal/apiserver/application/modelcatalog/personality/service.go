@@ -93,15 +93,16 @@ func (s *service) Create(ctx context.Context, input CreateInput) (*ModelSummary,
 	}
 	now := time.Now().UTC()
 	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
-		Code:        input.Code,
-		Kind:        domain.KindPersonality,
-		SubKind:     subKind,
-		Algorithm:   algorithm,
-		Title:       input.Title,
-		Description: input.Description,
-		Category:    input.Category,
-		Tags:        input.Tags,
-		Now:         now,
+		Code:           input.Code,
+		Kind:           domain.KindPersonality,
+		SubKind:        subKind,
+		Algorithm:      algorithm,
+		ProductChannel: domain.ProductChannel(input.ProductChannel),
+		Title:          input.Title,
+		Description:    input.Description,
+		Category:       input.Category,
+		Tags:           input.Tags,
+		Now:            now,
 	})
 	if err != nil {
 		return nil, mapDomainError(err)
@@ -140,6 +141,7 @@ func (s *service) UpdateBasicInfo(ctx context.Context, input UpdateBasicInfoInpu
 		input.Description,
 		domain.SubKind(input.SubKind),
 		domain.Algorithm(input.Algorithm),
+		domain.ProductChannel(input.ProductChannel),
 		input.Category,
 		input.Tags,
 		now,

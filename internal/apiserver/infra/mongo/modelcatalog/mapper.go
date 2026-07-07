@@ -30,6 +30,7 @@ func (Mapper) ToPO(snapshot *domain.PublishedModelSnapshot) *PublishedAssessment
 	return &PublishedAssessmentModelPO{
 		SchemaVersion:        schemaVersion,
 		PayloadFormat:        snapshot.PayloadFormat,
+		ModelProductChannel:  string(domain.ResolveProductChannel(snapshot.Model.Kind, snapshot.Model.ProductChannel)),
 		ModelKind:            string(snapshot.Model.Kind),
 		ModelSubKind:         string(snapshot.Model.SubKind),
 		ModelAlgorithm:       string(snapshot.Model.Algorithm),
@@ -53,17 +54,23 @@ func (Mapper) ToPublished(po *PublishedAssessmentModelPO) *domain.PublishedModel
 	for key, value := range po.Source {
 		source[key] = value
 	}
+	kind := domain.Kind(po.ModelKind)
+	productChannel := domain.ProductChannel(po.ModelProductChannel)
+	if productChannel == "" {
+		productChannel = domain.DefaultProductChannelFor(kind)
+	}
 	return &domain.PublishedModelSnapshot{
 		SchemaVersion: po.SchemaVersion,
 		PayloadFormat: po.PayloadFormat,
 		Model: domain.ModelDefinition{
-			Kind:      domain.Kind(po.ModelKind),
-			SubKind:   domain.SubKind(po.ModelSubKind),
-			Algorithm: domain.Algorithm(po.ModelAlgorithm),
-			Code:      po.ModelCode,
-			Version:   po.ModelVersion,
-			Title:     po.Title,
-			Status:    po.Status,
+			ProductChannel: productChannel,
+			Kind:           kind,
+			SubKind:        domain.SubKind(po.ModelSubKind),
+			Algorithm:      domain.Algorithm(po.ModelAlgorithm),
+			Code:           po.ModelCode,
+			Version:        po.ModelVersion,
+			Title:          po.Title,
+			Status:         po.Status,
 		},
 		Binding: domain.QuestionnaireBinding{
 			QuestionnaireCode:    po.QuestionnaireCode,

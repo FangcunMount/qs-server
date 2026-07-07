@@ -16,6 +16,7 @@ func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {
 		Kind:                 KindPersonality,
 		SubKind:              string(model.SubKind),
 		Algorithm:            string(model.Algorithm),
+		ProductChannel:       string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
 		Title:                model.Title,
 		Description:          model.Description,
 		Status:               string(model.Status),
@@ -33,11 +34,12 @@ func definitionFromModel(model *domain.AssessmentModel) *DefinitionResult {
 		return nil
 	}
 	return &DefinitionResult{
-		Kind:          KindPersonality,
-		SubKind:       string(model.SubKind),
-		Algorithm:     string(model.Algorithm),
-		PayloadFormat: model.Definition.Format,
-		Payload:       normalizeDefinitionPayloadForAPI(model),
+		Kind:           KindPersonality,
+		SubKind:        string(model.SubKind),
+		Algorithm:      string(model.Algorithm),
+		ProductChannel: string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
+		PayloadFormat:  model.Definition.Format,
+		Payload:        normalizeDefinitionPayloadForAPI(model),
 	}
 }
 

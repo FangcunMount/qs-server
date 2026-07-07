@@ -96,7 +96,7 @@ func TestArchiveCannotEdit(t *testing.T) {
 	if err := model.MarkArchived(now); err != nil {
 		t.Fatalf("MarkArchived() error = %v", err)
 	}
-	if err := model.UpdateBasicInfo("new title", "", "", "", "", nil, now); err == nil {
+	if err := model.UpdateBasicInfo("new title", "", "", "", "", "", nil, now); err == nil {
 		t.Fatal("UpdateBasicInfo() on archived model should fail")
 	}
 	if err := model.BindQuestionnaire(domain.QuestionnaireBinding{

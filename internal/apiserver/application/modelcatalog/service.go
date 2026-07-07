@@ -359,7 +359,9 @@ func (s *service) UpdateDefinition(ctx context.Context, modelCode string, dto De
 
 func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, error) {
 	result := &OptionsResult{
-		Kinds: apiKindOptions(),
+		Kinds:             apiKindOptions(),
+		ProductChannels:   productChannelOptions(),
+		AlgorithmFamilies: algorithmFamilyOptions(),
 		Algorithms: []Option{
 			{Label: "MBTI", Value: "mbti"},
 			{Label: "SBTI", Value: "sbti"},

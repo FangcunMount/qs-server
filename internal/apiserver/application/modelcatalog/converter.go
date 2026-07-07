@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	personalityconsumer "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type personalityDefinitionPayload struct {
@@ -40,7 +41,7 @@ func summaryFromBehavior(result *behavior.Model) *ModelSummary {
 }
 
 func summaryFromBehaviorValue(result behavior.Model) ModelSummary {
-	return ModelSummary{
+	summary := ModelSummary{
 		Code:                 result.Code,
 		Kind:                 KindBehaviorAbility,
 		SubKind:              SubKindScale,
@@ -55,10 +56,12 @@ func summaryFromBehaviorValue(result behavior.Model) ModelSummary {
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
+	populateModelSummaryIdentity(&summary, domain.KindBehaviorAbility, domain.SubKind(SubKindScale), domain.AlgorithmScaleDefault, domain.ProductChannelBehaviorAbility)
+	return summary
 }
 
 func personalitySummaryFromSummary(result personalityconsumer.PersonalityModelSummaryResult) ModelSummary {
-	return ModelSummary{
+	summary := ModelSummary{
 		Code:                 result.Code,
 		Kind:                 KindPersonality,
 		SubKind:              SubKindTypology,
@@ -70,6 +73,8 @@ func personalitySummaryFromSummary(result personalityconsumer.PersonalityModelSu
 		QuestionnaireCode:    result.QuestionnaireCode,
 		QuestionnaireVersion: result.QuestionnaireVersion,
 	}
+	populateModelSummaryIdentity(&summary, domain.KindPersonality, domain.SubKindTypology, domain.Algorithm(result.Algorithm), domain.ProductChannelPersonality)
+	return summary
 }
 
 func personalitySummaryFromDetail(result *personalityconsumer.PersonalityModelResult) *ModelSummary {

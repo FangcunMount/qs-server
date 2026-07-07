@@ -27,6 +27,7 @@ func (s *service) createBehavioralRating(ctx context.Context, dto CreateModelDTO
 		Code:                 dto.Code,
 		Title:                dto.Title,
 		Description:          dto.Description,
+		ProductChannel:       dto.ProductChannel,
 		Category:             dto.Category,
 		Tags:                 dto.Tags,
 		QuestionnaireCode:    dto.QuestionnaireCode,
@@ -44,11 +45,12 @@ func (g behavioralRatingGateway) updateBasicInfo(ctx context.Context, dto Update
 		return nil, err
 	}
 	result, err := cmd.UpdateBasicInfo(ctx, appBehavioralRating.UpdateBasicInfoInput{
-		Code:        dto.Code,
-		Title:       dto.Title,
-		Description: dto.Description,
-		Category:    dto.Category,
-		Tags:        dto.Tags,
+		Code:           dto.Code,
+		Title:          dto.Title,
+		Description:    dto.Description,
+		ProductChannel: dto.ProductChannel,
+		Category:       dto.Category,
+		Tags:           dto.Tags,
 	})
 	if err != nil {
 		return nil, err
@@ -128,12 +130,15 @@ func (g behavioralRatingGateway) getDefinition(ctx context.Context, modelCode st
 	if err != nil {
 		return nil, err
 	}
-	return &DefinitionDTO{
-		Kind:          KindBehavioralRating,
-		Algorithm:     string(domain.AlgorithmBrief2),
-		PayloadFormat: result.PayloadFormat,
-		Payload:       result.Payload,
-	}, nil
+	dto := &DefinitionDTO{
+		Kind:           result.Kind,
+		Algorithm:      result.Algorithm,
+		ProductChannel: result.ProductChannel,
+		PayloadFormat:  result.PayloadFormat,
+		Payload:        result.Payload,
+	}
+	populateDefinitionIdentity(dto, domain.KindBehavioralRating, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return dto, nil
 }
 
 func (g behavioralRatingGateway) updateDefinition(ctx context.Context, modelCode string, dto DefinitionDTO) (*DefinitionDTO, error) {
@@ -145,22 +150,26 @@ func (g behavioralRatingGateway) updateDefinition(ctx context.Context, modelCode
 	if err != nil {
 		return nil, err
 	}
-	return &DefinitionDTO{
-		Kind:          KindBehavioralRating,
-		Algorithm:     string(domain.AlgorithmBrief2),
-		PayloadFormat: result.PayloadFormat,
-		Payload:       result.Payload,
-	}, nil
+	out := &DefinitionDTO{
+		Kind:           result.Kind,
+		Algorithm:      result.Algorithm,
+		ProductChannel: result.ProductChannel,
+		PayloadFormat:  result.PayloadFormat,
+		Payload:        result.Payload,
+	}
+	populateDefinitionIdentity(out, domain.KindBehavioralRating, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return out, nil
 }
 
 func behavioralRatingSummaryFromResult(result *appBehavioralRating.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
-	return &ModelSummary{
+	summary := &ModelSummary{
 		Code:                 result.Code,
 		Kind:                 result.Kind,
 		Algorithm:            result.Algorithm,
+		ProductChannel:       result.ProductChannel,
 		Title:                result.Title,
 		Description:          result.Description,
 		Status:               result.Status,
@@ -171,6 +180,8 @@ func behavioralRatingSummaryFromResult(result *appBehavioralRating.ModelSummary)
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
+	populateModelSummaryIdentity(summary, domain.KindBehavioralRating, domain.SubKindEmpty, domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return summary
 }
 
 func (s *service) listBehavioralRating(ctx context.Context, dto ListModelsDTO) (*ModelListResult, error) {

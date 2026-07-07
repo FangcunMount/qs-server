@@ -88,6 +88,7 @@ func (h *AssessmentModelHandler) Create(c *gin.Context) {
 		Kind:                 req.Kind,
 		SubKind:              req.SubKind,
 		Algorithm:            req.Algorithm,
+		ProductChannel:       req.ProductChannel,
 		Title:                req.Title,
 		Description:          req.Description,
 		Category:             req.Category,
@@ -126,13 +127,14 @@ func (h *AssessmentModelHandler) UpdateBasicInfo(c *gin.Context) {
 		return
 	}
 	result, err := h.service.UpdateBasicInfo(c.Request.Context(), modelcatalog.UpdateBasicInfoDTO{
-		Code:        h.modelCode(c),
-		Title:       req.Title,
-		Description: req.Description,
-		SubKind:     req.SubKind,
-		Algorithm:   req.Algorithm,
-		Category:    req.Category,
-		Tags:        req.Tags,
+		Code:           h.modelCode(c),
+		Title:          req.Title,
+		Description:    req.Description,
+		SubKind:        req.SubKind,
+		Algorithm:      req.Algorithm,
+		ProductChannel: req.ProductChannel,
+		Category:       req.Category,
+		Tags:           req.Tags,
 	})
 	if err != nil {
 		h.Error(c, err)

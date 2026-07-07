@@ -49,6 +49,7 @@ type CreateModelDTO struct {
 	Kind                 string
 	SubKind              string
 	Algorithm            string
+	ProductChannel       string
 	Title                string
 	Description          string
 	Category             string
@@ -58,13 +59,14 @@ type CreateModelDTO struct {
 }
 
 type UpdateBasicInfoDTO struct {
-	Code        string
-	Title       string
-	Description string
-	SubKind     string
-	Algorithm   string
-	Category    string
-	Tags        []string
+	Code           string
+	Title          string
+	Description    string
+	SubKind        string
+	Algorithm      string
+	ProductChannel string
+	Category       string
+	Tags           []string
 }
 
 type BindQuestionnaireDTO struct {
@@ -74,11 +76,13 @@ type BindQuestionnaireDTO struct {
 }
 
 type DefinitionDTO struct {
-	Kind          string          `json:"kind"`
-	SubKind       string          `json:"sub_kind,omitempty"`
-	Algorithm     string          `json:"algorithm,omitempty"`
-	PayloadFormat string          `json:"payload_format"`
-	Payload       json.RawMessage `json:"payload"`
+	Kind            string          `json:"kind"`
+	SubKind         string          `json:"sub_kind,omitempty"`
+	Algorithm       string          `json:"algorithm,omitempty"`
+	ProductChannel  string          `json:"product_channel,omitempty"`
+	AlgorithmFamily string          `json:"algorithm_family,omitempty"`
+	PayloadFormat   string          `json:"payload_format"`
+	Payload         json.RawMessage `json:"payload"`
 }
 
 type ApplyCodesDTO struct {
@@ -92,6 +96,8 @@ type ModelSummary struct {
 	Kind                 string   `json:"kind"`
 	SubKind              string   `json:"sub_kind,omitempty"`
 	Algorithm            string   `json:"algorithm,omitempty"`
+	ProductChannel       string   `json:"product_channel,omitempty"`
+	AlgorithmFamily      string   `json:"algorithm_family,omitempty"`
 	Title                string   `json:"title"`
 	Description          string   `json:"description,omitempty"`
 	Status               string   `json:"status"`
@@ -118,12 +124,14 @@ type QuestionnaireBindingResult struct {
 }
 
 type OptionsResult struct {
-	Kinds         []Option `json:"kinds"`
-	ModelFamilies []Option `json:"model_families,omitempty"`
-	Categories    []Option `json:"categories"`
-	Algorithms    []Option `json:"algorithms"`
-	SubKinds      []Option `json:"sub_kinds"`
-	Tags          []Option `json:"tags,omitempty"`
+	Kinds             []Option `json:"kinds"`
+	ModelFamilies     []Option `json:"model_families,omitempty"`
+	ProductChannels   []Option `json:"product_channels,omitempty"`
+	AlgorithmFamilies []Option `json:"algorithm_families,omitempty"`
+	Categories        []Option `json:"categories"`
+	Algorithms        []Option `json:"algorithms"`
+	SubKinds          []Option `json:"sub_kinds"`
+	Tags              []Option `json:"tags,omitempty"`
 }
 
 type ValidationIssue struct {

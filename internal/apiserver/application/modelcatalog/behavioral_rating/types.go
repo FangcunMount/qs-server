@@ -20,6 +20,7 @@ type CreateInput struct {
 	Code                 string
 	Title                string
 	Description          string
+	ProductChannel       string
 	Category             string
 	Tags                 []string
 	QuestionnaireCode    string
@@ -27,11 +28,12 @@ type CreateInput struct {
 }
 
 type UpdateBasicInfoInput struct {
-	Code        string
-	Title       string
-	Description string
-	Category    string
-	Tags        []string
+	Code           string
+	Title          string
+	Description    string
+	ProductChannel string
+	Category       string
+	Tags           []string
 }
 
 type BindQuestionnaireInput struct {
@@ -48,6 +50,7 @@ type ModelSummary struct {
 	Code                 string   `json:"code"`
 	Kind                 string   `json:"kind"`
 	Algorithm            string   `json:"algorithm,omitempty"`
+	ProductChannel       string   `json:"product_channel,omitempty"`
 	Title                string   `json:"title"`
 	Description          string   `json:"description,omitempty"`
 	Status               string   `json:"status"`
@@ -68,8 +71,11 @@ type ModelListResult struct {
 }
 
 type DefinitionResult struct {
-	PayloadFormat string          `json:"payload_format"`
-	Payload       json.RawMessage `json:"payload"`
+	Kind           string          `json:"kind"`
+	Algorithm      string          `json:"algorithm,omitempty"`
+	ProductChannel string          `json:"product_channel,omitempty"`
+	PayloadFormat  string          `json:"payload_format"`
+	Payload        json.RawMessage `json:"payload"`
 }
 
 type QuestionnaireBindingResult struct {
@@ -85,6 +91,7 @@ func summaryFromModel(model *domain.AssessmentModel) *ModelSummary {
 		Code:                 model.Code,
 		Kind:                 KindBehavioralRating,
 		Algorithm:            string(model.Algorithm),
+		ProductChannel:       string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
 		Title:                model.Title,
 		Description:          model.Description,
 		Status:               string(model.Status),

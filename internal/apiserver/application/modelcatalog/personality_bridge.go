@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
+	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func personalityListInput(dto ListModelsDTO) personality.ListInput {
@@ -24,6 +25,7 @@ func personalityCreateInput(dto CreateModelDTO) personality.CreateInput {
 		Description:          dto.Description,
 		SubKind:              dto.SubKind,
 		Algorithm:            dto.Algorithm,
+		ProductChannel:       dto.ProductChannel,
 		Category:             dto.Category,
 		Tags:                 dto.Tags,
 		QuestionnaireCode:    dto.QuestionnaireCode,
@@ -33,13 +35,14 @@ func personalityCreateInput(dto CreateModelDTO) personality.CreateInput {
 
 func personalityUpdateBasicInfoInput(dto UpdateBasicInfoDTO) personality.UpdateBasicInfoInput {
 	return personality.UpdateBasicInfoInput{
-		Code:        dto.Code,
-		Title:       dto.Title,
-		Description: dto.Description,
-		SubKind:     dto.SubKind,
-		Algorithm:   dto.Algorithm,
-		Category:    dto.Category,
-		Tags:        dto.Tags,
+		Code:           dto.Code,
+		Title:          dto.Title,
+		Description:    dto.Description,
+		SubKind:        dto.SubKind,
+		Algorithm:      dto.Algorithm,
+		ProductChannel: dto.ProductChannel,
+		Category:       dto.Category,
+		Tags:           dto.Tags,
 	}
 }
 
@@ -64,11 +67,12 @@ func summaryFromPersonality(result *personality.ModelSummary) *ModelSummary {
 	if result == nil {
 		return nil
 	}
-	return &ModelSummary{
+	summary := &ModelSummary{
 		Code:                 result.Code,
 		Kind:                 result.Kind,
 		SubKind:              result.SubKind,
 		Algorithm:            result.Algorithm,
+		ProductChannel:       result.ProductChannel,
 		Title:                result.Title,
 		Description:          result.Description,
 		Status:               result.Status,
@@ -79,19 +83,24 @@ func summaryFromPersonality(result *personality.ModelSummary) *ModelSummary {
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
+	populateModelSummaryIdentity(summary, domain.KindPersonality, domain.SubKind(result.SubKind), domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return summary
 }
 
 func definitionFromPersonality(result *personality.DefinitionResult) *DefinitionDTO {
 	if result == nil {
 		return nil
 	}
-	return &DefinitionDTO{
-		Kind:          result.Kind,
-		SubKind:       result.SubKind,
-		Algorithm:     result.Algorithm,
-		PayloadFormat: result.PayloadFormat,
-		Payload:       result.Payload,
+	dto := &DefinitionDTO{
+		Kind:           result.Kind,
+		SubKind:        result.SubKind,
+		Algorithm:      result.Algorithm,
+		ProductChannel: result.ProductChannel,
+		PayloadFormat:  result.PayloadFormat,
+		Payload:        result.Payload,
 	}
+	populateDefinitionIdentity(dto, domain.KindPersonality, domain.SubKind(result.SubKind), domain.Algorithm(result.Algorithm), domain.ProductChannel(result.ProductChannel))
+	return dto
 }
 
 func validationFailedFromPersonalityIssues(issues []personality.ValidationIssue) error {

@@ -32,6 +32,7 @@ type CreateInput struct {
 	Description          string
 	SubKind              string
 	Algorithm            string
+	ProductChannel       string
 	Category             string
 	Tags                 []string
 	QuestionnaireCode    string
@@ -39,13 +40,14 @@ type CreateInput struct {
 }
 
 type UpdateBasicInfoInput struct {
-	Code        string
-	Title       string
-	Description string
-	SubKind     string
-	Algorithm   string
-	Category    string
-	Tags        []string
+	Code           string
+	Title          string
+	Description    string
+	SubKind        string
+	Algorithm      string
+	ProductChannel string
+	Category       string
+	Tags           []string
 }
 
 type BindQuestionnaireInput struct {
@@ -66,6 +68,7 @@ type ModelSummary struct {
 	Kind                 string   `json:"kind"`
 	SubKind              string   `json:"sub_kind,omitempty"`
 	Algorithm            string   `json:"algorithm,omitempty"`
+	ProductChannel       string   `json:"product_channel,omitempty"`
 	Title                string   `json:"title"`
 	Description          string   `json:"description,omitempty"`
 	Status               string   `json:"status"`
@@ -92,11 +95,12 @@ type QuestionnaireBindingResult struct {
 }
 
 type DefinitionResult struct {
-	Kind          string          `json:"kind"`
-	SubKind       string          `json:"sub_kind,omitempty"`
-	Algorithm     string          `json:"algorithm,omitempty"`
-	PayloadFormat string          `json:"payload_format"`
-	Payload       json.RawMessage `json:"payload"`
+	Kind           string          `json:"kind"`
+	SubKind        string          `json:"sub_kind,omitempty"`
+	Algorithm      string          `json:"algorithm,omitempty"`
+	ProductChannel string          `json:"product_channel,omitempty"`
+	PayloadFormat  string          `json:"payload_format"`
+	Payload        json.RawMessage `json:"payload"`
 }
 
 type ValidationIssue struct {

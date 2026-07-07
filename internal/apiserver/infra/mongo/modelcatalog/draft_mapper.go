@@ -16,6 +16,7 @@ func (DraftMapper) ToPO(model *domain.AssessmentModel) *AssessmentModelPO {
 	}
 	return &AssessmentModelPO{
 		Code:                    model.Code,
+		ProductChannel:          string(domain.ResolveProductChannel(model.Kind, model.ProductChannel)),
 		Kind:                    string(model.Kind),
 		SubKind:                 string(model.SubKind),
 		Algorithm:               string(model.Algorithm),
@@ -38,17 +39,23 @@ func (DraftMapper) ToDomain(po *AssessmentModelPO) *domain.AssessmentModel {
 	if po == nil {
 		return nil
 	}
+	kind := domain.Kind(po.Kind)
+	productChannel := domain.ProductChannel(po.ProductChannel)
+	if productChannel == "" {
+		productChannel = domain.DefaultProductChannelFor(kind)
+	}
 	return &domain.AssessmentModel{
-		ID:          po.ID.Hex(),
-		Code:        po.Code,
-		Kind:        domain.Kind(po.Kind),
-		SubKind:     domain.SubKind(po.SubKind),
-		Algorithm:   domain.Algorithm(po.Algorithm),
-		Title:       po.Title,
-		Description: po.Description,
-		Category:    po.Category,
-		Tags:        append([]string(nil), po.Tags...),
-		Status:      domain.ModelStatus(po.Status),
+		ID:             po.ID.Hex(),
+		Code:           po.Code,
+		Kind:           kind,
+		SubKind:        domain.SubKind(po.SubKind),
+		Algorithm:      domain.Algorithm(po.Algorithm),
+		ProductChannel: productChannel,
+		Title:          po.Title,
+		Description:    po.Description,
+		Category:       po.Category,
+		Tags:           append([]string(nil), po.Tags...),
+		Status:         domain.ModelStatus(po.Status),
 		Binding: domain.QuestionnaireBinding{
 			QuestionnaireCode:    po.QuestionnaireCode,
 			QuestionnaireVersion: po.QuestionnaireVersion,

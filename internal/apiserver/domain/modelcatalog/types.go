@@ -93,7 +93,7 @@ const (
 	PayloadFormatPersonalityTypologyV1     = "assessmentmodel.personality.typology.v1"
 	PayloadFormatBehavioralRatingDefaultV1 = "assessmentmodel.behavioral_rating.default.v1"
 	PayloadFormatBehavioralRatingBrief2V1  = "assessmentmodel.behavioral_rating.brief2.v1"
-	PayloadFormatCognitiveDefaultV1          = "assessmentmodel.cognitive.default.v1"
+	PayloadFormatCognitiveDefaultV1        = "assessmentmodel.cognitive.default.v1"
 	PayloadFormatCognitiveSPMV1            = "assessmentmodel.cognitive.spm.v1"
 
 	// Legacy read-only payload formats (migration / outbox drain).
@@ -114,13 +114,14 @@ type QuestionnaireBinding struct {
 
 // ModelDefinition is canonical published-model metadata.
 type ModelDefinition struct {
-	Kind      Kind
-	SubKind   SubKind
-	Algorithm Algorithm
-	Code      string
-	Version   string
-	Title     string
-	Status    string
+	ProductChannel ProductChannel
+	Kind           Kind
+	SubKind        SubKind
+	Algorithm      Algorithm
+	Code           string
+	Version        string
+	Title          string
+	Status         string
 }
 
 // Definition is kept as a compatibility name while callers migrate to ModelDefinition.

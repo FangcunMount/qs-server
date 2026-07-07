@@ -7,35 +7,37 @@ import (
 
 // AssessmentModel is the draft-model aggregate for backend configuration.
 type AssessmentModel struct {
-	ID          string
-	Code        string
-	Kind        Kind
-	SubKind     SubKind
-	Algorithm   Algorithm
-	Title       string
-	Description string
-	Category    string
-	Tags        []string
-	Status      ModelStatus
-	Binding     QuestionnaireBinding
-	Definition  DefinitionPayload
-	Version     int64
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	PublishedAt *time.Time
-	ArchivedAt  *time.Time
+	ID             string
+	Code           string
+	Kind           Kind
+	SubKind        SubKind
+	Algorithm      Algorithm
+	ProductChannel ProductChannel
+	Title          string
+	Description    string
+	Category       string
+	Tags           []string
+	Status         ModelStatus
+	Binding        QuestionnaireBinding
+	Definition     DefinitionPayload
+	Version        int64
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	PublishedAt    *time.Time
+	ArchivedAt     *time.Time
 }
 
 type NewAssessmentModelInput struct {
-	Code        string
-	Kind        Kind
-	SubKind     SubKind
-	Algorithm   Algorithm
-	Title       string
-	Description string
-	Category    string
-	Tags        []string
-	Now         time.Time
+	Code           string
+	Kind           Kind
+	SubKind        SubKind
+	Algorithm      Algorithm
+	ProductChannel ProductChannel
+	Title          string
+	Description    string
+	Category       string
+	Tags           []string
+	Now            time.Time
 }
 
 func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error) {
@@ -51,23 +53,28 @@ func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error)
 	if input.Kind == KindBehaviorAbility {
 		return nil, fmt.Errorf("%w: behavior_ability is a legacy product channel; use behavioral_rating or cognitive", ErrInvalidArgument)
 	}
+	productChannel, err := CompleteProductChannel(input.Kind, input.ProductChannel)
+	if err != nil {
+		return nil, err
+	}
 	now := input.Now
 	if now.IsZero() {
 		now = time.Now().UTC()
 	}
 	return &AssessmentModel{
-		Code:        input.Code,
-		Kind:        input.Kind,
-		SubKind:     input.SubKind,
-		Algorithm:   input.Algorithm,
-		Title:       input.Title,
-		Description: input.Description,
-		Category:    input.Category,
-		Tags:        append([]string(nil), input.Tags...),
-		Status:      ModelStatusDraft,
-		Version:     1,
-		CreatedAt:   now,
-		UpdatedAt:   now,
+		Code:           input.Code,
+		Kind:           input.Kind,
+		SubKind:        input.SubKind,
+		Algorithm:      input.Algorithm,
+		ProductChannel: productChannel,
+		Title:          input.Title,
+		Description:    input.Description,
+		Category:       input.Category,
+		Tags:           append([]string(nil), input.Tags...),
+		Status:         ModelStatusDraft,
+		Version:        1,
+		CreatedAt:      now,
+		UpdatedAt:      now,
 	}, nil
 }
 
@@ -101,7 +108,7 @@ func (m *AssessmentModel) touch(now time.Time) {
 	m.Version++
 }
 
-func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind SubKind, algorithm Algorithm, category string, tags []string, now time.Time) error {
+func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind SubKind, algorithm Algorithm, productChannel ProductChannel, category string, tags []string, now time.Time) error {
 	if err := m.ensureEditable(); err != nil {
 		return err
 	}
@@ -115,6 +122,13 @@ func (m *AssessmentModel) UpdateBasicInfo(title, description string, subKind Sub
 	}
 	if algorithm != "" {
 		m.Algorithm = algorithm
+	}
+	if productChannel != "" {
+		resolved, err := CompleteProductChannel(m.Kind, productChannel)
+		if err != nil {
+			return err
+		}
+		m.ProductChannel = resolved
 	}
 	m.Category = category
 	m.Tags = append([]string(nil), tags...)

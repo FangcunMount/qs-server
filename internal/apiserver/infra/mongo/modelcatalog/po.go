@@ -17,6 +17,7 @@ type PublishedAssessmentModelPO struct {
 
 	SchemaVersion        string     `bson:"schema_version,omitempty"`
 	PayloadFormat        string     `bson:"payload_format,omitempty"`
+	ModelProductChannel  string     `bson:"model_product_channel,omitempty"`
 	ModelKind            string     `bson:"model_kind"`
 	ModelSubKind         string     `bson:"model_sub_kind,omitempty"`
 	ModelAlgorithm       string     `bson:"model_algorithm,omitempty"`
