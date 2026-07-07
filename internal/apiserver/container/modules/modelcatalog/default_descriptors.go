@@ -36,7 +36,7 @@ var defaultRuntimeExecutionPathOrder = []domain.ExecutionPath{
 // DefaultEvaluationDescriptors returns runtime descriptors for all capability-backed execution paths.
 func DefaultEvaluationDescriptors() []evaldomain.ModelDescriptor {
 	runtimePaths := make(map[domain.ExecutionPath]bool)
-	for _, cap := range domain.DefaultCapabilities() {
+	for _, cap := range domain.ModelFamilyCapabilitiesV2() {
 		if cap.RuntimeExecutable {
 			runtimePaths[cap.ExecutionPath] = true
 		}

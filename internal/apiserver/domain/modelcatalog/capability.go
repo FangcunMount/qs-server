@@ -137,7 +137,7 @@ func CapabilityByAPIKind(apiKind string) (KindCapability, bool) {
 // RuntimeExecutableKinds returns domain kinds that have a direct evaluation descriptor.
 func RuntimeExecutableKinds() []Kind {
 	out := make([]Kind, 0, len(defaultCapabilities))
-	for _, cap := range defaultCapabilities {
+	for _, cap := range ModelFamilyCapabilitiesV2() {
 		if cap.RuntimeExecutable {
 			out = append(out, cap.Kind)
 		}

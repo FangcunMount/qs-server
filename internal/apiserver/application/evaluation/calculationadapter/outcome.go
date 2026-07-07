@@ -1,11 +1,12 @@
-package behavioralrating
+package calculationadapter
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
-func calcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.Result {
+// CalcResultFromOutcome translates an assessment outcome into a calculation result.
+func CalcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.Result {
 	if outcome == nil {
 		return nil
 	}
@@ -25,7 +26,8 @@ func calcResultFromOutcome(outcome *assessment.AssessmentOutcome) *calculation.R
 	return result
 }
 
-func mergeCalcResultIntoOutcome(outcome *assessment.AssessmentOutcome, result *calculation.Result) *assessment.AssessmentOutcome {
+// MergeCalcResultIntoOutcome merges a calculation result back into an assessment outcome.
+func MergeCalcResultIntoOutcome(outcome *assessment.AssessmentOutcome, result *calculation.Result) *assessment.AssessmentOutcome {
 	if outcome == nil || result == nil {
 		return outcome
 	}
@@ -85,7 +87,7 @@ func dimensionResultFromOutcome(dim assessment.DimensionResult) calculation.Dime
 	out := calculation.DimensionResult{
 		Code:           dim.Code,
 		Name:           dim.Name,
-		Kind:           calculation.DimensionKind(dim.Kind),
+		Kind:           CalculationKindFromAssessment(dim.Kind),
 		Role:           dim.Role,
 		ParentCode:     dim.ParentCode,
 		HierarchyLevel: dim.HierarchyLevel,
@@ -114,7 +116,7 @@ func dimensionResultToOutcome(dim calculation.DimensionResult) assessment.Dimens
 	out := assessment.DimensionResult{
 		Code:           dim.Code,
 		Name:           dim.Name,
-		Kind:           assessment.DimensionKind(dim.Kind),
+		Kind:           AssessmentKindFromCalculation(dim.Kind),
 		Role:           dim.Role,
 		ParentCode:     dim.ParentCode,
 		HierarchyLevel: dim.HierarchyLevel,

@@ -63,6 +63,7 @@ func primaryDimension(dimensions []calculation.DimensionResult, configuredCode s
 			}
 		}
 	}
+	// Deprecated: legacy fallback when primary_dimension_code is not configured on publish.
 	for i := range dimensions {
 		if dimensions[i].Code == "total" || dimensions[i].Code == "gec" {
 			return &dimensions[i]

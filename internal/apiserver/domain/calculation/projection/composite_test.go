@@ -42,6 +42,54 @@ func TestCompositeProjectionRollsUpParentScores(t *testing.T) {
 	}
 }
 
+func TestCompositeProjectionAverageDilutesMissingChildren(t *testing.T) {
+	t.Parallel()
+
+	result := &calculation.Result{
+		Dimensions: []calculation.DimensionResult{
+			{Code: "a", Score: rawScore(6)},
+		},
+	}
+	proj := projection.CompositeProjection{Nodes: []calculation.ScoreNode{
+		{
+			Code:        "parent",
+			Aggregation: calculation.AggregationAverage,
+			Children:    []string{"a", "b"},
+		},
+	}}
+
+	enriched := proj.Apply(result)
+	if got := dimensionScore(enriched.Dimensions, "parent"); got != 3 {
+		t.Fatalf("parent average = %v, want 3 (6 / 2 children)", got)
+	}
+}
+
+func TestCompositeProjectionLookupAndCustomAreNoOp(t *testing.T) {
+	t.Parallel()
+
+	result := &calculation.Result{
+		Dimensions: []calculation.DimensionResult{
+			{Code: "child", Score: rawScore(4)},
+		},
+	}
+	for _, strategy := range []calculation.AggregationStrategy{
+		calculation.AggregationLookup,
+		calculation.AggregationCustom,
+	} {
+		strategy := strategy
+		t.Run(string(strategy), func(t *testing.T) {
+			t.Parallel()
+			proj := projection.CompositeProjection{Nodes: []calculation.ScoreNode{
+				{Code: "parent", Aggregation: strategy, Children: []string{"child"}},
+			}}
+			enriched := proj.Apply(result)
+			if findDimension(enriched.Dimensions, "parent") != nil {
+				t.Fatalf("%s aggregation should not create parent score", strategy)
+			}
+		})
+	}
+}
+
 func TestScoreRangeProjectionIsIdentity(t *testing.T) {
 	t.Parallel()
 

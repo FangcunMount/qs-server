@@ -89,6 +89,9 @@ func aggregateSum(children []string, scores map[string]float64) (float64, bool) 
 	return sum, found
 }
 
+// aggregateAverage computes sum(present child scores) / len(children).
+// Missing children contribute 0 to the numerator but still count toward the divisor,
+// so absent scores dilute the average rather than being ignored in the denominator.
 func aggregateAverage(children []string, scores map[string]float64) (float64, bool) {
 	sum, found := aggregateSum(children, scores)
 	if !found {

@@ -1,14 +1,12 @@
-package behavioralrating
+package calculationadapter
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-// scoreNodesFromFactors translates catalog factor snapshots into calculation ScoreNodes.
-// This keeps the calculation kernel free of factor/model-catalog coupling: the domain asset
-// (factor) is translated into the neutral calculation input here in the orchestration layer.
-func scoreNodesFromFactors(factors []factor.FactorSnapshot) []calculation.ScoreNode {
+// ScoreNodesFromFactors translates catalog factor snapshots into calculation ScoreNodes.
+func ScoreNodesFromFactors(factors []factor.FactorSnapshot) []calculation.ScoreNode {
 	if len(factors) == 0 {
 		return nil
 	}

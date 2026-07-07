@@ -1,6 +1,7 @@
 package behavioralrating
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
@@ -17,8 +18,8 @@ func EnrichBrief2Outcome(
 	if outcome == nil || snapshot == nil {
 		return outcome
 	}
-	calcResult := enrichBrief2CalcResult(calcResultFromOutcome(outcome), snapshot, subject)
-	return mergeCalcResultIntoOutcome(outcome, calcResult)
+	calcResult := enrichBrief2CalcResult(calculationadapter.CalcResultFromOutcome(outcome), snapshot, subject)
+	return calculationadapter.MergeCalcResultIntoOutcome(outcome, calcResult)
 }
 
 func enrichBrief2CalcResult(

@@ -27,6 +27,10 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	if algorithm == "" {
 		algorithm = domain.AlgorithmBrief2
 	}
+	encoded, err := ensureBrief2PrimaryDimensionDefault(encoded, algorithm)
+	if err != nil {
+		return nil, err
+	}
 	return &domain.PublishedModelSnapshot{
 		SchemaVersion: domain.SchemaVersionV2,
 		PayloadFormat: domain.PayloadFormatForBehavioralRating(algorithm),
@@ -56,4 +60,46 @@ func brief2DecisionSpec(algorithm domain.Algorithm) domain.DecisionSpec {
 		return domain.DecisionSpec{Kind: domain.DecisionKindNormLookup}
 	}
 	return domain.DecisionSpec{Kind: domain.DecisionKindScoreRange}
+}
+
+const defaultBrief2PrimaryDimensionCode = "gec"
+
+func ensureBrief2PrimaryDimensionDefault(payload []byte, algorithm domain.Algorithm) ([]byte, error) {
+	if algorithm != domain.AlgorithmBrief2 {
+		return payload, nil
+	}
+	var body map[string]json.RawMessage
+	if err := json.Unmarshal(payload, &body); err != nil {
+		return nil, fmt.Errorf("decode behavioral_rating brief2 payload: %w", err)
+	}
+	brief2 := map[string]json.RawMessage{}
+	if raw, ok := body["brief2"]; ok {
+		if err := json.Unmarshal(raw, &brief2); err != nil {
+			return nil, fmt.Errorf("decode behavioral_rating brief2 extension: %w", err)
+		}
+	}
+	var primaryDimensionCode string
+	if raw, ok := brief2["primary_dimension_code"]; ok {
+		if err := json.Unmarshal(raw, &primaryDimensionCode); err != nil {
+			return nil, fmt.Errorf("decode behavioral_rating primary_dimension_code: %w", err)
+		}
+	}
+	if primaryDimensionCode != "" {
+		return payload, nil
+	}
+	encodedCode, err := json.Marshal(defaultBrief2PrimaryDimensionCode)
+	if err != nil {
+		return nil, fmt.Errorf("encode behavioral_rating primary_dimension_code: %w", err)
+	}
+	brief2["primary_dimension_code"] = encodedCode
+	brief2Encoded, err := json.Marshal(brief2)
+	if err != nil {
+		return nil, fmt.Errorf("encode behavioral_rating brief2 extension: %w", err)
+	}
+	body["brief2"] = brief2Encoded
+	encoded, err := json.Marshal(body)
+	if err != nil {
+		return nil, fmt.Errorf("encode behavioral_rating brief2 payload: %w", err)
+	}
+	return encoded, nil
 }

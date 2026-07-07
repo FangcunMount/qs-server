@@ -23,7 +23,7 @@ func (p HierarchyProjection) Apply(result *calculation.Result) *calculation.Resu
 		}
 		applyNodeMetadata(&result.Dimensions[i], meta)
 	}
-	sortDimensionsForDisplay(result.Dimensions)
+	sortDimensionsByHierarchy(result.Dimensions)
 	return result
 }
 
@@ -54,7 +54,7 @@ func applyNodeMetadata(dim *calculation.DimensionResult, node calculation.ScoreN
 	}
 }
 
-func sortDimensionsForDisplay(dimensions []calculation.DimensionResult) {
+func sortDimensionsByHierarchy(dimensions []calculation.DimensionResult) {
 	sort.SliceStable(dimensions, func(i, j int) bool {
 		left, right := dimensions[i], dimensions[j]
 		if left.HierarchyLevel != right.HierarchyLevel {
