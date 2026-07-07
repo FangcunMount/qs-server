@@ -52,3 +52,51 @@ func (b TaskPerformanceReportBuilder) MechanismKey() MechanismReportBuilderKey {
 		ReportType:      b.ReportType(),
 	}
 }
+
+func (FactorScoringScoreProjector) MechanismKey() MechanismReportBuilderKey {
+	return MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+}
+
+func (NormProfileScoreProjector) MechanismKey() MechanismReportBuilderKey {
+	return MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
+		DecisionKind:    modelcatalog.DecisionKindNormLookup,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+}
+
+func (TaskPerformanceScoreProjector) MechanismKey() MechanismReportBuilderKey {
+	return MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance,
+		DecisionKind:    modelcatalog.DecisionKindAbilityLevel,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+}
+
+// MechanismKeyedScoreProjector exposes mechanism routing metadata for a score projector.
+type MechanismKeyedScoreProjector interface {
+	ScoreProjector
+	MechanismKey() MechanismReportBuilderKey
+}
+
+// MultiMechanismKeyedScoreProjector registers additional decision-granularity mechanism keys.
+type MultiMechanismKeyedScoreProjector interface {
+	MechanismKeyedScoreProjector
+	MechanismKeys() []MechanismReportBuilderKey
+}
+
+// MechanismKeyedEventAssembler exposes mechanism routing metadata for an event assembler.
+type MechanismKeyedEventAssembler interface {
+	EventAssembler
+	MechanismKey() MechanismReportBuilderKey
+}
+
+// MultiMechanismKeyedEventAssembler registers additional decision-granularity mechanism keys.
+type MultiMechanismKeyedEventAssembler interface {
+	MechanismKeyedEventAssembler
+	MechanismKeys() []MechanismReportBuilderKey
+}

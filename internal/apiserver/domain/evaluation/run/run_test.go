@@ -5,6 +5,20 @@ import (
 	"time"
 )
 
+func TestNextEvaluationRunIncrementsAttempt(t *testing.T) {
+	t.Parallel()
+
+	first := NewEvaluationRunWithAttempt(42, 1)
+	first.Fail(time.Now(), Failure{Kind: FailureKindTimeout, Message: "timed out", Retryable: true})
+	second := NextEvaluationRun(first)
+	if second.Attempt.Number != 2 {
+		t.Fatalf("attempt=%d, want 2", second.Attempt.Number)
+	}
+	if second.RunID != "42:2" {
+		t.Fatalf("run id=%s", second.RunID)
+	}
+}
+
 func TestEvaluationRunLifecycle(t *testing.T) {
 	t.Parallel()
 

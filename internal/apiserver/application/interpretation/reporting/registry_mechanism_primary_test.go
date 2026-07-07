@@ -129,3 +129,43 @@ func behavioralRatingInputSnapshotForMechanismKey(t *testing.T) *evaluationinput
 		Model: evaluationinput.NewBehavioralRatingModelSnapshot(snapshot),
 	}
 }
+
+func TestScoreProjectorResolveByMechanism(t *testing.T) {
+	t.Parallel()
+
+	registry, err := NewScoreProjectorRegistry(
+		NewFactorScoringScoreProjector(nil),
+		NewNormProfileScoreProjector(nil),
+		NewTaskPerformanceScoreProjector(nil),
+	)
+	if err != nil {
+		t.Fatalf("NewScoreProjectorRegistry: %v", err)
+	}
+	mechanismKey := MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+	projector := registry.ResolveByMechanism(mechanismKey)
+	if projector.Key() != evaluation.EvaluatorKeyScaleDefault {
+		t.Fatalf("projector key=%s", projector.Key())
+	}
+}
+
+func TestEventAssemblerResolveByMechanism(t *testing.T) {
+	t.Parallel()
+
+	registry, err := NewEventAssemblerRegistry(DefaultMechanismEventAssemblers()...)
+	if err != nil {
+		t.Fatalf("NewEventAssemblerRegistry: %v", err)
+	}
+	mechanismKey := MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+		DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+		ReportType:      domainReport.ReportTypeStandard,
+	}
+	assembler := registry.ResolveByMechanism(mechanismKey)
+	if assembler.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+		t.Fatalf("assembler key=%s", assembler.Key())
+	}
+}

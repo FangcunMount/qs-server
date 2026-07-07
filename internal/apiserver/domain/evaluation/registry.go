@@ -13,6 +13,7 @@ const (
 )
 
 // ModelDescriptor is the canonical registration entry for an evaluation model.
+// Key is deprecated for routing; prefer ExecutionPath and AlgorithmFamily (R25).
 type ModelDescriptor struct {
 	Key       EvaluatorKey
 	Kind      ModelKind

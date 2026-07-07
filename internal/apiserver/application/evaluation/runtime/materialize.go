@@ -47,6 +47,58 @@ type wiringSession struct {
 	typologyReportBuilder *factorclassification.ReportBuilder
 }
 
+// MaterializeFamilyEvaluators builds one evaluator per algorithm family from materialization specs.
+func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFamily]execute.Evaluator, error) {
+	var sharedConfigured *factorclassification.Executor
+	session := wiringSession{typologyExecutor: &sharedConfigured}
+	out := make(map[modelcatalog.AlgorithmFamily]execute.Evaluator, len(defaultPathMaterializations()))
+	for _, spec := range defaultPathMaterializations() {
+		desc := evaldomain.ModelDescriptor{Kind: modelKindForExecutionPath(spec.path)}
+		evaluator, err := spec.evaluator(desc, deps, session)
+		if err != nil {
+			return nil, err
+		}
+		out[spec.family] = evaluator
+	}
+	return out, nil
+}
+
+// MaterializeLegacyEvaluators builds typology legacy alias evaluators for EvaluatorKey fallback.
+func MaterializeLegacyEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
+	var sharedConfigured *factorclassification.Executor
+	session := wiringSession{typologyExecutor: &sharedConfigured}
+	legacy := make([]execute.Evaluator, 0)
+	for _, desc := range descs {
+		if desc.Kind != evaldomain.ModelKindTypology {
+			continue
+		}
+		if desc.Key == evaldomain.EvaluatorKeyPersonalityTypology {
+			continue
+		}
+		evaluator, err := materializeEvaluator(desc, deps, session)
+		if err != nil {
+			return nil, err
+		}
+		legacy = append(legacy, evaluator)
+	}
+	return legacy, nil
+}
+
+func modelKindForExecutionPath(path modelcatalog.ExecutionPath) evaldomain.ModelKind {
+	switch path {
+	case modelcatalog.ExecutionPathScaleDescriptor:
+		return evaldomain.ModelKindScale
+	case modelcatalog.ExecutionPathTypologyDescriptor:
+		return evaldomain.ModelKindTypology
+	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
+		return evaldomain.ModelKindBehavioralRating
+	case modelcatalog.ExecutionPathCognitiveDescriptor:
+		return evaldomain.ModelKindCognitive
+	default:
+		return ""
+	}
+}
+
 // MaterializeEvaluators builds evaluators from descriptors.
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
 	var sharedConfigured *factorclassification.Executor

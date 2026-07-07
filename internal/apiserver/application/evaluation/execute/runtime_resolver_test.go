@@ -40,7 +40,9 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolver := NewRuntimeResolver(registry, evaluatorRegistry)
+	resolver := NewRuntimeResolver(registry, evaluatorRegistry, map[modelcatalog.AlgorithmFamily]Evaluator{
+		modelcatalog.AlgorithmFamilyFactorScoring: runtimeEvaluatorStub{key: evaluation.EvaluatorKeyScaleDefault},
+	})
 
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{
@@ -71,7 +73,7 @@ func TestRuntimeResolverFallsBackToEvaluatorKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	resolver := NewRuntimeResolver(nil, evaluatorRegistry)
+	resolver := NewRuntimeResolver(nil, evaluatorRegistry, nil)
 
 	input := &evaluationinput.InputSnapshot{
 		Model: &evaluationinput.ModelSnapshot{

@@ -16,6 +16,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
@@ -33,6 +34,8 @@ type service struct {
 	readyIndexer *appEventing.PostCommitReadyIndexer
 
 	evaluators            EvaluatorRegistry
+	descriptorRegistry    *evalpipeline.RuntimeDescriptorRegistry
+	familyEvaluators      map[modelcatalog.AlgorithmFamily]Evaluator
 	runtimeResolver       *RuntimeResolver
 	runRepo               evaluationrun.Repository
 	scoringWriter         evaluationscoring.Writer
@@ -68,15 +71,31 @@ func WithTransactionalOutbox(txRunner apptransaction.Runner, eventStager EventSt
 func WithEvaluatorRegistry(registry EvaluatorRegistry) ServiceOption {
 	return func(s *service) {
 		s.evaluators = registry
-		s.runtimeResolver = NewRuntimeResolver(nil, registry)
+		s.refreshRuntimeResolver()
 	}
 }
 
 // WithRuntimeDescriptorRegistry configures descriptor-primary evaluation routing.
 func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) ServiceOption {
 	return func(s *service) {
-		s.runtimeResolver = NewRuntimeResolver(registry, s.evaluators)
+		s.descriptorRegistry = registry
+		s.refreshRuntimeResolver()
 	}
+}
+
+// WithFamilyEvaluators configures descriptor-primary family dispatch.
+func WithFamilyEvaluators(family map[modelcatalog.AlgorithmFamily]Evaluator) ServiceOption {
+	return func(s *service) {
+		s.familyEvaluators = family
+		s.refreshRuntimeResolver()
+	}
+}
+
+func (s *service) refreshRuntimeResolver() {
+	if s.evaluators == nil {
+		return
+	}
+	s.runtimeResolver = NewRuntimeResolver(s.descriptorRegistry, s.evaluators, s.familyEvaluators)
 }
 
 func WithReportStatusReporter(reporter *reportstatus.Reporter) ServiceOption {
@@ -164,7 +183,10 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		return nil
 	}
 	a := loaded.assessment
-	evaluationRun := evalrun.NewEvaluationRun(assessmentID)
+	evaluationRun, err := s.newEvaluationRun(ctx, assessmentID)
+	if err != nil {
+		return err
+	}
 	evaluationRun.Start(time.Now())
 	a.SetCurrentRunID(evaluationRun.RunID)
 	s.persistEvaluationRunState(ctx, a, evaluationRun)
@@ -192,6 +214,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		l.Errorw("评估运行时解析失败",
 			"assessment_id", assessmentID,
 			"evaluation_run", evaluationRun.String(),
+			"evaluation_run_id", evaluationRun.RunID.String(),
 			"model_key", resolved.EvaluatorKey.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"result", "failed",
@@ -206,6 +229,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	l.Infow("开始执行评估解释器",
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
+		"evaluation_run_id", evaluationRun.RunID.String(),
 		"model_key", resolved.EvaluatorKey.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"runtime_descriptor_primary", resolved.UsedDescriptor,
@@ -217,6 +241,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		l.Errorw("评估模型执行失败",
 			"assessment_id", assessmentID,
 			"evaluation_run", evaluationRun.String(),
+			"evaluation_run_id", evaluationRun.RunID.String(),
 			"model_key", resolved.EvaluatorKey.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"model_code", evaluationModelCode(a, input),
@@ -256,6 +281,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"result", "success",
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
+		"evaluation_run_id", evaluationRun.RunID.String(),
 		"model_key", resolved.EvaluatorKey.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"model_code", evaluationModelCode(a, input),

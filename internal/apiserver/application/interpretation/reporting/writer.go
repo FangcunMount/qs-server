@@ -41,6 +41,7 @@ func NewWriter(
 		reportSaver,
 		notifier,
 		reportStatus,
+		DefaultMechanismEventAssemblers()...,
 	)
 }
 
@@ -129,18 +130,21 @@ func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 }
 
 func (w *writer) prepare(ctx context.Context, outcome evaloutcome.Outcome) (preparedOutcome, error) {
-	key := ResolveOutcomeKey(outcome)
 	if err := ensureOutcomeCanApplyEvaluation(outcome); err != nil {
 		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "应用评估结果失败")
 	}
+	mechanismKey, ok := MechanismReportBuilderKeyFromOutcome(outcome)
+	if !ok {
+		return preparedOutcome{}, fmt.Errorf("unsupported mechanism report builder key for outcome")
+	}
 	var projector ScoreProjector
 	if w.scoreProjectors != nil {
-		projector = w.scoreProjectors.Resolve(key)
+		projector = w.scoreProjectors.ResolveByMechanism(mechanismKey)
 	}
 	if w.reportBuilders == nil {
 		return preparedOutcome{}, evalerrors.ModuleNotConfigured("interpretation report builder registry is not configured")
 	}
-	builder, err := w.resolveReportBuilder(outcome)
+	builder, err := w.reportBuilders.ResolveByMechanism(mechanismKey)
 	if err != nil {
 		return preparedOutcome{}, err
 	}
@@ -148,7 +152,7 @@ func (w *writer) prepare(ctx context.Context, outcome evaloutcome.Outcome) (prep
 	if err != nil {
 		return preparedOutcome{}, evalerrors.AssessmentInterpretFailed(err, "生成报告失败")
 	}
-	assembler := w.eventAssemblers.Resolve(key)
+	assembler := w.eventAssemblers.ResolveByMechanism(mechanismKey)
 	return preparedOutcome{
 		projector: projector,
 		report:    rpt,
@@ -194,10 +198,3 @@ func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.EvaluatorKey {
 	return evaluation.EvaluatorKey{}
 }
 
-func (w *writer) resolveReportBuilder(outcome evaloutcome.Outcome) (ReportBuilder, error) {
-	mechanismKey, ok := MechanismReportBuilderKeyFromOutcome(outcome)
-	if !ok {
-		return nil, fmt.Errorf("unsupported mechanism report builder key for outcome")
-	}
-	return w.reportBuilders.ResolveByMechanism(mechanismKey)
-}

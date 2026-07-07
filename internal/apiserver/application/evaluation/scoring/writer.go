@@ -53,10 +53,18 @@ func (w *writer) Write(ctx context.Context, outcome evaloutcome.Outcome) error {
 		return evalerrors.Database(err, "保存计分结果失败")
 	}
 	if w.scoreProjectors != nil {
-		key := interpretationreporting.ResolveOutcomeKey(outcome)
-		if projector := w.scoreProjectors.Resolve(key); projector != nil {
+		mechanismKey, ok := interpretationreporting.MechanismReportBuilderKeyFromOutcome(outcome)
+		if ok {
+			projector := w.scoreProjectors.ResolveByMechanism(mechanismKey)
 			if err := projector.Project(ctx, outcome); err != nil {
 				return err
+			}
+		} else {
+			key := interpretationreporting.ResolveOutcomeKey(outcome)
+			if projector := w.scoreProjectors.Resolve(key); projector != nil {
+				if err := projector.Project(ctx, outcome); err != nil {
+					return err
+				}
 			}
 		}
 	}

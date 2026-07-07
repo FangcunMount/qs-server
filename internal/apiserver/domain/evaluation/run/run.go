@@ -24,11 +24,24 @@ type EvaluationRun struct {
 
 // NewEvaluationRun creates the first in-memory run for an assessment execution.
 func NewEvaluationRun(assessmentID uint64) EvaluationRun {
-	return EvaluationRun{
-		RunID:        ID(strconv.FormatUint(assessmentID, 10) + ":1"),
-		AssessmentID: assessmentID,
-		Attempt:      NewAttempt(),
+	return NewEvaluationRunWithAttempt(assessmentID, 1)
+}
+
+// NewEvaluationRunWithAttempt creates a run for a specific attempt number.
+func NewEvaluationRunWithAttempt(assessmentID uint64, attemptNo int) EvaluationRun {
+	if attemptNo < 1 {
+		attemptNo = 1
 	}
+	return EvaluationRun{
+		RunID:        ID(strconv.FormatUint(assessmentID, 10) + ":" + strconv.Itoa(attemptNo)),
+		AssessmentID: assessmentID,
+		Attempt:      Attempt{Number: attemptNo, Status: StatusPending},
+	}
+}
+
+// NextEvaluationRun creates the next attempt after a failed retryable run.
+func NextEvaluationRun(latest EvaluationRun) EvaluationRun {
+	return NewEvaluationRunWithAttempt(latest.AssessmentID, latest.Attempt.Number+1)
 }
 
 // Start marks the run as actively executing.

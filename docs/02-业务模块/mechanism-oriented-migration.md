@@ -389,3 +389,14 @@ type Algorithm = identity.Algorithm
 | R24-C | typology `MechanismKeys()` 按 `DecisionKind` 注册；`resolveEvaluatorKey` 无 typology 分支扩展 |
 
 **刻意保留（R25+）**：删除 `EvaluatorKey`、Run REST、worker 重试编排、Statistics 投影统一。
+
+## Round 25：机制键三轨对齐 + Descriptor-only 执行 + Run Attempt 递增（已完成）
+
+| 子轨 | 动作 |
+|------|------|
+| R25-A | ScoreProjector / EventAssembler `ResolveByMechanism`；`writer.prepare` 三轨机制键；`DefaultMechanismEventAssemblers` |
+| R25-B | `MaterializeFamilyEvaluators` + `WithFamilyEvaluators`；descriptor 命中不经 `EvaluatorRegistry` 族级 dispatch；legacy 仅 typology alias |
+| R25-C | `NewEvaluationRunWithAttempt` / `NextEvaluationRun`；Start 前读 latest retryable run；worker 日志 `evaluation_run_hint` |
+
+**刻意保留（R26+）**：删除 `EvaluatorKey` 类型、EvaluationRun REST、ModelCatalog R16 根包整理、KindCapability 全量迁移。
+

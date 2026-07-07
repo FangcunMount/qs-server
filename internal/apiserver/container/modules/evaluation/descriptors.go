@@ -7,6 +7,7 @@ import (
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 )
 
@@ -16,6 +17,16 @@ type WiringDeps = evalruntime.WiringDeps
 // MaterializeEvaluators builds evaluators from descriptors.
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
 	return evalruntime.MaterializeEvaluators(descs, deps)
+}
+
+// MaterializeFamilyEvaluators builds one evaluator per algorithm family.
+func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFamily]execute.Evaluator, error) {
+	return evalruntime.MaterializeFamilyEvaluators(deps)
+}
+
+// MaterializeLegacyEvaluators builds typology legacy alias evaluators.
+func MaterializeLegacyEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
+	return evalruntime.MaterializeLegacyEvaluators(descs, deps)
 }
 
 // MaterializeReportBuilders builds report builders from descriptors.

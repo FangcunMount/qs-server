@@ -2,10 +2,25 @@ package execute
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 )
+
+func (s *service) newEvaluationRun(ctx context.Context, assessmentID uint64) (evalrun.EvaluationRun, error) {
+	attemptNo := 1
+	if s.runRepo != nil {
+		latest, err := s.runRepo.FindLatestByAssessmentID(ctx, assessmentID)
+		if err != nil {
+			return evalrun.EvaluationRun{}, fmt.Errorf("load latest evaluation run: %w", err)
+		}
+		if latest != nil && latest.Attempt.Status == evalrun.StatusFailed && latest.Retryable() {
+			attemptNo = latest.Attempt.Number + 1
+		}
+	}
+	return evalrun.NewEvaluationRunWithAttempt(assessmentID, attemptNo), nil
+}
 
 func (s *service) persistEvaluationRun(ctx context.Context, run evalrun.EvaluationRun) error {
 	if s == nil || s.runRepo == nil {

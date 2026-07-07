@@ -90,6 +90,7 @@ func handleAssessmentSubmitted(deps *Dependencies) HandlerFunc {
 			deps.Logger.Warn("assessment evaluation returned retryable failure",
 				slog.Int64("assessment_id", data.AssessmentID),
 				slog.String("error", err.Error()),
+				slog.String("evaluation_run_hint", "check evaluation_run table for latest attempt and retryable flag"),
 			)
 			return err
 		}

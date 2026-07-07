@@ -27,9 +27,10 @@ type ScoreProjector interface {
 	Project(ctx context.Context, outcome evaloutcome.Outcome) error
 }
 
-// ScoreProjectorRegistry resolves score projectors by evaluator key.
+// ScoreProjectorRegistry resolves score projectors by evaluator key or mechanism key.
 type ScoreProjectorRegistry interface {
 	Resolve(key evaluation.EvaluatorKey) ScoreProjector
+	ResolveByMechanism(key MechanismReportBuilderKey) ScoreProjector
 }
 
 // CompletionNotifier notifies waiters after interpretation completes.

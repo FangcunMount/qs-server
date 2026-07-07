@@ -220,11 +220,15 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			TypologyRegistry:   normalized.TypologyRegistry,
 		}
 		descs := normalized.ModelDescriptors
-		evaluators, err := MaterializeEvaluators(descs, wiringDeps)
+		familyEvaluators, err := MaterializeFamilyEvaluators(wiringDeps)
 		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build evaluation evaluators: %v", err)
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build family evaluators: %v", err)
 		}
-		evaluatorRegistry, err := execute.NewEvaluatorRegistry(evaluators...)
+		legacyEvaluators, err := MaterializeLegacyEvaluators(descs, wiringDeps)
+		if err != nil {
+			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build legacy evaluators: %v", err)
+		}
+		evaluatorRegistry, err := execute.NewEvaluatorRegistry(legacyEvaluators...)
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}
@@ -272,6 +276,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
+			execute.WithFamilyEvaluators(familyEvaluators),
 			execute.WithRunRepository(infra.runRepo),
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithScoringWriter(scoringWriter),

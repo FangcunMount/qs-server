@@ -30,15 +30,13 @@ type RuntimeResolver struct {
 func NewRuntimeResolver(
 	descriptors *evalpipeline.RuntimeDescriptorRegistry,
 	evaluators EvaluatorRegistry,
+	familyEvaluators map[modelcatalog.AlgorithmFamily]Evaluator,
 ) *RuntimeResolver {
-	resolver := &RuntimeResolver{
-		descriptors: descriptors,
-		evaluators:  evaluators,
+	return &RuntimeResolver{
+		descriptors:      descriptors,
+		evaluators:       evaluators,
+		familyEvaluators: familyEvaluators,
 	}
-	if registry, ok := evaluators.(*mutableEvaluatorRegistry); ok {
-		resolver.familyEvaluators = familyExecutorsFromRegistry(registry)
-	}
-	return resolver
 }
 
 // ResolveExecution selects the runtime descriptor and evaluator key for one evaluation.
@@ -95,9 +93,12 @@ func (r *RuntimeResolver) Execute(
 }
 
 func (r *RuntimeResolver) resolveEvaluator(resolved ResolvedExecution) (Evaluator, error) {
-	if resolved.UsedDescriptor && r.familyEvaluators != nil {
-		if evaluator, ok := r.familyEvaluators[resolved.Descriptor.AlgorithmFamily]; ok {
-			return evaluator, nil
+	if resolved.UsedDescriptor {
+		if r.familyEvaluators != nil {
+			if evaluator, ok := r.familyEvaluators[resolved.Descriptor.AlgorithmFamily]; ok {
+				return evaluator, nil
+			}
+			return nil, fmt.Errorf("unsupported evaluation algorithm family: %s", resolved.Descriptor.AlgorithmFamily)
 		}
 	}
 	return r.evaluators.Resolve(resolved.EvaluatorKey)
