@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
@@ -23,7 +23,7 @@ func TestV2ScaleReportProjectsOutcomeSummaryFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("execute: %v", err)
 	}
-	report, err := interpretationreporting.NewScaleReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
+	report, err := interpretationreporting.NewFactorScoringReportBuilder(domainreport.NewDefaultInterpretReportBuilder(nil)).
 		Build(context.Background(), evaloutcome.Outcome{Assessment: a, Input: snapshot, Execution: execution})
 	if err != nil {
 		t.Fatalf("Build report: %v", err)

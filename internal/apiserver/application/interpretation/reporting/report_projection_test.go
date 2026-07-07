@@ -6,7 +6,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/typology"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"

@@ -4,10 +4,9 @@ import (
 	"context"
 	"testing"
 
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	mongoevaluation "github.com/FangcunMount/qs-server/internal/apiserver/infra/mongo/interpretation"
 )
@@ -16,7 +15,7 @@ import (
 // trait dimensions, distribution summary, and source attribution.
 func TestV1BigFivePipelinePreservesTraitScoresAndReportFields(t *testing.T) {
 	model := bigFiveCharacterizationModel()
-	detail, err := bigfiveadapter.Score(model, bigFiveAnswerSheet())
+	detail, err := scoreBigFiveCharacterization(t, model, bigFiveAnswerSheet())
 	if err != nil {
 		t.Fatalf("Score: %v", err)
 	}

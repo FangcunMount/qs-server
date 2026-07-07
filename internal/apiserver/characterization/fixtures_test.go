@@ -7,7 +7,8 @@ import (
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/configured"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
@@ -729,4 +730,22 @@ func requireTraitProfileDetail(t *testing.T, payload any) evaluationtypology.Tra
 		t.Fatalf("payload type = %T, want TraitProfileDetail", payload)
 	}
 	return detail
+}
+
+func scoreBigFiveCharacterization(
+	t *testing.T,
+	payload *modeltypology.Payload,
+	sheet *evaluationinputdomain.AnswerSheet,
+) (evaluationtypology.BigFiveResultDetail, error) {
+	t.Helper()
+	evaluator := configured.NewEvaluator()
+	result, err := evaluator.Score(payload, sheet)
+	if err != nil {
+		return evaluationtypology.BigFiveResultDetail{}, err
+	}
+	generic, err := evaluationtypology.TraitProfileDetailFromPayload(result.Detail)
+	if err != nil {
+		return evaluationtypology.BigFiveResultDetail{}, err
+	}
+	return evaluationtypology.BigFiveResultDetailFromTraitProfile(generic), nil
 }

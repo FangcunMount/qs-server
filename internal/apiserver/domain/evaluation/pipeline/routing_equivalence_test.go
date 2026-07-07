@@ -48,7 +48,7 @@ func TestRuntimeDescriptorKeyMatchesIdentityDerivation(t *testing.T) {
 	cases := []modelcatalog.PublishedModelSnapshot{
 		{
 			Model: modelcatalog.ModelDefinition{
-				Kind:    modelcatalog.KindScale,
+				Kind:      modelcatalog.KindScale,
 				Algorithm: modelcatalog.AlgorithmScaleDefault,
 			},
 			Decision:      modelcatalog.DecisionSpec{Kind: modelcatalog.DecisionKindScoreRange},

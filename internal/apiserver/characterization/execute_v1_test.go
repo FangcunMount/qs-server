@@ -4,11 +4,11 @@ import (
 	"context"
 	"testing"
 
+	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring"
 	taskperformance "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance"
-	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 

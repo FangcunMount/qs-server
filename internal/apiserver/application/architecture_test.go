@@ -527,7 +527,7 @@ func TestReportDomainDoesNotUseAlgorithmNamedTopLevelPackages(t *testing.T) {
 	}
 	for _, dir := range forbiddenDirs {
 		if _, err := os.Stat(dir); err == nil {
-			t.Fatalf("%s must not exist; typology report assembly belongs in domain/interpretation/personality/typology", filepath.ToSlash(mustRel(t, root, dir)))
+			t.Fatalf("%s must not exist; typology report assembly belongs in domain/interpretation/factor_classification/typology", filepath.ToSlash(mustRel(t, root, dir)))
 		}
 	}
 
@@ -538,7 +538,7 @@ func TestReportDomainDoesNotUseAlgorithmNamedTopLevelPackages(t *testing.T) {
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {
 		for _, forbidden := range forbiddenImports {
 			if importPath == forbidden || strings.HasPrefix(importPath, forbidden+"/") {
-				t.Fatalf("%s imports %s; use domain/interpretation/personality/typology instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
+				t.Fatalf("%s imports %s; use domain/interpretation/factor_classification/typology instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
 			}
 		}
 	})
@@ -684,8 +684,8 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 	}
 	scaleRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
-		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scale"),
-		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "score"),
+		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "factor_scoring"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "factor_scoring"),
 		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_scoring"),
 	}
 	for _, scanRoot := range scaleRoots {
@@ -724,7 +724,7 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 	}
 	allowedRelPrefixes := []string{
 		"internal/apiserver/characterization/",
-		"internal/apiserver/application/evaluation/scale/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/factor_scoring/outcome_mapper.go",
 		"internal/apiserver/application/evaluation/outcome/legacy.go",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")

@@ -3,7 +3,7 @@ package factor_classification
 import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
+	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/factor_classification/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )

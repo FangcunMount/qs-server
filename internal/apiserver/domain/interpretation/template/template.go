@@ -3,7 +3,7 @@ package template
 
 import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	typologytemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
+	typologytemplate "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/factor_classification/typology"
 )
 
 // Profile is a mechanism-neutral report template profile.

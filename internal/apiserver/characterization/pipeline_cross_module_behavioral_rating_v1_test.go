@@ -20,7 +20,7 @@ func TestV1CrossModuleSyncBehavioralRatingSurveySubmitWorkerToInterpretedReport(
 		v1SplitPhaseConfig: v1SplitPhaseConfig{
 			Assessment: a,
 			Input:      behavioralRatingInputSnapshot(),
-			ReportBuilder: interpretationreporting.NewBehavioralRatingReportBuilder(
+			ReportBuilder: interpretationreporting.NewNormProfileReportBuilder(
 				domainreport.NewDefaultInterpretReportBuilder(nil),
 			),
 		},

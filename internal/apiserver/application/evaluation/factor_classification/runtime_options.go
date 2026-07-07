@@ -1,7 +1,7 @@
 package factor_classification
 
 import (
-	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/configured"
 )
 
 // PersonalityRuntimeOptions configures injectable adapter registries for typology execution.

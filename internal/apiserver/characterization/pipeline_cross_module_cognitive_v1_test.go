@@ -20,7 +20,7 @@ func TestV1CrossModuleSyncCognitiveSurveySubmitWorkerToInterpretedReport(t *test
 		v1SplitPhaseConfig: v1SplitPhaseConfig{
 			Assessment: a,
 			Input:      cognitiveInputSnapshot(),
-			ReportBuilder: interpretationreporting.NewCognitiveReportBuilder(
+			ReportBuilder: interpretationreporting.NewTaskPerformanceReportBuilder(
 				domainreport.NewDefaultInterpretReportBuilder(nil),
 			),
 		},

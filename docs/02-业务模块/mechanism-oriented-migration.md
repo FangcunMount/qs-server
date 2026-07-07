@@ -169,3 +169,52 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R8-4 | `pipeline.Registry.HasAlgorithmFamily`；架构守卫 + 文档 Round 8 节 |
 
 **不做**：删 `domain/evaluation/scale`/`personality` 宿主（留 Round 9）；materialize 改读 registry 工厂表。
+
+## Round 9：domain scale 迁入 factor_scoring + materialize/registry 对齐（已完成）
+
+**做**：删除 `domain/evaluation/scale`；实现迁入 `domain/evaluation/factor_scoring`；materialize 工厂表与 registry path 对齐测试。
+
+| 阶段 | 动作 |
+|------|------|
+| R9-1 | `domain/evaluation/scale/*` 迁入 `domain/evaluation/factor_scoring`；删 `entry.go` 薄委托 |
+| R9-2 | `materialize_paths.go` + `materialize_registry_test`：工厂 map 与 `RuntimeDescriptorRegistry` 对齐 |
+| R9-3 | 架构守卫移除 `domain/scale` 白名单；`doc.go` 同步 |
+
+**不做**：`domain/evaluation/personality` 迁入 `factor_classification`（留 Round 10）；assemble 完全 registry 驱动物化。
+
+## Round 10：domain personality 迁入 factor_classification（已完成）
+
+**做**：`domain/evaluation/personality/*` 整树迁入 `domain/evaluation/factor_classification`；application 改引新路径；legacy adapter 白名单同步。
+
+| 阶段 | 动作 |
+|------|------|
+| R10-1 | `personality/{configured,typology,adapter,profile,specialrule}` → `factor_classification/`；删 `entry.go` 薄委托 |
+| R10-2 | 全仓 import `domain/evaluation/personality` → `factor_classification`；`architecture_test` 包名同步 |
+| R10-3 | 架构守卫：adapter 白名单路径更新；禁止 application 直引 `domain/personality` |
+| R10-4 | 文档 Round 10 节 |
+
+**不做**：`domain/interpretation/personality` 收敛；删 `adapter/{mbti,sbti,bigfive}`；assemble registry 驱动物化。
+
+## Round 11：interpretation 机制包收敛（已完成）
+
+**做**：`domain/interpretation/personality` → `factor_classification`；`domain/interpretation/score` → `factor_scoring`；清重复 `domain/evaluation/personality`。
+
+| 阶段 | 动作 |
+|------|------|
+| R11-1 | `personality/*` → `interpretation/factor_classification`（含 typology 子包）；`score/*` → `interpretation/factor_scoring` |
+| R11-2 | 全仓 import 切换；`builder`/`template` 改引机制包 |
+| R11-3 | 删重复 `domain/evaluation/personality`；架构守卫移除 interpretation personality/score 白名单 |
+| R11-4 | 文档 Round 11 节 |
+
+**不做**：删 `adapter/{mbti,sbti,bigfive}`；assemble 完全 registry 驱动物化（留 Round 12）。
+
+## Round 12：legacy adapter 清债 + materialize 单源（已完成）
+
+**做**：删 `adapter/{mbti,sbti,bigfive}`；characterization/configured 测试改引 configured + typology reference；materialize 与 `DefaultRuntimeDescriptorRegistry` 共用 `defaultPathMaterializations`。
+
+| 阶段 | 动作 |
+|------|------|
+| R12-1 | 删 legacy adapter 子包；`adapter` 仅保留 `ModelAdapter`/`Registry` + `configured` |
+| R12-2 | characterization 用 `scoreBigFiveCharacterization`；configured 等价测试改 typology reference |
+| R12-3 | `materialization_specs.go` 单源驱动 factory map 与 registry |
+| R12-4 | 架构守卫移除 adapter 过渡白名单；文档 Round 12 节 |

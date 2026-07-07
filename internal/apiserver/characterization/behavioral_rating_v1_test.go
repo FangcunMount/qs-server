@@ -22,7 +22,7 @@ func TestV1BehavioralRatingExecuteAndReport(t *testing.T) {
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      behavioralRatingInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewBehavioralRatingReportBuilder(
+		ReportBuilder: interpretationreporting.NewNormProfileReportBuilder(
 			domainreport.NewDefaultInterpretReportBuilder(nil),
 		),
 	})

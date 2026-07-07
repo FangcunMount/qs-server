@@ -41,9 +41,9 @@ func buildV1SplitPhaseExecuteService(t *testing.T, cfg v1SplitPhaseConfig, repos
 	}
 	reportSaver := &charSplitPhaseReportSaver{}
 	scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
-		interpretationreporting.NewScaleScoreProjector(&charNoopScoreRepo{}),
-		interpretationreporting.NewBehavioralRatingScoreProjector(&charNoopScoreRepo{}),
-		interpretationreporting.NewCognitiveScoreProjector(&charNoopScoreRepo{}),
+		interpretationreporting.NewFactorScoringScoreProjector(&charNoopScoreRepo{}),
+		interpretationreporting.NewNormProfileScoreProjector(&charNoopScoreRepo{}),
+		interpretationreporting.NewTaskPerformanceScoreProjector(&charNoopScoreRepo{}),
 	)
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry: %v", err)

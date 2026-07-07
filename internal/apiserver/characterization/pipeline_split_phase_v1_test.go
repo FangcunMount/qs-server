@@ -21,7 +21,7 @@ func TestV1SplitPhasePipelineScaleSubmitToInterpretedOutcome(t *testing.T) {
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewScaleReportBuilder(
+		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
 			domainreport.NewDefaultInterpretReportBuilder(nil),
 		),
 	})
@@ -77,7 +77,7 @@ func TestV1SplitPhaseAsyncScaleStopsAtEvaluatedThenGenerateReport(t *testing.T) 
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      scaleInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewScaleReportBuilder(
+		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
 			domainreport.NewDefaultInterpretReportBuilder(nil),
 		),
 		Async:         true,

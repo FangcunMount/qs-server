@@ -9,20 +9,12 @@ import (
 
 // transitionalAssessmentCodePackages lists algorithm-specific extension packages allowed
 // during migration to mechanism-oriented organization. Do not add new entries.
-var transitionalAssessmentCodePackages = map[string]string{
-	"internal/apiserver/domain/evaluation/personality/adapter/mbti":    "transitional: characterization-only legacy adapter",
-	"internal/apiserver/domain/evaluation/personality/adapter/sbti":    "transitional: characterization-only legacy adapter",
-	"internal/apiserver/domain/evaluation/personality/adapter/bigfive": "transitional: characterization-only legacy adapter",
-}
+var transitionalAssessmentCodePackages = map[string]string{}
 
 // transitionalModelFamilyPackages lists model-family packages allowed during migration.
 // Evaluation and interpretation domain cores must not add new entries here.
 var transitionalModelFamilyPackages = map[string]string{
-	"internal/apiserver/domain/evaluation/scale":                  "transitional: factor_scoring implementation host",
-	"internal/apiserver/domain/evaluation/personality":            "transitional: factor_classification implementation host",
-	"internal/apiserver/domain/interpretation/personality":        "transitional: typology report host",
-	"internal/apiserver/domain/interpretation/score":              "transitional: factor_scoring report host",
-	"internal/apiserver/application/evaluation/personality":       "transitional: factor_classification re-export only (empty)",
+	"internal/apiserver/application/evaluation/personality": "transitional: factor_classification re-export only (empty)",
 }
 
 var forbiddenAssessmentCodeDirNames = []string{
@@ -113,6 +105,8 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 		"internal/apiserver/domain/evaluation/input",
 		"internal/apiserver/domain/evaluation/policy",
 		"internal/apiserver/domain/evaluation/run",
+		"internal/apiserver/domain/evaluation/factor_scoring",
+		"internal/apiserver/domain/evaluation/factor_classification",
 		"internal/apiserver/application/evaluation/factor_scoring",
 		"internal/apiserver/application/evaluation/factor_classification",
 		"internal/apiserver/application/evaluation/factor_norm",
@@ -135,6 +129,8 @@ func TestMechanismOrientedInterpretationPackagesExist(t *testing.T) {
 		"internal/apiserver/domain/interpretation/builder",
 		"internal/apiserver/domain/interpretation/rule",
 		"internal/apiserver/domain/interpretation/policy",
+		"internal/apiserver/domain/interpretation/factor_scoring",
+		"internal/apiserver/domain/interpretation/factor_classification",
 	}
 	for _, rel := range required {
 		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
@@ -217,6 +213,9 @@ func TestApplicationFactorMechanismsUseDomainEntryPackages(t *testing.T) {
 	forbiddenImports := map[string][]string{
 		"internal/apiserver/application/evaluation/factor_scoring": {
 			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale",
+		},
+		"internal/apiserver/application/evaluation/factor_classification": {
+			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality",
 		},
 	}
 	for relDir, forbidden := range forbiddenImports {

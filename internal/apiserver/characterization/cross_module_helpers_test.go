@@ -61,7 +61,7 @@ func buildCharAnswerSheetCrossModuleHarness(t *testing.T, cfg charAnswerSheetCro
 	t.Helper()
 	splitCfg := v1SplitPhaseConfig{
 		Input: scaleInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewScaleReportBuilder(
+		ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
 			domainreport.NewDefaultInterpretReportBuilder(nil),
 		),
 		Async: cfg.Async,
@@ -429,7 +429,7 @@ func scaleCrossModuleConfig(t *testing.T, a *assessment.Assessment, async bool) 
 		v1SplitPhaseConfig: v1SplitPhaseConfig{
 			Assessment: a,
 			Input:      scaleInputSnapshot(),
-			ReportBuilder: interpretationreporting.NewScaleReportBuilder(
+			ReportBuilder: interpretationreporting.NewFactorScoringReportBuilder(
 				domainreport.NewDefaultInterpretReportBuilder(nil),
 			),
 			Async: async,

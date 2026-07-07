@@ -77,3 +77,35 @@ PublishedModelSnapshot
 | Catalog 导出 | `EvaluationCatalog.RuntimeDescriptorRegistry` 随 `ExportEvaluationCatalog` 注入 |
 | Domain entry | application `factor_scoring` 经 `domain/evaluation/factor_scoring` entry，不再直引 `scale` |
 | 守卫 | `TestApplicationFactorMechanismsUseDomainEntryPackages` |
+
+## Round 9（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Domain scale 收敛 | `domain/evaluation/factor_scoring` 承接原 `scale` 实现；删除过渡包 |
+| Materialize 对齐 | `RegisteredEvaluatorPaths` 等与 registry 四条 path 等价测试 |
+| 架构守卫 | domain `factor_scoring` 纳入 required packages；移除 `domain/scale` 白名单 |
+
+## Round 10（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Domain personality 收敛 | `domain/evaluation/factor_classification` 承接 configured/typology/adapter/profile/specialrule |
+| Import 全量切换 | 50+ 文件 `domain/evaluation/personality` → `factor_classification` |
+| 守卫更新 | legacy adapter 白名单迁至 `factor_classification/adapter/*`；application 禁止回引 personality |
+
+## Round 11（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Interpretation 机制收敛 | `factor_classification` 承接 typology 报告；`factor_scoring` 承接 scale 报告 |
+| Import 切换 | `builder`/`template`/application 改引机制包；移除 interpretation personality/score 过渡白名单 |
+| 清债 | 删除重复 `domain/evaluation/personality` 目录 |
+
+## Round 12（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Legacy adapter 清债 | 删除 `adapter/{mbti,sbti,bigfive}`；characterization 改走 configured runtime |
+| Materialize 单源 | `defaultPathMaterializations` 同时驱动 factory map 与 `RuntimeDescriptorRegistry` |
+| 守卫 | 移除 assessment-code adapter 过渡白名单 |

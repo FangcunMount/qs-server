@@ -8,8 +8,7 @@ import (
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	bigfiveadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/bigfive"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
@@ -72,7 +71,7 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 // V1 contract: typology executor scores v2 Big Five payload through trait-profile pipeline.
 func TestV1TypologyBigFiveExecutorPreservesTraitProfileOutcome(t *testing.T) {
 	model := bigFiveCharacterizationModel()
-	want, err := bigfiveadapter.Score(model, bigFiveAnswerSheet())
+	want, err := scoreBigFiveCharacterization(t, model, bigFiveAnswerSheet())
 	if err != nil {
 		t.Fatalf("domain Score: %v", err)
 	}

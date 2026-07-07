@@ -3,8 +3,8 @@ package factor_scoring
 import (
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_scoring"
-	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 func evaluateInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) domainfactor_scoring.EvaluateInput {

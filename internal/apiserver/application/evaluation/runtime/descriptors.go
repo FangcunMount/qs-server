@@ -11,12 +11,7 @@ import (
 // DescriptorProjector maps an execution path to legacy evaluator descriptors for wiring.
 type DescriptorProjector func(path modelcatalog.ExecutionPath) []evaldomain.ModelDescriptor
 
-var runtimeMaterializationOrder = []modelcatalog.ExecutionPath{
-	modelcatalog.ExecutionPathScaleDescriptor,
-	modelcatalog.ExecutionPathTypologyDescriptor,
-	modelcatalog.ExecutionPathBehavioralRatingDescriptor,
-	modelcatalog.ExecutionPathCognitiveDescriptor,
-}
+var runtimeMaterializationOrder = materializationOrder()
 
 // ExecutionPathsFromRegistry returns registered execution paths in stable materialization order.
 func ExecutionPathsFromRegistry(registry *evalpipeline.RuntimeDescriptorRegistry) ([]modelcatalog.ExecutionPath, error) {

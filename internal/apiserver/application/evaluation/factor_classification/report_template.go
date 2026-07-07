@@ -1,7 +1,7 @@
 package factor_classification
 
 import (
-	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
+	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/factor_classification/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 

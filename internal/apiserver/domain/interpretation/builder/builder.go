@@ -3,8 +3,8 @@ package builder
 
 import (
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	typology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
-	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/score"
+	typology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/factor_classification/typology"
+	reportscore "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/factor_scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 

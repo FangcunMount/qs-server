@@ -6,12 +6,12 @@ import (
 )
 
 type (
-	ScaleReportBuilder      = FactorScoringReportBuilder
-	ScaleScoreProjector     = FactorScoringScoreProjector
-	BehavioralRatingReportBuilder = NormProfileReportBuilder
+	ScaleReportBuilder             = FactorScoringReportBuilder
+	ScaleScoreProjector            = FactorScoringScoreProjector
+	BehavioralRatingReportBuilder  = NormProfileReportBuilder
 	BehavioralRatingScoreProjector = NormProfileScoreProjector
-	CognitiveReportBuilder  = TaskPerformanceReportBuilder
-	CognitiveScoreProjector = TaskPerformanceScoreProjector
+	CognitiveReportBuilder         = TaskPerformanceReportBuilder
+	CognitiveScoreProjector        = TaskPerformanceScoreProjector
 )
 
 // Deprecated: use NewFactorScoringReportBuilder.

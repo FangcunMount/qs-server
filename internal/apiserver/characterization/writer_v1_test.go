@@ -24,7 +24,7 @@ func TestV1ScaleWriterPersistenceOrderAndStagedEvents(t *testing.T) {
 		WithModelRef(*a.EvaluationModelRef()))
 
 	scoreProjectors, err := interpretationreporting.NewScoreProjectorRegistry(
-		interpretationreporting.NewScaleScoreProjector(&writerScoreRepoStub{order: &order}),
+		interpretationreporting.NewFactorScoringScoreProjector(&writerScoreRepoStub{order: &order}),
 	)
 	if err != nil {
 		t.Fatalf("NewScoreProjectorRegistry: %v", err)

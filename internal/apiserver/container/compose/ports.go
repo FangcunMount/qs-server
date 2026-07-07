@@ -24,8 +24,8 @@ type ReportIntegrationPorts struct {
 
 // EvaluationCatalog carries shared model descriptors for report/evaluation wiring.
 type EvaluationCatalog struct {
-	Descriptors              []evaldomain.ModelDescriptor
-	TypologyRegistry         typologyEvaluation.ModuleRegistry
+	Descriptors               []evaldomain.ModelDescriptor
+	TypologyRegistry          typologyEvaluation.ModuleRegistry
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 }
 

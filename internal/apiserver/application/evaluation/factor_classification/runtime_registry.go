@@ -5,8 +5,8 @@ import (
 
 	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/adapter/configured"
-	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
+	configuredadapter "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/adapter/configured"
+	personalityconfigured "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/configured"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 

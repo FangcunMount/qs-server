@@ -1,45 +1,18 @@
 package runtime
 
-import (
-	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-)
+import evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 
 // DefaultRuntimeDescriptorRegistry registers mechanism descriptors aligned with materialize factories.
 func DefaultRuntimeDescriptorRegistry() (*evalpipeline.RuntimeDescriptorRegistry, error) {
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
-	for _, path := range []modelcatalog.ExecutionPath{
-		modelcatalog.ExecutionPathScaleDescriptor,
-		modelcatalog.ExecutionPathTypologyDescriptor,
-		modelcatalog.ExecutionPathBehavioralRatingDescriptor,
-		modelcatalog.ExecutionPathCognitiveDescriptor,
-	} {
-		family, ok := algorithmFamilyForExecutionPath(path)
-		if !ok {
-			continue
-		}
-		if err := registry.Register(evalpipeline.RuntimeDescriptor{
-			Key:             evalpipeline.RuntimeDescriptorKey{AlgorithmFamily: family},
-			AlgorithmFamily: family,
-			ExecutionPath:   path,
-		}); err != nil {
+	descs, err := runtimeDescriptorsFromSpecs(defaultPathMaterializations())
+	if err != nil {
+		return nil, err
+	}
+	for _, desc := range descs {
+		if err := registry.Register(desc); err != nil {
 			return nil, err
 		}
 	}
 	return registry, nil
-}
-
-func algorithmFamilyForExecutionPath(path modelcatalog.ExecutionPath) (modelcatalog.AlgorithmFamily, bool) {
-	switch path {
-	case modelcatalog.ExecutionPathScaleDescriptor:
-		return modelcatalog.AlgorithmFamilyFactorScoring, true
-	case modelcatalog.ExecutionPathTypologyDescriptor:
-		return modelcatalog.AlgorithmFamilyFactorClassification, true
-	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
-		return modelcatalog.AlgorithmFamilyFactorNorm, true
-	case modelcatalog.ExecutionPathCognitiveDescriptor:
-		return modelcatalog.AlgorithmFamilyTaskPerformance, true
-	default:
-		return "", false
-	}
 }

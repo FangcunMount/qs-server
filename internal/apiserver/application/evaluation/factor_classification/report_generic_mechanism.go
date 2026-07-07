@@ -1,8 +1,8 @@
 package factor_classification
 
 import (
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_classification/typology"
+	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/factor_classification/typology"
 )
 
 func genericPersonalityTypeMechanismDetail(detail evaluationtypology.PersonalityTypeDetail) reporttypology.PersonalityTypeReportDetail {

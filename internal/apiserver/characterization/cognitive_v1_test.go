@@ -22,7 +22,7 @@ func TestV1CognitiveExecuteAndReport(t *testing.T) {
 	svc, reportSaver := buildV1SplitPhaseExecuteService(t, v1SplitPhaseConfig{
 		Assessment: a,
 		Input:      cognitiveInputSnapshot(),
-		ReportBuilder: interpretationreporting.NewCognitiveReportBuilder(
+		ReportBuilder: interpretationreporting.NewTaskPerformanceReportBuilder(
 			domainreport.NewDefaultInterpretReportBuilder(nil),
 		),
 	})
