@@ -43,12 +43,12 @@ Factor 是发布态模型快照中的**稳定维度单元**，表达：
 
 ## 4. AlgorithmFamily 如何使用 Factor
 
-| AlgorithmFamily | Factor 主要用法 | 典型测评 |
-| --------------- | --------------- | -------- |
-| `factor_scoring` | `ScoringSpec` + 分数区间解释 | PHQ-9、GAD-7、普通医学/行为量表 |
-| `factor_classification` | 维度得分 → 极性判断 → 类型组合 | MBTI、SBTI、BigFive 类型化 |
-| `factor_norm` | 原始分 → 常模查表 → T 分/百分位 | BRIEF-2、Conners 等 |
-| `task_performance` | 题组/任务集维度 + 能力等级（可选常模） | SPM、注意力/工作记忆任务 |
+| 机制包名 | `AlgorithmFamily` | Factor 主要用法 | 典型测评 |
+| -------- | ----------------- | --------------- | -------- |
+| `scoring` | `factor_scoring` | `ScoringSpec` + 分数区间解释 | PHQ-9、GAD-7、普通医学/行为量表 |
+| `typology` | `factor_classification` | 维度得分 → 极性判断 → 类型组合 | MBTI、SBTI、BigFive 类型化 |
+| `norming` | `factor_norm` | 原始分 → 常模查表 → T 分/百分位 | BRIEF-2、Conners 等 |
+| `task_performance` | `task_performance` | 题组/任务集维度 + 能力等级（可选常模） | SPM、注意力/工作记忆任务 |
 
 执行链路抽象：
 

@@ -4,11 +4,24 @@
 
 **代码按机制组织，数据按测评组织。**
 
-| 机制（代码） | 测评（配置） |
+## 包名与 AlgorithmFamily 对照表
+
+| Go 包名 | `AlgorithmFamily` 枚举 | 含义 | 典型测评 |
+|---------|------------------------|------|----------|
+| `scoring` | `factor_scoring` | 因子区间计分 | PHQ-9、GAD-7 |
+| `typology` | `factor_classification` | pole/trait/pattern 分型 | MBTI、SBTI、BigFive |
+| `norming` | `factor_norm` | 常模查表与投影 | Brief-2、Conners |
+| `task_performance` | `task_performance` | 任务/能力表现 | SPM |
+
+- **枚举**：API、种子、`AlgorithmFamily` 常量、持久化边界 — 保持 `factor_*`（除 `task_performance` 两端一致）。
+- **包名**：`domain/evaluation`、`domain/interpretation`、`registry/mechanisms` 下的执行/报告实现。
+- **modelcatalog metadata**：`modelcatalog/norming` ↔ `factor_norm`；`modelcatalog/task_performance` ↔ `task_performance`。
+
+| 机制（包名） | 测评（配置） |
 |-------------|-------------|
-| factor_scoring | PHQ-9、GAD-7、通用量表 |
-| factor_classification / typology | MBTI、SBTI、BigFive |
-| factor_norm | Brief-2、Conners（规划） |
+| scoring | PHQ-9、GAD-7、通用量表 |
+| typology | MBTI、SBTI、BigFive |
+| norming | Brief-2、Conners（规划） |
 | task_performance | SPM、工作记忆任务（规划） |
 
 ## 终局目录（目标态）
@@ -16,7 +29,7 @@
 ```
 domain/modelcatalog/
 ├── factor
-├── factor_norm          # 常模/综合指数 metadata
+├── norming              # 常模/综合指数 metadata（包名 norming；AlgorithmFamily 仍 factor_norm）
 ├── task_performance     # 任务表现 metadata
 ├── classification
 └── legacy
@@ -27,11 +40,14 @@ domain/calculation/
 └── norm                 # 常模查表 + norm projection
 
 application/evaluation/
-├── calculationadapter
-├── factor_scoring
-├── factor_classification
-├── factor_norm
-└── task_performance
+├── registry/                 # 对外门面
+│   └── mechanisms/
+│       ├── scoring           # AlgorithmFamily: factor_scoring
+│       ├── typology          # AlgorithmFamily: factor_classification
+│       ├── norming           # AlgorithmFamily: factor_norm
+│       └── task_performance
+├── runtime/
+└── calculationadapter/
 ```
 
 ## 三阶段迁移
@@ -46,7 +62,7 @@ application/evaluation/
 
 | 触发 | 动作 |
 |------|------|
-| Brief-2 + Conners | 抽 `calculation/norm`、`modelcatalog/factor_norm` |
+| Brief-2 + Conners | 抽 `calculation/norm`、`modelcatalog/norming` |
 | SPM + 第二任务 | 抽 `calculation/task`、`modelcatalog/task_performance` 执行层 |
 | MBTI/SBTI/BigFive | 收敛 report/detail 到 `personality_type` / `trait_profile` 机制 |
 
@@ -65,7 +81,7 @@ application/evaluation/
 | 交付 | 位置 |
 |------|------|
 | 常模查表 + projection | `domain/calculation/norm` |
-| 因子常模 metadata | `domain/modelcatalog/factor_norm` |
+| 因子常模 metadata | `domain/modelcatalog/norming` |
 | 任务表现 metadata | `domain/modelcatalog/task_performance` |
 | Typology 机制 detail/report | `personality_type` / `trait_profile` generic assembler |
 | 生产路径 | `configured` runtime（非 `adapter.DefaultRegistry()`） |
@@ -172,11 +188,11 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 
 ## Round 9：domain scale 迁入 factor_scoring + materialize/registry 对齐（已完成）
 
-**做**：删除 `domain/evaluation/scale`；实现迁入 `domain/evaluation/factor_scoring`；materialize 工厂表与 registry path 对齐测试。
+**做**：删除 `domain/evaluation/scale`；实现迁入 `domain/evaluation/scoring`；materialize 工厂表与 registry path 对齐测试。
 
 | 阶段 | 动作 |
 |------|------|
-| R9-1 | `domain/evaluation/scale/*` 迁入 `domain/evaluation/factor_scoring`；删 `entry.go` 薄委托 |
+| R9-1 | `domain/evaluation/scale/*` 迁入 `domain/evaluation/scoring`；删 `entry.go` 薄委托 |
 | R9-2 | `materialize_paths.go` + `materialize_registry_test`：工厂 map 与 `RuntimeDescriptorRegistry` 对齐 |
 | R9-3 | 架构守卫移除 `domain/scale` 白名单；`doc.go` 同步 |
 
@@ -184,7 +200,7 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 
 ## Round 10：domain personality 迁入 factor_classification（已完成）
 
-**做**：`domain/evaluation/personality/*` 整树迁入 `domain/evaluation/factor_classification`；application 改引新路径；legacy adapter 白名单同步。
+**做**：`domain/evaluation/personality/*` 整树迁入 `domain/evaluation/typology`；application 改引新路径；legacy adapter 白名单同步。
 
 | 阶段 | 动作 |
 |------|------|
@@ -242,3 +258,17 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R14-2 | runtime/registry/characterization import 全量切换 |
 | R14-3 | 架构守卫：`TestApplicationDoesNotImportLegacyFactorMechanismHosts`；container 禁止直引 mechanisms |
 | R14-4 | 文档 Round 14 节 |
+
+## Round 15：机制包语义重命名（方案 B，已完成）
+
+**做**：`factor_*` 机制包改为语义短名；`AlgorithmFamily` 字符串保留 `factor_*`（双层兼容）。
+
+| 旧包 | 新 Go 包名 | `AlgorithmFamily` 枚举 | 子包调整 |
+|------|-----------|------------------------|----------|
+| `factor_scoring` / `range_scoring` | `scoring` | `factor_scoring` | 合并原 `domain/evaluation/scoring`（FactorScorer） |
+| `factor_classification` | `typology` | `factor_classification` | `typology/`→`patterns/`，`profile/`→`trait/` |
+| `factor_norm` | `norming` | `factor_norm` | — |
+| `task_performance` | `task_performance` | `task_performance` | — |
+| `modelcatalog/factor_norm` | `modelcatalog/norming` | `factor_norm` | metadata 包名对齐 |
+
+`personality/typology`（测评 payload）、`task_performance` metadata、`application/evaluation/scoring`（快照）保持原名。

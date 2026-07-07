@@ -5,7 +5,16 @@
 - **ModelCatalog** 可按模型族组织（personality / scale / behavioral_rating / cognitive），承载模型资产差异。
 - **Evaluation** 按执行机制组织（assessment / run / input / policy / pipeline），不认识具体测评 code。
 - **Interpretation** 按报告机制组织（report / template / builder / rule / policy），不认识具体测评 code。
-- **机制轴**：复用 `AlgorithmFamily` + `DecisionKind` + `PayloadFormat`（定义于 `domain/modelcatalog`），不新造枚举。
+- **机制轴**：`AlgorithmFamily`（枚举）+ `DecisionKind` + `PayloadFormat`；执行代码包名见下表。
+
+## 包名与 AlgorithmFamily 对照表
+
+| Go 包名 | `AlgorithmFamily` 枚举 |
+|---------|------------------------|
+| `scoring` | `factor_scoring` |
+| `typology` | `factor_classification` |
+| `norming` | `factor_norm` |
+| `task_performance` | `task_performance` |
 
 ## 阶段零决策（已锁定）
 
@@ -75,14 +84,14 @@ PublishedModelSnapshot
 |------|------|
 | Registry 驱动 descs | `DefaultEvaluationDescriptors` 从 `RuntimeDescriptorRegistry` 派生 execution path 再投影 |
 | Catalog 导出 | `EvaluationCatalog.RuntimeDescriptorRegistry` 随 `ExportEvaluationCatalog` 注入 |
-| Domain entry | application `factor_scoring` 经 `domain/evaluation/factor_scoring` entry，不再直引 `scale` |
+| Domain entry | application `factor_scoring` 经 `domain/evaluation/scoring` entry，不再直引 `scale` |
 | 守卫 | `TestApplicationFactorMechanismsUseDomainEntryPackages` |
 
 ## Round 9（已完成）
 
 | 交付 | 说明 |
 |------|------|
-| Domain scale 收敛 | `domain/evaluation/factor_scoring` 承接原 `scale` 实现；删除过渡包 |
+| Domain scale 收敛 | `domain/evaluation/scoring` 承接原 `scale` 实现；删除过渡包 |
 | Materialize 对齐 | `RegisteredEvaluatorPaths` 等与 registry 四条 path 等价测试 |
 | 架构守卫 | domain `factor_scoring` 纳入 required packages；移除 `domain/scale` 白名单 |
 
@@ -90,7 +99,7 @@ PublishedModelSnapshot
 
 | 交付 | 说明 |
 |------|------|
-| Domain personality 收敛 | `domain/evaluation/factor_classification` 承接 configured/typology/adapter/profile/specialrule |
+| Domain personality 收敛 | `domain/evaluation/typology` 承接 configured/typology/adapter/profile/specialrule |
 | Import 全量切换 | 50+ 文件 `domain/evaluation/personality` → `factor_classification` |
 | 守卫更新 | legacy adapter 白名单迁至 `factor_classification/adapter/*`；application 禁止回引 personality |
 

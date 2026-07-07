@@ -105,12 +105,13 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 		"internal/apiserver/domain/evaluation/input",
 		"internal/apiserver/domain/evaluation/policy",
 		"internal/apiserver/domain/evaluation/run",
-		"internal/apiserver/domain/evaluation/factor_scoring",
-		"internal/apiserver/domain/evaluation/factor_classification",
+		"internal/apiserver/domain/evaluation/scoring",
+		"internal/apiserver/domain/evaluation/typology",
+		"internal/apiserver/domain/evaluation/norming",
 		"internal/apiserver/application/evaluation/registry",
-		"internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring",
-		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification",
-		"internal/apiserver/application/evaluation/registry/mechanisms/factor_norm",
+		"internal/apiserver/application/evaluation/registry/mechanisms/scoring",
+		"internal/apiserver/application/evaluation/registry/mechanisms/typology",
+		"internal/apiserver/application/evaluation/registry/mechanisms/norming",
 		"internal/apiserver/application/evaluation/registry/mechanisms/task_performance",
 	}
 	for _, rel := range required {
@@ -130,8 +131,8 @@ func TestMechanismOrientedInterpretationPackagesExist(t *testing.T) {
 		"internal/apiserver/domain/interpretation/builder",
 		"internal/apiserver/domain/interpretation/rule",
 		"internal/apiserver/domain/interpretation/policy",
-		"internal/apiserver/domain/interpretation/factor_scoring",
-		"internal/apiserver/domain/interpretation/factor_classification",
+		"internal/apiserver/domain/interpretation/scoring",
+		"internal/apiserver/domain/interpretation/typology",
 	}
 	for _, rel := range required {
 		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
@@ -212,10 +213,10 @@ func TestApplicationFactorMechanismsUseDomainEntryPackages(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := map[string][]string{
-		"internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring": {
+		"internal/apiserver/application/evaluation/registry/mechanisms/scoring": {
 			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale",
 		},
-		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification": {
+		"internal/apiserver/application/evaluation/registry/mechanisms/typology": {
 			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality",
 		},
 	}
@@ -255,9 +256,14 @@ func TestApplicationDoesNotImportLegacyFactorMechanismHosts(t *testing.T) {
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_norm",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/range_scoring",
 	}
 	allowedImporterPrefixes := []string{
 		"internal/apiserver/application/evaluation/registry/mechanisms/",
+		"internal/apiserver/application/evaluation/registry/",
 		"internal/apiserver/application/evaluation/runtime/",
 		"internal/apiserver/characterization/",
 	}

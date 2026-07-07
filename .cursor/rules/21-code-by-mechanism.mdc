@@ -8,13 +8,24 @@ alwaysApply: false
 ## 原则
 
 - **业务测评 code 不得成为长期代码组织单元**（目录名、package 名、专属 executor/report builder）。
-- **算法机制可以成为代码组织单元**（factor_scoring、factor_classification、factor_norm、task_performance、projection、reporting）。
+- **算法机制可以成为代码组织单元**（scoring、typology、norming、task_performance、projection、reporting）；`AlgorithmFamily` 字符串可保留 `factor_*` 兼容。
 - **ModelCatalog 可以按模型族组织**；**Evaluation / Interpretation 必须按执行/报告机制组织**。
 
 判据：
 
 - 差异是**数据**（因子结构、题目、常模表、解释文案、primary dimension）→ 放 ModelCatalog 配置 / payload / seed / 发布快照。
 - 差异是**机制**（pole 合成、nearest pattern、trait profile、norm lookup、task scoring）→ 写代码。
+
+## 包名与 AlgorithmFamily 对照
+
+| Go 包名 | `AlgorithmFamily` 枚举 |
+|---------|------------------------|
+| `scoring` | `factor_scoring` |
+| `typology` | `factor_classification` |
+| `norming` | `factor_norm` |
+| `task_performance` | `task_performance` |
+
+枚举用于 API/种子/路由；包名用于 `domain/evaluation`、`registry/mechanisms` 等代码组织。
 
 ## 模块边界
 
@@ -71,4 +82,4 @@ application/evaluation/
 - `domain/evaluation/{scale,personality}`、`domain/interpretation/{personality,score}` → 实现宿主，逐步迁入 factor_* / builder 机制包
 - `application/evaluation/{scale,behavioral_rating,cognitive,personality}` → 编排宿主，生产路径优先走 factor_* 机制包
 
-已删除（Round 3）：`behavioral_rating/brief2`、`cognitive/spm` — 生产路径直引 `factor_norm` / `calculation/norm` / `task_performance`。
+已删除（Round 3）：`behavioral_rating/brief2`、`cognitive/spm` — 生产路径直引 `norming` / `calculation/norm` / `task_performance`。

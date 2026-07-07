@@ -405,13 +405,13 @@ func TestContainerDoesNotImportFactorMechanismPackagesDirectly(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := []string{
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification",
-		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_norm",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/typology",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/norming",
 		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "container")

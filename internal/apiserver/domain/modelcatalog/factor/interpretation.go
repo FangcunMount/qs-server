@@ -14,7 +14,7 @@ func (r ScoreRangeRule) Matches(score float64) bool {
 	return score >= r.MinScore && score < r.MaxScore
 }
 
-// InterpretationSpec groups score-range rules for factor_scoring models.
+// InterpretationSpec groups score-range rules for scoring models.
 type InterpretationSpec struct {
 	Ranges []ScoreRangeRule
 }

@@ -2,7 +2,7 @@ package factor
 
 import "encoding/json"
 
-// DefinitionBody is the shared draft/published JSON body for factor_scoring payloads.
+// DefinitionBody is the shared draft/published JSON body for scoring payloads.
 type DefinitionBody struct {
 	Dimensions     []DimensionRule `json:"dimensions"`
 	InterpretRules []InterpretRule `json:"interpret_rules"`

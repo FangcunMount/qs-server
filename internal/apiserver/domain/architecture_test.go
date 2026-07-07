@@ -361,9 +361,9 @@ func TestReportDomainDoesNotImportRulesetPayloads(t *testing.T) {
 	root := repoRoot(t)
 	const rulesetImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	allowedModelCatalogImportFiles := map[string]struct{}{
-		"internal/apiserver/domain/interpretation/builder/builder.go":           {},
-		"internal/apiserver/domain/interpretation/factor_classification/doc.go": {},
-		"internal/apiserver/domain/interpretation/factor_scoring/doc.go":        {},
+		"internal/apiserver/domain/interpretation/builder/builder.go": {},
+		"internal/apiserver/domain/interpretation/typology/doc.go":    {},
+		"internal/apiserver/domain/interpretation/scoring/doc.go":     {},
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "interpretation"), func(path, importPath string) {
 		if importPath != rulesetImport && !strings.HasPrefix(importPath, rulesetImport+"/") {
@@ -551,7 +551,7 @@ func TestScaleExecutionDomainDoesNotReintroduceLegacyEngine(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "factor_scoring")
+	dir := filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scoring")
 	forbiddenTokens := []string{
 		"RegisterStrategy",
 		"GetStrategy(",

@@ -2,6 +2,16 @@ package modelcatalog
 
 // AlgorithmFamily groups execution semantics for runtime, payload, and reporting.
 // It is always derived from identity or DecisionKind and is never persisted.
+//
+// Package name vs enum (dual layer):
+//
+//	Go package          AlgorithmFamily
+//	scoring             factor_scoring
+//	typology            factor_classification
+//	norming             factor_norm
+//	task_performance    task_performance
+//
+// See docs/02-业务模块/mechanism-oriented-migration.md §包名与 AlgorithmFamily 对照表.
 type AlgorithmFamily string
 
 const (

@@ -6,7 +6,7 @@ import (
 
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor_norm"
+	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/norming"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 

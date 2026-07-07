@@ -149,12 +149,12 @@ func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_scoring"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "scoring"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
 		if strings.Contains(importPath, "/application/evaluation/engine") {
-			t.Fatalf("%s imports %s; factor_scoring executor must not wrap legacy evaluation pipeline", filepath.ToSlash(mustRel(t, root, path)), importPath)
+			t.Fatalf("%s imports %s; scoring executor must not wrap legacy evaluation pipeline", filepath.ToSlash(mustRel(t, root, path)), importPath)
 		}
 	})
 }
@@ -527,7 +527,7 @@ func TestReportDomainDoesNotUseAlgorithmNamedTopLevelPackages(t *testing.T) {
 	}
 	for _, dir := range forbiddenDirs {
 		if _, err := os.Stat(dir); err == nil {
-			t.Fatalf("%s must not exist; typology report assembly belongs in domain/interpretation/factor_classification/typology", filepath.ToSlash(mustRel(t, root, dir)))
+			t.Fatalf("%s must not exist; typology report assembly belongs in domain/interpretation/typology/patterns", filepath.ToSlash(mustRel(t, root, dir)))
 		}
 	}
 
@@ -538,7 +538,7 @@ func TestReportDomainDoesNotUseAlgorithmNamedTopLevelPackages(t *testing.T) {
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver"), func(path, importPath string) {
 		for _, forbidden := range forbiddenImports {
 			if importPath == forbidden || strings.HasPrefix(importPath, forbidden+"/") {
-				t.Fatalf("%s imports %s; use domain/interpretation/factor_classification/typology instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
+				t.Fatalf("%s imports %s; use domain/interpretation/typology/patterns instead", filepath.ToSlash(mustRel(t, root, path)), importPath)
 			}
 		}
 	})
@@ -684,9 +684,9 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 	}
 	scaleRoots := []string{
 		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
-		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "factor_scoring"),
-		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "factor_scoring"),
-		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_scoring"),
+		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scoring"),
+		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "scoring"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "scoring"),
 	}
 	for _, scanRoot := range scaleRoots {
 		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -724,7 +724,7 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 	}
 	allowedRelPrefixes := []string{
 		"internal/apiserver/characterization/",
-		"internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/scoring/outcome_mapper.go",
 		"internal/apiserver/application/evaluation/outcome/legacy.go",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")
