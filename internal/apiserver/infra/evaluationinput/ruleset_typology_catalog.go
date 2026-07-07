@@ -41,22 +41,6 @@ func (c RuleSetTypologyCatalog) GetTypologyModelByRef(ctx context.Context, ref p
 		}
 	}
 
-	if algorithm == "" {
-		return nil, domain.ErrNotFound
-	}
-
-	if legacyKind := legacyKindForAlgorithm(algorithm); legacyKind != "" {
-		legacyRef := rulesetport.Ref{
-			Kind:    legacyKind,
-			Code:    ref.Code,
-			Version: ref.Version,
-		}
-		payload, err := c.decodePublishedRef(ctx, legacyRef)
-		if err != nil {
-			return nil, err
-		}
-		return assertTypologyAlgorithm(payload, algorithm)
-	}
 	return nil, domain.ErrNotFound
 }
 
@@ -122,17 +106,6 @@ func typologyLookupRefs(ref port.ModelRef, algorithm domain.Algorithm) []ruleset
 		},
 	)
 	return refs
-}
-
-func legacyKindForAlgorithm(algorithm domain.Algorithm) domain.Kind {
-	switch algorithm {
-	case domain.AlgorithmMBTI:
-		return domain.KindMBTIMigration
-	case domain.AlgorithmSBTI:
-		return domain.KindSBTIMigration
-	default:
-		return ""
-	}
 }
 
 func assertTypologyAlgorithm(payload *modeltypology.Payload, algorithm domain.Algorithm) (*modeltypology.Payload, error) {

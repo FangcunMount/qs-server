@@ -73,7 +73,7 @@ func TestMBTICodecRoundTrip(t *testing.T) {
 	}
 }
 
-func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
+func TestDecodeRejectsLegacyFlatPayloadFormat(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
 		Code:              "MBTI_OEJTS",
 		Version:           "1.0.0",
@@ -92,12 +92,8 @@ func TestDecodeAcceptsLegacyPayloadFormat(t *testing.T) {
 		},
 		Payload: payload,
 	}
-	got, err := DecodeMBTI(snapshot)
-	if err != nil {
-		t.Fatalf("DecodeMBTI legacy: %v", err)
-	}
-	if got.Code != model.Code {
-		t.Fatalf("Code = %s", got.Code)
+	if _, err := DecodeMBTI(snapshot); err == nil {
+		t.Fatal("expected error for legacy flat mbti payload format")
 	}
 }
 

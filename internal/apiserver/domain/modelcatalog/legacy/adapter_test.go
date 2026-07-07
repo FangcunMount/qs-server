@@ -16,8 +16,8 @@ func TestLegacyKindMapping(t *testing.T) {
 		wantAlgorithm identity.Algorithm
 	}{
 		{identity.KindScale, identity.KindScale, identity.SubKindEmpty, identity.AlgorithmScaleDefault},
-		{identity.KindMBTIMigration, identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmMBTI},
-		{identity.KindSBTIMigration, identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmSBTI},
+		{identity.Kind(KindMBTIMigration), identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmMBTI},
+		{identity.Kind(KindSBTIMigration), identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmSBTI},
 	}
 	for _, tc := range tests {
 		kind, subKind, algorithm, ok := LegacyKindMapping(tc.legacy)
@@ -33,21 +33,21 @@ func TestPublishedLegacyEnvelopeRoundTrip(t *testing.T) {
 		SchemaVersion: catalog.SchemaVersionV1,
 		PayloadFormat: routing.PayloadFormatMBTIV1,
 		Definition: Definition{
-			Kind:    identity.KindMBTIMigration,
+			Kind:    identity.Kind(KindMBTIMigration),
 			Code:    "MBTI_OEJTS",
 			Version: "1.0.0",
 			Title:   "MBTI",
 			Status:  "published",
 		},
 		DecisionKind: identity.DecisionKindPoleComposition,
-		Payload:      []byte(`{"code":"MBTI_OEJTS"}`),
+		Payload:      []byte(`{"code":"MBTI_OEJTS","algorithm":"mbti","version":"1.0.0","status":"published"}`),
 	}
 	published := PublishedFromLegacy(legacySnapshot)
 	if published.Model.Kind != identity.KindPersonality || published.Model.Algorithm != identity.AlgorithmMBTI {
 		t.Fatalf("published model = %#v", published.Model)
 	}
 	back := LegacyFromPublished(published)
-	if back.Definition.Kind != identity.KindMBTIMigration || back.PayloadFormat != routing.PayloadFormatMBTIV1 {
+	if back.Definition.Kind != identity.KindPersonality || back.PayloadFormat != routing.PayloadFormatMBTIV1 {
 		t.Fatalf("legacy round trip = %#v", back)
 	}
 }

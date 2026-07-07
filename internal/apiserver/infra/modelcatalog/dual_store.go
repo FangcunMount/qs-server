@@ -130,8 +130,7 @@ func (s *DualStore) FindPublishedByModelCode(ctx context.Context, kind domain.Ki
 			continue
 		}
 		if kind == domain.KindPersonality {
-			switch snapshot.Definition.Kind {
-			case domain.KindPersonality, domain.KindMBTIMigration, domain.KindSBTIMigration:
+			if isLegacyPersonalityEnvelope(snapshot) {
 				return snapshot, nil
 			}
 			continue
@@ -217,9 +216,7 @@ func filterLegacySnapshots(all []*domain.Snapshot, filter port.ListPublishedFilt
 			continue
 		}
 		if filter.Kind == domain.KindPersonality {
-			switch snapshot.Definition.Kind {
-			case domain.KindPersonality, domain.KindMBTIMigration, domain.KindSBTIMigration:
-			default:
+			if !isLegacyPersonalityEnvelope(snapshot) {
 				continue
 			}
 		} else if filter.Kind != "" && snapshot.Definition.Kind != filter.Kind {
@@ -243,14 +240,21 @@ func resolveLegacyAlgorithm(snapshot *domain.Snapshot) (domain.Algorithm, error)
 	if domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat) {
 		return domain.AlgorithmFromTypologyPayload(snapshot.Payload)
 	}
-	switch snapshot.Definition.Kind {
-	case domain.KindMBTIMigration:
-		return domain.AlgorithmMBTI, nil
-	case domain.KindSBTIMigration:
-		return domain.AlgorithmSBTI, nil
-	default:
-		return "", nil
+	if _, _, algorithm, ok := domain.LegacyKindMapping(snapshot.Definition.Kind); ok {
+		return algorithm, nil
 	}
+	return "", nil
+}
+
+func isLegacyPersonalityEnvelope(snapshot *domain.Snapshot) bool {
+	if snapshot == nil {
+		return false
+	}
+	if snapshot.Definition.Kind == domain.KindPersonality {
+		return true
+	}
+	kind, subKind, _, ok := domain.LegacyKindMapping(snapshot.Definition.Kind)
+	return ok && kind == domain.KindPersonality && subKind == domain.SubKindTypology
 }
 
 func (s *DualStore) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {

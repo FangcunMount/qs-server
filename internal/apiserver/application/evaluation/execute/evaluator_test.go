@@ -153,5 +153,5 @@ func TestEvaluatorContractDoesNotImportLegacyPipeline(t *testing.T) {
 }
 
 func TestEvaluatorStubUsesLegacyKindMappingOnlyInTests(t *testing.T) {
-	_ = modelcatalog.KindMBTIMigration
+	_ = modelcatalog.Kind("mbti")
 }

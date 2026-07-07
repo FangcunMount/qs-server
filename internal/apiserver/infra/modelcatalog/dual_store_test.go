@@ -64,7 +64,7 @@ func TestDualStoreFindPublishedByModelCodeUsesLatestV2Snapshot(t *testing.T) {
 		Definition: domain.Definition{Kind: domain.KindPersonality, Code: "personality_demo", Version: "v4"},
 	}}
 	legacy := &dualStoreLegacyStub{snapshots: []*domain.Snapshot{{
-		Definition: domain.Definition{Kind: domain.KindMBTIMigration, Code: "personality_demo", Version: "v1"},
+		Definition: domain.Definition{Kind: domain.RuleSetKindMBTI, Code: "personality_demo", Version: "v1"},
 	}}}
 	store := &DualStore{v2: v2, legacy: legacy}
 

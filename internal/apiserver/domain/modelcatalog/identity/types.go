@@ -9,10 +9,6 @@ const (
 	KindBehavioralRating Kind = "behavioral_rating"
 	KindCognitive        Kind = "cognitive"
 	KindCustom           Kind = "custom"
-
-	// Migration-only flat kinds read from legacy envelopes; do not use in new writes.
-	KindMBTIMigration Kind = "mbti"
-	KindSBTIMigration Kind = "sbti"
 )
 
 // SubKind narrows a Kind when multiple payload shapes share the same family.
@@ -42,8 +38,7 @@ func (k Kind) String() string { return string(k) }
 
 func (k Kind) IsValid() bool {
 	switch k {
-	case KindScale, KindPersonality, KindBehavioralRating, KindCognitive, KindCustom,
-		KindMBTIMigration, KindSBTIMigration:
+	case KindScale, KindPersonality, KindBehavioralRating, KindCognitive, KindCustom:
 		return true
 	default:
 		return false

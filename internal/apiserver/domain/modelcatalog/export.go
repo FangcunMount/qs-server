@@ -49,8 +49,6 @@ const (
 	KindBehavioralRating = identity.KindBehavioralRating
 	KindCognitive        = identity.KindCognitive
 	KindCustom           = identity.KindCustom
-	KindMBTIMigration    = identity.KindMBTIMigration
-	KindSBTIMigration    = identity.KindSBTIMigration
 
 	SubKindEmpty    = identity.SubKindEmpty
 	SubKindTypology = identity.SubKindTypology

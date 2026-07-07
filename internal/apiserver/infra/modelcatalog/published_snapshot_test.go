@@ -25,8 +25,8 @@ func TestBuildMBTIPublishedSnapshotUsesTypologyPayload(t *testing.T) {
 		t.Fatalf("model = %#v", published.Model)
 	}
 	legacy := LegacySnapshotFromPublished(published)
-	if legacy.Definition.Kind != domain.KindMBTIMigration {
-		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
+	if legacy.Definition.Kind != domain.KindPersonality || legacy.Definition.Code != "MBTI_OEJTS" {
+		t.Fatalf("legacy kind = %s code = %s", legacy.Definition.Kind, legacy.Definition.Code)
 	}
 }
 
@@ -74,7 +74,7 @@ func TestRefMatchesSnapshotSupportsLegacyAndV2Refs(t *testing.T) {
 		Version:   "2.0.1",
 	}
 	legacyRef := port.Ref{
-		Kind:    domain.KindMBTIMigration,
+		Kind:    domain.RuleSetKindMBTI,
 		Code:    "MBTI_OEJTS",
 		Version: "2.0.1",
 	}

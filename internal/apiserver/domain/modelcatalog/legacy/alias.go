@@ -10,8 +10,8 @@ type RuleSetKind = identity.Kind
 
 const (
 	RuleSetKindScale = identity.KindScale
-	RuleSetKindMBTI  = identity.KindMBTIMigration
-	RuleSetKindSBTI  = identity.KindSBTIMigration
+	RuleSetKindMBTI  = RuleSetKind(KindMBTIMigration)
+	RuleSetKindSBTI  = RuleSetKind(KindSBTIMigration)
 )
 
 // Definition is kept as a compatibility name while callers migrate to ModelDefinition.

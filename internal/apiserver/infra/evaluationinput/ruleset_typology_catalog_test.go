@@ -178,15 +178,16 @@ func TestPublishedTypologyCatalogFallsBackToLegacyReader(t *testing.T) {
 	legacy := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
 		PayloadFormat: format,
 		Definition: domain.RuleSetDefinition{
-			Kind: domain.KindMBTIMigration, Code: model.Code, Version: model.Version,
+			Kind: domain.KindPersonality, Code: model.Code, Version: model.Version,
 		},
 		Payload: payload,
 	}}
 	catalog := NewPublishedTypologyCatalog(stubPublishedModelReader{err: domain.ErrNotFound}, legacy)
 	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
-		Kind:    port.EvaluationModelKindMBTIMigration,
-		Code:    model.Code,
-		Version: model.Version,
+		Kind:      port.EvaluationModelKindPersonality,
+		Algorithm: string(domain.AlgorithmMBTI),
+		Code:      model.Code,
+		Version:   model.Version,
 	})
 	if err != nil {
 		t.Fatalf("GetTypologyModelByRef: %v", err)
@@ -196,7 +197,7 @@ func TestPublishedTypologyCatalogFallsBackToLegacyReader(t *testing.T) {
 	}
 }
 
-func TestRuleSetTypologyCatalogLegacyMBTIFallback(t *testing.T) {
+func TestRuleSetTypologyCatalogMBTILookupViaV2Ref(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
 		Code:                 personalityseed.MBTIModelCode,
 		Version:              personalityseed.MBTIModelVersion,
@@ -215,36 +216,19 @@ func TestRuleSetTypologyCatalogLegacyMBTIFallback(t *testing.T) {
 	if err != nil {
 		t.Fatalf("EncodeMBTI: %v", err)
 	}
-	reader := &sequentialRuleReader{
-		snapshots: []struct {
-			ref      rulesetport.RuleSetRef
-			snapshot *domain.RuleSetSnapshot
-		}{
-			{
-				ref: rulesetport.RuleSetRef{
-					Kind: domain.KindPersonality, SubKind: domain.SubKindTypology,
-					Algorithm: domain.AlgorithmMBTI, Code: model.Code, Version: model.Version,
-				},
-			},
-			{
-				ref: rulesetport.RuleSetRef{
-					Kind: domain.KindMBTIMigration, Code: model.Code, Version: model.Version,
-				},
-				snapshot: &domain.RuleSetSnapshot{
-					PayloadFormat: format,
-					Definition: domain.RuleSetDefinition{
-						Kind: domain.KindMBTIMigration, Code: model.Code, Version: model.Version,
-					},
-					Payload: payload,
-				},
-			},
+	reader := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
+		PayloadFormat: format,
+		Definition: domain.RuleSetDefinition{
+			Kind: domain.KindPersonality, Code: model.Code, Version: model.Version,
 		},
-	}
+		Payload: payload,
+	}}
 	catalog := NewRuleSetTypologyCatalog(reader)
 	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
-		Kind:    port.EvaluationModelKindMBTIMigration,
-		Code:    model.Code,
-		Version: model.Version,
+		Kind:      "mbti",
+		Algorithm: string(domain.AlgorithmMBTI),
+		Code:      model.Code,
+		Version:   model.Version,
 	})
 	if err != nil {
 		t.Fatalf("GetTypologyModelByRef: %v", err)
@@ -362,7 +346,7 @@ func TestRuleSetTypologyCatalogFindByQuestionnaireDecodesV2Payload(t *testing.T)
 	}
 }
 
-func TestRuleSetTypologyCatalogFindByQuestionnaireLegacyMBTI(t *testing.T) {
+func TestRuleSetTypologyCatalogFindByQuestionnaireTypologyMBTI(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
 		Code:                 personalityseed.MBTIModelCode,
 		Version:              personalityseed.MBTIModelVersion,
@@ -384,7 +368,7 @@ func TestRuleSetTypologyCatalogFindByQuestionnaireLegacyMBTI(t *testing.T) {
 	reader := stubRuleReader{snapshot: &domain.RuleSetSnapshot{
 		PayloadFormat: format,
 		Definition: domain.RuleSetDefinition{
-			Kind: domain.KindMBTIMigration, Code: model.Code, Version: model.Version,
+			Kind: domain.KindPersonality, Code: model.Code, Version: model.Version,
 		},
 		Payload: payloadBytes,
 	}}

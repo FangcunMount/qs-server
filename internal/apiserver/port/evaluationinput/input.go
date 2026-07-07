@@ -13,10 +13,6 @@ type EvaluationModelKind string
 const (
 	EvaluationModelKindScale       EvaluationModelKind = "scale"
 	EvaluationModelKindPersonality EvaluationModelKind = "personality"
-	// EvaluationModelKindMBTIMigration and EvaluationModelKindSBTIMigration are legacy
-	// ModelRef.Kind values kept for routing compatibility only.
-	EvaluationModelKindMBTIMigration EvaluationModelKind = "mbti"
-	EvaluationModelKindSBTIMigration EvaluationModelKind = "sbti"
 )
 
 const (

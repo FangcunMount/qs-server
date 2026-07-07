@@ -62,18 +62,11 @@ func LegacyFromPublished(snapshot *catalog.PublishedModelSnapshot) *Snapshot {
 		return nil
 	}
 	def := Definition{
+		Kind:    snapshot.Model.Kind,
 		Code:    snapshot.Model.Code,
 		Version: snapshot.Model.Version,
 		Title:   snapshot.Model.Title,
 		Status:  snapshot.Model.Status,
-	}
-	switch {
-	case snapshot.Model.Kind == identity.KindPersonality && snapshot.Model.Algorithm == identity.AlgorithmMBTI:
-		def.Kind = identity.KindMBTIMigration
-	case snapshot.Model.Kind == identity.KindPersonality && snapshot.Model.Algorithm == identity.AlgorithmSBTI:
-		def.Kind = identity.KindSBTIMigration
-	default:
-		def.Kind = snapshot.Model.Kind
 	}
 	source := map[string]any(nil)
 	if snapshot.Source != nil {

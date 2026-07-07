@@ -35,7 +35,7 @@ func TestMapperRoundTripPublishedModel(t *testing.T) {
 		t.Fatalf("published round trip = %#v", got.Model)
 	}
 	legacy := mapper.ToLegacySnapshot(po)
-	if legacy.Definition.Kind != domain.KindMBTIMigration {
-		t.Fatalf("legacy kind = %s, want mbti", legacy.Definition.Kind)
+	if legacy.Definition.Kind != domain.KindPersonality {
+		t.Fatalf("legacy kind = %s, want personality", legacy.Definition.Kind)
 	}
 }

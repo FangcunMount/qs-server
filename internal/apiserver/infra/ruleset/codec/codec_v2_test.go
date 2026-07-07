@@ -45,7 +45,7 @@ func TestEncodeWritesAssessmentModelPayloadFormats(t *testing.T) {
 	_ = sbtiPayload
 }
 
-func TestDecodeAcceptsLegacyRulesetPayloadFormats(t *testing.T) {
+func TestDecodeRejectsLegacyRulesetPayloadFormats(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
 		Code:              "MBTI_OEJTS",
 		Version:           "1.0.0",
@@ -56,16 +56,13 @@ func TestDecodeAcceptsLegacyRulesetPayloadFormats(t *testing.T) {
 	if err != nil {
 		t.Fatalf("marshal: %v", err)
 	}
-	got, err := DecodeMBTI(&domain.RuleSetSnapshot{
+	_, err = DecodeMBTI(&domain.RuleSetSnapshot{
 		PayloadFormat: domain.PayloadFormatMBTIV1Legacy,
 		Definition:    domain.RuleSetDefinition{Kind: domain.RuleSetKindMBTI, Code: model.Code},
 		Payload:       payload,
 	})
-	if err != nil {
-		t.Fatalf("DecodeMBTI legacy: %v", err)
-	}
-	if got.Code != model.Code {
-		t.Fatalf("Code = %s", got.Code)
+	if err == nil {
+		t.Fatal("expected error for legacy flat mbti payload format")
 	}
 }
 

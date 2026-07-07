@@ -10,10 +10,7 @@ import (
 func TestNewAssessmentModelRejectsMigrationKinds(t *testing.T) {
 	t.Parallel()
 
-	for _, kind := range []modelcatalog.Kind{
-		modelcatalog.KindMBTIMigration,
-		modelcatalog.KindSBTIMigration,
-	} {
+	for _, kind := range []modelcatalog.Kind{"mbti", "sbti"} {
 		kind := kind
 		t.Run(string(kind), func(t *testing.T) {
 			t.Parallel()

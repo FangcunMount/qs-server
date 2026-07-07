@@ -54,9 +54,6 @@ func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error)
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
 	}
-	if isForbiddenDraftKind(input.Kind) {
-		return nil, fmt.Errorf("%w: legacy flat kind %q cannot be used for new models; use personality+typology+algorithm or behavioral_rating/cognitive", ErrInvalidArgument, input.Kind)
-	}
 	productChannel, err := identity.CompleteProductChannel(input.Kind, input.ProductChannel)
 	if err != nil {
 		return nil, err
@@ -224,11 +221,3 @@ func (m *AssessmentModel) MarkArchived(now time.Time) error {
 	return nil
 }
 
-func isForbiddenDraftKind(kind identity.Kind) bool {
-	switch kind {
-	case identity.KindMBTIMigration, identity.KindSBTIMigration:
-		return true
-	default:
-		return false
-	}
-}

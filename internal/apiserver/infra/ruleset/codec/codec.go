@@ -43,50 +43,36 @@ func DecodeSBTI(snapshot *domain.RuleSetSnapshot) (*typology.SBTILegacyModel, er
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
-	format, err := resolvePayloadFormat(snapshot, domain.KindSBTIMigration, domain.PayloadFormatSBTIV1)
+	format := snapshot.PayloadFormat
+	if format == "" {
+		format = domain.PayloadFormatPersonalityTypologyV1
+	}
+	if !domain.IsPersonalityTypologyPayloadFormat(format) {
+		return nil, fmt.Errorf("unsupported sbti payload format: %s", format)
+	}
+	payload, err := decodeTypologyPayload(snapshot.Payload)
 	if err != nil {
 		return nil, err
 	}
-	if domain.IsPersonalityTypologyPayloadFormat(format) {
-		payload, err := decodeTypologyPayload(snapshot.Payload)
-		if err != nil {
-			return nil, err
-		}
-		return typology.ToSBTI(payload)
-	}
-	if !domain.IsSBTIPayloadFormat(format) {
-		return nil, fmt.Errorf("unsupported sbti payload format: %s", format)
-	}
-	var model typology.SBTILegacyModel
-	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
-		return nil, fmt.Errorf("decode sbti payload: %w", err)
-	}
-	return &model, nil
+	return typology.ToSBTI(payload)
 }
 
 func DecodeMBTI(snapshot *domain.RuleSetSnapshot) (*typology.MBTILegacyModel, error) {
 	if snapshot == nil {
 		return nil, fmt.Errorf("ruleset snapshot is nil")
 	}
-	format, err := resolvePayloadFormat(snapshot, domain.KindMBTIMigration, domain.PayloadFormatMBTIV1)
+	format := snapshot.PayloadFormat
+	if format == "" {
+		format = domain.PayloadFormatPersonalityTypologyV1
+	}
+	if !domain.IsPersonalityTypologyPayloadFormat(format) {
+		return nil, fmt.Errorf("unsupported mbti payload format: %s", format)
+	}
+	payload, err := decodeTypologyPayload(snapshot.Payload)
 	if err != nil {
 		return nil, err
 	}
-	if domain.IsPersonalityTypologyPayloadFormat(format) {
-		payload, err := decodeTypologyPayload(snapshot.Payload)
-		if err != nil {
-			return nil, err
-		}
-		return typology.ToMBTI(payload)
-	}
-	if !domain.IsMBTIPayloadFormat(format) {
-		return nil, fmt.Errorf("unsupported mbti payload format: %s", format)
-	}
-	var model typology.MBTILegacyModel
-	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
-		return nil, fmt.Errorf("decode mbti payload: %w", err)
-	}
-	return &model, nil
+	return typology.ToMBTI(payload)
 }
 
 func DecodeScale(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot, error) {

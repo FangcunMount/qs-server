@@ -17,8 +17,8 @@ func TestV1LegacyKindMapsToEvaluatorKey(t *testing.T) {
 		want   evaluation.EvaluatorKey
 	}{
 		{modelcatalog.KindScale, evaluation.EvaluatorKeyScaleDefault},
-		{modelcatalog.KindMBTIMigration, evaluation.EvaluatorKeyMBTI},
-		{modelcatalog.KindSBTIMigration, evaluation.EvaluatorKeySBTI},
+		{modelcatalog.Kind("mbti"), evaluation.EvaluatorKeyMBTI},
+		{modelcatalog.Kind("sbti"), evaluation.EvaluatorKeySBTI},
 	}
 	for _, tc := range cases {
 		got, ok := evaluation.EvaluatorKeyFromLegacyKind(tc.legacy)
@@ -34,7 +34,7 @@ func TestV1LegacyKindMapsToEvaluatorKey(t *testing.T) {
 // V1 contract: port ModelRef with legacy kind falls back to EvaluatorKey mapping.
 func TestV1ModelRefEvaluatorKeyFromLegacyKind(t *testing.T) {
 	ref := evaluationinput.ModelRef{
-		Kind: evaluationinput.EvaluationModelKindMBTIMigration,
+		Kind: "mbti",
 		Code: "MBTI_TEST",
 	}
 	if got := ref.EvaluatorKey(); got != evaluation.EvaluatorKeyMBTI {

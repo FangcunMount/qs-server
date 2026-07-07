@@ -54,60 +54,6 @@ func TestV1CodecLegacyDecodeAndV2EncodeFormats(t *testing.T) {
 				}
 			},
 		},
-		{
-			name:       "legacy mbti decode",
-			wantFormat: domain.PayloadFormatMBTIV1,
-			wantKind:   domain.KindMBTIMigration,
-			wantCode:   "MBTI_OEJTS",
-			build: func(t *testing.T) (*domain.Snapshot, func(t *testing.T, snapshot *domain.Snapshot) error) {
-				payload, err := json.Marshal(&modeltypology.MBTILegacyModel{Code: "MBTI_OEJTS", Version: "1.0.0"})
-				if err != nil {
-					t.Fatalf("marshal: %v", err)
-				}
-				snapshot := &domain.Snapshot{
-					PayloadFormat: domain.PayloadFormatMBTIV1,
-					Definition:    domain.Definition{Kind: domain.KindMBTIMigration, Code: "MBTI_OEJTS"},
-					Payload:       payload,
-				}
-				return snapshot, func(t *testing.T, snapshot *domain.Snapshot) error {
-					got, err := codec.DecodeMBTI(snapshot)
-					if err != nil {
-						return err
-					}
-					if got.Code != "MBTI_OEJTS" {
-						t.Fatalf("mbti decode = %#v", got)
-					}
-					return nil
-				}
-			},
-		},
-		{
-			name:       "legacy sbti decode",
-			wantFormat: domain.PayloadFormatSBTIV1,
-			wantKind:   domain.KindSBTIMigration,
-			wantCode:   "SBTI_FUN",
-			build: func(t *testing.T) (*domain.Snapshot, func(t *testing.T, snapshot *domain.Snapshot) error) {
-				payload, err := json.Marshal(&modeltypology.SBTILegacyModel{Code: "SBTI_FUN", Version: "1.0.0"})
-				if err != nil {
-					t.Fatalf("marshal: %v", err)
-				}
-				snapshot := &domain.Snapshot{
-					PayloadFormat: domain.PayloadFormatSBTIV1,
-					Definition:    domain.Definition{Kind: domain.KindSBTIMigration, Code: "SBTI_FUN"},
-					Payload:       payload,
-				}
-				return snapshot, func(t *testing.T, snapshot *domain.Snapshot) error {
-					got, err := codec.DecodeSBTI(snapshot)
-					if err != nil {
-						return err
-					}
-					if got.Code != "SBTI_FUN" {
-						t.Fatalf("sbti decode = %#v", got)
-					}
-					return nil
-				}
-			},
-		},
 	}
 
 	for _, tc := range legacyDecodeCases {

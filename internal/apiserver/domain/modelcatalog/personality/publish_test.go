@@ -68,7 +68,7 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 		t.Fatalf("snapshot payload outcomes = %#v, want INTJ preserved", payload.Outcomes)
 	}
 	legacy := domain.LegacyFromPublished(snapshot)
-	if legacy.Definition.Kind != domain.KindMBTIMigration {
+	if legacy.Definition.Kind != domain.KindPersonality {
 		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
 	}
 }
