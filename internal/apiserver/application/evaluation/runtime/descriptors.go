@@ -56,7 +56,7 @@ func EvaluationDescriptorsFromRegistry(
 // FilterExecutablePaths keeps only paths backed by runtime-executable model capabilities.
 func FilterExecutablePaths(paths []modelcatalog.ExecutionPath) []modelcatalog.ExecutionPath {
 	executable := make(map[modelcatalog.ExecutionPath]bool)
-	for _, cap := range modelcatalog.ModelFamilyCapabilitiesV2() {
+	for _, cap := range modelcatalog.ModelFamilyCapabilities() {
 		if cap.RuntimeExecutable {
 			executable[cap.ExecutionPath] = true
 		}

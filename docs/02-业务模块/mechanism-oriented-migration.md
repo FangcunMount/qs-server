@@ -272,3 +272,93 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | `modelcatalog/factor_norm` | `modelcatalog/norming` | `factor_norm` | metadata 包名对齐 |
 
 `personality/typology`（测评 payload）、`task_performance` metadata、`application/evaluation/scoring`（快照）保持原名。
+
+## Round 16：ModelCatalog 根包 Phase A 整理（规划）
+
+**目标**：减根包平铺杂乱感；**不删** `behavior_ability` / migration kinds 等兼容语义（留 Phase B/C）。
+
+**策略**：子包承载实现 + 根包 `modelcatalog` 保留类型别名（对外 import 路径不变）。
+
+### 终态目录
+
+```text
+domain/modelcatalog/
+├── doc.go              # 模块地图（文件索引）
+├── errors.go           # 域错误
+├── export.go           # 根包类型别名 → 子包（过渡期）
+├── identity/           # Kind / Algorithm / SubKind / DecisionKind / ProductChannel
+├── routing/            # AlgorithmFamily / ExecutionPath / PayloadFormat
+├── catalog/            # AssessmentModel 聚合、Definition、PublishedSnapshot、校验
+├── capability/         # KindCapability（合并 ModelFamilyCapability）、CatalogOperation
+├── legacy/             # v1 信封、KindMapping、behavior_ability 槽位（扩展现有 legacy/）
+├── factor/             # （已有）通用 Factor 构件
+├── norming/            # （已有）常模 metadata
+├── task_performance/   # （已有）
+├── personality/        # （已有）
+├── scale/              # （已有）
+├── behavioral_rating/  # （已有）
+└── cognitive/          # （已有）
+```
+
+### 文件迁移清单（根包 36 个 → 子包）
+
+| 现文件 | 目标子包 | 备注 |
+|--------|----------|------|
+| `types.go`, `types_test.go` | `identity/` | Kind/Algorithm/SubKind/DecisionKind |
+| `product_channel.go`, `product_channel_test.go` | `identity/` | |
+| `personality_decision.go` | `identity/` | FallbackPersonalityDecisionKind |
+| `algorithm_family.go`, `algorithm_family_test.go` | `routing/` | |
+| `algorithm_identity_test.go` | `routing/` | |
+| `execution_path.go` | `routing/` | |
+| `payload_format.go`, `payload_format_test.go` | `routing/` | |
+| `aggregate.go`, `aggregate_*_test.go` | `catalog/` | |
+| `definition.go` | `catalog/` | DefinitionPayload |
+| `snapshot.go` | `catalog/` | v2 PublishedModelSnapshot |
+| `status.go` | `catalog/` | ModelStatus |
+| `validation.go`, `validation_factor_test.go` | `catalog/` | |
+| `capability.go`, `capability_test.go` | `capability/` | **先合并** `model_family_capability*` |
+| `capability_role.go` | `capability/` | |
+| `operation.go`, `operation_test.go` | `capability/` | |
+| `legacy_alias.go` | `legacy/` | v1 Snapshot 信封 |
+| `legacy_adapter.go` | `legacy/` | PublishedFromLegacy 等 |
+| `legacy_behavior_ability_capability.go` | `legacy/` | |
+| `behavior_ability.go`, `behavior_ability_test.go` | `legacy/` | |
+| `behavior_ability_channel.go`, `behavior_ability_channel_test.go` | `legacy/` | |
+| `doc.go` | 根包 | 增补模块地图 |
+| `errors.go` | 根包 | |
+
+### 实施顺序（减循环依赖）
+
+| 步骤 | 动作 | 验证 |
+|------|------|------|
+| R16-1 | `doc.go` 文件地图（零行为变更） | 已完成 |
+| R16-2 | 合并 `ModelFamilyCapability` → `KindCapability` | 已完成 |
+| R16-3 | 建 `identity/`，迁 types + product_channel；根包 `export.go` 别名 | 已完成 |
+| R16-4 | 建 `routing/`，迁 algorithm_family + execution_path + payload_format | 已完成 |
+| R16-5 | 建 `capability/`，迁 capability + operation | 已完成 |
+| R16-6 | 扩 `legacy/`，收拢 legacy_* + behavior_ability* | 已完成 |
+| R16-7 | 建 `catalog/`，迁 aggregate + snapshot + validation | 已完成 |
+| R16-8 | 架构测试：`domain/modelcatalog` 根包仅 doc/errors/export | 已完成 |
+
+### 根包 `export.go` 示例（保持对外 API）
+
+```go
+package modelcatalog
+
+import "…/modelcatalog/identity"
+
+type Kind = identity.Kind
+type Algorithm = identity.Algorithm
+// …其余别名同理
+```
+
+### 不做（Phase B/C，需产品/数据窗口）
+
+- 删除 `KindBehaviorAbility` / `RuntimeViaScaleLegacy`
+- 删除 `KindMBTIMigration` / flat-kind 快照解码
+- 合并 `behavioral_rating/snapshot` 与 `scale/snapshot` 解析框架
+
+### 风险
+
+- import 循环：`routing` 依赖 `identity`；`capability` 依赖 `routing` + `identity`；`catalog` 最后迁。
+- 全仓 `modelcatalog.Kind` 通过别名可不变；**禁止**外部直引新子包（架构守卫可选）。

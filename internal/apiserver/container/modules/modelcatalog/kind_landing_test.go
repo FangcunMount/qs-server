@@ -57,7 +57,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 	}
 
 	descKinds := descriptorDomainKinds(descs)
-	for _, cap := range domain.ModelFamilyCapabilitiesV2() {
+	for _, cap := range domain.ModelFamilyCapabilities() {
 		if !cap.RuntimeExecutable {
 			continue
 		}

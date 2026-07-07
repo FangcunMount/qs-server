@@ -1,13 +1,18 @@
 package modelcatalog
 
-import stderrors "errors"
+import (
+	stderrors "errors"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/catalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/identity"
+)
 
 var (
 	ErrNotFound         = stderrors.New("assessment model not found")
 	ErrVersionRequired  = stderrors.New("assessment model version is required")
 	ErrAmbiguousVersion = stderrors.New("multiple published assessment models matched")
-	ErrInvalidArgument  = stderrors.New("assessment model invalid argument")
-	ErrInvalidState     = stderrors.New("assessment model invalid state")
+	ErrInvalidArgument  = identity.ErrInvalidArgument
+	ErrInvalidState     = catalog.ErrInvalidState
 )
 
 func IsNotFound(err error) bool {

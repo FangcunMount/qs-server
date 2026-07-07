@@ -29,7 +29,7 @@ func TestModelCatalogOptionsIncludeLegacyBehaviorAbility(t *testing.T) {
 func TestModelCatalogOptionsExcludeProductChannelFromModelFamilies(t *testing.T) {
 	t.Parallel()
 
-	for _, cap := range domain.ModelFamilyCapabilitiesV2() {
+	for _, cap := range domain.ModelFamilyCapabilities() {
 		if cap.Kind == domain.KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 			t.Fatalf("product channel leaked into model families: %#v", cap)
 		}
