@@ -13,19 +13,19 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-type ScaleScoreProjector struct {
+type FactorScoringScoreProjector struct {
 	scoreRepo assessment.ScoreRepository
 }
 
-func NewScaleScoreProjector(scoreRepo assessment.ScoreRepository) ScaleScoreProjector {
-	return ScaleScoreProjector{scoreRepo: scoreRepo}
+func NewFactorScoringScoreProjector(scoreRepo assessment.ScoreRepository) FactorScoringScoreProjector {
+	return FactorScoringScoreProjector{scoreRepo: scoreRepo}
 }
 
-func (p ScaleScoreProjector) Key() evaluation.EvaluatorKey {
+func (p FactorScoringScoreProjector) Key() evaluation.EvaluatorKey {
 	return evaluation.EvaluatorKeyScaleDefault
 }
 
-func (p ScaleScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
+func (p FactorScoringScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
 	if p.scoreRepo == nil || outcome.Assessment == nil || outcome.Execution == nil {
 		return nil
 	}
@@ -36,25 +36,25 @@ func (p ScaleScoreProjector) Project(ctx context.Context, outcome evaloutcome.Ou
 	return nil
 }
 
-type ScaleReportBuilder struct {
+type FactorScoringReportBuilder struct {
 	composer domainReport.ReportBuilder
 }
 
-func NewScaleReportBuilder(composer domainReport.ReportBuilder) ScaleReportBuilder {
-	return ScaleReportBuilder{composer: composer}
+func NewFactorScoringReportBuilder(composer domainReport.ReportBuilder) FactorScoringReportBuilder {
+	return FactorScoringReportBuilder{composer: composer}
 }
 
-func (b ScaleReportBuilder) Key() evaluation.EvaluatorKey {
+func (b FactorScoringReportBuilder) Key() evaluation.EvaluatorKey {
 	return evaluation.EvaluatorKeyScaleDefault
 }
 
-func (ScaleReportBuilder) ReportType() domainReport.ReportType {
+func (FactorScoringReportBuilder) ReportType() domainReport.ReportType {
 	return domainReport.ReportTypeStandard
 }
 
-func (b ScaleReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+func (b FactorScoringReportBuilder) Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
 	if b.composer == nil {
-		return nil, evalerrors.ModuleNotConfigured("scale report builder is not configured")
+		return nil, evalerrors.ModuleNotConfigured("factor_scoring report builder is not configured")
 	}
 	_ = ctx
 	rpt, err := reportscore.BuildScaleReport(b.composer, scaleReportInputFromOutcome(outcome))

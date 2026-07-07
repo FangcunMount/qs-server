@@ -1,4 +1,4 @@
-package scale
+package factor_scoring
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"

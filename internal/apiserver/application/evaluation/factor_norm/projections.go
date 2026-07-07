@@ -1,4 +1,4 @@
-package behavioralrating
+package factor_norm
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter"
@@ -8,7 +8,7 @@ import (
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 )
 
-// ApplyFactorProjections enriches a raw scale outcome with composite rollup and Brief-2 norm projection.
+// ApplyFactorProjections enriches a raw scale outcome with composite rollup and norm projection.
 func ApplyFactorProjections(
 	outcome *assessment.AssessmentOutcome,
 	snapshot *behavioralsnapshot.Snapshot,

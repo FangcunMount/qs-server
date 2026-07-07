@@ -1,3 +1,2 @@
-// Package factor_norm is the mechanism-oriented application entry for norm-profile evaluations.
-// Transitional: delegates to application/evaluation/behavioral_rating until registry-only wiring lands.
+// Package factor_norm is the canonical application entry for factor-norm evaluations.
 package factor_norm

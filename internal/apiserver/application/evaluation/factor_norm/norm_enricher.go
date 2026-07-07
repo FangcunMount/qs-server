@@ -1,4 +1,4 @@
-package behavioralrating
+package factor_norm
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter"
@@ -41,6 +41,7 @@ func enrichNormCalcResult(
 	}.Apply(calcResult)
 }
 
+// NormSubjectFromInput extracts norm lookup subject metadata from an input snapshot.
 func NormSubjectFromInput(input *evaluationinput.InputSnapshot) calcnorm.Subject {
 	if input == nil || input.NormSubject == nil {
 		return calcnorm.Subject{}

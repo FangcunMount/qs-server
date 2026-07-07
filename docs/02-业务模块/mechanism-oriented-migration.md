@@ -129,3 +129,16 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R5-3 | 架构守卫 + 收敛文档 Round 5 节 |
 
 **不做**：`factor_*` 内联宿主；`RuntimeDescriptorRegistry` 接入 assemble。
+
+## Round 6：Middle Man 消除 + 机制命名为主（已完成）
+
+**做**：`factor_*` 承接真实实现宿主；模型族 application 包缩为 re-export；reporting 以机制命名为主；`runtime/materialize` 表驱动工厂注册。
+
+| 阶段 | 动作 |
+|------|------|
+| R6-A | `factor_scoring` 内联原 `scale` 实现；`factor_norm`/`task_performance` 内联原 `behavioral_rating`/`cognitive`；三模型族包仅 `aliases.go` + 测试 |
+| R6-B | `FactorScoringReportBuilder`/`NormProfileReportBuilder`/`TaskPerformanceReportBuilder` 为主类型；`legacy_report_aliases.go` 保留 deprecated 别名 |
+| R6-C | `runtime/materialize.go` 改为 `ExecutionPath→工厂` map，去掉 `switch path` |
+| R6-D | 架构守卫白名单注释同步；收敛文档 Round 6 节 |
+
+**不做**：`factor_classification` 内联 `personality/typology`（~30 文件，留 Round 7）；`RuntimeDescriptorRegistry` 接入 assemble；删除 deprecated 包（需 characterization 迁移）。

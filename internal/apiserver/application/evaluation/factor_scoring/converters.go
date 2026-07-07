@@ -1,18 +1,36 @@
-package scale
+package factor_scoring
 
 import (
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
-func scaleEvaluateInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) evaluationscale.EvaluateInput {
+func evaluateInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) evaluationscale.EvaluateInput {
 	scaleSnapshot, _ := evaluationinput.ScalePayload(snapshot)
 	return evaluationscale.EvaluateInput{
 		Scale:         scaleSnapshot,
 		AnswerSheet:   answerSheetFromPort(snapshot.AnswerSheet),
 		Questionnaire: questionnaireFromPort(snapshot.Questionnaire),
 	}
+}
+
+// CloneInputWithScaleSnapshot clones an input snapshot with a scale payload substituted.
+func CloneInputWithScaleSnapshot(input *evaluationinput.InputSnapshot, scaleSnapshot *scalesnapshot.ScaleSnapshot) *evaluationinput.InputSnapshot {
+	if input == nil {
+		return nil
+	}
+	cloned := *input
+	if scaleSnapshot != nil {
+		cloned.ModelPayload = evaluationinput.ScaleModelPayload{Scale: scaleSnapshot}
+		if cloned.Model != nil {
+			model := *cloned.Model
+			model.Payload = evaluationinput.ScaleModelPayload{Scale: scaleSnapshot}
+			cloned.Model = &model
+		}
+	}
+	return &cloned
 }
 
 func answerSheetFromPort(snapshot *evaluationinput.AnswerSheetSnapshot) *evaluationinputdomain.AnswerSheet {

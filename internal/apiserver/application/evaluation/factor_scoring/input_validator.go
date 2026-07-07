@@ -1,4 +1,4 @@
-package scale
+package factor_scoring
 
 import (
 	"fmt"
@@ -7,18 +7,21 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-type ScaleExecutionInput struct {
+// ExecutionInput is the validated input for a factor-scoring evaluation run.
+type ExecutionInput struct {
 	Assessment *assessment.Assessment
 	Input      *evaluationinput.InputSnapshot
 }
 
+// InputValidator validates factor-scoring execution input.
 type InputValidator interface {
-	Validate(input ScaleExecutionInput) error
+	Validate(input ExecutionInput) error
 }
 
+// DefaultInputValidator is the production input validator for factor-scoring runs.
 type DefaultInputValidator struct{}
 
-func (DefaultInputValidator) Validate(input ScaleExecutionInput) error {
+func (DefaultInputValidator) Validate(input ExecutionInput) error {
 	if input.Assessment == nil {
 		return fmt.Errorf("assessment is required")
 	}

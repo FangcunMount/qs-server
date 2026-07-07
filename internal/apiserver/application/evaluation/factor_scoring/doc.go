@@ -1,3 +1,2 @@
-// Package factor_scoring is the mechanism-oriented application entry for factor-scoring evaluations.
-// Transitional: delegates to application/evaluation/scale until registry-only wiring lands.
+// Package factor_scoring is the canonical application entry for factor-scoring evaluations.
 package factor_scoring

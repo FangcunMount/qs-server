@@ -50,3 +50,12 @@ PublishedModelSnapshot
 | 机制键主路径 | `reporting/registry` 与 `writer` 优先 `MechanismReportBuilderKey`，`EvaluatorKey` 作 legacy fallback |
 | 表征测试 | `pipeline/routing_equivalence_test.go`、`reporting/registry_mechanism_primary_test.go` |
 | 架构守卫 | 禁止在 pipeline 外新增 `executionPathForFamily` / `algorithmFamilyFromModelKind` |
+
+## Round 6（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| 实现宿主收敛 | `factor_scoring`/`factor_norm`/`task_performance` 承接 executor 实现；`scale`/`behavioral_rating`/`cognitive` 缩为 re-export |
+| Reporting 机制命名 | `factor_scoring_report.go`、`norm_task_report.go` 为主；`ScaleReportBuilder` 等 deprecated 别名 |
+| Materialize 表驱动 | `evaluatorFactories` / `reportBuilderFactories` / `scoreProjectorFactories` 按 `ExecutionPath` 注册 |
+| 架构守卫 | application 层模型族白名单改为 re-export only |
