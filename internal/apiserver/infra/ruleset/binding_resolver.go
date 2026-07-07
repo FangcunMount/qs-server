@@ -4,7 +4,7 @@ import (
 	"context"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
+	aminfrac "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -47,7 +47,7 @@ func (r *CatalogBindingResolver) ResolveAssessmentBinding(
 	if err != nil {
 		return port.AssessmentBinding{}, false, err
 	}
-	scale, err := codec.DecodeScale(snapshot)
+	scale, err := aminfrac.DecodeScaleFromRuleSetSnapshot(snapshot)
 	if err != nil {
 		return port.AssessmentBinding{}, false, err
 	}

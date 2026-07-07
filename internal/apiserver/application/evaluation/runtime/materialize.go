@@ -63,27 +63,6 @@ func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFam
 	return out, nil
 }
 
-// MaterializeLegacyEvaluators 构建类型学 旧别名 evaluators 用于 Evaluator键 fallback。
-func MaterializeLegacyEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
-	var sharedConfigured *factorclassification.Executor
-	session := wiringSession{typologyExecutor: &sharedConfigured}
-	legacy := make([]execute.Evaluator, 0)
-	for _, desc := range descs {
-		if desc.Kind != evaldomain.ModelKindTypology {
-			continue
-		}
-		if desc.Algorithm == modelcatalog.AlgorithmPersonalityTypology {
-			continue
-		}
-		evaluator, err := materializeEvaluator(desc, deps, session)
-		if err != nil {
-			return nil, err
-		}
-		legacy = append(legacy, evaluator)
-	}
-	return legacy, nil
-}
-
 func modelKindForExecutionPath(path modelcatalog.ExecutionPath) evaldomain.ModelKind {
 	switch path {
 	case modelcatalog.ExecutionPathScaleDescriptor:

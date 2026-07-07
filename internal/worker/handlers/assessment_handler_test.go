@@ -126,6 +126,26 @@ func TestHandleAssessmentSubmittedAcksWhenEvaluationAlreadyProcessed(t *testing.
 	}
 }
 
+func TestHandleAssessmentSubmittedRetriesOnRetryableCalculationFailure(t *testing.T) {
+	client := &assessmentEvaluateClient{
+		resp: &pb.EvaluateAssessmentResponse{
+			Success:     false,
+			Status:      "failed",
+			Message:     "calculation failed",
+			Retryable:   true,
+			RunId:       "42:1",
+			FailureKind: "calculation",
+		},
+	}
+	deps := newAnswerSheetHandlerTestDeps(client, nil)
+	handler := handleAssessmentSubmitted(deps)
+
+	err := handler(context.Background(), "assessment.submitted", mustBuildAssessmentSubmittedPayload(t, 42))
+	if err == nil {
+		t.Fatal("expected retryable calculation failure to nack")
+	}
+}
+
 func TestHandleAssessmentSubmittedAcksWhenEvaluationFailed(t *testing.T) {
 	client := &assessmentEvaluateClient{
 		resp: &pb.EvaluateAssessmentResponse{

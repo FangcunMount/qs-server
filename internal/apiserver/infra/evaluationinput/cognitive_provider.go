@@ -31,11 +31,6 @@ func (CognitiveModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdent
 	return evaldomain.ExecutionIdentityCognitiveDefault
 }
 
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (CognitiveModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityCognitiveDefault
-}
-
 func (CognitiveModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
 	return modelcatalog.ExecutionPathCognitiveDescriptor
 }

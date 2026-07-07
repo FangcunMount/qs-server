@@ -24,11 +24,6 @@ func MaterializeFamilyEvaluators(deps WiringDeps) (map[modelcatalog.AlgorithmFam
 	return evalruntime.MaterializeFamilyEvaluators(deps)
 }
 
-// MaterializeLegacyEvaluators builds typology legacy alias evaluators.
-func MaterializeLegacyEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
-	return evalruntime.MaterializeLegacyEvaluators(descs, deps)
-}
-
 // MaterializeReportBuilders builds report builders from descriptors.
 func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ReportBuilder, error) {
 	return evalruntime.MaterializeReportBuilders(descs, deps)

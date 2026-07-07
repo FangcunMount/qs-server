@@ -67,9 +67,6 @@ func resolveTypologyAlgorithm(ref port.ModelRef) domain.Algorithm {
 	if ref.Algorithm != "" {
 		return domain.Algorithm(ref.Algorithm)
 	}
-	if _, _, algorithm, ok := domain.LegacyKindMapping(domain.Kind(ref.Kind)); ok {
-		return algorithm
-	}
 	return ""
 }
 

@@ -6,15 +6,11 @@ const (
 	KindSBTIMigration = "sbti"
 )
 
-// KindMapping 解析deprecated flat 类型 到 v2 身份 triples 用于 read/迁移 paths。
+// KindMapping 解析 deprecated flat 类型 到 v2 身份 triples（仅 scale 迁移读路径保留）。
 func KindMapping(kind string) (mappedKind, subKind, algorithm string, ok bool) {
 	switch kind {
 	case "scale":
 		return "scale", "", "scale_default", true
-	case KindMBTIMigration:
-		return "personality", "typology", "mbti", true
-	case KindSBTIMigration:
-		return "personality", "typology", "sbti", true
 	default:
 		return "", "", "", false
 	}

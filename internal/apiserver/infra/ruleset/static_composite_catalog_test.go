@@ -73,9 +73,11 @@ func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
 	}
 
 	ref := port.RuleSetRef{
-		Kind:    domain.RuleSetKindMBTI,
-		Code:    personalityseed.MBTIModelCode,
-		Version: personalityseed.MBTIModelVersion,
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmMBTI,
+		Code:      personalityseed.MBTIModelCode,
+		Version:   personalityseed.MBTIModelVersion,
 	}
 	snapshot, err := catalog.GetPublishedByRef(t.Context(), ref)
 	if err != nil {

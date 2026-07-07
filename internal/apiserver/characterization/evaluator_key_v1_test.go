@@ -10,35 +10,41 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// V1 contract: legacy flat kinds map to stable ExecutionIdentity triples.
+// V1 contract: only scale flat kind still maps via ExecutionIdentityFromLegacyKind (R29-C1).
 func TestV1LegacyKindMapsToExecutionIdentity(t *testing.T) {
-	cases := []struct {
-		legacy modelcatalog.Kind
-		want   evaluation.ExecutionIdentity
-	}{
-		{modelcatalog.KindScale, evaluation.ExecutionIdentityScaleDefault},
-		{modelcatalog.Kind("mbti"), evaluation.ExecutionIdentityMBTI},
-		{modelcatalog.Kind("sbti"), evaluation.ExecutionIdentitySBTI},
+	got, ok := evaluation.ExecutionIdentityFromLegacyKind(modelcatalog.KindScale)
+	if !ok {
+		t.Fatal("legacy scale: not mapped")
 	}
-	for _, tc := range cases {
-		got, ok := evaluation.ExecutionIdentityFromLegacyKind(tc.legacy)
-		if !ok {
-			t.Fatalf("legacy %s: not mapped", tc.legacy)
-		}
-		if got != tc.want {
-			t.Fatalf("legacy %s: got %s, want %s", tc.legacy, got, tc.want)
+	if got != evaluation.ExecutionIdentityScaleDefault {
+		t.Fatalf("legacy scale: got %s, want %s", got, evaluation.ExecutionIdentityScaleDefault)
+	}
+	for _, legacy := range []modelcatalog.Kind{modelcatalog.Kind("mbti"), modelcatalog.Kind("sbti")} {
+		if _, ok := evaluation.ExecutionIdentityFromLegacyKind(legacy); ok {
+			t.Fatalf("legacy %s: should not map after R29-C1", legacy)
 		}
 	}
 }
 
-// V1 contract: port ModelRef with legacy kind falls back to ExecutionIdentity mapping.
+// V1 contract: flat mbti ModelRef without v2 fields no longer auto-maps; use v2 triple instead.
 func TestV1ModelRefExecutionIdentityFromLegacyKind(t *testing.T) {
 	ref := evaluationinput.ModelRef{
 		Kind: "mbti",
 		Code: "MBTI_TEST",
 	}
-	if got := ref.ExecutionIdentity(); got != evaluation.ExecutionIdentityMBTI {
-		t.Fatalf("got %s, want %s", got, evaluation.ExecutionIdentityMBTI)
+	got := ref.ExecutionIdentity()
+	want := evaluation.ExecutionIdentity{Kind: modelcatalog.Kind("mbti")}
+	if got != want {
+		t.Fatalf("got %s, want %s", got, want)
+	}
+	v2 := evaluationinput.ModelRef{
+		Kind:      "personality",
+		SubKind:   "typology",
+		Algorithm: "mbti",
+		Code:      "MBTI_TEST",
+	}
+	if got := v2.ExecutionIdentity(); got != evaluation.ExecutionIdentityMBTI {
+		t.Fatalf("v2 ref got %s, want %s", got, evaluation.ExecutionIdentityMBTI)
 	}
 }
 

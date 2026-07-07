@@ -13,10 +13,6 @@ func (r EvaluationModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 			id := evaldomain.ExecutionIdentity{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
 			return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
 		}
-		if mappedKind, subKind, _, ok := modelcatalog.LegacyKindMapping(kind); ok {
-			id := evaldomain.ExecutionIdentity{Kind: mappedKind, SubKind: subKind, Algorithm: r.algorithm}
-			return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
-		}
 		id := evaldomain.ExecutionIdentity{Kind: kind, SubKind: r.subKind, Algorithm: r.algorithm}
 		return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
 	}
@@ -34,9 +30,4 @@ func (r EvaluationModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 		SubKind:   r.subKind,
 		Algorithm: r.algorithm,
 	}
-}
-
-// EvaluatorKey 是deprecated; 使用 Execution身份。
-func (r EvaluationModelRef) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return r.ExecutionIdentity()
 }

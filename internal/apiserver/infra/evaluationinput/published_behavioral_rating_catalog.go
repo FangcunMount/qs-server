@@ -6,6 +6,7 @@ import (
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	aminfrac "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -30,7 +31,7 @@ func (c PublishedBehavioralRatingCatalog) GetBehavioralRatingByRef(ctx context.C
 	if err != nil {
 		return nil, err
 	}
-	return decodePublishedBehavioralRatingModel(snapshot)
+	return aminfrac.DecodeBehavioralRatingFromPublished(snapshot)
 }
 
 func (c PublishedBehavioralRatingCatalog) FindBehavioralRatingByQuestionnaire(ctx context.Context, questionnaireCode, questionnaireVersion string) (*behavioralsnapshot.Snapshot, error) {
@@ -41,7 +42,7 @@ func (c PublishedBehavioralRatingCatalog) FindBehavioralRatingByQuestionnaire(ct
 	if err != nil {
 		return nil, err
 	}
-	return decodePublishedBehavioralRatingModel(snapshot)
+	return aminfrac.DecodeBehavioralRatingFromPublished(snapshot)
 }
 
 func behavioralRatingLookupRef(ref port.ModelRef) rulesetport.Ref {
@@ -56,33 +57,4 @@ func behavioralRatingLookupRef(ref port.ModelRef) rulesetport.Ref {
 		Version:   ref.Version,
 		Title:     ref.Title,
 	}
-}
-
-func decodePublishedBehavioralRatingModel(snapshot *domain.PublishedModelSnapshot) (*behavioralsnapshot.Snapshot, error) {
-	if snapshot == nil {
-		return nil, domain.ErrNotFound
-	}
-	if snapshot.Model.Kind != domain.KindBehavioralRating {
-		return nil, fmt.Errorf("published model kind = %q, want behavioral_rating", snapshot.Model.Kind)
-	}
-	if !domain.IsBehavioralRatingPayloadFormat(snapshot.PayloadFormat) {
-		return nil, fmt.Errorf("unsupported behavioral_rating payload format: %s", snapshot.PayloadFormat)
-	}
-	payload, err := behavioralsnapshot.ParsePublishedPayload(
-		snapshot.PayloadFormat,
-		snapshot.Model.Code,
-		snapshot.Model.Version,
-		snapshot.Model.Title,
-		snapshot.Model.Status,
-		snapshot.Payload,
-	)
-	if err != nil {
-		return nil, err
-	}
-	payload.QuestionnaireCode = snapshot.Binding.QuestionnaireCode
-	payload.QuestionnaireVersion = snapshot.Binding.QuestionnaireVersion
-	if !payload.IsPublished() {
-		return nil, fmt.Errorf("behavioral_rating model is not published: %s", payload.Code)
-	}
-	return payload, nil
 }

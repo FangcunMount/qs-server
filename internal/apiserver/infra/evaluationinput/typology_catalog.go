@@ -34,11 +34,6 @@ func (p TypologyModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIden
 	return evaldomain.PersonalityTypologyIdentity(p.algorithm)
 }
 
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (p TypologyModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return p.ExecutionIdentity()
-}
-
 // ConfiguredTypologyModelInputProvider resolves typology payloads without algorithm-alias guards.
 type ConfiguredTypologyModelInputProvider struct {
 	catalog             port.TypologyModelCatalog
@@ -59,11 +54,6 @@ func NewConfiguredTypologyModelInputProvider(
 }
 
 func (ConfiguredTypologyModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityPersonalityTypology
-}
-
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (ConfiguredTypologyModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
 	return evaldomain.ExecutionIdentityPersonalityTypology
 }
 

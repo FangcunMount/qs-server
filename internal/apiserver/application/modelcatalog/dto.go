@@ -9,7 +9,7 @@ import (
 
 const (
 	KindPersonality = "personality"
-	// KindBehaviorAbility 是API 产品通道类型 用于 aggregating behavioral_rating 和 cognitive lists。
+	// KindBehaviorAbility 是 API 产品通道类型；List 聚合已移除，Options 仍暴露 channel 元数据。
 	KindBehaviorAbility                = domain.APIKindBehaviorAbility
 	KindBehavioralRating               = string(domain.KindBehavioralRating)
 	KindMedicalScale                   = "medical_scale"

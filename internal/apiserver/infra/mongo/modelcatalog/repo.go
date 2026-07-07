@@ -258,26 +258,16 @@ func sortAlgorithms(algorithms []domain.Algorithm) {
 }
 
 func (r *Repository) refFilter(ref port.Ref) bson.M {
-	kind := ref.Kind
-	subKind := ref.SubKind
-	algorithm := ref.Algorithm
-	if subKind == "" && algorithm == "" {
-		if mappedKind, mappedSubKind, mappedAlgorithm, mapped := domain.LegacyKindMapping(ref.Kind); mapped {
-			kind = mappedKind
-			subKind = mappedSubKind
-			algorithm = mappedAlgorithm
-		}
-	}
 	filter := bson.M{
-		"model_kind":    string(kind),
+		"model_kind":    string(ref.Kind),
 		"model_code":    ref.Code,
 		"model_version": ref.Version,
 	}
-	if subKind != "" {
-		filter["model_sub_kind"] = string(subKind)
+	if ref.SubKind != "" {
+		filter["model_sub_kind"] = string(ref.SubKind)
 	}
-	if algorithm != "" {
-		filter["model_algorithm"] = string(algorithm)
+	if ref.Algorithm != "" {
+		filter["model_algorithm"] = string(ref.Algorithm)
 	}
 	return filter
 }

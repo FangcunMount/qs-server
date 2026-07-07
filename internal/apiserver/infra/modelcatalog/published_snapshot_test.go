@@ -73,16 +73,8 @@ func TestRefMatchesSnapshotSupportsLegacyAndV2Refs(t *testing.T) {
 		Code:      "MBTI_OEJTS",
 		Version:   "2.0.1",
 	}
-	legacyRef := port.Ref{
-		Kind:    domain.RuleSetKindMBTI,
-		Code:    "MBTI_OEJTS",
-		Version: "2.0.1",
-	}
 	if !RefMatchesSnapshot(v2Ref, legacy) {
 		t.Fatal("expected v2 ref to match legacy snapshot")
-	}
-	if !RefMatchesSnapshot(legacyRef, legacy) {
-		t.Fatal("expected legacy ref to match legacy snapshot")
 	}
 }
 

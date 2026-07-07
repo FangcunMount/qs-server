@@ -187,13 +187,13 @@ func ensureOutcomeCanApplyEvaluation(outcome evaloutcome.Outcome) error {
 // ResolveOutcomeKey 解析评估器键 从 结果。
 func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.ExecutionIdentity {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
-		return outcome.Execution.ModelRef.EvaluatorKey()
+		return outcome.Execution.ModelRef.ExecutionIdentity()
 	}
 	if outcome.Assessment != nil && outcome.Assessment.EvaluationModelRef() != nil {
-		return outcome.Assessment.EvaluationModelRef().EvaluatorKey()
+		return outcome.Assessment.EvaluationModelRef().ExecutionIdentity()
 	}
 	if outcome.Input != nil && outcome.Input.Model != nil {
-		return outcome.Input.Model.ModelRef().EvaluatorKey()
+		return outcome.Input.Model.ModelRef().ExecutionIdentity()
 	}
 	return evaluation.ExecutionIdentity{}
 }

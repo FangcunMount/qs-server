@@ -226,11 +226,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build family evaluators: %v", err)
 		}
-		legacyEvaluators, err := MaterializeLegacyEvaluators(descs, wiringDeps)
-		if err != nil {
-			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to build legacy evaluators: %v", err)
-		}
-		evaluatorRegistry, err := execute.NewEvaluatorRegistry(legacyEvaluators...)
+		evaluatorRegistry, err := execute.NewEvaluatorRegistry()
 		if err != nil {
 			return errors.WithCode(code.ErrModuleInitializationFailed, "failed to initialize evaluation evaluator registry: %v", err)
 		}

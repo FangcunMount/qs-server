@@ -6,86 +6,24 @@ import (
 	"testing"
 
 	cberrors "github.com/FangcunMount/component-base/pkg/errors"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavioral_rating"
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/cognitive"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
-type channelListBehavioralRatingStub struct {
-	behavioralRatingCommandStub
-}
-
-func (s *channelListBehavioralRatingStub) List(context.Context, behavioral_rating.ListInput) (*behavioral_rating.ModelListResult, error) {
-	return &behavioral_rating.ModelListResult{
-		Total: 1,
-		Items: []behavioral_rating.ModelSummary{{Code: "BR-001", Kind: behavioral_rating.KindBehavioralRating, Title: "BRIEF-2"}},
-	}, nil
-}
-
-type channelListCognitiveStub struct {
-	cognitiveCommandStub
-}
-
-func (s *channelListCognitiveStub) List(context.Context, cognitive.ListInput) (*cognitive.ModelListResult, error) {
-	return &cognitive.ModelListResult{
-		Total: 1,
-		Items: []cognitive.ModelSummary{{Code: "COG-001", Kind: cognitive.KindCognitive, Title: "SPM"}},
-	}, nil
-}
-
-func TestListBehaviorAbilityChannelAggregatesFamilies(t *testing.T) {
+func TestListBehaviorAbilityChannelReturnsInvalidArgument(t *testing.T) {
 	t.Parallel()
 
-	svc := NewService(Dependencies{
-		BehavioralRatingCommand: &channelListBehavioralRatingStub{},
-		CognitiveCommand:        &channelListCognitiveStub{},
-	})
-
-	result, err := svc.List(context.Background(), ListModelsDTO{
+	svc := NewService(Dependencies{})
+	_, err := svc.List(context.Background(), ListModelsDTO{
 		Kind:     KindBehaviorAbility,
 		Page:     1,
 		PageSize: 20,
 	})
-	if err != nil {
-		t.Fatalf("List: %v", err)
+	if err == nil {
+		t.Fatal("List(behavior_ability) error = nil, want rejection")
 	}
-	if result.Total != 2 {
-		t.Fatalf("total = %d, want 2", result.Total)
-	}
-	if len(result.Items) != 2 {
-		t.Fatalf("items = %#v", result.Items)
-	}
-	kinds := map[string]bool{}
-	for _, item := range result.Items {
-		kinds[item.Kind] = true
-	}
-	for _, want := range []string{KindBehavioralRating, KindCognitive} {
-		if !kinds[want] {
-			t.Fatalf("missing kind %q in %#v", want, kinds)
-		}
-	}
-}
-
-func TestListBehaviorAbilityChannelFamilyFilter(t *testing.T) {
-	t.Parallel()
-
-	svc := NewService(Dependencies{
-		BehavioralRatingCommand: &channelListBehavioralRatingStub{},
-		CognitiveCommand:        &channelListCognitiveStub{},
-	})
-
-	result, err := svc.List(context.Background(), ListModelsDTO{
-		Kind:        KindBehaviorAbility,
-		ModelFamily: string(domain.KindBehavioralRating),
-		Page:        1,
-		PageSize:    20,
-	})
-	if err != nil {
-		t.Fatalf("List: %v", err)
-	}
-	if result.Total != 1 || len(result.Items) != 1 || result.Items[0].Kind != KindBehavioralRating {
-		t.Fatalf("result = %#v", result)
+	if !cberrors.IsCode(err, code.ErrInvalidArgument) {
+		t.Fatalf("List(behavior_ability) code = %v, want ErrInvalidArgument", cberrors.ParseCoder(err))
 	}
 }
 
@@ -116,20 +54,6 @@ func TestCreateRejectsBehaviorAbilityChannelKind(t *testing.T) {
 	}
 	if !cberrors.IsCode(err, code.ErrInvalidArgument) {
 		t.Fatalf("Create(behavior_ability) code = %v, want ErrInvalidArgument", cberrors.ParseCoder(err))
-	}
-}
-
-func TestListBehaviorAbilityChannelAllowedWithoutCapabilityRow(t *testing.T) {
-	t.Parallel()
-
-	svc := NewService(Dependencies{})
-	_, err := svc.List(context.Background(), ListModelsDTO{
-		Kind:     KindBehaviorAbility,
-		Page:     1,
-		PageSize: 10,
-	})
-	if err != nil {
-		t.Fatalf("List(behavior_ability) error = %v", err)
 	}
 }
 

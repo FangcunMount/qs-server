@@ -288,7 +288,7 @@ func (r EvaluationModelRef) IsScale() bool {
 }
 
 func (r EvaluationModelRef) SameIdentity(other EvaluationModelRef) bool {
-	return r.EvaluatorKey() == other.EvaluatorKey() &&
+	return r.ExecutionIdentity() == other.ExecutionIdentity() &&
 		r.code == other.code &&
 		r.version == other.version
 }

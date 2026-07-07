@@ -225,7 +225,8 @@ func TestRuleSetTypologyCatalogMBTILookupViaV2Ref(t *testing.T) {
 	}}
 	catalog := NewRuleSetTypologyCatalog(reader)
 	got, err := catalog.GetTypologyModelByRef(t.Context(), port.ModelRef{
-		Kind:      "mbti",
+		Kind:      port.EvaluationModelKindPersonality,
+		SubKind:   string(domain.SubKindTypology),
 		Algorithm: string(domain.AlgorithmMBTI),
 		Code:      model.Code,
 		Version:   model.Version,

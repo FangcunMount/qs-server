@@ -7,7 +7,7 @@ import (
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
+	aminfrac "github.com/FangcunMount/qs-server/internal/apiserver/infra/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
@@ -69,7 +69,7 @@ func (c RuleSetScaleCatalog) GetScaleByRef(ctx context.Context, ref port.ModelRe
 			if snapshot.Definition.Kind != domain.RuleSetKindScale {
 				return nil, domain.ErrNotFound
 			}
-			decoded, decodeErr := codec.DecodeScale(snapshot)
+			decoded, decodeErr := aminfrac.DecodeScaleFromRuleSetSnapshot(snapshot)
 			if decodeErr != nil {
 				return nil, port.NewResolveError(port.FailureKindModelNotFound, decodeErr, "解释模型不存在", "加载解释模型失败")
 			}

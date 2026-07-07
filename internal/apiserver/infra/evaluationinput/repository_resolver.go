@@ -96,9 +96,9 @@ func newResolver(
 
 func (r *RepositoryResolver) Resolve(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {
 	modelRef := normalizeModelRef(ref)
-	provider, err := r.providers.Resolve(modelRef.EvaluatorKey())
+	provider, err := r.providers.Resolve(modelRef.ExecutionIdentity())
 	if err != nil {
-		err := fmt.Errorf("unsupported evaluation model key: %s", modelRef.EvaluatorKey())
+		err := fmt.Errorf("unsupported evaluation model key: %s", modelRef.ExecutionIdentity())
 		return nil, port.NewResolveError(port.FailureKindUnsupportedModel, err, "不支持的解释模型", "加载解释模型失败")
 	}
 	ref.ModelRef = modelRef
@@ -128,8 +128,6 @@ func (r *RepositoryResolver) FindTypologyModelByQuestionnaire(ctx context.Contex
 
 type ModelInputProvider interface {
 	ExecutionIdentity() evaldomain.ExecutionIdentity
-	// EvaluatorKey is deprecated; use ExecutionIdentity.
-	EvaluatorKey() evaldomain.ExecutionIdentity
 	ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error)
 }
 
@@ -201,11 +199,6 @@ func NewScaleModelInputProvider(
 }
 
 func (ScaleModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityScaleDefault
-}
-
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (ScaleModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
 	return evaldomain.ExecutionIdentityScaleDefault
 }
 

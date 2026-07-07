@@ -31,11 +31,6 @@ func (BehavioralRatingModelInputProvider) ExecutionIdentity() evaldomain.Executi
 	return evaldomain.ExecutionIdentityBehavioralRatingDefault
 }
 
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (BehavioralRatingModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return evaldomain.ExecutionIdentityBehavioralRatingDefault
-}
-
 func (BehavioralRatingModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
 	return modelcatalog.ExecutionPathBehavioralRatingDescriptor
 }

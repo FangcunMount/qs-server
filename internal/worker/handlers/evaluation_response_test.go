@@ -33,6 +33,20 @@ func TestHandleEvaluateAssessmentResponseTerminalStatusesAck(t *testing.T) {
 	}
 }
 
+func TestHandleEvaluateAssessmentResponseRetryableFailedNacks(t *testing.T) {
+	err := handleEvaluateAssessmentResponse(&pb.EvaluateAssessmentResponse{
+		Success:     false,
+		Status:      "failed",
+		Message:     "calculation failed",
+		Retryable:   true,
+		RunId:       "42:1",
+		FailureKind: "calculation",
+	})
+	if err == nil {
+		t.Fatal("expected retryable failed status to nack")
+	}
+}
+
 func TestHandleEvaluateAssessmentResponseRetryableFailure(t *testing.T) {
 	for _, status := range []string{"", "skipped", "processing"} {
 		t.Run(status, func(t *testing.T) {
@@ -66,6 +80,18 @@ func TestHandleGenerateReportResponseTerminalStatusesAck(t *testing.T) {
 				t.Fatalf("status %q: unexpected error: %v", status, err)
 			}
 		})
+	}
+}
+
+func TestHandleGenerateReportResponseRetryableFailedNacks(t *testing.T) {
+	err := handleGenerateReportResponse(&pb.GenerateReportFromAssessmentResponse{
+		Success:   false,
+		Status:    "failed",
+		Message:   "temporary",
+		Retryable: true,
+	})
+	if err == nil {
+		t.Fatal("expected retryable failed report generation to nack")
 	}
 }
 

@@ -11,15 +11,8 @@ func applyAssessmentOutcomeV2Fields(po *AssessmentPO, a *assessment.Assessment) 
 		return
 	}
 	if ref := a.EvaluationModelRef(); ref != nil && !ref.IsEmpty() {
-		subKind, algorithm := ref.SubKind(), ref.Algorithm()
-		if algorithm == "" {
-			if _, mappedSubKind, mappedAlgorithm, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(ref.Kind())); ok {
-				if subKind == "" {
-					subKind = mappedSubKind
-				}
-				algorithm = mappedAlgorithm
-			}
-		}
+		id := ref.ExecutionIdentity()
+		subKind, algorithm := id.SubKind, id.Algorithm
 		if subKind != "" {
 			po.EvaluationModelSubKind = strPtr(string(subKind))
 		}

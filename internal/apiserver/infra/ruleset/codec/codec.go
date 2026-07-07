@@ -86,11 +86,7 @@ func DecodeScale(snapshot *domain.RuleSetSnapshot) (*scalesnapshot.ScaleSnapshot
 	if !domain.IsScalePayloadFormat(format) {
 		return nil, fmt.Errorf("unsupported scale payload format: %s", format)
 	}
-	var model scalesnapshot.ScaleSnapshot
-	if err := json.Unmarshal(snapshot.Payload, &model); err != nil {
-		return nil, fmt.Errorf("decode scale payload: %w", err)
-	}
-	return &model, nil
+	return scalesnapshot.ParsePublishedPayload(snapshot.Payload)
 }
 
 func DecodeTypology(snapshot *domain.PublishedModelSnapshot) (*typology.Payload, error) {

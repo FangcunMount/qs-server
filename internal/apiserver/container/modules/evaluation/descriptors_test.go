@@ -100,10 +100,6 @@ func (s parityStubInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentit
 	return evaldomain.ExecutionIdentityScaleDefault
 }
 
-func (s parityStubInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return s.ExecutionIdentity()
-}
-
 func (s parityStubInputProvider) ExecutionPath() modelcatalog.ExecutionPath { return s.path }
 
 func (parityStubInputProvider) ResolveInput(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {

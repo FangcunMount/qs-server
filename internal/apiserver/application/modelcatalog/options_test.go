@@ -20,6 +20,6 @@ func TestIsSupportedAPIKindIncludesBehaviorAbilityChannel(t *testing.T) {
 	t.Parallel()
 
 	if !IsSupportedAPIKind(KindBehaviorAbility) {
-		t.Fatal("behavior_ability channel kind must remain supported for list APIs")
+		t.Fatal("behavior_ability channel kind must remain supported for Options metadata")
 	}
 }

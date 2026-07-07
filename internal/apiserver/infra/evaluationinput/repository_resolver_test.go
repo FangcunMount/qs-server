@@ -267,8 +267,8 @@ func TestModelInputProviderRegistryResolvesLegacyTypologyViaConfiguredKey(t *tes
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
 		}
-		if provider.EvaluatorKey() != evaldomain.ExecutionIdentityPersonalityTypology {
-			t.Fatalf("provider key = %#v", provider.EvaluatorKey())
+		if provider.ExecutionIdentity() != evaldomain.ExecutionIdentityPersonalityTypology {
+			t.Fatalf("provider key = %#v", provider.ExecutionIdentity())
 		}
 	}
 }
@@ -312,11 +312,6 @@ type fakeInputProvider struct {
 
 func (p fakeInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	return p.key
-}
-
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (p fakeInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return p.ExecutionIdentity()
 }
 
 func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.InputSnapshot, error) {

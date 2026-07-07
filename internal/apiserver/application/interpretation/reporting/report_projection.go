@@ -4,7 +4,6 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIdentity {
@@ -28,22 +27,15 @@ func modelIdentityFromOutcome(outcome evaloutcome.Outcome) domainreport.ModelIde
 }
 
 func modelIdentityFromRef(ref assessment.EvaluationModelRef) domainreport.ModelIdentity {
-	identity := domainreport.ModelIdentity{
-		Kind:      string(ref.Kind()),
-		SubKind:   string(ref.SubKind()),
-		Algorithm: string(ref.Algorithm()),
+	id := ref.ExecutionIdentity()
+	return domainreport.ModelIdentity{
+		Kind:      string(id.Kind),
+		SubKind:   string(id.SubKind),
+		Algorithm: string(id.Algorithm),
 		Code:      ref.Code().String(),
 		Version:   ref.Version(),
 		Title:     ref.Title(),
 	}
-	if identity.Algorithm == "" {
-		if mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(modelcatalog.Kind(ref.Kind())); ok {
-			identity.Kind = string(mappedKind)
-			identity.SubKind = string(subKind)
-			identity.Algorithm = string(algorithm)
-		}
-	}
-	return identity
 }
 
 func primaryScoreFromOutcome(outcome evaloutcome.Outcome) *domainreport.ScoreValue {

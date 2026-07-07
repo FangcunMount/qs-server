@@ -205,11 +205,7 @@ func (flow assessmentFlow) EvaluateAssessment(
 			"result", "failed",
 			"error", err.Error(),
 		)
-		return &pb.EvaluateAssessmentResponse{
-			Success: false,
-			Status:  "failed",
-			Message: err.Error(),
-		}, nil
+		return evaluateFailureResponse(ctx, s.runQueryService, req.AssessmentId, err.Error()), nil
 	}
 
 	result, err := s.managementService.GetByID(ctx, req.AssessmentId)
@@ -273,11 +269,7 @@ func (flow assessmentFlow) GenerateReportFromAssessment(
 			"assessment_id", req.AssessmentId,
 			"error", err.Error(),
 		)
-		return &pb.GenerateReportFromAssessmentResponse{
-			Success: false,
-			Status:  "failed",
-			Message: err.Error(),
-		}, nil
+		return generateReportFailureResponse(ctx, s.runQueryService, req.AssessmentId, err.Error()), nil
 	}
 
 	return &pb.GenerateReportFromAssessmentResponse{

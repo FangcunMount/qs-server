@@ -240,9 +240,6 @@ func resolveLegacyAlgorithm(snapshot *domain.Snapshot) (domain.Algorithm, error)
 	if domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat) {
 		return domain.AlgorithmFromTypologyPayload(snapshot.Payload)
 	}
-	if _, _, algorithm, ok := domain.LegacyKindMapping(snapshot.Definition.Kind); ok {
-		return algorithm, nil
-	}
 	return "", nil
 }
 
@@ -250,11 +247,8 @@ func isLegacyPersonalityEnvelope(snapshot *domain.Snapshot) bool {
 	if snapshot == nil {
 		return false
 	}
-	if snapshot.Definition.Kind == domain.KindPersonality {
-		return true
-	}
-	kind, subKind, _, ok := domain.LegacyKindMapping(snapshot.Definition.Kind)
-	return ok && kind == domain.KindPersonality && subKind == domain.SubKindTypology
+	return snapshot.Definition.Kind == domain.KindPersonality ||
+		domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat)
 }
 
 func (s *DualStore) ListPublishedAlgorithms(ctx context.Context) ([]domain.Algorithm, error) {

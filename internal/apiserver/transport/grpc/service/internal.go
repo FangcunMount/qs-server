@@ -15,6 +15,7 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
 	planApp "github.com/FangcunMount/qs-server/internal/apiserver/application/plan"
 	statisticsApp "github.com/FangcunMount/qs-server/internal/apiserver/application/statistics"
@@ -35,6 +36,7 @@ type InternalService struct {
 	submissionService          assessmentApp.AssessmentSubmissionService
 	managementService          assessmentApp.AssessmentManagementService
 	executeService             execute.Service
+	runQueryService            runqueryApp.Service
 	assessmentBindingResolver  rulesetport.AssessmentBindingResolver
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService
 	taskAssessmentResolver     planApp.TaskAssessmentResolver
@@ -67,6 +69,7 @@ func NewInternalService(
 	submissionService assessmentApp.AssessmentSubmissionService,
 	managementService assessmentApp.AssessmentManagementService,
 	executeService execute.Service,
+	runQueryService runqueryApp.Service,
 	assessmentBindingResolver rulesetport.AssessmentBindingResolver,
 	assessmentAttentionService testeeApp.TesteeAssessmentAttentionService,
 	taskAssessmentResolver planApp.TaskAssessmentResolver,
@@ -86,6 +89,7 @@ func NewInternalService(
 		submissionService:                  submissionService,
 		managementService:                  managementService,
 		executeService:                     executeService,
+		runQueryService:                    runQueryService,
 		assessmentBindingResolver:          assessmentBindingResolver,
 		assessmentAttentionService:         assessmentAttentionService,
 		taskAssessmentResolver:             taskAssessmentResolver,

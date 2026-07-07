@@ -373,18 +373,18 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 // resolveExecutionIdentity 解析 v2 评估执行键。
 func resolveExecutionIdentity(a *assessment.Assessment, input *evaluationinput.InputSnapshot) evaluation.ExecutionIdentity {
 	if input != nil && input.Model != nil {
-		inputKey := input.Model.ModelRef().EvaluatorKey()
+		inputKey := input.Model.ModelRef().ExecutionIdentity()
 		if a == nil || a.EvaluationModelRef() == nil || a.EvaluationModelRef().IsEmpty() {
 			return inputKey
 		}
-		assessmentKey := a.EvaluationModelRef().EvaluatorKey()
+		assessmentKey := a.EvaluationModelRef().ExecutionIdentity()
 		if assessmentKey.Algorithm == "" && inputKey.Algorithm != "" {
 			return inputKey
 		}
 		return assessmentKey
 	}
 	if a != nil && a.EvaluationModelRef() != nil && !a.EvaluationModelRef().IsEmpty() {
-		return a.EvaluationModelRef().EvaluatorKey()
+		return a.EvaluationModelRef().ExecutionIdentity()
 	}
 	return evaluation.ExecutionIdentity{}
 }

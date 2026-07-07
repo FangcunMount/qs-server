@@ -1,70 +1,5 @@
 basePath: /api/v1
 definitions:
-  assessmentmodel.ModelSummary:
-    properties:
-      algorithm:
-        type: string
-      category:
-        type: string
-      code:
-        type: string
-      created_at:
-        type: string
-      description:
-        type: string
-      kind:
-        type: string
-      questionnaire_code:
-        type: string
-      questionnaire_version:
-        type: string
-      status:
-        type: string
-      sub_kind:
-        type: string
-      tags:
-        items:
-          type: string
-        type: array
-      title:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  assessmentmodel.Option:
-    properties:
-      label:
-        type: string
-      value:
-        type: string
-    type: object
-  assessmentmodel.PreviewOutcome:
-    properties:
-      code:
-        type: string
-      title:
-        type: string
-    type: object
-  assessmentmodel.PreviewReportSection:
-    properties:
-      content:
-        type: string
-      kind:
-        type: string
-      title:
-        type: string
-    type: object
-  assessmentmodel.ValidationIssue:
-    properties:
-      code:
-        type: string
-      field:
-        type: string
-      level:
-        type: string
-      message:
-        type: string
-    type: object
   cachegovernance.ManualWarmupItemResult:
     properties:
       family:
@@ -188,10 +123,80 @@ definitions:
   meta.ID:
     enum:
     - 0
-    format: int64
     type: integer
     x-enum-varnames:
     - ZeroID
+  modelcatalog.ModelSummary:
+    properties:
+      algorithm:
+        type: string
+      algorithm_family:
+        type: string
+      category:
+        type: string
+      code:
+        type: string
+      created_at:
+        type: string
+      description:
+        type: string
+      kind:
+        type: string
+      product_channel:
+        type: string
+      questionnaire_code:
+        type: string
+      questionnaire_version:
+        type: string
+      status:
+        type: string
+      sub_kind:
+        type: string
+      tags:
+        items:
+          type: string
+        type: array
+      title:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  modelcatalog.Option:
+    properties:
+      disabled:
+        type: boolean
+      label:
+        type: string
+      value:
+        type: string
+    type: object
+  modelcatalog.PreviewOutcome:
+    properties:
+      code:
+        type: string
+      title:
+        type: string
+    type: object
+  modelcatalog.PreviewReportSection:
+    properties:
+      content:
+        type: string
+      kind:
+        type: string
+      title:
+        type: string
+    type: object
+  modelcatalog.ValidationIssue:
+    properties:
+      code:
+        type: string
+      field:
+        type: string
+      level:
+        type: string
+      message:
+        type: string
+    type: object
   report.InterpretReport:
     type: object
   request.AddQuestionRequest:
@@ -346,6 +351,8 @@ definitions:
       description:
         type: string
       kind:
+        type: string
+      product_channel:
         type: string
       questionnaire_code:
         type: string
@@ -838,7 +845,7 @@ definitions:
     properties:
       items:
         items:
-          $ref: '#/definitions/assessmentmodel.ModelSummary'
+          $ref: '#/definitions/modelcatalog.ModelSummary'
         type: array
       page:
         type: integer
@@ -849,44 +856,55 @@ definitions:
     type: object
   response.AssessmentModelOptionsResponse:
     properties:
+      algorithm_families:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
       algorithms:
         items:
-          $ref: '#/definitions/assessmentmodel.Option'
+          $ref: '#/definitions/modelcatalog.Option'
         type: array
       categories:
         items:
-          $ref: '#/definitions/assessmentmodel.Option'
+          $ref: '#/definitions/modelcatalog.Option'
         type: array
       kinds:
         items:
-          $ref: '#/definitions/assessmentmodel.Option'
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
+      model_families:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
+        type: array
+      product_channels:
+        items:
+          $ref: '#/definitions/modelcatalog.Option'
         type: array
       sub_kinds:
         items:
-          $ref: '#/definitions/assessmentmodel.Option'
+          $ref: '#/definitions/modelcatalog.Option'
         type: array
       tags:
         items:
-          $ref: '#/definitions/assessmentmodel.Option'
+          $ref: '#/definitions/modelcatalog.Option'
         type: array
     type: object
   response.AssessmentModelPreviewReportResponse:
     properties:
       issues:
         items:
-          $ref: '#/definitions/assessmentmodel.ValidationIssue'
+          $ref: '#/definitions/modelcatalog.ValidationIssue'
         type: array
       outcome:
-        $ref: '#/definitions/assessmentmodel.PreviewOutcome'
+        $ref: '#/definitions/modelcatalog.PreviewOutcome'
       raw_report:
         $ref: '#/definitions/report.InterpretReport'
       report_sections:
         items:
-          $ref: '#/definitions/assessmentmodel.PreviewReportSection'
+          $ref: '#/definitions/modelcatalog.PreviewReportSection'
         type: array
       score_detail:
         additionalProperties:
-          format: float64
           type: number
         type: object
     type: object
@@ -905,6 +923,8 @@ definitions:
     properties:
       algorithm:
         type: string
+      algorithm_family:
+        type: string
       category:
         type: string
       code:
@@ -914,6 +934,8 @@ definitions:
       description:
         type: string
       kind:
+        type: string
+      product_channel:
         type: string
       questionnaire_code:
         type: string
@@ -1195,9 +1217,15 @@ definitions:
       factor_name:
         description: 因子名称
         type: string
+      hierarchy_level:
+        description: 树深度
+        type: integer
       max_score:
         description: 最大分
         type: number
+      parent_code:
+        description: 父因子编码
+        type: string
       raw_score:
         description: 原始分
         type: number
@@ -1207,6 +1235,12 @@ definitions:
       risk_level_label:
         description: 风险等级中文
         type: string
+      role:
+        description: 因子角色
+        type: string
+      sort_order:
+        description: 同级排序
+        type: integer
       suggestion:
         description: 维度建议
         type: string
@@ -1219,6 +1253,36 @@ definitions:
         items:
           $ref: '#/definitions/response.TaskResponse'
         type: array
+    type: object
+  response.EvaluationRunListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.EvaluationRunResponse'
+        type: array
+    type: object
+  response.EvaluationRunResponse:
+    properties:
+      assessment_id:
+        type: integer
+      attempt_no:
+        type: integer
+      error_code:
+        type: string
+      error_message:
+        type: string
+      finished_at:
+        type: string
+      retryable:
+        type: boolean
+      run_id:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      trace_id:
+        type: string
     type: object
   response.FactorListResponse:
     properties:
@@ -1678,6 +1742,40 @@ definitions:
       severity:
         type: string
     type: object
+  response.RetryableFailedRunListResponse:
+    properties:
+      items:
+        items:
+          $ref: '#/definitions/response.RetryableFailedRunResponse'
+        type: array
+      next_cursor:
+        type: integer
+    type: object
+  response.RetryableFailedRunResponse:
+    properties:
+      assessment_id:
+        type: integer
+      attempt_no:
+        type: integer
+      error_code:
+        type: string
+      error_message:
+        type: string
+      finished_at:
+        type: string
+      org_id:
+        type: integer
+      retryable:
+        type: boolean
+      run_id:
+        type: string
+      started_at:
+        type: string
+      status:
+        type: string
+      trace_id:
+        type: string
+    type: object
   response.ScaleCategoriesResponse:
     properties:
       applicable_ages:
@@ -2001,7 +2099,6 @@ definitions:
         type: integer
       risk_distribution:
         additionalProperties:
-          format: int64
           type: integer
         type: object
       testee_id:
@@ -2299,11 +2396,11 @@ definitions:
       trend:
         allOf:
         - $ref: '#/definitions/statistics.PlanTaskTrend'
-        description: 'Deprecated: use activity.trend.'
+        description: 'Deprecated: 使用 activity.trend。'
       window:
         allOf:
         - $ref: '#/definitions/statistics.PlanTaskWindow'
-        description: 'Deprecated: use activity.window.'
+        description: 'Deprecated: 使用 activity.窗口。'
     type: object
   statistics.PlanStatistics:
     properties:
@@ -2341,11 +2438,11 @@ definitions:
       trend:
         allOf:
         - $ref: '#/definitions/statistics.PlanTaskTrend'
-        description: 'Deprecated: use activity.trend.'
+        description: 'Deprecated: 使用 activity.trend。'
       window:
         allOf:
         - $ref: '#/definitions/statistics.PlanTaskWindow'
-        description: 'Deprecated: use activity.window.'
+        description: 'Deprecated: 使用 activity.窗口。'
     type: object
   statistics.PlanTaskActivityStatistics:
     properties:
@@ -2506,7 +2603,6 @@ definitions:
         type: integer
       origin_distribution:
         additionalProperties:
-          format: int64
           type: integer
         description: 来源分布
         type: object
@@ -2555,7 +2651,6 @@ definitions:
         type: integer
       assessment_status_distribution:
         additionalProperties:
-          format: int64
           type: integer
         description: 状态分布
         type: object
@@ -4256,6 +4351,59 @@ paths:
       summary: 重试失败的测评
       tags:
       - Evaluation-Admin
+  /api/v1/evaluations/assessments/{id}/runs:
+    get:
+      description: 按 attempt 倒序返回测评执行运行记录
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - default: 20
+        description: 返回条数
+        in: query
+        name: limit
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.EvaluationRunListResponse'
+              type: object
+      summary: 查询测评执行运行列表
+      tags:
+      - Evaluation-Assessment
+  /api/v1/evaluations/assessments/{id}/runs/latest:
+    get:
+      description: 返回测评最新一次执行运行记录
+      parameters:
+      - description: 测评ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.EvaluationRunResponse'
+              type: object
+      summary: 查询测评最新执行运行
+      tags:
+      - Evaluation-Assessment
   /api/v1/evaluations/assessments/{id}/scores:
     get:
       description: 获取指定测评的得分详情。响应中的 factor_scores 包含每个因子的得分信息，其中 max_score 为因子的最大分（可选）
@@ -6872,7 +7020,6 @@ paths:
         required: true
         type: string
       - description: 从业者ID
-        format: int64
         in: path
         name: id
         required: true
@@ -7054,7 +7201,6 @@ paths:
         required: true
         type: string
       - description: 从业者ID
-        format: int64
         in: query
         name: clinician_id
         type: integer
@@ -7113,7 +7259,6 @@ paths:
         required: true
         type: string
       - description: 入口ID
-        format: int64
         in: path
         name: id
         required: true
@@ -7203,7 +7348,6 @@ paths:
         required: true
         type: string
       - description: 计划ID
-        format: int64
         in: path
         name: plan_id
         required: true
@@ -7344,7 +7488,6 @@ paths:
         required: true
         type: string
       - description: 受试者ID
-        format: int64
         in: path
         name: testee_id
         required: true
@@ -7380,7 +7523,6 @@ paths:
         required: true
         type: string
       - description: 受试者ID
-        format: int64
         in: path
         name: testee_id
         required: true
@@ -7943,6 +8085,39 @@ paths:
       summary: 手工触发缓存预热
       tags:
       - Statistics-Sync
+  /internal/v1/evaluation-runs/failed:
+    get:
+      description: operating 内部接口，按组织返回可重试的失败运行
+      parameters:
+      - default: true
+        description: 仅可重试
+        in: query
+        name: retryable
+        type: boolean
+      - default: 50
+        description: 返回条数
+        in: query
+        name: limit
+        type: integer
+      - description: 分页游标
+        in: query
+        name: cursor
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/core.Response'
+            - properties:
+                data:
+                  $ref: '#/definitions/response.RetryableFailedRunListResponse'
+              type: object
+      summary: 查询可重试失败运行列表
+      tags:
+      - Evaluation-Run-Internal
   /internal/v1/plans/tasks/{id}/complete:
     post:
       description: 系统动作：用户完成测评后回写任务状态，仅内部路由暴露

@@ -2066,12 +2066,15 @@ func (x *EvaluateAssessmentRequest) GetAssessmentId() uint64 {
 // 执行测评评估响应
 type EvaluateAssessmentResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                          // 是否成功
-	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                             // 处理后的状态：interpreted/failed/skipped
-	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                           // 描述信息
-	TotalScore    float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"` // 总分（成功时，legacy）
-	RiskLevel     string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`      // 风险等级（成功时，legacy）
-	Outcome       *OutcomeSummary        `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`                           // v2 outcome 投影
+	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`                           // 是否成功
+	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`                              // 处理后的状态：interpreted/failed/skipped
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`                            // 描述信息
+	TotalScore    float64                `protobuf:"fixed64,4,opt,name=total_score,json=totalScore,proto3" json:"total_score,omitempty"`  // 总分（成功时，legacy）
+	RiskLevel     string                 `protobuf:"bytes,5,opt,name=risk_level,json=riskLevel,proto3" json:"risk_level,omitempty"`       // 风险等级（成功时，legacy）
+	Outcome       *OutcomeSummary        `protobuf:"bytes,6,opt,name=outcome,proto3" json:"outcome,omitempty"`                            // v2 outcome 投影
+	Retryable     bool                   `protobuf:"varint,7,opt,name=retryable,proto3" json:"retryable,omitempty"`                       // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
+	RunId         string                 `protobuf:"bytes,8,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                   // 失败时关联的 evaluation_run id
+	FailureKind   string                 `protobuf:"bytes,9,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"` // 失败分类：validation/calculation/timeout/internal
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2146,6 +2149,27 @@ func (x *EvaluateAssessmentResponse) GetOutcome() *OutcomeSummary {
 		return x.Outcome
 	}
 	return nil
+}
+
+func (x *EvaluateAssessmentResponse) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
+func (x *EvaluateAssessmentResponse) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *EvaluateAssessmentResponse) GetFailureKind() string {
+	if x != nil {
+		return x.FailureKind
+	}
+	return ""
 }
 
 type OutcomeSummary struct {
@@ -2469,6 +2493,9 @@ type GenerateReportFromAssessmentResponse struct {
 	Success       bool                   `protobuf:"varint,1,opt,name=success,proto3" json:"success,omitempty"`
 	Status        string                 `protobuf:"bytes,2,opt,name=status,proto3" json:"status,omitempty"`
 	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"`
+	Retryable     bool                   `protobuf:"varint,4,opt,name=retryable,proto3" json:"retryable,omitempty"`                       // 失败时是否应 nack 重试
+	RunId         string                 `protobuf:"bytes,5,opt,name=run_id,json=runId,proto3" json:"run_id,omitempty"`                   // 失败时关联的 evaluation_run id（若有）
+	FailureKind   string                 `protobuf:"bytes,6,opt,name=failure_kind,json=failureKind,proto3" json:"failure_kind,omitempty"` // 失败分类（若有）
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -2520,6 +2547,27 @@ func (x *GenerateReportFromAssessmentResponse) GetStatus() string {
 func (x *GenerateReportFromAssessmentResponse) GetMessage() string {
 	if x != nil {
 		return x.Message
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetRunId() string {
+	if x != nil {
+		return x.RunId
+	}
+	return ""
+}
+
+func (x *GenerateReportFromAssessmentResponse) GetFailureKind() string {
+	if x != nil {
+		return x.FailureKind
 	}
 	return ""
 }
@@ -3688,7 +3736,7 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\amessage\x18\x04 \x01(\tR\amessage\x12\x18\n" +
 	"\asuccess\x18\x05 \x01(\bR\asuccess\"@\n" +
 	"\x19EvaluateAssessmentRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xdf\x01\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xb7\x02\n" +
 	"\x1aEvaluateAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
@@ -3697,7 +3745,10 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"totalScore\x12\x1d\n" +
 	"\n" +
 	"risk_level\x18\x05 \x01(\tR\triskLevel\x125\n" +
-	"\aoutcome\x18\x06 \x01(\v2\x1b.internalapi.OutcomeSummaryR\aoutcome\"\xb0\x01\n" +
+	"\aoutcome\x18\x06 \x01(\v2\x1b.internalapi.OutcomeSummaryR\aoutcome\x12\x1c\n" +
+	"\tretryable\x18\a \x01(\bR\tretryable\x12\x15\n" +
+	"\x06run_id\x18\b \x01(\tR\x05runId\x12!\n" +
+	"\ffailure_kind\x18\t \x01(\tR\vfailureKind\"\xb0\x01\n" +
 	"\x0eOutcomeSummary\x120\n" +
 	"\x05model\x18\x01 \x01(\v2\x1a.internalapi.ModelIdentityR\x05model\x12<\n" +
 	"\rprimary_score\x18\x02 \x01(\v2\x17.internalapi.ScoreValueR\fprimaryScore\x12.\n" +
@@ -3721,11 +3772,14 @@ const file_internalapi_internal_proto_rawDesc = "" +
 	"\x05label\x18\x02 \x01(\tR\x05label\x12\x1a\n" +
 	"\bseverity\x18\x03 \x01(\tR\bseverity\"J\n" +
 	"#GenerateReportFromAssessmentRequest\x12#\n" +
-	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"r\n" +
+	"\rassessment_id\x18\x01 \x01(\x04R\fassessmentId\"\xca\x01\n" +
 	"$GenerateReportFromAssessmentResponse\x12\x18\n" +
 	"\asuccess\x18\x01 \x01(\bR\asuccess\x12\x16\n" +
 	"\x06status\x18\x02 \x01(\tR\x06status\x12\x18\n" +
-	"\amessage\x18\x03 \x01(\tR\amessage\"\x82\x01\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage\x12\x1c\n" +
+	"\tretryable\x18\x04 \x01(\bR\tretryable\x12\x15\n" +
+	"\x06run_id\x18\x05 \x01(\tR\x05runId\x12!\n" +
+	"\ffailure_kind\x18\x06 \x01(\tR\vfailureKind\"\x82\x01\n" +
 	"\x1eSyncAssessmentAttentionRequest\x12\x1b\n" +
 	"\ttestee_id\x18\x01 \x01(\x04R\btesteeId\x12\x1d\n" +
 	"\n" +

@@ -164,12 +164,6 @@ func RefFromSnapshot(snapshot *domain.Snapshot) port.Ref {
 		Version: snapshot.Definition.Version,
 		Title:   snapshot.Definition.Title,
 	}
-	if kind, subKind, algorithm, ok := domain.LegacyKindMapping(snapshot.Definition.Kind); ok {
-		ref.Kind = kind
-		ref.SubKind = subKind
-		ref.Algorithm = algorithm
-		return ref
-	}
 	if domain.IsPersonalityTypologyPayloadFormat(snapshot.PayloadFormat) {
 		algorithm, err := domain.AlgorithmFromTypologyPayload(snapshot.Payload)
 		if err == nil {
@@ -182,11 +176,6 @@ func RefFromSnapshot(snapshot *domain.Snapshot) port.Ref {
 }
 
 func canonicalRef(ref port.Ref) port.Ref {
-	if kind, subKind, algorithm, ok := domain.LegacyKindMapping(ref.Kind); ok {
-		ref.Kind = kind
-		ref.SubKind = subKind
-		ref.Algorithm = algorithm
-	}
 	return ref
 }
 

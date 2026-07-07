@@ -9,21 +9,13 @@ import (
 )
 
 func TestLegacyKindMapping(t *testing.T) {
-	tests := []struct {
-		legacy        identity.Kind
-		wantKind      identity.Kind
-		wantSubKind   identity.SubKind
-		wantAlgorithm identity.Algorithm
-	}{
-		{identity.KindScale, identity.KindScale, identity.SubKindEmpty, identity.AlgorithmScaleDefault},
-		{identity.Kind(KindMBTIMigration), identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmMBTI},
-		{identity.Kind(KindSBTIMigration), identity.KindPersonality, identity.SubKindTypology, identity.AlgorithmSBTI},
+	kind, subKind, algorithm, ok := LegacyKindMapping(identity.KindScale)
+	if !ok || kind != identity.KindScale || subKind != identity.SubKindEmpty || algorithm != identity.AlgorithmScaleDefault {
+		t.Fatalf("LegacyKindMapping(scale) = (%s,%s,%s,%v), want (scale,,scale_default,true)", kind, subKind, algorithm, ok)
 	}
-	for _, tc := range tests {
-		kind, subKind, algorithm, ok := LegacyKindMapping(tc.legacy)
-		if !ok || kind != tc.wantKind || subKind != tc.wantSubKind || algorithm != tc.wantAlgorithm {
-			t.Fatalf("LegacyKindMapping(%s) = (%s,%s,%s,%v), want (%s,%s,%s,true)",
-				tc.legacy, kind, subKind, algorithm, ok, tc.wantKind, tc.wantSubKind, tc.wantAlgorithm)
+	for _, legacyKind := range []identity.Kind{identity.Kind(KindMBTIMigration), identity.Kind(KindSBTIMigration)} {
+		if _, _, _, ok := LegacyKindMapping(legacyKind); ok {
+			t.Fatalf("LegacyKindMapping(%s) should be removed from runtime read paths", legacyKind)
 		}
 	}
 }
@@ -31,23 +23,23 @@ func TestLegacyKindMapping(t *testing.T) {
 func TestPublishedLegacyEnvelopeRoundTrip(t *testing.T) {
 	legacySnapshot := &Snapshot{
 		SchemaVersion: catalog.SchemaVersionV1,
-		PayloadFormat: routing.PayloadFormatMBTIV1,
+		PayloadFormat: routing.PayloadFormatAssessmentScaleV1,
 		Definition: Definition{
-			Kind:    identity.Kind(KindMBTIMigration),
-			Code:    "MBTI_OEJTS",
+			Kind:    identity.KindScale,
+			Code:    "PHQ9",
 			Version: "1.0.0",
-			Title:   "MBTI",
+			Title:   "PHQ-9",
 			Status:  "published",
 		},
-		DecisionKind: identity.DecisionKindPoleComposition,
-		Payload:      []byte(`{"code":"MBTI_OEJTS","algorithm":"mbti","version":"1.0.0","status":"published"}`),
+		DecisionKind: identity.DecisionKindScoreRange,
+		Payload:      []byte(`{"code":"PHQ9","version":"1.0.0","status":"published"}`),
 	}
 	published := PublishedFromLegacy(legacySnapshot)
-	if published.Model.Kind != identity.KindPersonality || published.Model.Algorithm != identity.AlgorithmMBTI {
+	if published.Model.Kind != identity.KindScale || published.Model.Algorithm != identity.AlgorithmScaleDefault {
 		t.Fatalf("published model = %#v", published.Model)
 	}
 	back := LegacyFromPublished(published)
-	if back.Definition.Kind != identity.KindPersonality || back.PayloadFormat != routing.PayloadFormatMBTIV1 {
+	if back.Definition.Kind != identity.KindScale {
 		t.Fatalf("legacy round trip = %#v", back)
 	}
 }

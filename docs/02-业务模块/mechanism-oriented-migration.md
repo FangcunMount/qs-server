@@ -429,3 +429,28 @@ type Algorithm = identity.Algorithm
 
 **刻意保留（R29+）**：Phase B/C behavior_ability / migration kinds；worker 重试编排。
 
+## Round 29：ModelCatalog 遗留收敛（已完成）
+
+| 子轨 | 动作 |
+|------|------|
+| R29-B | 删除 `behavior_ability` List/Options 运行时双列表聚合；`List?kind=behavior_ability` 返回 400；Options 仍暴露 channel 元数据 |
+| R29-C1 | 运行时删除 `mbti`/`sbti` flat `LegacyKindMapping` 读路径（仅保留 `scale` 迁移映射） |
+| R29-C2 | infra snapshot 解码单入口：`infra/modelcatalog/published_decode.go`（BR + scale ruleset） |
+
+## Round 30：Worker ack/nack 对齐 evaluation_run.retryable（已完成）
+
+| 动作 | 说明 |
+|------|------|
+| Proto | `EvaluateAssessmentResponse` / `GenerateReportFromAssessmentResponse` 增 `retryable`、`run_id`、`failure_kind` |
+| gRPC | 失败路径经 `RunQueryService.FindLatestByAssessmentID` 填充 run 元数据 |
+| Worker | 优先读 `resp.Retryable`：`true` → nack；`false` + `status=failed` → ack |
+
+## Round 31：ExecutionIdentity 遗留层清理（已完成）
+
+| 动作 | 说明 |
+|------|------|
+| 应用层 | `ResolveOutcomeKey` / `resolveExecutionIdentity` 统一 `ExecutionIdentity()`；删除 `EvaluatorKey()` 包装 |
+| 注册表 | 移除 `MaterializeLegacyEvaluators`；evaluator registry 空壳 + familyEvaluators 主路径 |
+
+**刻意保留（R34+）**：Statistics 投影统一、DB 列删除、Conners 新 mechanism、`migration 000039` 索引（explain 需要时）。
+

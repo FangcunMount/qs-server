@@ -2235,6 +2235,95 @@ const docTemplate = `{
                 }
             }
         },
+        "/api/v1/evaluations/assessments/{id}/runs": {
+            "get": {
+                "description": "按 attempt 倒序返回测评执行运行记录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Assessment"
+                ],
+                "summary": "查询测评执行运行列表",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "default": 20,
+                        "description": "返回条数",
+                        "name": "limit",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.EvaluationRunListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
+        "/api/v1/evaluations/assessments/{id}/runs/latest": {
+            "get": {
+                "description": "返回测评最新一次执行运行记录",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Assessment"
+                ],
+                "summary": "查询测评最新执行运行",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "测评ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.EvaluationRunResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/evaluations/assessments/{id}/scores": {
             "get": {
                 "description": "获取指定测评的得分详情。响应中的 factor_scores 包含每个因子的得分信息，其中 max_score 为因子的最大分（可选）",
@@ -6503,7 +6592,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "从业者ID",
                         "name": "id",
                         "in": "path",
@@ -6579,7 +6667,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "从业者ID",
                         "name": "clinician_id",
                         "in": "query"
@@ -6672,7 +6759,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "入口ID",
                         "name": "id",
                         "in": "path",
@@ -6816,7 +6902,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "计划ID",
                         "name": "plan_id",
                         "in": "path",
@@ -7046,7 +7131,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "受试者ID",
                         "name": "testee_id",
                         "in": "path",
@@ -7104,7 +7188,6 @@ const docTemplate = `{
                     },
                     {
                         "type": "integer",
-                        "format": "int64",
                         "description": "受试者ID",
                         "name": "testee_id",
                         "in": "path",
@@ -8011,6 +8094,60 @@ const docTemplate = `{
                 }
             }
         },
+        "/internal/v1/evaluation-runs/failed": {
+            "get": {
+                "description": "operating 内部接口，按组织返回可重试的失败运行",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "Evaluation-Run-Internal"
+                ],
+                "summary": "查询可重试失败运行列表",
+                "parameters": [
+                    {
+                        "type": "boolean",
+                        "default": true,
+                        "description": "仅可重试",
+                        "name": "retryable",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "default": 50,
+                        "description": "返回条数",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "分页游标",
+                        "name": "cursor",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "allOf": [
+                                {
+                                    "$ref": "#/definitions/core.Response"
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "data": {
+                                            "$ref": "#/definitions/response.RetryableFailedRunListResponse"
+                                        }
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                }
+            }
+        },
         "/internal/v1/plans/tasks/schedule": {
             "post": {
                 "description": "定时任务调用，扫描待推送任务，生成入口并开放；仅 qs:evaluation_plan_manager 或 qs:admin 可访问",
@@ -8865,106 +9002,6 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "assessmentmodel.ModelSummary": {
-            "type": "object",
-            "properties": {
-                "algorithm": {
-                    "type": "string"
-                },
-                "category": {
-                    "type": "string"
-                },
-                "code": {
-                    "type": "string"
-                },
-                "created_at": {
-                    "type": "string"
-                },
-                "description": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "questionnaire_code": {
-                    "type": "string"
-                },
-                "questionnaire_version": {
-                    "type": "string"
-                },
-                "status": {
-                    "type": "string"
-                },
-                "sub_kind": {
-                    "type": "string"
-                },
-                "tags": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "title": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "assessmentmodel.Option": {
-            "type": "object",
-            "properties": {
-                "label": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "assessmentmodel.PreviewOutcome": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "assessmentmodel.PreviewReportSection": {
-            "type": "object",
-            "properties": {
-                "content": {
-                    "type": "string"
-                },
-                "kind": {
-                    "type": "string"
-                },
-                "title": {
-                    "type": "string"
-                }
-            }
-        },
-        "assessmentmodel.ValidationIssue": {
-            "type": "object",
-            "properties": {
-                "code": {
-                    "type": "string"
-                },
-                "field": {
-                    "type": "string"
-                },
-                "level": {
-                    "type": "string"
-                },
-                "message": {
-                    "type": "string"
-                }
-            }
-        },
         "cachegovernance.ManualWarmupItemResult": {
             "type": "object",
             "properties": {
@@ -9136,13 +9173,121 @@ const docTemplate = `{
         },
         "meta.ID": {
             "type": "integer",
-            "format": "int64",
             "enum": [
                 0
             ],
             "x-enum-varnames": [
                 "ZeroID"
             ]
+        },
+        "modelcatalog.ModelSummary": {
+            "type": "object",
+            "properties": {
+                "algorithm": {
+                    "type": "string"
+                },
+                "algorithm_family": {
+                    "type": "string"
+                },
+                "category": {
+                    "type": "string"
+                },
+                "code": {
+                    "type": "string"
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "product_channel": {
+                    "type": "string"
+                },
+                "questionnaire_code": {
+                    "type": "string"
+                },
+                "questionnaire_version": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "sub_kind": {
+                    "type": "string"
+                },
+                "tags": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "title": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "modelcatalog.Option": {
+            "type": "object",
+            "properties": {
+                "disabled": {
+                    "type": "boolean"
+                },
+                "label": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "modelcatalog.PreviewOutcome": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "modelcatalog.PreviewReportSection": {
+            "type": "object",
+            "properties": {
+                "content": {
+                    "type": "string"
+                },
+                "kind": {
+                    "type": "string"
+                },
+                "title": {
+                    "type": "string"
+                }
+            }
+        },
+        "modelcatalog.ValidationIssue": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string"
+                },
+                "field": {
+                    "type": "string"
+                },
+                "level": {
+                    "type": "string"
+                },
+                "message": {
+                    "type": "string"
+                }
+            }
         },
         "report.InterpretReport": {
             "type": "object"
@@ -9376,6 +9521,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "product_channel": {
                     "type": "string"
                 },
                 "questionnaire_code": {
@@ -10115,7 +10263,7 @@ const docTemplate = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.ModelSummary"
+                        "$ref": "#/definitions/modelcatalog.ModelSummary"
                     }
                 },
                 "page": {
@@ -10132,34 +10280,52 @@ const docTemplate = `{
         "response.AssessmentModelOptionsResponse": {
             "type": "object",
             "properties": {
+                "algorithm_families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
                 "algorithms": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.Option"
+                        "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
                 "categories": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.Option"
+                        "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
                 "kinds": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.Option"
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
+                "model_families": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
+                    }
+                },
+                "product_channels": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
                 "sub_kinds": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.Option"
+                        "$ref": "#/definitions/modelcatalog.Option"
                     }
                 },
                 "tags": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.Option"
+                        "$ref": "#/definitions/modelcatalog.Option"
                     }
                 }
             }
@@ -10170,11 +10336,11 @@ const docTemplate = `{
                 "issues": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.ValidationIssue"
+                        "$ref": "#/definitions/modelcatalog.ValidationIssue"
                     }
                 },
                 "outcome": {
-                    "$ref": "#/definitions/assessmentmodel.PreviewOutcome"
+                    "$ref": "#/definitions/modelcatalog.PreviewOutcome"
                 },
                 "raw_report": {
                     "$ref": "#/definitions/report.InterpretReport"
@@ -10182,14 +10348,13 @@ const docTemplate = `{
                 "report_sections": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/assessmentmodel.PreviewReportSection"
+                        "$ref": "#/definitions/modelcatalog.PreviewReportSection"
                     }
                 },
                 "score_detail": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "number",
-                        "format": "float64"
+                        "type": "number"
                     }
                 }
             }
@@ -10217,6 +10382,9 @@ const docTemplate = `{
                 "algorithm": {
                     "type": "string"
                 },
+                "algorithm_family": {
+                    "type": "string"
+                },
                 "category": {
                     "type": "string"
                 },
@@ -10230,6 +10398,9 @@ const docTemplate = `{
                     "type": "string"
                 },
                 "kind": {
+                    "type": "string"
+                },
+                "product_channel": {
                     "type": "string"
                 },
                 "questionnaire_code": {
@@ -10644,9 +10815,17 @@ const docTemplate = `{
                     "description": "因子名称",
                     "type": "string"
                 },
+                "hierarchy_level": {
+                    "description": "树深度",
+                    "type": "integer"
+                },
                 "max_score": {
                     "description": "最大分",
                     "type": "number"
+                },
+                "parent_code": {
+                    "description": "父因子编码",
+                    "type": "string"
                 },
                 "raw_score": {
                     "description": "原始分",
@@ -10659,6 +10838,14 @@ const docTemplate = `{
                 "risk_level_label": {
                     "description": "风险等级中文",
                     "type": "string"
+                },
+                "role": {
+                    "description": "因子角色",
+                    "type": "string"
+                },
+                "sort_order": {
+                    "description": "同级排序",
+                    "type": "integer"
                 },
                 "suggestion": {
                     "description": "维度建议",
@@ -10677,6 +10864,52 @@ const docTemplate = `{
                     "items": {
                         "$ref": "#/definitions/response.TaskResponse"
                     }
+                }
+            }
+        },
+        "response.EvaluationRunListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.EvaluationRunResponse"
+                    }
+                }
+            }
+        },
+        "response.EvaluationRunResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "integer"
+                },
+                "attempt_no": {
+                    "type": "integer"
+                },
+                "error_code": {
+                    "type": "string"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "retryable": {
+                    "type": "boolean"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trace_id": {
+                    "type": "string"
                 }
             }
         },
@@ -11344,6 +11577,58 @@ const docTemplate = `{
                 }
             }
         },
+        "response.RetryableFailedRunListResponse": {
+            "type": "object",
+            "properties": {
+                "items": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/response.RetryableFailedRunResponse"
+                    }
+                },
+                "next_cursor": {
+                    "type": "integer"
+                }
+            }
+        },
+        "response.RetryableFailedRunResponse": {
+            "type": "object",
+            "properties": {
+                "assessment_id": {
+                    "type": "integer"
+                },
+                "attempt_no": {
+                    "type": "integer"
+                },
+                "error_code": {
+                    "type": "string"
+                },
+                "error_message": {
+                    "type": "string"
+                },
+                "finished_at": {
+                    "type": "string"
+                },
+                "org_id": {
+                    "type": "integer"
+                },
+                "retryable": {
+                    "type": "boolean"
+                },
+                "run_id": {
+                    "type": "string"
+                },
+                "started_at": {
+                    "type": "string"
+                },
+                "status": {
+                    "type": "string"
+                },
+                "trace_id": {
+                    "type": "string"
+                }
+            }
+        },
         "response.ScaleCategoriesResponse": {
             "type": "object",
             "properties": {
@@ -11814,8 +12099,7 @@ const docTemplate = `{
                 "risk_distribution": {
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer",
-                        "format": "int64"
+                        "type": "integer"
                     }
                 },
                 "testee_id": {
@@ -12266,7 +12550,7 @@ const docTemplate = `{
                     "$ref": "#/definitions/statistics.PlanTaskFulfillmentStatistics"
                 },
                 "trend": {
-                    "description": "Deprecated: use activity.trend.",
+                    "description": "Deprecated: 使用 activity.trend。",
                     "allOf": [
                         {
                             "$ref": "#/definitions/statistics.PlanTaskTrend"
@@ -12274,7 +12558,7 @@ const docTemplate = `{
                     ]
                 },
                 "window": {
-                    "description": "Deprecated: use activity.window.",
+                    "description": "Deprecated: 使用 activity.窗口。",
                     "allOf": [
                         {
                             "$ref": "#/definitions/statistics.PlanTaskWindow"
@@ -12332,7 +12616,7 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "trend": {
-                    "description": "Deprecated: use activity.trend.",
+                    "description": "Deprecated: 使用 activity.trend。",
                     "allOf": [
                         {
                             "$ref": "#/definitions/statistics.PlanTaskTrend"
@@ -12340,7 +12624,7 @@ const docTemplate = `{
                     ]
                 },
                 "window": {
-                    "description": "Deprecated: use activity.window.",
+                    "description": "Deprecated: 使用 activity.窗口。",
                     "allOf": [
                         {
                             "$ref": "#/definitions/statistics.PlanTaskWindow"
@@ -12591,8 +12875,7 @@ const docTemplate = `{
                     "description": "来源分布",
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer",
-                        "format": "int64"
+                        "type": "integer"
                     }
                 },
                 "questionnaire_code": {
@@ -12663,8 +12946,7 @@ const docTemplate = `{
                     "description": "状态分布",
                     "type": "object",
                     "additionalProperties": {
-                        "type": "integer",
-                        "format": "int64"
+                        "type": "integer"
                     }
                 },
                 "assessment_trend": {

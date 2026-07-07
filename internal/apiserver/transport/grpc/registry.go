@@ -11,6 +11,7 @@ import (
 	cachegov "github.com/FangcunMount/qs-server/internal/apiserver/application/cachegovernance"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	personalityModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality/consumer"
 	notificationApp "github.com/FangcunMount/qs-server/internal/apiserver/application/notification"
@@ -81,6 +82,7 @@ type EvaluationDeps struct {
 	ScoreQueryService    assessmentApp.ScoreQueryService
 	AssessmentReader     evaluationreadmodel.AssessmentReader
 	EvaluationService    execute.Service
+	RunQueryService      runqueryApp.Service
 	ReportStatusReporter *reportstatus.Reporter
 }
 
@@ -289,6 +291,7 @@ func (r *Registry) registerInternalService() error {
 		r.deps.Evaluation.SubmissionService,
 		r.deps.Evaluation.ManagementService,
 		r.deps.Evaluation.EvaluationService,
+		r.deps.Evaluation.RunQueryService,
 		rulesetInfra.NewAssessmentBindingResolver(r.deps.RuleSet.RuleSetCatalog),
 		r.deps.Actor.TesteeAssessmentAttentionService,
 		r.deps.Plan.TaskAssessmentResolver,

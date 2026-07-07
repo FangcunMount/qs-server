@@ -333,6 +333,9 @@ message EvaluateAssessmentResponse {
   double total_score = 4;            // 总分（成功时，legacy）
   string risk_level = 5;             // 风险等级（成功时，legacy）
   OutcomeSummary outcome = 6;        // v2 outcome 投影
+  bool retryable = 7;                // 失败时是否应 nack 重试（与 evaluation_run.retryable 对齐）
+  string run_id = 8;                 // 失败时关联的 evaluation_run id
+  string failure_kind = 9;           // 失败分类：validation/calculation/timeout/internal
 }
 
 message OutcomeSummary {
@@ -373,6 +376,9 @@ message GenerateReportFromAssessmentResponse {
   bool success = 1;
   string status = 2;
   string message = 3;
+  bool retryable = 4;                // 失败时是否应 nack 重试
+  string run_id = 5;                 // 失败时关联的 evaluation_run id（若有）
+  string failure_kind = 6;           // 失败分类（若有）
 }
 
 // ==================== Assessment Attention Sync ====================

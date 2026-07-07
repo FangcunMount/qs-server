@@ -35,6 +35,8 @@ tags:
   description: 测评报告
 - name: Evaluation-Report-Outcome
   description: Evaluation-Report-Outcome
+- name: Evaluation-Run-Internal
+  description: Evaluation-Run-Internal
 - name: Evaluation-Score
   description: 测评得分
 - name: Plan-Enrollment
@@ -1539,6 +1541,61 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /evaluations/assessments/{id}/runs:
+    get:
+      tags:
+      - Evaluation-Assessment
+      summary: 查询测评执行运行列表
+      description: 按 attempt 倒序返回测评执行运行记录
+      operationId: 查询测评执行运行列表
+      parameters:
+      - type: string
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      - type: integer
+        default: 20
+        description: 返回条数
+        name: limit
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.EvaluationRunListResponse'
+  /evaluations/assessments/{id}/runs/latest:
+    get:
+      tags:
+      - Evaluation-Assessment
+      summary: 查询测评最新执行运行
+      description: 返回测评最新一次执行运行记录
+      operationId: 查询测评最新执行运行
+      parameters:
+      - type: string
+        description: 测评ID
+        name: id
+        in: path
+        required: true
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.EvaluationRunResponse'
   /evaluations/assessments/{id}/scores:
     get:
       tags:
@@ -4398,7 +4455,6 @@ paths:
         in: header
         required: true
       - type: integer
-        format: int64
         description: 从业者ID
         name: id
         in: path
@@ -4447,7 +4503,6 @@ paths:
         in: header
         required: true
       - type: integer
-        format: int64
         description: 从业者ID
         name: clinician_id
         in: query
@@ -4507,7 +4562,6 @@ paths:
         in: header
         required: true
       - type: integer
-        format: int64
         description: 入口ID
         name: id
         in: path
@@ -4599,7 +4653,6 @@ paths:
         in: header
         required: true
       - type: integer
-        format: int64
         description: 计划ID
         name: plan_id
         in: path
@@ -4746,7 +4799,6 @@ paths:
         in: header
         required: true
       - type: integer
-        format: int64
         description: 受试者ID
         name: testee_id
         in: path
@@ -4783,7 +4835,6 @@ paths:
         in: header
         required: true
       - type: integer
-        format: int64
         description: 受试者ID
         name: testee_id
         in: path
@@ -5379,6 +5430,40 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/core.ErrResponse'
+  /internal/v1/evaluation-runs/failed:
+    get:
+      tags:
+      - Evaluation-Run-Internal
+      summary: 查询可重试失败运行列表
+      description: operating 内部接口，按组织返回可重试的失败运行
+      operationId: 查询可重试失败运行列表
+      parameters:
+      - type: boolean
+        default: true
+        description: 仅可重试
+        name: retryable
+        in: query
+      - type: integer
+        default: 50
+        description: 返回条数
+        name: limit
+        in: query
+      - type: integer
+        description: 分页游标
+        name: cursor
+        in: query
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                allOf:
+                - $ref: '#/components/schemas/core.Response'
+                - type: object
+                  properties:
+                    data:
+                      $ref: '#/components/schemas/response.RetryableFailedRunListResponse'
   /internal/v1/plans/tasks/schedule:
     post:
       tags:
@@ -5960,71 +6045,6 @@ paths:
                 $ref: '#/components/schemas/response.ClinicianWorkbenchQueueResponse'
 components:
   schemas:
-    assessmentmodel.ModelSummary:
-      type: object
-      properties:
-        algorithm:
-          type: string
-        category:
-          type: string
-        code:
-          type: string
-        created_at:
-          type: string
-        description:
-          type: string
-        kind:
-          type: string
-        questionnaire_code:
-          type: string
-        questionnaire_version:
-          type: string
-        status:
-          type: string
-        sub_kind:
-          type: string
-        tags:
-          type: array
-          items:
-            type: string
-        title:
-          type: string
-        updated_at:
-          type: string
-    assessmentmodel.Option:
-      type: object
-      properties:
-        label:
-          type: string
-        value:
-          type: string
-    assessmentmodel.PreviewOutcome:
-      type: object
-      properties:
-        code:
-          type: string
-        title:
-          type: string
-    assessmentmodel.PreviewReportSection:
-      type: object
-      properties:
-        content:
-          type: string
-        kind:
-          type: string
-        title:
-          type: string
-    assessmentmodel.ValidationIssue:
-      type: object
-      properties:
-        code:
-          type: string
-        field:
-          type: string
-        level:
-          type: string
-        message:
-          type: string
     cachegovernance.ManualWarmupItemResult:
       type: object
       properties:
@@ -6147,11 +6167,81 @@ components:
             type: string
     meta.ID:
       type: integer
-      format: int64
       enum:
       - 0
       x-enum-varnames:
       - ZeroID
+    modelcatalog.ModelSummary:
+      type: object
+      properties:
+        algorithm:
+          type: string
+        algorithm_family:
+          type: string
+        category:
+          type: string
+        code:
+          type: string
+        created_at:
+          type: string
+        description:
+          type: string
+        kind:
+          type: string
+        product_channel:
+          type: string
+        questionnaire_code:
+          type: string
+        questionnaire_version:
+          type: string
+        status:
+          type: string
+        sub_kind:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        title:
+          type: string
+        updated_at:
+          type: string
+    modelcatalog.Option:
+      type: object
+      properties:
+        disabled:
+          type: boolean
+        label:
+          type: string
+        value:
+          type: string
+    modelcatalog.PreviewOutcome:
+      type: object
+      properties:
+        code:
+          type: string
+        title:
+          type: string
+    modelcatalog.PreviewReportSection:
+      type: object
+      properties:
+        content:
+          type: string
+        kind:
+          type: string
+        title:
+          type: string
+    modelcatalog.ValidationIssue:
+      type: object
+      properties:
+        code:
+          type: string
+        field:
+          type: string
+        level:
+          type: string
+        message:
+          type: string
     report.InterpretReport:
       type: object
     request.AddQuestionRequest:
@@ -6307,6 +6397,8 @@ components:
         description:
           type: string
         kind:
+          type: string
+        product_channel:
           type: string
         questionnaire_code:
           type: string
@@ -6800,7 +6892,7 @@ components:
         items:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.ModelSummary'
+            $ref: '#/components/schemas/modelcatalog.ModelSummary'
         page:
           type: integer
         page_size:
@@ -6810,46 +6902,57 @@ components:
     response.AssessmentModelOptionsResponse:
       type: object
       properties:
+        algorithm_families:
+          type: array
+          items:
+            $ref: '#/components/schemas/modelcatalog.Option'
         algorithms:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.Option'
+            $ref: '#/components/schemas/modelcatalog.Option'
         categories:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.Option'
+            $ref: '#/components/schemas/modelcatalog.Option'
         kinds:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.Option'
+            $ref: '#/components/schemas/modelcatalog.Option'
+        model_families:
+          type: array
+          items:
+            $ref: '#/components/schemas/modelcatalog.Option'
+        product_channels:
+          type: array
+          items:
+            $ref: '#/components/schemas/modelcatalog.Option'
         sub_kinds:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.Option'
+            $ref: '#/components/schemas/modelcatalog.Option'
         tags:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.Option'
+            $ref: '#/components/schemas/modelcatalog.Option'
     response.AssessmentModelPreviewReportResponse:
       type: object
       properties:
         issues:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.ValidationIssue'
+            $ref: '#/components/schemas/modelcatalog.ValidationIssue'
         outcome:
-          $ref: '#/components/schemas/assessmentmodel.PreviewOutcome'
+          $ref: '#/components/schemas/modelcatalog.PreviewOutcome'
         raw_report:
           $ref: '#/components/schemas/report.InterpretReport'
         report_sections:
           type: array
           items:
-            $ref: '#/components/schemas/assessmentmodel.PreviewReportSection'
+            $ref: '#/components/schemas/modelcatalog.PreviewReportSection'
         score_detail:
           type: object
           additionalProperties:
             type: number
-            format: float64
     response.AssessmentModelQuestionnaireResponse:
       type: object
       properties:
@@ -6866,6 +6969,8 @@ components:
       properties:
         algorithm:
           type: string
+        algorithm_family:
+          type: string
         category:
           type: string
         code:
@@ -6875,6 +6980,8 @@ components:
         description:
           type: string
         kind:
+          type: string
+        product_channel:
           type: string
         questionnaire_code:
           type: string
@@ -7156,9 +7263,15 @@ components:
         factor_name:
           description: 因子名称
           type: string
+        hierarchy_level:
+          description: 树深度
+          type: integer
         max_score:
           description: 最大分
           type: number
+        parent_code:
+          description: 父因子编码
+          type: string
         raw_score:
           description: 原始分
           type: number
@@ -7168,6 +7281,12 @@ components:
         risk_level_label:
           description: 风险等级中文
           type: string
+        role:
+          description: 因子角色
+          type: string
+        sort_order:
+          description: 同级排序
+          type: integer
         suggestion:
           description: 维度建议
           type: string
@@ -7180,6 +7299,36 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/response.TaskResponse'
+    response.EvaluationRunListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.EvaluationRunResponse'
+    response.EvaluationRunResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: integer
+        attempt_no:
+          type: integer
+        error_code:
+          type: string
+        error_message:
+          type: string
+        finished_at:
+          type: string
+        retryable:
+          type: boolean
+        run_id:
+          type: string
+        started_at:
+          type: string
+        status:
+          type: string
+        trace_id:
+          type: string
     response.FactorListResponse:
       type: object
       properties:
@@ -7638,6 +7787,40 @@ components:
           type: string
         severity:
           type: string
+    response.RetryableFailedRunListResponse:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/response.RetryableFailedRunResponse'
+        next_cursor:
+          type: integer
+    response.RetryableFailedRunResponse:
+      type: object
+      properties:
+        assessment_id:
+          type: integer
+        attempt_no:
+          type: integer
+        error_code:
+          type: string
+        error_message:
+          type: string
+        finished_at:
+          type: string
+        org_id:
+          type: integer
+        retryable:
+          type: boolean
+        run_id:
+          type: string
+        started_at:
+          type: string
+        status:
+          type: string
+        trace_id:
+          type: string
     response.ScaleCategoriesResponse:
       type: object
       properties:
@@ -7964,7 +8147,6 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: int64
         testee_id:
           type: integer
         total_assessments:
@@ -8258,11 +8440,11 @@ components:
         fulfillment:
           $ref: '#/components/schemas/statistics.PlanTaskFulfillmentStatistics'
         trend:
-          description: 'Deprecated: use activity.trend.'
+          description: 'Deprecated: 使用 activity.trend。'
           allOf:
           - $ref: '#/components/schemas/statistics.PlanTaskTrend'
         window:
-          description: 'Deprecated: use activity.window.'
+          description: 'Deprecated: 使用 activity.窗口。'
           allOf:
           - $ref: '#/components/schemas/statistics.PlanTaskWindow'
     statistics.PlanStatistics:
@@ -8300,11 +8482,11 @@ components:
           description: 任务统计
           type: integer
         trend:
-          description: 'Deprecated: use activity.trend.'
+          description: 'Deprecated: 使用 activity.trend。'
           allOf:
           - $ref: '#/components/schemas/statistics.PlanTaskTrend'
         window:
-          description: 'Deprecated: use activity.window.'
+          description: 'Deprecated: 使用 activity.窗口。'
           allOf:
           - $ref: '#/components/schemas/statistics.PlanTaskWindow'
     statistics.PlanTaskActivityStatistics:
@@ -8470,7 +8652,6 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: int64
         questionnaire_code:
           type: string
         total_completions:
@@ -8519,7 +8700,6 @@ components:
           type: object
           additionalProperties:
             type: integer
-            format: int64
         assessment_trend:
           description: 趋势数据（近30天）
           type: array

@@ -69,16 +69,16 @@ func (s *service) List(ctx context.Context, dto ListModelsDTO) (*ModelListResult
 	if dto.PageSize <= 0 {
 		dto.PageSize = 20
 	}
-	if dto.Kind != "" && !domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
+	if dto.Kind != "" {
+		if domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
+			return nil, invalidArgument("behavior_ability 产品通道不再支持 List 聚合，请分别调用 behavioral_rating 或 cognitive")
+		}
 		if err := requireCatalogOperation(dto.Kind, domain.CatalogOpList); err != nil {
 			return nil, err
 		}
 	}
 
 	result := &ModelListResult{Page: dto.Page, PageSize: dto.PageSize}
-	if domain.IsBehaviorAbilityProductChannelAPIKind(dto.Kind) {
-		return s.listBehaviorAbilityChannel(ctx, dto)
-	}
 	if shouldListModelKind(dto.Kind, KindPersonality) {
 		items, total, err := s.listPersonality(ctx, dto)
 		if err != nil {
@@ -354,7 +354,7 @@ func (s *service) Options(ctx context.Context, kind string) (*OptionsResult, err
 		},
 	}
 	if kind == "" || domain.IsBehaviorAbilityProductChannelAPIKind(kind) {
-		result.ModelFamilies = behaviorAbilityChannelModelFamilyOptions()
+		result.ModelFamilies = behaviorAbilityProductChannelModelFamilyOptions()
 		result.Algorithms = append(result.Algorithms,
 			Option{Label: "BRIEF-2", Value: string(domain.AlgorithmBrief2)},
 			Option{Label: "SPM", Value: string(domain.AlgorithmSPM)},
@@ -426,6 +426,13 @@ func (s *service) GetQRCode(ctx context.Context, modelCode string) (string, erro
 		return "", invalidArgument("模型类型不支持二维码")
 	}
 	return s.getPersonalityQRCode(ctx, modelCode)
+}
+
+func behaviorAbilityProductChannelModelFamilyOptions() []Option {
+	return []Option{
+		{Label: "行为评定", Value: string(domain.KindBehavioralRating)},
+		{Label: "认知能力", Value: string(domain.KindCognitive)},
+	}
 }
 
 func invalidArgument(format string, args ...interface{}) error {

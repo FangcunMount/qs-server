@@ -399,13 +399,6 @@ func (c *CachedPublishedModelStore) refCacheKey(ref port.Ref) string {
 }
 
 func canonicalPublishedModelRef(ref port.Ref) port.Ref {
-	if ref.SubKind == "" && ref.Algorithm == "" {
-		if kind, subKind, algorithm, ok := domain.LegacyKindMapping(ref.Kind); ok {
-			ref.Kind = kind
-			ref.SubKind = subKind
-			ref.Algorithm = algorithm
-		}
-	}
 	return ref
 }
 

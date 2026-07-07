@@ -1,6 +1,20 @@
 package snapshot
 
-import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+import (
+	"encoding/json"
+	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+)
+
+// ParsePublishedPayload decodes a published scale payload envelope.
+func ParsePublishedPayload(payload []byte) (*ScaleSnapshot, error) {
+	var model ScaleSnapshot
+	if err := json.Unmarshal(payload, &model); err != nil {
+		return nil, fmt.Errorf("decode scale payload: %w", err)
+	}
+	return &model, nil
+}
 
 // ScaleSnapshot 已发布量表规则集 载荷（ruleset.scale.v1）。
 type ScaleSnapshot struct {

@@ -24,11 +24,6 @@ func (r ModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	return evaldomain.ExecutionIdentity{Kind: modelcatalog.Kind(r.Kind)}
 }
 
-// EvaluatorKey is deprecated; use ExecutionIdentity.
-func (r ModelRef) EvaluatorKey() evaldomain.ExecutionIdentity {
-	return r.ExecutionIdentity()
-}
-
 func TypologyPayload(input *InputSnapshot) (*typology.Payload, bool) {
 	if input == nil {
 		return nil, false
