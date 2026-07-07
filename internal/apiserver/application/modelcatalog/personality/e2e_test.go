@@ -9,7 +9,7 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
-	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
+	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
 	previewadapter "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/preview"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/personality"
 	questionnaireapp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"

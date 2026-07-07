@@ -142,3 +142,17 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R6-D | 架构守卫白名单注释同步；收敛文档 Round 6 节 |
 
 **不做**：`factor_classification` 内联 `personality/typology`（~30 文件，留 Round 7）；`RuntimeDescriptorRegistry` 接入 assemble；删除 deprecated 包（需 characterization 迁移）。
+
+## Round 7：typology 内联 + 清债 + Registry 桥接（已完成）
+
+**做**：`factor_classification` 承接 typology 实现；删除 application 层 deprecated 包；characterization 改引机制包；`RuntimeDescriptorRegistry` 最小桥接。
+
+| 阶段 | 动作 |
+|------|------|
+| R7-1 | characterization 改 import `factor_scoring`/`factor_norm`/`task_performance`/`factor_classification` |
+| R7-2 | 删除 `scale`/`behavioral_rating`/`cognitive` application 包；测试迁至 `factor_*` |
+| R7-3 | `personality/typology` 实现迁入 `factor_classification/`（~31 文件）；生产路径改引机制包 |
+| R7-4 | `runtime/descriptor_registry.go` 注册 4 条 `ExecutionPath` 等价 descriptor + 覆盖测试 |
+| R7-5 | 架构守卫白名单同步；收敛文档 Round 7 节 |
+
+**不做**：assemble 完全切到 `RuntimeDescriptorRegistry` 驱动（留 Round 8）；删 domain 层 `personality/scale` 过渡宿主。

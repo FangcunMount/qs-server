@@ -283,13 +283,13 @@ func TestTypologyApplicationMainPathDoesNotReferenceLegacyModules(t *testing.T) 
 
 	root := repoRoot(t)
 	mainPathFiles := []string{
-		"internal/apiserver/application/evaluation/personality/typology/executor.go",
-		"internal/apiserver/application/evaluation/personality/typology/module_registry.go",
-		"internal/apiserver/application/evaluation/personality/typology/runtime_registry.go",
-		"internal/apiserver/application/evaluation/personality/typology/algorithm_runner.go",
-		"internal/apiserver/application/evaluation/personality/typology/outcome_mapper.go",
-		"internal/apiserver/application/evaluation/personality/typology/report_registry.go",
-		"internal/apiserver/application/evaluation/personality/typology/materialize.go",
+		"internal/apiserver/application/evaluation/factor_classification/executor.go",
+		"internal/apiserver/application/evaluation/factor_classification/module_registry.go",
+		"internal/apiserver/application/evaluation/factor_classification/runtime_registry.go",
+		"internal/apiserver/application/evaluation/factor_classification/algorithm_runner.go",
+		"internal/apiserver/application/evaluation/factor_classification/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/factor_classification/report_registry.go",
+		"internal/apiserver/application/evaluation/factor_classification/materialize.go",
 	}
 	forbidden := []string{
 		"MBTIModule",

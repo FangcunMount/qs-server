@@ -59,3 +59,12 @@ PublishedModelSnapshot
 | Reporting 机制命名 | `factor_scoring_report.go`、`norm_task_report.go` 为主；`ScaleReportBuilder` 等 deprecated 别名 |
 | Materialize 表驱动 | `evaluatorFactories` / `reportBuilderFactories` / `scoreProjectorFactories` 按 `ExecutionPath` 注册 |
 | 架构守卫 | application 层模型族白名单改为 re-export only |
+
+## Round 7（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| typology 内联 | `factor_classification/` 承接原 `personality/typology` 全部实现 |
+| deprecated 清债 | 删除 application `scale`/`behavioral_rating`/`cognitive`；characterization 直引 `factor_*` |
+| Registry 桥接 | `DefaultRuntimeDescriptorRegistry()` 与 materialize 四条 `ExecutionPath` 对齐 |
+| 测试迁移 | `factor_scoring/executor_test`、`factor_norm/*_test`、fixture 路径修正 |

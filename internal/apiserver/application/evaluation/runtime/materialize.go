@@ -8,7 +8,6 @@ import (
 	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm"
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring"
 	taskperformance "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -79,17 +78,17 @@ type WiringDeps struct {
 	ScaleReportBuilder report.ReportBuilder
 	ScaleScorer        portruleengine.ScaleFactorScorer
 	ScoreRepo          assessment.ScoreRepository
-	TypologyRegistry   typologyEvaluation.ModuleRegistry
+	TypologyRegistry   factorclassification.ModuleRegistry
 }
 
 type wiringSession struct {
-	typologyExecutor      **typologyEvaluation.Executor
-	typologyReportBuilder *typologyEvaluation.ReportBuilder
+	typologyExecutor      **factorclassification.Executor
+	typologyReportBuilder *factorclassification.ReportBuilder
 }
 
 // MaterializeEvaluators builds evaluators from descriptors.
 func MaterializeEvaluators(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]execute.Evaluator, error) {
-	var sharedConfigured *typologyEvaluation.Executor
+	var sharedConfigured *factorclassification.Executor
 	session := wiringSession{typologyExecutor: &sharedConfigured}
 	evaluators := make([]execute.Evaluator, 0, len(descs))
 	for _, desc := range descs {
@@ -137,7 +136,7 @@ func materializeScoreProjector(desc evaldomain.ModelDescriptor, deps WiringDeps)
 
 // MaterializeReportBuilders builds report builders from descriptors.
 func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDeps) ([]interpretationreporting.ReportBuilder, error) {
-	var sharedConfigured typologyEvaluation.ReportBuilder
+	var sharedConfigured factorclassification.ReportBuilder
 	session := wiringSession{typologyReportBuilder: &sharedConfigured}
 	builders := make([]interpretationreporting.ReportBuilder, 0, len(descs))
 	for _, desc := range descs {
@@ -174,9 +173,9 @@ func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps, 
 	return factory(desc, deps, session)
 }
 
-func requireTypologyRegistry(deps WiringDeps) (typologyEvaluation.ModuleRegistry, error) {
+func requireTypologyRegistry(deps WiringDeps) (factorclassification.ModuleRegistry, error) {
 	if deps.TypologyRegistry.Len() == 0 {
-		return typologyEvaluation.ModuleRegistry{}, fmt.Errorf("typology registry is required")
+		return factorclassification.ModuleRegistry{}, fmt.Errorf("typology registry is required")
 	}
 	return deps.TypologyRegistry, nil
 }

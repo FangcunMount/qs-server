@@ -4,24 +4,24 @@ import (
 	"context"
 	"testing"
 
-	behavioralratingeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/behavioral_rating"
-	cognitiveeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/cognitive"
+	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm"
+	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring"
+	taskperformance "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance"
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 )
 
 func newV1EvaluatorRegistry(t *testing.T) evaluationexecute.EvaluatorRegistry {
 	t.Helper()
-	configured, err := typologyeval.NewConfiguredTypologyExecutor()
+	configured, err := factorclassification.NewConfiguredTypologyExecutor()
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
 	registry, err := evaluationexecute.NewEvaluatorRegistry(
-		evaluationscale.NewExecutor(nil),
-		behavioralratingeval.NewExecutor(nil),
-		cognitiveeval.NewExecutor(nil),
+		factorscoring.NewExecutor(nil),
+		factornorm.NewExecutor(nil),
+		taskperformance.NewExecutor(nil),
 		configured,
 	)
 	if err != nil {
@@ -107,7 +107,7 @@ func TestV1ExecuteServiceRejectsUnknownEvaluatorKey(t *testing.T) {
 	input := &charInputResolver{snapshot: mbtiInputSnapshot()}
 
 	registry, err := evaluationexecute.NewEvaluatorRegistry(
-		evaluationscale.NewExecutor(nil),
+		factorscoring.NewExecutor(nil),
 	)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)

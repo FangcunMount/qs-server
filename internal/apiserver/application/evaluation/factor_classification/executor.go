@@ -1,37 +1,86 @@
 package factor_classification
 
 import (
+	"context"
 	"fmt"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
-	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// Executor runs factor-classification evaluations via the configured typology runtime.
-type Executor = typologyEvaluation.Executor
-
-// ModuleRegistry resolves typology modules for factor-classification execution.
-type ModuleRegistry = typologyEvaluation.ModuleRegistry
-
-// MaterializeEvaluator builds or reuses the configured typology executor for a descriptor.
-func MaterializeEvaluator(
-	desc evaldomain.ModelDescriptor,
-	registry ModuleRegistry,
-	shared **Executor,
-) (evaluationexecute.Evaluator, error) {
-	return typologyEvaluation.MaterializeTypologyEvaluator(desc, registry, shared)
+type Executor struct {
+	runner          *algorithmRunner
+	key             evaluation.EvaluatorKey
+	legacyAlgorithm modelcatalog.Algorithm
 }
 
-// MaterializeReportBuilder builds or reuses the configured typology report builder for a descriptor.
-func MaterializeReportBuilder(
-	desc evaldomain.ModelDescriptor,
-	registry ModuleRegistry,
-	shared *typologyEvaluation.ReportBuilder,
-) (interpretationreporting.ReportBuilder, error) {
-	if shared == nil {
-		return nil, fmt.Errorf("shared typology report builder holder is required")
+var _ evaluationexecute.Evaluator = (*Executor)(nil)
+
+// NewTypologyExecutor constructs a legacy algorithm-scoped typology executor.
+// Deprecated: use NewConfiguredTypologyExecutor for new wiring; legacy keys remain for compat resolve only.
+func NewTypologyExecutor(algorithm modelcatalog.Algorithm) (*Executor, error) {
+	return NewTypologyExecutorWithRegistry(mustDefaultModuleRegistry(), algorithm)
+}
+
+func NewConfiguredTypologyExecutor() (*Executor, error) {
+	return NewConfiguredTypologyExecutorWithRegistry(mustDefaultModuleRegistry())
+}
+
+func NewConfiguredTypologyExecutorWithRegistry(registry ModuleRegistry) (*Executor, error) {
+	runner, err := registry.runnerForKey(evaluation.EvaluatorKeyPersonalityTypology)
+	if err != nil {
+		return nil, err
 	}
-	return typologyEvaluation.MaterializeTypologyReportBuilder(desc, registry, shared)
+	return &Executor{
+		runner: &runner,
+		key:    evaluation.EvaluatorKeyPersonalityTypology,
+	}, nil
+}
+
+func NewTypologyExecutorWithRegistry(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (*Executor, error) {
+	return newLegacyExecutor(registry, algorithm)
+}
+
+func newLegacyExecutor(registry ModuleRegistry, algorithm modelcatalog.Algorithm) (*Executor, error) {
+	runner, err := algorithmRunnerFor(registry, algorithm)
+	if err != nil {
+		return nil, err
+	}
+	return &Executor{
+		runner:          &runner,
+		key:             evaluation.PersonalityTypologyKey(algorithm),
+		legacyAlgorithm: algorithm,
+	}, nil
+}
+
+func (e *Executor) Key() evaluation.EvaluatorKey {
+	if e == nil {
+		return evaluation.EvaluatorKey{}
+	}
+	return e.key
+}
+
+func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
+	if e == nil || e.runner == nil {
+		return nil, fmt.Errorf("personality typology evaluator is not configured")
+	}
+	if input.Assessment == nil {
+		return nil, fmt.Errorf("assessment is required")
+	}
+	if input.Input == nil {
+		return nil, fmt.Errorf("evaluation input is required")
+	}
+	payload, ok := port.TypologyPayload(input.Input)
+	if !ok {
+		return nil, fmt.Errorf("personality typology payload is required")
+	}
+	if e.legacyAlgorithm != "" && payload.Algorithm != e.legacyAlgorithm {
+		return nil, fmt.Errorf("typology algorithm %s does not match executor %s", payload.Algorithm, e.legacyAlgorithm)
+	}
+
+	modelRef := modelRefFromExecutionInput(input, payload)
+	return e.runner.buildOutcome(modelRef, payload, input.Input.AnswerSheet)
 }

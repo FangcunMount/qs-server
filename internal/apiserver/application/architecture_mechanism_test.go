@@ -22,10 +22,7 @@ var transitionalModelFamilyPackages = map[string]string{
 	"internal/apiserver/domain/evaluation/personality":            "transitional: factor_classification implementation host",
 	"internal/apiserver/domain/interpretation/personality":        "transitional: typology report host",
 	"internal/apiserver/domain/interpretation/score":              "transitional: factor_scoring report host",
-	"internal/apiserver/application/evaluation/scale":             "transitional: factor_scoring re-export only",
-	"internal/apiserver/application/evaluation/behavioral_rating": "transitional: factor_norm re-export only",
-	"internal/apiserver/application/evaluation/cognitive":         "transitional: task_performance re-export only",
-	"internal/apiserver/application/evaluation/personality":       "transitional: factor_classification application host",
+	"internal/apiserver/application/evaluation/personality":       "transitional: factor_classification re-export only (empty)",
 }
 
 var forbiddenAssessmentCodeDirNames = []string{
