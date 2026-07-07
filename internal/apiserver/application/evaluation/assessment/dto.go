@@ -137,13 +137,17 @@ type ModelRarityResult struct {
 
 // DimensionResult 维度解读结果
 type DimensionResult struct {
-	FactorCode  string   // 因子编码
-	FactorName  string   // 因子名称
-	RawScore    float64  // 原始分
-	MaxScore    *float64 // 最大分
-	RiskLevel   string   // 风险等级
-	Description string   // 解读描述
-	Suggestion  string   // 维度建议
+	FactorCode     string   // 因子编码
+	FactorName     string   // 因子名称
+	RawScore       float64  // 原始分
+	MaxScore       *float64 // 最大分
+	RiskLevel      string   // 风险等级
+	Role           string   `json:"role,omitempty"`
+	ParentCode     string   `json:"parent_code,omitempty"`
+	HierarchyLevel int      `json:"hierarchy_level,omitempty"`
+	SortOrder      int      `json:"sort_order,omitempty"`
+	Description    string   // 解读描述
+	Suggestion     string   // 维度建议
 }
 
 // SuggestionDTO 结构化建议

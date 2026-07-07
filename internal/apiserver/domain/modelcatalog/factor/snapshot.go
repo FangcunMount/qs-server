@@ -5,6 +5,9 @@ type FactorSnapshot struct {
 	Code            string
 	Title           string
 	Role            FactorRole
+	ParentCode      string
+	SortOrder       int
+	Level           int
 	IsTotalScore    bool
 	QuestionCodes   []string
 	ScoringStrategy string
@@ -13,6 +16,7 @@ type FactorSnapshot struct {
 	InterpretRules  []ScoreRangeRule
 	Classification  *ClassificationSpec
 	Norm            *NormRef
+	ChildrenPolicy  *ChildrenPolicy
 }
 
 // ResolvedRole returns the explicit role or derives one from legacy flags.

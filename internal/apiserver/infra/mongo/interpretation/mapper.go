@@ -210,14 +210,18 @@ func toDomainModelExtra(po *ModelExtraPO) *report.ModelExtra {
 
 func dimensionToPO(d report.DimensionInterpret) DimensionInterpretPO {
 	po := DimensionInterpretPO{
-		Kind:        string(d.Kind()),
-		FactorCode:  d.Code().String(),
-		FactorName:  d.Name(),
-		RawScore:    d.RawScore(),
-		MaxScore:    d.MaxScore(),
-		RiskLevel:   d.Severity(),
-		Description: d.Description(),
-		Suggestion:  d.Suggestion(),
+		Kind:           string(d.Kind()),
+		FactorCode:     d.Code().String(),
+		FactorName:     d.Name(),
+		RawScore:       d.RawScore(),
+		MaxScore:       d.MaxScore(),
+		RiskLevel:      d.Severity(),
+		Role:           d.Role(),
+		ParentCode:     d.ParentCode(),
+		HierarchyLevel: d.HierarchyLevel(),
+		SortOrder:      d.SortOrder(),
+		Description:    d.Description(),
+		Suggestion:     d.Suggestion(),
 	}
 	po.Score = scoreValueToPO(report.NewRawTotalScore(d.RawScore(), d.MaxScore()))
 	if report.IsRiskLevelCode(d.Severity()) {
@@ -252,7 +256,7 @@ func dimensionToDomain(po DimensionInterpretPO) report.DimensionInterpret {
 			nil,
 			po.Description,
 			po.Suggestion,
-		)
+		).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
 	}
 	return report.NewDimensionInterpret(
 		report.NewFactorCode(po.FactorCode),
@@ -262,7 +266,7 @@ func dimensionToDomain(po DimensionInterpretPO) report.DimensionInterpret {
 		risk,
 		po.Description,
 		po.Suggestion,
-	)
+	).WithHierarchy(po.Role, po.ParentCode, po.HierarchyLevel, po.SortOrder)
 }
 
 func modelIdentityToPO(model report.ModelIdentity) *ModelIdentityPO {

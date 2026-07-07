@@ -186,6 +186,29 @@ func TestAlgorithmRunnerStaysModuleRegistryDriven(t *testing.T) {
 	}
 }
 
+func TestReportRegistryDispatchesThroughTypologyReportBuilder(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "personality", "typology", "report_registry.go")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(data)
+	if !strings.Contains(text, "func buildTypologyReport(") {
+		t.Fatal("report_registry.go must route adapters through buildTypologyReport")
+	}
+	for _, token := range []string{
+		"buildMBTIReport,",
+		"buildSBTIReport,",
+	} {
+		if strings.Contains(text, token) {
+			t.Fatalf("report_registry.go must not register %q directly; use buildTypologyReportAdapter", token)
+		}
+	}
+}
+
 func TestReportBuilderStaysAlgorithmAgnostic(t *testing.T) {
 	t.Parallel()
 

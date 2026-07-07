@@ -49,12 +49,20 @@ type definitionPayload struct {
 }
 
 type brief2Extension struct {
-	FormVariant      string                `json:"form_variant,omitempty"`
-	NormTableVersion string                `json:"norm_table_version,omitempty"`
-	IndexCodes       []string              `json:"index_codes,omitempty"`
-	ValidityCodes    []string              `json:"validity_codes,omitempty"`
-	Norms            []brief2FactorPayload `json:"norms,omitempty"`
-	TScoreRules      []brief2TScoreRule    `json:"t_score_rules,omitempty"`
+	FormVariant      string                 `json:"form_variant,omitempty"`
+	NormTableVersion string                 `json:"norm_table_version,omitempty"`
+	IndexCodes       []string               `json:"index_codes,omitempty"`
+	ValidityCodes    []string               `json:"validity_codes,omitempty"`
+	CompositeIndexes []brief2CompositeIndex `json:"composite_indexes,omitempty"`
+	Norms            []brief2FactorPayload  `json:"norms,omitempty"`
+	TScoreRules      []brief2TScoreRule     `json:"t_score_rules,omitempty"`
+}
+
+type brief2CompositeIndex struct {
+	Code       string   `json:"code"`
+	Strategy   string   `json:"strategy,omitempty"`
+	Children   []string `json:"children"`
+	ParentCode string   `json:"parent_code,omitempty"`
 }
 
 type brief2FactorPayload struct {
@@ -125,6 +133,7 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
 			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 		})
+		factors = factor.ApplyBrief2CompositeMetadata(factors, compositeSpecsFromPayload(body.Brief2))
 	}
 	out.Factors = factors
 	if body.Brief2 != nil {
@@ -190,6 +199,25 @@ func normFactorCodesFromPayload(body *brief2Extension) []string {
 		}
 	}
 	return codes
+}
+
+func compositeSpecsFromPayload(body *brief2Extension) []factor.Brief2CompositeIndexSpec {
+	if body == nil || len(body.CompositeIndexes) == 0 {
+		return nil
+	}
+	specs := make([]factor.Brief2CompositeIndexSpec, 0, len(body.CompositeIndexes))
+	for _, item := range body.CompositeIndexes {
+		if item.Code == "" || len(item.Children) == 0 {
+			continue
+		}
+		specs = append(specs, factor.Brief2CompositeIndexSpec{
+			Code:       item.Code,
+			Strategy:   factor.ChildrenAggregationStrategy(item.Strategy),
+			Children:   append([]string(nil), item.Children...),
+			ParentCode: item.ParentCode,
+		})
+	}
+	return specs
 }
 
 func (s *Snapshot) IsPublished() bool {

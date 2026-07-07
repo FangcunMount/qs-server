@@ -112,13 +112,17 @@ func reportPOToReadRow(po *InterpretReportPO) evaluationreadmodel.ReportRow {
 	dimensions := make([]evaluationreadmodel.ReportDimensionRow, 0, len(po.Dimensions))
 	for _, d := range po.Dimensions {
 		dimensions = append(dimensions, evaluationreadmodel.ReportDimensionRow{
-			FactorCode:  d.FactorCode,
-			FactorName:  d.FactorName,
-			RawScore:    d.RawScore,
-			MaxScore:    d.MaxScore,
-			RiskLevel:   d.RiskLevel,
-			Description: d.Description,
-			Suggestion:  d.Suggestion,
+			FactorCode:     d.FactorCode,
+			FactorName:     d.FactorName,
+			RawScore:       d.RawScore,
+			MaxScore:       d.MaxScore,
+			RiskLevel:      d.RiskLevel,
+			Role:           d.Role,
+			ParentCode:     d.ParentCode,
+			HierarchyLevel: d.HierarchyLevel,
+			SortOrder:      d.SortOrder,
+			Description:    d.Description,
+			Suggestion:     d.Suggestion,
 		})
 	}
 	suggestions := make([]evaluationreadmodel.ReportSuggestionRow, 0, len(po.Suggestions))

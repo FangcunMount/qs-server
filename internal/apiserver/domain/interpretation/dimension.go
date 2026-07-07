@@ -3,16 +3,20 @@ package interpretation
 // DimensionInterpret 维度解读值对象
 // 记录单个因子/维度的解读信息（含解读与建议）
 type DimensionInterpret struct {
-	code        DimensionCode
-	kind        DimensionKind
-	factorCode  FactorCode
-	factorName  string
-	rawScore    float64
-	maxScore    *float64
-	riskLevel   RiskLevel
-	severity    string
-	description string
-	suggestion  string
+	code           DimensionCode
+	kind           DimensionKind
+	factorCode     FactorCode
+	factorName     string
+	rawScore       float64
+	maxScore       *float64
+	riskLevel      RiskLevel
+	severity       string
+	description    string
+	suggestion     string
+	role           string
+	parentCode     string
+	hierarchyLevel int
+	sortOrder      int
 }
 
 // NewDimensionInterpret 创建维度解读
@@ -141,6 +145,35 @@ func (d DimensionInterpret) Suggestion() string {
 // MaxScore 获取最大分
 func (d DimensionInterpret) MaxScore() *float64 {
 	return d.maxScore
+}
+
+// Role returns the catalog factor role when present.
+func (d DimensionInterpret) Role() string {
+	return d.role
+}
+
+// ParentCode returns the parent factor code in a hierarchy tree.
+func (d DimensionInterpret) ParentCode() string {
+	return d.parentCode
+}
+
+// HierarchyLevel returns tree depth; 1 is root.
+func (d DimensionInterpret) HierarchyLevel() int {
+	return d.hierarchyLevel
+}
+
+// SortOrder returns sibling ordering within the same parent.
+func (d DimensionInterpret) SortOrder() int {
+	return d.sortOrder
+}
+
+// WithHierarchy returns a copy annotated with factor tree metadata.
+func (d DimensionInterpret) WithHierarchy(role, parentCode string, hierarchyLevel, sortOrder int) DimensionInterpret {
+	d.role = role
+	d.parentCode = parentCode
+	d.hierarchyLevel = hierarchyLevel
+	d.sortOrder = sortOrder
+	return d
 }
 
 // IsHighRisk 是否高风险

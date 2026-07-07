@@ -77,11 +77,65 @@ func scaleReportInputFromOutcome(outcome evaloutcome.Outcome) reportscore.ScaleR
 		if execution.Level != nil {
 			input.RiskLevel = domainReport.RiskLevel(execution.Level.Code)
 		}
-		if scores, ok := execution.Detail.Payload.([]assessment.FactorScoreResult); ok {
+		if outcomeDimensionsPreferredForReporting(execution.Dimensions) {
+			input.FactorScores = scaleDimensionReportScores(execution.Dimensions, input.Scale)
+		} else if scores, ok := execution.Detail.Payload.([]assessment.FactorScoreResult); ok && len(scores) > 0 {
 			input.FactorScores = scaleFactorReportScores(scores)
+		} else if len(execution.Dimensions) > 0 {
+			input.FactorScores = scaleDimensionReportScores(execution.Dimensions, input.Scale)
 		}
 	}
 	return input
+}
+
+func outcomeDimensionsPreferredForReporting(dimensions []assessment.DimensionResult) bool {
+	for _, dim := range dimensions {
+		if dim.Role != "" || dim.ParentCode != "" || dim.HierarchyLevel > 0 || dim.SortOrder > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func scaleDimensionReportScores(dimensions []assessment.DimensionResult, model *reportscore.ReportModel) []reportscore.FactorReportScore {
+	totalFactors := scaleTotalFactorCodes(model)
+	scores := make([]reportscore.FactorReportScore, 0, len(dimensions))
+	for _, dim := range dimensions {
+		if dim.Score == nil {
+			continue
+		}
+		risk := domainReport.RiskLevelNone
+		if dim.Level != nil && domainReport.IsRiskLevelCode(dim.Level.Code) {
+			risk = domainReport.RiskLevel(dim.Level.Code)
+		}
+		scores = append(scores, reportscore.FactorReportScore{
+			FactorCode:     dim.Code,
+			FactorName:     dim.Name,
+			RawScore:       dim.Score.Value,
+			RiskLevel:      risk,
+			Conclusion:     dim.Description,
+			Suggestion:     dim.Suggestion,
+			IsTotalScore:   totalFactors[dim.Code],
+			Role:           dim.Role,
+			ParentCode:     dim.ParentCode,
+			HierarchyLevel: dim.HierarchyLevel,
+			SortOrder:      dim.SortOrder,
+		})
+	}
+	return scores
+}
+
+func scaleTotalFactorCodes(model *reportscore.ReportModel) map[string]bool {
+	if model == nil {
+		return nil
+	}
+	codes := make(map[string]bool, len(model.Factors))
+	for _, factor := range model.Factors {
+		if factor.IsTotalScore {
+			codes[factor.Code] = true
+		}
+	}
+	return codes
 }
 
 func scaleFactorReportScores(factorScores []assessment.FactorScoreResult) []reportscore.FactorReportScore {
@@ -118,6 +172,7 @@ func scaleReportModelFromSnapshot(snapshot *scalesnapshot.ScaleSnapshot) *report
 			Code:           factor.Code,
 			Title:          factor.Title,
 			MaxScore:       factor.MaxScore,
+			IsTotalScore:   factor.IsTotalScore,
 			InterpretRules: scaleFactorInterpretRules(factor.InterpretRules),
 		})
 	}

@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	personalityseed "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/seed"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 )
 
@@ -24,28 +24,28 @@ func TestStaticCompositeCatalogResolveByQuestionnaire(t *testing.T) {
 	}{
 		{
 			name:    "sbti",
-			code:    evaluationinputPort.DefaultSBTIQuestionnaireCode,
-			version: evaluationinputPort.DefaultSBTIModelVersion,
+			code:    personalityseed.SBTIQuestionnaireCode,
+			version: personalityseed.SBTIModelVersion,
 			want: port.RuleSetRef{
 				Kind:      domain.KindPersonality,
 				SubKind:   domain.SubKindTypology,
 				Algorithm: domain.AlgorithmSBTI,
-				Code:      evaluationinputPort.DefaultSBTIModelCode,
-				Version:   evaluationinputPort.DefaultSBTIModelVersion,
-				Title:     evaluationinputPort.DefaultSBTIModelTitle,
+				Code:      personalityseed.SBTIModelCode,
+				Version:   personalityseed.SBTIModelVersion,
+				Title:     personalityseed.SBTIModelTitle,
 			},
 		},
 		{
 			name:    "mbti",
-			code:    evaluationinputPort.DefaultMBTIQuestionnaireCode,
-			version: evaluationinputPort.DefaultMBTIModelVersion,
+			code:    personalityseed.MBTIQuestionnaireCode,
+			version: personalityseed.MBTIModelVersion,
 			want: port.RuleSetRef{
 				Kind:      domain.KindPersonality,
 				SubKind:   domain.SubKindTypology,
 				Algorithm: domain.AlgorithmMBTI,
-				Code:      evaluationinputPort.DefaultMBTIModelCode,
-				Version:   evaluationinputPort.DefaultMBTIModelVersion,
-				Title:     evaluationinputPort.DefaultMBTIModelTitle,
+				Code:      personalityseed.MBTIModelCode,
+				Version:   personalityseed.MBTIModelVersion,
+				Title:     personalityseed.MBTIModelTitle,
 			},
 		},
 	}
@@ -74,8 +74,8 @@ func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
 
 	ref := port.RuleSetRef{
 		Kind:    domain.RuleSetKindMBTI,
-		Code:    evaluationinputPort.DefaultMBTIModelCode,
-		Version: evaluationinputPort.DefaultMBTIModelVersion,
+		Code:    personalityseed.MBTIModelCode,
+		Version: personalityseed.MBTIModelVersion,
 	}
 	snapshot, err := catalog.GetPublishedByRef(t.Context(), ref)
 	if err != nil {
@@ -84,7 +84,7 @@ func TestStaticCompositeCatalogGetPublishedByRef(t *testing.T) {
 	if snapshot.DecisionKind != domain.DecisionKindPoleComposition {
 		t.Fatalf("DecisionKind = %s, want %s", snapshot.DecisionKind, domain.DecisionKindPoleComposition)
 	}
-	if snapshot.Binding.QuestionnaireCode != evaluationinputPort.DefaultMBTIQuestionnaireCode {
+	if snapshot.Binding.QuestionnaireCode != personalityseed.MBTIQuestionnaireCode {
 		t.Fatalf("binding code = %s", snapshot.Binding.QuestionnaireCode)
 	}
 	if len(snapshot.Payload) == 0 {

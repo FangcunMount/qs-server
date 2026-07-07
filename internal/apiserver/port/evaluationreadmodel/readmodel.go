@@ -155,13 +155,17 @@ type ReportFilter struct {
 }
 
 type ReportDimensionRow struct {
-	FactorCode  string
-	FactorName  string
-	RawScore    float64
-	MaxScore    *float64
-	RiskLevel   string
-	Description string
-	Suggestion  string
+	FactorCode     string
+	FactorName     string
+	RawScore       float64
+	MaxScore       *float64
+	RiskLevel      string
+	Role           string
+	ParentCode     string
+	HierarchyLevel int
+	SortOrder      int
+	Description    string
+	Suggestion     string
 }
 
 type ReportSuggestionRow struct {

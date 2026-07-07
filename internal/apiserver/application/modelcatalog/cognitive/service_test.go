@@ -114,6 +114,13 @@ func TestPublishCognitiveModelRoundTrip(t *testing.T) {
 	if _, err := svc.UpdateDefinition(context.Background(), created.Code, cognitive.DefinitionInput{Payload: definition}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
+	if _, err := svc.BindQuestionnaire(context.Background(), cognitive.BindQuestionnaireInput{
+		Code:                 created.Code,
+		QuestionnaireCode:    "SPM",
+		QuestionnaireVersion: "1.0.0",
+	}); err != nil {
+		t.Fatalf("BindQuestionnaire: %v", err)
+	}
 
 	published, err := svc.Publish(context.Background(), created.Code)
 	if err != nil {

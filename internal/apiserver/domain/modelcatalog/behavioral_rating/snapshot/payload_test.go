@@ -73,6 +73,40 @@ func TestParseBrief2PayloadPreservesProfile(t *testing.T) {
 	}
 }
 
+func TestParseBrief2PayloadAnnotatesCompositeMetadata(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+		"dimensions": [
+			{"code": "inhibit", "title": "Inhibit", "question_codes": ["q1"], "scoring_strategy": "sum"},
+			{"code": "self_monitor", "title": "Self Monitor", "question_codes": ["q2"], "scoring_strategy": "sum"},
+			{"code": "bri", "title": "BRI"},
+			{"code": "gec", "title": "GEC"}
+		],
+		"brief2": {
+			"index_codes": ["bri", "gec"],
+			"composite_indexes": [
+				{"code": "bri", "strategy": "sum", "children": ["inhibit", "self_monitor"]},
+				{"code": "gec", "strategy": "sum", "children": ["bri"]}
+			]
+		}
+	}`)
+	got, err := snapshot.ParsePublishedPayload(
+		"assessmentmodel.behavioral_rating.brief2.v1",
+		"BR-004", "v1", "BRIEF-2", "published", raw,
+	)
+	if err != nil {
+		t.Fatalf("ParsePublishedPayload: %v", err)
+	}
+	byCode := factor.IndexByCode(got.Factors)
+	if byCode["bri"].ChildrenPolicy == nil || len(byCode["bri"].ChildrenPolicy.Children) != 2 {
+		t.Fatalf("bri policy = %#v", byCode["bri"].ChildrenPolicy)
+	}
+	if byCode["inhibit"].ParentCode != "bri" {
+		t.Fatalf("inhibit parent = %q", byCode["inhibit"].ParentCode)
+	}
+}
+
 func TestParseBrief2PayloadAnnotatesFactorNormMetadata(t *testing.T) {
 	t.Parallel()
 

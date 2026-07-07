@@ -94,14 +94,18 @@ func factorScoreInputs(
 			factorName = fs.FactorCode
 		}
 		inputs = append(inputs, domainreport.FactorScoreInput{
-			FactorCode:   domainreport.FactorCode(fs.FactorCode),
-			FactorName:   factorName,
-			RawScore:     fs.RawScore,
-			MaxScore:     maxScore,
-			RiskLevel:    fs.RiskLevel,
-			Description:  fs.Conclusion,
-			Suggestion:   fs.Suggestion,
-			IsTotalScore: fs.IsTotalScore,
+			FactorCode:     domainreport.FactorCode(fs.FactorCode),
+			FactorName:     factorName,
+			RawScore:       fs.RawScore,
+			MaxScore:       maxScore,
+			RiskLevel:      fs.RiskLevel,
+			Description:    fs.Conclusion,
+			Suggestion:     fs.Suggestion,
+			IsTotalScore:   fs.IsTotalScore,
+			Role:           fs.Role,
+			ParentCode:     fs.ParentCode,
+			HierarchyLevel: fs.HierarchyLevel,
+			SortOrder:      fs.SortOrder,
 		})
 	}
 	return inputs

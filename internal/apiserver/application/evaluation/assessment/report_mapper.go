@@ -13,15 +13,7 @@ func toReportResult(r *report.InterpretReport) *ReportResult {
 
 	dimensions := make([]DimensionResult, len(r.Dimensions()))
 	for i, d := range r.Dimensions() {
-		dimensions[i] = DimensionResult{
-			FactorCode:  d.Code().String(),
-			FactorName:  d.Name(),
-			RawScore:    d.RawScore(),
-			MaxScore:    d.MaxScore(),
-			RiskLevel:   d.Severity(),
-			Description: d.Description(),
-			Suggestion:  d.Suggestion(),
-		}
+		dimensions[i] = dimensionResultFromInterpret(d)
 	}
 
 	return &ReportResult{
@@ -66,15 +58,7 @@ func toModelExtraResult(extra *report.ModelExtra) *ModelExtraResult {
 func reportRowToResult(row evaluationreadmodel.ReportRow) *ReportResult {
 	dimensions := make([]DimensionResult, 0, len(row.Dimensions))
 	for _, d := range row.Dimensions {
-		dimensions = append(dimensions, DimensionResult{
-			FactorCode:  d.FactorCode,
-			FactorName:  d.FactorName,
-			RawScore:    d.RawScore,
-			MaxScore:    d.MaxScore,
-			RiskLevel:   d.RiskLevel,
-			Description: d.Description,
-			Suggestion:  d.Suggestion,
-		})
+		dimensions = append(dimensions, dimensionResultFromReadRow(d))
 	}
 	suggestions := make([]SuggestionDTO, 0, len(row.Suggestions))
 	for _, s := range row.Suggestions {
@@ -121,6 +105,38 @@ func reportModelExtraRowToResult(row *evaluationreadmodel.ReportModelExtraRow) *
 		}
 	}
 	return result
+}
+
+func dimensionResultFromInterpret(d report.DimensionInterpret) DimensionResult {
+	return DimensionResult{
+		FactorCode:     d.Code().String(),
+		FactorName:     d.Name(),
+		RawScore:       d.RawScore(),
+		MaxScore:       d.MaxScore(),
+		RiskLevel:      d.Severity(),
+		Role:           d.Role(),
+		ParentCode:     d.ParentCode(),
+		HierarchyLevel: d.HierarchyLevel(),
+		SortOrder:      d.SortOrder(),
+		Description:    d.Description(),
+		Suggestion:     d.Suggestion(),
+	}
+}
+
+func dimensionResultFromReadRow(d evaluationreadmodel.ReportDimensionRow) DimensionResult {
+	return DimensionResult{
+		FactorCode:     d.FactorCode,
+		FactorName:     d.FactorName,
+		RawScore:       d.RawScore,
+		MaxScore:       d.MaxScore,
+		RiskLevel:      d.RiskLevel,
+		Role:           d.Role,
+		ParentCode:     d.ParentCode,
+		HierarchyLevel: d.HierarchyLevel,
+		SortOrder:      d.SortOrder,
+		Description:    d.Description,
+		Suggestion:     d.Suggestion,
+	}
 }
 
 func toSuggestionDTOs(items []report.Suggestion) []SuggestionDTO {

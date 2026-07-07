@@ -15,12 +15,16 @@ type GenerateReportInput struct {
 
 // FactorScoreInput 因子得分输入。
 type FactorScoreInput struct {
-	FactorCode   FactorCode
-	FactorName   string
-	RawScore     float64
-	MaxScore     *float64
-	RiskLevel    RiskLevel
-	Description  string
-	Suggestion   string
-	IsTotalScore bool
+	FactorCode     FactorCode
+	FactorName     string
+	RawScore       float64
+	MaxScore       *float64
+	RiskLevel      RiskLevel
+	Description    string
+	Suggestion     string
+	IsTotalScore   bool
+	Role           string
+	ParentCode     string
+	HierarchyLevel int
+	SortOrder      int
 }

@@ -42,7 +42,7 @@ func (b *DefaultReportBuilder) buildDimensions(input GenerateReportInput) []Dime
 
 	dimensions := make([]DimensionInterpret, 0, len(input.FactorScores))
 	for _, fs := range input.FactorScores {
-		dimensions = append(dimensions, NewDimensionInterpret(
+		dim := NewDimensionInterpret(
 			fs.FactorCode,
 			fs.FactorName,
 			fs.RawScore,
@@ -50,7 +50,11 @@ func (b *DefaultReportBuilder) buildDimensions(input GenerateReportInput) []Dime
 			fs.RiskLevel,
 			fs.Description,
 			fs.Suggestion,
-		))
+		)
+		if fs.Role != "" || fs.ParentCode != "" || fs.HierarchyLevel > 0 || fs.SortOrder > 0 {
+			dim = dim.WithHierarchy(fs.Role, fs.ParentCode, fs.HierarchyLevel, fs.SortOrder)
+		}
+		dimensions = append(dimensions, dim)
 	}
 	return dimensions
 }

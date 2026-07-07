@@ -19,6 +19,8 @@ type Executor struct {
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
 
+// NewTypologyExecutor constructs a legacy algorithm-scoped typology executor.
+// Deprecated: use NewConfiguredTypologyExecutor for new wiring; legacy keys remain for compat resolve only.
 func NewTypologyExecutor(algorithm modelcatalog.Algorithm) (*Executor, error) {
 	return NewTypologyExecutorWithRegistry(mustDefaultModuleRegistry(), algorithm)
 }

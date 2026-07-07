@@ -124,6 +124,13 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	if _, err := svc.UpdateDefinition(context.Background(), created.Code, behavioral_rating.DefinitionInput{Payload: definition}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
 	}
+	if _, err := svc.BindQuestionnaire(context.Background(), behavioral_rating.BindQuestionnaireInput{
+		Code:                 created.Code,
+		QuestionnaireCode:    "MBRIEF2",
+		QuestionnaireVersion: "1.0.0",
+	}); err != nil {
+		t.Fatalf("BindQuestionnaire: %v", err)
+	}
 
 	published, err := svc.Publish(context.Background(), created.Code)
 	if err != nil {
@@ -160,5 +167,46 @@ func TestPublishBehavioralRatingModelRoundTrip(t *testing.T) {
 	}
 	if runtimeSnapshot.Brief2 == nil || runtimeSnapshot.Brief2.FormVariant != "parent" {
 		t.Fatalf("brief2 profile = %#v", runtimeSnapshot.Brief2)
+	}
+}
+
+func TestPublishRejectsInvalidFactorHierarchy(t *testing.T) {
+	t.Parallel()
+
+	modelRepo := &memoryModelRepo{}
+	publishedRepo := &memoryPublishedRepo{}
+	svc := behavioral_rating.NewService(behavioral_rating.Dependencies{
+		ModelRepo:     modelRepo,
+		PublishedRepo: publishedRepo,
+	})
+
+	created, err := svc.Create(context.Background(), behavioral_rating.CreateInput{
+		Code:  "BR-BAD-HIER",
+		Title: "无效层级",
+	})
+	if err != nil {
+		t.Fatalf("Create: %v", err)
+	}
+	definition := []byte(`{
+		"dimensions": [{
+			"code": "bri",
+			"title": "BRI",
+			"role": "index",
+			"parent_code": "gec"
+		}]
+	}`)
+	if _, err := svc.UpdateDefinition(context.Background(), created.Code, behavioral_rating.DefinitionInput{Payload: definition}); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+	if _, err := svc.BindQuestionnaire(context.Background(), behavioral_rating.BindQuestionnaireInput{
+		Code:                 created.Code,
+		QuestionnaireCode:    "Q-001",
+		QuestionnaireVersion: "1.0.0",
+	}); err != nil {
+		t.Fatalf("BindQuestionnaire: %v", err)
+	}
+
+	if _, err := svc.Publish(context.Background(), created.Code); err == nil {
+		t.Fatal("Publish() should reject invalid factor hierarchy")
 	}
 }

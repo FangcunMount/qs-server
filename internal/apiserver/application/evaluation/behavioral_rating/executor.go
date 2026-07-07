@@ -47,7 +47,7 @@ func (e *Executor) Execute(ctx context.Context, input evaluationexecute.Executio
 	if !ok || payload.Snapshot == nil {
 		return outcome, nil
 	}
-	return EnrichBrief2Outcome(outcome, payload.Snapshot, NormSubjectFromInput(input.Input)), nil
+	return ApplyFactorProjections(outcome, payload.Snapshot, NormSubjectFromInput(input.Input)), nil
 }
 
 func cloneInputWithScaleSnapshot(input *portevaluationinput.InputSnapshot, scaleSnapshot *scalesnapshot.ScaleSnapshot) *portevaluationinput.InputSnapshot {

@@ -75,6 +75,42 @@ func TestReportMapperRoundTripPreservesInterpretReportFields(t *testing.T) {
 	}
 }
 
+func TestReportMapperRoundTripPreservesDimensionHierarchy(t *testing.T) {
+	mapper := NewReportMapper()
+	original := domainReport.ReconstructInterpretReport(
+		domainReport.ID(44),
+		"BRIEF-2",
+		"BRIEF2",
+		10,
+		domainReport.RiskLevelNone,
+		"ok",
+		[]domainReport.DimensionInterpret{
+			domainReport.NewDimensionInterpret(
+				domainReport.NewFactorCode("bri"),
+				"BRI",
+				10,
+				nil,
+				domainReport.RiskLevelNone,
+				"index",
+				"",
+			).WithHierarchy("index", "gec", 2, 1),
+		},
+		nil,
+		nil,
+		time.Now(),
+		nil,
+	)
+
+	got := mapper.ToDomain(mapper.ToPO(original, 1))
+	if len(got.Dimensions()) != 1 {
+		t.Fatalf("dimensions = %#v", got.Dimensions())
+	}
+	dim := got.Dimensions()[0]
+	if dim.ParentCode() != "gec" || dim.HierarchyLevel() != 2 || dim.Role() != "index" {
+		t.Fatalf("hierarchy = role=%q parent=%q level=%d", dim.Role(), dim.ParentCode(), dim.HierarchyLevel())
+	}
+}
+
 func TestReportMapperRoundTripPreservesTraitDimensionKind(t *testing.T) {
 	mapper := NewReportMapper()
 	original := domainReport.ReconstructInterpretReport(

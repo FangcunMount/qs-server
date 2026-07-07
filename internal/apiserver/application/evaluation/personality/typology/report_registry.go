@@ -25,11 +25,11 @@ func DefaultReportAdapterRegistry() ReportAdapterRegistry {
 func NewReportAdapterRegistry() ReportAdapterRegistry {
 	return ReportAdapterRegistry{
 		adapters: map[modeltypology.ReportAdapterKey]reportBuilderFunc{
-			modeltypology.ReportAdapterPersonalityType: buildPersonalityTypeReport,
-			modeltypology.ReportAdapterTraitProfile:    buildTraitProfileReport,
-			modeltypology.ReportAdapterMBTI:            buildMBTIReport,
-			modeltypology.ReportAdapterSBTI:            buildSBTIReport,
-			modeltypology.ReportAdapterBigFive:         buildBigFiveReport,
+			modeltypology.ReportAdapterPersonalityType: buildTypologyReportAdapter(modeltypology.ReportAdapterPersonalityType),
+			modeltypology.ReportAdapterTraitProfile:    buildTypologyReportAdapter(modeltypology.ReportAdapterTraitProfile),
+			modeltypology.ReportAdapterMBTI:            buildTypologyReportAdapter(modeltypology.ReportAdapterMBTI),
+			modeltypology.ReportAdapterSBTI:            buildTypologyReportAdapter(modeltypology.ReportAdapterSBTI),
+			modeltypology.ReportAdapterBigFive:         buildTypologyReportAdapter(modeltypology.ReportAdapterBigFive),
 		},
 	}
 }
@@ -56,6 +56,13 @@ func (r ReportAdapterRegistry) build(
 	outcome evaloutcome.Outcome,
 ) (*domainReport.InterpretReport, error) {
 	adapterKey := spec.ResolvedAdapterKey(mapping, decisionKind)
+	return r.buildByAdapter(adapterKey, outcome)
+}
+
+func (r ReportAdapterRegistry) buildByAdapter(
+	adapterKey modeltypology.ReportAdapterKey,
+	outcome evaloutcome.Outcome,
+) (*domainReport.InterpretReport, error) {
 	if adapterKey == "" {
 		return nil, fmt.Errorf("report adapter key is required")
 	}
@@ -64,4 +71,31 @@ func (r ReportAdapterRegistry) build(
 		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)
 	}
 	return builder(outcome)
+}
+
+// buildTypologyReportAdapter returns a report builder for a fixed adapter key.
+func buildTypologyReportAdapter(adapterKey modeltypology.ReportAdapterKey) reportBuilderFunc {
+	return func(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
+		return buildTypologyReport(adapterKey, outcome)
+	}
+}
+
+func buildTypologyReport(
+	adapterKey modeltypology.ReportAdapterKey,
+	outcome evaloutcome.Outcome,
+) (*domainReport.InterpretReport, error) {
+	switch adapterKey {
+	case modeltypology.ReportAdapterPersonalityType:
+		return buildPersonalityTypeReport(outcome)
+	case modeltypology.ReportAdapterTraitProfile:
+		return buildTraitProfileReport(outcome)
+	case modeltypology.ReportAdapterMBTI:
+		return buildMBTIReport(outcome)
+	case modeltypology.ReportAdapterSBTI:
+		return buildSBTIReport(outcome)
+	case modeltypology.ReportAdapterBigFive:
+		return buildBigFiveReport(outcome)
+	default:
+		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)
+	}
 }

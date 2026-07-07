@@ -59,14 +59,18 @@ type OutcomeResultLevel struct {
 
 // DimensionResult records one scored dimension on an assessment outcome.
 type DimensionResult struct {
-	Code          string
-	Name          string
-	Kind          DimensionKind
-	Score         *OutcomeScoreValue
-	DerivedScores []OutcomeScoreValue
-	Level         *OutcomeResultLevel
-	Description   string
-	Suggestion    string
+	Code           string
+	Name           string
+	Kind           DimensionKind
+	Role           string
+	ParentCode     string
+	HierarchyLevel int
+	SortOrder      int
+	Score          *OutcomeScoreValue
+	DerivedScores  []OutcomeScoreValue
+	Level          *OutcomeResultLevel
+	Description    string
+	Suggestion     string
 }
 
 // ValidityResult records optional validity checks for an assessment outcome.

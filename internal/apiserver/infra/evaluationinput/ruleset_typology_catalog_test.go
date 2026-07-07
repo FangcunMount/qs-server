@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	personalityseed "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/seed"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/ruleset/codec"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -157,10 +158,10 @@ func TestPublishedTypologyCatalogDecodesPublishedModelSnapshot(t *testing.T) {
 
 func TestPublishedTypologyCatalogFallsBackToLegacyReader(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
-		Code:                 port.DefaultMBTIModelCode,
-		Version:              port.DefaultMBTIModelVersion,
-		QuestionnaireCode:    port.DefaultMBTIQuestionnaireCode,
-		QuestionnaireVersion: port.DefaultMBTIModelVersion,
+		Code:                 personalityseed.MBTIModelCode,
+		Version:              personalityseed.MBTIModelVersion,
+		QuestionnaireCode:    personalityseed.MBTIQuestionnaireCode,
+		QuestionnaireVersion: personalityseed.MBTIModelVersion,
 		Status:               "published",
 		DimensionOrder:       []string{"EI"},
 		Dimensions: map[string]modeltypology.MBTILegacyDimension{
@@ -197,10 +198,10 @@ func TestPublishedTypologyCatalogFallsBackToLegacyReader(t *testing.T) {
 
 func TestRuleSetTypologyCatalogLegacyMBTIFallback(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
-		Code:                 port.DefaultMBTIModelCode,
-		Version:              port.DefaultMBTIModelVersion,
-		QuestionnaireCode:    port.DefaultMBTIQuestionnaireCode,
-		QuestionnaireVersion: port.DefaultMBTIModelVersion,
+		Code:                 personalityseed.MBTIModelCode,
+		Version:              personalityseed.MBTIModelVersion,
+		QuestionnaireCode:    personalityseed.MBTIQuestionnaireCode,
+		QuestionnaireVersion: personalityseed.MBTIModelVersion,
 		Status:               "published",
 		DimensionOrder:       []string{"EI"},
 		Dimensions: map[string]modeltypology.MBTILegacyDimension{
@@ -363,10 +364,10 @@ func TestRuleSetTypologyCatalogFindByQuestionnaireDecodesV2Payload(t *testing.T)
 
 func TestRuleSetTypologyCatalogFindByQuestionnaireLegacyMBTI(t *testing.T) {
 	model := &modeltypology.MBTILegacyModel{
-		Code:                 port.DefaultMBTIModelCode,
-		Version:              port.DefaultMBTIModelVersion,
-		QuestionnaireCode:    port.DefaultMBTIQuestionnaireCode,
-		QuestionnaireVersion: port.DefaultMBTIModelVersion,
+		Code:                 personalityseed.MBTIModelCode,
+		Version:              personalityseed.MBTIModelVersion,
+		QuestionnaireCode:    personalityseed.MBTIQuestionnaireCode,
+		QuestionnaireVersion: personalityseed.MBTIModelVersion,
 		Status:               "published",
 		DimensionOrder:       []string{"EI"},
 		Dimensions: map[string]modeltypology.MBTILegacyDimension{

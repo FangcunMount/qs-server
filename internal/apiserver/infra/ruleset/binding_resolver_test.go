@@ -5,8 +5,8 @@ import (
 	"testing"
 
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	personalityseed "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/seed"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-	evaluationinputPort "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
 func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
@@ -18,8 +18,8 @@ func TestCatalogBindingResolverResolveAssessmentBindingSBTI(t *testing.T) {
 
 	binding, ok, err := resolver.ResolveAssessmentBinding(
 		context.Background(),
-		evaluationinputPort.DefaultSBTIQuestionnaireCode,
-		evaluationinputPort.DefaultSBTIModelVersion,
+		personalityseed.SBTIQuestionnaireCode,
+		personalityseed.SBTIModelVersion,
 	)
 	if err != nil {
 		t.Fatalf("ResolveAssessmentBinding: %v", err)
@@ -46,8 +46,8 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 
 	binding, ok, err := resolver.ResolveAssessmentBinding(
 		context.Background(),
-		evaluationinputPort.DefaultMBTIQuestionnaireCode,
-		evaluationinputPort.DefaultMBTIModelVersion,
+		personalityseed.MBTIQuestionnaireCode,
+		personalityseed.MBTIModelVersion,
 	)
 	if err != nil {
 		t.Fatalf("ResolveAssessmentBinding: %v", err)
@@ -55,7 +55,7 @@ func TestCatalogBindingResolverResolveAssessmentBindingMBTI(t *testing.T) {
 	if !ok {
 		t.Fatal("expected binding")
 	}
-	if binding.Ref.Code != evaluationinputPort.DefaultMBTIModelCode {
+	if binding.Ref.Code != personalityseed.MBTIModelCode {
 		t.Fatalf("code = %s", binding.Ref.Code)
 	}
 }

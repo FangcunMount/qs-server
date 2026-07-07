@@ -46,16 +46,20 @@ type InterpretReportPO struct {
 
 // DimensionInterpretPO 维度解读持久化对象
 type DimensionInterpretPO struct {
-	Kind        string         `bson:"kind,omitempty" json:"kind,omitempty"`
-	FactorCode  string         `bson:"factor_code" json:"factor_code"`
-	FactorName  string         `bson:"factor_name" json:"factor_name"`
-	RawScore    float64        `bson:"raw_score" json:"raw_score"`
-	MaxScore    *float64       `bson:"max_score,omitempty" json:"max_score,omitempty"`
-	RiskLevel   string         `bson:"risk_level" json:"risk_level"`
-	Score       *ScoreValuePO  `bson:"score,omitempty" json:"score,omitempty"`
-	Level       *ResultLevelPO `bson:"level,omitempty" json:"level,omitempty"`
-	Description string         `bson:"description" json:"description"`
-	Suggestion  string         `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
+	Kind           string         `bson:"kind,omitempty" json:"kind,omitempty"`
+	FactorCode     string         `bson:"factor_code" json:"factor_code"`
+	FactorName     string         `bson:"factor_name" json:"factor_name"`
+	RawScore       float64        `bson:"raw_score" json:"raw_score"`
+	MaxScore       *float64       `bson:"max_score,omitempty" json:"max_score,omitempty"`
+	RiskLevel      string         `bson:"risk_level" json:"risk_level"`
+	Role           string         `bson:"role,omitempty" json:"role,omitempty"`
+	ParentCode     string         `bson:"parent_code,omitempty" json:"parent_code,omitempty"`
+	HierarchyLevel int            `bson:"hierarchy_level,omitempty" json:"hierarchy_level,omitempty"`
+	SortOrder      int            `bson:"sort_order,omitempty" json:"sort_order,omitempty"`
+	Score          *ScoreValuePO  `bson:"score,omitempty" json:"score,omitempty"`
+	Level          *ResultLevelPO `bson:"level,omitempty" json:"level,omitempty"`
+	Description    string         `bson:"description" json:"description"`
+	Suggestion     string         `bson:"suggestion,omitempty" json:"suggestion,omitempty"`
 }
 
 type ModelIdentityPO struct {

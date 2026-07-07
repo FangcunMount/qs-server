@@ -20,16 +20,26 @@ const (
 )
 
 const (
-	DefaultSBTIModelCode          = "SBTI_FUN"
-	DefaultSBTIModelVersion       = "1.0.0"
-	DefaultSBTIModelTitle         = "SBTI 趣味人格测评"
-	DefaultSBTIQuestionnaireCode  = "SBTI_FUN"
+	// Deprecated: use domain/modelcatalog/personality/seed.SBTIModelCode. Kept for legacy reader compatibility only.
+	DefaultSBTIModelCode = "SBTI_FUN"
+	// Deprecated: use domain/modelcatalog/personality/seed.SBTIModelVersion.
+	DefaultSBTIModelVersion = "1.0.0"
+	// Deprecated: use domain/modelcatalog/personality/seed.SBTIModelTitle.
+	DefaultSBTIModelTitle = "SBTI 趣味人格测评"
+	// Deprecated: use domain/modelcatalog/personality/seed.SBTIQuestionnaireCode.
+	DefaultSBTIQuestionnaireCode = "SBTI_FUN"
+	// Deprecated: use domain/modelcatalog/personality/seed.SBTIQuestionnaireTitle.
 	DefaultSBTIQuestionnaireTitle = "SBTI 趣味人格测评"
 
-	DefaultMBTIModelCode          = "MBTI_OEJTS"
-	DefaultMBTIModelVersion       = "2.0.1"
-	DefaultMBTIModelTitle         = "MBTI 人格类型测评（OEJTS）"
-	DefaultMBTIQuestionnaireCode  = "MBTI_OEJTS"
+	// Deprecated: use domain/modelcatalog/personality/seed.MBTIModelCode. Kept for legacy reader compatibility only.
+	DefaultMBTIModelCode = "MBTI_OEJTS"
+	// Deprecated: use domain/modelcatalog/personality/seed.MBTIModelVersion.
+	DefaultMBTIModelVersion = "2.0.1"
+	// Deprecated: use domain/modelcatalog/personality/seed.MBTIModelTitle.
+	DefaultMBTIModelTitle = "MBTI 人格类型测评（OEJTS）"
+	// Deprecated: use domain/modelcatalog/personality/seed.MBTIQuestionnaireCode.
+	DefaultMBTIQuestionnaireCode = "MBTI_OEJTS"
+	// Deprecated: use domain/modelcatalog/personality/seed.MBTIQuestionnaireTitle.
 	DefaultMBTIQuestionnaireTitle = "MBTI 人格类型测评（OEJTS 32题）"
 )
 

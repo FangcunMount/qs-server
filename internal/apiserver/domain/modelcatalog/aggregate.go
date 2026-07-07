@@ -3,6 +3,8 @@ package modelcatalog
 import (
 	"fmt"
 	"time"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 )
 
 // AssessmentModel is the draft-model aggregate for backend configuration.
@@ -49,6 +51,9 @@ func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error)
 	}
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
+	}
+	if legacy.IsMigrationOnlyKind(string(input.Kind)) {
+		return nil, fmt.Errorf("%w: legacy flat kind %q cannot be used for new models; use personality+typology+algorithm", ErrInvalidArgument, input.Kind)
 	}
 	if input.Kind == KindBehaviorAbility {
 		return nil, fmt.Errorf("%w: behavior_ability is a legacy product channel; use behavioral_rating or cognitive", ErrInvalidArgument)

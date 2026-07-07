@@ -3,6 +3,8 @@ package modelcatalog
 import (
 	"encoding/json"
 	"fmt"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/legacy"
 )
 
 // Kind is the canonical assessment model family.
@@ -225,16 +227,11 @@ func AlgorithmFromTypologyPayload(payload []byte) (Algorithm, error) {
 
 // LegacyKindMapping resolves deprecated flat kinds to v2 identity triples.
 func LegacyKindMapping(kind Kind) (Kind, SubKind, Algorithm, bool) {
-	switch kind {
-	case KindScale:
-		return KindScale, SubKindEmpty, AlgorithmScaleDefault, true
-	case KindMBTIMigration:
-		return KindPersonality, SubKindTypology, AlgorithmMBTI, true
-	case KindSBTIMigration:
-		return KindPersonality, SubKindTypology, AlgorithmSBTI, true
-	default:
+	mappedKind, subKind, algorithm, ok := legacy.KindMapping(string(kind))
+	if !ok {
 		return "", "", "", false
 	}
+	return Kind(mappedKind), SubKind(subKind), Algorithm(algorithm), true
 }
 
 // ModelDefinitionFromLegacy builds a v2 definition from a v1 envelope definition.

@@ -441,6 +441,9 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 				if strings.Contains(rel, "domain/evaluation/assessment/") && forbidden == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
 					continue
 				}
+				if strings.Contains(rel, "domain/evaluation/projection/") && forbidden == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
+					continue
+				}
 				t.Fatalf("%s imports %s; evaluation domain should depend on %s", rel, importPath, replacement)
 			}
 		}

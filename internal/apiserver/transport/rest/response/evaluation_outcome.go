@@ -164,16 +164,7 @@ func NewReportOutcomeResponse(result *assessment.ReportOutcomeResult) *ReportOut
 	}
 	dimensions := make([]*DimensionItem, 0, len(result.Dimensions))
 	for _, d := range result.Dimensions {
-		dimensions = append(dimensions, &DimensionItem{
-			FactorCode:     d.FactorCode,
-			FactorName:     d.FactorName,
-			RawScore:       d.RawScore,
-			MaxScore:       d.MaxScore,
-			RiskLevel:      d.RiskLevel,
-			RiskLevelLabel: LabelForRiskLevel(d.RiskLevel),
-			Description:    d.Description,
-			Suggestion:     d.Suggestion,
-		})
+		dimensions = append(dimensions, newDimensionItem(d))
 	}
 	var modelExtra *ModelExtraResponse
 	if result.ModelExtra != nil {

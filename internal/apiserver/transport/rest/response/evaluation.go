@@ -124,8 +124,29 @@ type DimensionItem struct {
 	MaxScore       *float64 `json:"max_score,omitempty"`        // 最大分
 	RiskLevel      string   `json:"risk_level"`                 // 风险等级
 	RiskLevelLabel string   `json:"risk_level_label,omitempty"` // 风险等级中文
+	Role           string   `json:"role,omitempty"`             // 因子角色
+	ParentCode     string   `json:"parent_code,omitempty"`      // 父因子编码
+	HierarchyLevel int      `json:"hierarchy_level,omitempty"`  // 树深度
+	SortOrder      int      `json:"sort_order,omitempty"`       // 同级排序
 	Description    string   `json:"description"`                // 解读描述
 	Suggestion     string   `json:"suggestion,omitempty"`       // 维度建议
+}
+
+func newDimensionItem(d assessment.DimensionResult) *DimensionItem {
+	return &DimensionItem{
+		FactorCode:     d.FactorCode,
+		FactorName:     d.FactorName,
+		RawScore:       d.RawScore,
+		MaxScore:       d.MaxScore,
+		RiskLevel:      d.RiskLevel,
+		RiskLevelLabel: LabelForRiskLevel(d.RiskLevel),
+		Role:           d.Role,
+		ParentCode:     d.ParentCode,
+		HierarchyLevel: d.HierarchyLevel,
+		SortOrder:      d.SortOrder,
+		Description:    d.Description,
+		Suggestion:     d.Suggestion,
+	}
 }
 
 // SuggestionItem 建议项
@@ -331,16 +352,7 @@ func NewReportResponse(result *assessment.ReportResult) *ReportResponse {
 
 	dimensions := make([]*DimensionItem, 0, len(result.Dimensions))
 	for _, d := range result.Dimensions {
-		dimensions = append(dimensions, &DimensionItem{
-			FactorCode:     d.FactorCode,
-			FactorName:     d.FactorName,
-			RawScore:       d.RawScore,
-			MaxScore:       d.MaxScore,
-			RiskLevel:      d.RiskLevel,
-			RiskLevelLabel: LabelForRiskLevel(d.RiskLevel),
-			Description:    d.Description,
-			Suggestion:     d.Suggestion,
-		})
+		dimensions = append(dimensions, newDimensionItem(d))
 	}
 
 	return &ReportResponse{

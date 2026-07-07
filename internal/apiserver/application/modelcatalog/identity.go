@@ -12,13 +12,6 @@ func populateModelSummaryIdentity(summary *ModelSummary, kind domain.Kind, subKi
 	}
 }
 
-func populateModelSummaryFromDomain(summary *ModelSummary, model *domain.AssessmentModel) {
-	if model == nil {
-		return
-	}
-	populateModelSummaryIdentity(summary, model.Kind, model.SubKind, model.Algorithm, model.ProductChannel)
-}
-
 func populateDefinitionIdentity(dto *DefinitionDTO, kind domain.Kind, subKind domain.SubKind, algorithm domain.Algorithm, productChannel domain.ProductChannel) {
 	if dto == nil {
 		return

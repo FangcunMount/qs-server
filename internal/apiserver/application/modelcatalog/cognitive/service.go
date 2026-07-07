@@ -215,6 +215,9 @@ func (s *service) Publish(ctx context.Context, modelCode string) (*ModelSummary,
 	if model.Definition.IsEmpty() {
 		return nil, invalidArgument("认知模型定义不能为空")
 	}
+	if err := publishValidationError(model); err != nil {
+		return nil, err
+	}
 	now := time.Now().UTC()
 	if err := model.MarkPublished(now); err != nil {
 		return nil, mapDomainError(err)
