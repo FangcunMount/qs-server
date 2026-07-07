@@ -49,7 +49,7 @@ func assembleTraitProfileOutcome(
 	if err != nil {
 		return nil, err
 	}
-	return assessmentOutcomeFromBigFive(modelRef, detail), nil
+	return assessmentOutcomeFromTraitProfile(modelRef, evaluationtypology.TraitProfileDetailFromBigFive(detail)), nil
 }
 
 func assembleGenericTraitProfileOutcome(
@@ -82,7 +82,7 @@ func assemblePersonalityTypeFromMBTI(
 	if err != nil {
 		return nil, err
 	}
-	return assessmentOutcomeFromMBTI(modelRef, detail), nil
+	return assessmentOutcomeFromPersonalityType(modelRef, evaluationtypology.PersonalityTypeDetailFromMBTI(detail)), nil
 }
 
 func assemblePersonalityTypeFromSBTI(
@@ -93,7 +93,7 @@ func assemblePersonalityTypeFromSBTI(
 	if err != nil {
 		return nil, err
 	}
-	return assessmentOutcomeFromSBTI(modelRef, detail), nil
+	return assessmentOutcomeFromPersonalityType(modelRef, evaluationtypology.PersonalityTypeDetailFromSBTI(detail)), nil
 }
 
 // AssembleFromPayload derives mapping from payload and assembles the outcome.

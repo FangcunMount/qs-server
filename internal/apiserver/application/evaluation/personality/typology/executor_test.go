@@ -123,9 +123,9 @@ func TestBigFiveExecutorFillsTraitProfile(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute returned error: %v", err)
 	}
-	detail, ok := outcome.Detail.Payload.(evaluationtypology.BigFiveResultDetail)
+	detail, ok := outcome.Detail.Payload.(evaluationtypology.TraitProfileDetail)
 	if !ok {
-		t.Fatalf("payload type = %T, want BigFiveResultDetail", outcome.Detail.Payload)
+		t.Fatalf("payload type = %T, want TraitProfileDetail", outcome.Detail.Payload)
 	}
 	if len(detail.Traits) != 2 || detail.Traits[0].RawScore != 6 {
 		t.Fatalf("traits = %#v, want openness raw 6", detail.Traits)

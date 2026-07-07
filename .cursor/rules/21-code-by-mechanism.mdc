@@ -1,0 +1,34 @@
+---
+description: Code organized by algorithm mechanism; assessments are ModelCatalog data, not package names.
+alwaysApply: false
+---
+
+# 代码按机制组织，数据按测评组织
+
+## 原则
+
+- **业务测评 code 不得成为长期代码组织单元**（目录名、package 名、专属 executor/report builder）。
+- **算法机制可以成为代码组织单元**（factor_scoring、factor_norm、classification、task_performance、projection、reporting）。
+
+判据：
+
+- 差异是**数据**（因子结构、题目、常模表、解释文案、primary dimension）→ 放 ModelCatalog 配置 / payload / seed / 发布快照。
+- 差异是**机制**（pole 合成、nearest pattern、trait profile、norm lookup、task scoring）→ 写代码。
+
+## 可接受的 code 字符串出现场景
+
+- `Algorithm` 枚举常量（如 `AlgorithmBrief2`、`AlgorithmMBTI`）
+- 模型 code、payload format、seed 数据、migration 映射
+- 测试 fixture / characterization 文件名（如 `brief2_characterization_test.go`）
+- 历史兼容 adapter（须标注 transitional，不得新增同类包）
+
+## 禁止（长期）
+
+- 以测评 code 命名的核心 package：`domain/.../brief2`、`.../spm`、`.../mbti` 等作为扩展模式
+- 每新增测评就新增 executor / report builder / projection 分支
+
+## 过渡包（白名单，不得新增）
+
+- `domain/modelcatalog/behavioral_rating/brief2` → 收敛至 `factor_norm` / `calculation/norm`
+- `domain/modelcatalog/cognitive/spm` → 收敛至 `task_performance`
+- `domain/evaluation/personality/adapter/{mbti,sbti,bigfive}` → characterization-only

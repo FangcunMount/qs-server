@@ -8,7 +8,6 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	typologyapp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -31,10 +30,7 @@ func TestV1SBTIDrunkExecutorToReportPreservesSpecialFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := result.Detail.Payload.(evaluationtypology.SBTIResultDetail)
-	if !ok {
-		t.Fatalf("payload type = %T, want SBTIResultDetail", result.Detail.Payload)
-	}
+	detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
 	if detail.TypeCode != "DRUNK" {
 		t.Fatalf("TypeCode = %s, want DRUNK", detail.TypeCode)
 	}
@@ -84,10 +80,7 @@ func TestV1SBTIFallbackExecutorToReportPreservesSpecialFields(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := result.Detail.Payload.(evaluationtypology.SBTIResultDetail)
-	if !ok {
-		t.Fatalf("payload type = %T, want SBTIResultDetail", result.Detail.Payload)
-	}
+	detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
 	if detail.TypeCode != "HHHH" {
 		t.Fatalf("TypeCode = %s, want HHHH", detail.TypeCode)
 	}

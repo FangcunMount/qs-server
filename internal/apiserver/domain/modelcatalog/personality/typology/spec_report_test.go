@@ -70,7 +70,10 @@ func TestToRuntimeSpecSetsReportAdapterKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ToRuntimeSpec: %v", err)
 	}
-	if spec.Report.AdapterKey != ReportAdapterSBTI {
-		t.Fatalf("Report.AdapterKey = %s, want sbti", spec.Report.AdapterKey)
+	if spec.Report.AdapterKey != ReportAdapterPersonalityType {
+		t.Fatalf("Report.AdapterKey = %s, want personality_type", spec.Report.AdapterKey)
+	}
+	if spec.Report.CategoryLabel != "SBTI" {
+		t.Fatalf("Report.CategoryLabel = %s, want SBTI", spec.Report.CategoryLabel)
 	}
 }

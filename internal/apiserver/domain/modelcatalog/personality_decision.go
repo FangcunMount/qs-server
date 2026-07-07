@@ -1,8 +1,8 @@
 package modelcatalog
 
 // FallbackPersonalityDecisionKind maps legacy personality algorithm identities to decision kinds.
-// Compatibility-only: used when draft/default payloads do not declare decision.kind explicitly.
-// Target state: read DecisionKind from model definition or published snapshot payload.
+// Draft-only compatibility: used when draft payloads do not declare decision.kind explicitly.
+// Published snapshots must carry an explicit decision.kind; do not rely on this fallback at publish time.
 func FallbackPersonalityDecisionKind(algorithm Algorithm) DecisionKind {
 	switch algorithm {
 	case AlgorithmMBTI:

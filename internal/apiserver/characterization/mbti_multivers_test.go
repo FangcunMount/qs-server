@@ -6,7 +6,6 @@ import (
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
@@ -68,10 +67,7 @@ func TestV1MBTIMultiVersionExecutorPreservesScoringWithoutNewModule(t *testing.T
 			if err != nil {
 				t.Fatalf("Execute: %v", err)
 			}
-			detail, ok := result.Detail.Payload.(evaluationtypology.MBTIResultDetail)
-			if !ok {
-				t.Fatalf("payload type = %T, want MBTIResultDetail", result.Detail.Payload)
-			}
+			detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
 			if detail.TypeCode != tc.wantType {
 				t.Fatalf("TypeCode = %s, want %s", detail.TypeCode, tc.wantType)
 			}

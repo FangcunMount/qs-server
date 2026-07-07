@@ -12,6 +12,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/google/go-cmp/cmp"
+	"github.com/google/go-cmp/cmp/cmpopts"
 )
 
 func TestConfiguredEvaluatorMatchesBigFiveAdapter(t *testing.T) {
@@ -23,11 +24,16 @@ func TestConfiguredEvaluatorMatchesBigFiveAdapter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("configured Score: %v", err)
 	}
-	want, err := bigfiveadapter.Score(payload, sheet)
+	wantLegacy, err := bigfiveadapter.Score(payload, sheet)
 	if err != nil {
 		t.Fatalf("adapter Score: %v", err)
 	}
-	if diff := cmp.Diff(want, got.Detail); diff != "" {
+	wantGeneric := evaluationtypology.TraitProfileDetailFromBigFive(wantLegacy)
+	gotGeneric, err := evaluationtypology.TraitProfileDetailFromPayload(got.Detail)
+	if err != nil {
+		t.Fatalf("detail parse: %v", err)
+	}
+	if diff := cmp.Diff(wantGeneric, gotGeneric, cmpopts.EquateEmpty()); diff != "" {
 		t.Fatalf("detail mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -45,15 +51,16 @@ func TestConfiguredEvaluatorMatchesMBTIAdapter(t *testing.T) {
 	if err != nil {
 		t.Fatalf("adapter Score: %v", err)
 	}
-	want, err := evaluationtypology.MBTIResultDetailFromPayload(wantResult.Detail)
+	wantLegacy, err := evaluationtypology.MBTIResultDetailFromPayload(wantResult.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
-	gotDetail, err := evaluationtypology.MBTIResultDetailFromPayload(got.Detail)
+	wantGeneric := evaluationtypology.PersonalityTypeDetailFromMBTI(wantLegacy)
+	gotGeneric, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
-	if diff := cmp.Diff(want, gotDetail); diff != "" {
+	if diff := cmp.Diff(wantGeneric, gotGeneric, cmpopts.EquateEmpty()); diff != "" {
 		t.Fatalf("detail mismatch (-want +got):\n%s", diff)
 	}
 }
@@ -99,15 +106,16 @@ func assertSBTIEquivalence(
 	if err != nil {
 		t.Fatalf("adapter Score: %v", err)
 	}
-	want, err := evaluationtypology.SBTIResultDetailFromPayload(wantResult.Detail)
+	wantLegacy, err := evaluationtypology.SBTIResultDetailFromPayload(wantResult.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
-	gotDetail, err := evaluationtypology.SBTIResultDetailFromPayload(got.Detail)
+	wantGeneric := evaluationtypology.PersonalityTypeDetailFromSBTI(wantLegacy)
+	gotGeneric, err := evaluationtypology.PersonalityTypeDetailFromPayload(got.Detail)
 	if err != nil {
 		t.Fatalf("detail parse: %v", err)
 	}
-	if diff := cmp.Diff(want, gotDetail); diff != "" {
+	if diff := cmp.Diff(wantGeneric, gotGeneric, cmpopts.EquateEmpty()); diff != "" {
 		t.Fatalf("detail mismatch (-want +got):\n%s", diff)
 	}
 }

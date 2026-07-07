@@ -6,6 +6,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
@@ -710,4 +711,22 @@ func submittedCustomRuntimeAssessment(t *testing.T) *assessment.Assessment {
 	}
 	a.ClearEvents()
 	return a
+}
+
+func requirePersonalityTypeDetail(t *testing.T, payload any) evaluationtypology.PersonalityTypeDetail {
+	t.Helper()
+	detail, ok := payload.(evaluationtypology.PersonalityTypeDetail)
+	if !ok {
+		t.Fatalf("payload type = %T, want PersonalityTypeDetail", payload)
+	}
+	return detail
+}
+
+func requireTraitProfileDetail(t *testing.T, payload any) evaluationtypology.TraitProfileDetail {
+	t.Helper()
+	detail, ok := payload.(evaluationtypology.TraitProfileDetail)
+	if !ok {
+		t.Fatalf("payload type = %T, want TraitProfileDetail", payload)
+	}
+	return detail
 }

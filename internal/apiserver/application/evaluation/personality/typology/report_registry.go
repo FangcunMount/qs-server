@@ -85,16 +85,10 @@ func buildTypologyReport(
 	outcome evaloutcome.Outcome,
 ) (*domainReport.InterpretReport, error) {
 	switch adapterKey {
-	case modeltypology.ReportAdapterPersonalityType:
-		return buildPersonalityTypeReport(outcome)
-	case modeltypology.ReportAdapterTraitProfile:
-		return buildTraitProfileReport(outcome)
-	case modeltypology.ReportAdapterMBTI:
-		return buildMBTIReport(outcome)
-	case modeltypology.ReportAdapterSBTI:
-		return buildSBTIReport(outcome)
-	case modeltypology.ReportAdapterBigFive:
-		return buildBigFiveReport(outcome)
+	case modeltypology.ReportAdapterPersonalityType, modeltypology.ReportAdapterMBTI, modeltypology.ReportAdapterSBTI:
+		return buildPersonalityTypeReport(adapterKey, outcome)
+	case modeltypology.ReportAdapterTraitProfile, modeltypology.ReportAdapterBigFive:
+		return buildTraitProfileReport(adapterKey, outcome)
 	default:
 		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)
 	}

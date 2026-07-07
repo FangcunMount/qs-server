@@ -45,7 +45,7 @@ func TestEvaluatorCompositeFactorMatchesFlatTraitProfileScores(t *testing.T) {
 	if err != nil {
 		t.Fatalf("explicit detail: %v", err)
 	}
-	flatDetail, err := evaluationtypology.BigFiveResultDetailFromPayload(flatResult.Detail)
+	flatDetail, err := evaluationtypology.TraitProfileDetailFromPayload(flatResult.Detail)
 	if err != nil {
 		t.Fatalf("flat detail: %v", err)
 	}

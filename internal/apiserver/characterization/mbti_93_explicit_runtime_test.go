@@ -9,7 +9,6 @@ import (
 	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -45,10 +44,7 @@ func TestV2MBTI93ExplicitRuntimeRunsWithoutNewAlgorithmOrModule(t *testing.T) {
 			if err != nil {
 				t.Fatalf("Execute: %v", err)
 			}
-			detail, ok := outcome.Detail.Payload.(evaluationtypology.MBTIResultDetail)
-			if !ok {
-				t.Fatalf("detail type = %T, want MBTIResultDetail", outcome.Detail.Payload)
-			}
+			detail := requirePersonalityTypeDetail(t, outcome.Detail.Payload)
 			if detail.TypeCode != "INTJ" || detail.MatchPercent != 40 {
 				t.Fatalf("detail = %#v, want INTJ@40", detail)
 			}

@@ -32,10 +32,7 @@ func TestV1TypologyMBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := result.Detail.Payload.(evaluationtypology.MBTIResultDetail)
-	if !ok {
-		t.Fatalf("payload type = %T, want typology.MBTIResultDetail", result.Detail.Payload)
-	}
+	detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
 	if detail.TypeCode != want.TypeCode || detail.MatchPercent != want.MatchPercent {
 		t.Fatalf("detail = %#v, want type=%s match=%.0f", detail, want.TypeCode, want.MatchPercent)
 	}
@@ -63,10 +60,7 @@ func TestV1TypologySBTIExecutorPreservesLegacyScoringOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := result.Detail.Payload.(evaluationtypology.SBTIResultDetail)
-	if !ok {
-		t.Fatalf("payload type = %T, want typology.SBTIResultDetail", result.Detail.Payload)
-	}
+	detail := requirePersonalityTypeDetail(t, result.Detail.Payload)
 	if detail.TypeCode != want.TypeCode || detail.Similarity != want.Similarity {
 		t.Fatalf("detail = %#v, want type=%s similarity=%.0f", detail, want.TypeCode, want.Similarity)
 	}
@@ -94,10 +88,7 @@ func TestV1TypologyBigFiveExecutorPreservesTraitProfileOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Execute: %v", err)
 	}
-	detail, ok := result.Detail.Payload.(evaluationtypology.BigFiveResultDetail)
-	if !ok {
-		t.Fatalf("payload type = %T, want typology.BigFiveResultDetail", result.Detail.Payload)
-	}
+	detail := requireTraitProfileDetail(t, result.Detail.Payload)
 	if len(detail.Traits) != len(want.Traits) || detail.Traits[0].RawScore != want.Traits[0].RawScore {
 		t.Fatalf("detail = %#v, want traits %#v", detail.Traits, want.Traits)
 	}

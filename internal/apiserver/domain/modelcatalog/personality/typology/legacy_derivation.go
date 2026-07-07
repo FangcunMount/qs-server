@@ -8,19 +8,19 @@ func LegacyOutcomeMappingFromAlgorithm(algorithm modelcatalog.Algorithm) Outcome
 	case modelcatalog.AlgorithmBigFive:
 		return OutcomeMappingSpec{
 			DetailKind:       OutcomeDetailTraitProfile,
-			DetailAdapterKey: DetailAdapterBigFive,
+			DetailAdapterKey: DetailAdapterTraitProfile,
 			Algorithm:        algorithm,
 		}
 	case modelcatalog.AlgorithmSBTI:
 		return OutcomeMappingSpec{
 			DetailKind:       OutcomeDetailPersonalityType,
-			DetailAdapterKey: DetailAdapterSBTI,
+			DetailAdapterKey: DetailAdapterPersonalityType,
 			Algorithm:        algorithm,
 		}
 	default:
 		return OutcomeMappingSpec{
 			DetailKind:       OutcomeDetailPersonalityType,
-			DetailAdapterKey: DetailAdapterMBTI,
+			DetailAdapterKey: DetailAdapterPersonalityType,
 			Algorithm:        algorithm,
 		}
 	}
@@ -40,19 +40,19 @@ func LegacyReportSpecFromAlgorithm(algorithm modelcatalog.Algorithm) ReportSpec 
 	case modelcatalog.AlgorithmBigFive:
 		return ReportSpec{
 			Kind:          ReportKindTraitProfile,
-			AdapterKey:    ReportAdapterBigFive,
+			AdapterKey:    ReportAdapterTraitProfile,
 			CategoryLabel: "Big Five",
 		}
 	case modelcatalog.AlgorithmSBTI:
 		return ReportSpec{
 			Kind:          ReportKindPersonalityType,
-			AdapterKey:    ReportAdapterSBTI,
+			AdapterKey:    ReportAdapterPersonalityType,
 			CategoryLabel: "SBTI",
 		}
 	default:
 		return ReportSpec{
 			Kind:          ReportKindPersonalityType,
-			AdapterKey:    ReportAdapterMBTI,
+			AdapterKey:    ReportAdapterPersonalityType,
 			CategoryLabel: "MBTI",
 		}
 	}

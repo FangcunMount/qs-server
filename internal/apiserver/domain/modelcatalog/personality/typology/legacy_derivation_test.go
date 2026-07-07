@@ -9,22 +9,22 @@ import (
 
 func TestLegacyOutcomeMappingFromAlgorithm(t *testing.T) {
 	mbti := typology.LegacyOutcomeMappingFromAlgorithm(modelcatalog.AlgorithmMBTI)
-	if mbti.DetailAdapterKey != typology.DetailAdapterMBTI {
-		t.Fatalf("mbti adapter = %s", mbti.DetailAdapterKey)
+	if mbti.DetailAdapterKey != typology.DetailAdapterPersonalityType {
+		t.Fatalf("mbti adapter = %s, want personality_type", mbti.DetailAdapterKey)
 	}
 	sbti := typology.LegacyOutcomeMappingFromAlgorithm(modelcatalog.AlgorithmSBTI)
-	if sbti.DetailAdapterKey != typology.DetailAdapterSBTI {
-		t.Fatalf("sbti adapter = %s", sbti.DetailAdapterKey)
+	if sbti.DetailAdapterKey != typology.DetailAdapterPersonalityType {
+		t.Fatalf("sbti adapter = %s, want personality_type", sbti.DetailAdapterKey)
 	}
 	bigfive := typology.LegacyOutcomeMappingFromAlgorithm(modelcatalog.AlgorithmBigFive)
-	if bigfive.DetailAdapterKey != typology.DetailAdapterBigFive {
-		t.Fatalf("bigfive adapter = %s", bigfive.DetailAdapterKey)
+	if bigfive.DetailAdapterKey != typology.DetailAdapterTraitProfile {
+		t.Fatalf("bigfive adapter = %s, want trait_profile", bigfive.DetailAdapterKey)
 	}
 }
 
 func TestLegacyReportSpecFromAlgorithm(t *testing.T) {
 	spec := typology.LegacyReportSpecFromAlgorithm(modelcatalog.AlgorithmSBTI)
-	if spec.AdapterKey != typology.ReportAdapterSBTI || spec.CategoryLabel != "SBTI" {
+	if spec.AdapterKey != typology.ReportAdapterPersonalityType || spec.CategoryLabel != "SBTI" {
 		t.Fatalf("report spec = %#v", spec)
 	}
 }

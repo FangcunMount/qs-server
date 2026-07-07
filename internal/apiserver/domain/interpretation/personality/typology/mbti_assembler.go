@@ -2,10 +2,8 @@ package typology
 
 import (
 	"fmt"
-	"strings"
 
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	reportpersonality "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality"
 )
 
 type MBTIReportInput struct {
@@ -18,84 +16,40 @@ type MBTIReportInput struct {
 
 // BuildMBTIReport 组装 MBTI typology 解读报告。
 func BuildMBTIReport(input MBTIReportInput) (*domainreport.InterpretReport, error) {
-	if input.AssessmentID.IsZero() {
-		return nil, fmt.Errorf("assessment is required")
-	}
-	detail := input.Detail
-	profile := mbtiPersonalityProfile(detail)
-	return reportpersonality.Build(reportpersonality.Input{
+	maxScore := 40.0
+	return BuildPersonalityTypeReport(PersonalityTypeReportInput{
 		AssessmentID: input.AssessmentID,
 		ModelCode:    input.ModelCode,
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
-		Profile:      profile,
-		Conclusion:   profile.Conclusion(""),
-		Dimensions:   mbtiReportDimensions(detail),
-		Suggestions:  mbtiReportSuggestions(detail),
-	}), nil
+		Detail:       mbtiMechanismDetail(input.Detail),
+	}, PersonalityTypeReportTemplate{
+		Kind:              "mbti",
+		DefaultModelName:  "MBTI 人格类型测评",
+		DefaultModelCode:  "MBTI_OEJTS",
+		DimensionMaxScore: &maxScore,
+		DimensionDescription: func(name, preference string, rawScore, strength float64, _, _ string) string {
+			return fmt.Sprintf("%s：倾向 %s（原始分 %.0f，偏好强度 %.0f%%）", name, preference, rawScore, strength)
+		},
+	})
 }
 
-func mbtiPersonalityProfile(detail MBTIReportDetail) reportpersonality.Profile {
-	return reportpersonality.Profile{
-		Kind:             "mbti",
-		DefaultModelName: "MBTI 人格类型测评",
-		DefaultModelCode: "MBTI_OEJTS",
-		TypeCode:         detail.TypeCode,
-		TypeName:         detail.TypeName,
-		OneLiner:         detail.OneLiner,
-		ImageURL:         detail.ImageURL,
-		MatchPercent:     detail.MatchPercent,
-		Commentary:       detail.Profile.Summary,
-	}
-}
-
-func mbtiReportDimensions(detail MBTIReportDetail) []domainreport.DimensionInterpret {
-	if len(detail.Dimensions) == 0 {
-		return nil
-	}
-	maxScore := 40.0
-	dimensions := make([]domainreport.DimensionInterpret, 0, len(detail.Dimensions))
+func mbtiMechanismDetail(detail MBTIReportDetail) PersonalityTypeReportDetail {
+	dimensions := make([]PersonalityTypeDimensionReport, 0, len(detail.Dimensions))
 	for _, dim := range detail.Dimensions {
-		description := fmt.Sprintf("%s：倾向 %s（原始分 %.0f，偏好强度 %.0f%%）",
-			dim.Name, dim.Preference, dim.RawScore, dim.Strength)
-		dimensions = append(dimensions, domainreport.NewDimensionInterpret(
-			domainreport.FactorCode(dim.Code),
-			dim.Name,
-			dim.RawScore,
-			&maxScore,
-			domainreport.RiskLevelNone,
-			description,
-			"",
-		))
-	}
-	return dimensions
-}
-
-func mbtiReportSuggestions(detail MBTIReportDetail) []domainreport.Suggestion {
-	suggestions := make([]domainreport.Suggestion, 0, 8)
-	add := func(content string) {
-		content = strings.TrimSpace(content)
-		if content == "" {
-			return
-		}
-		suggestions = append(suggestions, domainreport.Suggestion{
-			Category: domainreport.SuggestionCategoryGeneral,
-			Content:  content,
+		dimensions = append(dimensions, PersonalityTypeDimensionReport{
+			Code: dim.Code, Name: dim.Name, LeftPole: dim.LeftPole, RightPole: dim.RightPole,
+			RawScore: dim.RawScore, Preference: dim.Preference, Strength: dim.Strength,
 		})
 	}
-	add(detail.Profile.Summary)
-	for _, s := range detail.Profile.Strengths {
-		add("优势：" + s)
+	return PersonalityTypeReportDetail{
+		TypeCode: detail.TypeCode, TypeName: detail.TypeName, OneLiner: detail.OneLiner,
+		MatchPercent: detail.MatchPercent, ImageURL: detail.ImageURL, Dimensions: dimensions,
+		Profile: PersonalityTypeProfileReport{
+			Summary: detail.Profile.Summary, Strengths: detail.Profile.Strengths,
+			Weaknesses: detail.Profile.Weaknesses, Suggestions: detail.Profile.Suggestions,
+		},
+		SourceAttribution: detail.Source.Attribution, SourceLicense: detail.Source.License,
+		SourceNonCommercial: detail.Source.NonCommercial,
 	}
-	for _, s := range detail.Profile.Weaknesses {
-		add("注意：" + s)
-	}
-	for _, s := range detail.Profile.Suggestions {
-		add("建议：" + s)
-	}
-	if detail.Source.Attribution != "" {
-		add(fmt.Sprintf("来源与授权：%s；License: %s；非商业使用: %t。",
-			detail.Source.Attribution, detail.Source.License, detail.Source.NonCommercial))
-	}
-	return suggestions
 }

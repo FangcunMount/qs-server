@@ -85,28 +85,3 @@ func (r DetailAssemblerRegistry) Assemble(input DetailInput) (any, error) {
 	}
 	return assembler(input)
 }
-
-func buildSBTIDimensions(input DetailInput) []DimensionLevel {
-	if len(input.Selected.Dimensions) > 0 {
-		return append([]DimensionLevel(nil), input.Selected.Dimensions...)
-	}
-	if len(input.Vector.Scores) == 0 {
-		return nil
-	}
-	results := make([]DimensionLevel, 0, len(input.Spec.FactorGraph.DecisionFactorOrder()))
-	for _, dimCode := range input.Spec.FactorGraph.DecisionFactorOrder() {
-		meta, ok := dimensionMetaForFactor(input.Spec.FactorGraph, dimCode)
-		if !ok {
-			continue
-		}
-		score := input.Vector.Scores[profile.FactorID(dimCode)]
-		results = append(results, DimensionLevel{
-			Code:     dimCode,
-			Name:     meta.Name,
-			Model:    meta.Model,
-			RawScore: score.Raw,
-			Level:    profile.LevelForScore(score.Raw, input.Decision.LevelRule),
-		})
-	}
-	return results
-}
