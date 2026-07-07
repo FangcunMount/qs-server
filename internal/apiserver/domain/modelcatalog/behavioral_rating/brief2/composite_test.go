@@ -1,20 +1,21 @@
-package factor_test
+package brief2_test
 
 import (
 	"testing"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
-func TestApplyBrief2CompositeMetadata(t *testing.T) {
+func TestApplyCompositeMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := factor.ApplyBrief2CompositeMetadata([]factor.FactorSnapshot{
+	factors := brief2.ApplyCompositeMetadata([]factor.FactorSnapshot{
 		{Code: "inhibit", Title: "Inhibit"},
 		{Code: "self_monitor", Title: "Self Monitor"},
 		{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
 		{Code: "gec", Title: "GEC", Role: factor.FactorRoleIndex},
-	}, []factor.Brief2CompositeIndexSpec{
+	}, []brief2.CompositeIndexSpec{
 		{Code: "bri", Strategy: factor.ChildrenAggregationSum, Children: []string{"inhibit", "self_monitor"}},
 		{Code: "gec", Strategy: factor.ChildrenAggregationSum, Children: []string{"bri"}},
 	})

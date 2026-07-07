@@ -52,11 +52,8 @@ func NewAssessmentModel(input NewAssessmentModelInput) (*AssessmentModel, error)
 	if !input.Kind.IsValid() {
 		return nil, fmt.Errorf("%w: kind is invalid", ErrInvalidArgument)
 	}
-	if legacy.IsMigrationOnlyKind(string(input.Kind)) {
-		return nil, fmt.Errorf("%w: legacy flat kind %q cannot be used for new models; use personality+typology+algorithm", ErrInvalidArgument, input.Kind)
-	}
-	if input.Kind == KindBehaviorAbility {
-		return nil, fmt.Errorf("%w: behavior_ability is a legacy product channel; use behavioral_rating or cognitive", ErrInvalidArgument)
+	if legacy.IsMigrationOnlyKind(string(input.Kind)) || legacy.IsDeprecatedProductChannelKind(string(input.Kind)) {
+		return nil, fmt.Errorf("%w: legacy flat kind %q cannot be used for new models; use personality+typology+algorithm or behavioral_rating/cognitive", ErrInvalidArgument, input.Kind)
 	}
 	productChannel, err := CompleteProductChannel(input.Kind, input.ProductChannel)
 	if err != nil {

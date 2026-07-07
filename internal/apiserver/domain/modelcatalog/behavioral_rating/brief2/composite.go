@@ -1,19 +1,23 @@
-package factor
+package brief2
 
-// Brief2CompositeIndexSpec declares how a Brief-2 composite index derives from child factors.
-type Brief2CompositeIndexSpec struct {
+import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+)
+
+// CompositeIndexSpec declares how a Brief-2 composite index derives from child factors.
+type CompositeIndexSpec struct {
 	Code       string
-	Strategy   ChildrenAggregationStrategy
+	Strategy   factor.ChildrenAggregationStrategy
 	Children   []string
 	ParentCode string
 }
 
-// ApplyBrief2CompositeMetadata annotates factors with Brief-2 composite index policies.
-func ApplyBrief2CompositeMetadata(factors []FactorSnapshot, specs []Brief2CompositeIndexSpec) []FactorSnapshot {
+// ApplyCompositeMetadata annotates factors with Brief-2 composite index policies.
+func ApplyCompositeMetadata(factors []factor.FactorSnapshot, specs []CompositeIndexSpec) []factor.FactorSnapshot {
 	if len(factors) == 0 || len(specs) == 0 {
 		return factors
 	}
-	out := make([]FactorSnapshot, len(factors))
+	out := make([]factor.FactorSnapshot, len(factors))
 	copy(out, factors)
 	indexPos := make(map[string]int, len(out))
 	for i, item := range out {
@@ -26,9 +30,9 @@ func ApplyBrief2CompositeMetadata(factors []FactorSnapshot, specs []Brief2Compos
 		}
 		strategy := spec.Strategy
 		if strategy == "" {
-			strategy = ChildrenAggregationSum
+			strategy = factor.ChildrenAggregationSum
 		}
-		out[pos].ChildrenPolicy = &ChildrenPolicy{
+		out[pos].ChildrenPolicy = &factor.ChildrenPolicy{
 			Strategy: strategy,
 			Children: append([]string(nil), spec.Children...),
 		}
@@ -43,5 +47,5 @@ func ApplyBrief2CompositeMetadata(factors []FactorSnapshot, specs []Brief2Compos
 			out[childPos].ParentCode = spec.Code
 		}
 	}
-	return DeriveLevels(out)
+	return factor.DeriveLevels(out)
 }

@@ -127,13 +127,13 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	}
 	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.Brief2 != nil {
-		factors = factor.ApplyBrief2NormMetadata(factors, factor.Brief2NormContext{
+		factors = brief2norm.ApplyNormMetadata(factors, brief2norm.NormContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
 			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
 			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 		})
-		factors = factor.ApplyBrief2CompositeMetadata(factors, compositeSpecsFromPayload(body.Brief2))
+		factors = brief2norm.ApplyCompositeMetadata(factors, compositeSpecsFromPayload(body.Brief2))
 	}
 	out.Factors = factors
 	if body.Brief2 != nil {
@@ -201,16 +201,16 @@ func normFactorCodesFromPayload(body *brief2Extension) []string {
 	return codes
 }
 
-func compositeSpecsFromPayload(body *brief2Extension) []factor.Brief2CompositeIndexSpec {
+func compositeSpecsFromPayload(body *brief2Extension) []brief2norm.CompositeIndexSpec {
 	if body == nil || len(body.CompositeIndexes) == 0 {
 		return nil
 	}
-	specs := make([]factor.Brief2CompositeIndexSpec, 0, len(body.CompositeIndexes))
+	specs := make([]brief2norm.CompositeIndexSpec, 0, len(body.CompositeIndexes))
 	for _, item := range body.CompositeIndexes {
 		if item.Code == "" || len(item.Children) == 0 {
 			continue
 		}
-		specs = append(specs, factor.Brief2CompositeIndexSpec{
+		specs = append(specs, brief2norm.CompositeIndexSpec{
 			Code:       item.Code,
 			Strategy:   factor.ChildrenAggregationStrategy(item.Strategy),
 			Children:   append([]string(nil), item.Children...),

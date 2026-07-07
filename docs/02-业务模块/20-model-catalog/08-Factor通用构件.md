@@ -179,8 +179,21 @@ type FactorSnapshot struct {
 
 | 上下文 | 名称 |
 | ------ | ---- |
-| ModelCatalog 快照 | Factor / FactorSnapshot |
+| ModelCatalog 快照 | Factor / FactorSnapshot（**catalog canonical**） |
+| scale/snapshot | FactorSnapshot（**scale executor 执行视图**；`factor_bridge.go` 互转，非模型定义权威） |
 | Evaluation 结果 | Dimension / DimensionResult |
+
+### 7.6 包边界与演进（domain 收敛）
+
+| 包 | 职责 | 演进 |
+| -- | ---- | ---- |
+| `factor` | 跨算法共享构件：`FactorSnapshot`、`Role`、`Scoring`、`Hierarchy`、`ChildrenPolicy`、`NormRef`、`ClassificationSpec`（轻量 seam） | **禁止**混入 Brief-2/SPM 等算法专属 metadata adapter |
+| `behavioral_rating/brief2` | Brief-2 常模表、综合指数、`ApplyCompositeMetadata` / `ApplyNormMetadata` | 算法 extension 调用 `factor`，不反向污染 |
+| `cognitive/spm` | SPM 题组/常模 metadata adapter | 同上 |
+| `personality/typology` | 分类图 runtime（`FactorGraphSpec`）；adapter 只读投影到 canonical factor | **classification 领域对象暂留 typology**；`factor.ClassificationSpec` 仅为 seam；第二个分类算法出现后上抽 `classification` 包 |
+| `evaluation/projection` | 通用投影：`CompositeProjection`、`HierarchyProjection`、`ScoreRangeProjection` | 算法专属投影（如 `Brief2NormProjection`）标注为 adapter；第二个常模算法出现后上抽 `NormProjection` 接口 |
+
+**norm 现状**：`factor` 仅保留 `NormRef`；`NormTable` / `Subject` / `Lookup` 暂留 `behavioral_rating/brief2`；第二个常模模型出现后上抽 `modelcatalog/norm` 包。
 
 ---
 
@@ -418,9 +431,9 @@ Brief-2 指数关系通过 `brief2.composite_indexes` 迁入（替代仅靠 prof
 }
 ```
 
-解析时 `ApplyBrief2CompositeMetadata` 写入 `ChildrenPolicy` / `ParentCode`；执行时 `CompositeProjection` → `Brief2NormProjection`。
+解析时 `brief2.ApplyCompositeMetadata` 写入 `ChildrenPolicy` / `ParentCode`；执行时 `CompositeProjection` → `Brief2NormProjection`。
 
-代码锚点：[`projection/composite.go`](../../../internal/apiserver/domain/evaluation/projection/composite.go)、[`factor/brief2_composite.go`](../../../internal/apiserver/domain/modelcatalog/factor/brief2_composite.go)、[`behavioral_rating/projections.go`](../../../internal/apiserver/application/evaluation/behavioral_rating/projections.go)。
+代码锚点：[`projection/composite.go`](../../../internal/apiserver/domain/evaluation/projection/composite.go)、[`behavioral_rating/brief2/composite.go`](../../../internal/apiserver/domain/modelcatalog/behavioral_rating/brief2/composite.go)、[`behavioral_rating/projections.go`](../../../internal/apiserver/application/evaluation/behavioral_rating/projections.go)。
 
 ### 17.7 Evaluation 输出扩展（草案）
 

@@ -1,6 +1,7 @@
 package modelcatalog
 
 // CapabilityRole separates product-facing taxonomy from executable model families.
+// Product channels must not drive runtime execution path for new models.
 type CapabilityRole string
 
 const (

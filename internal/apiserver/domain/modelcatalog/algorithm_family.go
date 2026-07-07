@@ -81,19 +81,6 @@ func AlgorithmFamilyFromIdentity(kind Kind, subKind SubKind, algorithm Algorithm
 	return AlgorithmFamilyFromDecisionKind(decision)
 }
 
-func personalityDecisionKindForAlgorithm(algorithm Algorithm) DecisionKind {
-	switch algorithm {
-	case AlgorithmMBTI:
-		return DecisionKindPoleComposition
-	case AlgorithmSBTI:
-		return DecisionKindNearestPattern
-	case AlgorithmBigFive:
-		return DecisionKindTraitProfile
-	default:
-		return DecisionKindScoreRange
-	}
-}
-
 // AllAlgorithmFamilies returns supported algorithm family values for API options.
 func AllAlgorithmFamilies() []AlgorithmFamily {
 	return []AlgorithmFamily{

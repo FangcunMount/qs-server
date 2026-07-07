@@ -6,6 +6,9 @@ import (
 )
 
 // Brief2NormProjection applies Brief-2 norm/T-score tables on top of raw scale scores.
+// Algorithm-specific adapter: not a generic projection primitive.
+// When a second norm algorithm appears, extract a shared NormProjection interface and move
+// algorithm implementations under evaluation/behavioral_rating/brief2 or modelcatalog extensions.
 type Brief2NormProjection struct {
 	Tables  *brief2norm.NormTables
 	Subject brief2norm.Subject

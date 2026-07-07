@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/spm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
@@ -71,7 +72,7 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	}
 	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.SPM != nil {
-		factors = factor.ApplySPMNormMetadata(factors, factor.SPMNormContext{
+		factors = spm.ApplyNormMetadata(factors, spm.NormContext{
 			NormTableVersion: body.SPM.NormTableVersion,
 			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
 		})

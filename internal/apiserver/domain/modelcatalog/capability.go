@@ -24,7 +24,7 @@ func (c KindCapability) CanExecute() bool {
 	return c.RuntimeExecutable || c.RuntimeViaScaleLegacy
 }
 
-var defaultCapabilities = []KindCapability{
+var defaultCapabilities = append([]KindCapability{
 	{
 		Kind:                      KindPersonality,
 		Role:                      CapabilityRoleModelFamily,
@@ -40,22 +40,6 @@ var defaultCapabilities = []KindCapability{
 		QRCodeSupported:           true,
 		RuntimeExecutable:         true,
 		ExecutionPath:             ExecutionPathTypologyDescriptor,
-	},
-	{
-		Kind:                      KindBehaviorAbility,
-		Role:                      CapabilityRoleProductChannel,
-		APIKind:                   APIKindBehaviorAbility,
-		DisplayName:               "行为能力测评",
-		OptionsEnabled:            true,
-		CreateSupported:           false,
-		ListSupported:             true,
-		PublishSupported:          true,
-		BindQuestionnaire:         true,
-		DefinitionUpdateSupported: true,
-		PreviewSupported:          false,
-		QRCodeSupported:           true,
-		RuntimeViaScaleLegacy:     true,
-		ExecutionPath:             ExecutionPathBehaviorAbilityScaleAdapter,
 	},
 	{
 		Kind:                      KindBehavioralRating,
@@ -107,7 +91,7 @@ var defaultCapabilities = []KindCapability{
 		OptionsEnabled: false,
 		ExecutionPath:  ExecutionPathNone,
 	},
-}
+}, behaviorAbilityLegacyCapability())
 
 // DefaultCapabilities returns the built-in model-catalog capability matrix.
 func DefaultCapabilities() []KindCapability {

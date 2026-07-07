@@ -29,6 +29,8 @@ func (pc ProductChannel) IsValid() bool {
 }
 
 // DefaultProductChannelFor derives the default product channel from a model family kind.
+// This is a UI/create-form default only; it is not a domain constraint.
+// Use ResolveProductChannel with an explicit channel when product taxonomy matters.
 func DefaultProductChannelFor(kind Kind) ProductChannel {
 	switch kind {
 	case KindScale:
