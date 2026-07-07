@@ -29,14 +29,14 @@ func TestDefaultEvaluationDescriptorsIncludeScaleAndTypologyModules(t *testing.T
 	if descs[0].Kind != evaldomain.ModelKindScale {
 		t.Fatalf("first descriptor kind = %s, want scale", descs[0].Kind)
 	}
-	if descs[1].Key != evaldomain.EvaluatorKeyPersonalityTypology {
-		t.Fatalf("configured typology key = %#v", descs[1].Key)
+	if descs[1].Algorithm != modelcatalog.AlgorithmPersonalityTypology {
+		t.Fatalf("configured typology algorithm = %#v", descs[1].Algorithm)
 	}
-	if descs[2].Key != evaldomain.EvaluatorKeyBehavioralRatingDefault {
-		t.Fatalf("behavioral_rating key = %#v", descs[2].Key)
+	if descs[2].Kind != evaldomain.ModelKindBehavioralRating {
+		t.Fatalf("behavioral_rating kind = %#v", descs[2].Kind)
 	}
-	if descs[3].Key != evaldomain.EvaluatorKeyCognitiveDefault {
-		t.Fatalf("cognitive key = %#v", descs[3].Key)
+	if descs[3].Kind != evaldomain.ModelKindCognitive {
+		t.Fatalf("cognitive kind = %#v", descs[3].Kind)
 	}
 	typology := evaldomain.TypologyAlgorithms(descs)
 	if len(typology) != 1 || typology[0] != modelcatalog.AlgorithmPersonalityTypology {
@@ -114,12 +114,12 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyKeys() {
+	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
 		got, err := evaluatorRegistry.Resolve(legacyKey)
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
 		}
-		if got.Key() != evaldomain.EvaluatorKeyPersonalityTypology {
+		if got.Key() != evaldomain.ExecutionIdentityPersonalityTypology {
 			t.Fatalf("resolved executor key = %s, want configured typology", got.Key())
 		}
 	}
@@ -132,7 +132,7 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyKeys() {
+	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
 		if _, err := reportRegistry.Resolve(legacyKey, report.ReportTypeStandard); err != nil {
 			t.Fatalf("Resolve report(%s): %v", legacyKey, err)
 		}
@@ -153,7 +153,7 @@ func TestMaterializedRegistryResolvesLegacyTypologyKeysViaConfiguredDescriptor(t
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyKeys() {
+	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
 		if _, err := providerRegistry.Resolve(legacyKey); err != nil {
 			t.Fatalf("Resolve provider(%s): %v", legacyKey, err)
 		}

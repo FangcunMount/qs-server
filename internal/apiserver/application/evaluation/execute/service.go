@@ -215,7 +215,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"assessment_id", assessmentID,
 			"evaluation_run", evaluationRun.String(),
 			"evaluation_run_id", evaluationRun.RunID.String(),
-			"model_key", resolved.EvaluatorKey.String(),
+			"model_key", resolved.ExecutionIdentity.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"result", "failed",
 			"error", resolveErr.Error(),
@@ -230,7 +230,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
 		"evaluation_run_id", evaluationRun.RunID.String(),
-		"model_key", resolved.EvaluatorKey.String(),
+		"model_key", resolved.ExecutionIdentity.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"runtime_descriptor_primary", resolved.UsedDescriptor,
 		"model_code", evaluationModelCode(a, input),
@@ -242,7 +242,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 			"assessment_id", assessmentID,
 			"evaluation_run", evaluationRun.String(),
 			"evaluation_run_id", evaluationRun.RunID.String(),
-			"model_key", resolved.EvaluatorKey.String(),
+			"model_key", resolved.ExecutionIdentity.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
@@ -263,7 +263,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}); err != nil {
 		l.Errorw("评估结果写入失败",
 			"assessment_id", assessmentID,
-			"model_key", resolved.EvaluatorKey.String(),
+			"model_key", resolved.ExecutionIdentity.String(),
 			"runtime_descriptor_key", resolved.DescriptorKey.String(),
 			"model_code", evaluationModelCode(a, input),
 			"result", "failed",
@@ -282,7 +282,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		"assessment_id", assessmentID,
 		"evaluation_run", evaluationRun.String(),
 		"evaluation_run_id", evaluationRun.RunID.String(),
-		"model_key", resolved.EvaluatorKey.String(),
+		"model_key", resolved.ExecutionIdentity.String(),
 		"runtime_descriptor_key", resolved.DescriptorKey.String(),
 		"model_code", evaluationModelCode(a, input),
 		"duration_ms", time.Since(startTime).Milliseconds(),
@@ -370,8 +370,8 @@ func (s *service) GenerateReport(ctx context.Context, assessmentID uint64) error
 	return nil
 }
 
-// resolveEvaluatorKey 解析 v2 评估执行键。
-func resolveEvaluatorKey(a *assessment.Assessment, input *evaluationinput.InputSnapshot) evaluation.EvaluatorKey {
+// resolveExecutionIdentity 解析 v2 评估执行键。
+func resolveExecutionIdentity(a *assessment.Assessment, input *evaluationinput.InputSnapshot) evaluation.ExecutionIdentity {
 	if input != nil && input.Model != nil {
 		inputKey := input.Model.ModelRef().EvaluatorKey()
 		if a == nil || a.EvaluationModelRef() == nil || a.EvaluationModelRef().IsEmpty() {
@@ -386,7 +386,7 @@ func resolveEvaluatorKey(a *assessment.Assessment, input *evaluationinput.InputS
 	if a != nil && a.EvaluationModelRef() != nil && !a.EvaluationModelRef().IsEmpty() {
 		return a.EvaluationModelRef().EvaluatorKey()
 	}
-	return evaluation.EvaluatorKey{}
+	return evaluation.ExecutionIdentity{}
 }
 
 // evaluationModelCode 解析评估模型代码

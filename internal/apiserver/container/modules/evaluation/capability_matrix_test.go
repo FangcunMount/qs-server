@@ -33,20 +33,20 @@ func TestEvaluationModuleMaterializesOnlyDeclaredDescriptors(t *testing.T) {
 		t.Fatalf("evaluator count = %d, want %d", len(evaluators), len(descs))
 	}
 
-	keys := make(map[evaldomain.EvaluatorKey]bool, len(evaluators))
+	keys := make(map[evaldomain.ExecutionIdentity]bool, len(evaluators))
 	for _, evaluator := range evaluators {
 		keys[evaluator.Key()] = true
 	}
-	if !keys[evaldomain.EvaluatorKeyScaleDefault] {
+	if !keys[evaldomain.ExecutionIdentityScaleDefault] {
 		t.Fatal("scale evaluator not materialized")
 	}
-	if !keys[evaldomain.EvaluatorKeyPersonalityTypology] {
+	if !keys[evaldomain.ExecutionIdentityPersonalityTypology] {
 		t.Fatal("configured typology evaluator not materialized")
 	}
-	if !keys[evaldomain.EvaluatorKeyBehavioralRatingDefault] {
+	if !keys[evaldomain.ExecutionIdentityBehavioralRatingDefault] {
 		t.Fatal("behavioral_rating evaluator not materialized")
 	}
-	if !keys[evaldomain.EvaluatorKeyCognitiveDefault] {
+	if !keys[evaldomain.ExecutionIdentityCognitiveDefault] {
 		t.Fatal("cognitive evaluator not materialized")
 	}
 	for _, forbidden := range []domain.Kind{

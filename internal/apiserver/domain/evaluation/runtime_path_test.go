@@ -17,8 +17,8 @@ func TestExecutionPathForDescriptor(t *testing.T) {
 		{desc: evaldomain.ScaleModelDescriptor(), want: modelcatalog.ExecutionPathScaleDescriptor},
 		{
 			desc: evaldomain.ModelDescriptor{
-				Key:  evaldomain.EvaluatorKeyPersonalityTypology,
-				Kind: evaldomain.ModelKindTypology,
+				Kind:      evaldomain.ModelKindTypology,
+				Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 			},
 			want: modelcatalog.ExecutionPathTypologyDescriptor,
 		},

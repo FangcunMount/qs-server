@@ -13,17 +13,33 @@ const (
 )
 
 // ModelDescriptor is the canonical registration entry for an evaluation model.
-// Key is deprecated for routing; prefer ExecutionPath and AlgorithmFamily (R25).
 type ModelDescriptor struct {
-	Key       EvaluatorKey
 	Kind      ModelKind
 	Algorithm modelcatalog.Algorithm
+}
+
+// ExecutionIdentity derives the routing identity for a runtime descriptor.
+func (d ModelDescriptor) ExecutionIdentity() ExecutionIdentity {
+	switch d.Kind {
+	case ModelKindScale:
+		return ExecutionIdentityScaleDefault
+	case ModelKindBehavioralRating:
+		return ExecutionIdentityBehavioralRatingDefault
+	case ModelKindCognitive:
+		return ExecutionIdentityCognitiveDefault
+	case ModelKindTypology:
+		if d.Algorithm != "" {
+			return PersonalityTypologyIdentity(d.Algorithm)
+		}
+		return ExecutionIdentityPersonalityTypology
+	default:
+		return ExecutionIdentity{}
+	}
 }
 
 // CognitiveModelDescriptor returns the built-in cognitive runtime descriptor.
 func CognitiveModelDescriptor() ModelDescriptor {
 	return ModelDescriptor{
-		Key:       EvaluatorKeyCognitiveDefault,
 		Kind:      ModelKindCognitive,
 		Algorithm: modelcatalog.AlgorithmSPM,
 	}
@@ -32,7 +48,6 @@ func CognitiveModelDescriptor() ModelDescriptor {
 // BehavioralRatingModelDescriptor returns the built-in behavioral_rating runtime descriptor.
 func BehavioralRatingModelDescriptor() ModelDescriptor {
 	return ModelDescriptor{
-		Key:       EvaluatorKeyBehavioralRatingDefault,
 		Kind:      ModelKindBehavioralRating,
 		Algorithm: modelcatalog.AlgorithmBehavioralRatingDefault,
 	}
@@ -40,7 +55,7 @@ func BehavioralRatingModelDescriptor() ModelDescriptor {
 
 // ScaleModelDescriptor returns the built-in scale evaluation descriptor.
 func ScaleModelDescriptor() ModelDescriptor {
-	return ModelDescriptor{Key: EvaluatorKeyScaleDefault, Kind: ModelKindScale}
+	return ModelDescriptor{Kind: ModelKindScale}
 }
 
 // DefaultModelDescriptors returns built-in scale descriptors only.

@@ -185,7 +185,7 @@ func ensureOutcomeCanApplyEvaluation(outcome evaloutcome.Outcome) error {
 }
 
 // ResolveOutcomeKey resolves the evaluator key from an outcome.
-func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.EvaluatorKey {
+func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.ExecutionIdentity {
 	if outcome.Execution != nil && !outcome.Execution.ModelRef.IsEmpty() {
 		return outcome.Execution.ModelRef.EvaluatorKey()
 	}
@@ -195,6 +195,5 @@ func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.EvaluatorKey {
 	if outcome.Input != nil && outcome.Input.Model != nil {
 		return outcome.Input.Model.ModelRef().EvaluatorKey()
 	}
-	return evaluation.EvaluatorKey{}
+	return evaluation.ExecutionIdentity{}
 }
-

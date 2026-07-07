@@ -8,6 +8,7 @@ import (
 	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	portevaluationinput "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -24,8 +25,16 @@ func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return &Executor{scoring: factorscoring.NewExecutor(scorer)}
 }
 
-func (e *Executor) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyCognitiveDefault
+func (e *Executor) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityCognitiveDefault
+}
+
+func (e *Executor) Key() evaluation.ExecutionIdentity {
+	return e.ExecutionIdentity()
+}
+
+func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathCognitiveDescriptor
 }
 
 func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {

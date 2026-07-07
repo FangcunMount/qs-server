@@ -10,14 +10,14 @@ import (
 )
 
 type mutableScoreProjectorRegistry struct {
-	items          map[evaluation.EvaluatorKey]ScoreProjector
+	items          map[evaluation.ExecutionIdentity]ScoreProjector
 	mechanismItems map[MechanismReportBuilderKey]ScoreProjector
 }
 
 // NewScoreProjectorRegistry creates a score projector registry from the given projectors.
 func NewScoreProjectorRegistry(projectors ...ScoreProjector) (ScoreProjectorRegistry, error) {
 	registry := &mutableScoreProjectorRegistry{
-		items:          make(map[evaluation.EvaluatorKey]ScoreProjector),
+		items:          make(map[evaluation.ExecutionIdentity]ScoreProjector),
 		mechanismItems: make(map[MechanismReportBuilderKey]ScoreProjector),
 	}
 	for _, projector := range projectors {
@@ -32,42 +32,52 @@ func (r *mutableScoreProjectorRegistry) Register(projector ScoreProjector) error
 	if projector == nil {
 		return fmt.Errorf("interpretation score projector is nil")
 	}
-	key := projector.Key()
-	if key.IsZero() {
-		return fmt.Errorf("interpretation score projector key is empty")
+	keyed, ok := projector.(MechanismKeyedScoreProjector)
+	if !ok {
+		return fmt.Errorf("interpretation score projector must implement MechanismKeyedScoreProjector")
 	}
-	if _, exists := r.items[key]; exists {
-		return fmt.Errorf("interpretation score projector already registered for key %s", key)
+	mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
+	if multi, ok := projector.(MultiMechanismKeyedScoreProjector); ok {
+		mechanismKeys = multi.MechanismKeys()
 	}
-	r.items[key] = projector
-	if keyed, ok := projector.(MechanismKeyedScoreProjector); ok {
-		mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
-		if multi, ok := projector.(MultiMechanismKeyedScoreProjector); ok {
-			mechanismKeys = multi.MechanismKeys()
+	for _, mechanismKey := range mechanismKeys {
+		if mechanismKey.ReportType == "" {
+			mechanismKey.ReportType = domainReport.ReportTypeStandard
 		}
-		for _, mechanismKey := range mechanismKeys {
-			if mechanismKey.ReportType == "" {
-				mechanismKey.ReportType = domainReport.ReportTypeStandard
-			}
-			if _, exists := r.mechanismItems[mechanismKey]; exists {
-				return fmt.Errorf("interpretation score projector already registered for mechanism %s", mechanismKey)
-			}
-			r.mechanismItems[mechanismKey] = projector
+		if _, exists := r.mechanismItems[mechanismKey]; exists {
+			return fmt.Errorf("interpretation score projector already registered for mechanism %s", mechanismKey)
 		}
+		r.mechanismItems[mechanismKey] = projector
+	}
+	if id := projector.ExecutionIdentity(); !id.IsZero() {
+		if _, exists := r.items[id]; exists {
+			return fmt.Errorf("interpretation score projector already registered for identity %s", id)
+		}
+		r.items[id] = projector
 	}
 	return nil
 }
 
-func (r *mutableScoreProjectorRegistry) Resolve(key evaluation.EvaluatorKey) ScoreProjector {
+func (r *mutableScoreProjectorRegistry) Resolve(key evaluation.ExecutionIdentity) ScoreProjector {
 	if r == nil {
 		return noopScoreProjector{}
 	}
 	if projector, ok := r.items[key]; ok {
 		return projector
 	}
-	if mechanismKey, ok := MechanismReportBuilderKeyFromEvaluatorKey(key, domainReport.ReportTypeStandard); ok {
+	if mechanismKey, ok := MechanismReportBuilderKeyFromExecutionIdentity(key, domainReport.ReportTypeStandard); ok {
 		projector := r.ResolveByMechanism(mechanismKey)
 		if _, ok := projector.(noopScoreProjector); !ok {
+			return projector
+		}
+	}
+	if routed := evaluation.ResolvePersonalityTypologyExecutorIdentity(key); routed != key {
+		if projector, ok := r.items[routed]; ok {
+			return projector
+		}
+	}
+	if routed := evaluation.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
+		if projector, ok := r.items[routed]; ok {
 			return projector
 		}
 	}
@@ -96,8 +106,12 @@ func (r *mutableScoreProjectorRegistry) ResolveByMechanism(key MechanismReportBu
 
 type noopScoreProjector struct{}
 
-func (noopScoreProjector) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKey{}
+func (noopScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentity{}
+}
+
+func (noopScoreProjector) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentity{}
 }
 
 func (noopScoreProjector) Project(context.Context, evaloutcome.Outcome) error {

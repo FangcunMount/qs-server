@@ -21,8 +21,12 @@ func NewFactorScoringScoreProjector(scoreRepo assessment.ScoreRepository) Factor
 	return FactorScoringScoreProjector{scoreRepo: scoreRepo}
 }
 
-func (p FactorScoringScoreProjector) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyScaleDefault
+func (p FactorScoringScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
+}
+
+func (p FactorScoringScoreProjector) Key() evaluation.ExecutionIdentity {
+	return p.ExecutionIdentity()
 }
 
 func (p FactorScoringScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
@@ -44,8 +48,12 @@ func NewFactorScoringReportBuilder(composer domainReport.ReportBuilder) FactorSc
 	return FactorScoringReportBuilder{composer: composer}
 }
 
-func (b FactorScoringReportBuilder) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyScaleDefault
+func (b FactorScoringReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
+}
+
+func (b FactorScoringReportBuilder) Key() evaluation.ExecutionIdentity {
+	return b.ExecutionIdentity()
 }
 
 func (FactorScoringReportBuilder) ReportType() domainReport.ReportType {

@@ -18,8 +18,12 @@ func NewNormProfileReportBuilder(composer domainReport.ReportBuilder) NormProfil
 	return NormProfileReportBuilder{scoring: NewFactorScoringReportBuilder(composer)}
 }
 
-func (NormProfileReportBuilder) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyBehavioralRatingDefault
+func (NormProfileReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityBehavioralRatingDefault
+}
+
+func (NormProfileReportBuilder) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityBehavioralRatingDefault
 }
 
 func (NormProfileReportBuilder) ReportType() domainReport.ReportType {
@@ -41,8 +45,12 @@ func NewNormProfileScoreProjector(scoreRepo assessment.ScoreRepository) NormProf
 	return NormProfileScoreProjector{scoring: NewFactorScoringScoreProjector(scoreRepo)}
 }
 
-func (NormProfileScoreProjector) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyBehavioralRatingDefault
+func (NormProfileScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityBehavioralRatingDefault
+}
+
+func (NormProfileScoreProjector) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityBehavioralRatingDefault
 }
 
 func (p NormProfileScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {
@@ -57,8 +65,12 @@ func NewTaskPerformanceReportBuilder(composer domainReport.ReportBuilder) TaskPe
 	return TaskPerformanceReportBuilder{scoring: NewFactorScoringReportBuilder(composer)}
 }
 
-func (TaskPerformanceReportBuilder) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyCognitiveDefault
+func (TaskPerformanceReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityCognitiveDefault
+}
+
+func (TaskPerformanceReportBuilder) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityCognitiveDefault
 }
 
 func (TaskPerformanceReportBuilder) ReportType() domainReport.ReportType {
@@ -80,8 +92,12 @@ func NewTaskPerformanceScoreProjector(scoreRepo assessment.ScoreRepository) Task
 	return TaskPerformanceScoreProjector{scoring: NewFactorScoringScoreProjector(scoreRepo)}
 }
 
-func (TaskPerformanceScoreProjector) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyCognitiveDefault
+func (TaskPerformanceScoreProjector) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityCognitiveDefault
+}
+
+func (TaskPerformanceScoreProjector) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityCognitiveDefault
 }
 
 func (p TaskPerformanceScoreProjector) Project(ctx context.Context, outcome evaloutcome.Outcome) error {

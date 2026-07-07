@@ -273,7 +273,7 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 
 `personality/typology`（测评 payload）、`task_performance` metadata、`application/evaluation/scoring`（快照）保持原名。
 
-## Round 16：ModelCatalog 根包 Phase A 整理（规划）
+## Round 16：ModelCatalog 根包 Phase A 整理（已完成）
 
 **目标**：减根包平铺杂乱感；**不删** `behavior_ability` / migration kinds 等兼容语义（留 Phase B/C）。
 
@@ -398,5 +398,34 @@ type Algorithm = identity.Algorithm
 | R25-B | `MaterializeFamilyEvaluators` + `WithFamilyEvaluators`；descriptor 命中不经 `EvaluatorRegistry` 族级 dispatch；legacy 仅 typology alias |
 | R25-C | `NewEvaluationRunWithAttempt` / `NextEvaluationRun`；Start 前读 latest retryable run；worker 日志 `evaluation_run_hint` |
 
-**刻意保留（R26+）**：删除 `EvaluatorKey` 类型、EvaluationRun REST、ModelCatalog R16 根包整理、KindCapability 全量迁移。
+**刻意保留（R26+）**：worker 基于 DB `Retryable` 的 ack/nack 编排、Statistics 投影统一、DB 列删除、Phase B/C legacy kinds。
+
+## Round 26：EvaluationRun 只读 REST + Operating 失败列表（已完成）
+
+| 动作 | 说明 |
+|------|------|
+| Port | `ListByAssessmentID`、`ListRetryableFailed` |
+| Application | `runquery` 查询服务；`ProtectedQueryService` 挂 org 隔离 |
+| REST 业务 | `GET /api/v1/evaluations/assessments/:id/runs`、`.../runs/latest` |
+| REST 内部 | `GET /internal/v1/evaluation-runs/failed?retryable=true`（`CapabilityOrgAdmin`） |
+
+**刻意保留（R27+）**：run 创建/取消 REST；worker 重试策略改造。
+
+## Round 27：KindCapability → ModelCatalogOption Registry（已完成）
+
+| 动作 | 说明 |
+|------|------|
+| `option.Registry` | 启动时从 `DefaultCatalogOptions` + `DefaultFamilyCapabilities` 物化 |
+| Application | `options.go` / `operation_policy.go` / `kind_mapper.go` 不再直引 `KindCapability` |
+| 等价测试 | `TestRegistryAllowsMatchesDefaultCapabilities` |
+
+## Round 28：EvaluatorKey 退役 → ExecutionIdentity（已完成）
+
+| 子轨 | 动作 |
+|------|------|
+| R28-A | `AssertExecutionPathParity`；reporting 注册表 mechanism 主索引 + legacy `ExecutionIdentity` 回退 |
+| R28-B | `ExecutionIdentity` 值对象；`ModelDescriptor` 删 `Key`；`resolveExecutionIdentity` |
+| R28-C | 删除 `domain/evaluation/key.go`；characterization 契约迁移 |
+
+**刻意保留（R29+）**：Phase B/C behavior_ability / migration kinds；worker 重试编排。
 

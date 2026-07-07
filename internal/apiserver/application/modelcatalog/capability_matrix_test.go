@@ -153,18 +153,18 @@ func TestAPICatalogCapabilityMatrix(t *testing.T) {
 				t.Fatalf("DomainKindToAPIKind(%q) = %q, want %q", cap.Kind, got, apiKind)
 			}
 
-			got, ok := capabilityForAPIKind(apiKind)
+			got, ok := registeredOptionForAPIKind(apiKind)
 			if !ok {
-				t.Fatalf("capabilityForAPIKind(%q) = false, want true", apiKind)
+				t.Fatalf("registeredOptionForAPIKind(%q) = false, want true", apiKind)
 			}
 			if got.OptionsEnabled != cap.OptionsEnabled {
 				t.Fatalf("OptionsEnabled = %v, want %v", got.OptionsEnabled, cap.OptionsEnabled)
 			}
-			if got.CreateSupported != cap.CreateSupported {
-				t.Fatalf("CreateSupported = %v, want %v", got.CreateSupported, cap.CreateSupported)
+			if got.Operations.CreateSupported != cap.CreateSupported {
+				t.Fatalf("CreateSupported = %v, want %v", got.Operations.CreateSupported, cap.CreateSupported)
 			}
-			if got.PreviewSupported != cap.PreviewSupported {
-				t.Fatalf("PreviewSupported = %v, want %v", got.PreviewSupported, cap.PreviewSupported)
+			if got.Operations.PreviewSupported != cap.PreviewSupported {
+				t.Fatalf("PreviewSupported = %v, want %v", got.Operations.PreviewSupported, cap.PreviewSupported)
 			}
 		})
 	}

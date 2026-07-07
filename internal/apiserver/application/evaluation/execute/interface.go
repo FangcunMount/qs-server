@@ -33,15 +33,16 @@ type Service interface {
 
 // Evaluator 执行某一类评估模型的评估。
 type Evaluator interface {
-	// Key 返回 v2 执行路由键。
-	Key() evaluation.EvaluatorKey
+	ExecutionIdentity() evaluation.ExecutionIdentity
+	// Key is deprecated; use ExecutionIdentity().
+	Key() evaluation.ExecutionIdentity
 	// Execute 执行评估模型并返回 canonical outcome。
 	Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
 // EvaluatorRegistry 评估模型评估器注册表。
 type EvaluatorRegistry interface {
-	Resolve(key evaluation.EvaluatorKey) (Evaluator, error)
+	Resolve(key evaluation.ExecutionIdentity) (Evaluator, error)
 }
 
 // ExecutionInput 执行输入

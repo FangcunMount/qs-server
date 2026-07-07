@@ -8,11 +8,11 @@ import (
 
 // mutableEvaluatorRegistry routes execution by v2 EvaluatorKey.
 type mutableEvaluatorRegistry struct {
-	items map[evaluation.EvaluatorKey]Evaluator
+	items map[evaluation.ExecutionIdentity]Evaluator
 }
 
 func newEmptyEvaluatorRegistry() *mutableEvaluatorRegistry {
-	return &mutableEvaluatorRegistry{items: make(map[evaluation.EvaluatorKey]Evaluator)}
+	return &mutableEvaluatorRegistry{items: make(map[evaluation.ExecutionIdentity]Evaluator)}
 }
 
 // NewEvaluatorRegistry creates an evaluator registry keyed by EvaluatorKey.
@@ -31,7 +31,7 @@ func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 	if evaluator == nil {
 		return fmt.Errorf("evaluation evaluator is nil")
 	}
-	key := evaluator.Key()
+	key := evaluator.ExecutionIdentity()
 	if key.IsZero() {
 		return fmt.Errorf("evaluation evaluator key is empty")
 	}
@@ -43,19 +43,19 @@ func (r *mutableEvaluatorRegistry) Register(evaluator Evaluator) error {
 }
 
 // Resolve finds an evaluator by v2 key.
-func (r *mutableEvaluatorRegistry) Resolve(key evaluation.EvaluatorKey) (Evaluator, error) {
+func (r *mutableEvaluatorRegistry) Resolve(key evaluation.ExecutionIdentity) (Evaluator, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation evaluator registry is not configured")
 	}
 	if evaluator, ok := r.items[key]; ok {
 		return evaluator, nil
 	}
-	if key.IsPersonalityTypologyLegacyKey() {
-		if evaluator, ok := r.items[evaluation.EvaluatorKeyPersonalityTypology]; ok {
+	if key.IsPersonalityTypologyLegacyIdentity() {
+		if evaluator, ok := r.items[evaluation.ExecutionIdentityPersonalityTypology]; ok {
 			return evaluator, nil
 		}
 	}
-	if routed := evaluation.ResolveBehavioralRatingExecutorKey(key); routed != key {
+	if routed := evaluation.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
 		if evaluator, ok := r.items[routed]; ok {
 			return evaluator, nil
 		}

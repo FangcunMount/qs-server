@@ -27,7 +27,7 @@ func TestResolvePrefersMechanismKeyOverEvaluatorKey(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	byEvaluator, err := registry.Resolve(evaluation.EvaluatorKeyScaleDefault, domainReport.ReportTypeStandard)
+	byEvaluator, err := registry.Resolve(evaluation.ExecutionIdentityScaleDefault, domainReport.ReportTypeStandard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -43,7 +43,7 @@ func TestResolveUsesMechanismForNormProfileBuilder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	builder, err := registry.Resolve(evaluation.EvaluatorKeyBehavioralRatingDefault, domainReport.ReportTypeStandard)
+	builder, err := registry.Resolve(evaluation.ExecutionIdentityBehavioralRatingDefault, domainReport.ReportTypeStandard)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,17 +60,17 @@ func TestResolveLegacyTypologyStillWorksAfterMechanismPrimary(t *testing.T) {
 	t.Parallel()
 
 	registry, err := NewReportBuilderRegistry(registryReportBuilderStub{
-		key: evaluation.EvaluatorKeyPersonalityTypology,
+		key: evaluation.ExecutionIdentityPersonalityTypology,
 	})
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}
-	for _, legacyKey := range evaluation.PersonalityTypologyLegacyKeys() {
+	for _, legacyKey := range evaluation.PersonalityTypologyLegacyIdentities() {
 		builder, err := registry.Resolve(legacyKey, domainReport.ReportTypeStandard)
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
 		}
-		if builder.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+		if builder.Key() != evaluation.ExecutionIdentityPersonalityTypology {
 			t.Fatalf("builder key = %s, want configured typology", builder.Key())
 		}
 	}
@@ -147,7 +147,7 @@ func TestScoreProjectorResolveByMechanism(t *testing.T) {
 		ReportType:      domainReport.ReportTypeStandard,
 	}
 	projector := registry.ResolveByMechanism(mechanismKey)
-	if projector.Key() != evaluation.EvaluatorKeyScaleDefault {
+	if projector.Key() != evaluation.ExecutionIdentityScaleDefault {
 		t.Fatalf("projector key=%s", projector.Key())
 	}
 }
@@ -165,7 +165,7 @@ func TestEventAssemblerResolveByMechanism(t *testing.T) {
 		ReportType:      domainReport.ReportTypeStandard,
 	}
 	assembler := registry.ResolveByMechanism(mechanismKey)
-	if assembler.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+	if assembler.Key() != evaluation.ExecutionIdentityPersonalityTypology {
 		t.Fatalf("assembler key=%s", assembler.Key())
 	}
 }

@@ -275,7 +275,7 @@ func TestEvaluateDispatchesScaleModelToScaleEvaluator(t *testing.T) {
 	capture := &splitPhaseCapture{}
 	var executionInput ExecutionInput
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		key: evaluation.EvaluatorKeyScaleDefault,
+		key: evaluation.ExecutionIdentityScaleDefault,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
 			executionInput = input
 			modelRef := *input.Assessment.EvaluationModelRef()
@@ -360,7 +360,7 @@ func TestEvaluateDispatchesNonScaleModelThroughRegistry(t *testing.T) {
 	}}
 	capture := &splitPhaseCapture{}
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		key: evaluation.EvaluatorKeyMBTI,
+		key: evaluation.ExecutionIdentityMBTI,
 		execute: func(ctx context.Context, input ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
 			modelRef := *input.Assessment.EvaluationModelRef()
 			outcome := domainAssessment.NewAssessmentOutcome(
@@ -429,7 +429,7 @@ func TestEvaluateUnknownRuleSetKindMarksAssessmentFailed(t *testing.T) {
 	capture := &splitPhaseCapture{}
 	txRunner := &engineRecordingTxRunner{}
 	stager := &engineRecordingEventStager{}
-	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
+	registry, registryErr := NewEvaluatorRegistry(evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
 	if registryErr != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", registryErr)
 	}

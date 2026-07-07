@@ -13,25 +13,27 @@ import (
 
 // EventAssembler stages interpretation success events for outbox persistence.
 type EventAssembler interface {
-	Key() evaluation.EvaluatorKey
+	ExecutionIdentity() evaluation.ExecutionIdentity
+	// Key is deprecated; use ExecutionIdentity().
+	Key() evaluation.ExecutionIdentity
 	BuildSuccessEvents(outcome evaloutcome.Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent
 }
 
 // EventAssemblerRegistry resolves event assemblers by evaluator key or mechanism key.
 type EventAssemblerRegistry interface {
-	Resolve(key evaluation.EvaluatorKey) EventAssembler
+	Resolve(key evaluation.ExecutionIdentity) EventAssembler
 	ResolveByMechanism(key MechanismReportBuilderKey) EventAssembler
 }
 
 type mutableEventAssemblerRegistry struct {
-	items          map[evaluation.EvaluatorKey]EventAssembler
+	items          map[evaluation.ExecutionIdentity]EventAssembler
 	mechanismItems map[MechanismReportBuilderKey]EventAssembler
 }
 
 // NewEventAssemblerRegistry creates a registry from the given assemblers.
 func NewEventAssemblerRegistry(assemblers ...EventAssembler) (*mutableEventAssemblerRegistry, error) {
 	registry := &mutableEventAssemblerRegistry{
-		items:          make(map[evaluation.EvaluatorKey]EventAssembler),
+		items:          make(map[evaluation.ExecutionIdentity]EventAssembler),
 		mechanismItems: make(map[MechanismReportBuilderKey]EventAssembler),
 	}
 	for _, assembler := range assemblers {
@@ -46,12 +48,12 @@ func (r *mutableEventAssemblerRegistry) Register(assembler EventAssembler) error
 	if assembler == nil {
 		return fmt.Errorf("interpretation event assembler is nil")
 	}
-	key := assembler.Key()
-	if !key.IsZero() {
-		if _, exists := r.items[key]; exists {
-			return fmt.Errorf("interpretation event assembler already registered for key %s", key)
+	id := assembler.ExecutionIdentity()
+	if !id.IsZero() {
+		if _, exists := r.items[id]; exists {
+			return fmt.Errorf("interpretation event assembler already registered for identity %s", id)
 		}
-		r.items[key] = assembler
+		r.items[id] = assembler
 	}
 	if keyed, ok := assembler.(MechanismKeyedEventAssembler); ok {
 		mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
@@ -71,14 +73,14 @@ func (r *mutableEventAssemblerRegistry) Register(assembler EventAssembler) error
 	return nil
 }
 
-func (r *mutableEventAssemblerRegistry) Resolve(key evaluation.EvaluatorKey) EventAssembler {
+func (r *mutableEventAssemblerRegistry) Resolve(key evaluation.ExecutionIdentity) EventAssembler {
 	if r == nil {
 		return GenericEventAssembler{}
 	}
 	if assembler, ok := r.items[key]; ok {
 		return assembler
 	}
-	if mechanismKey, ok := MechanismReportBuilderKeyFromEvaluatorKey(key, domainReport.ReportTypeStandard); ok {
+	if mechanismKey, ok := MechanismReportBuilderKeyFromExecutionIdentity(key, domainReport.ReportTypeStandard); ok {
 		return r.ResolveByMechanism(mechanismKey)
 	}
 	return GenericEventAssembler{}
@@ -107,8 +109,12 @@ func (r *mutableEventAssemblerRegistry) ResolveByMechanism(key MechanismReportBu
 // GenericEventAssembler is the default event assembler for all evaluator keys.
 type GenericEventAssembler struct{}
 
-func (GenericEventAssembler) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKey{}
+func (GenericEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentity{}
+}
+
+func (GenericEventAssembler) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentity{}
 }
 
 func (GenericEventAssembler) BuildSuccessEvents(outcome evaloutcome.Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {
@@ -129,8 +135,12 @@ func (GenericEventAssembler) BuildSuccessEvents(outcome evaloutcome.Outcome, rpt
 // ScaleEventAssembler is kept for explicit scale registration in tests.
 type ScaleEventAssembler struct{}
 
-func (ScaleEventAssembler) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyScaleDefault
+func (ScaleEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
+}
+
+func (ScaleEventAssembler) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
 }
 
 func (ScaleEventAssembler) BuildSuccessEvents(outcome evaloutcome.Outcome, rpt *domainReport.InterpretReport) []event.DomainEvent {

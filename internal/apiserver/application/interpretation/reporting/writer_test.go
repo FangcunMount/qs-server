@@ -54,15 +54,19 @@ func (r *resultScoreRepoStub) DeleteByAssessmentID(context.Context, assessment.I
 type resultReportBuilderStub struct {
 	order *[]string
 	rpt   *domainReport.InterpretReport
-	key   evaluation.EvaluatorKey
+	key   evaluation.ExecutionIdentity
 	err   error
 }
 
-func (b *resultReportBuilderStub) Key() evaluation.EvaluatorKey {
+func (b *resultReportBuilderStub) ExecutionIdentity() evaluation.ExecutionIdentity {
 	if !b.key.IsZero() {
 		return b.key
 	}
-	return evaluation.EvaluatorKeyScaleDefault
+	return evaluation.ExecutionIdentityScaleDefault
+}
+
+func (b *resultReportBuilderStub) Key() evaluation.ExecutionIdentity {
+	return b.ExecutionIdentity()
 }
 
 func (*resultReportBuilderStub) ReportType() domainReport.ReportType {
@@ -103,7 +107,7 @@ func (b mechanismTypologyReportBuilder) MechanismKey() MechanismReportBuilderKey
 	}
 }
 
-func typologyReportBuilderStub(order *[]string, key evaluation.EvaluatorKey, rpt *domainReport.InterpretReport) ReportBuilder {
+func typologyReportBuilderStub(order *[]string, key evaluation.ExecutionIdentity, rpt *domainReport.InterpretReport) ReportBuilder {
 	return &mechanismTypologyReportBuilder{resultReportBuilderStub: resultReportBuilderStub{order: order, key: key, rpt: rpt}}
 }
 
@@ -369,7 +373,7 @@ func TestWriterUsesGenericEventsAndNoopScoreProjectionForNonScaleOutcome(t *test
 	}
 	a.ClearEvents()
 
-	reportBuilders, err := NewReportBuilderRegistry(typologyReportBuilderStub(&order, evaluation.EvaluatorKeyMBTI, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil)))
+	reportBuilders, err := NewReportBuilderRegistry(typologyReportBuilderStub(&order, evaluation.ExecutionIdentityMBTI, domainReport.NewInterpretReport(domainReport.ID(a.ID()), "MBTI", "MBTI-16P", 0, domainReport.RiskLevelNone, "INTJ", nil, nil, nil)))
 	if err != nil {
 		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
 	}

@@ -54,6 +54,75 @@ func (r *runRepository) FindLatestByAssessmentID(ctx context.Context, assessment
 	return &run, nil
 }
 
+func (r *runRepository) ListByAssessmentID(ctx context.Context, assessmentID uint64, limit int) ([]evalrun.EvaluationRun, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("evaluation run repository is not configured")
+	}
+	if limit <= 0 {
+		limit = 20
+	}
+	var rows []EvaluationRunPO
+	err := r.db.WithContext(ctx).
+		Where("assessment_id = ?", assessmentID).
+		Order("attempt_no DESC, id DESC").
+		Limit(limit).
+		Find(&rows).Error
+	if err != nil {
+		return nil, err
+	}
+	runs := make([]evalrun.EvaluationRun, 0, len(rows))
+	for _, po := range rows {
+		runs = append(runs, runFromPO(po))
+	}
+	return runs, nil
+}
+
+func (r *runRepository) ListRetryableFailed(ctx context.Context, params evaluationrun.ListRetryableFailedParams) (*evaluationrun.ListRetryableFailedResult, error) {
+	if r == nil || r.db == nil {
+		return nil, fmt.Errorf("evaluation run repository is not configured")
+	}
+	limit := params.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	query := r.db.WithContext(ctx).
+		Table("evaluation_run AS er").
+		Select("er.*, a.org_id").
+		Joins("INNER JOIN assessment AS a ON a.id = er.assessment_id").
+		Where("er.status = ? AND er.retryable = ?", evalrun.StatusFailed.String(), true).
+		Where("a.org_id = ?", params.OrgID)
+	if params.Cursor > 0 {
+		query = query.Where("er.id < ?", params.Cursor)
+	}
+	query = query.Order("er.id DESC").Limit(limit + 1)
+
+	type retryableFailedRow struct {
+		EvaluationRunPO
+		OrgID int64 `gorm:"column:org_id"`
+	}
+	var rows []retryableFailedRow
+	if err := query.Find(&rows).Error; err != nil {
+		return nil, err
+	}
+
+	nextCursor := uint64(0)
+	if len(rows) > limit {
+		nextCursor = rows[limit-1].ID
+		rows = rows[:limit]
+	}
+	items := make([]evaluationrun.RetryableFailedRun, 0, len(rows))
+	for _, row := range rows {
+		items = append(items, evaluationrun.RetryableFailedRun{
+			Run:   runFromPO(row.EvaluationRunPO),
+			OrgID: row.OrgID,
+		})
+	}
+	return &evaluationrun.ListRetryableFailedResult{
+		Items:      items,
+		NextCursor: nextCursor,
+	}, nil
+}
+
 func runToPO(run evalrun.EvaluationRun) *EvaluationRunPO {
 	po := &EvaluationRunPO{
 		RunID:        run.RunID.String(),

@@ -1,6 +1,8 @@
 package reporting
 
 import (
+	"fmt"
+
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
@@ -48,8 +50,8 @@ func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcata
 	}
 }
 
-// MechanismReportBuilderKeyFromEvaluatorKey derives the mechanism routing key from an evaluator key.
-func MechanismReportBuilderKeyFromEvaluatorKey(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (MechanismReportBuilderKey, bool) {
+// MechanismReportBuilderKeyFromExecutionIdentity derives the mechanism routing key from an evaluator key.
+func MechanismReportBuilderKeyFromExecutionIdentity(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (MechanismReportBuilderKey, bool) {
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
 	}
@@ -83,14 +85,34 @@ func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (Mechanis
 	return MechanismReportBuilderKey{}, false
 }
 
-func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error) {
+func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
 	if reportType == "" {
 		reportType = domainReport.ReportTypeStandard
 	}
-	if mechanismKey, ok := MechanismReportBuilderKeyFromEvaluatorKey(key, reportType); ok {
+	if mechanismKey, ok := MechanismReportBuilderKeyFromExecutionIdentity(key, reportType); ok {
 		if builder, err := r.ResolveByMechanism(mechanismKey); err == nil {
 			return builder, nil
 		}
 	}
 	return r.resolveByEvaluatorKey(key, reportType)
+}
+
+func (r *mutableReportBuilderRegistry) resolveByEvaluatorKey(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
+	registryKey := reportBuilderKey{key: key, reportType: reportType}
+	if builder, ok := r.items[registryKey]; ok {
+		return builder, nil
+	}
+	if routed := evaluation.ResolvePersonalityTypologyExecutorIdentity(key); routed != key {
+		registryKey.key = routed
+		if builder, ok := r.items[registryKey]; ok {
+			return builder, nil
+		}
+	}
+	if routed := evaluation.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
+		registryKey.key = routed
+		if builder, ok := r.items[registryKey]; ok {
+			return builder, nil
+		}
+	}
+	return nil, fmt.Errorf("unsupported interpretation report builder key: %s report type: %s", key, reportType)
 }

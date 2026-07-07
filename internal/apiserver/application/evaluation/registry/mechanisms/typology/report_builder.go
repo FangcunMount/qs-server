@@ -13,7 +13,7 @@ import (
 
 type ReportBuilder struct {
 	runner *algorithmRunner
-	key    evaluation.EvaluatorKey
+	key    evaluation.ExecutionIdentity
 }
 
 var (
@@ -27,13 +27,13 @@ func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
 }
 
 func NewConfiguredReportBuilderWithRegistry(registry ModuleRegistry) (ReportBuilder, error) {
-	runner, err := registry.runnerForKey(evaluation.EvaluatorKeyPersonalityTypology)
+	runner, err := registry.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
 	if err != nil {
 		return ReportBuilder{}, err
 	}
 	return ReportBuilder{
 		runner: &runner,
-		key:    evaluation.EvaluatorKeyPersonalityTypology,
+		key:    evaluation.ExecutionIdentityPersonalityTypology,
 	}, nil
 }
 
@@ -48,7 +48,7 @@ func NewReportBuilderWithRegistry(registry ModuleRegistry, algorithm modelcatalo
 	}
 	return ReportBuilder{
 		runner: &runner,
-		key:    evaluation.PersonalityTypologyKey(algorithm),
+		key:    evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
 }
 
@@ -58,15 +58,19 @@ func NewLegacyTypologyAliasReportBuilder(configured ReportBuilder, algorithm mod
 	}
 	return ReportBuilder{
 		runner: configured.runner,
-		key:    evaluation.PersonalityTypologyKey(algorithm),
+		key:    evaluation.PersonalityTypologyIdentity(algorithm),
 	}, nil
 }
 
-func (b ReportBuilder) Key() evaluation.EvaluatorKey {
+func (b ReportBuilder) ExecutionIdentity() evaluation.ExecutionIdentity {
 	if b.key.IsZero() && b.runner != nil {
-		return evaluation.PersonalityTypologyKey(b.runner.algorithm())
+		return evaluation.PersonalityTypologyIdentity(b.runner.algorithm())
 	}
 	return b.key
+}
+
+func (b ReportBuilder) Key() evaluation.ExecutionIdentity {
+	return b.ExecutionIdentity()
 }
 
 func (ReportBuilder) ReportType() domainReport.ReportType {

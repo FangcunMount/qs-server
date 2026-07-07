@@ -10,18 +10,18 @@ import (
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
-// V1 contract: legacy flat kinds map to stable v2 EvaluatorKey triples.
-func TestV1LegacyKindMapsToEvaluatorKey(t *testing.T) {
+// V1 contract: legacy flat kinds map to stable ExecutionIdentity triples.
+func TestV1LegacyKindMapsToExecutionIdentity(t *testing.T) {
 	cases := []struct {
 		legacy modelcatalog.Kind
-		want   evaluation.EvaluatorKey
+		want   evaluation.ExecutionIdentity
 	}{
-		{modelcatalog.KindScale, evaluation.EvaluatorKeyScaleDefault},
-		{modelcatalog.Kind("mbti"), evaluation.EvaluatorKeyMBTI},
-		{modelcatalog.Kind("sbti"), evaluation.EvaluatorKeySBTI},
+		{modelcatalog.KindScale, evaluation.ExecutionIdentityScaleDefault},
+		{modelcatalog.Kind("mbti"), evaluation.ExecutionIdentityMBTI},
+		{modelcatalog.Kind("sbti"), evaluation.ExecutionIdentitySBTI},
 	}
 	for _, tc := range cases {
-		got, ok := evaluation.EvaluatorKeyFromLegacyKind(tc.legacy)
+		got, ok := evaluation.ExecutionIdentityFromLegacyKind(tc.legacy)
 		if !ok {
 			t.Fatalf("legacy %s: not mapped", tc.legacy)
 		}
@@ -31,14 +31,14 @@ func TestV1LegacyKindMapsToEvaluatorKey(t *testing.T) {
 	}
 }
 
-// V1 contract: port ModelRef with legacy kind falls back to EvaluatorKey mapping.
-func TestV1ModelRefEvaluatorKeyFromLegacyKind(t *testing.T) {
+// V1 contract: port ModelRef with legacy kind falls back to ExecutionIdentity mapping.
+func TestV1ModelRefExecutionIdentityFromLegacyKind(t *testing.T) {
 	ref := evaluationinput.ModelRef{
 		Kind: "mbti",
 		Code: "MBTI_TEST",
 	}
-	if got := ref.EvaluatorKey(); got != evaluation.EvaluatorKeyMBTI {
-		t.Fatalf("got %s, want %s", got, evaluation.EvaluatorKeyMBTI)
+	if got := ref.ExecutionIdentity(); got != evaluation.ExecutionIdentityMBTI {
+		t.Fatalf("got %s, want %s", got, evaluation.ExecutionIdentityMBTI)
 	}
 }
 
@@ -49,21 +49,20 @@ func TestV1ModelSnapshotCarriesV2IdentityFields(t *testing.T) {
 		t.Fatalf("snapshot identity = sub:%s algo:%s", snapshot.SubKind, snapshot.Algorithm)
 	}
 	ref := snapshot.ModelRef()
-	// Port ModelRef keeps legacy kind field; execute path uses assessment ref legacy mapping instead.
-	if got := ref.EvaluatorKey().String(); got != "personality/typology/mbti" {
-		t.Fatalf("ref key = %s, want personality/typology/mbti", got)
+	if got := ref.ExecutionIdentity().String(); got != "personality/typology/mbti" {
+		t.Fatalf("ref identity = %s, want personality/typology/mbti", got)
 	}
 }
 
 // V1 contract: assessment EvaluationModelRef preserves legacy kind routing when v2 fields absent.
-func TestV1AssessmentModelRefEvaluatorKeyFromLegacyKind(t *testing.T) {
+func TestV1AssessmentModelRefExecutionIdentityFromLegacyKind(t *testing.T) {
 	ref := assessment.NewEvaluationModelRefByCode(
 		assessment.EvaluationModelKindScale,
 		meta.NewCode("S-001"),
 		"1.0.0",
 		"Scale",
 	)
-	if ref.EvaluatorKey() != evaluation.EvaluatorKeyScaleDefault {
-		t.Fatalf("got %s, want %s", ref.EvaluatorKey(), evaluation.EvaluatorKeyScaleDefault)
+	if ref.ExecutionIdentity() != evaluation.ExecutionIdentityScaleDefault {
+		t.Fatalf("got %s, want %s", ref.ExecutionIdentity(), evaluation.ExecutionIdentityScaleDefault)
 	}
 }

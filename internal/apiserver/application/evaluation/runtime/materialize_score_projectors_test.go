@@ -26,17 +26,17 @@ func TestMaterializeScoreProjectorsRegistersScaleLikeRuntimes(t *testing.T) {
 	if err != nil {
 		t.Fatalf("MaterializeScoreProjectors: %v", err)
 	}
-	keys := make(map[evaldomain.EvaluatorKey]bool, len(projectors))
+	keys := make(map[evaldomain.ExecutionIdentity]bool, len(projectors))
 	for _, projector := range projectors {
 		keys[projector.Key()] = true
 	}
-	if !keys[evaldomain.EvaluatorKeyScaleDefault] {
+	if !keys[evaldomain.ExecutionIdentityScaleDefault] {
 		t.Fatal("scale score projector not materialized")
 	}
-	if !keys[evaldomain.EvaluatorKeyBehavioralRatingDefault] {
+	if !keys[evaldomain.ExecutionIdentityBehavioralRatingDefault] {
 		t.Fatal("behavioral_rating score projector not materialized")
 	}
-	if !keys[evaldomain.EvaluatorKeyCognitiveDefault] {
+	if !keys[evaldomain.ExecutionIdentityCognitiveDefault] {
 		t.Fatal("cognitive score projector not materialized")
 	}
 	if len(projectors) != 3 {

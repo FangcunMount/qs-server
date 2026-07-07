@@ -5,17 +5,17 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
-func canonicalEvaluatorKeyForFamily(family modelcatalog.AlgorithmFamily) (evaluation.EvaluatorKey, bool) {
+func canonicalExecutionIdentityForFamily(family modelcatalog.AlgorithmFamily) (evaluation.ExecutionIdentity, bool) {
 	switch family {
 	case modelcatalog.AlgorithmFamilyFactorScoring:
-		return evaluation.EvaluatorKeyScaleDefault, true
+		return evaluation.ExecutionIdentityScaleDefault, true
 	case modelcatalog.AlgorithmFamilyFactorClassification:
-		return evaluation.EvaluatorKeyPersonalityTypology, true
+		return evaluation.ExecutionIdentityPersonalityTypology, true
 	case modelcatalog.AlgorithmFamilyFactorNorm:
-		return evaluation.EvaluatorKeyBehavioralRatingDefault, true
+		return evaluation.ExecutionIdentityBehavioralRatingDefault, true
 	case modelcatalog.AlgorithmFamilyTaskPerformance:
-		return evaluation.EvaluatorKeyCognitiveDefault, true
+		return evaluation.ExecutionIdentityCognitiveDefault, true
 	default:
-		return evaluation.EvaluatorKey{}, false
+		return evaluation.ExecutionIdentity{}, false
 	}
 }

@@ -17,12 +17,16 @@ import (
 )
 
 type evaluatorStub struct {
-	key     evaluation.EvaluatorKey
+	key     evaluation.ExecutionIdentity
 	execute func(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
-func (e evaluatorStub) Key() evaluation.EvaluatorKey {
+func (e evaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity {
 	return e.key
+}
+
+func (e evaluatorStub) Key() evaluation.ExecutionIdentity {
+	return e.ExecutionIdentity()
 }
 
 func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error) {
@@ -37,41 +41,41 @@ func (e evaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*asse
 }
 
 func TestEvaluatorRegistryResolvesRegisteredEvaluator(t *testing.T) {
-	scaleEvaluator := evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault}
+	scaleEvaluator := evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault}
 	registry, err := NewEvaluatorRegistry(scaleEvaluator)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	got, err := registry.Resolve(evaluation.EvaluatorKeyScaleDefault)
+	got, err := registry.Resolve(evaluation.ExecutionIdentityScaleDefault)
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Key() != evaluation.EvaluatorKeyScaleDefault {
+	if got.Key() != evaluation.ExecutionIdentityScaleDefault {
 		t.Fatalf("resolved key = %s, want scale default", got.Key())
 	}
 }
 
 func TestEvaluatorRegistryResolvesByEvaluatorKey(t *testing.T) {
 	registry, err := NewEvaluatorRegistry(evaluatorStub{
-		key: evaluation.EvaluatorKeyMBTI,
+		key: evaluation.ExecutionIdentityMBTI,
 	})
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	got, err := registry.Resolve(evaluation.EvaluatorKeyMBTI)
+	got, err := registry.Resolve(evaluation.ExecutionIdentityMBTI)
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Key() != evaluation.EvaluatorKeyMBTI {
+	if got.Key() != evaluation.ExecutionIdentityMBTI {
 		t.Fatalf("resolved key = %s, want mbti", got.Key())
 	}
 }
 
 func TestEvaluatorRegistryRejectsDuplicateKey(t *testing.T) {
 	_, err := NewEvaluatorRegistry(
-		evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault},
-		evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault},
+		evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault},
+		evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault},
 	)
 	if err == nil {
 		t.Fatal("NewEvaluatorRegistry error = nil, want duplicate key error")
@@ -79,16 +83,16 @@ func TestEvaluatorRegistryRejectsDuplicateKey(t *testing.T) {
 }
 
 func TestEvaluatorRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
-	configured := evaluatorStub{key: evaluation.EvaluatorKeyPersonalityTypology}
+	configured := evaluatorStub{key: evaluation.ExecutionIdentityPersonalityTypology}
 	registry, err := NewEvaluatorRegistry(configured)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
-	got, err := registry.Resolve(evaluation.EvaluatorKeyMBTI)
+	got, err := registry.Resolve(evaluation.ExecutionIdentityMBTI)
 	if err != nil {
 		t.Fatalf("Resolve returned error: %v", err)
 	}
-	if got.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+	if got.Key() != evaluation.ExecutionIdentityPersonalityTypology {
 		t.Fatalf("resolved key = %s, want configured typology", got.Key())
 	}
 }
@@ -119,20 +123,20 @@ func TestResolveEvaluatorKeyPrefersInputAlgorithmWhenAssessmentMissing(t *testin
 			Status:    "published",
 		}),
 	}
-	got := resolveEvaluatorKey(a, input)
-	want := evaluation.EvaluatorKeyBigFive
+	got := resolveExecutionIdentity(a, input)
+	want := evaluation.ExecutionIdentityBigFive
 	if got != want {
-		t.Fatalf("resolveEvaluatorKey() = %s, want %s", got, want)
+		t.Fatalf("resolveExecutionIdentity() = %s, want %s", got, want)
 	}
 }
 
 func TestEvaluatorRegistryRejectsUnknownKey(t *testing.T) {
-	registry, err := NewEvaluatorRegistry(evaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
+	registry, err := NewEvaluatorRegistry(evaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry returned error: %v", err)
 	}
 
-	_, err = registry.Resolve(evaluation.EvaluatorKey{Kind: modelcatalog.KindCustom})
+	_, err = registry.Resolve(evaluation.ExecutionIdentity{Kind: modelcatalog.KindCustom})
 	if err == nil {
 		t.Fatal("Resolve error = nil, want unsupported model key")
 	}

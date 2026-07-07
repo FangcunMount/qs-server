@@ -54,7 +54,7 @@ func TestTypologyModelInputProviderReturnsTypologyPayload(t *testing.T) {
 		}},
 		fakeQuestionnaireReader{},
 	)
-	if provider.EvaluatorKey() != evaldomain.EvaluatorKeyMBTI {
+	if provider.EvaluatorKey() != evaldomain.ExecutionIdentityMBTI {
 		t.Fatalf("key = %#v", provider.EvaluatorKey())
 	}
 	snapshot, err := provider.ResolveInput(context.Background(), port.InputRef{AnswerSheetID: 1})

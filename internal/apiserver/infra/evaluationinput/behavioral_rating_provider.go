@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -26,8 +27,17 @@ func NewBehavioralRatingModelInputProvider(
 	}
 }
 
-func (BehavioralRatingModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
-	return evaldomain.EvaluatorKeyBehavioralRatingDefault
+func (BehavioralRatingModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityBehavioralRatingDefault
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (BehavioralRatingModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityBehavioralRatingDefault
+}
+
+func (BehavioralRatingModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathBehavioralRatingDescriptor
 }
 
 func (p BehavioralRatingModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

@@ -71,6 +71,56 @@ func (h *EvaluationHandler) GetAssessment(c *gin.Context) {
 	h.Success(c, response.NewAssessmentResponse(result))
 }
 
+// ListAssessmentRuns lists evaluation runs for one assessment.
+// @Summary 查询测评执行运行列表
+// @Description 按 attempt 倒序返回测评执行运行记录
+// @Tags Evaluation-Assessment
+// @Produce json
+// @Param id path string true "测评ID"
+// @Param limit query int false "返回条数" default(20)
+// @Success 200 {object} core.Response{data=response.EvaluationRunListResponse}
+// @Router /api/v1/evaluations/assessments/{id}/runs [get]
+func (h *EvaluationHandler) ListAssessmentRuns(c *gin.Context) {
+	assessmentID, scope, err := h.parseProtectedAssessmentQuery(c)
+	if err != nil {
+		h.BadRequestResponse(c, "无效的测评ID", err)
+		return
+	}
+	limit, _ := strconv.Atoi(c.DefaultQuery("limit", "20"))
+	result, err := h.protectedQueryService.ListAssessmentRuns(c.Request.Context(), scope, assessmentID, limit)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	h.Success(c, response.NewEvaluationRunListResponse(result))
+}
+
+// GetLatestAssessmentRun returns the latest evaluation run for one assessment.
+// @Summary 查询测评最新执行运行
+// @Description 返回测评最新一次执行运行记录
+// @Tags Evaluation-Assessment
+// @Produce json
+// @Param id path string true "测评ID"
+// @Success 200 {object} core.Response{data=response.EvaluationRunResponse}
+// @Router /api/v1/evaluations/assessments/{id}/runs/latest [get]
+func (h *EvaluationHandler) GetLatestAssessmentRun(c *gin.Context) {
+	assessmentID, scope, err := h.parseProtectedAssessmentQuery(c)
+	if err != nil {
+		h.BadRequestResponse(c, "无效的测评ID", err)
+		return
+	}
+	result, err := h.protectedQueryService.GetLatestAssessmentRun(c.Request.Context(), scope, assessmentID)
+	if err != nil {
+		h.Error(c, err)
+		return
+	}
+	if result == nil {
+		h.Success(c, nil)
+		return
+	}
+	h.Success(c, response.NewEvaluationRunResponse(result))
+}
+
 // ListAssessments 查询测评列表
 // @Summary 查询测评列表
 // @Description 分页查询测评列表

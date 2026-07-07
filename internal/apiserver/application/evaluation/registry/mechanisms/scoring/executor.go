@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scoring"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -42,8 +43,16 @@ func NewExecutorWithDeps(validator InputValidator, handler *domainfactor_scoring
 	}
 }
 
-func (e *Executor) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyScaleDefault
+func (e *Executor) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
+}
+
+func (e *Executor) Key() evaluation.ExecutionIdentity {
+	return e.ExecutionIdentity()
+}
+
+func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathScaleDescriptor
 }
 
 func (e *Executor) Execute(ctx context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {

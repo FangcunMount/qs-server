@@ -49,9 +49,9 @@ func NewPersonalityRuntimeRegistryWith(opts PersonalityRuntimeOptions, algorithm
 	}
 }
 
-func (r PersonalityRuntimeRegistry) runnerForKey(key evaluation.EvaluatorKey) (algorithmRunner, error) {
-	switch evaluation.ResolvePersonalityTypologyExecutorKey(key) {
-	case evaluation.EvaluatorKeyPersonalityTypology:
+func (r PersonalityRuntimeRegistry) runnerForIdentity(key evaluation.ExecutionIdentity) (algorithmRunner, error) {
+	switch evaluation.ResolvePersonalityTypologyExecutorIdentity(key) {
+	case evaluation.ExecutionIdentityPersonalityTypology:
 		return r.runnerForConfigured(), nil
 	default:
 		return algorithmRunner{}, fmt.Errorf("unsupported typology evaluator key: %s", key)

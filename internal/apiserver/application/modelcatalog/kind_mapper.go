@@ -24,9 +24,8 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 
 // DomainKindToAPIKind maps canonical domain kinds to the external API contract.
 func DomainKindToAPIKind(kind domain.Kind) string {
-	cap, ok := domain.CapabilityByKind(kind)
-	if ok && cap.APIKind != "" {
-		return cap.APIKind
+	if entry, ok := catalogRegistry.ByKind(kind); ok && entry.APIKind != "" {
+		return entry.APIKind
 	}
 	switch kind {
 	case domain.KindPersonality:
@@ -68,6 +67,6 @@ func IsSupportedAPIKind(kind string) bool {
 	if domain.IsBehaviorAbilityProductChannelAPIKind(kind) {
 		return true
 	}
-	_, ok := capabilityForAPIKind(kind)
+	_, ok := catalogRegistry.ByAPIKind(kind)
 	return ok
 }

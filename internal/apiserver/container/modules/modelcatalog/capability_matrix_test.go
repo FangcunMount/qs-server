@@ -48,17 +48,17 @@ func TestDefaultEvaluationDescriptorsAreExecutableRuntimeOnly(t *testing.T) {
 	if kinds[evaldomain.ModelKindCognitive] != 1 {
 		t.Fatalf("cognitive descriptor count = %d, want 1", kinds[evaldomain.ModelKindCognitive])
 	}
-	if descs[0].Key != evaldomain.EvaluatorKeyScaleDefault {
-		t.Fatalf("first descriptor key = %#v, want scale default", descs[0].Key)
+	if descs[0].Kind != evaldomain.ModelKindScale {
+		t.Fatalf("first descriptor kind = %#v, want scale", descs[0].Kind)
 	}
-	if descs[1].Key != evaldomain.EvaluatorKeyPersonalityTypology {
-		t.Fatalf("second descriptor key = %#v, want configured typology", descs[1].Key)
+	if descs[1].Algorithm != domain.AlgorithmPersonalityTypology {
+		t.Fatalf("second descriptor algorithm = %#v, want configured typology", descs[1].Algorithm)
 	}
-	if descs[2].Key != evaldomain.EvaluatorKeyBehavioralRatingDefault {
-		t.Fatalf("third descriptor key = %#v, want behavioral_rating default", descs[2].Key)
+	if descs[2].Kind != evaldomain.ModelKindBehavioralRating {
+		t.Fatalf("third descriptor kind = %#v, want behavioral_rating", descs[2].Kind)
 	}
-	if descs[3].Key != evaldomain.EvaluatorKeyCognitiveDefault {
-		t.Fatalf("fourth descriptor key = %#v, want cognitive default", descs[3].Key)
+	if descs[3].Kind != evaldomain.ModelKindCognitive {
+		t.Fatalf("fourth descriptor kind = %#v, want cognitive", descs[3].Kind)
 	}
 }
 
@@ -96,9 +96,9 @@ func TestRuntimeCapabilityPolicy(t *testing.T) {
 				t.Fatalf("LegacyKindMapping(%q) = %v, want %v", cap.Kind, legacyMapped, wantLegacy)
 			}
 
-			_, evaluatorMapped := evaldomain.EvaluatorKeyFromLegacyKind(cap.Kind)
+			_, evaluatorMapped := evaldomain.ExecutionIdentityFromLegacyKind(cap.Kind)
 			if evaluatorMapped != wantLegacy {
-				t.Fatalf("EvaluatorKeyFromLegacyKind(%q) = %v, want %v", cap.Kind, evaluatorMapped, wantLegacy)
+				t.Fatalf("ExecutionIdentityFromLegacyKind(%q) = %v, want %v", cap.Kind, evaluatorMapped, wantLegacy)
 			}
 		})
 	}
@@ -114,7 +114,7 @@ func TestBehavioralRatingRegistersDedicatedRuntimeDescriptor(t *testing.T) {
 
 	found := false
 	for _, desc := range DefaultEvaluationDescriptors() {
-		if desc.Key.Kind == domain.KindBehavioralRating {
+		if desc.Kind == evaldomain.ModelKindBehavioralRating {
 			found = true
 			break
 		}

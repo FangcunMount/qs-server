@@ -47,7 +47,7 @@ func TestEvaluationDescriptorsFromRegistryProjectsLegacyDescriptors(t *testing.T
 		case modelcatalog.ExecutionPathScaleDescriptor:
 			return []evaldomain.ModelDescriptor{evaldomain.ScaleModelDescriptor()}
 		case modelcatalog.ExecutionPathTypologyDescriptor:
-			return []evaldomain.ModelDescriptor{{Key: evaldomain.EvaluatorKeyPersonalityTypology}}
+			return []evaldomain.ModelDescriptor{{Kind: evaldomain.ModelKindTypology, Algorithm: modelcatalog.AlgorithmPersonalityTypology}}
 		case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
 			return []evaldomain.ModelDescriptor{evaldomain.BehavioralRatingModelDescriptor()}
 		case modelcatalog.ExecutionPathCognitiveDescriptor:
@@ -65,7 +65,7 @@ func TestEvaluationDescriptorsFromRegistryProjectsLegacyDescriptors(t *testing.T
 	if descs[0].Kind != evaldomain.ModelKindScale {
 		t.Fatalf("first kind = %s, want scale", descs[0].Kind)
 	}
-	if descs[1].Key != evaldomain.EvaluatorKeyPersonalityTypology {
-		t.Fatalf("typology key = %#v", descs[1].Key)
+	if descs[1].Algorithm != modelcatalog.AlgorithmPersonalityTypology {
+		t.Fatalf("typology algorithm = %#v", descs[1].Algorithm)
 	}
 }

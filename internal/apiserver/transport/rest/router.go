@@ -15,6 +15,7 @@ import (
 	codesapp "github.com/FangcunMount/qs-server/internal/apiserver/application/codes"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	assessmentModelApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog"
 	scaleApp "github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
@@ -111,6 +112,7 @@ type EvaluationDeps struct {
 	ManagementService     assessmentApp.AssessmentManagementService
 	EvaluationService     execute.Service
 	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
+	RunQueryService       runqueryApp.Service
 }
 
 type PlanDeps struct {

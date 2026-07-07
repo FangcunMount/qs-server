@@ -19,6 +19,7 @@ func TestProtectedQueryServiceListAssessmentsAdminKeepsWideScopeAndDefaults(t *t
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
+		nil,
 	)
 
 	_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
@@ -54,6 +55,7 @@ func TestProtectedQueryServiceListAssessmentsClinicianScopeRestrictsToAccessible
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
+		nil,
 	)
 
 	_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{Page: 2, PageSize: 20})
@@ -84,6 +86,7 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			nil,
 			NewAssessmentAccessQueryService(management, checker),
 			nil,
+			nil,
 		)
 
 		_, err := svc.ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{TesteeID: &testeeID})
@@ -102,6 +105,7 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			nil,
 			nil,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
+			nil,
 			nil,
 		)
 
@@ -125,6 +129,7 @@ func TestProtectedQueryServiceSpecifiedTesteeValidatesDirectly(t *testing.T) {
 			nil,
 			NewAssessmentAccessQueryService(&protectedManagementStub{}, checker),
 			nil,
+			nil,
 		)
 
 		_, err := svc.GetFactorTrend(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, GetFactorTrendDTO{TesteeID: 103, FactorCode: "sleep"})
@@ -147,6 +152,7 @@ func TestProtectedQueryServiceEmptyAccessibleIDsKeepRestrictedEmptyScope(t *test
 		nil,
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
+		nil,
 		nil,
 	)
 
@@ -176,6 +182,7 @@ func TestProtectedQueryServiceWaitReportValidatesAccessBeforeWaiting(t *testing.
 		wait,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
+		nil,
 	)
 
 	summary, err := svc.WaitReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
@@ -203,6 +210,7 @@ func TestProtectedQueryServiceWaitReportWithoutWaitServiceReturnsPendingAfterAcc
 		nil,
 		NewAssessmentAccessQueryService(management, checker),
 		nil,
+		nil,
 	)
 
 	summary, err := svc.WaitReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 902)
@@ -219,15 +227,15 @@ func TestProtectedQueryServiceWaitReportWithoutWaitServiceReturnsPendingAfterAcc
 }
 
 func TestProtectedQueryServiceMissingDependenciesReturnModuleNotConfigured(t *testing.T) {
-	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil, nil).
+	_, err := NewProtectedQueryService(nil, nil, nil, nil, nil, nil, nil).
 		ListAssessments(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, ListAssessmentsDTO{})
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil, nil).
 		GetScores(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 
-	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil).
+	_, err = NewProtectedQueryService(&protectedManagementStub{}, nil, nil, nil, nil, nil, nil).
 		GetReport(context.Background(), ProtectedQueryScope{OrgID: 12, OperatorUserID: 34}, 901)
 	assertCode(t, err, errorCode.ErrModuleInitializationFailed)
 }

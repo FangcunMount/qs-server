@@ -30,8 +30,13 @@ func NewTypologyModelInputProvider(
 	}
 }
 
-func (p TypologyModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
-	return evaldomain.PersonalityTypologyKey(p.algorithm)
+func (p TypologyModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.PersonalityTypologyIdentity(p.algorithm)
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (p TypologyModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return p.ExecutionIdentity()
 }
 
 // ConfiguredTypologyModelInputProvider resolves typology payloads without algorithm-alias guards.
@@ -53,8 +58,17 @@ func NewConfiguredTypologyModelInputProvider(
 	}
 }
 
-func (ConfiguredTypologyModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
-	return evaldomain.EvaluatorKeyPersonalityTypology
+func (ConfiguredTypologyModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityPersonalityTypology
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (ConfiguredTypologyModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityPersonalityTypology
+}
+
+func (ConfiguredTypologyModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathTypologyDescriptor
 }
 
 func (p ConfiguredTypologyModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

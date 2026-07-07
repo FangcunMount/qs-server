@@ -24,23 +24,23 @@ func TestExecutorKeys(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
-	if got := configured.Key(); got != evaluation.EvaluatorKeyPersonalityTypology {
-		t.Fatalf("configured key = %s, want %s", got, evaluation.EvaluatorKeyPersonalityTypology)
+	if got := configured.Key(); got != evaluation.ExecutionIdentityPersonalityTypology {
+		t.Fatalf("configured key = %s, want %s", got, evaluation.ExecutionIdentityPersonalityTypology)
 	}
 
 	mbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmMBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(mbti): %v", err)
 	}
-	if got := mbtiExecutor.Key(); got != evaluation.EvaluatorKeyMBTI {
-		t.Fatalf("mbti key = %s, want %s", got, evaluation.EvaluatorKeyMBTI)
+	if got := mbtiExecutor.Key(); got != evaluation.ExecutionIdentityMBTI {
+		t.Fatalf("mbti key = %s, want %s", got, evaluation.ExecutionIdentityMBTI)
 	}
 	sbtiExecutor, err := NewTypologyExecutor(modelcatalog.AlgorithmSBTI)
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor(sbti): %v", err)
 	}
-	if got := sbtiExecutor.Key(); got != evaluation.EvaluatorKeySBTI {
-		t.Fatalf("sbti key = %s, want %s", got, evaluation.EvaluatorKeySBTI)
+	if got := sbtiExecutor.Key(); got != evaluation.ExecutionIdentitySBTI {
+		t.Fatalf("sbti key = %s, want %s", got, evaluation.ExecutionIdentitySBTI)
 	}
 }
 

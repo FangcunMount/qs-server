@@ -65,7 +65,7 @@ func TestEvaluateSyncSplitPhaseInvokesScoringBeforeInterpretation(t *testing.T) 
 	interp := &phaseRecordingInterpretationService{rec: rec}
 
 	evaluator := &countingEvaluator{
-		key: evaluation.EvaluatorKeyScaleDefault,
+		key: evaluation.ExecutionIdentityScaleDefault,
 		outcome: domainAssessment.NewAssessmentOutcome(
 			*a.EvaluationModelRef(),
 			domainAssessment.ResultSummary{PrimaryLabel: "ok"},
@@ -96,7 +96,7 @@ func TestEvaluateRequiresSplitPhaseWriters(t *testing.T) {
 	t.Parallel()
 
 	a := splitPhaseAssessment(t)
-	evaluator := &countingEvaluator{key: evaluation.EvaluatorKeyScaleDefault}
+	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
 	registry, err := NewEvaluatorRegistry(evaluator)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)
@@ -124,7 +124,7 @@ func TestEvaluateAsyncSplitPhaseStagesEvaluatedWithoutInterpretation(t *testing.
 	snapshotStore := evaluationscoring.NewMemoryScoringSnapshotStore()
 
 	evaluator := &countingEvaluator{
-		key: evaluation.EvaluatorKeyScaleDefault,
+		key: evaluation.ExecutionIdentityScaleDefault,
 		outcome: domainAssessment.NewAssessmentOutcome(
 			*a.EvaluationModelRef(),
 			domainAssessment.ResultSummary{PrimaryLabel: "stored"},

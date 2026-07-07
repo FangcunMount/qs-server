@@ -36,8 +36,8 @@ func (r ModuleRegistry) runnerFor(algorithm modelcatalog.Algorithm) (algorithmRu
 	return r.runtime.runnerFor(algorithm)
 }
 
-func (r ModuleRegistry) runnerForKey(key evaluation.EvaluatorKey) (algorithmRunner, error) {
-	return r.runtime.runnerForKey(key)
+func (r ModuleRegistry) runnerForIdentity(key evaluation.ExecutionIdentity) (algorithmRunner, error) {
+	return r.runtime.runnerForIdentity(key)
 }
 
 func (r ModuleRegistry) Algorithms() []modelcatalog.Algorithm {

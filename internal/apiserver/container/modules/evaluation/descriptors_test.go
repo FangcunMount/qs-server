@@ -11,69 +11,100 @@ import (
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	evaluationinputInfra "github.com/FangcunMount/qs-server/internal/apiserver/infra/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-func TestAssertRegistryKeyParityRejectsMismatchedEvaluatorKey(t *testing.T) {
+func TestAssertExecutionPathParityRejectsMismatchedEvaluatorPath(t *testing.T) {
 	descs := []evaldomain.ModelDescriptor{
-		{Key: evaldomain.EvaluatorKeyScaleDefault, Kind: evaldomain.ModelKindScale},
+		{Kind: evaldomain.ModelKindScale},
 	}
 	evaluators := []execute.Evaluator{
-		parityStubEvaluator{key: evaldomain.EvaluatorKeyPersonalityTypology},
+		parityStubEvaluator{path: modelcatalog.ExecutionPathTypologyDescriptor},
 	}
 	builders := []interpretationreporting.ReportBuilder{
-		parityStubReportBuilder{key: evaldomain.EvaluatorKeyScaleDefault},
+		parityStubReportBuilder{path: modelcatalog.ExecutionPathScaleDescriptor},
 	}
 	providers := []evaluationinputInfra.ModelInputProvider{
-		parityStubInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+		parityStubInputProvider{path: modelcatalog.ExecutionPathScaleDescriptor},
 	}
 
-	err := evalmodule.AssertRegistryKeyParity(descs, evaluators, builders, providers)
+	err := evalmodule.AssertExecutionPathParity(descs, evaluators, builders, providers)
 	if err == nil {
-		t.Fatal("expected parity error for mismatched evaluator key")
+		t.Fatal("expected parity error for mismatched evaluator execution path")
 	}
 }
 
-func TestAssertRegistryKeyParityRejectsCountMismatch(t *testing.T) {
+func TestAssertExecutionPathParityRejectsCountMismatch(t *testing.T) {
 	descs := []evaldomain.ModelDescriptor{
-		{Key: evaldomain.EvaluatorKeyScaleDefault, Kind: evaldomain.ModelKindScale},
+		{Kind: evaldomain.ModelKindScale},
 	}
-	err := evalmodule.AssertRegistryKeyParity(descs, nil, nil, nil)
+	err := evalmodule.AssertExecutionPathParity(descs, nil, nil, nil)
 	if err == nil {
 		t.Fatal("expected parity error for descriptor count mismatch")
 	}
 }
 
 type parityStubEvaluator struct {
-	key evaldomain.EvaluatorKey
+	path modelcatalog.ExecutionPath
 }
 
-func (s parityStubEvaluator) Key() evaldomain.EvaluatorKey { return s.key }
+func (s parityStubEvaluator) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityScaleDefault
+}
+
+func (s parityStubEvaluator) ExecutionPath() modelcatalog.ExecutionPath { return s.path }
 
 func (parityStubEvaluator) Execute(context.Context, execute.ExecutionInput) (*assessment.AssessmentOutcome, error) {
 	return nil, nil
 }
 
-type parityStubReportBuilder struct {
-	key evaldomain.EvaluatorKey
+func (s parityStubEvaluator) Key() evaldomain.ExecutionIdentity {
+	return s.ExecutionIdentity()
 }
 
-func (s parityStubReportBuilder) Key() evaldomain.EvaluatorKey { return s.key }
+type parityStubReportBuilder struct {
+	path modelcatalog.ExecutionPath
+}
 
-func (parityStubReportBuilder) ReportType() domainreport.ReportType {
+func (s parityStubReportBuilder) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityScaleDefault
+}
+
+func (s parityStubReportBuilder) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard
+}
+
+func (s parityStubReportBuilder) Key() evaldomain.ExecutionIdentity {
+	return s.ExecutionIdentity()
 }
 
 func (parityStubReportBuilder) Build(context.Context, evaloutcome.Outcome) (*domainreport.InterpretReport, error) {
 	return nil, nil
 }
 
-type parityStubInputProvider struct {
-	key evaldomain.EvaluatorKey
+func (s parityStubReportBuilder) MechanismKey() interpretationreporting.MechanismReportBuilderKey {
+	return interpretationreporting.MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainreport.ReportTypeStandard,
+	}
 }
 
-func (s parityStubInputProvider) EvaluatorKey() evaldomain.EvaluatorKey { return s.key }
+type parityStubInputProvider struct {
+	path modelcatalog.ExecutionPath
+}
+
+func (s parityStubInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityScaleDefault
+}
+
+func (s parityStubInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return s.ExecutionIdentity()
+}
+
+func (s parityStubInputProvider) ExecutionPath() modelcatalog.ExecutionPath { return s.path }
 
 func (parityStubInputProvider) ResolveInput(context.Context, evaluationinput.InputRef) (*evaluationinput.InputSnapshot, error) {
 	return nil, nil

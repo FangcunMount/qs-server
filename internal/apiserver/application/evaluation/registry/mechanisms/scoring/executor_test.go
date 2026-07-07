@@ -86,7 +86,7 @@ func TestExecutorConvertsSnapshotThroughScaleEvaluator(t *testing.T) {
 
 func TestExecutorImplementsEvaluationExecutorContract(t *testing.T) {
 	var _ interface {
-		Key() evaluation.EvaluatorKey
+		Key() evaluation.ExecutionIdentity
 	} = (*Executor)(nil)
 }
 

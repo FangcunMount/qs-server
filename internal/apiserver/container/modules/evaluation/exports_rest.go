@@ -15,6 +15,7 @@ func (m *Module) ExportRESTDeps() resttransport.EvaluationDeps {
 	deps.ManagementService = m.ManagementService
 	deps.EvaluationService = m.EvaluationService
 	deps.ProtectedQueryService = m.ProtectedQueryService
+	deps.RunQueryService = m.RunQueryService
 	return deps
 }
 

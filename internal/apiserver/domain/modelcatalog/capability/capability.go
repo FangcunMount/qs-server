@@ -6,6 +6,7 @@ import (
 )
 
 // KindCapability is the composed capability view used during migration.
+// Deprecated: application code should use application/modelcatalog/option.Registry.
 // Prefer ModelFamilyCapability for domain guards and CatalogOption for API surfaces.
 type KindCapability struct {
 	Kind                      identity.Kind

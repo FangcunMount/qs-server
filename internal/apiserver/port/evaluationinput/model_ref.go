@@ -6,22 +6,27 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
-func (r ModelRef) EvaluatorKey() evaldomain.EvaluatorKey {
+func (r ModelRef) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	if r.Algorithm != "" {
-		key := evaldomain.EvaluatorKey{
+		id := evaldomain.ExecutionIdentity{
 			Kind:      modelcatalog.Kind(r.Kind),
 			SubKind:   modelcatalog.SubKind(r.SubKind),
 			Algorithm: modelcatalog.Algorithm(r.Algorithm),
 		}
-		return evaldomain.ResolveBehavioralRatingExecutorKey(key)
+		return evaldomain.ResolveBehavioralRatingExecutorIdentity(id)
 	}
-	if key, ok := evaldomain.EvaluatorKeyFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
-		return key
+	if id, ok := evaldomain.ExecutionIdentityFromLegacyKind(modelcatalog.Kind(r.Kind)); ok {
+		return id
 	}
 	if modelcatalog.Kind(r.Kind) == modelcatalog.KindBehavioralRating && r.Algorithm == "" {
-		return evaldomain.EvaluatorKeyBehavioralRatingDefault
+		return evaldomain.ExecutionIdentityBehavioralRatingDefault
 	}
-	return evaldomain.EvaluatorKey{Kind: modelcatalog.Kind(r.Kind)}
+	return evaldomain.ExecutionIdentity{Kind: modelcatalog.Kind(r.Kind)}
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (r ModelRef) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return r.ExecutionIdentity()
 }
 
 func TypologyPayload(input *InputSnapshot) (*typology.Payload, bool) {

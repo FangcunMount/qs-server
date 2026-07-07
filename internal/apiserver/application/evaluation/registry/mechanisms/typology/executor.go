@@ -13,7 +13,7 @@ import (
 
 type Executor struct {
 	runner          *algorithmRunner
-	key             evaluation.EvaluatorKey
+	key             evaluation.ExecutionIdentity
 	legacyAlgorithm modelcatalog.Algorithm
 }
 
@@ -30,13 +30,13 @@ func NewConfiguredTypologyExecutor() (*Executor, error) {
 }
 
 func NewConfiguredTypologyExecutorWithRegistry(registry ModuleRegistry) (*Executor, error) {
-	runner, err := registry.runnerForKey(evaluation.EvaluatorKeyPersonalityTypology)
+	runner, err := registry.runnerForIdentity(evaluation.ExecutionIdentityPersonalityTypology)
 	if err != nil {
 		return nil, err
 	}
 	return &Executor{
 		runner: &runner,
-		key:    evaluation.EvaluatorKeyPersonalityTypology,
+		key:    evaluation.ExecutionIdentityPersonalityTypology,
 	}, nil
 }
 
@@ -51,16 +51,24 @@ func newLegacyExecutor(registry ModuleRegistry, algorithm modelcatalog.Algorithm
 	}
 	return &Executor{
 		runner:          &runner,
-		key:             evaluation.PersonalityTypologyKey(algorithm),
+		key:             evaluation.PersonalityTypologyIdentity(algorithm),
 		legacyAlgorithm: algorithm,
 	}, nil
 }
 
-func (e *Executor) Key() evaluation.EvaluatorKey {
+func (e *Executor) ExecutionIdentity() evaluation.ExecutionIdentity {
 	if e == nil {
-		return evaluation.EvaluatorKey{}
+		return evaluation.ExecutionIdentity{}
 	}
 	return e.key
+}
+
+func (e *Executor) Key() evaluation.ExecutionIdentity {
+	return e.ExecutionIdentity()
+}
+
+func (e *Executor) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathTypologyDescriptor
 }
 
 func (e *Executor) Execute(_ context.Context, input evaluationexecute.ExecutionInput) (*assessment.AssessmentOutcome, error) {

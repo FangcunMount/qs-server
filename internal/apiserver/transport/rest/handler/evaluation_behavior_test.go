@@ -99,7 +99,7 @@ func TestEvaluationHandlerGetAssessmentSuccess(t *testing.T) {
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, assessmentapp.NewWaitService(management, nil), accessQuery, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, assessmentapp.NewWaitService(management, nil), accessQuery, nil, nil),
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/evaluations/assessments/301")
@@ -158,7 +158,7 @@ func TestEvaluationHandlerWaitReportReturnsTerminalSummaryImmediately(t *testing
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery, nil, nil),
 	)
 
 	c, rec := newProtectedHandlerTestContext(http.MethodGet, "/api/v1/assessments/302/wait-report?timeout=30")
@@ -208,7 +208,7 @@ func TestEvaluationHandlerWaitReportReturnsPendingWhenClientContextCanceled(t *t
 	handler := NewEvaluationHandler(
 		management,
 		nil,
-		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery, nil),
+		assessmentapp.NewProtectedQueryService(management, nil, nil, waitService, accessQuery, nil, nil),
 	)
 
 	baseCtx, cancel := context.WithCancel(context.Background())

@@ -115,8 +115,12 @@ type writerReportBuilderStub struct {
 	rpt   *domainreport.InterpretReport
 }
 
-func (*writerReportBuilderStub) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyScaleDefault
+func (*writerReportBuilderStub) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
+}
+
+func (*writerReportBuilderStub) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityScaleDefault
 }
 func (*writerReportBuilderStub) ReportType() domainreport.ReportType {
 	return domainreport.ReportTypeStandard

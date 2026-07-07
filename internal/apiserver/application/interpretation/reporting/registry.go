@@ -5,17 +5,16 @@ import (
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type reportBuilderKey struct {
-	key        evaluation.EvaluatorKey
+	key        evaluation.ExecutionIdentity
 	reportType domainReport.ReportType
 }
 
 // ReportBuilderRegistry resolves report builders by evaluator key and report type.
 type ReportBuilderRegistry interface {
-	Resolve(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error)
+	Resolve(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error)
 	ResolveByMechanism(key MechanismReportBuilderKey) (ReportBuilder, error)
 }
 
@@ -42,38 +41,38 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 	if builder == nil {
 		return fmt.Errorf("interpretation report builder is nil")
 	}
-	key := builder.Key()
-	if key.IsZero() {
-		return fmt.Errorf("interpretation report builder key is empty")
+	keyed, ok := builder.(MechanismKeyedReportBuilder)
+	if !ok {
+		return fmt.Errorf("interpretation report builder must implement MechanismKeyedReportBuilder")
 	}
 	reportType := builder.ReportType()
 	if reportType == "" {
 		return fmt.Errorf("interpretation report builder report type is empty")
 	}
-	registryKey := reportBuilderKey{key: key, reportType: reportType}
-	if _, exists := r.items[registryKey]; exists {
-		return fmt.Errorf("interpretation report builder already registered for key %s report type %s", key, reportType)
+	mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
+	if multi, ok := builder.(MultiMechanismKeyedReportBuilder); ok {
+		mechanismKeys = multi.MechanismKeys()
 	}
-	r.items[registryKey] = builder
-	if keyed, ok := builder.(MechanismKeyedReportBuilder); ok {
-		mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
-		if multi, ok := builder.(MultiMechanismKeyedReportBuilder); ok {
-			mechanismKeys = multi.MechanismKeys()
+	for _, mechanismKey := range mechanismKeys {
+		if mechanismKey.ReportType == "" {
+			mechanismKey.ReportType = reportType
 		}
-		for _, mechanismKey := range mechanismKeys {
-			if mechanismKey.ReportType == "" {
-				mechanismKey.ReportType = reportType
-			}
-			if _, exists := r.mechanismItems[mechanismKey]; exists {
-				return fmt.Errorf("interpretation report builder already registered for mechanism %s", mechanismKey)
-			}
-			r.mechanismItems[mechanismKey] = builder
+		if _, exists := r.mechanismItems[mechanismKey]; exists {
+			return fmt.Errorf("interpretation report builder already registered for mechanism %s", mechanismKey)
 		}
+		r.mechanismItems[mechanismKey] = builder
+	}
+	if id := builder.ExecutionIdentity(); !id.IsZero() {
+		registryKey := reportBuilderKey{key: id, reportType: reportType}
+		if _, exists := r.items[registryKey]; exists {
+			return fmt.Errorf("interpretation report builder already registered for identity %s report type %s", id, reportType)
+		}
+		r.items[registryKey] = builder
 	}
 	return nil
 }
 
-func (r *mutableReportBuilderRegistry) Resolve(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error) {
+func (r *mutableReportBuilderRegistry) Resolve(key evaluation.ExecutionIdentity, reportType domainReport.ReportType) (ReportBuilder, error) {
 	if r == nil {
 		return nil, fmt.Errorf("interpretation report builder registry is not configured")
 	}
@@ -105,30 +104,4 @@ func (r *mutableReportBuilderRegistry) ResolveByMechanism(key MechanismReportBui
 		return builder, nil
 	}
 	return nil, fmt.Errorf("unsupported interpretation report builder mechanism: %s", key)
-}
-
-func (r *mutableReportBuilderRegistry) resolveByEvaluatorKey(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error) {
-	registryKey := reportBuilderKey{key: key, reportType: reportType}
-	if builder, ok := r.items[registryKey]; ok {
-		return builder, nil
-	}
-	if routed := evaluation.ResolvePersonalityTypologyExecutorKey(key); routed != key {
-		registryKey.key = routed
-		if builder, ok := r.items[registryKey]; ok {
-			return builder, nil
-		}
-	}
-	if routed := evaluation.ResolveBehavioralRatingExecutorKey(key); routed != key {
-		registryKey.key = routed
-		if builder, ok := r.items[registryKey]; ok {
-			return builder, nil
-		}
-	}
-	if mappedKind, subKind, algorithm, ok := modelcatalog.LegacyKindMapping(key.Kind); ok {
-		registryKey.key = evaluation.EvaluatorKey{Kind: mappedKind, SubKind: subKind, Algorithm: algorithm}
-		if builder, ok := r.items[registryKey]; ok {
-			return builder, nil
-		}
-	}
-	return nil, fmt.Errorf("unsupported interpretation report builder key: %s report type: %s", key, reportType)
 }

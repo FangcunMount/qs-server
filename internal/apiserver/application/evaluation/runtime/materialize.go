@@ -72,7 +72,7 @@ func MaterializeLegacyEvaluators(descs []evaldomain.ModelDescriptor, deps Wiring
 		if desc.Kind != evaldomain.ModelKindTypology {
 			continue
 		}
-		if desc.Key == evaldomain.EvaluatorKeyPersonalityTypology {
+		if desc.Algorithm == modelcatalog.AlgorithmPersonalityTypology {
 			continue
 		}
 		evaluator, err := materializeEvaluator(desc, deps, session)

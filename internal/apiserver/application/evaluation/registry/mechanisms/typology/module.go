@@ -14,7 +14,6 @@ type Module struct {
 // Descriptor returns the evaluation registry entry for this module.
 func (m Module) Descriptor() evaldomain.ModelDescriptor {
 	return evaldomain.ModelDescriptor{
-		Key:       evaldomain.PersonalityTypologyKey(m.Algorithm),
 		Kind:      evaldomain.ModelKindTypology,
 		Algorithm: m.Algorithm,
 	}
@@ -35,7 +34,6 @@ func ModuleDescriptors(modules []Module) []evaldomain.ModelDescriptor {
 // ConfiguredTypologyDescriptor returns the generic configured typology routing descriptor.
 func ConfiguredTypologyDescriptor() evaldomain.ModelDescriptor {
 	return evaldomain.ModelDescriptor{
-		Key:       evaldomain.EvaluatorKeyPersonalityTypology,
 		Kind:      evaldomain.ModelKindTypology,
 		Algorithm: modelcatalog.AlgorithmPersonalityTypology,
 	}

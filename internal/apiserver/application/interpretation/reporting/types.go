@@ -11,7 +11,9 @@ import (
 
 // ReportBuilder materializes an InterpretReport from a scored outcome.
 type ReportBuilder interface {
-	Key() evaluation.EvaluatorKey
+	ExecutionIdentity() evaluation.ExecutionIdentity
+	// Key is deprecated; use ExecutionIdentity().
+	Key() evaluation.ExecutionIdentity
 	ReportType() domainReport.ReportType
 	Build(ctx context.Context, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error)
 }
@@ -23,13 +25,15 @@ type Writer interface {
 
 // ScoreProjector projects scores after interpretation for synchronous scoring paths.
 type ScoreProjector interface {
-	Key() evaluation.EvaluatorKey
+	ExecutionIdentity() evaluation.ExecutionIdentity
+	// Key is deprecated; use ExecutionIdentity().
+	Key() evaluation.ExecutionIdentity
 	Project(ctx context.Context, outcome evaloutcome.Outcome) error
 }
 
 // ScoreProjectorRegistry resolves score projectors by evaluator key or mechanism key.
 type ScoreProjectorRegistry interface {
-	Resolve(key evaluation.EvaluatorKey) ScoreProjector
+	Resolve(key evaluation.ExecutionIdentity) ScoreProjector
 	ResolveByMechanism(key MechanismReportBuilderKey) ScoreProjector
 }
 

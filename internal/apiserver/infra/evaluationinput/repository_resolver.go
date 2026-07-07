@@ -7,6 +7,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/logger"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 	scaledefinition "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/definition"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
@@ -126,16 +127,18 @@ func (r *RepositoryResolver) FindTypologyModelByQuestionnaire(ctx context.Contex
 }
 
 type ModelInputProvider interface {
-	EvaluatorKey() evaldomain.EvaluatorKey
+	ExecutionIdentity() evaldomain.ExecutionIdentity
+	// EvaluatorKey is deprecated; use ExecutionIdentity.
+	EvaluatorKey() evaldomain.ExecutionIdentity
 	ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error)
 }
 
 type ModelInputProviderRegistry struct {
-	items map[evaldomain.EvaluatorKey]ModelInputProvider
+	items map[evaldomain.ExecutionIdentity]ModelInputProvider
 }
 
 func NewModelInputProviderRegistry(providers ...ModelInputProvider) (*ModelInputProviderRegistry, error) {
-	registry := &ModelInputProviderRegistry{items: make(map[evaldomain.EvaluatorKey]ModelInputProvider)}
+	registry := &ModelInputProviderRegistry{items: make(map[evaldomain.ExecutionIdentity]ModelInputProvider)}
 	for _, provider := range providers {
 		if err := registry.Register(provider); err != nil {
 			return nil, err
@@ -148,7 +151,7 @@ func (r *ModelInputProviderRegistry) Register(provider ModelInputProvider) error
 	if provider == nil {
 		return fmt.Errorf("evaluation input provider is nil")
 	}
-	key := provider.EvaluatorKey()
+	key := provider.ExecutionIdentity()
 	if key.IsZero() {
 		return fmt.Errorf("evaluation input provider key is empty")
 	}
@@ -159,19 +162,19 @@ func (r *ModelInputProviderRegistry) Register(provider ModelInputProvider) error
 	return nil
 }
 
-func (r *ModelInputProviderRegistry) Resolve(key evaldomain.EvaluatorKey) (ModelInputProvider, error) {
+func (r *ModelInputProviderRegistry) Resolve(key evaldomain.ExecutionIdentity) (ModelInputProvider, error) {
 	if r == nil {
 		return nil, fmt.Errorf("evaluation input provider registry is not configured")
 	}
 	if provider, ok := r.items[key]; ok {
 		return provider, nil
 	}
-	if routed := evaldomain.ResolvePersonalityTypologyExecutorKey(key); routed != key {
+	if routed := evaldomain.ResolvePersonalityTypologyExecutorIdentity(key); routed != key {
 		if provider, ok := r.items[routed]; ok {
 			return provider, nil
 		}
 	}
-	if routed := evaldomain.ResolveBehavioralRatingExecutorKey(key); routed != key {
+	if routed := evaldomain.ResolveBehavioralRatingExecutorIdentity(key); routed != key {
 		if provider, ok := r.items[routed]; ok {
 			return provider, nil
 		}
@@ -197,8 +200,17 @@ func NewScaleModelInputProvider(
 	}
 }
 
-func (ScaleModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
-	return evaldomain.EvaluatorKeyScaleDefault
+func (ScaleModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityScaleDefault
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (ScaleModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityScaleDefault
+}
+
+func (ScaleModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathScaleDescriptor
 }
 
 func (p ScaleModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

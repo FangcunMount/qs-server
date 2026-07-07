@@ -14,6 +14,7 @@ import (
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	runqueryApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationapp "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation"
@@ -64,6 +65,7 @@ type Module struct {
 	WaitService           assessmentApp.AssessmentWaitService
 	AccessQueryService    assessmentApp.AssessmentAccessQueryService
 	ProtectedQueryService assessmentApp.AssessmentProtectedQueryService
+	RunQueryService       runqueryApp.Service
 	LatestRiskReader      evaluationreadmodel.LatestRiskReader
 	AssessmentReader      evaluationreadmodel.AssessmentReader
 
@@ -342,6 +344,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		m.ManagementService,
 		normalized.TesteeAccessChecker,
 	)
+	m.RunQueryService = runqueryApp.NewService(infra.runRepo)
 	m.ProtectedQueryService = assessmentApp.NewProtectedQueryService(
 		m.ManagementService,
 		m.ReportQueryService,
@@ -349,6 +352,7 @@ func (m *Module) wireAssessmentApplications(normalized Deps, infra *evaluationIn
 		m.WaitService,
 		m.AccessQueryService,
 		infra.assessmentReader,
+		m.RunQueryService,
 	)
 	m.LatestRiskReader = infra.latestRiskReader
 	m.AssessmentReader = infra.assessmentReader

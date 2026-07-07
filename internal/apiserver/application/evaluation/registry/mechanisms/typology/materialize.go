@@ -6,6 +6,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 // MaterializeEvaluator builds or reuses the configured typology executor for a descriptor.
@@ -17,8 +18,8 @@ func MaterializeEvaluator(
 	if shared == nil {
 		return nil, fmt.Errorf("shared typology executor holder is required")
 	}
-	if desc.Key != evaldomain.EvaluatorKeyPersonalityTypology {
-		return nil, fmt.Errorf("unsupported typology descriptor key: %s", desc.Key)
+	if desc.Algorithm != modelcatalog.AlgorithmPersonalityTypology {
+		return nil, fmt.Errorf("unsupported typology descriptor: kind=%s algorithm=%s", desc.Kind, desc.Algorithm)
 	}
 	if *shared == nil {
 		executor, err := NewConfiguredTypologyExecutorWithRegistry(registry)
@@ -39,8 +40,8 @@ func MaterializeReportBuilder(
 	if shared == nil {
 		return nil, fmt.Errorf("shared typology report builder holder is required")
 	}
-	if desc.Key != evaldomain.EvaluatorKeyPersonalityTypology {
-		return nil, fmt.Errorf("unsupported typology descriptor key: %s", desc.Key)
+	if desc.Algorithm != modelcatalog.AlgorithmPersonalityTypology {
+		return nil, fmt.Errorf("unsupported typology descriptor: kind=%s algorithm=%s", desc.Kind, desc.Algorithm)
 	}
 	if shared.runner == nil {
 		builder, err := NewConfiguredReportBuilderWithRegistry(registry)

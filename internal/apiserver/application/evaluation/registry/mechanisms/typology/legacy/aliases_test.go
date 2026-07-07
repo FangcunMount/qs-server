@@ -28,7 +28,7 @@ func TestDefaultAlgorithmAliases(t *testing.T) {
 
 func TestDefaultAlgorithmAliasesMatchEvaluatorLegacyKeys(t *testing.T) {
 	aliases := legacy.DefaultAlgorithmAliases()
-	keys := evaluation.PersonalityTypologyLegacyKeys()
+	keys := evaluation.PersonalityTypologyLegacyIdentities()
 	if len(aliases) != len(keys) {
 		t.Fatalf("aliases = %#v, legacy keys = %#v", aliases, keys)
 	}

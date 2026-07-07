@@ -15,13 +15,17 @@ import (
 )
 
 type countingEvaluator struct {
-	key     evaluation.EvaluatorKey
+	key     evaluation.ExecutionIdentity
 	calls   int
 	outcome *domainAssessment.AssessmentOutcome
 }
 
-func (e *countingEvaluator) Key() evaluation.EvaluatorKey {
+func (e *countingEvaluator) ExecutionIdentity() evaluation.ExecutionIdentity {
 	return e.key
+}
+
+func (e *countingEvaluator) Key() evaluation.ExecutionIdentity {
+	return e.ExecutionIdentity()
 }
 
 func (e *countingEvaluator) Execute(_ context.Context, _ ExecutionInput) (*domainAssessment.AssessmentOutcome, error) {
@@ -82,7 +86,7 @@ func TestGenerateReportUsesStoredScoringSnapshotWithoutReExecute(t *testing.T) {
 		t.Fatalf("Save snapshot: %v", err)
 	}
 
-	evaluator := &countingEvaluator{key: evaluation.EvaluatorKeyScaleDefault}
+	evaluator := &countingEvaluator{key: evaluation.ExecutionIdentityScaleDefault}
 	registry, err := NewEvaluatorRegistry(evaluator)
 	if err != nil {
 		t.Fatalf("NewEvaluatorRegistry: %v", err)

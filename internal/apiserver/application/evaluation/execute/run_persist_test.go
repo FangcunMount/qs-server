@@ -22,6 +22,17 @@ func (r *stubRunRepo) FindLatestByAssessmentID(_ context.Context, _ uint64) (*ev
 	return r.latest, nil
 }
 
+func (r *stubRunRepo) ListByAssessmentID(_ context.Context, _ uint64, _ int) ([]evalrun.EvaluationRun, error) {
+	if r.latest == nil {
+		return nil, nil
+	}
+	return []evalrun.EvaluationRun{*r.latest}, nil
+}
+
+func (r *stubRunRepo) ListRetryableFailed(_ context.Context, _ evaluationrun.ListRetryableFailedParams) (*evaluationrun.ListRetryableFailedResult, error) {
+	return &evaluationrun.ListRetryableFailedResult{}, nil
+}
+
 var _ evaluationrun.Repository = (*stubRunRepo)(nil)
 
 func TestNewEvaluationRunUsesNextAttemptAfterRetryableFailure(t *testing.T) {

@@ -11,16 +11,20 @@ import (
 // MechanismCanonicalEventAssembler stages success events for one mechanism family.
 type MechanismCanonicalEventAssembler struct {
 	mechanism MechanismReportBuilderKey
-	legacyKey evaluation.EvaluatorKey
+	legacyKey evaluation.ExecutionIdentity
 }
 
 // NewMechanismCanonicalEventAssembler registers a mechanism-keyed event assembler.
-func NewMechanismCanonicalEventAssembler(mechanism MechanismReportBuilderKey, legacyKey evaluation.EvaluatorKey) MechanismCanonicalEventAssembler {
+func NewMechanismCanonicalEventAssembler(mechanism MechanismReportBuilderKey, legacyKey evaluation.ExecutionIdentity) MechanismCanonicalEventAssembler {
 	return MechanismCanonicalEventAssembler{mechanism: mechanism, legacyKey: legacyKey}
 }
 
-func (a MechanismCanonicalEventAssembler) Key() evaluation.EvaluatorKey {
+func (a MechanismCanonicalEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {
 	return a.legacyKey
+}
+
+func (a MechanismCanonicalEventAssembler) Key() evaluation.ExecutionIdentity {
+	return a.ExecutionIdentity()
 }
 
 func (a MechanismCanonicalEventAssembler) MechanismKey() MechanismReportBuilderKey {
@@ -34,8 +38,12 @@ func (a MechanismCanonicalEventAssembler) BuildSuccessEvents(outcome evaloutcome
 // TypologyMechanismEventAssembler stages typology success events for all decision-granularity keys.
 type TypologyMechanismEventAssembler struct{}
 
-func (TypologyMechanismEventAssembler) Key() evaluation.EvaluatorKey {
-	return evaluation.EvaluatorKeyPersonalityTypology
+func (TypologyMechanismEventAssembler) ExecutionIdentity() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityPersonalityTypology
+}
+
+func (TypologyMechanismEventAssembler) Key() evaluation.ExecutionIdentity {
+	return evaluation.ExecutionIdentityPersonalityTypology
 }
 
 func (TypologyMechanismEventAssembler) MechanismKey() MechanismReportBuilderKey {
@@ -78,17 +86,17 @@ func DefaultMechanismEventAssemblers() []EventAssembler {
 			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
 			DecisionKind:    modelcatalog.DecisionKindScoreRange,
 			ReportType:      domainReport.ReportTypeStandard,
-		}, evaluation.EvaluatorKeyScaleDefault),
+		}, evaluation.ExecutionIdentityScaleDefault),
 		NewMechanismCanonicalEventAssembler(MechanismReportBuilderKey{
 			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorNorm,
 			DecisionKind:    modelcatalog.DecisionKindNormLookup,
 			ReportType:      domainReport.ReportTypeStandard,
-		}, evaluation.EvaluatorKeyBehavioralRatingDefault),
+		}, evaluation.ExecutionIdentityBehavioralRatingDefault),
 		NewMechanismCanonicalEventAssembler(MechanismReportBuilderKey{
 			AlgorithmFamily: modelcatalog.AlgorithmFamilyTaskPerformance,
 			DecisionKind:    modelcatalog.DecisionKindAbilityLevel,
 			ReportType:      domainReport.ReportTypeStandard,
-		}, evaluation.EvaluatorKeyCognitiveDefault),
+		}, evaluation.ExecutionIdentityCognitiveDefault),
 		TypologyMechanismEventAssembler{},
 	}
 }

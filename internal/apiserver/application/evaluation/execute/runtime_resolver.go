@@ -11,12 +11,12 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// ResolvedExecution captures runtime descriptor routing and the legacy evaluator key.
+// ResolvedExecution captures runtime descriptor routing and the legacy execution identity.
 type ResolvedExecution struct {
-	DescriptorKey  evalpipeline.RuntimeDescriptorKey
-	Descriptor     evalpipeline.RuntimeDescriptor
-	EvaluatorKey   evaluation.EvaluatorKey
-	UsedDescriptor bool
+	DescriptorKey     evalpipeline.RuntimeDescriptorKey
+	Descriptor        evalpipeline.RuntimeDescriptor
+	ExecutionIdentity evaluation.ExecutionIdentity
+	UsedDescriptor    bool
 }
 
 // RuntimeResolver routes evaluation execution through runtime descriptors with EvaluatorKey fallback.
@@ -44,8 +44,8 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 	if r == nil || r.evaluators == nil {
 		return ResolvedExecution{}, fmt.Errorf("evaluation runtime resolver is not configured")
 	}
-	evaluatorKey := resolveEvaluatorKey(a, input)
-	resolved := ResolvedExecution{EvaluatorKey: evaluatorKey}
+	executionIdentity := resolveExecutionIdentity(a, input)
+	resolved := ResolvedExecution{ExecutionIdentity: executionIdentity}
 
 	snapshot, ok := publishedSnapshotFromInput(input)
 	if ok && r.descriptors != nil {
@@ -58,8 +58,8 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 			resolved.DescriptorKey = key
 			resolved.Descriptor = desc
 			resolved.UsedDescriptor = true
-			if canonicalKey, ok := canonicalEvaluatorKeyForFamily(desc.AlgorithmFamily); ok {
-				resolved.EvaluatorKey = canonicalKey
+			if canonicalIdentity, ok := canonicalExecutionIdentityForFamily(desc.AlgorithmFamily); ok {
+				resolved.ExecutionIdentity = canonicalIdentity
 			}
 			if _, err := r.resolveEvaluator(resolved); err != nil {
 				return ResolvedExecution{}, err
@@ -68,7 +68,7 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 		}
 	}
 
-	if _, err := r.evaluators.Resolve(evaluatorKey); err != nil {
+	if _, err := r.evaluators.Resolve(executionIdentity); err != nil {
 		return ResolvedExecution{}, err
 	}
 	return resolved, nil
@@ -101,5 +101,5 @@ func (r *RuntimeResolver) resolveEvaluator(resolved ResolvedExecution) (Evaluato
 			return nil, fmt.Errorf("unsupported evaluation algorithm family: %s", resolved.Descriptor.AlgorithmFamily)
 		}
 	}
-	return r.evaluators.Resolve(resolved.EvaluatorKey)
+	return r.evaluators.Resolve(resolved.ExecutionIdentity)
 }

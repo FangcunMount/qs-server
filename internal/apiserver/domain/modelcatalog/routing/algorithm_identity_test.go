@@ -56,10 +56,10 @@ func TestApiserverDoesNotIntroduceTypologyAlgorithmVariants(t *testing.T) {
 		"AlgorithmSBTI9",
 		"AlgorithmSBTI_",
 		"AlgorithmBigFive_",
-		"EvaluatorKeyMBTI9",
-		"EvaluatorKeyMBTI_",
-		"EvaluatorKeySBTI9",
-		"EvaluatorKeySBTI_",
+		"ExecutionIdentityMBTI9",
+		"ExecutionIdentityMBTI_",
+		"ExecutionIdentitySBTI9",
+		"ExecutionIdentitySBTI_",
 	}
 	root := repoRoot(t)
 	apiserverRoot := filepath.Join(root, "internal", "apiserver")

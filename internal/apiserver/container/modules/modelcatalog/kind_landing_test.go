@@ -73,7 +73,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 		}
 	}
 
-	projectorKeys := make(map[evaldomain.EvaluatorKey]bool, len(projectors))
+	projectorKeys := make(map[evaldomain.ExecutionIdentity]bool, len(projectors))
 	for _, projector := range projectors {
 		projectorKeys[projector.Key()] = true
 	}
@@ -84,8 +84,8 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 		}
 		switch path {
 		case domain.ExecutionPathScaleDescriptor, domain.ExecutionPathBehavioralRatingDescriptor, domain.ExecutionPathCognitiveDescriptor:
-			if !projectorKeys[desc.Key] {
-				t.Fatalf("missing score projector for %s", desc.Key)
+			if !projectorKeys[desc.ExecutionIdentity()] {
+				t.Fatalf("missing score projector for %s", desc.ExecutionIdentity())
 			}
 		}
 	}
@@ -93,7 +93,7 @@ func TestRuntimeExecutableKindsSatisfyLandingContract(t *testing.T) {
 
 func descriptorForKind(descs []evaldomain.ModelDescriptor, kind domain.Kind) evaldomain.ModelDescriptor {
 	for _, desc := range descs {
-		if desc.Key.Kind == kind {
+		if desc.ExecutionIdentity().Kind == kind {
 			return desc
 		}
 	}

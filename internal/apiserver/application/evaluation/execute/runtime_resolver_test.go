@@ -12,17 +12,21 @@ import (
 )
 
 type runtimeEvaluatorStub struct {
-	key     evaluation.EvaluatorKey
+	key     evaluation.ExecutionIdentity
 	execute func(context.Context, ExecutionInput) (*assessment.AssessmentOutcome, error)
 }
 
-func (e runtimeEvaluatorStub) Key() evaluation.EvaluatorKey { return e.key }
+func (e runtimeEvaluatorStub) ExecutionIdentity() evaluation.ExecutionIdentity { return e.key }
 
 func (e runtimeEvaluatorStub) Execute(ctx context.Context, input ExecutionInput) (*assessment.AssessmentOutcome, error) {
 	if e.execute != nil {
 		return e.execute(ctx, input)
 	}
 	return assessment.NewAssessmentOutcome(assessment.EvaluationModelRef{}, assessment.ResultSummary{}, assessment.EvaluationDetail{}), nil
+}
+
+func (e runtimeEvaluatorStub) Key() evaluation.ExecutionIdentity {
+	return e.ExecutionIdentity()
 }
 
 func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
@@ -36,12 +40,12 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
+	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
 	if err != nil {
 		t.Fatal(err)
 	}
 	resolver := NewRuntimeResolver(registry, evaluatorRegistry, map[modelcatalog.AlgorithmFamily]Evaluator{
-		modelcatalog.AlgorithmFamilyFactorScoring: runtimeEvaluatorStub{key: evaluation.EvaluatorKeyScaleDefault},
+		modelcatalog.AlgorithmFamilyFactorScoring: runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault},
 	})
 
 	input := &evaluationinput.InputSnapshot{
@@ -69,7 +73,7 @@ func TestRuntimeResolverUsesDescriptorPrimaryPath(t *testing.T) {
 func TestRuntimeResolverFallsBackToEvaluatorKey(t *testing.T) {
 	t.Parallel()
 
-	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.EvaluatorKeyScaleDefault})
+	evaluatorRegistry, err := NewEvaluatorRegistry(runtimeEvaluatorStub{key: evaluation.ExecutionIdentityScaleDefault})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +93,7 @@ func TestRuntimeResolverFallsBackToEvaluatorKey(t *testing.T) {
 	if resolved.UsedDescriptor {
 		t.Fatal("expected legacy fallback without descriptor registry")
 	}
-	if resolved.EvaluatorKey != evaluation.EvaluatorKeyScaleDefault {
-		t.Fatalf("key=%s", resolved.EvaluatorKey)
+	if resolved.ExecutionIdentity != evaluation.ExecutionIdentityScaleDefault {
+		t.Fatalf("key=%s", resolved.ExecutionIdentity)
 	}
 }

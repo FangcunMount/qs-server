@@ -339,6 +339,7 @@ func newRouterTestContainer() *container.Container {
 		nil,
 		evaluationModule.AccessQueryService,
 		nil,
+		nil,
 	)
 	return &container.Container{
 		SurveyModule: surveyModule,

@@ -21,7 +21,7 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
-	if executor.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+	if executor.Key() != evaluation.ExecutionIdentityPersonalityTypology {
 		t.Fatalf("executor key = %s, want configured typology key", executor.Key())
 	}
 
@@ -29,7 +29,7 @@ func TestV2CustomRuntimeTypologyRunsWithoutNewModuleRegistration(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredReportBuilder: %v", err)
 	}
-	if reportBuilder.Key() != evaluation.EvaluatorKeyPersonalityTypology {
+	if reportBuilder.Key() != evaluation.ExecutionIdentityPersonalityTypology {
 		t.Fatalf("report builder key = %s, want configured typology key", reportBuilder.Key())
 	}
 

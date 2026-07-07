@@ -5,7 +5,7 @@ import (
 
 	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 func TestDefaultEvaluationCatalogPiecesAlign(t *testing.T) {
@@ -31,7 +31,7 @@ func TestDefaultEvaluationCatalogPiecesAlign(t *testing.T) {
 	}
 	foundTypology := false
 	for _, desc := range descs {
-		if desc.Key == evaluation.EvaluatorKeyPersonalityTypology {
+		if desc.Algorithm == modelcatalog.AlgorithmPersonalityTypology {
 			foundTypology = true
 		}
 	}

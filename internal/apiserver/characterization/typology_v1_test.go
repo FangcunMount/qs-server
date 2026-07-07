@@ -105,8 +105,8 @@ func TestV1ConfiguredTypologyExecutorKey(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewConfiguredTypologyExecutor: %v", err)
 	}
-	if got := executor.Key(); got != evaluation.EvaluatorKeyPersonalityTypology {
-		t.Fatalf("executor key = %s, want %s", got, evaluation.EvaluatorKeyPersonalityTypology)
+	if got := executor.Key(); got != evaluation.ExecutionIdentityPersonalityTypology {
+		t.Fatalf("executor key = %s, want %s", got, evaluation.ExecutionIdentityPersonalityTypology)
 	}
 }
 
@@ -124,8 +124,8 @@ func TestV1TypologyLegacyMBTIExecutorMatchesConfiguredOutcome(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewTypologyExecutor: %v", err)
 	}
-	if legacy.Key() != evaluation.EvaluatorKeyMBTI {
-		t.Fatalf("legacy key = %s, want %s", legacy.Key(), evaluation.EvaluatorKeyMBTI)
+	if legacy.Key() != evaluation.ExecutionIdentityMBTI {
+		t.Fatalf("legacy key = %s, want %s", legacy.Key(), evaluation.ExecutionIdentityMBTI)
 	}
 	configuredResult, err := configured.Execute(context.Background(), input)
 	if err != nil {

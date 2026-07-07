@@ -62,6 +62,22 @@ func (r *Router) registerEvaluationProtectedRoutes(apiV1 *gin.RouterGroup) {
 				r.rateCfg.QueryUserBurst,
 				evalHandler.GetHighRiskFactors,
 			)...)
+			assessments.GET("/:id/runs/latest", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.GetLatestAssessmentRun,
+			)...)
+			assessments.GET("/:id/runs", r.rateLimitedHandlers(
+				r.rateCfg,
+				r.rateCfg.QueryGlobalQPS,
+				r.rateCfg.QueryGlobalBurst,
+				r.rateCfg.QueryUserQPS,
+				r.rateCfg.QueryUserBurst,
+				evalHandler.ListAssessmentRuns,
+			)...)
 			assessmentAdmin := assessments.Group("", restmiddleware.RequireCapabilityMiddleware(restmiddleware.CapabilityEvaluateAssessments))
 			assessmentAdmin.POST("/:id/retry", r.rateLimitedHandlers(
 				r.rateCfg,

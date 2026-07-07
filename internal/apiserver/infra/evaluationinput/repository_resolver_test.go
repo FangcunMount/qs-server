@@ -241,33 +241,33 @@ func TestQuestionnaireSnapshotReaderExactVersionMissCarriesFailureReason(t *test
 
 func TestModelInputProviderRegistryRejectsDuplicateAndUnknownKind(t *testing.T) {
 	if _, err := NewModelInputProviderRegistry(
-		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
-		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+		fakeInputProvider{key: evaldomain.ExecutionIdentityScaleDefault},
+		fakeInputProvider{key: evaldomain.ExecutionIdentityScaleDefault},
 	); err == nil {
 		t.Fatal("expected duplicate provider key error")
 	}
-	registry, err := NewModelInputProviderRegistry(fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault})
+	registry, err := NewModelInputProviderRegistry(fakeInputProvider{key: evaldomain.ExecutionIdentityScaleDefault})
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	if _, err := registry.Resolve(evaldomain.EvaluatorKeyMBTI); err == nil {
+	if _, err := registry.Resolve(evaldomain.ExecutionIdentityMBTI); err == nil {
 		t.Fatal("expected unknown provider key error")
 	}
 }
 
 func TestModelInputProviderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.T) {
 	registry, err := NewModelInputProviderRegistry(fakeInputProvider{
-		key: evaldomain.EvaluatorKeyPersonalityTypology,
+		key: evaldomain.ExecutionIdentityPersonalityTypology,
 	})
 	if err != nil {
 		t.Fatalf("NewModelInputProviderRegistry returned error: %v", err)
 	}
-	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyKeys() {
+	for _, legacyKey := range evaldomain.PersonalityTypologyLegacyIdentities() {
 		provider, err := registry.Resolve(legacyKey)
 		if err != nil {
 			t.Fatalf("Resolve(%s): %v", legacyKey, err)
 		}
-		if provider.EvaluatorKey() != evaldomain.EvaluatorKeyPersonalityTypology {
+		if provider.EvaluatorKey() != evaldomain.ExecutionIdentityPersonalityTypology {
 			t.Fatalf("provider key = %#v", provider.EvaluatorKey())
 		}
 	}
@@ -276,8 +276,8 @@ func TestModelInputProviderRegistryResolvesLegacyTypologyViaConfiguredKey(t *tes
 func TestNewResolverReturnsProviderRegistryError(t *testing.T) {
 	if _, err := NewResolver(
 		&scaleCatalogStub{},
-		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
-		fakeInputProvider{key: evaldomain.EvaluatorKeyScaleDefault},
+		fakeInputProvider{key: evaldomain.ExecutionIdentityScaleDefault},
+		fakeInputProvider{key: evaldomain.ExecutionIdentityScaleDefault},
 	); err == nil {
 		t.Fatal("NewResolver error = nil, want duplicate provider key error")
 	}
@@ -307,11 +307,16 @@ func TestRepositoryResolverUnsupportedRuleSetKindCarriesFailureKind(t *testing.T
 }
 
 type fakeInputProvider struct {
-	key evaldomain.EvaluatorKey
+	key evaldomain.ExecutionIdentity
 }
 
-func (p fakeInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
+func (p fakeInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
 	return p.key
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (p fakeInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return p.ExecutionIdentity()
 }
 
 func (p fakeInputProvider) ResolveInput(context.Context, port.InputRef) (*port.InputSnapshot, error) {

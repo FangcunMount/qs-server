@@ -39,9 +39,9 @@ func MaterializeScoreProjectors(descs []evaldomain.ModelDescriptor, deps WiringD
 	return evalruntime.MaterializeScoreProjectors(descs, deps)
 }
 
-// AssertRegistryKeyParity verifies descriptor/evaluator/builder/provider key alignment.
+// AssertExecutionPathParity verifies descriptor/evaluator/builder/provider execution-path alignment.
 // ModelDescriptor slices are the single source of truth for execute/input/report registries.
-func AssertRegistryKeyParity(
+func AssertExecutionPathParity(
 	descs []evaldomain.ModelDescriptor,
 	evaluators []execute.Evaluator,
 	builders []interpretationreporting.ReportBuilder,
@@ -51,15 +51,41 @@ func AssertRegistryKeyParity(
 		return fmt.Errorf("evaluation descriptor count mismatch")
 	}
 	for i, desc := range descs {
-		if evaluators[i].Key() != desc.Key {
-			return fmt.Errorf("evaluator key mismatch at %d", i)
+		want, err := evaldomain.ExecutionPathForDescriptor(desc)
+		if err != nil {
+			return fmt.Errorf("descriptor execution path at %d: %w", i, err)
 		}
-		if builders[i].Key() != desc.Key {
-			return fmt.Errorf("report builder key mismatch at %d", i)
+		evaluatorPath, err := execute.ExecutionPathForEvaluator(evaluators[i])
+		if err != nil {
+			return fmt.Errorf("evaluator execution path at %d: %w", i, err)
 		}
-		if providers[i].EvaluatorKey() != desc.Key {
-			return fmt.Errorf("input provider key mismatch at %d", i)
+		if evaluatorPath != want {
+			return fmt.Errorf("evaluator execution path mismatch at %d: got %s want %s", i, evaluatorPath, want)
+		}
+		builderPath, err := interpretationreporting.ExecutionPathForReportBuilder(builders[i])
+		if err != nil {
+			return fmt.Errorf("report builder execution path at %d: %w", i, err)
+		}
+		if builderPath != want {
+			return fmt.Errorf("report builder execution path mismatch at %d: got %s want %s", i, builderPath, want)
+		}
+		providerPath, err := evaluationinputInfra.ExecutionPathForProvider(providers[i])
+		if err != nil {
+			return fmt.Errorf("input provider execution path at %d: %w", i, err)
+		}
+		if providerPath != want {
+			return fmt.Errorf("input provider execution path mismatch at %d: got %s want %s", i, providerPath, want)
 		}
 	}
 	return nil
+}
+
+// AssertRegistryKeyParity is deprecated; use AssertExecutionPathParity.
+func AssertRegistryKeyParity(
+	descs []evaldomain.ModelDescriptor,
+	evaluators []execute.Evaluator,
+	builders []interpretationreporting.ReportBuilder,
+	providers []evaluationinputInfra.ModelInputProvider,
+) error {
+	return AssertExecutionPathParity(descs, evaluators, builders, providers)
 }

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	port "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -26,8 +27,17 @@ func NewCognitiveModelInputProvider(
 	}
 }
 
-func (CognitiveModelInputProvider) EvaluatorKey() evaldomain.EvaluatorKey {
-	return evaldomain.EvaluatorKeyCognitiveDefault
+func (CognitiveModelInputProvider) ExecutionIdentity() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityCognitiveDefault
+}
+
+// EvaluatorKey is deprecated; use ExecutionIdentity.
+func (CognitiveModelInputProvider) EvaluatorKey() evaldomain.ExecutionIdentity {
+	return evaldomain.ExecutionIdentityCognitiveDefault
+}
+
+func (CognitiveModelInputProvider) ExecutionPath() modelcatalog.ExecutionPath {
+	return modelcatalog.ExecutionPathCognitiveDescriptor
 }
 
 func (p CognitiveModelInputProvider) ResolveInput(ctx context.Context, ref port.InputRef) (*port.InputSnapshot, error) {

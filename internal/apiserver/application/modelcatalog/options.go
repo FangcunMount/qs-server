@@ -13,35 +13,21 @@ type ModelCatalogOption struct {
 	PreviewEnabled bool
 }
 
-// ModelCatalogOptions returns API kind options from the model-family capability matrix.
+// ModelCatalogOptions returns API kind options from the catalog option registry.
 func ModelCatalogOptions() []ModelCatalogOption {
-	caps := domain.DefaultCapabilities()
-	options := make([]ModelCatalogOption, 0, len(caps))
-	for _, cap := range caps {
-		apiKind := cap.APIKind
-		if apiKind == "" {
-			apiKind = DomainKindToAPIKind(cap.Kind)
-		}
-		if apiKind == "" {
-			continue
-		}
+	presentation := catalogRegistry.PresentationOptions()
+	options := make([]ModelCatalogOption, 0, len(presentation))
+	for _, item := range presentation {
 		options = append(options, ModelCatalogOption{
-			APIKind:        apiKind,
-			DisplayName:    cap.DisplayName,
-			ProductChannel: productChannelForCapability(cap),
-			OptionsEnabled: cap.OptionsEnabled,
-			QRCodeEnabled:  cap.QRCodeSupported,
-			PreviewEnabled: cap.PreviewSupported,
+			APIKind:        item.APIKind,
+			DisplayName:    item.DisplayName,
+			ProductChannel: "",
+			OptionsEnabled: item.OptionsEnabled,
+			QRCodeEnabled:  item.QRCodeSupported,
+			PreviewEnabled: item.PreviewSupported,
 		})
 	}
 	return options
-}
-
-func productChannelForCapability(cap domain.KindCapability) domain.Kind {
-	if cap.IsProductChannel() {
-		return cap.Kind
-	}
-	return ""
 }
 
 func apiKindOptions() []Option {

@@ -4,6 +4,7 @@ import (
 	"context"
 
 	evalerrors "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/apperrors"
+	runquery "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runquery"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
 	evaluationwaiter "github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationwaiter"
 	"github.com/FangcunMount/qs-server/internal/pkg/safeconv"
@@ -17,6 +18,7 @@ type protectedQueryService struct {
 	waitService        AssessmentWaitService
 	accessQueryService AssessmentAccessQueryService
 	assessmentReader   evaluationreadmodel.AssessmentReader
+	runQueryService    runquery.Service
 }
 
 // NewProtectedQueryService 创建受保护的查询服务实例
@@ -27,6 +29,7 @@ func NewProtectedQueryService(
 	waitService AssessmentWaitService,
 	accessQueryService AssessmentAccessQueryService,
 	assessmentReader evaluationreadmodel.AssessmentReader,
+	runQueryService runquery.Service,
 ) AssessmentProtectedQueryService {
 	return &protectedQueryService{
 		managementService:  managementService,
@@ -35,6 +38,7 @@ func NewProtectedQueryService(
 		waitService:        waitService,
 		accessQueryService: accessQueryService,
 		assessmentReader:   assessmentReader,
+		runQueryService:    runQueryService,
 	}
 }
 
@@ -243,6 +247,77 @@ func (s *protectedQueryService) WaitReport(ctx context.Context, scope ProtectedQ
 		return pendingAssessmentStatusSummary(), nil
 	}
 	return s.waitService.WaitReport(ctx, assessmentID), nil
+}
+
+// ListAssessmentRuns lists evaluation runs for one accessible assessment.
+func (s *protectedQueryService) ListAssessmentRuns(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64, limit int) (*AssessmentRunListResult, error) {
+	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
+		return nil, err
+	}
+	runQuery, err := s.requireRunQueryService()
+	if err != nil {
+		return nil, err
+	}
+	result, err := runQuery.ListByAssessmentID(ctx, assessmentID, limit)
+	if err != nil {
+		return nil, err
+	}
+	return assessmentRunListFromQuery(result), nil
+}
+
+// GetLatestAssessmentRun returns the latest run for one accessible assessment.
+func (s *protectedQueryService) GetLatestAssessmentRun(ctx context.Context, scope ProtectedQueryScope, assessmentID uint64) (*AssessmentRunResult, error) {
+	if _, err := s.loadAccessibleAssessment(ctx, scope, assessmentID); err != nil {
+		return nil, err
+	}
+	runQuery, err := s.requireRunQueryService()
+	if err != nil {
+		return nil, err
+	}
+	result, err := runQuery.FindLatestByAssessmentID(ctx, assessmentID)
+	if err != nil {
+		return nil, err
+	}
+	if result == nil {
+		return nil, nil
+	}
+	return assessmentRunFromQuery(result), nil
+}
+
+func (s *protectedQueryService) requireRunQueryService() (runquery.Service, error) {
+	if s.runQueryService == nil {
+		return nil, evalerrors.ModuleNotConfigured("evaluation run query service is not configured")
+	}
+	return s.runQueryService, nil
+}
+
+func assessmentRunFromQuery(result *runquery.RunResult) *AssessmentRunResult {
+	if result == nil {
+		return nil
+	}
+	return &AssessmentRunResult{
+		RunID:        result.RunID,
+		AssessmentID: result.AssessmentID,
+		AttemptNo:    result.AttemptNo,
+		Status:       result.Status,
+		Retryable:    result.Retryable,
+		ErrorCode:    result.ErrorCode,
+		ErrorMessage: result.ErrorMessage,
+		StartedAt:    result.StartedAt,
+		FinishedAt:   result.FinishedAt,
+		TraceID:      result.TraceID,
+	}
+}
+
+func assessmentRunListFromQuery(result *runquery.RunListResult) *AssessmentRunListResult {
+	if result == nil {
+		return &AssessmentRunListResult{}
+	}
+	items := make([]*AssessmentRunResult, 0, len(result.Items))
+	for _, item := range result.Items {
+		items = append(items, assessmentRunFromQuery(item))
+	}
+	return &AssessmentRunListResult{Items: items}
 }
 
 // loadAccessibleAssessment 加载可访问的测评

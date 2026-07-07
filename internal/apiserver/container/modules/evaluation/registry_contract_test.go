@@ -17,8 +17,8 @@ func TestEvaluationModuleUsesDescriptorParityGuard(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !strings.Contains(string(data), "func AssertRegistryKeyParity") {
-		t.Fatal("evaluation descriptors must expose registry parity guard for execute/input/report alignment")
+	if !strings.Contains(string(data), "func AssertExecutionPathParity") {
+		t.Fatal("evaluation descriptors must expose execution path parity guard for execute/input/report alignment")
 	}
 }
 
