@@ -156,3 +156,16 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R7-5 | 架构守卫白名单同步；收敛文档 Round 7 节 |
 
 **不做**：assemble 完全切到 `RuntimeDescriptorRegistry` 驱动（留 Round 8）；删 domain 层 `personality/scale` 过渡宿主。
+
+## Round 8：Registry 驱动 assemble + domain entry 重定向（已完成）
+
+**做**：`DefaultEvaluationDescriptors` 从 `RuntimeDescriptorRegistry` 派生 path；catalog 导出 registry；application `factor_scoring` 改引 domain entry。
+
+| 阶段 | 动作 |
+|------|------|
+| R8-1 | `runtime/descriptors.go`：`ExecutionPathsFromRegistry` + `FilterExecutablePaths`；`default_descriptors` 改走 registry |
+| R8-2 | `EvaluationCatalog.RuntimeDescriptorRegistry`；`ExportEvaluationCatalog` 注入 |
+| R8-3 | `domain/factor_scoring/entry` 扩展 alias；application 禁止直引 `domain/evaluation/scale` |
+| R8-4 | `pipeline.Registry.HasAlgorithmFamily`；架构守卫 + 文档 Round 8 节 |
+
+**不做**：删 `domain/evaluation/scale`/`personality` 宿主（留 Round 9）；materialize 改读 registry 工厂表。

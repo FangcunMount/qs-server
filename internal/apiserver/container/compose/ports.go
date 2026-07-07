@@ -7,6 +7,7 @@ import (
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/iam"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/redis/outboxready"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
@@ -23,8 +24,9 @@ type ReportIntegrationPorts struct {
 
 // EvaluationCatalog carries shared model descriptors for report/evaluation wiring.
 type EvaluationCatalog struct {
-	Descriptors      []evaldomain.ModelDescriptor
-	TypologyRegistry typologyEvaluation.ModuleRegistry
+	Descriptors              []evaldomain.ModelDescriptor
+	TypologyRegistry         typologyEvaluation.ModuleRegistry
+	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 }
 
 // ActorIAMPorts carries IAM integration inputs for actor module installation.

@@ -44,6 +44,9 @@ func TestExportEvaluationCatalogMatchesDefaultDescriptors(t *testing.T) {
 	if catalog.TypologyRegistry.Len() != len(DefaultTypologyModules()) {
 		t.Fatalf("registry len = %d, want %d", catalog.TypologyRegistry.Len(), len(DefaultTypologyModules()))
 	}
+	if catalog.RuntimeDescriptorRegistry == nil || catalog.RuntimeDescriptorRegistry.Len() != 4 {
+		t.Fatalf("runtime descriptor registry len = %d, want 4", catalog.RuntimeDescriptorRegistry.Len())
+	}
 }
 
 func TestModuleExportEvaluationCatalogDelegatesToPackagePort(t *testing.T) {

@@ -2,14 +2,14 @@ package factor_scoring
 
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
+	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/pkg/meta"
 )
 
 // ToAssessmentOutcome maps a scale interpretation result into the canonical domain outcome.
 func ToAssessmentOutcome(
-	result *evaluationscale.ScaleInterpretationResult,
+	result *domainfactor_scoring.ScaleInterpretationResult,
 	a *assessment.Assessment,
 	snapshot *evaluationinput.InputSnapshot,
 ) *assessment.AssessmentOutcome {
@@ -60,7 +60,7 @@ func scaleModelRef(a *assessment.Assessment, snapshot *evaluationinput.InputSnap
 	return assessment.EvaluationModelRef{}
 }
 
-func factorScoreResultsFromInterpretation(result *evaluationscale.ScaleInterpretationResult) []assessment.FactorScoreResult {
+func factorScoreResultsFromInterpretation(result *domainfactor_scoring.ScaleInterpretationResult) []assessment.FactorScoreResult {
 	factorScores := make([]assessment.FactorScoreResult, 0, len(result.FactorScores))
 	for _, fs := range result.FactorScores {
 		factorScores = append(factorScores, assessment.NewFactorScoreResult(

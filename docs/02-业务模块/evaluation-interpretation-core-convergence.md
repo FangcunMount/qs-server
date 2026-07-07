@@ -68,3 +68,12 @@ PublishedModelSnapshot
 | deprecated 清债 | 删除 application `scale`/`behavioral_rating`/`cognitive`；characterization 直引 `factor_*` |
 | Registry 桥接 | `DefaultRuntimeDescriptorRegistry()` 与 materialize 四条 `ExecutionPath` 对齐 |
 | 测试迁移 | `factor_scoring/executor_test`、`factor_norm/*_test`、fixture 路径修正 |
+
+## Round 8（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Registry 驱动 descs | `DefaultEvaluationDescriptors` 从 `RuntimeDescriptorRegistry` 派生 execution path 再投影 |
+| Catalog 导出 | `EvaluationCatalog.RuntimeDescriptorRegistry` 随 `ExportEvaluationCatalog` 注入 |
+| Domain entry | application `factor_scoring` 经 `domain/evaluation/factor_scoring` entry，不再直引 `scale` |
+| 守卫 | `TestApplicationFactorMechanismsUseDomainEntryPackages` |

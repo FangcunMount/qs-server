@@ -7,7 +7,7 @@ import (
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
+	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_scoring"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
 )
@@ -15,7 +15,7 @@ import (
 // Executor runs factor-scoring evaluations.
 type Executor struct {
 	validator InputValidator
-	handler   *evaluationscale.Handler
+	handler   *domainfactor_scoring.Handler
 }
 
 var _ evaluationexecute.Evaluator = (*Executor)(nil)
@@ -24,17 +24,17 @@ var _ evaluationexecute.Evaluator = (*Executor)(nil)
 func NewExecutor(scorer ruleengine.ScaleFactorScorer) *Executor {
 	return NewExecutorWithDeps(
 		DefaultInputValidator{},
-		evaluationscale.NewHandler(scoringRegistry{scorer: scorer}),
+		domainfactor_scoring.NewHandler(scoringRegistry{scorer: scorer}),
 	)
 }
 
 // NewExecutorWithDeps creates an executor with replaceable dependencies (tests).
-func NewExecutorWithDeps(validator InputValidator, handler *evaluationscale.Handler) *Executor {
+func NewExecutorWithDeps(validator InputValidator, handler *domainfactor_scoring.Handler) *Executor {
 	if validator == nil {
 		validator = DefaultInputValidator{}
 	}
 	if handler == nil {
-		handler = evaluationscale.NewDefaultHandler()
+		handler = domainfactor_scoring.NewDefaultHandler()
 	}
 	return &Executor{
 		validator: validator,
@@ -70,7 +70,7 @@ type scoringRegistry struct {
 
 func (r scoringRegistry) ScoreFactor(ctx context.Context, factor scalesnapshot.FactorSnapshot, values []float64) (float64, error) {
 	if r.scorer == nil {
-		return evaluationscale.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
+		return domainfactor_scoring.DefaultScoringStrategyRegistry{}.ScoreFactor(ctx, factor, values)
 	}
 	return r.scorer.ScoreFactor(ctx, factor.Code, values, factor.ScoringStrategy, nil)
 }

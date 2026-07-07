@@ -64,3 +64,24 @@ func (r *RuntimeDescriptorRegistry) Len() int {
 	}
 	return len(r.byKey)
 }
+
+// HasAlgorithmFamily reports whether a family-level descriptor is registered.
+func (r *RuntimeDescriptorRegistry) HasAlgorithmFamily(family modelcatalog.AlgorithmFamily) bool {
+	if r == nil {
+		return false
+	}
+	_, ok := r.byKey[RuntimeDescriptorKey{AlgorithmFamily: family}]
+	return ok
+}
+
+// ExecutionPathForDescriptor returns the registered execution path for a family, if any.
+func (r *RuntimeDescriptorRegistry) ExecutionPathForFamily(family modelcatalog.AlgorithmFamily) (modelcatalog.ExecutionPath, bool) {
+	if r == nil {
+		return "", false
+	}
+	desc, ok := r.byKey[RuntimeDescriptorKey{AlgorithmFamily: family}]
+	if !ok {
+		return "", false
+	}
+	return desc.ExecutionPath, true
+}

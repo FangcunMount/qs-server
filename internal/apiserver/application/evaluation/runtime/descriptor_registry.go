@@ -6,7 +6,6 @@ import (
 )
 
 // DefaultRuntimeDescriptorRegistry registers mechanism descriptors aligned with materialize factories.
-// Production wiring still uses ExecutionPath factories; this registry is the convergence bridge for Round 7.
 func DefaultRuntimeDescriptorRegistry() (*evalpipeline.RuntimeDescriptorRegistry, error) {
 	registry := evalpipeline.NewRuntimeDescriptorRegistry()
 	for _, path := range []modelcatalog.ExecutionPath{

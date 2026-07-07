@@ -209,3 +209,39 @@ func TestExecutionPathRoutingLivesInPipelinePackage(t *testing.T) {
 		}
 	}
 }
+
+func TestApplicationFactorMechanismsUseDomainEntryPackages(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := map[string][]string{
+		"internal/apiserver/application/evaluation/factor_scoring": {
+			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale",
+		},
+	}
+	for relDir, forbidden := range forbiddenImports {
+		scanRoot := filepath.Join(root, relDir)
+		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+			if err != nil {
+				return err
+			}
+			if entry.IsDir() || !strings.HasSuffix(path, ".go") {
+				return nil
+			}
+			data, err := os.ReadFile(path)
+			if err != nil {
+				return err
+			}
+			text := string(data)
+			for _, imp := range forbidden {
+				if strings.Contains(text, imp) {
+					t.Fatalf("%s imports %s; use domain mechanism entry package instead", filepath.ToSlash(mustRel(t, root, path)), imp)
+				}
+			}
+			return nil
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+}

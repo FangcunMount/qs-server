@@ -149,12 +149,12 @@ func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "scale"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_scoring"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
 		if strings.Contains(importPath, "/application/evaluation/engine") {
-			t.Fatalf("%s imports %s; scale executor must not wrap legacy evaluation pipeline", filepath.ToSlash(mustRel(t, root, path)), importPath)
+			t.Fatalf("%s imports %s; factor_scoring executor must not wrap legacy evaluation pipeline", filepath.ToSlash(mustRel(t, root, path)), importPath)
 		}
 	})
 }
@@ -686,7 +686,7 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
 		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "scale"),
 		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "score"),
-		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "scale"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_scoring"),
 	}
 	for _, scanRoot := range scaleRoots {
 		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {

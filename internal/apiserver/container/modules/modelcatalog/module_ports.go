@@ -1,6 +1,7 @@
 package modelcatalog
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 )
 
@@ -10,9 +11,14 @@ func ExportEvaluationCatalog() (compose.EvaluationCatalog, error) {
 	if err != nil {
 		return compose.EvaluationCatalog{}, err
 	}
+	runtimeRegistry, err := runtime.DefaultRuntimeDescriptorRegistry()
+	if err != nil {
+		return compose.EvaluationCatalog{}, err
+	}
 	return compose.EvaluationCatalog{
-		Descriptors:      DefaultEvaluationDescriptors(),
-		TypologyRegistry: registry,
+		Descriptors:               DefaultEvaluationDescriptors(),
+		TypologyRegistry:          registry,
+		RuntimeDescriptorRegistry: runtimeRegistry,
 	}, nil
 }
 

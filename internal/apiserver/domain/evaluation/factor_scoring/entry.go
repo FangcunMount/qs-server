@@ -10,6 +10,18 @@ import (
 // Handler scores scale-like models using the factor-scoring engine.
 type Handler = evalscale.Handler
 
+// EvaluateInput is the domain input for factor-scoring execution.
+type EvaluateInput = evalscale.EvaluateInput
+
+// ScaleInterpretationResult is the domain scoring outcome for factor-scoring execution.
+type ScaleInterpretationResult = evalscale.ScaleInterpretationResult
+
+// ScoringStrategyRegistry scores individual factors during factor-scoring execution.
+type ScoringStrategyRegistry = evalscale.ScoringStrategyRegistry
+
+// DefaultScoringStrategyRegistry is the built-in factor scoring registry.
+type DefaultScoringStrategyRegistry = evalscale.DefaultScoringStrategyRegistry
+
 // NewHandler creates a factor-scoring handler.
 var NewHandler = evalscale.NewHandler
 

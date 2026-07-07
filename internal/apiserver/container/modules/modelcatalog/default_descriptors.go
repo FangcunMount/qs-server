@@ -2,6 +2,7 @@ package modelcatalog
 
 import (
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
@@ -26,27 +27,20 @@ func DefaultTypologyDescriptors() []evaldomain.ModelDescriptor {
 	return typologyEvaluation.DefaultTypologyDescriptors()
 }
 
-var defaultRuntimeExecutionPathOrder = []domain.ExecutionPath{
-	domain.ExecutionPathScaleDescriptor,
-	domain.ExecutionPathTypologyDescriptor,
-	domain.ExecutionPathBehavioralRatingDescriptor,
-	domain.ExecutionPathCognitiveDescriptor,
-}
-
 // DefaultEvaluationDescriptors returns runtime descriptors for all capability-backed execution paths.
 func DefaultEvaluationDescriptors() []evaldomain.ModelDescriptor {
-	runtimePaths := make(map[domain.ExecutionPath]bool)
-	for _, cap := range domain.ModelFamilyCapabilitiesV2() {
-		if cap.RuntimeExecutable {
-			runtimePaths[cap.ExecutionPath] = true
-		}
+	registry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
+	if err != nil {
+		panic("default runtime descriptor registry: " + err.Error())
 	}
+	paths, err := evalruntime.ExecutionPathsFromRegistry(registry)
+	if err != nil {
+		panic("execution paths from registry: " + err.Error())
+	}
+	paths = evalruntime.FilterExecutablePaths(paths)
 
 	var descs []evaldomain.ModelDescriptor
-	for _, path := range defaultRuntimeExecutionPathOrder {
-		if !runtimePaths[path] {
-			continue
-		}
+	for _, path := range paths {
 		descs = append(descs, descriptorsForExecutionPath(path)...)
 	}
 	return descs

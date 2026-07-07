@@ -2,14 +2,14 @@ package factor_scoring
 
 import (
 	evaluationinputdomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
-	evaluationscale "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale"
+	domainfactor_scoring "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/factor_scoring"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
-func evaluateInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) evaluationscale.EvaluateInput {
+func evaluateInputFromSnapshot(snapshot *evaluationinput.InputSnapshot) domainfactor_scoring.EvaluateInput {
 	scaleSnapshot, _ := evaluationinput.ScalePayload(snapshot)
-	return evaluationscale.EvaluateInput{
+	return domainfactor_scoring.EvaluateInput{
 		Scale:         scaleSnapshot,
 		AnswerSheet:   answerSheetFromPort(snapshot.AnswerSheet),
 		Questionnaire: questionnaireFromPort(snapshot.Questionnaire),
