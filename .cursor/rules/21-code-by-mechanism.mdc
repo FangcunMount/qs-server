@@ -29,6 +29,6 @@ alwaysApply: false
 
 ## 过渡包（白名单，不得新增）
 
-- `domain/modelcatalog/behavioral_rating/brief2` → 收敛至 `factor_norm` / `calculation/norm`
-- `domain/modelcatalog/cognitive/spm` → 收敛至 `task_performance`
 - `domain/evaluation/personality/adapter/{mbti,sbti,bigfive}` → characterization-only
+
+已删除（Round 3）：`behavioral_rating/brief2`、`cognitive/spm` — 生产路径直引 `factor_norm` / `calculation/norm` / `task_performance`。

@@ -41,17 +41,6 @@ func decisionKindFromResult(result evaluationtypology.ScoringResult) modelcatalo
 	return ""
 }
 
-func assembleTraitProfileOutcome(
-	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.BigFiveResultDetailFromPayload(result.Detail)
-	if err != nil {
-		return nil, err
-	}
-	return assessmentOutcomeFromTraitProfile(modelRef, evaluationtypology.TraitProfileDetailFromBigFive(detail)), nil
-}
-
 func assembleGenericTraitProfileOutcome(
 	modelRef assessment.EvaluationModelRef,
 	result evaluationtypology.ScoringResult,
@@ -72,28 +61,6 @@ func assembleGenericPersonalityTypeOutcome(
 		return nil, err
 	}
 	return assessmentOutcomeFromPersonalityType(modelRef, detail), nil
-}
-
-func assemblePersonalityTypeFromMBTI(
-	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.MBTIResultDetailFromPayload(result.Detail)
-	if err != nil {
-		return nil, err
-	}
-	return assessmentOutcomeFromPersonalityType(modelRef, evaluationtypology.PersonalityTypeDetailFromMBTI(detail)), nil
-}
-
-func assemblePersonalityTypeFromSBTI(
-	modelRef assessment.EvaluationModelRef,
-	result evaluationtypology.ScoringResult,
-) (*assessment.AssessmentOutcome, error) {
-	detail, err := evaluationtypology.SBTIResultDetailFromPayload(result.Detail)
-	if err != nil {
-		return nil, err
-	}
-	return assessmentOutcomeFromPersonalityType(modelRef, evaluationtypology.PersonalityTypeDetailFromSBTI(detail)), nil
 }
 
 // AssembleFromPayload derives mapping from payload and assembles the outcome.

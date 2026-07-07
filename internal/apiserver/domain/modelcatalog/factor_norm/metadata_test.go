@@ -1,21 +1,21 @@
-package brief2_test
+package factor_norm_test
 
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor_norm"
 )
 
 func TestApplyCompositeMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := brief2.ApplyCompositeMetadata([]factor.FactorSnapshot{
+	factors := factor_norm.ApplyCompositeMetadata([]factor.FactorSnapshot{
 		{Code: "inhibit", Title: "Inhibit"},
 		{Code: "self_monitor", Title: "Self Monitor"},
 		{Code: "bri", Title: "BRI", Role: factor.FactorRoleIndex},
 		{Code: "gec", Title: "GEC", Role: factor.FactorRoleIndex},
-	}, []brief2.CompositeIndexSpec{
+	}, []factor_norm.CompositeIndexSpec{
 		{Code: "bri", Strategy: factor.ChildrenAggregationSum, Children: []string{"inhibit", "self_monitor"}},
 		{Code: "gec", Strategy: factor.ChildrenAggregationSum, Children: []string{"bri"}},
 	})
@@ -29,5 +29,29 @@ func TestApplyCompositeMetadata(t *testing.T) {
 	}
 	if byCode["gec"].Level != 1 || byCode["bri"].Level != 2 || byCode["inhibit"].Level != 3 {
 		t.Fatalf("levels = gec:%d bri:%d inhibit:%d", byCode["gec"].Level, byCode["bri"].Level, byCode["inhibit"].Level)
+	}
+}
+
+func TestApplyNormMetadata(t *testing.T) {
+	t.Parallel()
+
+	factors := factor_norm.ApplyNormMetadata([]factor.FactorSnapshot{
+		{Code: "bri"},
+		{Code: "inconsistency"},
+		{Code: "gec"},
+	}, factor_norm.MetadataContext{
+		NormTableVersion: "2024",
+		IndexCodes:       []string{"bri", "gec"},
+		ValidityCodes:    []string{"inconsistency"},
+		NormFactorCodes:  []string{"gec"},
+	})
+	if factors[0].ResolvedRole() != factor.FactorRoleIndex {
+		t.Fatalf("bri role = %s", factors[0].ResolvedRole())
+	}
+	if factors[1].ResolvedRole() != factor.FactorRoleValidity {
+		t.Fatalf("validity role = %s", factors[1].ResolvedRole())
+	}
+	if factors[2].Norm == nil || factors[2].Norm.NormTableVersion != "2024" {
+		t.Fatalf("gec norm = %#v", factors[2].Norm)
 	}
 }

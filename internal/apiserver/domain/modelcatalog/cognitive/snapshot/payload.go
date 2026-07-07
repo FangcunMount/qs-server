@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
-	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/task_performance"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
+	taskperf "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/task_performance"
 )
 
 // Snapshot is a published cognitive execution payload (default.v1 or spm.v1).

@@ -1,19 +1,19 @@
-package spm_test
+package task_performance_test
 
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/spm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/task_performance"
 )
 
 func TestApplyNormMetadata(t *testing.T) {
 	t.Parallel()
 
-	factors := spm.ApplyNormMetadata([]factor.FactorSnapshot{
+	factors := task_performance.ApplyNormMetadata([]factor.FactorSnapshot{
 		{Code: "A"},
 		{Code: "total", IsTotalScore: true},
-	}, spm.NormContext{
+	}, task_performance.MetadataContext{
 		NormTableVersion: "2024",
 		ItemSetCodes:     []string{"A"},
 	})

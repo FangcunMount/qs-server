@@ -36,11 +36,11 @@ application/evaluation/
 
 ## 三阶段迁移
 
-### 阶段一：过渡（当前）
+### 阶段一：过渡（收尾）
 
-- 允许 `behavioral_rating/brief2`、`cognitive/spm`、`adapter/{mbti,sbti,bigfive}` 作为 algorithm extension。
+- 已删除 `behavioral_rating/brief2`、`cognitive/spm` 过渡包（Round 3）。
+- 仍保留 `adapter/{mbti,sbti,bigfive}` 作为 characterization-only 等价基线。
 - 架构守卫测试禁止**新增**以测评 code 命名的 package。
-- 所有过渡包须标注 `transitional` 注释。
 
 ### 阶段二：抽象（第二个同类模型出现时）
 
@@ -71,11 +71,9 @@ application/evaluation/
 | 生产路径 | `configured` runtime（非 `adapter.DefaultRegistry()`） |
 | 架构守卫 | `architecture_mechanism_test.go`、`.cursor/rules/21-code-by-mechanism.mdc` |
 
-## Round 2：收缩过渡层 + 收紧契约（当前）
+## Round 2：收缩过渡层 + 收紧契约（已完成）
 
 **做**：应用层直引机制包；默认 registry 仅机制 adapter key；publish 必填 `decision.kind`；publish 拒绝 legacy adapter key。
-
-**不做**：Conners / SPM 完整执行层；删 `Algorithm*` / payload JSON；前端 migration。
 
 | 阶段 | 动作 |
 |------|------|
@@ -86,8 +84,22 @@ application/evaluation/
 | R2-E | application typology 不得 import `adapter/{mbti,sbti,bigfive}` |
 | R2-F | 文档同步 |
 
-过渡包白名单（re-export / characterization-only）：`brief2`、`spm`、`adapter/{mbti,sbti,bigfive}`。
-
 ### 阶段二：MBTI 收敛 — 已完成
 
 report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；legacy assemble 保留供 characterization 显式注入。
+
+## Round 3：删除过渡包 + 契约全链路对齐（已完成）
+
+**做**：删除 `brief2`/`spm`；`detail_registry` 单轨；seed 对齐机制 key；报告路径统一走 mechanism template。
+
+**不做**：Conners / SPM 执行层；删 `adapter/{mbti,sbti,bigfive}`。
+
+| 阶段 | 动作 |
+|------|------|
+| R3-A | 删除 `brief2`/`spm`；测试迁至 `factor_norm`/`calcnorm`/`task_performance` |
+| R3-B | `DefaultDetailAssemblerRegistry` 仅 2 key；`RegisterLegacyDetailAssemblers` 供 characterization |
+| R3-C | seed_personality_typology 改机制 adapter key |
+| R3-D | `report_template.go` + `buildMechanism*Report` 统一机制路径 |
+| R3-E+F+G | characterization 标注、架构守卫、文档同步 |
+
+过渡包白名单（characterization-only）：`adapter/{mbti,sbti,bigfive}`。

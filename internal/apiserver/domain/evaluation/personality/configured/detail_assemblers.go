@@ -78,30 +78,6 @@ func assembleTraitProfileDetail(input DetailInput) (any, error) {
 	}, nil
 }
 
-func assembleMBTIDetail(input DetailInput) (any, error) {
-	generic, err := assemblePersonalityTypeDetail(input)
-	if err != nil {
-		return nil, err
-	}
-	return evaluationtypology.MBTIResultDetailFromPersonalityType(generic.(evaluationtypology.PersonalityTypeDetail)), nil
-}
-
-func assembleSBTIDetail(input DetailInput) (any, error) {
-	generic, err := assemblePersonalityTypeDetail(input)
-	if err != nil {
-		return nil, err
-	}
-	return evaluationtypology.SBTIResultDetailFromPersonalityType(generic.(evaluationtypology.PersonalityTypeDetail)), nil
-}
-
-func assembleBigFiveDetail(input DetailInput) (any, error) {
-	generic, err := assembleTraitProfileDetail(input)
-	if err != nil {
-		return nil, err
-	}
-	return evaluationtypology.BigFiveResultDetailFromTraitProfile(generic.(evaluationtypology.TraitProfileDetail)), nil
-}
-
 func buildPersonalityDimensions(input DetailInput) ([]evaluationtypology.PersonalityDimensionResult, error) {
 	if input.Decision.Kind == profile.DecisionKindPoleComposition || len(input.Decision.Poles) > 0 {
 		return buildPolePersonalityDimensions(input)

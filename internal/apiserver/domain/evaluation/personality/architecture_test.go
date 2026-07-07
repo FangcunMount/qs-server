@@ -6,6 +6,9 @@ import (
 	"runtime"
 	"strings"
 	"testing"
+
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/configured"
+	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
 )
 
 func TestExecutePackageDoesNotReferenceConcreteTypologyScorers(t *testing.T) {
@@ -77,6 +80,24 @@ func TestConfiguredEvaluatorDoesNotSpecialCaseLegacyAdapters(t *testing.T) {
 	} {
 		if strings.Contains(text, token) {
 			t.Fatalf("configured evaluator contains %q; legacy adapter details belong in detail assemblers", token)
+		}
+	}
+}
+
+func TestDefaultDetailAssemblerRegistryExcludesLegacyAdapterKeys(t *testing.T) {
+	t.Parallel()
+
+	registry := configured.NewDetailAssemblerRegistry()
+	if registry.Len() != 2 {
+		t.Fatalf("registry len = %d, want 2 mechanism adapters", registry.Len())
+	}
+	for _, key := range []modeltypology.DetailAdapterKey{
+		modeltypology.DetailAdapterMBTI,
+		modeltypology.DetailAdapterSBTI,
+		modeltypology.DetailAdapterBigFive,
+	} {
+		if _, err := registry.Assemble(configured.DetailInput{Adapter: key}); err == nil {
+			t.Fatalf("default registry should not register legacy adapter %s", key)
 		}
 	}
 }

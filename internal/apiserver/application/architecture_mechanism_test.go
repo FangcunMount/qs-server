@@ -10,8 +10,6 @@ import (
 // transitionalAssessmentCodePackages lists algorithm-specific extension packages allowed
 // during migration to mechanism-oriented organization. Do not add new entries.
 var transitionalAssessmentCodePackages = map[string]string{
-	"internal/apiserver/domain/modelcatalog/behavioral_rating/brief2":  "transitional: re-export only; production imports factor_norm / calculation/norm",
-	"internal/apiserver/domain/modelcatalog/cognitive/spm":             "transitional: re-export only; production imports task_performance",
 	"internal/apiserver/domain/evaluation/personality/adapter/mbti":    "transitional: characterization-only legacy adapter",
 	"internal/apiserver/domain/evaluation/personality/adapter/sbti":    "transitional: characterization-only legacy adapter",
 	"internal/apiserver/domain/evaluation/personality/adapter/bigfive": "transitional: characterization-only legacy adapter",

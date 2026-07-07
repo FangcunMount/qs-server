@@ -72,21 +72,21 @@ func enrichPayloadWithExplicitRuntime(payload *modeltypology.Payload) (*modeltyp
 	case domain.AlgorithmMBTI:
 		runtime.OutcomeMapping = modeltypology.OutcomeMappingSpec{
 			DetailKind:       modeltypology.OutcomeDetailPersonalityType,
-			DetailAdapterKey: modeltypology.DetailAdapterMBTI,
+			DetailAdapterKey: modeltypology.DetailAdapterPersonalityType,
 		}
 		runtime.Report = modeltypology.ReportSpec{
 			Kind:          modeltypology.ReportKindPersonalityType,
-			AdapterKey:    modeltypology.ReportAdapterMBTI,
+			AdapterKey:    modeltypology.ReportAdapterPersonalityType,
 			CategoryLabel: "MBTI",
 		}
 	case domain.AlgorithmSBTI:
 		runtime.OutcomeMapping = modeltypology.OutcomeMappingSpec{
 			DetailKind:       modeltypology.OutcomeDetailPersonalityType,
-			DetailAdapterKey: modeltypology.DetailAdapterSBTI,
+			DetailAdapterKey: modeltypology.DetailAdapterPersonalityType,
 		}
 		runtime.Report = modeltypology.ReportSpec{
 			Kind:          modeltypology.ReportKindPersonalityType,
-			AdapterKey:    modeltypology.ReportAdapterSBTI,
+			AdapterKey:    modeltypology.ReportAdapterPersonalityType,
 			CategoryLabel: "SBTI",
 		}
 	}

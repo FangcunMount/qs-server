@@ -53,9 +53,6 @@ func NewDetailAssemblerRegistry() DetailAssemblerRegistry {
 		assemblers: map[modeltypology.DetailAdapterKey]detailAssemblerFunc{
 			modeltypology.DetailAdapterPersonalityType: assemblePersonalityTypeDetail,
 			modeltypology.DetailAdapterTraitProfile:    assembleTraitProfileDetail,
-			modeltypology.DetailAdapterMBTI:            assembleMBTIDetail,
-			modeltypology.DetailAdapterSBTI:            assembleSBTIDetail,
-			modeltypology.DetailAdapterBigFive:         assembleBigFiveDetail,
 		},
 	}
 }

@@ -21,8 +21,8 @@ func buildBig5Payload() (*modeltypology.Payload, error) {
 		Factors:             traitFactorsFromSeed(seed),
 		Items:               traitItemsFromSeed(seed),
 		ReportCategoryLabel: "大五人格",
-		DetailAdapterKey:    modeltypology.DetailAdapterBigFive,
-		ReportAdapterKey:    modeltypology.ReportAdapterBigFive,
+		DetailAdapterKey:    modeltypology.DetailAdapterTraitProfile,
+		ReportAdapterKey:    modeltypology.ReportAdapterTraitProfile,
 		Source: modeltypology.Source{
 			SourceSite:    "https://ipip.ori.org/",
 			Attribution:   "IPIP (International Personality Item Pool)",

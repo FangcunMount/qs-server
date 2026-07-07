@@ -1,57 +1,9 @@
 package typology
 
 import (
-	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
-	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	reporttypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation/personality/typology"
 )
-
-func buildGenericPersonalityTypeReport(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	if outcome.Assessment == nil {
-		return nil, errAssessmentRequired
-	}
-	if outcome.Execution == nil {
-		return nil, errEvaluationOutcomeRequired
-	}
-	detail, err := personalityTypeDetailForReport(outcome.Execution.Detail.Payload)
-	if err != nil {
-		return nil, err
-	}
-	return reporttypology.BuildPersonalityTypeReport(
-		reporttypology.PersonalityTypeReportInput{
-			AssessmentID: domainReport.ID(outcome.Assessment.ID()),
-			ModelCode:    typologyModelCode(outcome),
-			TotalScore:   typologyTotalScore(outcome.Execution),
-			RiskLevel:    typologyRiskLevel(outcome.Execution),
-			Detail:       genericPersonalityTypeMechanismDetail(detail),
-		},
-		reporttypology.PersonalityTypeReportTemplate{},
-	)
-}
-
-func buildGenericTraitProfileReport(outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	if outcome.Assessment == nil {
-		return nil, errAssessmentRequired
-	}
-	if outcome.Execution == nil {
-		return nil, errEvaluationOutcomeRequired
-	}
-	detail, err := traitProfileDetailForReport(outcome.Execution.Detail.Payload)
-	if err != nil {
-		return nil, err
-	}
-	return reporttypology.BuildTraitProfileReport(
-		reporttypology.TraitProfileReportInput{
-			AssessmentID: domainReport.ID(outcome.Assessment.ID()),
-			ModelCode:    typologyModelCode(outcome),
-			TotalScore:   typologyTotalScore(outcome.Execution),
-			RiskLevel:    typologyRiskLevel(outcome.Execution),
-			Detail:       genericTraitProfileMechanismDetail(detail),
-		},
-		reporttypology.TraitProfileReportTemplate{},
-	)
-}
 
 func genericPersonalityTypeMechanismDetail(detail evaluationtypology.PersonalityTypeDetail) reporttypology.PersonalityTypeReportDetail {
 	dimensions := make([]reporttypology.PersonalityTypeDimensionReport, 0, len(detail.Dimensions))
@@ -67,8 +19,10 @@ func genericPersonalityTypeMechanismDetail(detail evaluationtypology.Personality
 		MatchPercent: detail.MatchPercent, ImageURL: detail.ImageURL,
 		IsSpecial: detail.IsSpecial, SpecialTrigger: detail.SpecialTrigger, Commentary: detail.Commentary,
 		Profile: reporttypology.PersonalityTypeProfileReport{
-			Summary: detail.Summary, Strengths: append([]string(nil), detail.Strengths...),
-			Weaknesses: append([]string(nil), detail.Weaknesses...), Suggestions: append([]string(nil), detail.Suggestions...),
+			Summary:     firstNonEmptyReportText(detail.Summary, detail.Commentary),
+			Strengths:   append([]string(nil), detail.Strengths...),
+			Weaknesses:  append([]string(nil), detail.Weaknesses...),
+			Suggestions: append([]string(nil), detail.Suggestions...),
 		},
 		Rarity: reporttypology.PersonalityTypeRarityReport{
 			Percent: detail.Rarity.Percent, Label: detail.Rarity.Label, OneInX: detail.Rarity.OneInX,
@@ -91,4 +45,13 @@ func genericTraitProfileMechanismDetail(detail evaluationtypology.TraitProfileDe
 			NonCommercial: detail.Source.NonCommercial,
 		},
 	}
+}
+
+func firstNonEmptyReportText(values ...string) string {
+	for _, value := range values {
+		if value != "" {
+			return value
+		}
+	}
+	return ""
 }

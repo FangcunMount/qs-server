@@ -1,8 +1,6 @@
 package typology
 
 import (
-	"fmt"
-
 	domainreport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 )
 
@@ -16,22 +14,13 @@ type MBTIReportInput struct {
 
 // BuildMBTIReport 组装 MBTI typology 解读报告。
 func BuildMBTIReport(input MBTIReportInput) (*domainreport.InterpretReport, error) {
-	maxScore := 40.0
 	return BuildPersonalityTypeReport(PersonalityTypeReportInput{
 		AssessmentID: input.AssessmentID,
 		ModelCode:    input.ModelCode,
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
 		Detail:       mbtiMechanismDetail(input.Detail),
-	}, PersonalityTypeReportTemplate{
-		Kind:              "mbti",
-		DefaultModelName:  "MBTI 人格类型测评",
-		DefaultModelCode:  "MBTI_OEJTS",
-		DimensionMaxScore: &maxScore,
-		DimensionDescription: func(name, preference string, rawScore, strength float64, _, _ string) string {
-			return fmt.Sprintf("%s：倾向 %s（原始分 %.0f，偏好强度 %.0f%%）", name, preference, rawScore, strength)
-		},
-	})
+	}, MBTIPersonalityTypeTemplate())
 }
 
 func mbtiMechanismDetail(detail MBTIReportDetail) PersonalityTypeReportDetail {

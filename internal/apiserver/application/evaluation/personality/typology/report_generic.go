@@ -9,31 +9,55 @@ import (
 )
 
 func buildPersonalityTypeReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	switch legacyAlgorithmFromOutcome(outcome) {
-	case modelcatalog.AlgorithmMBTI:
-		input, err := MBTIReportInputFromOutcome(outcome)
-		if err != nil {
-			return nil, err
-		}
-		return reporttypology.BuildMBTIReport(input)
-	case modelcatalog.AlgorithmSBTI:
-		input, err := SBTIReportInputFromOutcome(outcome)
-		if err != nil {
-			return nil, err
-		}
-		return reporttypology.BuildSBTIReport(input)
-	default:
-		return buildGenericPersonalityTypeReport(outcome)
-	}
+	return buildMechanismPersonalityTypeReport(outcome, legacyAlgorithmFromOutcome(outcome))
 }
 
 func buildTraitProfileReport(_ modeltypology.ReportAdapterKey, outcome evaloutcome.Outcome) (*domainReport.InterpretReport, error) {
-	if legacyAlgorithmFromOutcome(outcome) == modelcatalog.AlgorithmBigFive {
-		input, err := BigFiveReportInputFromOutcome(outcome)
-		if err != nil {
-			return nil, err
-		}
-		return reporttypology.BuildBigFiveReport(input)
+	return buildMechanismTraitProfileReport(outcome, legacyAlgorithmFromOutcome(outcome))
+}
+
+func buildMechanismPersonalityTypeReport(outcome evaloutcome.Outcome, algorithm modelcatalog.Algorithm) (*domainReport.InterpretReport, error) {
+	if outcome.Assessment == nil {
+		return nil, errAssessmentRequired
 	}
-	return buildGenericTraitProfileReport(outcome)
+	if outcome.Execution == nil {
+		return nil, errEvaluationOutcomeRequired
+	}
+	detail, err := personalityTypeDetailForReport(outcome.Execution.Detail.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return reporttypology.BuildPersonalityTypeReport(
+		reporttypology.PersonalityTypeReportInput{
+			AssessmentID: domainReport.ID(outcome.Assessment.ID()),
+			ModelCode:    typologyModelCode(outcome),
+			TotalScore:   typologyTotalScore(outcome.Execution),
+			RiskLevel:    typologyRiskLevel(outcome.Execution),
+			Detail:       genericPersonalityTypeMechanismDetail(detail),
+		},
+		personalityTypeTemplateForAlgorithm(algorithm),
+	)
+}
+
+func buildMechanismTraitProfileReport(outcome evaloutcome.Outcome, algorithm modelcatalog.Algorithm) (*domainReport.InterpretReport, error) {
+	if outcome.Assessment == nil {
+		return nil, errAssessmentRequired
+	}
+	if outcome.Execution == nil {
+		return nil, errEvaluationOutcomeRequired
+	}
+	detail, err := traitProfileDetailForReport(outcome.Execution.Detail.Payload)
+	if err != nil {
+		return nil, err
+	}
+	return reporttypology.BuildTraitProfileReport(
+		reporttypology.TraitProfileReportInput{
+			AssessmentID: domainReport.ID(outcome.Assessment.ID()),
+			ModelCode:    typologyModelCode(outcome),
+			TotalScore:   typologyTotalScore(outcome.Execution),
+			RiskLevel:    typologyRiskLevel(outcome.Execution),
+			Detail:       genericTraitProfileMechanismDetail(detail),
+		},
+		traitProfileTemplateForAlgorithm(algorithm),
+	)
 }

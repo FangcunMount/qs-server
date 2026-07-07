@@ -20,14 +20,7 @@ func BuildBigFiveReport(input BigFiveReportInput) (*domainreport.InterpretReport
 		TotalScore:   input.TotalScore,
 		RiskLevel:    input.RiskLevel,
 		Detail:       bigFiveMechanismDetail(input.Detail),
-	}, TraitProfileReportTemplate{
-		Kind:             "bigfive",
-		DefaultModelName: "Big Five 五大人格特质测评",
-		DefaultModelCode: "BIGFIVE_V1",
-		TypeName:         "五大人格特质",
-		ConclusionTitle:  "五大人格特质画像",
-		OneLiner:         "基于各维度原始分展示人格特质分布",
-	})
+	}, BigFiveTraitProfileTemplate())
 }
 
 func bigFiveMechanismDetail(detail BigFiveReportDetail) TraitProfileReportDetail {

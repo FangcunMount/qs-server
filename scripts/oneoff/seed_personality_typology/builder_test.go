@@ -20,8 +20,8 @@ func TestBuildMBTIPayloadHasExplicitRuntime(t *testing.T) {
 	if runtime == nil || !runtime.FactorGraph.HasExplicitFactorGraph() {
 		t.Fatal("expected explicit factor graph")
 	}
-	if runtime.Report.Kind != "personality_type" || runtime.Report.AdapterKey != "mbti" {
-		t.Fatalf("report = %#v, want personality_type/mbti", runtime.Report)
+	if runtime.Report.Kind != "personality_type" || runtime.Report.AdapterKey != "personality_type" {
+		t.Fatalf("report = %#v, want personality_type/personality_type", runtime.Report)
 	}
 	if len(runtime.FactorGraph.QuestionMappings) != 32 {
 		t.Fatalf("question_mappings = %d, want 32", len(runtime.FactorGraph.QuestionMappings))
@@ -49,8 +49,8 @@ func TestBuildSBTIPayloadHasExplicitRuntime(t *testing.T) {
 	if runtime.Decision.Kind != modelcatalog.DecisionKindNearestPattern {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
-	if runtime.Report.AdapterKey != "sbti" {
-		t.Fatalf("report adapter = %s, want sbti", runtime.Report.AdapterKey)
+	if runtime.Report.AdapterKey != "personality_type" {
+		t.Fatalf("report adapter = %s, want personality_type", runtime.Report.AdapterKey)
 	}
 }
 
@@ -76,8 +76,8 @@ func TestBuildMBTI93PayloadHasExplicitRuntime(t *testing.T) {
 	if runtime.Decision.Kind != modelcatalog.DecisionKindPoleComposition {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
-	if runtime.Report.AdapterKey != "mbti" {
-		t.Fatalf("report adapter = %s, want mbti", runtime.Report.AdapterKey)
+	if runtime.Report.AdapterKey != "personality_type" {
+		t.Fatalf("report adapter = %s, want personality_type", runtime.Report.AdapterKey)
 	}
 	if len(payload.Outcomes) != 16 {
 		t.Fatalf("outcomes = %d, want 16", len(payload.Outcomes))
@@ -112,8 +112,8 @@ func TestBuildBig5PayloadHasExplicitRuntime(t *testing.T) {
 	if runtime.Decision.Kind != modelcatalog.DecisionKindTraitProfile {
 		t.Fatalf("decision kind = %s", runtime.Decision.Kind)
 	}
-	if runtime.Report.AdapterKey != "bigfive" {
-		t.Fatalf("report adapter = %s, want bigfive", runtime.Report.AdapterKey)
+	if runtime.Report.AdapterKey != "trait_profile" {
+		t.Fatalf("report adapter = %s, want trait_profile", runtime.Report.AdapterKey)
 	}
 	if len(runtime.FactorGraph.QuestionMappings) != 50 {
 		t.Fatalf("question_mappings = %d, want 50", len(runtime.FactorGraph.QuestionMappings))

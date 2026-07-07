@@ -1,3 +1,4 @@
+// characterization-only: typology report builder helper for V1 contract tests.
 package typology
 
 import (
