@@ -6,7 +6,7 @@ import (
 
 	"github.com/FangcunMount/component-base/pkg/errors"
 	assessmentApp "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	appEventing "github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	modtx "github.com/FangcunMount/qs-server/internal/apiserver/container/internal/transaction"
@@ -43,7 +43,7 @@ type Deps struct {
 	TopicResolver    eventcatalog.TopicResolver
 	MongoLimiter     backpressure.Acquirer
 	ModelDescriptors []evaldomain.ModelDescriptor
-	TypologyRegistry typologyEvaluation.ModuleRegistry
+	TypologyRegistry evalregistry.TypologyRegistry
 	OpsHandle        *cacheplane.Handle
 }
 
@@ -135,7 +135,7 @@ func (m *Module) ReadyIndex() *outboxready.Index {
 	return m.readyIndex
 }
 
-func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry typologyEvaluation.ModuleRegistry) (interpretationreporting.ReportBuilderRegistry, error) {
+func buildReportBuilderRegistry(descs []evaldomain.ModelDescriptor, typologyRegistry evalregistry.TypologyRegistry) (interpretationreporting.ReportBuilderRegistry, error) {
 	wiringDeps := evalmod.WiringDeps{
 		ScaleReportBuilder: domainreport.NewDefaultInterpretReportBuilder(nil),
 		TypologyRegistry:   typologyRegistry,

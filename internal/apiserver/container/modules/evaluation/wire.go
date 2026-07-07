@@ -4,7 +4,7 @@ import (
 	"fmt"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 	surveymod "github.com/FangcunMount/qs-server/internal/apiserver/container/modules/survey"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -56,7 +56,7 @@ type WireInput struct {
 	StaticCacheBuilder                          *keyspace.Builder
 	PublishedModelPolicy                        cachepolicy.CachePolicy
 	ModelDescriptors                            []evaldomain.ModelDescriptor
-	TypologyRegistry                            typologyEvaluation.ModuleRegistry
+	TypologyRegistry                            evalregistry.TypologyRegistry
 	ReportPorts                                 compose.ReportIntegrationPorts
 }
 

@@ -399,3 +399,42 @@ func TestEvaluationModuleDoesNotOwnDefaultTypologyCatalog(t *testing.T) {
 		}
 	}
 }
+
+func TestContainerDoesNotImportFactorMechanismPackagesDirectly(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbiddenImports := []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_norm",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/task_performance",
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "container")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, imp := range forbiddenImports {
+			if strings.Contains(text, imp) {
+				t.Fatalf("%s imports %s; container wiring must use application/evaluation/registry", filepath.ToSlash(mustRel(t, root, path)), imp)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+}

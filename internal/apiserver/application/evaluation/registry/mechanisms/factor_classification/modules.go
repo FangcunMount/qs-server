@@ -3,7 +3,7 @@ package factor_classification
 import (
 	"fmt"
 
-	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification/legacy"
+	typologylegacy "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 

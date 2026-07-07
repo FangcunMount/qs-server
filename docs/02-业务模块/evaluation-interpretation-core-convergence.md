@@ -109,3 +109,19 @@ PublishedModelSnapshot
 | Legacy adapter 清债 | 删除 `adapter/{mbti,sbti,bigfive}`；characterization 改走 configured runtime |
 | Materialize 单源 | `defaultPathMaterializations` 同时驱动 factory map 与 `RuntimeDescriptorRegistry` |
 | 守卫 | 移除 assessment-code adapter 过渡白名单 |
+
+## Round 13（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Application registry 门面 | `application/evaluation/registry` 承接 catalog/typology 装配 API |
+| Container 收敛 | compose/evaluation/interpretation 改引 registry，禁止直引 `factor_*` |
+| 实现宿主保留 | `factor_*` 仍为 runtime materialize 内部实现，characterization 测试允许直引 |
+
+## Round 14（已完成）
+
+| 交付 | 说明 |
+|------|------|
+| Mechanisms 内联 | 顶层 `factor_*` 迁入 `registry/mechanisms/` 并删除旧路径 |
+| Import 守卫 | application 禁止 legacy 顶层路径；container 禁止直引 mechanisms |
+| 测试迁移 | characterization/runtime/domain 架构测试路径同步 |

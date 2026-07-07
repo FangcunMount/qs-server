@@ -9,7 +9,7 @@ import (
 	"context"
 
 	evaluationexecute "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
-	typologyevaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/actor/testee"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
@@ -32,7 +32,7 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	executor, err := typologyevaluation.NewConfiguredTypologyExecutor()
+	executor, err := evalregistry.NewConfiguredTypologyExecutor()
 	if err != nil {
 		return nil, err
 	}
@@ -43,7 +43,7 @@ func (p *Previewer) PreviewReport(ctx context.Context, req modelpreview.Request)
 	if err != nil {
 		return nil, err
 	}
-	reportBuilder, err := typologyevaluation.NewConfiguredReportBuilder()
+	reportBuilder, err := evalregistry.NewConfiguredReportBuilder()
 	if err != nil {
 		return nil, err
 	}

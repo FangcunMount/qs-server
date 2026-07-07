@@ -20,7 +20,7 @@ import (
 func TestFrontendPayloadMBTIEndToEndContract(t *testing.T) {
 	t.Parallel()
 	runFrontendPayloadContract(t, frontendPayloadCase{
-		file:          "../../../testdata/personality/frontend_payload_mbti.json",
+		file:          "../../../../../testdata/personality/frontend_payload_mbti.json",
 		code:          "FRONTEND_MBTI",
 		title:         "Frontend MBTI",
 		questionnaire: "Q_FRONTEND_MBTI",
@@ -43,7 +43,7 @@ func TestFrontendPayloadMBTIEndToEndContract(t *testing.T) {
 func TestFrontendPayloadSBTIEndToEndContract(t *testing.T) {
 	t.Parallel()
 	runFrontendPayloadContract(t, frontendPayloadCase{
-		file:          "../../../testdata/personality/frontend_payload_sbti.json",
+		file:          "../../../../../testdata/personality/frontend_payload_sbti.json",
 		code:          "FRONTEND_SBTI",
 		title:         "Frontend SBTI",
 		questionnaire: "Q_FRONTEND_SBTI",

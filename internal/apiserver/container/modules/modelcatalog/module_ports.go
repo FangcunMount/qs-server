@@ -1,23 +1,24 @@
 package modelcatalog
 
 import (
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
+	evalruntime "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/runtime"
 	"github.com/FangcunMount/qs-server/internal/apiserver/container/compose"
 )
 
 // ExportEvaluationCatalog builds descriptors and typology registry owned by assessmentmodel.
 func ExportEvaluationCatalog() (compose.EvaluationCatalog, error) {
-	registry, err := DefaultTypologyRegistry()
+	typologyRegistry, err := evalregistry.DefaultTypologyRegistry()
 	if err != nil {
 		return compose.EvaluationCatalog{}, err
 	}
-	runtimeRegistry, err := runtime.DefaultRuntimeDescriptorRegistry()
+	runtimeRegistry, err := evalruntime.DefaultRuntimeDescriptorRegistry()
 	if err != nil {
 		return compose.EvaluationCatalog{}, err
 	}
 	return compose.EvaluationCatalog{
-		Descriptors:               DefaultEvaluationDescriptors(),
-		TypologyRegistry:          registry,
+		Descriptors:               evalregistry.DefaultEvaluationDescriptors(),
+		TypologyRegistry:          typologyRegistry,
 		RuntimeDescriptorRegistry: runtimeRegistry,
 	}, nil
 }

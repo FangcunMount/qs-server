@@ -3,7 +3,7 @@ package factor_classification_test
 import (
 	"testing"
 
-	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification"
 )
 
 func TestDefaultModuleRegistryResolvesBuiltInModules(t *testing.T) {

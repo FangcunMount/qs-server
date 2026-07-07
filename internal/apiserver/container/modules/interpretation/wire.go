@@ -1,7 +1,7 @@
 package interpretation
 
 import (
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
@@ -20,7 +20,7 @@ type WireInput struct {
 	MongoLimiter     backpressure.Acquirer
 	OpsHandle        *cacheplane.Handle
 	ModelDescriptors []evaldomain.ModelDescriptor
-	TypologyRegistry typologyEvaluation.ModuleRegistry
+	TypologyRegistry evalregistry.TypologyRegistry
 }
 
 // Wire builds and bootstraps the report module from composition inputs.

@@ -2,7 +2,7 @@ package compose
 
 import (
 	actorAccessApp "github.com/FangcunMount/qs-server/internal/apiserver/application/actor/access"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/eventing"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	quesApp "github.com/FangcunMount/qs-server/internal/apiserver/application/survey/questionnaire"
@@ -25,7 +25,7 @@ type ReportIntegrationPorts struct {
 // EvaluationCatalog carries shared model descriptors for report/evaluation wiring.
 type EvaluationCatalog struct {
 	Descriptors               []evaldomain.ModelDescriptor
-	TypologyRegistry          typologyEvaluation.ModuleRegistry
+	TypologyRegistry          evalregistry.TypologyRegistry
 	RuntimeDescriptorRegistry *evalpipeline.RuntimeDescriptorRegistry
 }
 

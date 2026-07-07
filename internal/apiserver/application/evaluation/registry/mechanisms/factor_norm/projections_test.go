@@ -3,7 +3,7 @@ package factor_norm_test
 import (
 	"testing"
 
-	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm"
+	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_norm"
 	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"

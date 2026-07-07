@@ -38,7 +38,7 @@ func TestTypologyExecutorStaysAlgorithmAgnostic(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification", "executor.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification", "executor.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -106,7 +106,7 @@ func TestOutcomeAssemblerUsesAdapterRegistry(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification", "outcome_mapper.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification", "outcome_mapper.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestTypologyApplicationLayerKeepsConcreteModelsInAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	typologyRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification")
+	typologyRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification")
 	allowed := map[string]struct{}{
 		"algorithm_runner.go":    {},
 		"module.go":              {},
@@ -186,7 +186,7 @@ func TestAlgorithmRunnerStaysModuleRegistryDriven(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification", "algorithm_runner.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification", "algorithm_runner.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -211,7 +211,7 @@ func TestReportRegistryDispatchesThroughTypologyReportBuilder(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification", "report_registry.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification", "report_registry.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -234,7 +234,7 @@ func TestReportBuilderStaysAlgorithmAgnostic(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification", "report_builder.go")
+	path := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification", "report_builder.go")
 	data, err := os.ReadFile(path)
 	if err != nil {
 		t.Fatal(err)
@@ -283,13 +283,13 @@ func TestTypologyApplicationMainPathDoesNotReferenceLegacyModules(t *testing.T) 
 
 	root := repoRoot(t)
 	mainPathFiles := []string{
-		"internal/apiserver/application/evaluation/factor_classification/executor.go",
-		"internal/apiserver/application/evaluation/factor_classification/module_registry.go",
-		"internal/apiserver/application/evaluation/factor_classification/runtime_registry.go",
-		"internal/apiserver/application/evaluation/factor_classification/algorithm_runner.go",
-		"internal/apiserver/application/evaluation/factor_classification/outcome_mapper.go",
-		"internal/apiserver/application/evaluation/factor_classification/report_registry.go",
-		"internal/apiserver/application/evaluation/factor_classification/materialize.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/executor.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/module_registry.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/runtime_registry.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/algorithm_runner.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/report_registry.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/materialize.go",
 	}
 	forbidden := []string{
 		"MBTIModule",
@@ -327,7 +327,7 @@ func TestTypologyApplicationLayerDoesNotImportLegacyAdapters(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	typologyRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification")
+	typologyRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification")
 	forbiddenImports := []string{
 		"factor_classification/adapter/mbti",
 		"factor_classification/adapter/sbti",
@@ -405,7 +405,7 @@ func TestTypologyLegacyDerivationStaysInLegacyPackages(t *testing.T) {
 		string(filepath.Separator) + "legacy" + string(filepath.Separator),
 	}
 	mainRoots := []string{
-		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_classification"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_classification"),
 		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "personality", "typology"),
 	}
 	for _, typologyRoot := range mainRoots {

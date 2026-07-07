@@ -149,7 +149,7 @@ func TestScaleEvaluationExecutorDoesNotImportLegacyPipeline(t *testing.T) {
 	t.Parallel()
 
 	root := repoRoot(t)
-	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_scoring"), func(path, importPath string) {
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_scoring"), func(path, importPath string) {
 		if strings.HasSuffix(path, "_test.go") {
 			return
 		}
@@ -686,7 +686,7 @@ func TestScaleModelDoesNotContainOtherModelFamilyConcepts(t *testing.T) {
 		filepath.Join(root, "internal", "apiserver", "domain", "modelcatalog", "scale"),
 		filepath.Join(root, "internal", "apiserver", "domain", "evaluation", "factor_scoring"),
 		filepath.Join(root, "internal", "apiserver", "domain", "interpretation", "factor_scoring"),
-		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "factor_scoring"),
+		filepath.Join(root, "internal", "apiserver", "application", "evaluation", "registry", "mechanisms", "factor_scoring"),
 	}
 	for _, scanRoot := range scaleRoots {
 		err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
@@ -724,7 +724,7 @@ func TestApplicationEvaluationPrefersAssessmentOutcomeOverLegacyResult(t *testin
 	}
 	allowedRelPrefixes := []string{
 		"internal/apiserver/characterization/",
-		"internal/apiserver/application/evaluation/factor_scoring/outcome_mapper.go",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring/outcome_mapper.go",
 		"internal/apiserver/application/evaluation/outcome/legacy.go",
 	}
 	scanRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation")

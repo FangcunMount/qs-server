@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	typologyeval "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification"
 	evaluationscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scoring"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"

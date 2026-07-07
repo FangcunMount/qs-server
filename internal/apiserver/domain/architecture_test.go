@@ -361,9 +361,9 @@ func TestReportDomainDoesNotImportRulesetPayloads(t *testing.T) {
 	root := repoRoot(t)
 	const rulesetImport = "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	allowedModelCatalogImportFiles := map[string]struct{}{
-		"internal/apiserver/domain/interpretation/builder/builder.go":             {},
-		"internal/apiserver/domain/interpretation/factor_classification/doc.go":   {},
-		"internal/apiserver/domain/interpretation/factor_scoring/doc.go":          {},
+		"internal/apiserver/domain/interpretation/builder/builder.go":           {},
+		"internal/apiserver/domain/interpretation/factor_classification/doc.go": {},
+		"internal/apiserver/domain/interpretation/factor_scoring/doc.go":        {},
 	}
 	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "interpretation"), func(path, importPath string) {
 		if importPath != rulesetImport && !strings.HasPrefix(importPath, rulesetImport+"/") {

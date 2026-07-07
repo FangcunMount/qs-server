@@ -3,7 +3,7 @@ package legacy_test
 import (
 	"testing"
 
-	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification/legacy"
+	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry/mechanisms/factor_classification/legacy"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"

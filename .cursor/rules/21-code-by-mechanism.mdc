@@ -23,7 +23,7 @@ alwaysApply: false
 | modelcatalog | 可按模型族（personality/scale/…） | 模型结构、payload、配置 |
 | evaluation | 按执行机制（pipeline/input/policy/run） | 执行状态、RuntimeDescriptor registry |
 | interpretation | 按报告机制（report/template/builder/rule/policy） | 报告结构、模板、解释规则 |
-| application/evaluation | 过渡：factor_* 机制族包 → 终态 registry | 编排、adapter |
+| application/evaluation | 终态 registry 门面 + runtime 内部 mechanism 宿主 | 编排、registry 装配 |
 
 机制轴：`AlgorithmFamily` + `DecisionKind` + `PayloadFormat`（`domain/modelcatalog`）。
 
@@ -45,13 +45,11 @@ domain/interpretation/
 └── policy/       # audience/visibility
 
 application/evaluation/
-├── factor_scoring/
-├── factor_classification/
-├── factor_norm/
-├── task_performance/
-├── runtime/
+├── registry/           # 对外装配门面（container 唯一入口）
+│   └── mechanisms/     # 机制实现宿主（仅 registry/runtime 可引）
+├── runtime/            # materialize + RuntimeDescriptorRegistry
 ├── calculationadapter/
-└── executor/
+└── execute/
 ```
 
 ## 可接受的 code 字符串出现场景

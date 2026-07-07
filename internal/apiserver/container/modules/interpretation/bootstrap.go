@@ -5,7 +5,7 @@ import (
 
 	"go.mongodb.org/mongo-driver/mongo"
 
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
 	"github.com/FangcunMount/qs-server/internal/pkg/cacheplane"
@@ -18,7 +18,7 @@ type BootstrapInput struct {
 	TopicResolver    eventcatalog.TopicResolver
 	MongoLimiter     backpressure.Acquirer
 	ModelDescriptors []evaldomain.ModelDescriptor
-	TypologyRegistry typologyEvaluation.ModuleRegistry
+	TypologyRegistry evalregistry.TypologyRegistry
 	OpsHandle        *cacheplane.Handle
 }
 

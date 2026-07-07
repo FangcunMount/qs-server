@@ -107,10 +107,11 @@ func TestMechanismOrientedEvaluationPackagesExist(t *testing.T) {
 		"internal/apiserver/domain/evaluation/run",
 		"internal/apiserver/domain/evaluation/factor_scoring",
 		"internal/apiserver/domain/evaluation/factor_classification",
-		"internal/apiserver/application/evaluation/factor_scoring",
-		"internal/apiserver/application/evaluation/factor_classification",
-		"internal/apiserver/application/evaluation/factor_norm",
-		"internal/apiserver/application/evaluation/task_performance",
+		"internal/apiserver/application/evaluation/registry",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification",
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_norm",
+		"internal/apiserver/application/evaluation/registry/mechanisms/task_performance",
 	}
 	for _, rel := range required {
 		if _, err := os.Stat(filepath.Join(root, rel)); err != nil {
@@ -211,10 +212,10 @@ func TestApplicationFactorMechanismsUseDomainEntryPackages(t *testing.T) {
 
 	root := repoRoot(t)
 	forbiddenImports := map[string][]string{
-		"internal/apiserver/application/evaluation/factor_scoring": {
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_scoring": {
 			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/scale",
 		},
-		"internal/apiserver/application/evaluation/factor_classification": {
+		"internal/apiserver/application/evaluation/registry/mechanisms/factor_classification": {
 			"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality",
 		},
 	}
@@ -242,5 +243,51 @@ func TestApplicationFactorMechanismsUseDomainEntryPackages(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+func TestApplicationDoesNotImportLegacyFactorMechanismHosts(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	legacyImports := []string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm",
+		"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance",
+	}
+	allowedImporterPrefixes := []string{
+		"internal/apiserver/application/evaluation/registry/mechanisms/",
+		"internal/apiserver/application/evaluation/runtime/",
+		"internal/apiserver/characterization/",
+	}
+	scanRoot := filepath.Join(root, "internal", "apiserver", "application")
+	err := filepath.WalkDir(scanRoot, func(path string, entry os.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		if entry.IsDir() || !strings.HasSuffix(path, ".go") || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		rel := filepath.ToSlash(mustRel(t, root, path))
+		for _, prefix := range allowedImporterPrefixes {
+			if strings.HasPrefix(rel, prefix) {
+				return nil
+			}
+		}
+		data, err := os.ReadFile(path)
+		if err != nil {
+			return err
+		}
+		text := string(data)
+		for _, imp := range legacyImports {
+			if strings.Contains(text, imp) {
+				t.Fatalf("%s imports legacy mechanism host %s; use application/evaluation/registry", rel, imp)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		t.Fatal(err)
 	}
 }

@@ -7,7 +7,7 @@ import (
 	redis "github.com/redis/go-redis/v9"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/assessment"
-	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	evalregistry "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/registry"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/cachepolicy"
@@ -49,7 +49,7 @@ type BootstrapInput struct {
 	OpsHandle                                   *cacheplane.Handle
 	ReportStatusConfig                          reportstatus.Config
 	ModelDescriptors                            []evaldomain.ModelDescriptor
-	TypologyRegistry                            typologyEvaluation.ModuleRegistry
+	TypologyRegistry                            evalregistry.TypologyRegistry
 	ReportReader                                evaluationreadmodel.ReportReader
 	ReportBuilderRegistry                       interpretationreporting.ReportBuilderRegistry
 	ReportDurableSaver                          interpretationreporting.ReportDurableSaver

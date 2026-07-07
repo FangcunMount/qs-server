@@ -218,3 +218,27 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R12-2 | characterization 用 `scoreBigFiveCharacterization`；configured 等价测试改 typology reference |
 | R12-3 | `materialization_specs.go` 单源驱动 factory map 与 registry |
 | R12-4 | 架构守卫移除 adapter 过渡白名单；文档 Round 12 节 |
+
+## Round 13：application 纯 registry 终态（已完成）
+
+**做**：`application/evaluation/registry` 成为 container 唯一装配入口；`factor_*` 降为 runtime 内部实现宿主。
+
+| 阶段 | 动作 |
+|------|------|
+| R13-1 | 新增 `registry`：`DefaultEvaluationDescriptors`、`DefaultTypologyRegistry`、typology 类型别名 |
+| R13-2 | container/compose 改引 `registry.TypologyRegistry`；modelcatalog 薄委托 |
+| R13-3 | `preview` 改引 registry；架构守卫禁止 container 直引 `factor_*` |
+| R13-4 | 文档 Round 13 节 |
+
+**R14 已承接**：`factor_*` 迁入 `registry/mechanisms/` 并删除顶层路径；characterization 改引 mechanisms（测试允许）。
+
+## Round 14：mechanisms 内联 + 顶层 factor_* 删除（已完成）
+
+**做**：`factor_*`/`task_performance` 迁入 `registry/mechanisms/`；全仓 import 切换；禁止 application 引用旧顶层路径。
+
+| 阶段 | 动作 |
+|------|------|
+| R14-1 | `application/evaluation/{factor_*,task_performance}` → `registry/mechanisms/*` |
+| R14-2 | runtime/registry/characterization import 全量切换 |
+| R14-3 | 架构守卫：`TestApplicationDoesNotImportLegacyFactorMechanismHosts`；container 禁止直引 mechanisms |
+| R14-4 | 文档 Round 14 节 |
