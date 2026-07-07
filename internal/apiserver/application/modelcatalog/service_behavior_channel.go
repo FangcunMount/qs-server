@@ -37,7 +37,7 @@ func (s *service) listBehaviorAbilityChannel(ctx context.Context, dto ListModels
 
 func (s *service) listBehaviorAbilityChannelFamily(ctx context.Context, dto ListModelsDTO, family domain.Kind) (*ModelListResult, error) {
 	switch family {
-	case domain.KindBehaviorAbility:
+	case domain.KindBehaviorAbility: //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 		return s.listBehaviorAbility(ctx, dto)
 	case domain.KindBehavioralRating:
 		return s.listBehavioralRating(ctx, dto)
@@ -52,6 +52,6 @@ func behaviorAbilityChannelModelFamilyOptions() []Option {
 	return []Option{
 		{Label: "行为评定", Value: string(domain.KindBehavioralRating)},
 		{Label: "认知能力", Value: string(domain.KindCognitive)},
-		{Label: "legacy scale adapter", Value: string(domain.KindBehaviorAbility)},
+		{Label: "legacy scale adapter", Value: string(domain.KindBehaviorAbility)}, //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 	}
 }

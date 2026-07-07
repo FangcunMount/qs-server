@@ -1,8 +1,8 @@
 package behavioralrating
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/projection"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/projection"
 	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 )
@@ -16,7 +16,10 @@ func ApplyFactorProjections(
 	if outcome == nil || snapshot == nil {
 		return outcome
 	}
-	outcome = projection.CompositeProjection{Factors: snapshot.Factors}.Apply(outcome)
-	outcome = EnrichBrief2Outcome(outcome, snapshot, subject)
-	return projection.HierarchyProjection{Factors: snapshot.Factors}.Apply(outcome)
+	nodes := scoreNodesFromFactors(snapshot.Factors)
+	calcResult := calcResultFromOutcome(outcome)
+	calcResult = projection.CompositeProjection{Nodes: nodes}.Apply(calcResult)
+	calcResult = enrichBrief2CalcResult(calcResult, snapshot, subject)
+	calcResult = projection.HierarchyProjection{Nodes: nodes}.Apply(calcResult)
+	return mergeCalcResultIntoOutcome(outcome, calcResult)
 }

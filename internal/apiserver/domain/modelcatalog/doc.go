@@ -4,8 +4,12 @@
 // and unified personality typology payloads. Legacy ruleset.* payload formats
 // remain readable for migration; new writes use assessmentmodel.* payload formats.
 //
-// KindCapability.Role separates product channels from executable model families:
-//   - behavior_ability (CapabilityRoleProductChannel): API aggregation slot; new drafts
+// KindCapability.Role separates product channels from executable model families.
+// ProductChannel on AssessmentModel is a taxonomy field for product-facing classification;
+// it must not drive runtime execution path selection. Use ModelFamilyCapabilities for
+// executable model-family guards.
+//
+//   - behavior_ability (CapabilityRoleProductChannel): legacy API aggregation slot; new drafts
 //     must use behavioral_rating or cognitive instead.
 //   - behavioral_rating / cognitive (CapabilityRoleModelFamily): executable families;
 //     Brief-2 lands on behavioral_rating+AlgorithmBrief2, SPM on cognitive+AlgorithmSPM.

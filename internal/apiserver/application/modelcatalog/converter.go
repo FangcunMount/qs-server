@@ -56,7 +56,7 @@ func summaryFromBehaviorValue(result behavior.Model) ModelSummary {
 		CreatedAt:            result.CreatedAt,
 		UpdatedAt:            result.UpdatedAt,
 	}
-	populateModelSummaryIdentity(&summary, domain.KindBehaviorAbility, domain.SubKind(SubKindScale), domain.AlgorithmScaleDefault, domain.ProductChannelBehaviorAbility)
+	populateModelSummaryIdentity(&summary, domain.KindBehaviorAbility, domain.SubKind(SubKindScale), domain.AlgorithmScaleDefault, domain.ProductChannelBehaviorAbility) //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 	return summary
 }
 

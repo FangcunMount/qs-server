@@ -23,11 +23,12 @@ type Snapshot struct {
 
 // Brief2Profile carries BRIEF-2 specific configuration beyond score_range scoring.
 type Brief2Profile struct {
-	FormVariant      string
-	NormTableVersion string
-	IndexCodes       []string
-	ValidityCodes    []string
-	NormTables       *brief2norm.NormTables
+	FormVariant          string
+	NormTableVersion     string
+	IndexCodes           []string
+	ValidityCodes        []string
+	PrimaryDimensionCode string
+	NormTables           *brief2norm.NormTables
 }
 
 // NormTablesOrNil returns parsed norm tables when Brief-2 norm configuration is present.
@@ -49,13 +50,14 @@ type definitionPayload struct {
 }
 
 type brief2Extension struct {
-	FormVariant      string                 `json:"form_variant,omitempty"`
-	NormTableVersion string                 `json:"norm_table_version,omitempty"`
-	IndexCodes       []string               `json:"index_codes,omitempty"`
-	ValidityCodes    []string               `json:"validity_codes,omitempty"`
-	CompositeIndexes []brief2CompositeIndex `json:"composite_indexes,omitempty"`
-	Norms            []brief2FactorPayload  `json:"norms,omitempty"`
-	TScoreRules      []brief2TScoreRule     `json:"t_score_rules,omitempty"`
+	FormVariant          string                 `json:"form_variant,omitempty"`
+	NormTableVersion     string                 `json:"norm_table_version,omitempty"`
+	IndexCodes           []string               `json:"index_codes,omitempty"`
+	ValidityCodes        []string               `json:"validity_codes,omitempty"`
+	PrimaryDimensionCode string                 `json:"primary_dimension_code,omitempty"`
+	CompositeIndexes     []brief2CompositeIndex `json:"composite_indexes,omitempty"`
+	Norms                []brief2FactorPayload  `json:"norms,omitempty"`
+	TScoreRules          []brief2TScoreRule     `json:"t_score_rules,omitempty"`
 }
 
 type brief2CompositeIndex struct {
@@ -138,11 +140,12 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	out.Factors = factors
 	if body.Brief2 != nil {
 		out.Brief2 = &Brief2Profile{
-			FormVariant:      body.Brief2.FormVariant,
-			NormTableVersion: body.Brief2.NormTableVersion,
-			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
-			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
-			NormTables:       normTablesFromPayload(body.Brief2),
+			FormVariant:          body.Brief2.FormVariant,
+			NormTableVersion:     body.Brief2.NormTableVersion,
+			IndexCodes:           append([]string(nil), body.Brief2.IndexCodes...),
+			ValidityCodes:        append([]string(nil), body.Brief2.ValidityCodes...),
+			PrimaryDimensionCode: body.Brief2.PrimaryDimensionCode,
+			NormTables:           normTablesFromPayload(body.Brief2),
 		}
 	}
 	return out, nil

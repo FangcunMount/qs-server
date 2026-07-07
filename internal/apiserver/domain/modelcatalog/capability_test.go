@@ -115,3 +115,34 @@ func TestRuntimeExecutableKinds(t *testing.T) {
 		}
 	}
 }
+
+func TestRuntimeExecutableKindsExcludeProductChannel(t *testing.T) {
+	t.Parallel()
+
+	for _, kind := range RuntimeExecutableKinds() {
+		cap, ok := CapabilityByKind(kind)
+		if !ok {
+			t.Fatalf("RuntimeExecutableKinds contains unknown kind %q", kind)
+		}
+		if cap.IsProductChannel() {
+			t.Fatalf("product channel kind %q must not be runtime executable", kind)
+		}
+	}
+	if cap, ok := CapabilityByKind(KindBehaviorAbility); !ok || !cap.IsProductChannel() {
+		t.Fatalf("behavior_ability capability = %#v, %v", cap, ok)
+	}
+}
+
+func TestModelFamilyCapabilitiesExcludeProductChannel(t *testing.T) {
+	t.Parallel()
+
+	caps := ModelFamilyCapabilities()
+	if len(caps) != 5 {
+		t.Fatalf("model family capability count = %d, want 5", len(caps))
+	}
+	for _, cap := range caps {
+		if cap.IsProductChannel() {
+			t.Fatalf("product channel capability leaked into model families: %#v", cap)
+		}
+	}
+}

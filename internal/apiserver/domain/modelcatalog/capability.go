@@ -2,6 +2,8 @@ package modelcatalog
 
 // KindCapability is the canonical capability matrix for a model family.
 // API options, create/publish guards, and runtime descriptor export should read this table.
+// ProductChannel is a taxonomy field on AssessmentModel, not a model family capability.
+// Use ModelFamilyCapabilities for runtime/create/publish guards on executable families.
 type KindCapability struct {
 	Kind                      Kind
 	Role                      CapabilityRole
@@ -97,6 +99,18 @@ var defaultCapabilities = append([]KindCapability{
 func DefaultCapabilities() []KindCapability {
 	out := make([]KindCapability, len(defaultCapabilities))
 	copy(out, defaultCapabilities)
+	return out
+}
+
+// ModelFamilyCapabilities returns executable model-family capabilities only.
+// Product-channel slots such as behavior_ability are excluded.
+func ModelFamilyCapabilities() []KindCapability {
+	out := make([]KindCapability, 0, len(defaultCapabilities))
+	for _, cap := range defaultCapabilities {
+		if cap.Role == CapabilityRoleModelFamily {
+			out = append(out, cap)
+		}
+	}
 	return out
 }
 

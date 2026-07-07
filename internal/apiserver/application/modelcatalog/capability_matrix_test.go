@@ -142,7 +142,7 @@ func TestCreateCapabilityPolicy(t *testing.T) {
 func TestBehaviorAbilityIsLegacyScaleAdapter(t *testing.T) {
 	t.Parallel()
 
-	cap, ok := domain.CapabilityByKind(domain.KindBehaviorAbility)
+	cap, ok := domain.CapabilityByKind(domain.KindBehaviorAbility) //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 	if !ok || !cap.RuntimeViaScaleLegacy || cap.RuntimeExecutable {
 		t.Fatalf("behavior_ability capability = %#v", cap)
 	}

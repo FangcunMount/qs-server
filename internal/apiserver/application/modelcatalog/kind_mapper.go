@@ -14,7 +14,7 @@ func APIKindToDomainKind(kind string) (domain.Kind, bool) {
 		return domain.KindPersonality, true
 	case KindBehaviorAbility:
 		// behavior_ability executes via legacy scale binding.
-		return domain.KindBehaviorAbility, true
+		return domain.KindBehaviorAbility, true //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 	case string(domain.KindBehavioralRating):
 		return domain.KindBehavioralRating, true
 	case KindMedicalScale, "scale":
@@ -37,7 +37,7 @@ func DomainKindToAPIKind(kind domain.Kind) string {
 	switch kind {
 	case domain.KindPersonality:
 		return KindPersonality
-	case domain.KindBehaviorAbility:
+	case domain.KindBehaviorAbility: //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 		return KindBehaviorAbility
 	case domain.KindBehavioralRating:
 		return string(domain.KindBehavioralRating)

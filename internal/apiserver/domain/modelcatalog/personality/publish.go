@@ -35,7 +35,7 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	}
 	decisionKind := runtime.Decision.Kind
 	if decisionKind == "" {
-		decisionKind = defaultDecisionKind(model.Algorithm)
+		decisionKind = domain.FallbackPersonalityDecisionKind(model.Algorithm)
 	}
 	return &domain.PublishedModelSnapshot{
 		SchemaVersion: domain.SchemaVersionV2,
@@ -107,17 +107,4 @@ func preparePublishedPayload(payload *modeltypology.Payload, model *domain.Asses
 
 func modelVersionString(model *domain.AssessmentModel) string {
 	return "v" + strconv.FormatInt(model.Version, 10)
-}
-
-func defaultDecisionKind(algorithm domain.Algorithm) domain.DecisionKind {
-	switch algorithm {
-	case domain.AlgorithmMBTI:
-		return domain.DecisionKindPoleComposition
-	case domain.AlgorithmSBTI:
-		return domain.DecisionKindNearestPattern
-	case domain.AlgorithmBigFive:
-		return domain.DecisionKindTraitProfile
-	default:
-		return domain.DecisionKindScoreRange
-	}
 }

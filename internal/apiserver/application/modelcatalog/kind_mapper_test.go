@@ -10,10 +10,10 @@ func TestBehaviorAbilityKindMapperBoundary(t *testing.T) {
 	t.Parallel()
 
 	domainKind, ok := APIKindToDomainKind(KindBehaviorAbility)
-	if !ok || domainKind != domain.KindBehaviorAbility {
+	if !ok || domainKind != domain.KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 		t.Fatalf("APIKindToDomainKind(behavior_ability) = %q, %v", domainKind, ok)
 	}
-	if got := DomainKindToAPIKind(domain.KindBehaviorAbility); got != KindBehaviorAbility {
+	if got := DomainKindToAPIKind(domain.KindBehaviorAbility); got != KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 		t.Fatalf("DomainKindToAPIKind(behavior_ability) = %q, want %q", got, KindBehaviorAbility)
 	}
 	if !domain.IsBehaviorAbilityScaleAdapter(domainKind) {
@@ -57,7 +57,7 @@ func TestCapabilityPolicyUsesBehaviorAbilityAPIKind(t *testing.T) {
 	if !ok {
 		t.Fatal("CapabilityByAPIKind(behavior_ability) = false, want true")
 	}
-	if cap.Kind != domain.KindBehaviorAbility {
+	if cap.Kind != domain.KindBehaviorAbility { //nolint:staticcheck // SA1019: behavior_ability legacy product-channel compatibility
 		t.Fatalf("capability kind = %q, want behavior_ability", cap.Kind)
 	}
 	if cap.ExecutionPath != domain.ExecutionPathBehaviorAbilityScaleAdapter {

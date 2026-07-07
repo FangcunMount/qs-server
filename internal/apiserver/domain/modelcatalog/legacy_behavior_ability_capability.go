@@ -1,8 +1,8 @@
 package modelcatalog
 
 // behaviorAbilityLegacyCapability is the legacy product-channel slot for behavior_ability API kind.
+// ProductChannel is a taxonomy field, not a model family; this entry exists for legacy API compatibility only.
 // It must not receive new draft models; listings aggregate behavioral_rating and cognitive families.
-// Kept for legacy scale-adapter read paths and API compatibility only.
 func behaviorAbilityLegacyCapability() KindCapability {
 	return KindCapability{
 		Kind:                      KindBehaviorAbility,

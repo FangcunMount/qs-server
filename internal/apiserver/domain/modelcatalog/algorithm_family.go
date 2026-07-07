@@ -50,7 +50,7 @@ func DecisionKindForIdentity(kind Kind, subKind SubKind, algorithm Algorithm) (D
 		if subKind != SubKindTypology {
 			return "", false
 		}
-		return personalityDecisionKindForAlgorithm(algorithm), true
+		return FallbackPersonalityDecisionKind(algorithm), true
 	case KindBehavioralRating:
 		algo := algorithm
 		if algo == "" {

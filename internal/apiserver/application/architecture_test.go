@@ -441,10 +441,25 @@ func TestEvaluationDomainDoesNotDependOnOuterLayersOrSiblingAggregates(t *testin
 				if strings.Contains(rel, "domain/evaluation/assessment/") && forbidden == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
 					continue
 				}
-				if strings.Contains(rel, "domain/evaluation/projection/") && forbidden == "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment" {
-					continue
-				}
 				t.Fatalf("%s imports %s; evaluation domain should depend on %s", rel, importPath, replacement)
+			}
+		}
+	})
+}
+
+func TestCalculationDomainStaysStatelessKernel(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	forbidden := map[string]string{
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment": "its own calculation.Result types",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog":          "neutral calculation inputs (ScoreNode); callers translate factor/model-catalog assets",
+		"github.com/FangcunMount/qs-server/internal/apiserver/domain/survey":                "neutral calculation inputs; callers translate question assets",
+	}
+	scanGoImports(t, filepath.Join(root, "internal", "apiserver", "domain", "calculation"), func(path, importPath string) {
+		for prefix, replacement := range forbidden {
+			if strings.HasPrefix(importPath, prefix) {
+				t.Fatalf("%s imports %s; calculation kernel must stay domain-asset free and use %s", filepath.ToSlash(mustRel(t, root, path)), importPath, replacement)
 			}
 		}
 	})

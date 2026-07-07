@@ -1,8 +1,8 @@
 package behavioralrating
 
 import (
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/projection"
 	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
@@ -14,14 +14,30 @@ func EnrichBrief2Outcome(
 	snapshot *behavioralsnapshot.Snapshot,
 	subject brief2norm.Subject,
 ) *assessment.AssessmentOutcome {
-	if outcome == nil || snapshot == nil || snapshot.Brief2 == nil {
+	if outcome == nil || snapshot == nil {
 		return outcome
+	}
+	calcResult := enrichBrief2CalcResult(calcResultFromOutcome(outcome), snapshot, subject)
+	return mergeCalcResultIntoOutcome(outcome, calcResult)
+}
+
+func enrichBrief2CalcResult(
+	calcResult *calculation.Result,
+	snapshot *behavioralsnapshot.Snapshot,
+	subject brief2norm.Subject,
+) *calculation.Result {
+	if calcResult == nil || snapshot == nil || snapshot.Brief2 == nil {
+		return calcResult
 	}
 	tables := snapshot.Brief2.NormTablesOrNil()
 	if tables == nil {
-		return outcome
+		return calcResult
 	}
-	return projection.Brief2NormProjection{Tables: tables, Subject: subject}.Apply(outcome)
+	return brief2NormProjection{
+		tables:               tables,
+		subject:              subject,
+		primaryDimensionCode: snapshot.Brief2.PrimaryDimensionCode,
+	}.apply(calcResult)
 }
 
 func NormSubjectFromInput(input *evaluationinput.InputSnapshot) brief2norm.Subject {

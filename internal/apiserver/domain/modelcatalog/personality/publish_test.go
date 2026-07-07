@@ -72,3 +72,46 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 		t.Fatalf("legacy kind = %s", legacy.Definition.Kind)
 	}
 }
+
+func TestBuildPublishedSnapshotUsesMatchingSpecDecisionKind(t *testing.T) {
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code:      "personality_mbti_trait_profile",
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmMBTI,
+		Title:     "MBTI Trait Profile Override",
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel: %v", err)
+	}
+	if err := model.BindQuestionnaire(domain.QuestionnaireBinding{
+		QuestionnaireCode: "Q_MBTI", QuestionnaireVersion: "1.0.0",
+	}, model.CreatedAt); err != nil {
+		t.Fatalf("BindQuestionnaire: %v", err)
+	}
+	if err := model.UpdateDefinition(domain.DefinitionPayload{
+		Format: domain.PayloadFormatPersonalityTypologyV1,
+		Data: []byte(`{
+			"algorithm":"mbti",
+			"matching_spec":{"kind":"trait_profile"},
+			"dimension_order":["EI"],
+			"dimensions":{"EI":{"code":"EI","name":"EI"}},
+			"outcomes":[{"code":"INTJ","name":"建筑师"}],
+			"runtime":{
+				"factor_graph":{"dimension_order":["EI"],"dimensions":{"EI":{"code":"EI","name":"EI"}},"roots":["EI"]},
+				"outcome_mapping":{"detail_kind":"personality_trait","detail_adapter_key":"bigfive"},
+				"report":{"kind":"template","adapter_key":"bigfive"}
+			}
+		}`),
+	}, model.CreatedAt); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+
+	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
+	if err != nil {
+		t.Fatalf("BuildPublishedSnapshot: %v", err)
+	}
+	if snapshot.Decision.Kind != domain.DecisionKindTraitProfile {
+		t.Fatalf("decision kind = %s, want trait_profile from matching_spec", snapshot.Decision.Kind)
+	}
+}
