@@ -7,6 +7,7 @@ import (
 	evaloutcome "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/outcome"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	domainReport "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 type registryReportBuilderStub struct {
@@ -56,5 +57,37 @@ func TestReportBuilderRegistryResolvesLegacyTypologyViaConfiguredKey(t *testing.
 		if builder.Key() != evaluation.EvaluatorKeyPersonalityTypology {
 			t.Fatalf("builder key = %s, want configured typology", builder.Key())
 		}
+	}
+}
+
+func TestReportBuilderRegistryResolvesByMechanismKey(t *testing.T) {
+	registry, err := NewReportBuilderRegistry(NewFactorScoringReportBuilder(nil))
+	if err != nil {
+		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
+	}
+	builder, err := registry.ResolveByMechanism(MechanismReportBuilderKey{
+		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,
+		DecisionKind:    modelcatalog.DecisionKindScoreRange,
+		ReportType:      domainReport.ReportTypeStandard,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if builder.Key() != evaluation.EvaluatorKeyScaleDefault {
+		t.Fatalf("builder key = %s", builder.Key())
+	}
+}
+
+func TestReportBuilderRegistryFallsBackToMechanismFromEvaluatorKey(t *testing.T) {
+	registry, err := NewReportBuilderRegistry(NewNormProfileReportBuilder(nil))
+	if err != nil {
+		t.Fatalf("NewReportBuilderRegistry returned error: %v", err)
+	}
+	builder, err := registry.Resolve(evaluation.EvaluatorKeyBehavioralRatingDefault, domainReport.ReportTypeStandard)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if builder.Key() != evaluation.EvaluatorKeyBehavioralRatingDefault {
+		t.Fatalf("builder key = %s", builder.Key())
 	}
 }

@@ -140,7 +140,7 @@ func (w *writer) prepare(ctx context.Context, outcome evaloutcome.Outcome) (prep
 	if w.reportBuilders == nil {
 		return preparedOutcome{}, evalerrors.ModuleNotConfigured("interpretation report builder registry is not configured")
 	}
-	builder, err := w.reportBuilders.Resolve(key, resolveReportType(outcome))
+	builder, err := w.resolveReportBuilder(outcome)
 	if err != nil {
 		return preparedOutcome{}, err
 	}
@@ -192,4 +192,15 @@ func ResolveOutcomeKey(outcome evaloutcome.Outcome) evaluation.EvaluatorKey {
 		return outcome.Input.Model.ModelRef().EvaluatorKey()
 	}
 	return evaluation.EvaluatorKey{}
+}
+
+func (w *writer) resolveReportBuilder(outcome evaloutcome.Outcome) (ReportBuilder, error) {
+	reportType := resolveReportType(outcome)
+	if mechanismKey, ok := MechanismReportBuilderKeyFromOutcome(outcome); ok {
+		if builder, err := w.reportBuilders.ResolveByMechanism(mechanismKey); err == nil {
+			return builder, nil
+		}
+	}
+	key := ResolveOutcomeKey(outcome)
+	return w.reportBuilders.Resolve(key, reportType)
 }

@@ -3,14 +3,16 @@ package runtime
 import (
 	"fmt"
 
-	behavioralratingEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/behavioral_rating"
-	cognitiveEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/cognitive"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/execute"
+	factorclassification "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_classification"
+	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_norm"
+	factorscoring "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/factor_scoring"
 	typologyEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/personality/typology"
-	scaleEvaluation "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/scale"
+	taskperformance "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/task_performance"
 	interpretationreporting "github.com/FangcunMount/qs-server/internal/apiserver/application/interpretation/reporting"
 	evaldomain "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
+	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	report "github.com/FangcunMount/qs-server/internal/apiserver/domain/interpretation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	portruleengine "github.com/FangcunMount/qs-server/internal/apiserver/port/ruleengine"
@@ -63,17 +65,17 @@ func MaterializeScoreProjectors(descs []evaldomain.ModelDescriptor, deps WiringD
 }
 
 func materializeScoreProjector(desc evaldomain.ModelDescriptor, deps WiringDeps) (interpretationreporting.ScoreProjector, error) {
-	path, err := evaldomain.ExecutionPathForDescriptor(desc)
+	path, err := executionPathForDescriptor(desc)
 	if err != nil {
 		return nil, err
 	}
 	switch path {
 	case modelcatalog.ExecutionPathScaleDescriptor:
-		return interpretationreporting.NewScaleScoreProjector(deps.ScoreRepo), nil
+		return interpretationreporting.NewFactorScoringScoreProjector(deps.ScoreRepo), nil
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
-		return interpretationreporting.NewBehavioralRatingScoreProjector(deps.ScoreRepo), nil
+		return interpretationreporting.NewNormProfileScoreProjector(deps.ScoreRepo), nil
 	case modelcatalog.ExecutionPathCognitiveDescriptor:
-		return interpretationreporting.NewCognitiveScoreProjector(deps.ScoreRepo), nil
+		return interpretationreporting.NewTaskPerformanceScoreProjector(deps.ScoreRepo), nil
 	case modelcatalog.ExecutionPathTypologyDescriptor:
 		return nil, nil
 	default:
@@ -97,46 +99,46 @@ func MaterializeReportBuilders(descs []evaldomain.ModelDescriptor, deps WiringDe
 }
 
 func materializeEvaluator(desc evaldomain.ModelDescriptor, deps WiringDeps, session wiringSession) (execute.Evaluator, error) {
-	path, err := evaldomain.ExecutionPathForDescriptor(desc)
+	path, err := executionPathForDescriptor(desc)
 	if err != nil {
 		return nil, err
 	}
 	switch path {
 	case modelcatalog.ExecutionPathScaleDescriptor:
-		return scaleEvaluation.NewExecutor(deps.ScaleScorer), nil
+		return factorscoring.NewExecutor(deps.ScaleScorer), nil
 	case modelcatalog.ExecutionPathTypologyDescriptor:
 		registry, err := requireTypologyRegistry(deps)
 		if err != nil {
 			return nil, err
 		}
-		return typologyEvaluation.MaterializeTypologyEvaluator(desc, registry, session.typologyExecutor)
+		return factorclassification.MaterializeEvaluator(desc, registry, session.typologyExecutor)
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
-		return behavioralratingEvaluation.NewExecutor(deps.ScaleScorer), nil
+		return factornorm.NewExecutor(deps.ScaleScorer), nil
 	case modelcatalog.ExecutionPathCognitiveDescriptor:
-		return cognitiveEvaluation.NewExecutor(deps.ScaleScorer), nil
+		return taskperformance.NewExecutor(deps.ScaleScorer), nil
 	default:
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
 	}
 }
 
 func materializeReportBuilder(desc evaldomain.ModelDescriptor, deps WiringDeps, session wiringSession) (interpretationreporting.ReportBuilder, error) {
-	path, err := evaldomain.ExecutionPathForDescriptor(desc)
+	path, err := executionPathForDescriptor(desc)
 	if err != nil {
 		return nil, err
 	}
 	switch path {
 	case modelcatalog.ExecutionPathScaleDescriptor:
-		return interpretationreporting.NewScaleReportBuilder(deps.ScaleReportBuilder), nil
+		return interpretationreporting.NewFactorScoringReportBuilder(deps.ScaleReportBuilder), nil
 	case modelcatalog.ExecutionPathTypologyDescriptor:
 		registry, err := requireTypologyRegistry(deps)
 		if err != nil {
 			return nil, err
 		}
-		return typologyEvaluation.MaterializeTypologyReportBuilder(desc, registry, session.typologyReportBuilder)
+		return factorclassification.MaterializeReportBuilder(desc, registry, session.typologyReportBuilder)
 	case modelcatalog.ExecutionPathBehavioralRatingDescriptor:
-		return interpretationreporting.NewBehavioralRatingReportBuilder(deps.ScaleReportBuilder), nil
+		return interpretationreporting.NewNormProfileReportBuilder(deps.ScaleReportBuilder), nil
 	case modelcatalog.ExecutionPathCognitiveDescriptor:
-		return interpretationreporting.NewCognitiveReportBuilder(deps.ScaleReportBuilder), nil
+		return interpretationreporting.NewTaskPerformanceReportBuilder(deps.ScaleReportBuilder), nil
 	default:
 		return nil, fmt.Errorf("unsupported evaluation execution path: %s", path)
 	}
@@ -147,4 +149,8 @@ func requireTypologyRegistry(deps WiringDeps) (typologyEvaluation.ModuleRegistry
 		return typologyEvaluation.ModuleRegistry{}, fmt.Errorf("typology registry is required")
 	}
 	return deps.TypologyRegistry, nil
+}
+
+func executionPathForDescriptor(desc evaldomain.ModelDescriptor) (modelcatalog.ExecutionPath, error) {
+	return evalpipeline.ExecutionPathForModelKind(evalpipeline.ModelKind(desc.Kind))
 }

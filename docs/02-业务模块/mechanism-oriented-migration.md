@@ -103,3 +103,29 @@ report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；leg
 | R3-E+F+G | characterization 标注、架构守卫、文档同步 |
 
 过渡包白名单（characterization-only）：`adapter/{mbti,sbti,bigfive}`。
+
+## Round 4：机制内核收敛（已完成）
+
+**做**：沉淀 evaluation 执行内核（input/policy/run/pipeline）与 interpretation 报告机制骨架（report/template/builder/rule/policy）；application 按 factor_* 机制族物化；reporting registry 支持机制键。
+
+| 阶段 | 动作 |
+|------|------|
+| R4-A | `domain/evaluation/{input,policy,run,pipeline}` 稳定内核；`RuntimeDescriptorRegistry` 按 AlgorithmFamily/PayloadFormat 路由 |
+| R4-B | `application/evaluation/{factor_scoring,factor_classification,factor_norm,task_performance}` 机制族包；`runtime/materialize` 改走机制路径 |
+| R4-C | `domain/interpretation/{report,template,builder,rule,policy}` 报告机制骨架；机制 report builder（FactorScoring/Typology/NormProfile/TaskPerformance） |
+| R4-D | `reporting/registry` 增加 `MechanismReportBuilderKey` + `ResolveByMechanism` |
+| R4-E | 架构守卫 + `21-code-by-mechanism.mdc` + 收敛文档同步 |
+
+**不做**：删除 `scale/personality/score` 过渡实现宿主；纯 registry 终态（去掉 factor_* 子包）。
+
+## Round 5：路由单点 + 机制键主路径（已完成）
+
+**做**：`ExecutionPath` 映射单点化；interpretation `Resolve`/`Writer` 机制键优先。
+
+| 阶段 | 动作 |
+|------|------|
+| R5-1 | `pipeline/resolve.go` 为唯一 `ModelKind→ExecutionPath` 实现；`runtime_path.go` 委托；`routing_equivalence_test` |
+| R5-2 | `mechanism_key.go`；`registry.Resolve`/`writer.resolveReportBuilder` 机制优先；`registry_mechanism_primary_test` |
+| R5-3 | 架构守卫 + 收敛文档 Round 5 节 |
+
+**不做**：`factor_*` 内联宿主；`RuntimeDescriptorRegistry` 接入 assemble。

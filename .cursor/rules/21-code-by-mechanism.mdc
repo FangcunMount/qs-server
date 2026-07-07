@@ -8,12 +8,51 @@ alwaysApply: false
 ## 原则
 
 - **业务测评 code 不得成为长期代码组织单元**（目录名、package 名、专属 executor/report builder）。
-- **算法机制可以成为代码组织单元**（factor_scoring、factor_norm、classification、task_performance、projection、reporting）。
+- **算法机制可以成为代码组织单元**（factor_scoring、factor_classification、factor_norm、task_performance、projection、reporting）。
+- **ModelCatalog 可以按模型族组织**；**Evaluation / Interpretation 必须按执行/报告机制组织**。
 
 判据：
 
 - 差异是**数据**（因子结构、题目、常模表、解释文案、primary dimension）→ 放 ModelCatalog 配置 / payload / seed / 发布快照。
 - 差异是**机制**（pole 合成、nearest pattern、trait profile、norm lookup、task scoring）→ 写代码。
+
+## 模块边界
+
+| 模块 | 组织方式 | 承载差异 |
+|------|----------|----------|
+| modelcatalog | 可按模型族（personality/scale/…） | 模型结构、payload、配置 |
+| evaluation | 按执行机制（pipeline/input/policy/run） | 执行状态、RuntimeDescriptor registry |
+| interpretation | 按报告机制（report/template/builder/rule/policy） | 报告结构、模板、解释规则 |
+| application/evaluation | 过渡：factor_* 机制族包 → 终态 registry | 编排、adapter |
+
+机制轴：`AlgorithmFamily` + `DecisionKind` + `PayloadFormat`（`domain/modelcatalog`）。
+
+## 终局目录（evaluation / interpretation 内核）
+
+```
+domain/evaluation/
+├── assessment/   # 生命周期聚合
+├── run/          # attempt/failure 执行阶段
+├── input/        # 共享输入快照
+├── policy/       # idempotency/retry/timeout
+└── pipeline/     # RuntimeDescriptor + EvaluationPipeline
+
+domain/interpretation/
+├── report/       # InterpretReport 聚合
+├── template/     # 模板与渲染
+├── builder/      # 机制 builder registry
+├── rule/         # 解释规则
+└── policy/       # audience/visibility
+
+application/evaluation/
+├── factor_scoring/
+├── factor_classification/
+├── factor_norm/
+├── task_performance/
+├── runtime/
+├── calculationadapter/
+└── executor/
+```
 
 ## 可接受的 code 字符串出现场景
 
@@ -26,9 +65,12 @@ alwaysApply: false
 
 - 以测评 code 命名的核心 package：`domain/.../brief2`、`.../spm`、`.../mbti` 等作为扩展模式
 - 每新增测评就新增 executor / report builder / projection 分支
+- 在 `domain/evaluation` / `domain/interpretation` 内核下新增以模型族命名的 package（personality/scale/behavioral_rating/cognitive）
 
 ## 过渡包（白名单，不得新增）
 
 - `domain/evaluation/personality/adapter/{mbti,sbti,bigfive}` → characterization-only
+- `domain/evaluation/{scale,personality}`、`domain/interpretation/{personality,score}` → 实现宿主，逐步迁入 factor_* / builder 机制包
+- `application/evaluation/{scale,behavioral_rating,cognitive,personality}` → 编排宿主，生产路径优先走 factor_* 机制包
 
 已删除（Round 3）：`behavioral_rating/brief2`、`cognitive/spm` — 生产路径直引 `factor_norm` / `calculation/norm` / `task_performance`。
