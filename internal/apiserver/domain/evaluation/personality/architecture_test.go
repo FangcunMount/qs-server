@@ -302,6 +302,25 @@ func TestTypologyApplicationMainPathDoesNotReferenceLegacyModules(t *testing.T) 
 	}
 }
 
+func TestTypologyApplicationLayerDoesNotImportLegacyAdapters(t *testing.T) {
+	t.Parallel()
+
+	root := repoRoot(t)
+	typologyRoot := filepath.Join(root, "internal", "apiserver", "application", "evaluation", "personality", "typology")
+	forbiddenImports := []string{
+		"personality/adapter/mbti",
+		"personality/adapter/sbti",
+		"personality/adapter/bigfive",
+	}
+	walkGoFiles(t, typologyRoot, func(rel, text string) {
+		for _, imp := range forbiddenImports {
+			if strings.Contains(text, imp) {
+				t.Fatalf("%s imports %q; production typology wiring must use configured runtime", rel, imp)
+			}
+		}
+	})
+}
+
 func TestContainerEvaluationWiringDoesNotUseLegacyAdapterRegistry(t *testing.T) {
 	t.Parallel()
 

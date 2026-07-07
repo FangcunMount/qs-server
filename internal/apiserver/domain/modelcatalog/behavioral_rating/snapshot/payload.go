@@ -4,8 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 
-	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+	factornorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor_norm"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
@@ -28,11 +29,11 @@ type Brief2Profile struct {
 	IndexCodes           []string
 	ValidityCodes        []string
 	PrimaryDimensionCode string
-	NormTables           *brief2norm.NormTables
+	NormTables           *calcnorm.NormTables
 }
 
 // NormTablesOrNil returns parsed norm tables when Brief-2 norm configuration is present.
-func (p *Brief2Profile) NormTablesOrNil() *brief2norm.NormTables {
+func (p *Brief2Profile) NormTablesOrNil() *calcnorm.NormTables {
 	if p == nil {
 		return nil
 	}
@@ -129,13 +130,13 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	}
 	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
 	if body.Brief2 != nil {
-		factors = brief2norm.ApplyNormMetadata(factors, brief2norm.NormContext{
+		factors = factornorm.ApplyNormMetadata(factors, factornorm.MetadataContext{
 			NormTableVersion: body.Brief2.NormTableVersion,
 			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
 			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
 			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
 		})
-		factors = brief2norm.ApplyCompositeMetadata(factors, compositeSpecsFromPayload(body.Brief2))
+		factors = factornorm.ApplyCompositeMetadata(factors, compositeSpecsFromPayload(body.Brief2))
 	}
 	out.Factors = factors
 	if body.Brief2 != nil {
@@ -151,24 +152,24 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	return out, nil
 }
 
-func normTablesFromPayload(body *brief2Extension) *brief2norm.NormTables {
+func normTablesFromPayload(body *brief2Extension) *calcnorm.NormTables {
 	if body == nil || (len(body.Norms) == 0 && len(body.TScoreRules) == 0) {
 		return nil
 	}
-	tables := &brief2norm.NormTables{
+	tables := &calcnorm.NormTables{
 		FormVariant:      body.FormVariant,
 		NormTableVersion: body.NormTableVersion,
-		Factors:          make([]brief2norm.FactorNormTable, 0, len(body.Norms)),
-		TScoreRules:      make([]brief2norm.TScoreInterpretRule, 0, len(body.TScoreRules)),
+		Factors:          make([]calcnorm.FactorNormTable, 0, len(body.Norms)),
+		TScoreRules:      make([]calcnorm.TScoreInterpretRule, 0, len(body.TScoreRules)),
 	}
 	for _, factor := range body.Norms {
-		table := brief2norm.FactorNormTable{
+		table := calcnorm.FactorNormTable{
 			FactorCode: factor.FactorCode,
-			Bands:      make([]brief2norm.NormBand, 0, len(factor.Bands)),
-			Lookup:     make([]brief2norm.NormLookupEntry, 0, len(factor.Lookup)),
+			Bands:      make([]calcnorm.NormBand, 0, len(factor.Bands)),
+			Lookup:     make([]calcnorm.NormLookupEntry, 0, len(factor.Lookup)),
 		}
 		for _, band := range factor.Bands {
-			table.Bands = append(table.Bands, brief2norm.NormBand{
+			table.Bands = append(table.Bands, calcnorm.NormBand{
 				MinAgeMonths: band.MinAgeMonths,
 				MaxAgeMonths: band.MaxAgeMonths,
 				Gender:       band.Gender,
@@ -177,14 +178,14 @@ func normTablesFromPayload(body *brief2Extension) *brief2norm.NormTables {
 			})
 		}
 		for _, entry := range factor.Lookup {
-			table.Lookup = append(table.Lookup, brief2norm.NormLookupEntry(entry))
+			table.Lookup = append(table.Lookup, calcnorm.NormLookupEntry(entry))
 		}
 		tables.Factors = append(tables.Factors, table)
 	}
 	for _, rule := range body.TScoreRules {
-		converted := brief2norm.TScoreInterpretRule{FactorCode: rule.FactorCode}
+		converted := calcnorm.TScoreInterpretRule{FactorCode: rule.FactorCode}
 		for _, item := range rule.Ranges {
-			converted.Ranges = append(converted.Ranges, brief2norm.TScoreRange(item))
+			converted.Ranges = append(converted.Ranges, calcnorm.TScoreRange(item))
 		}
 		tables.TScoreRules = append(tables.TScoreRules, converted)
 	}
@@ -204,16 +205,16 @@ func normFactorCodesFromPayload(body *brief2Extension) []string {
 	return codes
 }
 
-func compositeSpecsFromPayload(body *brief2Extension) []brief2norm.CompositeIndexSpec {
+func compositeSpecsFromPayload(body *brief2Extension) []factornorm.CompositeIndexSpec {
 	if body == nil || len(body.CompositeIndexes) == 0 {
 		return nil
 	}
-	specs := make([]brief2norm.CompositeIndexSpec, 0, len(body.CompositeIndexes))
+	specs := make([]factornorm.CompositeIndexSpec, 0, len(body.CompositeIndexes))
 	for _, item := range body.CompositeIndexes {
 		if item.Code == "" || len(item.Children) == 0 {
 			continue
 		}
-		specs = append(specs, brief2norm.CompositeIndexSpec{
+		specs = append(specs, factornorm.CompositeIndexSpec{
 			Code:       item.Code,
 			Strategy:   factor.ChildrenAggregationStrategy(item.Strategy),
 			Children:   append([]string(nil), item.Children...),

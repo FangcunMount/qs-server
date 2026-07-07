@@ -209,8 +209,8 @@ func sampleRuntimePayload() []byte {
 				"roots":["EI"]
 			},
 			"decision":{"kind":"pole_composition"},
-			"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti"},
-			"report":{"kind":"template","adapter_key":"mbti"}
+			"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"personality_type"},
+			"report":{"kind":"personality_type","adapter_key":"personality_type"}
 		}
 	}`)
 }
@@ -507,8 +507,8 @@ func TestPublishRequiresQuestionReferencesInBoundQuestionnaire(t *testing.T) {
 		Payload: []byte(`{
 			"factor_graph":{"factors":{"EI":{"id":"EI","code":"EI","kind":"leaf","contributions":[{"question_code":"missing","option_scores":{"A":1}}]}},"roots":["EI"]},
 			"decision":{"kind":"pole_composition"},
-			"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti"},
-			"report":{"kind":"template","adapter_key":"mbti"}
+			"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"personality_type"},
+			"report":{"kind":"personality_type","adapter_key":"personality_type"}
 		}`),
 	}); err != nil {
 		t.Fatalf("UpdateDefinition: %v", err)
@@ -544,7 +544,7 @@ func TestPublishRequiresSupportedRuntimeAdapters(t *testing.T) {
 				"factor_graph":{"factors":{"EI":{"id":"EI","code":"EI","kind":"leaf","contributions":[{"question_code":"q1","option_scores":{"A":1,"B":-1}}]}},"roots":["EI"]},
 				"decision":{"kind":"pole_composition"},
 				"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti_default"},
-				"report":{"kind":"template","adapter_key":"mbti_default"}
+				"report":{"kind":"personality_type","adapter_key":"mbti_default"}
 			}
 		}`),
 	}); err != nil {

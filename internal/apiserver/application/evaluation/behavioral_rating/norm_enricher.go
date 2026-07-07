@@ -3,29 +3,29 @@ package behavioralrating
 import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/calculationadapter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation"
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-// EnrichBrief2Outcome applies Brief-2 norm/T-score projection on top of raw scale scoring.
-func EnrichBrief2Outcome(
+// ApplyNormProjection applies norm/T-score tables on top of raw scale scoring.
+func ApplyNormProjection(
 	outcome *assessment.AssessmentOutcome,
 	snapshot *behavioralsnapshot.Snapshot,
-	subject brief2norm.Subject,
+	subject calcnorm.Subject,
 ) *assessment.AssessmentOutcome {
 	if outcome == nil || snapshot == nil {
 		return outcome
 	}
-	calcResult := enrichBrief2CalcResult(calculationadapter.CalcResultFromOutcome(outcome), snapshot, subject)
+	calcResult := enrichNormCalcResult(calculationadapter.CalcResultFromOutcome(outcome), snapshot, subject)
 	return calculationadapter.MergeCalcResultIntoOutcome(outcome, calcResult)
 }
 
-func enrichBrief2CalcResult(
+func enrichNormCalcResult(
 	calcResult *calculation.Result,
 	snapshot *behavioralsnapshot.Snapshot,
-	subject brief2norm.Subject,
+	subject calcnorm.Subject,
 ) *calculation.Result {
 	if calcResult == nil || snapshot == nil || snapshot.Brief2 == nil {
 		return calcResult
@@ -34,18 +34,18 @@ func enrichBrief2CalcResult(
 	if tables == nil {
 		return calcResult
 	}
-	return brief2NormProjection{
-		tables:               tables,
-		subject:              subject,
-		primaryDimensionCode: snapshot.Brief2.PrimaryDimensionCode,
-	}.apply(calcResult)
+	return calcnorm.Projection{
+		Tables:               tables,
+		Subject:              subject,
+		PrimaryDimensionCode: snapshot.Brief2.PrimaryDimensionCode,
+	}.Apply(calcResult)
 }
 
-func NormSubjectFromInput(input *evaluationinput.InputSnapshot) brief2norm.Subject {
+func NormSubjectFromInput(input *evaluationinput.InputSnapshot) calcnorm.Subject {
 	if input == nil || input.NormSubject == nil {
-		return brief2norm.Subject{}
+		return calcnorm.Subject{}
 	}
-	return brief2norm.Subject{
+	return calcnorm.Subject{
 		AgeMonths: input.NormSubject.AgeMonths,
 		Gender:    input.NormSubject.Gender,
 	}

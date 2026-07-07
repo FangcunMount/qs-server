@@ -216,6 +216,11 @@ func (v *runtimeSpecValidator) validateOutcomeMapping(mapping OutcomeMappingSpec
 		v.add("outcome_mapping.detail_adapter_key", "outcome_mapping.detail_adapter.required", "outcome detail adapter 不能为空")
 		return
 	}
+	if mapping.DetailAdapterKey != "" && isLegacyDetailAdapter(mapping.DetailAdapterKey) {
+		v.add("outcome_mapping.detail_adapter_key", "outcome_mapping.detail_adapter.deprecated",
+			fmt.Sprintf("outcome detail adapter %s 已废弃，请使用 personality_type 或 trait_profile", mapping.DetailAdapterKey))
+		return
+	}
 	if !isSupportedDetailAdapter(adapterKey) {
 		v.add("outcome_mapping.detail_adapter_key", "outcome_mapping.detail_adapter.unsupported", fmt.Sprintf("outcome detail adapter %s 不支持", adapterKey))
 		return
@@ -275,6 +280,11 @@ func (v *runtimeSpecValidator) validateReport(report ReportSpec, mapping Outcome
 	}
 	if report.Kind == ReportKindTemplate && report.AdapterKey == "" {
 		v.add("report.adapter_key", "report.adapter.required", "template report adapter_key 不能为空")
+		return
+	}
+	if report.AdapterKey != "" && isLegacyReportAdapter(report.AdapterKey) {
+		v.add("report.adapter_key", "report.adapter.deprecated",
+			fmt.Sprintf("report adapter %s 已废弃，请使用 personality_type 或 trait_profile", report.AdapterKey))
 		return
 	}
 	adapterKey := report.ResolvedAdapterKey(mapping, decisionKind)
@@ -376,17 +386,33 @@ func isSupportedReportAdapter(adapter ReportAdapterKey) bool {
 	}
 }
 
+func isLegacyDetailAdapter(adapter DetailAdapterKey) bool {
+	switch adapter {
+	case DetailAdapterMBTI, DetailAdapterSBTI, DetailAdapterBigFive:
+		return true
+	default:
+		return false
+	}
+}
+
+func isLegacyReportAdapter(adapter ReportAdapterKey) bool {
+	switch adapter {
+	case ReportAdapterMBTI, ReportAdapterSBTI, ReportAdapterBigFive:
+		return true
+	default:
+		return false
+	}
+}
+
 func isDetailAdapterCompatible(algorithm modelcatalog.Algorithm, adapter DetailAdapterKey) bool {
 	if algorithm == "" || algorithm == modelcatalog.AlgorithmPersonalityTypology {
 		return true
 	}
 	switch algorithm {
-	case modelcatalog.AlgorithmMBTI:
-		return adapter == DetailAdapterMBTI || adapter == DetailAdapterPersonalityType
-	case modelcatalog.AlgorithmSBTI:
-		return adapter == DetailAdapterSBTI || adapter == DetailAdapterPersonalityType
+	case modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI:
+		return adapter == DetailAdapterPersonalityType
 	case modelcatalog.AlgorithmBigFive:
-		return adapter == DetailAdapterBigFive || adapter == DetailAdapterTraitProfile
+		return adapter == DetailAdapterTraitProfile
 	default:
 		return true
 	}
@@ -397,12 +423,10 @@ func isReportAdapterCompatible(algorithm modelcatalog.Algorithm, adapter ReportA
 		return true
 	}
 	switch algorithm {
-	case modelcatalog.AlgorithmMBTI:
-		return adapter == ReportAdapterMBTI || adapter == ReportAdapterPersonalityType
-	case modelcatalog.AlgorithmSBTI:
-		return adapter == ReportAdapterSBTI || adapter == ReportAdapterPersonalityType
+	case modelcatalog.AlgorithmMBTI, modelcatalog.AlgorithmSBTI:
+		return adapter == ReportAdapterPersonalityType
 	case modelcatalog.AlgorithmBigFive:
-		return adapter == ReportAdapterBigFive || adapter == ReportAdapterTraitProfile
+		return adapter == ReportAdapterTraitProfile
 	default:
 		return true
 	}

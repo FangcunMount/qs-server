@@ -26,9 +26,6 @@ func NewOutcomeAdapterRegistry() OutcomeAdapterRegistry {
 		adapters: map[modeltypology.DetailAdapterKey]outcomeAdapterFunc{
 			modeltypology.DetailAdapterPersonalityType: assembleGenericPersonalityTypeOutcome,
 			modeltypology.DetailAdapterTraitProfile:    assembleGenericTraitProfileOutcome,
-			modeltypology.DetailAdapterMBTI:            assemblePersonalityTypeFromMBTI,
-			modeltypology.DetailAdapterSBTI:            assemblePersonalityTypeFromSBTI,
-			modeltypology.DetailAdapterBigFive:         assembleTraitProfileOutcome,
 		},
 	}
 }

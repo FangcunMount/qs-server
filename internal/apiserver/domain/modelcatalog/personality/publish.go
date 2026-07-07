@@ -35,7 +35,7 @@ func BuildPublishedSnapshot(model *domain.AssessmentModel) (*domain.PublishedMod
 	}
 	decisionKind := runtime.Decision.Kind
 	if decisionKind == "" {
-		decisionKind = domain.FallbackPersonalityDecisionKind(model.Algorithm)
+		return nil, fmt.Errorf("runtime decision.kind is required for publish")
 	}
 	return &domain.PublishedModelSnapshot{
 		SchemaVersion: domain.SchemaVersionV2,

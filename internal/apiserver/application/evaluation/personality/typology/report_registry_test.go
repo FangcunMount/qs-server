@@ -12,8 +12,8 @@ import (
 func TestReportAdapterRegistryBuildsByAdapterKey(t *testing.T) {
 	registry := DefaultReportAdapterRegistry()
 
-	spec := modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterMBTI}
-	mapping := modeltypology.OutcomeMappingSpec{DetailAdapterKey: modeltypology.DetailAdapterMBTI}
+	spec := modeltypology.ReportSpec{Kind: modeltypology.ReportKindPersonalityType, AdapterKey: modeltypology.ReportAdapterPersonalityType}
+	mapping := modeltypology.OutcomeMappingSpec{DetailAdapterKey: modeltypology.DetailAdapterPersonalityType}
 
 	_, err := registry.build(spec, mapping, modelcatalog.DecisionKindPoleComposition, evaloutcome.Outcome{})
 	if err == nil {

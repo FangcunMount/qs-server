@@ -8,7 +8,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evaluationtypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/personality/typology"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
-	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	cognitivesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/cognitive/snapshot"
 	modeltypology "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/personality/typology"
@@ -342,16 +342,16 @@ func brief2InputSnapshot() *evaluationinput.InputSnapshot {
 		Brief2: &behavioralsnapshot.Brief2Profile{
 			FormVariant:      "parent",
 			NormTableVersion: "2024",
-			NormTables: &brief2norm.NormTables{
-				Factors: []brief2norm.FactorNormTable{{
+			NormTables: &calcnorm.NormTables{
+				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",
-					Lookup: []brief2norm.NormLookupEntry{
+					Lookup: []calcnorm.NormLookupEntry{
 						{RawMin: 0, RawMax: 10, TScore: 65, Percentile: 90},
 					},
 				}},
-				TScoreRules: []brief2norm.TScoreInterpretRule{{
+				TScoreRules: []calcnorm.TScoreInterpretRule{{
 					FactorCode: "gec",
-					Ranges: []brief2norm.TScoreRange{
+					Ranges: []calcnorm.TScoreRange{
 						{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "升高"},
 					},
 				}},

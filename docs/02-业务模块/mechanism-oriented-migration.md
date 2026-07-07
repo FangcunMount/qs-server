@@ -59,3 +59,35 @@ application/evaluation/
 - 测试 fixture / migration
 
 不再存在于主干 package 名称中。
+
+## Round 1 已完成（机制骨架）
+
+| 交付 | 位置 |
+|------|------|
+| 常模查表 + projection | `domain/calculation/norm` |
+| 因子常模 metadata | `domain/modelcatalog/factor_norm` |
+| 任务表现 metadata | `domain/modelcatalog/task_performance` |
+| Typology 机制 detail/report | `personality_type` / `trait_profile` generic assembler |
+| 生产路径 | `configured` runtime（非 `adapter.DefaultRegistry()`） |
+| 架构守卫 | `architecture_mechanism_test.go`、`.cursor/rules/21-code-by-mechanism.mdc` |
+
+## Round 2：收缩过渡层 + 收紧契约（当前）
+
+**做**：应用层直引机制包；默认 registry 仅机制 adapter key；publish 必填 `decision.kind`；publish 拒绝 legacy adapter key。
+
+**不做**：Conners / SPM 完整执行层；删 `Algorithm*` / payload JSON；前端 migration。
+
+| 阶段 | 动作 |
+|------|------|
+| R2-A | `behavioral_rating` application/snapshot 直引 `calcnorm` + `factor_norm`；`ApplyNormProjection` |
+| R2-B | `cognitive/snapshot` 直引 `task_performance`；`spm` 缩为 re-export |
+| R2-C | outcome/report registry 默认仅 `personality_type` + `trait_profile`；validator publish 拒绝 code adapter key |
+| R2-D | `BuildPublishedSnapshot` 无 `decision.kind` 报错 |
+| R2-E | application typology 不得 import `adapter/{mbti,sbti,bigfive}` |
+| R2-F | 文档同步 |
+
+过渡包白名单（re-export / characterization-only）：`brief2`、`spm`、`adapter/{mbti,sbti,bigfive}`。
+
+### 阶段二：MBTI 收敛 — 已完成
+
+report/detail 已收敛到 `personality_type` / `trait_profile` 机制 key；legacy assemble 保留供 characterization 显式注入。

@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	behavioralrating "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/behavioral_rating"
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
@@ -40,10 +40,10 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 			},
 		},
 		Brief2: &behavioralsnapshot.Brief2Profile{
-			NormTables: &brief2norm.NormTables{
-				Factors: []brief2norm.FactorNormTable{{
+			NormTables: &calcnorm.NormTables{
+				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",
-					Lookup: []brief2norm.NormLookupEntry{
+					Lookup: []calcnorm.NormLookupEntry{
 						{RawMin: 0, RawMax: 20, TScore: 65, Percentile: 92},
 					},
 				}},
@@ -51,7 +51,7 @@ func TestApplyFactorProjectionsRollsUpAndAppliesNorm(t *testing.T) {
 		},
 	}
 
-	enriched := behavioralrating.ApplyFactorProjections(outcome, snapshot, brief2norm.Subject{})
+	enriched := behavioralrating.ApplyFactorProjections(outcome, snapshot, calcnorm.Subject{})
 	if got := dimensionScore(enriched.Dimensions, "bri"); got != 10 {
 		t.Fatalf("bri raw = %v, want 10", got)
 	}

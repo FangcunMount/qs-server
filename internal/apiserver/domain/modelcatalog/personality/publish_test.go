@@ -33,8 +33,8 @@ func TestBuildPublishedSnapshot(t *testing.T) {
 			"runtime":{
 				"factor_graph":{"dimension_order":["EI"],"dimensions":{"EI":{"code":"EI","name":"EI"}},"roots":["EI"]},
 				"decision":{"kind":"pole_composition"},
-				"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"mbti"},
-				"report":{"kind":"template","adapter_key":"mbti"}
+				"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"personality_type"},
+				"report":{"kind":"personality_type","adapter_key":"personality_type"}
 			}
 		}`),
 	}, model.CreatedAt); err != nil {
@@ -99,8 +99,8 @@ func TestBuildPublishedSnapshotUsesMatchingSpecDecisionKind(t *testing.T) {
 			"outcomes":[{"code":"INTJ","name":"建筑师"}],
 			"runtime":{
 				"factor_graph":{"dimension_order":["EI"],"dimensions":{"EI":{"code":"EI","name":"EI"}},"roots":["EI"]},
-				"outcome_mapping":{"detail_kind":"personality_trait","detail_adapter_key":"bigfive"},
-				"report":{"kind":"template","adapter_key":"bigfive"}
+				"outcome_mapping":{"detail_kind":"personality_trait","detail_adapter_key":"trait_profile"},
+				"report":{"kind":"trait_profile","adapter_key":"trait_profile"}
 			}
 		}`),
 	}, model.CreatedAt); err != nil {
@@ -113,5 +113,46 @@ func TestBuildPublishedSnapshotUsesMatchingSpecDecisionKind(t *testing.T) {
 	}
 	if snapshot.Decision.Kind != domain.DecisionKindTraitProfile {
 		t.Fatalf("decision kind = %s, want trait_profile from matching_spec", snapshot.Decision.Kind)
+	}
+}
+
+func TestBuildPublishedSnapshotUsesExplicitRuntimeDecisionKind(t *testing.T) {
+	model, err := domain.NewAssessmentModel(domain.NewAssessmentModelInput{
+		Code:      "personality_mbti_explicit_decision",
+		Kind:      domain.KindPersonality,
+		SubKind:   domain.SubKindTypology,
+		Algorithm: domain.AlgorithmMBTI,
+		Title:     "MBTI Explicit Decision",
+	})
+	if err != nil {
+		t.Fatalf("NewAssessmentModel: %v", err)
+	}
+	if err := model.BindQuestionnaire(domain.QuestionnaireBinding{
+		QuestionnaireCode: "Q_MBTI", QuestionnaireVersion: "1.0.0",
+	}, model.CreatedAt); err != nil {
+		t.Fatalf("BindQuestionnaire: %v", err)
+	}
+	if err := model.UpdateDefinition(domain.DefinitionPayload{
+		Format: domain.PayloadFormatPersonalityTypologyV1,
+		Data: []byte(`{
+			"algorithm":"mbti",
+			"outcomes":[{"code":"INTJ","name":"建筑师"}],
+			"runtime":{
+				"factor_graph":{"dimension_order":["EI"],"dimensions":{"EI":{"code":"EI","name":"EI"}},"roots":["EI"]},
+				"decision":{"kind":"pole_composition"},
+				"outcome_mapping":{"detail_kind":"personality_type","detail_adapter_key":"personality_type"},
+				"report":{"kind":"personality_type","adapter_key":"personality_type"}
+			}
+		}`),
+	}, model.CreatedAt); err != nil {
+		t.Fatalf("UpdateDefinition: %v", err)
+	}
+
+	snapshot, err := personalitydomain.BuildPublishedSnapshot(model)
+	if err != nil {
+		t.Fatalf("BuildPublishedSnapshot: %v", err)
+	}
+	if snapshot.Decision.Kind != domain.DecisionKindPoleComposition {
+		t.Fatalf("decision kind = %s, want explicit pole_composition (no publish-time algorithm fallback)", snapshot.Decision.Kind)
 	}
 }

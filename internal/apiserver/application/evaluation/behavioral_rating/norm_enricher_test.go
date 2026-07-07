@@ -4,13 +4,13 @@ import (
 	"testing"
 
 	behavioralrating "github.com/FangcunMount/qs-server/internal/apiserver/application/evaluation/behavioral_rating"
+	calcnorm "github.com/FangcunMount/qs-server/internal/apiserver/domain/calculation/norm"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
-	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
-func TestEnrichBrief2OutcomeAppliesNormAndInterpretation(t *testing.T) {
+func TestApplyNormProjectionAppliesNormAndInterpretation(t *testing.T) {
 	t.Parallel()
 
 	outcome := &assessment.AssessmentOutcome{
@@ -21,16 +21,16 @@ func TestEnrichBrief2OutcomeAppliesNormAndInterpretation(t *testing.T) {
 	}
 	snapshot := &behavioralsnapshot.Snapshot{
 		Brief2: &behavioralsnapshot.Brief2Profile{
-			NormTables: &brief2norm.NormTables{
-				Factors: []brief2norm.FactorNormTable{{
+			NormTables: &calcnorm.NormTables{
+				Factors: []calcnorm.FactorNormTable{{
 					FactorCode: "gec",
-					Lookup: []brief2norm.NormLookupEntry{
+					Lookup: []calcnorm.NormLookupEntry{
 						{RawMin: 0, RawMax: 10, TScore: 65, Percentile: 90},
 					},
 				}},
-				TScoreRules: []brief2norm.TScoreInterpretRule{{
+				TScoreRules: []calcnorm.TScoreInterpretRule{{
 					FactorCode: "gec",
-					Ranges: []brief2norm.TScoreRange{
+					Ranges: []calcnorm.TScoreRange{
 						{MinT: 60, MaxT: 100, Level: "elevated", Conclusion: "升高"},
 					},
 				}},
@@ -38,7 +38,7 @@ func TestEnrichBrief2OutcomeAppliesNormAndInterpretation(t *testing.T) {
 		},
 	}
 
-	enriched := behavioralrating.EnrichBrief2Outcome(outcome, snapshot, brief2norm.Subject{})
+	enriched := behavioralrating.ApplyNormProjection(outcome, snapshot, calcnorm.Subject{})
 	if len(enriched.Dimensions) != 1 {
 		t.Fatalf("dimensions = %#v", enriched.Dimensions)
 	}

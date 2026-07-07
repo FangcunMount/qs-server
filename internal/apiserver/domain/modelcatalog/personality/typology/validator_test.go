@@ -17,7 +17,7 @@ func TestValidateRuntimeSpecForPublishRequiresExplicitFactorGraph(t *testing.T) 
 		},
 		Decision:       typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
-		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterMBTI},
+		Report:         typology.ReportSpec{Kind: typology.ReportKindPersonalityType, AdapterKey: typology.ReportAdapterPersonalityType},
 	}
 
 	issues := typology.ValidateRuntimeSpecForPublish(spec, typology.QuestionnaireSnapshot{})
@@ -44,7 +44,7 @@ func TestValidateRuntimeSpecForPublishValidatesQuestionAndOptionRefs(t *testing.
 		},
 		Decision:       typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{DetailKind: typology.OutcomeDetailPersonalityType},
-		Report:         typology.ReportSpec{Kind: typology.ReportKindTemplate, AdapterKey: typology.ReportAdapterMBTI},
+		Report:         typology.ReportSpec{Kind: typology.ReportKindPersonalityType, AdapterKey: typology.ReportAdapterPersonalityType},
 	}
 	questionnaire := typology.QuestionnaireSnapshot{
 		Questions: []typology.QuestionSnapshot{{Code: "q1", OptionCodes: []string{"A"}}},
@@ -124,10 +124,42 @@ func TestValidateRuntimeSpecForPublishValidatesDecisionAndLevelRule(t *testing.T
 	}
 }
 
+func TestValidateRuntimeSpecForPublishRequiresDecisionKind(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.Decision.Kind = ""
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmMBTI,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	})
+
+	if !hasIssueCode(issues, "decision.kind.required") {
+		t.Fatalf("issues = %#v, want decision.kind.required", issues)
+	}
+}
+
+func TestValidateRuntimeSpecForPublishRejectsLegacyAdapterKeys(t *testing.T) {
+	spec := validRuntimeSpec()
+	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterMBTI
+	spec.Report.AdapterKey = typology.ReportAdapterMBTI
+
+	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
+		Algorithm: modelcatalog.AlgorithmMBTI,
+		Outcomes:  []typology.Outcome{{Code: "INTJ", Name: "建筑师"}},
+	})
+
+	if !hasIssueCode(issues, "outcome_mapping.detail_adapter.deprecated") {
+		t.Fatalf("issues = %#v, want outcome_mapping.detail_adapter.deprecated", issues)
+	}
+	if !hasIssueCode(issues, "report.adapter.deprecated") {
+		t.Fatalf("issues = %#v, want report.adapter.deprecated", issues)
+	}
+}
+
 func TestValidateRuntimeSpecForPublishValidatesAdapterCompatibility(t *testing.T) {
 	spec := validRuntimeSpec()
-	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterBigFive
-	spec.Report.AdapterKey = typology.ReportAdapterBigFive
+	spec.OutcomeMapping.DetailAdapterKey = typology.DetailAdapterTraitProfile
+	spec.Report.AdapterKey = typology.ReportAdapterTraitProfile
 
 	issues := typology.ValidateRuntimeSpecForPublishWithContext(spec, validQuestionnaire(), typology.RuntimeSpecValidationContext{
 		Algorithm: modelcatalog.AlgorithmMBTI,
@@ -162,11 +194,11 @@ func validRuntimeSpec() *typology.RuntimeSpec {
 		Decision: typology.PersonalityDecisionSpec{Kind: modelcatalog.DecisionKindPoleComposition},
 		OutcomeMapping: typology.OutcomeMappingSpec{
 			DetailKind:       typology.OutcomeDetailPersonalityType,
-			DetailAdapterKey: typology.DetailAdapterMBTI,
+			DetailAdapterKey: typology.DetailAdapterPersonalityType,
 		},
 		Report: typology.ReportSpec{
-			Kind:       typology.ReportKindTemplate,
-			AdapterKey: typology.ReportAdapterMBTI,
+			Kind:       typology.ReportKindPersonalityType,
+			AdapterKey: typology.ReportAdapterPersonalityType,
 		},
 	}
 }

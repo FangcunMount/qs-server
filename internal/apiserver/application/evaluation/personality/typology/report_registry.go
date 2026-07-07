@@ -27,9 +27,6 @@ func NewReportAdapterRegistry() ReportAdapterRegistry {
 		adapters: map[modeltypology.ReportAdapterKey]reportBuilderFunc{
 			modeltypology.ReportAdapterPersonalityType: buildTypologyReportAdapter(modeltypology.ReportAdapterPersonalityType),
 			modeltypology.ReportAdapterTraitProfile:    buildTypologyReportAdapter(modeltypology.ReportAdapterTraitProfile),
-			modeltypology.ReportAdapterMBTI:            buildTypologyReportAdapter(modeltypology.ReportAdapterMBTI),
-			modeltypology.ReportAdapterSBTI:            buildTypologyReportAdapter(modeltypology.ReportAdapterSBTI),
-			modeltypology.ReportAdapterBigFive:         buildTypologyReportAdapter(modeltypology.ReportAdapterBigFive),
 		},
 	}
 }
@@ -85,9 +82,9 @@ func buildTypologyReport(
 	outcome evaloutcome.Outcome,
 ) (*domainReport.InterpretReport, error) {
 	switch adapterKey {
-	case modeltypology.ReportAdapterPersonalityType, modeltypology.ReportAdapterMBTI, modeltypology.ReportAdapterSBTI:
+	case modeltypology.ReportAdapterPersonalityType:
 		return buildPersonalityTypeReport(adapterKey, outcome)
-	case modeltypology.ReportAdapterTraitProfile, modeltypology.ReportAdapterBigFive:
+	case modeltypology.ReportAdapterTraitProfile:
 		return buildTraitProfileReport(adapterKey, outcome)
 	default:
 		return nil, fmt.Errorf("unsupported report adapter key: %s", adapterKey)

@@ -19,8 +19,16 @@
   "runtime": {
     "factor_graph": {
       "dimensions": {
-        "D1": { "code": "D1", "name": "D1", "model": "M1" },
-        "D2": { "code": "D2", "name": "D2", "model": "M2" }
+        "D1": {
+          "code": "D1",
+          "name": "D1",
+          "model": "M1"
+        },
+        "D2": {
+          "code": "D2",
+          "name": "D2",
+          "model": "M2"
+        }
       },
       "factors": {
         "D1": {
@@ -30,8 +38,22 @@
           "kind": "leaf",
           "option_scoring": "compat",
           "contributions": [
-            { "question_code": "Q1", "option_scores": { "A": 1, "B": 2, "C": 3 } },
-            { "question_code": "Q2", "option_scores": { "A": 1, "B": 2, "C": 3 } }
+            {
+              "question_code": "Q1",
+              "option_scores": {
+                "A": 1,
+                "B": 2,
+                "C": 3
+              }
+            },
+            {
+              "question_code": "Q2",
+              "option_scores": {
+                "A": 1,
+                "B": 2,
+                "C": 3
+              }
+            }
           ]
         },
         "D2": {
@@ -41,23 +63,55 @@
           "kind": "leaf",
           "option_scoring": "compat",
           "contributions": [
-            { "question_code": "Q3", "option_scores": { "A": 1, "B": 2, "C": 3 } },
-            { "question_code": "Q4", "option_scores": { "A": 1, "B": 2, "C": 3 } }
+            {
+              "question_code": "Q3",
+              "option_scores": {
+                "A": 1,
+                "B": 2,
+                "C": 3
+              }
+            },
+            {
+              "question_code": "Q4",
+              "option_scores": {
+                "A": 1,
+                "B": 2,
+                "C": 3
+              }
+            }
           ]
         }
       },
-      "roots": ["D1", "D2"]
+      "roots": [
+        "D1",
+        "D2"
+      ]
     },
     "decision": {
       "kind": "nearest_pattern",
       "fallback_similarity_threshold": 0.6,
       "fallback_code": "HHHH",
-      "level_rule": { "low_max": 3, "high_min": 5 }
+      "level_rule": {
+        "low_max": 3,
+        "high_min": 5
+      }
     },
     "special_rules": [
-      { "code": "fallback:HHHH", "kind": "fallback_threshold", "phase": "after_decision", "outcome_code": "HHHH" }
+      {
+        "code": "fallback:HHHH",
+        "kind": "fallback_threshold",
+        "phase": "after_decision",
+        "outcome_code": "HHHH"
+      }
     ],
-    "outcome_mapping": { "detail_kind": "personality_type", "detail_adapter_key": "sbti" },
-    "report": { "kind": "template", "adapter_key": "sbti", "category_label": "SBTI" }
+    "outcome_mapping": {
+      "detail_kind": "personality_type",
+      "detail_adapter_key": "personality_type"
+    },
+    "report": {
+      "kind": "personality_type",
+      "adapter_key": "personality_type",
+      "category_label": "SBTI"
+    }
   }
 }

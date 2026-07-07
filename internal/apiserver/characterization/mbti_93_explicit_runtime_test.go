@@ -120,11 +120,11 @@ func mbti93ExplicitRuntimePayload(algorithm modelcatalog.Algorithm) *modeltypolo
 			},
 			OutcomeMapping: modeltypology.OutcomeMappingSpec{
 				DetailKind:       modeltypology.OutcomeDetailPersonalityType,
-				DetailAdapterKey: modeltypology.DetailAdapterMBTI,
+				DetailAdapterKey: modeltypology.DetailAdapterPersonalityType,
 			},
 			Report: modeltypology.ReportSpec{
 				Kind:          modeltypology.ReportKindPersonalityType,
-				AdapterKey:    modeltypology.ReportAdapterMBTI,
+				AdapterKey:    modeltypology.ReportAdapterPersonalityType,
 				CategoryLabel: "MBTI",
 			},
 		},
