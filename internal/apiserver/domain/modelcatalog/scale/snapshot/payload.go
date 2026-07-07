@@ -1,5 +1,7 @@
 package snapshot
 
+import "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
+
 // ScaleSnapshot 已发布量表规则集 payload（ruleset.scale.v1）。
 type ScaleSnapshot struct {
 	ID                   uint64
@@ -26,6 +28,18 @@ func (s *ScaleSnapshot) FindFactor(code string) (*FactorSnapshot, bool) {
 		}
 	}
 	return nil, false
+}
+
+// CanonicalFactors projects scale execution factors into canonical catalog form.
+func (s *ScaleSnapshot) CanonicalFactors() []factor.FactorSnapshot {
+	if s == nil {
+		return nil
+	}
+	out := make([]factor.FactorSnapshot, 0, len(s.Factors))
+	for _, item := range s.Factors {
+		out = append(out, item.Canonical())
+	}
+	return out
 }
 
 type FactorSnapshot struct {

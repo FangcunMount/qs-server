@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
@@ -26,56 +27,20 @@ type SPMProfile struct {
 	NormTableVersion string
 }
 
-type FactorSnapshot struct {
-	Code            string
-	Title           string
-	IsTotalScore    bool
-	QuestionCodes   []string
-	ScoringStrategy string
-	MaxScore        *float64
-	InterpretRules  []InterpretRuleSnapshot
-}
-
-type InterpretRuleSnapshot struct {
-	MinScore   float64
-	MaxScore   float64
-	Conclusion string
-	Suggestion string
-	Level      string
-}
+type (
+	FactorSnapshot        = factor.FactorSnapshot
+	InterpretRuleSnapshot = factor.ScoreRangeRule
+)
 
 type definitionPayload struct {
-	Dimensions     []dimensionRule `json:"dimensions"`
-	InterpretRules []interpretRule `json:"interpret_rules"`
-	SPM            *spmExtension   `json:"spm,omitempty"`
+	factor.DefinitionBody
+	SPM *spmExtension `json:"spm,omitempty"`
 }
 
 type spmExtension struct {
 	TimeLimitSeconds int      `json:"time_limit_seconds,omitempty"`
 	ItemSetCodes     []string `json:"item_set_codes,omitempty"`
 	NormTableVersion string   `json:"norm_table_version,omitempty"`
-}
-
-type dimensionRule struct {
-	Code            string   `json:"code"`
-	Title           string   `json:"title"`
-	QuestionCodes   []string `json:"question_codes"`
-	ScoringStrategy string   `json:"scoring_strategy"`
-	MaxScore        *float64 `json:"max_score,omitempty"`
-	IsTotalScore    bool     `json:"is_total_score,omitempty"`
-}
-
-type interpretRule struct {
-	DimensionCode string       `json:"dimension_code"`
-	Ranges        []scoreRange `json:"ranges"`
-}
-
-type scoreRange struct {
-	MinScore   float64 `json:"min_score"`
-	MaxScore   float64 `json:"max_score"`
-	Conclusion string  `json:"conclusion"`
-	Suggestion string  `json:"suggestion,omitempty"`
-	Level      string  `json:"level,omitempty"`
 }
 
 // ParseDefinitionPayload decodes a cognitive payload body into a runtime snapshot.
@@ -98,33 +63,20 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return nil, fmt.Errorf("decode cognitive payload: %w", err)
 	}
-	rulesByDimension := make(map[string][]InterpretRuleSnapshot, len(body.InterpretRules))
-	for _, rule := range body.InterpretRules {
-		converted := make([]InterpretRuleSnapshot, 0, len(rule.Ranges))
-		for _, item := range rule.Ranges {
-			converted = append(converted, InterpretRuleSnapshot(item))
-		}
-		rulesByDimension[rule.DimensionCode] = converted
-	}
-	factors := make([]FactorSnapshot, 0, len(body.Dimensions))
-	for _, dimension := range body.Dimensions {
-		factors = append(factors, FactorSnapshot{
-			Code:            dimension.Code,
-			Title:           dimension.Title,
-			IsTotalScore:    dimension.IsTotalScore,
-			QuestionCodes:   append([]string(nil), dimension.QuestionCodes...),
-			ScoringStrategy: dimension.ScoringStrategy,
-			MaxScore:        dimension.MaxScore,
-			InterpretRules:  rulesByDimension[dimension.Code],
-		})
-	}
 	out := &Snapshot{
 		Code:    modelCode,
 		Version: modelVersion,
 		Title:   title,
 		Status:  status,
-		Factors: factors,
 	}
+	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	if body.SPM != nil {
+		factors = factor.ApplySPMNormMetadata(factors, factor.SPMNormContext{
+			NormTableVersion: body.SPM.NormTableVersion,
+			ItemSetCodes:     append([]string(nil), body.SPM.ItemSetCodes...),
+		})
+	}
+	out.Factors = factors
 	if body.SPM != nil {
 		out.SPM = &SPMProfile{
 			TimeLimitSeconds: body.SPM.TimeLimitSeconds,
@@ -144,35 +96,7 @@ func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil
 	}
-	factors := make([]scalesnapshot.FactorSnapshot, 0, len(s.Factors))
-	for _, factor := range s.Factors {
-		rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(factor.InterpretRules))
-		for _, rule := range factor.InterpretRules {
-			rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
-				Min:        rule.MinScore,
-				Max:        rule.MaxScore,
-				RiskLevel:  rule.Level,
-				Conclusion: rule.Conclusion,
-				Suggestion: rule.Suggestion,
-			})
-		}
-		factors = append(factors, scalesnapshot.FactorSnapshot{
-			Code:            factor.Code,
-			Title:           factor.Title,
-			IsTotalScore:    factor.IsTotalScore,
-			QuestionCodes:   append([]string(nil), factor.QuestionCodes...),
-			ScoringStrategy: factor.ScoringStrategy,
-			MaxScore:        factor.MaxScore,
-			InterpretRules:  rules,
-		})
-	}
-	return &scalesnapshot.ScaleSnapshot{
-		Code:                 s.Code,
-		ScaleVersion:         s.Version,
-		Title:                s.Title,
-		QuestionnaireCode:    s.QuestionnaireCode,
-		QuestionnaireVersion: s.QuestionnaireVersion,
-		Status:               s.Status,
-		Factors:              factors,
-	}
+	return scalesnapshot.BuildFromModelFactors(
+		s.Code, s.Version, s.Title, s.QuestionnaireCode, s.QuestionnaireVersion, s.Status, s.Factors,
+	)
 }

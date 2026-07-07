@@ -3,9 +3,9 @@ package evaluationinput
 import (
 	"context"
 
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	behavioralsnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
-	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 )
 
 const EvaluationModelKindBehavioralRating EvaluationModelKind = "behavioral_rating"

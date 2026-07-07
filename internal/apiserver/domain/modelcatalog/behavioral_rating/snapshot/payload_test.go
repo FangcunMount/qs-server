@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/snapshot"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 )
 
 func TestParseDefinitionPayloadProjectsToScaleSnapshot(t *testing.T) {
@@ -69,6 +70,38 @@ func TestParseBrief2PayloadPreservesProfile(t *testing.T) {
 	}
 	if got.ToScaleSnapshot() == nil || len(got.ToScaleSnapshot().Factors) != 1 {
 		t.Fatal("expected scale projection to remain available")
+	}
+}
+
+func TestParseBrief2PayloadAnnotatesFactorNormMetadata(t *testing.T) {
+	t.Parallel()
+
+	raw := []byte(`{
+		"dimensions": [
+			{"code": "bri", "title": "BRI", "question_codes": ["q1"], "scoring_strategy": "sum"},
+			{"code": "gec", "title": "GEC", "question_codes": ["q2"], "scoring_strategy": "sum"}
+		],
+		"brief2": {
+			"norm_table_version": "2024",
+			"index_codes": ["bri", "gec"],
+			"norms": [{"factor_code": "gec", "lookup": [{"raw_min": 0, "raw_max": 8, "t_score": 45, "percentile": 30}]}]
+		}
+	}`)
+	got, err := snapshot.ParsePublishedPayload(
+		"assessmentmodel.behavioral_rating.brief2.v1",
+		"BR-003", "v1", "BRIEF-2", "published", raw,
+	)
+	if err != nil {
+		t.Fatalf("ParsePublishedPayload: %v", err)
+	}
+	if len(got.Factors) != 2 {
+		t.Fatalf("factors = %#v", got.Factors)
+	}
+	if got.Factors[0].ResolvedRole() != factor.FactorRoleIndex {
+		t.Fatalf("bri role = %s", got.Factors[0].ResolvedRole())
+	}
+	if got.Factors[1].Norm == nil || got.Factors[1].Norm.NormTableVersion != "2024" {
+		t.Fatalf("gec norm = %#v", got.Factors[1].Norm)
 	}
 }
 

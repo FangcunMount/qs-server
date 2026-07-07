@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	brief2norm "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/behavioral_rating/brief2"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	scalesnapshot "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/scale/snapshot"
 )
 
@@ -37,28 +38,14 @@ func (p *Brief2Profile) NormTablesOrNil() *brief2norm.NormTables {
 	return p.NormTables
 }
 
-type FactorSnapshot struct {
-	Code            string
-	Title           string
-	IsTotalScore    bool
-	QuestionCodes   []string
-	ScoringStrategy string
-	MaxScore        *float64
-	InterpretRules  []InterpretRuleSnapshot
-}
-
-type InterpretRuleSnapshot struct {
-	MinScore   float64
-	MaxScore   float64
-	Conclusion string
-	Suggestion string
-	Level      string
-}
+type (
+	FactorSnapshot        = factor.FactorSnapshot
+	InterpretRuleSnapshot = factor.ScoreRangeRule
+)
 
 type definitionPayload struct {
-	Dimensions     []dimensionRule  `json:"dimensions"`
-	InterpretRules []interpretRule  `json:"interpret_rules"`
-	Brief2         *brief2Extension `json:"brief2,omitempty"`
+	factor.DefinitionBody
+	Brief2 *brief2Extension `json:"brief2,omitempty"`
 }
 
 type brief2Extension struct {
@@ -72,8 +59,8 @@ type brief2Extension struct {
 
 type brief2FactorPayload struct {
 	FactorCode string              `json:"factor_code"`
-	Bands      []brief2NormBand      `json:"bands,omitempty"`
-	Lookup     []brief2LookupEntry   `json:"lookup,omitempty"`
+	Bands      []brief2NormBand    `json:"bands,omitempty"`
+	Lookup     []brief2LookupEntry `json:"lookup,omitempty"`
 }
 
 type brief2NormBand struct {
@@ -92,7 +79,7 @@ type brief2LookupEntry struct {
 }
 
 type brief2TScoreRule struct {
-	FactorCode string           `json:"factor_code"`
+	FactorCode string              `json:"factor_code"`
 	Ranges     []brief2TScoreRange `json:"ranges"`
 }
 
@@ -102,28 +89,6 @@ type brief2TScoreRange struct {
 	Level      string  `json:"level,omitempty"`
 	Conclusion string  `json:"conclusion,omitempty"`
 	Suggestion string  `json:"suggestion,omitempty"`
-}
-
-type dimensionRule struct {
-	Code            string   `json:"code"`
-	Title           string   `json:"title"`
-	QuestionCodes   []string `json:"question_codes"`
-	ScoringStrategy string   `json:"scoring_strategy"`
-	MaxScore        *float64 `json:"max_score,omitempty"`
-	IsTotalScore    bool     `json:"is_total_score,omitempty"`
-}
-
-type interpretRule struct {
-	DimensionCode string       `json:"dimension_code"`
-	Ranges        []scoreRange `json:"ranges"`
-}
-
-type scoreRange struct {
-	MinScore   float64 `json:"min_score"`
-	MaxScore   float64 `json:"max_score"`
-	Conclusion string  `json:"conclusion"`
-	Suggestion string  `json:"suggestion,omitempty"`
-	Level      string  `json:"level,omitempty"`
 }
 
 // ParseDefinitionPayload decodes a behavioral_rating payload body into a runtime snapshot.
@@ -146,33 +111,22 @@ func parseDefinitionPayload(modelCode, modelVersion, title, status string, paylo
 	if err := json.Unmarshal(payload, &body); err != nil {
 		return nil, fmt.Errorf("decode behavioral_rating payload: %w", err)
 	}
-	rulesByDimension := make(map[string][]InterpretRuleSnapshot, len(body.InterpretRules))
-	for _, rule := range body.InterpretRules {
-		converted := make([]InterpretRuleSnapshot, 0, len(rule.Ranges))
-		for _, item := range rule.Ranges {
-			converted = append(converted, InterpretRuleSnapshot(item))
-		}
-		rulesByDimension[rule.DimensionCode] = converted
-	}
-	factors := make([]FactorSnapshot, 0, len(body.Dimensions))
-	for _, dimension := range body.Dimensions {
-		factors = append(factors, FactorSnapshot{
-			Code:            dimension.Code,
-			Title:           dimension.Title,
-			IsTotalScore:    dimension.IsTotalScore,
-			QuestionCodes:   append([]string(nil), dimension.QuestionCodes...),
-			ScoringStrategy: dimension.ScoringStrategy,
-			MaxScore:        dimension.MaxScore,
-			InterpretRules:  rulesByDimension[dimension.Code],
-		})
-	}
 	out := &Snapshot{
 		Code:    modelCode,
 		Version: modelVersion,
 		Title:   title,
 		Status:  status,
-		Factors: factors,
 	}
+	factors := factor.ParseFactorsFromDefinitionBody(body.Dimensions, body.InterpretRules)
+	if body.Brief2 != nil {
+		factors = factor.ApplyBrief2NormMetadata(factors, factor.Brief2NormContext{
+			NormTableVersion: body.Brief2.NormTableVersion,
+			IndexCodes:       append([]string(nil), body.Brief2.IndexCodes...),
+			ValidityCodes:    append([]string(nil), body.Brief2.ValidityCodes...),
+			NormFactorCodes:  normFactorCodesFromPayload(body.Brief2),
+		})
+	}
+	out.Factors = factors
 	if body.Brief2 != nil {
 		out.Brief2 = &Brief2Profile{
 			FormVariant:      body.Brief2.FormVariant,
@@ -225,6 +179,19 @@ func normTablesFromPayload(body *brief2Extension) *brief2norm.NormTables {
 	return tables
 }
 
+func normFactorCodesFromPayload(body *brief2Extension) []string {
+	if body == nil || len(body.Norms) == 0 {
+		return nil
+	}
+	codes := make([]string, 0, len(body.Norms))
+	for _, item := range body.Norms {
+		if item.FactorCode != "" {
+			codes = append(codes, item.FactorCode)
+		}
+	}
+	return codes
+}
+
 func (s *Snapshot) IsPublished() bool {
 	return s != nil && s.Status == "published"
 }
@@ -234,35 +201,7 @@ func (s *Snapshot) ToScaleSnapshot() *scalesnapshot.ScaleSnapshot {
 	if s == nil {
 		return nil
 	}
-	factors := make([]scalesnapshot.FactorSnapshot, 0, len(s.Factors))
-	for _, factor := range s.Factors {
-		rules := make([]scalesnapshot.InterpretRuleSnapshot, 0, len(factor.InterpretRules))
-		for _, rule := range factor.InterpretRules {
-			rules = append(rules, scalesnapshot.InterpretRuleSnapshot{
-				Min:        rule.MinScore,
-				Max:        rule.MaxScore,
-				RiskLevel:  rule.Level,
-				Conclusion: rule.Conclusion,
-				Suggestion: rule.Suggestion,
-			})
-		}
-		factors = append(factors, scalesnapshot.FactorSnapshot{
-			Code:            factor.Code,
-			Title:           factor.Title,
-			IsTotalScore:    factor.IsTotalScore,
-			QuestionCodes:   append([]string(nil), factor.QuestionCodes...),
-			ScoringStrategy: factor.ScoringStrategy,
-			MaxScore:        factor.MaxScore,
-			InterpretRules:  rules,
-		})
-	}
-	return &scalesnapshot.ScaleSnapshot{
-		Code:                 s.Code,
-		ScaleVersion:         s.Version,
-		Title:                s.Title,
-		QuestionnaireCode:    s.QuestionnaireCode,
-		QuestionnaireVersion: s.QuestionnaireVersion,
-		Status:               s.Status,
-		Factors:              factors,
-	}
+	return scalesnapshot.BuildFromModelFactors(
+		s.Code, s.Version, s.Title, s.QuestionnaireCode, s.QuestionnaireVersion, s.Status, s.Factors,
+	)
 }

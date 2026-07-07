@@ -8,6 +8,7 @@ import (
 	"github.com/FangcunMount/component-base/pkg/errors"
 	"github.com/FangcunMount/qs-server/internal/apiserver/application/modelcatalog/behavior/scale"
 	domain "github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog/factor"
 	"github.com/FangcunMount/qs-server/internal/pkg/code"
 )
 
@@ -127,34 +128,7 @@ type Option struct {
 	Value string
 }
 
-type definitionPayload struct {
-	Dimensions     []dimensionRule `json:"dimensions"`
-	InterpretRules []interpretRule `json:"interpret_rules"`
-}
-
-type dimensionRule struct {
-	Code            string                 `json:"code"`
-	Title           string                 `json:"title"`
-	QuestionCodes   []string               `json:"question_codes"`
-	ScoringStrategy string                 `json:"scoring_strategy"`
-	ScoringParams   map[string]interface{} `json:"scoring_params,omitempty"`
-	MaxScore        *float64               `json:"max_score,omitempty"`
-	IsTotalScore    bool                   `json:"is_total_score,omitempty"`
-	IsShow          bool                   `json:"is_show"`
-}
-
-type interpretRule struct {
-	DimensionCode string       `json:"dimension_code"`
-	Ranges        []scoreRange `json:"ranges"`
-}
-
-type scoreRange struct {
-	MinScore   float64 `json:"min_score"`
-	MaxScore   float64 `json:"max_score"`
-	Conclusion string  `json:"conclusion"`
-	Suggestion string  `json:"suggestion,omitempty"`
-	Level      string  `json:"level,omitempty"`
-}
+type definitionPayload = factor.DefinitionBody
 
 func (c *legacyScaleCommand) List(ctx context.Context, input ListInput) (*ListResult, error) {
 	if c.deps.Query == nil {
@@ -441,27 +415,27 @@ func modelFromFields(code, title, description, status, category string, tags []s
 	}
 }
 
-func newDefinitionPayload(result *scale.ScaleResult) definitionPayload {
-	payload := definitionPayload{}
+func newDefinitionPayload(result *scale.ScaleResult) factor.DefinitionBody {
+	payload := factor.DefinitionBody{}
 	if result == nil {
 		return payload
 	}
-	payload.Dimensions = make([]dimensionRule, 0, len(result.Factors))
-	payload.InterpretRules = make([]interpretRule, 0, len(result.Factors))
-	for _, factor := range result.Factors {
-		payload.Dimensions = append(payload.Dimensions, dimensionRule{
-			Code:            factor.Code,
-			Title:           factor.Title,
-			QuestionCodes:   factor.QuestionCodes,
-			ScoringStrategy: factor.ScoringStrategy,
-			ScoringParams:   factor.ScoringParams,
-			MaxScore:        factor.MaxScore,
-			IsTotalScore:    factor.IsTotalScore,
-			IsShow:          factor.IsShow,
+	payload.Dimensions = make([]factor.DimensionRule, 0, len(result.Factors))
+	payload.InterpretRules = make([]factor.InterpretRule, 0, len(result.Factors))
+	for _, item := range result.Factors {
+		payload.Dimensions = append(payload.Dimensions, factor.DimensionRule{
+			Code:            item.Code,
+			Title:           item.Title,
+			QuestionCodes:   item.QuestionCodes,
+			ScoringStrategy: item.ScoringStrategy,
+			ScoringParams:   scoringParamsPayloadFromMap(item.ScoringParams),
+			MaxScore:        item.MaxScore,
+			IsTotalScore:    item.IsTotalScore,
+			IsShow:          item.IsShow,
 		})
-		rules := make([]scoreRange, 0, len(factor.InterpretRules))
-		for _, rule := range factor.InterpretRules {
-			rules = append(rules, scoreRange{
+		rules := make([]factor.ScoreRangeRule, 0, len(item.InterpretRules))
+		for _, rule := range item.InterpretRules {
+			rules = append(rules, factor.ScoreRangeRule{
 				MinScore:   rule.MinScore,
 				MaxScore:   rule.MaxScore,
 				Conclusion: rule.Conclusion,
@@ -469,15 +443,34 @@ func newDefinitionPayload(result *scale.ScaleResult) definitionPayload {
 				Level:      rule.RiskLevel,
 			})
 		}
-		payload.InterpretRules = append(payload.InterpretRules, interpretRule{
-			DimensionCode: factor.Code,
+		payload.InterpretRules = append(payload.InterpretRules, factor.InterpretRule{
+			DimensionCode: item.Code,
 			Ranges:        rules,
 		})
 	}
 	return payload
 }
 
-func scoringParamsDTO(params map[string]interface{}) *scale.ScoringParamsDTO {
+func scoringParamsPayloadFromMap(params map[string]interface{}) *factor.ScoringParamsPayload {
+	dto := scoringParamsDTOFromMap(params)
+	if dto == nil || len(dto.CntOptionContents) == 0 {
+		return nil
+	}
+	return &factor.ScoringParamsPayload{
+		CntOptionContents: append([]string(nil), dto.CntOptionContents...),
+	}
+}
+
+func scoringParamsDTO(params *factor.ScoringParamsPayload) *scale.ScoringParamsDTO {
+	if params == nil || len(params.CntOptionContents) == 0 {
+		return nil
+	}
+	return &scale.ScoringParamsDTO{
+		CntOptionContents: append([]string(nil), params.CntOptionContents...),
+	}
+}
+
+func scoringParamsDTOFromMap(params map[string]interface{}) *scale.ScoringParamsDTO {
 	if len(params) == 0 {
 		return nil
 	}
