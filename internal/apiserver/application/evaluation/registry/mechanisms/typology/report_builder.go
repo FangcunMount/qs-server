@@ -17,8 +17,9 @@ type ReportBuilder struct {
 }
 
 var (
-	_ interpretationreporting.ReportBuilder              = ReportBuilder{}
-	_ interpretationreporting.MechanismKeyedReportBuilder = ReportBuilder{}
+	_ interpretationreporting.ReportBuilder                    = ReportBuilder{}
+	_ interpretationreporting.MechanismKeyedReportBuilder      = ReportBuilder{}
+	_ interpretationreporting.MultiMechanismKeyedReportBuilder = ReportBuilder{}
 )
 
 func NewReportBuilder(algorithm modelcatalog.Algorithm) (ReportBuilder, error) {
@@ -73,9 +74,31 @@ func (ReportBuilder) ReportType() domainReport.ReportType {
 }
 
 func (ReportBuilder) MechanismKey() interpretationreporting.MechanismReportBuilderKey {
-	return interpretationreporting.MechanismReportBuilderKey{
-		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
-		ReportType:      domainReport.ReportTypeStandard,
+	return typologyMechanismKeys()[0]
+}
+
+func (ReportBuilder) MechanismKeys() []interpretationreporting.MechanismReportBuilderKey {
+	return typologyMechanismKeys()
+}
+
+func typologyMechanismKeys() []interpretationreporting.MechanismReportBuilderKey {
+	reportType := domainReport.ReportTypeStandard
+	return []interpretationreporting.MechanismReportBuilderKey{
+		{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			DecisionKind:    modelcatalog.DecisionKindPoleComposition,
+			ReportType:      reportType,
+		},
+		{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			DecisionKind:    modelcatalog.DecisionKindTraitProfile,
+			ReportType:      reportType,
+		},
+		{
+			AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorClassification,
+			DecisionKind:    modelcatalog.DecisionKindNearestPattern,
+			ReportType:      reportType,
+		},
 	}
 }
 

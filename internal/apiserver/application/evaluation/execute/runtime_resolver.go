@@ -7,6 +7,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation"
 	"github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/assessment"
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
+	"github.com/FangcunMount/qs-server/internal/apiserver/domain/modelcatalog"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 )
 
@@ -20,8 +21,9 @@ type ResolvedExecution struct {
 
 // RuntimeResolver routes evaluation execution through runtime descriptors with EvaluatorKey fallback.
 type RuntimeResolver struct {
-	descriptors *evalpipeline.RuntimeDescriptorRegistry
-	evaluators  EvaluatorRegistry
+	descriptors      *evalpipeline.RuntimeDescriptorRegistry
+	evaluators       EvaluatorRegistry
+	familyEvaluators map[modelcatalog.AlgorithmFamily]Evaluator
 }
 
 // NewRuntimeResolver creates a resolver backed by descriptor and evaluator registries.
@@ -29,7 +31,14 @@ func NewRuntimeResolver(
 	descriptors *evalpipeline.RuntimeDescriptorRegistry,
 	evaluators EvaluatorRegistry,
 ) *RuntimeResolver {
-	return &RuntimeResolver{descriptors: descriptors, evaluators: evaluators}
+	resolver := &RuntimeResolver{
+		descriptors: descriptors,
+		evaluators:  evaluators,
+	}
+	if registry, ok := evaluators.(*mutableEvaluatorRegistry); ok {
+		resolver.familyEvaluators = familyExecutorsFromRegistry(registry)
+	}
+	return resolver
 }
 
 // ResolveExecution selects the runtime descriptor and evaluator key for one evaluation.
@@ -51,7 +60,10 @@ func (r *RuntimeResolver) ResolveExecution(a *assessment.Assessment, input *eval
 			resolved.DescriptorKey = key
 			resolved.Descriptor = desc
 			resolved.UsedDescriptor = true
-			if _, err := r.evaluators.Resolve(evaluatorKey); err != nil {
+			if canonicalKey, ok := canonicalEvaluatorKeyForFamily(desc.AlgorithmFamily); ok {
+				resolved.EvaluatorKey = canonicalKey
+			}
+			if _, err := r.resolveEvaluator(resolved); err != nil {
 				return ResolvedExecution{}, err
 			}
 			return resolved, nil
@@ -74,10 +86,19 @@ func (r *RuntimeResolver) Execute(
 	if err != nil {
 		return nil, ResolvedExecution{}, err
 	}
-	evaluator, err := r.evaluators.Resolve(resolved.EvaluatorKey)
+	evaluator, err := r.resolveEvaluator(resolved)
 	if err != nil {
 		return nil, resolved, err
 	}
 	outcome, err := evaluator.Execute(ctx, ExecutionInput{Assessment: a, Input: input})
 	return outcome, resolved, err
+}
+
+func (r *RuntimeResolver) resolveEvaluator(resolved ResolvedExecution) (Evaluator, error) {
+	if resolved.UsedDescriptor && r.familyEvaluators != nil {
+		if evaluator, ok := r.familyEvaluators[resolved.Descriptor.AlgorithmFamily]; ok {
+			return evaluator, nil
+		}
+	}
+	return r.evaluators.Resolve(resolved.EvaluatorKey)
 }

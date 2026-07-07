@@ -17,6 +17,7 @@ import (
 	evalpipeline "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/pipeline"
 	evalrun "github.com/FangcunMount/qs-server/internal/apiserver/domain/evaluation/run"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	"github.com/FangcunMount/qs-server/internal/pkg/reportstatus"
 	"github.com/FangcunMount/qs-server/pkg/event"
 )
@@ -33,6 +34,7 @@ type service struct {
 
 	evaluators            EvaluatorRegistry
 	runtimeResolver       *RuntimeResolver
+	runRepo               evaluationrun.Repository
 	scoringWriter         evaluationscoring.Writer
 	interpretationService interpretationapp.Service
 	scoringSnapshotStore  evaluationscoring.ScoringSnapshotStore
@@ -80,6 +82,13 @@ func WithRuntimeDescriptorRegistry(registry *evalpipeline.RuntimeDescriptorRegis
 func WithReportStatusReporter(reporter *reportstatus.Reporter) ServiceOption {
 	return func(s *service) {
 		s.reportStatus = reporter
+	}
+}
+
+// WithRunRepository configures evaluation run persistence.
+func WithRunRepository(repo evaluationrun.Repository) ServiceOption {
+	return func(s *service) {
+		s.runRepo = repo
 	}
 }
 
@@ -158,6 +167,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	evaluationRun := evalrun.NewEvaluationRun(assessmentID)
 	evaluationRun.Start(time.Now())
 	a.SetCurrentRunID(evaluationRun.RunID)
+	s.persistEvaluationRunState(ctx, a, evaluationRun)
 	if s.reportStatus != nil {
 		assessmentID, answerSheetID := evaluationapp.ReportStatusIDs(a)
 		s.reportStatus.SetProcessing(ctx, assessmentID, answerSheetID, "scoring")
@@ -189,6 +199,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		)
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+resolveErr.Error())
 		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindValidation, Message: resolveErr.Error()})
+		s.persistEvaluationRunState(ctx, a, evaluationRun)
 		return resolveErr
 	}
 
@@ -214,6 +225,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 		)
 		s.failureFinalizer().MarkAsFailed(ctx, a, "评估流程执行失败: "+err.Error())
 		evaluationRun.Fail(time.Now(), evalrun.Failure{Kind: evalrun.FailureKindCalculation, Message: err.Error(), Retryable: true})
+		s.persistEvaluationRunState(ctx, a, evaluationRun)
 		return err
 	}
 
@@ -237,6 +249,7 @@ func (s *service) Evaluate(ctx context.Context, assessmentID uint64) error {
 	}
 
 	evaluationRun.Succeed(time.Now())
+	s.persistEvaluationRunState(ctx, a, evaluationRun)
 	l.Infow("评估执行完成",
 		"action", "evaluate",
 		"resource", "assessment",

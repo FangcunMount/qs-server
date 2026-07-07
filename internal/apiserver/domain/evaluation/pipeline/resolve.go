@@ -24,26 +24,85 @@ func DecisionKindFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (mod
 	return modelcatalog.DecisionKindForIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
 }
 
-// RuntimeDescriptorKeyFromSnapshot derives mechanism routing keys from a published snapshot.
-func RuntimeDescriptorKeyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
-	family, ok := AlgorithmFamilyFromSnapshot(snapshot)
+// ExecutionRoutingFromSnapshot is the single source for runtime and report mechanism routing.
+// Legacy model kinds route by execution path family; DecisionKindForIdentity remains for publish matrices.
+func ExecutionRoutingFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
+	family, ok := ExecutionFamilyFromSnapshot(snapshot)
 	if !ok {
 		return RuntimeDescriptorKey{}, fmt.Errorf("unsupported snapshot identity for runtime descriptor: %s/%s", snapshot.Model.Kind, snapshot.Model.Algorithm)
 	}
-	decision, _ := DecisionKindFromSnapshot(snapshot)
 	return RuntimeDescriptorKey{
 		AlgorithmFamily: family,
-		DecisionKind:    decision,
+		DecisionKind:    ExecutionDecisionFromSnapshot(snapshot, family),
 		PayloadFormat:   snapshot.PayloadFormat,
 	}, nil
 }
 
-// AlgorithmFamilyFromSnapshot resolves the execution family for a published snapshot.
-func AlgorithmFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
+// RuntimeDescriptorKeyFromSnapshot derives mechanism routing keys from a published snapshot.
+func RuntimeDescriptorKeyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (RuntimeDescriptorKey, error) {
+	return ExecutionRoutingFromSnapshot(snapshot)
+}
+
+// ExecutionFamilyFromSnapshot resolves the execution family using kind-primary routing.
+func ExecutionFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
+	if family, ok := executionFamilyFromModelKind(snapshot.Model); ok {
+		return family, true
+	}
 	if snapshot.Decision.Kind != "" {
 		return modelcatalog.AlgorithmFamilyFromDecisionKind(snapshot.Decision.Kind)
 	}
 	return modelcatalog.AlgorithmFamilyFromIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm)
+}
+
+// ExecutionDecisionFromSnapshot resolves decision kind aligned with the execution family.
+func ExecutionDecisionFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot, family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+	if snapshot.Decision.Kind != "" {
+		if decisionFamily, ok := modelcatalog.AlgorithmFamilyFromDecisionKind(snapshot.Decision.Kind); ok && decisionFamily == family {
+			return snapshot.Decision.Kind
+		}
+	}
+	if family == modelcatalog.AlgorithmFamilyFactorClassification {
+		if decision, ok := modelcatalog.DecisionKindForIdentity(snapshot.Model.Kind, snapshot.Model.SubKind, snapshot.Model.Algorithm); ok {
+			return decision
+		}
+	}
+	return defaultDecisionKindForFamily(family)
+}
+
+func executionFamilyFromModelKind(model modelcatalog.ModelDefinition) (modelcatalog.AlgorithmFamily, bool) {
+	switch model.Kind {
+	case modelcatalog.KindScale:
+		return modelcatalog.AlgorithmFamilyFactorScoring, true
+	case modelcatalog.KindPersonality:
+		if model.SubKind == modelcatalog.SubKindTypology || model.SubKind == "" {
+			return modelcatalog.AlgorithmFamilyFactorClassification, true
+		}
+	case modelcatalog.KindBehavioralRating:
+		return modelcatalog.AlgorithmFamilyFactorNorm, true
+	case modelcatalog.KindCognitive:
+		return modelcatalog.AlgorithmFamilyTaskPerformance, true
+	}
+	return "", false
+}
+
+func defaultDecisionKindForFamily(family modelcatalog.AlgorithmFamily) modelcatalog.DecisionKind {
+	switch family {
+	case modelcatalog.AlgorithmFamilyFactorScoring:
+		return modelcatalog.DecisionKindScoreRange
+	case modelcatalog.AlgorithmFamilyFactorClassification:
+		return modelcatalog.DecisionKindPoleComposition
+	case modelcatalog.AlgorithmFamilyFactorNorm:
+		return modelcatalog.DecisionKindNormLookup
+	case modelcatalog.AlgorithmFamilyTaskPerformance:
+		return modelcatalog.DecisionKindAbilityLevel
+	default:
+		return ""
+	}
+}
+
+// AlgorithmFamilyFromSnapshot resolves the execution family for a published snapshot.
+func AlgorithmFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
+	return ExecutionFamilyFromSnapshot(snapshot)
 }
 
 // AlgorithmFamilyFromModelKind maps legacy model-kind descriptors to mechanism families.

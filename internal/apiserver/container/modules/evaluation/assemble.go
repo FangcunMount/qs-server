@@ -37,6 +37,7 @@ import (
 	"github.com/FangcunMount/qs-server/internal/apiserver/infra/waiter"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationinput"
 	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationreadmodel"
+	"github.com/FangcunMount/qs-server/internal/apiserver/port/evaluationrun"
 	rulesetport "github.com/FangcunMount/qs-server/internal/apiserver/port/modelcatalog"
 	outboxport "github.com/FangcunMount/qs-server/internal/apiserver/port/outbox"
 	"github.com/FangcunMount/qs-server/internal/pkg/backpressure"
@@ -135,6 +136,7 @@ func New(deps Deps) (*Module, error) {
 
 type evaluationInfra struct {
 	assessmentRepo               assessment.Repository
+	runRepo                      evaluationrun.Repository
 	scoreRepo                    assessment.ScoreRepository
 	assessmentReader             evaluationreadmodel.AssessmentReader
 	latestRiskReader             evaluationreadmodel.LatestRiskReader
@@ -164,6 +166,7 @@ func newEvaluationInfra(normalized Deps) (*evaluationInfra, error) {
 	infra.latestRiskReader = assessmentReadModel
 	infra.scoreRepo = mysqlEval.NewScoreRepository(normalized.MySQLDB, mysqlOptions)
 	infra.scoreReader = mysqlEval.NewScoreReadModel(normalized.MySQLDB, mysqlOptions)
+	infra.runRepo = mysqlEval.NewRunRepository(normalized.MySQLDB)
 	infra.txRunner = modtx.NewMySQLRunner(normalized.MySQLDB)
 	var opsClient redis.UniversalClient
 	if normalized.OpsHandle != nil {
@@ -269,6 +272,7 @@ func (m *Module) wireEvaluationEngine(normalized Deps, infra *evaluationInfra) e
 			execute.WithPostCommitReadyIndexer(infra.postCommitReadyIndexer),
 			execute.WithEvaluatorRegistry(evaluatorRegistry),
 			execute.WithRuntimeDescriptorRegistry(normalized.RuntimeDescriptorRegistry),
+			execute.WithRunRepository(infra.runRepo),
 			execute.WithReportStatusReporter(reportStatusReporter),
 			execute.WithScoringWriter(scoringWriter),
 			execute.WithInterpretationService(interpretationService),

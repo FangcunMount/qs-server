@@ -75,49 +75,12 @@ func MechanismReportBuilderKeyFromOutcome(outcome evaloutcome.Outcome) (Mechanis
 		return MechanismReportBuilderKeyFromRuntimeDescriptorKey(outcome.RuntimeDescriptorKey, reportType)
 	}
 	if snapshot, ok := evaloutcome.PublishedSnapshotFromInput(outcome.Input); ok {
-		if key, ok := mechanismReportBuilderKeyFromSnapshot(snapshot, reportType); ok {
-			return key, true
+		routingKey, err := evalpipeline.ExecutionRoutingFromSnapshot(snapshot)
+		if err == nil {
+			return MechanismReportBuilderKeyFromRuntimeDescriptorKey(routingKey, reportType)
 		}
 	}
 	return MechanismReportBuilderKey{}, false
-}
-
-func mechanismReportBuilderKeyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot, reportType domainReport.ReportType) (MechanismReportBuilderKey, bool) {
-	family, ok := reportAlgorithmFamilyFromSnapshot(snapshot)
-	if !ok {
-		return MechanismReportBuilderKey{}, false
-	}
-	decision, ok := evalpipeline.DecisionKindFromSnapshot(snapshot)
-	if !ok || decision == "" {
-		decision = defaultDecisionKindForFamily(family)
-	}
-	switch snapshot.Model.Kind {
-	case modelcatalog.KindBehavioralRating:
-		decision = modelcatalog.DecisionKindNormLookup
-	case modelcatalog.KindCognitive:
-		decision = modelcatalog.DecisionKindAbilityLevel
-	}
-	return MechanismReportBuilderKey{
-		AlgorithmFamily: family,
-		DecisionKind:    decision,
-		ReportType:      reportType,
-	}, true
-}
-
-func reportAlgorithmFamilyFromSnapshot(snapshot modelcatalog.PublishedModelSnapshot) (modelcatalog.AlgorithmFamily, bool) {
-	switch snapshot.Model.Kind {
-	case modelcatalog.KindScale:
-		return modelcatalog.AlgorithmFamilyFactorScoring, true
-	case modelcatalog.KindPersonality:
-		if snapshot.Model.SubKind == modelcatalog.SubKindTypology {
-			return modelcatalog.AlgorithmFamilyFactorClassification, true
-		}
-	case modelcatalog.KindBehavioralRating:
-		return modelcatalog.AlgorithmFamilyFactorNorm, true
-	case modelcatalog.KindCognitive:
-		return modelcatalog.AlgorithmFamilyTaskPerformance, true
-	}
-	return evalpipeline.AlgorithmFamilyFromSnapshot(snapshot)
 }
 
 func (r *mutableReportBuilderRegistry) resolveReportBuilder(key evaluation.EvaluatorKey, reportType domainReport.ReportType) (ReportBuilder, error) {

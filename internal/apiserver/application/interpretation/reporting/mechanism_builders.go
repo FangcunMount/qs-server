@@ -23,6 +23,12 @@ type MechanismKeyedReportBuilder interface {
 	MechanismKey() MechanismReportBuilderKey
 }
 
+// MultiMechanismKeyedReportBuilder registers additional decision-granularity mechanism keys.
+type MultiMechanismKeyedReportBuilder interface {
+	MechanismKeyedReportBuilder
+	MechanismKeys() []MechanismReportBuilderKey
+}
+
 func (b FactorScoringReportBuilder) MechanismKey() MechanismReportBuilderKey {
 	return MechanismReportBuilderKey{
 		AlgorithmFamily: modelcatalog.AlgorithmFamilyFactorScoring,

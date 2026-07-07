@@ -362,3 +362,30 @@ type Algorithm = identity.Algorithm
 
 - import 循环：`routing` 依赖 `identity`；`capability` 依赖 `routing` + `identity`；`catalog` 最后迁。
 - 全仓 `modelcatalog.Kind` 通过别名可不变；**禁止**外部直引新子包（架构守卫可选）。
+
+## Round 17–22：机制键主路径 + Interpretation 单轨 + Run 内存骨架（已完成）
+
+| Round | 动作 |
+|-------|------|
+| R17 | `Outcome.RuntimeDescriptorKey` 三元组与 Evaluate 主路径接线 |
+| R18 | `writer.ResolveByMechanism` 机制键报告生成；删除 EvaluatorKey 报告分叉 |
+| R19 | BR/COG characterization 热修（暴露路由三轨分裂） |
+| R20 | `EvaluationRun` 域模型 + Evaluate 内存编排 |
+| R21 | `KindCapability` / `ModelCatalogOption` 拆型 |
+| R22 | characterization harness 与 production assemble 对齐 |
+
+## Round 23：执行路由单源化（已完成）
+
+**做**：`pipeline.ExecutionRoutingFromSnapshot` 为 Evaluate / Interpretation / materialize 单源；删除 reporting `reportAlgorithmFamilyFromSnapshot` Kind-switch；characterization 注入 `RuntimeDescriptorRegistry`。
+
+| 验证 | `execution_routing_test.go`、`routing_equivalence_test.go`、全量 characterization |
+
+## Round 24：Descriptor 执行 + Run 落库 + Typology 子路由（已完成）
+
+| 子轨 | 动作 |
+|------|------|
+| R24-A | `RuntimeResolver` descriptor-primary 走族级 `familyEvaluators`；`runtime_descriptor_primary: true` |
+| R24-B | `evaluation_run` 表 + `assessment.current_run_id`；Execute Start/Success/Fail 落库 |
+| R24-C | typology `MechanismKeys()` 按 `DecisionKind` 注册；`resolveEvaluatorKey` 无 typology 分支扩展 |
+
+**刻意保留（R25+）**：删除 `EvaluatorKey`、Run REST、worker 重试编排、Statistics 投影统一。

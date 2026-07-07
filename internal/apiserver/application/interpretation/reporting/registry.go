@@ -56,14 +56,19 @@ func (r *mutableReportBuilderRegistry) Register(builder ReportBuilder) error {
 	}
 	r.items[registryKey] = builder
 	if keyed, ok := builder.(MechanismKeyedReportBuilder); ok {
-		mechanismKey := keyed.MechanismKey()
-		if mechanismKey.ReportType == "" {
-			mechanismKey.ReportType = reportType
+		mechanismKeys := []MechanismReportBuilderKey{keyed.MechanismKey()}
+		if multi, ok := builder.(MultiMechanismKeyedReportBuilder); ok {
+			mechanismKeys = multi.MechanismKeys()
 		}
-		if _, exists := r.mechanismItems[mechanismKey]; exists {
-			return fmt.Errorf("interpretation report builder already registered for mechanism %s", mechanismKey)
+		for _, mechanismKey := range mechanismKeys {
+			if mechanismKey.ReportType == "" {
+				mechanismKey.ReportType = reportType
+			}
+			if _, exists := r.mechanismItems[mechanismKey]; exists {
+				return fmt.Errorf("interpretation report builder already registered for mechanism %s", mechanismKey)
+			}
+			r.mechanismItems[mechanismKey] = builder
 		}
-		r.mechanismItems[mechanismKey] = builder
 	}
 	return nil
 }
